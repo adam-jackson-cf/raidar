@@ -197,5 +197,108 @@ def inject(
         click.echo("No rules injected")
 
 
+@main.command()
+@click.option(
+    "--config",
+    "-c",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to matrix configuration YAML",
+)
+@click.option(
+    "--dry-run",
+    is_flag=True,
+    help="Show matrix entries without running",
+)
+def matrix(config: Path, dry_run: bool) -> None:
+    """Run evaluation matrix from configuration."""
+    from .matrix import generate_matrix_entries, load_matrix_config
+
+    click.echo(f"Loading matrix from {config}")
+    matrix_config = load_matrix_config(config)
+    entries = generate_matrix_entries(matrix_config)
+
+    click.echo(f"Generated {len(entries)} matrix entries:")
+    for i, entry in enumerate(entries, 1):
+        click.echo(f"  {i}. {entry.harness} + {entry.model} + {entry.rules_variant}")
+
+    if dry_run:
+        click.echo("\nDry run - no tasks executed")
+        return
+
+    click.echo("\nNote: Full matrix execution requires Harbor. Run entries individually with 'run' command.")
+
+
+@main.command()
+@click.option(
+    "--results",
+    "-r",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to results directory",
+)
+@click.option(
+    "--format",
+    "-f",
+    type=click.Choice(["json", "csv", "markdown"]),
+    default="markdown",
+    help="Output format",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    help="Output file path",
+)
+def report(results: Path, format: str, output: Path | None) -> None:
+    """Generate comparison report from results."""
+    from .storage import (
+        aggregate_results,
+        export_to_csv,
+        generate_comparison_report,
+        load_all_runs,
+    )
+
+    click.echo(f"Loading runs from {results}")
+    runs = load_all_runs(results)
+    click.echo(f"Found {len(runs)} runs")
+
+    if not runs:
+        click.echo("No runs found")
+        return
+
+    if format == "csv":
+        out_path = output or (results / "comparison.csv")
+        export_to_csv(runs, out_path)
+        click.echo(f"CSV exported to {out_path}")
+    elif format == "markdown":
+        report_text = generate_comparison_report(runs)
+        if output:
+            with open(output, "w") as f:
+                f.write(report_text)
+            click.echo(f"Report saved to {output}")
+        else:
+            click.echo(report_text)
+    else:  # json
+        agg = aggregate_results(runs)
+        if output:
+            with open(output, "w") as f:
+                json.dump(agg, f, indent=2)
+            click.echo(f"JSON exported to {output}")
+        else:
+            click.echo(json.dumps(agg, indent=2))
+
+
+@main.command()
+def init_matrix() -> None:
+    """Create example matrix configuration file."""
+    from .matrix import create_example_matrix
+
+    output_path = Path("matrix.yaml")
+    with open(output_path, "w") as f:
+        f.write(create_example_matrix())
+    click.echo(f"Example matrix configuration created: {output_path}")
+
+
 if __name__ == "__main__":
     main()
