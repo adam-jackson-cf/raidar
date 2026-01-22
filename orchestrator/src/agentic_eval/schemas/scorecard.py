@@ -112,7 +112,7 @@ class Scorecard(BaseModel):
     # Scores
     functional: FunctionalScore = Field(default_factory=FunctionalScore)
     compliance: ComplianceScore = Field(default_factory=ComplianceScore)
-    visual: VisualScore = Field(default_factory=VisualScore)
+    visual: VisualScore | None = Field(default_factory=VisualScore)
     efficiency: EfficiencyScore = Field(default_factory=EfficiencyScore)
 
     # Scaffold audit
@@ -124,12 +124,21 @@ class Scorecard(BaseModel):
         """Calculate weighted composite score.
 
         Weights: functional 40%, compliance 25%, visual 20%, efficiency 15%
+        If visual is None, redistributes visual weight to other dimensions.
         """
+        visual_score = self.visual.score if self.visual else 0.0
+        if self.visual:
+            return (
+                self.functional.score * 0.4
+                + self.compliance.score * 0.25
+                + visual_score * 0.2
+                + self.efficiency.score * 0.15
+            )
+        # Redistribute visual weight proportionally
         return (
-            self.functional.score * 0.4
-            + self.compliance.score * 0.25
-            + self.visual.score * 0.2
-            + self.efficiency.score * 0.15
+            self.functional.score * 0.5
+            + self.compliance.score * 0.3125
+            + self.efficiency.score * 0.1875
         )
 
 
