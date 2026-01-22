@@ -1,0 +1,37 @@
+# Dependencies
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Build outputs
+.next/
+out/
+dist/
+*.egg-info/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Test outputs
+coverage/
+.pytest_cache/
+
+# Screenshots
+actual.png
+diff.png
+
+# Lock files (keep bun.lock for scaffold)
+uv.lock
