@@ -1,7 +1,12 @@
-"""Pydantic models for task definition."""
+"""Pydantic models for task definition.
 
+Extends Harbor's YAML format with custom fields for compliance, visual, and efficiency scoring.
+"""
+
+from pathlib import Path
 from typing import Literal
 
+import yaml
 from pydantic import BaseModel, Field
 
 
@@ -97,3 +102,15 @@ class TaskDefinition(BaseModel):
 
     # Task prompt
     prompt: str = Field(description="Task prompt shown to the agent")
+
+    @classmethod
+    def from_yaml(cls, path: Path) -> "TaskDefinition":
+        """Load task definition from a YAML file."""
+        with path.open() as f:
+            data = yaml.safe_load(f)
+        return cls.model_validate(data)
+
+    def to_yaml(self, path: Path) -> None:
+        """Save task definition to a YAML file."""
+        with path.open("w") as f:
+            yaml.dump(self.model_dump(exclude_none=True), f, sort_keys=False)

@@ -25,57 +25,6 @@ WEIGHTS = {
 }
 
 
-def calculate_composite_score(
-    functional: FunctionalScore,
-    compliance: ComplianceScore,
-    visual: VisualScore | None,
-    efficiency: EfficiencyScore,
-) -> float:
-    """Calculate weighted composite score.
-
-    Formula: score = (functional * 0.4) + (compliance * 0.25) + (visual * 0.2) + (efficiency * 0.15)
-
-    Args:
-        functional: Functional test results
-        compliance: Compliance evaluation results
-        visual: Visual regression results (optional)
-        efficiency: Efficiency metrics
-
-    Returns:
-        Composite score between 0 and 1
-    """
-    # Convert functional to 0-1 score
-    functional_score = 1.0 if functional.passed else 0.0
-
-    # Use compliance score directly
-    compliance_score = compliance.score
-
-    # Use visual similarity or 1.0 if no visual check
-    visual_score = visual.similarity if visual else 1.0
-
-    # Use efficiency score directly
-    efficiency_score = efficiency.score
-
-    # Calculate weighted sum
-    if visual:
-        composite = (
-            functional_score * WEIGHTS["functional"]
-            + compliance_score * WEIGHTS["compliance"]
-            + visual_score * WEIGHTS["visual"]
-            + efficiency_score * WEIGHTS["efficiency"]
-        )
-    else:
-        # Redistribute visual weight to other dimensions
-        adjusted_total = WEIGHTS["functional"] + WEIGHTS["compliance"] + WEIGHTS["efficiency"]
-        composite = (
-            functional_score * (WEIGHTS["functional"] / adjusted_total)
-            + compliance_score * (WEIGHTS["compliance"] / adjusted_total)
-            + efficiency_score * (WEIGHTS["efficiency"] / adjusted_total)
-        )
-
-    return round(composite, 3)
-
-
 def evaluate_all(
     workspace: Path,
     compliance_config: ComplianceConfig,
@@ -125,15 +74,11 @@ def evaluate_all(
         baseline_manifest = load_manifest(baseline_manifest_path)
         scaffold_audit = create_scaffold_audit(baseline_manifest, workspace)
 
-    # Calculate composite
-    composite = calculate_composite_score(functional, compliance, visual, efficiency)
-
     return Scorecard(
         functional=functional,
         compliance=compliance,
         visual=visual,
         efficiency=efficiency,
-        composite=composite,
         scaffold_audit=scaffold_audit,
     )
 
@@ -144,6 +89,5 @@ __all__ = [
     "evaluate_visual",
     "evaluate_efficiency",
     "evaluate_all",
-    "calculate_composite_score",
     "WEIGHTS",
 ]

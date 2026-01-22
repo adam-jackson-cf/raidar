@@ -139,15 +139,13 @@ def run_task(
             tests_total=0,
             build_succeeded=False,
         ),
-        compliance=ComplianceScore(score=0.0, checks=[]),
+        compliance=ComplianceScore(checks=[]),
         visual=None,
         efficiency=EfficiencyScore(
             total_gate_failures=0,
             unique_failure_categories=0,
             repeat_failures=0,
-            score=1.0,
         ),
-        composite=0.0,
     )
 
     return EvalRun(

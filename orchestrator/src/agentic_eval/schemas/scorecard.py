@@ -1,17 +1,35 @@
-"""Scorecard schemas for evaluation results."""
+"""Scorecard schemas for evaluation results.
 
-from pydantic import BaseModel, Field
+Multi-dimensional scoring: functional, compliance, visual, efficiency.
+Uses @computed_field for auto-calculated scores.
+"""
+
+from typing import Any
+
+from pydantic import BaseModel, Field, computed_field
 
 from .events import GateEvent, SessionEvent
 
 
 class FunctionalScore(BaseModel):
-    """Functional test results."""
+    """Functional test results with auto-computed score."""
 
-    passed: bool = Field(description="Whether all tests passed")
-    tests_passed: int = Field(description="Number of tests passed")
-    tests_total: int = Field(description="Total number of tests")
-    build_succeeded: bool = Field(description="Whether build succeeded")
+    passed: bool = False
+    tests_passed: int = 0
+    tests_total: int = 0
+    build_succeeded: bool = False
+    gates_passed: int = 0
+    gates_total: int = 0
+
+    @computed_field
+    @property
+    def score(self) -> float:
+        """Calculate functional score (0-1)."""
+        if not self.build_succeeded:
+            return 0.0
+        if self.tests_total == 0:
+            return 1.0 if self.passed else 0.0
+        return self.tests_passed / self.tests_total
 
 
 class ComplianceCheck(BaseModel):
@@ -24,52 +42,95 @@ class ComplianceCheck(BaseModel):
 
 
 class ComplianceScore(BaseModel):
-    """Compliance evaluation results."""
+    """Compliance evaluation with auto-computed score."""
 
-    score: float = Field(ge=0, le=1, description="Compliance score 0-1")
     checks: list[ComplianceCheck] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def score(self) -> float:
+        """Calculate compliance score (0-1)."""
+        if not self.checks:
+            return 1.0
+        passed_count = sum(1 for check in self.checks if check.passed)
+        return passed_count / len(self.checks)
 
 
 class VisualScore(BaseModel):
-    """Visual regression results."""
+    """Visual regression score."""
 
-    similarity: float = Field(ge=0, le=1, description="Similarity score 0-1")
-    diff_path: str | None = Field(default=None, description="Path to diff image")
+    similarity: float = 0.0
+    diff_path: str | None = None
+
+    @computed_field
+    @property
+    def score(self) -> float:
+        """Return visual similarity as score (0-1)."""
+        return self.similarity
 
 
 class EfficiencyScore(BaseModel):
-    """Efficiency metrics based on gate failures."""
+    """Efficiency score based on gate failures."""
 
-    total_gate_failures: int = Field(description="Total gate failures")
-    unique_failure_categories: int = Field(description="Unique failure types")
-    repeat_failures: int = Field(description="Number of repeated failures")
-    score: float = Field(ge=0, le=1, description="Efficiency score 0-1")
+    total_gate_failures: int = 0
+    unique_failure_categories: int = 0
+    repeat_failures: int = 0
+
+    @computed_field
+    @property
+    def score(self) -> float:
+        """Calculate efficiency score (0-1).
+
+        Formula: max(0, 1 - (gate_failures / 4) - (repeat_failures * 0.2))
+        """
+        raw_score = 1.0 - (self.total_gate_failures / 4) - (self.repeat_failures * 0.2)
+        return max(0.0, min(1.0, raw_score))
 
 
 class ScaffoldAudit(BaseModel):
     """Scaffold baseline audit results."""
 
-    manifest_version: str = Field(description="Manifest version")
-    file_count: int = Field(description="Number of tracked files")
-    dependency_count: int = Field(description="Number of dependencies")
-    changes_from_baseline: list[str] = Field(
-        default_factory=list,
-        description="List of changes detected",
-    )
+    manifest_version: str = "1.0.0"
+    file_count: int = 0
+    dependency_count: int = 0
+    changes_from_baseline: list[str] = Field(default_factory=list)
 
 
 class Scorecard(BaseModel):
     """Complete scorecard for an evaluation run."""
 
-    functional: FunctionalScore = Field(description="Functional test results")
-    compliance: ComplianceScore = Field(description="Compliance results")
-    visual: VisualScore | None = Field(default=None, description="Visual results")
-    efficiency: EfficiencyScore = Field(description="Efficiency results")
-    composite: float = Field(ge=0, le=1, description="Weighted composite score")
-    scaffold_audit: ScaffoldAudit | None = Field(
-        default=None,
-        description="Scaffold baseline audit",
-    )
+    run_id: str = ""
+    task_name: str = ""
+    agent: str = ""
+    model: str = ""
+    rules_variant: str = ""
+    duration_sec: float = 0.0
+    terminated_early: bool = False
+    termination_reason: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    # Scores
+    functional: FunctionalScore = Field(default_factory=FunctionalScore)
+    compliance: ComplianceScore = Field(default_factory=ComplianceScore)
+    visual: VisualScore = Field(default_factory=VisualScore)
+    efficiency: EfficiencyScore = Field(default_factory=EfficiencyScore)
+
+    # Scaffold audit
+    scaffold_audit: ScaffoldAudit | None = None
+
+    @computed_field
+    @property
+    def composite_score(self) -> float:
+        """Calculate weighted composite score.
+
+        Weights: functional 40%, compliance 25%, visual 20%, efficiency 15%
+        """
+        return (
+            self.functional.score * 0.4
+            + self.compliance.score * 0.25
+            + self.visual.score * 0.2
+            + self.efficiency.score * 0.15
+        )
 
 
 class EvalConfig(BaseModel):
