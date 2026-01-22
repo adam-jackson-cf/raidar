@@ -72,7 +72,7 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
     def avg_score(runs_list: list[EvalRun]) -> float:
         if not runs_list:
             return 0.0
-        return sum(r.scores.composite for r in runs_list) / len(runs_list)
+        return sum(r.scores.composite_score for r in runs_list) / len(runs_list)
 
     return {
         "total_runs": len(runs),
@@ -137,7 +137,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "efficiency_score": run.scores.efficiency.score,
                 "gate_failures": run.scores.efficiency.total_gate_failures,
                 "repeat_failures": run.scores.efficiency.repeat_failures,
-                "composite_score": run.scores.composite,
+                "composite_score": run.scores.composite_score,
                 "scaffold_changes": len(run.scores.scaffold_audit.changes_from_baseline) if run.scores.scaffold_audit else 0,
             }
             writer.writerow(row)
@@ -164,13 +164,13 @@ def generate_comparison_report(runs: list[EvalRun]) -> str:
         "|---------|-------|-------|-----------|------------|------------|--------|------------|",
     ]
 
-    for run in sorted(runs, key=lambda r: r.scores.composite, reverse=True):
+    for run in sorted(runs, key=lambda r: r.scores.composite_score, reverse=True):
         visual = run.scores.visual.similarity if run.scores.visual else "N/A"
         if isinstance(visual, float):
             visual = f"{visual:.2f}"
         lines.append(
             f"| {run.config.harness} | {run.config.model} | {run.config.rules_variant} | "
-            f"{run.scores.composite:.3f} | {'PASS' if run.scores.functional.passed else 'FAIL'} | "
+            f"{run.scores.composite_score:.3f} | {'PASS' if run.scores.functional.passed else 'FAIL'} | "
             f"{run.scores.compliance.score:.2f} | {visual} | {run.scores.efficiency.score:.2f} |"
         )
 
