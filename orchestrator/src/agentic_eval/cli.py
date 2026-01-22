@@ -300,5 +300,72 @@ def init_matrix() -> None:
     click.echo(f"Example matrix configuration created: {output_path}")
 
 
+@main.command()
+def list_agents() -> None:
+    """List supported agents and their rule files."""
+    from .harness.rules import SYSTEM_RULES
+
+    click.echo("Supported Agents:")
+    for agent, rule_file in SYSTEM_RULES.items():
+        click.echo(f"  {agent:15} -> {rule_file}")
+
+
+@main.command()
+@click.option(
+    "--task",
+    "-t",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to task directory",
+)
+def info(task: Path) -> None:
+    """Show task information and details."""
+    from .schemas.task import TaskDefinition
+
+    task_yaml = task / "task.yaml"
+    if not task_yaml.exists():
+        click.echo(f"Error: task.yaml not found in {task}", err=True)
+        raise SystemExit(1)
+
+    task_def = TaskDefinition.from_yaml(task_yaml)
+
+    click.echo(f"Task: {task_def.name}")
+    click.echo(f"Description: {task_def.description}")
+    click.echo(f"Difficulty: {task_def.difficulty}")
+    click.echo(f"Category: {task_def.category}")
+    click.echo(f"Timeout: {task_def.timeout_sec // 60} minutes")
+
+    if task_def.verification.gates:
+        gates = [g.name for g in task_def.verification.gates]
+        click.echo(f"Quality Gates: {', '.join(gates)}")
+
+    # Show rule variants
+    rules_dir = task / "rules"
+    if rules_dir.exists():
+        click.echo()
+        click.echo("Rule Variants:")
+        for variant in ["strict", "minimal", "none"]:
+            variant_dir = rules_dir / variant
+            if variant_dir.exists():
+                files = [f.name for f in variant_dir.iterdir() if f.is_file()]
+                click.echo(f"  {variant}: {', '.join(files) or '(empty)'}")
+
+    # Show visual config if present
+    if task_def.visual:
+        click.echo()
+        click.echo("Visual Config:")
+        click.echo(f"  Reference: {task_def.visual.reference_image}")
+        click.echo(f"  Threshold: {task_def.visual.threshold}")
+
+    # Show compliance config if present
+    if task_def.compliance.deterministic_checks or task_def.compliance.llm_judge_rubric:
+        click.echo()
+        click.echo("Compliance Config:")
+        if task_def.compliance.deterministic_checks:
+            click.echo(f"  Deterministic checks: {len(task_def.compliance.deterministic_checks)}")
+        if task_def.compliance.llm_judge_rubric:
+            click.echo(f"  LLM judge criteria: {len(task_def.compliance.llm_judge_rubric)}")
+
+
 if __name__ == "__main__":
     main()
