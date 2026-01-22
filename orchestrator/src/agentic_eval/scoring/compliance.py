@@ -1,6 +1,7 @@
 """Compliance scoring: deterministic checks and LLM judge."""
 
 import re
+from dataclasses import dataclass
 from pathlib import Path
 
 from litellm import completion
@@ -8,6 +9,68 @@ from litellm import completion
 from ..config import settings
 from ..schemas.scorecard import ComplianceCheck, ComplianceScore
 from ..schemas.task import ComplianceConfig, DeterministicCheck, LLMJudgeCriterion
+
+
+@dataclass
+class JudgeResult:
+    """Structured result from LLM judge response parsing."""
+
+    passed: bool
+    evidence: str
+    raw_response: str
+
+
+def parse_judge_response(response: str) -> JudgeResult:
+    """Parse LLM judge response with multiple fallback strategies.
+
+    Strategy 1: Look for structured VERDICT: PASS/FAIL + EVIDENCE: pattern
+    Strategy 2: Check first line for PASS/FAIL keywords
+    Strategy 3: Fail conservatively if unparseable
+
+    Args:
+        response: Raw LLM response text
+
+    Returns:
+        JudgeResult with parsed verdict and evidence
+    """
+    response = response.strip()
+
+    # Strategy 1: Structured format with VERDICT: and EVIDENCE:
+    verdict_match = re.search(r"VERDICT:\s*(PASS|FAIL)", response, re.IGNORECASE)
+    evidence_match = re.search(
+        r"EVIDENCE:\s*(.+?)(?=\n\n|\Z)", response, re.IGNORECASE | re.DOTALL
+    )
+
+    if verdict_match:
+        passed = verdict_match.group(1).upper() == "PASS"
+        evidence = (
+            evidence_match.group(1).strip()
+            if evidence_match
+            else response[:200]
+        )
+        return JudgeResult(passed=passed, evidence=evidence, raw_response=response)
+
+    # Strategy 2: Check first line for PASS/FAIL
+    first_line = response.split("\n")[0].upper()
+    if "PASS" in first_line and "FAIL" not in first_line:
+        return JudgeResult(
+            passed=True,
+            evidence=response[:200],
+            raw_response=response,
+        )
+    if "FAIL" in first_line:
+        return JudgeResult(
+            passed=False,
+            evidence=response[:200],
+            raw_response=response,
+        )
+
+    # Strategy 3: Fail conservatively if unparseable
+    return JudgeResult(
+        passed=False,
+        evidence=f"Could not parse response: {response[:100]}...",
+        raw_response=response,
+    )
 
 
 def check_import_present(workspace: Path, pattern: str) -> tuple[bool, str]:
@@ -115,7 +178,17 @@ def run_llm_judge(
     rules_content: str,
     judge_model: str | None = None,
 ) -> ComplianceCheck:
-    """Run LLM judge for a criterion."""
+    """Run LLM judge for a criterion with retry logic.
+
+    Args:
+        criterion: The criterion to evaluate
+        source_code: Collected source code
+        rules_content: Rules file content for context
+        judge_model: Optional model override
+
+    Returns:
+        ComplianceCheck with result
+    """
     if judge_model is None:
         judge_model = settings.llm_judge.model
 
@@ -138,31 +211,37 @@ Format:
 VERDICT: [PASS/FAIL]
 EVIDENCE: [your evidence]"""
 
-    try:
-        response = completion(
-            model=judge_model,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=settings.llm_judge.max_tokens,
-        )
-        result = response.choices[0].message.content or ""
+    max_retries = settings.llm_judge.max_retries
+    last_error: Exception | None = None
 
-        passed = "PASS" in result.upper().split("\n")[0]
-        evidence_match = re.search(r"EVIDENCE:\s*(.+)", result, re.IGNORECASE)
-        evidence = evidence_match.group(1).strip() if evidence_match else result[:100]
+    for attempt in range(max_retries + 1):
+        try:
+            response = completion(
+                model=judge_model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=settings.llm_judge.max_tokens,
+            )
+            result_text = response.choices[0].message.content or ""
 
-        return ComplianceCheck(
-            rule=criterion.criterion,
-            type="llm_judge",
-            passed=passed,
-            evidence=evidence,
-        )
-    except Exception as e:
-        return ComplianceCheck(
-            rule=criterion.criterion,
-            type="llm_judge",
-            passed=False,
-            evidence=f"LLM judge error: {e}",
-        )
+            judge_result = parse_judge_response(result_text)
+
+            return ComplianceCheck(
+                rule=criterion.criterion,
+                type="llm_judge",
+                passed=judge_result.passed,
+                evidence=judge_result.evidence,
+            )
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries:
+                continue
+
+    return ComplianceCheck(
+        rule=criterion.criterion,
+        type="llm_judge",
+        passed=False,
+        evidence=f"LLM judge error after {max_retries + 1} attempts: {last_error}",
+    )
 
 
 def evaluate_compliance(
