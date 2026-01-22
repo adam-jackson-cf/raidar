@@ -8,8 +8,8 @@ from pathlib import Path
 
 import yaml
 
-from .audit.scaffold_manifest import generate_manifest, load_manifest, save_manifest
-from .harness.config import Agent, HarnessConfig, ModelConfig
+from .audit.scaffold_manifest import generate_manifest, save_manifest
+from .harness.config import HarnessConfig
 from .harness.rules import inject_rules
 from .schemas.scorecard import EvalConfig, EvalRun, Scorecard
 from .schemas.task import TaskDefinition

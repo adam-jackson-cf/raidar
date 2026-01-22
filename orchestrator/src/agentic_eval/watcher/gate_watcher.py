@@ -5,6 +5,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
+from ..config import settings
 from ..schemas.events import FAILURE_CATEGORIES, GateEvent
 from ..schemas.task import VerificationGate
 
@@ -28,8 +29,11 @@ def categorize_failure(stdout: str, stderr: str) -> str | None:
     return "unknown" if combined.strip() else None
 
 
-def truncate_output(output: str, max_length: int = 2000) -> str:
+def truncate_output(output: str, max_length: int | None = None) -> str:
     """Truncate output to max length."""
+    if max_length is None:
+        max_length = settings.gate.max_output_length
+
     if len(output) <= max_length:
         return output
     return output[:max_length] + f"\n... (truncated, {len(output)} total chars)"
@@ -38,8 +42,8 @@ def truncate_output(output: str, max_length: int = 2000) -> str:
 class GateWatcher:
     """Watches verification gate executions and tracks failures."""
 
-    def __init__(self, max_failures: int = 3):
-        self.max_failures = max_failures
+    def __init__(self, max_failures: int | None = None):
+        self.max_failures = max_failures or settings.gate.max_failures
         self.events: list[GateEvent] = []
         self.failure_categories_seen: set[str] = set()
         self.total_failures = 0
@@ -67,7 +71,7 @@ class GateWatcher:
                 cwd=workspace,
                 capture_output=True,
                 text=True,
-                timeout=60,
+                timeout=settings.timeouts.gate,
             )
             exit_code = result.returncode
             stdout = result.stdout

@@ -1,13 +1,13 @@
 """Matrix runner for executing multiple harness/model combinations."""
 
 import concurrent.futures
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING
 
 from ..harness.config import HarnessConfig
-from ..harness.rules import get_rule_filename
 from ..matrix import MatrixConfig, generate_matrix_entries
 from ..runner import prepare_workspace, run_task
 from ..schemas.scorecard import Scorecard

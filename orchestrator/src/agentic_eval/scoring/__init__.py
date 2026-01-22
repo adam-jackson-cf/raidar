@@ -2,6 +2,7 @@
 
 from pathlib import Path
 
+from ..config import settings
 from ..schemas.events import GateEvent
 from ..schemas.scorecard import (
     ComplianceScore,
@@ -16,13 +17,19 @@ from .efficiency import evaluate_efficiency
 from .functional import evaluate_functional
 from .visual import evaluate_visual
 
-# Scoring weights from research document
-WEIGHTS = {
-    "functional": 0.40,
-    "compliance": 0.25,
-    "visual": 0.20,
-    "efficiency": 0.15,
-}
+
+def get_weights() -> dict[str, float]:
+    """Get scoring weights from config."""
+    return {
+        "functional": settings.weights.functional,
+        "compliance": settings.weights.compliance,
+        "visual": settings.weights.visual,
+        "efficiency": settings.weights.efficiency,
+    }
+
+
+# For backward compatibility - use get_weights() for dynamic access
+WEIGHTS = get_weights()
 
 
 def evaluate_all(
@@ -90,4 +97,10 @@ __all__ = [
     "evaluate_efficiency",
     "evaluate_all",
     "WEIGHTS",
+    "get_weights",
+    "ComplianceScore",
+    "EfficiencyScore",
+    "FunctionalScore",
+    "Scorecard",
+    "VisualScore",
 ]

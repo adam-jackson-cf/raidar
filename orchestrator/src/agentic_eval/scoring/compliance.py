@@ -5,6 +5,7 @@ from pathlib import Path
 
 from litellm import completion
 
+from ..config import settings
 from ..schemas.scorecard import ComplianceCheck, ComplianceScore
 from ..schemas.task import ComplianceConfig, DeterministicCheck, LLMJudgeCriterion
 
@@ -78,8 +79,11 @@ def run_deterministic_check(
     )
 
 
-def collect_source_code(workspace: Path, max_chars: int = 10000) -> str:
+def collect_source_code(workspace: Path, max_chars: int | None = None) -> str:
     """Collect source code for LLM evaluation."""
+    if max_chars is None:
+        max_chars = settings.llm_judge.max_source_chars
+
     src_dir = workspace / "src"
     if not src_dir.exists():
         return "No source directory found"
@@ -109,9 +113,12 @@ def run_llm_judge(
     criterion: LLMJudgeCriterion,
     source_code: str,
     rules_content: str,
-    judge_model: str = "anthropic/claude-sonnet-4-20250514",
+    judge_model: str | None = None,
 ) -> ComplianceCheck:
     """Run LLM judge for a criterion."""
+    if judge_model is None:
+        judge_model = settings.llm_judge.model
+
     prompt = f"""You are evaluating code compliance with project guidelines.
 
 ## Project Rules
@@ -135,7 +142,7 @@ EVIDENCE: [your evidence]"""
         response = completion(
             model=judge_model,
             messages=[{"role": "user", "content": prompt}],
-            max_tokens=200,
+            max_tokens=settings.llm_judge.max_tokens,
         )
         result = response.choices[0].message.content or ""
 

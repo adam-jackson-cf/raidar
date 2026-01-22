@@ -1,7 +1,6 @@
 """Run storage and aggregation for evaluation results."""
 
 import csv
-import json
 from datetime import datetime
 from pathlib import Path
 

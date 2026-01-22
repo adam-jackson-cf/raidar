@@ -3,6 +3,7 @@
 import subprocess
 from pathlib import Path
 
+from ..config import settings
 from ..schemas.scorecard import VisualScore
 
 
@@ -24,7 +25,7 @@ def capture_screenshot(workspace: Path, command: str, output_path: Path) -> bool
             cwd=workspace,
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=settings.timeouts.screenshot,
         )
         return result.returncode == 0 and output_path.exists()
     except subprocess.TimeoutExpired:
@@ -35,7 +36,7 @@ def compare_images(
     reference: Path,
     actual: Path,
     diff_output: Path,
-    threshold: float = 0.1,
+    threshold: float | None = None,
 ) -> tuple[float, str | None]:
     """Compare two images using odiff.
 
@@ -48,6 +49,9 @@ def compare_images(
     Returns:
         Tuple of (similarity_score, diff_path or None)
     """
+    if threshold is None:
+        threshold = settings.visual.odiff_threshold
+
     if not reference.exists():
         return 0.0, None
     if not actual.exists():
@@ -67,7 +71,7 @@ def compare_images(
             ],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=settings.timeouts.image_compare,
         )
 
         output = result.stdout + result.stderr
@@ -100,7 +104,7 @@ def evaluate_visual(
     workspace: Path,
     reference_image: Path,
     screenshot_command: str,
-    threshold: float = 0.95,
+    threshold: float | None = None,
 ) -> VisualScore:
     """Evaluate visual similarity to reference design.
 
@@ -113,6 +117,9 @@ def evaluate_visual(
     Returns:
         VisualScore with similarity and diff path
     """
+    if threshold is None:
+        threshold = settings.visual.similarity_threshold
+
     actual_path = workspace / "actual.png"
     diff_path = workspace / "diff.png"
 
@@ -123,7 +130,7 @@ def evaluate_visual(
             diff_path=None,
         )
 
-    # Compare images
+    # Compare images (odiff_threshold is used for anti-aliasing tolerance)
     similarity, diff_output = compare_images(
         reference=reference_image,
         actual=actual_path,

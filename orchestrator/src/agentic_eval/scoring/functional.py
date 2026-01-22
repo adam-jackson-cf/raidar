@@ -4,11 +4,15 @@ import re
 import subprocess
 from pathlib import Path
 
+from ..config import settings
 from ..schemas.scorecard import FunctionalScore
 
 
-def run_command(command: str, cwd: Path, timeout: int = 60) -> tuple[int, str, str]:
+def run_command(command: str, cwd: Path, timeout: int | None = None) -> tuple[int, str, str]:
     """Run a command and capture output."""
+    if timeout is None:
+        timeout = settings.timeouts.command_default
+
     try:
         result = subprocess.run(
             command,
@@ -25,13 +29,17 @@ def run_command(command: str, cwd: Path, timeout: int = 60) -> tuple[int, str, s
 
 def check_build(workspace: Path) -> bool:
     """Check if the build succeeds."""
-    code, stdout, stderr = run_command("bun run build", workspace, timeout=120)
+    code, stdout, stderr = run_command(
+        "bun run build", workspace, timeout=settings.timeouts.build
+    )
     return code == 0
 
 
 def check_typecheck(workspace: Path) -> bool:
     """Check if typecheck passes."""
-    code, stdout, stderr = run_command("bun run typecheck", workspace, timeout=60)
+    code, stdout, stderr = run_command(
+        "bun run typecheck", workspace, timeout=settings.timeouts.typecheck
+    )
     return code == 0
 
 
@@ -59,7 +67,9 @@ def run_tests(workspace: Path) -> tuple[bool, int, int]:
     Returns:
         Tuple of (all_passed, tests_passed, tests_total)
     """
-    code, stdout, stderr = run_command("bun test", workspace, timeout=120)
+    code, stdout, stderr = run_command(
+        "bun test", workspace, timeout=settings.timeouts.test
+    )
     tests_passed, tests_total = parse_test_output(stdout, stderr)
 
     # If no tests found, consider it passed with 0/0

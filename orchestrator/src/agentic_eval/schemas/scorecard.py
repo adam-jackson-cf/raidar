@@ -8,6 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, computed_field
 
+from ..config import settings
 from .events import GateEvent, SessionEvent
 
 
@@ -81,9 +82,15 @@ class EfficiencyScore(BaseModel):
     def score(self) -> float:
         """Calculate efficiency score (0-1).
 
-        Formula: max(0, 1 - (gate_failures / 4) - (repeat_failures * 0.2))
+        Formula: max(0, 1 - (gate_failures / max_failures) - (repeat_failures * penalty))
         """
-        raw_score = 1.0 - (self.total_gate_failures / 4) - (self.repeat_failures * 0.2)
+        max_failures = settings.efficiency.max_gate_failures
+        repeat_penalty = settings.efficiency.repeat_penalty
+        raw_score = (
+            1.0
+            - (self.total_gate_failures / max_failures)
+            - (self.repeat_failures * repeat_penalty)
+        )
         return max(0.0, min(1.0, raw_score))
 
 
@@ -123,22 +130,29 @@ class Scorecard(BaseModel):
     def composite_score(self) -> float:
         """Calculate weighted composite score.
 
-        Weights: functional 40%, compliance 25%, visual 20%, efficiency 15%
-        If visual is None, redistributes visual weight to other dimensions.
+        Weights from config. If visual is None, redistributes visual weight proportionally.
         """
+        w = settings.weights
         visual_score = self.visual.score if self.visual else 0.0
+
         if self.visual:
             return (
-                self.functional.score * 0.4
-                + self.compliance.score * 0.25
-                + visual_score * 0.2
-                + self.efficiency.score * 0.15
+                self.functional.score * w.functional
+                + self.compliance.score * w.compliance
+                + visual_score * w.visual
+                + self.efficiency.score * w.efficiency
             )
-        # Redistribute visual weight proportionally
+
+        # Redistribute visual weight proportionally to other dimensions
+        non_visual_total = w.functional + w.compliance + w.efficiency
+        func_adj = w.functional / non_visual_total
+        comp_adj = w.compliance / non_visual_total
+        eff_adj = w.efficiency / non_visual_total
+
         return (
-            self.functional.score * 0.5
-            + self.compliance.score * 0.3125
-            + self.efficiency.score * 0.1875
+            self.functional.score * func_adj
+            + self.compliance.score * comp_adj
+            + self.efficiency.score * eff_adj
         )
 
 

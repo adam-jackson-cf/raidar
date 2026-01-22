@@ -7,7 +7,7 @@ from typing import Literal
 import click
 
 from .harness.config import Agent, HarnessConfig, ModelConfig
-from .runner import load_task, prepare_workspace, run_task
+from .runner import load_task, run_task
 
 
 @click.group()
