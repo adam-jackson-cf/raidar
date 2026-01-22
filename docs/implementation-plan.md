@@ -1,5 +1,7 @@
 # Implementation Plan: Agentic Eval System
 
+This plan was used to create 4 initial variations - it has been implemented and is used for context reference.
+
 ## Overview
 
 Build an evaluation system for testing model/harness combinations on coding tasks. Extends Harbor (Terminal-Bench framework) with multi-dimensional scoring: functional, compliance, visual, and efficiency.
