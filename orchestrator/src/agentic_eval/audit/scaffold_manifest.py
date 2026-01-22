@@ -1,11 +1,17 @@
 """Base project auditing and manifest generation."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from ..schemas.scorecard import ScaffoldAudit
 
 
 class FileEntry(BaseModel):
@@ -120,9 +126,7 @@ def load_manifest(path: Path) -> ScaffoldManifest:
         return ScaffoldManifest.model_validate_json(f.read())
 
 
-def diff_manifests(
-    baseline: ScaffoldManifest, current: ScaffoldManifest
-) -> dict[str, list[str]]:
+def diff_manifests(baseline: ScaffoldManifest, current: ScaffoldManifest) -> dict[str, list[str]]:
     """Compare two manifests and return differences.
 
     Returns:
@@ -134,9 +138,7 @@ def diff_manifests(
     added = list(current_files - baseline_files)
     removed = list(baseline_files - current_files)
     modified = [
-        f
-        for f in baseline_files & current_files
-        if baseline.files[f].hash != current.files[f].hash
+        f for f in baseline_files & current_files if baseline.files[f].hash != current.files[f].hash
     ]
 
     return {
@@ -149,7 +151,7 @@ def diff_manifests(
 def create_scaffold_audit(
     baseline_manifest: ScaffoldManifest,
     workspace: Path,
-) -> "ScaffoldAudit":
+) -> ScaffoldAudit:
     """Create a scaffold audit comparing workspace to baseline.
 
     Args:

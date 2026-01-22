@@ -123,9 +123,7 @@ class ResultsAggregator:
 
         return scorecards
 
-    def scorecards_to_rows(
-        self, scorecards: list[Scorecard]
-    ) -> list[ComparisonRow]:
+    def scorecards_to_rows(self, scorecards: list[Scorecard]) -> list[ComparisonRow]:
         """Convert scorecards to comparison rows."""
         return [
             ComparisonRow(
@@ -184,37 +182,41 @@ class ResultsAggregator:
         writer = csv.writer(output)
 
         # Header
-        writer.writerow([
-            "run_id",
-            "task",
-            "agent",
-            "model",
-            "rules",
-            "functional",
-            "compliance",
-            "visual",
-            "efficiency",
-            "composite",
-            "gates_passed",
-            "gates_total",
-        ])
+        writer.writerow(
+            [
+                "run_id",
+                "task",
+                "agent",
+                "model",
+                "rules",
+                "functional",
+                "compliance",
+                "visual",
+                "efficiency",
+                "composite",
+                "gates_passed",
+                "gates_total",
+            ]
+        )
 
         # Data rows
         for row in sorted(report.rows, key=lambda r: -r.composite):
-            writer.writerow([
-                row.run_id,
-                row.task,
-                row.agent,
-                row.model,
-                row.rules,
-                f"{row.functional:.2f}",
-                f"{row.compliance:.2f}",
-                f"{row.visual:.2f}",
-                f"{row.efficiency:.2f}",
-                f"{row.composite:.2f}",
-                row.gates_passed,
-                row.gates_total,
-            ])
+            writer.writerow(
+                [
+                    row.run_id,
+                    row.task,
+                    row.agent,
+                    row.model,
+                    row.rules,
+                    f"{row.functional:.2f}",
+                    f"{row.compliance:.2f}",
+                    f"{row.visual:.2f}",
+                    f"{row.efficiency:.2f}",
+                    f"{row.composite:.2f}",
+                    row.gates_passed,
+                    row.gates_total,
+                ]
+            )
 
         csv_str = output.getvalue()
 

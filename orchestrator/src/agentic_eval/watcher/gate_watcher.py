@@ -106,9 +106,7 @@ class GateWatcher:
         self.events.append(event)
         return event
 
-    def run_all_gates(
-        self, gates: list[VerificationGate], workspace: Path
-    ) -> list[GateEvent]:
+    def run_all_gates(self, gates: list[VerificationGate], workspace: Path) -> list[GateEvent]:
         """Run all verification gates.
 
         Args:

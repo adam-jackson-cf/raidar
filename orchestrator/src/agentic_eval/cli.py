@@ -226,7 +226,10 @@ def matrix(config: Path, dry_run: bool) -> None:
         click.echo("\nDry run - no tasks executed")
         return
 
-    click.echo("\nNote: Full matrix execution requires Harbor. Run entries individually with 'run' command.")
+    click.echo(
+        "\nNote: Full matrix execution requires Harbor. "
+        "Run entries individually with 'run' command."
+    )
 
 
 @main.command()

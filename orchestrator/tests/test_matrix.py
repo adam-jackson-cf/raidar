@@ -1,7 +1,5 @@
 """Tests for matrix generation."""
 
-import pytest
-
 from agentic_eval.matrix import (
     MatrixConfig,
     MatrixEntry,

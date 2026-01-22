@@ -76,7 +76,9 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
 
     return {
         "total_runs": len(runs),
-        "by_harness": {h: {"count": len(r), "avg_score": avg_score(r)} for h, r in by_harness.items()},
+        "by_harness": {
+            h: {"count": len(r), "avg_score": avg_score(r)} for h, r in by_harness.items()
+        },
         "by_model": {m: {"count": len(r), "avg_score": avg_score(r)} for m, r in by_model.items()},
         "by_rules": {v: {"count": len(r), "avg_score": avg_score(r)} for v, r in by_rules.items()},
     }
@@ -138,7 +140,9 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "gate_failures": run.scores.efficiency.total_gate_failures,
                 "repeat_failures": run.scores.efficiency.repeat_failures,
                 "composite_score": run.scores.composite_score,
-                "scaffold_changes": len(run.scores.scaffold_audit.changes_from_baseline) if run.scores.scaffold_audit else 0,
+                "scaffold_changes": len(run.scores.scaffold_audit.changes_from_baseline)
+                if run.scores.scaffold_audit
+                else 0,
             }
             writer.writerow(row)
 
@@ -168,29 +172,36 @@ def generate_comparison_report(runs: list[EvalRun]) -> str:
         visual = run.scores.visual.similarity if run.scores.visual else "N/A"
         if isinstance(visual, float):
             visual = f"{visual:.2f}"
+        func_status = "PASS" if run.scores.functional.passed else "FAIL"
         lines.append(
             f"| {run.config.harness} | {run.config.model} | {run.config.rules_variant} | "
-            f"{run.scores.composite_score:.3f} | {'PASS' if run.scores.functional.passed else 'FAIL'} | "
+            f"{run.scores.composite_score:.3f} | {func_status} | "
             f"{run.scores.compliance.score:.2f} | {visual} | {run.scores.efficiency.score:.2f} |"
         )
 
     # Aggregated stats
     agg = aggregate_results(runs)
-    lines.extend([
-        "\n## By Harness",
-    ])
+    lines.extend(
+        [
+            "\n## By Harness",
+        ]
+    )
     for harness, stats in agg.get("by_harness", {}).items():
         lines.append(f"- **{harness}**: {stats['count']} runs, avg score: {stats['avg_score']:.3f}")
 
-    lines.extend([
-        "\n## By Model",
-    ])
+    lines.extend(
+        [
+            "\n## By Model",
+        ]
+    )
     for model, stats in agg.get("by_model", {}).items():
         lines.append(f"- **{model}**: {stats['count']} runs, avg score: {stats['avg_score']:.3f}")
 
-    lines.extend([
-        "\n## By Rules Variant",
-    ])
+    lines.extend(
+        [
+            "\n## By Rules Variant",
+        ]
+    )
     for rules, stats in agg.get("by_rules", {}).items():
         lines.append(f"- **{rules}**: {stats['count']} runs, avg score: {stats['avg_score']:.3f}")
 

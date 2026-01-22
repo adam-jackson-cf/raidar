@@ -29,9 +29,7 @@ def run_command(command: str, cwd: Path, timeout: int | None = None) -> tuple[in
 
 def check_build(workspace: Path) -> bool:
     """Check if the build succeeds."""
-    code, stdout, stderr = run_command(
-        "bun run build", workspace, timeout=settings.timeouts.build
-    )
+    code, stdout, stderr = run_command("bun run build", workspace, timeout=settings.timeouts.build)
     return code == 0
 
 
@@ -67,9 +65,7 @@ def run_tests(workspace: Path) -> tuple[bool, int, int]:
     Returns:
         Tuple of (all_passed, tests_passed, tests_total)
     """
-    code, stdout, stderr = run_command(
-        "bun test", workspace, timeout=settings.timeouts.test
-    )
+    code, stdout, stderr = run_command("bun test", workspace, timeout=settings.timeouts.test)
     tests_passed, tests_total = parse_test_output(stdout, stderr)
 
     # If no tests found, consider it passed with 0/0

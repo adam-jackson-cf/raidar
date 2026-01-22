@@ -1,7 +1,5 @@
 """Tests for scorecard computed fields."""
 
-import pytest
-
 from agentic_eval.schemas.scorecard import (
     ComplianceCheck,
     ComplianceScore,

@@ -1,7 +1,6 @@
 """Shared test fixtures for agentic evaluation system."""
 
 import json
-import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 

@@ -64,9 +64,7 @@ def generate_matrix_entries(config: MatrixConfig) -> list[MatrixEntry]:
         List of all harness/model/rules combinations
     """
     entries = []
-    for harness, model, rules in product(
-        config.harnesses, config.models, config.rules_variants
-    ):
+    for harness, model, rules in product(config.harnesses, config.models, config.rules_variants):
         entries.append(
             MatrixEntry(
                 harness=harness,

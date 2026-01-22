@@ -37,17 +37,11 @@ def parse_judge_response(response: str) -> JudgeResult:
 
     # Strategy 1: Structured format with VERDICT: and EVIDENCE:
     verdict_match = re.search(r"VERDICT:\s*(PASS|FAIL)", response, re.IGNORECASE)
-    evidence_match = re.search(
-        r"EVIDENCE:\s*(.+?)(?=\n\n|\Z)", response, re.IGNORECASE | re.DOTALL
-    )
+    evidence_match = re.search(r"EVIDENCE:\s*(.+?)(?=\n\n|\Z)", response, re.IGNORECASE | re.DOTALL)
 
     if verdict_match:
         passed = verdict_match.group(1).upper() == "PASS"
-        evidence = (
-            evidence_match.group(1).strip()
-            if evidence_match
-            else response[:200]
-        )
+        evidence = evidence_match.group(1).strip() if evidence_match else response[:200]
         return JudgeResult(passed=passed, evidence=evidence, raw_response=response)
 
     # Strategy 2: Check first line for PASS/FAIL
@@ -121,9 +115,7 @@ def check_no_pattern(workspace: Path, pattern: str) -> tuple[bool, str]:
     return True, "Pattern not found (good)"
 
 
-def run_deterministic_check(
-    check: DeterministicCheck, workspace: Path
-) -> ComplianceCheck:
+def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> ComplianceCheck:
     """Run a single deterministic compliance check."""
     if check.type == "import_present":
         passed, evidence = check_import_present(workspace, check.pattern)
@@ -287,13 +279,14 @@ def evaluate_compliance(
     deterministic_checks = [c for c in checks if c.type == "deterministic"]
     llm_checks = [c for c in checks if c.type == "llm_judge"]
 
-    det_score = sum(1 for c in deterministic_checks if c.passed) / len(deterministic_checks) if deterministic_checks else 1.0
+    det_score = (
+        sum(1 for c in deterministic_checks if c.passed) / len(deterministic_checks)
+        if deterministic_checks
+        else 1.0
+    )
     llm_score = sum(1 for c in llm_checks if c.passed) / len(llm_checks) if llm_checks else 1.0
 
     # Weighted average: 60% deterministic, 40% LLM
-    if llm_checks:
-        score = (det_score * 0.6) + (llm_score * 0.4)
-    else:
-        score = det_score
+    score = det_score * 0.6 + llm_score * 0.4 if llm_checks else det_score
 
     return ComplianceScore(score=score, checks=checks)

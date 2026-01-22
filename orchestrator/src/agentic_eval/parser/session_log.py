@@ -113,6 +113,98 @@ def parse_claude_session(session_dir: Path) -> list[SessionEvent]:
     return sorted(events, key=lambda e: e.timestamp)
 
 
+def _create_tool_event(timestamp: str, tool_name: str, tool_input: dict) -> SessionEvent:
+    """Create a SessionEvent for a tool use block."""
+    if tool_name == "Bash":
+        return SessionEvent(
+            timestamp=timestamp,
+            event_type="bash_command",
+            data={"command": tool_input.get("command", "")},
+        )
+    if tool_name in ("Write", "Edit"):
+        return SessionEvent(
+            timestamp=timestamp,
+            event_type="file_change",
+            data={"file_path": tool_input.get("file_path", "")},
+        )
+    return SessionEvent(
+        timestamp=timestamp,
+        event_type="tool_call",
+        data={"name": tool_name, "input": tool_input},
+    )
+
+
+def _parse_claude_user_content(timestamp: str, content: list | str) -> list[SessionEvent]:
+    """Parse user content blocks from Claude Code entry."""
+    events: list[SessionEvent] = []
+
+    if isinstance(content, str):
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="user_prompt",
+                data={"content": truncate_content(content)},
+            )
+        )
+        return events
+
+    text_parts = []
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        if block_type == "text":
+            text_parts.append(block.get("text", ""))
+        elif block_type == "tool_result":
+            events.append(
+                SessionEvent(
+                    timestamp=timestamp,
+                    event_type="gate_result",
+                    data={
+                        "tool_use_id": block.get("tool_use_id", ""),
+                        "content": truncate_content(str(block.get("content", ""))),
+                    },
+                )
+            )
+
+    if text_parts:
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="user_prompt",
+                data={"content": truncate_content("".join(text_parts))},
+            )
+        )
+
+    return events
+
+
+def _parse_claude_assistant_content(timestamp: str, content: list) -> list[SessionEvent]:
+    """Parse assistant content blocks from Claude Code entry."""
+    events: list[SessionEvent] = []
+
+    for block in content:
+        if not isinstance(block, dict):
+            continue
+        block_type = block.get("type")
+        if block_type == "tool_use":
+            events.append(
+                _create_tool_event(timestamp, block.get("name", ""), block.get("input", {}))
+            )
+        elif block_type == "text":
+            text = block.get("text", "")
+            if text.strip():
+                events.append(
+                    SessionEvent(
+                        timestamp=timestamp,
+                        event_type="assistant_message",
+                        data={"content": truncate_content(text)},
+                    )
+                )
+
+    return events
+
+
 def parse_claude_entry(entry: dict) -> list[SessionEvent]:
     """Parse a single Claude Code log entry.
 
@@ -121,90 +213,14 @@ def parse_claude_entry(entry: dict) -> list[SessionEvent]:
     timestamp = entry.get("timestamp", datetime.now().isoformat())
     role = entry.get("role")
     content = entry.get("content", [])
-    events: list[SessionEvent] = []
 
     if role == "user":
-        # Handle tool_result blocks
-        if isinstance(content, list):
-            text_parts = []
-            for block in content:
-                if isinstance(block, dict):
-                    if block.get("type") == "text":
-                        text_parts.append(block.get("text", ""))
-                    elif block.get("type") == "tool_result":
-                        # tool_result indicates output from a previous tool call
-                        events.append(
-                            SessionEvent(
-                                timestamp=timestamp,
-                                event_type="gate_result",
-                                data={
-                                    "tool_use_id": block.get("tool_use_id", ""),
-                                    "content": truncate_content(str(block.get("content", ""))),
-                                },
-                            )
-                        )
-            if text_parts:
-                events.append(
-                    SessionEvent(
-                        timestamp=timestamp,
-                        event_type="user_prompt",
-                        data={"content": truncate_content("".join(text_parts))},
-                    )
-                )
-        elif isinstance(content, str):
-            events.append(
-                SessionEvent(
-                    timestamp=timestamp,
-                    event_type="user_prompt",
-                    data={"content": truncate_content(content)},
-                )
-            )
+        return _parse_claude_user_content(timestamp, content)
 
-    elif role == "assistant":
-        # Process all blocks in content (not just the first one)
-        if isinstance(content, list):
-            for block in content:
-                if isinstance(block, dict):
-                    if block.get("type") == "tool_use":
-                        tool_name = block.get("name", "")
-                        tool_input = block.get("input", {})
+    if role == "assistant" and isinstance(content, list):
+        return _parse_claude_assistant_content(timestamp, content)
 
-                        if tool_name == "Bash":
-                            events.append(
-                                SessionEvent(
-                                    timestamp=timestamp,
-                                    event_type="bash_command",
-                                    data={"command": tool_input.get("command", "")},
-                                )
-                            )
-                        elif tool_name in ("Write", "Edit"):
-                            events.append(
-                                SessionEvent(
-                                    timestamp=timestamp,
-                                    event_type="file_change",
-                                    data={"file_path": tool_input.get("file_path", "")},
-                                )
-                            )
-                        else:
-                            events.append(
-                                SessionEvent(
-                                    timestamp=timestamp,
-                                    event_type="tool_call",
-                                    data={"name": tool_name, "input": tool_input},
-                                )
-                            )
-                    elif block.get("type") == "text":
-                        text = block.get("text", "")
-                        if text.strip():
-                            events.append(
-                                SessionEvent(
-                                    timestamp=timestamp,
-                                    event_type="assistant_message",
-                                    data={"content": truncate_content(text)},
-                                )
-                            )
-
-    return events
+    return []
 
 
 def parse_gemini_session(session_dir: Path) -> list[SessionEvent]:

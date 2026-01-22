@@ -59,9 +59,7 @@ def evaluate_all(
 
     # Evaluate each dimension
     functional = evaluate_functional(workspace)
-    compliance = evaluate_compliance(
-        workspace, compliance_config, rules_path, run_llm_checks
-    )
+    compliance = evaluate_compliance(workspace, compliance_config, rules_path, run_llm_checks)
 
     visual = None
     if visual_config:

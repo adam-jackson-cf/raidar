@@ -34,9 +34,7 @@ class ScaffoldConfig(BaseModel):
 class DeterministicCheck(BaseModel):
     """Deterministic compliance check."""
 
-    type: Literal["import_present", "file_exists", "no_pattern"] = Field(
-        description="Check type"
-    )
+    type: Literal["import_present", "file_exists", "no_pattern"] = Field(description="Check type")
     pattern: str = Field(description="Pattern to match")
     description: str = Field(description="Human-readable description")
 

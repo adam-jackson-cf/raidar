@@ -1,7 +1,5 @@
 """Tests for compliance scoring and judge parsing."""
 
-import pytest
-
 from agentic_eval.scoring.compliance import (
     JudgeResult,
     parse_judge_response,

@@ -3,8 +3,6 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-import pytest
-
 from agentic_eval.schemas.scorecard import EvalConfig, EvalRun, Scorecard
 from agentic_eval.storage import (
     aggregate_results,
@@ -17,18 +15,14 @@ from agentic_eval.storage import (
 class TestSaveAndLoadRun:
     """Test run persistence."""
 
-    def test_save_run_creates_file(
-        self, sample_eval_run: EvalRun, tmp_results_dir: Path
-    ):
+    def test_save_run_creates_file(self, sample_eval_run: EvalRun, tmp_results_dir: Path):
         """Should create JSON file when saving run."""
         path = save_run(sample_eval_run, tmp_results_dir)
 
         assert path.exists()
         assert path.suffix == ".json"
 
-    def test_load_run_returns_same_data(
-        self, sample_eval_run: EvalRun, tmp_results_dir: Path
-    ):
+    def test_load_run_returns_same_data(self, sample_eval_run: EvalRun, tmp_results_dir: Path):
         """Should load same data that was saved."""
         path = save_run(sample_eval_run, tmp_results_dir)
         loaded = load_run(path)
@@ -37,9 +31,7 @@ class TestSaveAndLoadRun:
         assert loaded.config.harness == sample_eval_run.config.harness
         assert loaded.config.model == sample_eval_run.config.model
 
-    def test_save_creates_directory_if_missing(
-        self, sample_eval_run: EvalRun, tmp_path: Path
-    ):
+    def test_save_creates_directory_if_missing(self, sample_eval_run: EvalRun, tmp_path: Path):
         """Should create directory if it doesn't exist."""
         results_dir = tmp_path / "new" / "nested" / "dir"
         assert not results_dir.exists()
@@ -70,9 +62,7 @@ class TestLoadAllRuns:
 
         assert runs == []
 
-    def test_skips_invalid_files(
-        self, sample_eval_run: EvalRun, tmp_results_dir: Path
-    ):
+    def test_skips_invalid_files(self, sample_eval_run: EvalRun, tmp_results_dir: Path):
         """Should skip invalid JSON files."""
         # Save valid run
         save_run(sample_eval_run, tmp_results_dir)

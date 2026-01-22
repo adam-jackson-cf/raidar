@@ -1,7 +1,5 @@
 """Tests for gate watcher functionality."""
 
-import pytest
-
 from agentic_eval.schemas.events import GateEvent
 from agentic_eval.watcher.gate_watcher import (
     GateWatcher,

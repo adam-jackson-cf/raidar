@@ -123,9 +123,7 @@ class MatrixRunner:
                 )
 
             if progress_callback:
-                progress_callback(
-                    f"Executing {harness_config.agent.value} with {model_str}"
-                )
+                progress_callback(f"Executing {harness_config.agent.value} with {model_str}")
 
             # Run task
             eval_run = run_task(

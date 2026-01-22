@@ -1,9 +1,5 @@
 """Tests for configuration system."""
 
-import os
-
-import pytest
-
 
 class TestEvalSettings:
     """Test configuration loading and defaults."""
