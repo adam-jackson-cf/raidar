@@ -144,3 +144,45 @@ def diff_manifests(
         "removed": sorted(removed),
         "modified": sorted(modified),
     }
+
+
+def create_scaffold_audit(
+    baseline_manifest: ScaffoldManifest,
+    workspace: Path,
+) -> "ScaffoldAudit":
+    """Create a scaffold audit comparing workspace to baseline.
+
+    Args:
+        baseline_manifest: Original scaffold manifest
+        workspace: Path to workspace directory
+
+    Returns:
+        ScaffoldAudit with changes from baseline
+    """
+    from ..schemas.scorecard import ScaffoldAudit
+
+    current_manifest = generate_manifest(workspace)
+    diff = diff_manifests(baseline_manifest, current_manifest)
+
+    changes: list[str] = []
+    for f in diff["added"]:
+        changes.append(f"Added: {f}")
+    for f in diff["removed"]:
+        changes.append(f"Removed: {f}")
+    for f in diff["modified"]:
+        changes.append(f"Modified: {f}")
+
+    # Check for dependency changes
+    baseline_deps = set(baseline_manifest.dependencies.keys())
+    current_deps = set(current_manifest.dependencies.keys())
+    for dep in current_deps - baseline_deps:
+        changes.append(f"Added dependency: {dep}")
+    for dep in baseline_deps - current_deps:
+        changes.append(f"Removed dependency: {dep}")
+
+    return ScaffoldAudit(
+        manifest_version=baseline_manifest.version,
+        file_count=len(current_manifest.files),
+        dependency_count=len(current_manifest.dependencies),
+        changes_from_baseline=changes,
+    )
