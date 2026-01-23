@@ -13,13 +13,13 @@ class TestMatrixEntry:
     def test_workspace_suffix_generation(self):
         """Workspace suffix should be safe for filesystem."""
         entry = MatrixEntry(
-            harness="codex",
+            harness="codex-cli",
             model="openai/gpt-4o",
             rules_variant="strict",
         )
         suffix = entry.workspace_suffix
         assert "/" not in suffix
-        assert "codex" in suffix
+        assert "codex-cli" in suffix
         assert "gpt-4o" in suffix
         assert "strict" in suffix
 
@@ -43,7 +43,7 @@ class TestGenerateMatrixEntries:
     def test_generates_all_combinations(self):
         """Should generate all combinations."""
         config = MatrixConfig(
-            harnesses=["codex", "claude-code"],
+            harnesses=["codex-cli", "claude-code"],
             models=["openai/gpt-4o"],
             rules_variants=["strict", "minimal"],
             task_path="task.yaml",
@@ -56,7 +56,7 @@ class TestGenerateMatrixEntries:
     def test_generates_correct_combinations(self):
         """Should generate correct harness/model/rules combinations."""
         config = MatrixConfig(
-            harnesses=["codex"],
+            harnesses=["codex-cli"],
             models=["openai/gpt-4o", "anthropic/claude-sonnet-4-5"],
             rules_variants=["strict"],
             task_path="task.yaml",
@@ -82,7 +82,7 @@ class TestGenerateMatrixEntries:
     def test_large_matrix_generation(self):
         """Should handle larger matrices."""
         config = MatrixConfig(
-            harnesses=["codex", "claude-code", "cursor"],
+            harnesses=["codex-cli", "claude-code", "cursor"],
             models=["openai/gpt-4o", "anthropic/claude-sonnet-4-5"],
             rules_variants=["strict", "minimal", "none"],
             task_path="task.yaml",

@@ -25,6 +25,7 @@ class ScaffoldConfig(BaseModel):
     """Scaffold template configuration."""
 
     template: str = Field(description="Scaffold template name")
+    version: str = Field(description="Template version identifier")
     rules_variant: Literal["strict", "minimal", "none"] = Field(
         default="strict",
         description="Rules variant to inject",

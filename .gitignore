@@ -28,6 +28,7 @@ Thumbs.db
 # Test outputs
 coverage/
 .pytest_cache/
+.enaible/
 
 # Screenshots
 actual.png

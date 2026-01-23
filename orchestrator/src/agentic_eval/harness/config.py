@@ -10,7 +10,7 @@ class Agent(str, Enum):
     """Supported agents via Harbor."""
 
     CLAUDE_CODE = "claude-code"
-    CODEX = "codex"
+    CODEX_CLI = "codex-cli"
     GEMINI = "gemini"
     OPENHANDS = "openhands"
 
@@ -46,11 +46,8 @@ class HarnessConfig(BaseModel):
     )
     timeout_sec: int = Field(default=1800, description="Task timeout in seconds")
 
-    def harbor_args(self) -> list[str]:
-        """Generate Harbor CLI arguments."""
-        return [
-            "-a",
-            self.agent.value,
-            "-m",
-            self.model.litellm_model,
-        ]
+    def adapter(self):  # type: ignore[override]
+        """Resolve the registered adapter for this harness."""
+        from .adapters.registry import registry
+
+        return registry.resolve(self)

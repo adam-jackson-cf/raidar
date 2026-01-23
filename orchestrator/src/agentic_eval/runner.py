@@ -1,5 +1,6 @@
 """Task execution via Harbor."""
 
+import os
 import shutil
 import subprocess
 import uuid
@@ -61,7 +62,7 @@ def prepare_workspace(
 def run_task(
     task: TaskDefinition,
     config: HarnessConfig,
-    scaffold_dir: Path,
+    scaffold_root: Path,
     task_dir: Path,
     workspace_dir: Path,
     results_dir: Path,
@@ -81,24 +82,34 @@ def run_task(
     """
     run_id = str(uuid.uuid4())[:8]
     start_time = datetime.now(UTC)
+    adapter = config.adapter()
+    adapter.validate()
 
-    # Prepare workspace
+    from .scaffold import record_scaffold_metadata, resolve_scaffold_source
+
+    scaffold_source = resolve_scaffold_source(
+        scaffold_root, task.scaffold.template, task.scaffold.version
+    )
+
     workspace = prepare_workspace(
-        scaffold_dir=scaffold_dir,
+        scaffold_dir=scaffold_source.path,
         target_dir=workspace_dir,
         task_dir=task_dir,
         agent=config.agent.value,
         rules_variant=config.rules_variant,
     )
+    manifest_path = workspace / "scaffold.manifest.json"
+    if not manifest_path.exists():
+        manifest = generate_manifest(workspace)
+        save_manifest(manifest, manifest_path)
+
+    record_scaffold_metadata(workspace, scaffold_source, manifest_path, config.rules_variant)
+    adapter.prepare_workspace(workspace)
 
     # Build Harbor command
-    harbor_cmd = [
-        "harbor",
-        "run",
-        "-d",
-        "terminal-bench@2.0",
-        *config.harbor_args(),
-    ]
+    harbor_cmd = adapter.build_harbor_command()
+    run_env = os.environ.copy()
+    run_env.update(adapter.runtime_env())
 
     terminated_early = False
     termination_reason = None
@@ -111,6 +122,7 @@ def run_task(
             capture_output=True,
             text=True,
             timeout=config.timeout_sec,
+            env=run_env,
         )
         if result.returncode != 0:
             terminated_early = True

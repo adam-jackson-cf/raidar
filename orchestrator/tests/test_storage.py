@@ -107,7 +107,7 @@ class TestAggregateResults:
             timestamp=datetime.now(UTC).isoformat(),
             config=EvalConfig(
                 model="openai/gpt-4o",
-                harness="codex",
+                harness="codex-cli",
                 rules_variant="strict",
                 task_name="test",
             ),
@@ -119,7 +119,7 @@ class TestAggregateResults:
             timestamp=datetime.now(UTC).isoformat(),
             config=EvalConfig(
                 model="openai/gpt-4o",
-                harness="codex",
+                harness="codex-cli",
                 rules_variant="strict",
                 task_name="test",
             ),
@@ -130,5 +130,5 @@ class TestAggregateResults:
         result = aggregate_results([run1, run2])
 
         # Both have default scores, so average should be equal to one
-        assert result["by_harness"]["codex"]["count"] == 2
-        assert isinstance(result["by_harness"]["codex"]["avg_score"], float)
+        assert result["by_harness"]["codex-cli"]["count"] == 2
+        assert isinstance(result["by_harness"]["codex-cli"]["avg_score"], float)

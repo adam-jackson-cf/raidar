@@ -1,63 +1,51 @@
-# Handoff: Merge Agentic Eval System Implementations
+# Handoff: Implement Outstanding Items for Agentic Eval System
 
 ## Starting Prompt
 
-Execute the merge plan in `/Users/adamjackson/.claude/plans/majestic-hugging-minsky.md` to combine the best components from 4 parallel implementations into main.
+Execute the plan at `/Users/adamjackson/.claude/plans/delightful-cooking-conway.md` to implement 5 outstanding items for the agentic eval system.
 
-**Context:** We ran 4 parallel Claude sessions to implement an agentic evaluation system. Each implementation is in a git worktree. Analysis determined impl-3 should be the base, with cherry-picks from impl-1, impl-2, and impl-4.
+**Context:** We just completed merging 4 parallel implementations into main. The system works but has gaps: no tests, hardcoded config values, fragile LLM parsing, and incomplete session log parsers.
 
 **Execute these phases in order:**
 
-1. Merge impl-3 into main as base
-2. Cherry-pick test infrastructure from impl-2 (vitest.config.ts, test deps)
-3. Cherry-pick comparison module from impl-4 (aggregator.py, matrix_runner.py)
-4. Cherry-pick schemas from impl-1/impl-2 (task.py, scorecard.py, evaluator.py)
-5. Add CLI enhancements from impl-4 (list-agents, info commands)
-6. Verify merged system works
+1. **Phase 1: Configurable Values** - Create `config.py` with pydantic-settings, extract 29 hardcoded values
+2. **Phase 2: LLM Judge Robustness** - Fix fragile parsing in compliance.py with fallback strategies
+3. **Phase 3: Unit Tests** - Create tests/ directory with ~40 tests across 6 test files
+4. **Phase 4: Session Log Parsers** - Implement Gemini parser, fix Claude Code parser
+5. **Phase 5: Pre-commit Hooks** - Add ruff + pytest hooks
 
-After merge, run verification commands in the plan to confirm everything works.
+**Also:** Delete `docs/implementation-plan.md` (already actioned, no longer needed).
+
+After each phase, run the verification commands in the plan to confirm everything works.
 
 ## Relevant Files
 
 | File | Purpose |
 |------|---------|
-| `/Users/adamjackson/.claude/plans/majestic-hugging-minsky.md` | **READ FIRST** - Complete merge plan with commands |
-| `docs/agentic-eval-system-research.md` | Original architecture specification |
-| `docs/implementation-plan.md` | Implementation phases (all 4 completed) |
-| `/Users/adamjackson/Projects/eval-impl-3/orchestrator/src/` | Primary base - cleanest architecture |
-| `/Users/adamjackson/Projects/eval-impl-2/scaffold/vitest.config.ts` | Test infrastructure to cherry-pick |
-| `/Users/adamjackson/Projects/eval-impl-4/orchestrator/src/agentic_eval/comparison/` | Aggregation module to cherry-pick |
-| `/Users/adamjackson/Projects/eval-impl-1/orchestrator/src/agentic_eval/evaluator.py` | Evaluator to cherry-pick |
+| `/Users/adamjackson/.claude/plans/delightful-cooking-conway.md` | **READ FIRST** - Complete implementation plan |
+| `orchestrator/src/agentic_eval/config.py` | **CREATE** - Centralized configuration |
+| `orchestrator/src/agentic_eval/scoring/compliance.py` | LLM judge parsing to fix (line 142) |
+| `orchestrator/src/agentic_eval/schemas/scorecard.py` | Has duplicated weights to consolidate |
+| `orchestrator/src/agentic_eval/parser/session_log.py` | Gemini stub, Claude incomplete |
+| `orchestrator/tests/` | **CREATE** - Test infrastructure |
+| `docs/implementation-plan.md` | **DELETE** - Already actioned |
 
 ## Key Context
 
-**Worktree Locations:**
-```
-/Users/adamjackson/Projects/typescript-ui-eval  [main] - merge target
-/Users/adamjackson/Projects/eval-impl-1         [impl-1] - 11 commits
-/Users/adamjackson/Projects/eval-impl-2         [impl-2] - 11 commits
-/Users/adamjackson/Projects/eval-impl-3         [impl-3] - 5 commits ⭐ BASE
-/Users/adamjackson/Projects/eval-impl-4         [impl-4] - 5 commits
-```
+**This Session Completed:**
+- Merged impl-3 as base + cherry-picked from impl-1, impl-2, impl-4
+- Added vitest infrastructure, comparison module, CLI commands
+- Fixed visual=None validation, lint script
+- All CLI commands working (`run`, `matrix`, `list-agents`, `info`, etc.)
 
-**Cherry-Pick Summary:**
-| Component | Source | Reason |
-|-----------|--------|--------|
-| Base structure | impl-3 | Cleanest (2,346 LOC) |
-| Test infra | impl-2 | Only one with vitest setup |
-| Comparison | impl-4 | Best aggregation + parallel execution |
-| Schemas | impl-1/impl-2 | Most complete models |
-| CLI commands | impl-4 | list-agents, info |
-
-**Outstanding After Merge (Priority Order):**
-1. Unit tests - ALL implementations have ZERO tests
-2. LLM judge robustness - fragile JSON parsing
-3. Configurable values - hardcoded thresholds
-4. Session log parsers - only Codex supported
-5. Pre-commit hooks
-6. Documentation
+**Key Findings from Exploration:**
+- 29 hardcoded values found (timeouts, weights, model names)
+- Weights duplicated in `scoring/__init__.py` AND `schemas/scorecard.py`
+- LLM judge at compliance.py:142 uses fragile first-line parsing
+- Gemini parser returns empty list (stub only)
+- Claude parser misses tool_result entries
 
 **Tech Stack:**
 - Orchestrator: Python 3.12+, uv, Pydantic, Click, LiteLLM
-- Scaffold: Next.js 16, React 19, Tailwind 4, shadcn/ui
-- Execution: Harbor framework, Docker
+- Testing: pytest 8.0+, pytest-asyncio (already in pyproject.toml)
+- Config: pydantic-settings (to add)

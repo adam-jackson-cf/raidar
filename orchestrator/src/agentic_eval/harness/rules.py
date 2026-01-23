@@ -10,7 +10,7 @@ from typing import Literal
 # Mapping from CLI/agent name to expected rule filename
 SYSTEM_RULES: dict[str, str] = {
     "claude-code": "CLAUDE.md",
-    "codex": "AGENTS.md",
+    "codex-cli": "AGENTS.md",
     "copilot": "copilot-instructions.md",
     "cursor": "user-rules-setting.md",
     "gemini": "GEMINI.md",

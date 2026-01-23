@@ -339,7 +339,7 @@ def parse_gemini_entry(entry: dict) -> list[SessionEvent]:
 
 def parse_session(
     session_dir: Path,
-    harness: Literal["codex", "claude-code", "gemini"],
+    harness: Literal["codex-cli", "claude-code", "gemini"],
 ) -> list[SessionEvent]:
     """Parse session logs for the specified harness.
 
@@ -350,7 +350,7 @@ def parse_session(
     Returns:
         List of session events
     """
-    if harness == "codex":
+    if harness == "codex-cli":
         return parse_codex_session(session_dir)
     elif harness == "claude-code":
         return parse_claude_session(session_dir)

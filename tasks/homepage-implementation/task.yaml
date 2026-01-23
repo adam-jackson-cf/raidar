@@ -6,6 +6,7 @@ timeout_sec: 1800
 
 scaffold:
   template: next-shadcn-starter
+  version: v2025.01
   rules_variant: strict
 
 verification:

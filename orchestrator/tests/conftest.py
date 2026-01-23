@@ -85,7 +85,7 @@ def sample_scorecard() -> Scorecard:
     return Scorecard(
         run_id="test-run-001",
         task_name="test-task",
-        agent="codex",
+        agent="codex-cli",
         model="openai/gpt-4o",
         rules_variant="strict",
         duration_sec=120.5,
@@ -121,7 +121,7 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
         timestamp=datetime.now(UTC).isoformat(),
         config=EvalConfig(
             model="openai/gpt-4o",
-            harness="codex",
+            harness="codex-cli",
             rules_variant="strict",
             task_name="test-task",
         ),

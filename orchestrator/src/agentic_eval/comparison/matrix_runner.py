@@ -105,6 +105,9 @@ class MatrixRunner:
 
             # Prepare workspace using module-level function
             task_dir = self.tasks_dir / task.name
+            adapter = harness_config.adapter()
+            adapter.validate()
+
             prepare_workspace(
                 scaffold_dir=self.scaffold_dir,
                 target_dir=workspace_dir,
@@ -112,6 +115,7 @@ class MatrixRunner:
                 agent=harness_config.agent.value,
                 rules_variant=harness_config.rules_variant,
             )
+            adapter.prepare_workspace(workspace_dir)
 
             if dry_run:
                 # In dry run, just prepare workspace without execution

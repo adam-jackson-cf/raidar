@@ -17,6 +17,9 @@ def main() -> None:
     pass
 
 
+AGENT_CHOICES = [agent.value for agent in Agent]
+
+
 @main.command()
 @click.option(
     "--task",
@@ -28,7 +31,7 @@ def main() -> None:
 @click.option(
     "--agent",
     "-a",
-    type=click.Choice(["claude-code", "codex", "gemini", "openhands"]),
+    type=click.Choice(AGENT_CHOICES),
     required=True,
     help="Agent/harness to use",
 )
@@ -161,7 +164,7 @@ def manifest(scaffold: Path, output: Path | None) -> None:
 @click.option(
     "--agent",
     "-a",
-    type=click.Choice(["claude-code", "codex", "gemini", "copilot"]),
+    type=click.Choice(sorted(set(AGENT_CHOICES + ["copilot", "cursor", "pi"]))),
     required=True,
     help="Agent to inject rules for",
 )

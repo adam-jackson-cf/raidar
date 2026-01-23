@@ -138,7 +138,7 @@ test_scripts:
 scaffold:
   template: "next-shadcn-starter"
   agents_md: "./rules/agents-strict.md"
-  
+
 verification:
   max_gate_failures: 3
   gates:
@@ -163,7 +163,7 @@ compliance:
     - type: "no_pattern"
       pattern: "style={{.*}}"
       description: "Avoids inline styles"
-  
+
   llm_judge_rubric:
     - criterion: "Error handling follows AGENTS.md patterns"
       weight: 0.3
@@ -220,7 +220,7 @@ Adapted from the Codex context bundle approach, the session log parser extracts:
 ```typescript
 interface SessionEvent {
   timestamp: string;
-  event_type: "user_prompt" | "assistant_message" | "file_change" | 
+  event_type: "user_prompt" | "assistant_message" | "file_change" |
               "bash_command" | "tool_call" | "gate_result";
   data: {
     content?: string;      // Truncated for prompts/messages
@@ -260,21 +260,21 @@ async function captureAndCompare(
 ): Promise<VisualResult> {
   // Execute screenshot capture (e.g., Playwright headless)
   await exec(screenshotCommand);
-  
+
   const actualPath = `${outputDir}/actual.png`;
   const diffPath = `${outputDir}/diff.png`;
-  
+
   const result = await odiff.compare(
     referencePath,
     actualPath,
     diffPath,
     { threshold: 0.1 }  // Anti-aliasing tolerance
   );
-  
+
   if (result.match) {
     return { similarity: 1.0, diff_path: null };
   }
-  
+
   return {
     similarity: 1 - (result.diffPercentage / 100),
     diff_path: diffPath
@@ -440,7 +440,7 @@ interface EvalRun {
   duration_sec: number;
   terminated_early: boolean;
   termination_reason?: string;
-  
+
   scores: {
     functional: {
       passed: boolean;
@@ -463,7 +463,7 @@ interface EvalRun {
     };
     composite: number;        // Weighted final score
   };
-  
+
   events: SessionEvent[];
   gate_history: GateEvent[];
 }
