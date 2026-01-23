@@ -7,7 +7,10 @@ from typing import Callable, Dict, Type
 from ..config import Agent, HarnessConfig
 from .base import HarnessAdapter
 from .codex_cli import CodexCliAdapter
+from .copilot_cli import CopilotCliAdapter
+from .cursor_cli import CursorCliAdapter
 from .default import HarborHarnessAdapter
+from .pi_cli import PiCliAdapter
 
 AdapterFactory = Callable[[HarnessConfig], HarnessAdapter]
 
@@ -35,3 +38,7 @@ registry.register(Agent.CLAUDE_CODE, lambda cfg: HarborHarnessAdapter(cfg))
 registry.register(Agent.CODEX_CLI, lambda cfg: CodexCliAdapter(cfg))
 registry.register(Agent.GEMINI, lambda cfg: HarborHarnessAdapter(cfg))
 registry.register(Agent.OPENHANDS, lambda cfg: HarborHarnessAdapter(cfg))
+# External CLI harnesses
+registry.register(Agent.CURSOR, lambda cfg: CursorCliAdapter(cfg))
+registry.register(Agent.COPILOT, lambda cfg: CopilotCliAdapter(cfg))
+registry.register(Agent.PI, lambda cfg: PiCliAdapter(cfg))

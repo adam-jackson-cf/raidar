@@ -202,6 +202,13 @@ def inject(
 
 @main.command()
 @click.option(
+    "--task",
+    "-t",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to task.yaml file",
+)
+@click.option(
     "--config",
     "-c",
     type=click.Path(exists=True, path_type=Path),
@@ -209,29 +216,55 @@ def inject(
     help="Path to matrix configuration YAML",
 )
 @click.option(
+    "--scaffolds-root",
+    "-S",
+    type=click.Path(exists=True, path_type=Path),
+    default=Path("scaffolds"),
+    help="Root directory containing versioned scaffolds",
+)
+@click.option(
+    "--parallel",
+    type=int,
+    default=1,
+    help="Number of parallel executions",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Show matrix entries without running",
 )
-def matrix(config: Path, dry_run: bool) -> None:
+def matrix(task: Path, config: Path, scaffolds_root: Path, parallel: int, dry_run: bool) -> None:
     """Run evaluation matrix from configuration."""
-    from .matrix import generate_matrix_entries, load_matrix_config
+    from .comparison.matrix_runner import MatrixRunner
+    from .matrix import load_matrix_config
+
+    click.echo(f"Loading task from {task}")
+    task_def = load_task(task)
 
     click.echo(f"Loading matrix from {config}")
     matrix_config = load_matrix_config(config)
-    entries = generate_matrix_entries(matrix_config)
+    entries = matrix_config.harnesses
+    click.echo(
+        f"Matrix defined for {len(matrix_config.harnesses)} harnesses, "
+        f"{len(matrix_config.models)} models, {len(matrix_config.rules_variants)} rule variants"
+    )
 
-    click.echo(f"Generated {len(entries)} matrix entries:")
-    for i, entry in enumerate(entries, 1):
-        click.echo(f"  {i}. {entry.harness} + {entry.model} + {entry.rules_variant}")
+    runner = MatrixRunner(
+        tasks_dir=task.parent,
+        scaffolds_root=scaffolds_root,
+        results_dir=Path(matrix_config.results_path),
+        workspaces_dir=Path(matrix_config.workspace_base),
+    )
 
-    if dry_run:
-        click.echo("\nDry run - no tasks executed")
-        return
+    report = runner.run_matrix(
+        task=task_def,
+        matrix_config=matrix_config,
+        parallel=parallel,
+        dry_run=dry_run,
+    )
 
     click.echo(
-        "\nNote: Full matrix execution requires Harbor. "
-        "Run entries individually with 'run' command."
+        f"Matrix completed: {report.successful_runs} successes, {report.failed_runs} failures."
     )
 
 

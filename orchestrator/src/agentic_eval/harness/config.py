@@ -13,6 +13,9 @@ class Agent(str, Enum):
     CODEX_CLI = "codex-cli"
     GEMINI = "gemini"
     OPENHANDS = "openhands"
+    CURSOR = "cursor"
+    COPILOT = "copilot"
+    PI = "pi"
 
 
 class ModelConfig(BaseModel):
