@@ -89,6 +89,15 @@ def sample_scorecard() -> Scorecard:
         model="openai/gpt-4o",
         rules_variant="strict",
         duration_sec=120.5,
+        metadata={
+            "scaffold": {
+                "template": "next-shadcn-starter",
+                "version": "v2025.01",
+                "fingerprint": "abc123",
+                "baseline_manifest": ".baseline-scaffold.json",
+                "workspace_manifest": "scaffold.manifest.json",
+            }
+        },
         functional=FunctionalScore(
             passed=True,
             tests_passed=8,
@@ -124,6 +133,8 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
             harness="codex-cli",
             rules_variant="strict",
             task_name="test-task",
+            scaffold_template="next-shadcn-starter",
+            scaffold_version="v2025.01",
         ),
         duration_sec=120.5,
         terminated_early=False,

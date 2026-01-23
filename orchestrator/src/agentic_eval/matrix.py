@@ -80,7 +80,7 @@ def create_example_matrix() -> str:
     return """# Evaluation matrix configuration
 matrix:
   harnesses:
-    - codex
+    - codex-cli
     - claude-code
   models:
     - openai/gpt-5

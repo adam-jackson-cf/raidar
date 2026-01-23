@@ -24,7 +24,7 @@ def load_task(task_path: Path) -> TaskDefinition:
 
 
 def prepare_workspace(
-    scaffold_dir: Path,
+    scaffold_root: Path,
     target_dir: Path,
     task_dir: Path,
     agent: str,
@@ -33,7 +33,7 @@ def prepare_workspace(
     """Prepare workspace by copying scaffold and injecting rules.
 
     Args:
-        scaffold_dir: Path to scaffold template
+        scaffold_root: Path to scaffold catalog root
         target_dir: Path to create workspace
         task_dir: Path to task directory (contains rules/)
         agent: Agent name for rule file selection
@@ -72,7 +72,7 @@ def run_task(
     Args:
         task: Task definition
         config: Harness configuration
-        scaffold_dir: Path to scaffold template
+        scaffold_root: Path to scaffold catalog root
         task_dir: Path to task directory
         workspace_dir: Path to create workspace
         results_dir: Path to store results
@@ -103,7 +103,16 @@ def run_task(
         manifest = generate_manifest(workspace)
         save_manifest(manifest, manifest_path)
 
-    record_scaffold_metadata(workspace, scaffold_source, manifest_path, config.rules_variant)
+    baseline_manifest_path = workspace / ".baseline-scaffold.json"
+    shutil.copy2(scaffold_source.manifest_path, baseline_manifest_path)
+
+    metadata_path = record_scaffold_metadata(
+        workspace,
+        scaffold_source,
+        manifest_path,
+        baseline_manifest_path,
+        config.rules_variant,
+    )
     adapter.prepare_workspace(workspace)
 
     # Build Harbor command
@@ -144,6 +153,15 @@ def run_task(
         FunctionalScore,
     )
 
+    scaffold_meta = {
+        "template": scaffold_source.template,
+        "version": scaffold_source.version,
+        "fingerprint": scaffold_source.manifest.fingerprint,
+        "baseline_manifest": baseline_manifest_path.name,
+        "workspace_manifest": manifest_path.name,
+        "metadata_file": metadata_path.name,
+    }
+
     scorecard = Scorecard(
         functional=FunctionalScore(
             passed=False,
@@ -158,6 +176,7 @@ def run_task(
             unique_failure_categories=0,
             repeat_failures=0,
         ),
+        metadata={"scaffold": scaffold_meta},
     )
 
     return EvalRun(
@@ -168,6 +187,8 @@ def run_task(
             harness=config.agent.value,
             rules_variant=config.rules_variant,
             task_name=task.name,
+            scaffold_template=scaffold_source.template,
+            scaffold_version=scaffold_source.version,
         ),
         duration_sec=duration,
         terminated_early=terminated_early,

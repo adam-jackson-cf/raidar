@@ -98,6 +98,9 @@ class ScaffoldAudit(BaseModel):
     """Scaffold baseline audit results."""
 
     manifest_version: str = "1.0.0"
+    template: str | None = None
+    template_version: str | None = None
+    manifest_fingerprint: str | None = None
     file_count: int = 0
     dependency_count: int = 0
     changes_from_baseline: list[str] = Field(default_factory=list)
@@ -163,6 +166,8 @@ class EvalConfig(BaseModel):
     harness: str = Field(description="Harness/agent name")
     rules_variant: str = Field(description="Rules variant used")
     task_name: str = Field(description="Task identifier")
+    scaffold_template: str = Field(description="Scaffold template name")
+    scaffold_version: str = Field(description="Scaffold template version")
 
 
 class EvalRun(BaseModel):

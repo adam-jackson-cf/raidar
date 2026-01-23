@@ -5,7 +5,7 @@ Follow these steps to make a new agent available across CLI commands, session pa
 ## 1. Extend the harness definitions
 1. Update `orchestrator/src/agentic_eval/harness/config.py`:
    - Add the agent to the `Agent` enum (name should match how Harbor identifies the harness).
-   - Ensure `HarnessConfig.harbor_args()` emits the correct CLI flags for the new harness.
+   - Register a `HarnessAdapter` implementation in `harness/adapters/registry.py` that knows how to validate auth, configure CLIs, and build the Harbor command.
 2. If the agent requires special timeout defaults or Harbor arguments, extend `HarnessConfig` with additional fields rather than hardcoding elsewhere.
 
 ## 2. Wire the CLI
@@ -24,7 +24,7 @@ Follow these steps to make a new agent available across CLI commands, session pa
 
 ## 5. Harbor + LiteLLM integration
 1. Confirm Harbor can launch the agent; if not, add the necessary container or adapter scripts.
-2. Ensure the desired model identifiers are supported by LiteLLM; update any configuration (`config.py`, `.env.example`) with provider-specific settings.
+2. Ensure the desired model identifiers are supported by your adapter (e.g., Codex CLI forces `provider=codex`); document required env vars (`CODEX_API_KEY`, OAuth tokens, binaries on PATH, etc.).
 
 ## 6. Update documentation and tooling
 - Mention the agent in `docs/architecture-review.md` or team onboarding docs so evaluators know when to use it.

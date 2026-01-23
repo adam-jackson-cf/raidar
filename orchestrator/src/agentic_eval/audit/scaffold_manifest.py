@@ -34,6 +34,9 @@ class ScaffoldManifest(BaseModel):
 
     generated_at: str = Field(description="ISO timestamp of manifest generation")
     version: str = Field(default="1.0.0")
+    template: str | None = Field(default=None, description="Template identifier")
+    template_version: str | None = Field(default=None, description="Template version")
+    fingerprint: str = Field(default="", description="Deterministic hash of manifest contents")
     files: dict[str, FileEntry] = Field(default_factory=dict)
     dependencies: dict[str, str] = Field(default_factory=dict)
     dev_dependencies: dict[str, str] = Field(default_factory=dict)
@@ -50,7 +53,29 @@ def compute_file_hash(path: Path) -> str:
     return f"sha256:{sha256.hexdigest()}"
 
 
-def generate_manifest(scaffold_dir: Path) -> ScaffoldManifest:
+def _fingerprint_entries(
+    files: dict[str, FileEntry],
+    dependencies: dict[str, str],
+    dev_dependencies: dict[str, str],
+) -> str:
+    """Compute deterministic fingerprint across manifest contents."""
+    fingerprint_seed: list[str] = []
+    for path_str, entry in sorted(files.items()):
+        fingerprint_seed.append(f"{path_str}:{entry.hash}")
+    for dep, version in sorted(dependencies.items()):
+        fingerprint_seed.append(f"dep:{dep}={version}")
+    for dep, version in sorted(dev_dependencies.items()):
+        fingerprint_seed.append(f"dev:{dep}={version}")
+    combined = "|".join(fingerprint_seed).encode()
+    return hashlib.sha256(combined).hexdigest()
+
+
+def generate_manifest(
+    scaffold_dir: Path,
+    *,
+    template_name: str | None = None,
+    template_version: str | None = None,
+) -> ScaffoldManifest:
     """Generate a manifest for a scaffold directory.
 
     Args:
@@ -104,8 +129,13 @@ def generate_manifest(scaffold_dir: Path) -> ScaffoldManifest:
             dependencies = pkg.get("dependencies", {})
             dev_dependencies = pkg.get("devDependencies", {})
 
+    fingerprint = _fingerprint_entries(files, dependencies, dev_dependencies)
+
     return ScaffoldManifest(
         generated_at=datetime.now(UTC).isoformat(),
+        template=template_name,
+        template_version=template_version,
+        fingerprint=fingerprint,
         files=files,
         dependencies=dependencies,
         dev_dependencies=dev_dependencies,

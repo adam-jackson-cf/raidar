@@ -26,7 +26,7 @@
 ## RISKS & GAPS
 1. Runner + MatrixRunner concentrate workspace prep, Harbor invocation, scoring, and artifact persistence in a single stack, so introducing alternative execution engines or async job control requires rewriting monolithic functions (`orchestrator/src/agentic_eval/runner.py:25`, `orchestrator/src/agentic_eval/comparison/matrix_runner.py:40`). Impact: high (blast radius across all CLI flows); Likelihood: high (already evidenced by analyzer God-Class warnings).
 2. GateWatcher executes user-defined shell commands with `shell=True` and only regex categorization, exposing the host to arbitrary command execution without sandboxing or streaming safeguards (`orchestrator/src/agentic_eval/watcher/gate_watcher.py:65`). Impact: high (security + stability); Likelihood: medium (depends on task author discipline).
-3. Session parser coverage contradicts CLI promises: CLI advertises `openhands`/`copilot`, yet `parse_session` only handles `codex`, `claude-code`, `gemini` and returns an empty list otherwise (`orchestrator/src/agentic_eval/parser/session_log.py:340`). Impact: medium (missing telemetry, undermining audits); Likelihood: high (any non-supported agent silently drops logs).
+3. Session parser coverage contradicts CLI promises: CLI advertises `openhands`/`copilot`, yet `parse_session` only handles `codex-cli`, `claude-code`, `gemini` and returns an empty list otherwise (`orchestrator/src/agentic_eval/parser/session_log.py:340`). Impact: medium (missing telemetry, undermining audits); Likelihood: high (any non-supported agent silently drops logs).
 4. Global `settings` singleton leaks into schemas (`orchestrator/src/agentic_eval/schemas/scorecard.py:32`) and scoring logic, so tests and concurrent runs cannot vary weights/timeouts independently, risking inconsistent scoring across matrices. Impact: medium; Likelihood: high whenever multiple evaluations run with different requirements.
 5. Matrix runs never clean up generated workspaces; run IDs only include timestamps, so parallel runs can still collide with shared directories and steadily grow disk usage (`orchestrator/src/agentic_eval/comparison/matrix_runner.py:70`). Impact: medium (resource exhaustion, stray artifacts); Likelihood: medium.
 
@@ -51,4 +51,3 @@
 - architecture:coupling → `.enaible/artifacts/analyze-architecture/20260123T104444Z/architecture-coupling.json`
 - architecture:scalability → `.enaible/artifacts/analyze-architecture/20260123T104444Z/architecture-scalability.json`
 - Recon & synthesis notes → `.enaible/artifacts/analyze-architecture/20260123T104444Z/recon.md`, `.enaible/artifacts/analyze-architecture/20260123T104444Z/synthesis-notes.md`
-

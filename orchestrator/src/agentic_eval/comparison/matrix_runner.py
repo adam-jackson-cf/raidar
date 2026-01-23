@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from ..harness.config import HarnessConfig
 from ..matrix import MatrixConfig, generate_matrix_entries
 from ..runner import prepare_workspace, run_task
+from ..scaffold import resolve_scaffold_source
 from ..schemas.scorecard import Scorecard
 from ..schemas.task import TaskDefinition
 
@@ -58,12 +59,12 @@ class MatrixRunner:
     def __init__(
         self,
         tasks_dir: Path,
-        scaffold_dir: Path,
+        scaffolds_root: Path,
         results_dir: Path,
         workspaces_dir: Path,
     ) -> None:
         self.tasks_dir = tasks_dir
-        self.scaffold_dir = scaffold_dir
+        self.scaffolds_root = scaffolds_root
         self.results_dir = results_dir
         self.workspaces_dir = workspaces_dir
 
@@ -108,17 +109,19 @@ class MatrixRunner:
             adapter = harness_config.adapter()
             adapter.validate()
 
-            prepare_workspace(
-                scaffold_dir=self.scaffold_dir,
-                target_dir=workspace_dir,
-                task_dir=task_dir,
-                agent=harness_config.agent.value,
-                rules_variant=harness_config.rules_variant,
+            scaffold_source = resolve_scaffold_source(
+                self.scaffolds_root, task.scaffold.template, task.scaffold.version
             )
-            adapter.prepare_workspace(workspace_dir)
 
             if dry_run:
-                # In dry run, just prepare workspace without execution
+                prepare_workspace(
+                    scaffold_dir=scaffold_source.path,
+                    target_dir=workspace_dir,
+                    task_dir=task_dir,
+                    agent=harness_config.agent.value,
+                    rules_variant=harness_config.rules_variant,
+                )
+                adapter.prepare_workspace(workspace_dir)
                 return MatrixRunResult(
                     config=harness_config,
                     scorecard=None,
@@ -133,7 +136,7 @@ class MatrixRunner:
             eval_run = run_task(
                 task=task,
                 config=harness_config,
-                scaffold_dir=self.scaffold_dir,
+                scaffold_root=self.scaffolds_root,
                 task_dir=task_dir,
                 workspace_dir=workspace_dir,
                 results_dir=self.results_dir,
@@ -220,7 +223,7 @@ class MatrixRunner:
 
 def run_matrix(
     tasks_dir: Path,
-    scaffold_dir: Path,
+    scaffolds_root: Path,
     results_dir: Path,
     workspaces_dir: Path,
     task: TaskDefinition,
@@ -232,7 +235,7 @@ def run_matrix(
 
     Args:
         tasks_dir: Path to tasks directory
-        scaffold_dir: Path to scaffold directory
+        scaffolds_root: Path to scaffold catalog root
         results_dir: Path to results directory
         workspaces_dir: Path to workspaces directory
         task: Task definition
@@ -245,7 +248,7 @@ def run_matrix(
     """
     runner = MatrixRunner(
         tasks_dir=tasks_dir,
-        scaffold_dir=scaffold_dir,
+        scaffolds_root=scaffolds_root,
         results_dir=results_dir,
         workspaces_dir=workspaces_dir,
     )

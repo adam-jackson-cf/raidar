@@ -233,7 +233,7 @@ interface SessionEvent {
 ```
 
 The parser reads from:
-- **Codex**: `~/.codex/sessions/YYYY/MM/DD/*.jsonl` + `~/.codex/history.jsonl`
+- **Codex CLI**: `~/.codex/sessions/YYYY/MM/DD/*.jsonl` + `~/.codex/history.jsonl`
 - **Claude Code**: `~/.claude/projects/{project}/sessions/*.jsonl`
 
 ### AGENTS.md Rule Injection
@@ -433,7 +433,7 @@ interface EvalRun {
   timestamp: string;
   config: {
     model: string;           // "claude-opus-4" | "gpt-5" | etc
-    harness: string;         // "codex" | "claude-code" | "cursor"
+    harness: string;         // "codex-cli" | "claude-code" | "cursor"
     rules_variant: string;   // "strict" | "minimal" | "none"
     task_name: string;
   };

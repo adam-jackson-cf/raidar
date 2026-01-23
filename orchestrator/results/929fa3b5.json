@@ -5,7 +5,9 @@
     "model": "openai/gpt-5",
     "harness": "codex-cli",
     "rules_variant": "strict",
-    "task_name": "homepage-implementation"
+    "task_name": "homepage-implementation",
+    "scaffold_template": "next-shadcn-starter",
+    "scaffold_version": "v2025.01"
   },
   "duration_sec": 30.14466,
   "terminated_early": true,
@@ -19,7 +21,15 @@
     "duration_sec": 0.0,
     "terminated_early": false,
     "termination_reason": null,
-    "metadata": {},
+    "metadata": {
+      "scaffold": {
+        "template": "next-shadcn-starter",
+        "version": "v2025.01",
+        "fingerprint": "demo-fingerprint",
+        "baseline_manifest": ".baseline-scaffold.json",
+        "workspace_manifest": "scaffold.manifest.json"
+      }
+    },
     "functional": {
       "passed": false,
       "tests_passed": 0,

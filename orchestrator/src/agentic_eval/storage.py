@@ -59,15 +59,18 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
     by_harness: dict[str, list[EvalRun]] = {}
     by_model: dict[str, list[EvalRun]] = {}
     by_rules: dict[str, list[EvalRun]] = {}
+    by_scaffold: dict[str, list[EvalRun]] = {}
 
     for run in runs:
         harness = run.config.harness
         model = run.config.model
         rules = run.config.rules_variant
+        scaffold_key = f"{run.config.scaffold_template}@{run.config.scaffold_version}"
 
         by_harness.setdefault(harness, []).append(run)
         by_model.setdefault(model, []).append(run)
         by_rules.setdefault(rules, []).append(run)
+        by_scaffold.setdefault(scaffold_key, []).append(run)
 
     def avg_score(runs_list: list[EvalRun]) -> float:
         if not runs_list:
@@ -81,6 +84,9 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
         },
         "by_model": {m: {"count": len(r), "avg_score": avg_score(r)} for m, r in by_model.items()},
         "by_rules": {v: {"count": len(r), "avg_score": avg_score(r)} for v, r in by_rules.items()},
+        "by_scaffold": {
+            key: {"count": len(r), "avg_score": avg_score(r)} for key, r in by_scaffold.items()
+        },
     }
 
 
@@ -100,6 +106,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "harness",
         "model",
         "rules_variant",
+        "scaffold_template",
+        "scaffold_version",
         "task_name",
         "duration_sec",
         "terminated_early",
@@ -127,6 +135,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "harness": run.config.harness,
                 "model": run.config.model,
                 "rules_variant": run.config.rules_variant,
+                "scaffold_template": run.config.scaffold_template,
+                "scaffold_version": run.config.scaffold_version,
                 "task_name": run.config.task_name,
                 "duration_sec": run.duration_sec,
                 "terminated_early": run.terminated_early,
@@ -204,5 +214,17 @@ def generate_comparison_report(runs: list[EvalRun]) -> str:
     )
     for rules, stats in agg.get("by_rules", {}).items():
         lines.append(f"- **{rules}**: {stats['count']} runs, avg score: {stats['avg_score']:.3f}")
+
+    lines.extend(
+        [
+            "\n## By Scaffold",
+        ]
+    )
+    for scaffold, stats in agg.get("by_scaffold", {}).items():
+        template, version = scaffold.split("@", maxsplit=1)
+        lines.append(
+            f"- **{template} ({version})**: {stats['count']} runs, "
+            f"avg score: {stats['avg_score']:.3f}"
+        )
 
     return "\n".join(lines)

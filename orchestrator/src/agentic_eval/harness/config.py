@@ -38,7 +38,7 @@ class ModelConfig(BaseModel):
 class HarnessConfig(BaseModel):
     """Configuration for harness/model combination."""
 
-    agent: Agent = Field(description="Agent to use (claude-code, codex, etc)")
+    agent: Agent = Field(description="Agent to use (claude-code, codex-cli, etc)")
     model: ModelConfig = Field(description="Model configuration")
     rules_variant: Literal["strict", "minimal", "none"] = Field(
         default="strict",

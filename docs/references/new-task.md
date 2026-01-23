@@ -18,6 +18,7 @@ timeout_sec: 1800
 
 scaffold:
   template: next-shadcn-starter
+  version: v2025.01
   rules_variant: strict
 
 verification:
@@ -30,7 +31,7 @@ verification:
 
 Key sections to fill out:
 1. **Metadata** – `name`, `description`, `difficulty`, `category`, `timeout_sec`.
-2. **Scaffold** – `template` name (usually `next-shadcn-starter`) and default `rules_variant` (strict|minimal|none).
+2. **Scaffold** – `template` name (usually `next-shadcn-starter`), pinned `version` (e.g., `v2025.01`), and default `rules_variant` (strict|minimal|none).
 3. **Verification** – `max_gate_failures` plus ordered gate list. Each gate executes in the prepared workspace via `GateWatcher` with global timeouts from `settings.timeouts.gate`.
 4. **Compliance** – deterministic checks (`import_present`, `file_exists`, `no_pattern`) and `llm_judge_rubric` entries with weights that sum to 1. These feed `scoring/compliance.py`.
 5. **Visual** (optional) – reference image path relative to the task folder, the screenshot capture command, and similarity `threshold`.
@@ -38,11 +39,11 @@ Key sections to fill out:
 
 ## 3. Provide rules
 - Place harness-specific rule files under `tasks/<task>/rules/<agent>/<variant>.md` if custom guidance is required.
-- The CLI injects these files during `prepare_workspace`, so ensure filenames match agent enums (e.g., `claude-code`, `codex`).
+- The CLI injects these files during `prepare_workspace`, so ensure filenames match agent enums (e.g., `claude-code`, `codex-cli`).
 
 ## 4. Validate locally
-1. Run `eval-orchestrator manifest --scaffold scaffold` to refresh baseline manifests if scaffold files changed.
-2. Dry-run the task: `eval-orchestrator run --task tasks/<task>/task.yaml --agent codex --model openai/gpt-4.1 --rules strict --scaffold scaffold --workspace workspace --output orchestrator/results`.
+1. Run `eval-orchestrator manifest --scaffold scaffolds/<template>/<version>` whenever you update a scaffold version. This regenerates `scaffold.manifest.json` with the latest hashes.
+2. Dry-run the task: `eval-orchestrator run --task tasks/<task>/task.yaml --agent codex-cli --model codex/gpt-5.2-high --rules strict --scaffolds-root scaffolds --workspace workspace --output orchestrator/results`.
 3. Inspect the emitted scorecard (`orchestrator/results/<id>.json`) to ensure gates, compliance checks, and optional visual diffs behave as expected.
 
 ## 5. Document references

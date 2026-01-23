@@ -50,11 +50,11 @@ AGENT_CHOICES = [agent.value for agent in Agent]
     help="Rules variant to inject",
 )
 @click.option(
-    "--scaffold",
-    "-s",
+    "--scaffolds-root",
+    "-S",
     type=click.Path(exists=True, path_type=Path),
-    default=Path("scaffold"),
-    help="Path to scaffold template",
+    default=Path("scaffolds"),
+    help="Root directory containing versioned scaffolds",
 )
 @click.option(
     "--workspace",
@@ -81,7 +81,7 @@ def run(
     agent: str,
     model: str,
     rules: Literal["strict", "minimal", "none"],
-    scaffold: Path,
+    scaffolds_root: Path,
     workspace: Path,
     output: Path,
     timeout: int,
@@ -108,7 +108,7 @@ def run(
     result = run_task(
         task=task_def,
         config=config,
-        scaffold_dir=scaffold,
+        scaffold_root=scaffolds_root,
         task_dir=task.parent,
         workspace_dir=workspace,
         results_dir=output,
@@ -133,7 +133,7 @@ def run(
     "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to scaffold directory",
+    help="Path to a specific scaffold template/version directory",
 )
 @click.option(
     "--output",
@@ -180,7 +180,7 @@ def manifest(scaffold: Path, output: Path | None) -> None:
     "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to scaffold directory",
+    help="Path to a specific scaffold template/version directory",
 )
 def inject(
     task: Path,

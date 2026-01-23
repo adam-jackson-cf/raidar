@@ -4,7 +4,7 @@ End-to-end outline of how the evaluation harness prepares workspaces, executes a
 
 ## 1. Task + scaffold preparation
 1. Author `tasks/<task>/task.yaml` (see `docs/references/new-task.md`).
-2. The CLI copies the referenced scaffold template (default `scaffold/`) into a workspace via `prepare_workspace`, injects the requested rules variant, and snapshots `scaffold.manifest.json` for later audits.
+2. The CLI resolves `scaffolds/<template>/<version>/`, copies that versioned scaffold into a workspace, injects the requested rules variant, and snapshots both the baseline manifest (from the catalog) and the workspace manifest for audits.
 
 ## 2. Agent configuration
 - Harness choice now maps to adapter-backed entries in `orchestrator/src/agentic_eval/harness/config.py` (claude-code, codex-cli, gemini, openhands, etc.). Each adapter validates model compatibility before Harbor runs.
@@ -27,10 +27,11 @@ End-to-end outline of how the evaluation harness prepares workspaces, executes a
 
 ## 5. Result persistence & inspection
 - Completed runs serialize to `orchestrator/results/<run_id>.json` via `EvalRun`. The JSON contains:
-  - `config`: harness/model/rules metadata
+  - `config`: harness/model/rules metadata plus the scaffold template/version that ran
   - `scores`: full `Scorecard` with dimension payloads
   - `events`: optional reconstructed session events
   - `gate_history`: chronological gate execution artifacts
+- Scorecards also embed `metadata.scaffold` (template, version, manifest fingerprint, and paths to baseline/workspace manifests) so you can correlate score deltas with scaffold tweaks.
 - Aggregation utilities:
   - `comparison/aggregator.py` loads scorecards, builds reports, and exports CSV leaderboards.
   - `comparison/matrix_runner.py` coordinates batch runs and tracks per-run success/failure counts.
