@@ -1,6 +1,7 @@
 """Session log parsing for different CLI tools."""
 
 import json
+from collections.abc import Iterable
 from datetime import datetime
 from pathlib import Path
 from typing import Literal
@@ -13,6 +14,165 @@ def truncate_content(content: str, max_length: int = 500) -> str:
     if len(content) <= max_length:
         return content
     return content[:max_length] + "..."
+
+
+def _read_jsonl_records(file_path: Path) -> Iterable[dict]:
+    """Read JSONL file and yield each entry."""
+    with open(file_path) as f:
+        for line in f:
+            if not line.strip():
+                continue
+            try:
+                payload = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, dict):
+                yield payload
+
+
+def _read_json_records(file_path: Path) -> Iterable[dict]:
+    """Read JSON file (list or dict) and yield entries."""
+    try:
+        with open(file_path) as f:
+            data = json.load(f)
+    except json.JSONDecodeError:
+        return []
+
+    if isinstance(data, list):
+        return [entry for entry in data if isinstance(entry, dict)]
+
+    if isinstance(data, dict):
+        events = data.get("events")
+        if isinstance(events, list):
+            return [entry for entry in events if isinstance(entry, dict)]
+        return [data]
+
+    return []
+
+
+def _iter_structured_records(session_dir: Path, patterns: Iterable[str]) -> Iterable[dict]:
+    """Yield JSON objects from files matching the provided patterns."""
+    for pattern in patterns:
+        for file_path in session_dir.glob(pattern):
+            try:
+                if file_path.suffix == ".jsonl":
+                    yield from _read_jsonl_records(file_path)
+                else:
+                    yield from _read_json_records(file_path)
+            except OSError:
+                continue
+
+
+def _coerce_timestamp(entry: dict) -> str:
+    """Extract timestamp or default to now."""
+    for key in ("timestamp", "time", "created_at", "ts"):
+        if key in entry:
+            value = entry[key]
+            if isinstance(value, (int, float)):
+                try:
+                    return datetime.fromtimestamp(value).isoformat()
+                except ValueError:
+                    continue
+            if isinstance(value, str):
+                return value
+    return datetime.now().isoformat()
+
+
+def _structured_record_to_events(entry: dict, default_role: str) -> list[SessionEvent]:
+    """Convert a generic CLI log entry into SessionEvents."""
+    timestamp = _coerce_timestamp(entry)
+    events: list[SessionEvent] = []
+
+    role_hint = str(
+        entry.get("role")
+        or entry.get("speaker")
+        or entry.get("source")
+        or entry.get("event")
+        or entry.get("type")
+        or default_role
+    ).lower()
+
+    text = entry.get("text") or entry.get("content") or entry.get("message")
+    command = entry.get("command") or entry.get("cmd")
+    file_path = entry.get("file_path") or entry.get("path")
+    stdout = entry.get("stdout")
+    stderr = entry.get("stderr")
+    status = entry.get("status")
+    tool_name = entry.get("tool") or entry.get("tool_name")
+    tool_args = entry.get("args") or entry.get("payload") or entry.get("data")
+
+    if command:
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="bash_command",
+                data={"command": command},
+            )
+        )
+
+    if file_path:
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="file_change",
+                data={"file_path": file_path},
+            )
+        )
+
+    if stdout or stderr or role_hint in {"gate", "verification"}:
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="gate_result",
+                data={
+                    "status": status,
+                    "stdout": truncate_content(stdout or ""),
+                    "stderr": truncate_content(stderr or ""),
+                },
+            )
+        )
+
+    if tool_name:
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="tool_call",
+                data={
+                    "name": tool_name,
+                    "input": tool_args if isinstance(tool_args, dict) else {"value": tool_args},
+                },
+            )
+        )
+
+    if text:
+        if role_hint in {"user", "human", "prompt"}:
+            event_type = "user_prompt"
+        elif role_hint in {"assistant", "ai", "copilot", "cursor", "pi", "openhands"}:
+            event_type = "assistant_message"
+        else:
+            event_type = "assistant_message"
+
+        events.append(
+            SessionEvent(
+                timestamp=timestamp,
+                event_type=event_type,
+                data={"content": truncate_content(str(text))},
+            )
+        )
+
+    return events
+
+
+def _parse_structured_cli_session(
+    session_dir: Path,
+    patterns: Iterable[str],
+    default_role: str,
+) -> list[SessionEvent]:
+    """Parse CLI logs where entries are structured JSON records."""
+    events: list[SessionEvent] = []
+    for entry in _iter_structured_records(session_dir, patterns):
+        events.extend(_structured_record_to_events(entry, default_role))
+    return sorted(events, key=lambda e: e.timestamp)
 
 
 def parse_codex_session(session_dir: Path) -> list[SessionEvent]:
@@ -337,9 +497,53 @@ def parse_gemini_entry(entry: dict) -> list[SessionEvent]:
     return events
 
 
+def parse_cursor_session(session_dir: Path) -> list[SessionEvent]:
+    """Parse Cursor CLI session logs (JSON/JSONL)."""
+    return _parse_structured_cli_session(
+        session_dir,
+        patterns=("*.jsonl", "*.json"),
+        default_role="cursor",
+    )
+
+
+def parse_copilot_session(session_dir: Path) -> list[SessionEvent]:
+    """Parse Copilot CLI session logs."""
+    return _parse_structured_cli_session(
+        session_dir,
+        patterns=("*.jsonl", "*.json"),
+        default_role="copilot",
+    )
+
+
+def parse_pi_session(session_dir: Path) -> list[SessionEvent]:
+    """Parse Pi agent CLI session logs."""
+    return _parse_structured_cli_session(
+        session_dir,
+        patterns=("*.jsonl", "*.json"),
+        default_role="pi",
+    )
+
+
+def parse_openhands_session(session_dir: Path) -> list[SessionEvent]:
+    """Parse OpenHands harness session logs."""
+    return _parse_structured_cli_session(
+        session_dir,
+        patterns=("*.jsonl", "*.json"),
+        default_role="openhands",
+    )
+
+
 def parse_session(
     session_dir: Path,
-    harness: Literal["codex-cli", "claude-code", "gemini"],
+    harness: Literal[
+        "codex-cli",
+        "claude-code",
+        "gemini",
+        "cursor",
+        "copilot",
+        "pi",
+        "openhands",
+    ],
 ) -> list[SessionEvent]:
     """Parse session logs for the specified harness.
 
@@ -356,6 +560,14 @@ def parse_session(
         return parse_claude_session(session_dir)
     elif harness == "gemini":
         return parse_gemini_session(session_dir)
+    elif harness == "cursor":
+        return parse_cursor_session(session_dir)
+    elif harness == "copilot":
+        return parse_copilot_session(session_dir)
+    elif harness == "pi":
+        return parse_pi_session(session_dir)
+    elif harness == "openhands":
+        return parse_openhands_session(session_dir)
     else:
         # Other harnesses may need custom parsers
         return []

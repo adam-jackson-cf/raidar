@@ -21,6 +21,11 @@ This document proposes an evaluation system for testing model/harness combinatio
 
 <cite index="9-1">Terminal-Bench 2.0 is the current standard for agent evaluation, with 89 rigorously validated Docker-containerised tasks.</cite> <cite index="17-1">Harbor abstracts away the complexities of container-based rollouts and scales from local Docker to cloud providers like Daytona and Modal.</cite>
 
+**Harness + model pairing in the wild**
+- Harbor’s CLI explicitly separates harness and model arguments (e.g., `harbor run -d terminal-bench@2.1 -a claude-code -m anthropic/claude-3.5-sonnet`). This is the pattern we mirror in `HarnessConfig` and adapter validation.
+- Community submissions such as Inflection’s Pi coding agent describe their runs the same way (“Pi harness on terminal-bench with claude-3.5-sonnet”), reinforcing that every scorecard must declare both halves of the pair for reproducibility.
+- Because Terminal-Bench publishes leaderboards keyed by harness name and model identifier, we can safely delete any legacy flows that attempted to talk to models directly (e.g., LiteLLM-first paths) without representing the harness that orchestrated the work.
+
 **What Terminal-Bench provides:**
 - Task specification format (YAML with instruction, environment, test scripts)
 - Docker isolation per task run

@@ -46,7 +46,7 @@ class CodexCliAdapter(HarnessAdapter):
             )
         self._resolve_cli()
         if not (os.environ.get(self.API_KEY_ENV) or os.environ.get(self.OAUTH_ENV)):
-            raise EnvironmentError(
+            raise OSError(
                 "Codex CLI requires credentials. Set CODEX_API_KEY or CODEX_OAUTH_TOKEN."
             )
 
@@ -60,4 +60,3 @@ class CodexCliAdapter(HarnessAdapter):
         # Ensure Codex CLI has session directory path recorded for parsers
         codex_session_dir = workspace / ".codex"
         codex_session_dir.mkdir(exist_ok=True)
-*** End of File

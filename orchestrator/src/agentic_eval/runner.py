@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 
-from .audit.scaffold_manifest import generate_manifest, save_manifest
+from .audit.scaffold_manifest import create_scaffold_audit, generate_manifest, save_manifest
 from .harness.config import HarnessConfig
 from .harness.rules import inject_rules
 from .schemas.scorecard import EvalConfig, EvalRun, Scorecard
@@ -24,23 +24,24 @@ def load_task(task_path: Path) -> TaskDefinition:
 
 
 def prepare_workspace(
-    scaffold_root: Path,
+    *,
+    scaffold_dir: Path,
     target_dir: Path,
     task_dir: Path,
     agent: str,
     rules_variant: str,
-) -> Path:
+) -> tuple[Path, Path | None]:
     """Prepare workspace by copying scaffold and injecting rules.
 
     Args:
-        scaffold_root: Path to scaffold catalog root
+        scaffold_dir: Path to resolved scaffold template/version
         target_dir: Path to create workspace
         task_dir: Path to task directory (contains rules/)
         agent: Agent name for rule file selection
         rules_variant: Rules variant (strict, minimal, none)
 
     Returns:
-        Path to prepared workspace
+        Tuple of workspace path and injected rules file (if any)
     """
     # Copy scaffold to target
     if target_dir.exists():
@@ -48,15 +49,16 @@ def prepare_workspace(
     shutil.copytree(scaffold_dir, target_dir, dirs_exist_ok=True)
 
     # Inject rules
+    injected_rules: Path | None = None
     rules_dir = task_dir / "rules"
     if rules_dir.exists():
-        inject_rules(rules_dir, target_dir, agent, rules_variant)
+        injected_rules = inject_rules(rules_dir, target_dir, agent, rules_variant)
 
     # Generate initial manifest for baseline
     manifest = generate_manifest(target_dir)
     save_manifest(manifest, target_dir / "scaffold.manifest.json")
 
-    return target_dir
+    return target_dir, injected_rules
 
 
 def run_task(
@@ -82,6 +84,11 @@ def run_task(
     """
     run_id = str(uuid.uuid4())[:8]
     start_time = datetime.now(UTC)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    artifacts_dir = results_dir / run_id
+    if artifacts_dir.exists():
+        shutil.rmtree(artifacts_dir)
+    artifacts_dir.mkdir(parents=True, exist_ok=True)
     adapter = config.adapter()
     adapter.validate()
 
@@ -91,7 +98,7 @@ def run_task(
         scaffold_root, task.scaffold.template, task.scaffold.version
     )
 
-    workspace = prepare_workspace(
+    workspace, injected_rules = prepare_workspace(
         scaffold_dir=scaffold_source.path,
         target_dir=workspace_dir,
         task_dir=task_dir,
@@ -153,6 +160,25 @@ def run_task(
         FunctionalScore,
     )
 
+    # Persist scaffold artifacts for later audits
+    artifact_manifest = Path(
+        shutil.copy2(manifest_path, artifacts_dir / "workspace.manifest.json")
+    )
+    artifact_baseline = Path(
+        shutil.copy2(scaffold_source.manifest_path, artifacts_dir / "baseline.manifest.json")
+    )
+    artifact_meta = Path(shutil.copy2(metadata_path, artifacts_dir / "scaffold-meta.json"))
+    artifact_rules = None
+    if injected_rules and injected_rules.exists():
+        artifact_rules = Path(
+            shutil.copy2(injected_rules, artifacts_dir / injected_rules.name.replace(" ", "_"))
+        )
+
+    scaffold_audit = create_scaffold_audit(scaffold_source.manifest, workspace)
+    scaffold_audit.template = scaffold_source.template
+    scaffold_audit.template_version = scaffold_source.version
+    scaffold_audit.manifest_fingerprint = scaffold_source.manifest.fingerprint
+
     scaffold_meta = {
         "template": scaffold_source.template,
         "version": scaffold_source.version,
@@ -160,6 +186,13 @@ def run_task(
         "baseline_manifest": baseline_manifest_path.name,
         "workspace_manifest": manifest_path.name,
         "metadata_file": metadata_path.name,
+        "rules_file": injected_rules.name if injected_rules else None,
+        "artifacts": {
+            "baseline_manifest": str(artifact_baseline),
+            "workspace_manifest": str(artifact_manifest),
+            "metadata": str(artifact_meta),
+            **({"rules": str(artifact_rules)} if artifact_rules else {}),
+        },
     }
 
     scorecard = Scorecard(
@@ -177,13 +210,14 @@ def run_task(
             repeat_failures=0,
         ),
         metadata={"scaffold": scaffold_meta},
+        scaffold_audit=scaffold_audit,
     )
 
     return EvalRun(
         id=run_id,
         timestamp=start_time.isoformat(),
         config=EvalConfig(
-            model=config.model.litellm_model,
+            model=config.model.qualified_name,
             harness=config.agent.value,
             rules_variant=config.rules_variant,
             task_name=task.name,

@@ -15,6 +15,7 @@ Follow these steps to make a new agent available across CLI commands, session pa
 ## 3. Provide rules + scaffolding support
 - Create rule files under `tasks/<task>/rules/<agent>/` so `inject_rules` can copy agent-specific guidance.
 - If the scaffold needs additional setup steps for the agent (env vars, toolchains), document them in the task prompt and rules.
+- Document the required provider prefix for the harness so matrix configs can pass explicit `provider/model` strings (e.g., `inflection/pi-coder`, `github/copilot-enterprise`). Adapters validate these prefixes at runtime, so mismatches fail fast.
 
 ## 4. Session log parsing
 - Extend `orchestrator/src/agentic_eval/parser/session_log.py`:

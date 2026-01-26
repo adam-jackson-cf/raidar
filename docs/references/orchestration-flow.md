@@ -8,10 +8,17 @@ End-to-end outline of how the evaluation harness prepares workspaces, executes a
 
 ## 2. Agent configuration
 - Harness choice now maps to adapter-backed entries in `orchestrator/src/agentic_eval/harness/config.py` (claude-code, codex-cli, gemini, openhands, etc.). Each adapter validates model compatibility before Harbor runs.
-- Models are specified as `provider/model` strings (e.g., `anthropic/claude-sonnet-4-20250514`) and parsed into `ModelConfig` objects consumed by LiteLLM.
+- Provider naming is enforced per harness so we always know which provider/model combo executed:
+  - `claude-code` → `anthropic/<model>`
+  - `gemini` → `google|vertex/<model>`
+  - `copilot` → `github/<profile>`
+  - `pi` → `inflection/<model>`
+  - `openhands` → `openhands/<profile>`
+  - CLI adapters such as Cursor remain flexible but still require explicit provider/model strings.
+- Models are specified as `provider/model` strings (e.g., `anthropic/claude-sonnet-4-20250514`) and parsed into `ModelTarget` objects so adapters can pass the fully-qualified name to Harbor.
 - CLI entry points:
-  - `eval-orchestrator run` for single runs.
-  - `eval-orchestrator matrix` (via `MatrixRunner`) to sweep multiple harness/model/rules combinations defined in a matrix YAML.
+- `eval-orchestrator run` for single runs.
+- `eval-orchestrator matrix` (via `MatrixRunner`) to sweep explicit harness/model/rules combinations defined in a matrix YAML. Each entry declares a `runs` list so we only execute valid harness/model pairs (no cartesian cross-product surprises).
 
 ## 3. Agent execution via Harbor
 1. `run_task` shells out to Harbor (`harbor run -d terminal-bench@2.0 …`) using the harness configuration.
@@ -32,6 +39,7 @@ End-to-end outline of how the evaluation harness prepares workspaces, executes a
   - `events`: optional reconstructed session events
   - `gate_history`: chronological gate execution artifacts
 - Scorecards also embed `metadata.scaffold` (template, version, manifest fingerprint, and paths to baseline/workspace manifests) so you can correlate score deltas with scaffold tweaks.
+- Each run now persists scaffold evidence under `results/<run_id>/` (baseline manifest, workspace manifest snapshot, `.scaffold-meta.json`, and injected rules copy) so audits can reconstruct exactly which scaffold/rules package executed without relying on the ephemeral workspace.
 - Aggregation utilities:
   - `comparison/aggregator.py` loads scorecards, builds reports, and exports CSV leaderboards.
   - `comparison/matrix_runner.py` coordinates batch runs and tracks per-run success/failure counts.

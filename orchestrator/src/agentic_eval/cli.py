@@ -6,7 +6,7 @@ from typing import Literal
 
 import click
 
-from .harness.config import Agent, HarnessConfig, ModelConfig
+from .harness.config import Agent, HarnessConfig, ModelTarget
 from .runner import load_task, run_task
 
 
@@ -97,7 +97,7 @@ def run(
 
     config = HarnessConfig(
         agent=Agent(agent),
-        model=ModelConfig.from_string(model),
+        model=ModelTarget.from_string(model),
         rules_variant=rules,
         timeout_sec=timeout,
     )
@@ -236,17 +236,17 @@ def inject(
 def matrix(task: Path, config: Path, scaffolds_root: Path, parallel: int, dry_run: bool) -> None:
     """Run evaluation matrix from configuration."""
     from .comparison.matrix_runner import MatrixRunner
-    from .matrix import load_matrix_config
+    from .matrix import generate_matrix_entries, load_matrix_config
 
     click.echo(f"Loading task from {task}")
     task_def = load_task(task)
 
     click.echo(f"Loading matrix from {config}")
     matrix_config = load_matrix_config(config)
-    entries = matrix_config.harnesses
+    total_entries = len(generate_matrix_entries(matrix_config))
     click.echo(
-        f"Matrix defined for {len(matrix_config.harnesses)} harnesses, "
-        f"{len(matrix_config.models)} models, {len(matrix_config.rules_variants)} rule variants"
+        f"Matrix defined for {len(matrix_config.runs)} harness/model pairs × "
+        f"{len(matrix_config.rules_variants)} rule variants ({total_entries} runs)"
     )
 
     runner = MatrixRunner(

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Dict, Type
+from collections.abc import Callable
 
 from ..config import Agent, HarnessConfig
 from .base import HarnessAdapter
@@ -19,7 +19,7 @@ class AdapterRegistry:
     """Simple registry mapping agents to adapter factories."""
 
     def __init__(self) -> None:
-        self._factories: Dict[Agent, AdapterFactory] = {}
+        self._factories: dict[Agent, AdapterFactory] = {}
 
     def register(self, agent: Agent, factory: AdapterFactory) -> None:
         self._factories[agent] = factory
