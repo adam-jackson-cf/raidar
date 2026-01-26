@@ -98,7 +98,7 @@ class MatrixRunner:
         workspace_dir = self.workspaces_dir / run_id
 
         try:
-            model_str = harness_config.model.litellm_model
+            model_str = harness_config.model.qualified_name
             if progress_callback:
                 progress_callback(
                     f"Preparing workspace for {harness_config.agent.value}/{model_str}"
@@ -114,14 +114,14 @@ class MatrixRunner:
             )
 
             if dry_run:
-                prepare_workspace(
+                workspace_path, _ = prepare_workspace(
                     scaffold_dir=scaffold_source.path,
                     target_dir=workspace_dir,
                     task_dir=task_dir,
                     agent=harness_config.agent.value,
                     rules_variant=harness_config.rules_variant,
                 )
-                adapter.prepare_workspace(workspace_dir)
+                adapter.prepare_workspace(workspace_path)
                 return MatrixRunResult(
                     config=harness_config,
                     scorecard=None,
@@ -207,7 +207,7 @@ class MatrixRunner:
                     results.append(result)
         else:
             for i, cfg in enumerate(configs, 1):
-                model_str = cfg.model.litellm_model
+                model_str = cfg.model.qualified_name
                 if progress_callback:
                     progress_callback(f"Run {i}/{len(configs)}: {cfg.agent.value}/{model_str}")
                 result = self.run_single(task, cfg, dry_run, progress_callback)
@@ -227,7 +227,7 @@ def run_matrix(
     results_dir: Path,
     workspaces_dir: Path,
     task: TaskDefinition,
-    matrix_config: MatrixConfig | None = None,
+    matrix_config: MatrixConfig,
     parallel: int = 1,
     dry_run: bool = False,
 ) -> MatrixRunReport:
@@ -252,9 +252,6 @@ def run_matrix(
         results_dir=results_dir,
         workspaces_dir=workspaces_dir,
     )
-
-    if matrix_config is None:
-        matrix_config = MatrixConfig()
 
     return runner.run_matrix(
         task=task,

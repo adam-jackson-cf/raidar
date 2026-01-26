@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
-from ..config import HarnessConfig
+from ..config import Agent, HarnessConfig
 from .base import HarnessAdapter
 
 
@@ -15,6 +15,21 @@ class HarborHarnessAdapter(HarnessAdapter):
 
     def __init__(self, config: HarnessConfig) -> None:
         super().__init__(config)
+
+    provider_constraints: dict[Agent, set[str]] = {
+        Agent.CLAUDE_CODE: {"anthropic"},
+        Agent.GEMINI: {"google", "vertex"},
+        Agent.OPENHANDS: {"openhands"},
+    }
+
+    def validate(self) -> None:  # noqa: D401
+        allowed = self.provider_constraints.get(self.config.agent)
+        if allowed and self.config.model.provider not in allowed:
+            allowed_str = ", ".join(sorted(allowed))
+            raise ValueError(
+                f"{self.config.agent.value} harness requires model providers: {allowed_str}. "
+                f"Received '{self.config.model.provider}'."
+            )
 
     def extra_harbor_args(self) -> Iterable[str]:
         return []

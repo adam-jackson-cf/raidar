@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import shutil
-from typing import Iterable
+from collections.abc import Iterable
 
 from ..config import HarnessConfig
 from .base import HarnessAdapter
@@ -16,6 +16,7 @@ class ExternalCliAdapter(HarnessAdapter):
     CLI_ENV_VAR: str = ""
     DEFAULT_BINARY: str = ""
     REQUIRED_ENV_VARS: tuple[str, ...] = ()
+    ALLOWED_PROVIDERS: tuple[str, ...] | None = None
 
     def __init__(self, config: HarnessConfig) -> None:
         super().__init__(config)
@@ -43,9 +44,15 @@ class ExternalCliAdapter(HarnessAdapter):
         self._resolve_cli()
         for env_var in self.REQUIRED_ENV_VARS:
             if not os.environ.get(env_var):
-                raise EnvironmentError(
+                raise OSError(
                     f"Environment variable {env_var} must be set for {self.config.agent.value}."
                 )
+        if self.ALLOWED_PROVIDERS and self.config.model.provider not in self.ALLOWED_PROVIDERS:
+            allowed = ", ".join(self.ALLOWED_PROVIDERS)
+            raise ValueError(
+                f"{self.config.agent.value} harness only supports providers: {allowed}. "
+                f"Received '{self.config.model.provider}'."
+            )
 
     def runtime_env(self) -> dict[str, str]:
         env = super().runtime_env()

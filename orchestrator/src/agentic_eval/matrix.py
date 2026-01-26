@@ -1,23 +1,31 @@
 """Configuration matrix for comparing harness/model/rules combinations."""
 
-from itertools import product
 from pathlib import Path
 from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
 
-from .harness.config import Agent, HarnessConfig, ModelConfig
+from .harness.config import Agent, HarnessConfig, ModelTarget
+
+
+class HarnessModelPair(BaseModel):
+    """Explicit harness/model pairing."""
+
+    harness: str = Field(description="Harness identifier (matches Agent enum values)")
+    model: str = Field(description="Model string provider/name passed to Harbor")
 
 
 class MatrixConfig(BaseModel):
     """Configuration for a matrix of evaluation runs."""
 
-    harnesses: list[str] = Field(description="List of harnesses to test")
-    models: list[str] = Field(description="List of models to test (provider/name)")
+    runs: list[HarnessModelPair] = Field(
+        min_length=1,
+        description="List of harness/model pairs to execute",
+    )
     rules_variants: list[Literal["strict", "minimal", "none"]] = Field(
         default=["strict", "minimal", "none"],
-        description="List of rules variants to test",
+        description="List of rules variants to test for each pair",
     )
     task_path: str = Field(description="Path to task.yaml")
     scaffold_path: str = Field(default="scaffold", description="Path to scaffold template")
@@ -36,7 +44,7 @@ class MatrixEntry(BaseModel):
         """Convert to HarnessConfig."""
         return HarnessConfig(
             agent=Agent(self.harness),
-            model=ModelConfig.from_string(self.model),
+            model=ModelTarget.from_string(self.model),
             rules_variant=self.rules_variant,
         )
 
@@ -55,23 +63,17 @@ def load_matrix_config(path: Path) -> MatrixConfig:
 
 
 def generate_matrix_entries(config: MatrixConfig) -> list[MatrixEntry]:
-    """Generate all combinations from a matrix configuration.
-
-    Args:
-        config: Matrix configuration
-
-    Returns:
-        List of all harness/model/rules combinations
-    """
-    entries = []
-    for harness, model, rules in product(config.harnesses, config.models, config.rules_variants):
-        entries.append(
-            MatrixEntry(
-                harness=harness,
-                model=model,
-                rules_variant=rules,
+    """Generate all combinations from a matrix configuration."""
+    entries: list[MatrixEntry] = []
+    for pair in config.runs:
+        for rules in config.rules_variants:
+            entries.append(
+                MatrixEntry(
+                    harness=pair.harness,
+                    model=pair.model,
+                    rules_variant=rules,
+                )
             )
-        )
     return entries
 
 
@@ -79,12 +81,11 @@ def create_example_matrix() -> str:
     """Create example matrix configuration YAML."""
     return """# Evaluation matrix configuration
 matrix:
-  harnesses:
-    - codex-cli
-    - claude-code
-  models:
-    - openai/gpt-5
-    - anthropic/claude-sonnet-4-5
+  runs:
+    - harness: codex-cli
+      model: codex/gpt-5.2-high
+    - harness: claude-code
+      model: anthropic/claude-sonnet-4-5
   rules_variants:
     - strict
     - minimal

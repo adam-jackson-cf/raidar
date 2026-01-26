@@ -6,20 +6,20 @@ model compatibility checks, and Harbor argument generation.
 
 from __future__ import annotations
 
-from abc import ABC
+from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
     from ..config import HarnessConfig
 
 
-class HarnessAdapter(ABC):
+class HarnessAdapter:
     """Base adapter contract for all harness integrations."""
 
     terminal_bench_dataset = "terminal-bench@2.0"
 
-    def __init__(self, config: "HarnessConfig") -> None:
+    def __init__(self, config: HarnessConfig) -> None:
         self.config = config
 
     # ------------------------------------------------------------------
@@ -44,7 +44,7 @@ class HarnessAdapter(ABC):
 
     def model_argument(self) -> str:
         """Render the model argument passed to Harbor."""
-        return self.config.model.litellm_model
+        return self.config.model.qualified_name
 
     def extra_harbor_args(self) -> Iterable[str]:
         """Adapters can append additional Harbor CLI flags."""

@@ -1,5 +1,8 @@
 """Tests for matrix generation."""
 
+import pytest
+from pydantic import ValidationError
+
 from agentic_eval.matrix import (
     MatrixConfig,
     MatrixEntry,
@@ -33,7 +36,7 @@ class TestMatrixEntry:
         config = entry.to_harness_config()
         assert config.agent.value == "claude-code"
         assert config.model.provider == "anthropic"
-        assert config.model.model_name == "claude-sonnet-4-5"
+        assert config.model.name == "claude-sonnet-4-5"
         assert config.rules_variant == "minimal"
 
 
@@ -43,21 +46,25 @@ class TestGenerateMatrixEntries:
     def test_generates_all_combinations(self):
         """Should generate all combinations."""
         config = MatrixConfig(
-            harnesses=["codex-cli", "claude-code"],
-            models=["openai/gpt-4o"],
+            runs=[
+                {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
+                {"harness": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
+            ],
             rules_variants=["strict", "minimal"],
             task_path="task.yaml",
         )
         entries = generate_matrix_entries(config)
 
-        # 2 harnesses * 1 model * 2 rules = 4 entries
+        # 2 pairs * 2 rule variants = 4 entries
         assert len(entries) == 4
 
     def test_generates_correct_combinations(self):
         """Should generate correct harness/model/rules combinations."""
         config = MatrixConfig(
-            harnesses=["codex-cli"],
-            models=["openai/gpt-4o", "anthropic/claude-sonnet-4-5"],
+            runs=[
+                {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
+                {"harness": "codex-cli", "model": "codex/gpt-5.1"},
+            ],
             rules_variants=["strict"],
             task_path="task.yaml",
         )
@@ -65,29 +72,34 @@ class TestGenerateMatrixEntries:
 
         assert len(entries) == 2
         models = {e.model for e in entries}
-        assert "openai/gpt-4o" in models
-        assert "anthropic/claude-sonnet-4-5" in models
+        assert "codex/gpt-5.2-high" in models
+        assert "codex/gpt-5.1" in models
 
     def test_empty_config_generates_empty_list(self):
-        """Empty config should generate empty list."""
-        config = MatrixConfig(
-            harnesses=[],
-            models=["openai/gpt-4o"],
-            rules_variants=["strict"],
-            task_path="task.yaml",
-        )
-        entries = generate_matrix_entries(config)
-        assert len(entries) == 0
+        """Empty config should raise validation error."""
+        try:
+            MatrixConfig(
+                runs=[],
+                rules_variants=["strict"],
+                task_path="task.yaml",
+            )
+        except ValidationError:
+            assert True
+        else:
+            pytest.fail("MatrixConfig should require at least one run")
 
     def test_large_matrix_generation(self):
         """Should handle larger matrices."""
         config = MatrixConfig(
-            harnesses=["codex-cli", "claude-code", "cursor"],
-            models=["openai/gpt-4o", "anthropic/claude-sonnet-4-5"],
+            runs=[
+                {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
+                {"harness": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
+                {"harness": "cursor", "model": "openai/gpt-4o-mini"},
+            ],
             rules_variants=["strict", "minimal", "none"],
             task_path="task.yaml",
         )
         entries = generate_matrix_entries(config)
 
-        # 3 harnesses * 2 models * 3 rules = 18 entries
-        assert len(entries) == 18
+        # 3 pairs * 3 rules = 9 entries
+        assert len(entries) == 9

@@ -18,31 +18,31 @@ class Agent(str, Enum):
     PI = "pi"
 
 
-class ModelConfig(BaseModel):
-    """Model configuration for LiteLLM."""
+class ModelTarget(BaseModel):
+    """Model descriptor paired with a harness."""
 
     provider: str = Field(description="Model provider (openai, anthropic, etc)")
-    model_name: str = Field(description="Model identifier within provider")
+    name: str = Field(description="Model identifier within provider")
 
     @property
-    def litellm_model(self) -> str:
-        """Return the LiteLLM-compatible model string."""
-        return f"{self.provider}/{self.model_name}"
+    def qualified_name(self) -> str:
+        """Return provider/model string expected by Harbor and adapters."""
+        return f"{self.provider}/{self.name}"
 
     @classmethod
-    def from_string(cls, model_string: str) -> "ModelConfig":
-        """Parse a model string like 'openai/gpt-5' into ModelConfig."""
+    def from_string(cls, model_string: str) -> "ModelTarget":
+        """Parse a model string like 'openai/gpt-5' into ModelTarget."""
         if "/" not in model_string:
             raise ValueError(f"Model string must be in format 'provider/model': {model_string}")
         provider, model_name = model_string.split("/", 1)
-        return cls(provider=provider, model_name=model_name)
+        return cls(provider=provider, name=model_name)
 
 
 class HarnessConfig(BaseModel):
     """Configuration for harness/model combination."""
 
     agent: Agent = Field(description="Agent to use (claude-code, codex-cli, etc)")
-    model: ModelConfig = Field(description="Model configuration")
+    model: ModelTarget = Field(description="Model configuration")
     rules_variant: Literal["strict", "minimal", "none"] = Field(
         default="strict",
         description="Rules variant to inject",
