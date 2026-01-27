@@ -2,19 +2,12 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-from dataclasses import dataclass
-
-from ..config import Agent, HarnessConfig
+from ..config import Agent
 from .base import HarnessAdapter
 
 
-@dataclass(slots=True)
 class HarborHarnessAdapter(HarnessAdapter):
     """Adapter that simply proxies to Harbor with minimal validation."""
-
-    def __init__(self, config: HarnessConfig) -> None:
-        super().__init__(config)
 
     provider_constraints: dict[Agent, set[str]] = {
         Agent.CLAUDE_CODE: {"anthropic"},
@@ -31,5 +24,5 @@ class HarborHarnessAdapter(HarnessAdapter):
                 f"Received '{self.config.model.provider}'."
             )
 
-    def extra_harbor_args(self) -> Iterable[str]:
+    def extra_harbor_args(self) -> list[str]:
         return []
