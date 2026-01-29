@@ -47,3 +47,18 @@ uv run eval-orchestrator run \
 ```
 
 > **Note:** Harbor requires Docker to be running; if it is missing, the orchestrator will terminate early with `Harbor not installed`.
+
+## Secrets via `.env`
+
+The CLI automatically loads environment variables from `orchestrator/.env` (if present) before executing any commands. Create this file locally (it is ignored by git) and define the agent-specific credentials you need, for example:
+
+```
+# orchestrator/.env
+CODEX_API_KEY=sk-live-...
+CODEX_OAUTH_TOKEN=
+CURSOR_API_KEY=
+COPILOT_API_KEY=
+PI_API_TOKEN=
+```
+
+Only populate the entries you use. Values in your shell environment still take precedence if you need to override something temporarily.

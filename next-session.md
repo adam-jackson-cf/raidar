@@ -1,51 +1,30 @@
-# Handoff: Implement Outstanding Items for Agentic Eval System
+# Handoff: Enable secure Codex auth + run full Harbor eval
 
 ## Starting Prompt
 
-Execute the plan at `/Users/adamjackson/.claude/plans/delightful-cooking-conway.md` to implement 5 outstanding items for the agentic eval system.
+You19re picking up the agentic-eval project after we introduced `.env`-based secret loading and documented the Codex OAuth plan. Your goals:
 
-**Context:** We just completed merging 4 parallel implementations into main. The system works but has gaps: no tests, hardcoded config values, fragile LLM parsing, and incomplete session log parsers.
+1. Finalize the Codex auth experience:
+   - Add user-facing docs/instructions covering both API-key and OAuth flows (see `docs/references/OAuth-improvement.md` for the plan).
+   - Consider providing a helper script or CLI command that guides users through exporting `CODEX_OAUTH_TOKEN` or mounting `~/.codex` if we decide to support that.
 
-**Execute these phases in order:**
+2. Conduct an authenticated Harbor run:
+   - Populate `orchestrator/.env` with a valid `CODEX_API_KEY` (user provided) and confirm `uv run eval-orchestrator run ...` completes without "Harbor exited with code 2/Harbor not installed".
+   - Capture the resulting artifacts and note any issues (e.g., Docker requirements, missing binaries).
 
-1. **Phase 1: Configurable Values** - Create `config.py` with pydantic-settings, extract 29 hardcoded values
-2. **Phase 2: LLM Judge Robustness** - Fix fragile parsing in compliance.py with fallback strategies
-3. **Phase 3: Unit Tests** - Create tests/ directory with ~40 tests across 6 test files
-4. **Phase 4: Session Log Parsers** - Implement Gemini parser, fix Claude Code parser
-5. **Phase 5: Pre-commit Hooks** - Add ruff + pytest hooks
-
-**Also:** Delete `docs/implementation-plan.md` (already actioned, no longer needed).
-
-After each phase, run the verification commands in the plan to confirm everything works.
+Start by reviewing `orchestrator/README.md` and `docs/references/OAuth-improvement.md`, then open `scripts/setup.sh` to confirm prerequisites. After updating docs/scripts, run the Harbor test and verify the new results folder under `orchestrator/results/`.
 
 ## Relevant Files
 
-| File | Purpose |
-|------|---------|
-| `/Users/adamjackson/.claude/plans/delightful-cooking-conway.md` | **READ FIRST** - Complete implementation plan |
-| `orchestrator/src/agentic_eval/config.py` | **CREATE** - Centralized configuration |
-| `orchestrator/src/agentic_eval/scoring/compliance.py` | LLM judge parsing to fix (line 142) |
-| `orchestrator/src/agentic_eval/schemas/scorecard.py` | Has duplicated weights to consolidate |
-| `orchestrator/src/agentic_eval/parser/session_log.py` | Gemini stub, Claude incomplete |
-| `orchestrator/tests/` | **CREATE** - Test infrastructure |
-| `docs/implementation-plan.md` | **DELETE** - Already actioned |
+- `docs/references/OAuth-improvement.md` 6 contains the phased plan for OAuth support; expand/execute Phase 1 tasks.
+- `orchestrator/README.md` 6 now mentions `.env`; extend it with explicit auth instructions or helper workflow.
+- `scripts/setup.sh` 6 currently sets up uv + Harbor; update if additional auth checks/scripts are added.
+- `orchestrator/src/agentic_eval/cli.py` 6 loads `.env`; modify if you add new env handling or helper commands.
+- `orchestrator/results/cdc46157*` 6 latest Harbor attempt (failed at code 2); use as reference when validating the new successful run.
 
 ## Key Context
 
-**This Session Completed:**
-- Merged impl-3 as base + cherry-picked from impl-1, impl-2, impl-4
-- Added vitest infrastructure, comparison module, CLI commands
-- Fixed visual=None validation, lint script
-- All CLI commands working (`run`, `matrix`, `list-agents`, `info`, etc.)
-
-**Key Findings from Exploration:**
-- 29 hardcoded values found (timeouts, weights, model names)
-- Weights duplicated in `scoring/__init__.py` AND `schemas/scorecard.py`
-- LLM judge at compliance.py:142 uses fragile first-line parsing
-- Gemini parser returns empty list (stub only)
-- Claude parser misses tool_result entries
-
-**Tech Stack:**
-- Orchestrator: Python 3.12+, uv, Pydantic, Click, LiteLLM
-- Testing: pytest 8.0+, pytest-asyncio (already in pyproject.toml)
-- Config: pydantic-settings (to add)
+- `.env` loading is automatic; secrets should live in `orchestrator/.env`, which is git-ignored.
+- Codex adapter still requires either `CODEX_API_KEY` or `CODEX_OAUTH_TOKEN`; no automatic OAuth handoff yet.
+- Harbor CLI is installed via `uv tool install harbor`; Docker must be running locally for real executions.
+- Last Harbor run terminated with exit code 2, so we still need a validated success case once credentials are present.

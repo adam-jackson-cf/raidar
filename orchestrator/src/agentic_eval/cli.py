@@ -5,9 +5,14 @@ from pathlib import Path
 from typing import Literal
 
 import click
+from dotenv import load_dotenv
 
 from .harness.config import Agent, HarnessConfig, ModelTarget
 from .runner import load_task, run_task
+
+ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH, override=False)
 
 
 @click.group()
