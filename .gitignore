@@ -29,6 +29,7 @@ Thumbs.db
 coverage/
 .pytest_cache/
 .enaible/
+next-session.md
 
 # Screenshots
 actual.png
