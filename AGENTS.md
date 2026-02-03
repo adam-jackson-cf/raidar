@@ -5,3 +5,4 @@
 ## Workflows
 
 ## Task completion
+- Requires `scripts/run-ci-quality-gates.sh` to pass.

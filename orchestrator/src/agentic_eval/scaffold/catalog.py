@@ -41,9 +41,7 @@ def resolve_scaffold_source(root: Path, template: str, version: str) -> Scaffold
     if manifest_path.exists():
         manifest = load_manifest(manifest_path)
     else:
-        manifest = generate_manifest(
-            source_path, template_name=template, template_version=version
-        )
+        manifest = generate_manifest(source_path, template_name=template, template_version=version)
         save_manifest(manifest, manifest_path)
 
     # Ensure template metadata stays consistent

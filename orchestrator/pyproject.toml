@@ -34,6 +34,13 @@ packages = ["src/agentic_eval"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+extend-exclude = [
+    "workspace",
+    "results",
+    "**/node_modules",
+    "**/*.tsbuildinfo",
+    "**/*.lock",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C90"]

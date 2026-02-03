@@ -46,9 +46,7 @@ class CodexCliAdapter(HarnessAdapter):
             )
         self._resolve_cli()
         if not (os.environ.get(self.API_KEY_ENV) or os.environ.get(self.OAUTH_ENV)):
-            raise OSError(
-                "Codex CLI requires credentials. Set CODEX_API_KEY or CODEX_OAUTH_TOKEN."
-            )
+            raise OSError("Codex CLI requires credentials. Set CODEX_API_KEY or CODEX_OAUTH_TOKEN.")
 
     def runtime_env(self) -> dict[str, str]:
         env: dict[str, str] = {}

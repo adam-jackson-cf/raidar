@@ -92,8 +92,7 @@ class MatrixRunner:
 
         # Generate workspace path
         run_id = (
-            f"{task.name}-{harness_config.agent.value}-"
-            f"{datetime.now().strftime('%Y%m%d-%H%M%S')}"
+            f"{task.name}-{harness_config.agent.value}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
         )
         workspace_dir = self.workspaces_dir / run_id
 

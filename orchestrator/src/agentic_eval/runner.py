@@ -161,9 +161,7 @@ def run_task(
     )
 
     # Persist scaffold artifacts for later audits
-    artifact_manifest = Path(
-        shutil.copy2(manifest_path, artifacts_dir / "workspace.manifest.json")
-    )
+    artifact_manifest = Path(shutil.copy2(manifest_path, artifacts_dir / "workspace.manifest.json"))
     artifact_baseline = Path(
         shutil.copy2(scaffold_source.manifest_path, artifacts_dir / "baseline.manifest.json")
     )
