@@ -25,14 +25,14 @@ verification:
   max_gate_failures: 3
   gates:
     - name: typecheck
-      command: bun run typecheck
+      command: ["bun", "run", "typecheck"]
       on_failure: continue
 ```
 
 Key sections to fill out:
 1. **Metadata** – `name`, `description`, `difficulty`, `category`, `timeout_sec`.
 2. **Scaffold** – `template` name (usually `next-shadcn-starter`), pinned `version` (e.g., `v2025.01`), and default `rules_variant` (strict|minimal|none).
-3. **Verification** – `max_gate_failures` plus ordered gate list. Each gate executes in the prepared workspace via `GateWatcher` with global timeouts from `settings.timeouts.gate`.
+3. **Verification** – `max_gate_failures` plus ordered gate list. Each gate executes in the prepared workspace via `GateWatcher` with global timeouts from `settings.timeouts.gate`. Commands must be argv lists (no shell strings).
 4. **Compliance** – deterministic checks (`import_present`, `file_exists`, `no_pattern`) and `llm_judge_rubric` entries with weights that sum to 1. These feed `scoring/compliance.py`.
 5. **Visual** (optional) – reference image path relative to the task folder, the screenshot capture command, and similarity `threshold`.
 6. **Prompt** – multi-line description instructing the agent; keep commands explicit (“Run `bun run dev`…”).

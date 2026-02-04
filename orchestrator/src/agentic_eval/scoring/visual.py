@@ -7,12 +7,12 @@ from ..config import settings
 from ..schemas.scorecard import VisualScore
 
 
-def capture_screenshot(workspace: Path, command: str, output_path: Path) -> bool:
+def capture_screenshot(workspace: Path, command: list[str], output_path: Path) -> bool:
     """Capture a screenshot of the implementation.
 
     Args:
         workspace: Working directory
-        command: Screenshot command to run
+        command: Screenshot command argv to run
         output_path: Path to save screenshot
 
     Returns:
@@ -21,14 +21,13 @@ def capture_screenshot(workspace: Path, command: str, output_path: Path) -> bool
     try:
         result = subprocess.run(
             command,
-            shell=True,
             cwd=workspace,
             capture_output=True,
             text=True,
             timeout=settings.timeouts.screenshot,
         )
         return result.returncode == 0 and output_path.exists()
-    except subprocess.TimeoutExpired:
+    except (subprocess.TimeoutExpired, FileNotFoundError):
         return False
 
 
@@ -103,7 +102,7 @@ def compare_images(
 def evaluate_visual(
     workspace: Path,
     reference_image: Path,
-    screenshot_command: str,
+    screenshot_command: list[str],
     threshold: float | None = None,
 ) -> VisualScore:
     """Evaluate visual similarity to reference design.
@@ -111,7 +110,7 @@ def evaluate_visual(
     Args:
         workspace: Path to workspace directory
         reference_image: Path to reference design image
-        screenshot_command: Command to capture screenshot
+        screenshot_command: Command argv to capture screenshot
         threshold: Minimum similarity threshold (not used in scoring, for reference)
 
     Returns:

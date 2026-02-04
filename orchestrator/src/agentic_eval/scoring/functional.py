@@ -8,7 +8,7 @@ from ..config import settings
 from ..schemas.scorecard import FunctionalScore
 
 
-def run_command(command: str, cwd: Path, timeout: int | None = None) -> tuple[int, str, str]:
+def run_command(command: list[str], cwd: Path, timeout: int | None = None) -> tuple[int, str, str]:
     """Run a command and capture output."""
     if timeout is None:
         timeout = settings.timeouts.command_default
@@ -16,7 +16,6 @@ def run_command(command: str, cwd: Path, timeout: int | None = None) -> tuple[in
     try:
         result = subprocess.run(
             command,
-            shell=True,
             cwd=cwd,
             capture_output=True,
             text=True,
@@ -25,18 +24,26 @@ def run_command(command: str, cwd: Path, timeout: int | None = None) -> tuple[in
         return result.returncode, result.stdout, result.stderr
     except subprocess.TimeoutExpired:
         return -1, "", "Command timed out"
+    except FileNotFoundError:
+        return -1, "", f"Command not found: {command[0]}"
 
 
 def check_build(workspace: Path) -> bool:
     """Check if the build succeeds."""
-    code, stdout, stderr = run_command("bun run build", workspace, timeout=settings.timeouts.build)
+    code, stdout, stderr = run_command(
+        ["bun", "run", "build"],
+        workspace,
+        timeout=settings.timeouts.build,
+    )
     return code == 0
 
 
 def check_typecheck(workspace: Path) -> bool:
     """Check if typecheck passes."""
     code, stdout, stderr = run_command(
-        "bun run typecheck", workspace, timeout=settings.timeouts.typecheck
+        ["bun", "run", "typecheck"],
+        workspace,
+        timeout=settings.timeouts.typecheck,
     )
     return code == 0
 
@@ -65,7 +72,11 @@ def run_tests(workspace: Path) -> tuple[bool, int, int]:
     Returns:
         Tuple of (all_passed, tests_passed, tests_total)
     """
-    code, stdout, stderr = run_command("bun test", workspace, timeout=settings.timeouts.test)
+    code, stdout, stderr = run_command(
+        ["bun", "test"],
+        workspace,
+        timeout=settings.timeouts.test,
+    )
     tests_passed, tests_total = parse_test_output(stdout, stderr)
 
     # If no tests found, consider it passed with 0/0

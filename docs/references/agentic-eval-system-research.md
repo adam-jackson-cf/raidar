@@ -148,13 +148,13 @@ verification:
   max_gate_failures: 3
   gates:
     - name: "typecheck"
-      command: "bun run typecheck"
+      command: ["bun", "run", "typecheck"]
       on_failure: "continue"  # or "terminate"
     - name: "lint"
-      command: "bunx ultracite check src"
+      command: ["bunx", "ultracite", "check", "src"]
       on_failure: "continue"
     - name: "test"
-      command: "bun test"
+      command: ["bun", "test"]
       on_failure: "continue"
 
 compliance:
@@ -179,7 +179,7 @@ compliance:
 
 visual:
   reference_image: "./reference/homepage.png"
-  screenshot_command: "bun run capture-screenshot"
+  screenshot_command: ["bun", "run", "capture-screenshot"]
   threshold: 0.95
 ```
 

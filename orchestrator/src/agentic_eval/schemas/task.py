@@ -14,7 +14,10 @@ class VerificationGate(BaseModel):
     """Configuration for a verification gate."""
 
     name: str = Field(description="Gate identifier (typecheck, lint, test)")
-    command: str = Field(description="Command to execute")
+    command: list[str] = Field(
+        min_length=1,
+        description="Command argv to execute",
+    )
     on_failure: Literal["continue", "terminate"] = Field(
         default="continue",
         description="Action when gate fails",
@@ -58,9 +61,10 @@ class VisualConfig(BaseModel):
     """Visual regression configuration."""
 
     reference_image: str = Field(description="Path to reference image")
-    screenshot_command: str = Field(
-        default="bun run capture-screenshot",
-        description="Command to capture screenshot",
+    screenshot_command: list[str] = Field(
+        default_factory=lambda: ["bun", "run", "capture-screenshot"],
+        min_length=1,
+        description="Command argv to capture screenshot",
     )
     threshold: float = Field(
         default=0.95,

@@ -2,6 +2,11 @@
 
 ## Structure
 
+## Workflow
+- **ALWAYS** define `verification.gates[].command` as an argv list in task YAML.
+- **ALWAYS** define `visual.screenshot_command` as an argv list in task YAML.
+- **NEVER** use shell operators or shell features in task YAML commands.
+
 ## Workflows
 
 ## Task completion
