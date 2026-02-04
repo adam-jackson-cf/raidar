@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from ..harness.config import HarnessConfig
 from ..matrix import MatrixConfig, generate_matrix_entries
-from ..runner import prepare_workspace, run_task
+from ..runner import RunRequest, prepare_workspace, run_task
 from ..scaffold import resolve_scaffold_source
 from ..schemas.scorecard import Scorecard
 from ..schemas.task import TaskDefinition
@@ -132,7 +132,7 @@ class MatrixRunner:
                 progress_callback(f"Executing {harness_config.agent.value} with {model_str}")
 
             # Run task
-            eval_run = run_task(
+            request = RunRequest(
                 task=task,
                 config=harness_config,
                 scaffold_root=self.scaffolds_root,
@@ -140,6 +140,7 @@ class MatrixRunner:
                 workspace_dir=workspace_dir,
                 results_dir=self.results_dir,
             )
+            eval_run = run_task(request)
 
             # Save result
             self.results_dir.mkdir(parents=True, exist_ok=True)

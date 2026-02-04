@@ -242,51 +242,67 @@ def evaluate_compliance(
     rules_path: Path | None = None,
     run_llm_checks: bool = True,
 ) -> ComplianceScore:
-    """Evaluate compliance against task configuration.
+    """Evaluate compliance against task configuration."""
+    checks = _collect_compliance_checks(workspace, config, rules_path, run_llm_checks)
+    return _score_compliance_checks(checks)
 
-    Args:
-        workspace: Path to workspace directory
-        config: Compliance configuration from task
-        rules_path: Path to rules file for LLM context
-        run_llm_checks: Whether to run LLM judge checks
 
-    Returns:
-        ComplianceScore with all check results
-    """
-    checks: list[ComplianceCheck] = []
+def _collect_compliance_checks(
+    workspace: Path,
+    config: ComplianceConfig,
+    rules_path: Path | None,
+    run_llm_checks: bool,
+) -> list[ComplianceCheck]:
+    checks = list(_run_deterministic_checks(config.deterministic_checks, workspace))
+    checks.extend(_run_llm_judge_checks(config, workspace, rules_path, run_llm_checks))
+    return checks
 
-    # Run deterministic checks
-    for check in config.deterministic_checks:
-        result = run_deterministic_check(check, workspace)
-        checks.append(result)
 
-    # Run LLM judge checks if enabled
-    if run_llm_checks and config.llm_judge_rubric:
-        source_code = collect_source_code(workspace)
-        rules_content = ""
-        if rules_path and rules_path.exists():
-            rules_content = rules_path.read_text()
+def _run_deterministic_checks(
+    deterministic_checks: list[DeterministicCheck],
+    workspace: Path,
+) -> list[ComplianceCheck]:
+    return [run_deterministic_check(check, workspace) for check in deterministic_checks]
 
-        for criterion in config.llm_judge_rubric:
-            result = run_llm_judge(criterion, source_code, rules_content)
-            checks.append(result)
 
-    # Calculate weighted score
+def _run_llm_judge_checks(
+    config: ComplianceConfig,
+    workspace: Path,
+    rules_path: Path | None,
+    run_llm_checks: bool,
+) -> list[ComplianceCheck]:
+    if not run_llm_checks or not config.llm_judge_rubric:
+        return []
+
+    source_code = collect_source_code(workspace)
+    rules_content = _load_rules_content(rules_path)
+    return [
+        run_llm_judge(criterion, source_code, rules_content)
+        for criterion in config.llm_judge_rubric
+    ]
+
+
+def _load_rules_content(rules_path: Path | None) -> str:
+    if not rules_path or not rules_path.exists():
+        return ""
+    return rules_path.read_text()
+
+
+def _score_compliance_checks(checks: list[ComplianceCheck]) -> ComplianceScore:
     if not checks:
         return ComplianceScore(score=1.0, checks=[])
 
-    # Weight deterministic and LLM checks differently
     deterministic_checks = [c for c in checks if c.type == "deterministic"]
     llm_checks = [c for c in checks if c.type == "llm_judge"]
 
-    det_score = (
-        sum(1 for c in deterministic_checks if c.passed) / len(deterministic_checks)
-        if deterministic_checks
-        else 1.0
-    )
-    llm_score = sum(1 for c in llm_checks if c.passed) / len(llm_checks) if llm_checks else 1.0
-
-    # Weighted average: 60% deterministic, 40% LLM
+    det_score = _ratio_passed(deterministic_checks)
+    llm_score = _ratio_passed(llm_checks)
     score = det_score * 0.6 + llm_score * 0.4 if llm_checks else det_score
 
     return ComplianceScore(score=score, checks=checks)
+
+
+def _ratio_passed(checks: list[ComplianceCheck]) -> float:
+    if not checks:
+        return 1.0
+    return sum(1 for c in checks if c.passed) / len(checks)

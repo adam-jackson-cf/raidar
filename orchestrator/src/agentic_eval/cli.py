@@ -8,7 +8,7 @@ import click
 from dotenv import load_dotenv
 
 from .harness.config import Agent, HarnessConfig, ModelTarget
-from .runner import load_task, run_task
+from .runner import RunRequest, load_task, run_task
 
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 if ENV_PATH.exists():
@@ -110,7 +110,7 @@ def run(
     output.mkdir(parents=True, exist_ok=True)
 
     click.echo("Running task...")
-    result = run_task(
+    request = RunRequest(
         task=task_def,
         config=config,
         scaffold_root=scaffolds_root,
@@ -118,6 +118,7 @@ def run(
         workspace_dir=workspace,
         results_dir=output,
     )
+    result = run_task(request)
 
     # Save result
     result_path = output / f"{result.id}.json"
@@ -354,6 +355,51 @@ def list_agents() -> None:
         click.echo(f"  {agent:15} -> {rule_file}")
 
 
+def _echo_task_summary(task_def) -> None:
+    click.echo(f"Task: {task_def.name}")
+    click.echo(f"Description: {task_def.description}")
+    click.echo(f"Difficulty: {task_def.difficulty}")
+    click.echo(f"Category: {task_def.category}")
+    click.echo(f"Timeout: {task_def.timeout_sec // 60} minutes")
+
+    if task_def.verification.gates:
+        gates = [g.name for g in task_def.verification.gates]
+        click.echo(f"Quality Gates: {', '.join(gates)}")
+
+
+def _echo_rule_variants(task_dir: Path) -> None:
+    rules_dir = task_dir / "rules"
+    if not rules_dir.exists():
+        return
+    click.echo()
+    click.echo("Rule Variants:")
+    for variant in ["strict", "minimal", "none"]:
+        variant_dir = rules_dir / variant
+        if variant_dir.exists():
+            files = [f.name for f in variant_dir.iterdir() if f.is_file()]
+            click.echo(f"  {variant}: {', '.join(files) or '(empty)'}")
+
+
+def _echo_visual_config(task_def) -> None:
+    if not task_def.visual:
+        return
+    click.echo()
+    click.echo("Visual Config:")
+    click.echo(f"  Reference: {task_def.visual.reference_image}")
+    click.echo(f"  Threshold: {task_def.visual.threshold}")
+
+
+def _echo_compliance_config(task_def) -> None:
+    if not (task_def.compliance.deterministic_checks or task_def.compliance.llm_judge_rubric):
+        return
+    click.echo()
+    click.echo("Compliance Config:")
+    if task_def.compliance.deterministic_checks:
+        click.echo(f"  Deterministic checks: {len(task_def.compliance.deterministic_checks)}")
+    if task_def.compliance.llm_judge_rubric:
+        click.echo(f"  LLM judge criteria: {len(task_def.compliance.llm_judge_rubric)}")
+
+
 @main.command()
 @click.option(
     "--task",
@@ -373,42 +419,10 @@ def info(task: Path) -> None:
 
     task_def = TaskDefinition.from_yaml(task_yaml)
 
-    click.echo(f"Task: {task_def.name}")
-    click.echo(f"Description: {task_def.description}")
-    click.echo(f"Difficulty: {task_def.difficulty}")
-    click.echo(f"Category: {task_def.category}")
-    click.echo(f"Timeout: {task_def.timeout_sec // 60} minutes")
-
-    if task_def.verification.gates:
-        gates = [g.name for g in task_def.verification.gates]
-        click.echo(f"Quality Gates: {', '.join(gates)}")
-
-    # Show rule variants
-    rules_dir = task / "rules"
-    if rules_dir.exists():
-        click.echo()
-        click.echo("Rule Variants:")
-        for variant in ["strict", "minimal", "none"]:
-            variant_dir = rules_dir / variant
-            if variant_dir.exists():
-                files = [f.name for f in variant_dir.iterdir() if f.is_file()]
-                click.echo(f"  {variant}: {', '.join(files) or '(empty)'}")
-
-    # Show visual config if present
-    if task_def.visual:
-        click.echo()
-        click.echo("Visual Config:")
-        click.echo(f"  Reference: {task_def.visual.reference_image}")
-        click.echo(f"  Threshold: {task_def.visual.threshold}")
-
-    # Show compliance config if present
-    if task_def.compliance.deterministic_checks or task_def.compliance.llm_judge_rubric:
-        click.echo()
-        click.echo("Compliance Config:")
-        if task_def.compliance.deterministic_checks:
-            click.echo(f"  Deterministic checks: {len(task_def.compliance.deterministic_checks)}")
-        if task_def.compliance.llm_judge_rubric:
-            click.echo(f"  LLM judge criteria: {len(task_def.compliance.llm_judge_rubric)}")
+    _echo_task_summary(task_def)
+    _echo_rule_variants(task)
+    _echo_visual_config(task_def)
+    _echo_compliance_config(task_def)
 
 
 if __name__ == "__main__":

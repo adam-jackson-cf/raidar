@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import uuid
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -12,6 +13,7 @@ import yaml
 from .audit.scaffold_manifest import create_scaffold_audit, generate_manifest, save_manifest
 from .harness.config import HarnessConfig
 from .harness.rules import inject_rules
+from .scaffold import ScaffoldSource
 from .schemas.scorecard import EvalConfig, EvalRun, Scorecard
 from .schemas.task import TaskDefinition
 
@@ -21,6 +23,40 @@ def load_task(task_path: Path) -> TaskDefinition:
     with open(task_path) as f:
         data = yaml.safe_load(f)
     return TaskDefinition.model_validate(data)
+
+
+@dataclass(frozen=True, slots=True)
+class RunRequest:
+    """Input bundle for running a task."""
+
+    task: TaskDefinition
+    config: HarnessConfig
+    scaffold_root: Path
+    task_dir: Path
+    workspace_dir: Path
+    results_dir: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ScaffoldContext:
+    """Resolved scaffold context for a task run."""
+
+    scaffold_source: ScaffoldSource
+    workspace: Path
+    injected_rules: Path | None
+    manifest_path: Path
+    baseline_manifest_path: Path
+    metadata_path: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ArtifactPaths:
+    """Persisted artifact locations for a run."""
+
+    baseline: Path
+    manifest: Path
+    metadata: Path
+    rules: Path | None
 
 
 def prepare_workspace(
@@ -61,27 +97,8 @@ def prepare_workspace(
     return target_dir, injected_rules
 
 
-def run_task(
-    task: TaskDefinition,
-    config: HarnessConfig,
-    scaffold_root: Path,
-    task_dir: Path,
-    workspace_dir: Path,
-    results_dir: Path,
-) -> EvalRun:
-    """Execute a task and return evaluation results.
-
-    Args:
-        task: Task definition
-        config: Harness configuration
-        scaffold_root: Path to scaffold catalog root
-        task_dir: Path to task directory
-        workspace_dir: Path to create workspace
-        results_dir: Path to store results
-
-    Returns:
-        EvalRun with execution results
-    """
+def initialize_run(results_dir: Path) -> tuple[str, datetime, Path]:
+    """Create the run identifier and artifacts directory."""
     run_id = str(uuid.uuid4())[:8]
     start_time = datetime.now(UTC)
     results_dir.mkdir(parents=True, exist_ok=True)
@@ -89,21 +106,23 @@ def run_task(
     if artifacts_dir.exists():
         shutil.rmtree(artifacts_dir)
     artifacts_dir.mkdir(parents=True, exist_ok=True)
-    adapter = config.adapter()
-    adapter.validate()
+    return run_id, start_time, artifacts_dir
 
+
+def prepare_run_context(request: RunRequest) -> ScaffoldContext:
+    """Resolve scaffold source, workspace, and manifest metadata."""
     from .scaffold import record_scaffold_metadata, resolve_scaffold_source
 
     scaffold_source = resolve_scaffold_source(
-        scaffold_root, task.scaffold.template, task.scaffold.version
+        request.scaffold_root, request.task.scaffold.template, request.task.scaffold.version
     )
 
     workspace, injected_rules = prepare_workspace(
         scaffold_dir=scaffold_source.path,
-        target_dir=workspace_dir,
-        task_dir=task_dir,
-        agent=config.agent.value,
-        rules_variant=config.rules_variant,
+        target_dir=request.workspace_dir,
+        task_dir=request.task_dir,
+        agent=request.config.agent.value,
+        rules_variant=request.config.rules_variant,
     )
     manifest_path = workspace / "scaffold.manifest.json"
     if not manifest_path.exists():
@@ -118,17 +137,22 @@ def run_task(
         scaffold_source,
         manifest_path,
         baseline_manifest_path,
-        config.rules_variant,
+        request.config.rules_variant,
     )
-    adapter.prepare_workspace(workspace)
 
-    # Build Harbor command
+    return ScaffoldContext(
+        scaffold_source=scaffold_source,
+        workspace=workspace,
+        injected_rules=injected_rules,
+        manifest_path=manifest_path,
+        baseline_manifest_path=baseline_manifest_path,
+        metadata_path=metadata_path,
+    )
+
+
+def execute_harbor(adapter, workspace: Path, timeout_sec: int, run_env: dict[str, str]):
+    """Execute a Harbor run and return termination flags."""
     harbor_cmd = adapter.build_harbor_command()
-    run_env = os.environ.copy()
-    run_env.update(adapter.runtime_env())
-
-    terminated_early = False
-    termination_reason = None
 
     # Execute via Harbor (placeholder - actual execution depends on Harbor being installed)
     try:
@@ -137,63 +161,80 @@ def run_task(
             cwd=workspace,
             capture_output=True,
             text=True,
-            timeout=config.timeout_sec,
+            timeout=timeout_sec,
             env=run_env,
         )
         if result.returncode != 0:
-            terminated_early = True
-            termination_reason = f"Harbor exited with code {result.returncode}"
+            return True, f"Harbor exited with code {result.returncode}"
     except subprocess.TimeoutExpired:
-        terminated_early = True
-        termination_reason = "Timeout expired"
+        return True, "Timeout expired"
     except FileNotFoundError:
-        terminated_early = True
-        termination_reason = "Harbor not installed"
+        return True, "Harbor not installed"
 
-    end_time = datetime.now(UTC)
-    duration = (end_time - start_time).total_seconds()
+    return False, None
 
-    # Create placeholder scorecard (actual scoring in Phase 2)
+
+def persist_scaffold_artifacts(context: ScaffoldContext, artifacts_dir: Path) -> ArtifactPaths:
+    """Persist scaffold artifacts for later audits."""
+    artifact_manifest = Path(
+        shutil.copy2(context.manifest_path, artifacts_dir / "workspace.manifest.json")
+    )
+    artifact_baseline = Path(
+        shutil.copy2(
+            context.scaffold_source.manifest_path, artifacts_dir / "baseline.manifest.json"
+        )
+    )
+    artifact_meta = Path(shutil.copy2(context.metadata_path, artifacts_dir / "scaffold-meta.json"))
+    artifact_rules = None
+    if context.injected_rules and context.injected_rules.exists():
+        artifact_rules = Path(
+            shutil.copy2(
+                context.injected_rules,
+                artifacts_dir / context.injected_rules.name.replace(" ", "_"),
+            )
+        )
+
+    return ArtifactPaths(
+        baseline=artifact_baseline,
+        manifest=artifact_manifest,
+        metadata=artifact_meta,
+        rules=artifact_rules,
+    )
+
+
+def build_scaffold_meta(context: ScaffoldContext, artifacts: ArtifactPaths) -> dict:
+    """Build scaffold metadata for the scorecard."""
+    return {
+        "template": context.scaffold_source.template,
+        "version": context.scaffold_source.version,
+        "fingerprint": context.scaffold_source.manifest.fingerprint,
+        "baseline_manifest": context.baseline_manifest_path.name,
+        "workspace_manifest": context.manifest_path.name,
+        "metadata_file": context.metadata_path.name,
+        "rules_file": context.injected_rules.name if context.injected_rules else None,
+        "artifacts": {
+            "baseline_manifest": str(artifacts.baseline),
+            "workspace_manifest": str(artifacts.manifest),
+            "metadata": str(artifacts.metadata),
+            **({"rules": str(artifacts.rules)} if artifacts.rules else {}),
+        },
+    }
+
+
+def build_scorecard(context: ScaffoldContext, scaffold_meta: dict) -> Scorecard:
+    """Create a placeholder scorecard for the run."""
     from .schemas.scorecard import (
         ComplianceScore,
         EfficiencyScore,
         FunctionalScore,
     )
 
-    # Persist scaffold artifacts for later audits
-    artifact_manifest = Path(shutil.copy2(manifest_path, artifacts_dir / "workspace.manifest.json"))
-    artifact_baseline = Path(
-        shutil.copy2(scaffold_source.manifest_path, artifacts_dir / "baseline.manifest.json")
-    )
-    artifact_meta = Path(shutil.copy2(metadata_path, artifacts_dir / "scaffold-meta.json"))
-    artifact_rules = None
-    if injected_rules and injected_rules.exists():
-        artifact_rules = Path(
-            shutil.copy2(injected_rules, artifacts_dir / injected_rules.name.replace(" ", "_"))
-        )
+    scaffold_audit = create_scaffold_audit(context.scaffold_source.manifest, context.workspace)
+    scaffold_audit.template = context.scaffold_source.template
+    scaffold_audit.template_version = context.scaffold_source.version
+    scaffold_audit.manifest_fingerprint = context.scaffold_source.manifest.fingerprint
 
-    scaffold_audit = create_scaffold_audit(scaffold_source.manifest, workspace)
-    scaffold_audit.template = scaffold_source.template
-    scaffold_audit.template_version = scaffold_source.version
-    scaffold_audit.manifest_fingerprint = scaffold_source.manifest.fingerprint
-
-    scaffold_meta = {
-        "template": scaffold_source.template,
-        "version": scaffold_source.version,
-        "fingerprint": scaffold_source.manifest.fingerprint,
-        "baseline_manifest": baseline_manifest_path.name,
-        "workspace_manifest": manifest_path.name,
-        "metadata_file": metadata_path.name,
-        "rules_file": injected_rules.name if injected_rules else None,
-        "artifacts": {
-            "baseline_manifest": str(artifact_baseline),
-            "workspace_manifest": str(artifact_manifest),
-            "metadata": str(artifact_meta),
-            **({"rules": str(artifact_rules)} if artifact_rules else {}),
-        },
-    }
-
-    scorecard = Scorecard(
+    return Scorecard(
         functional=FunctionalScore(
             passed=False,
             tests_passed=0,
@@ -211,16 +252,43 @@ def run_task(
         scaffold_audit=scaffold_audit,
     )
 
+
+def run_task(request: RunRequest) -> EvalRun:
+    """Execute a task and return evaluation results."""
+    run_id, start_time, artifacts_dir = initialize_run(request.results_dir)
+    adapter = request.config.adapter()
+    adapter.validate()
+
+    context = prepare_run_context(request)
+    adapter.prepare_workspace(context.workspace)
+
+    run_env = os.environ.copy()
+    run_env.update(adapter.runtime_env())
+
+    terminated_early, termination_reason = execute_harbor(
+        adapter,
+        context.workspace,
+        request.config.timeout_sec,
+        run_env,
+    )
+
+    end_time = datetime.now(UTC)
+    duration = (end_time - start_time).total_seconds()
+
+    artifacts = persist_scaffold_artifacts(context, artifacts_dir)
+    scaffold_meta = build_scaffold_meta(context, artifacts)
+    scorecard = build_scorecard(context, scaffold_meta)
+
     return EvalRun(
         id=run_id,
         timestamp=start_time.isoformat(),
         config=EvalConfig(
-            model=config.model.qualified_name,
-            harness=config.agent.value,
-            rules_variant=config.rules_variant,
-            task_name=task.name,
-            scaffold_template=scaffold_source.template,
-            scaffold_version=scaffold_source.version,
+            model=request.config.model.qualified_name,
+            harness=request.config.agent.value,
+            rules_variant=request.config.rules_variant,
+            task_name=request.task.name,
+            scaffold_template=context.scaffold_source.template,
+            scaffold_version=context.scaffold_source.version,
         ),
         duration_sec=duration,
         terminated_early=terminated_early,
