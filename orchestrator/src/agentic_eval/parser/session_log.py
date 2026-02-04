@@ -8,6 +8,21 @@ from typing import Literal
 
 from ..schemas.events import SessionEvent
 
+ROLE_KEYS = ("role", "speaker", "source", "event", "type")
+TEXT_KEYS = ("text", "content", "message")
+COMMAND_KEYS = ("command", "cmd")
+FILE_KEYS = ("file_path", "path")
+TOOL_KEYS = ("tool", "tool_name")
+TOOL_ARGS_KEYS = ("args", "payload", "data")
+
+
+def _first_truthy(entry: dict, keys: Iterable[str]):
+    for key in keys:
+        value = entry.get(key)
+        if value:
+            return value
+    return None
+
 
 def truncate_content(content: str, max_length: int = 500) -> str:
     """Truncate content for storage."""
@@ -83,84 +98,109 @@ def _structured_record_to_events(entry: dict, default_role: str) -> list[Session
     timestamp = _coerce_timestamp(entry)
     events: list[SessionEvent] = []
 
-    role_hint = str(
-        entry.get("role")
-        or entry.get("speaker")
-        or entry.get("source")
-        or entry.get("event")
-        or entry.get("type")
-        or default_role
-    ).lower()
+    role_hint = str(_first_truthy(entry, ROLE_KEYS) or default_role).lower()
 
-    text = entry.get("text") or entry.get("content") or entry.get("message")
-    command = entry.get("command") or entry.get("cmd")
-    file_path = entry.get("file_path") or entry.get("path")
+    text = _first_truthy(entry, TEXT_KEYS)
+    command = _first_truthy(entry, COMMAND_KEYS)
+    file_path = _first_truthy(entry, FILE_KEYS)
     stdout = entry.get("stdout")
     stderr = entry.get("stderr")
     status = entry.get("status")
-    tool_name = entry.get("tool") or entry.get("tool_name")
-    tool_args = entry.get("args") or entry.get("payload") or entry.get("data")
+    tool_name = _first_truthy(entry, TOOL_KEYS)
+    tool_args = _first_truthy(entry, TOOL_ARGS_KEYS)
 
-    if command:
-        events.append(
-            SessionEvent(
-                timestamp=timestamp,
-                event_type="bash_command",
-                data={"command": command},
-            )
-        )
-
-    if file_path:
-        events.append(
-            SessionEvent(
-                timestamp=timestamp,
-                event_type="file_change",
-                data={"file_path": file_path},
-            )
-        )
-
-    if stdout or stderr or role_hint in {"gate", "verification"}:
-        events.append(
-            SessionEvent(
-                timestamp=timestamp,
-                event_type="gate_result",
-                data={
-                    "status": status,
-                    "stdout": truncate_content(stdout or ""),
-                    "stderr": truncate_content(stderr or ""),
-                },
-            )
-        )
-
-    if tool_name:
-        events.append(
-            SessionEvent(
-                timestamp=timestamp,
-                event_type="tool_call",
-                data={
-                    "name": tool_name,
-                    "input": tool_args if isinstance(tool_args, dict) else {"value": tool_args},
-                },
-            )
-        )
-
-    if text:
-        if role_hint in {"user", "human", "prompt"}:
-            event_type = "user_prompt"
-        elif role_hint in {"assistant", "ai", "copilot", "cursor", "pi", "openhands"}:
-            event_type = "assistant_message"
-        else:
-            event_type = "assistant_message"
-
-        events.append(
-            SessionEvent(
-                timestamp=timestamp,
-                event_type=event_type,
-                data={"content": truncate_content(str(text))},
-            )
-        )
+    _append_command_event(events, timestamp, command)
+    _append_file_event(events, timestamp, file_path)
+    _append_gate_event(events, timestamp, role_hint, status, stdout, stderr)
+    _append_tool_event(events, timestamp, tool_name, tool_args)
+    _append_message_event(events, timestamp, role_hint, text)
 
     return events
+
+
+def _append_command_event(events: list[SessionEvent], timestamp: str, command: str | None) -> None:
+    if not command:
+        return
+    events.append(
+        SessionEvent(
+            timestamp=timestamp,
+            event_type="bash_command",
+            data={"command": command},
+        )
+    )
+
+
+def _append_file_event(events: list[SessionEvent], timestamp: str, file_path: str | None) -> None:
+    if not file_path:
+        return
+    events.append(
+        SessionEvent(
+            timestamp=timestamp,
+            event_type="file_change",
+            data={"file_path": file_path},
+        )
+    )
+
+
+def _append_gate_event(
+    events: list[SessionEvent],
+    timestamp: str,
+    role_hint: str,
+    status: str | None,
+    stdout: str | None,
+    stderr: str | None,
+) -> None:
+    if not stdout and not stderr and role_hint not in {"gate", "verification"}:
+        return
+    events.append(
+        SessionEvent(
+            timestamp=timestamp,
+            event_type="gate_result",
+            data={
+                "status": status,
+                "stdout": truncate_content(stdout or ""),
+                "stderr": truncate_content(stderr or ""),
+            },
+        )
+    )
+
+
+def _append_tool_event(
+    events: list[SessionEvent],
+    timestamp: str,
+    tool_name: str | None,
+    tool_args: object | None,
+) -> None:
+    if not tool_name:
+        return
+    events.append(
+        SessionEvent(
+            timestamp=timestamp,
+            event_type="tool_call",
+            data={
+                "name": tool_name,
+                "input": tool_args if isinstance(tool_args, dict) else {"value": tool_args},
+            },
+        )
+    )
+
+
+def _append_message_event(
+    events: list[SessionEvent],
+    timestamp: str,
+    role_hint: str,
+    text: object | None,
+) -> None:
+    if not text:
+        return
+    event_type = "user_prompt" if role_hint in {"user", "human", "prompt"} else "assistant_message"
+    events.append(
+        SessionEvent(
+            timestamp=timestamp,
+            event_type=event_type,
+            data={"content": truncate_content(str(text))},
+        )
+    )
 
 
 def _parse_structured_cli_session(
@@ -423,78 +463,82 @@ def parse_gemini_entry(entry: dict) -> list[SessionEvent]:
     events: list[SessionEvent] = []
 
     for part in parts:
-        if isinstance(part, dict):
-            # Text content
-            if "text" in part:
-                event_type = "user_prompt" if role == "user" else "assistant_message"
-                events.append(
-                    SessionEvent(
-                        timestamp=timestamp,
-                        event_type=event_type,
-                        data={"content": truncate_content(part["text"])},
-                    )
-                )
-
-            # Function call (tool use)
-            elif "functionCall" in part:
-                func_call = part["functionCall"]
-                func_name = func_call.get("name", "")
-                func_args = func_call.get("args", {})
-
-                # Map Gemini function names to event types
-                if func_name in ("run_shell_command", "execute_command"):
-                    events.append(
-                        SessionEvent(
-                            timestamp=timestamp,
-                            event_type="bash_command",
-                            data={"command": func_args.get("command", "")},
-                        )
-                    )
-                elif func_name in ("write_file", "edit_file", "create_file"):
-                    events.append(
-                        SessionEvent(
-                            timestamp=timestamp,
-                            event_type="file_change",
-                            data={
-                                "file_path": func_args.get("path", func_args.get("file_path", ""))
-                            },
-                        )
-                    )
-                else:
-                    events.append(
-                        SessionEvent(
-                            timestamp=timestamp,
-                            event_type="tool_call",
-                            data={"name": func_name, "args": func_args},
-                        )
-                    )
-
-            # Function response (tool result)
-            elif "functionResponse" in part:
-                func_response = part["functionResponse"]
-                events.append(
-                    SessionEvent(
-                        timestamp=timestamp,
-                        event_type="gate_result",
-                        data={
-                            "name": func_response.get("name", ""),
-                            "response": truncate_content(str(func_response.get("response", {}))),
-                        },
-                    )
-                )
-
-        elif isinstance(part, str):
-            # Simple string text
-            event_type = "user_prompt" if role == "user" else "assistant_message"
-            events.append(
-                SessionEvent(
-                    timestamp=timestamp,
-                    event_type=event_type,
-                    data={"content": truncate_content(part)},
-                )
-            )
+        events.extend(_gemini_part_to_events(timestamp, role, part))
 
     return events
+
+
+def _gemini_event_type(role: str) -> str:
+    return "user_prompt" if role == "user" else "assistant_message"
+
+
+def _gemini_text_event(timestamp: str, role: str, text: str) -> SessionEvent:
+    return SessionEvent(
+        timestamp=timestamp,
+        event_type=_gemini_event_type(role),
+        data={"content": truncate_content(text)},
+    )
+
+
+def _gemini_function_call_events(timestamp: str, func_call: dict) -> list[SessionEvent]:
+    func_name = func_call.get("name", "")
+    func_args = func_call.get("args", {})
+
+    if func_name in ("run_shell_command", "execute_command"):
+        return [
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="bash_command",
+                data={"command": func_args.get("command", "")},
+            )
+        ]
+
+    if func_name in ("write_file", "edit_file", "create_file"):
+        return [
+            SessionEvent(
+                timestamp=timestamp,
+                event_type="file_change",
+                data={"file_path": func_args.get("path", func_args.get("file_path", ""))},
+            )
+        ]
+
+    return [
+        SessionEvent(
+            timestamp=timestamp,
+            event_type="tool_call",
+            data={"name": func_name, "args": func_args},
+        )
+    ]
+
+
+def _gemini_function_response_event(timestamp: str, func_response: dict) -> SessionEvent:
+    return SessionEvent(
+        timestamp=timestamp,
+        event_type="gate_result",
+        data={
+            "name": func_response.get("name", ""),
+            "response": truncate_content(str(func_response.get("response", {}))),
+        },
+    )
+
+
+def _gemini_part_to_events(timestamp: str, role: str, part: object) -> list[SessionEvent]:
+    if isinstance(part, dict):
+        if "text" in part:
+            return [_gemini_text_event(timestamp, role, part["text"])]
+
+        if "functionCall" in part:
+            return _gemini_function_call_events(timestamp, part["functionCall"])
+
+        if "functionResponse" in part:
+            return [_gemini_function_response_event(timestamp, part["functionResponse"])]
+
+        return []
+
+    if isinstance(part, str):
+        return [_gemini_text_event(timestamp, role, part)]
+
+    return []
 
 
 def parse_cursor_session(session_dir: Path) -> list[SessionEvent]:

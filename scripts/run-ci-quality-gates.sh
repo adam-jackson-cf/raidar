@@ -84,6 +84,9 @@ else
     uv_project_run ruff check . --no-fix --force-exclude
 fi
 
+echo "[quality-gates] Lizard complexity"
+uv_project_run lizard -C 10 -l python src
+
 echo "[quality-gates] Pytest"
 uv_project_run pytest tests -x --tb=short
 

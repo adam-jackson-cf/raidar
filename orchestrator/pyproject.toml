@@ -19,6 +19,7 @@ dev = [
     "pytest-asyncio>=0.23",
     "ruff>=0.1",
     "pre-commit>=3.0",
+    "lizard>=1.17.10",
 ]
 
 [project.scripts]
