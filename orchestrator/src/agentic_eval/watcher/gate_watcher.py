@@ -1,6 +1,7 @@
 """Verification gate watching and event tracking."""
 
 import re
+import shlex
 import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
@@ -64,10 +65,12 @@ class GateWatcher:
         """
         timestamp = datetime.now(UTC).isoformat()
 
+        args = gate.command
+        command_text = shlex.join(args)
+
         try:
             result = subprocess.run(
-                gate.command,
-                shell=True,
+                args,
                 cwd=workspace,
                 capture_output=True,
                 text=True,
@@ -80,6 +83,10 @@ class GateWatcher:
             exit_code = -1
             stdout = ""
             stderr = "Command timed out"
+        except FileNotFoundError:
+            exit_code = -1
+            stdout = ""
+            stderr = f"Command not found: {args[0]}"
 
         failure_category = None
         is_repeat = False
@@ -95,7 +102,7 @@ class GateWatcher:
         event = GateEvent(
             timestamp=timestamp,
             gate_name=gate.name,
-            command=gate.command,
+            command=command_text,
             exit_code=exit_code,
             stdout=truncate_output(stdout),
             stderr=truncate_output(stderr),
