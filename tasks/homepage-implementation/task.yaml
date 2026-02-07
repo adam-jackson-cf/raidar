@@ -16,20 +16,26 @@ verification:
       command: ["bun", "run", "typecheck"]
       on_failure: continue
     - name: lint
-      command: ["bunx", "ultracite", "check", "src"]
+      command: ["bun", "run", "lint"]
       on_failure: continue
     - name: test
-      command: ["bun", "test"]
+      command: ["bun", "run", "test", "--passWithNoTests"]
       on_failure: continue
 
 compliance:
   deterministic_checks:
+    - type: no_pattern
+      pattern: "Homepage placeholder - implement the design"
+      description: Replaces scaffold placeholder content
     - type: import_present
-      pattern: "from 'zod'"
-      description: Uses Zod for validation
+      pattern: "Get Started"
+      description: Includes hero call-to-action copy
     - type: import_present
-      pattern: lucide-react
-      description: Uses Lucide icons
+      pattern: Contact
+      description: Includes contact navigation copy
+    - type: import_present
+      pattern: Features
+      description: Includes a features section heading
     - type: no_pattern
       pattern: "style={{"
       description: Avoids inline styles

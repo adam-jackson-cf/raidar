@@ -32,6 +32,7 @@ def capture_screenshot(workspace: Path, command: list[str], output_path: Path) -
 
 
 def compare_images(
+    workspace: Path,
     reference: Path,
     actual: Path,
     diff_output: Path,
@@ -60,7 +61,7 @@ def compare_images(
         # Run odiff comparison
         result = subprocess.run(
             [
-                "npx",
+                "bunx",
                 "odiff",
                 str(reference),
                 str(actual),
@@ -68,6 +69,7 @@ def compare_images(
                 "--threshold",
                 str(threshold),
             ],
+            cwd=workspace,
             capture_output=True,
             text=True,
             timeout=settings.timeouts.image_compare,
@@ -75,25 +77,22 @@ def compare_images(
 
         output = result.stdout + result.stderr
 
-        # odiff returns 0 for match, 1 for diff, other for error
+        # odiff returns 0 for exact match and non-zero for differences/errors.
         if result.returncode == 0:
             # Images match
             return 1.0, None
-        elif result.returncode == 1:
-            # Images differ - parse diff percentage
-            # odiff output: "Failure! Images differ by X.XX%"
-            import re
 
-            match = re.search(r"(\d+\.?\d*)\s*%", output)
-            if match:
-                diff_percent = float(match.group(1))
-                similarity = max(0, 1 - (diff_percent / 100))
-                return similarity, str(diff_output) if diff_output.exists() else None
-            else:
-                return 0.0, str(diff_output) if diff_output.exists() else None
-        else:
-            # Error
-            return 0.0, None
+        # Images differ - parse percentage from odiff output when available.
+        import re
+
+        match = re.search(r"(\d+\.?\d*)\s*%", output)
+        if match:
+            diff_percent = float(match.group(1))
+            similarity = max(0, 1 - (diff_percent / 100))
+            return similarity, str(diff_output) if diff_output.exists() else None
+        if diff_output.exists():
+            return 0.0, str(diff_output)
+        return 0.0, None
 
     except (subprocess.TimeoutExpired, FileNotFoundError):
         return 0.0, None
@@ -131,6 +130,7 @@ def evaluate_visual(
 
     # Compare images (odiff_threshold is used for anti-aliasing tolerance)
     similarity, diff_output = compare_images(
+        workspace=workspace,
         reference=reference_image,
         actual=actual_path,
         diff_output=diff_path,

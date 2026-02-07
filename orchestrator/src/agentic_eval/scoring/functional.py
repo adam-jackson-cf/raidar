@@ -60,6 +60,12 @@ def parse_test_output(stdout: str, stderr: str) -> tuple[int, int]:
     pass_match = re.search(r"(\d+) pass", output)
     fail_match = re.search(r"(\d+) fail", output)
 
+    # Try Vitest format: "X passed" / "X failed"
+    if not pass_match:
+        pass_match = re.search(r"(\d+)\s+passed", output, re.IGNORECASE)
+    if not fail_match:
+        fail_match = re.search(r"(\d+)\s+failed", output, re.IGNORECASE)
+
     passed = int(pass_match.group(1)) if pass_match else 0
     failed = int(fail_match.group(1)) if fail_match else 0
 
@@ -73,14 +79,18 @@ def run_tests(workspace: Path) -> tuple[bool, int, int]:
         Tuple of (all_passed, tests_passed, tests_total)
     """
     code, stdout, stderr = run_command(
-        ["bun", "test"],
+        ["bun", "run", "test"],
         workspace,
         timeout=settings.timeouts.test,
     )
     tests_passed, tests_total = parse_test_output(stdout, stderr)
+    output = stdout + stderr
 
     # If no tests found, consider it passed with 0/0
     if tests_total == 0:
+        no_tests_patterns = ("No tests found", "No test files found")
+        if any(pattern in output for pattern in no_tests_patterns):
+            return True, 0, 0
         return code == 0, 0, 0
 
     all_passed = code == 0 and tests_passed == tests_total
