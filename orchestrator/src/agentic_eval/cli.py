@@ -92,6 +92,11 @@ def run(
     timeout: int,
 ) -> None:
     """Run a task with specified harness and model."""
+    task = task.resolve()
+    scaffolds_root = scaffolds_root.resolve()
+    workspace = workspace.resolve()
+    output = output.resolve()
+
     click.echo(f"Loading task from {task}")
     task_def = load_task(task)
 
@@ -118,7 +123,10 @@ def run(
         workspace_dir=workspace,
         results_dir=output,
     )
-    result = run_task(request)
+    try:
+        result = run_task(request)
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
 
     # Save result
     result_path = output / f"{result.id}.json"

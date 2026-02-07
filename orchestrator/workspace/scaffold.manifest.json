@@ -1,6 +1,9 @@
 {
-  "generated_at": "2026-01-22T13:48:12.026900+00:00",
+  "generated_at": "2026-02-07T17:23:01.632720+00:00",
   "version": "1.0.0",
+  "template": null,
+  "template_version": null,
+  "fingerprint": "33917f1f1fa01952411e79ea775d83676c740ef77443ba9d9e9c06715469b987",
   "files": {
     "package.json": {
       "hash": "sha256:03085e19bdd67a2fc655960d3acdc46571034e9ed5cab1da7bd288e7eb2df765",
@@ -31,8 +34,8 @@
       "size": 388
     },
     "src/app/page.tsx": {
-      "hash": "sha256:5c90b9b68034fb47177d2539aab7fab58bab1324a732e3e72c40c805d61cd93d",
-      "size": 158
+      "hash": "sha256:6c5e5e3bd692cb6ba66168d71d69949e0e1c6c5eb67afd6ecd1740ef348aa254",
+      "size": 4301
     },
     "src/components/ui/button.tsx": {
       "hash": "sha256:8c64dcb5ea5a4a8d0572c67283f9646e699b4208d2e657b92067e8c9272f9db4",

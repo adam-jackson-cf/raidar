@@ -91,7 +91,7 @@ class EfficiencyScore(BaseModel):
             - (self.total_gate_failures / max_failures)
             - (self.repeat_failures * repeat_penalty)
         )
-        return max(0.0, min(1.0, raw_score))
+        return round(max(0.0, min(1.0, raw_score)), 3)
 
 
 class ScaffoldAudit(BaseModel):

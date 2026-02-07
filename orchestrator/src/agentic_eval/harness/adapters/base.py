@@ -50,16 +50,37 @@ class HarnessAdapter:
         """Adapters can append additional Harbor CLI flags."""
         return []
 
-    def build_harbor_command(self) -> list[str]:
+    def build_harbor_command(
+        self,
+        task_path: Path | None = None,
+        job_name: str | None = None,
+        jobs_dir: Path | None = None,
+    ) -> list[str]:
         """Construct the Harbor CLI command for this adapter."""
-        return [
+        cmd: list[str] = [
             "harbor",
             "run",
-            "-d",
-            self.terminal_bench_dataset,
-            "-a",
-            self.harbor_agent(),
-            "-m",
-            self.model_argument(),
-            *self.extra_harbor_args(),
         ]
+
+        if task_path is not None:
+            cmd.extend(["--path", str(task_path)])
+        else:
+            cmd.extend(["-d", self.terminal_bench_dataset, "-l", "1"])
+
+        if job_name:
+            cmd.extend(["--job-name", job_name])
+        if jobs_dir is not None:
+            cmd.extend(["--jobs-dir", str(jobs_dir)])
+
+        cmd.extend(
+            [
+                "--n-concurrent",
+                "1",
+                "-a",
+                self.harbor_agent(),
+                "-m",
+                self.model_argument(),
+                *self.extra_harbor_args(),
+            ]
+        )
+        return cmd

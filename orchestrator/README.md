@@ -54,11 +54,18 @@ The CLI automatically loads environment variables from `orchestrator/.env` (if p
 
 ```
 # orchestrator/.env
-CODEX_API_KEY=sk-live-...
-CODEX_OAUTH_TOKEN=
+OPENAI_API_KEY=sk-live-...
+CODEX_API_KEY=
 CURSOR_API_KEY=
 COPILOT_API_KEY=
 PI_API_TOKEN=
 ```
 
 Only populate the entries you use. Values in your shell environment still take precedence if you need to override something temporarily.
+
+For Harbor `codex` agent runs, an API key is required in-container. The orchestrator accepts either `OPENAI_API_KEY` or `CODEX_API_KEY` and forwards it to Harbor as `OPENAI_API_KEY`.
+
+Model aliases are supported for Codex tiers:
+- `codex/gpt-5.2-low` -> `codex/gpt-5.2-codex` with `reasoning_effort=low`
+- `codex/gpt-5.2-medium` -> `codex/gpt-5.2-codex` with `reasoning_effort=medium`
+- `codex/gpt-5.2-high` -> `codex/gpt-5.2-codex` with `reasoning_effort=high`

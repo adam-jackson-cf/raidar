@@ -1,6 +1,9 @@
 {
   "generated_at": "2026-01-22T13:46:06.969978+00:00",
   "version": "1.0.0",
+  "template": "next-shadcn-starter",
+  "template_version": "v2025.01",
+  "fingerprint": "",
   "files": {
     "package.json": {
       "hash": "sha256:03085e19bdd67a2fc655960d3acdc46571034e9ed5cab1da7bd288e7eb2df765",
