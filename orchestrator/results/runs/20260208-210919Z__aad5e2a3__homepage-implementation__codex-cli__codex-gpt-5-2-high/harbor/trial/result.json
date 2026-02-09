@@ -1,0 +1,92 @@
+{
+    "id": "c14831ee-a0a1-4bea-b9ee-62f3a90d30d4",
+    "task_name": "harbor-task-homepage-implementation-aad5e2a3",
+    "trial_name": "harbor-task-homepage-implementat__TpkzPFs",
+    "trial_uri": "file:///Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-aad5e2a3/harbor-task-homepage-implementat__TpkzPFs",
+    "task_id": {
+        "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-repeat-02/harbor-task-homepage-implementation-aad5e2a3"
+    },
+    "source": null,
+    "task_checksum": "cfff9bb593fe27bf5c167a5db8ef0b2be939eb52af1619c061ee6eb0546257d4",
+    "config": {
+        "task": {
+            "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-repeat-02/harbor-task-homepage-implementation-aad5e2a3",
+            "git_url": null,
+            "git_commit_id": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": null
+        },
+        "trial_name": "harbor-task-homepage-implementat__TpkzPFs",
+        "trials_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-aad5e2a3",
+        "timeout_multiplier": 1.0,
+        "agent": {
+            "name": "codex",
+            "import_path": null,
+            "model_name": "codex/gpt-5.2-codex",
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {
+                "reasoning_effort": "high"
+            }
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "job_id": "f460f436-9e29-431a-ab8b-ac1034dab476"
+    },
+    "agent_info": {
+        "name": "codex",
+        "version": "unknown",
+        "model_info": {
+            "name": "gpt-5.2-codex",
+            "provider": "codex"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": 296016,
+        "n_cache_tokens": 251520,
+        "n_output_tokens": 6569,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": null
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 0.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-02-08T21:09:23.803865Z",
+    "finished_at": "2026-02-08T21:13:17.941592Z",
+    "environment_setup": {
+        "started_at": "2026-02-08T21:09:23.805373Z",
+        "finished_at": "2026-02-08T21:10:05.095957Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-02-08T21:10:05.096027Z",
+        "finished_at": "2026-02-08T21:10:24.204394Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-02-08T21:10:24.204657Z",
+        "finished_at": "2026-02-08T21:12:43.969036Z"
+    },
+    "verifier": {
+        "started_at": "2026-02-08T21:12:43.969173Z",
+        "finished_at": "2026-02-08T21:13:07.091312Z"
+    }
+}

@@ -30,6 +30,18 @@ coverage/
 .pytest_cache/
 .enaible/
 next-session.md
+jobs/
+orchestrator/jobs/
+orchestrator/results/.preflight-cache/
+orchestrator/workspace-high/
+orchestrator/workspace/harbor-task/
+orchestrator/workspace/.baseline-scaffold.json
+orchestrator/workspace/.scaffold-meta.json
+orchestrator/workspace/.next/
+orchestrator/workspace/node_modules/
+orchestrator/workspace/actual.png
+orchestrator/workspace/diff.png
+orchestrator/workspace/tsconfig.tsbuildinfo
 
 # Screenshots
 actual.png

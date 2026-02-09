@@ -126,6 +126,8 @@ def evaluate_visual(
         return VisualScore(
             similarity=0.0,
             diff_path=None,
+            capture_succeeded=False,
+            threshold=threshold,
         )
 
     # Compare images (odiff_threshold is used for anti-aliasing tolerance)
@@ -139,4 +141,6 @@ def evaluate_visual(
     return VisualScore(
         similarity=similarity,
         diff_path=diff_output,
+        capture_succeeded=True,
+        threshold=threshold,
     )

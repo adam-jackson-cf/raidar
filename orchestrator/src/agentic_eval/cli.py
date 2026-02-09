@@ -1,6 +1,8 @@
 """CLI entrypoint for eval orchestrator."""
 
+import concurrent.futures
 import json
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
 
@@ -8,7 +10,13 @@ import click
 from dotenv import load_dotenv
 
 from .harness.config import Agent, HarnessConfig, ModelTarget
+from .repeat_suite import (
+    create_repeat_suite_summary,
+    persist_repeat_suite,
+    repeat_workspace,
+)
 from .runner import RunRequest, load_task, run_task
+from .schemas.scorecard import EvalRun
 
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
 if ENV_PATH.exists():
@@ -23,6 +31,128 @@ def main() -> None:
 
 
 AGENT_CHOICES = [agent.value for agent in Agent]
+
+
+def _summary_result_path(run: EvalRun) -> Path:
+    run_meta = run.scores.metadata.get("run", {})
+    summary_result = run_meta.get("summary_result_json")
+    if not isinstance(summary_result, str):
+        raise click.ClickException("Canonical summary result path missing from run metadata.")
+    return Path(summary_result)
+
+
+def _persist_eval_run(run: EvalRun) -> Path:
+    result_path = _summary_result_path(run)
+    result_path.parent.mkdir(parents=True, exist_ok=True)
+    result_path.write_text(run.model_dump_json(indent=2))
+    return result_path
+
+
+def _build_repeat_request(base_request: RunRequest, repeat_index: int) -> RunRequest:
+    return RunRequest(
+        task=base_request.task,
+        config=base_request.config,
+        scaffold_root=base_request.scaffold_root,
+        task_dir=base_request.task_dir,
+        workspace_dir=repeat_workspace(base_request.workspace_dir, repeat_index),
+        results_dir=base_request.results_dir,
+    )
+
+
+def _execute_run_request(run_request: RunRequest) -> EvalRun:
+    run = run_task(run_request)
+    _persist_eval_run(run)
+    return run
+
+
+def _execute_repeat_batch(
+    *,
+    request: RunRequest,
+    batch_size: int,
+    repeat_parallel: int,
+    start_index: int,
+) -> list[EvalRun]:
+    if batch_size <= 0:
+        return []
+    if repeat_parallel <= 1:
+        return [
+            _execute_run_request(_build_repeat_request(request, start_index + offset))
+            for offset in range(batch_size)
+        ]
+
+    resolved_parallel = max(1, min(repeat_parallel, batch_size))
+    by_index: dict[int, EvalRun] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=resolved_parallel) as executor:
+        future_map = {
+            executor.submit(
+                _execute_run_request,
+                _build_repeat_request(request, start_index + offset),
+            ): offset
+            for offset in range(batch_size)
+        }
+        for future in concurrent.futures.as_completed(future_map):
+            offset = future_map[future]
+            try:
+                by_index[offset] = future.result()
+            except Exception as exc:
+                repeat_idx = start_index + offset
+                raise click.ClickException(f"Repeat {repeat_idx} failed: {exc}") from exc
+    return [by_index[idx] for idx in sorted(by_index)]
+
+
+def _count_voided(runs: list[EvalRun]) -> int:
+    return sum(1 for run in runs if run.scores.voided)
+
+
+def _run_with_void_retries(
+    *,
+    request: RunRequest,
+    repeats: int,
+    repeat_parallel: int,
+    retry_void: int,
+) -> tuple[list[EvalRun], int, int]:
+    all_runs: list[EvalRun] = []
+    next_repeat_index = 1
+    pending_batch = repeats
+    retries_used = 0
+
+    initial_runs = _execute_repeat_batch(
+        request=request,
+        batch_size=pending_batch,
+        repeat_parallel=repeat_parallel,
+        start_index=next_repeat_index,
+    )
+    all_runs.extend(initial_runs)
+    pending_batch = _count_voided(initial_runs)
+    next_repeat_index += len(initial_runs)
+
+    while pending_batch > 0 and retries_used < retry_void:
+        retries_used += 1
+        retry_runs = _execute_repeat_batch(
+            request=request,
+            batch_size=pending_batch,
+            repeat_parallel=repeat_parallel,
+            start_index=next_repeat_index,
+        )
+        all_runs.extend(retry_runs)
+        pending_batch = _count_voided(retry_runs)
+        next_repeat_index += len(retry_runs)
+
+    return all_runs, retries_used, pending_batch
+
+
+def _run_repeat_requests(
+    *,
+    request: RunRequest,
+    repeats: int,
+    repeat_parallel: int,
+) -> list[EvalRun]:
+    return _execute_repeat_batch(
+        request=request,
+        batch_size=max(1, repeats),
+        repeat_parallel=repeat_parallel,
+        start_index=1,
+    )
 
 
 @main.command()
@@ -81,6 +211,24 @@ AGENT_CHOICES = [agent.value for agent in Agent]
     default=1800,
     help="Task timeout in seconds",
 )
+@click.option(
+    "--repeats",
+    type=click.IntRange(min=1),
+    default=1,
+    help="Number of repeated runs for the same configuration",
+)
+@click.option(
+    "--repeat-parallel",
+    type=click.IntRange(min=1),
+    default=1,
+    help="Parallel workers for repeat runs",
+)
+@click.option(
+    "--retry-void",
+    type=click.IntRange(min=0),
+    default=0,
+    help="Retry budget for voided runs (rate limits/timeouts/harness failures)",
+)
 def run(
     task: Path,
     agent: str,
@@ -90,6 +238,9 @@ def run(
     workspace: Path,
     output: Path,
     timeout: int,
+    repeats: int,
+    repeat_parallel: int,
+    retry_void: int,
 ) -> None:
     """Run a task with specified harness and model."""
     task = task.resolve()
@@ -104,6 +255,9 @@ def run(
     click.echo(f"Agent: {agent}")
     click.echo(f"Model: {model}")
     click.echo(f"Rules variant: {rules}")
+    click.echo(f"Repeats: {repeats}")
+    click.echo(f"Repeat parallelism: {repeat_parallel}")
+    click.echo(f"Retry void budget: {retry_void}")
 
     config = HarnessConfig(
         agent=Agent(agent),
@@ -114,7 +268,6 @@ def run(
 
     output.mkdir(parents=True, exist_ok=True)
 
-    click.echo("Running task...")
     request = RunRequest(
         task=task_def,
         config=config,
@@ -123,22 +276,64 @@ def run(
         workspace_dir=workspace,
         results_dir=output,
     )
+    click.echo("Running task...")
+    started_at = datetime.now(UTC)
     try:
-        result = run_task(request)
+        runs, retries_used, unresolved_void = _run_with_void_retries(
+            request=request,
+            repeats=max(1, repeats),
+            repeat_parallel=repeat_parallel,
+            retry_void=retry_void,
+        )
     except Exception as exc:
         raise click.ClickException(str(exc)) from exc
 
-    # Save result
-    result_path = output / f"{result.id}.json"
-    with open(result_path, "w") as f:
-        f.write(result.model_dump_json(indent=2))
+    if repeats == 1:
+        result = runs[0]
+        run_meta = result.scores.metadata.get("run", {})
+        canonical_dir = run_meta.get("canonical_run_dir")
+        if isinstance(canonical_dir, str):
+            click.echo(f"Canonical run dir: {canonical_dir}")
+        result_path = _summary_result_path(result)
+        click.echo(f"Result saved to {result_path}")
+        click.echo(f"Run ID: {result.id}")
+        click.echo(f"Duration: {result.duration_sec:.1f}s")
+        click.echo(f"Terminated early: {result.terminated_early}")
+        click.echo(f"Void result: {result.scores.voided}")
+        if result.scores.voided:
+            click.echo(f"Void reasons: {result.scores.void_reasons}")
+        if result.termination_reason:
+            click.echo(f"Reason: {result.termination_reason}")
+        return
 
-    click.echo(f"Result saved to {result_path}")
-    click.echo(f"Run ID: {result.id}")
-    click.echo(f"Duration: {result.duration_sec:.1f}s")
-    click.echo(f"Terminated early: {result.terminated_early}")
-    if result.termination_reason:
-        click.echo(f"Reason: {result.termination_reason}")
+    suite_summary = create_repeat_suite_summary(
+        task_name=task_def.name,
+        harness=agent,
+        model=model,
+        rules_variant=rules,
+        repeats=repeats,
+        repeat_parallel=max(1, min(repeat_parallel, repeats)),
+        runs=runs,
+        started_at=started_at,
+        retry_void_limit=retry_void,
+        retries_used=retries_used,
+        unresolved_void_count=unresolved_void,
+    )
+    summary_path, readme_path = persist_repeat_suite(output, suite_summary)
+
+    click.echo(f"Repeat suite summary: {summary_path}")
+    click.echo(f"Repeat suite readme: {readme_path}")
+    aggregate = suite_summary.get("aggregate", {})
+    repeat_required = int(aggregate.get("repeat_required_count", 0) or 0)
+    click.echo(f"Void retries used: {retries_used}")
+    if repeat_required > 0:
+        click.echo(f"Repeat required for {repeat_required} voided runs.")
+    for run in runs:
+        click.echo(
+            f"Run {run.id}: voided={run.scores.voided}, "
+            f"qualified={run.scores.qualification.passed}, "
+            f"composite={run.scores.composite_score:.3f}, duration={run.duration_sec:.1f}s"
+        )
 
 
 @main.command()
@@ -220,7 +415,8 @@ def inject(
     "-t",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to task.yaml file",
+    multiple=True,
+    help="Path to task.yaml file (repeatable)",
 )
 @click.option(
     "--config",
@@ -247,39 +443,122 @@ def inject(
     is_flag=True,
     help="Show matrix entries without running",
 )
-def matrix(task: Path, config: Path, scaffolds_root: Path, parallel: int, dry_run: bool) -> None:
+def matrix(
+    task: tuple[Path, ...], config: Path, scaffolds_root: Path, parallel: int, dry_run: bool
+) -> None:
     """Run evaluation matrix from configuration."""
     from .comparison.matrix_runner import MatrixRunner
-    from .matrix import generate_matrix_entries, load_matrix_config
+    from .matrix import MatrixEntry, generate_matrix_entries, load_matrix_config
 
-    click.echo(f"Loading task from {task}")
-    task_def = load_task(task)
+    task_paths = tuple(path.resolve() for path in task)
+    if not task_paths:
+        raise click.ClickException("At least one --task path is required.")
+    task_defs = _load_matrix_tasks(task_paths)
 
     click.echo(f"Loading matrix from {config}")
     matrix_config = load_matrix_config(config)
-    total_entries = len(generate_matrix_entries(matrix_config))
+    entries: list[MatrixEntry] = generate_matrix_entries(matrix_config)
+    total_entries = len(entries)
     click.echo(
         f"Matrix defined for {len(matrix_config.runs)} harness/model pairs × "
         f"{len(matrix_config.rules_variants)} rule variants ({total_entries} runs)"
     )
 
     runner = MatrixRunner(
-        tasks_dir=task.parent,
+        tasks_dir=task_paths[0].parent,
         scaffolds_root=scaffolds_root,
         results_dir=Path(matrix_config.results_path),
         workspaces_dir=Path(matrix_config.workspace_base),
     )
 
+    if len(task_defs) == 1:
+        _run_single_task_matrix(
+            runner=runner,
+            task_defs=task_defs,
+            matrix_config=matrix_config,
+            parallel=parallel,
+            dry_run=dry_run,
+        )
+        return
+
+    _run_multi_task_matrix(
+        runner=runner,
+        task_defs=task_defs,
+        entries=entries,
+        parallel=parallel,
+        dry_run=dry_run,
+    )
+
+
+def _load_matrix_tasks(task_paths: tuple[Path, ...]) -> list[tuple[Path, object]]:
+    task_defs: list[tuple[Path, object]] = []
+    for task_path in task_paths:
+        click.echo(f"Loading task from {task_path}")
+        task_defs.append((task_path, load_task(task_path)))
+    return task_defs
+
+
+def _run_single_task_matrix(
+    *,
+    runner,
+    task_defs: list[tuple[Path, object]],
+    matrix_config,
+    parallel: int,
+    dry_run: bool,
+) -> None:
+    task_path, task_def = task_defs[0]
     report = runner.run_matrix(
         task=task_def,
         matrix_config=matrix_config,
         parallel=parallel,
         dry_run=dry_run,
     )
-
     click.echo(
-        f"Matrix completed: {report.successful_runs} successes, {report.failed_runs} failures."
+        f"Matrix completed ({task_path.name}): "
+        f"{report.successful_runs} successes, {report.failed_runs} failures."
     )
+
+
+def _run_multi_task_matrix(
+    *,
+    runner,
+    task_defs: list[tuple[Path, object]],
+    entries,
+    parallel: int,
+    dry_run: bool,
+) -> None:
+    configs = [entry.to_harness_config() for entry in entries]
+    jobs = [(task_path, task_def, cfg) for task_path, task_def in task_defs for cfg in configs]
+    click.echo(
+        f"Running multi-task matrix: {len(task_defs)} tasks × {len(configs)} configs = "
+        f"{len(jobs)} runs with parallel={parallel}"
+    )
+    successes = 0
+    failures = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as executor:
+        future_to_task = {
+            executor.submit(
+                runner.run_single,
+                task_def,
+                cfg,
+                task_path.parent,
+                dry_run,
+            ): task_path
+            for task_path, task_def, cfg in jobs
+        }
+        for future in concurrent.futures.as_completed(future_to_task):
+            task_path = future_to_task[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                click.echo(f"[{task_path.stem}] failed: {exc}")
+                failures += 1
+                continue
+            if result.scorecard is not None:
+                successes += 1
+            elif result.error is not None:
+                failures += 1
+    click.echo(f"Multi-task matrix completed: {successes} successes, {failures} failures.")
 
 
 @main.command()

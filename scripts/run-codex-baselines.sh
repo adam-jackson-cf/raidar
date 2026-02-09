@@ -8,6 +8,10 @@ SCAFFOLDS_ROOT="../scaffolds"
 WORKSPACE="workspace"
 OUTPUT="results"
 AGENT="codex-cli"
+REPEATS="${REPEATS:-5}"
+REPEAT_PARALLEL="${REPEAT_PARALLEL:-1}"
+RETRY_VOID="${RETRY_VOID:-3}"
+TIMEOUT_SEC="${TIMEOUT_SEC:-300}"
 
 if [[ -f "$ORCH_DIR/.env" ]]; then
   set -a
@@ -31,14 +35,18 @@ models=(
 
 for model in "${models[@]}"; do
   echo
-  echo "Running baseline for $model"
+  echo "Running baseline for $model (repeats=$REPEATS, parallel=$REPEAT_PARALLEL, retry_void=$RETRY_VOID, timeout=${TIMEOUT_SEC}s)"
   uv run eval-orchestrator run \
     --task "$TASK_PATH" \
     --agent "$AGENT" \
     --model "$model" \
     --scaffolds-root "$SCAFFOLDS_ROOT" \
     --workspace "$WORKSPACE" \
-    --output "$OUTPUT"
+    --output "$OUTPUT" \
+    --timeout "$TIMEOUT_SEC" \
+    --repeats "$REPEATS" \
+    --repeat-parallel "$REPEAT_PARALLEL" \
+    --retry-void "$RETRY_VOID"
 done
 
 echo

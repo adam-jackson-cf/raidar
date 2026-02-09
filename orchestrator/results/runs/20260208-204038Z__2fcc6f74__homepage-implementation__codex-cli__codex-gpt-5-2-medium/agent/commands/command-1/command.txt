@@ -1,0 +1,23 @@
+trap 'rm -rf /tmp/codex-secrets "$CODEX_HOME/auth.json"' EXIT TERM INT; codex exec --dangerously-bypass-approvals-and-sandbox --skip-git-repo-check --model gpt-5.2-codex --json --enable unified_exec -c model_reasoning_effort=medium -- 'Implement a homepage for a SaaS product landing page.
+
+The page should include:
+1. A header with logo and navigation links (Home, About, Contact)
+2. A hero section with headline, subheadline, and call-to-action button
+3. A features section displaying 3 features in a grid
+4. A footer with copyright text
+
+The design reference image is available at ./reference/homepage.png
+
+Use the existing project setup with shadcn/ui components.
+Run `bun run typecheck`.
+Run `bun run lint`.
+Run `bun run test:coverage` and ensure coverage is at least 80%.
+Run `bun run build` to verify the build succeeds.
+
+Add or update tests so every task requirement is covered.
+Keep scaffold quality gate scripts intact.
+Only report completion after all required verification commands succeed.
+
+You are working in `/app`.
+Follow rules in `/app/AGENTS.md`.
+' 2>&1 </dev/null | tee /logs/agent/codex.txt

@@ -62,12 +62,23 @@ class VisualScore(BaseModel):
 
     similarity: float = 0.0
     diff_path: str | None = None
+    capture_succeeded: bool = False
+    capture_error: str | None = None
+    threshold: float | None = None
 
     @computed_field
     @property
     def score(self) -> float:
         """Return visual similarity as score (0-1)."""
         return self.similarity
+
+    @computed_field
+    @property
+    def threshold_met(self) -> bool | None:
+        """Whether similarity meets configured threshold."""
+        if self.threshold is None:
+            return None
+        return self.similarity >= self.threshold
 
 
 class EfficiencyScore(BaseModel):
@@ -94,6 +105,96 @@ class EfficiencyScore(BaseModel):
         return round(max(0.0, min(1.0, raw_score)), 3)
 
 
+class CoverageScore(BaseModel):
+    """Measured test coverage against a required threshold."""
+
+    threshold: float | None = None
+    measured: float | None = None
+    source: str | None = None
+    passed: bool = True
+
+
+class RequirementCoverageScore(BaseModel):
+    """Requirement presence and requirement-to-test mapping coverage."""
+
+    total_requirements: int = 0
+    satisfied_requirements: int = 0
+    mapped_requirements: int = 0
+    missing_requirement_ids: list[str] = Field(default_factory=list)
+    requirement_gap_ids: list[str] = Field(default_factory=list)
+    requirement_pattern_gaps: dict[str, list[str]] = Field(default_factory=dict)
+
+    @computed_field
+    @property
+    def presence_ratio(self) -> float:
+        """Fraction of requirements satisfied by implementation."""
+        if self.total_requirements == 0:
+            return 1.0
+        return self.satisfied_requirements / self.total_requirements
+
+    @computed_field
+    @property
+    def mapping_ratio(self) -> float:
+        """Fraction of requirements with test mapping evidence."""
+        if self.total_requirements == 0:
+            return 1.0
+        return self.mapped_requirements / self.total_requirements
+
+
+class QualificationCheck(BaseModel):
+    """Single hard-gate qualification result."""
+
+    name: str = Field(description="Qualification check name")
+    passed: bool = Field(description="Whether the check passed")
+    evidence: str | None = Field(default=None, description="Check evidence")
+
+
+class QualificationScore(BaseModel):
+    """Hard-gate qualification aggregate."""
+
+    checks: list[QualificationCheck] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def passed(self) -> bool:
+        """All qualification checks must pass."""
+        if not self.checks:
+            return True
+        return all(check.passed for check in self.checks)
+
+
+class OptimizationScore(BaseModel):
+    """Optimization metrics used after qualification succeeds."""
+
+    uncached_input_tokens: int = 0
+    output_tokens: int = 0
+    command_count: int = 0
+    failed_command_count: int = 0
+    verification_rounds: int = 0
+    repeated_verification_failures: int = 0
+
+    @computed_field
+    @property
+    def score(self) -> float:
+        """Compute optimization score from deterministic process metrics."""
+        cfg = settings.optimization
+        token_penalty = min(1.0, self.uncached_input_tokens / cfg.max_uncached_tokens)
+        command_penalty = min(1.0, self.command_count / cfg.max_commands)
+        failure_penalty = min(1.0, self.failed_command_count / cfg.max_failed_commands)
+        extra_rounds = max(0, self.verification_rounds - 1)
+        round_penalty = min(1.0, extra_rounds / cfg.max_extra_verification_rounds)
+        repeat_penalty = min(1.0, self.repeated_verification_failures / cfg.max_repeat_failures)
+
+        weighted_penalty = (
+            token_penalty * cfg.token_weight
+            + command_penalty * cfg.command_weight
+            + failure_penalty * cfg.failure_weight
+            + round_penalty * cfg.verification_round_weight
+            + repeat_penalty * cfg.repeat_failure_weight
+        )
+        return round(max(0.0, min(1.0, 1.0 - weighted_penalty)), 3)
+
+
 class ScaffoldAudit(BaseModel):
     """Scaffold baseline audit results."""
 
@@ -117,6 +218,8 @@ class Scorecard(BaseModel):
     duration_sec: float = 0.0
     terminated_early: bool = False
     termination_reason: str | None = None
+    voided: bool = False
+    void_reasons: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     # Scores
@@ -124,14 +227,18 @@ class Scorecard(BaseModel):
     compliance: ComplianceScore = Field(default_factory=ComplianceScore)
     visual: VisualScore | None = Field(default_factory=VisualScore)
     efficiency: EfficiencyScore = Field(default_factory=EfficiencyScore)
+    coverage: CoverageScore = Field(default_factory=CoverageScore)
+    requirements: RequirementCoverageScore = Field(default_factory=RequirementCoverageScore)
+    qualification: QualificationScore = Field(default_factory=QualificationScore)
+    optimization: OptimizationScore = Field(default_factory=OptimizationScore)
 
     # Scaffold audit
     scaffold_audit: ScaffoldAudit | None = None
 
     @computed_field
     @property
-    def composite_score(self) -> float:
-        """Calculate weighted composite score.
+    def quality_score(self) -> float:
+        """Calculate weighted quality score from quality dimensions.
 
         Weights from config. If visual is None, redistributes visual weight proportionally.
         """
@@ -156,6 +263,34 @@ class Scorecard(BaseModel):
             self.functional.score * func_adj
             + self.compliance.score * comp_adj
             + self.efficiency.score * eff_adj
+        )
+
+    @computed_field
+    @property
+    def composite_score(self) -> float:
+        """Compute gated final score.
+
+        Unqualified runs always receive 0. Qualified runs are ranked on optimization score.
+        """
+        if self.voided:
+            return 0.0
+        if not self.qualification.passed:
+            return 0.0
+        return self.optimization.score
+
+    @computed_field
+    @property
+    def diagnostic_score(self) -> float:
+        """Compute non-gating diagnostic score for comparing failed runs.
+
+        This score intentionally does not gate on qualification so disqualified runs
+        can still be ranked for analysis.
+        """
+        return round(
+            (self.quality_score * 0.6)
+            + (self.requirements.mapping_ratio * 0.25)
+            + (self.optimization.score * 0.15),
+            3,
         )
 
 

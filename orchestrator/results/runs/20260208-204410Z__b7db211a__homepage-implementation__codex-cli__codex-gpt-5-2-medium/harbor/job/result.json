@@ -1,0 +1,29 @@
+{
+    "id": "1de1a7c5-c43d-4a85-8a0f-6f39059d3a42",
+    "started_at": "2026-02-08T20:44:15.442557",
+    "finished_at": "2026-02-08T20:47:19.766182",
+    "n_total_trials": 1,
+    "stats": {
+        "n_trials": 1,
+        "n_errors": 0,
+        "evals": {
+            "codex__gpt-5.2-codex__adhoc": {
+                "n_trials": 1,
+                "n_errors": 0,
+                "metrics": [
+                    {
+                        "mean": 0.9509912033333334
+                    }
+                ],
+                "reward_stats": {
+                    "reward": {
+                        "0.9509912033333334": [
+                            "harbor-task-homepage-implementat__FXrBWJ3"
+                        ]
+                    }
+                },
+                "exception_stats": {}
+            }
+        }
+    }
+}

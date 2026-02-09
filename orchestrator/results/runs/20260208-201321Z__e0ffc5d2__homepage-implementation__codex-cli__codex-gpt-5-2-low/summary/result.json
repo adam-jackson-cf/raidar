@@ -1,0 +1,173 @@
+{
+  "id": "e0ffc5d2",
+  "timestamp": "2026-02-08T20:13:21.159795+00:00",
+  "config": {
+    "model": "codex/gpt-5.2-low",
+    "harness": "codex-cli",
+    "rules_variant": "strict",
+    "task_name": "homepage-implementation",
+    "scaffold_template": "next-shadcn-starter",
+    "scaffold_version": "v2025.01"
+  },
+  "duration_sec": 420.135149,
+  "terminated_early": true,
+  "termination_reason": "Timeout expired after 420s before trial result.json was written.",
+  "scores": {
+    "run_id": "e0ffc5d2",
+    "task_name": "homepage-implementation",
+    "agent": "codex-cli",
+    "model": "codex/gpt-5.2-low",
+    "rules_variant": "strict",
+    "duration_sec": 420.135149,
+    "terminated_early": true,
+    "termination_reason": "Timeout expired after 420s before trial result.json was written.",
+    "voided": true,
+    "void_reasons": [
+      "harbor_timeout"
+    ],
+    "metadata": {
+      "run": {
+        "instance_name": "20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+        "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+        "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json",
+        "summary_readme": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/README.md",
+        "repeat_required": true,
+        "repeat_required_reasons": [
+          "harbor_timeout"
+        ]
+      },
+      "scaffold": {
+        "template": "next-shadcn-starter",
+        "version": "v2025.01",
+        "fingerprint": "94ee262fb3b0089a5a55e835020362cceac5a5dbafbacd6d00ccb3d0e20b3c4a",
+        "baseline_manifest": ".baseline-scaffold.json",
+        "workspace_manifest": "scaffold.manifest.json",
+        "metadata_file": ".scaffold-meta.json",
+        "rules_file": "AGENTS.md",
+        "artifacts": {
+          "baseline_manifest": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/scaffold/baseline.manifest.json",
+          "workspace_manifest": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/scaffold/workspace.manifest.json",
+          "metadata": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/scaffold/scaffold-meta.json",
+          "rules": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/scaffold/AGENTS.md"
+        }
+      },
+      "task": {
+        "scoring_schema_version": "2.0.0",
+        "task_yaml_hash": "sha256:77abbb4d6d20ae235456482a8a230337804f8dd415bf89815e2a7f57b78bd57f",
+        "task_fingerprint": "sha256:1b36cc5895d7889f7bea4f17bae6be4888778c7b1cea5226088bb63bbedd42aa"
+      },
+      "harbor": {
+        "raw_job_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-e0ffc5d2",
+        "raw_trial_dir": null,
+        "job_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-e0ffc5d2",
+        "trial_dir": null,
+        "phase_timings_sec": {},
+        "harness_overhead_sec": null,
+        "artifacts": {
+          "job/config.json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/harbor/job/config.json",
+          "job/job.log": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/harbor/job/job.log"
+        }
+      },
+      "agent": {
+        "artifacts": {}
+      },
+      "verifier": {
+        "scorecard": null,
+        "artifacts": {}
+      },
+      "process": {
+        "uncached_input_tokens": 0,
+        "output_tokens": 0,
+        "command_count": 0,
+        "failed_command_count": 0,
+        "verification_rounds": 0,
+        "repeated_verification_failures": 0,
+        "required_verification_commands": 0,
+        "executed_required_verification_commands": 0,
+        "failed_command_categories": {},
+        "required_verification_first_pass": {},
+        "first_pass_verification_successes": 0,
+        "first_pass_verification_failures": 0,
+        "missing_required_verification_commands": 0
+      }
+    },
+    "functional": {
+      "passed": false,
+      "tests_passed": 0,
+      "tests_total": 0,
+      "build_succeeded": false,
+      "gates_passed": 0,
+      "gates_total": 0,
+      "score": 0.0
+    },
+    "compliance": {
+      "checks": [
+        {
+          "rule": "Evaluation run completed",
+          "type": "deterministic",
+          "passed": false,
+          "evidence": "Timeout expired after 420s before trial result.json was written."
+        }
+      ],
+      "score": 0.0
+    },
+    "visual": null,
+    "efficiency": {
+      "total_gate_failures": 4,
+      "unique_failure_categories": 0,
+      "repeat_failures": 0,
+      "score": 0.0
+    },
+    "coverage": {
+      "threshold": null,
+      "measured": null,
+      "source": null,
+      "passed": false
+    },
+    "requirements": {
+      "total_requirements": 0,
+      "satisfied_requirements": 0,
+      "mapped_requirements": 0,
+      "missing_requirement_ids": [],
+      "requirement_gap_ids": [],
+      "requirement_pattern_gaps": {},
+      "presence_ratio": 1.0,
+      "mapping_ratio": 1.0
+    },
+    "qualification": {
+      "checks": [
+        {
+          "name": "run_completed",
+          "passed": false,
+          "evidence": "Timeout expired after 420s before trial result.json was written."
+        },
+        {
+          "name": "required_verification_commands_executed",
+          "passed": true,
+          "evidence": "executed=0/0"
+        },
+        {
+          "name": "completion_claim_integrity",
+          "passed": true,
+          "evidence": "No completion claim detected."
+        }
+      ],
+      "passed": false
+    },
+    "optimization": {
+      "uncached_input_tokens": 0,
+      "output_tokens": 0,
+      "command_count": 0,
+      "failed_command_count": 0,
+      "verification_rounds": 0,
+      "repeated_verification_failures": 0,
+      "score": 1.0
+    },
+    "scaffold_audit": null,
+    "quality_score": 0.0,
+    "composite_score": 0.0,
+    "diagnostic_score": 0.4
+  },
+  "events": [],
+  "gate_history": []
+}

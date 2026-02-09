@@ -1,0 +1,82 @@
+{
+  "generated_at": "2026-02-08T21:31:40.679010+00:00",
+  "version": "1.0.0",
+  "template": null,
+  "template_version": null,
+  "fingerprint": "94ee262fb3b0089a5a55e835020362cceac5a5dbafbacd6d00ccb3d0e20b3c4a",
+  "files": {
+    "package.json": {
+      "hash": "sha256:baaeb90ad5e610c526a76d3a5bfd36aa5b0a5e7e26c29f998227d0a9c83ff450",
+      "size": 1223
+    },
+    "tsconfig.json": {
+      "hash": "sha256:7316ab51a0152b79f43585beb00421a54e69a5714db15ca5303cf6a2fdb61868",
+      "size": 635
+    },
+    "next.config.ts": {
+      "hash": "sha256:c5efcdb15ee66db5a3a749082d8a2d68abdd0555ce251baee0e3fd920b4c55b5",
+      "size": 130
+    },
+    "postcss.config.mjs": {
+      "hash": "sha256:dfac7ac2d86d326a0e5adb024e7943c181393ed17a5fcb8f0315b24c7da6ddde",
+      "size": 94
+    },
+    "src/test/setup.ts": {
+      "hash": "sha256:9b328c4843431fa76d8de00008fc159e95f99a840211085ff3b8f25e53d14409",
+      "size": 43
+    },
+    "src/lib/utils.ts": {
+      "hash": "sha256:4acbc7165a8d54738ff62b51414e772c08fe78434e524e6d8770180d3ba2925f",
+      "size": 169
+    },
+    "src/app/layout.tsx": {
+      "hash": "sha256:1721a4c245be044eed10b753cceba02b9a3f9a8ce3cb20c64d2dadc82573a1ac",
+      "size": 388
+    },
+    "src/app/page.tsx": {
+      "hash": "sha256:5c90b9b68034fb47177d2539aab7fab58bab1324a732e3e72c40c805d61cd93d",
+      "size": 158
+    },
+    "src/components/ui/button.tsx": {
+      "hash": "sha256:8c64dcb5ea5a4a8d0572c67283f9646e699b4208d2e657b92067e8c9272f9db4",
+      "size": 1346
+    }
+  },
+  "dependencies": {
+    "next": "^15.3.0",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "lucide-react": "^0.475.0",
+    "zod": "^3.24.0",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^3.2.0"
+  },
+  "dev_dependencies": {
+    "@playwright/test": "^1.51.0",
+    "@tailwindcss/postcss": "^4.1.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@types/node": "^22.14.0",
+    "@types/react": "^19.1.0",
+    "@types/react-dom": "^19.1.0",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/coverage-v8": "^4.0.17",
+    "jsdom": "^27.4.0",
+    "odiff-bin": "^3.1.0",
+    "tailwindcss": "^4.1.0",
+    "typescript": "^5.8.0",
+    "ultracite": "^4.1.0",
+    "vitest": "^4.0.17"
+  },
+  "quality_gates": {
+    "typecheck": "bun run typecheck",
+    "lint": "bunx ultracite check src",
+    "test": "bun test"
+  },
+  "pre_commit_hooks": [
+    "typecheck",
+    "lint"
+  ]
+}

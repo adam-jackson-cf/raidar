@@ -1,0 +1,178 @@
+{
+  "suite_id": "20260208-210535Z__homepage-implementation__codex-cli__codex-gpt-5.2-high__x5",
+  "created_at_utc": "2026-02-08T21:39:31.304590+00:00",
+  "started_at_utc": "2026-02-08T21:05:35.727755+00:00",
+  "completed_at_utc": "2026-02-08T21:39:31.304590+00:00",
+  "config": {
+    "task_name": "homepage-implementation",
+    "harness": "codex-cli",
+    "model": "codex/gpt-5.2-high",
+    "rules_variant": "strict",
+    "repeats": 5,
+    "repeat_parallel": 1,
+    "retry_void_limit": 3,
+    "retries_used": 1
+  },
+  "aggregate": {
+    "run_count_total": 7,
+    "run_count_scored": 5,
+    "void_count": 2,
+    "repeat_required_count": 2,
+    "qualified_count": 0,
+    "qualification_rate": 0.0,
+    "qualification_rate_total": 0.0,
+    "run_count": 5,
+    "composite_score": {
+      "mean": 0.0,
+      "median": 0.0,
+      "stddev": 0.0,
+      "min": 0.0,
+      "max": 0.0
+    },
+    "quality_score": {
+      "mean": 0.95101,
+      "median": 0.951006,
+      "stddev": 4.8e-05,
+      "min": 0.950941,
+      "max": 0.951083
+    },
+    "diagnostic_score": {
+      "mean": 0.8602,
+      "median": 0.877,
+      "stddev": 0.055869,
+      "min": 0.755,
+      "max": 0.922
+    },
+    "duration_sec": {
+      "mean": 244.315015,
+      "median": 239.277758,
+      "stddev": 24.545325,
+      "min": 219.822515,
+      "max": 288.080169
+    },
+    "uncached_input_tokens": {
+      "mean": 55696.6,
+      "median": 53166.0,
+      "stddev": 14480.47344,
+      "min": 37414.0,
+      "max": 77614.0
+    }
+  },
+  "runs": [
+    {
+      "run_id": "d232fd21",
+      "timestamp": "2026-02-08T21:05:35.727782+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.877,
+      "quality_score": 0.9509413573333334,
+      "duration_sec": 223.588563,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-210535Z__d232fd21__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-210535Z__d232fd21__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    },
+    {
+      "run_id": "aad5e2a3",
+      "timestamp": "2026-02-08T21:09:19.327192+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.755,
+      "quality_score": 0.9510057093333334,
+      "duration_sec": 239.277758,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-210919Z__aad5e2a3__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-210919Z__aad5e2a3__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    },
+    {
+      "run_id": "b0848f5e",
+      "timestamp": "2026-02-08T21:13:18.615058+00:00",
+      "voided": true,
+      "void_reasons": [
+        "harbor_trial_exception"
+      ],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.359,
+      "quality_score": 0.0,
+      "duration_sec": 393.795931,
+      "terminated_early": true,
+      "termination_reason": "Harbor trial exception: Agent execution timed out after 300.0 seconds",
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-211318Z__b0848f5e__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-211318Z__b0848f5e__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    },
+    {
+      "run_id": "065c19eb",
+      "timestamp": "2026-02-08T21:19:52.420981+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.867,
+      "quality_score": 0.9510834873333335,
+      "duration_sec": 288.080169,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-211952Z__065c19eb__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-211952Z__065c19eb__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    },
+    {
+      "run_id": "8b40e015",
+      "timestamp": "2026-02-08T21:24:40.511423+00:00",
+      "voided": true,
+      "void_reasons": [
+        "harbor_timeout"
+      ],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.4,
+      "quality_score": 0.0,
+      "duration_sec": 420.13846,
+      "terminated_early": true,
+      "termination_reason": "Timeout expired after 420s before trial result.json was written.",
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-212440Z__8b40e015__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-212440Z__8b40e015__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    },
+    {
+      "run_id": "7b41ec3f",
+      "timestamp": "2026-02-08T21:31:40.655434+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.922,
+      "quality_score": 0.9510339513333335,
+      "duration_sec": 250.806072,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-213140Z__7b41ec3f__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-213140Z__7b41ec3f__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    },
+    {
+      "run_id": "b1043d3c",
+      "timestamp": "2026-02-08T21:35:51.471987+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.88,
+      "quality_score": 0.9509854933333334,
+      "duration_sec": 219.822515,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-213551Z__b1043d3c__homepage-implementation__codex-cli__codex-gpt-5-2-high",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-213551Z__b1043d3c__homepage-implementation__codex-cli__codex-gpt-5-2-high/summary/result.json"
+    }
+  ],
+  "retry": {
+    "target_scored_runs": 5,
+    "achieved_scored_runs": 5,
+    "target_met": true,
+    "unresolved_void_count": 0
+  }
+}

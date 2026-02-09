@@ -8,6 +8,16 @@ export default defineConfig({
     environment: "jsdom",
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
+    coverage: {
+      reporter: ["text", "json-summary"],
+      reportsDirectory: "./coverage",
+      thresholds: {
+        lines: 80,
+        statements: 80,
+        functions: 80,
+        branches: 80,
+      },
+    },
   },
   resolve: {
     alias: {

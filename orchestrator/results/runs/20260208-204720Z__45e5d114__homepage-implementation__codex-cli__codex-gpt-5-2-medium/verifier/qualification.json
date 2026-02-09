@@ -1,0 +1,55 @@
+{
+  "checks": [
+    {
+      "name": "run_completed",
+      "passed": true,
+      "evidence": "Run completed without early termination."
+    },
+    {
+      "name": "quality_gates_passed",
+      "passed": true,
+      "evidence": "3/3 gates passed."
+    },
+    {
+      "name": "functional_passed",
+      "passed": true,
+      "evidence": "build=true, tests=4/4"
+    },
+    {
+      "name": "coverage_threshold_met",
+      "passed": true,
+      "evidence": "threshold=0.8, measured=1, source=/app/coverage/coverage-summary.json"
+    },
+    {
+      "name": "visual_threshold_met",
+      "passed": true,
+      "evidence": "captured=true, similarity=0.9634321, threshold=0.95"
+    },
+    {
+      "name": "all_requirements_present",
+      "passed": true,
+      "evidence": "satisfied=4/4, missing=[]"
+    },
+    {
+      "name": "no_requirement_test_gaps",
+      "passed": false,
+      "evidence": "mapped=3/4, gaps=[\"req-features-grid\"], pattern_gaps={\"req-features-grid\":[\"Everything You Need\"]}"
+    },
+    {
+      "name": "minimum_quality_score",
+      "passed": true,
+      "evidence": "quality=0.951, min=0.900"
+    },
+    {
+      "name": "stack_integrity",
+      "passed": true,
+      "evidence": "Scaffold scripts and package-manager integrity preserved."
+    },
+    {
+      "name": "completion_claim_integrity",
+      "passed": true,
+      "evidence": "Validated post-run by orchestrator."
+    }
+  ],
+  "passed": false
+}

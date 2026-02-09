@@ -43,6 +43,18 @@ class DeterministicCheck(BaseModel):
     description: str = Field(description="Human-readable description")
 
 
+class RequirementSpec(BaseModel):
+    """Task requirement with deterministic presence and test mapping checks."""
+
+    id: str = Field(description="Stable requirement identifier")
+    description: str = Field(description="Requirement description")
+    check: DeterministicCheck = Field(description="Deterministic check for requirement presence")
+    required_test_patterns: list[str] = Field(
+        default_factory=list,
+        description="Patterns that must appear in test sources to satisfy test mapping",
+    )
+
+
 class LLMJudgeCriterion(BaseModel):
     """LLM judge evaluation criterion."""
 
@@ -54,6 +66,7 @@ class ComplianceConfig(BaseModel):
     """Compliance checking configuration."""
 
     deterministic_checks: list[DeterministicCheck] = Field(default_factory=list)
+    requirements: list[RequirementSpec] = Field(default_factory=list)
     llm_judge_rubric: list[LLMJudgeCriterion] = Field(default_factory=list)
 
 
@@ -80,6 +93,22 @@ class VerificationConfig(BaseModel):
     max_gate_failures: int = Field(
         default=3,
         description="Maximum gate failures before termination",
+    )
+    coverage_threshold: float | None = Field(
+        default=None,
+        ge=0,
+        le=1,
+        description="Minimum required test coverage ratio (0-1)",
+    )
+    min_quality_score: float = Field(
+        default=0.8,
+        ge=0,
+        le=1,
+        description="Minimum quality score required before optimization ranking applies",
+    )
+    required_commands: list[list[str]] = Field(
+        default_factory=list,
+        description="Verification commands the agent must execute during the task run",
     )
     gates: list[VerificationGate] = Field(default_factory=list)
 

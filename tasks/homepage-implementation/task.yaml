@@ -11,6 +11,13 @@ scaffold:
 
 verification:
   max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.9
+  required_commands:
+    - ["bun", "run", "typecheck"]
+    - ["bun", "run", "lint"]
+    - ["bun", "run", "test:coverage"]
+    - ["bun", "run", "build"]
   gates:
     - name: typecheck
       command: ["bun", "run", "typecheck"]
@@ -18,11 +25,50 @@ verification:
     - name: lint
       command: ["bun", "run", "lint"]
       on_failure: continue
-    - name: test
-      command: ["bun", "run", "test", "--passWithNoTests"]
+    - name: coverage
+      command: ["bun", "run", "test:coverage"]
       on_failure: continue
 
 compliance:
+  requirements:
+    - id: req-header-nav
+      description: Header contains logo and Home/About/Contact navigation.
+      check:
+        type: import_present
+        pattern: Contact
+        description: Header navigation includes Contact entry
+      required_test_patterns:
+        - Home
+        - About
+        - Contact
+    - id: req-hero-cta
+      description: Hero section includes headline, supporting text, and CTA.
+      check:
+        type: import_present
+        pattern: Get Started
+        description: Hero call-to-action copy exists
+      required_test_patterns:
+        - Get Started
+        - Build Better Products Faster
+    - id: req-features-grid
+      description: Features section renders three feature cards.
+      check:
+        type: import_present
+        pattern: Everything You Need
+        description: Features section heading exists
+      required_test_patterns:
+        - Everything You Need
+        - Lightning Fast
+        - Secure by Default
+        - Team Collaboration
+    - id: req-footer
+      description: Footer contains copyright text.
+      check:
+        type: import_present
+        pattern: All rights reserved
+        description: Footer copyright copy exists
+      required_test_patterns:
+        - All rights reserved
   deterministic_checks:
     - type: no_pattern
       pattern: "Homepage placeholder - implement the design"
@@ -67,6 +113,11 @@ prompt: |
   The design reference image is available at ./reference/homepage.png
 
   Use the existing project setup with shadcn/ui components.
-  Run `bun run dev` to start the development server.
+  Run `bun run typecheck`.
+  Run `bun run lint`.
+  Run `bun run test:coverage` and ensure coverage is at least 80%.
   Run `bun run build` to verify the build succeeds.
-  Run `bun test` to run the test suite.
+
+  Add or update tests so every task requirement is covered.
+  Keep scaffold quality gate scripts intact.
+  Only report completion after all required verification commands succeed.

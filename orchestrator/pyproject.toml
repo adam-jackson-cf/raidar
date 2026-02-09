@@ -39,6 +39,7 @@ extend-exclude = [
     "workspace",
     "workspace-*",
     "results",
+    "jobs",
     "**/node_modules",
     "**/*.tsbuildinfo",
     "**/*.lock",

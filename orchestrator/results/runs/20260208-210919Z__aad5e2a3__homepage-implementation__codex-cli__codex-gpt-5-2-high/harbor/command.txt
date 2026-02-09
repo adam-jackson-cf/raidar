@@ -1,0 +1,1 @@
+harbor run --path /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-repeat-02/harbor-task-homepage-implementation-aad5e2a3 --job-name orchestrator-aad5e2a3 --jobs-dir /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs --n-concurrent 1 -a codex -m codex/gpt-5.2-codex --ak reasoning_effort=high

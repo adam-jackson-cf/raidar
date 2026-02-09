@@ -5,6 +5,9 @@ from agentic_eval.schemas.scorecard import (
     ComplianceScore,
     EfficiencyScore,
     FunctionalScore,
+    OptimizationScore,
+    QualificationCheck,
+    QualificationScore,
     Scorecard,
     VisualScore,
 )
@@ -149,7 +152,7 @@ class TestScorecardComposite:
         assert abs(scorecard.composite_score - 1.0) < 0.001
 
     def test_composite_with_mixed_scores(self):
-        """Composite should weight scores correctly."""
+        """Quality score should weight quality dimensions correctly."""
         scorecard = Scorecard(
             functional=FunctionalScore(
                 passed=True, build_succeeded=True, tests_passed=5, tests_total=10
@@ -159,4 +162,83 @@ class TestScorecardComposite:
             efficiency=EfficiencyScore(),  # 1.0
         )
         # 0.5*0.4 + 1.0*0.25 + 0.8*0.2 + 1.0*0.15 = 0.2 + 0.25 + 0.16 + 0.15 = 0.76
-        assert abs(scorecard.composite_score - 0.76) < 0.001
+        assert abs(scorecard.quality_score - 0.76) < 0.001
+
+    def test_composite_zero_when_unqualified(self):
+        """Composite score must be 0 when qualification checks fail."""
+        scorecard = Scorecard(
+            qualification=QualificationScore(
+                checks=[
+                    QualificationCheck(
+                        name="quality_gates_passed",
+                        passed=False,
+                        evidence="lint failed",
+                    )
+                ]
+            )
+        )
+        assert scorecard.composite_score == 0.0
+
+    def test_composite_uses_optimization_when_qualified(self):
+        """Composite score should use optimization score after qualification."""
+        scorecard = Scorecard(
+            qualification=QualificationScore(
+                checks=[
+                    QualificationCheck(
+                        name="quality_gates_passed",
+                        passed=True,
+                        evidence="all gates passed",
+                    )
+                ]
+            ),
+            optimization=OptimizationScore(
+                uncached_input_tokens=150000,
+                output_tokens=2000,
+                command_count=8,
+                failed_command_count=1,
+                verification_rounds=1,
+                repeated_verification_failures=0,
+            ),
+        )
+        assert scorecard.composite_score == scorecard.optimization.score
+
+    def test_composite_zero_when_voided(self):
+        """Composite score must be 0 when run is voided."""
+        scorecard = Scorecard(
+            voided=True,
+            void_reasons=["provider_rate_limit"],
+            qualification=QualificationScore(
+                checks=[
+                    QualificationCheck(
+                        name="quality_gates_passed",
+                        passed=True,
+                        evidence="all gates passed",
+                    )
+                ]
+            ),
+            optimization=OptimizationScore(
+                uncached_input_tokens=100,
+                output_tokens=20,
+                command_count=2,
+                failed_command_count=0,
+                verification_rounds=1,
+                repeated_verification_failures=0,
+            ),
+        )
+        assert scorecard.composite_score == 0.0
+
+    def test_diagnostic_score_available_when_unqualified(self):
+        """Diagnostic score should remain available for failed runs."""
+        scorecard = Scorecard(
+            qualification=QualificationScore(
+                checks=[
+                    QualificationCheck(
+                        name="no_requirement_test_gaps",
+                        passed=False,
+                        evidence="mapped=2/4",
+                    )
+                ]
+            )
+        )
+        assert scorecard.composite_score == 0.0
+        assert scorecard.diagnostic_score > 0.0

@@ -99,6 +99,43 @@ class VisualSettings(BaseSettings):
     )
 
 
+class OptimizationSettings(BaseSettings):
+    """Optimization scoring settings for qualified runs."""
+
+    model_config = SettingsConfigDict(env_prefix="EVAL_OPTIMIZATION__")
+
+    max_uncached_tokens: int = Field(
+        default=300_000,
+        gt=0,
+        description="Token count that maps to maximum token penalty",
+    )
+    max_commands: int = Field(
+        default=20,
+        gt=0,
+        description="Command count that maps to maximum command penalty",
+    )
+    max_failed_commands: int = Field(
+        default=6,
+        gt=0,
+        description="Failed command count that maps to maximum failure penalty",
+    )
+    max_extra_verification_rounds: int = Field(
+        default=3,
+        gt=0,
+        description="Extra verification rounds (beyond first) before max penalty",
+    )
+    max_repeat_failures: int = Field(
+        default=3,
+        gt=0,
+        description="Repeated verification failures before max penalty",
+    )
+    token_weight: float = Field(default=0.35, ge=0, le=1)
+    command_weight: float = Field(default=0.15, ge=0, le=1)
+    failure_weight: float = Field(default=0.25, ge=0, le=1)
+    verification_round_weight: float = Field(default=0.15, ge=0, le=1)
+    repeat_failure_weight: float = Field(default=0.10, ge=0, le=1)
+
+
 class EvalSettings(BaseSettings):
     """Root configuration for the evaluation system.
 
@@ -117,6 +154,7 @@ class EvalSettings(BaseSettings):
     efficiency: EfficiencySettings = Field(default_factory=EfficiencySettings)
     gate: GateWatcherSettings = Field(default_factory=GateWatcherSettings)
     visual: VisualSettings = Field(default_factory=VisualSettings)
+    optimization: OptimizationSettings = Field(default_factory=OptimizationSettings)
 
 
 # Singleton instance

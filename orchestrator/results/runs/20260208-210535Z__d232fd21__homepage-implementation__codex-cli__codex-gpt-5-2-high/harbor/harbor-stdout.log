@@ -1,0 +1,17 @@
+Wrote Codex trajectory to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-d232fd21/harbor-task-homepage-implementat__qUuv2vT/agent/trajectory.json
+  1/1 Mean: 0.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:03:38 0:00:00Results written to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-d232fd21/result.json
+        codex (gpt-5.2-codex) on adhoc         
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                 ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Agent               │ codex (gpt-5.2-codex) │
+│ Dataset             │ adhoc                 │
+│ Trials              │ 1                     │
+│ Errors              │ 0                     │
+│                     │                       │
+│ Mean                │ 0.000                 │
+│                     │                       │
+│ Reward Distribution │                       │
+│   reward = 0.0      │ 1                     │
+└─────────────────────┴───────────────────────┘
+

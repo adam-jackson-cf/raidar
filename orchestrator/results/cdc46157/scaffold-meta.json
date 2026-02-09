@@ -1,8 +1,0 @@
-{
-  "template": "next-shadcn-starter",
-  "version": "v2025.01",
-  "fingerprint": "",
-  "rules_variant": "strict",
-  "workspace_manifest": "scaffold.manifest.json",
-  "baseline_manifest": ".baseline-scaffold.json"
-}

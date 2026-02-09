@@ -1,6 +1,7 @@
 """Matrix runner for executing multiple harness/model combinations."""
 
 import concurrent.futures
+import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
@@ -72,6 +73,7 @@ class MatrixRunner:
         self,
         task: TaskDefinition,
         harness_config: HarnessConfig,
+        task_dir: Path | None = None,
         dry_run: bool = False,
         progress_callback: Callable[[str], None] | None = None,
     ) -> MatrixRunResult:
@@ -91,9 +93,7 @@ class MatrixRunner:
         start_time = time.time()
 
         # Generate workspace path
-        run_id = (
-            f"{task.name}-{harness_config.agent.value}-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
-        )
+        run_id = f"{task.name}-{harness_config.agent.value}-{uuid.uuid4().hex[:8]}"
         workspace_dir = self.workspaces_dir / run_id
 
         try:
@@ -104,7 +104,7 @@ class MatrixRunner:
                 )
 
             # Prepare workspace using module-level function
-            task_dir = self.tasks_dir / task.name
+            resolved_task_dir = task_dir or (self.tasks_dir / task.name)
             adapter = harness_config.adapter()
             adapter.validate()
 
@@ -116,7 +116,7 @@ class MatrixRunner:
                 workspace_path, _ = prepare_workspace(
                     scaffold_dir=scaffold_source.path,
                     target_dir=workspace_dir,
-                    task_dir=task_dir,
+                    task_dir=resolved_task_dir,
                     agent=harness_config.agent.value,
                     rules_variant=harness_config.rules_variant,
                 )
@@ -136,7 +136,7 @@ class MatrixRunner:
                 task=task,
                 config=harness_config,
                 scaffold_root=self.scaffolds_root,
-                task_dir=task_dir,
+                task_dir=resolved_task_dir,
                 workspace_dir=workspace_dir,
                 results_dir=self.results_dir,
             )

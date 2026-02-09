@@ -43,6 +43,7 @@ class TestEvalSettings:
         assert settings.efficiency is not None
         assert settings.gate is not None
         assert settings.visual is not None
+        assert settings.optimization is not None
 
 
 class TestEnvironmentOverrides:

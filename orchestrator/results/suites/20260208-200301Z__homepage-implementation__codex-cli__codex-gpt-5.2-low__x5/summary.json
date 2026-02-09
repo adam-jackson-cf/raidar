@@ -1,0 +1,195 @@
+{
+  "suite_id": "20260208-200301Z__homepage-implementation__codex-cli__codex-gpt-5.2-low__x5",
+  "created_at_utc": "2026-02-08T20:40:37.175263+00:00",
+  "started_at_utc": "2026-02-08T20:03:01.621015+00:00",
+  "completed_at_utc": "2026-02-08T20:40:37.175263+00:00",
+  "config": {
+    "task_name": "homepage-implementation",
+    "harness": "codex-cli",
+    "model": "codex/gpt-5.2-low",
+    "rules_variant": "strict",
+    "repeats": 5,
+    "repeat_parallel": 1,
+    "retry_void_limit": 3,
+    "retries_used": 1
+  },
+  "aggregate": {
+    "run_count_total": 8,
+    "run_count_scored": 5,
+    "void_count": 3,
+    "repeat_required_count": 3,
+    "qualified_count": 2,
+    "qualification_rate": 0.4,
+    "qualification_rate_total": 0.25,
+    "run_count": 5,
+    "composite_score": {
+      "mean": 0.291,
+      "median": 0.0,
+      "stddev": 0.356795,
+      "min": 0.0,
+      "max": 0.754
+    },
+    "quality_score": {
+      "mean": 0.951048,
+      "median": 0.951095,
+      "stddev": 7.9e-05,
+      "min": 0.950933,
+      "max": 0.95113
+    },
+    "diagnostic_score": {
+      "mean": 0.9064,
+      "median": 0.926,
+      "stddev": 0.031373,
+      "min": 0.862,
+      "max": 0.935
+    },
+    "duration_sec": {
+      "mean": 198.999178,
+      "median": 199.521238,
+      "stddev": 4.960541,
+      "min": 190.383835,
+      "max": 205.904824
+    },
+    "uncached_input_tokens": {
+      "mean": 52970.4,
+      "median": 57274.0,
+      "stddev": 17381.84824,
+      "min": 22980.0,
+      "max": 74651.0
+    }
+  },
+  "runs": [
+    {
+      "run_id": "cfe473f4",
+      "timestamp": "2026-02-08T20:03:01.621051+00:00",
+      "voided": true,
+      "void_reasons": [
+        "harbor_timeout"
+      ],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.4,
+      "quality_score": 0.0,
+      "duration_sec": 420.197493,
+      "terminated_early": true,
+      "termination_reason": "Timeout expired after 420s before trial result.json was written.",
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-200301Z__cfe473f4__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-200301Z__cfe473f4__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "8825095a",
+      "timestamp": "2026-02-08T20:10:01.824097+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.875,
+      "quality_score": 0.9510945993333334,
+      "duration_sec": 199.323784,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201001Z__8825095a__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201001Z__8825095a__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "e0ffc5d2",
+      "timestamp": "2026-02-08T20:13:21.159795+00:00",
+      "voided": true,
+      "void_reasons": [
+        "harbor_timeout"
+      ],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.4,
+      "quality_score": 0.0,
+      "duration_sec": 420.135149,
+      "terminated_early": true,
+      "termination_reason": "Timeout expired after 420s before trial result.json was written.",
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-201321Z__e0ffc5d2__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "134bc0e6",
+      "timestamp": "2026-02-08T20:20:21.300353+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.862,
+      "quality_score": 0.9511087953333334,
+      "duration_sec": 199.521238,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-202021Z__134bc0e6__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-202021Z__134bc0e6__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "adde451a",
+      "timestamp": "2026-02-08T20:23:40.835716+00:00",
+      "voided": true,
+      "void_reasons": [
+        "harbor_timeout"
+      ],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.4,
+      "quality_score": 0.0,
+      "duration_sec": 420.154979,
+      "terminated_early": true,
+      "termination_reason": "Timeout expired after 420s before trial result.json was written.",
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-202340Z__adde451a__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-202340Z__adde451a__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "cea5726b",
+      "timestamp": "2026-02-08T20:30:40.995582+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": false,
+      "composite_score": 0.0,
+      "diagnostic_score": 0.935,
+      "quality_score": 0.9509728393333334,
+      "duration_sec": 205.904824,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-203040Z__cea5726b__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-203040Z__cea5726b__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "bded8e96",
+      "timestamp": "2026-02-08T20:34:06.910076+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": true,
+      "composite_score": 0.701,
+      "diagnostic_score": 0.926,
+      "quality_score": 0.9509334873333334,
+      "duration_sec": 199.86221,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-203406Z__bded8e96__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-203406Z__bded8e96__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    },
+    {
+      "run_id": "9e0fed19",
+      "timestamp": "2026-02-08T20:37:26.781927+00:00",
+      "voided": false,
+      "void_reasons": [],
+      "qualified": true,
+      "composite_score": 0.754,
+      "diagnostic_score": 0.934,
+      "quality_score": 0.9511304013333334,
+      "duration_sec": 190.383835,
+      "terminated_early": false,
+      "termination_reason": null,
+      "canonical_run_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-203726Z__9e0fed19__homepage-implementation__codex-cli__codex-gpt-5-2-low",
+      "summary_result_json": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/20260208-203726Z__9e0fed19__homepage-implementation__codex-cli__codex-gpt-5-2-low/summary/result.json"
+    }
+  ],
+  "retry": {
+    "target_scored_runs": 5,
+    "achieved_scored_runs": 5,
+    "target_met": true,
+    "unresolved_void_count": 0
+  }
+}

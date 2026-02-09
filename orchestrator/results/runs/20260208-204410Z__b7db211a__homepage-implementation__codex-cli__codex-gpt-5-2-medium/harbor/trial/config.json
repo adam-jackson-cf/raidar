@@ -1,0 +1,41 @@
+{
+    "task": {
+        "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-repeat-02/harbor-task-homepage-implementation-b7db211a",
+        "git_url": null,
+        "git_commit_id": null,
+        "overwrite": false,
+        "download_dir": null,
+        "source": null
+    },
+    "trial_name": "harbor-task-homepage-implementat__FXrBWJ3",
+    "trials_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-b7db211a",
+    "timeout_multiplier": 1.0,
+    "agent": {
+        "name": "codex",
+        "import_path": null,
+        "model_name": "codex/gpt-5.2-codex",
+        "override_timeout_sec": null,
+        "override_setup_timeout_sec": null,
+        "max_timeout_sec": null,
+        "kwargs": {
+            "reasoning_effort": "medium"
+        }
+    },
+    "environment": {
+        "type": "docker",
+        "import_path": null,
+        "force_build": false,
+        "delete": true,
+        "override_cpus": null,
+        "override_memory_mb": null,
+        "override_storage_mb": null,
+        "override_gpus": null,
+        "kwargs": {}
+    },
+    "verifier": {
+        "override_timeout_sec": null,
+        "max_timeout_sec": null,
+        "disable": false
+    },
+    "job_id": "1de1a7c5-c43d-4a85-8a0f-6f39059d3a42"
+}
