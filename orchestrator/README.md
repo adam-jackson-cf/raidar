@@ -58,20 +58,20 @@ uv run eval-orchestrator run \
   --output results \
   --repeats 5 \
   --repeat-parallel 5 \
-  --retry-void 3
+  --retry-void 1
 ```
 
 For baseline generation, run suites sequentially per model and sequentially per repeat:
 
 ```bash
-REPEATS=5 REPEAT_PARALLEL=1 RETRY_VOID=3 TIMEOUT_SEC=300 ./scripts/run-codex-baselines.sh
+REPEATS=5 REPEAT_PARALLEL=1 RETRY_VOID=1 TIMEOUT_SEC=300 ./scripts/run-codex-baselines.sh
 ```
 
 Void-result policy:
 
 - Runs are marked `voided=true` when Harbor/harness/provider issues are detected (for example Harbor timeout, provider rate limit, stream disconnect, or Harbor runtime failure).
 - Voided runs are flagged as `repeat_required` and excluded from scored aggregate statistics.
-- `--retry-void N` reruns only the voided runs up to `N` retry rounds to recover target scored sample size.
+- `--retry-void` accepts `0` or `1`; when set to `1`, each voided run gets at most one retry attempt.
 - Suite summaries include `void_count`, `repeat_required_count`, retry usage, and whether target scored runs were reached.
 
 > **Note:** Harbor requires Docker to be running; if it is missing, the orchestrator will terminate early with `Harbor not installed`.

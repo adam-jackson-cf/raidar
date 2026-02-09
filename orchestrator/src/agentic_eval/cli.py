@@ -126,8 +126,8 @@ def _run_with_void_retries(
     pending_batch = _count_voided(initial_runs)
     next_repeat_index += len(initial_runs)
 
-    while pending_batch > 0 and retries_used < retry_void:
-        retries_used += 1
+    if pending_batch > 0 and retry_void > 0:
+        retries_used = 1
         retry_runs = _execute_repeat_batch(
             request=request,
             batch_size=pending_batch,
@@ -225,9 +225,9 @@ def _run_repeat_requests(
 )
 @click.option(
     "--retry-void",
-    type=click.IntRange(min=0),
+    type=click.IntRange(min=0, max=1),
     default=0,
-    help="Retry budget for voided runs (rate limits/timeouts/harness failures)",
+    help="Retry budget for voided runs (0 or 1; at most one retry per failure)",
 )
 def run(
     task: Path,
@@ -257,6 +257,7 @@ def run(
     click.echo(f"Rules variant: {rules}")
     click.echo(f"Repeats: {repeats}")
     click.echo(f"Repeat parallelism: {repeat_parallel}")
+    retry_void = min(retry_void, 1)
     click.echo(f"Retry void budget: {retry_void}")
 
     config = HarnessConfig(
