@@ -49,3 +49,5 @@ diff.png
 
 # Lock files (keep bun.lock for scaffold)
 uv.lock
+
+.enaible/
