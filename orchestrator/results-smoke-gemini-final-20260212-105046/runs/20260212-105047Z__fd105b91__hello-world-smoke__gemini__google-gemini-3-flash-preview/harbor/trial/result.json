@@ -1,0 +1,93 @@
+{
+    "id": "75cf84c3-2508-42f2-b6b4-bca6c3d693cb",
+    "task_name": "harbor-task-hello-world-smoke-fd105b91",
+    "trial_name": "harbor-task-hello-world-smoke-fd__mvSeF5L",
+    "trial_uri": "file:///Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-fd105b91/harbor-task-hello-world-smoke-fd__mvSeF5L",
+    "task_id": {
+        "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-gemini-final-20260212-105046-repeat-01/harbor-task-hello-world-smoke-fd105b91"
+    },
+    "source": null,
+    "task_checksum": "f1fde3faaef8166d3c8e7bfe54d09119bb982d333b4e55e54c3de0d0f00c002c",
+    "config": {
+        "task": {
+            "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-gemini-final-20260212-105046-repeat-01/harbor-task-hello-world-smoke-fd105b91",
+            "git_url": null,
+            "git_commit_id": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": null
+        },
+        "trial_name": "harbor-task-hello-world-smoke-fd__mvSeF5L",
+        "trials_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-fd105b91",
+        "timeout_multiplier": 1.0,
+        "agent": {
+            "name": null,
+            "import_path": "agentic_eval.harness.harbor_agents.fast_cli_agents:FastGeminiCliAgent",
+            "model_name": "google/gemini-3-flash-preview",
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {}
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "job_id": "5369703c-ec80-48e1-82eb-502d1f96d92b"
+    },
+    "agent_info": {
+        "name": "fast-gemini-cli",
+        "version": "unknown",
+        "model_info": {
+            "name": "gemini-3-flash-preview",
+            "provider": "google"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": null,
+        "n_cache_tokens": null,
+        "n_output_tokens": null,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": {
+            "return_code": 0,
+            "log_file": "/logs/agent/gemini-cli.txt"
+        }
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 1.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-02-12T10:50:57.615713Z",
+    "finished_at": "2026-02-12T10:51:46.086770Z",
+    "environment_setup": {
+        "started_at": "2026-02-12T10:50:57.617491Z",
+        "finished_at": "2026-02-12T10:51:11.489417Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-02-12T10:51:11.489602Z",
+        "finished_at": "2026-02-12T10:51:11.489726Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-02-12T10:51:11.489864Z",
+        "finished_at": "2026-02-12T10:51:28.333651Z"
+    },
+    "verifier": {
+        "started_at": "2026-02-12T10:51:28.334480Z",
+        "finished_at": "2026-02-12T10:51:43.722835Z"
+    }
+}

@@ -1,0 +1,55 @@
+{
+  "checks": [
+    {
+      "name": "run_completed",
+      "passed": true,
+      "evidence": "Run completed without early termination."
+    },
+    {
+      "name": "quality_gates_passed",
+      "passed": false,
+      "evidence": "0/0 gates passed."
+    },
+    {
+      "name": "functional_passed",
+      "passed": true,
+      "evidence": "build=true, tests=0/0"
+    },
+    {
+      "name": "coverage_threshold_met",
+      "passed": true,
+      "evidence": "threshold=null, measured=null, source=null"
+    },
+    {
+      "name": "visual_threshold_met",
+      "passed": true,
+      "evidence": "Visual threshold not configured."
+    },
+    {
+      "name": "all_requirements_present",
+      "passed": true,
+      "evidence": "satisfied=0/0, missing=[]"
+    },
+    {
+      "name": "no_requirement_test_gaps",
+      "passed": true,
+      "evidence": "mapped=0/0, gaps=[], pattern_gaps={}"
+    },
+    {
+      "name": "minimum_quality_score",
+      "passed": true,
+      "evidence": "quality=1.000, min=0.000"
+    },
+    {
+      "name": "stack_integrity",
+      "passed": true,
+      "evidence": "Scaffold scripts and package-manager integrity preserved."
+    },
+    {
+      "name": "completion_claim_integrity",
+      "passed": true,
+      "evidence": "Validated post-run by orchestrator."
+    }
+  ],
+  "passed": false
+}

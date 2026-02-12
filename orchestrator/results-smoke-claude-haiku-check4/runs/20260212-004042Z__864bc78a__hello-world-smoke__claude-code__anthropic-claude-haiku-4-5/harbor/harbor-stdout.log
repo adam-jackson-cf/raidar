@@ -1,0 +1,17 @@
+Wrote Claude Code trajectory to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-864bc78a/harbor-task-hello-world-smoke-86__Rkjzifn/agent/trajectory.json
+  1/1 Mean: 1.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:01:09 0:00:00Results written to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-864bc78a/result.json
+        claude-code (claude-haiku-4-5) on adhoc         
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                          ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Agent               │ claude-code (claude-haiku-4-5) │
+│ Dataset             │ adhoc                          │
+│ Trials              │ 1                              │
+│ Errors              │ 0                              │
+│                     │                                │
+│ Mean                │ 1.000                          │
+│                     │                                │
+│ Reward Distribution │                                │
+│   reward = 1.0      │ 1                              │
+└─────────────────────┴────────────────────────────────┘
+

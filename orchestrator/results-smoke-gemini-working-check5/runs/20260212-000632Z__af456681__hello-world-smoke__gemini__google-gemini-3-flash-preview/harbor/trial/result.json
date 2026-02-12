@@ -1,0 +1,90 @@
+{
+    "id": "842debfa-ef79-482b-a5bb-18e22d81cfb9",
+    "task_name": "harbor-task-hello-world-smoke-af456681",
+    "trial_name": "harbor-task-hello-world-smoke-af__FM6Z6Nj",
+    "trial_uri": "file:///Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-af456681/harbor-task-hello-world-smoke-af__FM6Z6Nj",
+    "task_id": {
+        "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-gemini-working-check5-repeat-01/harbor-task-hello-world-smoke-af456681"
+    },
+    "source": null,
+    "task_checksum": "06adeb0d4ab60edcd7c1cd963d22f4c741759840c7db17ea243da375c4de4bd0",
+    "config": {
+        "task": {
+            "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-gemini-working-check5-repeat-01/harbor-task-hello-world-smoke-af456681",
+            "git_url": null,
+            "git_commit_id": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": null
+        },
+        "trial_name": "harbor-task-hello-world-smoke-af__FM6Z6Nj",
+        "trials_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-af456681",
+        "timeout_multiplier": 1.0,
+        "agent": {
+            "name": "gemini-cli",
+            "import_path": null,
+            "model_name": "google/gemini-3-flash-preview",
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {}
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "job_id": "1944f450-a528-46ec-856d-d702a2c7ebf2"
+    },
+    "agent_info": {
+        "name": "gemini-cli",
+        "version": "unknown",
+        "model_info": {
+            "name": "gemini-3-flash-preview",
+            "provider": "google"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": 140189,
+        "n_cache_tokens": 0,
+        "n_output_tokens": 2668,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": null
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 0.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-02-12T00:06:44.741313Z",
+    "finished_at": "2026-02-12T00:09:15.949225Z",
+    "environment_setup": {
+        "started_at": "2026-02-12T00:06:44.742892Z",
+        "finished_at": "2026-02-12T00:06:53.345138Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-02-12T00:06:53.345226Z",
+        "finished_at": "2026-02-12T00:07:44.420912Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-02-12T00:07:44.421001Z",
+        "finished_at": "2026-02-12T00:08:59.509248Z"
+    },
+    "verifier": {
+        "started_at": "2026-02-12T00:08:59.510493Z",
+        "finished_at": "2026-02-12T00:09:13.792937Z"
+    }
+}

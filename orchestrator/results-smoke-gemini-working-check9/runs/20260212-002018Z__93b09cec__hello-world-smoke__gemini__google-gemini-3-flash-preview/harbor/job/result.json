@@ -1,0 +1,29 @@
+{
+    "id": "a9d61fc4-16c0-466e-8ea9-2934dde498bc",
+    "started_at": "2026-02-12T00:20:28.902256",
+    "finished_at": "2026-02-12T00:22:18.951866",
+    "n_total_trials": 1,
+    "stats": {
+        "n_trials": 1,
+        "n_errors": 0,
+        "evals": {
+            "gemini-cli__gemini-3-flash-preview__adhoc": {
+                "n_trials": 1,
+                "n_errors": 0,
+                "metrics": [
+                    {
+                        "mean": 1.0
+                    }
+                ],
+                "reward_stats": {
+                    "reward": {
+                        "1.0": [
+                            "harbor-task-hello-world-smoke-93__EXfGyfZ"
+                        ]
+                    }
+                },
+                "exception_stats": {}
+            }
+        }
+    }
+}

@@ -53,3 +53,20 @@ def test_run_with_void_retries_no_retry_when_budget_zero(monkeypatch):
     assert retries_used == 0
     assert unresolved_void == 2
     assert len(runs) == 2
+
+
+def test_cleanup_stale_harbor_before_runs_invokes_full_cleanup(monkeypatch):
+    called: dict[str, bool] = {}
+
+    def fake_cleanup(*, include_containers: bool, include_build_processes: bool) -> None:
+        called["include_containers"] = include_containers
+        called["include_build_processes"] = include_build_processes
+
+    monkeypatch.setattr(cli, "cleanup_stale_harbor_resources", fake_cleanup)
+
+    cli._cleanup_stale_harbor_before_runs()
+
+    assert called == {
+        "include_containers": True,
+        "include_build_processes": True,
+    }

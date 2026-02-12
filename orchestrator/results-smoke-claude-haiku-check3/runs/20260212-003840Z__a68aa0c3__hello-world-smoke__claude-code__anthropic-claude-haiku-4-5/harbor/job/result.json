@@ -1,0 +1,27 @@
+{
+    "id": "13be5e01-8650-4e3e-a229-94da37d77ff5",
+    "started_at": "2026-02-12T00:38:49.097160",
+    "finished_at": "2026-02-12T00:38:49.258510",
+    "n_total_trials": 1,
+    "stats": {
+        "n_trials": 1,
+        "n_errors": 1,
+        "evals": {
+            "claude-code__claude-haiku-4-5__adhoc": {
+                "n_trials": 0,
+                "n_errors": 1,
+                "metrics": [
+                    {
+                        "mean": 0.0
+                    }
+                ],
+                "reward_stats": {},
+                "exception_stats": {
+                    "RuntimeError": [
+                        "harbor-task-hello-world-smoke-a6__MdFP4R3"
+                    ]
+                }
+            }
+        }
+    }
+}

@@ -8,6 +8,7 @@ import shlex
 import shutil
 import signal
 import subprocess
+import time
 import uuid
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -20,6 +21,10 @@ from pydantic import ValidationError
 from .audit.scaffold_manifest import generate_manifest, save_manifest
 from .config import settings
 from .harness.config import HarnessConfig
+from .harness.fast_mode import (
+    fast_image_prefix,
+    is_fast_image_reuse_enabled,
+)
 from .harness.rules import inject_rules
 from .scaffold import ScaffoldSource
 from .schemas.events import GateEvent, SessionEvent
@@ -44,10 +49,94 @@ from .scoring.compliance import run_deterministic_check
 
 SCORING_SCHEMA_VERSION = "2.0.0"
 HARBOR_TIMEOUT_BUFFER_SEC = 120
+MIN_DOCKER_COMPOSE_VERSION = (2, 40, 1)
+HARBOR_RATE_LIMIT_RETRY_DELAY_SEC = 20
+HARBOR_RATE_LIMIT_MAX_ATTEMPTS = 2
 HARNESS_STALE_CONTAINER_PATTERN = re.compile(r"^harbor-task.*-main-1$")
 HARBOR_GIT_MULTIBRANCH_PATTERN = re.compile(r"^git-multibranch__.+-main-1$")
-HARNESS_STALE_BUILD_PATTERN = re.compile(r"harbor-task__.+docker-compose-build\.yaml build")
-HARNESS_STALE_BUILDX_PATTERN = re.compile(r"docker-buildx bake .*harbor-task/environment")
+HARNESS_STALE_BUILD_PATTERN = re.compile(
+    r"(?:docker compose|docker-compose compose).+docker-compose-build\.yaml build"
+)
+HARNESS_STALE_BUILDX_PATTERN = re.compile(
+    r"docker-buildx bake .*--allow fs\.read=.*harbor-task-[^/]+/environment"
+)
+HARNESS_STALE_RUN_PATTERN = re.compile(r"\bharbor run --path .*harbor-task-")
+DOCKER_COMPOSE_VERSION_PATTERN = re.compile(r"(?:^|[^0-9])v?(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)")
+DOCKERFILE_FROM_PATTERN = re.compile(
+    r"^\s*FROM(?:\s+--platform=[^\s]+)?\s+([^\s]+)",
+    re.IGNORECASE | re.MULTILINE,
+)
+BACKTICK_COMMAND_PATTERN = re.compile(r"`([^`\n]+)`")
+SHELL_COMMAND_PREFIX_PATTERN = re.compile(r"^(?:bun|npm|npx|pnpm|yarn|biome|tsc|next|vitest)\b")
+COMMAND_INTENT_PATTERN = re.compile(r"\b(i will|i'll|i am going to|i'm going to|i plan to)\b")
+COMMAND_FAILURE_PATTERN = re.compile(r"\b(failed|failure|error|unable|did not|non-zero)\b")
+COMMAND_EXECUTION_HINTS = (
+    "verified with",
+    "verified the changes with",
+    "verifying the changes with",
+    "by running",
+    "ran `",
+    "running `",
+    "executed `",
+    "all of which passed",
+    "verification steps passed",
+    "passed successfully",
+)
+VERIFIED_WITH_PATTERN = re.compile(r"\bverif(?:y|ied|ying)\b.*\bwith\b")
+INLINE_SECRET_PATTERN = re.compile(
+    r"\b("
+    r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
+    r"GEMINI_API_KEY|GOOGLE_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
+    r"GOOGLE_APPLICATION_CREDENTIALS"
+    r")=([^\s\"']+)"
+)
+JSON_SECRET_PATTERN = re.compile(
+    r'"('
+    r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
+    r"GEMINI_API_KEY|GOOGLE_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
+    r"GOOGLE_APPLICATION_CREDENTIALS"
+    r')"\s*:\s*"([^"]+)"'
+)
+KEY_LIKE_TOKEN_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b")
+SECRET_ENV_KEYS: tuple[str, ...] = (
+    "OPENAI_API_KEY",
+    "ANTHROPIC_API_KEY",
+    "CLAUDE_CODE_API_KEY",
+    "CLAUDE_CODE_OAUTH_TOKEN",
+    "GEMINI_API_KEY",
+    "GOOGLE_API_KEY",
+)
+SECRET_FILE_ENV_PREFIX = "AGENTIC_EVAL_SECRET_FILE_"
+PUBLIC_REGISTRY_HOSTS: set[str] = {
+    "docker.io",
+    "index.docker.io",
+    "registry-1.docker.io",
+    "ghcr.io",
+    "quay.io",
+    "mcr.microsoft.com",
+    "public.ecr.aws",
+    "gcr.io",
+    "us.gcr.io",
+    "eu.gcr.io",
+    "asia.gcr.io",
+    "registry.k8s.io",
+}
+REGISTRY_RATE_LIMIT_PATTERN = re.compile(
+    r"(?:toomanyrequests|too many requests|pull rate limit|rate limit exceeded|429)",
+    re.IGNORECASE,
+)
+KEYWORD_COMMAND_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("bun run typecheck", ("type-check", "typecheck", "type checking", "tsc")),
+    ("bun run lint", ("lint", "linting")),
+    ("bun run test:coverage", ("test:coverage", "coverage")),
+    ("bun run test", ("run test", "test command", "testing", "tests")),
+    ("bun run build", ("build", "compil", "next build")),
+)
+AGENT_NPM_PACKAGES: dict[str, str] = {
+    "codex-cli": "@openai/codex",
+    "claude-code": "@anthropic-ai/claude-code",
+    "gemini": "@google/gemini-cli",
+}
 
 
 def load_task(task_path: Path) -> TaskDefinition:
@@ -394,36 +483,226 @@ def _is_stale_harbor_container(*, name: str, status: str) -> bool:
 
 def cleanup_stale_harbor_build_processes() -> None:
     """Kill orphaned Harbor docker-compose/buildx build processes."""
+    parsed = _collect_harbor_process_candidates()
+    if parsed is None:
+        return
+
+    process_table, candidate_pids, orphan_harbor_run_pids = parsed
+    orphan_harbor_run_set = set(orphan_harbor_run_pids)
+    stale_build_pids = _stale_harbor_build_pids(
+        process_table=process_table,
+        candidate_pids=candidate_pids,
+        orphan_harbor_run_set=orphan_harbor_run_set,
+    )
+    stale_pids = sorted(set(orphan_harbor_run_pids).union(stale_build_pids))
+    for pid in stale_pids:
+        try:
+            os.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            continue
+
+
+def _collect_harbor_process_candidates() -> tuple[dict[int, int], list[int], list[int]] | None:
     listing = subprocess.run(
-        ["ps", "-ax", "-o", "pid=,command="],
+        ["ps", "-ax", "-o", "pid=,ppid=,command="],
         capture_output=True,
         text=True,
         timeout=30,
         check=False,
     )
     if listing.returncode != 0:
-        return
-    stale_pids: list[int] = []
-    for line in listing.stdout.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        parts = line.split(maxsplit=1)
-        if len(parts) != 2:
-            continue
-        pid_text, command = parts
-        if not pid_text.isdigit():
-            continue
-        if HARNESS_STALE_BUILD_PATTERN.search(command) or HARNESS_STALE_BUILDX_PATTERN.search(
-            command
-        ):
-            stale_pids.append(int(pid_text))
+        return None
 
-    for pid in stale_pids:
-        try:
-            os.kill(pid, signal.SIGTERM)
-        except ProcessLookupError:
+    process_table: dict[int, int] = {}
+    candidate_pids: list[int] = []
+    orphan_harbor_run_pids: list[int] = []
+    for line in listing.stdout.splitlines():
+        parsed = _parse_process_listing_line(line)
+        if parsed is None:
             continue
+        pid, ppid, command = parsed
+        process_table[pid] = ppid
+        if _is_orphan_harbor_run_command(command=command, ppid=ppid):
+            orphan_harbor_run_pids.append(pid)
+        if _is_harbor_build_command(command):
+            candidate_pids.append(pid)
+
+    return process_table, candidate_pids, orphan_harbor_run_pids
+
+
+def _stale_harbor_build_pids(
+    *,
+    process_table: dict[int, int],
+    candidate_pids: list[int],
+    orphan_harbor_run_set: set[int],
+) -> list[int]:
+    return [
+        pid
+        for pid in candidate_pids
+        if process_table.get(pid, 0) <= 1
+        or _has_ancestor_in_set(
+            pid=pid,
+            process_table=process_table,
+            ancestor_set=orphan_harbor_run_set,
+        )
+    ]
+
+
+def _parse_process_listing_line(line: str) -> tuple[int, int, str] | None:
+    line = line.strip()
+    if not line:
+        return None
+    parts = line.split(maxsplit=2)
+    if len(parts) != 3:
+        return None
+    pid_text, ppid_text, command = parts
+    if not pid_text.isdigit() or not ppid_text.isdigit():
+        return None
+    return int(pid_text), int(ppid_text), command
+
+
+def _is_harbor_build_command(command: str) -> bool:
+    return bool(
+        HARNESS_STALE_BUILD_PATTERN.search(command) or HARNESS_STALE_BUILDX_PATTERN.search(command)
+    )
+
+
+def _is_orphan_harbor_run_command(*, command: str, ppid: int) -> bool:
+    return ppid <= 1 and bool(HARNESS_STALE_RUN_PATTERN.search(command))
+
+
+def _has_ancestor_in_set(
+    *,
+    pid: int,
+    process_table: dict[int, int],
+    ancestor_set: set[int],
+) -> bool:
+    current = process_table.get(pid, 0)
+    seen: set[int] = set()
+    while current > 1 and current not in seen:
+        if current in ancestor_set:
+            return True
+        seen.add(current)
+        current = process_table.get(current, 0)
+    return current in ancestor_set
+
+
+def _build_harbor_run_env(adapter: Any) -> dict[str, str]:
+    run_env = os.environ.copy()
+    run_env.update(adapter.runtime_env())
+    _inject_secret_file_env(run_env)
+    # Workaround for docker compose v2.39.x bake hang in non-interactive runs.
+    run_env["COMPOSE_BAKE"] = "false"
+    return run_env
+
+
+def _redact_sensitive_text(value: str) -> str:
+    redacted = INLINE_SECRET_PATTERN.sub(r"\1=[REDACTED]", value)
+    redacted = JSON_SECRET_PATTERN.sub(r'"\1":"[REDACTED]"', redacted)
+    return KEY_LIKE_TOKEN_PATTERN.sub("[REDACTED]", redacted)
+
+
+def _inject_secret_file_env(run_env: dict[str, str]) -> None:
+    for key in SECRET_ENV_KEYS:
+        secret_value = run_env.pop(key, "")
+        if not secret_value:
+            continue
+        run_env[f"{SECRET_FILE_ENV_PREFIX}{key}"] = str(
+            _write_harbor_secret_file(secret_name=key, secret_value=secret_value)
+        )
+
+
+def _write_harbor_secret_file(*, secret_name: str, secret_value: str) -> Path:
+    secret_dir = Path.home() / ".agentic-eval" / "secrets"
+    secret_dir.mkdir(parents=True, exist_ok=True)
+    secret_path = secret_dir / f"{secret_name.lower()}-{uuid.uuid4().hex}"
+    secret_path.write_text(secret_value, encoding="utf-8")
+    secret_path.chmod(0o600)
+    return secret_path
+
+
+def _parse_docker_compose_version(raw: str) -> tuple[int, int, int] | None:
+    match = DOCKER_COMPOSE_VERSION_PATTERN.search(raw.strip())
+    if not match:
+        return None
+    major, minor, patch = match.groups()
+    return int(major), int(minor), int(patch)
+
+
+def _read_docker_compose_version(run_env: dict[str, str]) -> tuple[int, int, int] | None:
+    for cmd in (["docker", "compose", "version", "--short"], ["docker", "compose", "version"]):
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=15,
+                env=run_env,
+                check=False,
+            )
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            return None
+        if result.returncode != 0:
+            continue
+        version = _parse_docker_compose_version(result.stdout or "")
+        if version:
+            return version
+    return None
+
+
+def _format_version(version: tuple[int, int, int]) -> str:
+    return ".".join(str(part) for part in version)
+
+
+def _docker_compose_preflight_reason(run_env: dict[str, str]) -> str | None:
+    version = _read_docker_compose_version(run_env)
+    if version is None:
+        return None
+    if version < MIN_DOCKER_COMPOSE_VERSION:
+        required = _format_version(MIN_DOCKER_COMPOSE_VERSION)
+        detected = _format_version(version)
+        return (
+            f"Unsupported docker compose version {detected}. Require >= {required} for Harbor runs."
+        )
+    return None
+
+
+def _dockerfile_from_images(dockerfile_content: str) -> list[str]:
+    return [match.group(1) for match in DOCKERFILE_FROM_PATTERN.finditer(dockerfile_content)]
+
+
+def _image_registry_host(image: str) -> str | None:
+    first_segment = image.split("/", 1)[0].strip().lower()
+    if not first_segment or first_segment == "scratch":
+        return None
+    if "." in first_segment or ":" in first_segment or first_segment == "localhost":
+        return first_segment
+    return None
+
+
+def _validate_public_base_images(dockerfile_content: str) -> None:
+    for image in _dockerfile_from_images(dockerfile_content):
+        if image.startswith("$"):
+            raise ValueError(
+                f"Dockerfile FROM image must be explicit, found unresolved variable: {image}."
+            )
+        host = _image_registry_host(image)
+        if host and host not in PUBLIC_REGISTRY_HOSTS:
+            raise ValueError(
+                f"Dockerfile uses private or unsupported registry host '{host}' in FROM '{image}'. "
+                "Only public registries are allowed."
+            )
+
+
+def _is_registry_rate_limited(run_harbor_dir: Path) -> bool:
+    for name in ("harbor-stdout.log", "harbor-stderr.log"):
+        log_path = run_harbor_dir / name
+        if not log_path.exists():
+            continue
+        log_text = log_path.read_text(encoding="utf-8", errors="replace")
+        if REGISTRY_RATE_LIMIT_PATTERN.search(log_text):
+            return True
+    return False
 
 
 def prepare_workspace(
@@ -549,6 +828,108 @@ def _verifier_scorer_script() -> str:
     return _verifier_script_template_path().read_text(encoding="utf-8")
 
 
+def _fast_task_docker_image(request: RunRequest, context: ScaffoldContext) -> str | None:
+    if not is_fast_image_reuse_enabled():
+        return None
+
+    task_path = request.task_dir / "task.yaml"
+    task_yaml_hash = _hash_bytes(task_path.read_bytes()) if task_path.exists() else "missing"
+    payload = {
+        "fast_mode_version": "1",
+        "task_name": request.task.name,
+        "rules_variant": request.config.rules_variant,
+        "task_yaml_hash": task_yaml_hash,
+        "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
+    }
+    digest = hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()[:16]
+    image_tag = f"{_slug_fragment(request.task.name)}-{digest}"
+    return f"{fast_image_prefix()}:{image_tag}"
+
+
+def _task_environment_toml(image_name: str | None) -> str:
+    lines = ["build_timeout_sec = 1800.0"]
+    if image_name:
+        lines.append(f'docker_image = "{image_name}"')
+    lines.extend(
+        [
+            "cpus = 2",
+            "memory_mb = 4096",
+            "storage_mb = 10240",
+            "allow_internet = true",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def _agent_npm_package(agent: str) -> str | None:
+    return AGENT_NPM_PACKAGES.get(agent)
+
+
+def _docker_image_exists(image_name: str, run_env: dict[str, str]) -> bool:
+    try:
+        probe = subprocess.run(
+            ["docker", "image", "inspect", image_name],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            env=run_env,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Docker CLI not found.") from exc
+    return probe.returncode == 0
+
+
+def _ensure_fast_task_image(
+    *,
+    task_bundle_path: Path,
+    image_name: str,
+    run_env: dict[str, str],
+    log_dir: Path,
+) -> None:
+    if _docker_image_exists(image_name, run_env):
+        return
+
+    context_dir = task_bundle_path / "environment"
+    dockerfile = context_dir / "Dockerfile"
+    if not dockerfile.exists():
+        raise FileNotFoundError(f"Fast image build failed: missing Dockerfile {dockerfile}")
+
+    build_cmd = [
+        "docker",
+        "build",
+        "--tag",
+        image_name,
+        "--file",
+        str(dockerfile),
+        str(context_dir),
+    ]
+    try:
+        build = subprocess.run(
+            build_cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800,
+            env=run_env,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Docker CLI not found.") from exc
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    build_log = log_dir / "fast-image-build.log"
+    build_log.write_text((build.stdout or "") + "\n" + (build.stderr or ""))
+
+    if build.returncode != 0:
+        output = ((build.stdout or "") + "\n" + (build.stderr or "")).strip()[:8000]
+        rendered = " ".join(shlex.quote(part) for part in build_cmd)
+        raise RuntimeError(
+            f"Fast image build failed: `{rendered}` exited {build.returncode}\n{output}"
+        )
+
+
 def create_harbor_task_bundle(request: RunRequest, context: ScaffoldContext, run_id: str) -> Path:
     """Build a Harbor-compatible task directory from the scaffold workspace."""
     bundle_dir = context.workspace / f"harbor-task-{_slug_fragment(request.task.name)}-{run_id}"
@@ -589,6 +970,7 @@ def create_harbor_task_bundle(request: RunRequest, context: ScaffoldContext, run
         + "\n\nYou are working in `/app`.\nFollow rules in `/app/AGENTS.md`.\n"
     )
     (bundle_dir / "instruction.md").write_text(instruction)
+    task_image = _fast_task_docker_image(request, context)
     (bundle_dir / "task.toml").write_text(
         f"""version = "1.0"
 
@@ -603,16 +985,20 @@ timeout_sec = 300.0
 timeout_sec = {float(request.config.timeout_sec)}
 
 [environment]
-build_timeout_sec = 1800.0
-cpus = 2
-memory_mb = 4096
-storage_mb = 10240
-allow_internet = true
+{_task_environment_toml(task_image)}
 """
     )
     dockerfile = """FROM oven/bun:1
 WORKDIR /app
-COPY app/package.json app/bun.lock /app/
+"""
+    cli_package = _agent_npm_package(request.config.agent.value)
+    if cli_package:
+        dockerfile += """RUN apt-get update && apt-get install -y --no-install-recommends \\
+  npm \\
+  && rm -rf /var/lib/apt/lists/*
+"""
+        dockerfile += f"RUN npm install -g {cli_package}\n"
+    dockerfile += """COPY app/package.json app/bun.lock /app/
 RUN bun install --frozen-lockfile
 COPY app/ /app/
 """
@@ -638,6 +1024,7 @@ COPY app/ /app/
   && rm -rf /var/lib/apt/lists/*
 RUN bunx playwright install chromium
 """
+    _validate_public_base_images(dockerfile)
     (environment_dir / "Dockerfile").write_text(dockerfile)
     (tests_dir / "task-spec.json").write_text(
         json.dumps(_build_verifier_task_spec(request, context), indent=2)
@@ -761,14 +1148,32 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
         jobs_dir=request.jobs_dir,
     )
 
-    execution_error = _run_harbor_process(
-        harbor_cmd=harbor_cmd,
-        workspace=request.workspace,
-        timeout_sec=request.timeout_sec,
-        run_env=request.run_env,
-        run_harbor_dir=request.run_harbor_dir,
-        job_dir=job_dir,
-    )
+    execution_error: str | None = None
+    for attempt in range(1, HARBOR_RATE_LIMIT_MAX_ATTEMPTS + 1):
+        execution_error = _run_harbor_process(
+            harbor_cmd=harbor_cmd,
+            workspace=request.workspace,
+            timeout_sec=request.timeout_sec,
+            run_env=request.run_env,
+            run_harbor_dir=request.run_harbor_dir,
+            job_dir=job_dir,
+        )
+        if execution_error is None:
+            break
+        should_retry = (
+            attempt < HARBOR_RATE_LIMIT_MAX_ATTEMPTS
+            and execution_error.startswith("Harbor exited with code")
+            and _is_registry_rate_limited(request.run_harbor_dir)
+        )
+        if not should_retry:
+            return _terminated_harbor_result(
+                job_dir=job_dir,
+                reason=execution_error,
+                trial_dir=None,
+            )
+        cleanup_stale_harbor_resources()
+        time.sleep(HARBOR_RATE_LIMIT_RETRY_DELAY_SEC)
+
     if execution_error:
         return _terminated_harbor_result(job_dir=job_dir, reason=execution_error, trial_dir=None)
 
@@ -823,6 +1228,12 @@ def _run_harbor_process(
     stderr_path = run_harbor_dir / "harbor-stderr.log"
     command_path.write_text(" ".join(shlex.quote(part) for part in harbor_cmd) + "\n")
 
+    preflight_reason = _docker_compose_preflight_reason(run_env)
+    if preflight_reason:
+        stdout_path.write_text("")
+        stderr_path.write_text(preflight_reason + "\n")
+        return preflight_reason
+
     try:
         process = subprocess.Popen(
             harbor_cmd,
@@ -844,8 +1255,8 @@ def _run_harbor_process(
         _terminate_process_group(process)
         stdout, stderr = process.communicate()
 
-    stdout_path.write_text(stdout or "")
-    stderr_path.write_text(stderr or "")
+    stdout_path.write_text(_redact_sensitive_text(stdout or ""))
+    stderr_path.write_text(_redact_sensitive_text(stderr or ""))
 
     if timed_out:
         return _timeout_reason(timeout_sec=timeout_sec, job_dir=job_dir)
@@ -912,7 +1323,7 @@ def _trial_exception_reason(trial_dir: Path) -> str | None:
     message = message.strip()
     if not message:
         return None
-    return f"Harbor trial exception: {message}"
+    return f"Harbor trial exception: {_redact_sensitive_text(message)}"
 
 
 def _codex_turn_failure_reason(trial_dir: Path) -> str | None:
@@ -938,7 +1349,7 @@ def _codex_turn_failure_message(line: str) -> str | None:
     if not message:
         return None
     message = message.strip()
-    return message or None
+    return _redact_sensitive_text(message) if message else None
 
 
 def _load_json_dict(path: Path) -> dict:
@@ -1156,7 +1567,15 @@ def persist_agent_artifacts(
         return {}
 
     copied: dict[str, str] = {}
-    for filename in ("trajectory.json", "codex.txt", "install.sh", "final-app.tar.gz"):
+    for filename in (
+        "trajectory.json",
+        "codex.txt",
+        "claude-code.txt",
+        "gemini-cli.txt",
+        "gemini-cli.trajectory.json",
+        "install.sh",
+        "final-app.tar.gz",
+    ):
         src = source / filename
         if src.exists():
             copied[filename] = str(shutil.copy2(src, agent_dir / filename))
@@ -1232,9 +1651,26 @@ def write_summary_readme(
         "## Key Artifacts",
         f"- verifier_scorecard: `{layout.verifier_dir / 'scorecard.json'}`",
         f"- agent_trajectory: `{layout.agent_dir / 'trajectory.json'}`",
-        f"- agent_event_stream: `{layout.agent_dir / 'codex.txt'}`",
     ]
+    event_stream = _agent_event_stream_pointer(layout.agent_dir, request.config.agent.value)
+    lines.append(f"- agent_event_stream: `{event_stream}`")
     layout.summary_readme_path.write_text("\n".join(lines) + "\n")
+
+
+def _agent_event_stream_pointer(agent_dir: Path, harness: str) -> Path:
+    if harness == "codex-cli":
+        return agent_dir / "codex.txt"
+    if harness == "claude-code":
+        return agent_dir / "commands"
+    if harness == "gemini":
+        return agent_dir / "commands"
+    if harness == "cursor":
+        return agent_dir / "commands"
+    if harness == "copilot":
+        return agent_dir / "commands"
+    if harness == "pi":
+        return agent_dir / "commands"
+    raise ValueError(f"Unsupported harness for artifact summary: {harness}")
 
 
 def _read_jsonl_dicts(path: Path) -> list[dict]:
@@ -1273,6 +1709,38 @@ def _extract_usage(entry: dict) -> tuple[int, int, int] | None:
 
 
 def _normalize_command(command: str) -> str:
+    commands = _normalized_shell_subcommands(command)
+    if commands:
+        return commands[0]
+    return command.strip()
+
+
+def _normalized_shell_subcommands(command: str) -> list[str]:
+    command_text = _unwrap_shell_wrapper(command)
+    if not command_text:
+        return []
+    try:
+        tokens = shlex.split(command_text)
+    except ValueError:
+        return [_normalize_verification_alias(command_text)]
+    if not tokens:
+        return []
+
+    subcommands: list[str] = []
+    current: list[str] = []
+    for token in tokens:
+        if token in {"&&", "||", ";"}:
+            if current:
+                subcommands.append(_normalize_verification_alias(shlex.join(current).strip()))
+                current = []
+            continue
+        current.append(token)
+    if current:
+        subcommands.append(_normalize_verification_alias(shlex.join(current).strip()))
+    return [entry for entry in subcommands if entry]
+
+
+def _unwrap_shell_wrapper(command: str) -> str:
     command = command.strip()
     if not command:
         return command
@@ -1284,6 +1752,21 @@ def _normalize_command(command: str) -> str:
         idx = tokens.index("-lc")
         if idx + 1 < len(tokens):
             return tokens[idx + 1].strip()
+    return command
+
+
+def _normalize_verification_alias(command: str) -> str:
+    lowered = command.lower().strip()
+    if lowered in {"bun run typecheck", "npm run typecheck", "pnpm typecheck", "yarn typecheck"}:
+        return "bun run typecheck"
+    if lowered in {"bun run lint", "npm run lint", "pnpm lint", "yarn lint"}:
+        return "bun run lint"
+    if lowered in {"bun run build", "npm run build", "pnpm build", "yarn build"}:
+        return "bun run build"
+    if "tsc --noemit" in lowered:
+        return "bun run typecheck"
+    if "ultracite lint" in lowered or lowered.startswith("eslint "):
+        return "bun run lint"
     return command
 
 
@@ -1333,15 +1816,349 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
         item = _extract_item_completed(entry)
         if not item or item.get("type") != "command_execution":
             continue
-        command = _normalize_command(str(item.get("command", "")))
-        records.append(
-            CommandRecord(
-                command=command,
-                failed=_command_failed(item),
-                output=_command_output(item),
+        failed = _command_failed(item)
+        output = _command_output(item)
+        commands = _normalized_shell_subcommands(str(item.get("command", "")))
+        for command in commands:
+            if not _looks_like_shell_command(command):
+                continue
+            records.append(
+                CommandRecord(
+                    command=command,
+                    failed=failed,
+                    output=output,
+                )
             )
+    return records
+
+
+def _command_records_for_harness(trial_dir: Path, harness: str) -> list[CommandRecord]:
+    if harness == "codex-cli":
+        return _command_records(_read_jsonl_dicts(trial_dir / "agent" / "codex.txt"))
+    if harness == "claude-code":
+        return _command_records_from_claude_stdout(trial_dir)
+    if harness == "gemini":
+        stdout_records = _command_records_from_agent_stdout(
+            trial_dir,
+            additional_stdout_files=("gemini-cli.txt",),
+        )
+        if stdout_records:
+            return stdout_records
+        return _command_records_from_gemini_trajectory(trial_dir)
+    if harness == "cursor":
+        return _command_records_from_agent_stdout(trial_dir)
+    if harness == "copilot":
+        return _command_records_from_agent_stdout(trial_dir)
+    if harness == "pi":
+        return _command_records_from_agent_stdout(trial_dir)
+    raise ValueError(f"Unsupported harness for command extraction: {harness}")
+
+
+def _usage_entries_for_harness(trial_dir: Path, harness: str) -> list[dict]:
+    if harness == "codex-cli":
+        return _read_jsonl_dicts(trial_dir / "agent" / "codex.txt")
+    if harness == "claude-code":
+        return []
+    if harness == "gemini":
+        return []
+    if harness == "cursor":
+        return []
+    if harness == "copilot":
+        return []
+    if harness == "pi":
+        return []
+    raise ValueError(f"Unsupported harness for usage extraction: {harness}")
+
+
+def _harness_emits_structured_session_events(harness: str) -> bool:
+    if harness == "codex-cli":
+        return True
+    if harness in {"claude-code", "gemini", "cursor", "copilot", "pi"}:
+        return False
+    raise ValueError(f"Unsupported harness for session event extraction: {harness}")
+
+
+def _command_records_from_agent_stdout(
+    trial_dir: Path,
+    *,
+    additional_stdout_files: tuple[str, ...] = (),
+) -> list[CommandRecord]:
+    agent_dir = trial_dir / "agent"
+    if not agent_dir.exists():
+        return []
+    records: list[CommandRecord] = []
+    stdout_paths: list[Path] = sorted(agent_dir.glob("command-*/stdout.txt"))
+    stdout_paths.extend(agent_dir / name for name in additional_stdout_files)
+    for stdout_path in stdout_paths:
+        if not stdout_path.exists():
+            continue
+        records.extend(_command_records_from_stdout(stdout_path))
+    return records
+
+
+def _command_records_from_claude_stdout(trial_dir: Path) -> list[CommandRecord]:
+    agent_dir = trial_dir / "agent"
+    if not agent_dir.exists():
+        return []
+    records: list[CommandRecord] = []
+    stdout_paths: list[Path] = sorted(agent_dir.glob("command-*/stdout.txt"))
+    stdout_paths.append(agent_dir / "claude-code.txt")
+    for stdout_path in stdout_paths:
+        if not stdout_path.exists():
+            continue
+        records.extend(_command_records_from_claude_stdout_file(stdout_path))
+    return records
+
+
+def _command_records_from_claude_stdout_file(stdout_path: Path) -> list[CommandRecord]:
+    try:
+        lines = stdout_path.read_text(errors="ignore").splitlines()
+    except OSError:
+        return []
+
+    records: list[CommandRecord] = []
+    record_idx_by_tool_use_id: dict[str, int] = {}
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        payload = _line_as_json_dict(stripped)
+        if payload is None:
+            records.extend(_command_records_from_line(stripped))
+            continue
+        _append_claude_tool_use_records(
+            payload=payload,
+            output=stripped,
+            records=records,
+            record_idx_by_tool_use_id=record_idx_by_tool_use_id,
+        )
+        _mark_claude_failed_tool_records(
+            payload=payload,
+            records=records,
+            record_idx_by_tool_use_id=record_idx_by_tool_use_id,
         )
     return records
+
+
+def _append_claude_tool_use_records(
+    *,
+    payload: dict,
+    output: str,
+    records: list[CommandRecord],
+    record_idx_by_tool_use_id: dict[str, int],
+) -> None:
+    for tool_use_id, command in _claude_bash_tool_use_commands(payload):
+        matched_indexes: list[int] = []
+        for normalized in _normalized_shell_subcommands(command):
+            if not _looks_like_shell_command(normalized):
+                continue
+            matched_indexes.append(len(records))
+            records.append(
+                CommandRecord(
+                    command=normalized,
+                    failed=False,
+                    output=output,
+                )
+            )
+        if matched_indexes:
+            record_idx_by_tool_use_id[tool_use_id] = matched_indexes[0]
+
+
+def _mark_claude_failed_tool_records(
+    *,
+    payload: dict,
+    records: list[CommandRecord],
+    record_idx_by_tool_use_id: dict[str, int],
+) -> None:
+    for tool_use_id in _claude_failed_tool_result_ids(payload):
+        idx = record_idx_by_tool_use_id.get(tool_use_id)
+        if idx is None:
+            continue
+        original = records[idx]
+        records[idx] = CommandRecord(
+            command=original.command,
+            failed=True,
+            output=original.output,
+        )
+
+
+def _line_as_json_dict(line: str) -> dict | None:
+    try:
+        payload = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    return payload if isinstance(payload, dict) else None
+
+
+def _claude_bash_tool_use_commands(payload: dict) -> list[tuple[str, str]]:
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        return []
+    content = message.get("content")
+    if not isinstance(content, list):
+        return []
+    commands: list[tuple[str, str]] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") != "tool_use" or part.get("name") != "Bash":
+            continue
+        tool_use_id = str(part.get("id", "")).strip()
+        tool_input = part.get("input")
+        if not isinstance(tool_input, dict):
+            continue
+        command = str(tool_input.get("command", "")).strip()
+        if not tool_use_id or not command:
+            continue
+        commands.append((tool_use_id, command))
+    return commands
+
+
+def _claude_failed_tool_result_ids(payload: dict) -> list[str]:
+    message = payload.get("message")
+    if not isinstance(message, dict):
+        return []
+    content = message.get("content")
+    if not isinstance(content, list):
+        return []
+    failed_tool_ids: list[str] = []
+    for part in content:
+        if not isinstance(part, dict):
+            continue
+        if part.get("type") != "tool_result":
+            continue
+        if not bool(part.get("is_error", False)):
+            continue
+        tool_use_id = str(part.get("tool_use_id", "")).strip()
+        if tool_use_id:
+            failed_tool_ids.append(tool_use_id)
+    return failed_tool_ids
+
+
+def _command_records_from_stdout(stdout_path: Path) -> list[CommandRecord]:
+    try:
+        lines = stdout_path.read_text(errors="ignore").splitlines()
+    except OSError:
+        return []
+    records: list[CommandRecord] = []
+    for line in lines:
+        records.extend(_command_records_from_line(line))
+    return records
+
+
+def _command_records_from_line(line: str) -> list[CommandRecord]:
+    stripped = line.strip()
+    if not stripped:
+        return []
+    if stripped.startswith("$ "):
+        return _prompt_command_record(stripped[2:], output=stripped)
+    if _line_is_command_intent(stripped):
+        return []
+    if not _line_reports_command_execution(stripped):
+        return []
+    quoted_records = _quoted_command_records(stripped)
+    if quoted_records:
+        return quoted_records
+    return _keyword_command_records(stripped)
+
+
+def _prompt_command_record(command_text: str, *, output: str) -> list[CommandRecord]:
+    commands = _normalized_shell_subcommands(command_text)
+    return [
+        CommandRecord(command=command, failed=False, output=output)
+        for command in commands
+        if _looks_like_shell_command(command)
+    ]
+
+
+def _quoted_command_records(line: str) -> list[CommandRecord]:
+    commands: list[str] = []
+    for match in BACKTICK_COMMAND_PATTERN.findall(line):
+        commands.extend(_normalized_shell_subcommands(match))
+    commands = [command for command in commands if _looks_like_shell_command(command)]
+    if not commands:
+        return []
+    failed = _line_reports_command_failure(line)
+    return [CommandRecord(command=command, failed=failed, output=line) for command in commands]
+
+
+def _command_records_from_gemini_trajectory(trial_dir: Path) -> list[CommandRecord]:
+    payload = _load_json_dict(trial_dir / "agent" / "gemini-cli.trajectory.json")
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return []
+    records: list[CommandRecord] = []
+    for message in messages:
+        records.extend(_command_records_from_gemini_message(message))
+    return records
+
+
+def _command_records_from_gemini_message(message: dict) -> list[CommandRecord]:
+    if not isinstance(message, dict):
+        return []
+    tool_calls = message.get("toolCalls")
+    if not isinstance(tool_calls, list):
+        return []
+    records: list[CommandRecord] = []
+    for tool_call in tool_calls:
+        records.extend(_command_records_from_gemini_tool_call(tool_call))
+    return records
+
+
+def _command_records_from_gemini_tool_call(tool_call: dict) -> list[CommandRecord]:
+    if not isinstance(tool_call, dict):
+        return []
+    if tool_call.get("name") != "run_shell_command":
+        return []
+    args = tool_call.get("args")
+    if not isinstance(args, dict):
+        return []
+    command_text = str(args.get("command", "")).strip()
+    if not command_text:
+        return []
+    failed = str(tool_call.get("status", "")).strip().lower() == "error"
+    commands = _normalized_shell_subcommands(command_text)
+    return [
+        CommandRecord(
+            command=command,
+            failed=failed,
+            output=command_text,
+        )
+        for command in commands
+        if _looks_like_shell_command(command)
+    ]
+
+
+def _keyword_command_records(line: str) -> list[CommandRecord]:
+    lowered = f" {line.lower()} "
+    commands: list[str] = []
+    for command, keywords in KEYWORD_COMMAND_PATTERNS:
+        if any(keyword in lowered for keyword in keywords):
+            commands.append(command)
+    deduped = list(dict.fromkeys(commands))
+    if not deduped:
+        return []
+    failed = _line_reports_command_failure(line)
+    return [CommandRecord(command=command, failed=failed, output=line) for command in deduped]
+
+
+def _looks_like_shell_command(command: str) -> bool:
+    return bool(command and SHELL_COMMAND_PREFIX_PATTERN.match(command))
+
+
+def _line_is_command_intent(line: str) -> bool:
+    return bool(COMMAND_INTENT_PATTERN.search(line.lower()))
+
+
+def _line_reports_command_execution(line: str) -> bool:
+    lowered = line.lower()
+    if any(hint in lowered for hint in COMMAND_EXECUTION_HINTS):
+        return True
+    return bool(VERIFIED_WITH_PATTERN.search(lowered))
+
+
+def _line_reports_command_failure(line: str) -> bool:
+    return bool(COMMAND_FAILURE_PATTERN.search(line.lower()))
 
 
 def _verification_attempts(
@@ -1462,17 +2279,19 @@ def _first_pass_counts(first_pass_status: dict[str, str]) -> tuple[int, int, int
 def collect_process_metrics(
     task: TaskDefinition,
     trial_dir: Path | None,
+    *,
+    harness: str,
 ) -> ProcessMetrics:
-    """Collect optimization metrics from Harbor Codex logs."""
+    """Collect optimization metrics from harness agent logs."""
     if not trial_dir:
         return _empty_process_metrics()
 
-    entries = _read_jsonl_dicts(trial_dir / "agent" / "codex.txt")
-    usage_tuple = _usage_from_entries(entries)
+    usage_entries = _usage_entries_for_harness(trial_dir, harness)
+    usage_tuple = _usage_from_entries(usage_entries)
     input_tokens, cached_input_tokens, output_tokens = usage_tuple
     uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
 
-    records = _command_records(entries)
+    records = _command_records_for_harness(trial_dir, harness)
     verification_patterns = _verification_command_strings(task)
     attempts_by_pattern, failures_by_pattern = _verification_attempts(
         records, verification_patterns
@@ -1559,10 +2378,17 @@ def _events_from_item(timestamp: str, item: dict) -> list[SessionEvent]:
     ]
 
 
-def collect_session_events(trial_dir: Path | None) -> list[SessionEvent]:
-    """Project Harbor/Codex log lines into normalized session events."""
+def collect_session_events(
+    trial_dir: Path | None,
+    *,
+    harness: str,
+) -> list[SessionEvent]:
+    """Project harness logs into normalized session events."""
     if not trial_dir:
         return []
+    if not _harness_emits_structured_session_events(harness):
+        return []
+
     events: list[SessionEvent] = []
     for entry in _read_jsonl_dicts(trial_dir / "agent" / "codex.txt"):
         timestamp = str(entry.get("timestamp") or datetime.now(UTC).isoformat())
@@ -1869,6 +2695,7 @@ def _classify_void_reasons(terminated_early: bool, termination_reason: str | Non
     reason = (termination_reason or "").lower()
     rules: list[tuple[str, tuple[str, ...]]] = [
         ("harbor_timeout", ("timeout expired",)),
+        ("compose_version_unsupported", ("unsupported docker compose version",)),
         ("provider_rate_limit", ("rate limit",)),
         ("provider_stream_disconnect", ("stream disconnected before completion",)),
         ("harness_unavailable", ("harbor not installed",)),
@@ -2025,12 +2852,20 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
 
     context = prepare_run_context(request)
     adapter.prepare_workspace(context.workspace)
-    cleanup_stale_harbor_resources(include_containers=True, include_build_processes=False)
+    cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
     ensure_scaffold_preflight(request, context)
     harbor_task_bundle = create_harbor_task_bundle(request, context, layout.run_id)
 
-    run_env = os.environ.copy()
-    run_env.update(adapter.runtime_env())
+    run_env = _build_harbor_run_env(adapter)
+    fast_task_image = _fast_task_docker_image(request, context)
+    if fast_task_image:
+        _ensure_fast_task_image(
+            task_bundle_path=harbor_task_bundle,
+            image_name=fast_task_image,
+            run_env=run_env,
+            log_dir=layout.harbor_dir,
+        )
+
     harbor_request = HarborExecutionRequest(
         adapter=adapter,
         workspace=context.workspace,
@@ -2055,8 +2890,15 @@ def _execute_harbor_phase(
     harbor_result = execute_harbor(phase.harbor_request)
     terminated_early = harbor_result.terminated_early
     termination_reason = harbor_result.termination_reason
-    process_metrics = collect_process_metrics(request.task, harbor_result.trial_dir)
-    events = collect_session_events(harbor_result.trial_dir)
+    process_metrics = collect_process_metrics(
+        request.task,
+        harbor_result.trial_dir,
+        harness=request.config.agent.value,
+    )
+    events = collect_session_events(
+        harbor_result.trial_dir,
+        harness=request.config.agent.value,
+    )
 
     verifier_outputs: EvaluationOutputs | None = None
     if not terminated_early:

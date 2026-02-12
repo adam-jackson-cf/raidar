@@ -1,0 +1,93 @@
+{
+    "id": "ff21e5bf-9f43-492a-a387-67f2d2e4beec",
+    "task_name": "harbor-task-hello-world-smoke-313882d5",
+    "trial_name": "harbor-task-hello-world-smoke-31__dAUPKED",
+    "trial_uri": "file:///Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-313882d5/harbor-task-hello-world-smoke-31__dAUPKED",
+    "task_id": {
+        "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-claude-final-check-repeat-01/harbor-task-hello-world-smoke-313882d5"
+    },
+    "source": null,
+    "task_checksum": "12f5cc35b1e9b39d902490560486fb5fad4e885a8d784444845099a677ca4c30",
+    "config": {
+        "task": {
+            "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-claude-final-check-repeat-01/harbor-task-hello-world-smoke-313882d5",
+            "git_url": null,
+            "git_commit_id": null,
+            "overwrite": false,
+            "download_dir": null,
+            "source": null
+        },
+        "trial_name": "harbor-task-hello-world-smoke-31__dAUPKED",
+        "trials_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-313882d5",
+        "timeout_multiplier": 1.0,
+        "agent": {
+            "name": null,
+            "import_path": "agentic_eval.harness.harbor_agents.fast_cli_agents:FastClaudeCodeCliAgent",
+            "model_name": "anthropic/claude-haiku-4-5",
+            "override_timeout_sec": null,
+            "override_setup_timeout_sec": null,
+            "max_timeout_sec": null,
+            "kwargs": {}
+        },
+        "environment": {
+            "type": "docker",
+            "import_path": null,
+            "force_build": false,
+            "delete": true,
+            "override_cpus": null,
+            "override_memory_mb": null,
+            "override_storage_mb": null,
+            "override_gpus": null,
+            "kwargs": {}
+        },
+        "verifier": {
+            "override_timeout_sec": null,
+            "max_timeout_sec": null,
+            "disable": false
+        },
+        "job_id": "a1d743f7-0c59-42cb-86e6-89f3f272ef69"
+    },
+    "agent_info": {
+        "name": "fast-claude-code",
+        "version": "unknown",
+        "model_info": {
+            "name": "claude-haiku-4-5",
+            "provider": "anthropic"
+        }
+    },
+    "agent_result": {
+        "n_input_tokens": null,
+        "n_cache_tokens": null,
+        "n_output_tokens": null,
+        "cost_usd": null,
+        "rollout_details": null,
+        "metadata": {
+            "return_code": 0,
+            "log_file": "/logs/agent/claude-code.txt"
+        }
+    },
+    "verifier_result": {
+        "rewards": {
+            "reward": 1.0
+        }
+    },
+    "exception_info": null,
+    "started_at": "2026-02-12T10:47:52.739847Z",
+    "finished_at": "2026-02-12T10:48:57.617010Z",
+    "environment_setup": {
+        "started_at": "2026-02-12T10:47:52.741368Z",
+        "finished_at": "2026-02-12T10:48:01.639178Z"
+    },
+    "agent_setup": {
+        "started_at": "2026-02-12T10:48:01.639304Z",
+        "finished_at": "2026-02-12T10:48:01.639388Z"
+    },
+    "agent_execution": {
+        "started_at": "2026-02-12T10:48:01.639497Z",
+        "finished_at": "2026-02-12T10:48:39.408820Z"
+    },
+    "verifier": {
+        "started_at": "2026-02-12T10:48:39.408996Z",
+        "finished_at": "2026-02-12T10:48:55.672418Z"
+    }
+}

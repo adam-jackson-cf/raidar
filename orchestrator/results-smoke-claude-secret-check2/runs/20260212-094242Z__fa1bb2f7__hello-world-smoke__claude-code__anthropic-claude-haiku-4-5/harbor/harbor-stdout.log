@@ -1,0 +1,16 @@
+  1/1 Mean: 1.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:00:49 0:00:00Results written to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-fa1bb2f7/result.json
+        fast-claude-code (claude-haiku-4-5) on adhoc         
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                               ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Agent               │ fast-claude-code (claude-haiku-4-5) │
+│ Dataset             │ adhoc                               │
+│ Trials              │ 1                                   │
+│ Errors              │ 0                                   │
+│                     │                                     │
+│ Mean                │ 1.000                               │
+│                     │                                     │
+│ Reward Distribution │                                     │
+│   reward = 1.0      │ 1                                   │
+└─────────────────────┴─────────────────────────────────────┘
+

@@ -1,0 +1,12 @@
+[
+  {
+    "timestamp": "2026-02-11T21:54:29.105Z",
+    "gate_name": "typecheck",
+    "command": "bun run typecheck",
+    "exit_code": 0,
+    "stdout": "",
+    "stderr": "$ tsc --noEmit\n",
+    "failure_category": null,
+    "is_repeat": false
+  }
+]

@@ -1,0 +1,138 @@
+{
+  "functional": {
+    "passed": true,
+    "tests_passed": 0,
+    "tests_total": 0,
+    "build_succeeded": true,
+    "gates_passed": 1,
+    "gates_total": 1
+  },
+  "compliance": {
+    "checks": [
+      {
+        "rule": "Smoke marker text exists in source",
+        "type": "deterministic",
+        "passed": true,
+        "evidence": "Found in src/app/page.tsx"
+      },
+      {
+        "rule": "Scaffold placeholder text is removed",
+        "type": "deterministic",
+        "passed": true,
+        "evidence": "Pattern not found (good)"
+      }
+    ],
+    "score": 1
+  },
+  "visual": null,
+  "efficiency": {
+    "total_gate_failures": 0,
+    "unique_failure_categories": 0,
+    "repeat_failures": 0,
+    "score": 1
+  },
+  "coverage": {
+    "threshold": null,
+    "measured": null,
+    "source": null,
+    "passed": true
+  },
+  "requirements": {
+    "total_requirements": 0,
+    "satisfied_requirements": 0,
+    "mapped_requirements": 0,
+    "missing_requirement_ids": [],
+    "requirement_gap_ids": [],
+    "requirement_pattern_gaps": {},
+    "presence_ratio": 1,
+    "mapping_ratio": 1
+  },
+  "qualification": {
+    "checks": [
+      {
+        "name": "run_completed",
+        "passed": true,
+        "evidence": "Run completed without early termination."
+      },
+      {
+        "name": "quality_gates_passed",
+        "passed": true,
+        "evidence": "1/1 gates passed."
+      },
+      {
+        "name": "functional_passed",
+        "passed": true,
+        "evidence": "build=true, tests=0/0"
+      },
+      {
+        "name": "coverage_threshold_met",
+        "passed": true,
+        "evidence": "threshold=null, measured=null, source=null"
+      },
+      {
+        "name": "visual_threshold_met",
+        "passed": true,
+        "evidence": "Visual threshold not configured."
+      },
+      {
+        "name": "all_requirements_present",
+        "passed": true,
+        "evidence": "satisfied=0/0, missing=[]"
+      },
+      {
+        "name": "no_requirement_test_gaps",
+        "passed": true,
+        "evidence": "mapped=0/0, gaps=[], pattern_gaps={}"
+      },
+      {
+        "name": "minimum_quality_score",
+        "passed": true,
+        "evidence": "quality=1.000, min=0.000"
+      },
+      {
+        "name": "stack_integrity",
+        "passed": true,
+        "evidence": "Scaffold scripts and package-manager integrity preserved."
+      },
+      {
+        "name": "completion_claim_integrity",
+        "passed": true,
+        "evidence": "Validated post-run by orchestrator."
+      }
+    ],
+    "passed": true
+  },
+  "gate_history": [
+    {
+      "timestamp": "2026-02-11T21:58:32.179Z",
+      "gate_name": "typecheck",
+      "command": "bun run typecheck",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": "$ tsc --noEmit\n",
+      "failure_category": null,
+      "is_repeat": false
+    }
+  ],
+  "scaffold_audit": {
+    "manifest_version": "1.0.0",
+    "template": null,
+    "template_version": null,
+    "manifest_fingerprint": "94ee262fb3b0089a5a55e835020362cceac5a5dbafbacd6d00ccb3d0e20b3c4a",
+    "file_count": 19,
+    "dependency_count": 8,
+    "changes_from_baseline": [
+      "Added: .baseline-scaffold.json",
+      "Added: .scaffold-meta.json",
+      "Added: GEMINI.md",
+      "Added: bun.lock",
+      "Added: next-env.d.ts",
+      "Added: scaffold.manifest.json",
+      "Added: scripts/capture-screenshot.ts",
+      "Added: src/app/globals.css",
+      "Added: tsconfig.tsbuildinfo",
+      "Added: vitest.config.ts",
+      "Modified: src/app/page.tsx"
+    ]
+  }
+}

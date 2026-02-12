@@ -184,7 +184,7 @@ def _sample_scorecard_context(
         ),
         terminated_early=terminated_early,
         termination_reason=termination_reason,
-        process_metrics=collect_process_metrics(_sample_task(), None),
+        process_metrics=collect_process_metrics(_sample_task(), None, harness="codex-cli"),
         events=[],
         outputs=_sample_evaluation_outputs(scaffold_audit=scaffold_audit),
         duration_sec=12.5,
@@ -240,7 +240,7 @@ def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
     ]
     codex_log.write_text("\n".join(json.dumps(entry) for entry in entries))
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir)
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="codex-cli")
 
     assert metrics.uncached_input_tokens == 750
     assert metrics.output_tokens == 100
@@ -324,10 +324,210 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
         }
     )
 
-    metrics = collect_process_metrics(task, trial_dir)
+    metrics = collect_process_metrics(task, trial_dir, harness="codex-cli")
 
     assert metrics.required_verification_commands == 2
     assert metrics.executed_required_verification_commands == 2
+
+
+def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    command_dir = trial_dir / "agent" / "command-0"
+    command_dir.mkdir(parents=True, exist_ok=True)
+    (command_dir / "stdout.txt").write_text(
+        "\n".join(
+            [
+                "I will run the type-checking command to ensure there are no TypeScript errors.",
+                "I have completed the smoke-task implementation. I updated `src/app/page.tsx` "
+                "with the text `Harbor smoke test ready`, and verified by running the project's "
+                "type-checking, linting, and build commands, all of which passed.",
+            ]
+        )
+    )
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+
+    assert metrics.command_count == 3
+    assert metrics.failed_command_count == 0
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 3
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
+    assert metrics.required_verification_first_pass["bun run build"] == "pass"
+
+
+def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "gemini-cli.trajectory.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {
+                        "toolCalls": [
+                            {
+                                "name": "run_shell_command",
+                                "status": "success",
+                                "args": {"command": "bun run typecheck && bun run lint"},
+                            }
+                        ]
+                    }
+                ]
+            }
+        )
+    )
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+
+    assert metrics.command_count == 2
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 2
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
+    assert metrics.required_verification_first_pass["bun run build"] == "missing"
+
+
+def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    command_dir = trial_dir / "agent" / "command-0"
+    command_dir.mkdir(parents=True, exist_ok=True)
+    (command_dir / "stdout.txt").write_text(
+        "I have updated `src/app/page.tsx` with the requested text and verified "
+        "the implementation with a successful build and typecheck."
+    )
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+
+    assert metrics.command_count == 2
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 2
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "missing"
+    assert metrics.required_verification_first_pass["bun run build"] == "pass"
+
+
+def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    command_dir = trial_dir / "agent" / "command-1"
+    command_dir.mkdir(parents=True, exist_ok=True)
+    (command_dir / "stdout.txt").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "tool_use",
+                                    "id": "toolu_typecheck",
+                                    "name": "Bash",
+                                    "input": {"command": "bunx tsc --noEmit"},
+                                },
+                                {
+                                    "type": "tool_use",
+                                    "id": "toolu_lint",
+                                    "name": "Bash",
+                                    "input": {"command": "npm run lint"},
+                                },
+                            ]
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "user",
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": "toolu_typecheck",
+                                    "is_error": False,
+                                },
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": "toolu_lint",
+                                    "is_error": False,
+                                },
+                            ]
+                        },
+                    }
+                ),
+            ]
+        )
+    )
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="claude-code")
+
+    assert metrics.command_count == 2
+    assert metrics.failed_command_count == 0
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 2
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
+    assert metrics.required_verification_first_pass["bun run build"] == "missing"
+
+
+def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "claude-code.txt").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "tool_use",
+                                    "id": "toolu_typecheck",
+                                    "name": "Bash",
+                                    "input": {"command": "bun run typecheck"},
+                                },
+                                {
+                                    "type": "tool_use",
+                                    "id": "toolu_lint",
+                                    "name": "Bash",
+                                    "input": {"command": "bun run lint"},
+                                },
+                            ]
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "user",
+                        "message": {
+                            "content": [
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": "toolu_typecheck",
+                                    "is_error": False,
+                                },
+                                {
+                                    "type": "tool_result",
+                                    "tool_use_id": "toolu_lint",
+                                    "is_error": False,
+                                },
+                            ]
+                        },
+                    }
+                ),
+            ]
+        )
+    )
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="claude-code")
+
+    assert metrics.command_count == 2
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 2
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
+    assert metrics.required_verification_first_pass["bun run build"] == "missing"
 
 
 def test_evaluate_coverage_reads_summary_file(tmp_path: Path):
@@ -521,6 +721,16 @@ def test_classify_void_reasons_timeout():
     assert reasons == ["harbor_timeout"]
 
 
+def test_classify_void_reasons_compose_version_unsupported():
+    reasons = _classify_void_reasons(
+        terminated_early=True,
+        termination_reason=(
+            "Unsupported docker compose version 2.39.2. Require >= 2.40.1 for Harbor runs."
+        ),
+    )
+    assert reasons == ["compose_version_unsupported"]
+
+
 def test_classify_void_reasons_empty_when_not_terminated():
     reasons = _classify_void_reasons(
         terminated_early=False,
@@ -644,3 +854,74 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
         .read_text(encoding="utf-8")
         .startswith("#!/usr/bin/env bun")
     )
+
+
+def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
+    tmp_path: Path, monkeypatch
+):
+    monkeypatch.setenv("HARBOR_SMOKE_FAST", "1")
+    monkeypatch.setenv("HARBOR_SMOKE_FAST_REUSE_IMAGE", "1")
+
+    workspace = tmp_path / "workspace"
+    task_dir = tmp_path / "task"
+    results_dir = tmp_path / "results"
+    workspace.mkdir(parents=True, exist_ok=True)
+    task_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    (workspace / "package.json").write_text("{}")
+    (workspace / "bun.lock").write_text("")
+    (workspace / "src").mkdir(parents=True, exist_ok=True)
+    (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
+    (task_dir / "task.yaml").write_text("name: hello-world-smoke\n")
+
+    task = TaskDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "description": "test task",
+            "difficulty": "easy",
+            "category": "greenfield-ui",
+            "timeout_sec": 1800,
+            "scaffold": {
+                "template": "next-shadcn-starter",
+                "version": "v2025.01",
+                "rules_variant": "strict",
+            },
+            "verification": {"gates": [], "required_commands": []},
+            "compliance": {},
+            "prompt": "Print hello world",
+        }
+    )
+    request = RunRequest(
+        task=task,
+        config=_sample_harness_config(),
+        scaffold_root=tmp_path / "scaffolds",
+        task_dir=task_dir,
+        workspace_dir=workspace,
+        results_dir=results_dir,
+    )
+    scaffold_source = ScaffoldSource(
+        template="next-shadcn-starter",
+        version="v2025.01",
+        path=workspace,
+        manifest=generate_manifest(
+            workspace, template_name="next-shadcn-starter", template_version="v2025.01"
+        ),
+    )
+    context = ScaffoldContext(
+        scaffold_source=scaffold_source,
+        workspace=workspace,
+        injected_rules=None,
+        manifest_path=workspace / "scaffold.manifest.json",
+        baseline_manifest_path=workspace / ".baseline-scaffold.json",
+        metadata_path=workspace / ".scaffold-meta.json",
+    )
+
+    bundle = create_harbor_task_bundle(request, context, run_id="run1234")
+    task_toml = (bundle / "task.toml").read_text()
+    dockerfile = (bundle / "environment" / "Dockerfile").read_text()
+
+    assert 'docker_image = "ts-ui-eval-smoke-fast:hello-world-smoke-' in task_toml
+    assert "@openai/codex" in dockerfile
+    assert "@anthropic-ai/claude-code" not in dockerfile
+    assert "@google/gemini-cli" not in dockerfile

@@ -9,11 +9,7 @@ from .base import HarnessAdapter
 class HarborHarnessAdapter(HarnessAdapter):
     """Adapter that simply proxies to Harbor with minimal validation."""
 
-    provider_constraints: dict[Agent, set[str]] = {
-        Agent.CLAUDE_CODE: {"anthropic"},
-        Agent.GEMINI: {"google", "vertex"},
-        Agent.OPENHANDS: {"openhands"},
-    }
+    provider_constraints: dict[Agent, set[str]] = {}
 
     def validate(self) -> None:  # noqa: D401
         allowed = self.provider_constraints.get(self.config.agent)

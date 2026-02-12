@@ -13,6 +13,8 @@ REPEAT_PARALLEL="${REPEAT_PARALLEL:-1}"
 RETRY_VOID="${RETRY_VOID:-1}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-300}"
 
+"$ROOT_DIR/scripts/cleanup-stale-harbor.sh" || true
+
 if [[ -f "$ORCH_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -20,8 +22,8 @@ if [[ -f "$ORCH_DIR/.env" ]]; then
   set +a
 fi
 
-if [[ -z "${OPENAI_API_KEY:-}" && -z "${CODEX_API_KEY:-}" ]]; then
-  echo "Missing API key. Set OPENAI_API_KEY or CODEX_API_KEY (or place one in orchestrator/.env)."
+if [[ -z "${OPENAI_API_KEY:-}" ]]; then
+  echo "Missing API key. Set OPENAI_API_KEY (or place it in orchestrator/.env)."
   exit 1
 fi
 

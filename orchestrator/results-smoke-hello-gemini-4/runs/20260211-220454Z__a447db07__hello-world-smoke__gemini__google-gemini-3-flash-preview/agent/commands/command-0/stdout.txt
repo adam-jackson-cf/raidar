@@ -1,0 +1,12 @@
+bash: cannot set terminal process group (-1): Inappropriate ioctl for device
+bash: no job control in this shell
+YOLO mode is enabled. All tool calls will be automatically approved.
+YOLO mode is enabled. All tool calls will be automatically approved.
+Hook registry initialized with 0 hook entries
+I will read the contents of `src/app/page.tsx` to prepare for the replacement.
+I will update `src/app/page.tsx` to replace the placeholder content with the required text.
+I will check `package.json` for available scripts to verify the changes.
+I will run the `typecheck` script to ensure that the project still compiles correctly.
+pgrep: bash: line 1: pgrep: command not found
+I will verify the content of `src/app/page.tsx` one last time.
+The minimal smoke-task implementation is complete. `src/app/page.tsx` has been updated with the text "Harbor smoke test ready" and verified to be valid TSX.
