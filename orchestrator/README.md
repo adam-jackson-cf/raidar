@@ -6,6 +6,7 @@ Agentic evaluation system orchestrator for testing model/harness combinations on
 
 - [uv](https://github.com/astral-sh/uv) for Python dependency management
 - Docker Desktop (or another Docker runtime) so Harbor can launch Terminal-Bench containers
+- Docker Compose `>= 2.40.1` (required for stable Harbor environment builds)
 - Harbor CLI (installed automatically by the setup script)
 
 ## Setup
@@ -67,6 +68,24 @@ For baseline generation, run suites sequentially per model and sequentially per 
 REPEATS=5 REPEAT_PARALLEL=1 RETRY_VOID=1 TIMEOUT_SEC=300 ./scripts/run-codex-baselines.sh
 ```
 
+Provider smoke run (single end-to-end Harbor integration check):
+
+```bash
+./scripts/run-provider-smoke.sh --agent gemini --model google/gemini-3-flash-preview
+./scripts/run-provider-smoke.sh --agent claude-code --model anthropic/claude-haiku-4-5
+./scripts/run-provider-smoke.sh --agent codex-cli --model codex/gpt-5.2-high
+```
+
+The smoke runner uses `tasks/hello-world-smoke/task.yaml`, which is intentionally lightweight and suitable for validating harness/provider wiring before running heavier benchmark tasks.
+
+Use `--fast` to enable custom no-setup Harbor agents plus prebuilt image reuse:
+
+```bash
+./scripts/run-provider-smoke.sh --fast --agent gemini --model google/gemini-3-flash-preview
+```
+
+`run-provider-smoke.sh` defaults to `--rules none` for quick integration checks.
+
 Void-result policy:
 
 - Runs are marked `voided=true` when Harbor/harness/provider issues are detected (for example Harbor timeout, provider rate limit, stream disconnect, or Harbor runtime failure).
@@ -74,24 +93,27 @@ Void-result policy:
 - `--retry-void` accepts `0` or `1`; when set to `1`, each voided run gets at most one retry attempt.
 - Suite summaries include `void_count`, `repeat_required_count`, retry usage, and whether target scored runs were reached.
 
-> **Note:** Harbor requires Docker to be running; if it is missing, the orchestrator will terminate early with `Harbor not installed`.
+> **Note:** Harbor requires Docker to be running; if it is missing, the orchestrator will terminate early with `Harbor not installed`. The orchestrator also hard-fails preflight when Docker Compose is below `2.40.1`.
 
 ## Secrets via `.env`
 
-The CLI automatically loads environment variables from `orchestrator/.env` (if present) before executing any commands. Create this file locally (it is ignored by git) and define the agent-specific credentials you need, for example:
+The CLI automatically loads environment variables from `orchestrator/.env` (if present) before executing any commands. Start by copying `orchestrator/.env.example` to `orchestrator/.env` (it is ignored by git), then fill only the credentials you need:
 
 ```
-# orchestrator/.env
-OPENAI_API_KEY=sk-live-...
-CODEX_API_KEY=
-CURSOR_API_KEY=
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+CLAUDE_CODE_API_KEY=
+GEMINI_API_KEY=
 COPILOT_API_KEY=
-PI_API_TOKEN=
 ```
 
 Only populate the entries you use. Values in your shell environment still take precedence if you need to override something temporarily.
 
-For Harbor `codex` agent runs, an API key is required in-container. The orchestrator accepts either `OPENAI_API_KEY` or `CODEX_API_KEY` and forwards it to Harbor as `OPENAI_API_KEY`.
+For Harbor `codex` agent runs, an API key is required in-container via `OPENAI_API_KEY`.
+For Harbor `claude-code` agent runs, the orchestrator accepts either `ANTHROPIC_API_KEY` or `CLAUDE_CODE_API_KEY` and forwards it as `ANTHROPIC_API_KEY`.
+For Harbor `gemini` agent runs with `google/*` models, provide `GEMINI_API_KEY`, with supported model ids:
+- `google/gemini-3-pro-preview`
+- `google/gemini-3-flash-preview`
 
 Model aliases are supported for Codex tiers:
 - `codex/gpt-5.2-low` -> `codex/gpt-5.2-codex` with `reasoning_effort=low`

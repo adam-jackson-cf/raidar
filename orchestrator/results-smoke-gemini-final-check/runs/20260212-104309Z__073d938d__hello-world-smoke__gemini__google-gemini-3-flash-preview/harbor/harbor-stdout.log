@@ -1,0 +1,16 @@
+  1/1 Mean: 1.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:00:53 0:00:00Results written to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-073d938d/result.json
+        fast-gemini-cli (gemini-3-flash-preview) on adhoc         
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                                    ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Agent               │ fast-gemini-cli (gemini-3-flash-preview) │
+│ Dataset             │ adhoc                                    │
+│ Trials              │ 1                                        │
+│ Errors              │ 0                                        │
+│                     │                                          │
+│ Mean                │ 1.000                                    │
+│                     │                                          │
+│ Reward Distribution │                                          │
+│   reward = 1.0      │ 1                                        │
+└─────────────────────┴──────────────────────────────────────────┘
+

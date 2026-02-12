@@ -42,6 +42,10 @@ class HarnessAdapter:
         """Return the Harbor agent identifier."""
         return self.config.agent.value
 
+    def harbor_agent_import_path(self) -> str | None:
+        """Optional Harbor import path for custom repository-local agents."""
+        return None
+
     def model_argument(self) -> str:
         """Render the model argument passed to Harbor."""
         return self.config.model.qualified_name
@@ -72,12 +76,16 @@ class HarnessAdapter:
         if jobs_dir is not None:
             cmd.extend(["--jobs-dir", str(jobs_dir)])
 
+        import_path = self.harbor_agent_import_path()
+        if import_path:
+            cmd.extend(["--agent-import-path", import_path])
+        else:
+            cmd.extend(["-a", self.harbor_agent()])
+
         cmd.extend(
             [
                 "--n-concurrent",
                 "1",
-                "-a",
-                self.harbor_agent(),
                 "-m",
                 self.model_argument(),
                 *self.extra_harbor_args(),

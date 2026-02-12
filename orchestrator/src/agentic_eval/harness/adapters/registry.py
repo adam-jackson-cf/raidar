@@ -6,10 +6,11 @@ from collections.abc import Callable
 
 from ..config import Agent, HarnessConfig
 from .base import HarnessAdapter
+from .claude_code_cli import ClaudeCodeCliAdapter
 from .codex_cli import CodexCliAdapter
 from .copilot_cli import CopilotCliAdapter
 from .cursor_cli import CursorCliAdapter
-from .default import HarborHarnessAdapter
+from .gemini_cli import GeminiCliAdapter
 from .pi_cli import PiCliAdapter
 
 AdapterFactory = Callable[[HarnessConfig], HarnessAdapter]
@@ -34,10 +35,9 @@ registry = AdapterRegistry()
 
 
 # Default registrations for existing Harbor-native harnesses
-registry.register(Agent.CLAUDE_CODE, lambda cfg: HarborHarnessAdapter(cfg))
+registry.register(Agent.CLAUDE_CODE, lambda cfg: ClaudeCodeCliAdapter(cfg))
 registry.register(Agent.CODEX_CLI, lambda cfg: CodexCliAdapter(cfg))
-registry.register(Agent.GEMINI, lambda cfg: HarborHarnessAdapter(cfg))
-registry.register(Agent.OPENHANDS, lambda cfg: HarborHarnessAdapter(cfg))
+registry.register(Agent.GEMINI, lambda cfg: GeminiCliAdapter(cfg))
 # External CLI harnesses
 registry.register(Agent.CURSOR, lambda cfg: CursorCliAdapter(cfg))
 registry.register(Agent.COPILOT, lambda cfg: CopilotCliAdapter(cfg))

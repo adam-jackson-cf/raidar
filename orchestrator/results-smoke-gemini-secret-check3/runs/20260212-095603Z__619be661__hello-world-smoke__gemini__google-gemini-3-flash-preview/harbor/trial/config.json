@@ -1,0 +1,39 @@
+{
+    "task": {
+        "path": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-gemini-secret-check3-repeat-01/harbor-task-hello-world-smoke-619be661",
+        "git_url": null,
+        "git_commit_id": null,
+        "overwrite": false,
+        "download_dir": null,
+        "source": null
+    },
+    "trial_name": "harbor-task-hello-world-smoke-61__6TirZ7Y",
+    "trials_dir": "/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-619be661",
+    "timeout_multiplier": 1.0,
+    "agent": {
+        "name": null,
+        "import_path": "agentic_eval.harness.harbor_agents.fast_cli_agents:FastGeminiCliAgent",
+        "model_name": "google/gemini-3-flash-preview",
+        "override_timeout_sec": null,
+        "override_setup_timeout_sec": null,
+        "max_timeout_sec": null,
+        "kwargs": {}
+    },
+    "environment": {
+        "type": "docker",
+        "import_path": null,
+        "force_build": false,
+        "delete": true,
+        "override_cpus": null,
+        "override_memory_mb": null,
+        "override_storage_mb": null,
+        "override_gpus": null,
+        "kwargs": {}
+    },
+    "verifier": {
+        "override_timeout_sec": null,
+        "max_timeout_sec": null,
+        "disable": false
+    },
+    "job_id": "5d342c87-4aa8-46f3-be6b-f1f70def2cec"
+}

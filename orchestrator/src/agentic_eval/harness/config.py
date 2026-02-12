@@ -12,7 +12,6 @@ class Agent(str, Enum):
     CLAUDE_CODE = "claude-code"
     CODEX_CLI = "codex-cli"
     GEMINI = "gemini"
-    OPENHANDS = "openhands"
     CURSOR = "cursor"
     COPILOT = "copilot"
     PI = "pi"

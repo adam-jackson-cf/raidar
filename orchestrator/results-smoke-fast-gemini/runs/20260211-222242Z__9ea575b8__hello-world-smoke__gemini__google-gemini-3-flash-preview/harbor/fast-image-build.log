@@ -1,0 +1,48 @@
+
+#0 building with "desktop-linux" instance using docker driver
+
+#1 [internal] load build definition from Dockerfile
+#1 transferring dockerfile: 249B done
+#1 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1
+#2 ...
+
+#3 [auth] oven/bun:pull token for registry-1.docker.io
+#3 DONE 0.0s
+
+#2 [internal] load metadata for docker.io/oven/bun:1
+#2 DONE 3.7s
+
+#4 [internal] load .dockerignore
+#4 transferring context: 2B done
+#4 DONE 0.0s
+
+#5 [internal] load build context
+#5 transferring context: 3.86kB done
+#5 DONE 0.0s
+
+#6 [1/6] FROM docker.io/oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521
+#6 resolve docker.io/oven/bun:1@sha256:856da45d07aeb62eb38ea3e7f9e1794c0143a4ff63efb00e6c4491b627e2a521 done
+#6 DONE 0.0s
+
+#7 [2/6] WORKDIR /app
+#7 CACHED
+
+#8 [3/6] RUN npm install -g   @openai/codex   @anthropic-ai/claude-code   @google/gemini-cli
+#8 0.129 /bin/sh: 1: npm: not found
+#8 ERROR: process "/bin/sh -c npm install -g   @openai/codex   @anthropic-ai/claude-code   @google/gemini-cli" did not complete successfully: exit code: 127
+------
+ > [3/6] RUN npm install -g   @openai/codex   @anthropic-ai/claude-code   @google/gemini-cli:
+0.129 /bin/sh: 1: npm: not found
+------
+Dockerfile:3
+--------------------
+   2 |     WORKDIR /app
+   3 | >>> RUN npm install -g \
+   4 | >>>   @openai/codex \
+   5 | >>>   @anthropic-ai/claude-code \
+   6 | >>>   @google/gemini-cli
+   7 |     COPY app/package.json app/bun.lock /app/
+--------------------
+ERROR: failed to build: failed to solve: process "/bin/sh -c npm install -g   @openai/codex   @anthropic-ai/claude-code   @google/gemini-cli" did not complete successfully: exit code: 127

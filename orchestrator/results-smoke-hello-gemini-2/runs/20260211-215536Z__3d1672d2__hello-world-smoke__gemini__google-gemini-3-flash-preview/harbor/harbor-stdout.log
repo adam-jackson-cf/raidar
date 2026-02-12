@@ -1,0 +1,20 @@
+Error converting Gemini trajectory to ATIF: 1 validation error for Step
+message
+  Input should be a valid string [type=string_type, input_value=[{'text': 'Perform a mini...n `/app/AGENTS.md`.\n'}], input_type=list]
+    For further information visit https://errors.pydantic.dev/2.12/v/string_type
+  1/1 Mean: 1.000 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 0:03:06 0:00:00Results written to /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs/orchestrator-3d1672d2/result.json
+        gemini-cli (gemini-3-flash-preview) on adhoc         
+┏━━━━━━━━━━━━━━━━━━━━━┳━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┓
+┃ Metric              ┃ Value                               ┃
+┡━━━━━━━━━━━━━━━━━━━━━╇━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━┩
+│ Agent               │ gemini-cli (gemini-3-flash-preview) │
+│ Dataset             │ adhoc                               │
+│ Trials              │ 1                                   │
+│ Errors              │ 0                                   │
+│                     │                                     │
+│ Mean                │ 1.000                               │
+│                     │                                     │
+│ Reward Distribution │                                     │
+│   reward = 1.0      │ 1                                   │
+└─────────────────────┴─────────────────────────────────────┘
+

@@ -1,0 +1,17 @@
+{
+  "task_name": "hello-world-smoke",
+  "scaffold_fingerprint": "94ee262fb3b0089a5a55e835020362cceac5a5dbafbacd6d00ccb3d0e20b3c4a",
+  "validated_at": "2026-02-12T09:39:22.818535+00:00",
+  "required_commands": [
+    [
+      "bun",
+      "run",
+      "typecheck"
+    ],
+    [
+      "bun",
+      "run",
+      "lint"
+    ]
+  ]
+}

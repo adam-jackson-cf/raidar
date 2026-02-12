@@ -15,7 +15,7 @@ from .repeat_suite import (
     persist_repeat_suite,
     repeat_workspace,
 )
-from .runner import RunRequest, load_task, run_task
+from .runner import RunRequest, cleanup_stale_harbor_resources, load_task, run_task
 from .schemas.scorecard import EvalRun
 
 ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
@@ -31,6 +31,10 @@ def main() -> None:
 
 
 AGENT_CHOICES = [agent.value for agent in Agent]
+
+
+def _cleanup_stale_harbor_before_runs() -> None:
+    cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
 
 
 def _summary_result_path(run: EvalRun) -> Path:
@@ -243,6 +247,7 @@ def run(
     retry_void: int,
 ) -> None:
     """Run a task with specified harness and model."""
+    _cleanup_stale_harbor_before_runs()
     task = task.resolve()
     scaffolds_root = scaffolds_root.resolve()
     workspace = workspace.resolve()
@@ -448,6 +453,7 @@ def matrix(
     task: tuple[Path, ...], config: Path, scaffolds_root: Path, parallel: int, dry_run: bool
 ) -> None:
     """Run evaluation matrix from configuration."""
+    _cleanup_stale_harbor_before_runs()
     from .comparison.matrix_runner import MatrixRunner
     from .matrix import MatrixEntry, generate_matrix_entries, load_matrix_config
 

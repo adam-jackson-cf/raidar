@@ -1,0 +1,38 @@
+name: hello-world-smoke
+description: Minimal end-to-end Harbor orchestration smoke task
+difficulty: easy
+category: harness-integration
+timeout_sec: 300
+
+scaffold:
+  template: next-shadcn-starter
+  version: v2025.01
+  rules_variant: strict
+
+verification:
+  max_gate_failures: 1
+  min_quality_score: 0.0
+  required_commands:
+    - ["bun", "run", "typecheck"]
+    - ["bun", "run", "lint"]
+
+compliance:
+  deterministic_checks:
+    - type: import_present
+      pattern: Harbor smoke test ready
+      description: Smoke marker text exists in source
+    - type: no_pattern
+      pattern: Homepage placeholder - implement the design
+      description: Scaffold placeholder text is removed
+
+prompt: |
+  Perform a minimal smoke-task implementation to validate Harbor orchestration end-to-end.
+
+  Requirements:
+  1. Edit `src/app/page.tsx`.
+  2. Replace the scaffold placeholder content with the exact text: `Harbor smoke test ready`.
+  3. Keep the file valid TSX.
+  4. Run `bun run typecheck` and `bun run lint`.
+
+  Do not make unrelated changes.
+  Only report completion after the requested edit is complete.

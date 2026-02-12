@@ -568,15 +568,6 @@ def parse_pi_session(session_dir: Path) -> list[SessionEvent]:
     )
 
 
-def parse_openhands_session(session_dir: Path) -> list[SessionEvent]:
-    """Parse OpenHands harness session logs."""
-    return _parse_structured_cli_session(
-        session_dir,
-        patterns=("*.jsonl", "*.json"),
-        default_role="openhands",
-    )
-
-
 def parse_session(
     session_dir: Path,
     harness: Literal[
@@ -586,7 +577,6 @@ def parse_session(
         "cursor",
         "copilot",
         "pi",
-        "openhands",
     ],
 ) -> list[SessionEvent]:
     """Parse session logs for the specified harness.
@@ -610,8 +600,6 @@ def parse_session(
         return parse_copilot_session(session_dir)
     elif harness == "pi":
         return parse_pi_session(session_dir)
-    elif harness == "openhands":
-        return parse_openhands_session(session_dir)
     else:
         # Other harnesses may need custom parsers
         return []
