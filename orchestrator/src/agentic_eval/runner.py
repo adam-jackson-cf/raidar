@@ -930,18 +930,23 @@ def _ensure_fast_task_image(
         )
 
 
-def create_harbor_task_bundle(request: RunRequest, context: ScaffoldContext, run_id: str) -> Path:
-    """Build a Harbor-compatible task directory from the scaffold workspace."""
-    bundle_dir = context.workspace / f"harbor-task-{_slug_fragment(request.task.name)}-{run_id}"
+def _initialize_harbor_bundle_paths(
+    workspace: Path, task_name: str, run_id: str
+) -> tuple[Path, Path, Path, Path]:
+    bundle_dir = workspace / f"harbor-task-{_slug_fragment(task_name)}-{run_id}"
     if bundle_dir.exists():
         shutil.rmtree(bundle_dir)
-
     environment_dir = bundle_dir / "environment"
     app_dir = environment_dir / "app"
     tests_dir = bundle_dir / "tests"
     environment_dir.mkdir(parents=True, exist_ok=True)
     tests_dir.mkdir(parents=True, exist_ok=True)
+    return bundle_dir, environment_dir, app_dir, tests_dir
 
+
+def _copy_workspace_into_bundle(
+    request: RunRequest, context: ScaffoldContext, app_dir: Path
+) -> None:
     shutil.copytree(
         context.workspace,
         app_dir,
@@ -956,23 +961,25 @@ def create_harbor_task_bundle(request: RunRequest, context: ScaffoldContext, run
             "diff.png",
         ),
     )
-    if request.task.visual:
-        reference_path = Path(request.task.visual.reference_image)
-        if not reference_path.is_absolute():
-            source_reference = (request.task_dir / reference_path).resolve()
-            if source_reference.exists():
-                target_reference = app_dir / reference_path
-                target_reference.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source_reference, target_reference)
+    if not request.task.visual:
+        return
+    reference_path = Path(request.task.visual.reference_image)
+    if reference_path.is_absolute():
+        return
+    source_reference = (request.task_dir / reference_path).resolve()
+    if not source_reference.exists():
+        return
+    target_reference = app_dir / reference_path
+    target_reference.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source_reference, target_reference)
 
-    instruction = (
-        request.task.prompt.strip()
-        + "\n\nYou are working in `/app`.\nFollow rules in `/app/AGENTS.md`.\n"
-    )
-    (bundle_dir / "instruction.md").write_text(instruction)
-    task_image = _fast_task_docker_image(request, context)
-    (bundle_dir / "task.toml").write_text(
-        f"""version = "1.0"
+
+def _bundle_instruction_text(prompt: str) -> str:
+    return prompt.strip() + "\n\nYou are working in `/app`.\nFollow rules in `/app/AGENTS.md`.\n"
+
+
+def _render_task_toml(request: RunRequest, task_image: str | None) -> str:
+    return f"""version = "1.0"
 
 [metadata]
 name = "{request.task.name}"
@@ -987,7 +994,9 @@ timeout_sec = {float(request.config.timeout_sec)}
 [environment]
 {_task_environment_toml(task_image)}
 """
-    )
+
+
+def _render_environment_dockerfile(request: RunRequest) -> str:
     dockerfile = """FROM oven/bun:1
 WORKDIR /app
 """
@@ -1024,8 +1033,12 @@ COPY app/ /app/
   && rm -rf /var/lib/apt/lists/*
 RUN bunx playwright install chromium
 """
-    _validate_public_base_images(dockerfile)
-    (environment_dir / "Dockerfile").write_text(dockerfile)
+    return dockerfile
+
+
+def _write_verifier_artifacts(
+    request: RunRequest, context: ScaffoldContext, tests_dir: Path
+) -> None:
     (tests_dir / "task-spec.json").write_text(
         json.dumps(_build_verifier_task_spec(request, context), indent=2)
     )
@@ -1060,6 +1073,23 @@ tar \
 """
     )
     test_script.chmod(0o755)
+
+
+def create_harbor_task_bundle(request: RunRequest, context: ScaffoldContext, run_id: str) -> Path:
+    """Build a Harbor-compatible task directory from the scaffold workspace."""
+    bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(
+        context.workspace, request.task.name, run_id
+    )
+    _copy_workspace_into_bundle(request, context, app_dir)
+    (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(request.task.prompt))
+
+    task_image = _fast_task_docker_image(request, context)
+    (bundle_dir / "task.toml").write_text(_render_task_toml(request, task_image))
+
+    dockerfile = _render_environment_dockerfile(request)
+    _validate_public_base_images(dockerfile)
+    (environment_dir / "Dockerfile").write_text(dockerfile)
+    _write_verifier_artifacts(request, context, tests_dir)
     return bundle_dir
 
 
@@ -2712,6 +2742,112 @@ def _classify_void_reasons(terminated_early: bool, termination_reason: str | Non
     return list(dict.fromkeys(reasons))
 
 
+def _normalized_scaffold_audit(
+    scaffold_audit: ScaffoldAudit | None, scaffold_context: ScaffoldContext
+) -> ScaffoldAudit | None:
+    if not scaffold_audit:
+        return None
+    return scaffold_audit.model_copy(
+        update={
+            "template": scaffold_audit.template or scaffold_context.scaffold_source.template,
+            "template_version": scaffold_audit.template_version
+            or scaffold_context.scaffold_source.version,
+            "manifest_fingerprint": (
+                scaffold_audit.manifest_fingerprint
+                or scaffold_context.scaffold_source.manifest.fingerprint
+            ),
+        }
+    )
+
+
+def _scorecard_run_metadata(
+    layout: RunLayout, *, voided: bool, void_reasons: list[str]
+) -> dict[str, Any]:
+    return {
+        "instance_name": layout.instance_name,
+        "canonical_run_dir": str(layout.root_dir),
+        "summary_result_json": str(layout.result_json_path),
+        "summary_readme": str(layout.summary_readme_path),
+        "repeat_required": voided,
+        "repeat_required_reasons": void_reasons,
+    }
+
+
+def _scorecard_harbor_metadata(
+    execution: ExecutionPhaseResult, artifacts: PersistedArtifacts
+) -> dict[str, Any]:
+    harbor_timings = _harbor_phase_timings(execution.harbor_result.trial_dir)
+    trial_total_sec = harbor_timings.get("trial_total_sec")
+    harness_overhead_sec = (
+        round(max(0.0, execution.duration_sec - trial_total_sec), 3)
+        if trial_total_sec is not None
+        else None
+    )
+    trial_dir = (
+        str(execution.harbor_result.trial_dir) if execution.harbor_result.trial_dir else None
+    )
+    return {
+        "raw_job_dir": str(execution.harbor_result.job_dir),
+        "raw_trial_dir": trial_dir,
+        "job_dir": str(execution.harbor_result.job_dir),
+        "trial_dir": trial_dir,
+        "phase_timings_sec": harbor_timings,
+        "harness_overhead_sec": harness_overhead_sec,
+        "artifacts": artifacts.harbor_artifacts,
+    }
+
+
+def _scorecard_verifier_metadata(
+    execution: ExecutionPhaseResult, artifacts: PersistedArtifacts
+) -> dict[str, Any]:
+    verifier_scorecard_path = _verifier_scorecard_path(execution.harbor_result.trial_dir)
+    return {
+        "scorecard": str(verifier_scorecard_path) if verifier_scorecard_path else None,
+        "artifacts": artifacts.verifier_artifacts,
+    }
+
+
+def _scorecard_process_metadata(process_metrics: ProcessMetrics) -> dict[str, Any]:
+    return {
+        "uncached_input_tokens": process_metrics.uncached_input_tokens,
+        "output_tokens": process_metrics.output_tokens,
+        "command_count": process_metrics.command_count,
+        "failed_command_count": process_metrics.failed_command_count,
+        "verification_rounds": process_metrics.verification_rounds,
+        "repeated_verification_failures": process_metrics.repeated_verification_failures,
+        "required_verification_commands": process_metrics.required_verification_commands,
+        "executed_required_verification_commands": (
+            process_metrics.executed_required_verification_commands
+        ),
+        "failed_command_categories": process_metrics.failed_command_categories,
+        "required_verification_first_pass": process_metrics.required_verification_first_pass,
+        "first_pass_verification_successes": process_metrics.first_pass_verification_successes,
+        "first_pass_verification_failures": process_metrics.first_pass_verification_failures,
+        "missing_required_verification_commands": (
+            process_metrics.missing_required_verification_commands
+        ),
+    }
+
+
+def _scorecard_metadata(
+    *,
+    layout: RunLayout,
+    execution: ExecutionPhaseResult,
+    artifacts: PersistedArtifacts,
+    voided: bool,
+    void_reasons: list[str],
+) -> dict[str, Any]:
+    return {
+        "run": _scorecard_run_metadata(layout, voided=voided, void_reasons=void_reasons),
+        "scaffold": artifacts.scaffold_meta,
+        "task": artifacts.task_version_meta,
+        "harbor": _scorecard_harbor_metadata(execution, artifacts),
+        "agent": {"artifacts": artifacts.agent_artifacts},
+        "verifier": _scorecard_verifier_metadata(execution, artifacts),
+        "process": _scorecard_process_metadata(execution.process_metrics),
+    }
+
+
 def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     """Create scorecard with populated metrics and metadata."""
 
@@ -2722,17 +2858,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     execution = context.execution
     outputs = execution.outputs
 
-    scaffold_audit = outputs.scaffold_audit
-    if scaffold_audit:
-        scaffold_audit = scaffold_audit.model_copy(
-            update={
-                "template": scaffold_audit.template or scaffold_context.scaffold_source.template,
-                "template_version": scaffold_audit.template_version
-                or scaffold_context.scaffold_source.version,
-                "manifest_fingerprint": scaffold_audit.manifest_fingerprint
-                or scaffold_context.scaffold_source.manifest.fingerprint,
-            }
-        )
+    scaffold_audit = _normalized_scaffold_audit(outputs.scaffold_audit, scaffold_context)
 
     qualification = build_qualification_score(
         outputs=outputs,
@@ -2744,12 +2870,12 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     optimization = build_optimization_score(execution.process_metrics)
     void_reasons = _classify_void_reasons(execution.terminated_early, execution.termination_reason)
     voided = len(void_reasons) > 0
-    harbor_timings = _harbor_phase_timings(execution.harbor_result.trial_dir)
-    trial_total_sec = harbor_timings.get("trial_total_sec")
-    harness_overhead_sec = (
-        round(max(0.0, execution.duration_sec - trial_total_sec), 3)
-        if trial_total_sec is not None
-        else None
+    metadata = _scorecard_metadata(
+        layout=layout,
+        execution=execution,
+        artifacts=artifacts,
+        voided=voided,
+        void_reasons=void_reasons,
     )
 
     return Scorecard(
@@ -2771,75 +2897,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         requirements=outputs.requirements,
         qualification=qualification,
         optimization=optimization,
-        metadata={
-            "run": {
-                "instance_name": layout.instance_name,
-                "canonical_run_dir": str(layout.root_dir),
-                "summary_result_json": str(layout.result_json_path),
-                "summary_readme": str(layout.summary_readme_path),
-                "repeat_required": voided,
-                "repeat_required_reasons": void_reasons,
-            },
-            "scaffold": artifacts.scaffold_meta,
-            "task": artifacts.task_version_meta,
-            "harbor": {
-                "raw_job_dir": str(execution.harbor_result.job_dir),
-                "raw_trial_dir": (
-                    str(execution.harbor_result.trial_dir)
-                    if execution.harbor_result.trial_dir
-                    else None
-                ),
-                "job_dir": str(execution.harbor_result.job_dir),
-                "trial_dir": (
-                    str(execution.harbor_result.trial_dir)
-                    if execution.harbor_result.trial_dir
-                    else None
-                ),
-                "phase_timings_sec": harbor_timings,
-                "harness_overhead_sec": harness_overhead_sec,
-                "artifacts": artifacts.harbor_artifacts,
-            },
-            "agent": {
-                "artifacts": artifacts.agent_artifacts,
-            },
-            "verifier": {
-                "scorecard": (
-                    str(_verifier_scorecard_path(execution.harbor_result.trial_dir))
-                    if _verifier_scorecard_path(execution.harbor_result.trial_dir)
-                    else None
-                ),
-                "artifacts": artifacts.verifier_artifacts,
-            },
-            "process": {
-                "uncached_input_tokens": execution.process_metrics.uncached_input_tokens,
-                "output_tokens": execution.process_metrics.output_tokens,
-                "command_count": execution.process_metrics.command_count,
-                "failed_command_count": execution.process_metrics.failed_command_count,
-                "verification_rounds": execution.process_metrics.verification_rounds,
-                "repeated_verification_failures": (
-                    execution.process_metrics.repeated_verification_failures
-                ),
-                "required_verification_commands": (
-                    execution.process_metrics.required_verification_commands
-                ),
-                "executed_required_verification_commands": (
-                    execution.process_metrics.executed_required_verification_commands
-                ),
-                "failed_command_categories": execution.process_metrics.failed_command_categories,
-                "required_verification_first_pass": (
-                    execution.process_metrics.required_verification_first_pass
-                ),
-                "first_pass_verification_successes": (
-                    execution.process_metrics.first_pass_verification_successes
-                ),
-                "first_pass_verification_failures": (
-                    execution.process_metrics.first_pass_verification_failures
-                ),
-                "missing_required_verification_commands": (
-                    execution.process_metrics.missing_required_verification_commands
-                ),
-            },
-        },
+        metadata=metadata,
         scaffold_audit=scaffold_audit,
     )
 

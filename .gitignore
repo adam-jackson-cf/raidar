@@ -42,6 +42,10 @@ orchestrator/workspace/node_modules/
 orchestrator/workspace/actual.png
 orchestrator/workspace/diff.png
 orchestrator/workspace/tsconfig.tsbuildinfo
+orchestrator/results-*/
+orchestrator/workspace-*/
+orchestrator/results/*
+orchestrator/workspace/*
 
 # Screenshots
 actual.png

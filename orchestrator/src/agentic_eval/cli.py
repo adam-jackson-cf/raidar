@@ -1,7 +1,14 @@
 """CLI entrypoint for eval orchestrator."""
 
+from __future__ import annotations
+
 import concurrent.futures
 import json
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Literal
@@ -10,15 +17,39 @@ import click
 from dotenv import load_dotenv
 
 from .harness.config import Agent, HarnessConfig, ModelTarget
+from .harness.rules import SYSTEM_RULES, inject_rules
 from .repeat_suite import (
     create_repeat_suite_summary,
     persist_repeat_suite,
     repeat_workspace,
 )
-from .runner import RunRequest, cleanup_stale_harbor_resources, load_task, run_task
+from .runner import (
+    RunRequest,
+    _docker_compose_preflight_reason,
+    cleanup_stale_harbor_resources,
+    load_task,
+    run_task,
+)
 from .schemas.scorecard import EvalRun
+from .schemas.task import (
+    ComplianceConfig,
+    DeterministicCheck,
+    ScaffoldConfig,
+    TaskDefinition,
+    VerificationConfig,
+    VerificationGate,
+)
 
-ENV_PATH = Path(__file__).resolve().parents[2] / ".env"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
+ENV_PATH = ORCHESTRATOR_ROOT / ".env"
+RULE_VARIANTS = ("strict", "minimal", "none")
+ARTIFACT_CHANGE_PREFIXES = (
+    "orchestrator/results-",
+    "orchestrator/workspace-",
+    "orchestrator/results/",
+    "orchestrator/workspace/",
+)
 if ENV_PATH.exists():
     load_dotenv(ENV_PATH, override=False)
 
@@ -27,10 +58,41 @@ if ENV_PATH.exists():
 @click.version_option(version="0.1.0")
 def main() -> None:
     """Eval orchestrator for testing model/harness combinations."""
-    pass
 
 
 AGENT_CHOICES = [agent.value for agent in Agent]
+
+
+@dataclass(frozen=True, slots=True)
+class RunCliOptions:
+    """Normalized CLI options for task execution commands."""
+
+    task: Path
+    agent: str
+    model: str
+    rules: Literal["strict", "minimal", "none"]
+    scaffolds_root: Path
+    workspace: Path
+    output: Path
+    timeout: int
+    repeats: int
+    repeat_parallel: int
+    retry_void: int
+
+    def resolved(self) -> RunCliOptions:
+        return RunCliOptions(
+            task=self.task.resolve(),
+            agent=self.agent,
+            model=self.model,
+            rules=self.rules,
+            scaffolds_root=self.scaffolds_root.resolve(),
+            workspace=self.workspace.resolve(),
+            output=self.output.resolve(),
+            timeout=self.timeout,
+            repeats=self.repeats,
+            repeat_parallel=self.repeat_parallel,
+            retry_void=min(self.retry_void, 1),
+        )
 
 
 def _cleanup_stale_harbor_before_runs() -> None:
@@ -140,23 +202,214 @@ def _run_with_void_retries(
         )
         all_runs.extend(retry_runs)
         pending_batch = _count_voided(retry_runs)
-        next_repeat_index += len(retry_runs)
 
     return all_runs, retries_used, pending_batch
 
 
-def _run_repeat_requests(
-    *,
-    request: RunRequest,
-    repeats: int,
-    repeat_parallel: int,
-) -> list[EvalRun]:
-    return _execute_repeat_batch(
-        request=request,
-        batch_size=max(1, repeats),
-        repeat_parallel=repeat_parallel,
-        start_index=1,
+def _build_harness_config(options: RunCliOptions) -> HarnessConfig:
+    return HarnessConfig(
+        agent=Agent(options.agent),
+        model=ModelTarget.from_string(options.model),
+        rules_variant=options.rules,
+        timeout_sec=options.timeout,
     )
+
+
+def _build_run_request(options: RunCliOptions) -> RunRequest:
+    task_def = load_task(options.task)
+    config = _build_harness_config(options)
+    options.output.mkdir(parents=True, exist_ok=True)
+    return RunRequest(
+        task=task_def,
+        config=config,
+        scaffold_root=options.scaffolds_root,
+        task_dir=options.task.parent,
+        workspace_dir=options.workspace,
+        results_dir=options.output,
+    )
+
+
+def _echo_run_header(options: RunCliOptions, task_name: str) -> None:
+    click.echo(f"Loading task from {options.task}")
+    click.echo(f"Task: {task_name}")
+    click.echo(f"Agent: {options.agent}")
+    click.echo(f"Model: {options.model}")
+    click.echo(f"Rules variant: {options.rules}")
+    click.echo(f"Repeats: {options.repeats}")
+    click.echo(f"Repeat parallelism: {options.repeat_parallel}")
+    click.echo(f"Retry void budget: {options.retry_void}")
+
+
+def _echo_single_run_result(result: EvalRun) -> None:
+    run_meta = result.scores.metadata.get("run", {})
+    canonical_dir = run_meta.get("canonical_run_dir")
+    if isinstance(canonical_dir, str):
+        click.echo(f"Canonical run dir: {canonical_dir}")
+    result_path = _summary_result_path(result)
+    click.echo(f"Result saved to {result_path}")
+    click.echo(f"Run ID: {result.id}")
+    click.echo(f"Duration: {result.duration_sec:.1f}s")
+    click.echo(f"Terminated early: {result.terminated_early}")
+    click.echo(f"Void result: {result.scores.voided}")
+    if result.scores.voided:
+        click.echo(f"Void reasons: {result.scores.void_reasons}")
+    if result.termination_reason:
+        click.echo(f"Reason: {result.termination_reason}")
+
+
+def _echo_suite_result(
+    summary_path: Path, readme_path: Path, retries_used: int, runs: list[EvalRun]
+) -> None:
+    click.echo(f"Repeat suite summary: {summary_path}")
+    click.echo(f"Repeat suite readme: {readme_path}")
+    click.echo(f"Void retries used: {retries_used}")
+    for run in runs:
+        click.echo(
+            f"Run {run.id}: voided={run.scores.voided}, "
+            f"qualified={run.scores.qualification.passed}, "
+            f"composite={run.scores.composite_score:.3f}, duration={run.duration_sec:.1f}s"
+        )
+
+
+def _execute_run_options(options: RunCliOptions, *, force_suite_summary: bool) -> None:
+    resolved = options.resolved()
+    _cleanup_stale_harbor_before_runs()
+
+    request = _build_run_request(resolved)
+    _echo_run_header(resolved, request.task.name)
+
+    click.echo("Running task...")
+    started_at = datetime.now(UTC)
+    try:
+        runs, retries_used, unresolved_void = _run_with_void_retries(
+            request=request,
+            repeats=max(1, resolved.repeats),
+            repeat_parallel=resolved.repeat_parallel,
+            retry_void=resolved.retry_void,
+        )
+    except Exception as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    if resolved.repeats == 1 and not force_suite_summary:
+        _echo_single_run_result(runs[0])
+        return
+
+    suite_summary = create_repeat_suite_summary(
+        task_name=request.task.name,
+        harness=resolved.agent,
+        model=resolved.model,
+        rules_variant=resolved.rules,
+        repeats=resolved.repeats,
+        repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
+        runs=runs,
+        started_at=started_at,
+        retry_void_limit=resolved.retry_void,
+        retries_used=retries_used,
+        unresolved_void_count=unresolved_void,
+    )
+    summary_path, readme_path = persist_repeat_suite(resolved.output, suite_summary)
+    _echo_suite_result(summary_path, readme_path, retries_used, runs)
+
+
+def _repo_paths_from_git_cmd(args: list[str]) -> list[str]:
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise click.ClickException(result.stderr.strip() or f"Command failed: {' '.join(args)}")
+    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
+
+
+def _repo_name_status_from_git_cmd(args: list[str]) -> list[tuple[str, str]]:
+    result = subprocess.run(args, capture_output=True, text=True, check=False)
+    if result.returncode != 0:
+        raise click.ClickException(result.stderr.strip() or f"Command failed: {' '.join(args)}")
+    entries: list[tuple[str, str]] = []
+    for raw_line in result.stdout.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split("\t")
+        if len(parts) < 2:
+            continue
+        status = parts[0]
+        path = parts[-1]
+        entries.append((status, path))
+    return entries
+
+
+def _changed_repo_paths(repo_root: Path) -> list[str]:
+    staged = _repo_paths_from_git_cmd(
+        ["git", "-C", str(repo_root), "diff", "--name-only", "--cached"]
+    )
+    unstaged = _repo_paths_from_git_cmd(["git", "-C", str(repo_root), "diff", "--name-only"])
+    untracked = _repo_paths_from_git_cmd(
+        ["git", "-C", str(repo_root), "ls-files", "--others", "--exclude-standard"]
+    )
+    return sorted(set(staged + unstaged + untracked))
+
+
+def _generated_artifact_paths(paths: list[str]) -> list[str]:
+    return sorted(
+        path
+        for path in paths
+        if any(path.startswith(prefix) for prefix in ARTIFACT_CHANGE_PREFIXES)
+    )
+
+
+def _changed_repo_entries(repo_root: Path) -> list[tuple[str, str]]:
+    staged = _repo_name_status_from_git_cmd(
+        ["git", "-C", str(repo_root), "diff", "--name-status", "--cached"]
+    )
+    unstaged = _repo_name_status_from_git_cmd(
+        ["git", "-C", str(repo_root), "diff", "--name-status"]
+    )
+    untracked = [
+        (("??"), path)
+        for path in _repo_paths_from_git_cmd(
+            ["git", "-C", str(repo_root), "ls-files", "--others", "--exclude-standard"]
+        )
+    ]
+    seen: set[tuple[str, str]] = set()
+    deduped: list[tuple[str, str]] = []
+    for entry in staged + unstaged + untracked:
+        if entry in seen:
+            continue
+        seen.add(entry)
+        deduped.append(entry)
+    return deduped
+
+
+def _assert_no_generated_artifact_changes(repo_root: Path) -> None:
+    changed_entries = _changed_repo_entries(repo_root)
+    matches = [
+        path
+        for status, path in changed_entries
+        if not status.startswith("D")
+        and any(path.startswith(prefix) for prefix in ARTIFACT_CHANGE_PREFIXES)
+    ]
+    if not matches:
+        return
+    listed = "\n".join(f"- {path}" for path in matches)
+    raise click.ClickException(
+        "Generated Harbor artifacts must not be committed. Remove these changes:\n" + listed
+    )
+
+
+def _has_unstaged_changes(repo_root: Path) -> bool:
+    result = subprocess.run(
+        ["git", "-C", str(repo_root), "diff", "--quiet"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode != 0
+
+
+def _run_or_raise(cmd: list[str], cwd: Path) -> None:
+    rendered = " ".join(cmd)
+    click.echo(f"[exec] {rendered}")
+    result = subprocess.run(cmd, cwd=cwd, check=False)
+    if result.returncode != 0:
+        raise click.ClickException(f"Command failed ({result.returncode}): {rendered}")
 
 
 @main.command()
@@ -184,7 +437,7 @@ def _run_repeat_requests(
 @click.option(
     "--rules",
     "-r",
-    type=click.Choice(["strict", "minimal", "none"]),
+    type=click.Choice(list(RULE_VARIANTS)),
     default="strict",
     help="Rules variant to inject",
 )
@@ -247,99 +500,429 @@ def run(
     retry_void: int,
 ) -> None:
     """Run a task with specified harness and model."""
+    options = RunCliOptions(
+        task=task,
+        agent=agent,
+        model=model,
+        rules=rules,
+        scaffolds_root=scaffolds_root,
+        workspace=workspace,
+        output=output,
+        timeout=timeout,
+        repeats=repeats,
+        repeat_parallel=repeat_parallel,
+        retry_void=retry_void,
+    )
+    _execute_run_options(options, force_suite_summary=False)
+
+
+@main.group()
+def suite() -> None:
+    """Suite-level run workflows."""
+
+
+@suite.command("run")
+@click.option(
+    "--task",
+    "-t",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to task.yaml file",
+)
+@click.option(
+    "--agent",
+    "-a",
+    type=click.Choice(AGENT_CHOICES),
+    required=True,
+    help="Agent/harness to use",
+)
+@click.option(
+    "--model",
+    "-m",
+    type=str,
+    required=True,
+    help="Model in format provider/name",
+)
+@click.option(
+    "--rules",
+    "-r",
+    type=click.Choice(list(RULE_VARIANTS)),
+    default="strict",
+    help="Rules variant to inject",
+)
+@click.option(
+    "--scaffolds-root",
+    "-S",
+    type=click.Path(exists=True, path_type=Path),
+    default=Path("scaffolds"),
+    help="Root directory containing versioned scaffolds",
+)
+@click.option(
+    "--workspace",
+    "-w",
+    type=click.Path(path_type=Path),
+    default=Path("workspace"),
+    help="Path to create workspace",
+)
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(path_type=Path),
+    default=Path("results"),
+    help="Path to store results",
+)
+@click.option(
+    "--timeout",
+    type=int,
+    default=300,
+    help="Task timeout in seconds",
+)
+@click.option(
+    "--repeats",
+    type=click.IntRange(min=1),
+    default=5,
+    help="Number of repeated runs in the suite",
+)
+@click.option(
+    "--repeat-parallel",
+    type=click.IntRange(min=1),
+    default=1,
+    help="Parallel workers for repeat runs",
+)
+@click.option(
+    "--retry-void",
+    type=click.IntRange(min=0, max=1),
+    default=1,
+    help="Retry budget for voided runs (0 or 1)",
+)
+def suite_run(
+    task: Path,
+    agent: str,
+    model: str,
+    rules: Literal["strict", "minimal", "none"],
+    scaffolds_root: Path,
+    workspace: Path,
+    output: Path,
+    timeout: int,
+    repeats: int,
+    repeat_parallel: int,
+    retry_void: int,
+) -> None:
+    """Run repeat suites with deterministic aggregate output."""
+    options = RunCliOptions(
+        task=task,
+        agent=agent,
+        model=model,
+        rules=rules,
+        scaffolds_root=scaffolds_root,
+        workspace=workspace,
+        output=output,
+        timeout=timeout,
+        repeats=repeats,
+        repeat_parallel=repeat_parallel,
+        retry_void=retry_void,
+    )
+    _execute_run_options(options, force_suite_summary=True)
+
+
+@main.group()
+def quality() -> None:
+    """Quality gate commands."""
+
+
+@quality.command("gates")
+@click.option("--fix", is_flag=True, help="Apply auto-fixes where supported.")
+@click.option("--stage", is_flag=True, help="Stage tracked file updates after fixes.")
+def quality_gates(fix: bool, stage: bool) -> None:
+    """Run deterministic quality gates for orchestrator source."""
+    if stage and not fix:
+        raise click.ClickException("--stage is only supported together with --fix.")
+    if fix and _has_unstaged_changes(REPO_ROOT):
+        raise click.ClickException(
+            "Unstaged changes detected. Stage or stash before running --fix."
+        )
+
+    _assert_no_generated_artifact_changes(REPO_ROOT)
+
+    if shutil.which("lizard") is None:
+        raise click.ClickException("Missing required command: lizard")
+
+    if fix:
+        _run_or_raise(
+            [sys.executable, "-m", "ruff", "format", "--force-exclude"], ORCHESTRATOR_ROOT
+        )
+        _run_or_raise(
+            [sys.executable, "-m", "ruff", "check", ".", "--fix", "--force-exclude"],
+            ORCHESTRATOR_ROOT,
+        )
+    else:
+        _run_or_raise(
+            [sys.executable, "-m", "ruff", "format", "--check", "--force-exclude"],
+            ORCHESTRATOR_ROOT,
+        )
+        _run_or_raise(
+            [sys.executable, "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"],
+            ORCHESTRATOR_ROOT,
+        )
+
+    _run_or_raise(["lizard", "-C", "10", "-l", "python", "src"], ORCHESTRATOR_ROOT)
+    _run_or_raise([sys.executable, "-m", "pytest", "tests", "-x", "--tb=short"], ORCHESTRATOR_ROOT)
+
+    if stage:
+        _run_or_raise(["git", "-C", str(REPO_ROOT), "add", "-u"], REPO_ROOT)
+
+    click.echo("[quality-gates] Completed successfully")
+
+
+@main.group()
+def harbor() -> None:
+    """Harbor operational commands."""
+
+
+@harbor.command("cleanup")
+@click.option(
+    "--include-containers/--no-include-containers",
+    default=True,
+    help="Remove stale stopped Harbor containers.",
+)
+@click.option(
+    "--include-build-processes/--no-include-build-processes",
+    default=True,
+    help="Terminate stale orphan build processes.",
+)
+def harbor_cleanup(include_containers: bool, include_build_processes: bool) -> None:
+    """Cleanup stale Harbor processes and containers."""
+    cleanup_stale_harbor_resources(
+        include_containers=include_containers,
+        include_build_processes=include_build_processes,
+    )
+    click.echo("Harbor cleanup completed.")
+
+
+@main.group()
+def env() -> None:
+    """Environment setup and diagnostics."""
+
+
+@env.command("setup")
+@click.option(
+    "--install-tools/--no-install-tools",
+    default=True,
+    help="Install required toolchain components with uv.",
+)
+@click.option(
+    "--sync-arg",
+    multiple=True,
+    help="Additional argument to pass to `uv sync`.",
+)
+def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
+    """Setup local toolchain and run Harbor preflight checks."""
     _cleanup_stale_harbor_before_runs()
-    task = task.resolve()
-    scaffolds_root = scaffolds_root.resolve()
-    workspace = workspace.resolve()
-    output = output.resolve()
 
-    click.echo(f"Loading task from {task}")
-    task_def = load_task(task)
+    reason = _docker_compose_preflight_reason(dict(os.environ))
+    if reason:
+        raise click.ClickException(reason)
 
-    click.echo(f"Task: {task_def.name}")
-    click.echo(f"Agent: {agent}")
-    click.echo(f"Model: {model}")
-    click.echo(f"Rules variant: {rules}")
-    click.echo(f"Repeats: {repeats}")
-    click.echo(f"Repeat parallelism: {repeat_parallel}")
-    retry_void = min(retry_void, 1)
-    click.echo(f"Retry void budget: {retry_void}")
+    if install_tools:
+        _run_or_raise(["uv", "python", "install", "3.12"], ORCHESTRATOR_ROOT)
+        _run_or_raise(["uv", "sync", *sync_arg], ORCHESTRATOR_ROOT)
+        _run_or_raise(["uv", "tool", "install", "harbor"], ORCHESTRATOR_ROOT)
 
+    result = subprocess.run(["harbor", "--version"], capture_output=True, text=True, check=False)
+    if result.returncode == 0:
+        click.echo(result.stdout.strip())
+    click.echo("Environment setup completed.")
+
+
+@main.group()
+def provider() -> None:
+    """Provider and adapter workflows."""
+
+
+@provider.command("list")
+def provider_list() -> None:
+    """List supported provider CLI adapters and rule files."""
+    click.echo("Supported providers:")
+    for agent in AGENT_CHOICES:
+        click.echo(f"  {agent:12} -> {SYSTEM_RULES.get(agent, '(no rule mapping)')}")
+
+
+@provider.command("validate")
+@click.option(
+    "--agent",
+    "-a",
+    type=click.Choice(AGENT_CHOICES),
+    required=True,
+    help="Agent/harness to validate.",
+)
+@click.option(
+    "--model",
+    "-m",
+    type=str,
+    required=True,
+    help="Model in provider/name format.",
+)
+@click.option(
+    "--rules",
+    "-r",
+    type=click.Choice(list(RULE_VARIANTS)),
+    default="strict",
+    help="Rules variant for config validation.",
+)
+@click.option(
+    "--timeout",
+    type=int,
+    default=1800,
+    help="Timeout used to build harness config.",
+)
+def provider_validate(
+    agent: str,
+    model: str,
+    rules: Literal["strict", "minimal", "none"],
+    timeout: int,
+) -> None:
+    """Validate provider adapter wiring and environment requirements."""
     config = HarnessConfig(
         agent=Agent(agent),
         model=ModelTarget.from_string(model),
         rules_variant=rules,
         timeout_sec=timeout,
     )
+    adapter = config.adapter()
+    adapter.validate()
+    runtime_keys = sorted(adapter.runtime_env().keys())
 
-    output.mkdir(parents=True, exist_ok=True)
+    click.echo("Provider validation passed.")
+    click.echo(f"  agent: {agent}")
+    click.echo(f"  model: {model}")
+    click.echo(f"  harbor_agent: {adapter.harbor_agent()}")
+    click.echo(f"  model_argument: {adapter.model_argument()}")
+    click.echo(f"  runtime_env_keys: {', '.join(runtime_keys) if runtime_keys else '(none)'}")
 
-    request = RunRequest(
-        task=task_def,
-        config=config,
-        scaffold_root=scaffolds_root,
-        task_dir=task.parent,
-        workspace_dir=workspace,
-        results_dir=output,
+
+@main.group()
+def task() -> None:
+    """Task lifecycle commands."""
+
+
+@task.command("init")
+@click.option(
+    "--path",
+    "-p",
+    type=click.Path(path_type=Path),
+    required=True,
+    help="Directory to create the task in.",
+)
+@click.option("--name", type=str, help="Task name. Defaults to directory name.")
+@click.option(
+    "--template",
+    type=str,
+    default="next-shadcn-starter",
+    help="Scaffold template name.",
+)
+@click.option("--version", type=str, default="v2025.01", help="Scaffold version.")
+@click.option(
+    "--difficulty",
+    type=click.Choice(["easy", "medium", "hard"]),
+    default="medium",
+    help="Task difficulty.",
+)
+@click.option("--category", type=str, default="greenfield-ui", help="Task category.")
+@click.option("--timeout", type=int, default=1800, help="Task timeout in seconds.")
+def task_init(
+    path: Path,
+    name: str | None,
+    template: str,
+    version: str,
+    difficulty: Literal["easy", "medium", "hard"],
+    category: str,
+    timeout: int,
+) -> None:
+    """Create a new task descriptor and rule variants."""
+    task_dir = path.resolve()
+    task_name = name or task_dir.name
+
+    task_yaml = task_dir / "task.yaml"
+    if task_yaml.exists():
+        raise click.ClickException(f"Task already exists: {task_yaml}")
+
+    for variant in RULE_VARIANTS:
+        variant_dir = task_dir / "rules" / variant
+        variant_dir.mkdir(parents=True, exist_ok=True)
+
+    task_def = TaskDefinition(
+        name=task_name,
+        description=f"Task definition for {task_name}",
+        difficulty=difficulty,
+        category=category,
+        timeout_sec=timeout,
+        scaffold=ScaffoldConfig(template=template, version=version, rules_variant="strict"),
+        verification=VerificationConfig(
+            max_gate_failures=3,
+            min_quality_score=0.8,
+            required_commands=[
+                ["bun", "run", "typecheck"],
+                ["bun", "run", "lint"],
+            ],
+            gates=[
+                VerificationGate(name="typecheck", command=["bun", "run", "typecheck"]),
+                VerificationGate(name="lint", command=["bun", "run", "lint"]),
+            ],
+        ),
+        compliance=ComplianceConfig(
+            deterministic_checks=[
+                DeterministicCheck(
+                    type="no_pattern",
+                    pattern="TODO",
+                    description="No TODO markers remain in production files",
+                )
+            ]
+        ),
+        prompt=(
+            "Implement the requested feature in the scaffold application. "
+            "Run all required verification commands before completion and "
+            "report only after they pass."
+        ),
     )
-    click.echo("Running task...")
-    started_at = datetime.now(UTC)
-    try:
-        runs, retries_used, unresolved_void = _run_with_void_retries(
-            request=request,
-            repeats=max(1, repeats),
-            repeat_parallel=repeat_parallel,
-            retry_void=retry_void,
-        )
-    except Exception as exc:
-        raise click.ClickException(str(exc)) from exc
+    task_dir.mkdir(parents=True, exist_ok=True)
+    task_def.to_yaml(task_yaml)
 
-    if repeats == 1:
-        result = runs[0]
-        run_meta = result.scores.metadata.get("run", {})
-        canonical_dir = run_meta.get("canonical_run_dir")
-        if isinstance(canonical_dir, str):
-            click.echo(f"Canonical run dir: {canonical_dir}")
-        result_path = _summary_result_path(result)
-        click.echo(f"Result saved to {result_path}")
-        click.echo(f"Run ID: {result.id}")
-        click.echo(f"Duration: {result.duration_sec:.1f}s")
-        click.echo(f"Terminated early: {result.terminated_early}")
-        click.echo(f"Void result: {result.scores.voided}")
-        if result.scores.voided:
-            click.echo(f"Void reasons: {result.scores.void_reasons}")
-        if result.termination_reason:
-            click.echo(f"Reason: {result.termination_reason}")
-        return
-
-    suite_summary = create_repeat_suite_summary(
-        task_name=task_def.name,
-        harness=agent,
-        model=model,
-        rules_variant=rules,
-        repeats=repeats,
-        repeat_parallel=max(1, min(repeat_parallel, repeats)),
-        runs=runs,
-        started_at=started_at,
-        retry_void_limit=retry_void,
-        retries_used=retries_used,
-        unresolved_void_count=unresolved_void,
+    strict_text = (
+        "Follow the task prompt exactly. Run required verification commands before completion."
     )
-    summary_path, readme_path = persist_repeat_suite(output, suite_summary)
+    minimal_text = "Complete the task prompt and execute required verification commands."
+    none_text = "Complete the task prompt and return only when work is complete."
 
-    click.echo(f"Repeat suite summary: {summary_path}")
-    click.echo(f"Repeat suite readme: {readme_path}")
-    aggregate = suite_summary.get("aggregate", {})
-    repeat_required = int(aggregate.get("repeat_required_count", 0) or 0)
-    click.echo(f"Void retries used: {retries_used}")
-    if repeat_required > 0:
-        click.echo(f"Repeat required for {repeat_required} voided runs.")
-    for run in runs:
-        click.echo(
-            f"Run {run.id}: voided={run.scores.voided}, "
-            f"qualified={run.scores.qualification.passed}, "
-            f"composite={run.scores.composite_score:.3f}, duration={run.duration_sec:.1f}s"
-        )
+    for variant, content in (
+        ("strict", strict_text),
+        ("minimal", minimal_text),
+        ("none", none_text),
+    ):
+        variant_dir = task_dir / "rules" / variant
+        (variant_dir / "AGENTS.md").write_text(content + "\n")
+        (variant_dir / "CLAUDE.md").write_text(content + "\n")
+        (variant_dir / "GEMINI.md").write_text(content + "\n")
+
+    click.echo(f"Created task at {task_yaml}")
+
+
+@task.command("validate")
+@click.option(
+    "--task",
+    "-t",
+    type=click.Path(exists=True, path_type=Path),
+    required=True,
+    help="Path to task.yaml file.",
+)
+def task_validate(task: Path) -> None:
+    """Validate task schema and report key configuration fields."""
+    task_def = load_task(task.resolve())
+    click.echo("Task validation passed.")
+    click.echo(f"  name: {task_def.name}")
+    click.echo(f"  scaffold: {task_def.scaffold.template}@{task_def.scaffold.version}")
+    click.echo(f"  rules_variant: {task_def.scaffold.rules_variant}")
+    click.echo(f"  required_commands: {len(task_def.verification.required_commands)}")
+    click.echo(f"  gates: {len(task_def.verification.gates)}")
 
 
 @main.command()
@@ -386,7 +969,7 @@ def manifest(scaffold: Path, output: Path | None) -> None:
 @click.option(
     "--rules",
     "-r",
-    type=click.Choice(["strict", "minimal", "none"]),
+    type=click.Choice(list(RULE_VARIANTS)),
     default="strict",
     help="Rules variant to inject",
 )
@@ -404,8 +987,6 @@ def inject(
     scaffold: Path,
 ) -> None:
     """Inject rules into scaffold for testing."""
-    from .harness.rules import inject_rules
-
     click.echo(f"Injecting {rules} rules for {agent}")
     rules_dir = task / "rules"
     result = inject_rules(rules_dir, scaffold, agent, rules)
@@ -639,17 +1220,7 @@ def init_matrix() -> None:
     click.echo(f"Example matrix configuration created: {output_path}")
 
 
-@main.command()
-def list_agents() -> None:
-    """List supported agents and their rule files."""
-    from .harness.rules import SYSTEM_RULES
-
-    click.echo("Supported Agents:")
-    for agent, rule_file in SYSTEM_RULES.items():
-        click.echo(f"  {agent:15} -> {rule_file}")
-
-
-def _echo_task_summary(task_def) -> None:
+def _echo_task_summary(task_def: TaskDefinition) -> None:
     click.echo(f"Task: {task_def.name}")
     click.echo(f"Description: {task_def.description}")
     click.echo(f"Difficulty: {task_def.difficulty}")
@@ -667,14 +1238,14 @@ def _echo_rule_variants(task_dir: Path) -> None:
         return
     click.echo()
     click.echo("Rule Variants:")
-    for variant in ["strict", "minimal", "none"]:
+    for variant in RULE_VARIANTS:
         variant_dir = rules_dir / variant
         if variant_dir.exists():
             files = [f.name for f in variant_dir.iterdir() if f.is_file()]
             click.echo(f"  {variant}: {', '.join(files) or '(empty)'}")
 
 
-def _echo_visual_config(task_def) -> None:
+def _echo_visual_config(task_def: TaskDefinition) -> None:
     if not task_def.visual:
         return
     click.echo()
@@ -683,7 +1254,7 @@ def _echo_visual_config(task_def) -> None:
     click.echo(f"  Threshold: {task_def.visual.threshold}")
 
 
-def _echo_compliance_config(task_def) -> None:
+def _echo_compliance_config(task_def: TaskDefinition) -> None:
     if not (task_def.compliance.deterministic_checks or task_def.compliance.llm_judge_rubric):
         return
     click.echo()
@@ -704,8 +1275,6 @@ def _echo_compliance_config(task_def) -> None:
 )
 def info(task: Path) -> None:
     """Show task information and details."""
-    from .schemas.task import TaskDefinition
-
     task_yaml = task / "task.yaml"
     if not task_yaml.exists():
         click.echo(f"Error: task.yaml not found in {task}", err=True)

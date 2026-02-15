@@ -50,7 +50,7 @@ uv run eval-orchestrator run \
 Repeat-suite run (5 repeats, parallel workers):
 
 ```bash
-uv run eval-orchestrator run \
+uv run eval-orchestrator suite run \
   --task ../tasks/homepage-implementation/task.yaml \
   --agent codex-cli \
   --model codex/gpt-5.2-low \
@@ -60,6 +60,24 @@ uv run eval-orchestrator run \
   --repeats 5 \
   --repeat-parallel 5 \
   --retry-void 1
+```
+
+Quality gates:
+
+```bash
+uv run eval-orchestrator quality gates
+```
+
+Provider validation:
+
+```bash
+uv run eval-orchestrator provider validate --agent gemini --model google/gemini-3-flash-preview
+```
+
+Task scaffold creation:
+
+```bash
+uv run eval-orchestrator task init --path ../tasks/new-task --name new-task
 ```
 
 For baseline generation, run suites sequentially per model and sequentially per repeat:

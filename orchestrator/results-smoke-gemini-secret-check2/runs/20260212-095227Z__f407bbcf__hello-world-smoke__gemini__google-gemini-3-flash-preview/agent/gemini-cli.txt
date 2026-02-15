@@ -1,8 +1,0 @@
-YOLO mode is enabled. All tool calls will be automatically approved.
-YOLO mode is enabled. All tool calls will be automatically approved.
-Hook registry initialized with 0 hook entries
-I will read the current content of `src/app/page.tsx` to prepare for the smoke test implementation.
-I will update `src/app/page.tsx` to display "Harbor smoke test ready" as requested.
-I will now run the typecheck and linting commands to verify the changes.
-pgrep: bash: line 1: pgrep: command not found
-I have completed the smoke-task implementation. I updated `src/app/page.tsx` to display "Harbor smoke test ready" and verified the changes by running `bun run typecheck` and `bun run lint`, both of which passed successfully.

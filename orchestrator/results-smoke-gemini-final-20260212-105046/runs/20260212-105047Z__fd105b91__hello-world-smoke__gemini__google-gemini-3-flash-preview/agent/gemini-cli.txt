@@ -1,8 +1,0 @@
-YOLO mode is enabled. All tool calls will be automatically approved.
-YOLO mode is enabled. All tool calls will be automatically approved.
-Hook registry initialized with 0 hook entries
-I will read `src/app/page.tsx` to understand its current structure before making the requested changes.
-I will update `src/app/page.tsx` with the exact text requested, ensuring it remains a valid TSX component.
-I will now run the project's type-checking and linting commands to verify that the changes adhere to the codebase standards.
-pgrep: bash: line 1: pgrep: command not found
-The smoke-task implementation is complete; `src/app/page.tsx` now displays "Harbor smoke test ready," and both type-checking and linting passed successfully.

@@ -4,8 +4,6 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORCH_DIR="$ROOT_DIR/orchestrator"
 
-"$ROOT_DIR/scripts/cleanup-stale-harbor.sh" || true
-
 TASK_PATH="../tasks/hello-world-smoke/task.yaml"
 SCAFFOLDS_ROOT="../scaffolds"
 WORKSPACE="workspace-smoke"
@@ -145,6 +143,13 @@ if [[ "$FAST_MODE" == "1" ]]; then
 fi
 
 cd "$ORCH_DIR"
+uv run eval-orchestrator harbor cleanup
+
+uv run eval-orchestrator provider validate \
+  --agent "$AGENT" \
+  --model "$MODEL" \
+  --rules "$RULES" \
+  --timeout "$TIMEOUT_SEC"
 
 uv run eval-orchestrator run \
   --task "$TASK_PATH" \

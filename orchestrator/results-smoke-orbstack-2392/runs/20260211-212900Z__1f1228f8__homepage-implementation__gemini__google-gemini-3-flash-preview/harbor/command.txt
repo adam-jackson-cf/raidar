@@ -1,1 +1,0 @@
-harbor run --path /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-orbstack-2392-repeat-01/harbor-task-homepage-implementation-1f1228f8 --job-name orchestrator-1f1228f8 --jobs-dir /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs --n-concurrent 1 -a gemini-cli -m google/gemini-3-flash-preview
