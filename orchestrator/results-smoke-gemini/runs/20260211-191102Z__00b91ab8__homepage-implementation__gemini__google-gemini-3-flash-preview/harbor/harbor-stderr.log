@@ -1,8 +1,0 @@
-Usage: harbor run [OPTIONS]
-Try 'harbor run --help' for help.
-╭─ Error ──────────────────────────────────────────────────────────────────────╮
-│ Invalid value for '-a' / '--agent': 'gemini' is not one of 'oracle', 'nop',  │
-│ 'claude-code', 'cline-cli', 'terminus', 'terminus-1', 'terminus-2', 'aider', │
-│ 'codex', 'cursor-cli', 'gemini-cli', 'goose', 'mini-swe-agent', 'swe-agent', │
-│ 'opencode', 'openhands', 'qwen-coder'.                                       │
-╰──────────────────────────────────────────────────────────────────────────────╯

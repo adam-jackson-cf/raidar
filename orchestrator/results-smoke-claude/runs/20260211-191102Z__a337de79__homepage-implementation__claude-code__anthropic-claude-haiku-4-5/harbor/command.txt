@@ -1,1 +1,0 @@
-harbor run --path /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/workspace-smoke-claude-repeat-01/harbor-task-homepage-implementation-a337de79 --job-name orchestrator-a337de79 --jobs-dir /Users/adamjackson/Projects/typescript-ui-eval/orchestrator/jobs --n-concurrent 1 -a claude-code -m anthropic/claude-haiku-4-5

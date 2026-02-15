@@ -13,8 +13,6 @@ REPEAT_PARALLEL="${REPEAT_PARALLEL:-1}"
 RETRY_VOID="${RETRY_VOID:-1}"
 TIMEOUT_SEC="${TIMEOUT_SEC:-300}"
 
-"$ROOT_DIR/scripts/cleanup-stale-harbor.sh" || true
-
 if [[ -f "$ORCH_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -28,6 +26,8 @@ if [[ -z "${OPENAI_API_KEY:-}" ]]; then
 fi
 
 cd "$ORCH_DIR"
+uv run eval-orchestrator harbor cleanup
+uv run eval-orchestrator provider validate --agent "$AGENT" --model "codex/gpt-5.2-high"
 
 models=(
   "codex/gpt-5.2-low"
@@ -38,7 +38,7 @@ models=(
 for model in "${models[@]}"; do
   echo
   echo "Running baseline for $model (repeats=$REPEATS, parallel=$REPEAT_PARALLEL, retry_void=$RETRY_VOID, timeout=${TIMEOUT_SEC}s)"
-  uv run eval-orchestrator run \
+  uv run eval-orchestrator suite run \
     --task "$TASK_PATH" \
     --agent "$AGENT" \
     --model "$model" \
