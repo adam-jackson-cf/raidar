@@ -25,6 +25,7 @@ from .repeat_suite import (
 )
 from .runner import (
     RunRequest,
+    ScaffoldPreflightError,
     _docker_compose_preflight_reason,
     cleanup_stale_harbor_resources,
     load_task,
@@ -131,6 +132,47 @@ def _execute_run_request(run_request: RunRequest) -> EvalRun:
     return run
 
 
+def _execute_repeat_index(request: RunRequest, repeat_index: int) -> EvalRun:
+    try:
+        return _execute_run_request(_build_repeat_request(request, repeat_index))
+    except ScaffoldPreflightError:
+        raise
+    except Exception as exc:
+        raise click.ClickException(f"Repeat {repeat_index} failed: {exc}") from exc
+
+
+def _execute_repeat_batch_sequential(
+    *,
+    request: RunRequest,
+    batch_size: int,
+    start_index: int,
+) -> list[EvalRun]:
+    runs: list[EvalRun] = []
+    for offset in range(batch_size):
+        runs.append(_execute_repeat_index(request, start_index + offset))
+    return runs
+
+
+def _execute_repeat_batch_parallel(
+    *,
+    request: RunRequest,
+    batch_size: int,
+    repeat_parallel: int,
+    start_index: int,
+) -> list[EvalRun]:
+    resolved_parallel = max(1, min(repeat_parallel, batch_size))
+    by_index: dict[int, EvalRun] = {}
+    with concurrent.futures.ThreadPoolExecutor(max_workers=resolved_parallel) as executor:
+        future_map = {
+            executor.submit(_execute_repeat_index, request, start_index + offset): offset
+            for offset in range(batch_size)
+        }
+        for future in concurrent.futures.as_completed(future_map):
+            offset = future_map[future]
+            by_index[offset] = future.result()
+    return [by_index[idx] for idx in sorted(by_index)]
+
+
 def _execute_repeat_batch(
     *,
     request: RunRequest,
@@ -141,29 +183,17 @@ def _execute_repeat_batch(
     if batch_size <= 0:
         return []
     if repeat_parallel <= 1:
-        return [
-            _execute_run_request(_build_repeat_request(request, start_index + offset))
-            for offset in range(batch_size)
-        ]
-
-    resolved_parallel = max(1, min(repeat_parallel, batch_size))
-    by_index: dict[int, EvalRun] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=resolved_parallel) as executor:
-        future_map = {
-            executor.submit(
-                _execute_run_request,
-                _build_repeat_request(request, start_index + offset),
-            ): offset
-            for offset in range(batch_size)
-        }
-        for future in concurrent.futures.as_completed(future_map):
-            offset = future_map[future]
-            try:
-                by_index[offset] = future.result()
-            except Exception as exc:
-                repeat_idx = start_index + offset
-                raise click.ClickException(f"Repeat {repeat_idx} failed: {exc}") from exc
-    return [by_index[idx] for idx in sorted(by_index)]
+        return _execute_repeat_batch_sequential(
+            request=request,
+            batch_size=batch_size,
+            start_index=start_index,
+        )
+    return _execute_repeat_batch_parallel(
+        request=request,
+        batch_size=batch_size,
+        repeat_parallel=repeat_parallel,
+        start_index=start_index,
+    )
 
 
 def _count_voided(runs: list[EvalRun]) -> int:
@@ -182,24 +212,34 @@ def _run_with_void_retries(
     pending_batch = repeats
     retries_used = 0
 
-    initial_runs = _execute_repeat_batch(
-        request=request,
-        batch_size=pending_batch,
-        repeat_parallel=repeat_parallel,
-        start_index=next_repeat_index,
-    )
+    try:
+        initial_runs = _execute_repeat_batch(
+            request=request,
+            batch_size=pending_batch,
+            repeat_parallel=repeat_parallel,
+            start_index=next_repeat_index,
+        )
+    except ScaffoldPreflightError as exc:
+        raise click.ClickException(
+            f"Fatal scaffold preflight error. Suite aborted without retries: {exc}"
+        ) from exc
     all_runs.extend(initial_runs)
     pending_batch = _count_voided(initial_runs)
     next_repeat_index += len(initial_runs)
 
     if pending_batch > 0 and retry_void > 0:
         retries_used = 1
-        retry_runs = _execute_repeat_batch(
-            request=request,
-            batch_size=pending_batch,
-            repeat_parallel=repeat_parallel,
-            start_index=next_repeat_index,
-        )
+        try:
+            retry_runs = _execute_repeat_batch(
+                request=request,
+                batch_size=pending_batch,
+                repeat_parallel=repeat_parallel,
+                start_index=next_repeat_index,
+            )
+        except ScaffoldPreflightError as exc:
+            raise click.ClickException(
+                f"Fatal scaffold preflight error. Suite aborted without retries: {exc}"
+            ) from exc
         all_runs.extend(retry_runs)
         pending_batch = _count_voided(retry_runs)
 
@@ -266,7 +306,8 @@ def _echo_suite_result(
     for run in runs:
         click.echo(
             f"Run {run.id}: voided={run.scores.voided}, "
-            f"qualified={run.scores.qualification.passed}, "
+            f"run_valid={run.scores.run_validity.passed}, "
+            f"performance_gates={run.scores.performance_gates.passed}, "
             f"composite={run.scores.composite_score:.3f}, duration={run.duration_sec:.1f}s"
         )
 

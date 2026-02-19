@@ -27,9 +27,13 @@ Use these paths:
 - Suite readmes: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/suites/*/README.md`
 - Run summary artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/summary/result.json`
 - Verifier artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/verifier/scorecard.json`
-- Qualification artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/verifier/qualification.json`
+- Run-validity artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/verifier/run-validity.json`
+- Performance-gates artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/verifier/performance-gates.json`
 - Agent traces: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/agent/trajectory.json`
-- Agent logs: `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/agent/codex.txt`
+- Agent logs (harness-specific): `/Users/adamjackson/Projects/typescript-ui-eval/orchestrator/results/runs/*/agent/*.txt`
+  - Codex: `.../agent/codex.txt`
+  - Claude Code: `.../agent/claude-code.txt`
+  - Gemini: `.../agent/gemini-cli.txt`
 
 ### Suite Selection Rule
 
@@ -47,6 +51,8 @@ Treat completion and deterministic quality criteria as first-class requirements.
    - `retry.target_met == true`
    - `retry.unresolved_void_count == 0`
    - `aggregate.run_count_scored >= config.repeats`
+   - `aggregate.validity_rate == 1.0` (all scored runs passed `run_validity`)
+   - all runs have non-missing token metrics (`scores.metadata.process.uncached_input_tokens` derived from real usage, not default zeros)
 2. If any validity gate fails:
    - mark suite `INVALID_FOR_RANKING`
    - set final weighted score to `0.0`
@@ -60,9 +66,10 @@ For each valid suite, compute a strict weighted score in `[0, 100]` using normal
 
 Component definitions:
 
-- `success = aggregate.qualification_rate`
+- `success = aggregate.validity_rate`
 - `quality = aggregate.composite_score.mean`
-- `reliability = 1 - (aggregate.void_count / aggregate.run_count_total)`
+- `reliability = 1 - (process_fault_run_count / aggregate.run_count_total)`
+  where `process_fault_run_count = count(runs where voided == true OR scores.metadata.process.process_failed_command_count > 0)`
 - `speed = inverse_normalized(aggregate.duration_sec.mean)`
 - `cost = inverse_normalized(aggregate.uncached_input_tokens.mean)`
 
@@ -77,25 +84,34 @@ Normalization rules:
 
 For each suite and for cross-agent comparison, compute and report:
 
-1. Qualification profile:
-   - `qualification_rate`
-   - `qualified_count / run_count_scored`
+1. Validity profile:
+   - `validity_rate`
+   - `valid_count / run_count_scored`
+   - `performance_pass_rate`
 2. Reliability profile:
    - `void_count`, `repeat_required_count`, retry usage
    - void reason frequencies from `runs[].void_reasons`
+   - `process_failed_command_count` distribution (process faults only, not lint/typecheck/test quality failures)
 3. Efficiency profile:
    - `duration_sec.mean/median/stddev`
    - `uncached_input_tokens.mean/median/stddev`
 4. Process quality profile from run-level `scores.metadata.process`:
    - mean `failed_command_count`
+   - mean `process_failed_command_count`
    - mean `verification_rounds`
    - mean `repeated_verification_failures`
    - mean `missing_required_verification_commands`
    - distribution of `failed_command_categories`
-5. Deterministic-check profile from qualification and scorecard:
-   - failing qualification checks frequency
+5. Deterministic-check profile from `run_validity`, `performance_gates`, and scorecard:
+   - failing `run_validity.checks` frequency
+   - failing `performance_gates.checks` frequency
    - failing compliance rules frequency
    - requirement gap frequency (`requirement_gap_ids`, `requirement_pattern_gaps`)
+6. Agent log pattern profile (Codex/Claude/Gemini with identical pattern categories):
+   - command execution and failure motifs
+   - verification loop behavior (`run`, `fix`, `re-run` cycles)
+   - tool usage breadth and repeated failure patterns
+   - incomplete/aborted turn signatures
 
 ### Evidence Rules
 
@@ -104,6 +120,7 @@ For every material claim:
 1. Provide abbreviated evidence (one short line).
 2. Provide a direct artifact path.
 3. Prefer suite-level evidence first, then run-level evidence for detail.
+4. For log-derived claims, apply the same extraction pattern categories across `codex.txt`, `claude-code.txt`, and `gemini-cli.txt`; do not use harness-specific criteria.
 
 ### Recommendation Rules
 
@@ -159,5 +176,5 @@ In `Suggested Experiment Backlog`, include numbered experiments with:
 
 1. Never treat deterministic-check failures as harness defects.
 2. Always treat orchestrator implementation failures separately from task scoring failures.
-3. Never relax thresholds, qualification checks, or scoring criteria during analysis.
+3. Never relax thresholds, run-validity checks, performance gates, or scoring criteria during analysis.
 4. If evidence is missing, state exactly which artifact path is missing and continue with available deterministic evidence.

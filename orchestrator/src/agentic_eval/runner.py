@@ -36,10 +36,11 @@ from .schemas.scorecard import (
     EvalConfig,
     EvalRun,
     FunctionalScore,
+    GateCheck,
     OptimizationScore,
-    QualificationCheck,
-    QualificationScore,
+    PerformanceGatesScore,
     RequirementCoverageScore,
+    RunValidityScore,
     ScaffoldAudit,
     Scorecard,
     VisualScore,
@@ -137,6 +138,39 @@ AGENT_NPM_PACKAGES: dict[str, str] = {
     "claude-code": "@anthropic-ai/claude-code",
     "gemini": "@google/gemini-cli",
 }
+PROCESS_FAILURE_MISSING_COMMAND_SNIPPETS: tuple[str, ...] = (
+    "command not found",
+    "not found",
+    "no such file or directory",
+    "enoent",
+)
+PROCESS_FAILURE_PERMISSION_SNIPPETS: tuple[str, ...] = (
+    "permission denied",
+    "operation not permitted",
+    "eacces",
+)
+PROCESS_FAILURE_TIMEOUT_SNIPPETS: tuple[str, ...] = (
+    "timed out",
+    "timeout",
+    "time limit exceeded",
+)
+PROCESS_FAILURE_RESOURCE_SNIPPETS: tuple[str, ...] = (
+    "out of memory",
+    "cannot allocate memory",
+    "no space left on device",
+    "enospc",
+    "killed",
+)
+PROCESS_FAILURE_INVOCATION_SNIPPETS: tuple[str, ...] = (
+    "exec format error",
+    "bad substitution",
+    "syntax error near unexpected token",
+    "invalid option",
+)
+
+
+class ScaffoldPreflightError(RuntimeError):
+    """Fatal scaffold setup error that voids and aborts an entire suite."""
 
 
 def load_task(task_path: Path) -> TaskDefinition:
@@ -190,7 +224,8 @@ class EvaluationOutputs:
     efficiency: EfficiencyScore
     coverage: CoverageScore
     requirements: RequirementCoverageScore
-    qualification: QualificationScore
+    run_validity: RunValidityScore
+    performance_gates: PerformanceGatesScore
     scaffold_audit: ScaffoldAudit | None
     gate_history: list[GateEvent]
 
@@ -212,6 +247,7 @@ class CommandRecord:
     command: str
     failed: bool
     output: str
+    exit_code: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -222,6 +258,7 @@ class ProcessMetrics:
     output_tokens: int
     command_count: int
     failed_command_count: int
+    process_failed_command_count: int
     verification_rounds: int
     repeated_verification_failures: int
     required_verification_commands: int
@@ -379,7 +416,7 @@ def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> 
     if install.returncode != 0:
         output = (install.stdout + "\n" + install.stderr).strip()
         output = output[:8000]
-        raise RuntimeError(
+        raise ScaffoldPreflightError(
             f"Scaffold preflight failed: `bun install --frozen-lockfile` exited "
             f"{install.returncode}\n{output}"
         )
@@ -401,7 +438,7 @@ def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> 
             output = (completed.stdout + "\n" + completed.stderr).strip()
             output = output[:8000]
             rendered = " ".join(shlex.quote(part) for part in command)
-            raise RuntimeError(
+            raise ScaffoldPreflightError(
                 f"Scaffold preflight failed: `{rendered}` exited {completed.returncode}\n{output}"
             )
 
@@ -1479,7 +1516,10 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
             efficiency=EfficiencyScore.model_validate(payload.get("efficiency")),
             coverage=CoverageScore.model_validate(payload.get("coverage")),
             requirements=RequirementCoverageScore.model_validate(payload.get("requirements")),
-            qualification=QualificationScore.model_validate(payload.get("qualification")),
+            run_validity=RunValidityScore.model_validate(payload.get("run_validity")),
+            performance_gates=PerformanceGatesScore.model_validate(
+                payload.get("performance_gates")
+            ),
             scaffold_audit=scaffold_audit,
             gate_history=gate_history,
         )
@@ -1574,7 +1614,8 @@ def persist_verifier_artifacts(
     for filename in (
         "scorecard.json",
         "gate-history.json",
-        "qualification.json",
+        "run-validity.json",
+        "performance-gates.json",
         "reward.txt",
         "test-stdout.txt",
     ):
@@ -1666,7 +1707,8 @@ def write_summary_readme(
         f"- task: `{request.task.name}`",
         f"- agent: `{request.config.agent.value}`",
         f"- model: `{request.config.model.qualified_name}`",
-        f"- qualified: `{scorecard.qualification.passed}`",
+        f"- run_valid: `{scorecard.run_validity.passed}`",
+        f"- performance_gates_passed: `{scorecard.performance_gates.passed}`",
         f"- voided: `{scorecard.voided}`",
         f"- void_reasons: `{scorecard.void_reasons}`",
         f"- quality_score: `{scorecard.quality_score:.6f}`",
@@ -1726,16 +1768,41 @@ def _extract_item_completed(entry: dict) -> dict | None:
     return item if isinstance(item, dict) else None
 
 
-def _extract_usage(entry: dict) -> tuple[int, int, int] | None:
-    if entry.get("type") != "turn.completed":
+def _as_int(value: Any) -> int | None:
+    if value is None:
         return None
-    usage = entry.get("usage")
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _usage_tuple_from_payload(
+    usage: dict | None,
+    *,
+    input_key: str = "input_tokens",
+    cached_keys: tuple[str, ...] = ("cached_input_tokens",),
+    output_key: str = "output_tokens",
+) -> tuple[int, int, int] | None:
     if not isinstance(usage, dict):
         return None
-    input_tokens = int(usage.get("input_tokens", 0) or 0)
-    cached_input_tokens = int(usage.get("cached_input_tokens", 0) or 0)
-    output_tokens = int(usage.get("output_tokens", 0) or 0)
+    input_tokens = _as_int(usage.get(input_key))
+    output_tokens = _as_int(usage.get(output_key))
+    if input_tokens is None or output_tokens is None:
+        return None
+    cached_input_tokens = 0
+    for key in cached_keys:
+        candidate = _as_int(usage.get(key))
+        if candidate is not None:
+            cached_input_tokens = candidate
+            break
     return input_tokens, cached_input_tokens, output_tokens
+
+
+def _extract_codex_usage(entry: dict) -> tuple[int, int, int] | None:
+    if entry.get("type") != "turn.completed":
+        return None
+    return _usage_tuple_from_payload(entry.get("usage"))
 
 
 def _normalize_command(command: str) -> str:
@@ -1823,12 +1890,117 @@ def _command_matches_pattern(command: str, patterns: list[str]) -> str | None:
     return None
 
 
-def _usage_from_entries(entries: list[dict]) -> tuple[int, int, int]:
-    usage_tuple = next(
-        (usage for usage in reversed([_extract_usage(entry) for entry in entries]) if usage),
-        (0, 0, 0),
+def _usage_from_codex_log(trial_dir: Path) -> tuple[int, int, int] | None:
+    entries = _read_jsonl_dicts(trial_dir / "agent" / "codex.txt")
+    usages = [_extract_codex_usage(entry) for entry in entries]
+    return next((usage for usage in reversed(usages) if usage), None)
+
+
+def _usage_from_trial_result(trial_dir: Path) -> tuple[int, int, int] | None:
+    payload = _load_json_dict(trial_dir / "result.json")
+    agent_result = payload.get("agent_result")
+    if not isinstance(agent_result, dict):
+        return None
+    input_tokens = _as_int(agent_result.get("n_input_tokens"))
+    output_tokens = _as_int(agent_result.get("n_output_tokens"))
+    cached_tokens = _as_int(agent_result.get("n_cache_tokens")) or 0
+    if input_tokens is None or output_tokens is None:
+        return None
+    return input_tokens, cached_tokens, output_tokens
+
+
+def _record_claude_usage(
+    entry: dict,
+    *,
+    message_usage_by_id: dict[str, tuple[int, int, int]],
+    result_usage: tuple[int, int, int] | None,
+) -> tuple[int, int, int] | None:
+    if entry.get("type") == "result":
+        usage_tuple = _usage_tuple_from_payload(
+            entry.get("usage"),
+            cached_keys=("cached_input_tokens", "cache_read_input_tokens"),
+        )
+        if usage_tuple:
+            result_usage = usage_tuple
+    message = entry.get("message")
+    if not isinstance(message, dict):
+        return result_usage
+    message_id = str(message.get("id", "")).strip()
+    usage_tuple = _usage_tuple_from_payload(
+        message.get("usage"),
+        cached_keys=("cached_input_tokens", "cache_read_input_tokens"),
     )
-    return usage_tuple
+    if message_id and usage_tuple:
+        message_usage_by_id[message_id] = usage_tuple
+    return result_usage
+
+
+def _usage_from_claude_log(trial_dir: Path) -> tuple[int, int, int] | None:
+    result_usage: tuple[int, int, int] | None = None
+    message_usage_by_id: dict[str, tuple[int, int, int]] = {}
+    agent_dir = trial_dir / "agent"
+    candidate_paths = sorted(agent_dir.glob("command-*/stdout.txt"))
+    candidate_paths.append(agent_dir / "claude-code.txt")
+    for path in candidate_paths:
+        for entry in _read_jsonl_dicts(path):
+            result_usage = _record_claude_usage(
+                entry,
+                message_usage_by_id=message_usage_by_id,
+                result_usage=result_usage,
+            )
+
+    if result_usage:
+        return result_usage
+    if not message_usage_by_id:
+        return None
+    input_tokens = sum(usage[0] for usage in message_usage_by_id.values())
+    cached_tokens = sum(usage[1] for usage in message_usage_by_id.values())
+    output_tokens = sum(usage[2] for usage in message_usage_by_id.values())
+    return input_tokens, cached_tokens, output_tokens
+
+
+def _usage_from_gemini_trajectory(trial_dir: Path) -> tuple[int, int, int] | None:
+    payload = _load_json_dict(trial_dir / "agent" / "gemini-cli.trajectory.json")
+    messages = payload.get("messages")
+    if not isinstance(messages, list):
+        return None
+    input_tokens = 0
+    cached_tokens = 0
+    output_tokens = 0
+    found = False
+    for message in messages:
+        if not isinstance(message, dict):
+            continue
+        token_block = message.get("tokens")
+        if not isinstance(token_block, dict):
+            continue
+        msg_input = _as_int(token_block.get("input"))
+        msg_cached = _as_int(token_block.get("cached")) or 0
+        msg_output = _as_int(token_block.get("output"))
+        if msg_input is None or msg_output is None:
+            continue
+        input_tokens += msg_input
+        cached_tokens += msg_cached
+        output_tokens += msg_output
+        found = True
+    if not found:
+        return None
+    return input_tokens, cached_tokens, output_tokens
+
+
+def _usage_tuple_for_harness(trial_dir: Path, harness: str) -> tuple[int, int, int] | None:
+    trial_usage = _usage_from_trial_result(trial_dir)
+    if trial_usage:
+        return trial_usage
+    if harness == "codex-cli":
+        return _usage_from_codex_log(trial_dir)
+    if harness == "claude-code":
+        return _usage_from_claude_log(trial_dir)
+    if harness == "gemini":
+        return _usage_from_gemini_trajectory(trial_dir)
+    if harness in {"cursor", "copilot", "pi"}:
+        return None
+    raise ValueError(f"Unsupported harness for usage extraction: {harness}")
 
 
 def _command_output(item: dict) -> str:
@@ -1847,6 +2019,7 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
         if not item or item.get("type") != "command_execution":
             continue
         failed = _command_failed(item)
+        exit_code = _as_int(item.get("exit_code"))
         output = _command_output(item)
         commands = _normalized_shell_subcommands(str(item.get("command", "")))
         for command in commands:
@@ -1857,6 +2030,7 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
                     command=command,
                     failed=failed,
                     output=output,
+                    exit_code=exit_code,
                 )
             )
     return records
@@ -1882,22 +2056,6 @@ def _command_records_for_harness(trial_dir: Path, harness: str) -> list[CommandR
     if harness == "pi":
         return _command_records_from_agent_stdout(trial_dir)
     raise ValueError(f"Unsupported harness for command extraction: {harness}")
-
-
-def _usage_entries_for_harness(trial_dir: Path, harness: str) -> list[dict]:
-    if harness == "codex-cli":
-        return _read_jsonl_dicts(trial_dir / "agent" / "codex.txt")
-    if harness == "claude-code":
-        return []
-    if harness == "gemini":
-        return []
-    if harness == "cursor":
-        return []
-    if harness == "copilot":
-        return []
-    if harness == "pi":
-        return []
-    raise ValueError(f"Unsupported harness for usage extraction: {harness}")
 
 
 def _harness_emits_structured_session_events(harness: str) -> bool:
@@ -2219,49 +2377,25 @@ def _first_pass_status(
     return status
 
 
-def _matches_typecheck(command_text: str, combined: str) -> bool:
-    if "typecheck" in command_text:
-        return True
-    return "tsc" in combined
+def _contains_snippet(text: str, snippets: tuple[str, ...]) -> bool:
+    return any(snippet in text for snippet in snippets)
 
 
-def _matches_lint(command_text: str, combined: str) -> bool:
-    if "lint" in command_text:
-        return True
-    if "ultracite" in combined:
-        return True
-    return "eslint" in combined
-
-
-def _matches_coverage(command_text: str) -> bool:
-    if "test:coverage" in command_text:
-        return True
-    return "--coverage" in command_text
-
-
-def _matches_test(command_text: str) -> bool:
-    if " test" in f" {command_text}":
-        return True
-    return command_text.endswith("test")
-
-
-def _failure_category(record: CommandRecord) -> str:
-    command_text = record.command.lower()
-    output_text = record.output.lower()
-    combined = f"{command_text}\n{output_text}"
-    if "not found" in combined:
+def _failure_category(record: CommandRecord) -> str | None:
+    combined = f"{record.command}\n{record.output}".lower()
+    if record.exit_code in {126, 127} or _contains_snippet(
+        combined, PROCESS_FAILURE_MISSING_COMMAND_SNIPPETS
+    ):
         return "missing_command"
-    if _matches_typecheck(command_text, combined):
-        return "typecheck"
-    if _matches_lint(command_text, combined):
-        return "lint"
-    if _matches_coverage(command_text):
-        return "coverage"
-    if _matches_test(command_text):
-        return "test"
-    if "build" in command_text:
-        return "build"
-    return "other"
+    if _contains_snippet(combined, PROCESS_FAILURE_PERMISSION_SNIPPETS):
+        return "permission_denied"
+    if _contains_snippet(combined, PROCESS_FAILURE_TIMEOUT_SNIPPETS):
+        return "command_timeout"
+    if _contains_snippet(combined, PROCESS_FAILURE_RESOURCE_SNIPPETS):
+        return "resource_exhausted"
+    if _contains_snippet(combined, PROCESS_FAILURE_INVOCATION_SNIPPETS):
+        return "command_invocation_error"
+    return None
 
 
 def _failure_category_counts(records: list[CommandRecord]) -> dict[str, int]:
@@ -2270,6 +2404,8 @@ def _failure_category_counts(records: list[CommandRecord]) -> dict[str, int]:
         if not record.failed:
             continue
         category = _failure_category(record)
+        if category is None:
+            continue
         categories[category] = categories.get(category, 0) + 1
     return categories
 
@@ -2280,6 +2416,7 @@ def _empty_process_metrics() -> ProcessMetrics:
         output_tokens=0,
         command_count=0,
         failed_command_count=0,
+        process_failed_command_count=0,
         verification_rounds=0,
         repeated_verification_failures=0,
         required_verification_commands=0,
@@ -2289,6 +2426,10 @@ def _empty_process_metrics() -> ProcessMetrics:
 
 def _count_failed_commands(records: list[CommandRecord]) -> int:
     return sum(1 for record in records if record.failed)
+
+
+def _count_process_failed_commands(failure_categories: dict[str, int]) -> int:
+    return sum(failure_categories.values())
 
 
 def _count_repeated_failures(failures_by_pattern: dict[str, int]) -> int:
@@ -2316,8 +2457,11 @@ def collect_process_metrics(
     if not trial_dir:
         return _empty_process_metrics()
 
-    usage_entries = _usage_entries_for_harness(trial_dir, harness)
-    usage_tuple = _usage_from_entries(usage_entries)
+    usage_tuple = _usage_tuple_for_harness(trial_dir, harness)
+    if usage_tuple is None:
+        raise RuntimeError(
+            f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`."
+        )
     input_tokens, cached_input_tokens, output_tokens = usage_tuple
     uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
 
@@ -2330,6 +2474,7 @@ def collect_process_metrics(
     failure_categories = _failure_category_counts(records)
     command_count = len(records)
     failed_command_count = _count_failed_commands(records)
+    process_failed_command_count = _count_process_failed_commands(failure_categories)
     verification_rounds = max(attempts_by_pattern.values(), default=0)
     repeated_failures = _count_repeated_failures(failures_by_pattern)
     executed_required = _count_executed_required(attempts_by_pattern)
@@ -2341,6 +2486,7 @@ def collect_process_metrics(
         output_tokens=output_tokens,
         command_count=command_count,
         failed_command_count=failed_command_count,
+        process_failed_command_count=process_failed_command_count,
         verification_rounds=verification_rounds,
         repeated_verification_failures=repeated_failures,
         required_verification_commands=len(verification_patterns),
@@ -2519,7 +2665,7 @@ def _test_file_paths(workspace: Path) -> list[Path]:
 
 
 def _has_test_pattern(test_sources: list[str], pattern: str) -> bool:
-    return any(re.search(pattern, source, re.MULTILINE) for source in test_sources)
+    return any(re.search(pattern, source, re.MULTILINE | re.IGNORECASE) for source in test_sources)
 
 
 def evaluate_requirements(
@@ -2536,22 +2682,25 @@ def evaluate_requirements(
     pattern_gaps: dict[str, list[str]] = {}
     satisfied = 0
     mapped = 0
+    mapped_satisfied = 0
 
     for requirement in requirements:
-        requirement_check = run_deterministic_check(requirement.check, workspace)
+        requirement_check, missing_patterns = _requirement_status(
+            workspace, requirement, test_sources
+        )
         if requirement_check.passed:
             satisfied += 1
         else:
             missing_ids.append(requirement.id)
 
-        patterns = requirement.required_test_patterns
-        missing_patterns = [
-            pattern for pattern in patterns if not _has_test_pattern(test_sources, pattern)
-        ]
-        mapped_for_requirement = bool(patterns) and not missing_patterns
-        if mapped_for_requirement:
-            mapped += 1
-        else:
+        mapped_for_requirement = bool(requirement.required_test_patterns) and not missing_patterns
+        mapped, mapped_satisfied = _apply_requirement_mapping_counts(
+            mapped=mapped,
+            mapped_satisfied=mapped_satisfied,
+            mapped_for_requirement=mapped_for_requirement,
+            requirement_passed=requirement_check.passed,
+        )
+        if not mapped_for_requirement:
             gap_ids.append(requirement.id)
             if missing_patterns:
                 pattern_gaps[requirement.id] = missing_patterns
@@ -2560,10 +2709,40 @@ def evaluate_requirements(
         total_requirements=len(requirements),
         satisfied_requirements=satisfied,
         mapped_requirements=mapped,
+        mapped_satisfied_requirements=mapped_satisfied,
         missing_requirement_ids=missing_ids,
         requirement_gap_ids=gap_ids,
         requirement_pattern_gaps=pattern_gaps,
     )
+
+
+def _requirement_status(
+    workspace: Path,
+    requirement: RequirementSpec,
+    test_sources: list[str],
+) -> tuple[ComplianceCheck, list[str]]:
+    requirement_check = run_deterministic_check(requirement.check, workspace)
+    missing_patterns = [
+        pattern
+        for pattern in requirement.required_test_patterns
+        if not _has_test_pattern(test_sources, pattern)
+    ]
+    return requirement_check, missing_patterns
+
+
+def _apply_requirement_mapping_counts(
+    *,
+    mapped: int,
+    mapped_satisfied: int,
+    mapped_for_requirement: bool,
+    requirement_passed: bool,
+) -> tuple[int, int]:
+    if not mapped_for_requirement:
+        return mapped, mapped_satisfied
+    mapped += 1
+    if requirement_passed:
+        mapped_satisfied += 1
+    return mapped, mapped_satisfied
 
 
 def terminated_outputs(reason: str | None) -> EvaluationOutputs:
@@ -2607,15 +2786,16 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
             missing_requirement_ids=[],
             requirement_gap_ids=[],
         ),
-        qualification=QualificationScore(
+        run_validity=RunValidityScore(
             checks=[
-                QualificationCheck(
+                GateCheck(
                     name="run_completed",
                     passed=False,
                     evidence=failure_reason,
                 )
             ]
         ),
+        performance_gates=PerformanceGatesScore(checks=[]),
         scaffold_audit=None,
         gate_history=[],
     )
@@ -2625,9 +2805,7 @@ def _all_gates_passed(outputs: EvaluationOutputs) -> bool:
     return outputs.functional.gates_total == outputs.functional.gates_passed
 
 
-def _completion_claim_consistent(
-    events: list[SessionEvent], gates_passed: bool
-) -> QualificationCheck:
+def _completion_claim_consistent(events: list[SessionEvent], gates_passed: bool) -> GateCheck:
     completion_keywords = ("complete", "completed", "done", "finished")
     completion_claimed = any(
         event.event_type == "assistant_message"
@@ -2637,7 +2815,7 @@ def _completion_claim_consistent(
         for event in events
     )
     if completion_claimed and not gates_passed:
-        return QualificationCheck(
+        return GateCheck(
             name="completion_claim_integrity",
             passed=False,
             evidence="Agent claimed completion before all quality gates were passing.",
@@ -2647,16 +2825,14 @@ def _completion_claim_consistent(
         if not completion_claimed
         else "Completion claim matches gate state."
     )
-    return QualificationCheck(
+    return GateCheck(
         name="completion_claim_integrity",
         passed=True,
         evidence=evidence,
     )
 
 
-def _upsert_qualification_check(
-    checks: list[QualificationCheck], candidate: QualificationCheck
-) -> None:
+def _upsert_gate_check(checks: list[GateCheck], candidate: GateCheck) -> None:
     for idx, existing in enumerate(checks):
         if existing.name != candidate.name:
             continue
@@ -2665,19 +2841,19 @@ def _upsert_qualification_check(
     checks.append(candidate)
 
 
-def build_qualification_score(
+def build_run_validity_score(
     *,
     outputs: EvaluationOutputs,
     terminated_early: bool,
     termination_reason: str | None,
     process_metrics: ProcessMetrics,
     events: list[SessionEvent],
-) -> QualificationScore:
-    """Build qualification gate checks for the run."""
-    checks = [check.model_copy(deep=True) for check in outputs.qualification.checks]
-    _upsert_qualification_check(
+) -> RunValidityScore:
+    """Build run-validity checks for the run."""
+    checks = [check.model_copy(deep=True) for check in outputs.run_validity.checks]
+    _upsert_gate_check(
         checks,
-        QualificationCheck(
+        GateCheck(
             name="run_completed",
             passed=not terminated_early,
             evidence=termination_reason or "Run completed without early termination.",
@@ -2687,9 +2863,9 @@ def build_qualification_score(
     required_count = process_metrics.required_verification_commands
     required_executed = process_metrics.executed_required_verification_commands
     required_commands_passed = required_count == 0 or required_executed == required_count
-    _upsert_qualification_check(
+    _upsert_gate_check(
         checks,
-        QualificationCheck(
+        GateCheck(
             name="required_verification_commands_executed",
             passed=required_commands_passed,
             evidence=f"executed={required_executed}/{required_count}",
@@ -2697,8 +2873,14 @@ def build_qualification_score(
     )
 
     completion_check = _completion_claim_consistent(events, _all_gates_passed(outputs))
-    _upsert_qualification_check(checks, completion_check)
-    return QualificationScore(checks=checks)
+    _upsert_gate_check(checks, completion_check)
+    return RunValidityScore(checks=checks)
+
+
+def build_performance_gates_score(*, outputs: EvaluationOutputs) -> PerformanceGatesScore:
+    """Build performance-gate checks for scored task outcomes."""
+    checks = [check.model_copy(deep=True) for check in outputs.performance_gates.checks]
+    return PerformanceGatesScore(checks=checks)
 
 
 def build_optimization_score(metrics: ProcessMetrics) -> OptimizationScore:
@@ -2813,6 +2995,7 @@ def _scorecard_process_metadata(process_metrics: ProcessMetrics) -> dict[str, An
         "output_tokens": process_metrics.output_tokens,
         "command_count": process_metrics.command_count,
         "failed_command_count": process_metrics.failed_command_count,
+        "process_failed_command_count": process_metrics.process_failed_command_count,
         "verification_rounds": process_metrics.verification_rounds,
         "repeated_verification_failures": process_metrics.repeated_verification_failures,
         "required_verification_commands": process_metrics.required_verification_commands,
@@ -2860,13 +3043,14 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
 
     scaffold_audit = _normalized_scaffold_audit(outputs.scaffold_audit, scaffold_context)
 
-    qualification = build_qualification_score(
+    run_validity = build_run_validity_score(
         outputs=outputs,
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
         process_metrics=execution.process_metrics,
         events=execution.events,
     )
+    performance_gates = build_performance_gates_score(outputs=outputs)
     optimization = build_optimization_score(execution.process_metrics)
     void_reasons = _classify_void_reasons(execution.terminated_early, execution.termination_reason)
     voided = len(void_reasons) > 0
@@ -2895,7 +3079,8 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         efficiency=outputs.efficiency,
         coverage=outputs.coverage,
         requirements=outputs.requirements,
-        qualification=qualification,
+        run_validity=run_validity,
+        performance_gates=performance_gates,
         optimization=optimization,
         metadata=metadata,
         scaffold_audit=scaffold_audit,

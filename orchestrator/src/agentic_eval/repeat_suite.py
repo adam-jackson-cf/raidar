@@ -24,7 +24,8 @@ def _run_pointer(run: EvalRun) -> dict[str, object]:
         "timestamp": run.timestamp,
         "voided": run.scores.voided,
         "void_reasons": run.scores.void_reasons,
-        "qualified": run.scores.qualification.passed,
+        "run_valid": run.scores.run_validity.passed,
+        "performance_gates_passed": run.scores.performance_gates.passed,
         "composite_score": run.scores.composite_score,
         "diagnostic_score": run.scores.diagnostic_score,
         "quality_score": run.scores.quality_score,
@@ -70,15 +71,15 @@ def _suite_id(task_name: str, harness: str, model: str, repeats: int, started_ut
 def _partition_runs(runs: list[EvalRun]) -> tuple[list[EvalRun], list[EvalRun], list[EvalRun]]:
     void_runs = [run for run in runs if run.scores.voided]
     scored_runs = [run for run in runs if not run.scores.voided]
-    qualified_scored = [run for run in scored_runs if run.scores.qualification.passed]
-    return void_runs, scored_runs, qualified_scored
+    valid_scored = [run for run in scored_runs if run.scores.run_validity.passed]
+    return void_runs, scored_runs, valid_scored
 
 
 def _aggregate_block(
     runs: list[EvalRun],
     void_runs: list[EvalRun],
     scored_runs: list[EvalRun],
-    qualified_runs: list[EvalRun],
+    valid_runs: list[EvalRun],
 ) -> dict[str, object]:
     composite_scores = [run.scores.composite_score for run in scored_runs]
     quality_scores = [run.scores.quality_score for run in scored_runs]
@@ -87,15 +88,18 @@ def _aggregate_block(
     tokens = [float(_uncached_tokens(run)) for run in scored_runs]
     scored_count = len(scored_runs)
     total_count = len(runs)
-    qualified_count = len(qualified_runs)
+    valid_count = len(valid_runs)
+    performance_pass_count = sum(1 for run in scored_runs if run.scores.performance_gates.passed)
     return {
         "run_count_total": total_count,
         "run_count_scored": scored_count,
         "void_count": len(void_runs),
         "repeat_required_count": len(void_runs),
-        "qualified_count": qualified_count,
-        "qualification_rate": round(qualified_count / max(1, scored_count), 6),
-        "qualification_rate_total": round(qualified_count / max(1, total_count), 6),
+        "valid_count": valid_count,
+        "validity_rate": round(valid_count / max(1, scored_count), 6),
+        "validity_rate_total": round(valid_count / max(1, total_count), 6),
+        "performance_pass_count": performance_pass_count,
+        "performance_pass_rate": round(performance_pass_count / max(1, scored_count), 6),
         "run_count": scored_count,
         "composite_score": _stat_summary(composite_scores),
         "quality_score": _stat_summary(quality_scores),
@@ -123,7 +127,7 @@ def create_repeat_suite_summary(
     started_utc = started_at.astimezone(UTC)
     finished_utc = datetime.now(UTC)
     suite_id = _suite_id(task_name, harness, model, repeats, started_utc)
-    void_runs, scored_runs, qualified_runs = _partition_runs(runs)
+    void_runs, scored_runs, valid_runs = _partition_runs(runs)
     run_pointers = [_run_pointer(run) for run in runs]
 
     return {
@@ -141,7 +145,7 @@ def create_repeat_suite_summary(
             "retry_void_limit": retry_void_limit,
             "retries_used": retries_used,
         },
-        "aggregate": _aggregate_block(runs, void_runs, scored_runs, qualified_runs),
+        "aggregate": _aggregate_block(runs, void_runs, scored_runs, valid_runs),
         "runs": run_pointers,
         "retry": {
             "target_scored_runs": repeats,
@@ -182,9 +186,11 @@ def persist_repeat_suite(results_dir: Path, suite_summary: dict[str, object]) ->
         f"- run_count_scored: `{aggregate.get('run_count_scored')}`",
         f"- void_count: `{aggregate.get('void_count')}`",
         f"- repeat_required_count: `{aggregate.get('repeat_required_count')}`",
-        f"- qualified_count: `{aggregate.get('qualified_count')}`",
-        f"- qualification_rate_scored: `{aggregate.get('qualification_rate')}`",
-        f"- qualification_rate_total: `{aggregate.get('qualification_rate_total')}`",
+        f"- valid_count: `{aggregate.get('valid_count')}`",
+        f"- validity_rate_scored: `{aggregate.get('validity_rate')}`",
+        f"- validity_rate_total: `{aggregate.get('validity_rate_total')}`",
+        f"- performance_pass_count: `{aggregate.get('performance_pass_count')}`",
+        f"- performance_pass_rate: `{aggregate.get('performance_pass_rate')}`",
         f"- target_scored_runs: `{retry.get('target_scored_runs')}`",
         f"- achieved_scored_runs: `{retry.get('achieved_scored_runs')}`",
         f"- target_met: `{retry.get('target_met')}`",
@@ -207,7 +213,8 @@ def persist_repeat_suite(results_dir: Path, suite_summary: dict[str, object]) ->
             continue
         lines.append(
             f"- run_id=`{run.get('run_id')}`, voided=`{run.get('voided')}`, "
-            f"void_reasons=`{run.get('void_reasons')}`, qualified=`{run.get('qualified')}`, "
+            f"void_reasons=`{run.get('void_reasons')}`, run_valid=`{run.get('run_valid')}`, "
+            f"performance_gates_passed=`{run.get('performance_gates_passed')}`, "
             f"composite=`{run.get('composite_score')}`, "
             f"duration_sec=`{run.get('duration_sec')}`, "
             f"canonical=`{run.get('canonical_run_dir')}`"
