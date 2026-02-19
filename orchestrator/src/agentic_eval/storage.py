@@ -69,7 +69,8 @@ def _empty_group_stats() -> dict[str, float | int]:
         "void_rate": 0.0,
         "avg_score": 0.0,
         "score_variance": 0.0,
-        "pass_rate": 0.0,
+        "validity_rate": 0.0,
+        "performance_pass_rate": 0.0,
         "avg_diagnostic_score": 0.0,
         "diagnostic_variance": 0.0,
         "avg_duration_sec": 0.0,
@@ -102,7 +103,8 @@ def _group_stats(runs_list: list[EvalRun]) -> dict[str, float | int]:
     composite_scores = [run.scores.composite_score for run in scored_runs]
     diagnostic_scores = [run.scores.diagnostic_score for run in scored_runs]
     durations = [run.duration_sec for run in scored_runs]
-    qualified = [run for run in scored_runs if run.scores.qualification.passed]
+    valid_runs = [run for run in scored_runs if run.scores.run_validity.passed]
+    performance_pass_runs = [run for run in scored_runs if run.scores.performance_gates.passed]
     scored_count = len(scored_runs)
     return {
         "count": len(runs_list),
@@ -111,7 +113,8 @@ def _group_stats(runs_list: list[EvalRun]) -> dict[str, float | int]:
         "void_rate": _safe_ratio(void_count, len(runs_list)),
         "avg_score": _safe_average(composite_scores),
         "score_variance": _variance(composite_scores),
-        "pass_rate": _safe_ratio(len(qualified), scored_count),
+        "validity_rate": _safe_ratio(len(valid_runs), scored_count),
+        "performance_pass_rate": _safe_ratio(len(performance_pass_runs), scored_count),
         "avg_diagnostic_score": _safe_average(diagnostic_scores),
         "diagnostic_variance": _variance(diagnostic_scores),
         "avg_duration_sec": _safe_average(durations),
@@ -196,11 +199,13 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "diagnostic_score",
         "voided",
         "void_reasons",
-        "qualified",
+        "run_valid",
+        "performance_gates_passed",
         "optimization_score",
         "gate_failures",
         "repeat_failures",
         "failed_command_categories",
+        "process_failed_command_count",
         "first_pass_verification_successes",
         "first_pass_verification_failures",
         "missing_required_verification_commands",
@@ -257,7 +262,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "diagnostic_score": run.scores.diagnostic_score,
                 "voided": run.scores.voided,
                 "void_reasons": json.dumps(run.scores.void_reasons),
-                "qualified": run.scores.qualification.passed,
+                "run_valid": run.scores.run_validity.passed,
+                "performance_gates_passed": run.scores.performance_gates.passed,
                 "optimization_score": run.scores.optimization.score,
                 "gate_failures": run.scores.efficiency.total_gate_failures,
                 "repeat_failures": run.scores.efficiency.repeat_failures,
@@ -265,6 +271,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                     process_meta.get("failed_command_categories", {}),
                     sort_keys=True,
                 ),
+                "process_failed_command_count": process_meta.get("process_failed_command_count"),
                 "first_pass_verification_successes": process_meta.get(
                     "first_pass_verification_successes"
                 ),
@@ -327,11 +334,12 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         [
             "\n## Summary Table\n",
             (
-                "| Harness | Model | Rules | Void | Qualified | Composite | Diagnostic | "
+                "| Harness | Model | Rules | Void | Run Valid | Perf Gates | "
+                "Composite | Diagnostic | "
                 "Functional | Compliance | Visual | Efficiency |"
             ),
             (
-                "|---------|-------|-------|------|-----------|-----------|------------|"
+                "|---------|-------|-------|------|-----------|------------|-----------|------------|"
                 "------------|------------|--------|------------|"
             ),
         ]
@@ -340,7 +348,8 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         func_status = "PASS" if run.scores.functional.passed else "FAIL"
         lines.append(
             f"| {run.config.harness} | {run.config.model} | {run.config.rules_variant} | "
-            f"{run.scores.voided} | {run.scores.qualification.passed} | "
+            f"{run.scores.voided} | {run.scores.run_validity.passed} | "
+            f"{run.scores.performance_gates.passed} | "
             f"{run.scores.composite_score:.3f} | "
             f"{run.scores.diagnostic_score:.3f} | {func_status} | "
             f"{run.scores.compliance.score:.2f} | {_visual_value(run)} | "
@@ -364,7 +373,8 @@ def _append_aggregate_section(
         lines.append(
             f"- **{group_name}**: {stats['count']} total, {stats['scored_count']} scored, "
             f"{stats['void_count']} void ({stats['void_rate']:.2f}), "
-            f"avg score={stats['avg_score']:.3f}, pass_rate={stats['pass_rate']:.2f}, "
+            f"avg score={stats['avg_score']:.3f}, validity_rate={stats['validity_rate']:.2f}, "
+            f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
             f"score_var={stats['score_variance']:.4f}"
         )
 
@@ -376,7 +386,8 @@ def _append_scaffold_section(lines: list[str], groups: dict[str, dict[str, float
         lines.append(
             f"- **{template} ({version})**: {stats['count']} total, "
             f"{stats['void_count']} void ({stats['void_rate']:.2f}), "
-            f"avg score={stats['avg_score']:.3f}, pass_rate={stats['pass_rate']:.2f}, "
+            f"avg score={stats['avg_score']:.3f}, validity_rate={stats['validity_rate']:.2f}, "
+            f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
             f"score_var={stats['score_variance']:.4f}"
         )
 
@@ -387,7 +398,8 @@ def _append_stability_section(lines: list[str], groups: dict[str, dict[str, floa
         lines.append(
             f"- `{config_key}`: runs={stats['count']}, scored={stats['scored_count']}, "
             f"void={stats['void_count']} ({stats['void_rate']:.2f}), "
-            f"pass_rate={stats['pass_rate']:.2f}, "
+            f"validity_rate={stats['validity_rate']:.2f}, "
+            f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
             f"score_var={stats['score_variance']:.4f}, "
             f"duration_var={stats['duration_variance_sec']:.3f}"
         )
@@ -399,23 +411,21 @@ def _normalized_lower_better(value: float, lower: float, upper: float) -> float:
     return 1.0 - ((value - lower) / (upper - lower))
 
 
-def _append_qualified_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
-    qualified_runs = [
-        run for run in runs if run.scores.qualification.passed and not run.scores.voided
-    ]
-    lines.append("\n## Qualified Cost-Time Index")
-    if not qualified_runs:
-        lines.append("- No qualified runs; cost/time normalization skipped.")
+def _append_valid_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
+    valid_runs = [run for run in runs if run.scores.run_validity.passed and not run.scores.voided]
+    lines.append("\n## Valid Run Cost-Time Index")
+    if not valid_runs:
+        lines.append("- No valid runs; cost/time normalization skipped.")
         return
 
-    duration_values = [run.duration_sec for run in qualified_runs]
-    token_values = [_uncached_tokens(run) for run in qualified_runs]
+    duration_values = [run.duration_sec for run in valid_runs]
+    token_values = [_uncached_tokens(run) for run in valid_runs]
     min_duration = min(duration_values)
     max_duration = max(duration_values)
     min_tokens = min(token_values)
     max_tokens = max(token_values)
 
-    ranked = sorted(qualified_runs, key=lambda item: item.scores.optimization.score, reverse=True)
+    ranked = sorted(valid_runs, key=lambda item: item.scores.optimization.score, reverse=True)
     for run in ranked:
         duration_norm = _normalized_lower_better(run.duration_sec, min_duration, max_duration)
         token_norm = _normalized_lower_better(_uncached_tokens(run), min_tokens, max_tokens)
@@ -426,16 +436,16 @@ def _append_qualified_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
         )
 
 
-def _append_unqualified_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
-    unqualified = [
-        run for run in runs if not run.scores.qualification.passed and not run.scores.voided
+def _append_invalid_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
+    invalid_runs = [
+        run for run in runs if not run.scores.run_validity.passed and not run.scores.voided
     ]
-    lines.append("\n## Diagnostic Ranking (Unqualified)")
-    if not unqualified:
-        lines.append("- No unqualified runs.")
+    lines.append("\n## Diagnostic Ranking (Invalid Runs)")
+    if not invalid_runs:
+        lines.append("- No invalid runs.")
         return
 
-    ranked = sorted(unqualified, key=lambda item: item.scores.diagnostic_score, reverse=True)
+    ranked = sorted(invalid_runs, key=lambda item: item.scores.diagnostic_score, reverse=True)
     for run in ranked:
         lines.append(
             f"- run_id={run.id}, model={run.config.model}, "
@@ -477,6 +487,6 @@ def generate_comparison_report(runs: list[EvalRun]) -> str:
     _append_scaffold_section(lines, agg.get("by_scaffold", {}))
     _append_stability_section(lines, agg.get("by_config", {}))
     _append_void_runs(lines, runs)
-    _append_qualified_cost_time(lines, runs)
-    _append_unqualified_diagnostics(lines, runs)
+    _append_valid_cost_time(lines, runs)
+    _append_invalid_diagnostics(lines, runs)
     return "\n".join(lines)

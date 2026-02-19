@@ -69,7 +69,7 @@ function collectSourceFiles() {
 
 function collectTestSources() {
   const sourceFiles = collectSourceFiles();
-  const testPattern = /\\.(test|spec)\\.tsx?$/;
+  const testPattern = /\.(test|spec)\.tsx?$/;
   return sourceFiles
     .filter((sourceFile) => testPattern.test(sourceFile.path))
     .map((sourceFile) => sourceFile.content);
@@ -149,16 +149,16 @@ function runDeterministicCheck(check, sourceFiles) {
 function parseTestCounts(output) {
   const passValues = [];
   const failValues = [];
-  for (const match of output.matchAll(/(\\d+)\\s+passed/gi)) {
+  for (const match of output.matchAll(/(\d+)\s+passed/gi)) {
     passValues.push(Number.parseInt(match[1], 10));
   }
-  for (const match of output.matchAll(/(\\d+)\\s+pass/gi)) {
+  for (const match of output.matchAll(/(\d+)\s+pass/gi)) {
     passValues.push(Number.parseInt(match[1], 10));
   }
-  for (const match of output.matchAll(/(\\d+)\\s+failed/gi)) {
+  for (const match of output.matchAll(/(\d+)\s+failed/gi)) {
     failValues.push(Number.parseInt(match[1], 10));
   }
-  for (const match of output.matchAll(/(\\d+)\\s+fail/gi)) {
+  for (const match of output.matchAll(/(\d+)\s+fail/gi)) {
     failValues.push(Number.parseInt(match[1], 10));
   }
   const passed = passValues.length > 0 ? Math.max(...passValues) : 0;
@@ -169,10 +169,10 @@ function parseTestCounts(output) {
 function parseCoveragePercent(output) {
   const values = [];
   const patterns = [
-    /Lines\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)%/gi,
-    /Statements\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)%/gi,
-    /Functions\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)%/gi,
-    /Branches\\s*:\\s*([0-9]+(?:\\.[0-9]+)?)%/gi,
+    /Lines\s*:\s*([0-9]+(?:\.[0-9]+)?)%/gi,
+    /Statements\s*:\s*([0-9]+(?:\.[0-9]+)?)%/gi,
+    /Functions\s*:\s*([0-9]+(?:\.[0-9]+)?)%/gi,
+    /Branches\s*:\s*([0-9]+(?:\.[0-9]+)?)%/gi,
   ];
   for (const pattern of patterns) {
     for (const match of output.matchAll(pattern)) {
@@ -340,6 +340,7 @@ function checkRequirementMappings(requirements, testSources) {
   const requirementPatternGaps = {};
   let satisfied = 0;
   let mapped = 0;
+  let mappedSatisfied = 0;
 
   for (const requirement of requirements) {
     const result = runDeterministicCheck(requirement.check, collectSourceFiles());
@@ -351,11 +352,14 @@ function checkRequirementMappings(requirements, testSources) {
 
     const patterns = requirement.required_test_patterns || [];
     const missingPatterns = patterns.filter(
-      (pattern) => !testSources.some((content) => new RegExp(pattern, "m").test(content))
+      (pattern) => !testSources.some((content) => new RegExp(pattern, "mi").test(content))
     );
     const mappedForRequirement = patterns.length > 0 && missingPatterns.length === 0;
     if (mappedForRequirement) {
       mapped += 1;
+      if (result.passed) {
+        mappedSatisfied += 1;
+      }
     } else {
       requirementGapIds.push(requirement.id);
       if (missingPatterns.length > 0) {
@@ -369,6 +373,7 @@ function checkRequirementMappings(requirements, testSources) {
     total_requirements: total,
     satisfied_requirements: satisfied,
     mapped_requirements: mapped,
+    mapped_satisfied_requirements: mappedSatisfied,
     missing_requirement_ids: missingRequirementIds,
     requirement_gap_ids: requirementGapIds,
     requirement_pattern_gaps: requirementPatternGaps,
@@ -377,7 +382,7 @@ function checkRequirementMappings(requirements, testSources) {
   };
 }
 
-function buildQualificationChecks({
+function buildPerformanceGateChecks({
   gateHistory,
   functional,
   coverage,
@@ -385,15 +390,9 @@ function buildQualificationChecks({
   requirements,
   quality,
   minQuality,
-  stackIntegrity,
 }) {
   const checks = [];
   const allGatesPassed = gateHistory.every((event) => event.exit_code === 0);
-  checks.push({
-    name: "run_completed",
-    passed: true,
-    evidence: "Run completed without early termination.",
-  });
   checks.push({
     name: "quality_gates_passed",
     passed: allGatesPassed,
@@ -437,9 +436,13 @@ function buildQualificationChecks({
   });
   checks.push({
     name: "no_requirement_test_gaps",
-    passed: requirements.mapping_ratio >= 1,
+    passed:
+      requirements.satisfied_requirements === 0 ||
+      requirements.mapped_satisfied_requirements >= requirements.satisfied_requirements,
     evidence:
-      `mapped=${requirements.mapped_requirements}/${requirements.total_requirements}, ` +
+      `mapped_satisfied=${requirements.mapped_satisfied_requirements}/` +
+      `${requirements.satisfied_requirements}, ` +
+      `mapped_total=${requirements.mapped_requirements}/${requirements.total_requirements}, ` +
       `gaps=${JSON.stringify(requirements.requirement_gap_ids)}, ` +
       `pattern_gaps=${JSON.stringify(requirements.requirement_pattern_gaps)}`,
   });
@@ -448,8 +451,18 @@ function buildQualificationChecks({
     passed: quality >= minQuality,
     evidence: `quality=${quality.toFixed(3)}, min=${minQuality.toFixed(3)}`,
   });
-  checks.push(stackIntegrity);
   return checks;
+}
+
+function buildRunValidityChecks(stackIntegrity) {
+  return [
+    {
+      name: "run_completed",
+      passed: true,
+      evidence: "Run completed without early termination.",
+    },
+    stackIntegrity,
+  ];
 }
 
 function main() {
@@ -573,7 +586,7 @@ function main() {
         if (odiff.exit_code === 0) {
           similarity = 1;
         } else {
-          const match = odiffOutput.match(/([0-9]+(?:\\.[0-9]+)?)\\s*%/);
+          const match = odiffOutput.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
           if (match) similarity = Math.max(0, 1 - Number.parseFloat(match[1]) / 100);
         }
         if (fs.existsSync(diffPath)) diffOutput = diffPath;
@@ -624,7 +637,7 @@ function main() {
     efficiencyScore: efficiency.score,
     weights: taskSpec.weights,
   });
-  const qualificationChecks = buildQualificationChecks({
+  const performanceGateChecks = buildPerformanceGateChecks({
     gateHistory,
     functional,
     coverage,
@@ -632,9 +645,9 @@ function main() {
     requirements,
     quality,
     minQuality: taskSpec.verification?.min_quality_score ?? 0,
-    stackIntegrity,
   });
-  qualificationChecks.push({
+  const runValidityChecks = buildRunValidityChecks(stackIntegrity);
+  runValidityChecks.push({
     name: "completion_claim_integrity",
     passed: true,
     evidence: "Validated post-run by orchestrator.",
@@ -650,9 +663,13 @@ function main() {
     efficiency,
     coverage,
     requirements,
-    qualification: {
-      checks: qualificationChecks,
-      passed: qualificationChecks.every((check) => check.passed),
+    run_validity: {
+      checks: runValidityChecks,
+      passed: runValidityChecks.every((check) => check.passed),
+    },
+    performance_gates: {
+      checks: performanceGateChecks,
+      passed: performanceGateChecks.every((check) => check.passed),
     },
     gate_history: gateHistory,
     scaffold_audit: scaffoldAudit,
@@ -660,8 +677,9 @@ function main() {
 
   writeJson(path.join(LOG_DIR, "scorecard.json"), scorecard);
   writeJson(path.join(LOG_DIR, "gate-history.json"), gateHistory);
-  writeJson(path.join(LOG_DIR, "qualification.json"), scorecard.qualification);
-  const rewardValue = scorecard.qualification.passed ? quality : 0;
+  writeJson(path.join(LOG_DIR, "run-validity.json"), scorecard.run_validity);
+  writeJson(path.join(LOG_DIR, "performance-gates.json"), scorecard.performance_gates);
+  const rewardValue = scorecard.run_validity.passed ? quality : 0;
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), `${rewardValue}`);
 }
 
@@ -707,13 +725,14 @@ try {
       total_requirements: 0,
       satisfied_requirements: 0,
       mapped_requirements: 0,
+      mapped_satisfied_requirements: 0,
       missing_requirement_ids: [],
       requirement_gap_ids: [],
       requirement_pattern_gaps: {},
       presence_ratio: 0,
       mapping_ratio: 0,
     },
-    qualification: {
+    run_validity: {
       checks: [
         {
           name: "run_completed",
@@ -721,6 +740,10 @@ try {
           evidence: message,
         },
       ],
+      passed: false,
+    },
+    performance_gates: {
+      checks: [],
       passed: false,
     },
     gate_history: [],

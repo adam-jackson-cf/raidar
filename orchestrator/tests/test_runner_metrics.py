@@ -1,8 +1,10 @@
-"""Tests for runner qualification and optimization metric helpers."""
+"""Tests for runner validity and optimization metric helpers."""
 
 import json
 from datetime import UTC, datetime
 from pathlib import Path
+
+import pytest
 
 from agentic_eval.audit.scaffold_manifest import generate_manifest
 from agentic_eval.harness.config import Agent, HarnessConfig, ModelTarget
@@ -30,8 +32,9 @@ from agentic_eval.schemas.scorecard import (
     CoverageScore,
     EfficiencyScore,
     FunctionalScore,
-    QualificationScore,
+    PerformanceGatesScore,
     RequirementCoverageScore,
+    RunValidityScore,
     ScaffoldAudit,
 )
 from agentic_eval.schemas.task import DeterministicCheck, RequirementSpec, TaskDefinition
@@ -112,7 +115,8 @@ def _sample_evaluation_outputs(scaffold_audit: ScaffoldAudit | None = None) -> E
             satisfied_requirements=1,
             mapped_requirements=1,
         ),
-        qualification=QualificationScore(),
+        run_validity=RunValidityScore(),
+        performance_gates=PerformanceGatesScore(),
         scaffold_audit=scaffold_audit,
         gate_history=[],
     )
@@ -246,9 +250,10 @@ def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
     assert metrics.output_tokens == 100
     assert metrics.command_count == 2
     assert metrics.failed_command_count == 1
+    assert metrics.process_failed_command_count == 0
     assert metrics.required_verification_commands == 3
     assert metrics.executed_required_verification_commands == 2
-    assert metrics.failed_command_categories == {"build": 1}
+    assert metrics.failed_command_categories == {}
     assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
     assert metrics.required_verification_first_pass["bun run lint"] == "missing"
     assert metrics.required_verification_first_pass["bun run build"] == "fail"
@@ -332,6 +337,11 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
 
 def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_path: Path):
     trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "gemini-cli.trajectory.json").write_text(
+        json.dumps({"messages": [{"tokens": {"input": 20, "cached": 5, "output": 3}}]})
+    )
     command_dir = trial_dir / "agent" / "command-0"
     command_dir.mkdir(parents=True, exist_ok=True)
     (command_dir / "stdout.txt").write_text(
@@ -365,13 +375,14 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
             {
                 "messages": [
                     {
+                        "tokens": {"input": 30, "cached": 10, "output": 4},
                         "toolCalls": [
                             {
                                 "name": "run_shell_command",
                                 "status": "success",
                                 "args": {"command": "bun run typecheck && bun run lint"},
                             }
-                        ]
+                        ],
                     }
                 ]
             }
@@ -390,6 +401,11 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
 
 def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
     trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "gemini-cli.trajectory.json").write_text(
+        json.dumps({"messages": [{"tokens": {"input": 10, "cached": 2, "output": 1}}]})
+    )
     command_dir = trial_dir / "agent" / "command-0"
     command_dir.mkdir(parents=True, exist_ok=True)
     (command_dir / "stdout.txt").write_text(
@@ -418,6 +434,12 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
                     {
                         "type": "assistant",
                         "message": {
+                            "id": "msg_1",
+                            "usage": {
+                                "input_tokens": 70,
+                                "cache_read_input_tokens": 20,
+                                "output_tokens": 9,
+                            },
                             "content": [
                                 {
                                     "type": "tool_use",
@@ -431,7 +453,7 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
                                     "name": "Bash",
                                     "input": {"command": "npm run lint"},
                                 },
-                            ]
+                            ],
                         },
                     }
                 ),
@@ -480,6 +502,12 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
                     {
                         "type": "assistant",
                         "message": {
+                            "id": "msg_1",
+                            "usage": {
+                                "input_tokens": 50,
+                                "cache_read_input_tokens": 0,
+                                "output_tokens": 7,
+                            },
                             "content": [
                                 {
                                     "type": "tool_use",
@@ -493,7 +521,7 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
                                     "name": "Bash",
                                     "input": {"command": "bun run lint"},
                                 },
-                            ]
+                            ],
                         },
                     }
                 ),
@@ -528,6 +556,79 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
     assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
     assert metrics.required_verification_first_pass["bun run lint"] == "pass"
     assert metrics.required_verification_first_pass["bun run build"] == "missing"
+
+
+def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "claude-code.txt").write_text(
+        "\n".join(
+            [
+                json.dumps(
+                    {
+                        "type": "result",
+                        "usage": {
+                            "input_tokens": 900,
+                            "cache_read_input_tokens": 300,
+                            "output_tokens": 111,
+                        },
+                    }
+                ),
+                json.dumps(
+                    {
+                        "type": "assistant",
+                        "message": {
+                            "id": "msg_1",
+                            "usage": {
+                                "input_tokens": 9,
+                                "cache_read_input_tokens": 3,
+                                "output_tokens": 1,
+                            },
+                            "content": [],
+                        },
+                    }
+                ),
+            ]
+        )
+    )
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="claude-code")
+
+    assert metrics.uncached_input_tokens == 600
+    assert metrics.output_tokens == 111
+
+
+def test_collect_process_metrics_extracts_gemini_usage_from_trajectory(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "gemini-cli.trajectory.json").write_text(
+        json.dumps(
+            {
+                "messages": [
+                    {"tokens": {"input": 100, "cached": 20, "output": 10}},
+                    {"tokens": {"input": 120, "cached": 30, "output": 12}},
+                ]
+            }
+        )
+    )
+    (agent_dir / "gemini-cli.txt").write_text("$ bun run typecheck\n")
+
+    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+
+    assert metrics.uncached_input_tokens == 170
+    assert metrics.output_tokens == 22
+
+
+def test_collect_process_metrics_raises_when_usage_missing(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    (agent_dir / "gemini-cli.trajectory.json").write_text(json.dumps({"messages": []}))
+
+    with pytest.raises(RuntimeError, match="Missing token usage metrics"):
+        collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
 
 
 def test_evaluate_coverage_reads_summary_file(tmp_path: Path):
@@ -599,8 +700,43 @@ def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):
     assert result.total_requirements == 1
     assert result.satisfied_requirements == 1
     assert result.mapped_requirements == 0
+    assert result.mapped_satisfied_requirements == 0
     assert result.requirement_gap_ids == ["req-cta"]
     assert result.requirement_pattern_gaps == {"req-cta": ["Get Started"]}
+
+
+def test_evaluate_requirements_matches_patterns_case_insensitively(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    src_app = workspace / "src" / "app"
+    src_app.mkdir(parents=True, exist_ok=True)
+    (src_app / "page.tsx").write_text(
+        "export default function Home(){ return <h1>Get Started</h1>; }"
+    )
+    (src_app / "page.test.tsx").write_text(
+        "it('renders nav', () => { expect('nav-link-about').toBeTruthy();"
+        " expect('nav-link-contact').toBeTruthy(); })"
+    )
+
+    requirements = [
+        RequirementSpec(
+            id="req-header-nav",
+            description="Header nav links exist",
+            check=DeterministicCheck(
+                type="import_present",
+                pattern="Get Started",
+                description="Placeholder deterministic check",
+            ),
+            required_test_patterns=["About", "Contact"],
+        )
+    ]
+
+    result = evaluate_requirements(workspace, requirements)
+    assert result.total_requirements == 1
+    assert result.satisfied_requirements == 1
+    assert result.mapped_requirements == 1
+    assert result.mapped_satisfied_requirements == 1
+    assert result.requirement_gap_ids == []
+    assert result.requirement_pattern_gaps == {}
 
 
 def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
@@ -653,12 +789,21 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                     "missing_requirement_ids": [],
                     "requirement_gap_ids": [],
                 },
-                "qualification": {
+                "run_validity": {
                     "checks": [
                         {
                             "name": "run_completed",
                             "passed": True,
                             "evidence": "done",
+                        }
+                    ]
+                },
+                "performance_gates": {
+                    "checks": [
+                        {
+                            "name": "quality_gates_passed",
+                            "passed": True,
+                            "evidence": "2/2 gates passed",
                         }
                     ]
                 },
@@ -854,6 +999,12 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
         .read_text(encoding="utf-8")
         .startswith("#!/usr/bin/env bun")
     )
+    score_script = (bundle / "tests" / "score-task.mjs").read_text(encoding="utf-8")
+    assert r"const testPattern = /\.(test|spec)\.tsx?$/" in score_script
+    assert r"/(\d+)\s+passed/gi" in score_script
+    assert r"/(\d+)\s+failed/gi" in score_script
+    assert r"/([0-9]+(?:\.[0-9]+)?)\s*%/" in score_script
+    assert 'new RegExp(pattern, "mi").test(content)' in score_script
 
 
 def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(

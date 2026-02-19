@@ -2,7 +2,10 @@
 
 from types import SimpleNamespace
 
+import click
+
 from agentic_eval import cli
+from agentic_eval.runner import ScaffoldPreflightError
 
 
 def _void_run(voided: bool) -> SimpleNamespace:
@@ -70,3 +73,22 @@ def test_cleanup_stale_harbor_before_runs_invokes_full_cleanup(monkeypatch):
         "include_containers": True,
         "include_build_processes": True,
     }
+
+
+def test_run_with_void_retries_aborts_on_scaffold_preflight_error(monkeypatch):
+    def fail_preflight(*, request, batch_size, repeat_parallel, start_index):
+        raise ScaffoldPreflightError("Scaffold preflight failed: bun run lint exited 1")
+
+    monkeypatch.setattr(cli, "_execute_repeat_batch", fail_preflight)
+
+    try:
+        cli._run_with_void_retries(
+            request=SimpleNamespace(),
+            repeats=2,
+            repeat_parallel=1,
+            retry_void=1,
+        )
+    except click.ClickException as exc:
+        assert "Fatal scaffold preflight error" in str(exc)
+    else:
+        raise AssertionError("Expected fatal scaffold preflight ClickException.")

@@ -100,7 +100,7 @@ class VisualSettings(BaseSettings):
 
 
 class OptimizationSettings(BaseSettings):
-    """Optimization scoring settings for qualified runs."""
+    """Optimization scoring settings for valid runs."""
 
     model_config = SettingsConfigDict(env_prefix="EVAL_OPTIMIZATION__")
 

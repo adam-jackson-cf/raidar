@@ -120,6 +120,7 @@ class RequirementCoverageScore(BaseModel):
     total_requirements: int = 0
     satisfied_requirements: int = 0
     mapped_requirements: int = 0
+    mapped_satisfied_requirements: int = 0
     missing_requirement_ids: list[str] = Field(default_factory=list)
     requirement_gap_ids: list[str] = Field(default_factory=list)
     requirement_pattern_gaps: dict[str, list[str]] = Field(default_factory=dict)
@@ -141,30 +142,44 @@ class RequirementCoverageScore(BaseModel):
         return self.mapped_requirements / self.total_requirements
 
 
-class QualificationCheck(BaseModel):
-    """Single hard-gate qualification result."""
+class GateCheck(BaseModel):
+    """Single hard-gate validity or performance-gate result."""
 
-    name: str = Field(description="Qualification check name")
+    name: str = Field(description="Gate check name")
     passed: bool = Field(description="Whether the check passed")
     evidence: str | None = Field(default=None, description="Check evidence")
 
 
-class QualificationScore(BaseModel):
-    """Hard-gate qualification aggregate."""
+class RunValidityScore(BaseModel):
+    """Hard-gate run validity aggregate."""
 
-    checks: list[QualificationCheck] = Field(default_factory=list)
+    checks: list[GateCheck] = Field(default_factory=list)
 
     @computed_field
     @property
     def passed(self) -> bool:
-        """All qualification checks must pass."""
+        """All run-validity checks must pass."""
+        if not self.checks:
+            return True
+        return all(check.passed for check in self.checks)
+
+
+class PerformanceGatesScore(BaseModel):
+    """Performance gate aggregate for scored task outcomes."""
+
+    checks: list[GateCheck] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def passed(self) -> bool:
+        """All performance gates must pass."""
         if not self.checks:
             return True
         return all(check.passed for check in self.checks)
 
 
 class OptimizationScore(BaseModel):
-    """Optimization metrics used after qualification succeeds."""
+    """Optimization metrics used after run validity succeeds."""
 
     uncached_input_tokens: int = 0
     output_tokens: int = 0
@@ -229,7 +244,8 @@ class Scorecard(BaseModel):
     efficiency: EfficiencyScore = Field(default_factory=EfficiencyScore)
     coverage: CoverageScore = Field(default_factory=CoverageScore)
     requirements: RequirementCoverageScore = Field(default_factory=RequirementCoverageScore)
-    qualification: QualificationScore = Field(default_factory=QualificationScore)
+    run_validity: RunValidityScore = Field(default_factory=RunValidityScore)
+    performance_gates: PerformanceGatesScore = Field(default_factory=PerformanceGatesScore)
     optimization: OptimizationScore = Field(default_factory=OptimizationScore)
 
     # Scaffold audit
@@ -270,11 +286,11 @@ class Scorecard(BaseModel):
     def composite_score(self) -> float:
         """Compute gated final score.
 
-        Unqualified runs always receive 0. Qualified runs are ranked on optimization score.
+        Invalid runs always receive 0. Valid runs are ranked on optimization score.
         """
         if self.voided:
             return 0.0
-        if not self.qualification.passed:
+        if not self.run_validity.passed:
             return 0.0
         return self.optimization.score
 
@@ -283,7 +299,7 @@ class Scorecard(BaseModel):
     def diagnostic_score(self) -> float:
         """Compute non-gating diagnostic score for comparing failed runs.
 
-        This score intentionally does not gate on qualification so disqualified runs
+        This score intentionally does not gate on run validity so invalid runs
         can still be ranked for analysis.
         """
         return round(

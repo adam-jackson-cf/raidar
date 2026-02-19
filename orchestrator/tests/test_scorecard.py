@@ -5,9 +5,9 @@ from agentic_eval.schemas.scorecard import (
     ComplianceScore,
     EfficiencyScore,
     FunctionalScore,
+    GateCheck,
     OptimizationScore,
-    QualificationCheck,
-    QualificationScore,
+    RunValidityScore,
     Scorecard,
     VisualScore,
 )
@@ -164,12 +164,12 @@ class TestScorecardComposite:
         # 0.5*0.4 + 1.0*0.25 + 0.8*0.2 + 1.0*0.15 = 0.2 + 0.25 + 0.16 + 0.15 = 0.76
         assert abs(scorecard.quality_score - 0.76) < 0.001
 
-    def test_composite_zero_when_unqualified(self):
-        """Composite score must be 0 when qualification checks fail."""
+    def test_composite_zero_when_invalid(self):
+        """Composite score must be 0 when run validity checks fail."""
         scorecard = Scorecard(
-            qualification=QualificationScore(
+            run_validity=RunValidityScore(
                 checks=[
-                    QualificationCheck(
+                    GateCheck(
                         name="quality_gates_passed",
                         passed=False,
                         evidence="lint failed",
@@ -179,12 +179,12 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == 0.0
 
-    def test_composite_uses_optimization_when_qualified(self):
-        """Composite score should use optimization score after qualification."""
+    def test_composite_uses_optimization_when_valid(self):
+        """Composite score should use optimization score after run validity."""
         scorecard = Scorecard(
-            qualification=QualificationScore(
+            run_validity=RunValidityScore(
                 checks=[
-                    QualificationCheck(
+                    GateCheck(
                         name="quality_gates_passed",
                         passed=True,
                         evidence="all gates passed",
@@ -207,9 +207,9 @@ class TestScorecardComposite:
         scorecard = Scorecard(
             voided=True,
             void_reasons=["provider_rate_limit"],
-            qualification=QualificationScore(
+            run_validity=RunValidityScore(
                 checks=[
-                    QualificationCheck(
+                    GateCheck(
                         name="quality_gates_passed",
                         passed=True,
                         evidence="all gates passed",
@@ -227,12 +227,12 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == 0.0
 
-    def test_diagnostic_score_available_when_unqualified(self):
+    def test_diagnostic_score_available_when_invalid(self):
         """Diagnostic score should remain available for failed runs."""
         scorecard = Scorecard(
-            qualification=QualificationScore(
+            run_validity=RunValidityScore(
                 checks=[
-                    QualificationCheck(
+                    GateCheck(
                         name="no_requirement_test_gaps",
                         passed=False,
                         evidence="mapped=2/4",

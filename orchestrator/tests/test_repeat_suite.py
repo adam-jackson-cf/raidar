@@ -8,10 +8,10 @@ from agentic_eval.repeat_suite import (
     persist_repeat_suite,
     repeat_workspace,
 )
-from agentic_eval.schemas.scorecard import EvalConfig, EvalRun, QualificationCheck, Scorecard
+from agentic_eval.schemas.scorecard import EvalConfig, EvalRun, GateCheck, Scorecard
 
 
-def _run(run_id: str, *, qualified: bool, duration: float, voided: bool = False) -> EvalRun:
+def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False) -> EvalRun:
     scorecard = Scorecard(
         run_id=run_id,
         task_name="homepage",
@@ -29,11 +29,11 @@ def _run(run_id: str, *, qualified: bool, duration: float, voided: bool = False)
         voided=voided,
         void_reasons=["provider_rate_limit"] if voided else [],
     )
-    scorecard.qualification.checks = [
-        QualificationCheck(name="run_completed", passed=qualified, evidence=None)
+    scorecard.run_validity.checks = [
+        GateCheck(name="run_completed", passed=run_valid, evidence=None)
     ]
     scorecard.optimization.command_count = 1
-    scorecard.optimization.uncached_input_tokens = 10 if qualified else 250_000
+    scorecard.optimization.uncached_input_tokens = 10 if run_valid else 250_000
     return EvalRun(
         id=run_id,
         timestamp=datetime.now(UTC).isoformat(),
@@ -57,8 +57,8 @@ def test_repeat_workspace_isolated_path():
 
 
 def test_create_repeat_suite_summary_aggregates():
-    run_a = _run("run-a", qualified=True, duration=120.0)
-    run_b = _run("run-b", qualified=False, duration=160.0)
+    run_a = _run("run-a", run_valid=True, duration=120.0)
+    run_b = _run("run-b", run_valid=False, duration=160.0)
     started_at = datetime.now(UTC) - timedelta(minutes=5)
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
@@ -73,8 +73,8 @@ def test_create_repeat_suite_summary_aggregates():
 
     assert summary["aggregate"]["run_count_total"] == 2
     assert summary["aggregate"]["run_count_scored"] == 2
-    assert summary["aggregate"]["qualified_count"] == 1
-    assert summary["aggregate"]["qualification_rate"] == 0.5
+    assert summary["aggregate"]["valid_count"] == 1
+    assert summary["aggregate"]["validity_rate"] == 0.5
     assert summary["retry"]["target_scored_runs"] == 2
     assert summary["retry"]["achieved_scored_runs"] == 2
     assert summary["retry"]["target_met"] is True
@@ -83,8 +83,8 @@ def test_create_repeat_suite_summary_aggregates():
 
 
 def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
-    run_a = _run("run-a", qualified=True, duration=120.0)
-    run_b = _run("run-b", qualified=False, duration=160.0, voided=True)
+    run_a = _run("run-a", run_valid=True, duration=120.0)
+    run_b = _run("run-b", run_valid=False, duration=160.0, voided=True)
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
         harness="codex-cli",
@@ -100,15 +100,15 @@ def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
     assert summary["aggregate"]["run_count_scored"] == 1
     assert summary["aggregate"]["void_count"] == 1
     assert summary["aggregate"]["repeat_required_count"] == 1
-    assert summary["aggregate"]["qualified_count"] == 1
-    assert summary["aggregate"]["qualification_rate"] == 1.0
+    assert summary["aggregate"]["valid_count"] == 1
+    assert summary["aggregate"]["validity_rate"] == 1.0
     assert summary["retry"]["target_scored_runs"] == 2
     assert summary["retry"]["achieved_scored_runs"] == 1
     assert summary["retry"]["target_met"] is False
 
 
 def test_create_repeat_suite_summary_includes_retry_metadata():
-    run_a = _run("run-a", qualified=True, duration=120.0)
+    run_a = _run("run-a", run_valid=True, duration=120.0)
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
         harness="codex-cli",
@@ -135,9 +135,11 @@ def test_persist_repeat_suite_writes_summary_and_readme(tmp_path: Path):
             "run_count_scored": 1,
             "void_count": 0,
             "repeat_required_count": 0,
-            "qualified_count": 1,
-            "qualification_rate": 1.0,
-            "qualification_rate_total": 1.0,
+            "valid_count": 1,
+            "validity_rate": 1.0,
+            "validity_rate_total": 1.0,
+            "performance_pass_count": 1,
+            "performance_pass_rate": 1.0,
             "composite_score": {"mean": 0.9},
             "quality_score": {"mean": 1.0},
             "diagnostic_score": {"mean": 1.0},
@@ -163,7 +165,8 @@ def test_persist_repeat_suite_writes_summary_and_readme(tmp_path: Path):
                 "run_id": "run-1",
                 "voided": False,
                 "void_reasons": [],
-                "qualified": True,
+                "run_valid": True,
+                "performance_gates_passed": True,
                 "composite_score": 0.9,
                 "duration_sec": 90.0,
                 "canonical_run_dir": "/tmp/canonical/run-1",

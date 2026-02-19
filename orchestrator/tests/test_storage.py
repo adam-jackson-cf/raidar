@@ -101,14 +101,15 @@ class TestAggregateResults:
         assert sample_eval_run.config.model in result["by_model"]
 
     def test_aggregates_stability_by_config(self, sample_eval_run: EvalRun):
-        """Should expose pass-rate and variance by config key."""
+        """Should expose validity and variance by config key."""
         runs = [sample_eval_run]
         result = aggregate_results(runs)
 
         assert "by_config" in result
         assert len(result["by_config"]) == 1
         stats = next(iter(result["by_config"].values()))
-        assert stats["pass_rate"] == 1.0
+        assert stats["validity_rate"] == 1.0
+        assert stats["performance_pass_rate"] == 1.0
         assert stats["score_variance"] == 0.0
 
     def test_calculates_average_score(self):
@@ -149,21 +150,24 @@ class TestAggregateResults:
         assert isinstance(result["by_harness"]["codex-cli"]["avg_score"], float)
 
     def test_void_runs_excluded_from_scored_aggregates(self, sample_eval_run: EvalRun):
-        """Void runs should not affect scored pass-rate/average."""
+        """Void runs should not affect scored validity-rate/average."""
         valid = sample_eval_run.model_copy(deep=True)
         valid.id = "valid-run"
         valid.scores.voided = False
-        valid.scores.qualification.checks = []
+        valid.scores.run_validity.checks = []
+        valid.scores.performance_gates.checks = []
 
         voided = sample_eval_run.model_copy(deep=True)
         voided.id = "void-run"
         voided.scores.voided = True
         voided.scores.void_reasons = ["provider_rate_limit"]
-        voided.scores.qualification.checks = []
+        voided.scores.run_validity.checks = []
+        voided.scores.performance_gates.checks = []
 
         result = aggregate_results([valid, voided])
         stats = result["by_harness"][valid.config.harness]
         assert stats["count"] == 2
         assert stats["scored_count"] == 1
         assert stats["void_count"] == 1
-        assert stats["pass_rate"] == 1.0
+        assert stats["validity_rate"] == 1.0
+        assert stats["performance_pass_rate"] == 1.0
