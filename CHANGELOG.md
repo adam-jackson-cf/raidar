@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [0.2.0] - 2026-02-22
 
+- chore: rename project branding to Raidar
+
+## [0.2.0] - 2026-02-22
+
 - feat: finalize multi-provider harness support and smoke validation
 - feat(orchestrator): enforce harness-model pairing
 - feat(harness): add adapters for cursor copilot pi
