@@ -47,6 +47,15 @@ ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
 ARTIFACT_CHANGE_PREFIXES = ("executions/",)
 EXECUTIONS_ROOT = REPO_ROOT / "executions"
+DEFAULT_ARCHIVE_ROOT = Path("/tmp")
+LEGACY_ARTIFACT_PATHS = (
+    "jobs",
+    "orchestrator/jobs",
+    "orchestrator/results",
+    "orchestrator/executions",
+    "orchestrator/executions-smoke",
+    "orchestrator/executions-baseline",
+)
 if ENV_PATH.exists():
     load_dotenv(ENV_PATH, override=False)
 
@@ -453,6 +462,129 @@ def _run_or_raise(cmd: list[str], cwd: Path) -> None:
         raise click.ClickException(f"Command failed ({result.returncode}): {rendered}")
 
 
+def _load_json_file(path: Path) -> dict[str, object] | None:
+    if not path.is_file():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    return payload
+
+
+def _execution_payload(execution_dir: Path) -> dict[str, object]:
+    for candidate in (
+        execution_dir / "suite-summary.json",
+        execution_dir / "suite.json",
+        execution_dir / "runs" / "run-01" / "run.json",
+    ):
+        payload = _load_json_file(candidate)
+        if payload is not None:
+            return payload
+    return {}
+
+
+def _execution_name_parts(execution_id: str) -> tuple[str | None, str | None, str | None]:
+    parts = execution_id.split("__")
+    if len(parts) < 3:
+        return None, None, None
+    return parts[0], parts[1], parts[2]
+
+
+def _execution_record(execution_dir: Path) -> dict[str, object]:
+    payload = _execution_payload(execution_dir)
+    config = payload.get("config")
+    aggregate = payload.get("aggregate")
+    config_dict = config if isinstance(config, dict) else {}
+    aggregate_dict = aggregate if isinstance(aggregate, dict) else {}
+    _, task_from_name, version_from_name = _execution_name_parts(execution_dir.name)
+    task_name = str(config_dict.get("task_name") or task_from_name or "unknown-task")
+    task_version = str(version_from_name or "unknown-version")
+    return {
+        "execution_id": execution_dir.name,
+        "path": str(execution_dir),
+        "created_at_utc": payload.get("created_at_utc"),
+        "task_name": task_name,
+        "task_version": task_version,
+        "harness": config_dict.get("harness"),
+        "model": config_dict.get("model"),
+        "run_count_total": aggregate_dict.get("run_count_total"),
+        "void_count": aggregate_dict.get("void_count"),
+    }
+
+
+def _execution_model_key(execution_dir: Path) -> str:
+    payload = _execution_payload(execution_dir)
+    config = payload.get("config")
+    config_dict = config if isinstance(config, dict) else {}
+    model = config_dict.get("model")
+    if isinstance(model, str) and model:
+        return model.replace("/", "__")
+    return "unknown-model"
+
+
+def _archive_destination(src: Path, archive_dir: Path) -> Path:
+    try:
+        rel = src.relative_to(REPO_ROOT)
+    except ValueError:
+        rel = Path("executions") / src.name
+    return archive_dir / rel
+
+
+def _archive_path(src: Path, archive_dir: Path, *, dry_run: bool) -> bool:
+    if not src.exists():
+        return False
+    destination = _archive_destination(src, archive_dir)
+    rel = destination.relative_to(archive_dir)
+    if dry_run:
+        click.echo(f"would-archive: {rel}")
+        return True
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(src), str(destination))
+    click.echo(f"archived: {rel}")
+    return True
+
+
+def _legacy_artifact_paths() -> list[Path]:
+    paths = [REPO_ROOT / rel for rel in LEGACY_ARTIFACT_PATHS]
+    workspace_variants = sorted((REPO_ROOT / "orchestrator").glob("workspace*"))
+    return paths + workspace_variants
+
+
+def _sorted_execution_dirs(executions_root: Path) -> list[Path]:
+    if not executions_root.is_dir():
+        return []
+    return sorted(
+        (path for path in executions_root.iterdir() if path.is_dir()),
+        key=lambda path: path.name,
+        reverse=True,
+    )
+
+
+def _default_archive_dir() -> Path:
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    return DEFAULT_ARCHIVE_ROOT / "raidar-archive" / stamp
+
+
+def _execution_matches_filters(
+    record: dict[str, object],
+    *,
+    task: str | None,
+    model: str | None,
+    harness: str | None,
+) -> bool:
+    task_value = str(record.get("task_name", "")).lower()
+    model_value = str(record.get("model", "")).lower()
+    harness_value = str(record.get("harness", "")).lower()
+    if task and task.lower() not in task_value:
+        return False
+    if model and model.lower() not in model_value:
+        return False
+    return not (harness and harness.lower() not in harness_value)
+
+
 @main.command()
 @click.option(
     "--task",
@@ -701,6 +833,125 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
     if result.returncode == 0:
         click.echo(result.stdout.strip())
     click.echo("Environment setup completed.")
+
+
+@main.group()
+def executions() -> None:
+    """Execution artifact workflows."""
+
+
+@executions.command("list")
+@click.option(
+    "--executions-root",
+    type=click.Path(path_type=Path),
+    default=EXECUTIONS_ROOT,
+    show_default=True,
+    help="Execution directory root.",
+)
+@click.option("--task", type=str, help="Filter by task name substring.")
+@click.option("--model", type=str, help="Filter by model substring.")
+@click.option("--harness", type=str, help="Filter by harness substring.")
+@click.option(
+    "--limit",
+    type=click.IntRange(min=1),
+    default=20,
+    show_default=True,
+    help="Maximum rows to display.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
+def executions_list(
+    executions_root: Path,
+    task: str | None,
+    model: str | None,
+    harness: str | None,
+    limit: int,
+    as_json: bool,
+) -> None:
+    """List execution suites with optional filters."""
+    dirs = _sorted_execution_dirs(executions_root.resolve())
+    rows: list[dict[str, object]] = []
+    for path in dirs:
+        record = _execution_record(path)
+        if not _execution_matches_filters(record, task=task, model=model, harness=harness):
+            continue
+        rows.append(record)
+        if len(rows) >= limit:
+            break
+
+    if as_json:
+        click.echo(json.dumps(rows, indent=2))
+        return
+    if not rows:
+        click.echo("No executions found.")
+        return
+
+    for index, row in enumerate(rows, start=1):
+        click.echo(
+            f"{index:02d}. {row['execution_id']} | task={row['task_name']}@{row['task_version']} | "
+            f"harness={row.get('harness') or 'unknown'} | model={row.get('model') or 'unknown'} | "
+            f"runs={row.get('run_count_total') or 0} | void={row.get('void_count') or 0}"
+        )
+
+
+@executions.command("prune")
+@click.option(
+    "--executions-root",
+    type=click.Path(path_type=Path),
+    default=EXECUTIONS_ROOT,
+    show_default=True,
+    help="Execution directory root.",
+)
+@click.option(
+    "--keep-per-model",
+    type=click.IntRange(min=0),
+    default=1,
+    show_default=True,
+    help="How many latest suites to keep per model.",
+)
+@click.option(
+    "--archive-dir",
+    type=click.Path(path_type=Path),
+    help="Archive destination. Defaults to /tmp/raidar-archive/<timestamp>.",
+)
+@click.option(
+    "--include-legacy/--no-include-legacy",
+    default=True,
+    show_default=True,
+    help="Archive legacy split artifact roots and workspace variants.",
+)
+@click.option("--dry-run", is_flag=True, help="Show actions without moving files.")
+def executions_prune(
+    executions_root: Path,
+    keep_per_model: int,
+    archive_dir: Path | None,
+    include_legacy: bool,
+    dry_run: bool,
+) -> None:
+    """Archive stale execution artifacts while keeping latest suites per model."""
+    archive_root = (archive_dir or _default_archive_dir()).resolve()
+    executions_root = executions_root.resolve()
+    if not dry_run:
+        archive_root.mkdir(parents=True, exist_ok=True)
+
+    archived_count = 0
+    if include_legacy:
+        for path in _legacy_artifact_paths():
+            archived_count += int(_archive_path(path, archive_root, dry_run=dry_run))
+
+    kept_counts: dict[str, int] = {}
+    pruned_count = 0
+    for execution_dir in _sorted_execution_dirs(executions_root):
+        model_key = _execution_model_key(execution_dir)
+        count = kept_counts.get(model_key, 0)
+        if count < keep_per_model:
+            kept_counts[model_key] = count + 1
+            continue
+        if _archive_path(execution_dir, archive_root, dry_run=dry_run):
+            pruned_count += 1
+
+    click.echo(f"archive_dir={archive_root}")
+    click.echo(f"legacy_archived={archived_count}")
+    click.echo(f"executions_pruned={pruned_count}")
 
 
 @main.group()

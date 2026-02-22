@@ -187,3 +187,173 @@ def test_info_selects_latest_task_version_numerically(tmp_path: Path) -> None:
     info_result = runner.invoke(main, ["info", "--task", str(task_dir)])
     assert info_result.exit_code == 0, info_result.output
     assert "Version: v10" in info_result.output
+
+
+def _write_execution_summary(
+    execution_dir: Path,
+    *,
+    task_name: str,
+    model: str,
+    harness: str,
+    created_at: str,
+    run_count_total: int = 1,
+    void_count: int = 0,
+) -> None:
+    execution_dir.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "created_at_utc": created_at,
+        "config": {
+            "task_name": task_name,
+            "harness": harness,
+            "model": model,
+        },
+        "aggregate": {
+            "run_count_total": run_count_total,
+            "void_count": void_count,
+        },
+    }
+    (execution_dir / "suite-summary.json").write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_executions_list_filters_and_json_output(tmp_path: Path) -> None:
+    runner = CliRunner()
+    executions_root = tmp_path / "executions"
+    _write_execution_summary(
+        executions_root / "20260222-100000Z__hello-world-smoke__v001",
+        task_name="hello-world-smoke",
+        model="anthropic/claude-haiku-4-5",
+        harness="claude-code",
+        created_at="2026-02-22T10:00:00+00:00",
+    )
+    _write_execution_summary(
+        executions_root / "20260222-110000Z__homepage-implementation__v001",
+        task_name="homepage-implementation",
+        model="codex/gpt-5.2-high",
+        harness="codex-cli",
+        created_at="2026-02-22T11:00:00+00:00",
+    )
+
+    text_result = runner.invoke(
+        main,
+        [
+            "executions",
+            "list",
+            "--executions-root",
+            str(executions_root),
+            "--task",
+            "homepage",
+        ],
+    )
+    assert text_result.exit_code == 0, text_result.output
+    assert "homepage-implementation@v001" in text_result.output
+    assert "hello-world-smoke@v001" not in text_result.output
+
+    json_result = runner.invoke(
+        main,
+        [
+            "executions",
+            "list",
+            "--executions-root",
+            str(executions_root),
+            "--json",
+        ],
+    )
+    assert json_result.exit_code == 0, json_result.output
+    rows = json.loads(json_result.output)
+    assert isinstance(rows, list)
+    assert rows[0]["execution_id"] == "20260222-110000Z__homepage-implementation__v001"
+
+
+def test_executions_prune_keeps_latest_per_model(tmp_path: Path) -> None:
+    runner = CliRunner()
+    executions_root = tmp_path / "executions"
+    archive_root = tmp_path / "archive"
+
+    old_dir = executions_root / "20260220-100000Z__hello-world-smoke__v001"
+    new_dir = executions_root / "20260221-100000Z__hello-world-smoke__v001"
+    other_model_dir = executions_root / "20260222-100000Z__hello-world-smoke__v001"
+    _write_execution_summary(
+        old_dir,
+        task_name="hello-world-smoke",
+        model="anthropic/claude-haiku-4-5",
+        harness="claude-code",
+        created_at="2026-02-20T10:00:00+00:00",
+    )
+    _write_execution_summary(
+        new_dir,
+        task_name="hello-world-smoke",
+        model="anthropic/claude-haiku-4-5",
+        harness="claude-code",
+        created_at="2026-02-21T10:00:00+00:00",
+    )
+    _write_execution_summary(
+        other_model_dir,
+        task_name="hello-world-smoke",
+        model="codex/gpt-5.2-high",
+        harness="codex-cli",
+        created_at="2026-02-22T10:00:00+00:00",
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "executions",
+            "prune",
+            "--executions-root",
+            str(executions_root),
+            "--archive-dir",
+            str(archive_root),
+            "--keep-per-model",
+            "1",
+            "--no-include-legacy",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert new_dir.exists()
+    assert other_model_dir.exists()
+    assert not old_dir.exists()
+    assert (archive_root / "executions" / old_dir.name).exists()
+    assert "executions_pruned=1" in result.output
+
+
+def test_executions_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
+    runner = CliRunner()
+    executions_root = tmp_path / "executions"
+    archive_root = tmp_path / "archive"
+    old_dir = executions_root / "20260220-100000Z__hello-world-smoke__v001"
+    new_dir = executions_root / "20260221-100000Z__hello-world-smoke__v001"
+    _write_execution_summary(
+        old_dir,
+        task_name="hello-world-smoke",
+        model="anthropic/claude-haiku-4-5",
+        harness="claude-code",
+        created_at="2026-02-20T10:00:00+00:00",
+    )
+    _write_execution_summary(
+        new_dir,
+        task_name="hello-world-smoke",
+        model="anthropic/claude-haiku-4-5",
+        harness="claude-code",
+        created_at="2026-02-21T10:00:00+00:00",
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "executions",
+            "prune",
+            "--executions-root",
+            str(executions_root),
+            "--archive-dir",
+            str(archive_root),
+            "--keep-per-model",
+            "1",
+            "--no-include-legacy",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    assert old_dir.exists()
+    assert new_dir.exists()
+    assert not archive_root.exists()
+    assert "would-archive: executions/" in result.output

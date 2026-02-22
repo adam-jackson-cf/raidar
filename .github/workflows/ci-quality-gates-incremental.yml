@@ -30,4 +30,5 @@ jobs:
 
       - name: Run consolidated CI quality gates
         run: |
-          bash scripts/run-ci-quality-gates.sh
+          cd orchestrator
+          uv run raidar quality gates

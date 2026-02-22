@@ -10,7 +10,7 @@
 ## Workflows
 
 ## Task completion
-- Requires `scripts/run-ci-quality-gates.sh` to pass.
+- Requires `uv run --project orchestrator raidar quality gates` to pass.
 
 ## Scoring integrity
 - **NEVER** relax deterministic checks.

@@ -3,14 +3,14 @@ repos:
     hooks:
       - id: ci-quality-gates
         name: Run CI quality gates (auto-fix supported)
-        entry: bash scripts/run-ci-quality-gates.sh --fix --stage
+        entry: bash -lc "cd orchestrator && uv run raidar quality gates --fix --stage"
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: ci-quality-gates-check
         name: Run CI quality gates (check mode)
-        entry: bash scripts/run-ci-quality-gates.sh
+        entry: bash -lc "cd orchestrator && uv run raidar quality gates"
         language: system
         pass_filenames: false
         always_run: true

@@ -33,8 +33,8 @@ If log format differs, extend `orchestrator/src/agentic_eval/parser/session_log.
 
 ```bash
 cd orchestrator
-uv run eval-orchestrator provider validate --agent <agent> --model <provider/model>
-uv run eval-orchestrator run \
+uv run raidar provider validate --agent <agent> --model <provider/model>
+uv run raidar run \
   --task ../tasks/hello-world-smoke/v001/task.yaml \
   --agent <agent> \
   --model <provider/model>
