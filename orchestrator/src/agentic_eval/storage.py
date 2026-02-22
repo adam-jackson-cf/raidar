@@ -217,7 +217,6 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "agent_execution_sec",
         "verifier_sec",
         "harness_overhead_sec",
-        "scaffold_changes",
     ]
 
     with open(output_path, "w", newline="") as f:
@@ -293,9 +292,6 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "agent_execution_sec": phase_timings.get("agent_execution_sec"),
                 "verifier_sec": phase_timings.get("verifier_sec"),
                 "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
-                "scaffold_changes": len(run.scores.scaffold_audit.changes_from_baseline)
-                if run.scores.scaffold_audit
-                else 0,
             }
             writer.writerow(row)
 

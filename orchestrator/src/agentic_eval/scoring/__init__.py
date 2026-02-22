@@ -39,7 +39,6 @@ def evaluate_all(
     gate_events: list[GateEvent],
     rules_path: Path | None = None,
     run_llm_checks: bool = True,
-    baseline_manifest_path: Path | None = None,
 ) -> Scorecard:
     """Run all evaluations and return complete scorecard.
 
@@ -50,13 +49,10 @@ def evaluate_all(
         gate_events: Gate events from execution
         rules_path: Path to rules file for LLM context
         run_llm_checks: Whether to run LLM judge checks
-        baseline_manifest_path: Path to baseline scaffold manifest for audit
 
     Returns:
         Complete Scorecard with all dimensions
     """
-    from ..audit.scaffold_manifest import create_scaffold_audit, load_manifest
-
     # Evaluate each dimension
     functional = evaluate_functional(workspace)
     compliance = evaluate_compliance(workspace, compliance_config, rules_path, run_llm_checks)
@@ -73,18 +69,11 @@ def evaluate_all(
 
     efficiency = evaluate_efficiency(gate_events)
 
-    # Generate scaffold audit if baseline manifest provided
-    scaffold_audit = None
-    if baseline_manifest_path and baseline_manifest_path.exists():
-        baseline_manifest = load_manifest(baseline_manifest_path)
-        scaffold_audit = create_scaffold_audit(baseline_manifest, workspace)
-
     return Scorecard(
         functional=functional,
         compliance=compliance,
         visual=visual,
         efficiency=efficiency,
-        scaffold_audit=scaffold_audit,
     )
 
 

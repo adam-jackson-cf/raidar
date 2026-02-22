@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .audit.scaffold_manifest import generate_manifest, save_manifest
+from .audit.workspace_diff import diff_directories
 from .config import settings
 from .harness.config import HarnessConfig
 from .harness.fast_mode import (
@@ -43,7 +43,6 @@ from .schemas.scorecard import (
     PerformanceGatesScore,
     RequirementCoverageScore,
     RunValidityScore,
-    ScaffoldAudit,
     Scorecard,
     VisualScore,
 )
@@ -212,8 +211,6 @@ class ScaffoldContext:
     scaffold_source: ScaffoldSource
     workspace: Path
     injected_rules: Path | None
-    manifest_path: Path
-    baseline_manifest_path: Path
     metadata_path: Path
 
 
@@ -229,7 +226,6 @@ class EvaluationOutputs:
     requirements: RequirementCoverageScore
     run_validity: RunValidityScore
     performance_gates: PerformanceGatesScore
-    scaffold_audit: ScaffoldAudit | None
     gate_history: list[GateEvent]
 
 
@@ -339,6 +335,7 @@ class PersistedArtifacts:
     harbor_artifacts: dict[str, str]
     evidence_artifacts: dict[str, Any]
     workspace_prune: dict[str, Any]
+    workspace_changes: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -518,11 +515,56 @@ def _prune_workspace_artifacts(workspace: Path) -> dict[str, Any]:
     }
 
 
+def _workspace_changes_from_baseline(
+    *,
+    baseline_workspace: Path,
+    run_workspace: Path,
+    run_root_dir: Path,
+) -> dict[str, Any]:
+    if not baseline_workspace.exists():
+        return {
+            "added": [],
+            "removed": [],
+            "modified": [],
+            "changed_files": [],
+            "changed_file_count": 0,
+            "artifact": None,
+            "error": f"Missing baseline workspace: {baseline_workspace}",
+        }
+
+    diff = diff_directories(baseline_workspace, run_workspace)
+    artifact_path = run_root_dir / "workspace-diff.json"
+    artifact_path.write_text(
+        json.dumps(
+            {
+                "baseline_workspace": str(baseline_workspace),
+                "run_workspace": str(run_workspace),
+                "added": diff.added,
+                "removed": diff.removed,
+                "modified": diff.modified,
+                "changed_files": diff.changed_files,
+                "changed_file_count": diff.count,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    return {
+        "added": diff.added,
+        "removed": diff.removed,
+        "modified": diff.modified,
+        "changed_files": diff.changed_files,
+        "changed_file_count": diff.count,
+        "artifact": str(artifact_path),
+        "error": None,
+    }
+
+
 def _preflight_cache_key(request: RunRequest, context: ScaffoldContext) -> str:
     payload = {
         "task_name": request.task.name,
         "task_yaml_hash": _hash_bytes((request.task_dir / "task.yaml").read_bytes()),
-        "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
+        "scaffold_fingerprint": context.scaffold_source.fingerprint,
         "required_commands": request.task.verification.required_commands,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -584,7 +626,7 @@ def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> 
         json.dumps(
             {
                 "task_name": request.task.name,
-                "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
+                "scaffold_fingerprint": context.scaffold_source.fingerprint,
                 "validated_at": datetime.now(UTC).isoformat(),
                 "required_commands": required_commands,
             },
@@ -913,10 +955,6 @@ def prepare_workspace(
     if rules_dir.exists():
         injected_rules = inject_rules(rules_dir, target_dir, agent)
 
-    # Generate initial manifest for baseline
-    manifest = generate_manifest(target_dir)
-    save_manifest(manifest, target_dir / "scaffold.manifest.json")
-
     return target_dir, injected_rules
 
 
@@ -1011,7 +1049,7 @@ def _fast_task_docker_image(request: RunRequest, context: ScaffoldContext) -> st
         "task_name": request.task.name,
         "task_version": request.task.version,
         "task_yaml_hash": task_yaml_hash,
-        "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
+        "scaffold_fingerprint": context.scaffold_source.fingerprint,
     }
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -1310,7 +1348,7 @@ def initialize_run(request: RunRequest) -> RunLayout:
 
 
 def prepare_run_context(request: RunRequest) -> ScaffoldContext:
-    """Resolve scaffold source, workspace, and manifest metadata."""
+    """Resolve scaffold source, workspace, and metadata."""
     from .scaffold import record_scaffold_metadata, resolve_scaffold_source
 
     scaffold_source = resolve_scaffold_source(
@@ -1346,27 +1384,12 @@ def prepare_run_context(request: RunRequest) -> ScaffoldContext:
             injected_rules = candidate
 
     workspace = workspace_dir
-    manifest_path = workspace / "scaffold.manifest.json"
-    if not manifest_path.exists():
-        manifest = generate_manifest(workspace)
-        save_manifest(manifest, manifest_path)
-
-    baseline_manifest_path = workspace / ".baseline-scaffold.json"
-    shutil.copy2(suite_baseline_dir / "scaffold.manifest.json", baseline_manifest_path)
-
-    metadata_path = record_scaffold_metadata(
-        workspace,
-        scaffold_source,
-        manifest_path,
-        baseline_manifest_path,
-    )
+    metadata_path = record_scaffold_metadata(workspace, scaffold_source)
 
     return ScaffoldContext(
         scaffold_source=scaffold_source,
         workspace=workspace,
         injected_rules=injected_rules,
-        manifest_path=manifest_path,
-        baseline_manifest_path=baseline_manifest_path,
         metadata_path=metadata_path,
     )
 
@@ -1665,13 +1688,6 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
             raise ValueError("scorecard.gate_history must be a list")
         gate_history = [GateEvent.model_validate(item) for item in gate_history_payload]
 
-        scaffold_audit_payload = payload.get("scaffold_audit")
-        scaffold_audit = (
-            ScaffoldAudit.model_validate(scaffold_audit_payload)
-            if scaffold_audit_payload is not None
-            else None
-        )
-
         outputs = EvaluationOutputs(
             functional=FunctionalScore.model_validate(payload.get("functional")),
             compliance=ComplianceScore.model_validate(payload.get("compliance")),
@@ -1687,7 +1703,6 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
             performance_gates=PerformanceGatesScore.model_validate(
                 payload.get("performance_gates")
             ),
-            scaffold_audit=scaffold_audit,
             gate_history=gate_history,
         )
     except (ValidationError, ValueError) as exc:
@@ -1705,14 +1720,10 @@ def build_scaffold_meta(request: RunRequest, context: ScaffoldContext) -> dict:
         "root": str(context.scaffold_source.path),
         "suite_baseline_dir": str(suite_baseline_dir),
         "run_workspace_dir": str(context.workspace),
-        "fingerprint": context.scaffold_source.manifest.fingerprint,
-        "baseline_manifest": context.baseline_manifest_path.name,
-        "workspace_manifest": context.manifest_path.name,
+        "fingerprint": context.scaffold_source.fingerprint,
         "metadata_file": context.metadata_path.name,
         "rules_file": context.injected_rules.name if context.injected_rules else None,
         "artifacts": {
-            "baseline_manifest": str(context.baseline_manifest_path),
-            "workspace_manifest": str(context.manifest_path),
             "metadata": str(context.metadata_path),
             **({"rules": str(context.injected_rules)} if context.injected_rules else {}),
         },
@@ -1735,7 +1746,7 @@ def build_task_version_meta(request: RunRequest, context: ScaffoldContext) -> di
         "task_name": request.task.name,
         "task_version": request.task.version,
         "scaffold_root": request.task.scaffold.root,
-        "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
+        "scaffold_fingerprint": context.scaffold_source.fingerprint,
     }
     seed = json.dumps(seed_payload, sort_keys=True, separators=(",", ":")).encode()
     return {
@@ -1844,6 +1855,7 @@ def write_run_analysis(
     evidence_meta = scorecard.metadata.get("evidence", {})
     workspace_meta = scorecard.metadata.get("workspace", {})
     prune_meta = workspace_meta.get("prune", {}) if isinstance(workspace_meta, dict) else {}
+    change_meta = workspace_meta.get("changes", {}) if isinstance(workspace_meta, dict) else {}
     lines = [
         "# Run Summary",
         "",
@@ -1879,6 +1891,10 @@ def write_run_analysis(
     lines.append(f"- evidence_errors: `{evidence_meta.get('errors')}`")
     lines.append(f"- workspace_pruned_dirs: `{prune_meta.get('removed')}`")
     lines.append(f"- workspace_pruned_bytes: `{prune_meta.get('reclaimed_bytes')}`")
+    lines.append(f"- workspace_changed_file_count: `{change_meta.get('changed_file_count')}`")
+    lines.append(f"- workspace_changed_files: `{change_meta.get('changed_files')}`")
+    lines.append(f"- workspace_diff_artifact: `{change_meta.get('artifact')}`")
+    lines.append(f"- workspace_diff_error: `{change_meta.get('error')}`")
     layout.analysis_path.write_text("\n".join(lines) + "\n")
 
 
@@ -2949,7 +2965,6 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
             ]
         ),
         performance_gates=PerformanceGatesScore(checks=[]),
-        scaffold_audit=None,
         gate_history=[],
     )
 
@@ -3077,24 +3092,6 @@ def _classify_void_reasons(terminated_early: bool, termination_reason: str | Non
     return list(dict.fromkeys(reasons))
 
 
-def _normalized_scaffold_audit(
-    scaffold_audit: ScaffoldAudit | None, scaffold_context: ScaffoldContext
-) -> ScaffoldAudit | None:
-    if not scaffold_audit:
-        return None
-    return scaffold_audit.model_copy(
-        update={
-            "template": scaffold_audit.template or scaffold_context.scaffold_source.task_name,
-            "template_version": scaffold_audit.template_version
-            or scaffold_context.scaffold_source.task_version,
-            "manifest_fingerprint": (
-                scaffold_audit.manifest_fingerprint
-                or scaffold_context.scaffold_source.manifest.fingerprint
-            ),
-        }
-    )
-
-
 def _scorecard_run_metadata(
     layout: RunLayout, *, voided: bool, void_reasons: list[str]
 ) -> dict[str, Any]:
@@ -3182,7 +3179,10 @@ def _scorecard_metadata(
         "verifier": _scorecard_verifier_metadata(execution, artifacts),
         "process": _scorecard_process_metadata(execution.process_metrics),
         "evidence": artifacts.evidence_artifacts,
-        "workspace": {"prune": artifacts.workspace_prune},
+        "workspace": {
+            "prune": artifacts.workspace_prune,
+            "changes": artifacts.workspace_changes,
+        },
     }
 
 
@@ -3191,12 +3191,9 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
 
     request = context.request
     layout = context.layout
-    scaffold_context = context.context
     artifacts = context.artifacts
     execution = context.execution
     outputs = execution.outputs
-
-    scaffold_audit = _normalized_scaffold_audit(outputs.scaffold_audit, scaffold_context)
 
     run_validity = build_run_validity_score(
         outputs=outputs,
@@ -3239,7 +3236,6 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         performance_gates=performance_gates,
         optimization=optimization,
         metadata=metadata,
-        scaffold_audit=scaffold_audit,
     )
 
 
@@ -3373,6 +3369,11 @@ def _persist_artifacts_phase(
             evidence_artifacts["errors"].append(hydrate_error)
 
     workspace_prune = _prune_workspace_artifacts(phase.layout.workspace_dir)
+    workspace_changes = _workspace_changes_from_baseline(
+        baseline_workspace=request.execution_dir / "workspace" / "baseline",
+        run_workspace=phase.layout.workspace_dir,
+        run_root_dir=phase.layout.root_dir,
+    )
     return PersistedArtifacts(
         scaffold_meta=build_scaffold_meta(request, phase.context),
         task_version_meta=build_task_version_meta(request, phase.context),
@@ -3383,6 +3384,7 @@ def _persist_artifacts_phase(
         harbor_artifacts=persist_harbor_artifacts(execution.harbor_result, phase.layout.harbor_dir),
         evidence_artifacts=evidence_artifacts,
         workspace_prune=workspace_prune,
+        workspace_changes=workspace_changes,
     )
 
 

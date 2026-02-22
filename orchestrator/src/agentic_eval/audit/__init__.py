@@ -1,1 +1,1 @@
-"""Base project auditing and manifest generation."""
+"""Audit utilities."""

@@ -210,18 +210,6 @@ class OptimizationScore(BaseModel):
         return round(max(0.0, min(1.0, 1.0 - weighted_penalty)), 3)
 
 
-class ScaffoldAudit(BaseModel):
-    """Scaffold baseline audit results."""
-
-    manifest_version: str = "1.0.0"
-    template: str | None = None
-    template_version: str | None = None
-    manifest_fingerprint: str | None = None
-    file_count: int = 0
-    dependency_count: int = 0
-    changes_from_baseline: list[str] = Field(default_factory=list)
-
-
 class Scorecard(BaseModel):
     """Complete scorecard for an evaluation run."""
 
@@ -248,9 +236,6 @@ class Scorecard(BaseModel):
     run_validity: RunValidityScore = Field(default_factory=RunValidityScore)
     performance_gates: PerformanceGatesScore = Field(default_factory=PerformanceGatesScore)
     optimization: OptimizationScore = Field(default_factory=OptimizationScore)
-
-    # Scaffold audit
-    scaffold_audit: ScaffoldAudit | None = None
 
     @computed_field
     @property

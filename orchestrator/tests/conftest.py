@@ -96,8 +96,6 @@ def sample_scorecard() -> Scorecard:
                 "task_version": "v001",
                 "root": "scaffold",
                 "fingerprint": "abc123",
-                "baseline_manifest": ".baseline-scaffold.json",
-                "workspace_manifest": "scaffold.manifest.json",
             }
         },
         functional=FunctionalScore(

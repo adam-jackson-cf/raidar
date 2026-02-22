@@ -7,7 +7,6 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
-from .audit.scaffold_manifest import load_manifest, save_manifest
 from .schemas.task import TaskDefinition
 
 VERSION_PATTERN = re.compile(r"^v(\d+)$")
@@ -21,7 +20,6 @@ class TaskCloneResult:
     source_version: str
     target_version: str
     target_task_yaml: Path
-    target_scaffold_manifest: Path
 
 
 def _validate_version_label(version: str) -> int:
@@ -44,7 +42,7 @@ def clone_task_version(
     source_version: str,
     target_version: str | None = None,
 ) -> TaskCloneResult:
-    """Clone one task version to another and update task/scaffold version metadata."""
+    """Clone one task version to another and update task version metadata."""
     source_dir = task_root / source_version
     if not source_dir.is_dir():
         raise FileNotFoundError(f"Source task version directory does not exist: {source_dir}")
@@ -69,15 +67,6 @@ def clone_task_version(
         task_def = TaskDefinition.from_yaml(target_task_yaml)
         task_def.version = resolved_target
         task_def.to_yaml(target_task_yaml)
-
-        target_manifest = target_dir / task_def.scaffold.root / "scaffold.manifest.json"
-        if not target_manifest.is_file():
-            raise FileNotFoundError(f"Task scaffold manifest not found: {target_manifest}")
-
-        manifest = load_manifest(target_manifest)
-        manifest.template = task_def.name
-        manifest.template_version = resolved_target
-        save_manifest(manifest, target_manifest)
     except Exception:
         shutil.rmtree(target_dir, ignore_errors=True)
         raise
@@ -87,5 +76,4 @@ def clone_task_version(
         source_version=source_version,
         target_version=resolved_target,
         target_task_yaml=target_task_yaml,
-        target_scaffold_manifest=target_manifest,
     )
