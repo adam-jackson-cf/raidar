@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.2] - 2026-02-22
+
+- fix: remove frozen sync requirement from quality gates
+
 ## [0.2.1] - 2026-02-22
 
 - fix: align local and ci gate sync flow
