@@ -1,0 +1,65 @@
+name: version-changelog
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  version-bump:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 100
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Run version bump
+        run: python scripts/bump-version.py
+
+      - name: Format CHANGELOG
+        run: |
+          npx --yes prettier --write CHANGELOG.md
+
+      - name: Prettier check (CHANGELOG)
+        run: |
+          npx --yes prettier --check CHANGELOG.md
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if git diff --quiet; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git add -A
+          VERSION=$(grep -oP 'version = "\K[^"]+' orchestrator/pyproject.toml)
+          git commit -m "chore: bump version to $VERSION [skip ci]"
+          git push
