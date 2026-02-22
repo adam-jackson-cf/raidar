@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Version bump and changelog generator for typescript-ui-eval.
+Version bump and changelog generator for Raidar.
 
 Analyzes conventional commits to determine version bump type:
 - feat: -> minor bump (0.1.1 -> 0.2.0)

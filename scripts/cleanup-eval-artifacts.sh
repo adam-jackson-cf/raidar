@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 KEEP_PER_MODEL="${KEEP_PER_MODEL:-1}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
-ARCHIVE_DIR="${ARCHIVE_DIR:-/tmp/typescript-ui-eval-archive/$STAMP}"
+ARCHIVE_DIR="${ARCHIVE_DIR:-/tmp/raidar-archive/$STAMP}"
 EXECUTIONS_DIR="$ROOT_DIR/executions"
 
 mkdir -p "$ARCHIVE_DIR"
