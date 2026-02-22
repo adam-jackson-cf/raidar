@@ -1,6 +1,5 @@
 #!/usr/bin/env bun
 import { spawnSync } from "node:child_process";
-import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 
@@ -235,60 +234,6 @@ function qualityScore({ functional, complianceScore, visual, efficiencyScore, we
     complianceScore * (weights.compliance / nonVisualTotal) +
     efficiencyScore * (weights.efficiency / nonVisualTotal)
   );
-}
-
-function hashFile(filePath) {
-  const fileBytes = fs.readFileSync(filePath);
-  const digest = crypto.createHash("sha256").update(fileBytes).digest("hex");
-  return `sha256:${digest}`;
-}
-
-function collectWorkspaceHashes() {
-  const ignoredDirs = new Set(["node_modules", ".next", "jobs", "coverage", "harbor-task"]);
-  const ignoredFiles = new Set(["actual.png", "diff.png"]);
-  const hashes = {};
-  const files = walkFiles(APP_DIR);
-  for (const absolutePath of files) {
-    const relative = path.relative(APP_DIR, absolutePath);
-    const segments = relative.split(path.sep);
-    if (segments.some((segment) => ignoredDirs.has(segment))) continue;
-    if (ignoredFiles.has(path.basename(relative))) continue;
-    hashes[relative] = hashFile(absolutePath);
-  }
-  return hashes;
-}
-
-function createScaffoldAudit() {
-  const manifestPath = path.join(APP_DIR, "scaffold.manifest.json");
-  const baselineManifest = readJson(manifestPath, {});
-  const baselineFiles = baselineManifest.files || {};
-  const currentFiles = collectWorkspaceHashes();
-  const changes = [];
-
-  for (const [relativePath, baselineInfo] of Object.entries(baselineFiles)) {
-    if (!(relativePath in currentFiles)) {
-      changes.push(`Removed: ${relativePath}`);
-      continue;
-    }
-    if (baselineInfo.hash !== currentFiles[relativePath]) {
-      changes.push(`Modified: ${relativePath}`);
-    }
-  }
-  for (const relativePath of Object.keys(currentFiles)) {
-    if (!(relativePath in baselineFiles)) {
-      changes.push(`Added: ${relativePath}`);
-    }
-  }
-  changes.sort();
-  return {
-    manifest_version: baselineManifest.version || "1.0.0",
-    template: baselineManifest.template || null,
-    template_version: baselineManifest.template_version || null,
-    manifest_fingerprint: baselineManifest.fingerprint || null,
-    file_count: Object.keys(currentFiles).length,
-    dependency_count: Object.keys(baselineManifest.dependencies || {}).length,
-    changes_from_baseline: changes,
-  };
 }
 
 function stackIntegrityCheck(taskSpec) {
@@ -604,16 +549,6 @@ function main() {
     };
   }
 
-  const scaffoldAudit = createScaffoldAudit();
-  if (scaffoldAudit.changes_from_baseline.length === 0) {
-    complianceChecks.push({
-      rule: "Modifies scaffold files",
-      type: "deterministic",
-      passed: false,
-      evidence: "No tracked file changes from scaffold baseline.",
-    });
-  }
-
   const complianceScore = scoreCompliance(complianceChecks);
   const failingGateNames = gateHistory
     .filter((event) => event.exit_code !== 0)
@@ -672,7 +607,6 @@ function main() {
       passed: performanceGateChecks.every((check) => check.passed),
     },
     gate_history: gateHistory,
-    scaffold_audit: scaffoldAudit,
   };
 
   writeJson(path.join(LOG_DIR, "scorecard.json"), scorecard);
@@ -747,7 +681,6 @@ try {
       passed: false,
     },
     gate_history: [],
-    scaffold_audit: null,
   });
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), "0");
   console.error(message);

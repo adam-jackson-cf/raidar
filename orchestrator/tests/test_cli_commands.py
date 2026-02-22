@@ -5,7 +5,6 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from agentic_eval.audit.scaffold_manifest import load_manifest
 from agentic_eval.cli import (
     RunCliOptions,
     _assert_no_generated_artifact_changes,
@@ -93,7 +92,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
     _assert_no_generated_artifact_changes(tmp_path)
 
 
-def _create_scaffold_manifest(task_dir: Path, template: str, version: str) -> Path:
+def _create_scaffold_files(task_dir: Path, version: str) -> None:
     scaffold_dir = task_dir / version / "scaffold"
     src_dir = scaffold_dir / "src" / "app"
     src_dir.mkdir(parents=True, exist_ok=True)
@@ -104,32 +103,9 @@ def _create_scaffold_manifest(task_dir: Path, template: str, version: str) -> Pa
     (scaffold_dir / "tsconfig.json").write_text("{}\n")
     (scaffold_dir / "next.config.ts").write_text("export default {};\n")
     (scaffold_dir / "postcss.config.mjs").write_text("export default {};\n")
-    manifest_path = scaffold_dir / "scaffold.manifest.json"
-    manifest_path.write_text(
-        json.dumps(
-            {
-                "generated_at": "2026-02-21T00:00:00+00:00",
-                "version": "1.0.0",
-                "template": template,
-                "template_version": version,
-                "fingerprint": "sha256:test",
-                "files": {},
-                "dependencies": {},
-                "dev_dependencies": {},
-                "quality_gates": {
-                    "typecheck": "bun run typecheck",
-                    "lint": "bunx ultracite check src",
-                    "test": "bun test",
-                },
-                "pre_commit_hooks": ["typecheck", "lint"],
-            },
-            indent=2,
-        )
-    )
-    return manifest_path
 
 
-def test_task_clone_version_auto_increments_and_updates_manifest(tmp_path: Path) -> None:
+def test_task_clone_version_auto_increments(tmp_path: Path) -> None:
     runner = CliRunner()
     task_dir = tmp_path / "tasks" / "sample-task"
 
@@ -139,7 +115,7 @@ def test_task_clone_version_auto_increments_and_updates_manifest(tmp_path: Path)
     )
     assert init_result.exit_code == 0, init_result.output
 
-    _create_scaffold_manifest(task_dir, template="sample-task", version="v001")
+    _create_scaffold_files(task_dir, version="v001")
 
     clone_result = runner.invoke(
         main,
@@ -151,13 +127,10 @@ def test_task_clone_version_auto_increments_and_updates_manifest(tmp_path: Path)
     cloned_task_yaml = task_dir / "v002" / "task.yaml"
     cloned_task = TaskDefinition.from_yaml(cloned_task_yaml)
     assert cloned_task.version == "v002"
-
-    cloned_manifest = load_manifest(task_dir / "v002" / "scaffold" / "scaffold.manifest.json")
-    assert cloned_manifest.template == "sample-task"
-    assert cloned_manifest.template_version == "v002"
+    assert (task_dir / "v002" / "scaffold" / "src" / "app" / "page.tsx").exists()
 
 
-def test_task_clone_version_fails_without_scaffold_manifest(tmp_path: Path) -> None:
+def test_task_clone_version_succeeds_without_scaffold_manifest(tmp_path: Path) -> None:
     runner = CliRunner()
     task_dir = tmp_path / "tasks" / "sample-task"
 
@@ -173,9 +146,8 @@ def test_task_clone_version_fails_without_scaffold_manifest(tmp_path: Path) -> N
         main,
         ["task", "clone-version", "--path", str(task_dir), "--from-version", "v001"],
     )
-    assert clone_result.exit_code != 0
-    assert "Task scaffold manifest not found" in clone_result.output
-    assert not (task_dir / "v002").exists()
+    assert clone_result.exit_code == 0, clone_result.output
+    assert (task_dir / "v002").exists()
 
 
 def test_info_selects_latest_task_version_numerically(tmp_path: Path) -> None:

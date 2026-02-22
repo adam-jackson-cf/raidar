@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from agentic_eval.audit.scaffold_manifest import generate_manifest
+from agentic_eval.audit.workspace_diff import directory_fingerprint
 from agentic_eval.harness.config import Agent, HarnessConfig, ModelTarget
 from agentic_eval.runner import (
     EvaluationOutputs,
@@ -24,6 +24,7 @@ from agentic_eval.runner import (
     _load_verifier_outputs,
     _prune_workspace_artifacts,
     _resolve_homepage_screenshot_command,
+    _workspace_changes_from_baseline,
     build_scorecard,
     collect_process_metrics,
     create_harbor_task_bundle,
@@ -40,7 +41,6 @@ from agentic_eval.schemas.scorecard import (
     PerformanceGatesScore,
     RequirementCoverageScore,
     RunValidityScore,
-    ScaffoldAudit,
 )
 from agentic_eval.schemas.task import DeterministicCheck, RequirementSpec, TaskDefinition
 
@@ -90,7 +90,7 @@ def _sample_harness_config() -> HarnessConfig:
     )
 
 
-def _sample_evaluation_outputs(scaffold_audit: ScaffoldAudit | None = None) -> EvaluationOutputs:
+def _sample_evaluation_outputs() -> EvaluationOutputs:
     return EvaluationOutputs(
         functional=FunctionalScore(
             passed=True,
@@ -120,7 +120,6 @@ def _sample_evaluation_outputs(scaffold_audit: ScaffoldAudit | None = None) -> E
         ),
         run_validity=RunValidityScore(),
         performance_gates=PerformanceGatesScore(),
-        scaffold_audit=scaffold_audit,
         gate_history=[],
     )
 
@@ -130,7 +129,6 @@ def _sample_scorecard_context(
     *,
     terminated_early: bool,
     termination_reason: str | None,
-    scaffold_audit: ScaffoldAudit | None = None,
 ) -> ScorecardBuildContext:
     task_dir = tmp_path / "task"
     workspace_dir = tmp_path / "workspace"
@@ -142,16 +140,11 @@ def _sample_scorecard_context(
     (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
 
-    scaffold_manifest = generate_manifest(
-        workspace_dir,
-        template_name="homepage-implementation",
-        template_version="v001",
-    )
     scaffold_source = ScaffoldSource(
         task_name="homepage-implementation",
         task_version="v001",
         path=workspace_dir,
-        manifest=scaffold_manifest,
+        fingerprint=directory_fingerprint(workspace_dir),
     )
 
     request = RunRequest(
@@ -165,8 +158,6 @@ def _sample_scorecard_context(
         scaffold_source=scaffold_source,
         workspace=workspace_dir,
         injected_rules=None,
-        manifest_path=workspace_dir / "scaffold.manifest.json",
-        baseline_manifest_path=workspace_dir / ".baseline-scaffold.json",
         metadata_path=workspace_dir / ".scaffold-meta.json",
     )
     layout = RunLayout(
@@ -192,7 +183,7 @@ def _sample_scorecard_context(
         termination_reason=termination_reason,
         process_metrics=collect_process_metrics(_sample_task(), None, harness="codex-cli"),
         events=[],
-        outputs=_sample_evaluation_outputs(scaffold_audit=scaffold_audit),
+        outputs=_sample_evaluation_outputs(),
         duration_sec=12.5,
     )
     artifacts = PersistedArtifacts(
@@ -203,6 +194,15 @@ def _sample_scorecard_context(
         harbor_artifacts={"command": "harbor/command.txt"},
         evidence_artifacts={"homepage_pre": None, "homepage_post": None, "errors": []},
         workspace_prune={"removed": [], "reclaimed_bytes": 0},
+        workspace_changes={
+            "added": [],
+            "removed": [],
+            "modified": [],
+            "changed_files": [],
+            "changed_file_count": 0,
+            "artifact": None,
+            "error": None,
+        },
     )
     return ScorecardBuildContext(
         request=request,
@@ -233,7 +233,6 @@ def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
             call_count += 1
         time.sleep(0.05)
         target_dir.mkdir(parents=True, exist_ok=True)
-        (target_dir / "scaffold.manifest.json").write_text("{}\n", encoding="utf-8")
         return target_dir, None
 
     monkeypatch.setattr("agentic_eval.runner.prepare_workspace", fake_prepare_workspace)
@@ -872,15 +871,6 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                         "is_repeat": False,
                     }
                 ],
-                "scaffold_audit": {
-                    "manifest_version": "1.0.0",
-                    "template": "homepage-implementation",
-                    "template_version": "v001",
-                    "manifest_fingerprint": "abc",
-                    "file_count": 10,
-                    "dependency_count": 8,
-                    "changes_from_baseline": ["Modified: src/app/page.tsx"],
-                },
             }
         )
     )
@@ -893,8 +883,6 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs.visual is not None
     assert outputs.visual.threshold_met is True
     assert len(outputs.gate_history) == 1
-    assert outputs.scaffold_audit is not None
-    assert outputs.scaffold_audit.template == "homepage-implementation"
 
 
 def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
@@ -952,31 +940,6 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
     assert scorecard.metadata["run"]["repeat_required_reasons"] == scorecard.void_reasons
 
 
-def test_build_scorecard_populates_missing_scaffold_audit_fields(tmp_path: Path):
-    context = _sample_scorecard_context(
-        tmp_path,
-        terminated_early=False,
-        termination_reason=None,
-        scaffold_audit=ScaffoldAudit(
-            template=None,
-            template_version=None,
-            manifest_fingerprint=None,
-            file_count=3,
-            dependency_count=2,
-            changes_from_baseline=[],
-        ),
-    )
-
-    scorecard = build_scorecard(context)
-
-    assert scorecard.scaffold_audit is not None
-    assert scorecard.scaffold_audit.template == "homepage-implementation"
-    assert scorecard.scaffold_audit.template_version == "v001"
-    assert scorecard.scaffold_audit.manifest_fingerprint == (
-        context.context.scaffold_source.manifest.fingerprint
-    )
-
-
 def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Path):
     workspace = tmp_path / "workspace"
     task_dir = tmp_path / "task"
@@ -1029,18 +992,12 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
         task_name="homepage-implementation",
         task_version="v001",
         path=workspace,
-        manifest=generate_manifest(
-            workspace,
-            template_name="homepage-implementation",
-            template_version="v001",
-        ),
+        fingerprint=directory_fingerprint(workspace),
     )
     context = ScaffoldContext(
         scaffold_source=scaffold_source,
         workspace=workspace,
         injected_rules=None,
-        manifest_path=workspace / "scaffold.manifest.json",
-        baseline_manifest_path=workspace / ".baseline-scaffold.json",
         metadata_path=workspace / ".scaffold-meta.json",
     )
 
@@ -1114,18 +1071,12 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
         task_name="hello-world-smoke",
         task_version="v001",
         path=workspace,
-        manifest=generate_manifest(
-            workspace,
-            template_name="hello-world-smoke",
-            template_version="v001",
-        ),
+        fingerprint=directory_fingerprint(workspace),
     )
     context = ScaffoldContext(
         scaffold_source=scaffold_source,
         workspace=workspace,
         injected_rules=None,
-        manifest_path=workspace / "scaffold.manifest.json",
-        baseline_manifest_path=workspace / ".baseline-scaffold.json",
         metadata_path=workspace / ".scaffold-meta.json",
     )
 
@@ -1217,3 +1168,30 @@ def test_prune_workspace_artifacts_removes_transient_directories(tmp_path: Path)
     assert not (workspace / "node_modules").exists()
     assert not (workspace / ".next").exists()
     assert (workspace / "src" / "app.tsx").exists()
+
+
+def test_workspace_changes_from_baseline_reports_added_modified_removed(tmp_path: Path):
+    baseline = tmp_path / "baseline"
+    run_workspace = tmp_path / "run"
+    run_root = tmp_path / "run-root"
+    (baseline / "src").mkdir(parents=True, exist_ok=True)
+    (run_workspace / "src").mkdir(parents=True, exist_ok=True)
+    run_root.mkdir(parents=True, exist_ok=True)
+
+    (baseline / "src" / "a.ts").write_text("export const a = 1;\n")
+    (baseline / "src" / "b.ts").write_text("export const b = 1;\n")
+
+    (run_workspace / "src" / "a.ts").write_text("export const a = 2;\n")
+    (run_workspace / "src" / "c.ts").write_text("export const c = 1;\n")
+
+    changes = _workspace_changes_from_baseline(
+        baseline_workspace=baseline,
+        run_workspace=run_workspace,
+        run_root_dir=run_root,
+    )
+
+    assert changes["added"] == ["src/c.ts"]
+    assert changes["removed"] == ["src/b.ts"]
+    assert changes["modified"] == ["src/a.ts"]
+    assert changes["changed_file_count"] == 3
+    assert (run_root / "workspace-diff.json").exists()

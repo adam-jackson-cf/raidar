@@ -915,7 +915,7 @@ def task_validate(task: Path) -> None:
     help="Target task version label. Defaults to the next version after --from-version.",
 )
 def task_clone_version(path: Path, from_version: str, to_version: str | None) -> None:
-    """Clone a task version and update task/scaffold version metadata."""
+    """Clone a task version and update task version metadata."""
     try:
         result = clone_task_version(
             task_root=path.resolve(),
@@ -930,33 +930,6 @@ def task_clone_version(path: Path, from_version: str, to_version: str | None) ->
     click.echo(f"  source_version: {result.source_version}")
     click.echo(f"  target_version: {result.target_version}")
     click.echo(f"  task_yaml: {result.target_task_yaml}")
-    click.echo(f"  scaffold_manifest: {result.target_scaffold_manifest}")
-
-
-@main.command()
-@click.option(
-    "--scaffold",
-    "-s",
-    type=click.Path(exists=True, path_type=Path),
-    required=True,
-    help="Path to a specific scaffold template/version directory",
-)
-@click.option(
-    "--output",
-    "-o",
-    type=click.Path(path_type=Path),
-    help="Output path for manifest (default: scaffold/scaffold.manifest.json)",
-)
-def manifest(scaffold: Path, output: Path | None) -> None:
-    """Generate scaffold manifest."""
-    from .audit.scaffold_manifest import generate_manifest, save_manifest
-
-    click.echo(f"Generating manifest for {scaffold}")
-    m = generate_manifest(scaffold)
-
-    output_path = output or (scaffold / "scaffold.manifest.json")
-    save_manifest(m, output_path)
-    click.echo(f"Manifest saved to {output_path}")
 
 
 @main.command()
