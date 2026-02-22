@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [0.2.0] - 2026-02-22
 
+- docs: update readme strapline
+
+## [0.2.0] - 2026-02-22
+
 - chore: rename project branding to Raidar
 
 ## [0.2.0] - 2026-02-22
