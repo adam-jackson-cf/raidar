@@ -34,7 +34,7 @@ Goal: support Codex CLI usage in Harbor with secure non-interactive authenticati
 
 ## Validation Checklist
 
-- `uv run eval-orchestrator provider validate --agent codex-cli --model codex/gpt-5.2-high`
+- `uv run raidar provider validate --agent codex-cli --model codex/gpt-5.2-high`
 - `./scripts/run-provider-smoke.sh --agent codex-cli --model codex/gpt-5.2-high`
 
 ## Status

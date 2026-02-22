@@ -23,8 +23,8 @@ if [[ -z "${OPENAI_API_KEY:-}" ]]; then
 fi
 
 cd "$ORCH_DIR"
-uv run eval-orchestrator harbor cleanup
-uv run eval-orchestrator provider validate --agent "$AGENT" --model "codex/gpt-5.2-high"
+uv run raidar harbor cleanup
+uv run raidar provider validate --agent "$AGENT" --model "codex/gpt-5.2-high"
 
 models=(
   "codex/gpt-5.2-low"
@@ -35,7 +35,7 @@ models=(
 for model in "${models[@]}"; do
   echo
   echo "Running baseline for $model (repeats=$REPEATS, parallel=$REPEAT_PARALLEL, retry_void=$RETRY_VOID, timeout=${TIMEOUT_SEC}s)"
-  uv run eval-orchestrator suite run \
+  uv run raidar suite run \
     --task "$TASK_PATH" \
     --agent "$AGENT" \
     --model "$model" \

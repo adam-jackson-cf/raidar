@@ -119,14 +119,14 @@ if [[ "$FAST_MODE" == "1" ]]; then
 fi
 
 cd "$ORCH_DIR"
-uv run eval-orchestrator harbor cleanup
+uv run raidar harbor cleanup
 
-uv run eval-orchestrator provider validate \
+uv run raidar provider validate \
   --agent "$AGENT" \
   --model "$MODEL" \
   --timeout "$TIMEOUT_SEC"
 
-uv run eval-orchestrator suite run \
+uv run raidar suite run \
   --task "$TASK_PATH" \
   --agent "$AGENT" \
   --model "$MODEL" \

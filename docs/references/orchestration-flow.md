@@ -1,4 +1,4 @@
-# Eval Orchestration Flow
+# Raidar Orchestration Flow
 
 End-to-end flow for task execution, Harbor runtime orchestration, and scoring output.
 
@@ -61,7 +61,7 @@ Canonical artifact paths for analysis:
 
 ## 6. Cleanup Lifecycle
 
-`./scripts/cleanup-eval-artifacts.sh`:
-- archives legacy split roots (`orchestrator/results`, `orchestrator/jobs`, `orchestrator/workspace*`).
-- prunes execution roots per model via `KEEP_PER_MODEL`.
-- archives pruned artifacts under `/tmp/typescript-ui-eval-archive/<timestamp>/`.
+`uv run --project orchestrator raidar executions prune`:
+- archives legacy split roots (`orchestrator/results`, `orchestrator/jobs`, `orchestrator/workspace*`) by default.
+- prunes execution roots per model via `--keep-per-model` (default `1`).
+- archives pruned artifacts under `/tmp/raidar-archive/<timestamp>/` by default.

@@ -61,12 +61,12 @@ Populate `tasks/<task>/v001/rules/` with agent-mapped files:
 1. Validate task:
 ```bash
 cd orchestrator
-uv run eval-orchestrator task validate --task ../tasks/<task-name>/v001/task.yaml
+uv run raidar task validate --task ../tasks/<task-name>/v001/task.yaml
 ```
 
 2. Run smoke execution:
 ```bash
-uv run eval-orchestrator run \
+uv run raidar run \
   --task ../tasks/<task-name>/v001/task.yaml \
   --agent codex-cli \
   --model codex/gpt-5.2-high
@@ -84,12 +84,11 @@ Use deterministic cloning for version promotion:
 
 ```bash
 cd orchestrator
-uv run eval-orchestrator task clone-version \
+uv run raidar task clone-version \
   --path ../tasks/<task-name> \
   --from-version v001
 ```
 
-This creates `v002` automatically, updates `task.yaml` (`version`), and rewrites
-`scaffold/scaffold.manifest.json` metadata (`template`, `template_version`).
+This creates `v002` automatically and updates `task.yaml` version metadata in the cloned version.
 
 Do not mutate old versions once they are used for benchmark comparisons.

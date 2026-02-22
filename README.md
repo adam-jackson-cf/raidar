@@ -7,7 +7,7 @@
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=flat-square)
 ![Runtime](https://img.shields.io/badge/runtime-uv%20%7C%20docker-lightgrey.svg?style=flat-square)
-![Primary CLI](https://img.shields.io/badge/cli-eval--orchestrator-orange.svg?style=flat-square)
+![Primary CLI](https://img.shields.io/badge/cli-raidar-orange.svg?style=flat-square)
 
 <p>
   <a href="#quick-install">Quick Install</a> •
@@ -47,7 +47,8 @@ Bootstrap the orchestrator environment:
 ```bash
 cp orchestrator/.env.example orchestrator/.env
 # Edit orchestrator/.env and set your provider key(s)
-./scripts/setup.sh
+cd orchestrator
+uv run raidar env setup
 ```
 
 ## Start Here (2 Minutes)
@@ -56,8 +57,8 @@ Run one end-to-end smoke suite:
 
 ```bash
 cd orchestrator
-uv run eval-orchestrator provider validate --agent claude-code --model anthropic/claude-haiku-4-5
-uv run eval-orchestrator suite run \
+uv run raidar provider validate --agent claude-code --model anthropic/claude-haiku-4-5
+uv run raidar suite run \
   --task ../tasks/hello-world-smoke/v001/task.yaml \
   --agent claude-code \
   --model anthropic/claude-haiku-4-5 \
@@ -149,9 +150,9 @@ Environment and provider checks:
 
 ```bash
 cd orchestrator
-uv run eval-orchestrator env setup
-uv run eval-orchestrator provider list
-uv run eval-orchestrator provider validate --agent codex-cli --model codex/gpt-5.2-high
+uv run raidar env setup
+uv run raidar provider list
+uv run raidar provider validate --agent codex-cli --model codex/gpt-5.2-high
 ```
 
 Run a smoke suite:
@@ -171,7 +172,8 @@ Run homepage task baseline set:
 Prune/archive stale generated execution artifacts:
 
 ```bash
-./scripts/cleanup-eval-artifacts.sh
+cd orchestrator
+uv run raidar executions prune
 ```
 
 ## Changelog
