@@ -14,17 +14,17 @@ Produce a deterministic comparison of the latest suite per combination, then gen
 
 Use only these artifact paths:
 
-- Suite records: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/suite.json`
-- Suite summaries: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/suite-summary.json`
-- Suite analysis docs: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/analysis.md`
-- Run records: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/run.json`
-- Verifier scorecards: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/verifier/scorecard.json`
-- Run-validity artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/verifier/run-validity.json`
-- Performance-gates artifacts: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/verifier/performance-gates.json`
-- Pre-task screenshots: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/homepage-pre.png`
-- Post-task screenshots: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/homepage-post.png`
-- Agent traces: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/agent/trajectory.json`
-- Agent logs: `/Users/adamjackson/Projects/typescript-ui-eval/executions/*/runs/*/agent/*.txt`
+- Suite records: `executions/*/suite.json`
+- Suite summaries: `executions/*/suite-summary.json`
+- Suite analysis docs: `executions/*/analysis.md`
+- Run records: `executions/*/runs/*/run.json`
+- Verifier scorecards: `executions/*/runs/*/verifier/scorecard.json`
+- Run-validity artifacts: `executions/*/runs/*/verifier/run-validity.json`
+- Performance-gates artifacts: `executions/*/runs/*/verifier/performance-gates.json`
+- Pre-task screenshots: `executions/*/runs/*/homepage-pre.png`
+- Post-task screenshots: `executions/*/runs/*/homepage-post.png`
+- Agent traces: `executions/*/runs/*/agent/trajectory.json`
+- Agent logs: `executions/*/runs/*/agent/*.txt`
 
 Do not use legacy roots such as `orchestrator/executions*`, `orchestrator/results`, `orchestrator/jobs`, or `orchestrator/workspace*`.
 
@@ -80,5 +80,5 @@ Return:
 1. Never treat deterministic-check failures as harness defects.
 2. Always separate orchestrator implementation failures from task scoring failures.
 3. Never propose relaxing thresholds, deterministic checks, or scoring criteria.
-4. If evidence is missing, list missing absolute paths and continue with available evidence.
+4. If evidence is missing, list missing artifact paths and continue with available evidence.
 5. Recommendations must explicitly reference the affected task version(s) (for example `homepage-implementation@v001`).

@@ -1,6 +1,26 @@
-# TypeScript UI Eval
+<div align="center">
 
-Deterministic task evaluation for UI implementation workflows using Harbor-based agent execution.
+<h1>Raidar</h1>
+
+**Deterministic task evaluation for UI implementation workflows using Harbor-based agent execution.**
+
+![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
+![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=flat-square)
+![Runtime](https://img.shields.io/badge/runtime-uv%20%7C%20docker-lightgrey.svg?style=flat-square)
+![Primary CLI](https://img.shields.io/badge/cli-eval--orchestrator-orange.svg?style=flat-square)
+
+<p>
+  <a href="#quick-install">Quick Install</a> •
+  <a href="#start-here-2-minutes">Start Here</a> •
+  <a href="#orchestrator-flow">Flow</a> •
+  <a href="#execution-suite-layout">Execution Layout</a> •
+  <a href="CHANGELOG.md">Changelog</a> •
+  <a href="analyze-results.md">Analyze Prompt</a>
+</p>
+
+</div>
+
+---
 
 ## Table of Contents
 
