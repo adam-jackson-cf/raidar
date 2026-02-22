@@ -61,7 +61,7 @@ if ENV_PATH.exists():
 
 
 @click.group()
-@click.version_option(version="0.1.0")
+@click.version_option(version="0.2.0")
 def main() -> None:
     """Eval orchestrator for testing model/harness combinations."""
 
