@@ -11,14 +11,14 @@ from .schemas.scorecard import EvalRun
 
 
 def repeat_workspace(base_workspace: Path, repeat_index: int) -> Path:
-    """Return an isolated workspace path for one repeat."""
-    return base_workspace.parent / f"{base_workspace.name}-repeat-{repeat_index:02d}"
+    """Return an isolated run workspace path for one repeat under a suite root."""
+    return base_workspace / "runs" / f"run-{repeat_index:02d}" / "workspace"
 
 
 def _run_pointer(run: EvalRun) -> dict[str, object]:
     run_meta = run.scores.metadata.get("run", {})
     canonical_run_dir = run_meta.get("canonical_run_dir")
-    summary_result_json = run_meta.get("summary_result_json")
+    run_json_path = run_meta.get("run_json_path")
     return {
         "run_id": run.id,
         "timestamp": run.timestamp,
@@ -33,9 +33,7 @@ def _run_pointer(run: EvalRun) -> dict[str, object]:
         "terminated_early": run.terminated_early,
         "termination_reason": run.termination_reason,
         "canonical_run_dir": canonical_run_dir if isinstance(canonical_run_dir, str) else None,
-        "summary_result_json": summary_result_json
-        if isinstance(summary_result_json, str)
-        else None,
+        "run_json_path": run_json_path if isinstance(run_json_path, str) else None,
     }
 
 
@@ -114,7 +112,6 @@ def create_repeat_suite_summary(
     task_name: str,
     harness: str,
     model: str,
-    rules_variant: str,
     repeats: int,
     repeat_parallel: int,
     runs: list[EvalRun],
@@ -139,7 +136,6 @@ def create_repeat_suite_summary(
             "task_name": task_name,
             "harness": harness,
             "model": model,
-            "rules_variant": rules_variant,
             "repeats": repeats,
             "repeat_parallel": repeat_parallel,
             "retry_void_limit": retry_void_limit,
@@ -156,14 +152,32 @@ def create_repeat_suite_summary(
     }
 
 
-def persist_repeat_suite(results_dir: Path, suite_summary: dict[str, object]) -> tuple[Path, Path]:
-    """Write repeat-suite summary artifacts and return their paths."""
-    suite_id = str(suite_summary["suite_id"])
-    suite_dir = results_dir / "suites" / suite_id
-    suite_dir.mkdir(parents=True, exist_ok=True)
+def _suite_summary_payload(suite: dict[str, object]) -> dict[str, object]:
+    return {
+        "suite_id": suite.get("suite_id"),
+        "created_at_utc": suite.get("created_at_utc"),
+        "started_at_utc": suite.get("started_at_utc"),
+        "completed_at_utc": suite.get("completed_at_utc"),
+        "config": suite.get("config"),
+        "aggregate": suite.get("aggregate"),
+        "retry": suite.get("retry"),
+        "run_count": len(suite.get("runs", [])) if isinstance(suite.get("runs"), list) else 0,
+    }
 
-    summary_path = suite_dir / "summary.json"
-    summary_path.write_text(json.dumps(suite_summary, indent=2))
+
+def persist_repeat_suite(
+    results_dir: Path, suite_summary: dict[str, object]
+) -> tuple[Path, Path, Path]:
+    """Write suite artifacts and return suite.json, suite-summary.json, and analysis.md paths."""
+    suite_dir = results_dir
+    suite_dir.mkdir(parents=True, exist_ok=True)
+    suite_id = str(suite_summary["suite_id"])
+
+    suite_json_path = suite_dir / "suite.json"
+    suite_json_path.write_text(json.dumps(suite_summary, indent=2))
+
+    summary_path = suite_dir / "suite-summary.json"
+    summary_path.write_text(json.dumps(_suite_summary_payload(suite_summary), indent=2))
 
     aggregate = suite_summary.get("aggregate", {})
     config = suite_summary.get("config", {})
@@ -175,7 +189,6 @@ def persist_repeat_suite(results_dir: Path, suite_summary: dict[str, object]) ->
         f"- task: `{config.get('task_name')}`",
         f"- harness: `{config.get('harness')}`",
         f"- model: `{config.get('model')}`",
-        f"- rules_variant: `{config.get('rules_variant')}`",
         f"- repeats: `{config.get('repeats')}`",
         f"- repeat_parallel: `{config.get('repeat_parallel')}`",
         f"- retry_void_limit: `{config.get('retry_void_limit')}`",
@@ -217,9 +230,10 @@ def persist_repeat_suite(results_dir: Path, suite_summary: dict[str, object]) ->
             f"performance_gates_passed=`{run.get('performance_gates_passed')}`, "
             f"composite=`{run.get('composite_score')}`, "
             f"duration_sec=`{run.get('duration_sec')}`, "
-            f"canonical=`{run.get('canonical_run_dir')}`"
+            f"canonical=`{run.get('canonical_run_dir')}`, "
+            f"run_json=`{run.get('run_json_path')}`"
         )
 
-    readme_path = suite_dir / "README.md"
-    readme_path.write_text("\n".join(lines) + "\n")
-    return summary_path, readme_path
+    analysis_path = suite_dir / "analysis.md"
+    analysis_path.write_text("\n".join(lines) + "\n")
+    return suite_json_path, summary_path, analysis_path

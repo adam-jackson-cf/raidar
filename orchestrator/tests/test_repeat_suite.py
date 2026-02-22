@@ -15,14 +15,15 @@ def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False)
     scorecard = Scorecard(
         run_id=run_id,
         task_name="homepage",
+        task_version="v001",
         agent="codex-cli",
         model="codex/gpt-5.2-low",
-        rules_variant="strict",
+        scaffold_root="scaffold",
         duration_sec=duration,
         metadata={
             "run": {
                 "canonical_run_dir": f"/tmp/canonical/{run_id}",
-                "summary_result_json": f"/tmp/canonical/{run_id}/summary/result.json",
+                "run_json_path": f"/tmp/canonical/{run_id}/run.json",
             },
             "process": {"uncached_input_tokens": 1000},
         },
@@ -40,10 +41,9 @@ def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False)
         config=EvalConfig(
             model="codex/gpt-5.2-low",
             harness="codex-cli",
-            rules_variant="strict",
             task_name="homepage",
-            scaffold_template="next-shadcn-starter",
-            scaffold_version="v2025.01",
+            task_version="v001",
+            scaffold_root="scaffold",
         ),
         duration_sec=duration,
         terminated_early=False,
@@ -52,8 +52,8 @@ def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False)
 
 
 def test_repeat_workspace_isolated_path():
-    base = Path("/tmp/workspace")
-    assert repeat_workspace(base, 3) == Path("/tmp/workspace-repeat-03")
+    base = Path("/tmp/executions/suite-01")
+    assert repeat_workspace(base, 3) == Path("/tmp/executions/suite-01/runs/run-03/workspace")
 
 
 def test_create_repeat_suite_summary_aggregates():
@@ -64,7 +64,6 @@ def test_create_repeat_suite_summary_aggregates():
         task_name="Homepage Task",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
-        rules_variant="strict",
         repeats=2,
         repeat_parallel=2,
         runs=[run_a, run_b],
@@ -89,7 +88,6 @@ def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
         task_name="Homepage Task",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
-        rules_variant="strict",
         repeats=2,
         repeat_parallel=1,
         runs=[run_a, run_b],
@@ -113,7 +111,6 @@ def test_create_repeat_suite_summary_includes_retry_metadata():
         task_name="Homepage Task",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
-        rules_variant="strict",
         repeats=1,
         repeat_parallel=1,
         runs=[run_a],
@@ -127,7 +124,7 @@ def test_create_repeat_suite_summary_includes_retry_metadata():
     assert summary["retry"]["unresolved_void_count"] == 0
 
 
-def test_persist_repeat_suite_writes_summary_and_readme(tmp_path: Path):
+def test_persist_repeat_suite_writes_suite_summary_and_analysis(tmp_path: Path):
     summary = {
         "suite_id": "test-suite",
         "aggregate": {
@@ -148,7 +145,6 @@ def test_persist_repeat_suite_writes_summary_and_readme(tmp_path: Path):
             "task_name": "homepage",
             "harness": "codex-cli",
             "model": "codex/gpt-5.2-low",
-            "rules_variant": "strict",
             "repeats": 1,
             "repeat_parallel": 1,
             "retry_void_limit": 2,
@@ -173,8 +169,9 @@ def test_persist_repeat_suite_writes_summary_and_readme(tmp_path: Path):
             }
         ],
     }
-    summary_path, readme_path = persist_repeat_suite(tmp_path, summary)
+    suite_json_path, summary_path, analysis_path = persist_repeat_suite(tmp_path, summary)
+    assert suite_json_path.exists()
     assert summary_path.exists()
-    assert readme_path.exists()
-    assert "test-suite" in summary_path.read_text()
-    assert "Run" in readme_path.read_text()
+    assert analysis_path.exists()
+    assert "test-suite" in suite_json_path.read_text()
+    assert "run-1" in analysis_path.read_text()

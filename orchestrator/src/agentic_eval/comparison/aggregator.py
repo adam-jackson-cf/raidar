@@ -18,7 +18,7 @@ class ComparisonRow:
     task: str
     agent: str
     model: str
-    rules: str
+    task_version: str
     functional: float
     compliance: float
     visual: float
@@ -75,25 +75,6 @@ class ComparisonReport:
             }
         return result
 
-    def averages_by_rules(self) -> dict[str, dict[str, float]]:
-        """Calculate average scores grouped by rules variant."""
-        by_rules: dict[str, list[ComparisonRow]] = {}
-        for row in self.rows:
-            if row.rules not in by_rules:
-                by_rules[row.rules] = []
-            by_rules[row.rules].append(row)
-
-        result: dict[str, dict[str, float]] = {}
-        for rules, rows in by_rules.items():
-            result[rules] = {
-                "functional": sum(r.functional for r in rows) / len(rows),
-                "compliance": sum(r.compliance for r in rows) / len(rows),
-                "visual": sum(r.visual for r in rows) / len(rows),
-                "efficiency": sum(r.efficiency for r in rows) / len(rows),
-                "composite": sum(r.composite for r in rows) / len(rows),
-            }
-        return result
-
 
 class ResultsAggregator:
     """Aggregates and compares evaluation results."""
@@ -131,7 +112,7 @@ class ResultsAggregator:
                 task=sc.task_name,
                 agent=sc.agent,
                 model=sc.model,
-                rules=sc.rules_variant,
+                task_version=sc.task_version,
                 functional=sc.functional.score,
                 compliance=sc.compliance.score,
                 visual=sc.visual.score,
@@ -188,7 +169,7 @@ class ResultsAggregator:
                 "task",
                 "agent",
                 "model",
-                "rules",
+                "task_version",
                 "functional",
                 "compliance",
                 "visual",
@@ -207,7 +188,7 @@ class ResultsAggregator:
                     row.task,
                     row.agent,
                     row.model,
-                    row.rules,
+                    row.task_version,
                     f"{row.functional:.2f}",
                     f"{row.compliance:.2f}",
                     f"{row.visual:.2f}",

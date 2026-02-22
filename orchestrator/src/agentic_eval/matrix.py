@@ -1,7 +1,6 @@
-"""Configuration matrix for comparing harness/model/rules combinations."""
+"""Configuration matrix for comparing harness/model combinations."""
 
 from pathlib import Path
-from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
@@ -23,14 +22,8 @@ class MatrixConfig(BaseModel):
         min_length=1,
         description="List of harness/model pairs to execute",
     )
-    rules_variants: list[Literal["strict", "minimal", "none"]] = Field(
-        default=["strict", "minimal", "none"],
-        description="List of rules variants to test for each pair",
-    )
     task_path: str = Field(description="Path to task.yaml")
-    scaffold_path: str = Field(default="scaffold", description="Path to scaffold template")
-    workspace_base: str = Field(default="workspace", description="Base path for workspaces")
-    results_path: str = Field(default="results", description="Path to store results")
+    executions_path: str = Field(default="executions", description="Path to execution outputs")
 
 
 class MatrixEntry(BaseModel):
@@ -38,21 +31,19 @@ class MatrixEntry(BaseModel):
 
     harness: str
     model: str
-    rules_variant: Literal["strict", "minimal", "none"]
 
     def to_harness_config(self) -> HarnessConfig:
         """Convert to HarnessConfig."""
         return HarnessConfig(
             agent=Agent(self.harness),
             model=ModelTarget.from_string(self.model),
-            rules_variant=self.rules_variant,
         )
 
     @property
     def workspace_suffix(self) -> str:
         """Generate unique workspace suffix for this entry."""
         model_safe = self.model.replace("/", "-")
-        return f"{self.harness}_{model_safe}_{self.rules_variant}"
+        return f"{self.harness}_{model_safe}"
 
 
 def load_matrix_config(path: Path) -> MatrixConfig:
@@ -66,14 +57,12 @@ def generate_matrix_entries(config: MatrixConfig) -> list[MatrixEntry]:
     """Generate all combinations from a matrix configuration."""
     entries: list[MatrixEntry] = []
     for pair in config.runs:
-        for rules in config.rules_variants:
-            entries.append(
-                MatrixEntry(
-                    harness=pair.harness,
-                    model=pair.model,
-                    rules_variant=rules,
-                )
+        entries.append(
+            MatrixEntry(
+                harness=pair.harness,
+                model=pair.model,
             )
+        )
     return entries
 
 
@@ -86,12 +75,6 @@ matrix:
       model: codex/gpt-5.2-high
     - harness: claude-code
       model: anthropic/claude-sonnet-4-5
-  rules_variants:
-    - strict
-    - minimal
-    - none
-  task_path: tasks/homepage-implementation/task.yaml
-  scaffold_path: scaffold
-  workspace_base: workspace
-  results_path: results
+  task_path: tasks/homepage-implementation/v001/task.yaml
+  executions_path: executions
 """

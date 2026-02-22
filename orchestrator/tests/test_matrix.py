@@ -18,26 +18,22 @@ class TestMatrixEntry:
         entry = MatrixEntry(
             harness="codex-cli",
             model="openai/gpt-4o",
-            rules_variant="strict",
         )
         suffix = entry.workspace_suffix
         assert "/" not in suffix
         assert "codex-cli" in suffix
         assert "gpt-4o" in suffix
-        assert "strict" in suffix
 
     def test_to_harness_config(self):
         """Should convert to HarnessConfig correctly."""
         entry = MatrixEntry(
             harness="claude-code",
             model="anthropic/claude-sonnet-4-5",
-            rules_variant="minimal",
         )
         config = entry.to_harness_config()
         assert config.agent.value == "claude-code"
         assert config.model.provider == "anthropic"
         assert config.model.name == "claude-sonnet-4-5"
-        assert config.rules_variant == "minimal"
 
     @pytest.mark.parametrize(
         ("model_name"),
@@ -48,7 +44,6 @@ class TestMatrixEntry:
         entry = MatrixEntry(
             harness="claude-code",
             model=f"anthropic/{model_name}",
-            rules_variant="strict",
         )
         config = entry.to_harness_config()
         assert config.agent.value == "claude-code"
@@ -64,7 +59,6 @@ class TestMatrixEntry:
         entry = MatrixEntry(
             harness="gemini",
             model=f"google/{model_name}",
-            rules_variant="strict",
         )
         config = entry.to_harness_config()
         assert config.agent.value == "gemini"
@@ -82,13 +76,11 @@ class TestGenerateMatrixEntries:
                 {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
                 {"harness": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
             ],
-            rules_variants=["strict", "minimal"],
             task_path="task.yaml",
         )
         entries = generate_matrix_entries(config)
 
-        # 2 pairs * 2 rule variants = 4 entries
-        assert len(entries) == 4
+        assert len(entries) == 2
 
     def test_generates_correct_combinations(self):
         """Should generate correct harness/model/rules combinations."""
@@ -97,7 +89,6 @@ class TestGenerateMatrixEntries:
                 {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
                 {"harness": "codex-cli", "model": "codex/gpt-5.1"},
             ],
-            rules_variants=["strict"],
             task_path="task.yaml",
         )
         entries = generate_matrix_entries(config)
@@ -112,7 +103,6 @@ class TestGenerateMatrixEntries:
         try:
             MatrixConfig(
                 runs=[],
-                rules_variants=["strict"],
                 task_path="task.yaml",
             )
         except ValidationError:
@@ -128,10 +118,8 @@ class TestGenerateMatrixEntries:
                 {"harness": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
                 {"harness": "cursor", "model": "openai/gpt-4o-mini"},
             ],
-            rules_variants=["strict", "minimal", "none"],
             task_path="task.yaml",
         )
         entries = generate_matrix_entries(config)
 
-        # 3 pairs * 3 rules = 9 entries
-        assert len(entries) == 9
+        assert len(entries) == 3

@@ -6,7 +6,6 @@ from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from ..harness.config import HarnessConfig
 from ..matrix import MatrixConfig, generate_matrix_entries
@@ -14,9 +13,6 @@ from ..runner import RunRequest, prepare_workspace, run_task
 from ..scaffold import resolve_scaffold_source
 from ..schemas.scorecard import Scorecard
 from ..schemas.task import TaskDefinition
-
-if TYPE_CHECKING:
-    pass
 
 
 @dataclass
@@ -60,14 +56,10 @@ class MatrixRunner:
     def __init__(
         self,
         tasks_dir: Path,
-        scaffolds_root: Path,
-        results_dir: Path,
-        workspaces_dir: Path,
+        executions_dir: Path,
     ) -> None:
         self.tasks_dir = tasks_dir
-        self.scaffolds_root = scaffolds_root
-        self.results_dir = results_dir
-        self.workspaces_dir = workspaces_dir
+        self.executions_dir = executions_dir
 
     def run_single(
         self,
@@ -92,12 +84,10 @@ class MatrixRunner:
 
         start_time = time.time()
 
-        # Generate workspace path
-        run_id = f"{task.name}-{harness_config.agent.value}-{uuid.uuid4().hex[:8]}"
-        workspace_dir = self.workspaces_dir / run_id
-
         try:
             model_str = harness_config.model.qualified_name
+            run_id = f"{task.name}-{harness_config.agent.value}-{uuid.uuid4().hex[:8]}"
+            execution_dir = self.executions_dir / run_id
             if progress_callback:
                 progress_callback(
                     f"Preparing workspace for {harness_config.agent.value}/{model_str}"
@@ -109,16 +99,18 @@ class MatrixRunner:
             adapter.validate()
 
             scaffold_source = resolve_scaffold_source(
-                self.scaffolds_root, task.scaffold.template, task.scaffold.version
+                resolved_task_dir,
+                task.scaffold.root,
+                task_name=task.name,
+                task_version=task.version,
             )
 
             if dry_run:
                 workspace_path, _ = prepare_workspace(
                     scaffold_dir=scaffold_source.path,
-                    target_dir=workspace_dir,
+                    target_dir=execution_dir / "runs" / "run-01" / "workspace",
                     task_dir=resolved_task_dir,
                     agent=harness_config.agent.value,
-                    rules_variant=harness_config.rules_variant,
                 )
                 adapter.prepare_workspace(workspace_path)
                 return MatrixRunResult(
@@ -135,16 +127,18 @@ class MatrixRunner:
             request = RunRequest(
                 task=task,
                 config=harness_config,
-                scaffold_root=self.scaffolds_root,
                 task_dir=resolved_task_dir,
-                workspace_dir=workspace_dir,
-                results_dir=self.results_dir,
+                execution_dir=execution_dir,
+                repeat_index=1,
             )
             eval_run = run_task(request)
 
-            # Save result
-            self.results_dir.mkdir(parents=True, exist_ok=True)
-            result_path = self.results_dir / f"{eval_run.id}.json"
+            run_meta = eval_run.scores.metadata.get("run", {})
+            run_json_path_raw = run_meta.get("run_json_path")
+            if not isinstance(run_json_path_raw, str):
+                raise ValueError("run metadata missing run_json_path")
+            result_path = Path(run_json_path_raw)
+            result_path.parent.mkdir(parents=True, exist_ok=True)
             result_path.write_text(eval_run.model_dump_json(indent=2))
 
             return MatrixRunResult(
@@ -196,8 +190,8 @@ class MatrixRunner:
                         self.run_single,
                         task,
                         cfg,
-                        dry_run,
-                        progress_callback,
+                        dry_run=dry_run,
+                        progress_callback=progress_callback,
                     ): cfg
                     for cfg in configs
                 }
@@ -210,7 +204,12 @@ class MatrixRunner:
                 model_str = cfg.model.qualified_name
                 if progress_callback:
                     progress_callback(f"Run {i}/{len(configs)}: {cfg.agent.value}/{model_str}")
-                result = self.run_single(task, cfg, dry_run, progress_callback)
+                result = self.run_single(
+                    task,
+                    cfg,
+                    dry_run=dry_run,
+                    progress_callback=progress_callback,
+                )
                 results.append(result)
 
         return MatrixRunReport(
@@ -223,9 +222,7 @@ class MatrixRunner:
 
 def run_matrix(
     tasks_dir: Path,
-    scaffolds_root: Path,
-    results_dir: Path,
-    workspaces_dir: Path,
+    executions_dir: Path,
     task: TaskDefinition,
     matrix_config: MatrixConfig,
     parallel: int = 1,
@@ -235,11 +232,9 @@ def run_matrix(
 
     Args:
         tasks_dir: Path to tasks directory
-        scaffolds_root: Path to scaffold catalog root
-        results_dir: Path to results directory
-        workspaces_dir: Path to workspaces directory
+        executions_dir: Path to matrix execution output directory
         task: Task definition
-        matrix_config: Optional matrix configuration (uses defaults if None)
+        matrix_config: Matrix configuration
         parallel: Number of parallel executions
         dry_run: If True, prepare but don't execute
 
@@ -248,9 +243,7 @@ def run_matrix(
     """
     runner = MatrixRunner(
         tasks_dir=tasks_dir,
-        scaffolds_root=scaffolds_root,
-        results_dir=results_dir,
-        workspaces_dir=workspaces_dir,
+        executions_dir=executions_dir,
     )
 
     return runner.run_matrix(

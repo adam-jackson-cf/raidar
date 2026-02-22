@@ -85,14 +85,16 @@ def sample_scorecard() -> Scorecard:
     return Scorecard(
         run_id="test-run-001",
         task_name="test-task",
+        task_version="v001",
         agent="codex-cli",
         model="openai/gpt-4o",
-        rules_variant="strict",
+        scaffold_root="scaffold",
         duration_sec=120.5,
         metadata={
             "scaffold": {
-                "template": "next-shadcn-starter",
-                "version": "v2025.01",
+                "task": "test-task",
+                "task_version": "v001",
+                "root": "scaffold",
                 "fingerprint": "abc123",
                 "baseline_manifest": ".baseline-scaffold.json",
                 "workspace_manifest": "scaffold.manifest.json",
@@ -131,10 +133,9 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
         config=EvalConfig(
             model="openai/gpt-4o",
             harness="codex-cli",
-            rules_variant="strict",
             task_name="test-task",
-            scaffold_template="next-shadcn-starter",
-            scaffold_version="v2025.01",
+            task_version="v001",
+            scaffold_root="scaffold",
         ),
         duration_sec=120.5,
         terminated_early=False,

@@ -19,7 +19,7 @@ def save_run(run: EvalRun, results_dir: Path) -> Path:
         Path to saved file
     """
     results_dir.mkdir(parents=True, exist_ok=True)
-    output_path = results_dir / "runs" / run.id / "summary" / "result.json"
+    output_path = results_dir / "runs" / run.id / "run.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(output_path, "w") as f:
@@ -35,11 +35,10 @@ def load_run(path: Path) -> EvalRun:
 
 
 def load_all_runs(results_dir: Path) -> list[EvalRun]:
-    """Load all evaluation runs from a results directory."""
+    """Load all evaluation runs from an executions directory."""
     runs = []
 
-    # Canonical layout: results/runs/<instance>/summary/result.json
-    for json_file in results_dir.glob("runs/*/summary/result.json"):
+    for json_file in results_dir.glob("**/runs/*/run.json"):
         try:
             runs.append(load_run(json_file))
         except Exception:
@@ -137,23 +136,20 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
     # Group by configuration
     by_harness: dict[str, list[EvalRun]] = {}
     by_model: dict[str, list[EvalRun]] = {}
-    by_rules: dict[str, list[EvalRun]] = {}
     by_scaffold: dict[str, list[EvalRun]] = {}
     by_config: dict[str, list[EvalRun]] = {}
 
     for run in runs:
         harness = run.config.harness
         model = run.config.model
-        rules = run.config.rules_variant
-        scaffold_key = f"{run.config.scaffold_template}@{run.config.scaffold_version}"
+        scaffold_key = run.config.scaffold_root
         config_key = (
-            f"{harness}|{model}|{rules}|{run.config.task_name}|"
-            f"{run.config.scaffold_template}@{run.config.scaffold_version}"
+            f"{harness}|{model}|{run.config.task_name}|"
+            f"{run.config.task_version}|{run.config.scaffold_root}"
         )
 
         by_harness.setdefault(harness, []).append(run)
         by_model.setdefault(model, []).append(run)
-        by_rules.setdefault(rules, []).append(run)
         by_scaffold.setdefault(scaffold_key, []).append(run)
         by_config.setdefault(config_key, []).append(run)
 
@@ -161,7 +157,6 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
         "total_runs": len(runs),
         "by_harness": {h: _group_stats(r) for h, r in by_harness.items()},
         "by_model": {m: _group_stats(r) for m, r in by_model.items()},
-        "by_rules": {v: _group_stats(r) for v, r in by_rules.items()},
         "by_scaffold": {key: _group_stats(r) for key, r in by_scaffold.items()},
         "by_config": {key: _group_stats(r) for key, r in by_config.items()},
     }
@@ -182,10 +177,9 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "timestamp",
         "harness",
         "model",
-        "rules_variant",
-        "scaffold_template",
-        "scaffold_version",
         "task_name",
+        "task_version",
+        "scaffold_root",
         "duration_sec",
         "terminated_early",
         "functional_passed",
@@ -245,10 +239,9 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "timestamp": run.timestamp,
                 "harness": run.config.harness,
                 "model": run.config.model,
-                "rules_variant": run.config.rules_variant,
-                "scaffold_template": run.config.scaffold_template,
-                "scaffold_version": run.config.scaffold_version,
                 "task_name": run.config.task_name,
+                "task_version": run.config.task_version,
+                "scaffold_root": run.config.scaffold_root,
                 "duration_sec": run.duration_sec,
                 "terminated_early": run.terminated_early,
                 "functional_passed": run.scores.functional.passed,
@@ -334,20 +327,21 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         [
             "\n## Summary Table\n",
             (
-                "| Harness | Model | Rules | Void | Run Valid | Perf Gates | "
+                "| Harness | Model | Task | Void | Run Valid | Perf Gates | "
                 "Composite | Diagnostic | "
                 "Functional | Compliance | Visual | Efficiency |"
             ),
             (
-                "|---------|-------|-------|------|-----------|------------|-----------|------------|"
+                "|---------|-------|------|------|-----------|------------|-----------|------------|"
                 "------------|------------|--------|------------|"
             ),
         ]
     )
     for run in _ranked_runs(runs):
         func_status = "PASS" if run.scores.functional.passed else "FAIL"
+        task_ref = f"{run.config.task_name}@{run.config.task_version}"
         lines.append(
-            f"| {run.config.harness} | {run.config.model} | {run.config.rules_variant} | "
+            f"| {run.config.harness} | {run.config.model} | {task_ref} | "
             f"{run.scores.voided} | {run.scores.run_validity.passed} | "
             f"{run.scores.performance_gates.passed} | "
             f"{run.scores.composite_score:.3f} | "
@@ -382,9 +376,8 @@ def _append_aggregate_section(
 def _append_scaffold_section(lines: list[str], groups: dict[str, dict[str, float | int]]) -> None:
     lines.append("\n## By Scaffold")
     for scaffold_key, stats in groups.items():
-        template, version = scaffold_key.split("@", maxsplit=1)
         lines.append(
-            f"- **{template} ({version})**: {stats['count']} total, "
+            f"- **{scaffold_key}**: {stats['count']} total, "
             f"{stats['void_count']} void ({stats['void_rate']:.2f}), "
             f"avg score={stats['avg_score']:.3f}, validity_rate={stats['validity_rate']:.2f}, "
             f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
@@ -483,7 +476,6 @@ def generate_comparison_report(runs: list[EvalRun]) -> str:
     agg = aggregate_results(runs)
     _append_aggregate_section(lines, "By Harness", agg.get("by_harness", {}))
     _append_aggregate_section(lines, "By Model", agg.get("by_model", {}))
-    _append_aggregate_section(lines, "By Rules Variant", agg.get("by_rules", {}))
     _append_scaffold_section(lines, agg.get("by_scaffold", {}))
     _append_stability_section(lines, agg.get("by_config", {}))
     _append_void_runs(lines, runs)

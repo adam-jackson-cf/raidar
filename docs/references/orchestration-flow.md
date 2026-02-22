@@ -1,52 +1,67 @@
 # Eval Orchestration Flow
 
-End-to-end outline of how the evaluation harness prepares workspaces, executes agents, and produces scorecards.
+End-to-end flow for task execution, Harbor runtime orchestration, and scoring output.
 
-## 1. Task + scaffold preparation
-1. Author `tasks/<task>/task.yaml` (see `docs/references/new-task.md`).
-2. The CLI resolves `scaffolds/<template>/<version>/`, copies that versioned scaffold into a workspace, injects the requested rules variant, and snapshots both the baseline manifest (from the catalog) and the workspace manifest for audits.
+## 1. Task Definition Resolution
 
-## 2. Agent configuration
-- Harness choice now maps to adapter-backed entries in `orchestrator/src/agentic_eval/harness/config.py` (claude-code, codex-cli, gemini, openhands, etc.). Each adapter validates model compatibility before Harbor runs.
-- Provider naming is enforced per harness so we always know which provider/model combo executed:
-  - `claude-code` → `anthropic/<model>`
-  - `gemini` → `google|vertex/<model>`
-  - `copilot` → `github/<profile>`
-  - `pi` → `inflection/<model>`
-  - `openhands` → `openhands/<profile>`
-  - CLI adapters such as Cursor remain flexible but still require explicit provider/model strings.
-- Models are specified as `provider/model` strings (e.g., `anthropic/claude-sonnet-4-20250514`) and parsed into `ModelTarget` objects so adapters can pass the fully-qualified name to Harbor.
-- CLI entry points:
-- `eval-orchestrator run` for single runs.
-- `eval-orchestrator matrix` (via `MatrixRunner`) to sweep explicit harness/model/rules combinations defined in a matrix YAML. Each entry declares a `runs` list so we only execute valid harness/model pairs (no cartesian cross-product surprises).
+1. Select a versioned task file: `tasks/<task-name>/v###/task.yaml`.
+2. Load task schema (`TaskDefinition`) with:
+   - `name`
+   - `version`
+   - `scaffold.root` (task-local scaffold path)
+   - `prompt.entry` + optional `prompt.includes`
+3. Resolve scaffold from task version directory (`task_dir / scaffold.root`).
+4. Copy scaffold into per-repeat workspace and inject a single ruleset from `tasks/<task>/v###/rules/`.
 
-## 3. Agent execution via Harbor
-1. `run_task` shells out to Harbor (`harbor run -d terminal-bench@2.0 …`) using the harness configuration.
-2. The agent operates inside the workspace until completion or timeout.
-3. Session logs (Codex, Claude Code, Gemini) can be parsed with `parser/session_log.py` to reconstruct prompts, tool calls, and gate results.
+## 2. Execution Layout (Single Top-Level Root)
 
-## 4. Verification & scoring
-1. **Functional dimension** – Based on gate execution results and test outcomes. If builds/tests fail, the functional score drops to 0.
-2. **Compliance dimension** – Deterministic checks scan the workspace; optional LLM judge prompts evaluate rubric criteria using code excerpts and rules text.
-3. **Visual dimension** – When configured, odiff compares the captured screenshot against the reference image and reports similarity.
-4. **Efficiency dimension** – `GateWatcher` records exit codes, failure categories, repeats, and total failures to penalize unstable runs.
-5. Each dimension’s computed score feeds the weighted composite specified in `orchestrator/src/agentic_eval/config.py` (`settings.weights`).
+Every suite/run writes to one execution root:
 
-## 5. Result persistence & inspection
-- Completed runs serialize to `orchestrator/results/<run_id>.json` via `EvalRun`. The JSON contains:
-  - `config`: harness/model/rules metadata plus the scaffold template/version that ran
-  - `scores`: full `Scorecard` with dimension payloads
-  - `events`: optional reconstructed session events
-  - `gate_history`: chronological gate execution artifacts
-- Scorecards also embed `metadata.scaffold` (template, version, manifest fingerprint, and paths to baseline/workspace manifests) so you can correlate score deltas with scaffold tweaks.
-- Each run now persists scaffold evidence under `results/<run_id>/` (baseline manifest, workspace manifest snapshot, `.scaffold-meta.json`, and injected rules copy) so audits can reconstruct exactly which scaffold/rules package executed without relying on the ephemeral workspace.
-- Aggregation utilities:
-  - `comparison/aggregator.py` loads scorecards, builds reports, and exports CSV leaderboards.
-  - `comparison/matrix_runner.py` coordinates batch runs and tracks per-run success/failure counts.
-- Historical artifacts can be replayed or compared by pointing reporting commands at the same results directory.
+`executions/<timestamp>__<task>__<version>/`
 
-## 6. Where to look when debugging
-1. **Workspace** (`workspace/` by default) – inspect files the agent produced.
-2. **Results JSON** – confirm scoring, termination reasons, metadata.
-3. **Harbor logs** – captured via `subprocess.run` stderr/stdout inside `run_task`.
-4. **Analyzer artifacts** – `.enaible/artifacts/*` hold structural assessments when architecture review workflows run.
+Inside that root:
+- `workspace/baseline/`: prepared scaffold baseline snapshot used by all runs in the suite.
+- `runs/`: canonical run artifacts (`run-01`, `run-02`, ... each with `workspace/`, `agent/`, `verifier/`, `harbor/`, `run.json`, `summary.md`, `homepage-pre.png`, `homepage-post.png`).
+- `suite.json`: full suite record (source of truth).
+- `suite-summary.json`: suite aggregate output.
+- `analysis.md`: suite-level human summary.
+
+## 3. Run Lifecycle
+
+1. CLI command (`run` or `suite run`) builds `RunRequest` from task + harness config.
+2. Runner prepares workspace, validates scaffold preflight commands, and builds Harbor task bundle.
+3. Runner captures `homepage-pre.png` after preflight passes and before Harbor task execution.
+4. Harbor executes the adapter/model pair.
+5. Runner hydrates workspace from `final-app.tar.gz`, captures `homepage-post.png`, then prunes transient workspace folders (`node_modules`, `.next`, etc.).
+6. Verifier artifacts are loaded and normalized into score outputs.
+7. Scorecard metadata persists run pointers, process metrics, scaffold fingerprints, evidence pointers, and prune metadata.
+
+## 4. Scoring Pipeline
+
+Dimensions:
+- `functional`
+- `compliance`
+- `visual` (optional)
+- `efficiency`
+- `coverage`
+- `requirements`
+- hard gates: `run_validity`, `performance_gates`
+- ranking metric: `optimization`
+
+`composite_score` is gated (voided/invalid runs score `0.0`).
+
+## 5. Reporting and Analysis Inputs
+
+Canonical artifact paths for analysis:
+- `executions/*/suite.json`
+- `executions/*/suite-summary.json`
+- `executions/*/runs/*/run.json`
+- `executions/*/runs/*/verifier/scorecard.json`
+- `executions/*/runs/*/agent/*.txt`
+
+## 6. Cleanup Lifecycle
+
+`./scripts/cleanup-eval-artifacts.sh`:
+- archives legacy split roots (`orchestrator/results`, `orchestrator/jobs`, `orchestrator/workspace*`).
+- prunes execution roots per model via `KEEP_PER_MODEL`.
+- archives pruned artifacts under `/tmp/typescript-ui-eval-archive/<timestamp>/`.
