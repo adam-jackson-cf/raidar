@@ -1,7 +1,4 @@
-"""Pydantic models for task definition.
-
-Extends Harbor's YAML format with custom fields for compliance, visual, and efficiency scoring.
-"""
+"""Pydantic models for task definition."""
 
 from pathlib import Path
 from typing import Literal
@@ -25,13 +22,23 @@ class VerificationGate(BaseModel):
 
 
 class ScaffoldConfig(BaseModel):
-    """Scaffold template configuration."""
+    """Task-local scaffold configuration."""
 
-    template: str = Field(description="Scaffold template name")
-    version: str = Field(description="Template version identifier")
-    rules_variant: Literal["strict", "minimal", "none"] = Field(
-        default="strict",
-        description="Rules variant to inject",
+    root: str = Field(
+        default="scaffold",
+        description="Relative path (from task version directory) to scaffold root",
+    )
+
+
+class PromptConfig(BaseModel):
+    """Prompt artifact configuration."""
+
+    entry: str = Field(
+        description="Primary prompt artifact path relative to task version directory"
+    )
+    includes: list[str] = Field(
+        default_factory=list,
+        description="Additional prompt artifact paths to append in order",
     )
 
 
@@ -117,6 +124,7 @@ class TaskDefinition(BaseModel):
     """Complete task definition matching the YAML format."""
 
     name: str = Field(description="Task identifier")
+    version: str = Field(description="Task version identifier (e.g., v001)")
     description: str = Field(description="Task description")
     difficulty: Literal["easy", "medium", "hard"] = Field(default="medium")
     category: str = Field(description="Task category (greenfield-ui, etc)")
@@ -132,8 +140,8 @@ class TaskDefinition(BaseModel):
     compliance: ComplianceConfig = Field(default_factory=ComplianceConfig)
     visual: VisualConfig | None = Field(default=None)
 
-    # Task prompt
-    prompt: str = Field(description="Task prompt shown to the agent")
+    # Prompt artifacts
+    prompt: PromptConfig = Field(description="Prompt artifact configuration")
 
     @classmethod
     def from_yaml(cls, path: Path) -> "TaskDefinition":

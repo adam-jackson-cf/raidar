@@ -3,10 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORCH_DIR="$ROOT_DIR/orchestrator"
-TASK_PATH="../tasks/homepage-implementation/task.yaml"
-SCAFFOLDS_ROOT="../scaffolds"
-WORKSPACE="workspace"
-OUTPUT="results"
+TASK_PATH="../tasks/homepage-implementation/v001/task.yaml"
 AGENT="codex-cli"
 REPEATS="${REPEATS:-5}"
 REPEAT_PARALLEL="${REPEAT_PARALLEL:-1}"
@@ -42,9 +39,6 @@ for model in "${models[@]}"; do
     --task "$TASK_PATH" \
     --agent "$AGENT" \
     --model "$model" \
-    --scaffolds-root "$SCAFFOLDS_ROOT" \
-    --workspace "$WORKSPACE" \
-    --output "$OUTPUT" \
     --timeout "$TIMEOUT_SEC" \
     --repeats "$REPEATS" \
     --repeat-parallel "$REPEAT_PARALLEL" \

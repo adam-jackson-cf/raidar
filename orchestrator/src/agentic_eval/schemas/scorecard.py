@@ -227,9 +227,10 @@ class Scorecard(BaseModel):
 
     run_id: str = ""
     task_name: str = ""
+    task_version: str = ""
     agent: str = ""
     model: str = ""
-    rules_variant: str = ""
+    scaffold_root: str = ""
     duration_sec: float = 0.0
     terminated_early: bool = False
     termination_reason: str | None = None
@@ -315,10 +316,9 @@ class EvalConfig(BaseModel):
 
     model: str = Field(description="Model identifier (provider/name)")
     harness: str = Field(description="Harness/agent name")
-    rules_variant: str = Field(description="Rules variant used")
     task_name: str = Field(description="Task identifier")
-    scaffold_template: str = Field(description="Scaffold template name")
-    scaffold_version: str = Field(description="Scaffold template version")
+    task_version: str = Field(description="Task version")
+    scaffold_root: str = Field(description="Task-local scaffold root path")
 
 
 class EvalRun(BaseModel):

@@ -1,6 +1,8 @@
 """Tests for runner validity and optimization metric helpers."""
 
 import json
+import threading
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -18,7 +20,10 @@ from agentic_eval.runner import (
     ScaffoldContext,
     ScorecardBuildContext,
     _classify_void_reasons,
+    _ensure_suite_baseline_workspace,
     _load_verifier_outputs,
+    _prune_workspace_artifacts,
+    _resolve_homepage_screenshot_command,
     build_scorecard,
     collect_process_metrics,
     create_harbor_task_bundle,
@@ -44,14 +49,13 @@ def _sample_task() -> TaskDefinition:
     return TaskDefinition.model_validate(
         {
             "name": "homepage-implementation",
+            "version": "v001",
             "description": "test task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
             "scaffold": {
-                "template": "next-shadcn-starter",
-                "version": "v2025.01",
-                "rules_variant": "strict",
+                "root": "scaffold",
             },
             "verification": {
                 "gates": [
@@ -73,7 +77,7 @@ def _sample_task() -> TaskDefinition:
                 "min_quality_score": 0.9,
             },
             "compliance": {},
-            "prompt": "Build homepage",
+            "prompt": {"entry": "prompt/task.md"},
         }
     )
 
@@ -82,7 +86,6 @@ def _sample_harness_config() -> HarnessConfig:
     return HarnessConfig(
         agent=Agent.CODEX_CLI,
         model=ModelTarget(provider="openai", name="gpt-5"),
-        rules_variant="strict",
         timeout_sec=1800,
     )
 
@@ -135,16 +138,18 @@ def _sample_scorecard_context(
     task_dir.mkdir(parents=True, exist_ok=True)
     workspace_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
-    (task_dir / "task.yaml").write_text("name: sample-task\n")
+    (task_dir / "task.yaml").write_text("name: sample-task\nversion: v001\n")
+    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
 
     scaffold_manifest = generate_manifest(
         workspace_dir,
-        template_name="next-shadcn-starter",
-        template_version="v2025.01",
+        template_name="homepage-implementation",
+        template_version="v001",
     )
     scaffold_source = ScaffoldSource(
-        template="next-shadcn-starter",
-        version="v2025.01",
+        task_name="homepage-implementation",
+        task_version="v001",
         path=workspace_dir,
         manifest=scaffold_manifest,
     )
@@ -152,10 +157,9 @@ def _sample_scorecard_context(
     request = RunRequest(
         task=_sample_task(),
         config=_sample_harness_config(),
-        scaffold_root=tmp_path / "scaffolds",
         task_dir=task_dir,
-        workspace_dir=workspace_dir,
-        results_dir=results_dir,
+        execution_dir=results_dir,
+        repeat_index=1,
     )
     context = ScaffoldContext(
         scaffold_source=scaffold_source,
@@ -168,16 +172,14 @@ def _sample_scorecard_context(
     layout = RunLayout(
         run_id="run-1234",
         start_time=datetime.now(UTC),
-        instance_name="20260209-000000Z__run-1234__sample",
+        run_label="run-01",
         root_dir=results_dir / "runs" / "run-1234",
-        summary_dir=results_dir / "runs" / "run-1234" / "summary",
-        scaffold_dir=results_dir / "runs" / "run-1234" / "scaffold",
+        workspace_dir=results_dir / "runs" / "run-1234" / "workspace",
         verifier_dir=results_dir / "runs" / "run-1234" / "verifier",
         agent_dir=results_dir / "runs" / "run-1234" / "agent",
         harbor_dir=results_dir / "runs" / "run-1234" / "harbor",
-        result_json_path=results_dir / "runs" / "run-1234" / "summary" / "result.json",
-        summary_readme_path=results_dir / "runs" / "run-1234" / "summary" / "README.md",
-        jobs_root=tmp_path / "jobs",
+        run_json_path=results_dir / "runs" / "run-1234" / "run.json",
+        analysis_path=results_dir / "runs" / "run-1234" / "summary.md",
     )
     execution = ExecutionPhaseResult(
         harbor_result=HarborExecutionResult(
@@ -194,11 +196,13 @@ def _sample_scorecard_context(
         duration_sec=12.5,
     )
     artifacts = PersistedArtifacts(
-        scaffold_meta={"template": "next-shadcn-starter"},
+        scaffold_meta={"task": "homepage-implementation", "task_version": "v001"},
         task_version_meta={"task_yaml_sha256": "abc"},
         verifier_artifacts={"scorecard": "verifier/scorecard.json"},
         agent_artifacts={"log": "agent/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
+        evidence_artifacts={"homepage_pre": None, "homepage_post": None, "errors": []},
+        workspace_prune={"removed": [], "reclaimed_bytes": 0},
     )
     return ScorecardBuildContext(
         request=request,
@@ -207,6 +211,56 @@ def _sample_scorecard_context(
         artifacts=artifacts,
         execution=execution,
     )
+
+
+def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    task_dir = tmp_path / "task" / "v001"
+    scaffold_dir = task_dir / "scaffold"
+    scaffold_dir.mkdir(parents=True, exist_ok=True)
+    suite_baseline_dir = tmp_path / "executions" / "suite-01" / "workspace" / "baseline"
+    call_count = 0
+    call_lock = threading.Lock()
+    start_barrier = threading.Barrier(3)
+
+    def fake_prepare_workspace(
+        scaffold_dir: Path, target_dir: Path, task_dir: Path, agent: str
+    ) -> tuple[Path, Path | None]:
+        del scaffold_dir, task_dir, agent
+        nonlocal call_count
+        with call_lock:
+            call_count += 1
+        time.sleep(0.05)
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "scaffold.manifest.json").write_text("{}\n", encoding="utf-8")
+        return target_dir, None
+
+    monkeypatch.setattr("agentic_eval.runner.prepare_workspace", fake_prepare_workspace)
+
+    failures: list[Exception] = []
+
+    def _run() -> None:
+        try:
+            start_barrier.wait(timeout=1.0)
+            _ensure_suite_baseline_workspace(
+                scaffold_dir=scaffold_dir,
+                suite_baseline_dir=suite_baseline_dir,
+                task_dir=task_dir,
+                agent="codex-cli",
+            )
+        except Exception as exc:  # pragma: no cover - assertion below surfaces failure
+            failures.append(exc)
+
+    threads = [threading.Thread(target=_run), threading.Thread(target=_run)]
+    for thread in threads:
+        thread.start()
+    start_barrier.wait(timeout=1.0)
+    for thread in threads:
+        thread.join()
+
+    assert not failures
+    assert call_count == 1
 
 
 def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
@@ -300,14 +354,13 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
     task = TaskDefinition.model_validate(
         {
             "name": "homepage-implementation",
+            "version": "v001",
             "description": "test task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
             "scaffold": {
-                "template": "next-shadcn-starter",
-                "version": "v2025.01",
-                "rules_variant": "strict",
+                "root": "scaffold",
             },
             "verification": {
                 "gates": [
@@ -325,7 +378,7 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
                 "required_commands": [],
             },
             "compliance": {},
-            "prompt": "Build homepage",
+            "prompt": {"entry": "prompt/task.md"},
         }
     )
 
@@ -821,8 +874,8 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                 ],
                 "scaffold_audit": {
                     "manifest_version": "1.0.0",
-                    "template": "next-shadcn-starter",
-                    "template_version": "v2025.01",
+                    "template": "homepage-implementation",
+                    "template_version": "v001",
                     "manifest_fingerprint": "abc",
                     "file_count": 10,
                     "dependency_count": 8,
@@ -841,7 +894,7 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs.visual.threshold_met is True
     assert len(outputs.gate_history) == 1
     assert outputs.scaffold_audit is not None
-    assert outputs.scaffold_audit.template == "next-shadcn-starter"
+    assert outputs.scaffold_audit.template == "homepage-implementation"
 
 
 def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
@@ -917,8 +970,8 @@ def test_build_scorecard_populates_missing_scaffold_audit_fields(tmp_path: Path)
     scorecard = build_scorecard(context)
 
     assert scorecard.scaffold_audit is not None
-    assert scorecard.scaffold_audit.template == "next-shadcn-starter"
-    assert scorecard.scaffold_audit.template_version == "v2025.01"
+    assert scorecard.scaffold_audit.template == "homepage-implementation"
+    assert scorecard.scaffold_audit.template_version == "v001"
     assert scorecard.scaffold_audit.manifest_fingerprint == (
         context.context.scaffold_source.manifest.fingerprint
     )
@@ -945,14 +998,13 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     task = TaskDefinition.model_validate(
         {
             "name": "homepage-implementation",
+            "version": "v001",
             "description": "test task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
             "scaffold": {
-                "template": "next-shadcn-starter",
-                "version": "v2025.01",
-                "rules_variant": "strict",
+                "root": "scaffold",
             },
             "verification": {"gates": [], "required_commands": []},
             "visual": {
@@ -961,23 +1013,26 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
                 "threshold": 0.95,
             },
             "compliance": {},
-            "prompt": "Build homepage",
+            "prompt": {"entry": "prompt/task.md"},
         }
     )
+    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
     request = RunRequest(
         task=task,
         config=_sample_harness_config(),
-        scaffold_root=tmp_path / "scaffolds",
         task_dir=task_dir,
-        workspace_dir=workspace,
-        results_dir=results_dir,
+        execution_dir=results_dir,
+        repeat_index=1,
     )
     scaffold_source = ScaffoldSource(
-        template="next-shadcn-starter",
-        version="v2025.01",
+        task_name="homepage-implementation",
+        task_version="v001",
         path=workspace,
         manifest=generate_manifest(
-            workspace, template_name="next-shadcn-starter", template_version="v2025.01"
+            workspace,
+            template_name="homepage-implementation",
+            template_version="v001",
         ),
     )
     context = ScaffoldContext(
@@ -989,7 +1044,11 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
         metadata_path=workspace / ".scaffold-meta.json",
     )
 
-    bundle = create_harbor_task_bundle(request, context, run_id="run1234")
+    bundle = create_harbor_task_bundle(
+        request,
+        context,
+        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+    )
     copied_reference = bundle / "environment" / "app" / reference_rel
 
     assert copied_reference.exists()
@@ -1024,39 +1083,41 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     (workspace / "bun.lock").write_text("")
     (workspace / "src").mkdir(parents=True, exist_ok=True)
     (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
-    (task_dir / "task.yaml").write_text("name: hello-world-smoke\n")
+    (task_dir / "task.yaml").write_text("name: hello-world-smoke\nversion: v001\n")
+    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (task_dir / "prompt" / "task.md").write_text("Print hello world\n")
 
     task = TaskDefinition.model_validate(
         {
             "name": "hello-world-smoke",
+            "version": "v001",
             "description": "test task",
             "difficulty": "easy",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
             "scaffold": {
-                "template": "next-shadcn-starter",
-                "version": "v2025.01",
-                "rules_variant": "strict",
+                "root": "scaffold",
             },
             "verification": {"gates": [], "required_commands": []},
             "compliance": {},
-            "prompt": "Print hello world",
+            "prompt": {"entry": "prompt/task.md"},
         }
     )
     request = RunRequest(
         task=task,
         config=_sample_harness_config(),
-        scaffold_root=tmp_path / "scaffolds",
         task_dir=task_dir,
-        workspace_dir=workspace,
-        results_dir=results_dir,
+        execution_dir=results_dir,
+        repeat_index=1,
     )
     scaffold_source = ScaffoldSource(
-        template="next-shadcn-starter",
-        version="v2025.01",
+        task_name="hello-world-smoke",
+        task_version="v001",
         path=workspace,
         manifest=generate_manifest(
-            workspace, template_name="next-shadcn-starter", template_version="v2025.01"
+            workspace,
+            template_name="hello-world-smoke",
+            template_version="v001",
         ),
     )
     context = ScaffoldContext(
@@ -1068,7 +1129,11 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
         metadata_path=workspace / ".scaffold-meta.json",
     )
 
-    bundle = create_harbor_task_bundle(request, context, run_id="run1234")
+    bundle = create_harbor_task_bundle(
+        request,
+        context,
+        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+    )
     task_toml = (bundle / "task.toml").read_text()
     dockerfile = (bundle / "environment" / "Dockerfile").read_text()
 
@@ -1076,3 +1141,79 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     assert "@openai/codex" in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
     assert "@google/gemini-cli" not in dockerfile
+
+
+def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "package.json").write_text("{}\n")
+
+    task = TaskDefinition.model_validate(
+        {
+            "name": "homepage-implementation",
+            "version": "v001",
+            "description": "task",
+            "difficulty": "medium",
+            "category": "greenfield-ui",
+            "timeout_sec": 1800,
+            "scaffold": {"root": "scaffold"},
+            "verification": {"gates": [], "required_commands": []},
+            "visual": {
+                "reference_image": "reference/homepage.png",
+                "screenshot_command": ["bun", "run", "capture-screenshot"],
+                "threshold": 0.95,
+            },
+            "compliance": {},
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+
+    command = _resolve_homepage_screenshot_command(task, workspace)
+    assert command == ["bun", "run", "capture-screenshot"]
+
+
+def test_resolve_homepage_screenshot_command_uses_package_script_when_visual_missing(
+    tmp_path: Path,
+):
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "package.json").write_text(
+        json.dumps({"scripts": {"capture-screenshot": "bun run scripts/capture-screenshot.ts"}})
+    )
+
+    task = TaskDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "version": "v001",
+            "description": "task",
+            "difficulty": "easy",
+            "category": "harness-integration",
+            "timeout_sec": 300,
+            "scaffold": {"root": "scaffold"},
+            "verification": {"gates": [], "required_commands": []},
+            "compliance": {},
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+
+    command = _resolve_homepage_screenshot_command(task, workspace)
+    assert command == ["bun", "run", "capture-screenshot"]
+
+
+def test_prune_workspace_artifacts_removes_transient_directories(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    (workspace / "node_modules" / "pkg").mkdir(parents=True, exist_ok=True)
+    (workspace / "node_modules" / "pkg" / "index.js").write_text("console.log('x')\n")
+    (workspace / ".next").mkdir(parents=True, exist_ok=True)
+    (workspace / ".next" / "trace").write_text("trace\n")
+    (workspace / "src").mkdir(parents=True, exist_ok=True)
+    (workspace / "src" / "app.tsx").write_text("export const App = () => null;\n")
+
+    prune = _prune_workspace_artifacts(workspace)
+
+    assert "node_modules" in prune["removed"]
+    assert ".next" in prune["removed"]
+    assert prune["reclaimed_bytes"] > 0
+    assert not (workspace / "node_modules").exists()
+    assert not (workspace / ".next").exists()
+    assert (workspace / "src" / "app.tsx").exists()

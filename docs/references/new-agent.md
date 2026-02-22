@@ -1,37 +1,45 @@
-# Adding a New Agent (Model + Harness)
+# Adding a New Agent (Harness + Model)
 
-Follow these steps to make a new agent available across CLI commands, session parsers, and rules.
+Use this flow to add a new harness cleanly and keep run outputs comparable.
 
-## 1. Extend the harness definitions
-1. Update `orchestrator/src/agentic_eval/harness/config.py`:
-   - Add the agent to the `Agent` enum (name should match how Harbor identifies the harness).
-   - Register a `HarnessAdapter` implementation in `harness/adapters/registry.py` that knows how to validate auth, configure CLIs, and build the Harbor command.
-2. If the agent requires special timeout defaults or Harbor arguments, extend `HarnessConfig` with additional fields rather than hardcoding elsewhere.
+## 1. Extend Harness Registry
 
-## 2. Wire the CLI
-- In `orchestrator/src/agentic_eval/cli.py`, add the agent name to every `click.Choice` referencing agents (`run`, `inject`, `matrix`, `list-agents`, etc.).
-- Provide help text describing any prerequisites (e.g., “requires OpenHands binary”).
+1. Add enum entry in `orchestrator/src/agentic_eval/harness/config.py`.
+2. Implement adapter in `orchestrator/src/agentic_eval/harness/adapters/`.
+3. Register adapter in `orchestrator/src/agentic_eval/harness/adapters/registry.py`.
 
-## 3. Provide rules + scaffolding support
-- Create rule files under `tasks/<task>/rules/<agent>/` so `inject_rules` can copy agent-specific guidance.
-- If the scaffold needs additional setup steps for the agent (env vars, toolchains), document them in the task prompt and rules.
-- Document the required provider prefix for the harness so matrix configs can pass explicit `provider/model` strings (e.g., `inflection/pi-coder`, `github/copilot-enterprise`). Adapters validate these prefixes at runtime, so mismatches fail fast.
+Adapter responsibilities:
+- validate provider/model prefix compatibility.
+- validate required CLI binaries and environment prerequisites.
+- emit Harbor agent name, model argument, and extra Harbor args.
 
-## 4. Session log parsing
-- Extend `orchestrator/src/agentic_eval/parser/session_log.py`:
-  - Add parser functions for the agent’s log format.
-  - Update `parse_session()` to dispatch when `harness` equals the new agent.
-  - Add tests under `orchestrator/tests/` to ensure session events are captured (user prompts, assistant outputs, bash commands, tool calls, gate results).
+## 2. Wire CLI and Rules Mapping
 
-## 5. Harbor + LiteLLM integration
-1. Confirm Harbor can launch the agent; if not, add the necessary container or adapter scripts.
-2. Ensure the desired model identifiers are supported by your adapter (e.g., Codex CLI forces `provider=codex`); document required env vars (`CODEX_API_KEY`, OAuth tokens, binaries on PATH, etc.).
+1. Ensure CLI choices include the new agent where relevant (`run`, `suite run`, `provider validate`, `inject`, `matrix`).
+2. Add rule filename mapping in `orchestrator/src/agentic_eval/harness/rules.py` (`SYSTEM_RULES`).
 
-## 6. Update documentation and tooling
-- Mention the agent in `docs/architecture-review.md` or team onboarding docs so evaluators know when to use it.
-- If pre-commit hooks or CI need additional binaries, update the relevant scripts (`Makefile`, GitHub Actions, etc.).
+## 3. Ensure Task Rules Compatibility
 
-## 7. Validate end-to-end
-1. Run `eval-orchestrator run` with the new agent + model string against a known task.
-2. Check `orchestrator/results/<run_id>.json` for correct metadata (agent name, model, scorecard entries).
-3. Verify session logs parse successfully and show up in scorecard attachments or audits.
+For each active task version, add the agent-specific rules file to:
+- `tasks/<task>/v###/rules/`
+
+The runner injects exactly one ruleset file based on `SYSTEM_RULES` mapping.
+
+## 4. Session Parsing Coverage
+
+If log format differs, extend `orchestrator/src/agentic_eval/parser/session_log.py` and add tests so metrics/events are extracted consistently.
+
+## 5. Validate End-to-End
+
+```bash
+cd orchestrator
+uv run eval-orchestrator provider validate --agent <agent> --model <provider/model>
+uv run eval-orchestrator run \
+  --task ../tasks/hello-world-smoke/v001/task.yaml \
+  --agent <agent> \
+  --model <provider/model>
+```
+
+Check outputs in:
+- `executions/<suite-id>/suite-summary.json`
+- `executions/<suite-id>/runs/*/run.json`

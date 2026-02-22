@@ -1,7 +1,6 @@
 """Harness and model configuration for Harbor execution."""
 
 from enum import Enum
-from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -42,10 +41,6 @@ class HarnessConfig(BaseModel):
 
     agent: Agent = Field(description="Agent to use (claude-code, codex-cli, etc)")
     model: ModelTarget = Field(description="Model configuration")
-    rules_variant: Literal["strict", "minimal", "none"] = Field(
-        default="strict",
-        description="Rules variant to inject",
-    )
     timeout_sec: int = Field(default=1800, description="Task timeout in seconds")
 
     def adapter(self):  # type: ignore[override]

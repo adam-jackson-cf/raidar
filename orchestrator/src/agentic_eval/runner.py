@@ -8,6 +8,8 @@ import shlex
 import shutil
 import signal
 import subprocess
+import tarfile
+import threading
 import time
 import uuid
 from dataclasses import dataclass, field
@@ -25,7 +27,7 @@ from .harness.fast_mode import (
     fast_image_prefix,
     is_fast_image_reuse_enabled,
 )
-from .harness.rules import inject_rules
+from .harness.rules import SYSTEM_RULES, inject_rules
 from .scaffold import ScaffoldSource
 from .schemas.events import GateEvent, SessionEvent
 from .schemas.scorecard import (
@@ -167,6 +169,18 @@ PROCESS_FAILURE_INVOCATION_SNIPPETS: tuple[str, ...] = (
     "syntax error near unexpected token",
     "invalid option",
 )
+WORKSPACE_PRUNE_DIRS: tuple[str, ...] = (
+    "node_modules",
+    ".next",
+    ".turbo",
+    ".cache",
+    "coverage",
+    "dist",
+    "build",
+    "tmp",
+)
+_SUITE_BASELINE_LOCKS_GUARD = threading.Lock()
+_SUITE_BASELINE_LOCKS: dict[Path, threading.Lock] = {}
 
 
 class ScaffoldPreflightError(RuntimeError):
@@ -186,10 +200,9 @@ class RunRequest:
 
     task: TaskDefinition
     config: HarnessConfig
-    scaffold_root: Path
     task_dir: Path
-    workspace_dir: Path
-    results_dir: Path
+    execution_dir: Path
+    repeat_index: int = 1
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,16 +215,6 @@ class ScaffoldContext:
     manifest_path: Path
     baseline_manifest_path: Path
     metadata_path: Path
-
-
-@dataclass(frozen=True, slots=True)
-class ArtifactPaths:
-    """Persisted artifact locations for a run."""
-
-    baseline: Path
-    manifest: Path
-    metadata: Path
-    rules: Path | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,16 +279,14 @@ class RunLayout:
 
     run_id: str
     start_time: datetime
-    instance_name: str
+    run_label: str
     root_dir: Path
-    summary_dir: Path
-    scaffold_dir: Path
+    workspace_dir: Path
     verifier_dir: Path
     agent_dir: Path
     harbor_dir: Path
-    result_json_path: Path
-    summary_readme_path: Path
-    jobs_root: Path
+    run_json_path: Path
+    analysis_path: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -309,6 +310,9 @@ class WorkspacePreparationPhaseResult:
     layout: RunLayout
     context: ScaffoldContext
     harbor_request: HarborExecutionRequest
+    screenshot_command: tuple[str, ...] | None
+    pre_screenshot_path: Path | None
+    evidence_errors: tuple[str, ...]
 
 
 @dataclass(frozen=True, slots=True)
@@ -333,6 +337,8 @@ class PersistedArtifacts:
     verifier_artifacts: dict[str, str]
     agent_artifacts: dict[str, str]
     harbor_artifacts: dict[str, str]
+    evidence_artifacts: dict[str, Any]
+    workspace_prune: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -351,12 +357,40 @@ def _slug_fragment(value: str) -> str:
     return slug or "unknown"
 
 
-def _instance_name(run_id: str, start_time: datetime, request: RunRequest) -> str:
-    timestamp = start_time.strftime("%Y%m%d-%H%M%SZ")
-    task = _slug_fragment(request.task.name)
-    agent = _slug_fragment(request.config.agent.value)
-    model = _slug_fragment(request.config.model.qualified_name)
-    return f"{timestamp}__{run_id}__{task}__{agent}__{model}"
+def _run_label(repeat_index: int) -> str:
+    return f"run-{repeat_index:02d}"
+
+
+def _repeat_workspace_dir(request: RunRequest) -> Path:
+    return request.execution_dir / "runs" / _run_label(request.repeat_index) / "workspace"
+
+
+def _suite_baseline_lock(suite_baseline_dir: Path) -> threading.Lock:
+    key = suite_baseline_dir.resolve()
+    with _SUITE_BASELINE_LOCKS_GUARD:
+        lock = _SUITE_BASELINE_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _SUITE_BASELINE_LOCKS[key] = lock
+        return lock
+
+
+def _ensure_suite_baseline_workspace(
+    *,
+    scaffold_dir: Path,
+    suite_baseline_dir: Path,
+    task_dir: Path,
+    agent: str,
+) -> None:
+    with _suite_baseline_lock(suite_baseline_dir):
+        if suite_baseline_dir.exists():
+            return
+        prepare_workspace(
+            scaffold_dir=scaffold_dir,
+            target_dir=suite_baseline_dir,
+            task_dir=task_dir,
+            agent=agent,
+        )
 
 
 def _command_timeout(command: list[str]) -> int:
@@ -380,6 +414,110 @@ def _workspace_has_tests(workspace: Path) -> bool:
     return False
 
 
+def _resolve_homepage_screenshot_command(task: TaskDefinition, workspace: Path) -> list[str] | None:
+    if task.visual and task.visual.screenshot_command:
+        return list(task.visual.screenshot_command)
+
+    package_json = workspace / "package.json"
+    if not package_json.exists():
+        return None
+    try:
+        payload = json.loads(package_json.read_text(encoding="utf-8"))
+    except json.JSONDecodeError:
+        return None
+    scripts = payload.get("scripts")
+    if not isinstance(scripts, dict):
+        return None
+    capture_script = scripts.get("capture-screenshot")
+    if not isinstance(capture_script, str) or not capture_script.strip():
+        return None
+    return ["bun", "run", "capture-screenshot"]
+
+
+def _run_homepage_capture_command(
+    command: list[str], workspace: Path, output_path: Path
+) -> tuple[Path | None, str | None]:
+    actual_path = workspace / "actual.png"
+    actual_path.unlink(missing_ok=True)
+
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=settings.timeouts.screenshot,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return None, str(exc)
+
+    if completed.returncode != 0:
+        output = (completed.stdout + "\n" + completed.stderr).strip()[:4000]
+        rendered = " ".join(shlex.quote(part) for part in command)
+        return None, f"`{rendered}` exited {completed.returncode}: {output}"
+
+    if not actual_path.exists():
+        rendered = " ".join(shlex.quote(part) for part in command)
+        return None, f"`{rendered}` completed without producing {actual_path}"
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(actual_path, output_path)
+    actual_path.unlink(missing_ok=True)
+    return output_path, None
+
+
+def _safe_extract_tarball(archive_path: Path, target_dir: Path) -> None:
+    target_root = target_dir.resolve()
+    with tarfile.open(archive_path, "r:gz") as archive:
+        for member in archive.getmembers():
+            member_target = (target_root / member.name).resolve()
+            if member_target != target_root and not str(member_target).startswith(
+                f"{target_root}{os.sep}"
+            ):
+                raise RuntimeError(f"Unsafe tar member path: {member.name}")
+        archive.extractall(path=target_root, filter="data")
+
+
+def _hydrate_workspace_from_final_app(
+    harbor_result: HarborExecutionResult, workspace: Path
+) -> tuple[Path | None, str | None]:
+    if not harbor_result.trial_dir:
+        return None, "Harbor trial directory missing; cannot hydrate post-run workspace."
+    archive_path = harbor_result.trial_dir / "agent" / "final-app.tar.gz"
+    if not archive_path.exists():
+        return None, f"Missing final app archive: {archive_path}"
+    try:
+        _safe_extract_tarball(archive_path, workspace)
+    except (OSError, tarfile.TarError, RuntimeError) as exc:
+        return None, f"Failed to hydrate workspace from {archive_path}: {exc}"
+    return archive_path, None
+
+
+def _directory_size_bytes(path: Path) -> int:
+    total = 0
+    for candidate in path.rglob("*"):
+        if candidate.is_file():
+            total += candidate.stat().st_size
+    return total
+
+
+def _prune_workspace_artifacts(workspace: Path) -> dict[str, Any]:
+    removed: list[str] = []
+    reclaimed_bytes = 0
+    for dirname in WORKSPACE_PRUNE_DIRS:
+        candidate = workspace / dirname
+        if not candidate.exists():
+            continue
+        reclaimed_bytes += _directory_size_bytes(candidate)
+        shutil.rmtree(candidate)
+        removed.append(dirname)
+    return {
+        "removed": removed,
+        "reclaimed_bytes": reclaimed_bytes,
+    }
+
+
 def _preflight_cache_key(request: RunRequest, context: ScaffoldContext) -> str:
     payload = {
         "task_name": request.task.name,
@@ -397,7 +535,7 @@ def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> 
     if not required_commands:
         return
 
-    cache_dir = request.results_dir / ".preflight-cache"
+    cache_dir = request.execution_dir / ".preflight-cache"
     cache_dir.mkdir(parents=True, exist_ok=True)
     cache_key = _preflight_cache_key(request, context)
     cache_file = cache_dir / f"{cache_key}.ok.json"
@@ -748,7 +886,6 @@ def prepare_workspace(
     target_dir: Path,
     task_dir: Path,
     agent: str,
-    rules_variant: str,
 ) -> tuple[Path, Path | None]:
     """Prepare workspace by copying scaffold and injecting rules.
 
@@ -757,8 +894,6 @@ def prepare_workspace(
         target_dir: Path to create workspace
         task_dir: Path to task directory (contains rules/)
         agent: Agent name for rule file selection
-        rules_variant: Rules variant (strict, minimal, none)
-
     Returns:
         Tuple of workspace path and injected rules file (if any)
     """
@@ -776,7 +911,7 @@ def prepare_workspace(
     injected_rules: Path | None = None
     rules_dir = task_dir / "rules"
     if rules_dir.exists():
-        injected_rules = inject_rules(rules_dir, target_dir, agent, rules_variant)
+        injected_rules = inject_rules(rules_dir, target_dir, agent)
 
     # Generate initial manifest for baseline
     manifest = generate_manifest(target_dir)
@@ -874,7 +1009,7 @@ def _fast_task_docker_image(request: RunRequest, context: ScaffoldContext) -> st
     payload = {
         "fast_mode_version": "1",
         "task_name": request.task.name,
-        "rules_variant": request.config.rules_variant,
+        "task_version": request.task.version,
         "task_yaml_hash": task_yaml_hash,
         "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
     }
@@ -968,9 +1103,9 @@ def _ensure_fast_task_image(
 
 
 def _initialize_harbor_bundle_paths(
-    workspace: Path, task_name: str, run_id: str
+    bundle_root: Path,
 ) -> tuple[Path, Path, Path, Path]:
-    bundle_dir = workspace / f"harbor-task-{_slug_fragment(task_name)}-{run_id}"
+    bundle_dir = bundle_root
     if bundle_dir.exists():
         shutil.rmtree(bundle_dir)
     environment_dir = bundle_dir / "environment"
@@ -1009,6 +1144,17 @@ def _copy_workspace_into_bundle(
     target_reference = app_dir / reference_path
     target_reference.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(source_reference, target_reference)
+
+
+def _load_task_prompt(task: TaskDefinition, task_dir: Path) -> str:
+    prompt_paths = [task.prompt.entry, *task.prompt.includes]
+    prompt_chunks: list[str] = []
+    for rel_path in prompt_paths:
+        prompt_path = (task_dir / rel_path).resolve()
+        if not prompt_path.exists():
+            raise FileNotFoundError(f"Prompt artifact not found: {prompt_path}")
+        prompt_chunks.append(prompt_path.read_text(encoding="utf-8").strip())
+    return "\n\n".join(chunk for chunk in prompt_chunks if chunk)
 
 
 def _bundle_instruction_text(prompt: str) -> str:
@@ -1112,13 +1258,16 @@ tar \
     test_script.chmod(0o755)
 
 
-def create_harbor_task_bundle(request: RunRequest, context: ScaffoldContext, run_id: str) -> Path:
+def create_harbor_task_bundle(
+    request: RunRequest,
+    context: ScaffoldContext,
+    bundle_root: Path,
+) -> Path:
     """Build a Harbor-compatible task directory from the scaffold workspace."""
-    bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(
-        context.workspace, request.task.name, run_id
-    )
+    bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(bundle_root)
     _copy_workspace_into_bundle(request, context, app_dir)
-    (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(request.task.prompt))
+    prompt_text = _load_task_prompt(request.task, request.task_dir)
+    (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(prompt_text))
 
     task_image = _fast_task_docker_image(request, context)
     (bundle_dir / "task.toml").write_text(_render_task_toml(request, task_image))
@@ -1134,32 +1283,29 @@ def initialize_run(request: RunRequest) -> RunLayout:
     """Create run ids and canonical output directories."""
     run_id = str(uuid.uuid4())[:8]
     start_time = datetime.now(UTC)
-    runs_root = request.results_dir / "runs"
+    runs_root = request.execution_dir / "runs"
     runs_root.mkdir(parents=True, exist_ok=True)
-    instance_name = _instance_name(run_id, start_time, request)
-    root_dir = runs_root / instance_name
+    run_label = _run_label(request.repeat_index)
+    root_dir = runs_root / run_label
     if root_dir.exists():
         shutil.rmtree(root_dir)
-    summary_dir = root_dir / "summary"
-    scaffold_dir = root_dir / "scaffold"
+    workspace_dir = root_dir / "workspace"
     verifier_dir = root_dir / "verifier"
     agent_dir = root_dir / "agent"
     harbor_dir = root_dir / "harbor"
-    for path in (summary_dir, scaffold_dir, verifier_dir, agent_dir, harbor_dir):
+    for path in (workspace_dir, verifier_dir, agent_dir, harbor_dir):
         path.mkdir(parents=True, exist_ok=True)
     return RunLayout(
         run_id=run_id,
         start_time=start_time,
-        instance_name=instance_name,
+        run_label=run_label,
         root_dir=root_dir,
-        summary_dir=summary_dir,
-        scaffold_dir=scaffold_dir,
+        workspace_dir=workspace_dir,
         verifier_dir=verifier_dir,
         agent_dir=agent_dir,
         harbor_dir=harbor_dir,
-        result_json_path=summary_dir / "result.json",
-        summary_readme_path=summary_dir / "README.md",
-        jobs_root=request.results_dir.parent / "jobs",
+        run_json_path=root_dir / "run.json",
+        analysis_path=root_dir / "summary.md",
     )
 
 
@@ -1168,30 +1314,51 @@ def prepare_run_context(request: RunRequest) -> ScaffoldContext:
     from .scaffold import record_scaffold_metadata, resolve_scaffold_source
 
     scaffold_source = resolve_scaffold_source(
-        request.scaffold_root, request.task.scaffold.template, request.task.scaffold.version
+        request.task_dir,
+        request.task.scaffold.root,
+        task_name=request.task.name,
+        task_version=request.task.version,
     )
 
-    workspace, injected_rules = prepare_workspace(
+    suite_baseline_dir = request.execution_dir / "workspace" / "baseline"
+    _ensure_suite_baseline_workspace(
         scaffold_dir=scaffold_source.path,
-        target_dir=request.workspace_dir,
+        suite_baseline_dir=suite_baseline_dir,
         task_dir=request.task_dir,
         agent=request.config.agent.value,
-        rules_variant=request.config.rules_variant,
     )
+
+    workspace_dir = _repeat_workspace_dir(request)
+    if workspace_dir.exists():
+        shutil.rmtree(workspace_dir)
+    shutil.copytree(
+        suite_baseline_dir,
+        workspace_dir,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
+    )
+
+    injected_rules: Path | None = None
+    injected_rule_name = SYSTEM_RULES.get(request.config.agent.value)
+    if injected_rule_name:
+        candidate = workspace_dir / injected_rule_name
+        if candidate.exists():
+            injected_rules = candidate
+
+    workspace = workspace_dir
     manifest_path = workspace / "scaffold.manifest.json"
     if not manifest_path.exists():
         manifest = generate_manifest(workspace)
         save_manifest(manifest, manifest_path)
 
     baseline_manifest_path = workspace / ".baseline-scaffold.json"
-    shutil.copy2(scaffold_source.manifest_path, baseline_manifest_path)
+    shutil.copy2(suite_baseline_dir / "scaffold.manifest.json", baseline_manifest_path)
 
     metadata_path = record_scaffold_metadata(
         workspace,
         scaffold_source,
         manifest_path,
         baseline_manifest_path,
-        request.config.rules_variant,
     )
 
     return ScaffoldContext(
@@ -1529,47 +1696,25 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
     return outputs, None
 
 
-def persist_scaffold_artifacts(context: ScaffoldContext, scaffold_dir: Path) -> ArtifactPaths:
-    """Persist scaffold artifacts for later audits."""
-    artifact_manifest = Path(
-        shutil.copy2(context.manifest_path, scaffold_dir / "workspace.manifest.json")
-    )
-    artifact_baseline = Path(
-        shutil.copy2(context.scaffold_source.manifest_path, scaffold_dir / "baseline.manifest.json")
-    )
-    artifact_meta = Path(shutil.copy2(context.metadata_path, scaffold_dir / "scaffold-meta.json"))
-    artifact_rules = None
-    if context.injected_rules and context.injected_rules.exists():
-        artifact_rules = Path(
-            shutil.copy2(
-                context.injected_rules,
-                scaffold_dir / context.injected_rules.name.replace(" ", "_"),
-            )
-        )
-
-    return ArtifactPaths(
-        baseline=artifact_baseline,
-        manifest=artifact_manifest,
-        metadata=artifact_meta,
-        rules=artifact_rules,
-    )
-
-
-def build_scaffold_meta(context: ScaffoldContext, artifacts: ArtifactPaths) -> dict:
+def build_scaffold_meta(request: RunRequest, context: ScaffoldContext) -> dict:
     """Build scaffold metadata for the scorecard."""
+    suite_baseline_dir = request.execution_dir / "workspace" / "baseline"
     return {
-        "template": context.scaffold_source.template,
-        "version": context.scaffold_source.version,
+        "task": context.scaffold_source.task_name,
+        "task_version": context.scaffold_source.task_version,
+        "root": str(context.scaffold_source.path),
+        "suite_baseline_dir": str(suite_baseline_dir),
+        "run_workspace_dir": str(context.workspace),
         "fingerprint": context.scaffold_source.manifest.fingerprint,
         "baseline_manifest": context.baseline_manifest_path.name,
         "workspace_manifest": context.manifest_path.name,
         "metadata_file": context.metadata_path.name,
         "rules_file": context.injected_rules.name if context.injected_rules else None,
         "artifacts": {
-            "baseline_manifest": str(artifacts.baseline),
-            "workspace_manifest": str(artifacts.manifest),
-            "metadata": str(artifacts.metadata),
-            **({"rules": str(artifacts.rules)} if artifacts.rules else {}),
+            "baseline_manifest": str(context.baseline_manifest_path),
+            "workspace_manifest": str(context.manifest_path),
+            "metadata": str(context.metadata_path),
+            **({"rules": str(context.injected_rules)} if context.injected_rules else {}),
         },
     }
 
@@ -1587,10 +1732,10 @@ def build_task_version_meta(request: RunRequest, context: ScaffoldContext) -> di
         "scoring_schema_version": SCORING_SCHEMA_VERSION,
         "task_yaml_hash": task_yaml_hash,
         "task_model": request.task.model_dump(mode="json", exclude_none=True),
-        "scaffold_template": context.scaffold_source.template,
-        "scaffold_version": context.scaffold_source.version,
+        "task_name": request.task.name,
+        "task_version": request.task.version,
+        "scaffold_root": request.task.scaffold.root,
         "scaffold_fingerprint": context.scaffold_source.manifest.fingerprint,
-        "rules_variant": request.config.rules_variant,
     }
     seed = json.dumps(seed_payload, sort_keys=True, separators=(",", ":")).encode()
     return {
@@ -1650,6 +1795,11 @@ def persist_agent_artifacts(
         src = source / filename
         if src.exists():
             copied[filename] = str(shutil.copy2(src, agent_dir / filename))
+    final_app = agent_dir / "final-app.tar.gz"
+    if final_app.exists():
+        copied["project.final.tar.gz"] = str(
+            shutil.copy2(final_app, agent_dir / "project.final.tar.gz")
+        )
 
     setup_dir = source / "setup"
     if setup_dir.exists():
@@ -1672,33 +1822,28 @@ def persist_agent_artifacts(
 def persist_harbor_artifacts(
     harbor_result: HarborExecutionResult, harbor_dir: Path
 ) -> dict[str, str]:
-    """Persist Harbor job/trial metadata and logs for run review."""
+    """Record Harbor artifact pointers for run review."""
     copied: dict[str, str] = {}
-    job_files = ("config.json", "result.json", "job.log")
-    job_target = harbor_dir / "job"
-    job_target.mkdir(parents=True, exist_ok=True)
-    for filename in job_files:
-        source = harbor_result.job_dir / filename
-        if source.exists():
-            copied[f"job/{filename}"] = str(shutil.copy2(source, job_target / filename))
-
+    for name in ("command.txt", "harbor-stdout.log", "harbor-stderr.log"):
+        candidate = harbor_dir / name
+        if candidate.exists():
+            copied[name] = str(candidate)
+    copied["raw_job_dir"] = str(harbor_result.job_dir)
     if harbor_result.trial_dir:
-        trial_target = harbor_dir / "trial"
-        trial_target.mkdir(parents=True, exist_ok=True)
-        for filename in ("config.json", "result.json", "trial.log"):
-            source = harbor_result.trial_dir / filename
-            if source.exists():
-                copied[f"trial/{filename}"] = str(shutil.copy2(source, trial_target / filename))
+        copied["raw_trial_dir"] = str(harbor_result.trial_dir)
     return copied
 
 
-def write_summary_readme(
+def write_run_analysis(
     layout: RunLayout,
     request: RunRequest,
     scorecard: Scorecard,
     harbor_result: HarborExecutionResult,
 ) -> None:
     """Write a human-readable run summary with canonical/raw pointers."""
+    evidence_meta = scorecard.metadata.get("evidence", {})
+    workspace_meta = scorecard.metadata.get("workspace", {})
+    prune_meta = workspace_meta.get("prune", {}) if isinstance(workspace_meta, dict) else {}
     lines = [
         "# Run Summary",
         "",
@@ -1707,6 +1852,7 @@ def write_summary_readme(
         f"- task: `{request.task.name}`",
         f"- agent: `{request.config.agent.value}`",
         f"- model: `{request.config.model.qualified_name}`",
+        f"- run_label: `{layout.run_label}`",
         f"- run_valid: `{scorecard.run_validity.passed}`",
         f"- performance_gates_passed: `{scorecard.performance_gates.passed}`",
         f"- voided: `{scorecard.voided}`",
@@ -1716,9 +1862,10 @@ def write_summary_readme(
         "",
         "## Pointers",
         f"- canonical_run_dir: `{layout.root_dir}`",
+        f"- workspace_dir: `{layout.workspace_dir}`",
         f"- raw_harbor_job_dir: `{harbor_result.job_dir}`",
         f"- raw_harbor_trial_dir: `{harbor_result.trial_dir}`",
-        f"- summary_result_json: `{layout.result_json_path}`",
+        f"- run_json_path: `{layout.run_json_path}`",
         "",
         "## Key Artifacts",
         f"- verifier_scorecard: `{layout.verifier_dir / 'scorecard.json'}`",
@@ -1726,7 +1873,13 @@ def write_summary_readme(
     ]
     event_stream = _agent_event_stream_pointer(layout.agent_dir, request.config.agent.value)
     lines.append(f"- agent_event_stream: `{event_stream}`")
-    layout.summary_readme_path.write_text("\n".join(lines) + "\n")
+    lines.append(f"- homepage_pre_screenshot: `{evidence_meta.get('homepage_pre')}`")
+    lines.append(f"- homepage_post_screenshot: `{evidence_meta.get('homepage_post')}`")
+    lines.append(f"- final_workspace_archive: `{evidence_meta.get('final_workspace_archive')}`")
+    lines.append(f"- evidence_errors: `{evidence_meta.get('errors')}`")
+    lines.append(f"- workspace_pruned_dirs: `{prune_meta.get('removed')}`")
+    lines.append(f"- workspace_pruned_bytes: `{prune_meta.get('reclaimed_bytes')}`")
+    layout.analysis_path.write_text("\n".join(lines) + "\n")
 
 
 def _agent_event_stream_pointer(agent_dir: Path, harness: str) -> Path:
@@ -2931,9 +3084,9 @@ def _normalized_scaffold_audit(
         return None
     return scaffold_audit.model_copy(
         update={
-            "template": scaffold_audit.template or scaffold_context.scaffold_source.template,
+            "template": scaffold_audit.template or scaffold_context.scaffold_source.task_name,
             "template_version": scaffold_audit.template_version
-            or scaffold_context.scaffold_source.version,
+            or scaffold_context.scaffold_source.task_version,
             "manifest_fingerprint": (
                 scaffold_audit.manifest_fingerprint
                 or scaffold_context.scaffold_source.manifest.fingerprint
@@ -2946,10 +3099,10 @@ def _scorecard_run_metadata(
     layout: RunLayout, *, voided: bool, void_reasons: list[str]
 ) -> dict[str, Any]:
     return {
-        "instance_name": layout.instance_name,
+        "run_label": layout.run_label,
         "canonical_run_dir": str(layout.root_dir),
-        "summary_result_json": str(layout.result_json_path),
-        "summary_readme": str(layout.summary_readme_path),
+        "run_json_path": str(layout.run_json_path),
+        "run_analysis_path": str(layout.analysis_path),
         "repeat_required": voided,
         "repeat_required_reasons": void_reasons,
     }
@@ -3028,6 +3181,8 @@ def _scorecard_metadata(
         "agent": {"artifacts": artifacts.agent_artifacts},
         "verifier": _scorecard_verifier_metadata(execution, artifacts),
         "process": _scorecard_process_metadata(execution.process_metrics),
+        "evidence": artifacts.evidence_artifacts,
+        "workspace": {"prune": artifacts.workspace_prune},
     }
 
 
@@ -3065,9 +3220,10 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     return Scorecard(
         run_id=layout.run_id,
         task_name=request.task.name,
+        task_version=request.task.version,
         agent=request.config.agent.value,
         model=request.config.model.qualified_name,
-        rules_variant=request.config.rules_variant,
+        scaffold_root=request.task.scaffold.root,
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
@@ -3097,7 +3253,22 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
     adapter.prepare_workspace(context.workspace)
     cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
     ensure_scaffold_preflight(request, context)
-    harbor_task_bundle = create_harbor_task_bundle(request, context, layout.run_id)
+    screenshot_command = _resolve_homepage_screenshot_command(request.task, context.workspace)
+    pre_screenshot_path: Path | None = None
+    evidence_errors: list[str] = []
+    if screenshot_command:
+        pre_screenshot_path, pre_error = _run_homepage_capture_command(
+            screenshot_command,
+            context.workspace,
+            layout.root_dir / "homepage-pre.png",
+        )
+        if pre_error:
+            evidence_errors.append(f"homepage-pre capture failed: {pre_error}")
+    harbor_task_bundle = create_harbor_task_bundle(
+        request,
+        context,
+        bundle_root=layout.harbor_dir / "bundle",
+    )
 
     run_env = _build_harbor_run_env(adapter)
     fast_task_image = _fast_task_docker_image(request, context)
@@ -3113,7 +3284,7 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
         adapter=adapter,
         workspace=context.workspace,
         task_bundle_path=harbor_task_bundle,
-        jobs_dir=layout.jobs_root,
+        jobs_dir=layout.harbor_dir / "raw",
         run_harbor_dir=layout.harbor_dir,
         run_id=layout.run_id,
         timeout_sec=_harbor_process_timeout(request.config.timeout_sec),
@@ -3123,6 +3294,9 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
         layout=layout,
         context=context,
         harbor_request=harbor_request,
+        screenshot_command=tuple(screenshot_command) if screenshot_command else None,
+        pre_screenshot_path=pre_screenshot_path,
+        evidence_errors=tuple(evidence_errors),
     )
 
 
@@ -3172,15 +3346,43 @@ def _persist_artifacts_phase(
     execution: ExecutionPhaseResult,
 ) -> PersistedArtifacts:
     """Artifact persistence phase."""
-    scaffold_artifacts = persist_scaffold_artifacts(phase.context, phase.layout.scaffold_dir)
+    evidence_artifacts: dict[str, Any] = {
+        "screenshot_command": list(phase.screenshot_command) if phase.screenshot_command else None,
+        "homepage_pre": str(phase.pre_screenshot_path) if phase.pre_screenshot_path else None,
+        "homepage_post": None,
+        "final_workspace_archive": None,
+        "errors": list(phase.evidence_errors),
+    }
+    if phase.screenshot_command and not execution.terminated_early:
+        archive_path, hydrate_error = _hydrate_workspace_from_final_app(
+            execution.harbor_result,
+            phase.context.workspace,
+        )
+        if archive_path:
+            evidence_artifacts["final_workspace_archive"] = str(archive_path)
+            post_path, post_error = _run_homepage_capture_command(
+                list(phase.screenshot_command),
+                phase.context.workspace,
+                phase.layout.root_dir / "homepage-post.png",
+            )
+            if post_path:
+                evidence_artifacts["homepage_post"] = str(post_path)
+            if post_error:
+                evidence_artifacts["errors"].append(f"homepage-post capture failed: {post_error}")
+        if hydrate_error:
+            evidence_artifacts["errors"].append(hydrate_error)
+
+    workspace_prune = _prune_workspace_artifacts(phase.layout.workspace_dir)
     return PersistedArtifacts(
-        scaffold_meta=build_scaffold_meta(phase.context, scaffold_artifacts),
+        scaffold_meta=build_scaffold_meta(request, phase.context),
         task_version_meta=build_task_version_meta(request, phase.context),
         verifier_artifacts=persist_verifier_artifacts(
             execution.harbor_result, phase.layout.verifier_dir
         ),
         agent_artifacts=persist_agent_artifacts(execution.harbor_result, phase.layout.agent_dir),
         harbor_artifacts=persist_harbor_artifacts(execution.harbor_result, phase.layout.harbor_dir),
+        evidence_artifacts=evidence_artifacts,
+        workspace_prune=workspace_prune,
     )
 
 
@@ -3200,7 +3402,7 @@ def _synthesize_scorecard_phase(
             execution=execution,
         )
     )
-    write_summary_readme(phase.layout, request, scorecard, execution.harbor_result)
+    write_run_analysis(phase.layout, request, scorecard, execution.harbor_result)
     return scorecard
 
 
@@ -3217,10 +3419,9 @@ def run_task(request: RunRequest) -> EvalRun:
         config=EvalConfig(
             model=request.config.model.qualified_name,
             harness=request.config.agent.value,
-            rules_variant=request.config.rules_variant,
             task_name=request.task.name,
-            scaffold_template=prepared.context.scaffold_source.template,
-            scaffold_version=prepared.context.scaffold_source.version,
+            task_version=request.task.version,
+            scaffold_root=request.task.scaffold.root,
         ),
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,

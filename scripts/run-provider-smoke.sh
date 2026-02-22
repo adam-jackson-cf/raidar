@@ -4,11 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORCH_DIR="$ROOT_DIR/orchestrator"
 
-TASK_PATH="../tasks/hello-world-smoke/task.yaml"
-SCAFFOLDS_ROOT="../scaffolds"
-WORKSPACE="workspace-smoke"
-OUTPUT="results-smoke"
-RULES="none"
+TASK_PATH="../tasks/hello-world-smoke/v001/task.yaml"
 TIMEOUT_SEC="300"
 REPEATS="1"
 REPEAT_PARALLEL="1"
@@ -26,10 +22,7 @@ Required:
   --model            Model id (e.g. codex/gpt-5.2-high)
 
 Optional:
-  --rules            Rules variant (strict|minimal|none), default: none
   --timeout          Timeout in seconds, default: 300
-  --workspace        Workspace base dir (relative to orchestrator/), default: workspace-smoke
-  --output           Output base dir (relative to orchestrator/), default: results-smoke
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
   --retry-void       Void retry budget (0|1), default: 0
@@ -56,20 +49,8 @@ while [[ $# -gt 0 ]]; do
       MODEL="$2"
       shift 2
       ;;
-    --rules)
-      RULES="$2"
-      shift 2
-      ;;
     --timeout)
       TIMEOUT_SEC="$2"
-      shift 2
-      ;;
-    --workspace)
-      WORKSPACE="$2"
-      shift 2
-      ;;
-    --output)
-      OUTPUT="$2"
       shift 2
       ;;
     --repeats)
@@ -110,11 +91,6 @@ if [[ "$AGENT" != "codex-cli" && "$AGENT" != "claude-code" && "$AGENT" != "gemin
   exit 1
 fi
 
-if [[ "$RULES" != "strict" && "$RULES" != "minimal" && "$RULES" != "none" ]]; then
-  echo "Unsupported --rules '$RULES'. Expected one of: strict, minimal, none" >&2
-  exit 1
-fi
-
 if [[ -f "$ORCH_DIR/.env" ]]; then
   set -a
   # shellcheck disable=SC1091
@@ -148,17 +124,12 @@ uv run eval-orchestrator harbor cleanup
 uv run eval-orchestrator provider validate \
   --agent "$AGENT" \
   --model "$MODEL" \
-  --rules "$RULES" \
   --timeout "$TIMEOUT_SEC"
 
-uv run eval-orchestrator run \
+uv run eval-orchestrator suite run \
   --task "$TASK_PATH" \
   --agent "$AGENT" \
   --model "$MODEL" \
-  --rules "$RULES" \
-  --scaffolds-root "$SCAFFOLDS_ROOT" \
-  --workspace "$WORKSPACE" \
-  --output "$OUTPUT" \
   --timeout "$TIMEOUT_SEC" \
   --repeats "$REPEATS" \
   --repeat-parallel "$REPEAT_PARALLEL" \
