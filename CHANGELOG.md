@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.1] - 2026-02-22
+
+- fix: align local and ci gate sync flow
+- refactor: migrate execution maintenance into raidar cli
+
 ## [0.2.0] - 2026-02-22
 
 - docs: update readme strapline
