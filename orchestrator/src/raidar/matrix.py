@@ -23,7 +23,7 @@ class MatrixConfig(BaseModel):
         description="List of harness/model pairs to execute",
     )
     task_path: str = Field(description="Path to task.yaml")
-    executions_path: str = Field(default="executions", description="Path to execution outputs")
+    evals_path: str = Field(default="evals", description="Path to eval suite outputs")
 
 
 class MatrixEntry(BaseModel):
@@ -76,5 +76,5 @@ matrix:
     - harness: claude-code
       model: anthropic/claude-sonnet-4-5
   task_path: tasks/homepage-implementation/v001/task.yaml
-  executions_path: executions
+  evals_path: evals
 """

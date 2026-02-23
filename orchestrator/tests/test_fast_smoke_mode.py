@@ -2,9 +2,9 @@
 
 from pathlib import Path
 
-from agentic_eval.harness.adapters.gemini_cli import GeminiCliAdapter
-from agentic_eval.harness.config import Agent, HarnessConfig, ModelTarget
-from agentic_eval.harness.fast_mode import harness_src_path
+from raidar.harness.adapters.gemini_cli import GeminiCliAdapter
+from raidar.harness.config import Agent, HarnessConfig, ModelTarget
+from raidar.harness.fast_mode import harness_src_path
 
 
 def _gemini_adapter(monkeypatch) -> GeminiCliAdapter:
@@ -29,7 +29,7 @@ def test_fast_mode_uses_agent_import_path(monkeypatch) -> None:
 
     assert "--agent-import-path" in command
     assert "-a" not in command
-    assert "agentic_eval.harness.harbor_agents.fast_cli_agents:FastGeminiCliAgent" in command
+    assert "raidar.harness.harbor_agents.fast_cli_agents:FastGeminiCliAgent" in command
 
 
 def test_fast_mode_runtime_env_includes_pythonpath(monkeypatch) -> None:

@@ -6,8 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from agentic_eval.schemas.events import GateEvent
-from agentic_eval.schemas.scorecard import (
+from raidar.schemas.events import GateEvent
+from raidar.schemas.scorecard import (
     ComplianceCheck,
     ComplianceScore,
     EfficiencyScore,

@@ -15,9 +15,9 @@ _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
 
 FAST_AGENT_IMPORT_PATHS: dict[Agent, str] = {
-    Agent.CODEX_CLI: "agentic_eval.harness.harbor_agents.fast_cli_agents:FastCodexCliAgent",
-    Agent.CLAUDE_CODE: "agentic_eval.harness.harbor_agents.fast_cli_agents:FastClaudeCodeCliAgent",
-    Agent.GEMINI: "agentic_eval.harness.harbor_agents.fast_cli_agents:FastGeminiCliAgent",
+    Agent.CODEX_CLI: "raidar.harness.harbor_agents.fast_cli_agents:FastCodexCliAgent",
+    Agent.CLAUDE_CODE: "raidar.harness.harbor_agents.fast_cli_agents:FastClaudeCodeCliAgent",
+    Agent.GEMINI: "raidar.harness.harbor_agents.fast_cli_agents:FastGeminiCliAgent",
 }
 
 

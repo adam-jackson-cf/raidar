@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from agentic_eval.schemas.task import TaskDefinition
+from raidar.schemas.task import TaskDefinition
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 TASK_DIR = REPO_ROOT / "tasks" / "hello-world-smoke" / "v001"

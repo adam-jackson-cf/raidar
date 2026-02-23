@@ -17,7 +17,7 @@ End-to-end flow for task execution, Harbor runtime orchestration, and scoring ou
 
 Every suite/run writes to one execution root:
 
-`executions/<timestamp>__<task>__<version>/`
+`evals/<timestamp>__<task>__<version>/`
 
 Inside that root:
 - `workspace/baseline/`: prepared scaffold baseline snapshot used by all runs in the suite.
@@ -53,15 +53,14 @@ Dimensions:
 ## 5. Reporting and Analysis Inputs
 
 Canonical artifact paths for analysis:
-- `executions/*/suite.json`
-- `executions/*/suite-summary.json`
-- `executions/*/runs/*/run.json`
-- `executions/*/runs/*/verifier/scorecard.json`
-- `executions/*/runs/*/agent/*.txt`
+- `evals/*/suite.json`
+- `evals/*/suite-summary.json`
+- `evals/*/runs/*/run.json`
+- `evals/*/runs/*/verifier/scorecard.json`
+- `evals/*/runs/*/agent/*.txt`
 
 ## 6. Cleanup Lifecycle
 
-`uv run --project orchestrator raidar executions prune`:
-- archives legacy split roots (`orchestrator/results`, `orchestrator/jobs`, `orchestrator/workspace*`) by default.
-- prunes execution roots per model via `--keep-per-model` (default `1`).
+`uv run --project orchestrator raidar evals prune`:
+- prunes eval suite roots per model via `--keep-per-model` (default `1`).
 - archives pruned artifacts under `/tmp/raidar-archive/<timestamp>/` by default.

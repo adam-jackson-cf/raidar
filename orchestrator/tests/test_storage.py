@@ -3,8 +3,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from agentic_eval.schemas.scorecard import EvalConfig, EvalRun, Scorecard
-from agentic_eval.storage import (
+from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
+from raidar.storage import (
     aggregate_results,
     load_all_runs,
     load_run,

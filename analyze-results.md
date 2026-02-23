@@ -14,19 +14,19 @@ Produce a deterministic comparison of the latest suite per combination, then gen
 
 Use only these artifact paths:
 
-- Suite records: `executions/*/suite.json`
-- Suite summaries: `executions/*/suite-summary.json`
-- Suite analysis docs: `executions/*/analysis.md`
-- Run records: `executions/*/runs/*/run.json`
-- Verifier scorecards: `executions/*/runs/*/verifier/scorecard.json`
-- Run-validity artifacts: `executions/*/runs/*/verifier/run-validity.json`
-- Performance-gates artifacts: `executions/*/runs/*/verifier/performance-gates.json`
-- Pre-task screenshots: `executions/*/runs/*/homepage-pre.png`
-- Post-task screenshots: `executions/*/runs/*/homepage-post.png`
-- Agent traces: `executions/*/runs/*/agent/trajectory.json`
-- Agent logs: `executions/*/runs/*/agent/*.txt`
+- Suite records: `evals/*/suite.json`
+- Suite summaries: `evals/*/suite-summary.json`
+- Suite analysis docs: `evals/*/analysis.md`
+- Run records: `evals/*/runs/*/run.json`
+- Verifier scorecards: `evals/*/runs/*/verifier/scorecard.json`
+- Run-validity artifacts: `evals/*/runs/*/verifier/run-validity.json`
+- Performance-gates artifacts: `evals/*/runs/*/verifier/performance-gates.json`
+- Pre-task screenshots: `evals/*/runs/*/homepage-pre.png`
+- Post-task screenshots: `evals/*/runs/*/homepage-post.png`
+- Agent traces: `evals/*/runs/*/agent/trajectory.json`
+- Agent logs: `evals/*/runs/*/agent/*.txt`
 
-Do not use legacy roots such as `orchestrator/executions*`, `orchestrator/results`, `orchestrator/jobs`, or `orchestrator/workspace*`.
+Do not use non-canonical legacy roots outside `evals/`.
 
 ### Suite Selection Rule
 

@@ -1,6 +1,6 @@
 """Tests for compliance scoring and judge parsing."""
 
-from agentic_eval.scoring.compliance import (
+from raidar.scoring.compliance import (
     JudgeResult,
     parse_judge_response,
 )

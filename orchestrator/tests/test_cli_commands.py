@@ -5,26 +5,26 @@ from pathlib import Path
 
 from click.testing import CliRunner
 
-from agentic_eval.cli import (
+from raidar.cli import (
     RunCliOptions,
     _assert_no_generated_artifact_changes,
     _generated_artifact_paths,
     main,
 )
-from agentic_eval.schemas.task import TaskDefinition
+from raidar.schemas.task import TaskDefinition
 
 
 def test_generated_artifact_paths_filters_prefixes() -> None:
     paths = [
-        "executions/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+        "evals/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
         "tasks/hello-world-smoke/v001/task.yaml",
-        "orchestrator/src/agentic_eval/cli.py",
+        "orchestrator/src/raidar/cli.py",
     ]
 
     matches = _generated_artifact_paths(paths)
 
     assert matches == [
-        "executions/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+        "evals/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
     ]
 
 
@@ -80,11 +80,11 @@ def test_task_init_creates_schema_valid_task_and_rules(tmp_path: Path) -> None:
 
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "agentic_eval.cli._changed_repo_entries",
+        "raidar.cli._changed_repo_entries",
         lambda _: [
             (
                 "D",
-                "executions/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+                "evals/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
             ),
         ],
     )
@@ -215,18 +215,18 @@ def _write_execution_summary(
     (execution_dir / "suite-summary.json").write_text(json.dumps(payload), encoding="utf-8")
 
 
-def test_executions_list_filters_and_json_output(tmp_path: Path) -> None:
+def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
     runner = CliRunner()
-    executions_root = tmp_path / "executions"
+    evals_root = tmp_path / "evals"
     _write_execution_summary(
-        executions_root / "20260222-100000Z__hello-world-smoke__v001",
+        evals_root / "20260222-100000Z__hello-world-smoke__v001",
         task_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
         created_at="2026-02-22T10:00:00+00:00",
     )
     _write_execution_summary(
-        executions_root / "20260222-110000Z__homepage-implementation__v001",
+        evals_root / "20260222-110000Z__homepage-implementation__v001",
         task_name="homepage-implementation",
         model="codex/gpt-5.2-high",
         harness="codex-cli",
@@ -236,10 +236,10 @@ def test_executions_list_filters_and_json_output(tmp_path: Path) -> None:
     text_result = runner.invoke(
         main,
         [
-            "executions",
+            "evals",
             "list",
-            "--executions-root",
-            str(executions_root),
+            "--evals-root",
+            str(evals_root),
             "--task",
             "homepage",
         ],
@@ -251,10 +251,10 @@ def test_executions_list_filters_and_json_output(tmp_path: Path) -> None:
     json_result = runner.invoke(
         main,
         [
-            "executions",
+            "evals",
             "list",
-            "--executions-root",
-            str(executions_root),
+            "--evals-root",
+            str(evals_root),
             "--json",
         ],
     )
@@ -264,14 +264,14 @@ def test_executions_list_filters_and_json_output(tmp_path: Path) -> None:
     assert rows[0]["execution_id"] == "20260222-110000Z__homepage-implementation__v001"
 
 
-def test_executions_prune_keeps_latest_per_model(tmp_path: Path) -> None:
+def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     runner = CliRunner()
-    executions_root = tmp_path / "executions"
+    evals_root = tmp_path / "evals"
     archive_root = tmp_path / "archive"
 
-    old_dir = executions_root / "20260220-100000Z__hello-world-smoke__v001"
-    new_dir = executions_root / "20260221-100000Z__hello-world-smoke__v001"
-    other_model_dir = executions_root / "20260222-100000Z__hello-world-smoke__v001"
+    old_dir = evals_root / "20260220-100000Z__hello-world-smoke__v001"
+    new_dir = evals_root / "20260221-100000Z__hello-world-smoke__v001"
+    other_model_dir = evals_root / "20260222-100000Z__hello-world-smoke__v001"
     _write_execution_summary(
         old_dir,
         task_name="hello-world-smoke",
@@ -297,31 +297,30 @@ def test_executions_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     result = runner.invoke(
         main,
         [
-            "executions",
+            "evals",
             "prune",
-            "--executions-root",
-            str(executions_root),
+            "--evals-root",
+            str(evals_root),
             "--archive-dir",
             str(archive_root),
             "--keep-per-model",
             "1",
-            "--no-include-legacy",
         ],
     )
     assert result.exit_code == 0, result.output
     assert new_dir.exists()
     assert other_model_dir.exists()
     assert not old_dir.exists()
-    assert (archive_root / "executions" / old_dir.name).exists()
-    assert "executions_pruned=1" in result.output
+    assert (archive_root / "evals" / old_dir.name).exists()
+    assert "evals_pruned=1" in result.output
 
 
-def test_executions_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
+def test_evals_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
     runner = CliRunner()
-    executions_root = tmp_path / "executions"
+    evals_root = tmp_path / "evals"
     archive_root = tmp_path / "archive"
-    old_dir = executions_root / "20260220-100000Z__hello-world-smoke__v001"
-    new_dir = executions_root / "20260221-100000Z__hello-world-smoke__v001"
+    old_dir = evals_root / "20260220-100000Z__hello-world-smoke__v001"
+    new_dir = evals_root / "20260221-100000Z__hello-world-smoke__v001"
     _write_execution_summary(
         old_dir,
         task_name="hello-world-smoke",
@@ -340,15 +339,14 @@ def test_executions_prune_dry_run_does_not_move_directories(tmp_path: Path) -> N
     result = runner.invoke(
         main,
         [
-            "executions",
+            "evals",
             "prune",
-            "--executions-root",
-            str(executions_root),
+            "--evals-root",
+            str(evals_root),
             "--archive-dir",
             str(archive_root),
             "--keep-per-model",
             "1",
-            "--no-include-legacy",
             "--dry-run",
         ],
     )
@@ -356,4 +354,4 @@ def test_executions_prune_dry_run_does_not_move_directories(tmp_path: Path) -> N
     assert old_dir.exists()
     assert new_dir.exists()
     assert not archive_root.exists()
-    assert "would-archive: executions/" in result.output
+    assert "would-archive: evals/" in result.output

@@ -56,10 +56,10 @@ class MatrixRunner:
     def __init__(
         self,
         tasks_dir: Path,
-        executions_dir: Path,
+        evals_dir: Path,
     ) -> None:
         self.tasks_dir = tasks_dir
-        self.executions_dir = executions_dir
+        self.evals_dir = evals_dir
 
     def run_single(
         self,
@@ -87,7 +87,7 @@ class MatrixRunner:
         try:
             model_str = harness_config.model.qualified_name
             run_id = f"{task.name}-{harness_config.agent.value}-{uuid.uuid4().hex[:8]}"
-            execution_dir = self.executions_dir / run_id
+            execution_dir = self.evals_dir / run_id
             if progress_callback:
                 progress_callback(
                     f"Preparing workspace for {harness_config.agent.value}/{model_str}"
@@ -222,7 +222,7 @@ class MatrixRunner:
 
 def run_matrix(
     tasks_dir: Path,
-    executions_dir: Path,
+    evals_dir: Path,
     task: TaskDefinition,
     matrix_config: MatrixConfig,
     parallel: int = 1,
@@ -232,7 +232,7 @@ def run_matrix(
 
     Args:
         tasks_dir: Path to tasks directory
-        executions_dir: Path to matrix execution output directory
+        evals_dir: Path to matrix eval output directory
         task: Task definition
         matrix_config: Matrix configuration
         parallel: Number of parallel executions
@@ -243,7 +243,7 @@ def run_matrix(
     """
     runner = MatrixRunner(
         tasks_dir=tasks_dir,
-        executions_dir=executions_dir,
+        evals_dir=evals_dir,
     )
 
     return runner.run_matrix(

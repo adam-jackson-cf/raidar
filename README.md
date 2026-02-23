@@ -13,7 +13,7 @@
   <a href="#quick-install">Quick Install</a> •
   <a href="#start-here-2-minutes">Start Here</a> •
   <a href="#orchestrator-flow">Flow</a> •
-  <a href="#execution-suite-layout">Execution Layout</a> •
+  <a href="#eval-suite-layout">Eval Layout</a> •
   <a href="CHANGELOG.md">Changelog</a> •
   <a href="analyze-results.md">Analyze Prompt</a>
 </p>
@@ -29,7 +29,7 @@
 - [System Overview](#system-overview)
 - [Orchestrator Flow](#orchestrator-flow)
 - [Task Model](#task-model)
-- [Execution Suite Layout](#execution-suite-layout)
+- [Eval Suite Layout](#eval-suite-layout)
 - [Common Commands](#common-commands)
 - [Cleanup](#cleanup)
 - [Changelog](#changelog)
@@ -67,7 +67,7 @@ uv run raidar suite run \
   --retry-void 0
 ```
 
-This creates one suite in `executions/` with run artifacts, verifier outputs, screenshots, and summary files.
+This creates one suite in `evals/` with run artifacts, verifier outputs, screenshots, and summary files.
 
 ## System Overview
 
@@ -75,14 +75,14 @@ The repository has three primary concerns:
 
 - `orchestrator/`: CLI and runtime pipeline that executes and scores tasks.
 - `tasks/`: versioned task definitions (`task.yaml`), prompts, rules, references, and scaffolds.
-- `executions/`: generated suite artifacts (gitignored) with per-run evidence bundles.
+- `evals/`: generated suite artifacts (gitignored) with per-run evidence bundles.
 
 ## Orchestrator Flow
 
 ```mermaid
 flowchart TD
     A["suite run CLI"] --> B["Load task.yaml + prompt entry + rules + scaffold root"]
-    B --> C["Create suite folder in executions/<timestamp>__<task>__<version>"]
+    B --> C["Create suite folder in evals/<timestamp>__<task>__<version>"]
     C --> D["Create baseline workspace snapshot from task scaffold"]
     D --> E["For each repeat (run-01..run-N)"]
     E --> F["Launch Harbor agent run against run workspace copy"]
@@ -118,13 +118,13 @@ tasks/<task-name>/<version>/
 - `compliance`: deterministic checks and optional rubric config
 - `visual`: screenshot command/reference image/threshold (for visual tasks)
 
-## Execution Suite Layout
+## Eval Suite Layout
 
-Each suite run writes one timestamped folder under `executions/`.
+Each suite run writes one timestamped folder under `evals/`.
 
 ```mermaid
 flowchart TD
-    A["executions/<timestamp>__<task>__<version>/"] --> B["suite.json (full suite payload)"]
+    A["evals/<timestamp>__<task>__<version>/"] --> B["suite.json (full suite payload)"]
     A --> C["suite-summary.json (aggregate stats only)"]
     A --> D["analysis.md (human-readable suite analysis)"]
     A --> E["workspace/baseline/ (suite baseline snapshot)"]
@@ -141,8 +141,8 @@ flowchart TD
 
 Concrete example from this repository:
 
-- `executions/20260222-181058Z__hello-world-smoke__v001`
-- `executions/20260222-181058Z__hello-world-smoke__v001/runs/run-01`
+- `evals/20260222-181058Z__hello-world-smoke__v001`
+- `evals/20260222-181058Z__hello-world-smoke__v001/runs/run-01`
 
 ## Common Commands
 
@@ -169,11 +169,11 @@ Run homepage task baseline set:
 
 ## Cleanup
 
-Prune/archive stale generated execution artifacts:
+Prune/archive stale generated eval artifacts:
 
 ```bash
 cd orchestrator
-uv run raidar executions prune
+uv run raidar evals prune
 ```
 
 ## Changelog

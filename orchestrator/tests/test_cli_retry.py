@@ -4,8 +4,8 @@ from types import SimpleNamespace
 
 import click
 
-from agentic_eval import cli
-from agentic_eval.runner import ScaffoldPreflightError
+from raidar import cli
+from raidar.runner import ScaffoldPreflightError
 
 
 def _void_run(voided: bool) -> SimpleNamespace:

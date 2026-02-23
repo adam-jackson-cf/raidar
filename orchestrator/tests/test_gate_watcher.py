@@ -1,7 +1,7 @@
 """Tests for gate watcher functionality."""
 
-from agentic_eval.schemas.events import GateEvent
-from agentic_eval.watcher.gate_watcher import (
+from raidar.schemas.events import GateEvent
+from raidar.watcher.gate_watcher import (
     GateWatcher,
     categorize_failure,
     truncate_output,
