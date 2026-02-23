@@ -27,7 +27,7 @@ jobs:
       - name: Install orchestrator dev dependencies
         run: |
           cd orchestrator
-          uv sync --all-extras
+          uv sync --all-extras --frozen
 
       - name: Run consolidated CI quality gates
         run: |
