@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.3] - 2026-02-23
+
+- fix: use StrEnum for harness agent enum
+- docs: update AGENTS project map and workflows
+- build: track uv lockfile and enforce frozen sync
+
 ## [0.2.2] - 2026-02-22
 
 - fix: remove frozen sync requirement from quality gates
