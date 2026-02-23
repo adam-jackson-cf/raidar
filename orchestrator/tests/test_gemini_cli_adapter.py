@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from agentic_eval.harness.adapters.gemini_cli import GeminiCliAdapter
-from agentic_eval.harness.config import Agent, HarnessConfig, ModelTarget
+from raidar.harness.adapters.gemini_cli import GeminiCliAdapter
+from raidar.harness.config import Agent, HarnessConfig, ModelTarget
 
 
 def _config(model: str, provider: str = "google") -> HarnessConfig:

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-import agentic_eval.runner as runner
+import raidar.runner as runner
 
 
 class _AdapterStub:

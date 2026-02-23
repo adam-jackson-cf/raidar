@@ -1,6 +1,6 @@
 """Tests for scorecard computed fields."""
 
-from agentic_eval.schemas.scorecard import (
+from raidar.schemas.scorecard import (
     ComplianceCheck,
     ComplianceScore,
     EfficiencyScore,

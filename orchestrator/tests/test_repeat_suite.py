@@ -3,12 +3,12 @@
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-from agentic_eval.repeat_suite import (
+from raidar.repeat_suite import (
     create_repeat_suite_summary,
     persist_repeat_suite,
     repeat_workspace,
 )
-from agentic_eval.schemas.scorecard import EvalConfig, EvalRun, GateCheck, Scorecard
+from raidar.schemas.scorecard import EvalConfig, EvalRun, GateCheck, Scorecard
 
 
 def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False) -> EvalRun:
@@ -52,8 +52,8 @@ def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False)
 
 
 def test_repeat_workspace_isolated_path():
-    base = Path("/tmp/executions/suite-01")
-    assert repeat_workspace(base, 3) == Path("/tmp/executions/suite-01/runs/run-03/workspace")
+    base = Path("/tmp/evals/suite-01")
+    assert repeat_workspace(base, 3) == Path("/tmp/evals/suite-01/runs/run-03/workspace")
 
 
 def test_create_repeat_suite_summary_aggregates():

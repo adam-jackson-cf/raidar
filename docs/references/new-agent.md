@@ -4,9 +4,9 @@ Use this flow to add a new harness cleanly and keep run outputs comparable.
 
 ## 1. Extend Harness Registry
 
-1. Add enum entry in `orchestrator/src/agentic_eval/harness/config.py`.
-2. Implement adapter in `orchestrator/src/agentic_eval/harness/adapters/`.
-3. Register adapter in `orchestrator/src/agentic_eval/harness/adapters/registry.py`.
+1. Add enum entry in `orchestrator/src/raidar/harness/config.py`.
+2. Implement adapter in `orchestrator/src/raidar/harness/adapters/`.
+3. Register adapter in `orchestrator/src/raidar/harness/adapters/registry.py`.
 
 Adapter responsibilities:
 - validate provider/model prefix compatibility.
@@ -16,7 +16,7 @@ Adapter responsibilities:
 ## 2. Wire CLI and Rules Mapping
 
 1. Ensure CLI choices include the new agent where relevant (`run`, `suite run`, `provider validate`, `inject`, `matrix`).
-2. Add rule filename mapping in `orchestrator/src/agentic_eval/harness/rules.py` (`SYSTEM_RULES`).
+2. Add rule filename mapping in `orchestrator/src/raidar/harness/rules.py` (`SYSTEM_RULES`).
 
 ## 3. Ensure Task Rules Compatibility
 
@@ -27,7 +27,7 @@ The runner injects exactly one ruleset file based on `SYSTEM_RULES` mapping.
 
 ## 4. Session Parsing Coverage
 
-If log format differs, extend `orchestrator/src/agentic_eval/parser/session_log.py` and add tests so metrics/events are extracted consistently.
+If log format differs, extend `orchestrator/src/raidar/parser/session_log.py` and add tests so metrics/events are extracted consistently.
 
 ## 5. Validate End-to-End
 
@@ -41,5 +41,5 @@ uv run raidar run \
 ```
 
 Check outputs in:
-- `executions/<suite-id>/suite-summary.json`
-- `executions/<suite-id>/runs/*/run.json`
+- `evals/<suite-id>/suite-summary.json`
+- `evals/<suite-id>/runs/*/run.json`

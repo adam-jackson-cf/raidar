@@ -4,8 +4,8 @@ from pathlib import Path
 
 import pytest
 
-from agentic_eval.harness.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from agentic_eval.harness.config import Agent, HarnessConfig, ModelTarget
+from raidar.harness.adapters.claude_code_cli import ClaudeCodeCliAdapter
+from raidar.harness.config import Agent, HarnessConfig, ModelTarget
 
 
 def _config(model: str, provider: str = "anthropic") -> HarnessConfig:

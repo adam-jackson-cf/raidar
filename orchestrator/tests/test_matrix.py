@@ -3,7 +3,7 @@
 import pytest
 from pydantic import ValidationError
 
-from agentic_eval.matrix import (
+from raidar.matrix import (
     MatrixConfig,
     MatrixEntry,
     generate_matrix_entries,

@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from agentic_eval.audit.workspace_diff import directory_fingerprint
-from agentic_eval.harness.config import Agent, HarnessConfig, ModelTarget
-from agentic_eval.runner import (
+from raidar.audit.workspace_diff import directory_fingerprint
+from raidar.harness.config import Agent, HarnessConfig, ModelTarget
+from raidar.runner import (
     EvaluationOutputs,
     ExecutionPhaseResult,
     HarborExecutionResult,
@@ -31,9 +31,9 @@ from agentic_eval.runner import (
     evaluate_coverage,
     evaluate_requirements,
 )
-from agentic_eval.scaffold.catalog import ScaffoldSource
-from agentic_eval.schemas.events import GateEvent
-from agentic_eval.schemas.scorecard import (
+from raidar.scaffold.catalog import ScaffoldSource
+from raidar.schemas.events import GateEvent
+from raidar.schemas.scorecard import (
     ComplianceScore,
     CoverageScore,
     EfficiencyScore,
@@ -42,7 +42,7 @@ from agentic_eval.schemas.scorecard import (
     RequirementCoverageScore,
     RunValidityScore,
 )
-from agentic_eval.schemas.task import DeterministicCheck, RequirementSpec, TaskDefinition
+from raidar.schemas.task import DeterministicCheck, RequirementSpec, TaskDefinition
 
 
 def _sample_task() -> TaskDefinition:
@@ -219,7 +219,7 @@ def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
     task_dir = tmp_path / "task" / "v001"
     scaffold_dir = task_dir / "scaffold"
     scaffold_dir.mkdir(parents=True, exist_ok=True)
-    suite_baseline_dir = tmp_path / "executions" / "suite-01" / "workspace" / "baseline"
+    suite_baseline_dir = tmp_path / "evals" / "suite-01" / "workspace" / "baseline"
     call_count = 0
     call_lock = threading.Lock()
     start_barrier = threading.Barrier(3)
@@ -235,7 +235,7 @@ def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir, None
 
-    monkeypatch.setattr("agentic_eval.runner.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
 
     failures: list[Exception] = []
 

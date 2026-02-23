@@ -45,17 +45,9 @@ from .task_clone import clone_task_version
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
-ARTIFACT_CHANGE_PREFIXES = ("executions/",)
-EXECUTIONS_ROOT = REPO_ROOT / "executions"
+ARTIFACT_CHANGE_PREFIXES = ("evals/",)
+EVALS_ROOT = REPO_ROOT / "evals"
 DEFAULT_ARCHIVE_ROOT = Path("/tmp")
-LEGACY_ARTIFACT_PATHS = (
-    "jobs",
-    "orchestrator/jobs",
-    "orchestrator/results",
-    "orchestrator/executions",
-    "orchestrator/executions-smoke",
-    "orchestrator/executions-baseline",
-)
 if ENV_PATH.exists():
     load_dotenv(ENV_PATH, override=False)
 
@@ -324,7 +316,7 @@ def _execute_run_options(options: RunCliOptions, *, force_suite_summary: bool) -
     task_def = load_task(resolved.task)
     started_at = datetime.now(UTC)
     execution_id = _execution_id(task_def.name, task_def.version, started_at)
-    execution_dir = EXECUTIONS_ROOT / execution_id
+    execution_dir = EVALS_ROOT / execution_id
     request = _build_run_request(resolved, task_def, execution_dir)
     _echo_run_header(resolved, request.task.name)
 
@@ -529,7 +521,7 @@ def _archive_destination(src: Path, archive_dir: Path) -> Path:
     try:
         rel = src.relative_to(REPO_ROOT)
     except ValueError:
-        rel = Path("executions") / src.name
+        rel = Path("evals") / src.name
     return archive_dir / rel
 
 
@@ -547,17 +539,11 @@ def _archive_path(src: Path, archive_dir: Path, *, dry_run: bool) -> bool:
     return True
 
 
-def _legacy_artifact_paths() -> list[Path]:
-    paths = [REPO_ROOT / rel for rel in LEGACY_ARTIFACT_PATHS]
-    workspace_variants = sorted((REPO_ROOT / "orchestrator").glob("workspace*"))
-    return paths + workspace_variants
-
-
-def _sorted_execution_dirs(executions_root: Path) -> list[Path]:
-    if not executions_root.is_dir():
+def _sorted_eval_dirs(evals_root: Path) -> list[Path]:
+    if not evals_root.is_dir():
         return []
     return sorted(
-        (path for path in executions_root.iterdir() if path.is_dir()),
+        (path for path in evals_root.iterdir() if path.is_dir()),
         key=lambda path: path.name,
         reverse=True,
     )
@@ -836,17 +822,17 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
 
 
 @main.group()
-def executions() -> None:
-    """Execution artifact workflows."""
+def evals() -> None:
+    """Eval suite artifact workflows."""
 
 
-@executions.command("list")
+@evals.command("list")
 @click.option(
-    "--executions-root",
+    "--evals-root",
     type=click.Path(path_type=Path),
-    default=EXECUTIONS_ROOT,
+    default=EVALS_ROOT,
     show_default=True,
-    help="Execution directory root.",
+    help="Eval suite directory root.",
 )
 @click.option("--task", type=str, help="Filter by task name substring.")
 @click.option("--model", type=str, help="Filter by model substring.")
@@ -859,16 +845,16 @@ def executions() -> None:
     help="Maximum rows to display.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
-def executions_list(
-    executions_root: Path,
+def evals_list(
+    evals_root: Path,
     task: str | None,
     model: str | None,
     harness: str | None,
     limit: int,
     as_json: bool,
 ) -> None:
-    """List execution suites with optional filters."""
-    dirs = _sorted_execution_dirs(executions_root.resolve())
+    """List eval suites with optional filters."""
+    dirs = _sorted_eval_dirs(evals_root.resolve())
     rows: list[dict[str, object]] = []
     for path in dirs:
         record = _execution_record(path)
@@ -882,7 +868,7 @@ def executions_list(
         click.echo(json.dumps(rows, indent=2))
         return
     if not rows:
-        click.echo("No executions found.")
+        click.echo("No eval suites found.")
         return
 
     for index, row in enumerate(rows, start=1):
@@ -893,13 +879,13 @@ def executions_list(
         )
 
 
-@executions.command("prune")
+@evals.command("prune")
 @click.option(
-    "--executions-root",
+    "--evals-root",
     type=click.Path(path_type=Path),
-    default=EXECUTIONS_ROOT,
+    default=EVALS_ROOT,
     show_default=True,
-    help="Execution directory root.",
+    help="Eval suite directory root.",
 )
 @click.option(
     "--keep-per-model",
@@ -913,34 +899,22 @@ def executions_list(
     type=click.Path(path_type=Path),
     help="Archive destination. Defaults to /tmp/raidar-archive/<timestamp>.",
 )
-@click.option(
-    "--include-legacy/--no-include-legacy",
-    default=True,
-    show_default=True,
-    help="Archive legacy split artifact roots and workspace variants.",
-)
 @click.option("--dry-run", is_flag=True, help="Show actions without moving files.")
-def executions_prune(
-    executions_root: Path,
+def evals_prune(
+    evals_root: Path,
     keep_per_model: int,
     archive_dir: Path | None,
-    include_legacy: bool,
     dry_run: bool,
 ) -> None:
-    """Archive stale execution artifacts while keeping latest suites per model."""
+    """Archive stale eval suite artifacts while keeping latest suites per model."""
     archive_root = (archive_dir or _default_archive_dir()).resolve()
-    executions_root = executions_root.resolve()
+    evals_root = evals_root.resolve()
     if not dry_run:
         archive_root.mkdir(parents=True, exist_ok=True)
 
-    archived_count = 0
-    if include_legacy:
-        for path in _legacy_artifact_paths():
-            archived_count += int(_archive_path(path, archive_root, dry_run=dry_run))
-
     kept_counts: dict[str, int] = {}
     pruned_count = 0
-    for execution_dir in _sorted_execution_dirs(executions_root):
+    for execution_dir in _sorted_eval_dirs(evals_root):
         model_key = _execution_model_key(execution_dir)
         count = kept_counts.get(model_key, 0)
         if count < keep_per_model:
@@ -950,8 +924,7 @@ def executions_prune(
             pruned_count += 1
 
     click.echo(f"archive_dir={archive_root}")
-    click.echo(f"legacy_archived={archived_count}")
-    click.echo(f"executions_pruned={pruned_count}")
+    click.echo(f"evals_pruned={pruned_count}")
 
 
 @main.group()
@@ -1265,7 +1238,7 @@ def matrix(task: tuple[Path, ...], config: Path, parallel: int, dry_run: bool) -
 
     runner = MatrixRunner(
         tasks_dir=task_paths[0].parent,
-        executions_dir=Path(matrix_config.executions_path),
+        evals_dir=Path(matrix_config.evals_path),
     )
 
     if len(task_defs) == 1:
@@ -1364,7 +1337,7 @@ def _run_multi_task_matrix(
     "-r",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to executions directory",
+    help="Path to evals directory",
 )
 @click.option(
     "--format",
@@ -1380,7 +1353,7 @@ def _run_multi_task_matrix(
     help="Output file path",
 )
 def report(results: Path, format: str, output: Path | None) -> None:
-    """Generate comparison report from executions."""
+    """Generate comparison report from eval suites."""
     from .storage import (
         aggregate_results,
         export_to_csv,

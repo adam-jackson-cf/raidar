@@ -35,7 +35,7 @@ def load_run(path: Path) -> EvalRun:
 
 
 def load_all_runs(results_dir: Path) -> list[EvalRun]:
-    """Load all evaluation runs from an executions directory."""
+    """Load all evaluation runs from an evals directory."""
     runs = []
 
     for json_file in results_dir.glob("**/runs/*/run.json"):

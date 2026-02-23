@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-from agentic_eval.scoring import functional
-from agentic_eval.scoring.visual import compare_images
+from raidar.scoring import functional
+from raidar.scoring.visual import compare_images
 
 
 def test_run_tests_passes_when_no_tests_found(monkeypatch):
@@ -36,7 +36,7 @@ def test_compare_images_parses_diff_percent_from_nonzero_exit(monkeypatch, tmp_p
     actual.write_bytes(b"actual")
     diff.write_bytes(b"diff")
 
-    monkeypatch.setattr("agentic_eval.scoring.visual.subprocess.run", lambda *a, **k: FakeResult())
+    monkeypatch.setattr("raidar.scoring.visual.subprocess.run", lambda *a, **k: FakeResult())
 
     similarity, diff_path = compare_images(
         workspace=tmp_path,

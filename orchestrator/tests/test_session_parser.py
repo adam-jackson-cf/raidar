@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from agentic_eval.parser.session_log import parse_cursor_session, parse_session
+from raidar.parser.session_log import parse_cursor_session, parse_session
 
 
 def _write_jsonl(tmp_dir: Path, name: str, lines: list[dict]) -> None:

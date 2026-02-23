@@ -7,7 +7,7 @@ class TestEvalSettings:
     def test_default_weights_sum_to_one(self):
         """Weights should sum to 1.0."""
         # Import fresh to get defaults
-        from agentic_eval.config import ScoringWeights
+        from raidar.config import ScoringWeights
 
         weights = ScoringWeights()
         total = weights.functional + weights.compliance + weights.visual + weights.efficiency
@@ -15,7 +15,7 @@ class TestEvalSettings:
 
     def test_default_timeouts_are_reasonable(self):
         """Timeouts should be positive integers."""
-        from agentic_eval.config import TimeoutSettings
+        from raidar.config import TimeoutSettings
 
         timeouts = TimeoutSettings()
         assert timeouts.build > 0
@@ -25,7 +25,7 @@ class TestEvalSettings:
 
     def test_llm_judge_defaults(self):
         """LLM judge should have sensible defaults."""
-        from agentic_eval.config import LLMJudgeSettings
+        from raidar.config import LLMJudgeSettings
 
         judge = LLMJudgeSettings()
         assert judge.max_tokens > 0
@@ -35,7 +35,7 @@ class TestEvalSettings:
 
     def test_settings_singleton_exports(self):
         """Settings singleton should be importable and have all subsections."""
-        from agentic_eval.config import settings
+        from raidar.config import settings
 
         assert settings.weights is not None
         assert settings.timeouts is not None
@@ -54,7 +54,7 @@ class TestEnvironmentOverrides:
         monkeypatch.setenv("EVAL_LLM_JUDGE__MODEL", "test/model")
 
         # Need to reimport to pick up env var
-        from agentic_eval.config import LLMJudgeSettings
+        from raidar.config import LLMJudgeSettings
 
         settings = LLMJudgeSettings()
         assert settings.model == "test/model"
@@ -63,7 +63,7 @@ class TestEnvironmentOverrides:
         """Environment variable should override timeout."""
         monkeypatch.setenv("EVAL_TIMEOUTS__BUILD", "300")
 
-        from agentic_eval.config import TimeoutSettings
+        from raidar.config import TimeoutSettings
 
         settings = TimeoutSettings()
         assert settings.build == 300
