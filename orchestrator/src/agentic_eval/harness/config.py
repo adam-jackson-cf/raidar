@@ -1,11 +1,11 @@
 """Harness and model configuration for Harbor execution."""
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
 
-class Agent(str, Enum):
+class Agent(StrEnum):
     """Supported agents via Harbor."""
 
     CLAUDE_CODE = "claude-code"
