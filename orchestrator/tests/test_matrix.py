@@ -37,7 +37,7 @@ class TestMatrixEntry:
 
     @pytest.mark.parametrize(
         ("model_name"),
-        ("claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"),
+        ("claude-opus-4-6", "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"),
     )
     def test_to_harness_config_for_requested_claude_models(self, model_name: str):
         """Should parse requested Claude model variants."""
@@ -52,7 +52,7 @@ class TestMatrixEntry:
 
     @pytest.mark.parametrize(
         ("model_name"),
-        ("gemini-3-pro-preview", "gemini-3-flash-preview"),
+        ("gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-3-flash-preview"),
     )
     def test_to_harness_config_for_requested_gemini_models(self, model_name: str):
         """Should parse requested Gemini model variants."""

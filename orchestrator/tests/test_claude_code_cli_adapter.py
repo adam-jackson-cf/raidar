@@ -44,7 +44,7 @@ def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.parametrize(
     "model_name",
-    ("claude-opus-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"),
+    ("claude-opus-4-6", "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"),
 )
 def test_validate_accepts_requested_models(monkeypatch: pytest.MonkeyPatch, model_name: str):
     monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")

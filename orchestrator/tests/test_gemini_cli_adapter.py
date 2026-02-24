@@ -48,7 +48,7 @@ def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
 
 @pytest.mark.parametrize(
     "model_name",
-    ("gemini-3-pro-preview", "gemini-3-flash-preview"),
+    ("gemini-3.1-pro-preview", "gemini-3-pro-preview", "gemini-3-flash-preview"),
 )
 def test_validate_accepts_supported_models(monkeypatch: pytest.MonkeyPatch, model_name: str):
     monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")

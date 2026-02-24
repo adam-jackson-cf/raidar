@@ -21,6 +21,7 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
     ANTHROPIC_API_ENV = "ANTHROPIC_API_KEY"
     SUPPORTED_MODELS: set[str] = {
         "claude-opus-4-6",
+        "claude-sonnet-4-6",
         "claude-sonnet-4-5",
         "claude-haiku-4-5",
     }
