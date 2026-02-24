@@ -35,6 +35,10 @@ class HarnessAdapter:
         """Extra environment variables required for the harness runtime."""
         return {}
 
+    def provider_probe(self) -> tuple[list[str], dict[str, str]] | None:
+        """Optional lightweight provider probe command and environment."""
+        return None
+
     # ------------------------------------------------------------------
     # Harbor command wiring
     # ------------------------------------------------------------------

@@ -81,6 +81,17 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
         env[self.CLI_ENV_VAR] = cli_path
         return with_harness_pythonpath(env)
 
+    def provider_probe(self) -> tuple[list[str], dict[str, str]] | None:
+        env = os.environ.copy()
+        env.setdefault("ANTHROPIC_MODEL", self.config.model.name)
+        return [
+            self._resolve_cli(),
+            "--output-format",
+            "stream-json",
+            "-p",
+            "Reply with exactly OK.",
+        ], env
+
     def prepare_workspace(self, workspace: Path) -> None:
         # Ensure Claude Code has session directory path recorded for parsers
         claude_session_dir = workspace / ".claude"

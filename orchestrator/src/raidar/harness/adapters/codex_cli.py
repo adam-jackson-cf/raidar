@@ -83,6 +83,21 @@ class CodexCliAdapter(HarnessAdapter):
         env[self.CLI_ENV_VAR] = cli_path
         return with_harness_pythonpath(env)
 
+    def provider_probe(self) -> tuple[list[str], dict[str, str]] | None:
+        model_name, reasoning_effort = self._resolve_model_alias()
+        command = [
+            self._resolve_cli(),
+            "exec",
+            "--dangerously-bypass-approvals-and-sandbox",
+            "--skip-git-repo-check",
+            "--model",
+            model_name,
+        ]
+        if reasoning_effort:
+            command.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
+        command.extend(["--", "Reply with exactly OK."])
+        return command, os.environ.copy()
+
     def prepare_workspace(self, workspace: Path) -> None:
         # Ensure Codex CLI has session directory path recorded for parsers
         codex_session_dir = workspace / ".codex"
