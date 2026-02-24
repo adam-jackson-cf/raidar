@@ -19,6 +19,7 @@ class GeminiCliAdapter(HarnessAdapter):
     CLI_ENV_VAR = "GEMINI_CLI_PATH"
     GEMINI_API_ENV = "GEMINI_API_KEY"
     SUPPORTED_MODELS: set[str] = {
+        "gemini-3.1-pro-preview",
         "gemini-3-pro-preview",
         "gemini-3-flash-preview",
     }
