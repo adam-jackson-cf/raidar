@@ -39,6 +39,9 @@ jobs:
       - name: Run version bump
         run: python scripts/bump-version.py
 
+      - name: Verify version wiring
+        run: python scripts/verify-version-wiring.py
+
       - name: Format CHANGELOG
         run: |
           npx --yes prettier --write CHANGELOG.md

@@ -53,7 +53,7 @@ if ENV_PATH.exists():
 
 
 @click.group()
-@click.version_option(version="0.2.0")
+@click.version_option(package_name="raidar")
 def main() -> None:
     """Eval orchestrator for testing model/harness combinations."""
 
