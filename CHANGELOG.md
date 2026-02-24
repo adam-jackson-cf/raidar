@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-02-24
+
+- feat: add adapter-driven provider probe preflight
+- chore: add fast pre-commit quality preflight
+
 ## [0.3.0] - 2026-02-24
 
 - Update README.md
