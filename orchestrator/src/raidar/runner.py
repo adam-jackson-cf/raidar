@@ -54,6 +54,9 @@ HARBOR_TIMEOUT_BUFFER_SEC = 120
 MIN_DOCKER_COMPOSE_VERSION = (2, 40, 1)
 HARBOR_RATE_LIMIT_RETRY_DELAY_SEC = 20
 HARBOR_RATE_LIMIT_MAX_ATTEMPTS = 2
+PROVIDER_PROBE_TIMEOUT_SEC = 45
+PROVIDER_PROBE_OUTPUT_LIMIT = 600
+PROVIDER_PROBE_PROMPT = "Reply with exactly OK."
 HARNESS_STALE_CONTAINER_PATTERN = re.compile(r"^harbor-task.*-main-1$")
 HARBOR_GIT_MULTIBRANCH_PATTERN = re.compile(r"^git-multibranch__.+-main-1$")
 HARNESS_STALE_BUILD_PATTERN = re.compile(
@@ -168,6 +171,46 @@ PROCESS_FAILURE_INVOCATION_SNIPPETS: tuple[str, ...] = (
     "syntax error near unexpected token",
     "invalid option",
 )
+PROVIDER_PROBE_BILLING_SNIPPETS: tuple[str, ...] = (
+    "credit balance is too low",
+    "insufficient credit",
+    "insufficient funds",
+    "out of credits",
+    "billing",
+    "payment required",
+    "quota exceeded",
+)
+PROVIDER_PROBE_RATE_LIMIT_SNIPPETS: tuple[str, ...] = (
+    "rate limit",
+    "too many requests",
+    "resource_exhausted",
+    "429",
+)
+PROVIDER_PROBE_AUTH_SNIPPETS: tuple[str, ...] = (
+    "unauthorized",
+    "invalid api key",
+    "authentication",
+    "forbidden",
+    "permission denied",
+    "401",
+    "403",
+)
+PROVIDER_PROBE_NETWORK_SNIPPETS: tuple[str, ...] = (
+    "timed out",
+    "timeout",
+    "connection reset",
+    "connection refused",
+    "network is unreachable",
+    "enotfound",
+    "econnreset",
+)
+PROVIDER_PROBE_SERVICE_SNIPPETS: tuple[str, ...] = (
+    "service unavailable",
+    "internal server error",
+    "bad gateway",
+    "503",
+    "502",
+)
 WORKSPACE_PRUNE_DIRS: tuple[str, ...] = (
     "node_modules",
     ".next",
@@ -180,10 +223,22 @@ WORKSPACE_PRUNE_DIRS: tuple[str, ...] = (
 )
 _SUITE_BASELINE_LOCKS_GUARD = threading.Lock()
 _SUITE_BASELINE_LOCKS: dict[Path, threading.Lock] = {}
+_PROVIDER_PRECHECK_LOCKS_GUARD = threading.Lock()
+_PROVIDER_PRECHECK_LOCKS: dict[Path, threading.Lock] = {}
 
 
 class ScaffoldPreflightError(RuntimeError):
     """Fatal scaffold setup error that voids and aborts an entire suite."""
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderProbeResult:
+    """Result of a lightweight provider availability/billing probe."""
+
+    ok: bool
+    reason_code: str | None = None
+    detail: str | None = None
+    duration_sec: float = 0.0
 
 
 def load_task(task_path: Path) -> TaskDefinition:
@@ -372,6 +427,16 @@ def _suite_baseline_lock(suite_baseline_dir: Path) -> threading.Lock:
         return lock
 
 
+def _provider_precheck_lock(cache_key_path: Path) -> threading.Lock:
+    key = cache_key_path.resolve()
+    with _PROVIDER_PRECHECK_LOCKS_GUARD:
+        lock = _PROVIDER_PRECHECK_LOCKS.get(key)
+        if lock is None:
+            lock = threading.Lock()
+            _PROVIDER_PRECHECK_LOCKS[key] = lock
+        return lock
+
+
 def _ensure_suite_baseline_workspace(
     *,
     scaffold_dir: Path,
@@ -409,6 +474,182 @@ def _workspace_has_tests(workspace: Path) -> bool:
         if any(src_root.glob(pattern)):
             return True
     return False
+
+
+def _provider_probe_cache_key(request: RunRequest) -> str:
+    payload = {
+        "probe_version": 1,
+        "agent": request.config.agent.value,
+        "model": request.config.model.qualified_name,
+        "anthropic_base_url": os.environ.get("ANTHROPIC_BASE_URL", ""),
+        "google_genai_use_vertexai": os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", ""),
+        "google_cloud_project": os.environ.get("GOOGLE_CLOUD_PROJECT", ""),
+        "google_cloud_location": os.environ.get("GOOGLE_CLOUD_LOCATION", ""),
+    }
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _provider_probe_command(adapter: Any) -> tuple[list[str], dict[str, str]] | None:
+    probe = adapter.provider_probe()
+    if probe is None:
+        return None
+    command, env = probe
+    return list(command), dict(env)
+
+
+def _probe_output_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _summarize_probe_output(output: str) -> str:
+    redacted = _redact_sensitive_text(output)
+    collapsed = " ".join(redacted.split())
+    return collapsed[:PROVIDER_PROBE_OUTPUT_LIMIT]
+
+
+def _classify_provider_probe_failure(combined_output: str) -> str:
+    lowered = combined_output.lower()
+    if _contains_snippet(lowered, PROVIDER_PROBE_BILLING_SNIPPETS):
+        return "billing_credit"
+    if _contains_snippet(lowered, PROVIDER_PROBE_RATE_LIMIT_SNIPPETS):
+        return "rate_limit"
+    if _contains_snippet(lowered, PROVIDER_PROBE_AUTH_SNIPPETS):
+        return "auth"
+    if _contains_snippet(lowered, PROVIDER_PROBE_NETWORK_SNIPPETS):
+        return "network"
+    if _contains_snippet(lowered, PROVIDER_PROBE_SERVICE_SNIPPETS):
+        return "service_unavailable"
+    return "provider_unavailable"
+
+
+def _provider_probe_duration(started: float) -> float:
+    return round(max(0.0, time.monotonic() - started), 3)
+
+
+def _provider_probe_failure_result(
+    *,
+    combined_output: str,
+    duration_sec: float,
+) -> ProviderProbeResult:
+    return ProviderProbeResult(
+        ok=False,
+        reason_code=_classify_provider_probe_failure(combined_output),
+        detail=_summarize_probe_output(combined_output),
+        duration_sec=duration_sec,
+    )
+
+
+def _provider_probe_timeout_result(
+    *,
+    exc: subprocess.TimeoutExpired,
+    started: float,
+) -> ProviderProbeResult:
+    duration_sec = _provider_probe_duration(started)
+    combined = "\n".join(
+        part for part in (_probe_output_text(exc.stdout), _probe_output_text(exc.stderr)) if part
+    )
+    if not combined:
+        return ProviderProbeResult(
+            ok=False,
+            reason_code="probe_timeout",
+            detail="Probe timed out before a provider response.",
+            duration_sec=duration_sec,
+        )
+    failure = _provider_probe_failure_result(combined_output=combined, duration_sec=duration_sec)
+    return failure.model_copy(update={"detail": failure.detail or "Probe timed out."})
+
+
+def _provider_probe_completed_result(
+    *,
+    completed: subprocess.CompletedProcess[str],
+    started: float,
+) -> ProviderProbeResult:
+    duration_sec = _provider_probe_duration(started)
+    if completed.returncode == 0:
+        return ProviderProbeResult(ok=True, duration_sec=duration_sec)
+    combined_output = "\n".join(part for part in (completed.stdout, completed.stderr) if part)
+    return _provider_probe_failure_result(
+        combined_output=combined_output, duration_sec=duration_sec
+    )
+
+
+def _execute_provider_probe_command(
+    *,
+    command: list[str],
+    env: dict[str, str],
+    workspace: Path,
+) -> ProviderProbeResult:
+    started = time.monotonic()
+    try:
+        completed = subprocess.run(
+            command,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=PROVIDER_PROBE_TIMEOUT_SEC,
+            env=env,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        return ProviderProbeResult(
+            ok=False,
+            reason_code="probe_cli_missing",
+            detail=_summarize_probe_output(str(exc)),
+            duration_sec=_provider_probe_duration(started),
+        )
+    except subprocess.TimeoutExpired as exc:
+        return _provider_probe_timeout_result(exc=exc, started=started)
+
+    return _provider_probe_completed_result(completed=completed, started=started)
+
+
+def _run_provider_probe(*, adapter: Any, workspace: Path) -> ProviderProbeResult:
+    resolved = _provider_probe_command(adapter)
+    if resolved is None:
+        return ProviderProbeResult(ok=True, reason_code="not_required")
+    command, env = resolved
+    return _execute_provider_probe_command(command=command, env=env, workspace=workspace)
+
+
+def ensure_provider_preflight(request: RunRequest, workspace: Path, adapter: Any) -> None:
+    """Validate provider availability/credit before expensive run execution."""
+    if _provider_probe_command(adapter) is None:
+        return
+
+    cache_dir = request.execution_dir / ".preflight-cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    cache_key = _provider_probe_cache_key(request)
+    cache_file = cache_dir / f"{cache_key}.provider.ok.json"
+
+    with _provider_precheck_lock(cache_file):
+        if cache_file.exists():
+            return
+        result = _run_provider_probe(adapter=adapter, workspace=workspace)
+        if not result.ok:
+            reason = result.reason_code or "provider_unavailable"
+            detail = f"\n{result.detail}" if result.detail else ""
+            raise ScaffoldPreflightError(
+                "Provider preflight failed "
+                f"for `{request.config.agent.value}` model `{request.config.model.qualified_name}` "
+                f"({reason}).{detail}"
+            )
+
+        cache_file.write_text(
+            json.dumps(
+                {
+                    "agent": request.config.agent.value,
+                    "model": request.config.model.qualified_name,
+                    "validated_at": datetime.now(UTC).isoformat(),
+                    "duration_sec": result.duration_sec,
+                },
+                indent=2,
+            )
+        )
 
 
 def _resolve_homepage_screenshot_command(task: TaskDefinition, workspace: Path) -> list[str] | None:
@@ -3247,6 +3488,7 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
 
     context = prepare_run_context(request)
     adapter.prepare_workspace(context.workspace)
+    ensure_provider_preflight(request, context.workspace, adapter)
     cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
     ensure_scaffold_preflight(request, context)
     screenshot_command = _resolve_homepage_screenshot_command(request.task, context.workspace)

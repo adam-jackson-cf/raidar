@@ -76,6 +76,16 @@ class GeminiCliAdapter(HarnessAdapter):
         env[self.CLI_ENV_VAR] = cli_path
         return with_harness_pythonpath(env)
 
+    def provider_probe(self) -> tuple[list[str], dict[str, str]] | None:
+        return [
+            self._resolve_cli(),
+            "-p",
+            "Reply with exactly OK.",
+            "-y",
+            "-m",
+            self.config.model.name,
+        ], os.environ.copy()
+
     def prepare_workspace(self, workspace: Path) -> None:
         # Ensure Gemini CLI has session directory path recorded for parsers
         gemini_session_dir = workspace / ".gemini"
