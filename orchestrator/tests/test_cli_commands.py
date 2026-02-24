@@ -1,6 +1,7 @@
 """Tests for CLI utility commands and helpers."""
 
 import json
+import tomllib
 from pathlib import Path
 
 from click.testing import CliRunner
@@ -12,6 +13,18 @@ from raidar.cli import (
     main,
 )
 from raidar.schemas.task import TaskDefinition
+
+
+def test_cli_version_matches_pyproject_version() -> None:
+    runner = CliRunner()
+    result = runner.invoke(main, ["--version"])
+
+    assert result.exit_code == 0, result.output
+    pyproject_data = tomllib.loads(
+        (Path(__file__).resolve().parents[1] / "pyproject.toml").read_text(encoding="utf-8")
+    )
+    expected_version = pyproject_data["project"]["version"]
+    assert result.output.strip().endswith(expected_version)
 
 
 def test_generated_artifact_paths_filters_prefixes() -> None:
