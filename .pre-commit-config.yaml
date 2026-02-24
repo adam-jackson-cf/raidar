@@ -1,6 +1,13 @@
 repos:
   - repo: local
     hooks:
+      - id: ci-quality-preflight
+        name: CI quality preflight (fast)
+        entry: bash scripts/pre-commit-quality-preflight.sh
+        language: system
+        pass_filenames: false
+        always_run: true
+        stages: [pre-commit]
       - id: ci-quality-gates
         name: Run CI quality gates (auto-fix supported)
         entry: bash -lc "cd orchestrator && uv sync --all-extras --locked && uv run raidar quality gates --fix --stage"
