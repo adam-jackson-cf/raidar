@@ -3,14 +3,14 @@ repos:
     hooks:
       - id: ci-quality-gates
         name: Run CI quality gates (auto-fix supported)
-        entry: bash -lc "cd orchestrator && uv sync --all-extras --frozen && uv run raidar quality gates --fix --stage"
+        entry: bash -lc "cd orchestrator && uv sync --all-extras --locked && uv run raidar quality gates --fix --stage"
         language: system
         pass_filenames: false
         always_run: true
         stages: [pre-commit]
       - id: ci-quality-gates-check
         name: Run CI quality gates (check mode)
-        entry: bash -lc "cd orchestrator && uv sync --all-extras --frozen && uv run raidar quality gates"
+        entry: bash -lc "cd orchestrator && uv sync --all-extras --locked && uv run raidar quality gates"
         language: system
         pass_filenames: false
         always_run: true
