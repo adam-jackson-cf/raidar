@@ -31,8 +31,6 @@
 - [Task Model](#task-model)
 - [Eval Suite Layout](#eval-suite-layout)
 - [Common Commands](#common-commands)
-- [Cleanup](#cleanup)
-- [Changelog](#changelog)
 
 ## Quick Install
 
@@ -76,6 +74,23 @@ The repository has three primary concerns:
 - `orchestrator/`: CLI and runtime pipeline that executes and scores tasks.
 - `tasks/`: versioned task definitions (`task.yaml`), prompts, rules, references, and scaffolds.
 - `evals/`: generated suite artifacts (gitignored) with per-run evidence bundles.
+
+A task consists of:
+
+- task instruction ("implement this homepage...")
+- rules (AGENTS.md etc)
+- scaffold (baseline project representative of what you want to test, say a copy of your project, or nextjs starter etc)
+- metrics (how you want eval performance)
+
+Theres an example eval task, home page design implementation (design to code) to help demonstrate the approach.
+
+There is a temp analyze-results.md prompt you can use to compare a suite of runs, view a results table and receive recommendations on suitable iterations as experiments. The prompt is a temp place holder whilst the dashboard for results is being worked on.
+
+Through this you can work out:
+
+- why my agent fails at a task
+- what is the best choice for my task
+- how do i improve rules, scaffold, choice of agent etc for a task
 
 ## Orchestrator Flow
 
@@ -166,16 +181,3 @@ Run homepage task baseline set:
 ```bash
 ./scripts/run-codex-baselines.sh
 ```
-
-## Cleanup
-
-Prune/archive stale generated eval artifacts:
-
-```bash
-cd orchestrator
-uv run raidar evals prune
-```
-
-## Changelog
-
-See `CHANGELOG.md` for release history generated from conventional commit messages.
