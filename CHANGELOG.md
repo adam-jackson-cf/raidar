@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-02-24
+
+- feat: add claude sonnet 4.6 and gemini 3.1 pro support
+
 ## [0.2.4] - 2026-02-24
 
 - fix: enforce single-source version wiring
