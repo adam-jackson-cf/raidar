@@ -2,7 +2,7 @@
 
 <h1>Raidar</h1>
 
-**Task evaluation of Cli harness + model pairs to improve delivery performance using Harbor-based execution**
+**Task evaluation of Cli harness + model pairs to improve delivery performance using Harbor-based tasks**
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=flat-square)
