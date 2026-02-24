@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [0.3.0] - 2026-02-24
 
+- Update README.md
+
+## [0.3.0] - 2026-02-24
+
 - Update README.md by removing sections and adding details
 
 ## [0.3.0] - 2026-02-24
