@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.2.4] - 2026-02-24
+
+- fix: enforce single-source version wiring
+- chore: enforce locked uv sync in git hooks
+
 ## [0.2.3] - 2026-02-23
 
 - refactor: rename agentic_eval to raidar and standardize evals layout
