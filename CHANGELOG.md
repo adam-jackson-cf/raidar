@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.4.0] - 2026-03-01
+
+- refactor: remove provider probe preflight and refresh eval guidance
+
 ## [0.4.0] - 2026-02-24
 
 - feat: add adapter-driven provider probe preflight
