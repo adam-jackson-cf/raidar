@@ -30,6 +30,7 @@ coverage/
 .pytest_cache/
 evals/
 .enaible/
+.enaible/artifacts/visual-report/
 next-session.md
 jobs/
 orchestrator/jobs/

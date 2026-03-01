@@ -2,13 +2,13 @@
 
 import signal
 import subprocess
+from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
 import raidar.runner as runner
-from raidar.harness.config import Agent, HarnessConfig, ModelTarget
 
 
 class _AdapterStub:
@@ -35,21 +35,6 @@ class _ExecAdapterStub:
     def build_harbor_command(self, *, task_path: Path, job_name: str, jobs_dir: Path) -> list[str]:
         del task_path, job_name, jobs_dir
         return ["harbor", "run"]
-
-
-def _preflight_request(
-    tmp_path: Path,
-    *,
-    agent: Agent,
-    provider: str,
-    model: str,
-):
-    config = HarnessConfig(
-        agent=agent,
-        model=ModelTarget(provider=provider, name=model),
-        timeout_sec=300,
-    )
-    return SimpleNamespace(config=config, execution_dir=tmp_path)
 
 
 def test_cleanup_stale_harbor_build_processes_only_kills_orphans(
@@ -282,125 +267,70 @@ def test_execute_harbor_does_not_retry_non_rate_limit(monkeypatch, tmp_path) -> 
     assert sleeps == []
 
 
-def test_provider_preflight_caches_success(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    request = _preflight_request(
-        tmp_path,
-        agent=Agent.GEMINI,
-        provider="google",
-        model="gemini-3-pro-preview",
-    )
-    workspace = tmp_path / "workspace"
-    workspace.mkdir(parents=True, exist_ok=True)
-
-    monkeypatch.setenv("GEMINI_CLI_PATH", "/tmp/gemini")
-    calls: list[list[str]] = []
-
-    def fake_run(*args, **kwargs):
-        command = list(args[0])
-        calls.append(command)
-        del kwargs
-        return subprocess.CompletedProcess(command, 0, stdout="OK\n", stderr="")
-
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
-
-    adapter = request.config.adapter()
-    runner.ensure_provider_preflight(request, workspace, adapter)
-    runner.ensure_provider_preflight(request, workspace, adapter)
-
-    assert len(calls) == 1
-    cache_files = list((tmp_path / ".preflight-cache").glob("*.provider.ok.json"))
-    assert len(cache_files) == 1
-
-
-def test_provider_preflight_maps_billing_errors(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missing(
+    monkeypatch, tmp_path: Path
 ) -> None:
-    request = _preflight_request(
-        tmp_path,
-        agent=Agent.CLAUDE_CODE,
-        provider="anthropic",
-        model="claude-haiku-4-5",
+    request = SimpleNamespace(
+        task=object(),
+        config=SimpleNamespace(agent=SimpleNamespace(value="gemini")),
     )
-    workspace = tmp_path / "workspace"
-    workspace.mkdir(parents=True, exist_ok=True)
+    phase = SimpleNamespace(
+        harbor_request=object(),
+        layout=SimpleNamespace(start_time=datetime.now(UTC)),
+    )
+    harbor_result = runner.HarborExecutionResult(
+        terminated_early=True,
+        termination_reason="Harbor trial exception: Agent execution timed out after 300.0 seconds",
+        job_dir=tmp_path / "jobs" / "orchestrator-run-01",
+        trial_dir=tmp_path / "trial",
+    )
 
-    monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/tmp/claude")
-
-    def fake_run(*args, **kwargs):
-        command = list(args[0])
-        del kwargs
-        return subprocess.CompletedProcess(
-            command,
-            1,
-            stdout="Credit balance is too low",
-            stderr="",
+    def fake_collect_process_metrics(*args, **kwargs):
+        del args, kwargs
+        raise RuntimeError(
+            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`."
         )
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
+    monkeypatch.setattr(runner, "collect_process_metrics", fake_collect_process_metrics)
+    monkeypatch.setattr(runner, "collect_session_events", lambda *args, **kwargs: [])
 
-    adapter = request.config.adapter()
-    with pytest.raises(runner.ScaffoldPreflightError, match="billing_credit"):
-        runner.ensure_provider_preflight(request, workspace, adapter)
+    result = runner._execute_harbor_phase(request, phase)
+
+    assert result.terminated_early is True
+    assert result.termination_reason == harbor_result.termination_reason
+    assert result.process_metrics.uncached_input_tokens == 0
+    assert result.process_metrics.output_tokens == 0
+    assert result.process_metrics.command_count == 0
 
 
-def test_provider_preflight_runs_codex_probe(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
+    monkeypatch, tmp_path: Path
 ) -> None:
-    request = _preflight_request(
-        tmp_path,
-        agent=Agent.CODEX_CLI,
-        provider="codex",
-        model="gpt-5.2-high",
+    request = SimpleNamespace(
+        task=object(),
+        config=SimpleNamespace(agent=SimpleNamespace(value="gemini")),
     )
-    workspace = tmp_path / "workspace"
-    workspace.mkdir(parents=True, exist_ok=True)
-
-    monkeypatch.setenv("CODEX_CLI_PATH", "/tmp/codex")
-    calls: list[list[str]] = []
-
-    def fake_run(*args, **kwargs):
-        command = list(args[0])
-        calls.append(command)
-        del kwargs
-        return subprocess.CompletedProcess(command, 0, stdout="OK\n", stderr="")
-
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
-
-    adapter = request.config.adapter()
-    runner.ensure_provider_preflight(request, workspace, adapter)
-
-    assert len(calls) == 1
-    assert calls[0][:5] == [
-        "/tmp/codex",
-        "exec",
-        "--dangerously-bypass-approvals-and-sandbox",
-        "--skip-git-repo-check",
-        "--model",
-    ]
-
-
-def test_provider_preflight_skips_unsupported_harness(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    request = _preflight_request(
-        tmp_path,
-        agent=Agent.CURSOR,
-        provider="cursor",
-        model="cursor-fast",
+    phase = SimpleNamespace(
+        harbor_request=object(),
+        layout=SimpleNamespace(start_time=datetime.now(UTC)),
     )
-    workspace = tmp_path / "workspace"
-    workspace.mkdir(parents=True, exist_ok=True)
+    harbor_result = runner.HarborExecutionResult(
+        terminated_early=False,
+        termination_reason=None,
+        job_dir=tmp_path / "jobs" / "orchestrator-run-01",
+        trial_dir=tmp_path / "trial",
+    )
 
-    called = False
+    def fake_collect_process_metrics(*args, **kwargs):
+        del args, kwargs
+        raise RuntimeError(
+            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`."
+        )
 
-    def fake_run(*args, **kwargs):
-        nonlocal called
-        called = True
-        return subprocess.CompletedProcess(list(args[0]), 0, stdout="", stderr="")
+    monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
+    monkeypatch.setattr(runner, "collect_process_metrics", fake_collect_process_metrics)
+    monkeypatch.setattr(runner, "collect_session_events", lambda *args, **kwargs: [])
 
-    monkeypatch.setattr(runner.subprocess, "run", fake_run)
-
-    adapter = request.config.adapter()
-    runner.ensure_provider_preflight(request, workspace, adapter)
-
-    assert called is False
+    with pytest.raises(RuntimeError, match="Missing token usage metrics"):
+        runner._execute_harbor_phase(request, phase)

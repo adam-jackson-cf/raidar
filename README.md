@@ -154,11 +154,6 @@ flowchart TD
     F --> N["agent/ (trajectory/events/final archives)"]
 ```
 
-Concrete example from this repository:
-
-- `evals/20260222-181058Z__hello-world-smoke__v001`
-- `evals/20260222-181058Z__hello-world-smoke__v001/runs/run-01`
-
 ## Common Commands
 
 Environment and provider checks:
