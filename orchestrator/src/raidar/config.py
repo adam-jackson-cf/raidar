@@ -90,8 +90,8 @@ class VisualSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EVAL_VISUAL__")
 
     odiff_threshold: float = Field(
-        default=0.1,
-        description="Anti-aliasing tolerance for odiff",
+        default=0.03,
+        description="Anti-aliasing tolerance for odiff (lower is stricter)",
     )
     similarity_threshold: float = Field(
         default=0.95,

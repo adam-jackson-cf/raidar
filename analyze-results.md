@@ -81,8 +81,16 @@ For suites with `operational_valid_for_ranking == false`:
 - set `final_score = 0.0`
 
 Metric definitions:
-- `objective_quality = aggregate visual objective mean`
-  - For homepage tasks, this is `odiff similarity mean` (from run scorecards `scores.visual.similarity` across scored runs).
+- `raw_objective_quality = aggregate visual objective mean`
+  - For homepage tasks, this is `odiff similarity mean` from run scorecards `scores.visual.similarity`.
+  - If available, treat this as region-weighted similarity (global + region blend produced by verifier).
+- `raw_objective_global_quality` (optional) = aggregate mean of `scores.visual.global_similarity` when present.
+  - Use this only for diagnostics to explain whether variance comes from global frame or region weighting.
+- `objective_threshold = task visual threshold` (from task YAML `visual.threshold`; default to `0.95` if unavailable).
+- `objective_similarity_margin = clamp((raw_objective_quality - objective_threshold) / (1 - objective_threshold), 0, 1)`
+  - This expands meaningful separation above threshold so small raw ODiff deltas produce larger score variance.
+- `objective_quality = objective_similarity_margin * requirements_quality`
+  - This keeps requirement-missing implementations from retaining high objective contribution even when raw ODiff is close.
 - `requirements_quality = mean(requirements.presence_ratio)` across scored runs.
 - `run_validity_strength = aggregate.validity_rate`.
 - `performance_strength = aggregate.performance_pass_rate`.
@@ -99,26 +107,76 @@ When any metric input is missing:
 - set that metric component to `0.0`,
 - continue scoring with remaining components.
 
-### Score Table Columns (Expanded)
+### Output UX Model (Layered)
 
-Return an expanded comparison table with one row per latest suite and these columns in this order:
+Do not use one single dense top-level table. Use a layered output model that keeps decision speed high while preserving diagnostics.
+
+#### Table A: `Top-Level Ranking Snapshot` (decision-first)
+
+Purpose: fast comparison of rankable suites only.
+
+Rows:
+- Include only suites where `operational_valid_for_ranking == true`.
+- Sort by `final_score` descending.
+
+Columns (in this order):
 1. `rank`
-2. `task`
-3. `harness`
-4. `model`
-5. `status` (`RANKABLE` or `INVALID_FOR_RANKING`)
-6. `operational_valid_for_ranking`
-7. `quality_compliant`
-8. `scored_runs/repeats`
-9. `void_rate`
-10. `run_valid_rate`
-11. `performance_pass_rate`
-12. `required_verification_exec_rate`
-13. `objective_odiff_mean`
-14. `objective_odiff_pass_rate`
+2. `harness`
+3. `model`
+4. `final_score`
+5. `performance_pass_rate`
+6. `requirements_test_mapping_rate`
+7. `objective_odiff_mean`
+8. `quality_compliant`
+9. `quick_failure_summary`
+
+Rules:
+- Assume rows in this table are operationally rankable by definition; do not repeat `operational_valid_for_ranking` in every row.
+- `quick_failure_summary` must be one short phrase:
+  - `clean` when `quality_compliant == true`
+  - otherwise summarize dominant failure mode(s) with compact counts.
+
+#### Table B: `Operational Exceptions` (only non-rankable suites)
+
+Purpose: isolate rankability blockers without polluting top-level comparison.
+
+Rows:
+- Include only suites where `operational_valid_for_ranking == false`.
+
+Columns (in this order):
+1. `harness`
+2. `model`
+3. `status`
+4. `scored_runs/repeats`
+5. `void_rate`
+6. `operational_fail_reasons`
+7. `missing_required_artifact_count`
+
+#### Table C: `Detailed Diagnostic Table` (full depth)
+
+Purpose: troubleshooting and auditability for every latest suite.
+
+Rows:
+- Include all latest suites, including non-rankable suites.
+
+Columns (in this order):
+1. `rank`
+2. `harness`
+3. `model`
+4. `status`
+5. `operational_valid_for_ranking`
+6. `quality_compliant`
+7. `scored_runs/repeats`
+8. `void_rate`
+9. `run_valid_rate`
+10. `performance_pass_rate`
+11. `required_verification_exec_rate`
+12. `objective_odiff_mean`
+13. `objective_odiff_pass_rate`
+14. `objective_odiff_global_mean` (optional; `n/a` when unavailable)
 15. `objective_odiff_min`
-16. `requirements_presence_rate`
-17. `requirements_test_mapping_rate`
+16. `requirements_test_mapping_rate`
+17. `requirements_presence_rate`
 18. `duration_mean_sec`
 19. `uncached_input_tokens_mean`
 20. `+objective_impact`
@@ -135,11 +193,37 @@ Return an expanded comparison table with one row per latest suite and these colu
 31. `final_score`
 32. `top_failure_modes`
 
-Column derivations:
+Derivations and consistency rules:
 - `required_verification_exec_rate`: mean of `executed_required_verification_commands / required_verification_commands` from run metadata process block (treat required=0 as 1.0).
 - `objective_odiff_pass_rate`: share of scored runs where visual threshold is met.
 - `top_failure_modes`: top 3 failing checks with counts across run-validity + performance checks.
+- Normalize failure-mode labels in reporting:
+  - render `no_requirement_test_gaps` as `requirement_test_gaps` for readability (historical artifact compatibility).
 - Each `+..._impact` and `-..._penalty_impact` column must show the signed numeric contribution used in score computation.
+
+### Signal Direction Rules
+
+Ensure success/failure direction is explicit and consistent:
+
+1. In `Top-Level Ranking Snapshot`, all numeric columns must be "higher is better" signals except `final_score` already composite.
+2. Keep lower-is-better metrics (`void_rate`, `duration_mean_sec`, `uncached_input_tokens_mean`) out of the top-level snapshot and in secondary tables.
+3. When lower-is-better metrics are shown, label them explicitly with wording that indicates lower is better.
+4. Never mix unlabeled positive and inverse interpretations in the same table.
+
+### Redundancy Rules
+
+1. Do not repeat constant cross-suite context per row (task/version); place it once in the report subtitle.
+2. Do not repeat operational validity booleans in the top-level table where only rankable suites are shown.
+3. Keep deep-dive fields in diagnostic sections; do not force all readers through full diagnostic density.
+
+### Report Subtitle Requirement
+
+Directly under the report title, include:
+- `Scope: <task_name>@<task_version>` for this analysis set.
+
+Assumption:
+- Analysis is single-task latest-suite comparison.
+- If more than one `(task_name, task_version)` appears, explicitly call this out in `Contradictions and Knock-On Effects`.
 
 ### Required Sections
 
@@ -151,6 +235,12 @@ Return:
 5. `## Ranked Recommendations (Exhaustive)`
 6. `## Suggested Experiment Backlog`
 7. `## Contradictions and Knock-On Effects`
+8. `## UX Rationale (Before vs After)`
+
+`UX Rationale (Before vs After)` must be short and concrete:
+- `Before`: what made quick scanning hard.
+- `After`: what changed in layout and why it improves at-a-glance comprehension.
+- `Tradeoff`: what information moved to deep-dive sections and why.
 
 ### Optional Skill Integration: `visual-explainer`
 
@@ -168,7 +258,7 @@ If skill is present:
 3. Before generating visuals, build a verification fact sheet listing every numeric/table claim and its artifact source path (`suite-summary.json`, `suite.json`, `run.json`, verifier artifacts).
 4. Generate a self-contained HTML companion report that explains results visually with:
    - Executive summary and ranking outcome
-   - Expanded score table (all required columns)
+   - Top-level ranking snapshot + operational exceptions + detailed diagnostic table
    - Positive vs negative impact breakdown (`+..._impact`, `-..._penalty_impact`)
    - Reliability/failure anatomy and top failure modes
    - Per-agent quality vs operational state (`operational_valid_for_ranking`, `quality_compliant`)

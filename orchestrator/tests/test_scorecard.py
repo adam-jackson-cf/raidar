@@ -233,7 +233,7 @@ class TestScorecardComposite:
             run_validity=RunValidityScore(
                 checks=[
                     GateCheck(
-                        name="no_requirement_test_gaps",
+                        name="requirement_test_gaps",
                         passed=False,
                         evidence="mapped=2/4",
                     )

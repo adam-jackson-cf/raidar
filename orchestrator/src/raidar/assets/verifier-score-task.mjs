@@ -5,7 +5,14 @@ import path from "node:path";
 
 const APP_DIR = "/app";
 const LOG_DIR = "/logs/verifier";
-const ODIFF_TOLERANCE = "0.1";
+const ODIFF_TOLERANCE = "0.03";
+const GLOBAL_VISUAL_WEIGHT = 0.35;
+const REGIONAL_VISUAL_WEIGHT = 0.65;
+const VISUAL_REGION_WEIGHTS = [
+  { name: "hero", weight: 0.35 },
+  { name: "features", weight: 0.45 },
+  { name: "footer", weight: 0.2 },
+];
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -34,6 +41,42 @@ function runCommand(argv, cwd = APP_DIR) {
     exit_code: typeof result.status === "number" ? result.status : -1,
     stdout: result.stdout || "",
     stderr: result.stderr || "",
+  };
+}
+
+function runOdiffSimilarity(referencePath, actualPath, diffPath) {
+  const odiff = runCommand([
+    "bunx",
+    "odiff",
+    referencePath,
+    actualPath,
+    diffPath,
+    "--threshold",
+    ODIFF_TOLERANCE,
+  ]);
+  const odiffOutput = `${odiff.stdout}\\n${odiff.stderr}`;
+  if (odiff.exit_code === 0) {
+    return {
+      similarity: 1,
+      diff_path: fs.existsSync(diffPath) ? diffPath : null,
+      raw_output: odiffOutput.trim(),
+      exit_code: odiff.exit_code,
+    };
+  }
+  const match = odiffOutput.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
+  if (match) {
+    return {
+      similarity: Math.max(0, 1 - Number.parseFloat(match[1]) / 100),
+      diff_path: fs.existsSync(diffPath) ? diffPath : null,
+      raw_output: odiffOutput.trim(),
+      exit_code: odiff.exit_code,
+    };
+  }
+  return {
+    similarity: 0,
+    diff_path: fs.existsSync(diffPath) ? diffPath : null,
+    raw_output: odiffOutput.trim(),
+    exit_code: odiff.exit_code,
   };
 }
 
@@ -372,6 +415,32 @@ function buildPerformanceGateChecks({
         )
       : "Visual threshold not configured.",
   });
+  const regionScores = Array.isArray(visual?.regional_scores)
+    ? visual.regional_scores
+    : [];
+  const regionalThreshold = visual?.threshold ?? null;
+  const regionalVisualPassed =
+    regionalThreshold === null ||
+    regionScores.length === 0 ||
+    regionScores.every((region) => region.similarity >= regionalThreshold);
+  const worstRegion =
+    regionScores.length > 0
+      ? regionScores.reduce((worst, current) =>
+          current.similarity < worst.similarity ? current : worst
+        )
+      : null;
+  checks.push({
+    name: "visual_regions_threshold_met",
+    passed: regionalVisualPassed,
+    evidence:
+      regionScores.length === 0
+        ? "Region visual scores unavailable; check skipped."
+        : (
+            `threshold=${regionalThreshold}, ` +
+            `worst_region=${worstRegion.name}:${worstRegion.similarity.toFixed(4)}, ` +
+            `regions=${regionScores.length}`
+          ),
+  });
   checks.push({
     name: "all_requirements_present",
     passed: requirements.presence_ratio >= 1,
@@ -380,7 +449,7 @@ function buildPerformanceGateChecks({
       `missing=${JSON.stringify(requirements.missing_requirement_ids)}`,
   });
   checks.push({
-    name: "no_requirement_test_gaps",
+    name: "requirement_test_gaps",
     passed:
       requirements.satisfied_requirements === 0 ||
       requirements.mapped_satisfied_requirements >= requirements.satisfied_requirements,
@@ -507,7 +576,11 @@ function main() {
     const captureSucceeded =
       screenshot.exit_code === 0 && fs.existsSync(actualPath);
     let similarity = 0;
+    let globalSimilarity = 0;
+    let regionalSimilarity = null;
+    let regionalWeightTotal = 0;
     let diffOutput = null;
+    const regionalScores = [];
     const captureOutput = `${screenshot.stdout}\\n${screenshot.stderr}`.trim();
     let captureError = null;
     if (!captureSucceeded) {
@@ -518,31 +591,64 @@ function main() {
         ? taskSpec.visual.reference_image
         : path.join(APP_DIR, taskSpec.visual.reference_image);
       if (fs.existsSync(referencePath)) {
-        const odiff = runCommand([
-          "bunx",
-          "odiff",
-          referencePath,
-          actualPath,
-          diffPath,
-          "--threshold",
-          ODIFF_TOLERANCE,
-        ]);
-        const odiffOutput = `${odiff.stdout}\\n${odiff.stderr}`;
-        if (odiff.exit_code === 0) {
-          similarity = 1;
-        } else {
-          const match = odiffOutput.match(/([0-9]+(?:\.[0-9]+)?)\s*%/);
-          if (match) similarity = Math.max(0, 1 - Number.parseFloat(match[1]) / 100);
+        const globalCompare = runOdiffSimilarity(referencePath, actualPath, diffPath);
+        globalSimilarity = globalCompare.similarity;
+        diffOutput = globalCompare.diff_path;
+
+        const referenceExt = path.extname(referencePath);
+        const referenceStem = path.basename(referencePath, referenceExt);
+        const referenceDir = path.dirname(referencePath);
+        let weightedRegionalSum = 0;
+
+        for (const region of VISUAL_REGION_WEIGHTS) {
+          const actualRegionPath = path.join(APP_DIR, `actual-region-${region.name}.png`);
+          const referenceRegionPath = path.join(
+            referenceDir,
+            `${referenceStem}-region-${region.name}${referenceExt}`
+          );
+          const regionDiffPath = path.join(APP_DIR, `diff-region-${region.name}.png`);
+          if (!fs.existsSync(actualRegionPath) || !fs.existsSync(referenceRegionPath)) {
+            continue;
+          }
+          const regionCompare = runOdiffSimilarity(
+            referenceRegionPath,
+            actualRegionPath,
+            regionDiffPath
+          );
+          regionalScores.push({
+            name: region.name,
+            weight: region.weight,
+            similarity: regionCompare.similarity,
+            actual_path: actualRegionPath,
+            reference_path: referenceRegionPath,
+            diff_path: regionCompare.diff_path,
+            odiff_exit_code: regionCompare.exit_code,
+          });
+          weightedRegionalSum += region.weight * regionCompare.similarity;
+          regionalWeightTotal += region.weight;
         }
-        if (fs.existsSync(diffPath)) diffOutput = diffPath;
+
+        if (regionalWeightTotal > 0) {
+          regionalSimilarity = weightedRegionalSum / regionalWeightTotal;
+          similarity =
+            GLOBAL_VISUAL_WEIGHT * globalSimilarity +
+            REGIONAL_VISUAL_WEIGHT * regionalSimilarity;
+        } else {
+          similarity = globalSimilarity;
+        }
       }
     }
     const threshold = taskSpec.visual.threshold ?? null;
     visual = {
       similarity,
+      global_similarity: globalSimilarity,
+      regional_similarity: regionalSimilarity,
+      regional_weight_sum: regionalWeightTotal,
+      regional_scores: regionalScores,
       diff_path: diffOutput,
       capture_succeeded: captureSucceeded,
       capture_error: captureError,
+      odiff_tolerance: Number.parseFloat(ODIFF_TOLERANCE),
       threshold,
       score: similarity,
       threshold_met: threshold === null ? null : similarity >= threshold,
