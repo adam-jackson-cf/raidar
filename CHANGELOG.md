@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.5.0] - 2026-03-02
+
+- feat: added more rigour to the odiff comparisons
+
 ## [0.4.0] - 2026-03-01
 
 - refactor: remove provider probe preflight and refresh eval guidance
