@@ -27,7 +27,12 @@ The runner injects exactly one ruleset file based on `SYSTEM_RULES` mapping.
 
 ## 4. Session Parsing Coverage
 
-If log format differs, extend `orchestrator/src/raidar/parser/session_log.py` and add tests so metrics/events are extracted consistently.
+If log format differs, extend `orchestrator/src/raidar/parser/session_log.py` and add tests so process metrics/events are extracted consistently.
+
+Agent integration expectations for module-driven evaluation:
+- Do not change task metric behavior in adapters; metric assignment is task-defined via `task.yaml -> metrics.modules[]`.
+- Ensure adapter output still allows deterministic verifier execution so `scorecard.modules[]` is written.
+- Keep run metadata parity so `metric_profile` and module outputs remain comparable across harnesses.
 
 ## 5. Validate End-to-End
 
@@ -43,3 +48,8 @@ uv run raidar run \
 Check outputs in:
 - `evals/<suite-id>/suite-summary.json`
 - `evals/<suite-id>/runs/*/run.json`
+
+Verify these fields are present and consistent:
+- `config.metric_profile` in run/suite config blocks.
+- `config.metric_modules` in suite config.
+- `scores.modules[]` in `run.json` / verifier scorecard artifacts.
