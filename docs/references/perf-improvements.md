@@ -8,8 +8,9 @@ Reduce orchestrator and harness startup latency for local runs while preserving 
 
 1. Do not invalidate evals.
 2. Keep canonical scoring behavior unchanged.
-3. Do not increase local parallelism or local fan-out.
-4. Keep per-run workspace and artifact isolation semantics.
+3. Preserve module-driven metric semantics (`metrics.modules[]`, `metric_profile`, `scores.modules[]`) across optimization paths.
+4. Do not increase local parallelism or local fan-out.
+5. Keep per-run workspace and artifact isolation semantics.
 
 ## Git-History Review (Latest)
 
@@ -109,6 +110,10 @@ Acceptance:
 1. Add `CODEOWNERS` for orchestrator subdomains.
 2. Add parity tests that compare optimized path outputs against canonical baselines.
 3. Add regression tests for cache key invalidation behavior.
+4. Add parity assertions for module-era fields:
+   - run/suite `metric_profile`
+   - suite `metric_modules`
+   - run `scores.modules[]` payload integrity
 
 Acceptance:
 
