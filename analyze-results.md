@@ -1,6 +1,6 @@
 # Analyze Latest Agent Eval Results
 
-Use this prompt to analyze the latest suite for each `(task_name, task_version, harness, model)` combination.
+Use this prompt to analyze the latest suite for each `(task_name, task_version, harness, model, metric_profile)` combination.
 
 ## Prompt
 
@@ -30,11 +30,34 @@ Do not use non-canonical legacy roots outside `evals/`.
 
 ### Suite Selection Rule
 
-For each unique `(task_name, task_version, harness, model)`:
-1. Identify task version from run scorecards (`task_name`, `task_version`) in the suite.
-2. Select the latest suite by `created_at_utc`.
+For each unique `(task_name, task_version, harness, model, metric_profile)`:
+1. Read suite identity from `suite-summary.json.config`: `task_name`, `task_version`, `harness`, `model`, `metric_profile`.
+2. Select the latest suite by `created_at_utc` within that identity key.
 3. Analyze only that latest suite for ranking.
 4. Use per-run pointers from `suite.json` (`runs[].run_json_path`, `runs[].canonical_run_dir`) to collect all required run artifacts.
+
+### Metric Module Semantics (v2)
+
+Treat module metadata as first-class analysis context:
+
+1. Read and report `suite-summary.json.config.metric_modules`.
+2. `metric_profile` (`v2:<module-id>+...`) and `metric_modules` together define suite capability/profile identity.
+3. Core modules define capability identity only; they do not add new analyzer-side ranking math in this release.
+4. `artifact_presence` is audit-only:
+   - report pass/fail outcomes and missing patterns,
+   - do not feed module outcomes into ranking score computation.
+
+### Prompt Contract (v2)
+
+Required fields that must be consumed:
+
+- `suite-summary.json.config.metric_profile`
+- `suite-summary.json.config.metric_modules`
+- `suite-summary.json.aggregate.module_outcomes`
+- `run.json.config.metric_profile`
+- `run.json.scores.modules[]`
+- `run.json.scores.visual.similarity` (primary objective ODiff signal when configured)
+- `verifier/scorecard.json.visual.global_similarity` and `verifier/scorecard.json.visual.regional_scores` (optional diagnostics)
 
 ### Gate-First Interpretation
 
@@ -63,6 +86,8 @@ Always include both fields per suite in the scoring breakdown and per-agent insi
 
 ### Deterministic Ranking Score (v2)
 
+Keep the ranking formula unchanged; only module/profile awareness and diagnostic sourcing are extended.
+
 For suites with `operational_valid_for_ranking == true`, compute:
 
 1. Positive contribution block:
@@ -82,11 +107,13 @@ For suites with `operational_valid_for_ranking == false`:
 
 Metric definitions:
 - `raw_objective_quality = aggregate visual objective mean`
-  - For homepage tasks, this is `odiff similarity mean` from run scorecards `scores.visual.similarity`.
-  - If available, treat this as region-weighted similarity (global + region blend produced by verifier).
-- `raw_objective_global_quality` (optional) = aggregate mean of `scores.visual.global_similarity` when present.
+  - Compute only when `visual-odiff` is present in `metric_modules`.
+  - For homepage tasks, this is `odiff similarity mean` from run scorecards `run.json -> scores.visual.similarity`.
+  - If available, this value already reflects region-weighted similarity produced by verifier.
+- `raw_objective_global_quality` (optional) = aggregate mean of verifier scorecards `verifier/scorecard.json -> visual.global_similarity` when present.
   - Use this only for diagnostics to explain whether variance comes from global frame or region weighting.
-- `objective_threshold = task visual threshold` (from task YAML `visual.threshold`; default to `0.95` if unavailable).
+- `raw_objective_regional_quality` (optional) = aggregate mean of verifier scorecards `verifier/scorecard.json -> visual.regional_similarity` when present.
+- `objective_threshold = visual threshold` from `run.json -> scores.visual.threshold`; default to `0.95` if unavailable.
 - `objective_similarity_margin = clamp((raw_objective_quality - objective_threshold) / (1 - objective_threshold), 0, 1)`
   - This expands meaningful separation above threshold so small raw ODiff deltas produce larger score variance.
 - `objective_quality = objective_similarity_margin * requirements_quality`
@@ -107,6 +134,11 @@ When any metric input is missing:
 - set that metric component to `0.0`,
 - continue scoring with remaining components.
 
+When `visual-odiff` is not in `metric_modules`:
+- do not compute objective ODiff metrics for that suite,
+- set objective-related scoring components/impacts to `0.0`,
+- mark objective diagnostics as `not-configured`.
+
 ### Output UX Model (Layered)
 
 Do not use one single dense top-level table. Use a layered output model that keeps decision speed high while preserving diagnostics.
@@ -123,12 +155,13 @@ Columns (in this order):
 1. `rank`
 2. `harness`
 3. `model`
-4. `final_score`
-5. `performance_pass_rate`
-6. `requirements_test_mapping_rate`
-7. `objective_odiff_mean`
-8. `quality_compliant`
-9. `quick_failure_summary`
+4. `metric_profile`
+5. `final_score`
+6. `performance_pass_rate`
+7. `requirements_test_mapping_rate`
+8. `objective_odiff_mean`
+9. `quality_compliant`
+10. `quick_failure_summary`
 
 Rules:
 - Assume rows in this table are operationally rankable by definition; do not repeat `operational_valid_for_ranking` in every row.
@@ -163,39 +196,42 @@ Columns (in this order):
 1. `rank`
 2. `harness`
 3. `model`
-4. `status`
-5. `operational_valid_for_ranking`
-6. `quality_compliant`
-7. `scored_runs/repeats`
-8. `void_rate`
-9. `run_valid_rate`
-10. `performance_pass_rate`
-11. `required_verification_exec_rate`
-12. `objective_odiff_mean`
-13. `objective_odiff_pass_rate`
-14. `objective_odiff_global_mean` (optional; `n/a` when unavailable)
-15. `objective_odiff_min`
-16. `requirements_test_mapping_rate`
-17. `requirements_presence_rate`
-18. `duration_mean_sec`
-19. `uncached_input_tokens_mean`
-20. `+objective_impact`
-21. `+requirements_impact`
-22. `+run_validity_impact`
-23. `+performance_impact`
-24. `+reliability_impact`
-25. `+speed_impact`
-26. `+cost_impact`
-27. `-void_penalty_impact`
-28. `-run_validity_penalty_impact`
-29. `-performance_penalty_impact`
-30. `-requirements_penalty_impact`
-31. `final_score`
-32. `top_failure_modes`
+4. `metric_modules`
+5. `status`
+6. `operational_valid_for_ranking`
+7. `quality_compliant`
+8. `scored_runs/repeats`
+9. `void_rate`
+10. `run_valid_rate`
+11. `performance_pass_rate`
+12. `artifact_presence_pass_rate`
+13. `required_verification_exec_rate`
+14. `objective_odiff_mean`
+15. `objective_odiff_pass_rate`
+16. `objective_odiff_global_mean` (optional; `n/a` when unavailable)
+17. `objective_odiff_min`
+18. `requirements_test_mapping_rate`
+19. `requirements_presence_rate`
+20. `duration_mean_sec`
+21. `uncached_input_tokens_mean`
+22. `+objective_impact`
+23. `+requirements_impact`
+24. `+run_validity_impact`
+25. `+performance_impact`
+26. `+reliability_impact`
+27. `+speed_impact`
+28. `+cost_impact`
+29. `-void_penalty_impact`
+30. `-run_validity_penalty_impact`
+31. `-performance_penalty_impact`
+32. `-requirements_penalty_impact`
+33. `final_score`
+34. `top_failure_modes`
 
 Derivations and consistency rules:
 - `required_verification_exec_rate`: mean of `executed_required_verification_commands / required_verification_commands` from run metadata process block (treat required=0 as 1.0).
 - `objective_odiff_pass_rate`: share of scored runs where visual threshold is met.
+- `artifact_presence_pass_rate`: from `suite-summary.json.aggregate.module_outcomes.artifact_presence.pass_rate` when available; otherwise `n/a`.
 - `top_failure_modes`: top 3 failing checks with counts across run-validity + performance checks.
 - Normalize failure-mode labels in reporting:
   - render `no_requirement_test_gaps` as `requirement_test_gaps` for readability (historical artifact compatibility).
@@ -220,6 +256,7 @@ Ensure success/failure direction is explicit and consistent:
 
 Directly under the report title, include:
 - `Scope: <task_name>@<task_version>` for this analysis set.
+- `Profile Compatibility: metric_profile=<metric_profile>; metric_modules=<sorted module ids>`
 
 Assumption:
 - Analysis is single-task latest-suite comparison.
@@ -236,6 +273,21 @@ Return:
 6. `## Suggested Experiment Backlog`
 7. `## Contradictions and Knock-On Effects`
 8. `## UX Rationale (Before vs After)`
+
+`Scoring Breakdown` must include:
+- `Audit-only modules included: artifact_presence`
+
+`Reliability and Failure Anatomy` must include a `Module Audit` subsection:
+- report `artifact_presence` pass/fail counts from `suite-summary.aggregate.module_outcomes.artifact_presence`,
+- report top missing patterns from run-level `run.json -> scores.modules[].missing_patterns`.
+
+### Consistency Checks
+
+Always validate and report these conditions:
+
+1. If run-level `run.json.config.metric_profile` disagrees with suite-level `suite-summary.json.config.metric_profile`, flag it in `Contradictions and Knock-On Effects`.
+2. If `visual-odiff` is not in `metric_modules`, objective ODiff metrics must be marked `not-configured` and excluded from objective scoring computation.
+3. If `visual-odiff` is present but visual artifacts are missing (`run.json.scores.visual` and verifier visual fields), treat this as an artifact defect and list explicit missing paths.
 
 `UX Rationale (Before vs After)` must be short and concrete:
 - `Before`: what made quick scanning hard.

@@ -80,7 +80,9 @@ A task consists of:
 - task instruction ("implement this homepage...")
 - rules (AGENTS.md etc)
 - scaffold (baseline project representative of what you want to test, say a copy of your project, or nextjs starter etc)
-- metrics (how you want eval performance)
+- metrics via required ordered `metrics.modules[]` in `task.yaml`
+- derived `metric_profile` in format `v2:<module-id>+...` from module order
+- optional audit-only modules (for example `artifact_presence`) that are reported but do not change composite gating in this release
 
 Theres an example eval task, home page design implementation (design to code) to help demonstrate the approach.
 
@@ -96,15 +98,18 @@ Through this you can work out:
 
 ```mermaid
 flowchart TD
-    A["suite run CLI"] --> B["Load task.yaml + prompt entry + rules + scaffold root"]
-    B --> C["Create suite folder in evals/<timestamp>__<task>__<version>"]
-    C --> D["Create baseline workspace snapshot from task scaffold"]
-    D --> E["For each repeat (run-01..run-N)"]
-    E --> F["Launch Harbor agent run against run workspace copy"]
-    F --> G["Run verification gates + deterministic checks + visual checks"]
-    G --> H["Capture evidence: logs, scorecard, screenshots, workspace diff"]
-    H --> I["Persist runs/run-XX/run.json + summary.md"]
-    I --> J["Aggregate suite.json + suite-summary.json + analysis.md"]
+    A["suite run CLI"] --> B["Load task.yaml + prompt/rules/scaffold"]
+    B --> C["Validate required metrics.modules[] and task dependencies"]
+    C --> D["Derive metric_profile: v2:<module-id>+... (ordered)"]
+    D --> E["Create suite folder in evals/<timestamp>__<task>__<version>"]
+    E --> F["Create baseline workspace snapshot from task scaffold"]
+    F --> G["For each repeat (run-01..run-N): launch Harbor agent run"]
+    G --> H["Build verifier task spec including metrics.modules[]"]
+    H --> I["Run verifier core checks (verification/compliance/visual if configured)"]
+    I --> J["Run verifier module evaluations (artifact_presence, etc.)"]
+    J --> K["Persist run outputs: run.json (config.metric_profile + scores.modules[])"]
+    K --> L["Aggregate suite-summary.json (config.metric_profile, config.metric_modules, aggregate.module_outcomes)"]
+    L --> M["Persist suite.json + analysis.md + evidence artifacts"]
 ```
 
 ## Task Model
@@ -136,6 +141,92 @@ tasks/<task-name>/<version>/
 
 `metrics.modules[]` is the source of truth for metric profile derivation (`v2:<module-id>+...`).
 
+### Metrics setup
+
+Core module IDs:
+
+- `functional`
+- `compliance`
+- `efficiency`
+- `run-validity`
+- `optimization`
+- `coverage-threshold`
+- `requirements`
+- `llm-judge`
+- `visual-odiff`
+
+Non-core module example:
+
+- `artifact_presence`: checks required workspace paths and reports audit outcomes (`pass/fail`, missing patterns, evidence).
+
+Dependency rules enforced by task schema:
+
+- `visual-odiff` requires `visual`.
+- `coverage-threshold` requires `verification.coverage_threshold`.
+- `requirements` requires non-empty `compliance.requirements`.
+- `llm-judge` requires non-empty `compliance.llm_judge_rubric`.
+
+Minimal `task.yaml` metrics example:
+
+```yaml
+verification:
+  coverage_threshold: 0.8
+compliance:
+  requirements:
+    - id: req-example
+      description: Example requirement
+      check:
+        type: import_present
+        pattern: Example
+        description: Example presence check
+  llm_judge_rubric:
+    - criterion: Example criterion
+      weight: 1.0
+visual:
+  reference_image: ./reference/homepage.png
+  screenshot_command: ["bun", "run", "capture-screenshot"]
+  threshold: 0.95
+metrics:
+  modules:
+    - type: core
+      id: functional
+    - type: core
+      id: compliance
+    - type: core
+      id: efficiency
+    - type: core
+      id: run-validity
+    - type: core
+      id: optimization
+    - type: core
+      id: coverage-threshold
+    - type: core
+      id: requirements
+    - type: core
+      id: llm-judge
+    - type: core
+      id: visual-odiff
+    - type: artifact_presence
+      id: artifact_presence
+      config:
+        required_paths:
+          - src/app/page.tsx
+          - src/components/**/*.tsx
+        path_match: glob
+```
+
+Migration note:
+
+- Tasks missing `metrics.modules[]` now fail validation. Use `uv run raidar task init ...` to scaffold compliant task packages.
+- Audit-only modules appear in profile/reporting but do not yet affect composite ranking.
+- `visual-odiff` in `metrics.modules[]` declares capability/profile, but visual execution still requires a valid `visual` config and screenshot artifacts.
+
+Homepage ODiff note:
+
+- `homepage-implementation@v001` keeps `visual-odiff` in `metrics.modules[]` and a `visual` block.
+- Verifier computes ODiff similarity and applies visual threshold checks in performance gates.
+- Region-aware ODiff diagnostics are emitted by verifier scorecard when region captures are available.
+
 ## Eval Suite Layout
 
 Each suite run writes one timestamped folder under `evals/`.
@@ -157,6 +248,15 @@ flowchart TD
     F --> N["agent/ (trajectory/events/final archives)"]
 ```
 
+Key metric fields in artifacts:
+
+- `suite-summary.json` includes `config.metric_profile`, `config.metric_modules`, and `aggregate.module_outcomes`.
+- `runs/*/run.json` includes `config.metric_profile` and `scores.modules[]` (audit module results).
+
+Compatibility note:
+
+- Older historical suite artifacts may not include module fields (`metric_modules`, `module_outcomes`, `scores.modules[]`).
+
 ## Common Commands
 
 Environment and provider checks:
@@ -166,6 +266,7 @@ cd orchestrator
 uv run raidar env setup
 uv run raidar provider list
 uv run raidar provider validate --agent codex-cli --model codex/gpt-5.2-high
+uv run raidar info --task ../tasks/homepage-implementation
 ```
 
 Run a smoke suite:
