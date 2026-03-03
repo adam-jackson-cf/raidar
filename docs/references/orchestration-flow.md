@@ -38,7 +38,9 @@ Inside that root:
 
 ## 4. Scoring Pipeline
 
-Dimensions:
+Task scoring capability is module-driven from `task.yaml -> metrics.modules[]`.
+
+Core score outputs:
 - `functional`
 - `compliance`
 - `visual` (optional)
@@ -47,6 +49,14 @@ Dimensions:
 - `requirements`
 - hard gates: `run_validity`, `performance_gates`
 - ranking metric: `optimization`
+
+Module output:
+- `modules[]` in verifier scorecard and run scorecard metadata (for example `artifact_presence`).
+- Current module behavior is audit-only unless explicitly wired into gates/ranking.
+
+Profile:
+- `metric_profile` is derived from ordered modules as `v2:<module-id>+...`.
+- Persisted in `run.json` config and suite config (`suite.json`, `suite-summary.json`).
 
 `composite_score` is gated (voided/invalid runs score `0.0`).
 
