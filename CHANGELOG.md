@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [0.6.0] - 2026-03-03
 
+- docs: align metrics v2 guidance and analyzer prompt
+
+## [0.6.0] - 2026-03-03
+
 - feat: add modular metrics schema and artifact presence module
 - docs: align reference guides with module-driven metrics
 - docs: add metrics module setup guidance for tasks
