@@ -6,6 +6,7 @@ from pathlib import Path
 from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
 from raidar.storage import (
     aggregate_results,
+    export_to_csv,
     load_all_runs,
     load_run,
     save_run,
@@ -123,6 +124,7 @@ class TestAggregateResults:
                 task_name="test",
                 task_version="v001",
                 scaffold_root="scaffold",
+                metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
             ),
             duration_sec=60,
             scores=Scorecard(),
@@ -136,6 +138,7 @@ class TestAggregateResults:
                 task_name="test",
                 task_version="v001",
                 scaffold_root="scaffold",
+                metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
             ),
             duration_sec=60,
             scores=Scorecard(),
@@ -169,3 +172,18 @@ class TestAggregateResults:
         assert stats["void_count"] == 1
         assert stats["validity_rate"] == 1.0
         assert stats["performance_pass_rate"] == 1.0
+
+
+class TestExportCsv:
+    """Test CSV export fields."""
+
+    def test_export_to_csv_includes_metric_profile_and_modules(
+        self, sample_eval_run: EvalRun, tmp_path: Path
+    ):
+        sample_eval_run.scores.modules = []
+        output = tmp_path / "runs.csv"
+        export_to_csv([sample_eval_run], output)
+        payload = output.read_text(encoding="utf-8")
+        assert "metric_profile" in payload
+        assert "metric_modules" in payload
+        assert sample_eval_run.config.metric_profile in payload

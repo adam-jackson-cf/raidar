@@ -21,6 +21,13 @@ def test_hello_world_smoke_task_loads() -> None:
         ["bun", "run", "lint"],
     ]
     assert task.verification.gates == []
+    assert [module.id for module in task.metrics.modules] == [
+        "functional",
+        "compliance",
+        "efficiency",
+        "run-validity",
+        "optimization",
+    ]
 
 
 def test_hello_world_smoke_rules_exist_for_supported_harnesses() -> None:

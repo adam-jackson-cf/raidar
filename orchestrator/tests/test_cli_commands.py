@@ -81,6 +81,13 @@ def test_task_init_creates_schema_valid_task_and_rules(tmp_path: Path) -> None:
         ["bun", "run", "typecheck"],
         ["bun", "run", "lint"],
     ]
+    assert [module.id for module in task_def.metrics.modules] == [
+        "functional",
+        "compliance",
+        "efficiency",
+        "run-validity",
+        "optimization",
+    ]
 
     rules_dir = task_dir / "v001" / "rules"
     assert (rules_dir / "AGENTS.md").exists()
@@ -200,6 +207,10 @@ def test_info_selects_latest_task_version_numerically(tmp_path: Path) -> None:
     info_result = runner.invoke(main, ["info", "--task", str(task_dir)])
     assert info_result.exit_code == 0, info_result.output
     assert "Version: v10" in info_result.output
+    assert (
+        "Metric Profile: v2:functional+compliance+efficiency+run-validity+optimization"
+        in info_result.output
+    )
 
 
 def _write_execution_summary(
@@ -208,6 +219,7 @@ def _write_execution_summary(
     task_name: str,
     model: str,
     harness: str,
+    metric_profile: str,
     created_at: str,
     run_count_total: int = 1,
     void_count: int = 0,
@@ -219,6 +231,7 @@ def _write_execution_summary(
             "task_name": task_name,
             "harness": harness,
             "model": model,
+            "metric_profile": metric_profile,
         },
         "aggregate": {
             "run_count_total": run_count_total,
@@ -236,6 +249,7 @@ def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
         task_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         created_at="2026-02-22T10:00:00+00:00",
     )
     _write_execution_summary(
@@ -243,6 +257,7 @@ def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
         task_name="homepage-implementation",
         model="codex/gpt-5.2-high",
         harness="codex-cli",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization+visual-odiff",
         created_at="2026-02-22T11:00:00+00:00",
     )
 
@@ -260,6 +275,27 @@ def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
     assert text_result.exit_code == 0, text_result.output
     assert "homepage-implementation@v001" in text_result.output
     assert "hello-world-smoke@v001" not in text_result.output
+    assert (
+        "metric_profile=v2:functional+compliance+efficiency+run-validity+optimization+visual-odiff"
+        in text_result.output
+    )
+
+    profile_result = runner.invoke(
+        main,
+        [
+            "evals",
+            "list",
+            "--evals-root",
+            str(evals_root),
+            "--metric-profile",
+            "visual-odiff",
+            "--json",
+        ],
+    )
+    assert profile_result.exit_code == 0, profile_result.output
+    profile_rows = json.loads(profile_result.output)
+    assert len(profile_rows) == 1
+    assert profile_rows[0]["task_name"] == "homepage-implementation"
 
     json_result = runner.invoke(
         main,
@@ -275,6 +311,9 @@ def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
     rows = json.loads(json_result.output)
     assert isinstance(rows, list)
     assert rows[0]["execution_id"] == "20260222-110000Z__homepage-implementation__v001"
+    assert rows[0]["metric_profile"] == (
+        "v2:functional+compliance+efficiency+run-validity+optimization+visual-odiff"
+    )
 
 
 def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
@@ -290,6 +329,7 @@ def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         task_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         created_at="2026-02-20T10:00:00+00:00",
     )
     _write_execution_summary(
@@ -297,6 +337,7 @@ def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         task_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         created_at="2026-02-21T10:00:00+00:00",
     )
     _write_execution_summary(
@@ -304,6 +345,7 @@ def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         task_name="hello-world-smoke",
         model="codex/gpt-5.2-high",
         harness="codex-cli",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         created_at="2026-02-22T10:00:00+00:00",
     )
 
@@ -339,6 +381,7 @@ def test_evals_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
         task_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         created_at="2026-02-20T10:00:00+00:00",
     )
     _write_execution_summary(
@@ -346,6 +389,7 @@ def test_evals_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
         task_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         created_at="2026-02-21T10:00:00+00:00",
     )
 

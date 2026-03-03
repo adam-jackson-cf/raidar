@@ -30,11 +30,15 @@ from .runner import (
     cleanup_stale_harbor_resources,
     load_task,
     run_task,
+    task_metric_modules,
+    task_metric_profile,
 )
 from .schemas.scorecard import EvalRun
 from .schemas.task import (
     ComplianceConfig,
+    CoreMetricModule,
     DeterministicCheck,
+    MetricsConfig,
     PromptConfig,
     TaskDefinition,
     VerificationConfig,
@@ -339,6 +343,8 @@ def _execute_run_options(options: RunCliOptions, *, force_suite_summary: bool) -
         task_name=request.task.name,
         harness=resolved.agent,
         model=resolved.model,
+        metric_profile=task_metric_profile(request.task),
+        metric_modules=task_metric_modules(request.task),
         repeats=resolved.repeats,
         repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
         runs=runs,
@@ -502,6 +508,8 @@ def _execution_record(execution_dir: Path) -> dict[str, object]:
         "task_version": task_version,
         "harness": config_dict.get("harness"),
         "model": config_dict.get("model"),
+        "metric_profile": config_dict.get("metric_profile"),
+        "metric_modules": config_dict.get("metric_modules"),
         "run_count_total": aggregate_dict.get("run_count_total"),
         "void_count": aggregate_dict.get("void_count"),
     }
@@ -560,15 +568,19 @@ def _execution_matches_filters(
     task: str | None,
     model: str | None,
     harness: str | None,
+    metric_profile: str | None,
 ) -> bool:
     task_value = str(record.get("task_name", "")).lower()
     model_value = str(record.get("model", "")).lower()
     harness_value = str(record.get("harness", "")).lower()
+    metric_profile_value = str(record.get("metric_profile", "")).lower()
     if task and task.lower() not in task_value:
         return False
     if model and model.lower() not in model_value:
         return False
-    return not (harness and harness.lower() not in harness_value)
+    if harness and harness.lower() not in harness_value:
+        return False
+    return not (metric_profile and metric_profile.lower() not in metric_profile_value)
 
 
 @main.command()
@@ -837,6 +849,7 @@ def evals() -> None:
 @click.option("--task", type=str, help="Filter by task name substring.")
 @click.option("--model", type=str, help="Filter by model substring.")
 @click.option("--harness", type=str, help="Filter by harness substring.")
+@click.option("--metric-profile", type=str, help="Filter by metric profile substring.")
 @click.option(
     "--limit",
     type=click.IntRange(min=1),
@@ -850,6 +863,7 @@ def evals_list(
     task: str | None,
     model: str | None,
     harness: str | None,
+    metric_profile: str | None,
     limit: int,
     as_json: bool,
 ) -> None:
@@ -858,7 +872,13 @@ def evals_list(
     rows: list[dict[str, object]] = []
     for path in dirs:
         record = _execution_record(path)
-        if not _execution_matches_filters(record, task=task, model=model, harness=harness):
+        if not _execution_matches_filters(
+            record,
+            task=task,
+            model=model,
+            harness=harness,
+            metric_profile=metric_profile,
+        ):
             continue
         rows.append(record)
         if len(rows) >= limit:
@@ -875,6 +895,7 @@ def evals_list(
         click.echo(
             f"{index:02d}. {row['execution_id']} | task={row['task_name']}@{row['task_version']} | "
             f"harness={row.get('harness') or 'unknown'} | model={row.get('model') or 'unknown'} | "
+            f"metric_profile={row.get('metric_profile') or 'unknown'} | "
             f"runs={row.get('run_count_total') or 0} | void={row.get('void_count') or 0}"
         )
 
@@ -1074,6 +1095,15 @@ def task_init(
                 )
             ]
         ),
+        metrics=MetricsConfig(
+            modules=[
+                CoreMetricModule(id="functional"),
+                CoreMetricModule(id="compliance"),
+                CoreMetricModule(id="efficiency"),
+                CoreMetricModule(id="run-validity"),
+                CoreMetricModule(id="optimization"),
+            ]
+        ),
         prompt=PromptConfig(entry=prompt_entry, includes=[]),
     )
     task_dir.mkdir(parents=True, exist_ok=True)
@@ -1117,6 +1147,7 @@ def task_validate(task: Path) -> None:
     click.echo(f"  prompt_entry: {task_def.prompt.entry}")
     click.echo(f"  required_commands: {len(task_def.verification.required_commands)}")
     click.echo(f"  gates: {len(task_def.verification.gates)}")
+    click.echo(f"  metric_modules: {len(task_def.metrics.modules)}")
 
 
 @task.command("clone-version")
@@ -1409,6 +1440,8 @@ def _echo_task_summary(task_def: TaskDefinition) -> None:
     click.echo(f"Difficulty: {task_def.difficulty}")
     click.echo(f"Category: {task_def.category}")
     click.echo(f"Timeout: {task_def.timeout_sec // 60} minutes")
+    click.echo(f"Metric Profile: {task_metric_profile(task_def)}")
+    click.echo(f"Metric Modules: {', '.join(task_metric_modules(task_def))}")
 
     if task_def.verification.gates:
         gates = [g.name for g in task_def.verification.gates]

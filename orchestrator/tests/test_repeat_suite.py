@@ -8,10 +8,17 @@ from raidar.repeat_suite import (
     persist_repeat_suite,
     repeat_workspace,
 )
-from raidar.schemas.scorecard import EvalConfig, EvalRun, GateCheck, Scorecard
+from raidar.schemas.scorecard import EvalConfig, EvalRun, GateCheck, ModuleResult, Scorecard
 
 
-def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False) -> EvalRun:
+def _run(
+    run_id: str,
+    *,
+    run_valid: bool,
+    duration: float,
+    voided: bool = False,
+    artifact_presence_passed: bool | None = None,
+) -> EvalRun:
     scorecard = Scorecard(
         run_id=run_id,
         task_name="homepage",
@@ -29,6 +36,21 @@ def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False)
         },
         voided=voided,
         void_reasons=["provider_rate_limit"] if voided else [],
+        modules=(
+            [
+                ModuleResult(
+                    module_id="artifact_presence",
+                    passed=artifact_presence_passed,
+                    matched_count=1 if artifact_presence_passed else 0,
+                    missing_patterns=[]
+                    if artifact_presence_passed
+                    else ["src/components/**/*.tsx"],
+                    evidence="test",
+                )
+            ]
+            if artifact_presence_passed is not None
+            else []
+        ),
     )
     scorecard.run_validity.checks = [
         GateCheck(name="run_completed", passed=run_valid, evidence=None)
@@ -44,6 +66,7 @@ def _run(run_id: str, *, run_valid: bool, duration: float, voided: bool = False)
             task_name="homepage",
             task_version="v001",
             scaffold_root="scaffold",
+            metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         ),
         duration_sec=duration,
         terminated_early=False,
@@ -64,6 +87,8 @@ def test_create_repeat_suite_summary_aggregates():
         task_name="Homepage Task",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        metric_modules=["functional", "compliance", "efficiency", "run-validity", "optimization"],
         repeats=2,
         repeat_parallel=2,
         runs=[run_a, run_b],
@@ -79,15 +104,30 @@ def test_create_repeat_suite_summary_aggregates():
     assert summary["retry"]["target_met"] is True
     assert len(summary["runs"]) == 2
     assert str(summary["suite_id"]).endswith("__codex-gpt-5.2-low__x2")
+    assert summary["config"]["metric_modules"] == [
+        "functional",
+        "compliance",
+        "efficiency",
+        "run-validity",
+        "optimization",
+    ]
 
 
 def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
     run_a = _run("run-a", run_valid=True, duration=120.0)
-    run_b = _run("run-b", run_valid=False, duration=160.0, voided=True)
+    run_b = _run(
+        "run-b",
+        run_valid=False,
+        duration=160.0,
+        voided=True,
+        artifact_presence_passed=False,
+    )
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        metric_modules=["functional", "compliance", "efficiency", "run-validity", "optimization"],
         repeats=2,
         repeat_parallel=1,
         runs=[run_a, run_b],
@@ -103,14 +143,24 @@ def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
     assert summary["retry"]["target_scored_runs"] == 2
     assert summary["retry"]["achieved_scored_runs"] == 1
     assert summary["retry"]["target_met"] is False
+    assert summary["aggregate"]["module_outcomes"] == {}
 
 
 def test_create_repeat_suite_summary_includes_retry_metadata():
-    run_a = _run("run-a", run_valid=True, duration=120.0)
+    run_a = _run("run-a", run_valid=True, duration=120.0, artifact_presence_passed=True)
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
+        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization+artifact_presence",
+        metric_modules=[
+            "functional",
+            "compliance",
+            "efficiency",
+            "run-validity",
+            "optimization",
+            "artifact_presence",
+        ],
         repeats=1,
         repeat_parallel=1,
         runs=[run_a],
@@ -122,6 +172,8 @@ def test_create_repeat_suite_summary_includes_retry_metadata():
     assert summary["config"]["retry_void_limit"] == 3
     assert summary["config"]["retries_used"] == 1
     assert summary["retry"]["unresolved_void_count"] == 0
+    assert summary["aggregate"]["module_outcomes"]["artifact_presence"]["pass_count"] == 1
+    assert summary["aggregate"]["module_outcomes"]["artifact_presence"]["pass_rate"] == 1.0
 
 
 def test_persist_repeat_suite_writes_suite_summary_and_analysis(tmp_path: Path):
@@ -140,11 +192,27 @@ def test_persist_repeat_suite_writes_suite_summary_and_analysis(tmp_path: Path):
             "composite_score": {"mean": 0.9},
             "quality_score": {"mean": 1.0},
             "diagnostic_score": {"mean": 1.0},
+            "module_outcomes": {
+                "artifact_presence": {
+                    "pass_count": 1,
+                    "fail_count": 0,
+                    "sample_size": 1,
+                    "pass_rate": 1.0,
+                }
+            },
         },
         "config": {
             "task_name": "homepage",
             "harness": "codex-cli",
             "model": "codex/gpt-5.2-low",
+            "metric_profile": "v2:functional+compliance+efficiency+run-validity+optimization",
+            "metric_modules": [
+                "functional",
+                "compliance",
+                "efficiency",
+                "run-validity",
+                "optimization",
+            ],
             "repeats": 1,
             "repeat_parallel": 1,
             "retry_void_limit": 2,
@@ -175,3 +243,4 @@ def test_persist_repeat_suite_writes_suite_summary_and_analysis(tmp_path: Path):
     assert analysis_path.exists()
     assert "test-suite" in suite_json_path.read_text()
     assert "run-1" in analysis_path.read_text()
+    assert "module_outcomes" in analysis_path.read_text()

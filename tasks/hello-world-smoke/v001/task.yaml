@@ -24,5 +24,18 @@ compliance:
       pattern: Homepage placeholder - implement the design
       description: Scaffold placeholder text is removed
 
+metrics:
+  modules:
+    - type: core
+      id: functional
+    - type: core
+      id: compliance
+    - type: core
+      id: efficiency
+    - type: core
+      id: run-validity
+    - type: core
+      id: optimization
+
 prompt:
   entry: prompt/task.md

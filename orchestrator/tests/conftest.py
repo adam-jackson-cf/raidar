@@ -134,6 +134,7 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
             task_name="test-task",
             task_version="v001",
             scaffold_root="scaffold",
+            metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
         ),
         duration_sec=120.5,
         terminated_early=False,

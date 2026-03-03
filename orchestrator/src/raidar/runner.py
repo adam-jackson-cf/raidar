@@ -39,6 +39,7 @@ from .schemas.scorecard import (
     EvalRun,
     FunctionalScore,
     GateCheck,
+    ModuleResult,
     OptimizationScore,
     PerformanceGatesScore,
     RequirementCoverageScore,
@@ -226,6 +227,7 @@ class EvaluationOutputs:
     requirements: RequirementCoverageScore
     run_validity: RunValidityScore
     performance_gates: PerformanceGatesScore
+    modules: list[ModuleResult]
     gate_history: list[GateEvent]
 
 
@@ -412,23 +414,20 @@ def _workspace_has_tests(workspace: Path) -> bool:
 
 
 def _resolve_homepage_screenshot_command(task: TaskDefinition, workspace: Path) -> list[str] | None:
+    del workspace
     if task.visual and task.visual.screenshot_command:
         return list(task.visual.screenshot_command)
+    return None
 
-    package_json = workspace / "package.json"
-    if not package_json.exists():
-        return None
-    try:
-        payload = json.loads(package_json.read_text(encoding="utf-8"))
-    except json.JSONDecodeError:
-        return None
-    scripts = payload.get("scripts")
-    if not isinstance(scripts, dict):
-        return None
-    capture_script = scripts.get("capture-screenshot")
-    if not isinstance(capture_script, str) or not capture_script.strip():
-        return None
-    return ["bun", "run", "capture-screenshot"]
+
+def task_metric_profile(task: TaskDefinition) -> str:
+    """Derive deterministic metric profile identifier for a task definition."""
+    return f"v2:{'+'.join(task_metric_modules(task))}"
+
+
+def task_metric_modules(task: TaskDefinition) -> list[str]:
+    """Return deterministic ordered metric module ids for a task."""
+    return task.metric_module_ids()
 
 
 def _run_homepage_capture_command(
@@ -975,6 +974,12 @@ def _load_baseline_scripts(scaffold_source: ScaffoldSource) -> dict[str, str]:
 def _build_verifier_task_spec(request: RunRequest, context: ScaffoldContext) -> dict:
     return {
         "task_name": request.task.name,
+        "metrics": {
+            "modules": [
+                module.model_dump(mode="json", exclude_none=True)
+                for module in request.task.metrics.modules
+            ]
+        },
         "verification": {
             "max_gate_failures": request.task.verification.max_gate_failures,
             "coverage_threshold": request.task.verification.coverage_threshold,
@@ -1668,6 +1673,41 @@ def _verifier_scorecard_path(trial_dir: Path | None) -> Path | None:
     return trial_dir / "verifier" / "scorecard.json"
 
 
+def _parse_gate_history(payload: dict[str, Any]) -> list[GateEvent]:
+    gate_history_payload = payload.get("gate_history")
+    if not isinstance(gate_history_payload, list):
+        raise ValueError("scorecard.gate_history must be a list")
+    return [GateEvent.model_validate(item) for item in gate_history_payload]
+
+
+def _parse_module_results(payload: dict[str, Any]) -> list[ModuleResult]:
+    modules_payload = payload.get("modules")
+    if not isinstance(modules_payload, list):
+        raise ValueError("scorecard.modules must be a list")
+    return [ModuleResult.model_validate(item) for item in modules_payload]
+
+
+def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:
+    gate_history = _parse_gate_history(payload)
+    modules = _parse_module_results(payload)
+    return EvaluationOutputs(
+        functional=FunctionalScore.model_validate(payload.get("functional")),
+        compliance=ComplianceScore.model_validate(payload.get("compliance")),
+        visual=(
+            VisualScore.model_validate(payload.get("visual"))
+            if payload.get("visual") is not None
+            else None
+        ),
+        efficiency=EfficiencyScore.model_validate(payload.get("efficiency")),
+        coverage=CoverageScore.model_validate(payload.get("coverage")),
+        requirements=RequirementCoverageScore.model_validate(payload.get("requirements")),
+        run_validity=RunValidityScore.model_validate(payload.get("run_validity")),
+        performance_gates=PerformanceGatesScore.model_validate(payload.get("performance_gates")),
+        modules=modules,
+        gate_history=gate_history,
+    )
+
+
 def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | None, str | None]:
     scorecard_path = _verifier_scorecard_path(trial_dir)
     if not scorecard_path:
@@ -1683,28 +1723,7 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
         return None, "Invalid verifier scorecard content: expected object root."
 
     try:
-        gate_history_payload = payload.get("gate_history")
-        if not isinstance(gate_history_payload, list):
-            raise ValueError("scorecard.gate_history must be a list")
-        gate_history = [GateEvent.model_validate(item) for item in gate_history_payload]
-
-        outputs = EvaluationOutputs(
-            functional=FunctionalScore.model_validate(payload.get("functional")),
-            compliance=ComplianceScore.model_validate(payload.get("compliance")),
-            visual=(
-                VisualScore.model_validate(payload.get("visual"))
-                if payload.get("visual") is not None
-                else None
-            ),
-            efficiency=EfficiencyScore.model_validate(payload.get("efficiency")),
-            coverage=CoverageScore.model_validate(payload.get("coverage")),
-            requirements=RequirementCoverageScore.model_validate(payload.get("requirements")),
-            run_validity=RunValidityScore.model_validate(payload.get("run_validity")),
-            performance_gates=PerformanceGatesScore.model_validate(
-                payload.get("performance_gates")
-            ),
-            gate_history=gate_history,
-        )
+        outputs = _parse_verifier_scorecard(payload)
     except (ValidationError, ValueError) as exc:
         return None, f"Invalid verifier scorecard content: {exc}"
 
@@ -1753,6 +1772,7 @@ def build_task_version_meta(request: RunRequest, context: ScaffoldContext) -> di
         "scoring_schema_version": SCORING_SCHEMA_VERSION,
         "task_yaml_hash": task_yaml_hash,
         "task_fingerprint": _hash_bytes(seed),
+        "metric_profile": task_metric_profile(request.task),
     }
 
 
@@ -2965,6 +2985,7 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
             ]
         ),
         performance_gates=PerformanceGatesScore(checks=[]),
+        modules=[],
         gate_history=[],
     )
 
@@ -3235,6 +3256,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         run_validity=run_validity,
         performance_gates=performance_gates,
         optimization=optimization,
+        modules=outputs.modules,
         metadata=metadata,
     )
 
@@ -3431,6 +3453,7 @@ def run_task(request: RunRequest) -> EvalRun:
             task_name=request.task.name,
             task_version=request.task.version,
             scaffold_root=request.task.scaffold.root,
+            metric_profile=task_metric_profile(request.task),
         ),
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,

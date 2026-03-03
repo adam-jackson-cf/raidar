@@ -60,6 +60,17 @@ def _uncached_tokens(run: EvalRun) -> int:
     return int(process.get("uncached_input_tokens", 0) or 0)
 
 
+def _module_ids(run: EvalRun) -> list[str]:
+    return [module.module_id for module in run.scores.modules]
+
+
+def _artifact_presence_module(run: EvalRun):
+    for module in run.scores.modules:
+        if module.module_id == "artifact_presence":
+            return module
+    return None
+
+
 def _empty_group_stats() -> dict[str, float | int]:
     return {
         "count": 0,
@@ -145,7 +156,8 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
         scaffold_key = run.config.scaffold_root
         config_key = (
             f"{harness}|{model}|{run.config.task_name}|"
-            f"{run.config.task_version}|{run.config.scaffold_root}"
+            f"{run.config.task_version}|{run.config.scaffold_root}|"
+            f"{run.config.metric_profile}|{','.join(_module_ids(run))}"
         )
 
         by_harness.setdefault(harness, []).append(run)
@@ -180,6 +192,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "task_name",
         "task_version",
         "scaffold_root",
+        "metric_profile",
+        "metric_modules",
         "duration_sec",
         "terminated_early",
         "functional_passed",
@@ -217,6 +231,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "agent_execution_sec",
         "verifier_sec",
         "harness_overhead_sec",
+        "artifact_presence_passed",
+        "artifact_presence_missing_patterns",
     ]
 
     with open(output_path, "w", newline="") as f:
@@ -233,6 +249,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
             phase_timings = harbor_meta.get("phase_timings_sec", {})
             if not isinstance(phase_timings, dict):
                 phase_timings = {}
+            artifact_presence = _artifact_presence_module(run)
             row = {
                 "run_id": run.id,
                 "timestamp": run.timestamp,
@@ -241,6 +258,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "task_name": run.config.task_name,
                 "task_version": run.config.task_version,
                 "scaffold_root": run.config.scaffold_root,
+                "metric_profile": run.config.metric_profile,
+                "metric_modules": json.dumps(_module_ids(run)),
                 "duration_sec": run.duration_sec,
                 "terminated_early": run.terminated_early,
                 "functional_passed": run.scores.functional.passed,
@@ -292,6 +311,14 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "agent_execution_sec": phase_timings.get("agent_execution_sec"),
                 "verifier_sec": phase_timings.get("verifier_sec"),
                 "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
+                "artifact_presence_passed": (
+                    artifact_presence.passed if artifact_presence is not None else None
+                ),
+                "artifact_presence_missing_patterns": (
+                    json.dumps(artifact_presence.missing_patterns)
+                    if artifact_presence is not None
+                    else None
+                ),
             }
             writer.writerow(row)
 
@@ -351,6 +378,8 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
             f"coverage_passed={run.scores.coverage.passed}, "
             f"requirement_presence={run.scores.requirements.presence_ratio:.2f}, "
             f"requirement_mapping={run.scores.requirements.mapping_ratio:.2f}, "
+            f"metric_profile={run.config.metric_profile}, "
+            f"metric_modules={_module_ids(run)}, "
             f"failed_categories={_failed_categories(run)}"
         )
 
