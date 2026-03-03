@@ -210,6 +210,19 @@ class OptimizationScore(BaseModel):
         return round(max(0.0, min(1.0, 1.0 - weighted_penalty)), 3)
 
 
+class ModuleResult(BaseModel):
+    """Audit result for one configured metric module."""
+
+    module_id: str = Field(description="Metric module identifier")
+    passed: bool = Field(description="Whether the module evaluation passed")
+    matched_count: int = Field(default=0, ge=0, description="Matched artifact count")
+    missing_patterns: list[str] = Field(
+        default_factory=list,
+        description="Configured patterns that were not matched",
+    )
+    evidence: str | None = Field(default=None, description="Supporting evidence")
+
+
 class Scorecard(BaseModel):
     """Complete scorecard for an evaluation run."""
 
@@ -236,6 +249,7 @@ class Scorecard(BaseModel):
     run_validity: RunValidityScore = Field(default_factory=RunValidityScore)
     performance_gates: PerformanceGatesScore = Field(default_factory=PerformanceGatesScore)
     optimization: OptimizationScore = Field(default_factory=OptimizationScore)
+    modules: list[ModuleResult] = Field(default_factory=list)
 
     @computed_field
     @property
@@ -304,6 +318,7 @@ class EvalConfig(BaseModel):
     task_name: str = Field(description="Task identifier")
     task_version: str = Field(description="Task version")
     scaffold_root: str = Field(description="Task-local scaffold root path")
+    metric_profile: str = Field(description="Metric capability profile identifier")
 
 
 class EvalRun(BaseModel):

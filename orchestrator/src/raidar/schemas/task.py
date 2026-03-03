@@ -1,10 +1,10 @@
 """Pydantic models for task definition."""
 
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class VerificationGate(BaseModel):
@@ -120,6 +120,64 @@ class VerificationConfig(BaseModel):
     gates: list[VerificationGate] = Field(default_factory=list)
 
 
+CoreMetricModuleId = Literal[
+    "functional",
+    "compliance",
+    "efficiency",
+    "run-validity",
+    "optimization",
+    "coverage-threshold",
+    "requirements",
+    "llm-judge",
+    "visual-odiff",
+]
+
+
+class CoreMetricModule(BaseModel):
+    """Built-in metric module descriptor."""
+
+    type: Literal["core"] = "core"
+    id: CoreMetricModuleId = Field(description="Core metric module id")
+
+
+class ArtifactPresenceMetricConfig(BaseModel):
+    """Configuration for artifact presence checks."""
+
+    required_paths: list[str] = Field(
+        min_length=1,
+        description="Glob paths that must exist in the run workspace",
+    )
+    path_match: Literal["glob"] = Field(
+        default="glob",
+        description="Path matching mode",
+    )
+
+
+class ArtifactPresenceMetricModule(BaseModel):
+    """Metric module that checks required artifacts exist."""
+
+    type: Literal["artifact_presence"] = "artifact_presence"
+    id: Literal["artifact_presence"] = "artifact_presence"
+    config: ArtifactPresenceMetricConfig = Field(
+        description="Artifact presence module configuration"
+    )
+
+
+MetricModule = Annotated[
+    CoreMetricModule | ArtifactPresenceMetricModule,
+    Field(discriminator="type"),
+]
+
+
+class MetricsConfig(BaseModel):
+    """Metrics module configuration."""
+
+    modules: list[MetricModule] = Field(
+        min_length=1,
+        description="Ordered metric modules enabled for this task",
+    )
+
+
 class TaskDefinition(BaseModel):
     """Complete task definition matching the YAML format."""
 
@@ -139,9 +197,36 @@ class TaskDefinition(BaseModel):
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
     compliance: ComplianceConfig = Field(default_factory=ComplianceConfig)
     visual: VisualConfig | None = Field(default=None)
+    metrics: MetricsConfig = Field(description="Metric module configuration")
 
     # Prompt artifacts
     prompt: PromptConfig = Field(description="Prompt artifact configuration")
+
+    def metric_module_ids(self) -> list[str]:
+        """Return ordered metric module ids."""
+        return [module.id for module in self.metrics.modules]
+
+    @model_validator(mode="after")
+    def _validate_metrics_modules(self) -> "TaskDefinition":
+        module_ids = self.metric_module_ids()
+        if len(module_ids) != len(set(module_ids)):
+            raise ValueError("metrics.modules contains duplicate module ids")
+        if "coverage-threshold" in module_ids and self.verification.coverage_threshold is None:
+            raise ValueError(
+                "metrics.modules includes coverage-threshold "
+                "without verification.coverage_threshold"
+            )
+        if "requirements" in module_ids and not self.compliance.requirements:
+            raise ValueError(
+                "metrics.modules includes requirements without compliance.requirements"
+            )
+        if "llm-judge" in module_ids and not self.compliance.llm_judge_rubric:
+            raise ValueError(
+                "metrics.modules includes llm-judge without compliance.llm_judge_rubric"
+            )
+        if "visual-odiff" in module_ids and self.visual is None:
+            raise ValueError("metrics.modules includes visual-odiff without visual config")
+        return self
 
     @classmethod
     def from_yaml(cls, path: Path) -> "TaskDefinition":

@@ -19,6 +19,7 @@ from raidar.runner import (
     RunRequest,
     ScaffoldContext,
     ScorecardBuildContext,
+    _build_verifier_task_spec,
     _classify_void_reasons,
     _ensure_suite_baseline_workspace,
     _load_verifier_outputs,
@@ -30,6 +31,7 @@ from raidar.runner import (
     create_harbor_task_bundle,
     evaluate_coverage,
     evaluate_requirements,
+    task_metric_profile,
 )
 from raidar.scaffold.catalog import ScaffoldSource
 from raidar.schemas.events import GateEvent
@@ -38,6 +40,7 @@ from raidar.schemas.scorecard import (
     CoverageScore,
     EfficiencyScore,
     FunctionalScore,
+    ModuleResult,
     PerformanceGatesScore,
     RequirementCoverageScore,
     RunValidityScore,
@@ -77,6 +80,16 @@ def _sample_task() -> TaskDefinition:
                 "min_quality_score": 0.9,
             },
             "compliance": {},
+            "metrics": {
+                "modules": [
+                    {"type": "core", "id": "functional"},
+                    {"type": "core", "id": "compliance"},
+                    {"type": "core", "id": "efficiency"},
+                    {"type": "core", "id": "run-validity"},
+                    {"type": "core", "id": "optimization"},
+                    {"type": "core", "id": "coverage-threshold"},
+                ]
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -120,6 +133,7 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
         ),
         run_validity=RunValidityScore(),
         performance_gates=PerformanceGatesScore(),
+        modules=[],
         gate_history=[],
     )
 
@@ -377,6 +391,15 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
                 "required_commands": [],
             },
             "compliance": {},
+            "metrics": {
+                "modules": [
+                    {"type": "core", "id": "functional"},
+                    {"type": "core", "id": "compliance"},
+                    {"type": "core", "id": "efficiency"},
+                    {"type": "core", "id": "run-validity"},
+                    {"type": "core", "id": "optimization"},
+                ]
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -859,6 +882,15 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                         }
                     ]
                 },
+                "modules": [
+                    {
+                        "module_id": "artifact_presence",
+                        "passed": False,
+                        "matched_count": 0,
+                        "missing_patterns": ["src/components/**/*.tsx"],
+                        "evidence": "artifact_presence matches (src/components/**/*.tsx:0)",
+                    }
+                ],
                 "gate_history": [
                     {
                         "timestamp": "2026-01-01T00:00:00Z",
@@ -882,13 +914,96 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs.functional.passed is True
     assert outputs.visual is not None
     assert outputs.visual.threshold_met is True
+    assert outputs.modules == [
+        ModuleResult(
+            module_id="artifact_presence",
+            passed=False,
+            matched_count=0,
+            missing_patterns=["src/components/**/*.tsx"],
+            evidence="artifact_presence matches (src/components/**/*.tsx:0)",
+        )
+    ]
     assert len(outputs.gate_history) == 1
+
+
+def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    verifier_dir = trial_dir / "verifier"
+    verifier_dir.mkdir(parents=True, exist_ok=True)
+    (verifier_dir / "scorecard.json").write_text(
+        json.dumps(
+            {
+                "functional": {
+                    "passed": True,
+                    "tests_passed": 1,
+                    "tests_total": 1,
+                    "build_succeeded": True,
+                    "gates_passed": 1,
+                    "gates_total": 1,
+                },
+                "compliance": {"checks": []},
+                "visual": None,
+                "efficiency": {
+                    "total_gate_failures": 0,
+                    "unique_failure_categories": 0,
+                    "repeat_failures": 0,
+                },
+                "coverage": {
+                    "threshold": None,
+                    "measured": None,
+                    "source": None,
+                    "passed": True,
+                },
+                "requirements": {
+                    "total_requirements": 0,
+                    "satisfied_requirements": 0,
+                    "mapped_requirements": 0,
+                    "mapped_satisfied_requirements": 0,
+                    "missing_requirement_ids": [],
+                    "requirement_gap_ids": [],
+                    "requirement_pattern_gaps": {},
+                },
+                "run_validity": {"checks": []},
+                "performance_gates": {"checks": []},
+                "gate_history": [],
+            }
+        )
+    )
+    outputs, reason = _load_verifier_outputs(trial_dir)
+    assert outputs is None
+    assert reason is not None
+    assert "scorecard.modules must be a list" in reason
 
 
 def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
     outputs, reason = _load_verifier_outputs(tmp_path / "missing")
     assert outputs is None
     assert reason is not None
+
+
+def test_task_metric_profile_uses_ordered_task_modules():
+    task = _sample_task()
+    assert (
+        task_metric_profile(task)
+        == "v2:functional+compliance+efficiency+run-validity+optimization+coverage-threshold"
+    )
+
+
+def test_build_verifier_task_spec_includes_metrics_modules(tmp_path: Path):
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    task_spec = _build_verifier_task_spec(score_context.request, score_context.context)
+    assert task_spec["metrics"]["modules"] == [
+        {"type": "core", "id": "functional"},
+        {"type": "core", "id": "compliance"},
+        {"type": "core", "id": "efficiency"},
+        {"type": "core", "id": "run-validity"},
+        {"type": "core", "id": "optimization"},
+        {"type": "core", "id": "coverage-threshold"},
+    ]
 
 
 def test_classify_void_reasons_rate_limit():
@@ -976,6 +1091,16 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
                 "threshold": 0.95,
             },
             "compliance": {},
+            "metrics": {
+                "modules": [
+                    {"type": "core", "id": "functional"},
+                    {"type": "core", "id": "compliance"},
+                    {"type": "core", "id": "efficiency"},
+                    {"type": "core", "id": "run-validity"},
+                    {"type": "core", "id": "optimization"},
+                    {"type": "core", "id": "visual-odiff"},
+                ]
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -1057,6 +1182,15 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
             },
             "verification": {"gates": [], "required_commands": []},
             "compliance": {},
+            "metrics": {
+                "modules": [
+                    {"type": "core", "id": "functional"},
+                    {"type": "core", "id": "compliance"},
+                    {"type": "core", "id": "efficiency"},
+                    {"type": "core", "id": "run-validity"},
+                    {"type": "core", "id": "optimization"},
+                ]
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -1115,6 +1249,16 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
                 "threshold": 0.95,
             },
             "compliance": {},
+            "metrics": {
+                "modules": [
+                    {"type": "core", "id": "functional"},
+                    {"type": "core", "id": "compliance"},
+                    {"type": "core", "id": "efficiency"},
+                    {"type": "core", "id": "run-validity"},
+                    {"type": "core", "id": "optimization"},
+                    {"type": "core", "id": "visual-odiff"},
+                ]
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -1123,7 +1267,7 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
     assert command == ["bun", "run", "capture-screenshot"]
 
 
-def test_resolve_homepage_screenshot_command_uses_package_script_when_visual_missing(
+def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
     tmp_path: Path,
 ):
     workspace = tmp_path / "workspace"
@@ -1143,12 +1287,21 @@ def test_resolve_homepage_screenshot_command_uses_package_script_when_visual_mis
             "scaffold": {"root": "scaffold"},
             "verification": {"gates": [], "required_commands": []},
             "compliance": {},
+            "metrics": {
+                "modules": [
+                    {"type": "core", "id": "functional"},
+                    {"type": "core", "id": "compliance"},
+                    {"type": "core", "id": "efficiency"},
+                    {"type": "core", "id": "run-validity"},
+                    {"type": "core", "id": "optimization"},
+                ]
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
 
     command = _resolve_homepage_screenshot_command(task, workspace)
-    assert command == ["bun", "run", "capture-screenshot"]
+    assert command is None
 
 
 def test_prune_workspace_artifacts_removes_transient_directories(tmp_path: Path):

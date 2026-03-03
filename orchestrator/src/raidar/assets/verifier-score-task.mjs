@@ -126,10 +126,14 @@ function globToRegex(pattern) {
   return new RegExp(`^${regex}$`);
 }
 
-function fileExistsByPattern(pattern) {
+function filesMatchingPattern(pattern) {
   const matcher = globToRegex(pattern);
   const allFiles = walkFiles(APP_DIR).map((file) => path.relative(APP_DIR, file));
-  return allFiles.some((file) => matcher.test(file));
+  return allFiles.filter((file) => matcher.test(file));
+}
+
+function fileExistsByPattern(pattern) {
+  return filesMatchingPattern(pattern).length > 0;
 }
 
 function runDeterministicCheck(check, sourceFiles) {
@@ -370,6 +374,60 @@ function checkRequirementMappings(requirements, testSources) {
   };
 }
 
+function evaluateArtifactPresence(moduleSpec) {
+  const requiredPaths = moduleSpec?.config?.required_paths || [];
+  if (!Array.isArray(requiredPaths) || requiredPaths.length === 0) {
+    return {
+      module_id: moduleSpec?.id || "artifact_presence",
+      passed: false,
+      matched_count: 0,
+      missing_patterns: [],
+      evidence: "artifact_presence module missing required_paths configuration.",
+    };
+  }
+  const missingPatterns = [];
+  let matchedCount = 0;
+  const evidenceParts = [];
+  for (const pattern of requiredPaths) {
+    const matches = filesMatchingPattern(pattern);
+    matchedCount += matches.length;
+    if (matches.length === 0) {
+      missingPatterns.push(pattern);
+      evidenceParts.push(`${pattern}:0`);
+    } else {
+      evidenceParts.push(`${pattern}:${matches.length}`);
+    }
+  }
+  return {
+    module_id: moduleSpec?.id || "artifact_presence",
+    passed: missingPatterns.length === 0,
+    matched_count: matchedCount,
+    missing_patterns: missingPatterns,
+    evidence: `artifact_presence matches (${evidenceParts.join(", ")})`,
+  };
+}
+
+function evaluateMetricModules(modules) {
+  const results = [];
+  for (const moduleSpec of modules) {
+    if (moduleSpec?.type === "core") {
+      continue;
+    }
+    if (moduleSpec?.type === "artifact_presence") {
+      results.push(evaluateArtifactPresence(moduleSpec));
+      continue;
+    }
+    results.push({
+      module_id: moduleSpec?.id || "unknown-module",
+      passed: false,
+      matched_count: 0,
+      missing_patterns: [],
+      evidence: `Unsupported metric module type '${moduleSpec?.type}'`,
+    });
+  }
+  return results;
+}
+
 function buildPerformanceGateChecks({
   gateHistory,
   functional,
@@ -486,6 +544,7 @@ function main() {
   }
   ensureDir(LOG_DIR);
   const taskSpec = readJson(taskSpecPath, {});
+  const metricModules = taskSpec.metrics?.modules || [];
   const sourceFiles = collectSourceFiles();
   const deterministicChecks = taskSpec.compliance?.deterministic_checks || [];
   const complianceChecks = deterministicChecks.map((check) =>
@@ -693,6 +752,7 @@ function main() {
     passed: true,
     evidence: "Validated post-run by orchestrator.",
   });
+  const moduleResults = evaluateMetricModules(metricModules);
 
   const scorecard = {
     functional,
@@ -712,6 +772,7 @@ function main() {
       checks: performanceGateChecks,
       passed: performanceGateChecks.every((check) => check.passed),
     },
+    modules: moduleResults,
     gate_history: gateHistory,
   };
 
@@ -786,6 +847,7 @@ try {
       checks: [],
       passed: false,
     },
+    modules: [],
     gate_history: [],
   });
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), "0");

@@ -95,6 +95,34 @@ compliance:
     - criterion: Code organisation matches project conventions
       weight: 0.3
 
+metrics:
+  modules:
+    - type: core
+      id: functional
+    - type: core
+      id: compliance
+    - type: core
+      id: efficiency
+    - type: core
+      id: run-validity
+    - type: core
+      id: optimization
+    - type: core
+      id: coverage-threshold
+    - type: core
+      id: requirements
+    - type: core
+      id: llm-judge
+    - type: core
+      id: visual-odiff
+    - type: artifact_presence
+      id: artifact_presence
+      config:
+        required_paths:
+          - src/app/page.tsx
+          - src/components/**/*.tsx
+        path_match: glob
+
 visual:
   reference_image: ./reference/homepage.png
   screenshot_command: ["bun", "run", "capture-screenshot"]

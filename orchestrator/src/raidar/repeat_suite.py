@@ -79,6 +79,7 @@ def _aggregate_block(
     scored_runs: list[EvalRun],
     valid_runs: list[EvalRun],
 ) -> dict[str, object]:
+    module_outcomes = _aggregate_module_outcomes(scored_runs)
     composite_scores = [run.scores.composite_score for run in scored_runs]
     quality_scores = [run.scores.quality_score for run in scored_runs]
     diagnostic_scores = [run.scores.diagnostic_score for run in scored_runs]
@@ -104,7 +105,30 @@ def _aggregate_block(
         "diagnostic_score": _stat_summary(diagnostic_scores),
         "duration_sec": _stat_summary(durations),
         "uncached_input_tokens": _stat_summary(tokens),
+        "module_outcomes": module_outcomes,
     }
+
+
+def _aggregate_module_outcomes(runs: list[EvalRun]) -> dict[str, dict[str, float | int]]:
+    by_module: dict[str, dict[str, int]] = {}
+    for run in runs:
+        for module in run.scores.modules:
+            counts = by_module.setdefault(module.module_id, {"pass_count": 0, "fail_count": 0})
+            if module.passed:
+                counts["pass_count"] += 1
+            else:
+                counts["fail_count"] += 1
+
+    outcomes: dict[str, dict[str, float | int]] = {}
+    for module_id, counts in sorted(by_module.items()):
+        sample_size = counts["pass_count"] + counts["fail_count"]
+        outcomes[module_id] = {
+            "pass_count": counts["pass_count"],
+            "fail_count": counts["fail_count"],
+            "sample_size": sample_size,
+            "pass_rate": round(counts["pass_count"] / max(1, sample_size), 6),
+        }
+    return outcomes
 
 
 def create_repeat_suite_summary(
@@ -112,6 +136,8 @@ def create_repeat_suite_summary(
     task_name: str,
     harness: str,
     model: str,
+    metric_profile: str,
+    metric_modules: list[str],
     repeats: int,
     repeat_parallel: int,
     runs: list[EvalRun],
@@ -136,6 +162,8 @@ def create_repeat_suite_summary(
             "task_name": task_name,
             "harness": harness,
             "model": model,
+            "metric_profile": metric_profile,
+            "metric_modules": metric_modules,
             "repeats": repeats,
             "repeat_parallel": repeat_parallel,
             "retry_void_limit": retry_void_limit,
@@ -189,6 +217,8 @@ def persist_repeat_suite(
         f"- task: `{config.get('task_name')}`",
         f"- harness: `{config.get('harness')}`",
         f"- model: `{config.get('model')}`",
+        f"- metric_profile: `{config.get('metric_profile')}`",
+        f"- metric_modules: `{config.get('metric_modules')}`",
         f"- repeats: `{config.get('repeats')}`",
         f"- repeat_parallel: `{config.get('repeat_parallel')}`",
         f"- retry_void_limit: `{config.get('retry_void_limit')}`",
@@ -217,6 +247,7 @@ def persist_repeat_suite(
             "- diagnostic_mean: "
             f"`{(aggregate.get('diagnostic_score', {}) or {}).get('mean', 0.0):.6f}`"
         ),
+        f"- module_outcomes: `{aggregate.get('module_outcomes')}`",
         "",
         "## Runs",
     ]
