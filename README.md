@@ -131,7 +131,10 @@ tasks/<task-name>/<version>/
 - `scaffold.root`: source scaffold copied into suite/run workspaces
 - `verification`: required commands and quality gates
 - `compliance`: deterministic checks and optional rubric config
+- `metrics.modules[]`: required ordered metric modules that define task evaluation capability
 - `visual`: screenshot command/reference image/threshold (for visual tasks)
+
+`metrics.modules[]` is the source of truth for metric profile derivation (`v2:<module-id>+...`).
 
 ## Eval Suite Layout
 
@@ -175,4 +178,11 @@ Run homepage task baseline set:
 
 ```bash
 ./scripts/run-codex-baselines.sh
+```
+
+List eval suites by metric profile:
+
+```bash
+cd orchestrator
+uv run raidar evals list --metric-profile visual-odiff
 ```
