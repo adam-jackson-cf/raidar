@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.0] - 2026-03-04
+
+- chore: sync uv lockfile version metadata
+
 ## [0.6.0] - 2026-03-03
 
 - docs: align metrics v2 guidance and analyzer prompt
