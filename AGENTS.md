@@ -2,34 +2,40 @@
 
 ## Workflows
 
-### Available scripts and purpose:
+### Supported command surface
 
-- `scripts/install-pre-commit.sh`: installs the pre-commit tooling and registers repository hooks.
-- `scripts/run-provider-smoke.sh`: runs the hello-world smoke task against a selected provider/agent pair with configurable run settings.
-- `scripts/run-codex-baselines.sh`: runs the homepage baseline suite across the configured Codex model set.
+- Public interface: repo-root `make ...`
+- Treat direct `uv run --project orchestrator raidar ...` as implementation detail behind the root `Makefile`.
 
-### Available CLI commands and purpose (`raidar`):
+### Internal or legacy command surfaces
 
-- `run`: execute one task against one harness/model pair.
-- `suite run`: execute deterministic repeat suites with aggregate outputs.
-- `quality gates`: run deterministic quality checks for orchestrator code.
-- `harbor cleanup`: clean stale Harbor containers and stale Harbor build processes.
-- `env setup`: bootstrap local tooling and run Harbor environment preflight.
-- `evals list`: list recorded eval suites with optional filters.
-- `evals prune`: archive stale eval suite artifacts with retention controls.
-- `provider list`: list supported harness/provider adapters.
-- `provider validate`: validate adapter wiring and runtime requirements for a harness/model pair.
-- `task init`: scaffold a new versioned task package.
-- `task validate`: validate a task definition.
-- `task clone-version`: clone a task version to a new version label.
-- `inject`: inject agent rules into a scaffold path for local testing.
-- `matrix`: execute matrix runs from matrix configuration.
-- `report`: build aggregate reports from eval suite outputs.
-- `init_matrix`: generate an example matrix configuration template.
-- `info`: display task metadata for a task package/version.
+- `uv run --project orchestrator raidar ...`
+- `scripts/run-provider-smoke.sh`
+- `scripts/run-codex-baselines.sh`
+
+### Public Make targets to prefer in docs
+
+- `make env-setup`
+- `make provider-list`
+- `make provider-validate AGENT=... MODEL=...`
+- `make task-init TASK_DIR=... [TASK_VERSION=...]`
+- `make task-info TASK_DIR=...`
+- `make task-validate TASK=...`
+- `make suite-run TASK=... AGENT=... MODEL=...`
+- `make matrix-run TASK=... [CONFIG=matrix.yaml]`
+- `make evals-list [METRIC_PROFILE=...] [LIMIT=...]`
+- `make evals-prune [KEEP_PER_MODEL=1]`
+- `make quality`
+
+### Review workflow
+
+- Treat `evals/.../run.json`, `evals/.../suite-summary.json`, and `evals/.../analysis.md` as the canonical review artifacts.
+- Use [docs/analyze-results.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/analyze-results.md) as the reference analysis guide for human review and for any future in-repo dashboard implementation.
+- Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
 
 ### Task completion
-- Requires `uv run --project orchestrator raidar quality gates` to pass.
+
+- Requires `make quality` to pass.
 
 ## Rules
 

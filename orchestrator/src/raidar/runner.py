@@ -570,6 +570,71 @@ def _preflight_cache_key(request: RunRequest, context: ScaffoldContext) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def _run_scaffold_preflight_install(workspace: Path, env: dict[str, str]) -> None:
+    install = subprocess.run(
+        ["bun", "install", "--frozen-lockfile"],
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        timeout=settings.timeouts.build,
+        env=env,
+    )
+    if install.returncode == 0:
+        return
+    output = (install.stdout + "\n" + install.stderr).strip()[:8000]
+    raise ScaffoldPreflightError(
+        "Scaffold preflight failed: `bun install --frozen-lockfile` exited "
+        f"{install.returncode}\n{output}"
+    )
+
+
+def _should_skip_preflight_command(command: list[str], has_tests: bool) -> bool:
+    if has_tests:
+        return False
+    command_text = " ".join(command)
+    return "test:coverage" in command_text or command_text.endswith(" test")
+
+
+def _run_scaffold_preflight_command(
+    workspace: Path, env: dict[str, str], command: list[str]
+) -> None:
+    completed = subprocess.run(
+        command,
+        cwd=workspace,
+        capture_output=True,
+        text=True,
+        timeout=_command_timeout(command),
+        env=env,
+    )
+    if completed.returncode == 0:
+        return
+    output = (completed.stdout + "\n" + completed.stderr).strip()[:8000]
+    rendered = " ".join(shlex.quote(part) for part in command)
+    raise ScaffoldPreflightError(
+        f"Scaffold preflight failed: `{rendered}` exited {completed.returncode}\n{output}"
+    )
+
+
+def _write_scaffold_preflight_cache(
+    *,
+    cache_file: Path,
+    task_name: str,
+    scaffold_fingerprint: str,
+    required_commands: list[list[str]],
+) -> None:
+    cache_file.write_text(
+        json.dumps(
+            {
+                "task_name": task_name,
+                "scaffold_fingerprint": scaffold_fingerprint,
+                "validated_at": datetime.now(UTC).isoformat(),
+                "required_commands": required_commands,
+            },
+            indent=2,
+        )
+    )
+
+
 def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> None:
     """Validate scaffold baseline commands once per task/scaffold version."""
     required_commands = request.task.verification.required_commands
@@ -584,53 +649,19 @@ def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> 
         return
 
     env = os.environ.copy()
-    install = subprocess.run(
-        ["bun", "install", "--frozen-lockfile"],
-        cwd=context.workspace,
-        capture_output=True,
-        text=True,
-        timeout=settings.timeouts.build,
-        env=env,
-    )
-    if install.returncode != 0:
-        output = (install.stdout + "\n" + install.stderr).strip()
-        output = output[:8000]
-        raise ScaffoldPreflightError(
-            f"Scaffold preflight failed: `bun install --frozen-lockfile` exited "
-            f"{install.returncode}\n{output}"
-        )
+    _run_scaffold_preflight_install(context.workspace, env)
 
     has_tests = _workspace_has_tests(context.workspace)
     for command in required_commands:
-        command_text = " ".join(command)
-        if not has_tests and ("test:coverage" in command_text or command_text.endswith(" test")):
+        if _should_skip_preflight_command(command, has_tests):
             continue
-        completed = subprocess.run(
-            command,
-            cwd=context.workspace,
-            capture_output=True,
-            text=True,
-            timeout=_command_timeout(command),
-            env=env,
-        )
-        if completed.returncode != 0:
-            output = (completed.stdout + "\n" + completed.stderr).strip()
-            output = output[:8000]
-            rendered = " ".join(shlex.quote(part) for part in command)
-            raise ScaffoldPreflightError(
-                f"Scaffold preflight failed: `{rendered}` exited {completed.returncode}\n{output}"
-            )
+        _run_scaffold_preflight_command(context.workspace, env, command)
 
-    cache_file.write_text(
-        json.dumps(
-            {
-                "task_name": request.task.name,
-                "scaffold_fingerprint": context.scaffold_source.fingerprint,
-                "validated_at": datetime.now(UTC).isoformat(),
-                "required_commands": required_commands,
-            },
-            indent=2,
-        )
+    _write_scaffold_preflight_cache(
+        cache_file=cache_file,
+        task_name=request.task.name,
+        scaffold_fingerprint=context.scaffold_source.fingerprint,
+        required_commands=required_commands,
     )
 
 
@@ -1097,6 +1128,48 @@ def _docker_image_exists(image_name: str, run_env: dict[str, str]) -> bool:
     return probe.returncode == 0
 
 
+def _fast_image_build_command(image_name: str, dockerfile: Path, context_dir: Path) -> list[str]:
+    return [
+        "docker",
+        "build",
+        "--tag",
+        image_name,
+        "--file",
+        str(dockerfile),
+        str(context_dir),
+    ]
+
+
+def _run_fast_image_build(
+    build_cmd: list[str], run_env: dict[str, str]
+) -> subprocess.CompletedProcess:
+    try:
+        return subprocess.run(
+            build_cmd,
+            capture_output=True,
+            text=True,
+            timeout=1800,
+            env=run_env,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Docker CLI not found.") from exc
+
+
+def _write_fast_image_build_log(log_dir: Path, build: subprocess.CompletedProcess) -> None:
+    log_dir.mkdir(parents=True, exist_ok=True)
+    build_log = log_dir / "fast-image-build.log"
+    build_log.write_text((build.stdout or "") + "\n" + (build.stderr or ""))
+
+
+def _raise_fast_image_build_error(build_cmd: list[str], build: subprocess.CompletedProcess) -> None:
+    if build.returncode == 0:
+        return
+    output = ((build.stdout or "") + "\n" + (build.stderr or "")).strip()[:8000]
+    rendered = " ".join(shlex.quote(part) for part in build_cmd)
+    raise RuntimeError(f"Fast image build failed: `{rendered}` exited {build.returncode}\n{output}")
+
+
 def _ensure_fast_task_image(
     *,
     task_bundle_path: Path,
@@ -1112,37 +1185,10 @@ def _ensure_fast_task_image(
     if not dockerfile.exists():
         raise FileNotFoundError(f"Fast image build failed: missing Dockerfile {dockerfile}")
 
-    build_cmd = [
-        "docker",
-        "build",
-        "--tag",
-        image_name,
-        "--file",
-        str(dockerfile),
-        str(context_dir),
-    ]
-    try:
-        build = subprocess.run(
-            build_cmd,
-            capture_output=True,
-            text=True,
-            timeout=1800,
-            env=run_env,
-            check=False,
-        )
-    except FileNotFoundError as exc:
-        raise RuntimeError("Docker CLI not found.") from exc
-
-    log_dir.mkdir(parents=True, exist_ok=True)
-    build_log = log_dir / "fast-image-build.log"
-    build_log.write_text((build.stdout or "") + "\n" + (build.stderr or ""))
-
-    if build.returncode != 0:
-        output = ((build.stdout or "") + "\n" + (build.stderr or "")).strip()[:8000]
-        rendered = " ".join(shlex.quote(part) for part in build_cmd)
-        raise RuntimeError(
-            f"Fast image build failed: `{rendered}` exited {build.returncode}\n{output}"
-        )
+    build_cmd = _fast_image_build_command(image_name, dockerfile, context_dir)
+    build = _run_fast_image_build(build_cmd, run_env)
+    _write_fast_image_build_log(log_dir, build)
+    _raise_fast_image_build_error(build_cmd, build)
 
 
 def _initialize_harbor_bundle_paths(
@@ -1773,6 +1819,7 @@ def build_task_version_meta(request: RunRequest, context: ScaffoldContext) -> di
         "task_yaml_hash": task_yaml_hash,
         "task_fingerprint": _hash_bytes(seed),
         "metric_profile": task_metric_profile(request.task),
+        "metric_modules": task_metric_modules(request.task),
     }
 
 

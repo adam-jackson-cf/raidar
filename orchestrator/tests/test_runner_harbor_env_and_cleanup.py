@@ -267,6 +267,101 @@ def test_execute_harbor_does_not_retry_non_rate_limit(monkeypatch, tmp_path) -> 
     assert sleeps == []
 
 
+def test_ensure_scaffold_preflight_skips_test_command_without_tests(monkeypatch, tmp_path) -> None:
+    workspace = tmp_path / "workspace"
+    task_dir = tmp_path / "task"
+    execution_dir = tmp_path / "results"
+    workspace.mkdir(parents=True, exist_ok=True)
+    task_dir.mkdir(parents=True, exist_ok=True)
+    execution_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "task.yaml").write_text("name: sample\nversion: v001\n", encoding="utf-8")
+
+    request = SimpleNamespace(
+        task=SimpleNamespace(
+            name="sample-task",
+            verification=SimpleNamespace(
+                required_commands=[["bun", "run", "test"], ["bun", "run", "lint"]]
+            ),
+        ),
+        execution_dir=execution_dir,
+        task_dir=task_dir,
+    )
+    context = SimpleNamespace(
+        workspace=workspace,
+        scaffold_source=SimpleNamespace(fingerprint="abc123"),
+    )
+
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        del kwargs
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: False)
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    runner.ensure_scaffold_preflight(request, context)
+
+    assert calls == [["bun", "install", "--frozen-lockfile"], ["bun", "run", "lint"]]
+
+
+def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle_path = tmp_path / "bundle"
+    docker_context = bundle_path / "environment"
+    docker_context.mkdir(parents=True, exist_ok=True)
+    (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
+
+    monkeypatch.setattr(runner, "_docker_image_exists", lambda *_args, **_kwargs: False)
+
+    def fake_run(command, **kwargs):
+        del kwargs
+        return subprocess.CompletedProcess(command, 2, stdout="build-out", stderr="build-err")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    with pytest.raises(RuntimeError, match="Fast image build failed"):
+        runner._ensure_fast_task_image(
+            task_bundle_path=bundle_path,
+            image_name="ts-ui-eval-smoke-fast:test",
+            run_env={},
+            log_dir=tmp_path / "logs",
+        )
+
+    build_log = tmp_path / "logs" / "fast-image-build.log"
+    assert build_log.exists()
+    text = build_log.read_text(encoding="utf-8")
+    assert "build-out" in text
+    assert "build-err" in text
+
+
+def test_ensure_fast_task_image_returns_immediately_when_image_exists(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle_path = tmp_path / "bundle"
+    docker_context = bundle_path / "environment"
+    docker_context.mkdir(parents=True, exist_ok=True)
+    (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
+
+    monkeypatch.setattr(runner, "_docker_image_exists", lambda *_args, **_kwargs: True)
+
+    def fail_if_called(*_args, **_kwargs):
+        raise AssertionError("subprocess.run should not be called when image already exists")
+
+    monkeypatch.setattr(runner.subprocess, "run", fail_if_called)
+
+    runner._ensure_fast_task_image(
+        task_bundle_path=bundle_path,
+        image_name="ts-ui-eval-smoke-fast:test",
+        run_env={},
+        log_dir=tmp_path / "logs",
+    )
+
+    assert not (tmp_path / "logs" / "fast-image-build.log").exists()
+
+
 def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missing(
     monkeypatch, tmp_path: Path
 ) -> None:

@@ -2,70 +2,57 @@
 
 <h1>Raidar</h1>
 
-**Task evaluation of Cli harness + model pairs to improve delivery performance using Harbor-based tasks**
+**Task evaluation of CLI harness + model pairs to improve delivery performance using Harbor-based tasks**
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=flat-square)
 ![Runtime](https://img.shields.io/badge/runtime-uv%20%7C%20docker-lightgrey.svg?style=flat-square)
 ![Primary CLI](https://img.shields.io/badge/cli-raidar-orange.svg?style=flat-square)
 
-<p>
-  <a href="#quick-install">Quick Install</a> •
-  <a href="#start-here-2-minutes">Start Here</a> •
-  <a href="#orchestrator-flow">Flow</a> •
-  <a href="#eval-suite-layout">Eval Layout</a> •
-  <a href="CHANGELOG.md">Changelog</a> •
-  <a href="analyze-results.md">Analyze Prompt</a>
-</p>
-
 </div>
-
----
-
-## Table of Contents
-
-- [Quick Install](#quick-install)
-- [Start Here (2 Minutes)](#start-here-2-minutes)
-- [System Overview](#system-overview)
-- [Orchestrator Flow](#orchestrator-flow)
-- [Task Model](#task-model)
-- [Eval Suite Layout](#eval-suite-layout)
-- [Common Commands](#common-commands)
 
 ## Quick Install
 
 Prerequisites:
 
-- `uv` ([installation](https://docs.astral.sh/uv/getting-started/installation/))
+- `uv`
 - Docker with `docker compose`
-- One provider API key in `orchestrator/.env` (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `CLAUDE_CODE_API_KEY`, or `GEMINI_API_KEY`)
+- at least one provider API key in `orchestrator/.env`
 
-Bootstrap the orchestrator environment:
+Bootstrap the environment:
 
 ```bash
 cp orchestrator/.env.example orchestrator/.env
-# Edit orchestrator/.env and set your provider key(s)
-cd orchestrator
-uv run raidar env setup
+make env-setup
 ```
 
-## Start Here (2 Minutes)
+## Start Here
 
-Run one end-to-end smoke suite:
+Run one smoke suite:
 
 ```bash
-cd orchestrator
-uv run raidar provider validate --agent claude-code --model anthropic/claude-haiku-4-5
-uv run raidar suite run \
-  --task ../tasks/hello-world-smoke/v001/task.yaml \
-  --agent claude-code \
-  --model anthropic/claude-haiku-4-5 \
-  --repeats 1 \
-  --repeat-parallel 1 \
-  --retry-void 0
+make provider-validate AGENT=claude-code MODEL=anthropic/claude-haiku-4-5
+make suite-run \
+  TASK=tasks/hello-world-smoke/v001/task.yaml \
+  AGENT=claude-code \
+  MODEL=anthropic/claude-haiku-4-5 \
+  REPEATS=1 \
+  REPEAT_PARALLEL=1 \
+  RETRY_VOID=0
 ```
 
-This creates one suite in `evals/` with run artifacts, verifier outputs, screenshots, and summary files.
+This writes canonical artifacts into `evals/`, including per-run `run.json`, suite-level `suite.json`, `suite-summary.json`, and `analysis.md`.
+
+## Review Workflow
+
+The active review workflow is local artifact analysis based on [docs/analyze-results.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/analyze-results.md).
+
+- `evals/.../run.json` is the canonical per-run scorecard and evidence pointer.
+- `evals/.../suite-summary.json` is the canonical repeat-suite aggregate.
+- `evals/.../analysis.md` is the human-readable suite summary generated from the same canonical data.
+- `make evals-list` and `make evals-prune` are the supported artifact inspection helpers.
+
+`docs/analyze-results.md` is preserved as the reference review prompt and should guide any replacement dashboard or analysis surface built in-repo.
 
 ## System Overview
 
@@ -73,26 +60,15 @@ The repository has three primary concerns:
 
 - `orchestrator/`: CLI and runtime pipeline that executes and scores tasks.
 - `tasks/`: versioned task definitions (`task.yaml`), prompts, rules, references, and scaffolds.
-- `evals/`: generated suite artifacts (gitignored) with per-run evidence bundles.
+- `evals/`: generated suite artifacts with per-run evidence bundles.
 
 A task consists of:
 
-- task instruction ("implement this homepage...")
-- rules (AGENTS.md etc)
-- scaffold (baseline project representative of what you want to test, say a copy of your project, or nextjs starter etc)
-- metrics via required ordered `metrics.modules[]` in `task.yaml`
-- derived `metric_profile` in format `v2:<module-id>+...` from module order
-- optional audit-only modules (for example `artifact_presence`) that are reported but do not change composite gating in this release
-
-Theres an example eval task, home page design implementation (design to code) to help demonstrate the approach.
-
-There is a temp analyze-results.md prompt you can use to compare a suite of runs, view a results table and receive recommendations on suitable iterations as experiments. The prompt is a temp place holder whilst the dashboard for results is being worked on.
-
-Through this you can work out:
-
-- why my agent fails at a task
-- what is the best choice for my task
-- how do i improve rules, scaffold, choice of agent etc for a task
+- task instruction
+- rules
+- scaffold
+- metrics via ordered `metrics.modules[]` in `task.yaml`
+- derived `metric_profile` in format `v2:<module-id>+...`
 
 ## Orchestrator Flow
 
@@ -105,185 +81,28 @@ flowchart TD
     E --> F["Create baseline workspace snapshot from task scaffold"]
     F --> G["For each repeat (run-01..run-N): launch Harbor agent run"]
     G --> H["Build verifier task spec including metrics.modules[]"]
-    H --> I["Run verifier core checks (verification/compliance/visual if configured)"]
-    I --> J["Run verifier module evaluations (artifact_presence, etc.)"]
-    J --> K["Persist run outputs: run.json (config.metric_profile + scores.modules[])"]
-    K --> L["Aggregate suite-summary.json (config.metric_profile, config.metric_modules, aggregate.module_outcomes)"]
-    L --> M["Persist suite.json + analysis.md + evidence artifacts"]
+    H --> I["Run verifier core checks and module evaluations"]
+    I --> J["Persist run outputs: run.json"]
+    J --> K["Aggregate suite-summary.json and suite.json"]
+    K --> L["Write analysis.md and evidence artifacts"]
 ```
 
-## Task Model
+## Key Actions
 
-Each task is versioned and treated as source input for execution.
-
-```text
-tasks/<task-name>/<version>/
-  task.yaml
-  prompt/
-    task.md
-  rules/
-    AGENTS.md
-    CLAUDE.md
-    GEMINI.md
-    copilot-instructions.md
-  scaffold/
-    ...baseline project files...
-  reference/            # optional task assets (e.g. images/html)
-```
-
-`task.yaml` is config, not prompt implementation. It points to prompt artifacts via `prompt.entry`, and defines:
-
-- `scaffold.root`: source scaffold copied into suite/run workspaces
-- `verification`: required commands and quality gates
-- `compliance`: deterministic checks and optional rubric config
-- `metrics.modules[]`: required ordered metric modules that define task evaluation capability
-- `visual`: screenshot command/reference image/threshold (for visual tasks)
-
-`metrics.modules[]` is the source of truth for metric profile derivation (`v2:<module-id>+...`).
-
-### Metrics setup
-
-Core module IDs:
-
-- `functional`
-- `compliance`
-- `efficiency`
-- `run-validity`
-- `optimization`
-- `coverage-threshold`
-- `requirements`
-- `llm-judge`
-- `visual-odiff`
-
-Non-core module example:
-
-- `artifact_presence`: checks required workspace paths and reports audit outcomes (`pass/fail`, missing patterns, evidence).
-
-Dependency rules enforced by task schema:
-
-- `visual-odiff` requires `visual`.
-- `coverage-threshold` requires `verification.coverage_threshold`.
-- `requirements` requires non-empty `compliance.requirements`.
-- `llm-judge` requires non-empty `compliance.llm_judge_rubric`.
-
-Minimal `task.yaml` metrics example:
-
-```yaml
-verification:
-  coverage_threshold: 0.8
-compliance:
-  requirements:
-    - id: req-example
-      description: Example requirement
-      check:
-        type: import_present
-        pattern: Example
-        description: Example presence check
-  llm_judge_rubric:
-    - criterion: Example criterion
-      weight: 1.0
-visual:
-  reference_image: ./reference/homepage.png
-  screenshot_command: ["bun", "run", "capture-screenshot"]
-  threshold: 0.95
-metrics:
-  modules:
-    - type: core
-      id: functional
-    - type: core
-      id: compliance
-    - type: core
-      id: efficiency
-    - type: core
-      id: run-validity
-    - type: core
-      id: optimization
-    - type: core
-      id: coverage-threshold
-    - type: core
-      id: requirements
-    - type: core
-      id: llm-judge
-    - type: core
-      id: visual-odiff
-    - type: artifact_presence
-      id: artifact_presence
-      config:
-        required_paths:
-          - src/app/page.tsx
-          - src/components/**/*.tsx
-        path_match: glob
-```
-
-Migration note:
-
-- Tasks missing `metrics.modules[]` now fail validation. Use `uv run raidar task init ...` to scaffold compliant task packages.
-- Audit-only modules appear in profile/reporting but do not yet affect composite ranking.
-- `visual-odiff` in `metrics.modules[]` declares capability/profile, but visual execution still requires a valid `visual` config and screenshot artifacts.
-
-Homepage ODiff note:
-
-- `homepage-implementation@v001` keeps `visual-odiff` in `metrics.modules[]` and a `visual` block.
-- Verifier computes ODiff similarity and applies visual threshold checks in performance gates.
-- Region-aware ODiff diagnostics are emitted by verifier scorecard when region captures are available.
-
-## Eval Suite Layout
-
-Each suite run writes one timestamped folder under `evals/`.
-
-```mermaid
-flowchart TD
-    A["evals/<timestamp>__<task>__<version>/"] --> B["suite.json (full suite payload)"]
-    A --> C["suite-summary.json (aggregate stats only)"]
-    A --> D["analysis.md (human-readable suite analysis)"]
-    A --> E["workspace/baseline/ (suite baseline snapshot)"]
-    A --> F["runs/run-01/ ... runs/run-N/"]
-    F --> G["run.json (canonical run record)"]
-    F --> H["summary.md (run pointers + key metrics)"]
-    F --> I["homepage-pre.png / homepage-post.png"]
-    F --> J["workspace/ (post-run project state)"]
-    F --> K["workspace-diff.json (baseline vs run workspace changes)"]
-    F --> L["verifier/ (scorecard + gate outputs)"]
-    F --> M["harbor/ (bundle, logs, raw session artifacts)"]
-    F --> N["agent/ (trajectory/events/final archives)"]
-```
-
-Key metric fields in artifacts:
-
-- `suite-summary.json` includes `config.metric_profile`, `config.metric_modules`, and `aggregate.module_outcomes`.
-- `runs/*/run.json` includes `config.metric_profile` and `scores.modules[]` (audit module results).
-
-Compatibility note:
-
-- Older historical suite artifacts may not include module fields (`metric_modules`, `module_outcomes`, `scores.modules[]`).
-
-## Common Commands
-
-Environment and provider checks:
+From the repo root:
 
 ```bash
-cd orchestrator
-uv run raidar env setup
-uv run raidar provider list
-uv run raidar provider validate --agent codex-cli --model codex/gpt-5.2-high
-uv run raidar info --task ../tasks/homepage-implementation
+make env-setup
+make provider-list
+make provider-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high
+make task-init TASK_DIR=tasks/new-task TASK_VERSION=v001
+make task-info TASK_DIR=tasks/homepage-implementation/v001
+make task-validate TASK=tasks/homepage-implementation/v001/task.yaml
+make suite-run TASK=... AGENT=... MODEL=...
+make matrix-run TASK=... CONFIG=matrix.yaml
+make evals-list
+make evals-prune KEEP_PER_MODEL=1
+make quality
 ```
 
-Run a smoke suite:
-
-```bash
-./scripts/run-provider-smoke.sh --agent claude-code --model anthropic/claude-haiku-4-5
-```
-
-Run homepage task baseline set:
-
-```bash
-./scripts/run-codex-baselines.sh
-```
-
-List eval suites by metric profile:
-
-```bash
-cd orchestrator
-uv run raidar evals list --metric-profile visual-odiff
-```
+Detailed command policy: [docs/command-surface.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/command-surface.md)

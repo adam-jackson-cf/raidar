@@ -85,6 +85,7 @@ def test_create_repeat_suite_summary_aggregates():
     started_at = datetime.now(UTC) - timedelta(minutes=5)
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
+        task_version="v001",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
         metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
@@ -104,6 +105,7 @@ def test_create_repeat_suite_summary_aggregates():
     assert summary["retry"]["target_met"] is True
     assert len(summary["runs"]) == 2
     assert str(summary["suite_id"]).endswith("__codex-gpt-5.2-low__x2")
+    assert summary["config"]["task_version"] == "v001"
     assert summary["config"]["metric_modules"] == [
         "functional",
         "compliance",
@@ -111,6 +113,8 @@ def test_create_repeat_suite_summary_aggregates():
         "run-validity",
         "optimization",
     ]
+    assert summary["config"]["scaffold_root"] == "scaffold"
+    assert summary["config"]["scaffold_fingerprint"] is None
 
 
 def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
@@ -124,6 +128,7 @@ def test_create_repeat_suite_summary_excludes_void_runs_from_stats():
     )
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
+        task_version="v001",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
         metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
@@ -150,6 +155,7 @@ def test_create_repeat_suite_summary_includes_retry_metadata():
     run_a = _run("run-a", run_valid=True, duration=120.0, artifact_presence_passed=True)
     summary = create_repeat_suite_summary(
         task_name="Homepage Task",
+        task_version="v001",
         harness="codex-cli",
         model="codex/gpt-5.2-low",
         metric_profile="v2:functional+compliance+efficiency+run-validity+optimization+artifact_presence",

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 from raidar.matrix import (
     MatrixConfig,
     MatrixEntry,
+    MatrixSuiteConfig,
     generate_matrix_entries,
 )
 
@@ -72,6 +73,12 @@ class TestGenerateMatrixEntries:
     def test_generates_all_combinations(self):
         """Should generate all combinations."""
         config = MatrixConfig(
+            suite=MatrixSuiteConfig(
+                timeout_sec=300,
+                repeats=3,
+                repeat_parallel=1,
+                retry_void=1,
+            ),
             runs=[
                 {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
                 {"harness": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
@@ -85,6 +92,12 @@ class TestGenerateMatrixEntries:
     def test_generates_correct_combinations(self):
         """Should generate correct harness/model/rules combinations."""
         config = MatrixConfig(
+            suite=MatrixSuiteConfig(
+                timeout_sec=300,
+                repeats=3,
+                repeat_parallel=1,
+                retry_void=1,
+            ),
             runs=[
                 {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
                 {"harness": "codex-cli", "model": "codex/gpt-5.1"},
@@ -102,6 +115,12 @@ class TestGenerateMatrixEntries:
         """Empty config should raise validation error."""
         try:
             MatrixConfig(
+                suite=MatrixSuiteConfig(
+                    timeout_sec=300,
+                    repeats=3,
+                    repeat_parallel=1,
+                    retry_void=1,
+                ),
                 runs=[],
                 task_path="task.yaml",
             )
@@ -113,6 +132,12 @@ class TestGenerateMatrixEntries:
     def test_large_matrix_generation(self):
         """Should handle larger matrices."""
         config = MatrixConfig(
+            suite=MatrixSuiteConfig(
+                timeout_sec=300,
+                repeats=3,
+                repeat_parallel=1,
+                retry_void=1,
+            ),
             runs=[
                 {"harness": "codex-cli", "model": "codex/gpt-5.2-high"},
                 {"harness": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
