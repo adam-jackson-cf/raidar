@@ -1,6 +1,7 @@
 # Analyze Latest Agent Eval Results
 
-Use this prompt to analyze the latest suite for each `(task_name, task_version, harness, model, metric_profile)` combination.
+Use this prompt to analyze the latest suite for each
+`(task_name, task_version, harness, model, metric_profile)` combination.
 
 ## Prompt
 
@@ -8,7 +9,9 @@ You are analyzing agent-eval outcomes for design-implementation tasks.
 
 ### Objective
 
-Produce a deterministic comparison of the latest suite per combination, then generate impact-ranked recommendations that improve scored validity and optimization outcomes without relaxing gates.
+Produce a deterministic comparison of the latest suite per combination, then
+generate impact-ranked recommendations that improve scored validity and
+optimization outcomes without relaxing gates.
 
 ### Repository Inputs
 
@@ -31,18 +34,23 @@ Do not use non-canonical legacy roots outside `evals/`.
 ### Suite Selection Rule
 
 For each unique `(task_name, task_version, harness, model, metric_profile)`:
-1. Read suite identity from `suite-summary.json.config`: `task_name`, `task_version`, `harness`, `model`, `metric_profile`.
+
+1. Read suite identity from `suite-summary.json.config`: `task_name`,
+   `task_version`, `harness`, `model`, `metric_profile`.
 2. Select the latest suite by `created_at_utc` within that identity key.
 3. Analyze only that latest suite for ranking.
-4. Use per-run pointers from `suite.json` (`runs[].run_json_path`, `runs[].canonical_run_dir`) to collect all required run artifacts.
+4. Use per-run pointers from `suite.json` (`runs[].run_json_path`,
+   `runs[].canonical_run_dir`) to collect all required run artifacts.
 
 ### Metric Module Semantics (v2)
 
 Treat module metadata as first-class analysis context:
 
 1. Read and report `suite-summary.json.config.metric_modules`.
-2. `metric_profile` (`v2:<module-id>+...`) and `metric_modules` together define suite capability/profile identity.
-3. Core modules define capability identity only; they do not add new analyzer-side ranking math in this release.
+2. `metric_profile` (`v2:<module-id>+...`) and `metric_modules` together define
+   suite capability/profile identity.
+3. Core modules define capability identity only; they do not add new
+   analyzer-side ranking math in this release.
 4. `artifact_presence` is audit-only:
    - report pass/fail outcomes and missing patterns,
    - do not feed module outcomes into ranking score computation.
@@ -56,24 +64,27 @@ Required fields that must be consumed:
 - `suite-summary.json.aggregate.module_outcomes`
 - `run.json.config.metric_profile`
 - `run.json.scores.modules[]`
-- `run.json.scores.visual.similarity` (primary objective ODiff signal when configured)
-- `verifier/scorecard.json.visual.global_similarity` and `verifier/scorecard.json.visual.regional_scores` (optional diagnostics)
+- `run.json.scores.visual.similarity` (primary objective ODiff signal when
+  configured)
+- `verifier/scorecard.json.visual.global_similarity` and
+  `verifier/scorecard.json.visual.regional_scores` (optional diagnostics)
 
 ### Gate-First Interpretation
 
 Compute and report two separate suite states:
 
 1. `operational_valid_for_ranking`
-- `retry.target_met == true`
-- `retry.unresolved_void_count == 0`
-- `aggregate.run_count_scored >= config.repeats`
+   - `retry.target_met == true`
+   - `retry.unresolved_void_count == 0`
+   - `aggregate.run_count_scored >= config.repeats`
 
 2. `quality_compliant`
-- `aggregate.validity_rate == 1.0`
-- every scored run has `run_valid == true`
-- every scored run has `performance_gates_passed == true`
+   - `aggregate.validity_rate == 1.0`
+   - every scored run has `run_valid == true`
+   - every scored run has `performance_gates_passed == true`
 
 Ranking rule:
+
 - If `operational_valid_for_ranking == false`:
   - mark suite status `INVALID_FOR_RANKING`
   - set final ranking score to `0.0`
@@ -82,76 +93,101 @@ Ranking rule:
   - compute ranking score normally, regardless of `quality_compliant`
   - still report `quality_compliant` and all failure reasons
 
-Always include both fields per suite in the scoring breakdown and per-agent insights.
+Always include both fields per suite in the scoring breakdown and per-agent
+insights.
 
 ### Deterministic Ranking Score (v2)
 
-Keep the ranking formula unchanged; only module/profile awareness and diagnostic sourcing are extended.
+Keep the ranking formula unchanged; only module/profile awareness and diagnostic
+sourcing are extended.
 
 For suites with `operational_valid_for_ranking == true`, compute:
 
 1. Positive contribution block:
 
-`positive_score = 100 * (0.30*objective_quality + 0.20*requirements_quality + 0.20*run_validity_strength + 0.10*performance_strength + 0.10*reliability + 0.05*speed + 0.05*cost)`
+`positive_score = 100 * (0.30*objective_quality + 0.20*requirements_quality +
+0.20*run_validity_strength + 0.10*performance_strength + 0.10*reliability +
+0.05*speed + 0.05*cost)`
 
 2. Negative penalty block:
 
-`penalty_score = 100 * (0.35*void_penalty + 0.25*run_validity_penalty + 0.25*performance_penalty + 0.15*requirements_penalty)`
+`penalty_score = 100 * (0.35*void_penalty + 0.25*run_validity_penalty +
+0.25*performance_penalty + 0.15*requirements_penalty)`
 
 3. Final score:
 
 `final_score = clamp(positive_score - penalty_score, 0, 100)`
 
 For suites with `operational_valid_for_ranking == false`:
+
 - set `final_score = 0.0`
 
 Metric definitions:
+
 - `raw_objective_quality = aggregate visual objective mean`
   - Compute only when `visual-odiff` is present in `metric_modules`.
-  - For homepage tasks, this is `odiff similarity mean` from run scorecards `run.json -> scores.visual.similarity`.
-  - If available, this value already reflects region-weighted similarity produced by verifier.
-- `raw_objective_global_quality` (optional) = aggregate mean of verifier scorecards `verifier/scorecard.json -> visual.global_similarity` when present.
-  - Use this only for diagnostics to explain whether variance comes from global frame or region weighting.
-- `raw_objective_regional_quality` (optional) = aggregate mean of verifier scorecards `verifier/scorecard.json -> visual.regional_similarity` when present.
-- `objective_threshold = visual threshold` from `run.json -> scores.visual.threshold`; default to `0.95` if unavailable.
-- `objective_similarity_margin = clamp((raw_objective_quality - objective_threshold) / (1 - objective_threshold), 0, 1)`
-  - This expands meaningful separation above threshold so small raw ODiff deltas produce larger score variance.
+  - For homepage tasks, this is `odiff similarity mean` from run scorecards
+    `run.json -> scores.visual.similarity`.
+  - If available, this value already reflects region-weighted similarity
+    produced by verifier.
+- `raw_objective_global_quality` (optional) = aggregate mean of verifier
+  scorecards `verifier/scorecard.json -> visual.global_similarity` when present.
+  - Use this only for diagnostics to explain whether variance comes from global
+    frame or region weighting.
+- `raw_objective_regional_quality` (optional) = aggregate mean of verifier
+  scorecards `verifier/scorecard.json -> visual.regional_similarity` when
+  present.
+- `objective_threshold = visual threshold` from
+  `run.json -> scores.visual.threshold`; default to `0.95` if unavailable.
+- `objective_similarity_margin = clamp((raw_objective_quality -
+  objective_threshold) / (1 - objective_threshold), 0, 1)`
+  - This expands meaningful separation above threshold so small raw ODiff deltas
+    produce larger score variance.
 - `objective_quality = objective_similarity_margin * requirements_quality`
-  - This keeps requirement-missing implementations from retaining high objective contribution even when raw ODiff is close.
+  - This keeps requirement-missing implementations from retaining high
+    objective contribution even when raw ODiff is close.
 - `requirements_quality = mean(requirements.presence_ratio)` across scored runs.
 - `run_validity_strength = aggregate.validity_rate`.
 - `performance_strength = aggregate.performance_pass_rate`.
 - `reliability = 1 - (void_count / aggregate.run_count_total)`.
-- `speed = inverse_normalized(aggregate.duration_sec.mean)` (normalize across compared rankable suites only).
-- `cost = inverse_normalized(aggregate.uncached_input_tokens.mean)` (normalize across compared rankable suites only).
+- `speed = inverse_normalized(aggregate.duration_sec.mean)` (normalize across
+  compared rankable suites only).
+- `cost = inverse_normalized(aggregate.uncached_input_tokens.mean)` (normalize
+  across compared rankable suites only).
 - `void_penalty = void_count / aggregate.run_count_total`.
 - `run_validity_penalty = 1 - aggregate.validity_rate`.
 - `performance_penalty = 1 - aggregate.performance_pass_rate`.
-- `requirements_penalty = 1 - mean(requirements.mapping_ratio)` across scored runs.
+- `requirements_penalty = 1 - mean(requirements.mapping_ratio)` across scored
+  runs.
 
 When any metric input is missing:
+
 - list the missing artifact path(s),
 - set that metric component to `0.0`,
 - continue scoring with remaining components.
 
 When `visual-odiff` is not in `metric_modules`:
+
 - do not compute objective ODiff metrics for that suite,
 - set objective-related scoring components/impacts to `0.0`,
 - mark objective diagnostics as `not-configured`.
 
 ### Output UX Model (Layered)
 
-Do not use one single dense top-level table. Use a layered output model that keeps decision speed high while preserving diagnostics.
+Do not use one single dense top-level table. Use a layered output model that
+keeps decision speed high while preserving diagnostics.
 
 #### Table A: `Top-Level Ranking Snapshot` (decision-first)
 
 Purpose: fast comparison of rankable suites only.
 
 Rows:
+
 - Include only suites where `operational_valid_for_ranking == true`.
 - Sort by `final_score` descending.
 
 Columns (in this order):
+
 1. `rank`
 2. `harness`
 3. `model`
@@ -164,7 +200,9 @@ Columns (in this order):
 10. `quick_failure_summary`
 
 Rules:
-- Assume rows in this table are operationally rankable by definition; do not repeat `operational_valid_for_ranking` in every row.
+
+- Assume rows in this table are operationally rankable by definition; do not
+  repeat `operational_valid_for_ranking` in every row.
 - `quick_failure_summary` must be one short phrase:
   - `clean` when `quality_compliant == true`
   - otherwise summarize dominant failure mode(s) with compact counts.
@@ -174,9 +212,11 @@ Rules:
 Purpose: isolate rankability blockers without polluting top-level comparison.
 
 Rows:
+
 - Include only suites where `operational_valid_for_ranking == false`.
 
 Columns (in this order):
+
 1. `harness`
 2. `model`
 3. `status`
@@ -190,9 +230,11 @@ Columns (in this order):
 Purpose: troubleshooting and auditability for every latest suite.
 
 Rows:
+
 - Include all latest suites, including non-rankable suites.
 
 Columns (in this order):
+
 1. `rank`
 2. `harness`
 3. `model`
@@ -229,42 +271,63 @@ Columns (in this order):
 34. `top_failure_modes`
 
 Derivations and consistency rules:
-- `required_verification_exec_rate`: mean of `executed_required_verification_commands / required_verification_commands` from run metadata process block (treat required=0 as 1.0).
-- `objective_odiff_pass_rate`: share of scored runs where visual threshold is met.
-- `artifact_presence_pass_rate`: from `suite-summary.json.aggregate.module_outcomes.artifact_presence.pass_rate` when available; otherwise `n/a`.
-- `top_failure_modes`: top 3 failing checks with counts across run-validity + performance checks.
+
+- `required_verification_exec_rate`: mean of
+  `executed_required_verification_commands / required_verification_commands`
+  from run metadata process block (treat required=0 as 1.0).
+- `objective_odiff_pass_rate`: share of scored runs where visual threshold is
+  met.
+- `artifact_presence_pass_rate`: from
+  `suite-summary.json.aggregate.module_outcomes.artifact_presence.pass_rate`
+  when available; otherwise `n/a`.
+- `top_failure_modes`: top 3 failing checks with counts across run-validity +
+  performance checks.
 - Normalize failure-mode labels in reporting:
-  - render `no_requirement_test_gaps` as `requirement_test_gaps` for readability (historical artifact compatibility).
-- Each `+..._impact` and `-..._penalty_impact` column must show the signed numeric contribution used in score computation.
+  - render `no_requirement_test_gaps` as `requirement_test_gaps` for
+    readability (historical artifact compatibility).
+- Each `+..._impact` and `-..._penalty_impact` column must show the signed
+  numeric contribution used in score computation.
 
 ### Signal Direction Rules
 
 Ensure success/failure direction is explicit and consistent:
 
-1. In `Top-Level Ranking Snapshot`, all numeric columns must be "higher is better" signals except `final_score` already composite.
-2. Keep lower-is-better metrics (`void_rate`, `duration_mean_sec`, `uncached_input_tokens_mean`) out of the top-level snapshot and in secondary tables.
-3. When lower-is-better metrics are shown, label them explicitly with wording that indicates lower is better.
+1. In `Top-Level Ranking Snapshot`, all numeric columns must be "higher is
+   better" signals except `final_score` already composite.
+2. Keep lower-is-better metrics (`void_rate`, `duration_mean_sec`,
+   `uncached_input_tokens_mean`) out of the top-level snapshot and in secondary
+   tables.
+3. When lower-is-better metrics are shown, label them explicitly with wording
+   that indicates lower is better.
 4. Never mix unlabeled positive and inverse interpretations in the same table.
 
 ### Redundancy Rules
 
-1. Do not repeat constant cross-suite context per row (task/version); place it once in the report subtitle.
-2. Do not repeat operational validity booleans in the top-level table where only rankable suites are shown.
-3. Keep deep-dive fields in diagnostic sections; do not force all readers through full diagnostic density.
+1. Do not repeat constant cross-suite context per row (task/version); place it
+   once in the report subtitle.
+2. Do not repeat operational validity booleans in the top-level table where
+   only rankable suites are shown.
+3. Keep deep-dive fields in diagnostic sections; do not force all readers
+   through full diagnostic density.
 
 ### Report Subtitle Requirement
 
 Directly under the report title, include:
+
 - `Scope: <task_name>@<task_version>` for this analysis set.
-- `Profile Compatibility: metric_profile=<metric_profile>; metric_modules=<sorted module ids>`
+- `Profile Compatibility: metric_profile=<metric_profile>; metric_modules=<sorted
+  module ids>`
 
 Assumption:
+
 - Analysis is single-task latest-suite comparison.
-- If more than one `(task_name, task_version)` appears, explicitly call this out in `Contradictions and Knock-On Effects`.
+- If more than one `(task_name, task_version)` appears, explicitly call this out
+  in `Contradictions and Knock-On Effects`.
 
 ### Required Sections
 
 Return:
+
 1. `## Ranked Agents (Latest Suite Per Task Version)`
 2. `## Scoring Breakdown`
 3. `## Reliability and Failure Anatomy`
@@ -275,58 +338,86 @@ Return:
 8. `## UX Rationale (Before vs After)`
 
 `Scoring Breakdown` must include:
+
 - `Audit-only modules included: artifact_presence`
 
 `Reliability and Failure Anatomy` must include a `Module Audit` subsection:
-- report `artifact_presence` pass/fail counts from `suite-summary.aggregate.module_outcomes.artifact_presence`,
-- report top missing patterns from run-level `run.json -> scores.modules[].missing_patterns`.
+
+- report `artifact_presence` pass/fail counts from
+  `suite-summary.aggregate.module_outcomes.artifact_presence`,
+- report top missing patterns from run-level
+  `run.json -> scores.modules[].missing_patterns`.
 
 ### Consistency Checks
 
 Always validate and report these conditions:
 
-1. If run-level `run.json.config.metric_profile` disagrees with suite-level `suite-summary.json.config.metric_profile`, flag it in `Contradictions and Knock-On Effects`.
-2. If `visual-odiff` is not in `metric_modules`, objective ODiff metrics must be marked `not-configured` and excluded from objective scoring computation.
-3. If `visual-odiff` is present but visual artifacts are missing (`run.json.scores.visual` and verifier visual fields), treat this as an artifact defect and list explicit missing paths.
+1. If run-level `run.json.config.metric_profile` disagrees with suite-level
+   `suite-summary.json.config.metric_profile`, flag it in
+   `Contradictions and Knock-On Effects`.
+2. If `visual-odiff` is not in `metric_modules`, objective ODiff metrics must be
+   marked `not-configured` and excluded from objective scoring computation.
+3. If `visual-odiff` is present but visual artifacts are missing
+   (`run.json.scores.visual` and verifier visual fields), treat this as an
+   artifact defect and list explicit missing paths.
 
 `UX Rationale (Before vs After)` must be short and concrete:
+
 - `Before`: what made quick scanning hard.
-- `After`: what changed in layout and why it improves at-a-glance comprehension.
+- `After`: what changed in layout and why it improves at-a-glance
+  comprehension.
 - `Tradeoff`: what information moved to deep-dive sections and why.
 
 ### Optional Skill Integration: `visual-explainer`
 
-This section is optional and must not change the default markdown behavior when the skill is unavailable.
+This section is optional and must not change the default markdown behavior when
+the skill is unavailable.
 
 Skill detection:
+
 - Check for `visual-explainer` skill presence in any of these locations:
   - `$CODEX_HOME/skills/visual-explainer/SKILL.md`
   - `~/.codex/skills/visual-explainer/SKILL.md`
   - `~/.agents/skills/visual-explainer/SKILL.md`
 
 If skill is present:
+
 1. Load the `visual-explainer` skill and follow its workflow.
-2. Reuse the exact computed metrics from this analysis (do not recompute with different formulas).
-3. Before generating visuals, build a verification fact sheet listing every numeric/table claim and its artifact source path (`suite-summary.json`, `suite.json`, `run.json`, verifier artifacts).
-4. Generate a self-contained HTML companion report that explains results visually with:
+2. Reuse the exact computed metrics from this analysis (do not recompute with
+   different formulas).
+3. Before generating visuals, build a verification fact sheet listing every
+   numeric/table claim and its artifact source path (`suite-summary.json`,
+   `suite.json`, `run.json`, verifier artifacts).
+4. Generate a self-contained HTML companion report that explains results
+   visually with:
    - Executive summary and ranking outcome
-   - Top-level ranking snapshot + operational exceptions + detailed diagnostic table
+   - Top-level ranking snapshot + operational exceptions + detailed diagnostic
+     table
    - Positive vs negative impact breakdown (`+..._impact`, `-..._penalty_impact`)
    - Reliability/failure anatomy and top failure modes
-   - Per-agent quality vs operational state (`operational_valid_for_ranking`, `quality_compliant`)
-5. Save HTML output under `./.enaible/artifacts/visual-report/` with a deterministic datetime-stamped filename (for example `eval-analysis-<task>-<YYYYMMDD-HHMMSS>.html`). Create the directory if it does not exist.
+   - Per-agent quality vs operational state
+     (`operational_valid_for_ranking`, `quality_compliant`)
+5. Save HTML output under `./.enaible/artifacts/visual-report/` with a
+   deterministic datetime-stamped filename (for example
+   `eval-analysis-<task>-<YYYYMMDD-HHMMSS>.html`). Create the directory if it
+   does not exist.
 6. Return both:
    - The standard markdown analysis (all required sections above)
    - The HTML output path as an additional artifact
 
 If skill is not present:
+
 - Output the standard markdown analysis only, exactly as defined in this prompt.
 - Do not fail, skip, or alter scoring behavior due to missing skill.
 
 ### Hard Constraints
 
 1. Never treat deterministic-check failures as harness defects.
-2. Always separate orchestrator implementation failures from task scoring failures.
-3. Never propose relaxing thresholds, deterministic checks, or scoring criteria.
-4. If evidence is missing, list missing artifact paths and continue with available evidence.
-5. Recommendations must explicitly reference the affected task version(s) (for example `homepage-implementation@v001`).
+2. Always separate orchestrator implementation failures from task scoring
+   failures.
+3. Never propose relaxing thresholds, deterministic checks, or scoring
+   criteria.
+4. If evidence is missing, list missing artifact paths and continue with
+   available evidence.
+5. Recommendations must explicitly reference the affected task version(s) (for
+   example `homepage-implementation@v001`).

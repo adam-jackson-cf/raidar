@@ -15,6 +15,15 @@ class HarnessModelPair(BaseModel):
     model: str = Field(description="Model string provider/name passed to Harbor")
 
 
+class MatrixSuiteConfig(BaseModel):
+    """Repeat-suite execution settings for every matrix pair."""
+
+    timeout_sec: int = Field(gt=0, description="Task timeout in seconds for each suite")
+    repeats: int = Field(ge=1, description="Number of repeats per harness/model pair")
+    repeat_parallel: int = Field(ge=1, description="Parallel workers within a repeat suite")
+    retry_void: int = Field(ge=0, le=1, description="Retry budget for voided runs")
+
+
 class MatrixConfig(BaseModel):
     """Configuration for a matrix of evaluation runs."""
 
@@ -22,6 +31,7 @@ class MatrixConfig(BaseModel):
         min_length=1,
         description="List of harness/model pairs to execute",
     )
+    suite: MatrixSuiteConfig = Field(description="Repeat-suite execution settings")
     task_path: str = Field(description="Path to task.yaml")
     evals_path: str = Field(default="evals", description="Path to eval suite outputs")
 
@@ -70,6 +80,11 @@ def create_example_matrix() -> str:
     """Create example matrix configuration YAML."""
     return """# Evaluation matrix configuration
 matrix:
+  suite:
+    timeout_sec: 1800
+    repeats: 3
+    repeat_parallel: 1
+    retry_void: 1
   runs:
     - harness: codex-cli
       model: codex/gpt-5.2-high

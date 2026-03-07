@@ -134,6 +134,7 @@ def _aggregate_module_outcomes(runs: list[EvalRun]) -> dict[str, dict[str, float
 def create_repeat_suite_summary(
     *,
     task_name: str,
+    task_version: str,
     harness: str,
     model: str,
     metric_profile: str,
@@ -152,6 +153,12 @@ def create_repeat_suite_summary(
     suite_id = _suite_id(task_name, harness, model, repeats, started_utc)
     void_runs, scored_runs, valid_runs = _partition_runs(runs)
     run_pointers = [_run_pointer(run) for run in runs]
+    first_run = runs[0] if runs else None
+    scaffold_meta = first_run.scores.metadata.get("scaffold", {}) if first_run else {}
+    scaffold_root = first_run.config.scaffold_root if first_run is not None else None
+    scaffold_fingerprint = (
+        scaffold_meta.get("fingerprint") if isinstance(scaffold_meta, dict) else None
+    )
 
     return {
         "suite_id": suite_id,
@@ -160,6 +167,7 @@ def create_repeat_suite_summary(
         "completed_at_utc": finished_utc.isoformat(),
         "config": {
             "task_name": task_name,
+            "task_version": task_version,
             "harness": harness,
             "model": model,
             "metric_profile": metric_profile,
@@ -168,6 +176,8 @@ def create_repeat_suite_summary(
             "repeat_parallel": repeat_parallel,
             "retry_void_limit": retry_void_limit,
             "retries_used": retries_used,
+            "scaffold_root": scaffold_root,
+            "scaffold_fingerprint": scaffold_fingerprint,
         },
         "aggregate": _aggregate_block(runs, void_runs, scored_runs, valid_runs),
         "runs": run_pointers,
@@ -215,6 +225,7 @@ def persist_repeat_suite(
         "",
         f"- suite_id: `{suite_id}`",
         f"- task: `{config.get('task_name')}`",
+        f"- task_version: `{config.get('task_version')}`",
         f"- harness: `{config.get('harness')}`",
         f"- model: `{config.get('model')}`",
         f"- metric_profile: `{config.get('metric_profile')}`",

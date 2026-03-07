@@ -64,6 +64,14 @@ def main() -> None:
 
 AGENT_CHOICES = [agent.value for agent in Agent]
 VERSION_DIR_PATTERN = re.compile(r"^v(\d+)$")
+INTEGRATION_TEST_TARGET = "tests/test_runner_harbor_env_and_cleanup.py"
+TYPECHECK_TARGETS = [
+    "src/raidar/watcher",
+    "src/raidar/harness/adapters",
+    "tests/test_claude_code_cli_adapter.py",
+    "tests/test_gemini_cli_adapter.py",
+]
+COVERAGE_FAIL_UNDER = "60"
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +96,20 @@ class RunCliOptions:
             repeat_parallel=self.repeat_parallel,
             retry_void=min(self.retry_void, 1),
         )
+
+
+@dataclass(frozen=True, slots=True)
+class SuiteExecutionResult:
+    """Canonical suite execution outcome for suite and matrix flows."""
+
+    task_path: Path
+    task_name: str
+    task_version: str
+    runs: list[EvalRun]
+    retries_used: int
+    suite_json_path: Path | None = None
+    summary_path: Path | None = None
+    analysis_path: Path | None = None
 
 
 def _cleanup_stale_harbor_before_runs() -> None:
@@ -247,9 +269,17 @@ def _build_harness_config(options: RunCliOptions) -> HarnessConfig:
     )
 
 
-def _execution_id(task_name: str, task_version: str, started_at: datetime) -> str:
+def _execution_id(
+    task_name: str,
+    task_version: str,
+    started_at: datetime,
+    execution_suffix: str | None = None,
+) -> str:
     task_slug = task_name.lower().replace(" ", "-")
-    return f"{started_at.strftime('%Y%m%d-%H%M%SZ')}__{task_slug}__{task_version}"
+    base = f"{started_at.strftime('%Y%m%d-%H%M%SZ')}__{task_slug}__{task_version}"
+    if not execution_suffix:
+        return base
+    return f"{base}__{execution_suffix}"
 
 
 def _build_run_request(
@@ -313,34 +343,76 @@ def _echo_suite_result(
         )
 
 
-def _execute_run_options(options: RunCliOptions, *, force_suite_summary: bool) -> None:
-    resolved = options.resolved()
-    _cleanup_stale_harbor_before_runs()
-
+def _prepared_run_request(
+    resolved: RunCliOptions,
+    *,
+    execution_suffix: str | None,
+) -> tuple[TaskDefinition, datetime, Path, RunRequest]:
     task_def = load_task(resolved.task)
     started_at = datetime.now(UTC)
-    execution_id = _execution_id(task_def.name, task_def.version, started_at)
+    execution_id = _execution_id(
+        task_def.name,
+        task_def.version,
+        started_at,
+        execution_suffix=execution_suffix,
+    )
     execution_dir = EVALS_ROOT / execution_id
     request = _build_run_request(resolved, task_def, execution_dir)
-    _echo_run_header(resolved, request.task.name)
+    return task_def, started_at, execution_dir, request
 
-    click.echo("Running task...")
+
+def _execute_repeat_runs(
+    *,
+    request: RunRequest,
+    repeats: int,
+    repeat_parallel: int,
+    retry_void: int,
+) -> tuple[list[EvalRun], int, int]:
     try:
-        runs, retries_used, unresolved_void = _run_with_void_retries(
+        return _run_with_void_retries(
             request=request,
-            repeats=max(1, resolved.repeats),
-            repeat_parallel=resolved.repeat_parallel,
-            retry_void=resolved.retry_void,
+            repeats=max(1, repeats),
+            repeat_parallel=repeat_parallel,
+            retry_void=retry_void,
         )
     except Exception as exc:
         raise click.ClickException(str(exc)) from exc
 
-    if resolved.repeats == 1 and not force_suite_summary:
-        _echo_single_run_result(runs[0])
-        return
 
+def _single_run_execution_result(
+    *,
+    resolved: RunCliOptions,
+    task_def: TaskDefinition,
+    runs: list[EvalRun],
+    retries_used: int,
+    echo: bool,
+) -> SuiteExecutionResult:
+    if echo:
+        _echo_single_run_result(runs[0])
+    return SuiteExecutionResult(
+        task_path=resolved.task,
+        task_name=task_def.name,
+        task_version=task_def.version,
+        runs=runs,
+        retries_used=retries_used,
+    )
+
+
+def _persist_suite_execution(
+    *,
+    resolved: RunCliOptions,
+    request: RunRequest,
+    task_def: TaskDefinition,
+    execution_dir: Path,
+    started_at: datetime,
+    runs: list[EvalRun],
+    retries_used: int,
+    unresolved_void: int,
+    echo: bool,
+) -> SuiteExecutionResult:
     suite_summary = create_repeat_suite_summary(
         task_name=request.task.name,
+        task_version=request.task.version,
         harness=resolved.agent,
         model=resolved.model,
         metric_profile=task_metric_profile(request.task),
@@ -356,7 +428,67 @@ def _execute_run_options(options: RunCliOptions, *, force_suite_summary: bool) -
     suite_json_path, summary_path, analysis_path = persist_repeat_suite(
         execution_dir, suite_summary
     )
-    _echo_suite_result(suite_json_path, summary_path, analysis_path, retries_used, runs)
+    if echo:
+        _echo_suite_result(suite_json_path, summary_path, analysis_path, retries_used, runs)
+    return SuiteExecutionResult(
+        task_path=resolved.task,
+        task_name=task_def.name,
+        task_version=task_def.version,
+        runs=runs,
+        retries_used=retries_used,
+        suite_json_path=suite_json_path,
+        summary_path=summary_path,
+        analysis_path=analysis_path,
+    )
+
+
+def _execute_run_options(
+    options: RunCliOptions,
+    *,
+    force_suite_summary: bool,
+    cleanup_before_runs: bool,
+    echo: bool,
+    execution_suffix: str | None = None,
+) -> SuiteExecutionResult:
+    resolved = options.resolved()
+    if cleanup_before_runs:
+        _cleanup_stale_harbor_before_runs()
+
+    task_def, started_at, execution_dir, request = _prepared_run_request(
+        resolved,
+        execution_suffix=execution_suffix,
+    )
+    if echo:
+        _echo_run_header(resolved, request.task.name)
+        click.echo("Running task...")
+
+    runs, retries_used, unresolved_void = _execute_repeat_runs(
+        request=request,
+        repeats=resolved.repeats,
+        repeat_parallel=resolved.repeat_parallel,
+        retry_void=resolved.retry_void,
+    )
+
+    if resolved.repeats == 1 and not force_suite_summary:
+        return _single_run_execution_result(
+            resolved=resolved,
+            task_def=task_def,
+            runs=runs,
+            retries_used=retries_used,
+            echo=echo,
+        )
+
+    return _persist_suite_execution(
+        resolved=resolved,
+        request=request,
+        task_def=task_def,
+        execution_dir=execution_dir,
+        started_at=started_at,
+        runs=runs,
+        retries_used=retries_used,
+        unresolved_void=unresolved_void,
+        echo=echo,
+    )
 
 
 def _repo_paths_from_git_cmd(args: list[str]) -> list[str]:
@@ -648,7 +780,12 @@ def run(
         repeat_parallel=repeat_parallel,
         retry_void=retry_void,
     )
-    _execute_run_options(options, force_suite_summary=False)
+    _execute_run_options(
+        options,
+        force_suite_summary=False,
+        cleanup_before_runs=True,
+        echo=True,
+    )
 
 
 @main.group()
@@ -721,7 +858,12 @@ def suite_run(
         repeat_parallel=repeat_parallel,
         retry_void=retry_void,
     )
-    _execute_run_options(options, force_suite_summary=True)
+    _execute_run_options(
+        options,
+        force_suite_summary=True,
+        cleanup_before_runs=True,
+        echo=True,
+    )
 
 
 @main.group()
@@ -765,7 +907,29 @@ def quality_gates(fix: bool, stage: bool) -> None:
         )
 
     _run_or_raise(["lizard", "-C", "10", "-l", "python", "src"], ORCHESTRATOR_ROOT)
+    _run_or_raise(
+        [sys.executable, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
+        ORCHESTRATOR_ROOT,
+    )
     _run_or_raise([sys.executable, "-m", "pytest", "tests", "-x", "--tb=short"], ORCHESTRATOR_ROOT)
+    _run_or_raise(
+        [sys.executable, "-m", "pytest", INTEGRATION_TEST_TARGET, "-x", "--tb=short"],
+        ORCHESTRATOR_ROOT,
+    )
+    _run_or_raise(
+        [
+            sys.executable,
+            "-m",
+            "pytest",
+            "tests",
+            "--cov=src",
+            "--cov-report=term-missing:skip-covered",
+            f"--cov-fail-under={COVERAGE_FAIL_UNDER}",
+            "-x",
+            "--tb=short",
+        ],
+        ORCHESTRATOR_ROOT,
+    )
 
     if stage:
         _run_or_raise(["git", "-C", str(REPO_ROOT), "add", "-u"], REPO_ROOT)
@@ -1248,11 +1412,14 @@ def inject(
     is_flag=True,
     help="Show matrix entries without running",
 )
-def matrix(task: tuple[Path, ...], config: Path, parallel: int, dry_run: bool) -> None:
-    """Run evaluation matrix from configuration."""
-    _cleanup_stale_harbor_before_runs()
-    from .comparison.matrix_runner import MatrixRunner
-    from .matrix import MatrixEntry, generate_matrix_entries, load_matrix_config
+def matrix(
+    task: tuple[Path, ...],
+    config: Path,
+    parallel: int,
+    dry_run: bool,
+) -> None:
+    """Run repeat-suite matrix from configuration."""
+    from .matrix import MatrixConfig, MatrixEntry, generate_matrix_entries, load_matrix_config
 
     task_paths = tuple(path.resolve() for path in task)
     if not task_paths:
@@ -1260,106 +1427,133 @@ def matrix(task: tuple[Path, ...], config: Path, parallel: int, dry_run: bool) -
     task_defs = _load_matrix_tasks(task_paths)
 
     click.echo(f"Loading matrix from {config}")
-    matrix_config = load_matrix_config(config)
+    matrix_config: MatrixConfig = load_matrix_config(config)
     entries: list[MatrixEntry] = generate_matrix_entries(matrix_config)
-    total_entries = len(entries)
+    total_entries = len(entries) * len(task_defs)
     click.echo(
-        f"Matrix defined for {len(matrix_config.runs)} harness/model pairs ({total_entries} runs)"
+        f"Matrix defined for {len(matrix_config.runs)} harness/model pairs ({total_entries} suites)"
     )
 
-    runner = MatrixRunner(
-        tasks_dir=task_paths[0].parent,
-        evals_dir=Path(matrix_config.evals_path),
+    suite_config = matrix_config.suite
+    click.echo(
+        "Suite settings: "
+        f"timeout={suite_config.timeout_sec}s, repeats={suite_config.repeats}, "
+        f"repeat_parallel={suite_config.repeat_parallel}, retry_void={suite_config.retry_void}"
     )
 
-    if len(task_defs) == 1:
-        _run_single_task_matrix(
-            runner=runner,
+    if dry_run:
+        _echo_matrix_dry_run(
             task_defs=task_defs,
-            matrix_config=matrix_config,
-            parallel=parallel,
-            dry_run=dry_run,
+            entries=entries,
+            repeats=suite_config.repeats,
         )
         return
 
-    _run_multi_task_matrix(
-        runner=runner,
-        task_defs=task_defs,
-        entries=entries,
+    _cleanup_stale_harbor_before_runs()
+    jobs = [(task_path, task_def, entry) for task_path, task_def in task_defs for entry in entries]
+    successes, failures = _run_matrix_jobs(
+        jobs=jobs,
+        suite_config=suite_config,
         parallel=parallel,
-        dry_run=dry_run,
     )
 
+    click.echo(f"Matrix completed: {successes} suites succeeded, {failures} suites failed.")
 
-def _load_matrix_tasks(task_paths: tuple[Path, ...]) -> list[tuple[Path, object]]:
-    task_defs: list[tuple[Path, object]] = []
+
+def _load_matrix_tasks(task_paths: tuple[Path, ...]) -> list[tuple[Path, TaskDefinition]]:
+    task_defs: list[tuple[Path, TaskDefinition]] = []
     for task_path in task_paths:
         click.echo(f"Loading task from {task_path}")
         task_defs.append((task_path, load_task(task_path)))
     return task_defs
 
 
-def _run_single_task_matrix(
+def _echo_matrix_dry_run(
     *,
-    runner,
-    task_defs: list[tuple[Path, object]],
-    matrix_config,
-    parallel: int,
-    dry_run: bool,
+    task_defs: list[tuple[Path, TaskDefinition]],
+    entries: list[object],
+    repeats: int,
 ) -> None:
-    task_path, task_def = task_defs[0]
-    report = runner.run_matrix(
-        task=task_def,
-        matrix_config=matrix_config,
-        parallel=parallel,
-        dry_run=dry_run,
-    )
-    click.echo(
-        f"Matrix completed ({task_path.name}): "
-        f"{report.successful_runs} successes, {report.failed_runs} failures."
+    for _task_path, task_def in task_defs:
+        for entry in entries:
+            click.echo(
+                f"[dry-run] {task_def.name}@{task_def.version}: "
+                f"{entry.harness}/{entry.model} x{repeats}"
+            )
+
+
+def _matrix_job_options(
+    *,
+    task_path: Path,
+    entry: object,
+    suite_config: object,
+) -> RunCliOptions:
+    return RunCliOptions(
+        task=task_path,
+        agent=entry.harness,
+        model=entry.model,
+        timeout=suite_config.timeout_sec,
+        repeats=suite_config.repeats,
+        repeat_parallel=suite_config.repeat_parallel,
+        retry_void=suite_config.retry_void,
     )
 
 
-def _run_multi_task_matrix(
+def _run_matrix_jobs(
     *,
-    runner,
-    task_defs: list[tuple[Path, object]],
-    entries,
+    jobs: list[tuple[Path, TaskDefinition, object]],
+    suite_config: object,
     parallel: int,
-    dry_run: bool,
-) -> None:
-    configs = [entry.to_harness_config() for entry in entries]
-    jobs = [(task_path, task_def, cfg) for task_path, task_def in task_defs for cfg in configs]
-    click.echo(
-        f"Running multi-task matrix: {len(task_defs)} tasks × {len(configs)} configs = "
-        f"{len(jobs)} runs with parallel={parallel}"
-    )
+) -> tuple[int, int]:
     successes = 0
     failures = 0
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as executor:
-        future_to_task = {
-            executor.submit(
-                runner.run_single,
-                task_def,
-                cfg,
-                task_path.parent,
-                dry_run,
-            ): task_path
-            for task_path, task_def, cfg in jobs
-        }
-        for future in concurrent.futures.as_completed(future_to_task):
-            task_path = future_to_task[future]
-            try:
-                result = future.result()
-            except Exception as exc:
-                click.echo(f"[{task_path.stem}] failed: {exc}")
-                failures += 1
-                continue
-            if result.scorecard is not None:
+
+    def _run_matrix_job(job: tuple[Path, TaskDefinition, object]) -> SuiteExecutionResult:
+        task_path, _task_def, entry = job
+        options = _matrix_job_options(
+            task_path=task_path,
+            entry=entry,
+            suite_config=suite_config,
+        )
+        return _execute_run_options(
+            options,
+            force_suite_summary=True,
+            cleanup_before_runs=False,
+            echo=False,
+            execution_suffix=f"{entry.harness}__{entry.model.replace('/', '-')}",
+        )
+
+    if parallel > 1:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as executor:
+            future_map = {executor.submit(_run_matrix_job, job): job for job in jobs}
+            for future in concurrent.futures.as_completed(future_map):
+                _task_path, task_def, entry = future_map[future]
+                try:
+                    result = future.result()
+                except Exception as exc:
+                    click.echo(f"[{task_def.name}] {entry.harness}/{entry.model} failed: {exc}")
+                    failures += 1
+                    continue
                 successes += 1
-            elif result.error is not None:
-                failures += 1
-    click.echo(f"Multi-task matrix completed: {successes} successes, {failures} failures.")
+                click.echo(
+                    f"[{task_def.name}] {entry.harness}/{entry.model} -> {result.summary_path}"
+                )
+        return successes, failures
+
+    for task_path, task_def, entry in jobs:
+        click.echo(
+            f"Running suite: {task_def.name}@{task_def.version} {entry.harness}/{entry.model}"
+        )
+        try:
+            result = _run_matrix_job((task_path, task_def, entry))
+        except Exception as exc:
+            click.echo(f"[{task_def.name}] {entry.harness}/{entry.model} failed: {exc}")
+            failures += 1
+            continue
+        successes += 1
+        click.echo(f"[{task_def.name}] suite summary: {result.summary_path}")
+
+    return successes, failures
 
 
 @main.command()
