@@ -2,13 +2,13 @@
 
 ## Objective
 
-Reduce orchestrator and harness startup latency for local runs while preserving eval validity.
+Reduce orchestrator and agent startup latency for local runs while preserving experiment validity.
 
 ## Hard Constraints
 
-1. Do not invalidate evals.
+1. Do not invalidate experiments.
 2. Keep canonical scoring behavior unchanged.
-3. Preserve module-driven metric semantics (`metrics.modules[]`, `metric_profile`, `scores.modules[]`) across optimization paths.
+3. Preserve metric-driven semantics (`metrics[]`, `evaluation_profile`, `scores.metric_results[]`) across optimization paths.
 4. Do not increase local parallelism or local fan-out.
 5. Keep per-run workspace and artifact isolation semantics.
 
@@ -28,7 +28,7 @@ Reviewed latest commits on `main` as of March 1, 2026:
 
 ## What Is Already Implemented (From History)
 
-1. Adapter-level provider probe hook is implemented (`provider_probe()` in harness adapters).
+1. Adapter-level provider probe hook is implemented in agent adapters.
 2. Provider preflight execution and failure classification are implemented.
 3. Provider preflight caching exists in `.preflight-cache` and is lock-guarded for the cache key.
 4. Provider preflight is integrated into `_prepare_workspace_phase`.
@@ -46,7 +46,7 @@ Status note: this reduces wasted expensive runs when provider auth/billing/netwo
 1. Detailed phase timing for non-Harbor orchestration overhead.
 2. Cleanup cadence optimization (avoid running expensive stale cleanup on every run prep by default).
 3. Shared content-addressed preflight cache across execution directories.
-4. Scaffold preflight lock symmetry (provider preflight has lock; scaffold preflight should match).
+4. Starter preflight lock symmetry (provider preflight has lock; starter preflight should match).
 5. Immutable cache strategy for Harbor bundle static segments.
 6. `runner.py` modularization to reduce fan-out and blast radius.
 7. Retry policy improvement (replace fixed sleep with bounded exponential backoff + jitter and telemetry).
@@ -59,7 +59,7 @@ Status note: this reduces wasted expensive runs when provider auth/billing/netwo
    - `initialize_run`
    - `prepare_run_context`
    - `provider_preflight`
-   - `scaffold_preflight`
+   - `starter_preflight`
    - Harbor bundle build
    - evidence capture/hydration/diff
 2. Keep provider preflight enabled, but explicitly record probe duration and cache hit/miss in run metadata.
@@ -69,19 +69,19 @@ Status note: this reduces wasted expensive runs when provider auth/billing/netwo
 Acceptance:
 
 1. Canonical parity unchanged.
-2. Lower median and p95 `harness_overhead_sec`.
+2. Lower median and p95 `agent_overhead_sec`.
 3. No increase in void rate due to orchestration changes.
 
 ## P1: Safe Reuse Without Eval Contamination
 
-1. Promote preflight caches (provider + scaffold) from execution-local to shared content-addressed cache keys.
+1. Promote preflight caches (provider + starter) from execution-local to shared content-addressed cache keys.
 2. Include immutable invalidation inputs:
-   - task yaml hash
-   - scaffold fingerprint
+   - scenario yaml hash
+   - starter fingerprint
    - lockfile hash
    - required command list
-   - harness/model
-3. Add scaffold preflight lock symmetry for duplicate-call prevention.
+   - agent/model
+3. Add starter preflight lock symmetry for duplicate-call prevention.
 4. Cache Harbor bundle static segments (`environment`, `tests`) by fingerprint while preserving per-run mutable workspace materialization.
 
 Acceptance:
@@ -110,10 +110,10 @@ Acceptance:
 1. Add `CODEOWNERS` for orchestrator subdomains.
 2. Add parity tests that compare optimized path outputs against canonical baselines.
 3. Add regression tests for cache key invalidation behavior.
-4. Add parity assertions for module-era fields:
-   - run/suite `metric_profile`
-   - suite `metric_modules`
-   - run `scores.modules[]` payload integrity
+4. Add parity assertions for canonical metric fields:
+   - run/experiment `evaluation_profile`
+   - experiment `metrics`
+   - run `scores.metric_results[]` payload integrity
 
 Acceptance:
 
@@ -127,7 +127,7 @@ Acceptance:
 
 ## Eval Validity Guardrails
 
-1. Canonical mode remains default for official evals.
+1. Canonical mode remains default for official experiments.
 2. Any non-canonical fast mode must be explicit and never used for official score reporting.
 3. Reuse only immutable, fingerprinted assets.
 4. Never reuse mutable run workspace state across runs.
@@ -135,8 +135,8 @@ Acceptance:
 ## Suggested Next Implementation Slice
 
 1. Implement P0 timing instrumentation first.
-2. Add provider/scaffold cache hit/miss telemetry.
-3. Re-baseline with existing eval suite and compare:
+2. Add provider/starter cache hit/miss telemetry.
+3. Re-baseline with the existing experiment matrix and compare:
    - startup-to-agent-execution latency
-   - `harness_overhead_sec`
+   - `agent_overhead_sec`
    - parity outputs

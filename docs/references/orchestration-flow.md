@@ -1,76 +1,81 @@
 # Raidar Orchestration Flow
 
-End-to-end flow for task execution, Harbor runtime orchestration, and scoring output.
+End-to-end flow for scenario execution, Harbor runtime orchestration, and experiment artifacts.
 
-## 1. Task Definition Resolution
+## 1. Scenario Resolution
 
-1. Select a versioned task file: `tasks/<task-name>/v###/task.yaml`.
-2. Load task schema (`TaskDefinition`) with:
+1. Select a versioned scenario file: `scenarios/<scenario-name>/v###/scenario.yaml`.
+2. Load `ScenarioDefinition` with:
    - `name`
-   - `version`
-   - `scaffold.root` (task-local scaffold path)
-   - `prompt.entry` + optional `prompt.includes`
-3. Resolve scaffold from task version directory (`task_dir / scaffold.root`).
-4. Copy scaffold into per-repeat workspace and inject a single ruleset from `tasks/<task>/v###/rules/`.
+   - `scenario_revision`
+   - `starter.root`
+   - `prompt.entry` and optional `prompt.includes`
+   - `verification`
+   - `acceptance`
+   - ordered `metrics`
+3. Resolve the starter from the scenario revision directory (`scenario_dir / starter.root`).
+4. Copy the starter into the run workspace and inject one rules file from `scenarios/<scenario>/v###/rules/`.
 
-## 2. Execution Layout (Single Top-Level Root)
+## 2. Execution Layout
 
-Every suite/run writes to one execution root:
+Each experiment writes to one execution root:
 
-`evals/<timestamp>__<task>__<version>/`
+`experiments/<timestamp>__<scenario>__<revision>__<agent>__<model>__xN/`
 
 Inside that root:
-- `workspace/baseline/`: prepared scaffold baseline snapshot used by all runs in the suite.
-- `runs/`: canonical run artifacts (`run-01`, `run-02`, ... each with `workspace/`, `agent/`, `verifier/`, `harbor/`, `run.json`, `summary.md`, `homepage-pre.png`, `homepage-post.png`).
-- `suite.json`: full suite record (source of truth).
-- `suite-summary.json`: suite aggregate output.
-- `analysis.md`: suite-level human summary.
+- `workspace/baseline/`: prepared starter baseline snapshot shared by the experiment runs.
+- `runs/`: canonical run artifacts (`run-01`, `run-02`, ... each with `workspace/`, `agent/`, `verifier/`, `harbor/`, `run.json`, `report.md`, and any captured evidence).
+- `experiment.json`: full experiment record.
+- `experiment-summary.json`: aggregate experiment output.
+- `report.md`: human-readable experiment summary.
 
 ## 3. Run Lifecycle
 
-1. CLI command (`run` or `suite run`) builds `RunRequest` from task + harness config.
-2. Runner prepares workspace, validates scaffold preflight commands, and builds Harbor task bundle.
-3. Runner captures `homepage-pre.png` after preflight passes and before Harbor task execution.
-4. Harbor executes the adapter/model pair.
-5. Runner hydrates workspace from `final-app.tar.gz`, captures `homepage-post.png`, then prunes transient workspace folders (`node_modules`, `.next`, etc.).
+1. CLI command (`experiment run` or `matrix`) builds `RunRequest` from scenario + agent config.
+2. Runner prepares the workspace, validates starter preflight commands, and builds the Harbor scenario bundle.
+3. Runner captures any configured pre-run evidence after preflight succeeds.
+4. Harbor executes the agent/model pair.
+5. Runner hydrates the workspace from `final-app.tar.gz`, captures post-run evidence, then prunes transient workspace folders (`node_modules`, `.next`, etc.).
 6. Verifier artifacts are loaded and normalized into score outputs.
-7. Scorecard metadata persists run pointers, process metrics, scaffold fingerprints, evidence pointers, and prune metadata.
+7. Scorecard metadata persists run pointers, process metrics, starter fingerprints, evidence pointers, and prune metadata.
 
 ## 4. Scoring Pipeline
 
-Task scoring capability is module-driven from `task.yaml -> metrics.modules[]`.
+Scenario scoring capability is defined by ordered `scenario.yaml -> metrics[]`.
 
 Core score outputs:
 - `functional`
-- `compliance`
+- `acceptance`
 - `visual` (optional)
-- `efficiency`
-- `coverage`
-- `requirements`
-- hard gates: `run_validity`, `performance_gates`
-- ranking metric: `optimization`
+- `verification_stability`
+- `test_coverage`
+- `requirements_coverage`
+- hard gates: `execution_validity`, `performance_gates`
+- ranking metric: `resource_efficiency`
 
-Module output:
-- `modules[]` in verifier scorecard and run scorecard metadata (for example `artifact_presence`).
-- Current module behavior is audit-only unless explicitly wired into gates/ranking.
+Metric output:
+- `metric_results[]` in verifier scorecards and persisted run scorecards.
+- `artifact-checks` is audit-only unless an experiment contract explicitly makes it gating.
 
-Profile:
-- `metric_profile` is derived from ordered modules as `v2:<module-id>+...`.
-- Persisted in `run.json` config and suite config (`suite.json`, `suite-summary.json`).
+Evaluation profile:
+- `evaluation_profile` is derived from ordered metrics as `v2:<metric-id>+...`.
+- Persisted in `run.json` config and experiment config.
 
-`composite_score` is gated (voided/invalid runs score `0.0`).
+`composite_score` is gated: unscored or execution-invalid runs score `0.0`.
 
-## 5. Reporting and Analysis Inputs
+## 5. Canonical Analysis Inputs
 
-Canonical artifact paths for analysis:
-- `evals/*/suite.json`
-- `evals/*/suite-summary.json`
-- `evals/*/runs/*/run.json`
-- `evals/*/runs/*/verifier/scorecard.json`
-- `evals/*/runs/*/agent/*.txt`
+Use these artifact paths for human or automated review:
+- `experiments/*/experiment.json`
+- `experiments/*/experiment-summary.json`
+- `experiments/*/report.md`
+- `experiments/*/runs/*/run.json`
+- `experiments/*/runs/*/verifier/scorecard.json`
+- `experiments/*/runs/*/verifier/execution-validity.json`
+- `experiments/*/runs/*/agent/*.txt`
 
 ## 6. Cleanup Lifecycle
 
-`uv run --project orchestrator raidar evals prune`:
-- prunes eval suite roots per model via `--keep-per-model` (default `1`).
+`make experiments-prune`:
+- prunes older experiment roots per model via `KEEP_PER_MODEL`.
 - archives pruned artifacts under `/tmp/raidar-archive/<timestamp>/` by default.

@@ -12,14 +12,14 @@ Goal: support Codex CLI usage in Harbor with secure non-interactive authenticati
 
 1. Interactive OAuth inside Harbor containers is not practical.
 2. Long-lived tokens should not be persisted in repository artifacts.
-3. Any auth workflow must remain deterministic for benchmark repeatability.
+3. Any auth workflow must remain deterministic for experiment repeatability.
 
 ## Recommended Path
 
 ### Phase 1 (Documentation + Safe Workflow)
 
 1. Document short-lived token workflow for local export before run.
-2. Keep primary documented path as `OPENAI_API_KEY` for Codex harness stability.
+2. Keep primary documented path as `OPENAI_API_KEY` for Codex agent stability.
 3. Add explicit teardown guidance (unset env vars after runs).
 
 ### Phase 2 (Optional UX)
@@ -34,7 +34,7 @@ Goal: support Codex CLI usage in Harbor with secure non-interactive authenticati
 
 ## Validation Checklist
 
-- `uv run raidar provider validate --agent codex-cli --model codex/gpt-5.2-high`
+- `make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high`
 - `./scripts/run-provider-smoke.sh --agent codex-cli --model codex/gpt-5.2-high`
 
 ## Status
