@@ -1,6 +1,6 @@
 # Command Surface
 
-This repo is migrating to a scenario/experiment command model.
+This repo uses the scenario/experiment command model.
 
 ## Target Public Surface
 
@@ -31,4 +31,3 @@ These remain implementation details behind the public surface:
 
 - Scenario fixtures now live under `scenarios/` and use `scenario.yaml`.
 - Experiment artifacts now live under `experiments/`.
-- The current `Makefile` still exposes legacy target names. Keep docs and tests aligned to the migrated contract, but treat that mismatch as an outstanding production follow-up.

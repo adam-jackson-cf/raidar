@@ -330,8 +330,8 @@ class ExecutionPhaseResult:
 class PersistedArtifacts:
     """Persisted artifact metadata used for score synthesis."""
 
-    scaffold_meta: dict
-    task_version_meta: dict[str, str | None]
+    starter_meta: dict
+    scenario_revision_meta: dict[str, str | None]
     verifier_artifacts: dict[str, str]
     agent_artifacts: dict[str, str]
     harbor_artifacts: dict[str, str]
@@ -956,26 +956,26 @@ def _is_registry_rate_limited(run_harbor_dir: Path) -> bool:
 
 def prepare_workspace(
     *,
-    scaffold_dir: Path,
+    starter_dir: Path,
     target_dir: Path,
     scenario_dir: Path,
     agent: str,
 ) -> tuple[Path, Path | None]:
-    """Prepare workspace by copying scaffold and injecting rules.
+    """Prepare workspace by copying the starter and injecting rules.
 
     Args:
-        scaffold_dir: Path to resolved scaffold template/version
+        starter_dir: Path to resolved starter template/version
         target_dir: Path to create workspace
-        scenario_dir: Path to task directory (contains rules/)
+        scenario_dir: Path to scenario directory (contains rules/)
         agent: Agent name for rule file selection
     Returns:
         Tuple of workspace path and injected rules file (if any)
     """
-    # Copy scaffold to target
+    # Copy the starter into the run workspace.
     if target_dir.exists():
         shutil.rmtree(target_dir)
     shutil.copytree(
-        scaffold_dir,
+        starter_dir,
         target_dir,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
@@ -1004,15 +1004,13 @@ def _load_baseline_scripts(starter_source: StarterSource) -> dict[str, str]:
     return {str(key): str(value) for key, value in scripts.items()}
 
 
-def _task_spec_metrics_block(request: RunRequest) -> dict[str, Any]:
-    return {
-        "metrics": [
-            metric.model_dump(mode="json", exclude_none=True) for metric in request.scenario.metrics
-        ]
-    }
+def _scenario_spec_metrics_block(request: RunRequest) -> list[dict[str, Any]]:
+    return [
+        metric.model_dump(mode="json", exclude_none=True) for metric in request.scenario.metrics
+    ]
 
 
-def _task_spec_verification_block(request: RunRequest) -> dict[str, Any]:
+def _scenario_spec_verification_block(request: RunRequest) -> dict[str, Any]:
     return {
         "max_gate_failures": request.scenario.verification.max_gate_failures,
         "coverage_threshold": request.scenario.verification.coverage_threshold,
@@ -1028,7 +1026,7 @@ def _task_spec_verification_block(request: RunRequest) -> dict[str, Any]:
     }
 
 
-def _task_spec_compliance_block(request: RunRequest) -> dict[str, Any]:
+def _scenario_spec_acceptance_block(request: RunRequest) -> dict[str, Any]:
     return {
         "deterministic_checks": [
             {
@@ -1054,7 +1052,7 @@ def _task_spec_compliance_block(request: RunRequest) -> dict[str, Any]:
     }
 
 
-def _task_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
+def _scenario_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
     if request.scenario.visual is None:
         return None
     return {
@@ -1064,7 +1062,7 @@ def _task_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
     }
 
 
-def _task_spec_weights_block() -> dict[str, float]:
+def _scenario_spec_weights_block() -> dict[str, float]:
     return {
         "functional": settings.weights.functional,
         "acceptance": settings.weights.acceptance,
@@ -1073,20 +1071,20 @@ def _task_spec_weights_block() -> dict[str, float]:
     }
 
 
-def _build_verifier_task_spec(request: RunRequest, context: WorkspaceContext) -> dict:
+def _build_verifier_scenario_spec(request: RunRequest, context: WorkspaceContext) -> dict:
     return {
         "scenario_name": request.scenario.name,
-        "metrics": _task_spec_metrics_block(request),
-        "verification": _task_spec_verification_block(request),
-        "acceptance": _task_spec_compliance_block(request),
-        "visual": _task_spec_visual_block(request),
-        "weights": _task_spec_weights_block(),
+        "metrics": _scenario_spec_metrics_block(request),
+        "verification": _scenario_spec_verification_block(request),
+        "acceptance": _scenario_spec_acceptance_block(request),
+        "visual": _scenario_spec_visual_block(request),
+        "weights": _scenario_spec_weights_block(),
         "baseline_scripts": _load_baseline_scripts(context.starter_source),
     }
 
 
 def _verifier_script_template_path() -> Path:
-    return Path(__file__).parent / "assets" / "verifier-score-task.mjs"
+    return Path(__file__).parent / "assets" / "verifier-score-scenario.mjs"
 
 
 def _verifier_scorer_script() -> str:
@@ -1276,7 +1274,7 @@ def _render_task_toml(request: RunRequest, task_image: str | None) -> str:
 
 [metadata]
 name = "{request.scenario.name}"
-source = "scaffold-spec"
+source = "starter-spec"
 
 [verifier]
 timeout_sec = 300.0
@@ -1332,10 +1330,10 @@ RUN bunx playwright install chromium
 def _write_verifier_artifacts(
     request: RunRequest, context: WorkspaceContext, tests_dir: Path
 ) -> None:
-    (tests_dir / "task-spec.json").write_text(
-        json.dumps(_build_verifier_task_spec(request, context), indent=2)
+    (tests_dir / "scenario-spec.json").write_text(
+        json.dumps(_build_verifier_scenario_spec(request, context), indent=2)
     )
-    scorer_path = tests_dir / "score-task.mjs"
+    scorer_path = tests_dir / "score-scenario.mjs"
     scorer_path.write_text(_verifier_scorer_script())
     scorer_path.chmod(0o755)
     test_script = tests_dir / "test.sh"
@@ -1351,7 +1349,7 @@ if [[ ! -d /app ]]; then
   exit 1
 fi
 
-if ! bun run "$SCRIPT_DIR/score-task.mjs" "$SCRIPT_DIR/task-spec.json"; then
+if ! bun run "$SCRIPT_DIR/score-scenario.mjs" "$SCRIPT_DIR/scenario-spec.json"; then
   echo "0" > /logs/verifier/reward.txt
 fi
 
@@ -1373,7 +1371,7 @@ def create_harbor_task_bundle(
     context: WorkspaceContext,
     bundle_root: Path,
 ) -> Path:
-    """Build a Harbor-compatible task directory from the scaffold workspace."""
+    """Build a Harbor-compatible bundle from the starter workspace."""
     bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(bundle_root)
     _copy_workspace_into_bundle(request, context, app_dir)
     prompt_text = _load_scenario_prompt(request.scenario, request.scenario_dir)
@@ -1467,7 +1465,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
 
 
 def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
-    """Execute Harbor against a local task bundle."""
+    """Execute Harbor against a local scenario bundle."""
     request.jobs_dir.mkdir(parents=True, exist_ok=True)
     job_name = f"orchestrator-{request.run_id}"
     job_dir = request.jobs_dir / job_name
@@ -1853,7 +1851,7 @@ def build_scenario_revision_meta(
 def persist_verifier_artifacts(
     harbor_result: HarborExecutionResult, verifier_dir: Path
 ) -> dict[str, str]:
-    """Persist verifier outputs for run/task audits."""
+    """Persist verifier outputs for run and scenario audits."""
     if not harbor_result.trial_dir:
         return {}
     source_dir = harbor_result.trial_dir / "verifier"
@@ -1864,7 +1862,7 @@ def persist_verifier_artifacts(
     for filename in (
         "scorecard.json",
         "gate-history.json",
-        "run-validity.json",
+        "execution-validity.json",
         "performance-gates.json",
         "reward.txt",
         "test-stdout.txt",
@@ -1992,20 +1990,20 @@ def write_run_analysis(
     layout.analysis_path.write_text("\n".join(lines) + "\n")
 
 
-def _agent_event_stream_pointer(agent_dir: Path, harness: str) -> Path:
-    if harness == "codex-cli":
+def _agent_event_stream_pointer(agent_dir: Path, agent: str) -> Path:
+    if agent == "codex-cli":
         return agent_dir / "codex.txt"
-    if harness == "claude-code":
+    if agent == "claude-code":
         return agent_dir / "commands"
-    if harness == "gemini":
+    if agent == "gemini":
         return agent_dir / "commands"
-    if harness == "cursor":
+    if agent == "cursor":
         return agent_dir / "commands"
-    if harness == "copilot":
+    if agent == "copilot":
         return agent_dir / "commands"
-    if harness == "pi":
+    if agent == "pi":
         return agent_dir / "commands"
-    raise ValueError(f"Unsupported harness for artifact summary: {harness}")
+    raise ValueError(f"Unsupported agent for artifact summary: {agent}")
 
 
 def _read_jsonl_dicts(path: Path) -> list[dict]:
@@ -2302,19 +2300,19 @@ def _usage_from_gemini_trajectory(trial_dir: Path) -> tuple[int, int, int] | Non
     return input_tokens, cached_tokens, output_tokens
 
 
-def _usage_tuple_for_harness(trial_dir: Path, harness: str) -> tuple[int, int, int] | None:
+def _usage_tuple_for_agent(trial_dir: Path, agent: str) -> tuple[int, int, int] | None:
     trial_usage = _usage_from_trial_result(trial_dir)
     if trial_usage:
         return trial_usage
-    if harness == "codex-cli":
+    if agent == "codex-cli":
         return _usage_from_codex_log(trial_dir)
-    if harness == "claude-code":
+    if agent == "claude-code":
         return _usage_from_claude_log(trial_dir)
-    if harness == "gemini":
+    if agent == "gemini":
         return _usage_from_gemini_trajectory(trial_dir)
-    if harness in {"cursor", "copilot", "pi"}:
+    if agent in {"cursor", "copilot", "pi"}:
         return None
-    raise ValueError(f"Unsupported harness for usage extraction: {harness}")
+    raise ValueError(f"Unsupported agent for usage extraction: {agent}")
 
 
 def _command_output(item: dict) -> str:
@@ -2350,12 +2348,12 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
     return records
 
 
-def _command_records_for_harness(trial_dir: Path, harness: str) -> list[CommandRecord]:
-    if harness == "codex-cli":
+def _command_records_for_agent(trial_dir: Path, agent: str) -> list[CommandRecord]:
+    if agent == "codex-cli":
         return _command_records(_read_jsonl_dicts(trial_dir / "agent" / "codex.txt"))
-    if harness == "claude-code":
+    if agent == "claude-code":
         return _command_records_from_claude_stdout(trial_dir)
-    if harness == "gemini":
+    if agent == "gemini":
         stdout_records = _command_records_from_agent_stdout(
             trial_dir,
             additional_stdout_files=("gemini-cli.txt",),
@@ -2363,21 +2361,21 @@ def _command_records_for_harness(trial_dir: Path, harness: str) -> list[CommandR
         if stdout_records:
             return stdout_records
         return _command_records_from_gemini_trajectory(trial_dir)
-    if harness == "cursor":
+    if agent == "cursor":
         return _command_records_from_agent_stdout(trial_dir)
-    if harness == "copilot":
+    if agent == "copilot":
         return _command_records_from_agent_stdout(trial_dir)
-    if harness == "pi":
+    if agent == "pi":
         return _command_records_from_agent_stdout(trial_dir)
-    raise ValueError(f"Unsupported harness for command extraction: {harness}")
+    raise ValueError(f"Unsupported agent for command extraction: {agent}")
 
 
-def _harness_emits_structured_session_events(harness: str) -> bool:
-    if harness == "codex-cli":
+def _agent_emits_structured_trace_events(agent: str) -> bool:
+    if agent == "codex-cli":
         return True
-    if harness in {"claude-code", "gemini", "cursor", "copilot", "pi"}:
+    if agent in {"claude-code", "gemini", "cursor", "copilot", "pi"}:
         return False
-    raise ValueError(f"Unsupported harness for session event extraction: {harness}")
+    raise ValueError(f"Unsupported agent for trace event extraction: {agent}")
 
 
 def _command_records_from_agent_stdout(
@@ -2762,25 +2760,25 @@ def _first_pass_counts(first_pass_status: dict[str, str]) -> tuple[int, int, int
 
 
 def collect_process_metrics(
-    task: ScenarioDefinition,
+    scenario: ScenarioDefinition,
     trial_dir: Path | None,
     *,
-    harness: str,
+    agent: str,
 ) -> ProcessMetrics:
-    """Collect optimization metrics from harness agent logs."""
+    """Collect optimization metrics from agent execution logs."""
     if not trial_dir:
         return _empty_process_metrics()
 
-    usage_tuple = _usage_tuple_for_harness(trial_dir, harness)
+    usage_tuple = _usage_tuple_for_agent(trial_dir, agent)
     if usage_tuple is None:
         raise RuntimeError(
-            f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`."
+            f"Missing token usage metrics for agent `{agent}` in trial `{trial_dir}`."
         )
     input_tokens, cached_input_tokens, output_tokens = usage_tuple
     uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
 
-    records = _command_records_for_harness(trial_dir, harness)
-    verification_patterns = _verification_command_strings(task)
+    records = _command_records_for_agent(trial_dir, agent)
+    verification_patterns = _verification_command_strings(scenario)
     attempts_by_pattern, failures_by_pattern = _verification_attempts(
         records, verification_patterns
     )
@@ -2868,15 +2866,15 @@ def _events_from_item(timestamp: str, item: dict) -> list[TraceEvent]:
     ]
 
 
-def collect_session_events(
+def collect_trace_events(
     trial_dir: Path | None,
     *,
-    harness: str,
+    agent: str,
 ) -> list[TraceEvent]:
-    """Project harness logs into normalized session events."""
+    """Project agent logs into normalized trace events."""
     if not trial_dir:
         return []
-    if not _harness_emits_structured_session_events(harness):
+    if not _agent_emits_structured_trace_events(agent):
         return []
 
     events: list[TraceEvent] = []
@@ -3155,7 +3153,7 @@ def _upsert_gate_check(checks: list[GateCheck], candidate: GateCheck) -> None:
     checks.append(candidate)
 
 
-def build_run_validity_score(
+def build_execution_validity_score(
     *,
     outputs: EvaluationOutputs,
     terminated_early: bool,
@@ -3163,7 +3161,7 @@ def build_run_validity_score(
     process_metrics: ProcessMetrics,
     events: list[TraceEvent],
 ) -> ExecutionValidityScore:
-    """Build run-validity checks for the run."""
+    """Build execution-validity checks for the run."""
     checks = [check.model_copy(deep=True) for check in outputs.execution_validity.checks]
     _upsert_gate_check(
         checks,
@@ -3192,7 +3190,7 @@ def build_run_validity_score(
 
 
 def build_performance_gates_score(*, outputs: EvaluationOutputs) -> PerformanceGatesScore:
-    """Build performance-gate checks for scored task outcomes."""
+    """Build performance-gate checks for scored scenario outcomes."""
     checks = [check.model_copy(deep=True) for check in outputs.performance_gates.checks]
     return PerformanceGatesScore(checks=checks)
 
@@ -3214,7 +3212,7 @@ def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
 
 
 def _classify_void_reasons(terminated_early: bool, termination_reason: str | None) -> list[str]:
-    """Classify harness/provider issues that void a run and require repeat."""
+    """Classify agent/provider issues that void a run and require repeat."""
     if not terminated_early and not termination_reason:
         return []
 
@@ -3224,7 +3222,7 @@ def _classify_void_reasons(terminated_early: bool, termination_reason: str | Non
         ("compose_version_unsupported", ("unsupported docker compose version",)),
         ("provider_rate_limit", ("rate limit",)),
         ("provider_stream_disconnect", ("stream disconnected before completion",)),
-        ("harness_unavailable", ("harbor not installed",)),
+        ("agent_unavailable", ("harbor not installed",)),
         ("harbor_cli_failure", ("harbor exited with code",)),
         ("harbor_trial_exception", ("harbor trial exception",)),
     ]
@@ -3233,7 +3231,7 @@ def _classify_void_reasons(terminated_early: bool, termination_reason: str | Non
         if _contains_any(reason, patterns):
             reasons.append(code)
     if "codex turn failed" in reason and not reasons:
-        reasons.append("provider_or_harness_turn_failure")
+        reasons.append("provider_or_agent_turn_failure")
 
     return list(dict.fromkeys(reasons))
 
@@ -3256,7 +3254,7 @@ def _scorecard_harbor_metadata(
 ) -> dict[str, Any]:
     harbor_timings = _harbor_phase_timings(execution.harbor_result.trial_dir)
     trial_total_sec = harbor_timings.get("trial_total_sec")
-    harness_overhead_sec = (
+    agent_overhead_sec = (
         round(max(0.0, execution.duration_sec - trial_total_sec), 3)
         if trial_total_sec is not None
         else None
@@ -3270,7 +3268,7 @@ def _scorecard_harbor_metadata(
         "job_dir": str(execution.harbor_result.job_dir),
         "trial_dir": trial_dir,
         "phase_timings_sec": harbor_timings,
-        "harness_overhead_sec": harness_overhead_sec,
+        "agent_overhead_sec": agent_overhead_sec,
         "artifacts": artifacts.harbor_artifacts,
     }
 
@@ -3322,8 +3320,8 @@ def _scorecard_metadata(
             unscored=unscored,
             unscored_reasons=unscored_reasons,
         ),
-        "starter": artifacts.scaffold_meta,
-        "scenario": artifacts.task_version_meta,
+        "starter": artifacts.starter_meta,
+        "scenario": artifacts.scenario_revision_meta,
         "harbor": _scorecard_harbor_metadata(execution, artifacts),
         "agent": {"artifacts": artifacts.agent_artifacts},
         "verifier": _scorecard_verifier_metadata(execution, artifacts),
@@ -3345,7 +3343,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     execution = context.execution
     outputs = execution.outputs
 
-    execution_validity = build_run_validity_score(
+    execution_validity = build_execution_validity_score(
         outputs=outputs,
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
@@ -3461,7 +3459,7 @@ def _execute_harbor_phase(
         process_metrics = collect_process_metrics(
             request.scenario,
             harbor_result.trial_dir,
-            harness=request.config.agent.value,
+            agent=request.config.agent.value,
         )
     except RuntimeError as exc:
         message = str(exc)
@@ -3469,9 +3467,9 @@ def _execute_harbor_phase(
             process_metrics = _empty_process_metrics()
         else:
             raise
-    events = collect_session_events(
+    events = collect_trace_events(
         harbor_result.trial_dir,
-        harness=request.config.agent.value,
+        agent=request.config.agent.value,
     )
 
     verifier_outputs: EvaluationOutputs | None = None
@@ -3536,8 +3534,8 @@ def _persist_artifacts_phase(
         run_root_dir=phase.layout.root_dir,
     )
     return PersistedArtifacts(
-        scaffold_meta=build_starter_meta(request, phase.context),
-        task_version_meta=build_scenario_revision_meta(request, phase.context),
+        starter_meta=build_starter_meta(request, phase.context),
+        scenario_revision_meta=build_scenario_revision_meta(request, phase.context),
         verifier_artifacts=persist_verifier_artifacts(
             execution.harbor_result, phase.layout.verifier_dir
         ),

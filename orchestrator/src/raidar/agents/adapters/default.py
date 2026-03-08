@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from ..config import Agent
-from .base import HarnessAdapter
+from .base import AgentAdapter
 
 
-class HarborHarnessAdapter(HarnessAdapter):
+class HarborAgentAdapter(AgentAdapter):
     """Adapter that simply proxies to Harbor with minimal validation."""
 
     provider_constraints: dict[Agent, set[str]] = {}

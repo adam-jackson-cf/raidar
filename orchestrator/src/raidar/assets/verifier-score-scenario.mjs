@@ -254,36 +254,43 @@ function coverageFromSummary() {
   return { measured: Math.min(...values) / 100, source: summaryPath };
 }
 
-function scoreCompliance(checks) {
+function scoreAcceptance(checks) {
   if (checks.length === 0) return 1;
   const passed = checks.filter((check) => check.passed).length;
   return passed / checks.length;
 }
 
-function scoreEfficiency(efficiency) {
-  const basePenalty = efficiency.total_gate_failures / 4;
-  const repeatPenalty = efficiency.repeat_failures * 0.2;
+function scoreVerificationStability(verificationStability) {
+  const basePenalty = verificationStability.total_gate_failures / 4;
+  const repeatPenalty = verificationStability.repeat_failures * 0.2;
   return Math.max(0, Math.min(1, 1 - basePenalty - repeatPenalty));
 }
 
-function qualityScore({ functional, complianceScore, visual, efficiencyScore, weights }) {
+function qualityScore({
+  functional,
+  acceptanceScore,
+  visual,
+  verificationStabilityScore,
+  weights,
+}) {
   if (visual) {
     return (
       functional.score * weights.functional +
-      complianceScore * weights.compliance +
+      acceptanceScore * weights.acceptance +
       visual.score * weights.visual +
-      efficiencyScore * weights.efficiency
+      verificationStabilityScore * weights.verification_stability
     );
   }
-  const nonVisualTotal = weights.functional + weights.compliance + weights.efficiency;
+  const nonVisualTotal =
+    weights.functional + weights.acceptance + weights.verification_stability;
   return (
     functional.score * (weights.functional / nonVisualTotal) +
-    complianceScore * (weights.compliance / nonVisualTotal) +
-    efficiencyScore * (weights.efficiency / nonVisualTotal)
+    acceptanceScore * (weights.acceptance / nonVisualTotal) +
+    verificationStabilityScore * (weights.verification_stability / nonVisualTotal)
   );
 }
 
-function stackIntegrityCheck(taskSpec) {
+function starterIntegrityCheck(scenarioSpec) {
   const packagePath = path.join(APP_DIR, "package.json");
   if (!fs.existsSync(packagePath)) {
     return {
@@ -295,7 +302,7 @@ function stackIntegrityCheck(taskSpec) {
   const payload = readJson(packagePath, {});
   const scripts = payload.scripts || {};
   for (const scriptName of ["typecheck", "lint", "test"]) {
-    if ((scripts[scriptName] || "") !== (taskSpec.baseline_scripts?.[scriptName] || "")) {
+    if ((scripts[scriptName] || "") !== (scenarioSpec.baseline_scripts?.[scriptName] || "")) {
       return {
         name: "stack_integrity",
         passed: false,
@@ -322,7 +329,7 @@ function stackIntegrityCheck(taskSpec) {
   return {
     name: "stack_integrity",
     passed: true,
-    evidence: "Scaffold scripts and package-manager integrity preserved.",
+    evidence: "Starter scripts and package-manager integrity preserved.",
   };
 }
 
@@ -374,15 +381,15 @@ function checkRequirementMappings(requirements, testSources) {
   };
 }
 
-function evaluateArtifactPresence(moduleSpec) {
-  const requiredPaths = moduleSpec?.config?.required_paths || [];
+function evaluateArtifactChecks(metricSpec) {
+  const requiredPaths = metricSpec?.config?.required_paths || [];
   if (!Array.isArray(requiredPaths) || requiredPaths.length === 0) {
     return {
-      module_id: moduleSpec?.id || "artifact_presence",
+      metric_id: metricSpec?.id || "artifact-checks",
       passed: false,
       matched_count: 0,
       missing_patterns: [],
-      evidence: "artifact_presence module missing required_paths configuration.",
+      evidence: "artifact-checks metric missing required_paths configuration.",
     };
   }
   const missingPatterns = [];
@@ -399,30 +406,30 @@ function evaluateArtifactPresence(moduleSpec) {
     }
   }
   return {
-    module_id: moduleSpec?.id || "artifact_presence",
+    metric_id: metricSpec?.id || "artifact-checks",
     passed: missingPatterns.length === 0,
     matched_count: matchedCount,
     missing_patterns: missingPatterns,
-    evidence: `artifact_presence matches (${evidenceParts.join(", ")})`,
+    evidence: `artifact-checks matches (${evidenceParts.join(", ")})`,
   };
 }
 
-function evaluateMetricModules(modules) {
+function evaluateMetricResults(metrics) {
   const results = [];
-  for (const moduleSpec of modules) {
-    if (moduleSpec?.type === "core") {
+  for (const metricSpec of metrics) {
+    if (metricSpec?.type === "core") {
       continue;
     }
-    if (moduleSpec?.type === "artifact_presence") {
-      results.push(evaluateArtifactPresence(moduleSpec));
+    if (metricSpec?.type === "artifact-checks") {
+      results.push(evaluateArtifactChecks(metricSpec));
       continue;
     }
     results.push({
-      module_id: moduleSpec?.id || "unknown-module",
+      metric_id: metricSpec?.id || "unknown-metric",
       passed: false,
       matched_count: 0,
       missing_patterns: [],
-      evidence: `Unsupported metric module type '${moduleSpec?.type}'`,
+      evidence: `Unsupported metric type '${metricSpec?.type}'`,
     });
   }
   return results;
@@ -526,7 +533,7 @@ function buildPerformanceGateChecks({
   return checks;
 }
 
-function buildRunValidityChecks(stackIntegrity) {
+function buildExecutionValidityChecks(stackIntegrity) {
   return [
     {
       name: "run_completed",
@@ -538,22 +545,22 @@ function buildRunValidityChecks(stackIntegrity) {
 }
 
 function main() {
-  const taskSpecPath = process.argv[2];
-  if (!taskSpecPath || !fs.existsSync(taskSpecPath)) {
-    throw new Error("Missing task specification for verifier scoring.");
+  const scenarioSpecPath = process.argv[2];
+  if (!scenarioSpecPath || !fs.existsSync(scenarioSpecPath)) {
+    throw new Error("Missing scenario specification for verifier scoring.");
   }
   ensureDir(LOG_DIR);
-  const taskSpec = readJson(taskSpecPath, {});
-  const metricModules = taskSpec.metrics?.modules || [];
+  const scenarioSpec = readJson(scenarioSpecPath, {});
+  const metricDefinitions = Array.isArray(scenarioSpec.metrics) ? scenarioSpec.metrics : [];
   const sourceFiles = collectSourceFiles();
-  const deterministicChecks = taskSpec.compliance?.deterministic_checks || [];
-  const complianceChecks = deterministicChecks.map((check) =>
+  const deterministicChecks = scenarioSpec.acceptance?.deterministic_checks || [];
+  const acceptanceChecks = deterministicChecks.map((check) =>
     runDeterministicCheck(check, sourceFiles)
   );
   const gateHistory = [];
   let gateFailures = 0;
 
-  for (const gate of taskSpec.verification?.gates || []) {
+  for (const gate of scenarioSpec.verification?.gates || []) {
     const result = runCommand(gate.command || []);
     gateHistory.push({
       timestamp: new Date().toISOString(),
@@ -570,7 +577,7 @@ function main() {
       if (gate.on_failure === "terminate") break;
       if (
         gateFailures >=
-        Number.parseInt(String(taskSpec.verification?.max_gate_failures || "3"), 10)
+        Number.parseInt(String(scenarioSpec.verification?.max_gate_failures || "3"), 10)
       ) {
         break;
       }
@@ -596,8 +603,8 @@ function main() {
   };
 
   const testSources = collectTestSources();
-  const requirements = checkRequirementMappings(
-    taskSpec.compliance?.requirements || [],
+  const requirementsCoverage = checkRequirementMappings(
+    scenarioSpec.acceptance?.requirements || [],
     testSources
   );
 
@@ -617,8 +624,8 @@ function main() {
       }
     }
   }
-  const coverageThreshold = taskSpec.verification?.coverage_threshold ?? null;
-  const coverage = {
+  const coverageThreshold = scenarioSpec.verification?.coverage_threshold ?? null;
+  const testCoverage = {
     threshold: coverageThreshold,
     measured: coverageMeasured,
     source: coverageSource,
@@ -628,8 +635,8 @@ function main() {
   };
 
   let visual = null;
-  if (taskSpec.visual) {
-    const screenshot = runCommand(taskSpec.visual.screenshot_command || []);
+  if (scenarioSpec.visual) {
+    const screenshot = runCommand(scenarioSpec.visual.screenshot_command || []);
     const actualPath = path.join(APP_DIR, "actual.png");
     const diffPath = path.join(APP_DIR, "diff.png");
     const captureSucceeded =
@@ -646,9 +653,9 @@ function main() {
       captureError = captureOutput || `exit_code=${screenshot.exit_code}`;
     }
     if (captureSucceeded) {
-      const referencePath = path.isAbsolute(taskSpec.visual.reference_image)
-        ? taskSpec.visual.reference_image
-        : path.join(APP_DIR, taskSpec.visual.reference_image);
+      const referencePath = path.isAbsolute(scenarioSpec.visual.reference_image)
+        ? scenarioSpec.visual.reference_image
+        : path.join(APP_DIR, scenarioSpec.visual.reference_image);
       if (fs.existsSync(referencePath)) {
         const globalCompare = runOdiffSimilarity(referencePath, actualPath, diffPath);
         globalSimilarity = globalCompare.similarity;
@@ -697,7 +704,7 @@ function main() {
         }
       }
     }
-    const threshold = taskSpec.visual.threshold ?? null;
+    const threshold = scenarioSpec.visual.threshold ?? null;
     visual = {
       similarity,
       global_similarity: globalSimilarity,
@@ -714,73 +721,73 @@ function main() {
     };
   }
 
-  const complianceScore = scoreCompliance(complianceChecks);
+  const acceptanceScore = scoreAcceptance(acceptanceChecks);
   const failingGateNames = gateHistory
     .filter((event) => event.exit_code !== 0)
     .map((event) => event.gate_name);
   const repeats = Math.max(0, failingGateNames.length - new Set(failingGateNames).size);
-  const efficiency = {
+  const verificationStability = {
     total_gate_failures: gateFailures,
     unique_failure_categories: new Set(failingGateNames).size,
     repeat_failures: repeats,
-    score: scoreEfficiency({
+    score: scoreVerificationStability({
       total_gate_failures: gateFailures,
       repeat_failures: repeats,
     }),
   };
 
-  const stackIntegrity = stackIntegrityCheck(taskSpec);
+  const stackIntegrity = starterIntegrityCheck(scenarioSpec);
   const quality = qualityScore({
     functional: { score: functional.passed ? 1 : 0 },
-    complianceScore,
+    acceptanceScore,
     visual: visual ? { score: visual.score } : null,
-    efficiencyScore: efficiency.score,
-    weights: taskSpec.weights,
+    verificationStabilityScore: verificationStability.score,
+    weights: scenarioSpec.weights,
   });
   const performanceGateChecks = buildPerformanceGateChecks({
     gateHistory,
     functional,
-    coverage,
+    coverage: testCoverage,
     visual,
-    requirements,
+    requirements: requirementsCoverage,
     quality,
-    minQuality: taskSpec.verification?.min_quality_score ?? 0,
+    minQuality: scenarioSpec.verification?.min_quality_score ?? 0,
   });
-  const runValidityChecks = buildRunValidityChecks(stackIntegrity);
-  runValidityChecks.push({
+  const executionValidityChecks = buildExecutionValidityChecks(stackIntegrity);
+  executionValidityChecks.push({
     name: "completion_claim_integrity",
     passed: true,
     evidence: "Validated post-run by orchestrator.",
   });
-  const moduleResults = evaluateMetricModules(metricModules);
+  const metricResults = evaluateMetricResults(metricDefinitions);
 
   const scorecard = {
     functional,
-    compliance: {
-      checks: complianceChecks,
-      score: complianceScore,
+    acceptance: {
+      checks: acceptanceChecks,
+      score: acceptanceScore,
     },
     visual,
-    efficiency,
-    coverage,
-    requirements,
-    run_validity: {
-      checks: runValidityChecks,
-      passed: runValidityChecks.every((check) => check.passed),
+    verification_stability: verificationStability,
+    test_coverage: testCoverage,
+    requirements_coverage: requirementsCoverage,
+    execution_validity: {
+      checks: executionValidityChecks,
+      passed: executionValidityChecks.every((check) => check.passed),
     },
     performance_gates: {
       checks: performanceGateChecks,
       passed: performanceGateChecks.every((check) => check.passed),
     },
-    modules: moduleResults,
+    metric_results: metricResults,
     gate_history: gateHistory,
   };
 
   writeJson(path.join(LOG_DIR, "scorecard.json"), scorecard);
   writeJson(path.join(LOG_DIR, "gate-history.json"), gateHistory);
-  writeJson(path.join(LOG_DIR, "run-validity.json"), scorecard.run_validity);
+  writeJson(path.join(LOG_DIR, "execution-validity.json"), scorecard.execution_validity);
   writeJson(path.join(LOG_DIR, "performance-gates.json"), scorecard.performance_gates);
-  const rewardValue = scorecard.run_validity.passed ? quality : 0;
+  const rewardValue = scorecard.execution_validity.passed ? quality : 0;
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), `${rewardValue}`);
 }
 
@@ -798,7 +805,7 @@ try {
       gates_passed: 0,
       gates_total: 0,
     },
-    compliance: {
+    acceptance: {
       checks: [
         {
           rule: "Verifier execution completed",
@@ -810,19 +817,19 @@ try {
       score: 0,
     },
     visual: null,
-    efficiency: {
+    verification_stability: {
       total_gate_failures: 0,
       unique_failure_categories: 0,
       repeat_failures: 0,
       score: 0,
     },
-    coverage: {
+    test_coverage: {
       threshold: null,
       measured: null,
       source: null,
       passed: false,
     },
-    requirements: {
+    requirements_coverage: {
       total_requirements: 0,
       satisfied_requirements: 0,
       mapped_requirements: 0,
@@ -833,7 +840,7 @@ try {
       presence_ratio: 0,
       mapping_ratio: 0,
     },
-    run_validity: {
+    execution_validity: {
       checks: [
         {
           name: "run_completed",
@@ -847,7 +854,7 @@ try {
       checks: [],
       passed: false,
     },
-    modules: [],
+    metric_results: [],
     gate_history: [],
   });
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), "0");

@@ -9,10 +9,10 @@ from pathlib import Path
 
 from ..config import AgentRunConfig
 from ..fast_mode import fast_agent_import_path, with_agent_pythonpath
-from .base import HarnessAdapter
+from .base import AgentAdapter
 
 
-class GeminiCliAdapter(HarnessAdapter):
+class GeminiCliAdapter(AgentAdapter):
     """Adapter enforcing Gemini agent + model pairing."""
 
     HARBOR_AGENT_NAME = "gemini-cli"
@@ -77,6 +77,6 @@ class GeminiCliAdapter(HarnessAdapter):
         return with_agent_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
-        # Ensure Gemini CLI has session directory path recorded for parsers
+        # Ensure Gemini trace artifacts always have a stable home.
         gemini_session_dir = workspace / ".gemini"
         gemini_session_dir.mkdir(exist_ok=True)

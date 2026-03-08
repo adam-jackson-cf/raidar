@@ -7,10 +7,10 @@ import shutil
 from collections.abc import Iterable
 
 from ..config import AgentRunConfig
-from .base import HarnessAdapter
+from .base import AgentAdapter
 
 
-class ExternalCliAdapter(HarnessAdapter):
+class ExternalCliAdapter(AgentAdapter):
     """Shared adapter for agents launched via a dedicated CLI binary."""
 
     CLI_ENV_VAR: str = ""

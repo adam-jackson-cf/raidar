@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from ..config import Agent, AgentRunConfig
-from .base import HarnessAdapter
+from .base import AgentAdapter
 from .claude_code_cli import ClaudeCodeCliAdapter
 from .codex_cli import CodexCliAdapter
 from .copilot_cli import CopilotCliAdapter
@@ -13,7 +13,7 @@ from .cursor_cli import CursorCliAdapter
 from .gemini_cli import GeminiCliAdapter
 from .pi_cli import PiCliAdapter
 
-AdapterFactory = Callable[[AgentRunConfig], HarnessAdapter]
+AdapterFactory = Callable[[AgentRunConfig], AgentAdapter]
 
 
 class AdapterRegistry:
@@ -25,7 +25,7 @@ class AdapterRegistry:
     def register(self, agent: Agent, factory: AdapterFactory) -> None:
         self._factories[agent] = factory
 
-    def resolve(self, config: AgentRunConfig) -> HarnessAdapter:
+    def resolve(self, config: AgentRunConfig) -> AgentAdapter:
         if config.agent not in self._factories:
             raise ValueError(f"No adapter registered for agent {config.agent.value}")
         return self._factories[config.agent](config)

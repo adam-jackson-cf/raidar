@@ -1,6 +1,6 @@
 """Base interface for agent adapters.
 
-Adapters encapsulate agent-specific validation, environment preparation,
+Adapters encapsulate agent-specific validation, workspace preparation,
 model compatibility checks, and Harbor argument generation.
 """
 
@@ -14,7 +14,7 @@ if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
     from ..config import AgentRunConfig
 
 
-class HarnessAdapter:
+class AgentAdapter:
     """Base adapter contract for all agent integrations."""
 
     terminal_bench_dataset = "terminal-bench@2.0"

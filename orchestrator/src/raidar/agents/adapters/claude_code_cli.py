@@ -9,10 +9,10 @@ from pathlib import Path
 
 from ..config import AgentRunConfig
 from ..fast_mode import fast_agent_import_path, with_agent_pythonpath
-from .base import HarnessAdapter
+from .base import AgentAdapter
 
 
-class ClaudeCodeCliAdapter(HarnessAdapter):
+class ClaudeCodeCliAdapter(AgentAdapter):
     """Adapter enforcing Claude Code CLI agent + model pairing."""
 
     HARBOR_AGENT_NAME = "claude-code"
@@ -82,6 +82,6 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
         return with_agent_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
-        # Ensure Claude Code has session directory path recorded for parsers
+        # Ensure Claude Code trace artifacts always have a stable home.
         claude_session_dir = workspace / ".claude"
         claude_session_dir.mkdir(exist_ok=True)
