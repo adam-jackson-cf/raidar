@@ -96,3 +96,33 @@ def test_metrics_artifact_presence_requires_paths() -> None:
     )
     with pytest.raises(ValidationError):
         TaskDefinition.model_validate(payload)
+
+
+def test_required_commands_reject_shell_wrappers() -> None:
+    payload = _base_task_payload()
+    payload["verification"]["required_commands"] = [["bash", "-lc", "bun run lint"]]
+
+    with pytest.raises(ValidationError, match="must be an argv list"):
+        TaskDefinition.model_validate(payload)
+
+
+def test_gate_commands_reject_shell_operators() -> None:
+    payload = _base_task_payload()
+    payload["verification"]["gates"] = [
+        {"name": "lint", "command": ["bun", "run", "lint&&bun", "run", "test"]}
+    ]
+
+    with pytest.raises(ValidationError, match="must not include shell operators"):
+        TaskDefinition.model_validate(payload)
+
+
+def test_screenshot_command_rejects_shell_redirection() -> None:
+    payload = _base_task_payload()
+    payload["visual"] = {
+        "reference_image": "reference.png",
+        "screenshot_command": ["bun", "run", "capture-screenshot", ">", "out.png"],
+    }
+    payload["metrics"]["modules"].append({"type": "core", "id": "visual-odiff"})
+
+    with pytest.raises(ValidationError, match="must not include shell operators"):
+        TaskDefinition.model_validate(payload)

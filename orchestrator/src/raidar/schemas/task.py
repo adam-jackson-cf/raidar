@@ -1,10 +1,49 @@
 """Pydantic models for task definition."""
 
+import re
 from pathlib import Path
 from typing import Annotated, Literal
 
 import yaml
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+SHELL_WRAPPER_ARGS = {"-c", "-lc", "/c", "/k", "-command", "-encodedcommand"}
+SHELL_WRAPPER_BINARIES = {
+    "bash",
+    "sh",
+    "zsh",
+    "fish",
+    "cmd",
+    "cmd.exe",
+    "powershell",
+    "powershell.exe",
+    "pwsh",
+    "pwsh.exe",
+}
+SHELL_OPERATOR_PATTERN = re.compile(r"&&|\|\||[|;]|>>?|<<|`|\$\(|\${")
+
+
+def _validate_argv_command(argv: list[str], *, field_name: str) -> list[str]:
+    """Reject shell wrappers and shell operators in task YAML commands."""
+    if not argv:
+        return argv
+    binary = argv[0].strip().lower()
+    if binary in SHELL_WRAPPER_BINARIES:
+        raise ValueError(
+            f"{field_name} must be an argv list for the target command, not a shell wrapper"
+        )
+    for part in argv:
+        if SHELL_OPERATOR_PATTERN.search(part):
+            raise ValueError(
+                f"{field_name} must not include shell operators or shell features; "
+                f"found forbidden token in {part!r}"
+            )
+    lowered = {part.strip().lower() for part in argv[1:]}
+    if lowered & SHELL_WRAPPER_ARGS:
+        raise ValueError(
+            f"{field_name} must not invoke a command through shell flags like -c or -lc"
+        )
+    return argv
 
 
 class VerificationGate(BaseModel):
@@ -19,6 +58,11 @@ class VerificationGate(BaseModel):
         default="continue",
         description="Action when gate fails",
     )
+
+    @field_validator("command")
+    @classmethod
+    def _validate_command_argv(cls, value: list[str]) -> list[str]:
+        return _validate_argv_command(value, field_name="verification.gates[].command")
 
 
 class ScaffoldConfig(BaseModel):
@@ -93,6 +137,11 @@ class VisualConfig(BaseModel):
         description="Minimum similarity threshold",
     )
 
+    @field_validator("screenshot_command")
+    @classmethod
+    def _validate_screenshot_command(cls, value: list[str]) -> list[str]:
+        return _validate_argv_command(value, field_name="visual.screenshot_command")
+
 
 class VerificationConfig(BaseModel):
     """Verification configuration."""
@@ -118,6 +167,14 @@ class VerificationConfig(BaseModel):
         description="Verification commands the agent must execute during the task run",
     )
     gates: list[VerificationGate] = Field(default_factory=list)
+
+    @field_validator("required_commands")
+    @classmethod
+    def _validate_required_commands(cls, value: list[list[str]]) -> list[list[str]]:
+        return [
+            _validate_argv_command(command, field_name="verification.required_commands[]")
+            for command in value
+        ]
 
 
 CoreMetricModuleId = Literal[
