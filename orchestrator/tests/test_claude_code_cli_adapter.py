@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from raidar.harness.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from raidar.harness.config import Agent, HarnessConfig, ModelTarget
+from raidar.agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
+from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
 
 
-def _config(model: str, provider: str = "anthropic") -> HarnessConfig:
-    return HarnessConfig(
+def _config(model: str, provider: str = "anthropic") -> AgentRunConfig:
+    return AgentRunConfig(
         agent=Agent.CLAUDE_CODE,
         model=ModelTarget(provider=provider, name=model),
     )
@@ -63,7 +63,7 @@ def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch):
     assert "ANTHROPIC_API_KEY" not in env
 
 
-def test_prepare_workspace_creates_claude_session_dir(tmp_path: Path):
+def test_prepare_workspace_creates_claude_trace_dir(tmp_path: Path):
     adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-5"))
     adapter.prepare_workspace(tmp_path)
     assert (tmp_path / ".claude").exists()

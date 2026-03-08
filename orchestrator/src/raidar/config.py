@@ -1,12 +1,4 @@
-"""Centralized configuration using pydantic-settings.
-
-All configurable values for the agentic evaluation system.
-Values can be overridden via environment variables with EVAL_ prefix.
-
-Example:
-    EVAL_LLM_JUDGE__MODEL="openai/gpt-4o"
-    EVAL_TIMEOUTS__BUILD=180
-"""
+"""Centralized configuration using pydantic-settings."""
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,9 +10,12 @@ class ScoringWeights(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EVAL_WEIGHTS__")
 
     functional: float = Field(default=0.40, description="Functional tests weight")
-    compliance: float = Field(default=0.25, description="Compliance checks weight")
+    acceptance: float = Field(default=0.25, description="Acceptance checks weight")
     visual: float = Field(default=0.20, description="Visual regression weight")
-    efficiency: float = Field(default=0.15, description="Efficiency/recovery weight")
+    verification_stability: float = Field(
+        default=0.15,
+        description="Verification stability weight",
+    )
 
 
 class TimeoutSettings(BaseSettings):
@@ -54,19 +49,16 @@ class LLMJudgeSettings(BaseSettings):
     max_retries: int = Field(default=2, description="Max retries for LLM calls")
 
 
-class EfficiencySettings(BaseSettings):
-    """Efficiency scoring parameters."""
+class VerificationStabilitySettings(BaseSettings):
+    """Verification stability scoring parameters."""
 
-    model_config = SettingsConfigDict(env_prefix="EVAL_EFFICIENCY__")
+    model_config = SettingsConfigDict(env_prefix="EVAL_VERIFICATION_STABILITY__")
 
     max_gate_failures: int = Field(
         default=4,
         description="Gate failures divisor for score calculation",
     )
-    repeat_penalty: float = Field(
-        default=0.2,
-        description="Score penalty per repeat failure",
-    )
+    repeat_penalty: float = Field(default=0.2, description="Score penalty per repeat failure")
 
 
 class GateWatcherSettings(BaseSettings):
@@ -74,14 +66,8 @@ class GateWatcherSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="EVAL_GATE__")
 
-    max_failures: int = Field(
-        default=3,
-        description="Max failures before termination",
-    )
-    max_output_length: int = Field(
-        default=2000,
-        description="Max output length before truncation",
-    )
+    max_failures: int = Field(default=3, description="Max failures before termination")
+    max_output_length: int = Field(default=2000, description="Max output length before truncation")
 
 
 class VisualSettings(BaseSettings):
@@ -93,16 +79,13 @@ class VisualSettings(BaseSettings):
         default=0.03,
         description="Anti-aliasing tolerance for odiff (lower is stricter)",
     )
-    similarity_threshold: float = Field(
-        default=0.95,
-        description="Default similarity threshold",
-    )
+    similarity_threshold: float = Field(default=0.95, description="Default similarity threshold")
 
 
-class OptimizationSettings(BaseSettings):
-    """Optimization scoring settings for valid runs."""
+class ResourceEfficiencySettings(BaseSettings):
+    """Resource efficiency scoring settings for valid runs."""
 
-    model_config = SettingsConfigDict(env_prefix="EVAL_OPTIMIZATION__")
+    model_config = SettingsConfigDict(env_prefix="EVAL_RESOURCE_EFFICIENCY__")
 
     max_uncached_tokens: int = Field(
         default=300_000,
@@ -122,7 +105,7 @@ class OptimizationSettings(BaseSettings):
     max_extra_verification_rounds: int = Field(
         default=3,
         gt=0,
-        description="Extra verification rounds (beyond first) before max penalty",
+        description="Extra verification rounds before max penalty",
     )
     max_repeat_failures: int = Field(
         default=3,
@@ -137,25 +120,21 @@ class OptimizationSettings(BaseSettings):
 
 
 class EvalSettings(BaseSettings):
-    """Root configuration for the evaluation system.
+    """Root configuration for the evaluation system."""
 
-    All settings can be overridden via environment variables with EVAL_ prefix.
-    Nested settings use double underscore: EVAL_TIMEOUTS__BUILD=180
-    """
-
-    model_config = SettingsConfigDict(
-        env_prefix="EVAL_",
-        env_nested_delimiter="__",
-    )
+    model_config = SettingsConfigDict(env_prefix="EVAL_", env_nested_delimiter="__")
 
     weights: ScoringWeights = Field(default_factory=ScoringWeights)
     timeouts: TimeoutSettings = Field(default_factory=TimeoutSettings)
     llm_judge: LLMJudgeSettings = Field(default_factory=LLMJudgeSettings)
-    efficiency: EfficiencySettings = Field(default_factory=EfficiencySettings)
+    verification_stability: VerificationStabilitySettings = Field(
+        default_factory=VerificationStabilitySettings
+    )
     gate: GateWatcherSettings = Field(default_factory=GateWatcherSettings)
     visual: VisualSettings = Field(default_factory=VisualSettings)
-    optimization: OptimizationSettings = Field(default_factory=OptimizationSettings)
+    resource_efficiency: ResourceEfficiencySettings = Field(
+        default_factory=ResourceEfficiencySettings
+    )
 
 
-# Singleton instance
 settings = EvalSettings()

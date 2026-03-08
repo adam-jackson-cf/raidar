@@ -1,15 +1,15 @@
-"""Pydantic schemas for tasks, scorecards, and events."""
+"""Pydantic schemas for scenarios, scorecards, and trace events."""
 
-from .events import GateEvent, SessionEvent
-from .scorecard import ComplianceCheck, EvalRun, Scorecard
-from .task import TaskDefinition, VerificationGate
+from .events import GateEvent, TraceEvent
+from .scenario import ScenarioDefinition, VerificationGate
+from .scorecard import AcceptanceCheck, EvalRun, Scorecard
 
 __all__ = [
-    "TaskDefinition",
+    "ScenarioDefinition",
     "VerificationGate",
     "Scorecard",
-    "ComplianceCheck",
+    "AcceptanceCheck",
     "EvalRun",
     "GateEvent",
-    "SessionEvent",
+    "TraceEvent",
 ]

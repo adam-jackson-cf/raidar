@@ -267,28 +267,30 @@ def test_execute_harbor_does_not_retry_non_rate_limit(monkeypatch, tmp_path) -> 
     assert sleeps == []
 
 
-def test_ensure_scaffold_preflight_skips_test_command_without_tests(monkeypatch, tmp_path) -> None:
+def test_ensure_starter_preflight_skips_test_command_without_tests(monkeypatch, tmp_path) -> None:
     workspace = tmp_path / "workspace"
-    task_dir = tmp_path / "task"
+    task_dir = tmp_path / "scenario"
     execution_dir = tmp_path / "results"
     workspace.mkdir(parents=True, exist_ok=True)
     task_dir.mkdir(parents=True, exist_ok=True)
     execution_dir.mkdir(parents=True, exist_ok=True)
-    (task_dir / "task.yaml").write_text("name: sample\nversion: v001\n", encoding="utf-8")
+    (task_dir / "scenario.yaml").write_text(
+        "name: sample\nscenario_revision: v001\n", encoding="utf-8"
+    )
 
     request = SimpleNamespace(
-        task=SimpleNamespace(
+        scenario=SimpleNamespace(
             name="sample-task",
             verification=SimpleNamespace(
                 required_commands=[["bun", "run", "test"], ["bun", "run", "lint"]]
             ),
         ),
         execution_dir=execution_dir,
-        task_dir=task_dir,
+        scenario_dir=task_dir,
     )
     context = SimpleNamespace(
         workspace=workspace,
-        scaffold_source=SimpleNamespace(fingerprint="abc123"),
+        starter_source=SimpleNamespace(fingerprint="abc123"),
     )
 
     calls: list[list[str]] = []
@@ -301,7 +303,7 @@ def test_ensure_scaffold_preflight_skips_test_command_without_tests(monkeypatch,
     monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: False)
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    runner.ensure_scaffold_preflight(request, context)
+    runner.ensure_starter_preflight(request, context)
 
     assert calls == [["bun", "install", "--frozen-lockfile"], ["bun", "run", "lint"]]
 
@@ -366,7 +368,7 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
     monkeypatch, tmp_path: Path
 ) -> None:
     request = SimpleNamespace(
-        task=object(),
+        scenario=object(),
         config=SimpleNamespace(agent=SimpleNamespace(value="gemini")),
     )
     phase = SimpleNamespace(
@@ -403,7 +405,7 @@ def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
     monkeypatch, tmp_path: Path
 ) -> None:
     request = SimpleNamespace(
-        task=object(),
+        scenario=object(),
         config=SimpleNamespace(agent=SimpleNamespace(value="gemini")),
     )
     phase = SimpleNamespace(

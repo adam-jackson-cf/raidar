@@ -1,4 +1,4 @@
-"""Tests for CLI utility commands and helpers."""
+"""Tests for CLI utility commands and helpers under the scenario migration."""
 
 import json
 import tomllib
@@ -12,7 +12,7 @@ from raidar.cli import (
     _generated_artifact_paths,
     main,
 )
-from raidar.schemas.task import TaskDefinition
+from raidar.schemas.scenario import ScenarioDefinition
 
 
 def test_cli_version_matches_pyproject_version() -> None:
@@ -29,21 +29,21 @@ def test_cli_version_matches_pyproject_version() -> None:
 
 def test_generated_artifact_paths_filters_prefixes() -> None:
     paths = [
-        "evals/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
-        "tasks/hello-world-smoke/v001/task.yaml",
+        "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+        "scenarios/hello-world-smoke/v001/scenario.yaml",
         "orchestrator/src/raidar/cli.py",
     ]
 
     matches = _generated_artifact_paths(paths)
 
     assert matches == [
-        "evals/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+        "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
     ]
 
 
 def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) -> None:
     options = RunCliOptions(
-        task=tmp_path / "task.yaml",
+        scenario=tmp_path / "scenario.yaml",
         agent="gemini",
         model="google/gemini-3-flash-preview",
         timeout=300,
@@ -55,38 +55,41 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
     resolved = options.resolved()
 
     assert resolved.retry_void == 1
-    assert resolved.task.is_absolute()
+    assert resolved.scenario.is_absolute()
 
 
-def test_task_init_creates_schema_valid_task_and_rules(tmp_path: Path) -> None:
+def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -> None:
     runner = CliRunner()
-    task_dir = tmp_path / "tasks" / "sample-task"
+    task_dir = tmp_path / "scenarios" / "sample-task"
 
-    result = runner.invoke(main, ["task", "init", "--path", str(task_dir), "--name", "sample-task"])
+    result = runner.invoke(
+        main,
+        ["scenario", "init", "--path", str(task_dir), "--name", "sample-task"],
+    )
 
     assert result.exit_code == 0, result.output
-    task_yaml = task_dir / "v001" / "task.yaml"
-    assert task_yaml.exists()
+    scenario_yaml = task_dir / "v001" / "scenario.yaml"
+    assert scenario_yaml.exists()
 
-    task_def = TaskDefinition.from_yaml(task_yaml)
-    assert task_def.name == "sample-task"
-    assert task_def.version == "v001"
-    assert task_def.scaffold.root == "scaffold"
-    assert task_def.prompt.entry == "prompt/task.md"
-    assert task_def.verification.required_commands == [
+    scenario_def = ScenarioDefinition.from_yaml(scenario_yaml)
+    assert scenario_def.name == "sample-task"
+    assert scenario_def.scenario_revision == "v001"
+    assert scenario_def.starter.root == "starter"
+    assert scenario_def.prompt.entry == "prompt/task.md"
+    assert scenario_def.verification.required_commands == [
         ["bun", "run", "typecheck"],
         ["bun", "run", "lint"],
     ]
-    assert [gate.command for gate in task_def.verification.gates] == [
+    assert [gate.command for gate in scenario_def.verification.gates] == [
         ["bun", "run", "typecheck"],
         ["bun", "run", "lint"],
     ]
-    assert [module.id for module in task_def.metrics.modules] == [
+    assert scenario_def.metric_ids() == [
         "functional",
-        "compliance",
-        "efficiency",
-        "run-validity",
-        "optimization",
+        "acceptance",
+        "verification-stability",
+        "execution-validity",
+        "resource-efficiency",
     ]
 
     rules_dir = task_dir / "v001" / "rules"
@@ -104,7 +107,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
         lambda _: [
             (
                 "D",
-                "evals/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+                "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
             ),
         ],
     )
@@ -112,78 +115,78 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
     _assert_no_generated_artifact_changes(tmp_path)
 
 
-def _create_scaffold_files(task_dir: Path, version: str) -> None:
-    scaffold_dir = task_dir / version / "scaffold"
-    src_dir = scaffold_dir / "src" / "app"
+def _create_starter_files(scenario_dir: Path, revision: str) -> None:
+    starter_dir = scenario_dir / revision / "starter"
+    src_dir = starter_dir / "src" / "app"
     src_dir.mkdir(parents=True, exist_ok=True)
     (src_dir / "page.tsx").write_text("export default function Page() { return null; }\n")
-    (scaffold_dir / "package.json").write_text(
+    (starter_dir / "package.json").write_text(
         json.dumps({"dependencies": {}, "devDependencies": {}})
     )
-    (scaffold_dir / "tsconfig.json").write_text("{}\n")
-    (scaffold_dir / "next.config.ts").write_text("export default {};\n")
-    (scaffold_dir / "postcss.config.mjs").write_text("export default {};\n")
+    (starter_dir / "tsconfig.json").write_text("{}\n")
+    (starter_dir / "next.config.ts").write_text("export default {};\n")
+    (starter_dir / "postcss.config.mjs").write_text("export default {};\n")
 
 
-def test_task_clone_version_auto_increments(tmp_path: Path) -> None:
+def test_scenario_clone_revision_auto_increments(tmp_path: Path) -> None:
     runner = CliRunner()
-    task_dir = tmp_path / "tasks" / "sample-task"
+    scenario_dir = tmp_path / "scenarios" / "sample-task"
 
     init_result = runner.invoke(
         main,
-        ["task", "init", "--path", str(task_dir), "--name", "sample-task"],
+        ["scenario", "init", "--path", str(scenario_dir), "--name", "sample-task"],
     )
     assert init_result.exit_code == 0, init_result.output
 
-    _create_scaffold_files(task_dir, version="v001")
+    _create_starter_files(scenario_dir, revision="v001")
 
     clone_result = runner.invoke(
         main,
-        ["task", "clone-version", "--path", str(task_dir), "--from-version", "v001"],
+        ["scenario", "clone-revision", "--path", str(scenario_dir), "--from-revision", "v001"],
     )
     assert clone_result.exit_code == 0, clone_result.output
-    assert "target_version: v002" in clone_result.output
+    assert "target_revision: v002" in clone_result.output
 
-    cloned_task_yaml = task_dir / "v002" / "task.yaml"
-    cloned_task = TaskDefinition.from_yaml(cloned_task_yaml)
-    assert cloned_task.version == "v002"
-    assert (task_dir / "v002" / "scaffold" / "src" / "app" / "page.tsx").exists()
+    cloned_scenario_yaml = scenario_dir / "v002" / "scenario.yaml"
+    cloned_scenario = ScenarioDefinition.from_yaml(cloned_scenario_yaml)
+    assert cloned_scenario.scenario_revision == "v002"
+    assert (scenario_dir / "v002" / "starter" / "src" / "app" / "page.tsx").exists()
 
 
-def test_task_clone_version_succeeds_without_scaffold_manifest(tmp_path: Path) -> None:
+def test_scenario_clone_revision_succeeds_without_starter_manifest(tmp_path: Path) -> None:
     runner = CliRunner()
-    task_dir = tmp_path / "tasks" / "sample-task"
+    scenario_dir = tmp_path / "scenarios" / "sample-task"
 
     init_result = runner.invoke(
         main,
-        ["task", "init", "--path", str(task_dir), "--name", "sample-task"],
+        ["scenario", "init", "--path", str(scenario_dir), "--name", "sample-task"],
     )
     assert init_result.exit_code == 0, init_result.output
 
-    (task_dir / "v001" / "scaffold").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "v001" / "starter").mkdir(parents=True, exist_ok=True)
 
     clone_result = runner.invoke(
         main,
-        ["task", "clone-version", "--path", str(task_dir), "--from-version", "v001"],
+        ["scenario", "clone-revision", "--path", str(scenario_dir), "--from-revision", "v001"],
     )
     assert clone_result.exit_code == 0, clone_result.output
-    assert (task_dir / "v002").exists()
+    assert (scenario_dir / "v002").exists()
 
 
-def test_info_selects_latest_task_version_numerically(tmp_path: Path) -> None:
+def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> None:
     runner = CliRunner()
-    task_dir = tmp_path / "tasks" / "sample-task"
+    scenario_dir = tmp_path / "scenarios" / "sample-task"
 
     init_v2 = runner.invoke(
         main,
         [
-            "task",
+            "scenario",
             "init",
             "--path",
-            str(task_dir),
+            str(scenario_dir),
             "--name",
             "sample-task",
-            "--task-version",
+            "--scenario-revision",
             "v2",
         ],
     )
@@ -192,83 +195,87 @@ def test_info_selects_latest_task_version_numerically(tmp_path: Path) -> None:
     init_v10 = runner.invoke(
         main,
         [
-            "task",
+            "scenario",
             "init",
             "--path",
-            str(task_dir),
+            str(scenario_dir),
             "--name",
             "sample-task",
-            "--task-version",
+            "--scenario-revision",
             "v10",
         ],
     )
     assert init_v10.exit_code == 0, init_v10.output
 
-    info_result = runner.invoke(main, ["info", "--task", str(task_dir)])
+    info_result = runner.invoke(main, ["info", "--scenario", str(scenario_dir)])
     assert info_result.exit_code == 0, info_result.output
-    assert "Version: v10" in info_result.output
+    assert "Revision: v10" in info_result.output
     assert (
-        "Metric Profile: v2:functional+compliance+efficiency+run-validity+optimization"
+        "Evaluation Profile: "
+        "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
         in info_result.output
     )
 
 
-def _write_execution_summary(
+def _write_experiment_summary(
     execution_dir: Path,
     *,
-    task_name: str,
+    scenario_name: str,
     model: str,
-    harness: str,
-    metric_profile: str,
+    agent: str,
+    evaluation_profile: str,
     created_at: str,
     run_count_total: int = 1,
-    void_count: int = 0,
+    unscored_count: int = 0,
 ) -> None:
     execution_dir.mkdir(parents=True, exist_ok=True)
     payload = {
         "created_at_utc": created_at,
         "config": {
-            "task_name": task_name,
-            "harness": harness,
+            "scenario_name": scenario_name,
+            "agent": agent,
             "model": model,
-            "metric_profile": metric_profile,
+            "evaluation_profile": evaluation_profile,
         },
         "aggregate": {
             "run_count_total": run_count_total,
-            "void_count": void_count,
+            "unscored_count": unscored_count,
         },
     }
-    (execution_dir / "suite-summary.json").write_text(json.dumps(payload), encoding="utf-8")
+    (execution_dir / "experiment-summary.json").write_text(
+        json.dumps(payload),
+        encoding="utf-8",
+    )
 
 
-def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
+def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
     runner = CliRunner()
-    evals_root = tmp_path / "evals"
-    _write_execution_summary(
-        evals_root / "20260222-100000Z__hello-world-smoke__v001",
-        task_name="hello-world-smoke",
+    experiments_root = tmp_path / "experiments"
+    _write_experiment_summary(
+        experiments_root / "20260222-100000Z__hello-world-smoke__v001",
+        scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        agent="claude-code",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",
     )
-    _write_execution_summary(
-        evals_root / "20260222-110000Z__homepage-implementation__v001",
-        task_name="homepage-implementation",
+    _write_experiment_summary(
+        experiments_root / "20260222-110000Z__homepage-implementation__v001",
+        scenario_name="homepage-implementation",
         model="codex/gpt-5.2-high",
-        harness="codex-cli",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization+visual-odiff",
+        agent="codex-cli",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression",
         created_at="2026-02-22T11:00:00+00:00",
     )
 
     text_result = runner.invoke(
         main,
         [
-            "evals",
+            "experiments",
             "list",
-            "--evals-root",
-            str(evals_root),
-            "--task",
+            "--experiments-root",
+            str(experiments_root),
+            "--scenario",
             "homepage",
         ],
     )
@@ -276,34 +283,34 @@ def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
     assert "homepage-implementation@v001" in text_result.output
     assert "hello-world-smoke@v001" not in text_result.output
     assert (
-        "metric_profile=v2:functional+compliance+efficiency+run-validity+optimization+visual-odiff"
+        "evaluation_profile=v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
         in text_result.output
     )
 
     profile_result = runner.invoke(
         main,
         [
-            "evals",
+            "experiments",
             "list",
-            "--evals-root",
-            str(evals_root),
-            "--metric-profile",
-            "visual-odiff",
+            "--experiments-root",
+            str(experiments_root),
+            "--evaluation-profile",
+            "visual-regression",
             "--json",
         ],
     )
     assert profile_result.exit_code == 0, profile_result.output
     profile_rows = json.loads(profile_result.output)
     assert len(profile_rows) == 1
-    assert profile_rows[0]["task_name"] == "homepage-implementation"
+    assert profile_rows[0]["scenario_name"] == "homepage-implementation"
 
     json_result = runner.invoke(
         main,
         [
-            "evals",
+            "experiments",
             "list",
-            "--evals-root",
-            str(evals_root),
+            "--experiments-root",
+            str(experiments_root),
             "--json",
         ],
     )
@@ -311,51 +318,51 @@ def test_evals_list_filters_and_json_output(tmp_path: Path) -> None:
     rows = json.loads(json_result.output)
     assert isinstance(rows, list)
     assert rows[0]["execution_id"] == "20260222-110000Z__homepage-implementation__v001"
-    assert rows[0]["metric_profile"] == (
-        "v2:functional+compliance+efficiency+run-validity+optimization+visual-odiff"
+    assert rows[0]["evaluation_profile"] == (
+        "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
     )
 
 
-def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
+def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     runner = CliRunner()
-    evals_root = tmp_path / "evals"
+    experiments_root = tmp_path / "experiments"
     archive_root = tmp_path / "archive"
 
-    old_dir = evals_root / "20260220-100000Z__hello-world-smoke__v001"
-    new_dir = evals_root / "20260221-100000Z__hello-world-smoke__v001"
-    other_model_dir = evals_root / "20260222-100000Z__hello-world-smoke__v001"
-    _write_execution_summary(
+    old_dir = experiments_root / "20260220-100000Z__hello-world-smoke__v001"
+    new_dir = experiments_root / "20260221-100000Z__hello-world-smoke__v001"
+    other_model_dir = experiments_root / "20260222-100000Z__hello-world-smoke__v001"
+    _write_experiment_summary(
         old_dir,
-        task_name="hello-world-smoke",
+        scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        agent="claude-code",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-20T10:00:00+00:00",
     )
-    _write_execution_summary(
+    _write_experiment_summary(
         new_dir,
-        task_name="hello-world-smoke",
+        scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        agent="claude-code",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-21T10:00:00+00:00",
     )
-    _write_execution_summary(
+    _write_experiment_summary(
         other_model_dir,
-        task_name="hello-world-smoke",
+        scenario_name="hello-world-smoke",
         model="codex/gpt-5.2-high",
-        harness="codex-cli",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        agent="codex-cli",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",
     )
 
     result = runner.invoke(
         main,
         [
-            "evals",
+            "experiments",
             "prune",
-            "--evals-root",
-            str(evals_root),
+            "--experiments-root",
+            str(experiments_root),
             "--archive-dir",
             str(archive_root),
             "--keep-per-model",
@@ -366,40 +373,40 @@ def test_evals_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     assert new_dir.exists()
     assert other_model_dir.exists()
     assert not old_dir.exists()
-    assert (archive_root / "evals" / old_dir.name).exists()
-    assert "evals_pruned=1" in result.output
+    assert (archive_root / "experiments" / old_dir.name).exists()
+    assert "experiments_pruned=1" in result.output
 
 
-def test_evals_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
+def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
     runner = CliRunner()
-    evals_root = tmp_path / "evals"
+    experiments_root = tmp_path / "experiments"
     archive_root = tmp_path / "archive"
-    old_dir = evals_root / "20260220-100000Z__hello-world-smoke__v001"
-    new_dir = evals_root / "20260221-100000Z__hello-world-smoke__v001"
-    _write_execution_summary(
+    old_dir = experiments_root / "20260220-100000Z__hello-world-smoke__v001"
+    new_dir = experiments_root / "20260221-100000Z__hello-world-smoke__v001"
+    _write_experiment_summary(
         old_dir,
-        task_name="hello-world-smoke",
+        scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        agent="claude-code",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-20T10:00:00+00:00",
     )
-    _write_execution_summary(
+    _write_experiment_summary(
         new_dir,
-        task_name="hello-world-smoke",
+        scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+        agent="claude-code",
+        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-21T10:00:00+00:00",
     )
 
     result = runner.invoke(
         main,
         [
-            "evals",
+            "experiments",
             "prune",
-            "--evals-root",
-            str(evals_root),
+            "--experiments-root",
+            str(experiments_root),
             "--archive-dir",
             str(archive_root),
             "--keep-per-model",
@@ -411,4 +418,4 @@ def test_evals_prune_dry_run_does_not_move_directories(tmp_path: Path) -> None:
     assert old_dir.exists()
     assert new_dir.exists()
     assert not archive_root.exists()
-    assert "would-archive: evals/" in result.output
+    assert "would-archive: experiments/" in result.output

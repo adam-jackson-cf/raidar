@@ -1,0 +1,40 @@
+name: hello-world-smoke
+scenario_revision: v001
+description: Minimal end-to-end Harbor orchestration smoke scenario
+difficulty: easy
+category: agent-integration
+timeout_sec: 300
+
+starter:
+  root: starter
+
+verification:
+  max_gate_failures: 1
+  min_quality_score: 0.0
+  required_commands:
+    - ["bun", "run", "typecheck"]
+    - ["bun", "run", "lint"]
+
+acceptance:
+  deterministic_checks:
+    - type: import_present
+      pattern: Harbor smoke test ready
+      description: Smoke marker text exists in source
+    - type: no_pattern
+      pattern: Homepage placeholder - implement the design
+      description: Starter placeholder text is removed
+
+metrics:
+  - type: core
+    id: functional
+  - type: core
+    id: acceptance
+  - type: core
+    id: verification-stability
+  - type: core
+    id: execution-validity
+  - type: core
+    id: resource-efficiency
+
+prompt:
+  entry: prompt/task.md

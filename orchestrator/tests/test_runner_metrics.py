@@ -1,4 +1,4 @@
-"""Tests for runner validity and optimization metric helpers."""
+"""Tests for runner validity and resource-efficiency metric helpers."""
 
 import json
 import threading
@@ -8,8 +8,9 @@ from pathlib import Path
 
 import pytest
 
+from raidar.agents.config import Agent, ModelTarget
+from raidar.agents.config import AgentRunConfig as HarnessConfig
 from raidar.audit.workspace_diff import directory_fingerprint
-from raidar.harness.config import Agent, HarnessConfig, ModelTarget
 from raidar.runner import (
     EvaluationOutputs,
     ExecutionPhaseResult,
@@ -17,11 +18,9 @@ from raidar.runner import (
     PersistedArtifacts,
     RunLayout,
     RunRequest,
-    ScaffoldContext,
     ScorecardBuildContext,
     _build_verifier_task_spec,
     _classify_void_reasons,
-    _ensure_suite_baseline_workspace,
     _load_verifier_outputs,
     _normalized_shell_subcommands,
     _prune_workspace_artifacts,
@@ -32,34 +31,59 @@ from raidar.runner import (
     create_harbor_task_bundle,
     evaluate_coverage,
     evaluate_requirements,
-    task_metric_profile,
 )
-from raidar.scaffold.catalog import ScaffoldSource
+from raidar.runner import (
+    WorkspaceContext as ScaffoldContext,
+)
+from raidar.runner import (
+    _ensure_experiment_baseline_workspace as _ensure_suite_baseline_workspace,
+)
+from raidar.runner import (
+    scenario_evaluation_profile as task_metric_profile,
+)
 from raidar.schemas.events import GateEvent
-from raidar.schemas.scorecard import (
-    ComplianceScore,
-    CoverageScore,
-    EfficiencyScore,
-    FunctionalScore,
-    ModuleResult,
-    PerformanceGatesScore,
-    RequirementCoverageScore,
-    RunValidityScore,
+from raidar.schemas.scenario import (
+    DeterministicCheck,
+    RequirementSpec,
+    ScenarioDefinition,
 )
-from raidar.schemas.task import DeterministicCheck, RequirementSpec, TaskDefinition
+from raidar.schemas.scenario import (
+    ScenarioDefinition as TaskDefinition,
+)
+from raidar.schemas.scorecard import (
+    AcceptanceScore as ComplianceScore,
+)
+from raidar.schemas.scorecard import (
+    CoverageScore,
+    FunctionalScore,
+    PerformanceGatesScore,
+)
+from raidar.schemas.scorecard import (
+    ExecutionValidityScore as RunValidityScore,
+)
+from raidar.schemas.scorecard import (
+    MetricResult as ModuleResult,
+)
+from raidar.schemas.scorecard import (
+    RequirementsCoverageScore as RequirementCoverageScore,
+)
+from raidar.schemas.scorecard import (
+    VerificationStabilityScore as EfficiencyScore,
+)
+from raidar.starter.catalog import StarterSource as ScaffoldSource
 
 
-def _sample_task() -> TaskDefinition:
-    return TaskDefinition.model_validate(
+def _sample_task() -> ScenarioDefinition:
+    return ScenarioDefinition.model_validate(
         {
             "name": "homepage-implementation",
-            "version": "v001",
+            "scenario_revision": "v001",
             "description": "test task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
-            "scaffold": {
-                "root": "scaffold",
+            "starter": {
+                "root": "starter",
             },
             "verification": {
                 "gates": [
@@ -80,17 +104,15 @@ def _sample_task() -> TaskDefinition:
                 "coverage_threshold": 0.8,
                 "min_quality_score": 0.9,
             },
-            "compliance": {},
-            "metrics": {
-                "modules": [
-                    {"type": "core", "id": "functional"},
-                    {"type": "core", "id": "compliance"},
-                    {"type": "core", "id": "efficiency"},
-                    {"type": "core", "id": "run-validity"},
-                    {"type": "core", "id": "optimization"},
-                    {"type": "core", "id": "coverage-threshold"},
-                ]
-            },
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+                {"type": "core", "id": "test-coverage"},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -114,27 +136,27 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
             gates_passed=2,
             gates_total=2,
         ),
-        compliance=ComplianceScore(),
+        acceptance=ComplianceScore(),
         visual=None,
-        efficiency=EfficiencyScore(
+        verification_stability=EfficiencyScore(
             total_gate_failures=0,
             unique_failure_categories=0,
             repeat_failures=0,
         ),
-        coverage=CoverageScore(
+        test_coverage=CoverageScore(
             threshold=0.8,
             measured=0.9,
             source="coverage-summary",
             passed=True,
         ),
-        requirements=RequirementCoverageScore(
+        requirements_coverage=RequirementCoverageScore(
             total_requirements=1,
             satisfied_requirements=1,
             mapped_requirements=1,
         ),
-        run_validity=RunValidityScore(),
+        execution_validity=RunValidityScore(),
         performance_gates=PerformanceGatesScore(),
-        modules=[],
+        metric_results=[],
         gate_history=[],
     )
 
@@ -145,35 +167,35 @@ def _sample_scorecard_context(
     terminated_early: bool,
     termination_reason: str | None,
 ) -> ScorecardBuildContext:
-    task_dir = tmp_path / "task"
+    task_dir = tmp_path / "scenario"
     workspace_dir = tmp_path / "workspace"
     results_dir = tmp_path / "results"
     task_dir.mkdir(parents=True, exist_ok=True)
     workspace_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
-    (task_dir / "task.yaml").write_text("name: sample-task\nversion: v001\n")
+    (task_dir / "scenario.yaml").write_text("name: sample-task\nscenario_revision: v001\n")
     (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
 
     scaffold_source = ScaffoldSource(
-        task_name="homepage-implementation",
-        task_version="v001",
+        scenario_name="homepage-implementation",
+        scenario_revision="v001",
         path=workspace_dir,
         fingerprint=directory_fingerprint(workspace_dir),
     )
 
     request = RunRequest(
-        task=_sample_task(),
+        scenario=_sample_task(),
         config=_sample_harness_config(),
-        task_dir=task_dir,
+        scenario_dir=task_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
     context = ScaffoldContext(
-        scaffold_source=scaffold_source,
+        starter_source=scaffold_source,
         workspace=workspace_dir,
         injected_rules=None,
-        metadata_path=workspace_dir / ".scaffold-meta.json",
+        metadata_path=workspace_dir / ".starter-meta.json",
     )
     layout = RunLayout(
         run_id="run-1234",
@@ -185,7 +207,7 @@ def _sample_scorecard_context(
         agent_dir=results_dir / "runs" / "run-1234" / "agent",
         harbor_dir=results_dir / "runs" / "run-1234" / "harbor",
         run_json_path=results_dir / "runs" / "run-1234" / "run.json",
-        analysis_path=results_dir / "runs" / "run-1234" / "summary.md",
+        analysis_path=results_dir / "runs" / "run-1234" / "report.md",
     )
     execution = ExecutionPhaseResult(
         harbor_result=HarborExecutionResult(
@@ -202,8 +224,8 @@ def _sample_scorecard_context(
         duration_sec=12.5,
     )
     artifacts = PersistedArtifacts(
-        scaffold_meta={"task": "homepage-implementation", "task_version": "v001"},
-        task_version_meta={"task_yaml_sha256": "abc"},
+        scaffold_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
+        task_version_meta={"scenario_yaml_hash": "abc"},
         verifier_artifacts={"scorecard": "verifier/scorecard.json"},
         agent_artifacts={"log": "agent/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
@@ -231,18 +253,18 @@ def _sample_scorecard_context(
 def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    task_dir = tmp_path / "task" / "v001"
-    scaffold_dir = task_dir / "scaffold"
-    scaffold_dir.mkdir(parents=True, exist_ok=True)
-    suite_baseline_dir = tmp_path / "evals" / "suite-01" / "workspace" / "baseline"
+    scenario_dir = tmp_path / "scenario" / "v001"
+    starter_dir = scenario_dir / "starter"
+    starter_dir.mkdir(parents=True, exist_ok=True)
+    experiment_baseline_dir = tmp_path / "experiments" / "experiment-01" / "workspace" / "baseline"
     call_count = 0
     call_lock = threading.Lock()
     start_barrier = threading.Barrier(3)
 
     def fake_prepare_workspace(
-        scaffold_dir: Path, target_dir: Path, task_dir: Path, agent: str
+        starter_dir: Path, target_dir: Path, scenario_dir: Path, agent: str
     ) -> tuple[Path, Path | None]:
-        del scaffold_dir, task_dir, agent
+        del starter_dir, scenario_dir, agent
         nonlocal call_count
         with call_lock:
             call_count += 1
@@ -258,9 +280,9 @@ def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
         try:
             start_barrier.wait(timeout=1.0)
             _ensure_suite_baseline_workspace(
-                scaffold_dir=scaffold_dir,
-                suite_baseline_dir=suite_baseline_dir,
-                task_dir=task_dir,
+                starter_dir=starter_dir,
+                experiment_baseline_dir=experiment_baseline_dir,
+                scenario_dir=scenario_dir,
                 agent="codex-cli",
             )
         except Exception as exc:  # pragma: no cover - assertion below surfaces failure
@@ -368,13 +390,13 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
     task = TaskDefinition.model_validate(
         {
             "name": "homepage-implementation",
-            "version": "v001",
+            "scenario_revision": "v001",
             "description": "test task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
-            "scaffold": {
-                "root": "scaffold",
+            "starter": {
+                "root": "starter",
             },
             "verification": {
                 "gates": [
@@ -391,16 +413,14 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
                 ],
                 "required_commands": [],
             },
-            "compliance": {},
-            "metrics": {
-                "modules": [
-                    {"type": "core", "id": "functional"},
-                    {"type": "core", "id": "compliance"},
-                    {"type": "core", "id": "efficiency"},
-                    {"type": "core", "id": "run-validity"},
-                    {"type": "core", "id": "optimization"},
-                ]
-            },
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -849,7 +869,7 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                     "gates_passed": 4,
                     "gates_total": 4,
                 },
-                "compliance": {
+                "acceptance": {
                     "checks": [
                         {
                             "rule": "Placeholder removed",
@@ -865,25 +885,25 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                     "capture_succeeded": True,
                     "threshold": 0.95,
                 },
-                "efficiency": {
+                "verification_stability": {
                     "total_gate_failures": 0,
                     "unique_failure_categories": 0,
                     "repeat_failures": 0,
                 },
-                "coverage": {
+                "test_coverage": {
                     "threshold": 0.8,
                     "measured": 0.9,
                     "source": "coverage-summary",
                     "passed": True,
                 },
-                "requirements": {
+                "requirements_coverage": {
                     "total_requirements": 1,
                     "satisfied_requirements": 1,
                     "mapped_requirements": 1,
                     "missing_requirement_ids": [],
                     "requirement_gap_ids": [],
                 },
-                "run_validity": {
+                "execution_validity": {
                     "checks": [
                         {
                             "name": "run_completed",
@@ -901,13 +921,13 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                         }
                     ]
                 },
-                "modules": [
+                "metric_results": [
                     {
-                        "module_id": "artifact_presence",
+                        "metric_id": "artifact-checks",
                         "passed": False,
                         "matched_count": 0,
                         "missing_patterns": ["src/components/**/*.tsx"],
-                        "evidence": "artifact_presence matches (src/components/**/*.tsx:0)",
+                        "evidence": "artifact-checks matches (src/components/**/*.tsx:0)",
                     }
                 ],
                 "gate_history": [
@@ -933,13 +953,13 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs.functional.passed is True
     assert outputs.visual is not None
     assert outputs.visual.threshold_met is True
-    assert outputs.modules == [
+    assert outputs.metric_results == [
         ModuleResult(
-            module_id="artifact_presence",
+            metric_id="artifact-checks",
             passed=False,
             matched_count=0,
             missing_patterns=["src/components/**/*.tsx"],
-            evidence="artifact_presence matches (src/components/**/*.tsx:0)",
+            evidence="artifact-checks matches (src/components/**/*.tsx:0)",
         )
     ]
     assert len(outputs.gate_history) == 1
@@ -960,20 +980,20 @@ def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
                     "gates_passed": 1,
                     "gates_total": 1,
                 },
-                "compliance": {"checks": []},
+                "acceptance": {"checks": []},
                 "visual": None,
-                "efficiency": {
+                "verification_stability": {
                     "total_gate_failures": 0,
                     "unique_failure_categories": 0,
                     "repeat_failures": 0,
                 },
-                "coverage": {
+                "test_coverage": {
                     "threshold": None,
                     "measured": None,
                     "source": None,
                     "passed": True,
                 },
-                "requirements": {
+                "requirements_coverage": {
                     "total_requirements": 0,
                     "satisfied_requirements": 0,
                     "mapped_requirements": 0,
@@ -982,7 +1002,7 @@ def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
                     "requirement_gap_ids": [],
                     "requirement_pattern_gaps": {},
                 },
-                "run_validity": {"checks": []},
+                "execution_validity": {"checks": []},
                 "performance_gates": {"checks": []},
                 "gate_history": [],
             }
@@ -991,7 +1011,7 @@ def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
     outputs, reason = _load_verifier_outputs(trial_dir)
     assert outputs is None
     assert reason is not None
-    assert "scorecard.modules must be a list" in reason
+    assert "scorecard.metric_results must be a list" in reason
 
 
 def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
@@ -1002,9 +1022,9 @@ def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
 
 def test_task_metric_profile_uses_ordered_task_modules():
     task = _sample_task()
-    assert (
-        task_metric_profile(task)
-        == "v2:functional+compliance+efficiency+run-validity+optimization+coverage-threshold"
+    assert task_metric_profile(task) == (
+        "v2:functional+acceptance+verification-stability+"
+        "execution-validity+resource-efficiency+test-coverage"
     )
 
 
@@ -1015,13 +1035,13 @@ def test_build_verifier_task_spec_includes_metrics_modules(tmp_path: Path):
         termination_reason=None,
     )
     task_spec = _build_verifier_task_spec(score_context.request, score_context.context)
-    assert task_spec["metrics"]["modules"] == [
+    assert task_spec["metrics"]["metrics"] == [
         {"type": "core", "id": "functional"},
-        {"type": "core", "id": "compliance"},
-        {"type": "core", "id": "efficiency"},
-        {"type": "core", "id": "run-validity"},
-        {"type": "core", "id": "optimization"},
-        {"type": "core", "id": "coverage-threshold"},
+        {"type": "core", "id": "acceptance"},
+        {"type": "core", "id": "verification-stability"},
+        {"type": "core", "id": "execution-validity"},
+        {"type": "core", "id": "resource-efficiency"},
+        {"type": "core", "id": "test-coverage"},
     ]
 
 
@@ -1068,10 +1088,10 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
 
     scorecard = build_scorecard(context)
 
-    assert scorecard.voided is True
-    assert "provider_rate_limit" in scorecard.void_reasons
-    assert scorecard.metadata["run"]["repeat_required"] is True
-    assert scorecard.metadata["run"]["repeat_required_reasons"] == scorecard.void_reasons
+    assert scorecard.unscored is True
+    assert "provider_rate_limit" in scorecard.unscored_reasons
+    assert scorecard.metadata["run"]["rerun_required"] is True
+    assert scorecard.metadata["run"]["unscored_reasons"] == scorecard.unscored_reasons
 
 
 def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Path):
@@ -1095,13 +1115,13 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     task = TaskDefinition.model_validate(
         {
             "name": "homepage-implementation",
-            "version": "v001",
+            "scenario_revision": "v001",
             "description": "test task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
-            "scaffold": {
-                "root": "scaffold",
+            "starter": {
+                "root": "starter",
             },
             "verification": {"gates": [], "required_commands": []},
             "visual": {
@@ -1109,40 +1129,38 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
                 "threshold": 0.95,
             },
-            "compliance": {},
-            "metrics": {
-                "modules": [
-                    {"type": "core", "id": "functional"},
-                    {"type": "core", "id": "compliance"},
-                    {"type": "core", "id": "efficiency"},
-                    {"type": "core", "id": "run-validity"},
-                    {"type": "core", "id": "optimization"},
-                    {"type": "core", "id": "visual-odiff"},
-                ]
-            },
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+                {"type": "core", "id": "visual-regression"},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
     (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
     request = RunRequest(
-        task=task,
+        scenario=task,
         config=_sample_harness_config(),
-        task_dir=task_dir,
+        scenario_dir=task_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
     scaffold_source = ScaffoldSource(
-        task_name="homepage-implementation",
-        task_version="v001",
+        scenario_name="homepage-implementation",
+        scenario_revision="v001",
         path=workspace,
         fingerprint=directory_fingerprint(workspace),
     )
     context = ScaffoldContext(
-        scaffold_source=scaffold_source,
+        starter_source=scaffold_source,
         workspace=workspace,
         injected_rules=None,
-        metadata_path=workspace / ".scaffold-meta.json",
+        metadata_path=workspace / ".starter-meta.json",
     )
 
     bundle = create_harbor_task_bundle(
@@ -1184,53 +1202,51 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     (workspace / "bun.lock").write_text("")
     (workspace / "src").mkdir(parents=True, exist_ok=True)
     (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
-    (task_dir / "task.yaml").write_text("name: hello-world-smoke\nversion: v001\n")
+    (task_dir / "scenario.yaml").write_text("name: hello-world-smoke\nscenario_revision: v001\n")
     (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (task_dir / "prompt" / "task.md").write_text("Print hello world\n")
 
     task = TaskDefinition.model_validate(
         {
             "name": "hello-world-smoke",
-            "version": "v001",
+            "scenario_revision": "v001",
             "description": "test task",
             "difficulty": "easy",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
-            "scaffold": {
-                "root": "scaffold",
+            "starter": {
+                "root": "starter",
             },
             "verification": {"gates": [], "required_commands": []},
-            "compliance": {},
-            "metrics": {
-                "modules": [
-                    {"type": "core", "id": "functional"},
-                    {"type": "core", "id": "compliance"},
-                    {"type": "core", "id": "efficiency"},
-                    {"type": "core", "id": "run-validity"},
-                    {"type": "core", "id": "optimization"},
-                ]
-            },
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
     request = RunRequest(
-        task=task,
+        scenario=task,
         config=_sample_harness_config(),
-        task_dir=task_dir,
+        scenario_dir=task_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
     scaffold_source = ScaffoldSource(
-        task_name="hello-world-smoke",
-        task_version="v001",
+        scenario_name="hello-world-smoke",
+        scenario_revision="v001",
         path=workspace,
         fingerprint=directory_fingerprint(workspace),
     )
     context = ScaffoldContext(
-        scaffold_source=scaffold_source,
+        starter_source=scaffold_source,
         workspace=workspace,
         injected_rules=None,
-        metadata_path=workspace / ".scaffold-meta.json",
+        metadata_path=workspace / ".starter-meta.json",
     )
 
     bundle = create_harbor_task_bundle(
@@ -1255,29 +1271,27 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
     task = TaskDefinition.model_validate(
         {
             "name": "homepage-implementation",
-            "version": "v001",
+            "scenario_revision": "v001",
             "description": "task",
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
-            "scaffold": {"root": "scaffold"},
+            "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": []},
             "visual": {
                 "reference_image": "reference/homepage.png",
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
                 "threshold": 0.95,
             },
-            "compliance": {},
-            "metrics": {
-                "modules": [
-                    {"type": "core", "id": "functional"},
-                    {"type": "core", "id": "compliance"},
-                    {"type": "core", "id": "efficiency"},
-                    {"type": "core", "id": "run-validity"},
-                    {"type": "core", "id": "optimization"},
-                    {"type": "core", "id": "visual-odiff"},
-                ]
-            },
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+                {"type": "core", "id": "visual-regression"},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -1298,23 +1312,21 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
     task = TaskDefinition.model_validate(
         {
             "name": "hello-world-smoke",
-            "version": "v001",
+            "scenario_revision": "v001",
             "description": "task",
             "difficulty": "easy",
             "category": "harness-integration",
             "timeout_sec": 300,
-            "scaffold": {"root": "scaffold"},
+            "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": []},
-            "compliance": {},
-            "metrics": {
-                "modules": [
-                    {"type": "core", "id": "functional"},
-                    {"type": "core", "id": "compliance"},
-                    {"type": "core", "id": "efficiency"},
-                    {"type": "core", "id": "run-validity"},
-                    {"type": "core", "id": "optimization"},
-                ]
-            },
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )

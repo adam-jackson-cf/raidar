@@ -8,13 +8,13 @@ import pytest
 
 from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
-    ComplianceCheck,
-    ComplianceScore,
-    EfficiencyScore,
+    AcceptanceCheck,
+    AcceptanceScore,
     EvalConfig,
     EvalRun,
     FunctionalScore,
     Scorecard,
+    VerificationStabilityScore,
     VisualScore,
 )
 
@@ -84,17 +84,17 @@ def sample_scorecard() -> Scorecard:
     """Create a scorecard with known scores."""
     return Scorecard(
         run_id="test-run-001",
-        task_name="test-task",
-        task_version="v001",
+        scenario_name="test-task",
+        scenario_revision="v001",
         agent="codex-cli",
         model="openai/gpt-4o",
-        scaffold_root="scaffold",
+        starter_root="starter",
         duration_sec=120.5,
         metadata={
-            "scaffold": {
-                "task": "test-task",
-                "task_version": "v001",
-                "root": "scaffold",
+            "starter": {
+                "scenario": "test-task",
+                "scenario_revision": "v001",
+                "root": "starter",
                 "fingerprint": "abc123",
             }
         },
@@ -106,15 +106,15 @@ def sample_scorecard() -> Scorecard:
             gates_passed=3,
             gates_total=3,
         ),
-        compliance=ComplianceScore(
+        acceptance=AcceptanceScore(
             checks=[
-                ComplianceCheck(rule="Use React", type="deterministic", passed=True),
-                ComplianceCheck(rule="No console.log", type="deterministic", passed=True),
-                ComplianceCheck(rule="Code quality", type="llm_judge", passed=True),
+                AcceptanceCheck(rule="Use React", type="deterministic", passed=True),
+                AcceptanceCheck(rule="No console.log", type="deterministic", passed=True),
+                AcceptanceCheck(rule="Code quality", type="llm_judge", passed=True),
             ]
         ),
         visual=VisualScore(similarity=0.95),
-        efficiency=EfficiencyScore(
+        verification_stability=VerificationStabilityScore(
             total_gate_failures=1,
             unique_failure_categories=1,
             repeat_failures=0,
@@ -130,11 +130,14 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
         timestamp=datetime.now(UTC).isoformat(),
         config=EvalConfig(
             model="openai/gpt-4o",
-            harness="codex-cli",
-            task_name="test-task",
-            task_version="v001",
-            scaffold_root="scaffold",
-            metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+            agent="codex-cli",
+            scenario_name="test-task",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile=(
+                "v2:functional+acceptance+verification-stability+"
+                "execution-validity+resource-efficiency"
+            ),
         ),
         duration_sec=120.5,
         terminated_early=False,

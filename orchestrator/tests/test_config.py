@@ -10,7 +10,12 @@ class TestEvalSettings:
         from raidar.config import ScoringWeights
 
         weights = ScoringWeights()
-        total = weights.functional + weights.compliance + weights.visual + weights.efficiency
+        total = (
+            weights.functional
+            + weights.acceptance
+            + weights.visual
+            + weights.verification_stability
+        )
         assert abs(total - 1.0) < 0.001
 
     def test_default_timeouts_are_reasonable(self):
@@ -40,10 +45,10 @@ class TestEvalSettings:
         assert settings.weights is not None
         assert settings.timeouts is not None
         assert settings.llm_judge is not None
-        assert settings.efficiency is not None
+        assert settings.verification_stability is not None
         assert settings.gate is not None
         assert settings.visual is not None
-        assert settings.optimization is not None
+        assert settings.resource_efficiency is not None
 
 
 class TestEnvironmentOverrides:
