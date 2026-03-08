@@ -52,6 +52,7 @@ orchestrator/workspace/*
 # Screenshots
 actual.png
 diff.png
+.visual-explainer/
 
 # Lock files (keep bun.lock for scaffold)
 .enaible/
