@@ -1,1 +1,1 @@
-"""Eval orchestrator for testing model/harness combinations on coding tasks."""
+"""Scenario orchestrator for testing agent/model combinations with Harbor."""

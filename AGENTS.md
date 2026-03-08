@@ -30,7 +30,7 @@
 ### Review workflow
 
 - Treat `experiments/.../runs/*/run.json`, `experiments/.../experiment-summary.json`, and `experiments/.../report.md` as the canonical review artifacts.
-- Use [docs/analyze-results.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/analyze-results.md) as the reference analysis guide for human review and for any future in-repo dashboard implementation.
+- Use [docs/analyze-results.md](/Users/adamjackson/Projects/raidar/docs/analyze-results.md) as the reference analysis guide for human review and for any future in-repo dashboard implementation.
 - Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
 
 ### Task completion

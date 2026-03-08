@@ -4,6 +4,7 @@ import json
 import tomllib
 from pathlib import Path
 
+import click
 from click.testing import CliRunner
 
 from raidar.cli import (
@@ -113,6 +114,29 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
     )
 
     _assert_no_generated_artifact_changes(tmp_path)
+
+
+def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "raidar.cli._changed_repo_entries",
+        lambda _: [
+            (
+                "M",
+                "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+            ),
+            (
+                "A",
+                "experiments/20260220-000000Z__hello-world-smoke__v001/report.md",
+            ),
+        ],
+    )
+
+    try:
+        _assert_no_generated_artifact_changes(tmp_path)
+    except click.ClickException as exc:
+        assert "Generated Harbor artifacts must not be committed" in str(exc)
+    else:
+        raise AssertionError("Expected generated artifact guard failure.")
 
 
 def _create_starter_files(scenario_dir: Path, revision: str) -> None:

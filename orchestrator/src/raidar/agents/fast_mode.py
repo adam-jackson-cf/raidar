@@ -31,7 +31,7 @@ def is_fast_mode_enabled() -> bool:
 
 
 def is_fast_image_reuse_enabled() -> bool:
-    """Return whether fast mode should reuse prebuilt task images."""
+    """Return whether fast mode should reuse prebuilt scenario images."""
     if not is_fast_mode_enabled():
         return False
     value = _normalized_env(FAST_IMAGE_REUSE_ENV_VAR)
@@ -39,7 +39,7 @@ def is_fast_image_reuse_enabled() -> bool:
 
 
 def fast_image_prefix() -> str:
-    """Return docker image repo prefix for fast-mode task images."""
+    """Return docker image repo prefix for fast-mode scenario images."""
     prefix = os.environ.get(FAST_IMAGE_PREFIX_ENV_VAR, "").strip()
     return prefix or "ts-ui-eval-smoke-fast"
 

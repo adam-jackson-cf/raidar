@@ -9,10 +9,10 @@ from pathlib import Path
 
 from ..config import AgentRunConfig
 from ..fast_mode import fast_agent_import_path, with_agent_pythonpath
-from .base import HarnessAdapter
+from .base import AgentAdapter
 
 
-class CodexCliAdapter(HarnessAdapter):
+class CodexCliAdapter(AgentAdapter):
     """Adapter enforcing Codex CLI agent + model pairing."""
 
     HARBOR_AGENT_NAME = "codex"
@@ -84,6 +84,6 @@ class CodexCliAdapter(HarnessAdapter):
         return with_agent_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
-        # Ensure Codex CLI has session directory path recorded for parsers
+        # Ensure Codex CLI trace artifacts always have a stable home.
         codex_session_dir = workspace / ".codex"
         codex_session_dir.mkdir(exist_ok=True)

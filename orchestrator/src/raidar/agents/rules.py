@@ -25,31 +25,31 @@ def get_rule_filename(agent: str) -> str:
 
 
 def inject_rules(
-    task_rules_dir: Path,
+    scenario_rules_dir: Path,
     target_dir: Path,
     agent: str,
 ) -> Path:
     """Inject rule file for the specified agent into target directory.
 
     Args:
-        task_rules_dir: Path to task's rules directory
-        target_dir: Path to scaffold target directory
+        scenario_rules_dir: Path to scenario rules directory
+        target_dir: Path to workspace target directory
         agent: Agent name (claude-code, codex, etc)
 
     Returns:
         Path to injected rule file
     """
     target_filename = get_rule_filename(agent)
-    if not task_rules_dir.exists():
-        raise FileNotFoundError(f"Rules directory not found: {task_rules_dir}")
+    if not scenario_rules_dir.exists():
+        raise FileNotFoundError(f"Rules directory not found: {scenario_rules_dir}")
 
     # Find the source rule file (may have different name in source)
-    source_file = task_rules_dir / target_filename
+    source_file = scenario_rules_dir / target_filename
     if not source_file.exists():
         # Try finding any markdown file in the rules directory
-        md_files = list(task_rules_dir.glob("*.md"))
+        md_files = list(scenario_rules_dir.glob("*.md"))
         if not md_files:
-            raise FileNotFoundError(f"No rule file found for {agent} in {task_rules_dir}")
+            raise FileNotFoundError(f"No rule file found for {agent} in {scenario_rules_dir}")
         source_file = md_files[0]
 
     target_path = target_dir / target_filename

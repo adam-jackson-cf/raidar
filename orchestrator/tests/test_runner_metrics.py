@@ -1,4 +1,4 @@
-"""Tests for runner validity and resource-efficiency metric helpers."""
+"""Tests for execution-validity and resource-efficiency helpers."""
 
 import json
 import threading
@@ -8,8 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.agents.config import Agent, ModelTarget
-from raidar.agents.config import AgentRunConfig as HarnessConfig
+from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
 from raidar.audit.workspace_diff import directory_fingerprint
 from raidar.runner import (
     EvaluationOutputs,
@@ -19,8 +18,10 @@ from raidar.runner import (
     RunLayout,
     RunRequest,
     ScorecardBuildContext,
-    _build_verifier_task_spec,
+    WorkspaceContext,
+    _build_verifier_scenario_spec,
     _classify_void_reasons,
+    _ensure_experiment_baseline_workspace,
     _load_verifier_outputs,
     _normalized_shell_subcommands,
     _prune_workspace_artifacts,
@@ -31,49 +32,26 @@ from raidar.runner import (
     create_harbor_task_bundle,
     evaluate_coverage,
     evaluate_requirements,
-)
-from raidar.runner import (
-    WorkspaceContext as ScaffoldContext,
-)
-from raidar.runner import (
-    _ensure_experiment_baseline_workspace as _ensure_suite_baseline_workspace,
-)
-from raidar.runner import (
-    scenario_evaluation_profile as task_metric_profile,
+    scenario_evaluation_profile,
 )
 from raidar.schemas.events import GateEvent
-from raidar.schemas.scenario import (
-    DeterministicCheck,
-    RequirementSpec,
-    ScenarioDefinition,
-)
-from raidar.schemas.scenario import (
-    ScenarioDefinition as TaskDefinition,
-)
+from raidar.schemas.scenario import DeterministicCheck, RequirementSpec, ScenarioDefinition
 from raidar.schemas.scorecard import (
-    AcceptanceScore as ComplianceScore,
-)
-from raidar.schemas.scorecard import (
+    AcceptanceScore,
     CoverageScore,
+    ExecutionValidityScore,
     FunctionalScore,
+    MetricResult,
     PerformanceGatesScore,
-)
-from raidar.schemas.scorecard import (
-    ExecutionValidityScore as RunValidityScore,
-)
-from raidar.schemas.scorecard import (
-    MetricResult as ModuleResult,
+    VerificationStabilityScore,
 )
 from raidar.schemas.scorecard import (
     RequirementsCoverageScore as RequirementCoverageScore,
 )
-from raidar.schemas.scorecard import (
-    VerificationStabilityScore as EfficiencyScore,
-)
-from raidar.starter.catalog import StarterSource as ScaffoldSource
+from raidar.starter.catalog import StarterSource
 
 
-def _sample_task() -> ScenarioDefinition:
+def _sample_scenario() -> ScenarioDefinition:
     return ScenarioDefinition.model_validate(
         {
             "name": "homepage-implementation",
@@ -118,8 +96,8 @@ def _sample_task() -> ScenarioDefinition:
     )
 
 
-def _sample_harness_config() -> HarnessConfig:
-    return HarnessConfig(
+def _sample_agent_config() -> AgentRunConfig:
+    return AgentRunConfig(
         agent=Agent.CODEX_CLI,
         model=ModelTarget(provider="openai", name="gpt-5"),
         timeout_sec=1800,
@@ -136,9 +114,9 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
             gates_passed=2,
             gates_total=2,
         ),
-        acceptance=ComplianceScore(),
+        acceptance=AcceptanceScore(),
         visual=None,
-        verification_stability=EfficiencyScore(
+        verification_stability=VerificationStabilityScore(
             total_gate_failures=0,
             unique_failure_categories=0,
             repeat_failures=0,
@@ -154,7 +132,7 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
             satisfied_requirements=1,
             mapped_requirements=1,
         ),
-        execution_validity=RunValidityScore(),
+        execution_validity=ExecutionValidityScore(),
         performance_gates=PerformanceGatesScore(),
         metric_results=[],
         gate_history=[],
@@ -167,17 +145,17 @@ def _sample_scorecard_context(
     terminated_early: bool,
     termination_reason: str | None,
 ) -> ScorecardBuildContext:
-    task_dir = tmp_path / "scenario"
+    scenario_dir = tmp_path / "scenario"
     workspace_dir = tmp_path / "workspace"
     results_dir = tmp_path / "results"
-    task_dir.mkdir(parents=True, exist_ok=True)
+    scenario_dir.mkdir(parents=True, exist_ok=True)
     workspace_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
-    (task_dir / "scenario.yaml").write_text("name: sample-task\nscenario_revision: v001\n")
-    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
+    (scenario_dir / "scenario.yaml").write_text("name: sample-task\nscenario_revision: v001\n")
+    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
 
-    scaffold_source = ScaffoldSource(
+    starter_source = StarterSource(
         scenario_name="homepage-implementation",
         scenario_revision="v001",
         path=workspace_dir,
@@ -185,14 +163,14 @@ def _sample_scorecard_context(
     )
 
     request = RunRequest(
-        scenario=_sample_task(),
-        config=_sample_harness_config(),
-        scenario_dir=task_dir,
+        scenario=_sample_scenario(),
+        config=_sample_agent_config(),
+        scenario_dir=scenario_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
-    context = ScaffoldContext(
-        starter_source=scaffold_source,
+    context = WorkspaceContext(
+        starter_source=starter_source,
         workspace=workspace_dir,
         injected_rules=None,
         metadata_path=workspace_dir / ".starter-meta.json",
@@ -218,14 +196,14 @@ def _sample_scorecard_context(
         ),
         terminated_early=terminated_early,
         termination_reason=termination_reason,
-        process_metrics=collect_process_metrics(_sample_task(), None, harness="codex-cli"),
+        process_metrics=collect_process_metrics(_sample_scenario(), None, agent="codex-cli"),
         events=[],
         outputs=_sample_evaluation_outputs(),
         duration_sec=12.5,
     )
     artifacts = PersistedArtifacts(
-        scaffold_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
-        task_version_meta={"scenario_yaml_hash": "abc"},
+        starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
+        scenario_revision_meta={"scenario_yaml_hash": "abc"},
         verifier_artifacts={"scorecard": "verifier/scorecard.json"},
         agent_artifacts={"log": "agent/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
@@ -250,7 +228,7 @@ def _sample_scorecard_context(
     )
 
 
-def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
+def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario_dir = tmp_path / "scenario" / "v001"
@@ -279,7 +257,7 @@ def test_ensure_suite_baseline_workspace_initializes_once_in_parallel(
     def _run() -> None:
         try:
             start_barrier.wait(timeout=1.0)
-            _ensure_suite_baseline_workspace(
+            _ensure_experiment_baseline_workspace(
                 starter_dir=starter_dir,
                 experiment_baseline_dir=experiment_baseline_dir,
                 scenario_dir=scenario_dir,
@@ -334,7 +312,7 @@ def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
     ]
     codex_log.write_text("\n".join(json.dumps(entry) for entry in entries))
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="codex-cli")
 
     assert metrics.uncached_input_tokens == 750
     assert metrics.output_tokens == 100
@@ -387,7 +365,7 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
     ]
     codex_log.write_text("\n".join(json.dumps(entry) for entry in entries))
 
-    task = TaskDefinition.model_validate(
+    scenario = ScenarioDefinition.model_validate(
         {
             "name": "homepage-implementation",
             "scenario_revision": "v001",
@@ -425,7 +403,7 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
         }
     )
 
-    metrics = collect_process_metrics(task, trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(scenario, trial_dir, agent="codex-cli")
 
     assert metrics.required_verification_commands == 2
     assert metrics.executed_required_verification_commands == 2
@@ -451,7 +429,7 @@ def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_
         )
     )
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
 
     assert metrics.command_count == 3
     assert metrics.failed_command_count == 0
@@ -485,7 +463,7 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
         )
     )
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -527,7 +505,7 @@ def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
         "the implementation with a successful build and typecheck."
     )
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -594,7 +572,7 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
         )
     )
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="claude-code")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="claude-code")
 
     assert metrics.command_count == 2
     assert metrics.failed_command_count == 0
@@ -662,7 +640,7 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
         )
     )
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="claude-code")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="claude-code")
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -707,7 +685,7 @@ def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
         )
     )
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="claude-code")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="claude-code")
 
     assert metrics.uncached_input_tokens == 600
     assert metrics.output_tokens == 111
@@ -729,7 +707,7 @@ def test_collect_process_metrics_extracts_gemini_usage_from_trajectory(tmp_path:
     )
     (agent_dir / "gemini-cli.txt").write_text("$ bun run typecheck\n")
 
-    metrics = collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
 
     assert metrics.uncached_input_tokens == 170
     assert metrics.output_tokens == 22
@@ -742,7 +720,7 @@ def test_collect_process_metrics_raises_when_usage_missing(tmp_path: Path):
     (agent_dir / "gemini-cli.trajectory.json").write_text(json.dumps({"messages": []}))
 
     with pytest.raises(RuntimeError, match="Missing token usage metrics"):
-        collect_process_metrics(_sample_task(), trial_dir, harness="gemini")
+        collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
 
 
 def test_evaluate_coverage_reads_summary_file(tmp_path: Path):
@@ -954,7 +932,7 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs.visual is not None
     assert outputs.visual.threshold_met is True
     assert outputs.metric_results == [
-        ModuleResult(
+        MetricResult(
             metric_id="artifact-checks",
             passed=False,
             matched_count=0,
@@ -1020,22 +998,22 @@ def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
     assert reason is not None
 
 
-def test_task_metric_profile_uses_ordered_task_modules():
-    task = _sample_task()
-    assert task_metric_profile(task) == (
+def test_scenario_evaluation_profile_uses_ordered_metrics():
+    scenario = _sample_scenario()
+    assert scenario_evaluation_profile(scenario) == (
         "v2:functional+acceptance+verification-stability+"
         "execution-validity+resource-efficiency+test-coverage"
     )
 
 
-def test_build_verifier_task_spec_includes_metrics_modules(tmp_path: Path):
+def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
     score_context = _sample_scorecard_context(
         tmp_path=tmp_path,
         terminated_early=False,
         termination_reason=None,
     )
-    task_spec = _build_verifier_task_spec(score_context.request, score_context.context)
-    assert task_spec["metrics"]["metrics"] == [
+    scenario_spec = _build_verifier_scenario_spec(score_context.request, score_context.context)
+    assert scenario_spec["metrics"] == [
         {"type": "core", "id": "functional"},
         {"type": "core", "id": "acceptance"},
         {"type": "core", "id": "verification-stability"},
@@ -1096,10 +1074,10 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
 
 def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Path):
     workspace = tmp_path / "workspace"
-    task_dir = tmp_path / "task"
+    scenario_dir = tmp_path / "scenario"
     results_dir = tmp_path / "results"
     workspace.mkdir(parents=True, exist_ok=True)
-    task_dir.mkdir(parents=True, exist_ok=True)
+    scenario_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     (workspace / "package.json").write_text("{}")
@@ -1108,11 +1086,11 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
 
     reference_rel = Path("references/hero.png")
-    source_reference = task_dir / reference_rel
+    source_reference = scenario_dir / reference_rel
     source_reference.parent.mkdir(parents=True, exist_ok=True)
     source_reference.write_bytes(b"png-binary")
 
-    task = TaskDefinition.model_validate(
+    scenario = ScenarioDefinition.model_validate(
         {
             "name": "homepage-implementation",
             "scenario_revision": "v001",
@@ -1141,23 +1119,23 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
             "prompt": {"entry": "prompt/task.md"},
         }
     )
-    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (task_dir / "prompt" / "task.md").write_text("Build homepage\n")
+    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
     request = RunRequest(
-        scenario=task,
-        config=_sample_harness_config(),
-        scenario_dir=task_dir,
+        scenario=scenario,
+        config=_sample_agent_config(),
+        scenario_dir=scenario_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
-    scaffold_source = ScaffoldSource(
+    starter_source = StarterSource(
         scenario_name="homepage-implementation",
         scenario_revision="v001",
         path=workspace,
         fingerprint=directory_fingerprint(workspace),
     )
-    context = ScaffoldContext(
-        starter_source=scaffold_source,
+    context = WorkspaceContext(
+        starter_source=starter_source,
         workspace=workspace,
         injected_rules=None,
         metadata_path=workspace / ".starter-meta.json",
@@ -1172,12 +1150,16 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
 
     assert copied_reference.exists()
     assert copied_reference.read_bytes() == b"png-binary"
+    assert (bundle / "tests" / "scenario-spec.json").exists()
     assert (
-        (bundle / "tests" / "score-task.mjs")
+        (bundle / "tests" / "score-scenario.mjs")
         .read_text(encoding="utf-8")
         .startswith("#!/usr/bin/env bun")
     )
-    score_script = (bundle / "tests" / "score-task.mjs").read_text(encoding="utf-8")
+    score_script = (bundle / "tests" / "score-scenario.mjs").read_text(encoding="utf-8")
+    assert "scenarioSpec.acceptance?.deterministic_checks" in score_script
+    assert "metric_results" in score_script
+    assert "verification_stability" in score_script
     assert r"const testPattern = /\.(test|spec)\.tsx?$/" in score_script
     assert r"/(\d+)\s+passed/gi" in score_script
     assert r"/(\d+)\s+failed/gi" in score_script
@@ -1192,21 +1174,23 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     monkeypatch.setenv("HARBOR_SMOKE_FAST_REUSE_IMAGE", "1")
 
     workspace = tmp_path / "workspace"
-    task_dir = tmp_path / "task"
+    scenario_dir = tmp_path / "scenario"
     results_dir = tmp_path / "results"
     workspace.mkdir(parents=True, exist_ok=True)
-    task_dir.mkdir(parents=True, exist_ok=True)
+    scenario_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     (workspace / "package.json").write_text("{}")
     (workspace / "bun.lock").write_text("")
     (workspace / "src").mkdir(parents=True, exist_ok=True)
     (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
-    (task_dir / "scenario.yaml").write_text("name: hello-world-smoke\nscenario_revision: v001\n")
-    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (task_dir / "prompt" / "task.md").write_text("Print hello world\n")
+    (scenario_dir / "scenario.yaml").write_text(
+        "name: hello-world-smoke\nscenario_revision: v001\n"
+    )
+    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "prompt" / "task.md").write_text("Print hello world\n")
 
-    task = TaskDefinition.model_validate(
+    scenario = ScenarioDefinition.model_validate(
         {
             "name": "hello-world-smoke",
             "scenario_revision": "v001",
@@ -1230,20 +1214,20 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
         }
     )
     request = RunRequest(
-        scenario=task,
-        config=_sample_harness_config(),
-        scenario_dir=task_dir,
+        scenario=scenario,
+        config=_sample_agent_config(),
+        scenario_dir=scenario_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
-    scaffold_source = ScaffoldSource(
+    starter_source = StarterSource(
         scenario_name="hello-world-smoke",
         scenario_revision="v001",
         path=workspace,
         fingerprint=directory_fingerprint(workspace),
     )
-    context = ScaffoldContext(
-        starter_source=scaffold_source,
+    context = WorkspaceContext(
+        starter_source=starter_source,
         workspace=workspace,
         injected_rules=None,
         metadata_path=workspace / ".starter-meta.json",
@@ -1268,7 +1252,7 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
     workspace.mkdir(parents=True, exist_ok=True)
     (workspace / "package.json").write_text("{}\n")
 
-    task = TaskDefinition.model_validate(
+    scenario = ScenarioDefinition.model_validate(
         {
             "name": "homepage-implementation",
             "scenario_revision": "v001",
@@ -1296,7 +1280,7 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
         }
     )
 
-    command = _resolve_homepage_screenshot_command(task, workspace)
+    command = _resolve_homepage_screenshot_command(scenario, workspace)
     assert command == ["bun", "run", "capture-screenshot"]
 
 
@@ -1309,13 +1293,13 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
         json.dumps({"scripts": {"capture-screenshot": "bun run scripts/capture-screenshot.ts"}})
     )
 
-    task = TaskDefinition.model_validate(
+    scenario = ScenarioDefinition.model_validate(
         {
             "name": "hello-world-smoke",
             "scenario_revision": "v001",
             "description": "task",
             "difficulty": "easy",
-            "category": "harness-integration",
+            "category": "agent-integration",
             "timeout_sec": 300,
             "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": []},
@@ -1331,7 +1315,7 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
         }
     )
 
-    command = _resolve_homepage_screenshot_command(task, workspace)
+    command = _resolve_homepage_screenshot_command(scenario, workspace)
     assert command is None
 
 

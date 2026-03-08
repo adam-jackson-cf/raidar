@@ -45,7 +45,7 @@ This writes canonical artifacts into `experiments/`, including per-run `run.json
 
 ## Review Workflow
 
-The active review workflow is local artifact analysis based on [docs/analyze-results.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/analyze-results.md).
+The active review workflow is local artifact analysis based on [docs/analyze-results.md](/Users/adamjackson/Projects/raidar/docs/analyze-results.md).
 
 - `experiments/.../runs/*/run.json` is the canonical per-run scorecard and evidence pointer.
 - `experiments/.../experiment-summary.json` is the canonical repeat aggregate.
@@ -105,4 +105,4 @@ make experiments-prune KEEP_PER_MODEL=1
 make quality
 ```
 
-Detailed command policy: [docs/command-surface.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/command-surface.md)
+Detailed command policy: [docs/command-surface.md](/Users/adamjackson/Projects/raidar/docs/command-surface.md)

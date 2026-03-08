@@ -79,7 +79,7 @@ def test_cleanup_stale_harbor_before_runs_invokes_full_cleanup(monkeypatch):
     }
 
 
-def test_run_with_void_retries_aborts_on_scaffold_preflight_error(monkeypatch):
+def test_run_with_void_retries_aborts_on_starter_preflight_error(monkeypatch):
     def fail_preflight(*, request, batch_size, repeat_parallel, start_index):
         raise StarterPreflightError("Starter preflight failed: bun run lint exited 1")
 
@@ -95,4 +95,4 @@ def test_run_with_void_retries_aborts_on_scaffold_preflight_error(monkeypatch):
     except click.ClickException as exc:
         assert "Fatal starter preflight error" in str(exc)
     else:
-        raise AssertionError("Expected fatal scaffold preflight ClickException.")
+        raise AssertionError("Expected fatal starter preflight ClickException.")

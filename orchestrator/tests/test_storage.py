@@ -187,9 +187,15 @@ class TestExportCsv:
         self, sample_eval_run: EvalRun, tmp_path: Path
     ):
         sample_eval_run.scores.metric_results = []
+        sample_eval_run.scores.metadata["harbor"] = {
+            "phase_timings_sec": {},
+            "agent_overhead_sec": 1.23,
+        }
         output = tmp_path / "runs.csv"
         export_to_csv([sample_eval_run], output)
         payload = output.read_text(encoding="utf-8")
         assert "evaluation_profile" in payload
         assert "metric_results" in payload
+        assert "agent_overhead_sec" in payload
+        assert "1.23" in payload
         assert sample_eval_run.config.evaluation_profile in payload
