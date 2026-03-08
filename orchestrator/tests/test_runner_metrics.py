@@ -23,6 +23,7 @@ from raidar.runner import (
     _classify_void_reasons,
     _ensure_suite_baseline_workspace,
     _load_verifier_outputs,
+    _normalized_shell_subcommands,
     _prune_workspace_artifacts,
     _resolve_homepage_screenshot_command,
     _workspace_changes_from_baseline,
@@ -472,6 +473,24 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
     assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
     assert metrics.required_verification_first_pass["bun run lint"] == "pass"
     assert metrics.required_verification_first_pass["bun run build"] == "missing"
+
+
+def test_normalized_shell_subcommands_splits_and_normalizes_aliases() -> None:
+    commands = _normalized_shell_subcommands(
+        "bash -lc 'bunx tsc --noEmit && npm run lint; bun run build'"
+    )
+
+    assert commands == ["bun run typecheck", "bun run lint", "bun run build"]
+
+
+def test_normalized_shell_subcommands_handles_unparseable_command() -> None:
+    commands = _normalized_shell_subcommands("bunx tsc --noEmit '")
+
+    assert commands == ["bun run typecheck"]
+
+
+def test_normalized_shell_subcommands_returns_empty_for_blank() -> None:
+    assert _normalized_shell_subcommands("   ") == []
 
 
 def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):

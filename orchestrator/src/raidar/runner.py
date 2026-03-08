@@ -1002,66 +1002,84 @@ def _load_baseline_scripts(scaffold_source: ScaffoldSource) -> dict[str, str]:
     return {str(key): str(value) for key, value in scripts.items()}
 
 
+def _task_spec_metrics_block(request: RunRequest) -> dict[str, Any]:
+    return {
+        "modules": [
+            module.model_dump(mode="json", exclude_none=True)
+            for module in request.task.metrics.modules
+        ]
+    }
+
+
+def _task_spec_verification_block(request: RunRequest) -> dict[str, Any]:
+    return {
+        "max_gate_failures": request.task.verification.max_gate_failures,
+        "coverage_threshold": request.task.verification.coverage_threshold,
+        "min_quality_score": request.task.verification.min_quality_score,
+        "gates": [
+            {
+                "name": gate.name,
+                "command": gate.command,
+                "on_failure": gate.on_failure,
+            }
+            for gate in request.task.verification.gates
+        ],
+    }
+
+
+def _task_spec_compliance_block(request: RunRequest) -> dict[str, Any]:
+    return {
+        "deterministic_checks": [
+            {
+                "type": check.type,
+                "pattern": check.pattern,
+                "description": check.description,
+            }
+            for check in request.task.compliance.deterministic_checks
+        ],
+        "requirements": [
+            {
+                "id": requirement.id,
+                "description": requirement.description,
+                "check": {
+                    "type": requirement.check.type,
+                    "pattern": requirement.check.pattern,
+                    "description": requirement.check.description,
+                },
+                "required_test_patterns": requirement.required_test_patterns,
+            }
+            for requirement in request.task.compliance.requirements
+        ],
+    }
+
+
+def _task_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
+    if request.task.visual is None:
+        return None
+    return {
+        "reference_image": request.task.visual.reference_image,
+        "screenshot_command": request.task.visual.screenshot_command,
+        "threshold": request.task.visual.threshold,
+    }
+
+
+def _task_spec_weights_block() -> dict[str, float]:
+    return {
+        "functional": settings.weights.functional,
+        "compliance": settings.weights.compliance,
+        "visual": settings.weights.visual,
+        "efficiency": settings.weights.efficiency,
+    }
+
+
 def _build_verifier_task_spec(request: RunRequest, context: ScaffoldContext) -> dict:
     return {
         "task_name": request.task.name,
-        "metrics": {
-            "modules": [
-                module.model_dump(mode="json", exclude_none=True)
-                for module in request.task.metrics.modules
-            ]
-        },
-        "verification": {
-            "max_gate_failures": request.task.verification.max_gate_failures,
-            "coverage_threshold": request.task.verification.coverage_threshold,
-            "min_quality_score": request.task.verification.min_quality_score,
-            "gates": [
-                {
-                    "name": gate.name,
-                    "command": gate.command,
-                    "on_failure": gate.on_failure,
-                }
-                for gate in request.task.verification.gates
-            ],
-        },
-        "compliance": {
-            "deterministic_checks": [
-                {
-                    "type": check.type,
-                    "pattern": check.pattern,
-                    "description": check.description,
-                }
-                for check in request.task.compliance.deterministic_checks
-            ],
-            "requirements": [
-                {
-                    "id": requirement.id,
-                    "description": requirement.description,
-                    "check": {
-                        "type": requirement.check.type,
-                        "pattern": requirement.check.pattern,
-                        "description": requirement.check.description,
-                    },
-                    "required_test_patterns": requirement.required_test_patterns,
-                }
-                for requirement in request.task.compliance.requirements
-            ],
-        },
-        "visual": (
-            {
-                "reference_image": request.task.visual.reference_image,
-                "screenshot_command": request.task.visual.screenshot_command,
-                "threshold": request.task.visual.threshold,
-            }
-            if request.task.visual
-            else None
-        ),
-        "weights": {
-            "functional": settings.weights.functional,
-            "compliance": settings.weights.compliance,
-            "visual": settings.weights.visual,
-            "efficiency": settings.weights.efficiency,
-        },
+        "metrics": _task_spec_metrics_block(request),
+        "verification": _task_spec_verification_block(request),
+        "compliance": _task_spec_compliance_block(request),
+        "visual": _task_spec_visual_block(request),
+        "weights": _task_spec_weights_block(),
         "baseline_scripts": _load_baseline_scripts(context.scaffold_source),
     }
 
@@ -2048,6 +2066,69 @@ def _normalize_command(command: str) -> str:
     return command.strip()
 
 
+def _is_shell_separator(token: str) -> bool:
+    return token in {"&&", "||", ";"}
+
+
+def _normalized_joined_command(tokens: list[str]) -> str | None:
+    if not tokens:
+        return None
+    return _normalize_verification_alias(shlex.join(tokens).strip())
+
+
+def _split_token_by_shell_separators(token: str) -> list[str]:
+    parts: list[str] = []
+    current: list[str] = []
+    idx = 0
+    while idx < len(token):
+        pair = token[idx : idx + 2]
+        if pair in {"&&", "||"}:
+            if current:
+                parts.append("".join(current))
+                current = []
+            parts.append(pair)
+            idx += 2
+            continue
+        if token[idx] == ";":
+            if current:
+                parts.append("".join(current))
+                current = []
+            parts.append(";")
+            idx += 1
+            continue
+        current.append(token[idx])
+        idx += 1
+    if current:
+        parts.append("".join(current))
+    return [part for part in parts if part]
+
+
+def _expand_shell_separator_tokens(tokens: list[str]) -> list[str]:
+    expanded: list[str] = []
+    for token in tokens:
+        expanded.extend(_split_token_by_shell_separators(token))
+    return expanded
+
+
+def _split_normalized_subcommands(tokens: list[str]) -> list[str]:
+    expanded_tokens = _expand_shell_separator_tokens(tokens)
+    subcommands: list[str] = []
+    current: list[str] = []
+    for token in expanded_tokens:
+        if _is_shell_separator(token):
+            normalized = _normalized_joined_command(current)
+            if normalized:
+                subcommands.append(normalized)
+            current = []
+            continue
+        current.append(token)
+
+    normalized = _normalized_joined_command(current)
+    if normalized:
+        subcommands.append(normalized)
+    return subcommands
+
+
 def _normalized_shell_subcommands(command: str) -> list[str]:
     command_text = _unwrap_shell_wrapper(command)
     if not command_text:
@@ -2058,19 +2139,7 @@ def _normalized_shell_subcommands(command: str) -> list[str]:
         return [_normalize_verification_alias(command_text)]
     if not tokens:
         return []
-
-    subcommands: list[str] = []
-    current: list[str] = []
-    for token in tokens:
-        if token in {"&&", "||", ";"}:
-            if current:
-                subcommands.append(_normalize_verification_alias(shlex.join(current).strip()))
-                current = []
-            continue
-        current.append(token)
-    if current:
-        subcommands.append(_normalize_verification_alias(shlex.join(current).strip()))
-    return [entry for entry in subcommands if entry]
+    return _split_normalized_subcommands(tokens)
 
 
 def _unwrap_shell_wrapper(command: str) -> str:
