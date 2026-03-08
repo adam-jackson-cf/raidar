@@ -16,20 +16,20 @@
 ### Public Make targets to prefer in docs
 
 - `make env-setup`
-- `make provider-list`
-- `make provider-validate AGENT=... MODEL=...`
-- `make task-init TASK_DIR=... [TASK_VERSION=...]`
-- `make task-info TASK_DIR=...`
-- `make task-validate TASK=...`
-- `make suite-run TASK=... AGENT=... MODEL=...`
-- `make matrix-run TASK=... [CONFIG=matrix.yaml]`
-- `make evals-list [METRIC_PROFILE=...] [LIMIT=...]`
-- `make evals-prune [KEEP_PER_MODEL=1]`
+- `make agent-list`
+- `make agent-validate AGENT=... MODEL=...`
+- `make scenario-init SCENARIO_DIR=... [SCENARIO_REVISION=...]`
+- `make scenario-info SCENARIO_DIR=...`
+- `make scenario-validate SCENARIO=...`
+- `make experiment-run SCENARIO=... AGENT=... MODEL=...`
+- `make matrix-run SCENARIO=... [CONFIG=matrix.yaml]`
+- `make experiments-list [EVALUATION_PROFILE=...] [LIMIT=...]`
+- `make experiments-prune [KEEP_PER_MODEL=1]`
 - `make quality`
 
 ### Review workflow
 
-- Treat `evals/.../run.json`, `evals/.../suite-summary.json`, and `evals/.../analysis.md` as the canonical review artifacts.
+- Treat `experiments/.../runs/*/run.json`, `experiments/.../experiment-summary.json`, and `experiments/.../report.md` as the canonical review artifacts.
 - Use [docs/analyze-results.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/analyze-results.md) as the reference analysis guide for human review and for any future in-repo dashboard implementation.
 - Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
 
@@ -39,6 +39,6 @@
 
 ## Rules
 
-- **ALWAYS** define `verification.gates[].command` as an argv list in task YAML.
-- **ALWAYS** define `visual.screenshot_command` as an argv list in task YAML.
-- **NEVER** use shell operators or shell features in task YAML commands.
+- **ALWAYS** define `verification.gates[].command` as an argv list in scenario YAML.
+- **ALWAYS** define `visual.screenshot_command` as an argv list in scenario YAML.
+- **NEVER** use shell operators or shell features in scenario YAML commands.

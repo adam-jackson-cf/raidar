@@ -20,35 +20,35 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .audit.workspace_diff import diff_directories
-from .config import settings
-from .harness.config import HarnessConfig
-from .harness.fast_mode import (
+from .agents.config import AgentRunConfig
+from .agents.fast_mode import (
     fast_image_prefix,
     is_fast_image_reuse_enabled,
 )
-from .harness.rules import SYSTEM_RULES, inject_rules
-from .scaffold import ScaffoldSource
-from .schemas.events import GateEvent, SessionEvent
+from .agents.rules import SYSTEM_RULES, inject_rules
+from .audit.workspace_diff import diff_directories
+from .config import settings
+from .schemas.events import GateEvent, TraceEvent
+from .schemas.scenario import RequirementSpec, ScenarioDefinition
 from .schemas.scorecard import (
-    ComplianceCheck,
-    ComplianceScore,
+    AcceptanceCheck,
+    AcceptanceScore,
     CoverageScore,
-    EfficiencyScore,
     EvalConfig,
     EvalRun,
+    ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
-    ModuleResult,
-    OptimizationScore,
+    MetricResult,
     PerformanceGatesScore,
-    RequirementCoverageScore,
-    RunValidityScore,
+    RequirementsCoverageScore,
+    ResourceEfficiencyScore,
     Scorecard,
+    VerificationStabilityScore,
     VisualScore,
 )
-from .schemas.task import RequirementSpec, TaskDefinition
-from .scoring.compliance import run_deterministic_check
+from .scoring.acceptance import run_deterministic_check
+from .starter import StarterSource
 
 SCORING_SCHEMA_VERSION = "2.0.0"
 HARBOR_TIMEOUT_BUFFER_SEC = 120
@@ -183,33 +183,33 @@ _SUITE_BASELINE_LOCKS_GUARD = threading.Lock()
 _SUITE_BASELINE_LOCKS: dict[Path, threading.Lock] = {}
 
 
-class ScaffoldPreflightError(RuntimeError):
-    """Fatal scaffold setup error that voids and aborts an entire suite."""
+class StarterPreflightError(RuntimeError):
+    """Fatal starter setup error that unscored and aborts an entire experiment."""
 
 
-def load_task(task_path: Path) -> TaskDefinition:
-    """Load task definition from YAML file."""
-    with open(task_path) as f:
+def load_scenario(scenario_path: Path) -> ScenarioDefinition:
+    """Load scenario definition from YAML file."""
+    with open(scenario_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
-    return TaskDefinition.model_validate(data)
+    return ScenarioDefinition.model_validate(data)
 
 
 @dataclass(frozen=True, slots=True)
 class RunRequest:
-    """Input bundle for running a task."""
+    """Input bundle for running a scenario."""
 
-    task: TaskDefinition
-    config: HarnessConfig
-    task_dir: Path
+    scenario: ScenarioDefinition
+    config: AgentRunConfig
+    scenario_dir: Path
     execution_dir: Path
     repeat_index: int = 1
 
 
 @dataclass(frozen=True, slots=True)
-class ScaffoldContext:
-    """Resolved scaffold context for a task run."""
+class WorkspaceContext:
+    """Resolved starter context for a scenario run."""
 
-    scaffold_source: ScaffoldSource
+    starter_source: StarterSource
     workspace: Path
     injected_rules: Path | None
     metadata_path: Path
@@ -220,14 +220,14 @@ class EvaluationOutputs:
     """Computed scoring outputs for a run."""
 
     functional: FunctionalScore
-    compliance: ComplianceScore
+    acceptance: AcceptanceScore
     visual: VisualScore | None
-    efficiency: EfficiencyScore
-    coverage: CoverageScore
-    requirements: RequirementCoverageScore
-    run_validity: RunValidityScore
+    verification_stability: VerificationStabilityScore
+    test_coverage: CoverageScore
+    requirements_coverage: RequirementsCoverageScore
+    execution_validity: ExecutionValidityScore
     performance_gates: PerformanceGatesScore
-    modules: list[ModuleResult]
+    metric_results: list[MetricResult]
     gate_history: list[GateEvent]
 
 
@@ -306,7 +306,7 @@ class WorkspacePreparationPhaseResult:
     """Workspace preparation phase output."""
 
     layout: RunLayout
-    context: ScaffoldContext
+    context: WorkspaceContext
     harbor_request: HarborExecutionRequest
     screenshot_command: tuple[str, ...] | None
     pre_screenshot_path: Path | None
@@ -321,7 +321,7 @@ class ExecutionPhaseResult:
     terminated_early: bool
     termination_reason: str | None
     process_metrics: ProcessMetrics
-    events: list[SessionEvent]
+    events: list[TraceEvent]
     outputs: EvaluationOutputs
     duration_sec: float
 
@@ -346,7 +346,7 @@ class ScorecardBuildContext:
 
     request: RunRequest
     layout: RunLayout
-    context: ScaffoldContext
+    context: WorkspaceContext
     artifacts: PersistedArtifacts
     execution: ExecutionPhaseResult
 
@@ -364,8 +364,8 @@ def _repeat_workspace_dir(request: RunRequest) -> Path:
     return request.execution_dir / "runs" / _run_label(request.repeat_index) / "workspace"
 
 
-def _suite_baseline_lock(suite_baseline_dir: Path) -> threading.Lock:
-    key = suite_baseline_dir.resolve()
+def _experiment_baseline_lock(experiment_baseline_dir: Path) -> threading.Lock:
+    key = experiment_baseline_dir.resolve()
     with _SUITE_BASELINE_LOCKS_GUARD:
         lock = _SUITE_BASELINE_LOCKS.get(key)
         if lock is None:
@@ -374,20 +374,20 @@ def _suite_baseline_lock(suite_baseline_dir: Path) -> threading.Lock:
         return lock
 
 
-def _ensure_suite_baseline_workspace(
+def _ensure_experiment_baseline_workspace(
     *,
-    scaffold_dir: Path,
-    suite_baseline_dir: Path,
-    task_dir: Path,
+    starter_dir: Path,
+    experiment_baseline_dir: Path,
+    scenario_dir: Path,
     agent: str,
 ) -> None:
-    with _suite_baseline_lock(suite_baseline_dir):
-        if suite_baseline_dir.exists():
+    with _experiment_baseline_lock(experiment_baseline_dir):
+        if experiment_baseline_dir.exists():
             return
         prepare_workspace(
-            scaffold_dir=scaffold_dir,
-            target_dir=suite_baseline_dir,
-            task_dir=task_dir,
+            starter_dir=starter_dir,
+            target_dir=experiment_baseline_dir,
+            scenario_dir=scenario_dir,
             agent=agent,
         )
 
@@ -413,21 +413,23 @@ def _workspace_has_tests(workspace: Path) -> bool:
     return False
 
 
-def _resolve_homepage_screenshot_command(task: TaskDefinition, workspace: Path) -> list[str] | None:
+def _resolve_homepage_screenshot_command(
+    task: ScenarioDefinition, workspace: Path
+) -> list[str] | None:
     del workspace
     if task.visual and task.visual.screenshot_command:
         return list(task.visual.screenshot_command)
     return None
 
 
-def task_metric_profile(task: TaskDefinition) -> str:
-    """Derive deterministic metric profile identifier for a task definition."""
-    return f"v2:{'+'.join(task_metric_modules(task))}"
+def scenario_evaluation_profile(scenario: ScenarioDefinition) -> str:
+    """Derive deterministic evaluation-profile identifier for a scenario."""
+    return f"v2:{'+'.join(scenario_metrics(scenario))}"
 
 
-def task_metric_modules(task: TaskDefinition) -> list[str]:
-    """Return deterministic ordered metric module ids for a task."""
-    return task.metric_module_ids()
+def scenario_metrics(scenario: ScenarioDefinition) -> list[str]:
+    """Return deterministic ordered metric ids for a scenario."""
+    return scenario.metric_ids()
 
 
 def _run_homepage_capture_command(
@@ -559,18 +561,18 @@ def _workspace_changes_from_baseline(
     }
 
 
-def _preflight_cache_key(request: RunRequest, context: ScaffoldContext) -> str:
+def _preflight_cache_key(request: RunRequest, context: WorkspaceContext) -> str:
     payload = {
-        "task_name": request.task.name,
-        "task_yaml_hash": _hash_bytes((request.task_dir / "task.yaml").read_bytes()),
-        "scaffold_fingerprint": context.scaffold_source.fingerprint,
-        "required_commands": request.task.verification.required_commands,
+        "scenario_name": request.scenario.name,
+        "scenario_yaml_hash": _hash_bytes((request.scenario_dir / "scenario.yaml").read_bytes()),
+        "starter_fingerprint": context.starter_source.fingerprint,
+        "required_commands": request.scenario.verification.required_commands,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 
-def _run_scaffold_preflight_install(workspace: Path, env: dict[str, str]) -> None:
+def _run_starter_preflight_install(workspace: Path, env: dict[str, str]) -> None:
     install = subprocess.run(
         ["bun", "install", "--frozen-lockfile"],
         cwd=workspace,
@@ -582,8 +584,8 @@ def _run_scaffold_preflight_install(workspace: Path, env: dict[str, str]) -> Non
     if install.returncode == 0:
         return
     output = (install.stdout + "\n" + install.stderr).strip()[:8000]
-    raise ScaffoldPreflightError(
-        "Scaffold preflight failed: `bun install --frozen-lockfile` exited "
+    raise StarterPreflightError(
+        "Starter preflight failed: `bun install --frozen-lockfile` exited "
         f"{install.returncode}\n{output}"
     )
 
@@ -595,7 +597,7 @@ def _should_skip_preflight_command(command: list[str], has_tests: bool) -> bool:
     return "test:coverage" in command_text or command_text.endswith(" test")
 
 
-def _run_scaffold_preflight_command(
+def _run_starter_preflight_command(
     workspace: Path, env: dict[str, str], command: list[str]
 ) -> None:
     completed = subprocess.run(
@@ -610,23 +612,23 @@ def _run_scaffold_preflight_command(
         return
     output = (completed.stdout + "\n" + completed.stderr).strip()[:8000]
     rendered = " ".join(shlex.quote(part) for part in command)
-    raise ScaffoldPreflightError(
-        f"Scaffold preflight failed: `{rendered}` exited {completed.returncode}\n{output}"
+    raise StarterPreflightError(
+        f"Starter preflight failed: `{rendered}` exited {completed.returncode}\n{output}"
     )
 
 
-def _write_scaffold_preflight_cache(
+def _write_starter_preflight_cache(
     *,
     cache_file: Path,
-    task_name: str,
-    scaffold_fingerprint: str,
+    scenario_name: str,
+    starter_fingerprint: str,
     required_commands: list[list[str]],
 ) -> None:
     cache_file.write_text(
         json.dumps(
             {
-                "task_name": task_name,
-                "scaffold_fingerprint": scaffold_fingerprint,
+                "scenario_name": scenario_name,
+                "starter_fingerprint": starter_fingerprint,
                 "validated_at": datetime.now(UTC).isoformat(),
                 "required_commands": required_commands,
             },
@@ -635,9 +637,9 @@ def _write_scaffold_preflight_cache(
     )
 
 
-def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> None:
-    """Validate scaffold baseline commands once per task/scaffold version."""
-    required_commands = request.task.verification.required_commands
+def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> None:
+    """Validate starter baseline commands once per scenario revision."""
+    required_commands = request.scenario.verification.required_commands
     if not required_commands:
         return
 
@@ -649,18 +651,18 @@ def ensure_scaffold_preflight(request: RunRequest, context: ScaffoldContext) -> 
         return
 
     env = os.environ.copy()
-    _run_scaffold_preflight_install(context.workspace, env)
+    _run_starter_preflight_install(context.workspace, env)
 
     has_tests = _workspace_has_tests(context.workspace)
     for command in required_commands:
         if _should_skip_preflight_command(command, has_tests):
             continue
-        _run_scaffold_preflight_command(context.workspace, env, command)
+        _run_starter_preflight_command(context.workspace, env, command)
 
-    _write_scaffold_preflight_cache(
+    _write_starter_preflight_cache(
         cache_file=cache_file,
-        task_name=request.task.name,
-        scaffold_fingerprint=context.scaffold_source.fingerprint,
+        scenario_name=request.scenario.name,
+        starter_fingerprint=context.starter_source.fingerprint,
         required_commands=required_commands,
     )
 
@@ -956,7 +958,7 @@ def prepare_workspace(
     *,
     scaffold_dir: Path,
     target_dir: Path,
-    task_dir: Path,
+    scenario_dir: Path,
     agent: str,
 ) -> tuple[Path, Path | None]:
     """Prepare workspace by copying scaffold and injecting rules.
@@ -964,7 +966,7 @@ def prepare_workspace(
     Args:
         scaffold_dir: Path to resolved scaffold template/version
         target_dir: Path to create workspace
-        task_dir: Path to task directory (contains rules/)
+        scenario_dir: Path to task directory (contains rules/)
         agent: Agent name for rule file selection
     Returns:
         Tuple of workspace path and injected rules file (if any)
@@ -981,15 +983,15 @@ def prepare_workspace(
 
     # Inject rules
     injected_rules: Path | None = None
-    rules_dir = task_dir / "rules"
+    rules_dir = scenario_dir / "rules"
     if rules_dir.exists():
         injected_rules = inject_rules(rules_dir, target_dir, agent)
 
     return target_dir, injected_rules
 
 
-def _load_baseline_scripts(scaffold_source: ScaffoldSource) -> dict[str, str]:
-    package_path = scaffold_source.path / "package.json"
+def _load_baseline_scripts(starter_source: StarterSource) -> dict[str, str]:
+    package_path = starter_source.path / "package.json"
     if not package_path.exists():
         return {}
     try:
@@ -1004,25 +1006,24 @@ def _load_baseline_scripts(scaffold_source: ScaffoldSource) -> dict[str, str]:
 
 def _task_spec_metrics_block(request: RunRequest) -> dict[str, Any]:
     return {
-        "modules": [
-            module.model_dump(mode="json", exclude_none=True)
-            for module in request.task.metrics.modules
+        "metrics": [
+            metric.model_dump(mode="json", exclude_none=True) for metric in request.scenario.metrics
         ]
     }
 
 
 def _task_spec_verification_block(request: RunRequest) -> dict[str, Any]:
     return {
-        "max_gate_failures": request.task.verification.max_gate_failures,
-        "coverage_threshold": request.task.verification.coverage_threshold,
-        "min_quality_score": request.task.verification.min_quality_score,
+        "max_gate_failures": request.scenario.verification.max_gate_failures,
+        "coverage_threshold": request.scenario.verification.coverage_threshold,
+        "min_quality_score": request.scenario.verification.min_quality_score,
         "gates": [
             {
                 "name": gate.name,
                 "command": gate.command,
                 "on_failure": gate.on_failure,
             }
-            for gate in request.task.verification.gates
+            for gate in request.scenario.verification.gates
         ],
     }
 
@@ -1035,7 +1036,7 @@ def _task_spec_compliance_block(request: RunRequest) -> dict[str, Any]:
                 "pattern": check.pattern,
                 "description": check.description,
             }
-            for check in request.task.compliance.deterministic_checks
+            for check in request.scenario.acceptance.deterministic_checks
         ],
         "requirements": [
             {
@@ -1048,39 +1049,39 @@ def _task_spec_compliance_block(request: RunRequest) -> dict[str, Any]:
                 },
                 "required_test_patterns": requirement.required_test_patterns,
             }
-            for requirement in request.task.compliance.requirements
+            for requirement in request.scenario.acceptance.requirements
         ],
     }
 
 
 def _task_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
-    if request.task.visual is None:
+    if request.scenario.visual is None:
         return None
     return {
-        "reference_image": request.task.visual.reference_image,
-        "screenshot_command": request.task.visual.screenshot_command,
-        "threshold": request.task.visual.threshold,
+        "reference_image": request.scenario.visual.reference_image,
+        "screenshot_command": request.scenario.visual.screenshot_command,
+        "threshold": request.scenario.visual.threshold,
     }
 
 
 def _task_spec_weights_block() -> dict[str, float]:
     return {
         "functional": settings.weights.functional,
-        "compliance": settings.weights.compliance,
+        "acceptance": settings.weights.acceptance,
         "visual": settings.weights.visual,
-        "efficiency": settings.weights.efficiency,
+        "verification_stability": settings.weights.verification_stability,
     }
 
 
-def _build_verifier_task_spec(request: RunRequest, context: ScaffoldContext) -> dict:
+def _build_verifier_task_spec(request: RunRequest, context: WorkspaceContext) -> dict:
     return {
-        "task_name": request.task.name,
+        "scenario_name": request.scenario.name,
         "metrics": _task_spec_metrics_block(request),
         "verification": _task_spec_verification_block(request),
-        "compliance": _task_spec_compliance_block(request),
+        "acceptance": _task_spec_compliance_block(request),
         "visual": _task_spec_visual_block(request),
         "weights": _task_spec_weights_block(),
-        "baseline_scripts": _load_baseline_scripts(context.scaffold_source),
+        "baseline_scripts": _load_baseline_scripts(context.starter_source),
     }
 
 
@@ -1092,23 +1093,25 @@ def _verifier_scorer_script() -> str:
     return _verifier_script_template_path().read_text(encoding="utf-8")
 
 
-def _fast_task_docker_image(request: RunRequest, context: ScaffoldContext) -> str | None:
+def _fast_task_docker_image(request: RunRequest, context: WorkspaceContext) -> str | None:
     if not is_fast_image_reuse_enabled():
         return None
 
-    task_path = request.task_dir / "task.yaml"
-    task_yaml_hash = _hash_bytes(task_path.read_bytes()) if task_path.exists() else "missing"
+    scenario_path = request.scenario_dir / "scenario.yaml"
+    scenario_yaml_hash = (
+        _hash_bytes(scenario_path.read_bytes()) if scenario_path.exists() else "missing"
+    )
     payload = {
         "fast_mode_version": "1",
-        "task_name": request.task.name,
-        "task_version": request.task.version,
-        "task_yaml_hash": task_yaml_hash,
-        "scaffold_fingerprint": context.scaffold_source.fingerprint,
+        "scenario_name": request.scenario.name,
+        "scenario_revision": request.scenario.scenario_revision,
+        "scenario_yaml_hash": scenario_yaml_hash,
+        "starter_fingerprint": context.starter_source.fingerprint,
     }
     digest = hashlib.sha256(
         json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()[:16]
-    image_tag = f"{_slug_fragment(request.task.name)}-{digest}"
+    image_tag = f"{_slug_fragment(request.scenario.name)}-{digest}"
     return f"{fast_image_prefix()}:{image_tag}"
 
 
@@ -1224,7 +1227,7 @@ def _initialize_harbor_bundle_paths(
 
 
 def _copy_workspace_into_bundle(
-    request: RunRequest, context: ScaffoldContext, app_dir: Path
+    request: RunRequest, context: WorkspaceContext, app_dir: Path
 ) -> None:
     shutil.copytree(
         context.workspace,
@@ -1240,12 +1243,12 @@ def _copy_workspace_into_bundle(
             "diff.png",
         ),
     )
-    if not request.task.visual:
+    if not request.scenario.visual:
         return
-    reference_path = Path(request.task.visual.reference_image)
+    reference_path = Path(request.scenario.visual.reference_image)
     if reference_path.is_absolute():
         return
-    source_reference = (request.task_dir / reference_path).resolve()
+    source_reference = (request.scenario_dir / reference_path).resolve()
     if not source_reference.exists():
         return
     target_reference = app_dir / reference_path
@@ -1253,11 +1256,11 @@ def _copy_workspace_into_bundle(
     shutil.copy2(source_reference, target_reference)
 
 
-def _load_task_prompt(task: TaskDefinition, task_dir: Path) -> str:
+def _load_scenario_prompt(task: ScenarioDefinition, scenario_dir: Path) -> str:
     prompt_paths = [task.prompt.entry, *task.prompt.includes]
     prompt_chunks: list[str] = []
     for rel_path in prompt_paths:
-        prompt_path = (task_dir / rel_path).resolve()
+        prompt_path = (scenario_dir / rel_path).resolve()
         if not prompt_path.exists():
             raise FileNotFoundError(f"Prompt artifact not found: {prompt_path}")
         prompt_chunks.append(prompt_path.read_text(encoding="utf-8").strip())
@@ -1272,7 +1275,7 @@ def _render_task_toml(request: RunRequest, task_image: str | None) -> str:
     return f"""version = "1.0"
 
 [metadata]
-name = "{request.task.name}"
+name = "{request.scenario.name}"
 source = "scaffold-spec"
 
 [verifier]
@@ -1301,7 +1304,7 @@ WORKDIR /app
 RUN bun install --frozen-lockfile
 COPY app/ /app/
 """
-    if request.task.visual:
+    if request.scenario.visual:
         dockerfile += """RUN apt-get update && apt-get install -y --no-install-recommends \\
   libx11-6 \\
   libxext6 \\
@@ -1327,7 +1330,7 @@ RUN bunx playwright install chromium
 
 
 def _write_verifier_artifacts(
-    request: RunRequest, context: ScaffoldContext, tests_dir: Path
+    request: RunRequest, context: WorkspaceContext, tests_dir: Path
 ) -> None:
     (tests_dir / "task-spec.json").write_text(
         json.dumps(_build_verifier_task_spec(request, context), indent=2)
@@ -1367,13 +1370,13 @@ tar \
 
 def create_harbor_task_bundle(
     request: RunRequest,
-    context: ScaffoldContext,
+    context: WorkspaceContext,
     bundle_root: Path,
 ) -> Path:
     """Build a Harbor-compatible task directory from the scaffold workspace."""
     bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(bundle_root)
     _copy_workspace_into_bundle(request, context, app_dir)
-    prompt_text = _load_task_prompt(request.task, request.task_dir)
+    prompt_text = _load_scenario_prompt(request.scenario, request.scenario_dir)
     (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(prompt_text))
 
     task_image = _fast_task_docker_image(request, context)
@@ -1416,22 +1419,22 @@ def initialize_run(request: RunRequest) -> RunLayout:
     )
 
 
-def prepare_run_context(request: RunRequest) -> ScaffoldContext:
-    """Resolve scaffold source, workspace, and metadata."""
-    from .scaffold import record_scaffold_metadata, resolve_scaffold_source
+def prepare_run_context(request: RunRequest) -> WorkspaceContext:
+    """Resolve starter source, workspace, and metadata."""
+    from .starter import record_starter_metadata, resolve_starter_source
 
-    scaffold_source = resolve_scaffold_source(
-        request.task_dir,
-        request.task.scaffold.root,
-        task_name=request.task.name,
-        task_version=request.task.version,
+    starter_source = resolve_starter_source(
+        request.scenario_dir,
+        request.scenario.starter.root,
+        scenario_name=request.scenario.name,
+        scenario_revision=request.scenario.scenario_revision,
     )
 
-    suite_baseline_dir = request.execution_dir / "workspace" / "baseline"
-    _ensure_suite_baseline_workspace(
-        scaffold_dir=scaffold_source.path,
-        suite_baseline_dir=suite_baseline_dir,
-        task_dir=request.task_dir,
+    experiment_baseline_dir = request.execution_dir / "workspace" / "baseline"
+    _ensure_experiment_baseline_workspace(
+        starter_dir=starter_source.path,
+        experiment_baseline_dir=experiment_baseline_dir,
+        scenario_dir=request.scenario_dir,
         agent=request.config.agent.value,
     )
 
@@ -1439,7 +1442,7 @@ def prepare_run_context(request: RunRequest) -> ScaffoldContext:
     if workspace_dir.exists():
         shutil.rmtree(workspace_dir)
     shutil.copytree(
-        suite_baseline_dir,
+        experiment_baseline_dir,
         workspace_dir,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
@@ -1453,10 +1456,10 @@ def prepare_run_context(request: RunRequest) -> ScaffoldContext:
             injected_rules = candidate
 
     workspace = workspace_dir
-    metadata_path = record_scaffold_metadata(workspace, scaffold_source)
+    metadata_path = record_starter_metadata(workspace, starter_source)
 
-    return ScaffoldContext(
-        scaffold_source=scaffold_source,
+    return WorkspaceContext(
+        starter_source=starter_source,
         workspace=workspace,
         injected_rules=injected_rules,
         metadata_path=metadata_path,
@@ -1744,30 +1747,34 @@ def _parse_gate_history(payload: dict[str, Any]) -> list[GateEvent]:
     return [GateEvent.model_validate(item) for item in gate_history_payload]
 
 
-def _parse_module_results(payload: dict[str, Any]) -> list[ModuleResult]:
-    modules_payload = payload.get("modules")
-    if not isinstance(modules_payload, list):
-        raise ValueError("scorecard.modules must be a list")
-    return [ModuleResult.model_validate(item) for item in modules_payload]
+def _parse_module_results(payload: dict[str, Any]) -> list[MetricResult]:
+    metric_results_payload = payload.get("metric_results")
+    if not isinstance(metric_results_payload, list):
+        raise ValueError("scorecard.metric_results must be a list")
+    return [MetricResult.model_validate(item) for item in metric_results_payload]
 
 
 def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:
     gate_history = _parse_gate_history(payload)
-    modules = _parse_module_results(payload)
+    metric_results = _parse_module_results(payload)
     return EvaluationOutputs(
         functional=FunctionalScore.model_validate(payload.get("functional")),
-        compliance=ComplianceScore.model_validate(payload.get("compliance")),
+        acceptance=AcceptanceScore.model_validate(payload.get("acceptance")),
         visual=(
             VisualScore.model_validate(payload.get("visual"))
             if payload.get("visual") is not None
             else None
         ),
-        efficiency=EfficiencyScore.model_validate(payload.get("efficiency")),
-        coverage=CoverageScore.model_validate(payload.get("coverage")),
-        requirements=RequirementCoverageScore.model_validate(payload.get("requirements")),
-        run_validity=RunValidityScore.model_validate(payload.get("run_validity")),
+        verification_stability=VerificationStabilityScore.model_validate(
+            payload.get("verification_stability")
+        ),
+        test_coverage=CoverageScore.model_validate(payload.get("test_coverage")),
+        requirements_coverage=RequirementsCoverageScore.model_validate(
+            payload.get("requirements_coverage")
+        ),
+        execution_validity=ExecutionValidityScore.model_validate(payload.get("execution_validity")),
         performance_gates=PerformanceGatesScore.model_validate(payload.get("performance_gates")),
-        modules=modules,
+        metric_results=metric_results,
         gate_history=gate_history,
     )
 
@@ -1794,16 +1801,16 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
     return outputs, None
 
 
-def build_scaffold_meta(request: RunRequest, context: ScaffoldContext) -> dict:
-    """Build scaffold metadata for the scorecard."""
-    suite_baseline_dir = request.execution_dir / "workspace" / "baseline"
+def build_starter_meta(request: RunRequest, context: WorkspaceContext) -> dict:
+    """Build starter metadata for the scorecard."""
+    experiment_baseline_dir = request.execution_dir / "workspace" / "baseline"
     return {
-        "task": context.scaffold_source.task_name,
-        "task_version": context.scaffold_source.task_version,
-        "root": str(context.scaffold_source.path),
-        "suite_baseline_dir": str(suite_baseline_dir),
+        "scenario": context.starter_source.scenario_name,
+        "scenario_revision": context.starter_source.scenario_revision,
+        "root": str(context.starter_source.path),
+        "experiment_baseline_dir": str(experiment_baseline_dir),
         "run_workspace_dir": str(context.workspace),
-        "fingerprint": context.scaffold_source.fingerprint,
+        "fingerprint": context.starter_source.fingerprint,
         "metadata_file": context.metadata_path.name,
         "rules_file": context.injected_rules.name if context.injected_rules else None,
         "artifacts": {
@@ -1817,27 +1824,29 @@ def _hash_bytes(payload: bytes) -> str:
     return f"sha256:{hashlib.sha256(payload).hexdigest()}"
 
 
-def build_task_version_meta(request: RunRequest, context: ScaffoldContext) -> dict[str, str | None]:
-    """Build deterministic task/scaffold fingerprint metadata."""
-    task_path = request.task_dir / "task.yaml"
-    task_yaml_hash = _hash_bytes(task_path.read_bytes()) if task_path.exists() else None
+def build_scenario_revision_meta(
+    request: RunRequest, context: WorkspaceContext
+) -> dict[str, str | None]:
+    """Build deterministic scenario/starter fingerprint metadata."""
+    scenario_path = request.scenario_dir / "scenario.yaml"
+    scenario_yaml_hash = _hash_bytes(scenario_path.read_bytes()) if scenario_path.exists() else None
 
     seed_payload = {
         "scoring_schema_version": SCORING_SCHEMA_VERSION,
-        "task_yaml_hash": task_yaml_hash,
-        "task_model": request.task.model_dump(mode="json", exclude_none=True),
-        "task_name": request.task.name,
-        "task_version": request.task.version,
-        "scaffold_root": request.task.scaffold.root,
-        "scaffold_fingerprint": context.scaffold_source.fingerprint,
+        "scenario_yaml_hash": scenario_yaml_hash,
+        "scenario_model": request.scenario.model_dump(mode="json", exclude_none=True),
+        "scenario_name": request.scenario.name,
+        "scenario_revision": request.scenario.scenario_revision,
+        "starter_root": request.scenario.starter.root,
+        "starter_fingerprint": context.starter_source.fingerprint,
     }
     seed = json.dumps(seed_payload, sort_keys=True, separators=(",", ":")).encode()
     return {
         "scoring_schema_version": SCORING_SCHEMA_VERSION,
-        "task_yaml_hash": task_yaml_hash,
-        "task_fingerprint": _hash_bytes(seed),
-        "metric_profile": task_metric_profile(request.task),
-        "metric_modules": task_metric_modules(request.task),
+        "scenario_yaml_hash": scenario_yaml_hash,
+        "scenario_fingerprint": _hash_bytes(seed),
+        "evaluation_profile": scenario_evaluation_profile(request.scenario),
+        "metrics": scenario_metrics(request.scenario),
     }
 
 
@@ -1946,14 +1955,14 @@ def write_run_analysis(
         "",
         f"- run_id: `{layout.run_id}`",
         f"- started_at_utc: `{layout.start_time.isoformat()}`",
-        f"- task: `{request.task.name}`",
+        f"- scenario: `{request.scenario.name}`",
         f"- agent: `{request.config.agent.value}`",
         f"- model: `{request.config.model.qualified_name}`",
         f"- run_label: `{layout.run_label}`",
-        f"- run_valid: `{scorecard.run_validity.passed}`",
+        f"- execution_valid: `{scorecard.execution_validity.passed}`",
         f"- performance_gates_passed: `{scorecard.performance_gates.passed}`",
-        f"- voided: `{scorecard.voided}`",
-        f"- void_reasons: `{scorecard.void_reasons}`",
+        f"- unscored: `{scorecard.unscored}`",
+        f"- unscored_reasons: `{scorecard.unscored_reasons}`",
         f"- quality_score: `{scorecard.quality_score:.6f}`",
         f"- composite_score: `{scorecard.composite_score:.6f}`",
         "",
@@ -2178,7 +2187,7 @@ def _command_failed(item: dict) -> bool:
     return status == "failed" or exit_code != 0
 
 
-def _verification_command_strings(task: TaskDefinition) -> list[str]:
+def _verification_command_strings(task: ScenarioDefinition) -> list[str]:
     patterns: list[str] = []
     for gate in task.verification.gates:
         patterns.append(shlex.join(gate.command))
@@ -2753,7 +2762,7 @@ def _first_pass_counts(first_pass_status: dict[str, str]) -> tuple[int, int, int
 
 
 def collect_process_metrics(
-    task: TaskDefinition,
+    task: ScenarioDefinition,
     trial_dir: Path | None,
     *,
     harness: str,
@@ -2804,15 +2813,15 @@ def collect_process_metrics(
     )
 
 
-def _events_from_command(timestamp: str, item: dict) -> list[SessionEvent]:
+def _events_from_command(timestamp: str, item: dict) -> list[TraceEvent]:
     command = _normalize_command(str(item.get("command", "")))
     return [
-        SessionEvent(
+        TraceEvent(
             timestamp=timestamp,
             event_type="bash_command",
             data={"command": command},
         ),
-        SessionEvent(
+        TraceEvent(
             timestamp=timestamp,
             event_type="gate_result",
             data={
@@ -2823,14 +2832,14 @@ def _events_from_command(timestamp: str, item: dict) -> list[SessionEvent]:
     ]
 
 
-def _events_from_file_changes(timestamp: str, item: dict) -> list[SessionEvent]:
-    file_events: list[SessionEvent] = []
+def _events_from_file_changes(timestamp: str, item: dict) -> list[TraceEvent]:
+    file_events: list[TraceEvent] = []
     for change in item.get("changes", []) or []:
         path = change.get("path")
         if not path:
             continue
         file_events.append(
-            SessionEvent(
+            TraceEvent(
                 timestamp=timestamp,
                 event_type="file_change",
                 data={"file_path": str(path)},
@@ -2839,7 +2848,7 @@ def _events_from_file_changes(timestamp: str, item: dict) -> list[SessionEvent]:
     return file_events
 
 
-def _events_from_item(timestamp: str, item: dict) -> list[SessionEvent]:
+def _events_from_item(timestamp: str, item: dict) -> list[TraceEvent]:
     item_type = item.get("type")
     if item_type == "command_execution":
         return _events_from_command(timestamp, item)
@@ -2851,7 +2860,7 @@ def _events_from_item(timestamp: str, item: dict) -> list[SessionEvent]:
     if not text:
         return []
     return [
-        SessionEvent(
+        TraceEvent(
             timestamp=timestamp,
             event_type="assistant_message",
             data={"content": str(text)},
@@ -2863,14 +2872,14 @@ def collect_session_events(
     trial_dir: Path | None,
     *,
     harness: str,
-) -> list[SessionEvent]:
+) -> list[TraceEvent]:
     """Project harness logs into normalized session events."""
     if not trial_dir:
         return []
     if not _harness_emits_structured_session_events(harness):
         return []
 
-    events: list[SessionEvent] = []
+    events: list[TraceEvent] = []
     for entry in _read_jsonl_dicts(trial_dir / "agent" / "codex.txt"):
         timestamp = str(entry.get("timestamp") or datetime.now(UTC).isoformat())
         item = _extract_item_completed(entry)
@@ -2976,10 +2985,10 @@ def _has_test_pattern(test_sources: list[str], pattern: str) -> bool:
 def evaluate_requirements(
     workspace: Path,
     requirements: list[RequirementSpec],
-) -> RequirementCoverageScore:
+) -> RequirementsCoverageScore:
     """Evaluate requirement implementation and requirement-to-test mapping."""
     if not requirements:
-        return RequirementCoverageScore()
+        return RequirementsCoverageScore()
 
     test_sources = [path.read_text(errors="ignore") for path in _test_file_paths(workspace)]
     missing_ids: list[str] = []
@@ -3010,7 +3019,7 @@ def evaluate_requirements(
             if missing_patterns:
                 pattern_gaps[requirement.id] = missing_patterns
 
-    return RequirementCoverageScore(
+    return RequirementsCoverageScore(
         total_requirements=len(requirements),
         satisfied_requirements=satisfied,
         mapped_requirements=mapped,
@@ -3025,7 +3034,7 @@ def _requirement_status(
     workspace: Path,
     requirement: RequirementSpec,
     test_sources: list[str],
-) -> tuple[ComplianceCheck, list[str]]:
+) -> tuple[AcceptanceCheck, list[str]]:
     requirement_check = run_deterministic_check(requirement.check, workspace)
     missing_patterns = [
         pattern
@@ -3062,9 +3071,9 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
             gates_passed=0,
             gates_total=0,
         ),
-        compliance=ComplianceScore(
+        acceptance=AcceptanceScore(
             checks=[
-                ComplianceCheck(
+                AcceptanceCheck(
                     rule="Evaluation run completed",
                     type="deterministic",
                     passed=False,
@@ -3073,25 +3082,25 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
             ]
         ),
         visual=None,
-        efficiency=EfficiencyScore(
-            total_gate_failures=settings.efficiency.max_gate_failures,
+        verification_stability=VerificationStabilityScore(
+            total_gate_failures=settings.verification_stability.max_gate_failures,
             unique_failure_categories=0,
             repeat_failures=0,
         ),
-        coverage=CoverageScore(
+        test_coverage=CoverageScore(
             threshold=None,
             measured=None,
             source=None,
             passed=False,
         ),
-        requirements=RequirementCoverageScore(
+        requirements_coverage=RequirementsCoverageScore(
             total_requirements=0,
             satisfied_requirements=0,
             mapped_requirements=0,
             missing_requirement_ids=[],
             requirement_gap_ids=[],
         ),
-        run_validity=RunValidityScore(
+        execution_validity=ExecutionValidityScore(
             checks=[
                 GateCheck(
                     name="run_completed",
@@ -3101,7 +3110,7 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
             ]
         ),
         performance_gates=PerformanceGatesScore(checks=[]),
-        modules=[],
+        metric_results=[],
         gate_history=[],
     )
 
@@ -3110,7 +3119,7 @@ def _all_gates_passed(outputs: EvaluationOutputs) -> bool:
     return outputs.functional.gates_total == outputs.functional.gates_passed
 
 
-def _completion_claim_consistent(events: list[SessionEvent], gates_passed: bool) -> GateCheck:
+def _completion_claim_consistent(events: list[TraceEvent], gates_passed: bool) -> GateCheck:
     completion_keywords = ("complete", "completed", "done", "finished")
     completion_claimed = any(
         event.event_type == "assistant_message"
@@ -3152,10 +3161,10 @@ def build_run_validity_score(
     terminated_early: bool,
     termination_reason: str | None,
     process_metrics: ProcessMetrics,
-    events: list[SessionEvent],
-) -> RunValidityScore:
+    events: list[TraceEvent],
+) -> ExecutionValidityScore:
     """Build run-validity checks for the run."""
-    checks = [check.model_copy(deep=True) for check in outputs.run_validity.checks]
+    checks = [check.model_copy(deep=True) for check in outputs.execution_validity.checks]
     _upsert_gate_check(
         checks,
         GateCheck(
@@ -3179,7 +3188,7 @@ def build_run_validity_score(
 
     completion_check = _completion_claim_consistent(events, _all_gates_passed(outputs))
     _upsert_gate_check(checks, completion_check)
-    return RunValidityScore(checks=checks)
+    return ExecutionValidityScore(checks=checks)
 
 
 def build_performance_gates_score(*, outputs: EvaluationOutputs) -> PerformanceGatesScore:
@@ -3188,9 +3197,9 @@ def build_performance_gates_score(*, outputs: EvaluationOutputs) -> PerformanceG
     return PerformanceGatesScore(checks=checks)
 
 
-def build_optimization_score(metrics: ProcessMetrics) -> OptimizationScore:
+def build_optimization_score(metrics: ProcessMetrics) -> ResourceEfficiencyScore:
     """Build optimization score model from process metrics."""
-    return OptimizationScore(
+    return ResourceEfficiencyScore(
         uncached_input_tokens=metrics.uncached_input_tokens,
         output_tokens=metrics.output_tokens,
         command_count=metrics.command_count,
@@ -3230,15 +3239,15 @@ def _classify_void_reasons(terminated_early: bool, termination_reason: str | Non
 
 
 def _scorecard_run_metadata(
-    layout: RunLayout, *, voided: bool, void_reasons: list[str]
+    layout: RunLayout, *, unscored: bool, unscored_reasons: list[str]
 ) -> dict[str, Any]:
     return {
         "run_label": layout.run_label,
         "canonical_run_dir": str(layout.root_dir),
         "run_json_path": str(layout.run_json_path),
-        "run_analysis_path": str(layout.analysis_path),
-        "repeat_required": voided,
-        "repeat_required_reasons": void_reasons,
+        "run_report_path": str(layout.analysis_path),
+        "rerun_required": unscored,
+        "unscored_reasons": unscored_reasons,
     }
 
 
@@ -3304,13 +3313,17 @@ def _scorecard_metadata(
     layout: RunLayout,
     execution: ExecutionPhaseResult,
     artifacts: PersistedArtifacts,
-    voided: bool,
-    void_reasons: list[str],
+    unscored: bool,
+    unscored_reasons: list[str],
 ) -> dict[str, Any]:
     return {
-        "run": _scorecard_run_metadata(layout, voided=voided, void_reasons=void_reasons),
-        "scaffold": artifacts.scaffold_meta,
-        "task": artifacts.task_version_meta,
+        "run": _scorecard_run_metadata(
+            layout,
+            unscored=unscored,
+            unscored_reasons=unscored_reasons,
+        ),
+        "starter": artifacts.scaffold_meta,
+        "scenario": artifacts.task_version_meta,
         "harbor": _scorecard_harbor_metadata(execution, artifacts),
         "agent": {"artifacts": artifacts.agent_artifacts},
         "verifier": _scorecard_verifier_metadata(execution, artifacts),
@@ -3332,7 +3345,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     execution = context.execution
     outputs = execution.outputs
 
-    run_validity = build_run_validity_score(
+    execution_validity = build_run_validity_score(
         outputs=outputs,
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
@@ -3340,39 +3353,42 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         events=execution.events,
     )
     performance_gates = build_performance_gates_score(outputs=outputs)
-    optimization = build_optimization_score(execution.process_metrics)
-    void_reasons = _classify_void_reasons(execution.terminated_early, execution.termination_reason)
-    voided = len(void_reasons) > 0
+    resource_efficiency = build_optimization_score(execution.process_metrics)
+    unscored_reasons = _classify_void_reasons(
+        execution.terminated_early,
+        execution.termination_reason,
+    )
+    unscored = len(unscored_reasons) > 0
     metadata = _scorecard_metadata(
         layout=layout,
         execution=execution,
         artifacts=artifacts,
-        voided=voided,
-        void_reasons=void_reasons,
+        unscored=unscored,
+        unscored_reasons=unscored_reasons,
     )
 
     return Scorecard(
         run_id=layout.run_id,
-        task_name=request.task.name,
-        task_version=request.task.version,
+        scenario_name=request.scenario.name,
+        scenario_revision=request.scenario.scenario_revision,
         agent=request.config.agent.value,
         model=request.config.model.qualified_name,
-        scaffold_root=request.task.scaffold.root,
+        starter_root=request.scenario.starter.root,
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
-        voided=voided,
-        void_reasons=void_reasons,
+        unscored=unscored,
+        unscored_reasons=unscored_reasons,
         functional=outputs.functional,
-        compliance=outputs.compliance,
+        acceptance=outputs.acceptance,
         visual=outputs.visual,
-        efficiency=outputs.efficiency,
-        coverage=outputs.coverage,
-        requirements=outputs.requirements,
-        run_validity=run_validity,
+        verification_stability=outputs.verification_stability,
+        test_coverage=outputs.test_coverage,
+        requirements_coverage=outputs.requirements_coverage,
+        execution_validity=execution_validity,
         performance_gates=performance_gates,
-        optimization=optimization,
-        modules=outputs.modules,
+        resource_efficiency=resource_efficiency,
+        metric_results=outputs.metric_results,
         metadata=metadata,
     )
 
@@ -3386,8 +3402,8 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
     context = prepare_run_context(request)
     adapter.prepare_workspace(context.workspace)
     cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
-    ensure_scaffold_preflight(request, context)
-    screenshot_command = _resolve_homepage_screenshot_command(request.task, context.workspace)
+    ensure_starter_preflight(request, context)
+    screenshot_command = _resolve_homepage_screenshot_command(request.scenario, context.workspace)
     pre_screenshot_path: Path | None = None
     evidence_errors: list[str] = []
     if screenshot_command:
@@ -3443,7 +3459,7 @@ def _execute_harbor_phase(
     termination_reason = harbor_result.termination_reason
     try:
         process_metrics = collect_process_metrics(
-            request.task,
+            request.scenario,
             harbor_result.trial_dir,
             harness=request.config.agent.value,
         )
@@ -3520,8 +3536,8 @@ def _persist_artifacts_phase(
         run_root_dir=phase.layout.root_dir,
     )
     return PersistedArtifacts(
-        scaffold_meta=build_scaffold_meta(request, phase.context),
-        task_version_meta=build_task_version_meta(request, phase.context),
+        scaffold_meta=build_starter_meta(request, phase.context),
+        task_version_meta=build_scenario_revision_meta(request, phase.context),
         verifier_artifacts=persist_verifier_artifacts(
             execution.harbor_result, phase.layout.verifier_dir
         ),
@@ -3554,7 +3570,7 @@ def _synthesize_scorecard_phase(
 
 
 def run_task(request: RunRequest) -> EvalRun:
-    """Execute a task and return evaluation results."""
+    """Execute a scenario and return evaluation results."""
     prepared = _prepare_workspace_phase(request)
     execution = _execute_harbor_phase(request, prepared)
     artifacts = _persist_artifacts_phase(request, prepared, execution)
@@ -3565,11 +3581,11 @@ def run_task(request: RunRequest) -> EvalRun:
         timestamp=prepared.layout.start_time.isoformat(),
         config=EvalConfig(
             model=request.config.model.qualified_name,
-            harness=request.config.agent.value,
-            task_name=request.task.name,
-            task_version=request.task.version,
-            scaffold_root=request.task.scaffold.root,
-            metric_profile=task_metric_profile(request.task),
+            agent=request.config.agent.value,
+            scenario_name=request.scenario.name,
+            scenario_revision=request.scenario.scenario_revision,
+            starter_root=request.scenario.starter.root,
+            evaluation_profile=scenario_evaluation_profile(request.scenario),
         ),
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,

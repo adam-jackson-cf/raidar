@@ -1,4 +1,4 @@
-"""Run storage and aggregation for evaluation results."""
+"""Run storage and aggregation for experiment results."""
 
 import csv
 import json
@@ -35,7 +35,7 @@ def load_run(path: Path) -> EvalRun:
 
 
 def load_all_runs(results_dir: Path) -> list[EvalRun]:
-    """Load all evaluation runs from an evals directory."""
+    """Load all evaluation runs from an experiments directory."""
     runs = []
 
     for json_file in results_dir.glob("**/runs/*/run.json"):
@@ -60,13 +60,13 @@ def _uncached_tokens(run: EvalRun) -> int:
     return int(process.get("uncached_input_tokens", 0) or 0)
 
 
-def _module_ids(run: EvalRun) -> list[str]:
-    return [module.module_id for module in run.scores.modules]
+def _metric_ids(run: EvalRun) -> list[str]:
+    return [module.metric_id for module in run.scores.metric_results]
 
 
-def _artifact_presence_module(run: EvalRun):
-    for module in run.scores.modules:
-        if module.module_id == "artifact_presence":
+def _artifact_checks_metric(run: EvalRun):
+    for module in run.scores.metric_results:
+        if module.metric_id == "artifact-checks":
             return module
     return None
 
@@ -75,8 +75,8 @@ def _empty_group_stats() -> dict[str, float | int]:
     return {
         "count": 0,
         "scored_count": 0,
-        "void_count": 0,
-        "void_rate": 0.0,
+        "unscored_count": 0,
+        "unscored_rate": 0.0,
         "avg_score": 0.0,
         "score_variance": 0.0,
         "validity_rate": 0.0,
@@ -101,7 +101,7 @@ def _safe_average(values: list[float]) -> float:
 
 
 def _scored_runs(runs_list: list[EvalRun]) -> list[EvalRun]:
-    return [run for run in runs_list if not run.scores.voided]
+    return [run for run in runs_list if not run.scores.unscored]
 
 
 def _group_stats(runs_list: list[EvalRun]) -> dict[str, float | int]:
@@ -109,18 +109,18 @@ def _group_stats(runs_list: list[EvalRun]) -> dict[str, float | int]:
         return _empty_group_stats()
 
     scored_runs = _scored_runs(runs_list)
-    void_count = len(runs_list) - len(scored_runs)
+    unscored_count = len(runs_list) - len(scored_runs)
     composite_scores = [run.scores.composite_score for run in scored_runs]
     diagnostic_scores = [run.scores.diagnostic_score for run in scored_runs]
     durations = [run.duration_sec for run in scored_runs]
-    valid_runs = [run for run in scored_runs if run.scores.run_validity.passed]
+    valid_runs = [run for run in scored_runs if run.scores.execution_validity.passed]
     performance_pass_runs = [run for run in scored_runs if run.scores.performance_gates.passed]
     scored_count = len(scored_runs)
     return {
         "count": len(runs_list),
         "scored_count": scored_count,
-        "void_count": void_count,
-        "void_rate": _safe_ratio(void_count, len(runs_list)),
+        "unscored_count": unscored_count,
+        "unscored_rate": _safe_ratio(unscored_count, len(runs_list)),
         "avg_score": _safe_average(composite_scores),
         "score_variance": _variance(composite_scores),
         "validity_rate": _safe_ratio(len(valid_runs), scored_count),
@@ -145,31 +145,31 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
         return {"total_runs": 0}
 
     # Group by configuration
-    by_harness: dict[str, list[EvalRun]] = {}
+    by_agent: dict[str, list[EvalRun]] = {}
     by_model: dict[str, list[EvalRun]] = {}
-    by_scaffold: dict[str, list[EvalRun]] = {}
+    by_starter: dict[str, list[EvalRun]] = {}
     by_config: dict[str, list[EvalRun]] = {}
 
     for run in runs:
-        harness = run.config.harness
+        agent = run.config.agent
         model = run.config.model
-        scaffold_key = run.config.scaffold_root
+        starter_key = run.config.starter_root
         config_key = (
-            f"{harness}|{model}|{run.config.task_name}|"
-            f"{run.config.task_version}|{run.config.scaffold_root}|"
-            f"{run.config.metric_profile}|{','.join(_module_ids(run))}"
+            f"{agent}|{model}|{run.config.scenario_name}|"
+            f"{run.config.scenario_revision}|{run.config.starter_root}|"
+            f"{run.config.evaluation_profile}|{','.join(_metric_ids(run))}"
         )
 
-        by_harness.setdefault(harness, []).append(run)
+        by_agent.setdefault(agent, []).append(run)
         by_model.setdefault(model, []).append(run)
-        by_scaffold.setdefault(scaffold_key, []).append(run)
+        by_starter.setdefault(starter_key, []).append(run)
         by_config.setdefault(config_key, []).append(run)
 
     return {
         "total_runs": len(runs),
-        "by_harness": {h: _group_stats(r) for h, r in by_harness.items()},
+        "by_agent": {h: _group_stats(r) for h, r in by_agent.items()},
         "by_model": {m: _group_stats(r) for m, r in by_model.items()},
-        "by_scaffold": {key: _group_stats(r) for key, r in by_scaffold.items()},
+        "by_starter": {key: _group_stats(r) for key, r in by_starter.items()},
         "by_config": {key: _group_stats(r) for key, r in by_config.items()},
     }
 
@@ -187,29 +187,29 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
     fieldnames = [
         "run_id",
         "timestamp",
-        "harness",
+        "agent",
         "model",
-        "task_name",
-        "task_version",
-        "scaffold_root",
-        "metric_profile",
-        "metric_modules",
+        "scenario_name",
+        "scenario_revision",
+        "starter_root",
+        "evaluation_profile",
+        "metric_results",
         "duration_sec",
         "terminated_early",
         "functional_passed",
         "build_succeeded",
         "tests_passed",
         "tests_total",
-        "compliance_score",
+        "acceptance_score",
         "visual_similarity",
-        "efficiency_score",
+        "verification_stability_score",
         "quality_score",
         "diagnostic_score",
-        "voided",
-        "void_reasons",
-        "run_valid",
+        "unscored",
+        "unscored_reasons",
+        "execution_valid",
         "performance_gates_passed",
-        "optimization_score",
+        "resource_efficiency_score",
         "gate_failures",
         "repeat_failures",
         "failed_command_categories",
@@ -217,11 +217,11 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "first_pass_verification_successes",
         "first_pass_verification_failures",
         "missing_required_verification_commands",
-        "coverage_threshold",
-        "coverage_measured",
-        "coverage_passed",
-        "requirement_presence_ratio",
-        "requirement_mapping_ratio",
+        "test_coverage_threshold",
+        "test_coverage_measured",
+        "test_coverage_passed",
+        "requirements_presence_ratio",
+        "requirements_mapping_ratio",
         "requirement_pattern_gap_count",
         "requirement_pattern_gaps",
         "composite_score",
@@ -230,9 +230,9 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "agent_setup_sec",
         "agent_execution_sec",
         "verifier_sec",
-        "harness_overhead_sec",
-        "artifact_presence_passed",
-        "artifact_presence_missing_patterns",
+        "agent_overhead_sec",
+        "artifact_checks_passed",
+        "artifact_checks_missing_patterns",
     ]
 
     with open(output_path, "w", newline="") as f:
@@ -249,35 +249,35 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
             phase_timings = harbor_meta.get("phase_timings_sec", {})
             if not isinstance(phase_timings, dict):
                 phase_timings = {}
-            artifact_presence = _artifact_presence_module(run)
+            artifact_checks = _artifact_checks_metric(run)
             row = {
                 "run_id": run.id,
                 "timestamp": run.timestamp,
-                "harness": run.config.harness,
+                "agent": run.config.agent,
                 "model": run.config.model,
-                "task_name": run.config.task_name,
-                "task_version": run.config.task_version,
-                "scaffold_root": run.config.scaffold_root,
-                "metric_profile": run.config.metric_profile,
-                "metric_modules": json.dumps(_module_ids(run)),
+                "scenario_name": run.config.scenario_name,
+                "scenario_revision": run.config.scenario_revision,
+                "starter_root": run.config.starter_root,
+                "evaluation_profile": run.config.evaluation_profile,
+                "metric_results": json.dumps(_metric_ids(run)),
                 "duration_sec": run.duration_sec,
                 "terminated_early": run.terminated_early,
                 "functional_passed": run.scores.functional.passed,
                 "build_succeeded": run.scores.functional.build_succeeded,
                 "tests_passed": run.scores.functional.tests_passed,
                 "tests_total": run.scores.functional.tests_total,
-                "compliance_score": run.scores.compliance.score,
+                "acceptance_score": run.scores.acceptance.score,
                 "visual_similarity": run.scores.visual.similarity if run.scores.visual else None,
-                "efficiency_score": run.scores.efficiency.score,
+                "verification_stability_score": run.scores.verification_stability.score,
                 "quality_score": run.scores.quality_score,
                 "diagnostic_score": run.scores.diagnostic_score,
-                "voided": run.scores.voided,
-                "void_reasons": json.dumps(run.scores.void_reasons),
-                "run_valid": run.scores.run_validity.passed,
+                "unscored": run.scores.unscored,
+                "unscored_reasons": json.dumps(run.scores.unscored_reasons),
+                "execution_valid": run.scores.execution_validity.passed,
                 "performance_gates_passed": run.scores.performance_gates.passed,
-                "optimization_score": run.scores.optimization.score,
-                "gate_failures": run.scores.efficiency.total_gate_failures,
-                "repeat_failures": run.scores.efficiency.repeat_failures,
+                "resource_efficiency_score": run.scores.resource_efficiency.score,
+                "gate_failures": run.scores.verification_stability.total_gate_failures,
+                "repeat_failures": run.scores.verification_stability.repeat_failures,
                 "failed_command_categories": json.dumps(
                     process_meta.get("failed_command_categories", {}),
                     sort_keys=True,
@@ -292,16 +292,16 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "missing_required_verification_commands": process_meta.get(
                     "missing_required_verification_commands"
                 ),
-                "coverage_threshold": run.scores.coverage.threshold,
-                "coverage_measured": run.scores.coverage.measured,
-                "coverage_passed": run.scores.coverage.passed,
-                "requirement_presence_ratio": run.scores.requirements.presence_ratio,
-                "requirement_mapping_ratio": run.scores.requirements.mapping_ratio,
+                "test_coverage_threshold": run.scores.test_coverage.threshold,
+                "test_coverage_measured": run.scores.test_coverage.measured,
+                "test_coverage_passed": run.scores.test_coverage.passed,
+                "requirements_presence_ratio": run.scores.requirements_coverage.presence_ratio,
+                "requirements_mapping_ratio": run.scores.requirements_coverage.mapping_ratio,
                 "requirement_pattern_gap_count": len(
-                    run.scores.requirements.requirement_pattern_gaps
+                    run.scores.requirements_coverage.requirement_pattern_gaps
                 ),
                 "requirement_pattern_gaps": json.dumps(
-                    run.scores.requirements.requirement_pattern_gaps,
+                    run.scores.requirements_coverage.requirement_pattern_gaps,
                     sort_keys=True,
                 ),
                 "composite_score": run.scores.composite_score,
@@ -310,13 +310,13 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "agent_setup_sec": phase_timings.get("agent_setup_sec"),
                 "agent_execution_sec": phase_timings.get("agent_execution_sec"),
                 "verifier_sec": phase_timings.get("verifier_sec"),
-                "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
-                "artifact_presence_passed": (
-                    artifact_presence.passed if artifact_presence is not None else None
+                "agent_overhead_sec": harbor_meta.get("agent_overhead_sec"),
+                "artifact_checks_passed": (
+                    artifact_checks.passed if artifact_checks is not None else None
                 ),
-                "artifact_presence_missing_patterns": (
-                    json.dumps(artifact_presence.missing_patterns)
-                    if artifact_presence is not None
+                "artifact_checks_missing_patterns": (
+                    json.dumps(artifact_checks.missing_patterns)
+                    if artifact_checks is not None
                     else None
                 ),
             }
@@ -350,9 +350,9 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         [
             "\n## Summary Table\n",
             (
-                "| Harness | Model | Task | Void | Run Valid | Perf Gates | "
+                "| Agent | Model | Scenario | Unscored | Execution Valid | Perf Gates | "
                 "Composite | Diagnostic | "
-                "Functional | Compliance | Visual | Efficiency |"
+                "Functional | Acceptance | Visual | Verification Stability |"
             ),
             (
                 "|---------|-------|------|------|-----------|------------|-----------|------------|"
@@ -362,24 +362,24 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
     )
     for run in _ranked_runs(runs):
         func_status = "PASS" if run.scores.functional.passed else "FAIL"
-        task_ref = f"{run.config.task_name}@{run.config.task_version}"
+        scenario_ref = f"{run.config.scenario_name}@{run.config.scenario_revision}"
         lines.append(
-            f"| {run.config.harness} | {run.config.model} | {task_ref} | "
-            f"{run.scores.voided} | {run.scores.run_validity.passed} | "
+            f"| {run.config.agent} | {run.config.model} | {scenario_ref} | "
+            f"{run.scores.unscored} | {run.scores.execution_validity.passed} | "
             f"{run.scores.performance_gates.passed} | "
             f"{run.scores.composite_score:.3f} | "
             f"{run.scores.diagnostic_score:.3f} | {func_status} | "
-            f"{run.scores.compliance.score:.2f} | {_visual_value(run)} | "
-            f"{run.scores.efficiency.score:.2f} |"
+            f"{run.scores.acceptance.score:.2f} | {_visual_value(run)} | "
+            f"{run.scores.verification_stability.score:.2f} |"
         )
         lines.append(
-            f"  - run_id={run.id}, optimization={run.scores.optimization.score:.3f}, "
-            f"void_reasons={run.scores.void_reasons}, "
-            f"coverage_passed={run.scores.coverage.passed}, "
-            f"requirement_presence={run.scores.requirements.presence_ratio:.2f}, "
-            f"requirement_mapping={run.scores.requirements.mapping_ratio:.2f}, "
-            f"metric_profile={run.config.metric_profile}, "
-            f"metric_modules={_module_ids(run)}, "
+            f"  - run_id={run.id}, resource_efficiency={run.scores.resource_efficiency.score:.3f}, "
+            f"unscored_reasons={run.scores.unscored_reasons}, "
+            f"test_coverage_passed={run.scores.test_coverage.passed}, "
+            f"requirements_presence={run.scores.requirements_coverage.presence_ratio:.2f}, "
+            f"requirements_mapping={run.scores.requirements_coverage.mapping_ratio:.2f}, "
+            f"evaluation_profile={run.config.evaluation_profile}, "
+            f"metric_results={_metric_ids(run)}, "
             f"failed_categories={_failed_categories(run)}"
         )
 
@@ -391,19 +391,19 @@ def _append_aggregate_section(
     for group_name, stats in groups.items():
         lines.append(
             f"- **{group_name}**: {stats['count']} total, {stats['scored_count']} scored, "
-            f"{stats['void_count']} void ({stats['void_rate']:.2f}), "
+            f"{stats['unscored_count']} unscored ({stats['unscored_rate']:.2f}), "
             f"avg score={stats['avg_score']:.3f}, validity_rate={stats['validity_rate']:.2f}, "
             f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
             f"score_var={stats['score_variance']:.4f}"
         )
 
 
-def _append_scaffold_section(lines: list[str], groups: dict[str, dict[str, float | int]]) -> None:
-    lines.append("\n## By Scaffold")
-    for scaffold_key, stats in groups.items():
+def _append_starter_section(lines: list[str], groups: dict[str, dict[str, float | int]]) -> None:
+    lines.append("\n## By Starter")
+    for starter_key, stats in groups.items():
         lines.append(
-            f"- **{scaffold_key}**: {stats['count']} total, "
-            f"{stats['void_count']} void ({stats['void_rate']:.2f}), "
+            f"- **{starter_key}**: {stats['count']} total, "
+            f"{stats['unscored_count']} unscored ({stats['unscored_rate']:.2f}), "
             f"avg score={stats['avg_score']:.3f}, validity_rate={stats['validity_rate']:.2f}, "
             f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
             f"score_var={stats['score_variance']:.4f}"
@@ -415,7 +415,7 @@ def _append_stability_section(lines: list[str], groups: dict[str, dict[str, floa
     for config_key, stats in groups.items():
         lines.append(
             f"- `{config_key}`: runs={stats['count']}, scored={stats['scored_count']}, "
-            f"void={stats['void_count']} ({stats['void_rate']:.2f}), "
+            f"unscored={stats['unscored_count']} ({stats['unscored_rate']:.2f}), "
             f"validity_rate={stats['validity_rate']:.2f}, "
             f"performance_pass_rate={stats['performance_pass_rate']:.2f}, "
             f"score_var={stats['score_variance']:.4f}, "
@@ -430,7 +430,9 @@ def _normalized_lower_better(value: float, lower: float, upper: float) -> float:
 
 
 def _append_valid_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
-    valid_runs = [run for run in runs if run.scores.run_validity.passed and not run.scores.voided]
+    valid_runs = [
+        run for run in runs if run.scores.execution_validity.passed and not run.scores.unscored
+    ]
     lines.append("\n## Valid Run Cost-Time Index")
     if not valid_runs:
         lines.append("- No valid runs; cost/time normalization skipped.")
@@ -443,7 +445,9 @@ def _append_valid_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
     min_tokens = min(token_values)
     max_tokens = max(token_values)
 
-    ranked = sorted(valid_runs, key=lambda item: item.scores.optimization.score, reverse=True)
+    ranked = sorted(
+        valid_runs, key=lambda item: item.scores.resource_efficiency.score, reverse=True
+    )
     for run in ranked:
         duration_norm = _normalized_lower_better(run.duration_sec, min_duration, max_duration)
         token_norm = _normalized_lower_better(_uncached_tokens(run), min_tokens, max_tokens)
@@ -456,7 +460,7 @@ def _append_valid_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
 
 def _append_invalid_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
     invalid_runs = [
-        run for run in runs if not run.scores.run_validity.passed and not run.scores.voided
+        run for run in runs if not run.scores.execution_validity.passed and not run.scores.unscored
     ]
     lines.append("\n## Diagnostic Ranking (Invalid Runs)")
     if not invalid_runs:
@@ -468,20 +472,20 @@ def _append_invalid_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
         lines.append(
             f"- run_id={run.id}, model={run.config.model}, "
             f"diagnostic={run.scores.diagnostic_score:.3f}, "
-            f"gaps={run.scores.requirements.requirement_gap_ids}, "
-            f"pattern_gaps={run.scores.requirements.requirement_pattern_gaps}"
+            f"gaps={run.scores.requirements_coverage.requirement_gap_ids}, "
+            f"pattern_gaps={run.scores.requirements_coverage.requirement_pattern_gaps}"
         )
 
 
-def _append_void_runs(lines: list[str], runs: list[EvalRun]) -> None:
-    voided = [run for run in runs if run.scores.voided]
-    lines.append("\n## Void Runs (Repeat Required)")
-    if not voided:
-        lines.append("- No void runs.")
+def _append_unscored_runs(lines: list[str], runs: list[EvalRun]) -> None:
+    unscored = [run for run in runs if run.scores.unscored]
+    lines.append("\n## Unscored Runs (Rerun Required)")
+    if not unscored:
+        lines.append("- No unscored runs.")
         return
-    for run in voided:
+    for run in unscored:
         lines.append(
-            f"- run_id={run.id}, model={run.config.model}, reasons={run.scores.void_reasons}, "
+            f"- run_id={run.id}, model={run.config.model}, reasons={run.scores.unscored_reasons}, "
             f"termination_reason={run.termination_reason}"
         )
 
@@ -489,21 +493,21 @@ def _append_void_runs(lines: list[str], runs: list[EvalRun]) -> None:
 def generate_comparison_report(runs: list[EvalRun]) -> str:
     """Generate a markdown comparison report."""
     if not runs:
-        return "# Evaluation Report\n\nNo runs to report."
+        return "# Experiment Report\n\nNo runs to report."
 
     lines = [
-        "# Evaluation Comparison Report",
+        "# Experiment Comparison Report",
         f"\nGenerated: {datetime.now().isoformat()}",
         f"\nTotal runs: {len(runs)}",
     ]
     _append_summary_table(lines, runs)
 
     agg = aggregate_results(runs)
-    _append_aggregate_section(lines, "By Harness", agg.get("by_harness", {}))
+    _append_aggregate_section(lines, "By Agent", agg.get("by_agent", {}))
     _append_aggregate_section(lines, "By Model", agg.get("by_model", {}))
-    _append_scaffold_section(lines, agg.get("by_scaffold", {}))
+    _append_starter_section(lines, agg.get("by_starter", {}))
     _append_stability_section(lines, agg.get("by_config", {}))
-    _append_void_runs(lines, runs)
+    _append_unscored_runs(lines, runs)
     _append_valid_cost_time(lines, runs)
     _append_invalid_diagnostics(lines, runs)
     return "\n".join(lines)

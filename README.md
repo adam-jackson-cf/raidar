@@ -2,7 +2,7 @@
 
 <h1>Raidar</h1>
 
-**Task evaluation of CLI harness + model pairs to improve delivery performance using Harbor-based tasks**
+**Scenario evaluation of CLI agent + model pairs to improve delivery performance using Harbor-based runs**
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=flat-square)
@@ -28,29 +28,29 @@ make env-setup
 
 ## Start Here
 
-Run one smoke suite:
+Run one smoke experiment:
 
 ```bash
-make provider-validate AGENT=claude-code MODEL=anthropic/claude-haiku-4-5
-make suite-run \
-  TASK=tasks/hello-world-smoke/v001/task.yaml \
+make agent-validate AGENT=claude-code MODEL=anthropic/claude-haiku-4-5
+make experiment-run \
+  SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
   AGENT=claude-code \
   MODEL=anthropic/claude-haiku-4-5 \
-  REPEATS=1 \
-  REPEAT_PARALLEL=1 \
-  RETRY_VOID=0
+  RUN_COUNT=1 \
+  RUN_PARALLELISM=1 \
+  RERUN_UNSCORED=0
 ```
 
-This writes canonical artifacts into `evals/`, including per-run `run.json`, suite-level `suite.json`, `suite-summary.json`, and `analysis.md`.
+This writes canonical artifacts into `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
 
 ## Review Workflow
 
 The active review workflow is local artifact analysis based on [docs/analyze-results.md](/Users/adamjackson/Projects/typescript-ui-eval/docs/analyze-results.md).
 
-- `evals/.../run.json` is the canonical per-run scorecard and evidence pointer.
-- `evals/.../suite-summary.json` is the canonical repeat-suite aggregate.
-- `evals/.../analysis.md` is the human-readable suite summary generated from the same canonical data.
-- `make evals-list` and `make evals-prune` are the supported artifact inspection helpers.
+- `experiments/.../runs/*/run.json` is the canonical per-run scorecard and evidence pointer.
+- `experiments/.../experiment-summary.json` is the canonical repeat aggregate.
+- `experiments/.../report.md` is the human-readable experiment summary generated from the same canonical data.
+- `make experiments-list` and `make experiments-prune` are the supported artifact inspection helpers.
 
 `docs/analyze-results.md` is preserved as the reference review prompt and should guide any replacement dashboard or analysis surface built in-repo.
 
@@ -58,33 +58,33 @@ The active review workflow is local artifact analysis based on [docs/analyze-res
 
 The repository has three primary concerns:
 
-- `orchestrator/`: CLI and runtime pipeline that executes and scores tasks.
-- `tasks/`: versioned task definitions (`task.yaml`), prompts, rules, references, and scaffolds.
-- `evals/`: generated suite artifacts with per-run evidence bundles.
+- `orchestrator/`: CLI and runtime pipeline that executes and scores scenarios.
+- `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
+- `experiments/`: generated experiment artifacts with per-run evidence bundles.
 
-A task consists of:
+A scenario consists of:
 
 - task instruction
 - rules
-- scaffold
-- metrics via ordered `metrics.modules[]` in `task.yaml`
-- derived `metric_profile` in format `v2:<module-id>+...`
+- starter
+- metrics via ordered `metrics[]` in `scenario.yaml`
+- derived `evaluation_profile` in format `v2:<metric-id>+...`
 
 ## Orchestrator Flow
 
 ```mermaid
 flowchart TD
-    A["suite run CLI"] --> B["Load task.yaml + prompt/rules/scaffold"]
-    B --> C["Validate required metrics.modules[] and task dependencies"]
-    C --> D["Derive metric_profile: v2:<module-id>+... (ordered)"]
-    D --> E["Create suite folder in evals/<timestamp>__<task>__<version>"]
-    E --> F["Create baseline workspace snapshot from task scaffold"]
+    A["experiment run CLI"] --> B["Load scenario.yaml + prompt/rules/starter"]
+    B --> C["Validate required metrics[] and scenario dependencies"]
+    C --> D["Derive evaluation_profile: v2:<metric-id>+... (ordered)"]
+    D --> E["Create experiment folder in experiments/<timestamp>__<scenario>__<revision>"]
+    E --> F["Create baseline workspace snapshot from scenario starter"]
     F --> G["For each repeat (run-01..run-N): launch Harbor agent run"]
-    G --> H["Build verifier task spec including metrics.modules[]"]
+    G --> H["Build verifier scenario spec including metrics[]"]
     H --> I["Run verifier core checks and module evaluations"]
     I --> J["Persist run outputs: run.json"]
-    J --> K["Aggregate suite-summary.json and suite.json"]
-    K --> L["Write analysis.md and evidence artifacts"]
+    J --> K["Aggregate experiment-summary.json and experiment.json"]
+    K --> L["Write report.md and evidence artifacts"]
 ```
 
 ## Key Actions
@@ -93,15 +93,15 @@ From the repo root:
 
 ```bash
 make env-setup
-make provider-list
-make provider-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high
-make task-init TASK_DIR=tasks/new-task TASK_VERSION=v001
-make task-info TASK_DIR=tasks/homepage-implementation/v001
-make task-validate TASK=tasks/homepage-implementation/v001/task.yaml
-make suite-run TASK=... AGENT=... MODEL=...
-make matrix-run TASK=... CONFIG=matrix.yaml
-make evals-list
-make evals-prune KEEP_PER_MODEL=1
+make agent-list
+make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high
+make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001
+make scenario-info SCENARIO_DIR=scenarios/homepage-implementation/v001
+make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
+make experiment-run SCENARIO=... AGENT=... MODEL=...
+make matrix-run SCENARIO=... CONFIG=matrix.yaml
+make experiments-list
+make experiments-prune KEEP_PER_MODEL=1
 make quality
 ```
 

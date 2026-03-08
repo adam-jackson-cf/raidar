@@ -29,7 +29,7 @@ class TestSaveAndLoadRun:
         loaded = load_run(path)
 
         assert loaded.id == sample_eval_run.id
-        assert loaded.config.harness == sample_eval_run.config.harness
+        assert loaded.config.agent == sample_eval_run.config.agent
         assert loaded.config.model == sample_eval_run.config.model
 
     def test_save_creates_directory_if_missing(self, sample_eval_run: EvalRun, tmp_path: Path):
@@ -85,13 +85,13 @@ class TestAggregateResults:
 
         assert result["total_runs"] == 0
 
-    def test_aggregates_by_harness(self, sample_eval_run: EvalRun):
-        """Should aggregate results by harness."""
+    def test_aggregates_by_agent(self, sample_eval_run: EvalRun):
+        """Should aggregate results by agent."""
         runs = [sample_eval_run]
         result = aggregate_results(runs)
 
-        assert "by_harness" in result
-        assert sample_eval_run.config.harness in result["by_harness"]
+        assert "by_agent" in result
+        assert sample_eval_run.config.agent in result["by_agent"]
 
     def test_aggregates_by_model(self, sample_eval_run: EvalRun):
         """Should aggregate results by model."""
@@ -120,11 +120,14 @@ class TestAggregateResults:
             timestamp=datetime.now(UTC).isoformat(),
             config=EvalConfig(
                 model="openai/gpt-4o",
-                harness="codex-cli",
-                task_name="test",
-                task_version="v001",
-                scaffold_root="scaffold",
-                metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+                agent="codex-cli",
+                scenario_name="test",
+                scenario_revision="v001",
+                starter_root="starter",
+                evaluation_profile=(
+                    "v2:functional+acceptance+verification-stability+"
+                    "execution-validity+resource-efficiency"
+                ),
             ),
             duration_sec=60,
             scores=Scorecard(),
@@ -134,11 +137,14 @@ class TestAggregateResults:
             timestamp=datetime.now(UTC).isoformat(),
             config=EvalConfig(
                 model="openai/gpt-4o",
-                harness="codex-cli",
-                task_name="test",
-                task_version="v001",
-                scaffold_root="scaffold",
-                metric_profile="v2:functional+compliance+efficiency+run-validity+optimization",
+                agent="codex-cli",
+                scenario_name="test",
+                scenario_revision="v001",
+                starter_root="starter",
+                evaluation_profile=(
+                    "v2:functional+acceptance+verification-stability+"
+                    "execution-validity+resource-efficiency"
+                ),
             ),
             duration_sec=60,
             scores=Scorecard(),
@@ -147,29 +153,29 @@ class TestAggregateResults:
         result = aggregate_results([run1, run2])
 
         # Both have default scores, so average should be equal to one
-        assert result["by_harness"]["codex-cli"]["count"] == 2
-        assert isinstance(result["by_harness"]["codex-cli"]["avg_score"], float)
+        assert result["by_agent"]["codex-cli"]["count"] == 2
+        assert isinstance(result["by_agent"]["codex-cli"]["avg_score"], float)
 
     def test_void_runs_excluded_from_scored_aggregates(self, sample_eval_run: EvalRun):
         """Void runs should not affect scored validity-rate/average."""
         valid = sample_eval_run.model_copy(deep=True)
         valid.id = "valid-run"
-        valid.scores.voided = False
-        valid.scores.run_validity.checks = []
+        valid.scores.unscored = False
+        valid.scores.execution_validity.checks = []
         valid.scores.performance_gates.checks = []
 
         voided = sample_eval_run.model_copy(deep=True)
         voided.id = "void-run"
-        voided.scores.voided = True
-        voided.scores.void_reasons = ["provider_rate_limit"]
-        voided.scores.run_validity.checks = []
+        voided.scores.unscored = True
+        voided.scores.unscored_reasons = ["provider_rate_limit"]
+        voided.scores.execution_validity.checks = []
         voided.scores.performance_gates.checks = []
 
         result = aggregate_results([valid, voided])
-        stats = result["by_harness"][valid.config.harness]
+        stats = result["by_agent"][valid.config.agent]
         assert stats["count"] == 2
         assert stats["scored_count"] == 1
-        assert stats["void_count"] == 1
+        assert stats["unscored_count"] == 1
         assert stats["validity_rate"] == 1.0
         assert stats["performance_pass_rate"] == 1.0
 
@@ -177,13 +183,13 @@ class TestAggregateResults:
 class TestExportCsv:
     """Test CSV export fields."""
 
-    def test_export_to_csv_includes_metric_profile_and_modules(
+    def test_export_to_csv_includes_evaluation_profile_and_metrics(
         self, sample_eval_run: EvalRun, tmp_path: Path
     ):
-        sample_eval_run.scores.modules = []
+        sample_eval_run.scores.metric_results = []
         output = tmp_path / "runs.csv"
         export_to_csv([sample_eval_run], output)
         payload = output.read_text(encoding="utf-8")
-        assert "metric_profile" in payload
-        assert "metric_modules" in payload
-        assert sample_eval_run.config.metric_profile in payload
+        assert "evaluation_profile" in payload
+        assert "metric_results" in payload
+        assert sample_eval_run.config.evaluation_profile in payload

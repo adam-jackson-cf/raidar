@@ -4,15 +4,15 @@ from pathlib import Path
 
 from ..config import settings
 from ..schemas.events import GateEvent
+from ..schemas.scenario import AcceptanceConfig, VisualConfig
 from ..schemas.scorecard import (
-    ComplianceScore,
-    EfficiencyScore,
+    AcceptanceScore,
     FunctionalScore,
     Scorecard,
+    VerificationStabilityScore,
     VisualScore,
 )
-from ..schemas.task import ComplianceConfig, VisualConfig
-from .compliance import evaluate_compliance
+from .acceptance import evaluate_acceptance
 from .efficiency import evaluate_efficiency
 from .functional import evaluate_functional
 from .visual import evaluate_visual
@@ -20,42 +20,30 @@ from .visual import evaluate_visual
 
 def get_weights() -> dict[str, float]:
     """Get scoring weights from config."""
+
     return {
         "functional": settings.weights.functional,
-        "compliance": settings.weights.compliance,
+        "acceptance": settings.weights.acceptance,
         "visual": settings.weights.visual,
-        "efficiency": settings.weights.efficiency,
+        "verification_stability": settings.weights.verification_stability,
     }
 
 
-# For backward compatibility - use get_weights() for dynamic access
 WEIGHTS = get_weights()
 
 
 def evaluate_all(
     workspace: Path,
-    compliance_config: ComplianceConfig,
+    acceptance_config: AcceptanceConfig,
     visual_config: VisualConfig | None,
     gate_events: list[GateEvent],
     rules_path: Path | None = None,
     run_llm_checks: bool = True,
 ) -> Scorecard:
-    """Run all evaluations and return complete scorecard.
+    """Run all evaluations and return complete scorecard."""
 
-    Args:
-        workspace: Path to workspace directory
-        compliance_config: Compliance configuration from task
-        visual_config: Visual configuration from task (optional)
-        gate_events: Gate events from execution
-        rules_path: Path to rules file for LLM context
-        run_llm_checks: Whether to run LLM judge checks
-
-    Returns:
-        Complete Scorecard with all dimensions
-    """
-    # Evaluate each dimension
     functional = evaluate_functional(workspace)
-    compliance = evaluate_compliance(workspace, compliance_config, rules_path, run_llm_checks)
+    acceptance = evaluate_acceptance(workspace, acceptance_config, rules_path, run_llm_checks)
 
     visual = None
     if visual_config:
@@ -67,26 +55,26 @@ def evaluate_all(
             threshold=visual_config.threshold,
         )
 
-    efficiency = evaluate_efficiency(gate_events)
+    verification_stability = evaluate_efficiency(gate_events)
 
     return Scorecard(
         functional=functional,
-        compliance=compliance,
+        acceptance=acceptance,
         visual=visual,
-        efficiency=efficiency,
+        verification_stability=verification_stability,
     )
 
 
 __all__ = [
     "evaluate_functional",
-    "evaluate_compliance",
+    "evaluate_acceptance",
     "evaluate_visual",
     "evaluate_efficiency",
     "evaluate_all",
     "WEIGHTS",
     "get_weights",
-    "ComplianceScore",
-    "EfficiencyScore",
+    "AcceptanceScore",
+    "VerificationStabilityScore",
     "FunctionalScore",
     "Scorecard",
     "VisualScore",

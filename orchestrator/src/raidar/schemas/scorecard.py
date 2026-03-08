@@ -1,15 +1,11 @@
-"""Scorecard schemas for evaluation results.
-
-Multi-dimensional scoring: functional, compliance, visual, efficiency.
-Uses @computed_field for auto-calculated scores.
-"""
+"""Scorecard schemas for experiment results."""
 
 from typing import Any
 
 from pydantic import BaseModel, Field, computed_field
 
 from ..config import settings
-from .events import GateEvent, SessionEvent
+from .events import GateEvent, TraceEvent
 
 
 class FunctionalScore(BaseModel):
@@ -25,7 +21,6 @@ class FunctionalScore(BaseModel):
     @computed_field
     @property
     def score(self) -> float:
-        """Calculate functional score (0-1)."""
         if not self.build_succeeded:
             return 0.0
         if self.tests_total == 0:
@@ -33,8 +28,8 @@ class FunctionalScore(BaseModel):
         return self.tests_passed / self.tests_total
 
 
-class ComplianceCheck(BaseModel):
-    """Result of a single compliance check."""
+class AcceptanceCheck(BaseModel):
+    """Result of a single acceptance check."""
 
     rule: str = Field(description="Rule description")
     type: str = Field(description="Check type (deterministic or llm_judge)")
@@ -42,15 +37,14 @@ class ComplianceCheck(BaseModel):
     evidence: str | None = Field(default=None, description="Supporting evidence")
 
 
-class ComplianceScore(BaseModel):
-    """Compliance evaluation with auto-computed score."""
+class AcceptanceScore(BaseModel):
+    """Acceptance evaluation with auto-computed score."""
 
-    checks: list[ComplianceCheck] = Field(default_factory=list)
+    checks: list[AcceptanceCheck] = Field(default_factory=list)
 
     @computed_field
     @property
     def score(self) -> float:
-        """Calculate compliance score (0-1)."""
         if not self.checks:
             return 1.0
         passed_count = sum(1 for check in self.checks if check.passed)
@@ -69,20 +63,18 @@ class VisualScore(BaseModel):
     @computed_field
     @property
     def score(self) -> float:
-        """Return visual similarity as score (0-1)."""
         return self.similarity
 
     @computed_field
     @property
     def threshold_met(self) -> bool | None:
-        """Whether similarity meets configured threshold."""
         if self.threshold is None:
             return None
         return self.similarity >= self.threshold
 
 
-class EfficiencyScore(BaseModel):
-    """Efficiency score based on gate failures."""
+class VerificationStabilityScore(BaseModel):
+    """Verification stability score based on gate failures."""
 
     total_gate_failures: int = 0
     unique_failure_categories: int = 0
@@ -91,16 +83,11 @@ class EfficiencyScore(BaseModel):
     @computed_field
     @property
     def score(self) -> float:
-        """Calculate efficiency score (0-1).
-
-        Formula: max(0, 1 - (gate_failures / max_failures) - (repeat_failures * penalty))
-        """
-        max_failures = settings.efficiency.max_gate_failures
-        repeat_penalty = settings.efficiency.repeat_penalty
+        cfg = settings.verification_stability
         raw_score = (
             1.0
-            - (self.total_gate_failures / max_failures)
-            - (self.repeat_failures * repeat_penalty)
+            - (self.total_gate_failures / cfg.max_gate_failures)
+            - (self.repeat_failures * cfg.repeat_penalty)
         )
         return round(max(0.0, min(1.0, raw_score)), 3)
 
@@ -114,7 +101,7 @@ class CoverageScore(BaseModel):
     passed: bool = True
 
 
-class RequirementCoverageScore(BaseModel):
+class RequirementsCoverageScore(BaseModel):
     """Requirement presence and requirement-to-test mapping coverage."""
 
     total_requirements: int = 0
@@ -128,7 +115,6 @@ class RequirementCoverageScore(BaseModel):
     @computed_field
     @property
     def presence_ratio(self) -> float:
-        """Fraction of requirements satisfied by implementation."""
         if self.total_requirements == 0:
             return 1.0
         return self.satisfied_requirements / self.total_requirements
@@ -136,7 +122,6 @@ class RequirementCoverageScore(BaseModel):
     @computed_field
     @property
     def mapping_ratio(self) -> float:
-        """Fraction of requirements with test mapping evidence."""
         if self.total_requirements == 0:
             return 1.0
         return self.mapped_requirements / self.total_requirements
@@ -150,36 +135,34 @@ class GateCheck(BaseModel):
     evidence: str | None = Field(default=None, description="Check evidence")
 
 
-class RunValidityScore(BaseModel):
-    """Hard-gate run validity aggregate."""
+class ExecutionValidityScore(BaseModel):
+    """Hard-gate execution validity aggregate."""
 
     checks: list[GateCheck] = Field(default_factory=list)
 
     @computed_field
     @property
     def passed(self) -> bool:
-        """All run-validity checks must pass."""
         if not self.checks:
             return True
         return all(check.passed for check in self.checks)
 
 
 class PerformanceGatesScore(BaseModel):
-    """Performance gate aggregate for scored task outcomes."""
+    """Performance gate aggregate for scored scenario outcomes."""
 
     checks: list[GateCheck] = Field(default_factory=list)
 
     @computed_field
     @property
     def passed(self) -> bool:
-        """All performance gates must pass."""
         if not self.checks:
             return True
         return all(check.passed for check in self.checks)
 
 
-class OptimizationScore(BaseModel):
-    """Optimization metrics used after run validity succeeds."""
+class ResourceEfficiencyScore(BaseModel):
+    """Resource-efficiency metrics used after execution validity succeeds."""
 
     uncached_input_tokens: int = 0
     output_tokens: int = 0
@@ -191,8 +174,7 @@ class OptimizationScore(BaseModel):
     @computed_field
     @property
     def score(self) -> float:
-        """Compute optimization score from deterministic process metrics."""
-        cfg = settings.optimization
+        cfg = settings.resource_efficiency
         token_penalty = min(1.0, self.uncached_input_tokens / cfg.max_uncached_tokens)
         command_penalty = min(1.0, self.command_count / cfg.max_commands)
         failure_penalty = min(1.0, self.failed_command_count / cfg.max_failed_commands)
@@ -210,138 +192,108 @@ class OptimizationScore(BaseModel):
         return round(max(0.0, min(1.0, 1.0 - weighted_penalty)), 3)
 
 
-class ModuleResult(BaseModel):
-    """Audit result for one configured metric module."""
+class MetricResult(BaseModel):
+    """Audit result for one configured metric."""
 
-    module_id: str = Field(description="Metric module identifier")
-    passed: bool = Field(description="Whether the module evaluation passed")
+    metric_id: str = Field(description="Metric identifier")
+    passed: bool = Field(description="Whether the metric evaluation passed")
     matched_count: int = Field(default=0, ge=0, description="Matched artifact count")
-    missing_patterns: list[str] = Field(
-        default_factory=list,
-        description="Configured patterns that were not matched",
-    )
+    missing_patterns: list[str] = Field(default_factory=list)
     evidence: str | None = Field(default=None, description="Supporting evidence")
 
 
 class Scorecard(BaseModel):
-    """Complete scorecard for an evaluation run."""
+    """Complete scorecard for an experiment run."""
 
     run_id: str = ""
-    task_name: str = ""
-    task_version: str = ""
+    scenario_name: str = ""
+    scenario_revision: str = ""
     agent: str = ""
     model: str = ""
-    scaffold_root: str = ""
+    starter_root: str = ""
     duration_sec: float = 0.0
     terminated_early: bool = False
     termination_reason: str | None = None
-    voided: bool = False
-    void_reasons: list[str] = Field(default_factory=list)
+    unscored: bool = False
+    unscored_reasons: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
-
-    # Scores
     functional: FunctionalScore = Field(default_factory=FunctionalScore)
-    compliance: ComplianceScore = Field(default_factory=ComplianceScore)
+    acceptance: AcceptanceScore = Field(default_factory=AcceptanceScore)
     visual: VisualScore | None = Field(default_factory=VisualScore)
-    efficiency: EfficiencyScore = Field(default_factory=EfficiencyScore)
-    coverage: CoverageScore = Field(default_factory=CoverageScore)
-    requirements: RequirementCoverageScore = Field(default_factory=RequirementCoverageScore)
-    run_validity: RunValidityScore = Field(default_factory=RunValidityScore)
+    verification_stability: VerificationStabilityScore = Field(
+        default_factory=VerificationStabilityScore
+    )
+    test_coverage: CoverageScore = Field(default_factory=CoverageScore)
+    requirements_coverage: RequirementsCoverageScore = Field(
+        default_factory=RequirementsCoverageScore
+    )
+    execution_validity: ExecutionValidityScore = Field(default_factory=ExecutionValidityScore)
     performance_gates: PerformanceGatesScore = Field(default_factory=PerformanceGatesScore)
-    optimization: OptimizationScore = Field(default_factory=OptimizationScore)
-    modules: list[ModuleResult] = Field(default_factory=list)
+    resource_efficiency: ResourceEfficiencyScore = Field(default_factory=ResourceEfficiencyScore)
+    metric_results: list[MetricResult] = Field(default_factory=list)
 
     @computed_field
     @property
     def quality_score(self) -> float:
-        """Calculate weighted quality score from quality dimensions.
-
-        Weights from config. If visual is None, redistributes visual weight proportionally.
-        """
-        w = settings.weights
+        weights = settings.weights
         visual_score = self.visual.score if self.visual else 0.0
-
         if self.visual:
             return (
-                self.functional.score * w.functional
-                + self.compliance.score * w.compliance
-                + visual_score * w.visual
-                + self.efficiency.score * w.efficiency
+                self.functional.score * weights.functional
+                + self.acceptance.score * weights.acceptance
+                + visual_score * weights.visual
+                + self.verification_stability.score * weights.verification_stability
             )
-
-        # Redistribute visual weight proportionally to other dimensions
-        non_visual_total = w.functional + w.compliance + w.efficiency
-        func_adj = w.functional / non_visual_total
-        comp_adj = w.compliance / non_visual_total
-        eff_adj = w.efficiency / non_visual_total
-
+        non_visual_total = weights.functional + weights.acceptance + weights.verification_stability
         return (
-            self.functional.score * func_adj
-            + self.compliance.score * comp_adj
-            + self.efficiency.score * eff_adj
+            self.functional.score * (weights.functional / non_visual_total)
+            + self.acceptance.score * (weights.acceptance / non_visual_total)
+            + self.verification_stability.score
+            * (weights.verification_stability / non_visual_total)
         )
 
     @computed_field
     @property
     def composite_score(self) -> float:
-        """Compute gated final score.
-
-        Invalid runs always receive 0. Valid runs are ranked on optimization score.
-        """
-        if self.voided:
+        if self.unscored:
             return 0.0
-        if not self.run_validity.passed:
+        if not self.execution_validity.passed:
             return 0.0
-        return self.optimization.score
+        return self.resource_efficiency.score
 
     @computed_field
     @property
     def diagnostic_score(self) -> float:
-        """Compute non-gating diagnostic score for comparing failed runs.
-
-        This score intentionally does not gate on run validity so invalid runs
-        can still be ranked for analysis.
-        """
         return round(
             (self.quality_score * 0.6)
-            + (self.requirements.mapping_ratio * 0.25)
-            + (self.optimization.score * 0.15),
+            + (self.requirements_coverage.mapping_ratio * 0.25)
+            + (self.resource_efficiency.score * 0.15),
             3,
         )
 
 
 class EvalConfig(BaseModel):
-    """Configuration for an evaluation run."""
+    """Configuration for an experiment run."""
 
     model: str = Field(description="Model identifier (provider/name)")
-    harness: str = Field(description="Harness/agent name")
-    task_name: str = Field(description="Task identifier")
-    task_version: str = Field(description="Task version")
-    scaffold_root: str = Field(description="Task-local scaffold root path")
-    metric_profile: str = Field(description="Metric capability profile identifier")
+    agent: str = Field(description="Agent name")
+    scenario_name: str = Field(description="Scenario identifier")
+    scenario_revision: str = Field(description="Scenario revision")
+    starter_root: str = Field(description="Scenario-local starter root path")
+    evaluation_profile: str = Field(description="Metric capability profile identifier")
 
 
 class EvalRun(BaseModel):
-    """Complete evaluation run record."""
+    """Complete experiment run record."""
 
     id: str = Field(description="Unique run identifier")
     timestamp: str = Field(description="ISO timestamp of run start")
     config: EvalConfig = Field(description="Run configuration")
     duration_sec: float = Field(description="Run duration in seconds")
-    terminated_early: bool = Field(
-        default=False,
-        description="Whether run terminated early",
-    )
-    termination_reason: str | None = Field(
-        default=None,
-        description="Reason for early termination",
-    )
+    terminated_early: bool = Field(default=False, description="Whether run terminated early")
+    termination_reason: str | None = Field(default=None, description="Reason for early termination")
     scores: Scorecard = Field(description="Evaluation scores")
-    events: list[SessionEvent] = Field(
-        default_factory=list,
-        description="Session events",
-    )
+    traces: list[TraceEvent] = Field(default_factory=list, description="Execution trace events")
     gate_history: list[GateEvent] = Field(
-        default_factory=list,
-        description="Gate execution history",
+        default_factory=list, description="Gate execution history"
     )

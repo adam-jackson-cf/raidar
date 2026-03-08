@@ -2,29 +2,29 @@ SHELL := /bin/bash
 
 RAIDAR := uv run --project orchestrator raidar
 
-TASK ?=
-TASK_DIR ?=
-TASK_VERSION ?=
+SCENARIO ?=
+SCENARIO_DIR ?=
+SCENARIO_REVISION ?=
 NAME ?=
 AGENT ?=
 MODEL ?=
 CONFIG ?= matrix.yaml
-REPEATS ?= 1
-REPEAT_PARALLEL ?= 1
-RETRY_VOID ?= 0
-METRIC_PROFILE ?=
+RUN_COUNT ?= 1
+RUN_PARALLELISM ?= 1
+RERUN_UNSCORED ?= 0
+EVALUATION_PROFILE ?=
 LIMIT ?=
 KEEP_PER_MODEL ?=
-SCAFFOLD_ROOT ?=
+STARTER_ROOT ?=
 PROMPT_ENTRY ?=
 DIFFICULTY ?=
 CATEGORY ?=
 TIMEOUT_SEC ?=
 
 .PHONY: help \
-	env-setup provider-list provider-validate task-init task-info task-validate \
-	suite-run matrix-run \
-	evals-list evals-prune \
+	env-setup agent-list agent-validate scenario-init scenario-info scenario-validate \
+	experiment-run matrix-run \
+	experiments-list experiments-prune \
 	quality
 
 define require_var
@@ -39,73 +39,73 @@ help:
 	@echo ""
 	@echo "Environment and validation:"
 	@echo "  make env-setup"
-	@echo "  make provider-list"
-	@echo "  make provider-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high"
-	@echo "  make task-init TASK_DIR=tasks/new-task TASK_VERSION=v001"
-	@echo "  make task-info TASK_DIR=tasks/homepage-implementation/v001"
-	@echo "  make task-validate TASK=tasks/homepage-implementation/v001/task.yaml"
+	@echo "  make agent-list"
+	@echo "  make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high"
+	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001"
+	@echo "  make scenario-info SCENARIO_DIR=scenarios/homepage-implementation/v001"
+	@echo "  make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml"
 	@echo "  make quality"
 	@echo ""
-	@echo "Eval orchestration:"
-	@echo "  make suite-run TASK=... AGENT=... MODEL=... [REPEATS=1 REPEAT_PARALLEL=1 RETRY_VOID=0]"
-	@echo "  make matrix-run TASK=... [CONFIG=matrix.yaml]"
-	@echo "  make evals-list [METRIC_PROFILE=...] [LIMIT=...]"
-	@echo "  make evals-prune [KEEP_PER_MODEL=1]"
+	@echo "Experiment orchestration:"
+	@echo "  make experiment-run SCENARIO=... AGENT=... MODEL=... [RUN_COUNT=1 RUN_PARALLELISM=1 RERUN_UNSCORED=0]"
+	@echo "  make matrix-run SCENARIO=... [CONFIG=matrix.yaml]"
+	@echo "  make experiments-list [EVALUATION_PROFILE=...] [LIMIT=...]"
+	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
 
 env-setup:
 	@$(RAIDAR) env setup
 
-provider-list:
-	@$(RAIDAR) provider list
+agent-list:
+	@$(RAIDAR) agent list
 
-provider-validate:
+agent-validate:
 	$(call require_var,AGENT)
 	$(call require_var,MODEL)
-	@$(RAIDAR) provider validate --agent "$(AGENT)" --model "$(MODEL)"
+	@$(RAIDAR) agent validate --agent "$(AGENT)" --model "$(MODEL)"
 
-task-init:
-	$(call require_var,TASK_DIR)
-	@$(RAIDAR) task init \
-		--path "$(TASK_DIR)" \
+scenario-init:
+	$(call require_var,SCENARIO_DIR)
+	@$(RAIDAR) scenario init \
+		--path "$(SCENARIO_DIR)" \
 		$(if $(NAME),--name "$(NAME)",) \
-		$(if $(TASK_VERSION),--task-version "$(TASK_VERSION)",) \
-		$(if $(SCAFFOLD_ROOT),--scaffold-root "$(SCAFFOLD_ROOT)",) \
+		$(if $(SCENARIO_REVISION),--scenario-revision "$(SCENARIO_REVISION)",) \
+		$(if $(STARTER_ROOT),--starter-root "$(STARTER_ROOT)",) \
 		$(if $(PROMPT_ENTRY),--prompt-entry "$(PROMPT_ENTRY)",) \
 		$(if $(DIFFICULTY),--difficulty "$(DIFFICULTY)",) \
 		$(if $(CATEGORY),--category "$(CATEGORY)",) \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
-task-info:
-	$(call require_var,TASK_DIR)
-	@$(RAIDAR) info --task "$(TASK_DIR)"
+scenario-info:
+	$(call require_var,SCENARIO_DIR)
+	@$(RAIDAR) info --scenario "$(SCENARIO_DIR)"
 
-task-validate:
-	$(call require_var,TASK)
-	@$(RAIDAR) task validate --task "$(TASK)"
+scenario-validate:
+	$(call require_var,SCENARIO)
+	@$(RAIDAR) scenario validate --scenario "$(SCENARIO)"
 
-suite-run:
-	$(call require_var,TASK)
+experiment-run:
+	$(call require_var,SCENARIO)
 	$(call require_var,AGENT)
 	$(call require_var,MODEL)
-	@$(RAIDAR) suite run \
-		--task "$(TASK)" \
+	@$(RAIDAR) experiment run \
+		--scenario "$(SCENARIO)" \
 		--agent "$(AGENT)" \
 		--model "$(MODEL)" \
-		--repeats "$(REPEATS)" \
-		--repeat-parallel "$(REPEAT_PARALLEL)" \
-		--retry-void "$(RETRY_VOID)"
+		--repeats "$(RUN_COUNT)" \
+		--repeat-parallel "$(RUN_PARALLELISM)" \
+		--retry-void "$(RERUN_UNSCORED)"
 
 matrix-run:
-	$(call require_var,TASK)
-	@$(RAIDAR) matrix --task "$(TASK)" --config "$(CONFIG)"
+	$(call require_var,SCENARIO)
+	@$(RAIDAR) matrix --scenario "$(SCENARIO)" --config "$(CONFIG)"
 
-evals-list:
-	@$(RAIDAR) evals list \
-		$(if $(METRIC_PROFILE),--metric-profile "$(METRIC_PROFILE)",) \
+experiments-list:
+	@$(RAIDAR) experiments list \
+		$(if $(EVALUATION_PROFILE),--evaluation-profile "$(EVALUATION_PROFILE)",) \
 		$(if $(LIMIT),--limit "$(LIMIT)",)
 
-evals-prune:
-	@$(RAIDAR) evals prune --dry-run \
+experiments-prune:
+	@$(RAIDAR) experiments prune --dry-run \
 		$(if $(KEEP_PER_MODEL),--keep-per-model "$(KEEP_PER_MODEL)",)
 
 quality:

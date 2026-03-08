@@ -1,4 +1,4 @@
-"""Event schemas for tracking execution."""
+"""Event schemas for tracking execution traces."""
 
 from typing import Literal
 
@@ -14,18 +14,15 @@ class GateEvent(BaseModel):
     exit_code: int = Field(description="Process exit code")
     stdout: str = Field(description="Standard output (truncated)")
     stderr: str = Field(description="Standard error (truncated)")
-    failure_category: str | None = Field(
-        default=None,
-        description="Categorized failure type",
-    )
+    failure_category: str | None = Field(default=None, description="Categorized failure type")
     is_repeat: bool = Field(
         default=False,
         description="Whether this is a repeat of a previous failure category",
     )
 
 
-class SessionEvent(BaseModel):
-    """Event from agent session log."""
+class TraceEvent(BaseModel):
+    """Event from an agent trace log."""
 
     timestamp: str = Field(description="ISO timestamp")
     event_type: Literal[
@@ -39,7 +36,6 @@ class SessionEvent(BaseModel):
     data: dict = Field(default_factory=dict, description="Event-specific data")
 
 
-# Failure category patterns for gate watcher
 FAILURE_CATEGORIES: list[tuple[str, str, str]] = [
     ("type_error", r"TS\d+:", "TypeScript Error"),
     ("lint_unused", r"no-unused-vars", "Unused Variable"),

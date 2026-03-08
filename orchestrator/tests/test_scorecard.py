@@ -1,14 +1,14 @@
 """Tests for scorecard computed fields."""
 
 from raidar.schemas.scorecard import (
-    ComplianceCheck,
-    ComplianceScore,
-    EfficiencyScore,
+    AcceptanceCheck,
+    AcceptanceScore,
+    ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
-    OptimizationScore,
-    RunValidityScore,
+    ResourceEfficiencyScore,
     Scorecard,
+    VerificationStabilityScore,
     VisualScore,
 )
 
@@ -51,65 +51,65 @@ class TestFunctionalScore:
         assert score.score == 1.0
 
 
-class TestComplianceScore:
-    """Test ComplianceScore computed fields."""
+class TestAcceptanceScore:
+    """Test AcceptanceScore computed fields."""
 
     def test_score_one_when_no_checks(self):
         """Score should be 1 when no checks configured."""
-        score = ComplianceScore(checks=[])
+        score = AcceptanceScore(checks=[])
         assert score.score == 1.0
 
     def test_score_one_when_all_pass(self):
         """Score should be 1 when all checks pass."""
         checks = [
-            ComplianceCheck(rule="Rule 1", type="deterministic", passed=True),
-            ComplianceCheck(rule="Rule 2", type="deterministic", passed=True),
+            AcceptanceCheck(rule="Rule 1", type="deterministic", passed=True),
+            AcceptanceCheck(rule="Rule 2", type="deterministic", passed=True),
         ]
-        score = ComplianceScore(checks=checks)
+        score = AcceptanceScore(checks=checks)
         assert score.score == 1.0
 
     def test_score_zero_when_all_fail(self):
         """Score should be 0 when all checks fail."""
         checks = [
-            ComplianceCheck(rule="Rule 1", type="deterministic", passed=False),
-            ComplianceCheck(rule="Rule 2", type="deterministic", passed=False),
+            AcceptanceCheck(rule="Rule 1", type="deterministic", passed=False),
+            AcceptanceCheck(rule="Rule 2", type="deterministic", passed=False),
         ]
-        score = ComplianceScore(checks=checks)
+        score = AcceptanceScore(checks=checks)
         assert score.score == 0.0
 
     def test_score_partial_when_some_fail(self):
         """Score should be partial when some checks fail."""
         checks = [
-            ComplianceCheck(rule="Rule 1", type="deterministic", passed=True),
-            ComplianceCheck(rule="Rule 2", type="deterministic", passed=False),
+            AcceptanceCheck(rule="Rule 1", type="deterministic", passed=True),
+            AcceptanceCheck(rule="Rule 2", type="deterministic", passed=False),
         ]
-        score = ComplianceScore(checks=checks)
+        score = AcceptanceScore(checks=checks)
         assert score.score == 0.5
 
 
-class TestEfficiencyScore:
-    """Test EfficiencyScore computed fields."""
+class TestVerificationStabilityScore:
+    """Test VerificationStabilityScore computed fields."""
 
     def test_score_one_when_no_failures(self):
         """Score should be 1 when no gate failures."""
-        score = EfficiencyScore(total_gate_failures=0, repeat_failures=0)
+        score = VerificationStabilityScore(total_gate_failures=0, repeat_failures=0)
         assert score.score == 1.0
 
     def test_score_decreases_with_failures(self):
         """Score should decrease with gate failures."""
-        score = EfficiencyScore(total_gate_failures=2, repeat_failures=0)
+        score = VerificationStabilityScore(total_gate_failures=2, repeat_failures=0)
         assert score.score < 1.0
         assert score.score > 0.0
 
     def test_score_decreases_more_with_repeats(self):
         """Repeat failures should decrease score more."""
-        no_repeat = EfficiencyScore(total_gate_failures=2, repeat_failures=0)
-        with_repeat = EfficiencyScore(total_gate_failures=2, repeat_failures=1)
+        no_repeat = VerificationStabilityScore(total_gate_failures=2, repeat_failures=0)
+        with_repeat = VerificationStabilityScore(total_gate_failures=2, repeat_failures=1)
         assert with_repeat.score < no_repeat.score
 
     def test_score_clamped_to_zero(self):
         """Score should not go below 0."""
-        score = EfficiencyScore(total_gate_failures=100, repeat_failures=100)
+        score = VerificationStabilityScore(total_gate_failures=100, repeat_failures=100)
         assert score.score == 0.0
 
 
@@ -131,9 +131,9 @@ class TestScorecardComposite:
             functional=FunctionalScore(
                 passed=True, build_succeeded=True, tests_passed=10, tests_total=10
             ),
-            compliance=ComplianceScore(),
+            acceptance=AcceptanceScore(),
             visual=VisualScore(similarity=1.0),
-            efficiency=EfficiencyScore(),
+            verification_stability=VerificationStabilityScore(),
         )
         # All scores are 1.0, so composite should be 1.0
         assert abs(scorecard.composite_score - 1.0) < 0.001
@@ -144,9 +144,9 @@ class TestScorecardComposite:
             functional=FunctionalScore(
                 passed=True, build_succeeded=True, tests_passed=10, tests_total=10
             ),
-            compliance=ComplianceScore(),
+            acceptance=AcceptanceScore(),
             visual=None,
-            efficiency=EfficiencyScore(),
+            verification_stability=VerificationStabilityScore(),
         )
         # All scores are 1.0, so composite should still be 1.0
         assert abs(scorecard.composite_score - 1.0) < 0.001
@@ -157,9 +157,9 @@ class TestScorecardComposite:
             functional=FunctionalScore(
                 passed=True, build_succeeded=True, tests_passed=5, tests_total=10
             ),  # 0.5
-            compliance=ComplianceScore(),  # 1.0
+            acceptance=AcceptanceScore(),  # 1.0
             visual=VisualScore(similarity=0.8),  # 0.8
-            efficiency=EfficiencyScore(),  # 1.0
+            verification_stability=VerificationStabilityScore(),  # 1.0
         )
         # 0.5*0.4 + 1.0*0.25 + 0.8*0.2 + 1.0*0.15 = 0.2 + 0.25 + 0.16 + 0.15 = 0.76
         assert abs(scorecard.quality_score - 0.76) < 0.001
@@ -167,7 +167,7 @@ class TestScorecardComposite:
     def test_composite_zero_when_invalid(self):
         """Composite score must be 0 when run validity checks fail."""
         scorecard = Scorecard(
-            run_validity=RunValidityScore(
+            execution_validity=ExecutionValidityScore(
                 checks=[
                     GateCheck(
                         name="quality_gates_passed",
@@ -182,7 +182,7 @@ class TestScorecardComposite:
     def test_composite_uses_optimization_when_valid(self):
         """Composite score should use optimization score after run validity."""
         scorecard = Scorecard(
-            run_validity=RunValidityScore(
+            execution_validity=ExecutionValidityScore(
                 checks=[
                     GateCheck(
                         name="quality_gates_passed",
@@ -191,7 +191,7 @@ class TestScorecardComposite:
                     )
                 ]
             ),
-            optimization=OptimizationScore(
+            resource_efficiency=ResourceEfficiencyScore(
                 uncached_input_tokens=150000,
                 output_tokens=2000,
                 command_count=8,
@@ -200,14 +200,14 @@ class TestScorecardComposite:
                 repeated_verification_failures=0,
             ),
         )
-        assert scorecard.composite_score == scorecard.optimization.score
+        assert scorecard.composite_score == scorecard.resource_efficiency.score
 
     def test_composite_zero_when_voided(self):
         """Composite score must be 0 when run is voided."""
         scorecard = Scorecard(
-            voided=True,
-            void_reasons=["provider_rate_limit"],
-            run_validity=RunValidityScore(
+            unscored=True,
+            unscored_reasons=["provider_rate_limit"],
+            execution_validity=ExecutionValidityScore(
                 checks=[
                     GateCheck(
                         name="quality_gates_passed",
@@ -216,7 +216,7 @@ class TestScorecardComposite:
                     )
                 ]
             ),
-            optimization=OptimizationScore(
+            resource_efficiency=ResourceEfficiencyScore(
                 uncached_input_tokens=100,
                 output_tokens=20,
                 command_count=2,
@@ -230,7 +230,7 @@ class TestScorecardComposite:
     def test_diagnostic_score_available_when_invalid(self):
         """Diagnostic score should remain available for failed runs."""
         scorecard = Scorecard(
-            run_validity=RunValidityScore(
+            execution_validity=ExecutionValidityScore(
                 checks=[
                     GateCheck(
                         name="requirement_test_gaps",

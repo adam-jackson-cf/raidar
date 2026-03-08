@@ -8,7 +8,7 @@ from pathlib import Path
 
 from ..config import settings
 from ..schemas.events import FAILURE_CATEGORIES, GateEvent
-from ..schemas.task import VerificationGate
+from ..schemas.scenario import VerificationGate
 
 
 def categorize_failure(stdout: str, stderr: str) -> str | None:

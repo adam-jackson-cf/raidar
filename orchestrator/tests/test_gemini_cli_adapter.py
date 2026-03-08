@@ -4,12 +4,12 @@ from pathlib import Path
 
 import pytest
 
-from raidar.harness.adapters.gemini_cli import GeminiCliAdapter
-from raidar.harness.config import Agent, HarnessConfig, ModelTarget
+from raidar.agents.adapters.gemini_cli import GeminiCliAdapter
+from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
 
 
-def _config(model: str, provider: str = "google") -> HarnessConfig:
-    return HarnessConfig(
+def _config(model: str, provider: str = "google") -> AgentRunConfig:
+    return AgentRunConfig(
         agent=Agent.GEMINI,
         model=ModelTarget(provider=provider, name=model),
     )
@@ -66,7 +66,7 @@ def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch):
     assert "GEMINI_API_KEY" not in env
 
 
-def test_prepare_workspace_creates_gemini_session_dir(tmp_path: Path):
+def test_prepare_workspace_creates_gemini_trace_dir(tmp_path: Path):
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
     adapter.prepare_workspace(tmp_path)
     assert (tmp_path / ".gemini").exists()

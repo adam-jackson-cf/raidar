@@ -1,4 +1,4 @@
-"""CLI entrypoint for eval orchestrator."""
+"""CLI entrypoint for the scenario/experiment orchestrator."""
 
 from __future__ import annotations
 
@@ -12,45 +12,25 @@ import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 import click
+import yaml
 from dotenv import load_dotenv
 
-from .harness.config import Agent, HarnessConfig, ModelTarget
-from .harness.rules import SYSTEM_RULES, inject_rules
-from .repeat_suite import (
-    create_repeat_suite_summary,
-    persist_repeat_suite,
-)
-from .runner import (
-    RunRequest,
-    ScaffoldPreflightError,
-    _docker_compose_preflight_reason,
-    cleanup_stale_harbor_resources,
-    load_task,
-    run_task,
-    task_metric_modules,
-    task_metric_profile,
-)
-from .schemas.scorecard import EvalRun
-from .schemas.task import (
-    ComplianceConfig,
-    CoreMetricModule,
-    DeterministicCheck,
-    MetricsConfig,
-    PromptConfig,
-    TaskDefinition,
-    VerificationConfig,
-    VerificationGate,
-)
-from .task_clone import clone_task_version
+from .agents.config import Agent, AgentRunConfig, ModelTarget
+from .agents.rules import SYSTEM_RULES, inject_rules
+
+if TYPE_CHECKING:
+    from .runner import RunRequest
+    from .schemas.scenario import ScenarioDefinition
+    from .schemas.scorecard import EvalRun
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
-ARTIFACT_CHANGE_PREFIXES = ("evals/",)
-EVALS_ROOT = REPO_ROOT / "evals"
+ARTIFACT_CHANGE_PREFIXES = ("experiments/",)
+EXPERIMENTS_ROOT = REPO_ROOT / "experiments"
 DEFAULT_ARCHIVE_ROOT = Path("/tmp")
 if ENV_PATH.exists():
     load_dotenv(ENV_PATH, override=False)
@@ -59,7 +39,7 @@ if ENV_PATH.exists():
 @click.group()
 @click.version_option(package_name="raidar")
 def main() -> None:
-    """Eval orchestrator for testing model/harness combinations."""
+    """Scenario/experiment orchestrator for agent/model evaluation runs."""
 
 
 AGENT_CHOICES = [agent.value for agent in Agent]
@@ -67,7 +47,7 @@ VERSION_DIR_PATTERN = re.compile(r"^v(\d+)$")
 INTEGRATION_TEST_TARGET = "tests/test_runner_harbor_env_and_cleanup.py"
 TYPECHECK_TARGETS = [
     "src/raidar/watcher",
-    "src/raidar/harness/adapters",
+    "src/raidar/agents/adapters",
     "tests/test_claude_code_cli_adapter.py",
     "tests/test_gemini_cli_adapter.py",
 ]
@@ -76,9 +56,9 @@ COVERAGE_FAIL_UNDER = "60"
 
 @dataclass(frozen=True, slots=True)
 class RunCliOptions:
-    """Normalized CLI options for task execution commands."""
+    """Normalized CLI options for scenario execution commands."""
 
-    task: Path
+    scenario: Path
     agent: str
     model: str
     timeout: int
@@ -88,7 +68,7 @@ class RunCliOptions:
 
     def resolved(self) -> RunCliOptions:
         return RunCliOptions(
-            task=self.task.resolve(),
+            scenario=self.scenario.resolve(),
             agent=self.agent,
             model=self.model,
             timeout=self.timeout,
@@ -100,20 +80,41 @@ class RunCliOptions:
 
 @dataclass(frozen=True, slots=True)
 class SuiteExecutionResult:
-    """Canonical suite execution outcome for suite and matrix flows."""
+    """Canonical experiment execution outcome for experiment and matrix flows."""
 
-    task_path: Path
-    task_name: str
-    task_version: str
+    scenario_path: Path
+    scenario_name: str
+    scenario_revision: str
     runs: list[EvalRun]
     retries_used: int
-    suite_json_path: Path | None = None
+    experiment_json_path: Path | None = None
     summary_path: Path | None = None
-    analysis_path: Path | None = None
+    report_path: Path | None = None
+
+
+def _runner_api() -> Any:
+    from . import runner as runner_module
+
+    return runner_module
+
+
+def _experiment_api() -> Any:
+    from . import experiment as experiment_module
+
+    return experiment_module
+
+
+def _scenario_clone_api() -> Any:
+    from . import scenario_clone as scenario_clone_module
+
+    return scenario_clone_module
 
 
 def _cleanup_stale_harbor_before_runs() -> None:
-    cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
+    _runner_api().cleanup_stale_harbor_resources(
+        include_containers=True,
+        include_build_processes=True,
+    )
 
 
 def _summary_result_path(run: EvalRun) -> Path:
@@ -132,17 +133,18 @@ def _persist_eval_run(run: EvalRun) -> Path:
 
 
 def _build_repeat_request(base_request: RunRequest, repeat_index: int) -> RunRequest:
-    return RunRequest(
-        task=base_request.task,
+    run_request = _runner_api().RunRequest
+    return run_request(
+        scenario=base_request.scenario,
         config=base_request.config,
-        task_dir=base_request.task_dir,
+        scenario_dir=base_request.scenario_dir,
         execution_dir=base_request.execution_dir,
         repeat_index=repeat_index,
     )
 
 
 def _execute_run_request(run_request: RunRequest) -> EvalRun:
-    run = run_task(run_request)
+    run = _runner_api().run_task(run_request)
     _persist_eval_run(run)
     return run
 
@@ -150,7 +152,7 @@ def _execute_run_request(run_request: RunRequest) -> EvalRun:
 def _execute_repeat_index(request: RunRequest, repeat_index: int) -> EvalRun:
     try:
         return _execute_run_request(_build_repeat_request(request, repeat_index))
-    except ScaffoldPreflightError:
+    except _runner_api().StarterPreflightError:
         raise
     except Exception as exc:
         raise click.ClickException(f"Repeat {repeat_index} failed: {exc}") from exc
@@ -211,8 +213,16 @@ def _execute_repeat_batch(
     )
 
 
-def _count_voided(runs: list[EvalRun]) -> int:
-    return sum(1 for run in runs if run.scores.voided)
+def _run_is_unscored(run: EvalRun) -> bool:
+    return bool(run.scores.unscored)
+
+
+def _run_unscored_reasons(run: EvalRun) -> list[str]:
+    return list(run.scores.unscored_reasons)
+
+
+def _count_unscored(runs: list[EvalRun]) -> int:
+    return sum(1 for run in runs if _run_is_unscored(run))
 
 
 def _run_with_void_retries(
@@ -234,12 +244,12 @@ def _run_with_void_retries(
             repeat_parallel=repeat_parallel,
             start_index=next_repeat_index,
         )
-    except ScaffoldPreflightError as exc:
+    except _runner_api().StarterPreflightError as exc:
         raise click.ClickException(
-            f"Fatal scaffold preflight error. Suite aborted without retries: {exc}"
+            f"Fatal starter preflight error. Experiment aborted without retries: {exc}"
         ) from exc
     all_runs.extend(initial_runs)
-    pending_batch = _count_voided(initial_runs)
+    pending_batch = _count_unscored(initial_runs)
     next_repeat_index += len(initial_runs)
 
     if pending_batch > 0 and retry_void > 0:
@@ -251,18 +261,18 @@ def _run_with_void_retries(
                 repeat_parallel=repeat_parallel,
                 start_index=next_repeat_index,
             )
-        except ScaffoldPreflightError as exc:
+        except _runner_api().StarterPreflightError as exc:
             raise click.ClickException(
-                f"Fatal scaffold preflight error. Suite aborted without retries: {exc}"
+                f"Fatal starter preflight error. Experiment aborted without retries: {exc}"
             ) from exc
         all_runs.extend(retry_runs)
-        pending_batch = _count_voided(retry_runs)
+        pending_batch = _count_unscored(retry_runs)
 
     return all_runs, retries_used, pending_batch
 
 
-def _build_harness_config(options: RunCliOptions) -> HarnessConfig:
-    return HarnessConfig(
+def _build_agent_run_config(options: RunCliOptions) -> AgentRunConfig:
+    return AgentRunConfig(
         agent=Agent(options.agent),
         model=ModelTarget.from_string(options.model),
         timeout_sec=options.timeout,
@@ -270,40 +280,40 @@ def _build_harness_config(options: RunCliOptions) -> HarnessConfig:
 
 
 def _execution_id(
-    task_name: str,
-    task_version: str,
+    scenario_name: str,
+    scenario_revision: str,
     started_at: datetime,
     execution_suffix: str | None = None,
 ) -> str:
-    task_slug = task_name.lower().replace(" ", "-")
-    base = f"{started_at.strftime('%Y%m%d-%H%M%SZ')}__{task_slug}__{task_version}"
+    scenario_slug = scenario_name.lower().replace(" ", "-")
+    base = f"{started_at.strftime('%Y%m%d-%H%M%SZ')}__{scenario_slug}__{scenario_revision}"
     if not execution_suffix:
         return base
     return f"{base}__{execution_suffix}"
 
 
 def _build_run_request(
-    options: RunCliOptions, task_def: TaskDefinition, execution_dir: Path
+    options: RunCliOptions, scenario_def: ScenarioDefinition, execution_dir: Path
 ) -> RunRequest:
-    config = _build_harness_config(options)
+    config = _build_agent_run_config(options)
     execution_dir.mkdir(parents=True, exist_ok=True)
-    return RunRequest(
-        task=task_def,
+    return _runner_api().RunRequest(
+        scenario=scenario_def,
         config=config,
-        task_dir=options.task.parent,
+        scenario_dir=options.scenario.parent,
         execution_dir=execution_dir,
         repeat_index=1,
     )
 
 
-def _echo_run_header(options: RunCliOptions, task_name: str) -> None:
-    click.echo(f"Loading task from {options.task}")
-    click.echo(f"Task: {task_name}")
+def _echo_run_header(options: RunCliOptions, scenario_name: str) -> None:
+    click.echo(f"Loading scenario from {options.scenario}")
+    click.echo(f"Scenario: {scenario_name}")
     click.echo(f"Agent: {options.agent}")
     click.echo(f"Model: {options.model}")
     click.echo(f"Repeats: {options.repeats}")
     click.echo(f"Repeat parallelism: {options.repeat_parallel}")
-    click.echo(f"Retry void budget: {options.retry_void}")
+    click.echo(f"Retry unscored budget: {options.retry_void}")
 
 
 def _echo_single_run_result(result: EvalRun) -> None:
@@ -316,28 +326,28 @@ def _echo_single_run_result(result: EvalRun) -> None:
     click.echo(f"Run ID: {result.id}")
     click.echo(f"Duration: {result.duration_sec:.1f}s")
     click.echo(f"Terminated early: {result.terminated_early}")
-    click.echo(f"Void result: {result.scores.voided}")
-    if result.scores.voided:
-        click.echo(f"Void reasons: {result.scores.void_reasons}")
+    click.echo(f"Unscored result: {_run_is_unscored(result)}")
+    if _run_is_unscored(result):
+        click.echo(f"Unscored reasons: {_run_unscored_reasons(result)}")
     if result.termination_reason:
         click.echo(f"Reason: {result.termination_reason}")
 
 
-def _echo_suite_result(
-    suite_json_path: Path,
+def _echo_experiment_result(
+    experiment_json_path: Path,
     summary_path: Path,
-    analysis_path: Path,
+    report_path: Path,
     retries_used: int,
     runs: list[EvalRun],
 ) -> None:
-    click.echo(f"Suite record: {suite_json_path}")
-    click.echo(f"Repeat suite summary: {summary_path}")
-    click.echo(f"Suite analysis: {analysis_path}")
-    click.echo(f"Void retries used: {retries_used}")
+    click.echo(f"Experiment record: {experiment_json_path}")
+    click.echo(f"Experiment summary: {summary_path}")
+    click.echo(f"Experiment report: {report_path}")
+    click.echo(f"Unscored retries used: {retries_used}")
     for run in runs:
         click.echo(
-            f"Run {run.id}: voided={run.scores.voided}, "
-            f"run_valid={run.scores.run_validity.passed}, "
+            f"Run {run.id}: unscored={_run_is_unscored(run)}, "
+            f"execution_valid={run.scores.execution_validity.passed}, "
             f"performance_gates={run.scores.performance_gates.passed}, "
             f"composite={run.scores.composite_score:.3f}, duration={run.duration_sec:.1f}s"
         )
@@ -347,18 +357,18 @@ def _prepared_run_request(
     resolved: RunCliOptions,
     *,
     execution_suffix: str | None,
-) -> tuple[TaskDefinition, datetime, Path, RunRequest]:
-    task_def = load_task(resolved.task)
+) -> tuple[ScenarioDefinition, datetime, Path, RunRequest]:
+    scenario_def = _runner_api().load_scenario(resolved.scenario)
     started_at = datetime.now(UTC)
     execution_id = _execution_id(
-        task_def.name,
-        task_def.version,
+        scenario_def.name,
+        scenario_def.scenario_revision,
         started_at,
         execution_suffix=execution_suffix,
     )
-    execution_dir = EVALS_ROOT / execution_id
-    request = _build_run_request(resolved, task_def, execution_dir)
-    return task_def, started_at, execution_dir, request
+    execution_dir = EXPERIMENTS_ROOT / execution_id
+    request = _build_run_request(resolved, scenario_def, execution_dir)
+    return scenario_def, started_at, execution_dir, request
 
 
 def _execute_repeat_runs(
@@ -382,7 +392,7 @@ def _execute_repeat_runs(
 def _single_run_execution_result(
     *,
     resolved: RunCliOptions,
-    task_def: TaskDefinition,
+    task_def: ScenarioDefinition,
     runs: list[EvalRun],
     retries_used: int,
     echo: bool,
@@ -390,19 +400,19 @@ def _single_run_execution_result(
     if echo:
         _echo_single_run_result(runs[0])
     return SuiteExecutionResult(
-        task_path=resolved.task,
-        task_name=task_def.name,
-        task_version=task_def.version,
+        scenario_path=resolved.scenario,
+        scenario_name=task_def.name,
+        scenario_revision=task_def.scenario_revision,
         runs=runs,
         retries_used=retries_used,
     )
 
 
-def _persist_suite_execution(
+def _persist_experiment_execution(
     *,
     resolved: RunCliOptions,
     request: RunRequest,
-    task_def: TaskDefinition,
+    task_def: ScenarioDefinition,
     execution_dir: Path,
     started_at: datetime,
     runs: list[EvalRun],
@@ -410,42 +420,45 @@ def _persist_suite_execution(
     unresolved_void: int,
     echo: bool,
 ) -> SuiteExecutionResult:
-    suite_summary = create_repeat_suite_summary(
-        task_name=request.task.name,
-        task_version=request.task.version,
-        harness=resolved.agent,
+    runner_api = _runner_api()
+    experiment_api = _experiment_api()
+    experiment_summary = experiment_api.create_experiment_summary(
+        scenario_name=request.scenario.name,
+        scenario_revision=request.scenario.scenario_revision,
+        agent=resolved.agent,
         model=resolved.model,
-        metric_profile=task_metric_profile(request.task),
-        metric_modules=task_metric_modules(request.task),
+        evaluation_profile=runner_api.scenario_evaluation_profile(request.scenario),
+        metrics=runner_api.scenario_metrics(request.scenario),
         repeats=resolved.repeats,
         repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
         runs=runs,
         started_at=started_at,
-        retry_void_limit=resolved.retry_void,
+        rerun_unscored_limit=resolved.retry_void,
         retries_used=retries_used,
-        unresolved_void_count=unresolved_void,
+        unresolved_unscored_count=unresolved_void,
     )
-    suite_json_path, summary_path, analysis_path = persist_repeat_suite(
-        execution_dir, suite_summary
+    experiment_json_path, summary_path, report_path = experiment_api.persist_experiment(
+        execution_dir,
+        experiment_summary,
     )
     if echo:
-        _echo_suite_result(suite_json_path, summary_path, analysis_path, retries_used, runs)
+        _echo_experiment_result(experiment_json_path, summary_path, report_path, retries_used, runs)
     return SuiteExecutionResult(
-        task_path=resolved.task,
-        task_name=task_def.name,
-        task_version=task_def.version,
+        scenario_path=resolved.scenario,
+        scenario_name=task_def.name,
+        scenario_revision=task_def.scenario_revision,
         runs=runs,
         retries_used=retries_used,
-        suite_json_path=suite_json_path,
+        experiment_json_path=experiment_json_path,
         summary_path=summary_path,
-        analysis_path=analysis_path,
+        report_path=report_path,
     )
 
 
 def _execute_run_options(
     options: RunCliOptions,
     *,
-    force_suite_summary: bool,
+    force_experiment_summary: bool,
     cleanup_before_runs: bool,
     echo: bool,
     execution_suffix: str | None = None,
@@ -459,17 +472,17 @@ def _execute_run_options(
         execution_suffix=execution_suffix,
     )
     if echo:
-        _echo_run_header(resolved, request.task.name)
-        click.echo("Running task...")
+        _echo_run_header(resolved, request.scenario.name)
+        click.echo("Running scenario...")
 
-    runs, retries_used, unresolved_void = _execute_repeat_runs(
+    runs, retries_used, unresolved_unscored = _execute_repeat_runs(
         request=request,
         repeats=resolved.repeats,
         repeat_parallel=resolved.repeat_parallel,
         retry_void=resolved.retry_void,
     )
 
-    if resolved.repeats == 1 and not force_suite_summary:
+    if resolved.repeats == 1 and not force_experiment_summary:
         return _single_run_execution_result(
             resolved=resolved,
             task_def=task_def,
@@ -478,7 +491,7 @@ def _execute_run_options(
             echo=echo,
         )
 
-    return _persist_suite_execution(
+    return _persist_experiment_execution(
         resolved=resolved,
         request=request,
         task_def=task_def,
@@ -486,7 +499,7 @@ def _execute_run_options(
         started_at=started_at,
         runs=runs,
         retries_used=retries_used,
-        unresolved_void=unresolved_void,
+        unresolved_void=unresolved_unscored,
         echo=echo,
     )
 
@@ -604,10 +617,45 @@ def _load_json_file(path: Path) -> dict[str, object] | None:
     return payload
 
 
+def _load_scenario_document(path: Path) -> dict[str, Any]:
+    with path.open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise click.ClickException(f"Scenario document must be a mapping: {path}")
+    return payload
+
+
+def _write_scenario_document(path: Path, payload: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", encoding="utf-8") as handle:
+        yaml.safe_dump(payload, handle, sort_keys=False)
+
+
+def _scenario_revision_sort_key(scenario_yaml: Path) -> tuple[int, str]:
+    revision_dir = scenario_yaml.parent.name
+    match = VERSION_DIR_PATTERN.fullmatch(revision_dir)
+    if match is None:
+        return (-1, revision_dir)
+    return (int(match.group(1)), revision_dir)
+
+
+def _resolve_scenario_yaml(path: Path) -> Path:
+    resolved = path.resolve()
+    if resolved.is_file():
+        return resolved
+    scenario_yaml = resolved / "scenario.yaml"
+    if scenario_yaml.is_file():
+        return scenario_yaml
+    candidates = list(resolved.glob("v*/scenario.yaml"))
+    if not candidates:
+        raise click.ClickException(f"scenario.yaml not found in {resolved}")
+    return max(candidates, key=_scenario_revision_sort_key)
+
+
 def _execution_payload(execution_dir: Path) -> dict[str, object]:
     for candidate in (
-        execution_dir / "suite-summary.json",
-        execution_dir / "suite.json",
+        execution_dir / "experiment-summary.json",
+        execution_dir / "experiment.json",
         execution_dir / "runs" / "run-01" / "run.json",
     ):
         payload = _load_json_file(candidate)
@@ -629,21 +677,25 @@ def _execution_record(execution_dir: Path) -> dict[str, object]:
     aggregate = payload.get("aggregate")
     config_dict = config if isinstance(config, dict) else {}
     aggregate_dict = aggregate if isinstance(aggregate, dict) else {}
-    _, task_from_name, version_from_name = _execution_name_parts(execution_dir.name)
-    task_name = str(config_dict.get("task_name") or task_from_name or "unknown-task")
-    task_version = str(version_from_name or "unknown-version")
+    _, scenario_from_name, revision_from_name = _execution_name_parts(execution_dir.name)
+    scenario_name = str(
+        config_dict.get("scenario_name") or scenario_from_name or "unknown-scenario"
+    )
+    scenario_revision = str(
+        config_dict.get("scenario_revision") or revision_from_name or "unknown-revision"
+    )
     return {
         "execution_id": execution_dir.name,
         "path": str(execution_dir),
         "created_at_utc": payload.get("created_at_utc"),
-        "task_name": task_name,
-        "task_version": task_version,
-        "harness": config_dict.get("harness"),
+        "scenario_name": scenario_name,
+        "scenario_revision": scenario_revision,
+        "agent": config_dict.get("agent"),
         "model": config_dict.get("model"),
-        "metric_profile": config_dict.get("metric_profile"),
-        "metric_modules": config_dict.get("metric_modules"),
+        "evaluation_profile": config_dict.get("evaluation_profile"),
+        "metrics": config_dict.get("metrics"),
         "run_count_total": aggregate_dict.get("run_count_total"),
-        "void_count": aggregate_dict.get("void_count"),
+        "unscored_count": aggregate_dict.get("unscored_count"),
     }
 
 
@@ -661,7 +713,7 @@ def _archive_destination(src: Path, archive_dir: Path) -> Path:
     try:
         rel = src.relative_to(REPO_ROOT)
     except ValueError:
-        rel = Path("evals") / src.name
+        rel = Path("experiments") / src.name
     return archive_dir / rel
 
 
@@ -679,11 +731,11 @@ def _archive_path(src: Path, archive_dir: Path, *, dry_run: bool) -> bool:
     return True
 
 
-def _sorted_eval_dirs(evals_root: Path) -> list[Path]:
-    if not evals_root.is_dir():
+def _sorted_experiment_dirs(experiments_root: Path) -> list[Path]:
+    if not experiments_root.is_dir():
         return []
     return sorted(
-        (path for path in evals_root.iterdir() if path.is_dir()),
+        (path for path in experiments_root.iterdir() if path.is_dir()),
         key=lambda path: path.name,
         reverse=True,
     )
@@ -697,38 +749,38 @@ def _default_archive_dir() -> Path:
 def _execution_matches_filters(
     record: dict[str, object],
     *,
-    task: str | None,
+    scenario: str | None,
     model: str | None,
-    harness: str | None,
-    metric_profile: str | None,
+    agent: str | None,
+    evaluation_profile: str | None,
 ) -> bool:
-    task_value = str(record.get("task_name", "")).lower()
+    scenario_value = str(record.get("scenario_name", "")).lower()
     model_value = str(record.get("model", "")).lower()
-    harness_value = str(record.get("harness", "")).lower()
-    metric_profile_value = str(record.get("metric_profile", "")).lower()
-    if task and task.lower() not in task_value:
+    agent_value = str(record.get("agent", "")).lower()
+    evaluation_profile_value = str(record.get("evaluation_profile", "")).lower()
+    if scenario and scenario.lower() not in scenario_value:
         return False
     if model and model.lower() not in model_value:
         return False
-    if harness and harness.lower() not in harness_value:
+    if agent and agent.lower() not in agent_value:
         return False
-    return not (metric_profile and metric_profile.lower() not in metric_profile_value)
+    return not (evaluation_profile and evaluation_profile.lower() not in evaluation_profile_value)
 
 
 @main.command()
 @click.option(
-    "--task",
-    "-t",
+    "--scenario",
+    "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to task.yaml file",
+    help="Path to scenario.yaml file",
 )
 @click.option(
     "--agent",
     "-a",
     type=click.Choice(AGENT_CHOICES),
     required=True,
-    help="Agent/harness to use",
+    help="Agent to use",
 )
 @click.option(
     "--model",
@@ -741,7 +793,7 @@ def _execution_matches_filters(
     "--timeout",
     type=int,
     default=1800,
-    help="Task timeout in seconds",
+    help="Scenario timeout in seconds",
 )
 @click.option(
     "--repeats",
@@ -759,10 +811,10 @@ def _execution_matches_filters(
     "--retry-void",
     type=click.IntRange(min=0, max=1),
     default=0,
-    help="Retry budget for voided runs (0 or 1; at most one retry per failure)",
+    help="Retry budget for unscored runs (0 or 1; at most one retry per failure)",
 )
 def run(
-    task: Path,
+    scenario: Path,
     agent: str,
     model: str,
     timeout: int,
@@ -770,9 +822,9 @@ def run(
     repeat_parallel: int,
     retry_void: int,
 ) -> None:
-    """Run a task with specified harness and model."""
+    """Run one scenario with the specified agent and model."""
     options = RunCliOptions(
-        task=task,
+        scenario=scenario,
         agent=agent,
         model=model,
         timeout=timeout,
@@ -782,31 +834,31 @@ def run(
     )
     _execute_run_options(
         options,
-        force_suite_summary=False,
+        force_experiment_summary=False,
         cleanup_before_runs=True,
         echo=True,
     )
 
 
 @main.group()
-def suite() -> None:
-    """Suite-level run workflows."""
+def experiment() -> None:
+    """Experiment-level run workflows."""
 
 
-@suite.command("run")
+@experiment.command("run")
 @click.option(
-    "--task",
-    "-t",
+    "--scenario",
+    "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to task.yaml file",
+    help="Path to scenario.yaml file",
 )
 @click.option(
     "--agent",
     "-a",
     type=click.Choice(AGENT_CHOICES),
     required=True,
-    help="Agent/harness to use",
+    help="Agent to use",
 )
 @click.option(
     "--model",
@@ -819,13 +871,13 @@ def suite() -> None:
     "--timeout",
     type=int,
     default=300,
-    help="Task timeout in seconds",
+    help="Scenario timeout in seconds",
 )
 @click.option(
     "--repeats",
     type=click.IntRange(min=1),
     default=5,
-    help="Number of repeated runs in the suite",
+    help="Number of repeated runs in the experiment",
 )
 @click.option(
     "--repeat-parallel",
@@ -837,10 +889,10 @@ def suite() -> None:
     "--retry-void",
     type=click.IntRange(min=0, max=1),
     default=1,
-    help="Retry budget for voided runs (0 or 1)",
+    help="Retry budget for unscored runs (0 or 1)",
 )
-def suite_run(
-    task: Path,
+def experiment_run(
+    scenario: Path,
     agent: str,
     model: str,
     timeout: int,
@@ -848,9 +900,9 @@ def suite_run(
     repeat_parallel: int,
     retry_void: int,
 ) -> None:
-    """Run repeat suites with deterministic aggregate output."""
+    """Run a repeated experiment with deterministic aggregate output."""
     options = RunCliOptions(
-        task=task,
+        scenario=scenario,
         agent=agent,
         model=model,
         timeout=timeout,
@@ -860,7 +912,7 @@ def suite_run(
     )
     _execute_run_options(
         options,
-        force_suite_summary=True,
+        force_experiment_summary=True,
         cleanup_before_runs=True,
         echo=True,
     )
@@ -955,7 +1007,7 @@ def harbor() -> None:
 )
 def harbor_cleanup(include_containers: bool, include_build_processes: bool) -> None:
     """Cleanup stale Harbor processes and containers."""
-    cleanup_stale_harbor_resources(
+    _runner_api().cleanup_stale_harbor_resources(
         include_containers=include_containers,
         include_build_processes=include_build_processes,
     )
@@ -982,7 +1034,7 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
     """Setup local toolchain and run Harbor preflight checks."""
     _cleanup_stale_harbor_before_runs()
 
-    reason = _docker_compose_preflight_reason(dict(os.environ))
+    reason = _runner_api()._docker_compose_preflight_reason(dict(os.environ))
     if reason:
         raise click.ClickException(reason)
 
@@ -998,22 +1050,26 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
 
 
 @main.group()
-def evals() -> None:
-    """Eval suite artifact workflows."""
+def experiments() -> None:
+    """Experiment artifact workflows."""
 
 
-@evals.command("list")
+@experiments.command("list")
 @click.option(
-    "--evals-root",
+    "--experiments-root",
     type=click.Path(path_type=Path),
-    default=EVALS_ROOT,
+    default=EXPERIMENTS_ROOT,
     show_default=True,
-    help="Eval suite directory root.",
+    help="Experiment directory root.",
 )
-@click.option("--task", type=str, help="Filter by task name substring.")
+@click.option("--scenario", type=str, help="Filter by scenario name substring.")
 @click.option("--model", type=str, help="Filter by model substring.")
-@click.option("--harness", type=str, help="Filter by harness substring.")
-@click.option("--metric-profile", type=str, help="Filter by metric profile substring.")
+@click.option("--agent", type=str, help="Filter by agent substring.")
+@click.option(
+    "--evaluation-profile",
+    type=str,
+    help="Filter by evaluation profile substring.",
+)
 @click.option(
     "--limit",
     type=click.IntRange(min=1),
@@ -1022,26 +1078,26 @@ def evals() -> None:
     help="Maximum rows to display.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
-def evals_list(
-    evals_root: Path,
-    task: str | None,
+def experiments_list(
+    experiments_root: Path,
+    scenario: str | None,
     model: str | None,
-    harness: str | None,
-    metric_profile: str | None,
+    agent: str | None,
+    evaluation_profile: str | None,
     limit: int,
     as_json: bool,
 ) -> None:
-    """List eval suites with optional filters."""
-    dirs = _sorted_eval_dirs(evals_root.resolve())
+    """List experiments with optional filters."""
+    dirs = _sorted_experiment_dirs(experiments_root.resolve())
     rows: list[dict[str, object]] = []
     for path in dirs:
         record = _execution_record(path)
         if not _execution_matches_filters(
             record,
-            task=task,
+            scenario=scenario,
             model=model,
-            harness=harness,
-            metric_profile=metric_profile,
+            agent=agent,
+            evaluation_profile=evaluation_profile,
         ):
             continue
         rows.append(record)
@@ -1052,32 +1108,33 @@ def evals_list(
         click.echo(json.dumps(rows, indent=2))
         return
     if not rows:
-        click.echo("No eval suites found.")
+        click.echo("No experiments found.")
         return
 
     for index, row in enumerate(rows, start=1):
         click.echo(
-            f"{index:02d}. {row['execution_id']} | task={row['task_name']}@{row['task_version']} | "
-            f"harness={row.get('harness') or 'unknown'} | model={row.get('model') or 'unknown'} | "
-            f"metric_profile={row.get('metric_profile') or 'unknown'} | "
-            f"runs={row.get('run_count_total') or 0} | void={row.get('void_count') or 0}"
+            f"{index:02d}. {row['execution_id']} | "
+            f"scenario={row['scenario_name']}@{row['scenario_revision']} | "
+            f"agent={row.get('agent') or 'unknown'} | model={row.get('model') or 'unknown'} | "
+            f"evaluation_profile={row.get('evaluation_profile') or 'unknown'} | "
+            f"runs={row.get('run_count_total') or 0} | unscored={row.get('unscored_count') or 0}"
         )
 
 
-@evals.command("prune")
+@experiments.command("prune")
 @click.option(
-    "--evals-root",
+    "--experiments-root",
     type=click.Path(path_type=Path),
-    default=EVALS_ROOT,
+    default=EXPERIMENTS_ROOT,
     show_default=True,
-    help="Eval suite directory root.",
+    help="Experiment directory root.",
 )
 @click.option(
     "--keep-per-model",
     type=click.IntRange(min=0),
     default=1,
     show_default=True,
-    help="How many latest suites to keep per model.",
+    help="How many latest experiments to keep per model.",
 )
 @click.option(
     "--archive-dir",
@@ -1085,21 +1142,21 @@ def evals_list(
     help="Archive destination. Defaults to /tmp/raidar-archive/<timestamp>.",
 )
 @click.option("--dry-run", is_flag=True, help="Show actions without moving files.")
-def evals_prune(
-    evals_root: Path,
+def experiments_prune(
+    experiments_root: Path,
     keep_per_model: int,
     archive_dir: Path | None,
     dry_run: bool,
 ) -> None:
-    """Archive stale eval suite artifacts while keeping latest suites per model."""
+    """Archive stale experiment artifacts while keeping latest experiments per model."""
     archive_root = (archive_dir or _default_archive_dir()).resolve()
-    evals_root = evals_root.resolve()
+    experiments_root = experiments_root.resolve()
     if not dry_run:
         archive_root.mkdir(parents=True, exist_ok=True)
 
     kept_counts: dict[str, int] = {}
     pruned_count = 0
-    for execution_dir in _sorted_eval_dirs(evals_root):
+    for execution_dir in _sorted_experiment_dirs(experiments_root):
         model_key = _execution_model_key(execution_dir)
         count = kept_counts.get(model_key, 0)
         if count < keep_per_model:
@@ -1109,29 +1166,29 @@ def evals_prune(
             pruned_count += 1
 
     click.echo(f"archive_dir={archive_root}")
-    click.echo(f"evals_pruned={pruned_count}")
+    click.echo(f"experiments_pruned={pruned_count}")
 
 
 @main.group()
-def provider() -> None:
-    """Provider and adapter workflows."""
+def agent() -> None:
+    """Agent and adapter workflows."""
 
 
-@provider.command("list")
-def provider_list() -> None:
-    """List supported provider CLI adapters and rule files."""
-    click.echo("Supported providers:")
+@agent.command("list")
+def agent_list() -> None:
+    """List supported agent CLI adapters and rule files."""
+    click.echo("Supported agents:")
     for agent in AGENT_CHOICES:
         click.echo(f"  {agent:12} -> {SYSTEM_RULES.get(agent, '(no rule mapping)')}")
 
 
-@provider.command("validate")
+@agent.command("validate")
 @click.option(
     "--agent",
     "-a",
     type=click.Choice(AGENT_CHOICES),
     required=True,
-    help="Agent/harness to validate.",
+    help="Agent to validate.",
 )
 @click.option(
     "--model",
@@ -1144,15 +1201,15 @@ def provider_list() -> None:
     "--timeout",
     type=int,
     default=1800,
-    help="Timeout used to build harness config.",
+    help="Timeout used to build the agent run config.",
 )
-def provider_validate(
+def agent_validate(
     agent: str,
     model: str,
     timeout: int,
 ) -> None:
-    """Validate provider adapter wiring and environment requirements."""
-    config = HarnessConfig(
+    """Validate agent adapter wiring and environment requirements."""
+    config = AgentRunConfig(
         agent=Agent(agent),
         model=ModelTarget.from_string(model),
         timeout_sec=timeout,
@@ -1161,7 +1218,7 @@ def provider_validate(
     adapter.validate()
     runtime_keys = sorted(adapter.runtime_env().keys())
 
-    click.echo("Provider validation passed.")
+    click.echo("Agent validation passed.")
     click.echo(f"  agent: {agent}")
     click.echo(f"  model: {model}")
     click.echo(f"  harbor_agent: {adapter.harbor_agent()}")
@@ -1170,114 +1227,115 @@ def provider_validate(
 
 
 @main.group()
-def task() -> None:
-    """Task lifecycle commands."""
+def scenario() -> None:
+    """Scenario lifecycle commands."""
 
 
-@task.command("init")
+@scenario.command("init")
 @click.option(
     "--path",
     "-p",
     type=click.Path(path_type=Path),
     required=True,
-    help="Directory to create the task in.",
+    help="Directory to create the scenario in.",
 )
-@click.option("--name", type=str, help="Task name. Defaults to directory name.")
+@click.option("--name", type=str, help="Scenario name. Defaults to directory name.")
 @click.option(
-    "--task-version",
+    "--scenario-revision",
     type=str,
     default="v001",
-    help="Task version directory to initialize.",
+    help="Scenario revision directory to initialize.",
 )
 @click.option(
-    "--scaffold-root",
+    "--starter-root",
     type=str,
-    default="scaffold",
-    help="Task-local scaffold root path.",
+    default="starter",
+    help="Scenario-local starter root path.",
 )
 @click.option(
     "--prompt-entry",
     type=str,
     default="prompt/task.md",
-    help="Primary prompt artifact path (relative to task version directory).",
+    help="Primary prompt artifact path (relative to scenario revision directory).",
 )
 @click.option(
     "--difficulty",
     type=click.Choice(["easy", "medium", "hard"]),
     default="medium",
-    help="Task difficulty.",
+    help="Scenario difficulty.",
 )
-@click.option("--category", type=str, default="greenfield-ui", help="Task category.")
-@click.option("--timeout", type=int, default=1800, help="Task timeout in seconds.")
-def task_init(
+@click.option("--category", type=str, default="greenfield-ui", help="Scenario category.")
+@click.option("--timeout", type=int, default=1800, help="Scenario timeout in seconds.")
+def scenario_init(
     path: Path,
     name: str | None,
-    task_version: str,
-    scaffold_root: str,
+    scenario_revision: str,
+    starter_root: str,
     prompt_entry: str,
     difficulty: Literal["easy", "medium", "hard"],
     category: str,
     timeout: int,
 ) -> None:
-    """Create a new versioned task descriptor with prompt artifacts and rules."""
-    task_root = path.resolve()
-    task_name = name or task_root.name
-    task_dir = task_root / task_version
-    task_yaml = task_dir / "task.yaml"
-    if task_yaml.exists():
-        raise click.ClickException(f"Task already exists: {task_yaml}")
+    """Create a new versioned scenario descriptor with prompt artifacts and rules."""
+    scenario_root = path.resolve()
+    scenario_name = name or scenario_root.name
+    revision_dir = scenario_root / scenario_revision
+    scenario_yaml = revision_dir / "scenario.yaml"
+    if scenario_yaml.exists():
+        raise click.ClickException(f"Scenario already exists: {scenario_yaml}")
 
-    (task_dir / "rules").mkdir(parents=True, exist_ok=True)
-    (task_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (revision_dir / "rules").mkdir(parents=True, exist_ok=True)
+    (revision_dir / "prompt").mkdir(parents=True, exist_ok=True)
 
-    task_def = TaskDefinition(
-        name=task_name,
-        version=task_version,
-        description=f"Task definition for {task_name}",
-        difficulty=difficulty,
-        category=category,
-        timeout_sec=timeout,
-        scaffold={"root": scaffold_root},
-        verification=VerificationConfig(
-            max_gate_failures=3,
-            min_quality_score=0.8,
-            required_commands=[
+    scenario_doc = {
+        "name": scenario_name,
+        "scenario_revision": scenario_revision,
+        "description": f"Scenario definition for {scenario_name}",
+        "difficulty": difficulty,
+        "category": category,
+        "timeout_sec": timeout,
+        "dockerfile": "./Dockerfile",
+        "test_scripts": [],
+        "starter": {"root": starter_root},
+        "verification": {
+            "max_gate_failures": 3,
+            "min_quality_score": 0.8,
+            "required_commands": [
                 ["bun", "run", "typecheck"],
                 ["bun", "run", "lint"],
             ],
-            gates=[
-                VerificationGate(name="typecheck", command=["bun", "run", "typecheck"]),
-                VerificationGate(name="lint", command=["bun", "run", "lint"]),
+            "gates": [
+                {"name": "typecheck", "command": ["bun", "run", "typecheck"]},
+                {"name": "lint", "command": ["bun", "run", "lint"]},
             ],
-        ),
-        compliance=ComplianceConfig(
-            deterministic_checks=[
-                DeterministicCheck(
-                    type="no_pattern",
-                    pattern="TODO",
-                    description="No TODO markers remain in production files",
-                )
-            ]
-        ),
-        metrics=MetricsConfig(
-            modules=[
-                CoreMetricModule(id="functional"),
-                CoreMetricModule(id="compliance"),
-                CoreMetricModule(id="efficiency"),
-                CoreMetricModule(id="run-validity"),
-                CoreMetricModule(id="optimization"),
-            ]
-        ),
-        prompt=PromptConfig(entry=prompt_entry, includes=[]),
-    )
-    task_dir.mkdir(parents=True, exist_ok=True)
-    task_def.to_yaml(task_yaml)
+        },
+        "acceptance": {
+            "deterministic_checks": [
+                {
+                    "type": "no_pattern",
+                    "pattern": "TODO",
+                    "description": "No TODO markers remain in production files",
+                }
+            ],
+            "requirements": [],
+            "llm_judge_rubric": [],
+        },
+        "metrics": [
+            {"type": "core", "id": "functional"},
+            {"type": "core", "id": "acceptance"},
+            {"type": "core", "id": "verification-stability"},
+            {"type": "core", "id": "execution-validity"},
+            {"type": "core", "id": "resource-efficiency"},
+        ],
+        "prompt": {"entry": prompt_entry, "includes": []},
+    }
+    _write_scenario_document(scenario_yaml, scenario_doc)
 
-    prompt_path = task_dir / prompt_entry
+    prompt_path = revision_dir / prompt_entry
     prompt_path.parent.mkdir(parents=True, exist_ok=True)
     prompt_path.write_text(
         (
-            "Implement the requested feature in the scaffold application.\n\n"
+            "Implement the requested feature in the starter application.\n\n"
             "Run all required verification commands before completion and "
             "report only after they pass.\n"
         ),
@@ -1285,79 +1343,80 @@ def task_init(
     )
 
     rule_text = (
-        "Follow the task prompt exactly. Run required verification commands before completion."
+        "Follow the scenario prompt exactly. Run required verification commands before completion."
     )
     for filename in sorted(set(SYSTEM_RULES.values())):
-        (task_dir / "rules" / filename).write_text(rule_text + "\n", encoding="utf-8")
+        (revision_dir / "rules" / filename).write_text(rule_text + "\n", encoding="utf-8")
 
-    click.echo(f"Created task at {task_yaml}")
+    click.echo(f"Created scenario at {scenario_yaml}")
 
 
-@task.command("validate")
+@scenario.command("validate")
 @click.option(
-    "--task",
-    "-t",
+    "--scenario",
+    "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to task.yaml file.",
+    help="Path to scenario.yaml file.",
 )
-def task_validate(task: Path) -> None:
-    """Validate task schema and report key configuration fields."""
-    task_def = load_task(task.resolve())
-    click.echo("Task validation passed.")
-    click.echo(f"  name: {task_def.name}")
-    click.echo(f"  version: {task_def.version}")
-    click.echo(f"  scaffold_root: {task_def.scaffold.root}")
-    click.echo(f"  prompt_entry: {task_def.prompt.entry}")
-    click.echo(f"  required_commands: {len(task_def.verification.required_commands)}")
-    click.echo(f"  gates: {len(task_def.verification.gates)}")
-    click.echo(f"  metric_modules: {len(task_def.metrics.modules)}")
+def scenario_validate(scenario: Path) -> None:
+    """Validate a scenario document and report key configuration fields."""
+    runner_api = _runner_api()
+    scenario_def = runner_api.load_scenario(_resolve_scenario_yaml(scenario))
+    click.echo("Scenario validation passed.")
+    click.echo(f"  name: {scenario_def.name}")
+    click.echo(f"  scenario_revision: {scenario_def.scenario_revision}")
+    click.echo(f"  starter_root: {scenario_def.starter.root}")
+    click.echo(f"  prompt_entry: {scenario_def.prompt.entry}")
+    click.echo(f"  required_commands: {len(scenario_def.verification.required_commands)}")
+    click.echo(f"  gates: {len(scenario_def.verification.gates)}")
+    click.echo(f"  metrics: {len(scenario_def.metric_ids())}")
 
 
-@task.command("clone-version")
+@scenario.command("clone-revision")
 @click.option(
     "--path",
     "-p",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     required=True,
-    help="Path to task root directory that contains version folders.",
+    help="Path to the scenario root directory that contains revision folders.",
 )
 @click.option(
-    "--from-version",
+    "--from-revision",
     type=str,
     required=True,
-    help="Source task version label (for example: v001).",
+    help="Source scenario revision label (for example: v001).",
 )
 @click.option(
-    "--to-version",
+    "--to-revision",
     type=str,
-    help="Target task version label. Defaults to the next version after --from-version.",
+    help="Target scenario revision label. Defaults to the next revision after --from-revision.",
 )
-def task_clone_version(path: Path, from_version: str, to_version: str | None) -> None:
-    """Clone a task version and update task version metadata."""
+def scenario_clone_revision(path: Path, from_revision: str, to_revision: str | None) -> None:
+    """Clone a scenario revision and update revision metadata."""
     try:
-        result = clone_task_version(
-            task_root=path.resolve(),
-            source_version=from_version,
-            target_version=to_version,
+        result = _scenario_clone_api().clone_scenario_revision(
+            scenario_root=path.resolve(),
+            source_revision=from_revision,
+            target_revision=to_revision,
         )
     except (FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
-    click.echo("Task version clone completed.")
-    click.echo(f"  task_root: {result.task_root}")
-    click.echo(f"  source_version: {result.source_version}")
-    click.echo(f"  target_version: {result.target_version}")
-    click.echo(f"  task_yaml: {result.target_task_yaml}")
+    click.echo("Scenario revision clone completed.")
+    click.echo(f"  scenario_root: {result.scenario_root}")
+    click.echo(f"  source_revision: {result.source_revision}")
+    click.echo(f"  target_revision: {result.target_revision}")
+    click.echo(f"  scenario_yaml: {result.target_scenario_yaml}")
 
 
 @main.command()
 @click.option(
-    "--task",
-    "-t",
+    "--scenario",
+    "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to task directory",
+    help="Path to scenario revision directory",
 )
 @click.option(
     "--agent",
@@ -1367,32 +1426,32 @@ def task_clone_version(path: Path, from_version: str, to_version: str | None) ->
     help="Agent to inject rules for",
 )
 @click.option(
-    "--scaffold",
-    "-s",
+    "--starter",
+    "-r",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to a specific scaffold template/version directory",
+    help="Path to a specific starter template/revision directory",
 )
 def inject(
-    task: Path,
+    scenario: Path,
     agent: str,
-    scaffold: Path,
+    starter: Path,
 ) -> None:
-    """Inject rules into scaffold for testing."""
+    """Inject rules into a starter workspace for testing."""
     click.echo(f"Injecting rules for {agent}")
-    rules_dir = task / "rules"
-    result = inject_rules(rules_dir, scaffold, agent)
+    rules_dir = scenario / "rules"
+    result = inject_rules(rules_dir, starter, agent)
     click.echo(f"Injected: {result}")
 
 
 @main.command()
 @click.option(
-    "--task",
-    "-t",
+    "--scenario",
+    "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
     multiple=True,
-    help="Path to task.yaml file (repeatable)",
+    help="Path to scenario.yaml file (repeatable)",
 )
 @click.option(
     "--config",
@@ -1413,72 +1472,78 @@ def inject(
     help="Show matrix entries without running",
 )
 def matrix(
-    task: tuple[Path, ...],
+    scenario: tuple[Path, ...],
     config: Path,
     parallel: int,
     dry_run: bool,
 ) -> None:
-    """Run repeat-suite matrix from configuration."""
+    """Run an experiment matrix from configuration."""
     from .matrix import MatrixConfig, MatrixEntry, generate_matrix_entries, load_matrix_config
 
-    task_paths = tuple(path.resolve() for path in task)
-    if not task_paths:
-        raise click.ClickException("At least one --task path is required.")
-    task_defs = _load_matrix_tasks(task_paths)
+    scenario_paths = tuple(path.resolve() for path in scenario)
+    if not scenario_paths:
+        raise click.ClickException("At least one --scenario path is required.")
+    scenario_defs = _load_matrix_scenarios(scenario_paths)
 
     click.echo(f"Loading matrix from {config}")
     matrix_config: MatrixConfig = load_matrix_config(config)
     entries: list[MatrixEntry] = generate_matrix_entries(matrix_config)
-    total_entries = len(entries) * len(task_defs)
+    total_entries = len(entries) * len(scenario_defs)
     click.echo(
-        f"Matrix defined for {len(matrix_config.runs)} harness/model pairs ({total_entries} suites)"
+        "Matrix defined for "
+        f"{len(matrix_config.runs)} agent/model pairs ({total_entries} experiments)"
     )
 
-    suite_config = matrix_config.suite
+    experiment_config = matrix_config.suite
     click.echo(
-        "Suite settings: "
-        f"timeout={suite_config.timeout_sec}s, repeats={suite_config.repeats}, "
-        f"repeat_parallel={suite_config.repeat_parallel}, retry_void={suite_config.retry_void}"
+        "Experiment settings: "
+        f"timeout={experiment_config.timeout_sec}s, repeats={experiment_config.repeats}, "
+        "repeat_parallel="
+        f"{experiment_config.repeat_parallel}, retry_void={experiment_config.retry_void}"
     )
 
     if dry_run:
         _echo_matrix_dry_run(
-            task_defs=task_defs,
+            task_defs=scenario_defs,
             entries=entries,
-            repeats=suite_config.repeats,
+            repeats=experiment_config.repeats,
         )
         return
 
     _cleanup_stale_harbor_before_runs()
-    jobs = [(task_path, task_def, entry) for task_path, task_def in task_defs for entry in entries]
+    jobs = [
+        (scenario_path, scenario_def, entry)
+        for scenario_path, scenario_def in scenario_defs
+        for entry in entries
+    ]
     successes, failures = _run_matrix_jobs(
         jobs=jobs,
-        suite_config=suite_config,
+        suite_config=experiment_config,
         parallel=parallel,
     )
 
-    click.echo(f"Matrix completed: {successes} suites succeeded, {failures} suites failed.")
+    click.echo(f"Matrix completed: {successes} experiments succeeded, {failures} failed.")
 
 
-def _load_matrix_tasks(task_paths: tuple[Path, ...]) -> list[tuple[Path, TaskDefinition]]:
-    task_defs: list[tuple[Path, TaskDefinition]] = []
+def _load_matrix_scenarios(task_paths: tuple[Path, ...]) -> list[tuple[Path, ScenarioDefinition]]:
+    task_defs: list[tuple[Path, ScenarioDefinition]] = []
     for task_path in task_paths:
-        click.echo(f"Loading task from {task_path}")
-        task_defs.append((task_path, load_task(task_path)))
+        click.echo(f"Loading scenario from {task_path}")
+        task_defs.append((task_path, _runner_api().load_scenario(task_path)))
     return task_defs
 
 
 def _echo_matrix_dry_run(
     *,
-    task_defs: list[tuple[Path, TaskDefinition]],
+    task_defs: list[tuple[Path, ScenarioDefinition]],
     entries: list[object],
     repeats: int,
 ) -> None:
     for _task_path, task_def in task_defs:
         for entry in entries:
             click.echo(
-                f"[dry-run] {task_def.name}@{task_def.version}: "
-                f"{entry.harness}/{entry.model} x{repeats}"
+                f"[dry-run] {task_def.name}@{task_def.scenario_revision}: "
+                f"{entry.agent}/{entry.model} x{repeats}"
             )
 
 
@@ -1489,8 +1554,8 @@ def _matrix_job_options(
     suite_config: object,
 ) -> RunCliOptions:
     return RunCliOptions(
-        task=task_path,
-        agent=entry.harness,
+        scenario=task_path,
+        agent=entry.agent,
         model=entry.model,
         timeout=suite_config.timeout_sec,
         repeats=suite_config.repeats,
@@ -1501,14 +1566,14 @@ def _matrix_job_options(
 
 def _run_matrix_jobs(
     *,
-    jobs: list[tuple[Path, TaskDefinition, object]],
+    jobs: list[tuple[Path, ScenarioDefinition, object]],
     suite_config: object,
     parallel: int,
 ) -> tuple[int, int]:
     successes = 0
     failures = 0
 
-    def _run_matrix_job(job: tuple[Path, TaskDefinition, object]) -> SuiteExecutionResult:
+    def _run_matrix_job(job: tuple[Path, ScenarioDefinition, object]) -> SuiteExecutionResult:
         task_path, _task_def, entry = job
         options = _matrix_job_options(
             task_path=task_path,
@@ -1517,10 +1582,10 @@ def _run_matrix_jobs(
         )
         return _execute_run_options(
             options,
-            force_suite_summary=True,
+            force_experiment_summary=True,
             cleanup_before_runs=False,
             echo=False,
-            execution_suffix=f"{entry.harness}__{entry.model.replace('/', '-')}",
+            execution_suffix=f"{entry.agent}__{entry.model.replace('/', '-')}",
         )
 
     if parallel > 1:
@@ -1531,27 +1596,28 @@ def _run_matrix_jobs(
                 try:
                     result = future.result()
                 except Exception as exc:
-                    click.echo(f"[{task_def.name}] {entry.harness}/{entry.model} failed: {exc}")
+                    click.echo(f"[{task_def.name}] {entry.agent}/{entry.model} failed: {exc}")
                     failures += 1
                     continue
                 successes += 1
                 click.echo(
-                    f"[{task_def.name}] {entry.harness}/{entry.model} -> {result.summary_path}"
+                    f"[{task_def.name}] {entry.agent}/{entry.model} -> {result.summary_path}"
                 )
         return successes, failures
 
     for task_path, task_def, entry in jobs:
         click.echo(
-            f"Running suite: {task_def.name}@{task_def.version} {entry.harness}/{entry.model}"
+            f"Running experiment: {task_def.name}@{task_def.scenario_revision} "
+            f"{entry.agent}/{entry.model}"
         )
         try:
             result = _run_matrix_job((task_path, task_def, entry))
         except Exception as exc:
-            click.echo(f"[{task_def.name}] {entry.harness}/{entry.model} failed: {exc}")
+            click.echo(f"[{task_def.name}] {entry.agent}/{entry.model} failed: {exc}")
             failures += 1
             continue
         successes += 1
-        click.echo(f"[{task_def.name}] suite summary: {result.summary_path}")
+        click.echo(f"[{task_def.name}] experiment summary: {result.summary_path}")
 
     return successes, failures
 
@@ -1562,7 +1628,7 @@ def _run_matrix_jobs(
     "-r",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to evals directory",
+    help="Path to experiments directory",
 )
 @click.option(
     "--format",
@@ -1578,7 +1644,7 @@ def _run_matrix_jobs(
     help="Output file path",
 )
 def report(results: Path, format: str, output: Path | None) -> None:
-    """Generate comparison report from eval suites."""
+    """Generate a comparison report from experiment runs."""
     from .storage import (
         aggregate_results,
         export_to_csv,
@@ -1627,23 +1693,24 @@ def init_matrix() -> None:
     click.echo(f"Example matrix configuration created: {output_path}")
 
 
-def _echo_task_summary(task_def: TaskDefinition) -> None:
-    click.echo(f"Task: {task_def.name}")
-    click.echo(f"Version: {task_def.version}")
-    click.echo(f"Description: {task_def.description}")
-    click.echo(f"Difficulty: {task_def.difficulty}")
-    click.echo(f"Category: {task_def.category}")
-    click.echo(f"Timeout: {task_def.timeout_sec // 60} minutes")
-    click.echo(f"Metric Profile: {task_metric_profile(task_def)}")
-    click.echo(f"Metric Modules: {', '.join(task_metric_modules(task_def))}")
+def _echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
+    runner_api = _runner_api()
+    click.echo(f"Scenario: {scenario_def.name}")
+    click.echo(f"Revision: {scenario_def.scenario_revision}")
+    click.echo(f"Description: {scenario_def.description}")
+    click.echo(f"Difficulty: {scenario_def.difficulty}")
+    click.echo(f"Category: {scenario_def.category}")
+    click.echo(f"Timeout: {scenario_def.timeout_sec // 60} minutes")
+    click.echo(f"Evaluation Profile: {runner_api.scenario_evaluation_profile(scenario_def)}")
+    click.echo(f"Metrics: {', '.join(runner_api.scenario_metrics(scenario_def))}")
 
-    if task_def.verification.gates:
-        gates = [g.name for g in task_def.verification.gates]
+    if scenario_def.verification.gates:
+        gates = [g.name for g in scenario_def.verification.gates]
         click.echo(f"Quality Gates: {', '.join(gates)}")
 
 
-def _echo_rule_variants(task_dir: Path) -> None:
-    rules_dir = task_dir / "rules"
+def _echo_rule_variants(scenario_dir: Path) -> None:
+    rules_dir = scenario_dir / "rules"
     if not rules_dir.exists():
         return
     click.echo()
@@ -1652,7 +1719,7 @@ def _echo_rule_variants(task_dir: Path) -> None:
     click.echo(f"  files: {', '.join(files) if files else '(none)'}")
 
 
-def _echo_visual_config(task_def: TaskDefinition) -> None:
+def _echo_visual_config(task_def: ScenarioDefinition) -> None:
     if not task_def.visual:
         return
     click.echo()
@@ -1661,50 +1728,34 @@ def _echo_visual_config(task_def: TaskDefinition) -> None:
     click.echo(f"  Threshold: {task_def.visual.threshold}")
 
 
-def _echo_compliance_config(task_def: TaskDefinition) -> None:
-    if not (task_def.compliance.deterministic_checks or task_def.compliance.llm_judge_rubric):
+def _echo_acceptance_config(task_def: ScenarioDefinition) -> None:
+    if not (task_def.acceptance.deterministic_checks or task_def.acceptance.llm_judge_rubric):
         return
     click.echo()
-    click.echo("Compliance Config:")
-    if task_def.compliance.deterministic_checks:
-        click.echo(f"  Deterministic checks: {len(task_def.compliance.deterministic_checks)}")
-    if task_def.compliance.llm_judge_rubric:
-        click.echo(f"  LLM judge criteria: {len(task_def.compliance.llm_judge_rubric)}")
-
-
-def _task_version_sort_key(task_yaml: Path) -> tuple[int, str]:
-    version_dir = task_yaml.parent.name
-    match = VERSION_DIR_PATTERN.fullmatch(version_dir)
-    if match is None:
-        return (-1, version_dir)
-    return (int(match.group(1)), version_dir)
+    click.echo("Acceptance Config:")
+    if task_def.acceptance.deterministic_checks:
+        click.echo(f"  Deterministic checks: {len(task_def.acceptance.deterministic_checks)}")
+    if task_def.acceptance.llm_judge_rubric:
+        click.echo(f"  LLM judge criteria: {len(task_def.acceptance.llm_judge_rubric)}")
 
 
 @main.command()
 @click.option(
-    "--task",
-    "-t",
+    "--scenario",
+    "-s",
     type=click.Path(exists=True, path_type=Path),
     required=True,
-    help="Path to task directory",
+    help="Path to a scenario directory or scenario.yaml file",
 )
-def info(task: Path) -> None:
-    """Show task information and details."""
-    task_yaml = task / "task.yaml"
-    if not task_yaml.exists():
-        candidates = list(task.glob("v*/task.yaml"))
-        if not candidates:
-            click.echo(f"Error: task.yaml not found in {task}", err=True)
-            raise SystemExit(1)
-        task_yaml = max(candidates, key=_task_version_sort_key)
-        task = task_yaml.parent
+def info(scenario: Path) -> None:
+    """Show scenario information and details."""
+    scenario_yaml = _resolve_scenario_yaml(scenario)
+    scenario_def = _runner_api().load_scenario(scenario_yaml)
 
-    task_def = TaskDefinition.from_yaml(task_yaml)
-
-    _echo_task_summary(task_def)
-    _echo_rule_variants(task)
-    _echo_visual_config(task_def)
-    _echo_compliance_config(task_def)
+    _echo_scenario_summary(scenario_def)
+    _echo_rule_variants(scenario_yaml.parent)
+    _echo_visual_config(scenario_def)
+    _echo_acceptance_config(scenario_def)
 
 
 if __name__ == "__main__":
