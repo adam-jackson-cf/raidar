@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.6.0] - 2026-03-08
+
+- refactor: remove opik workflow
+- test: enforce argv-only task commands
+- refactor runner phase-2 complexity slices
+
 ## [0.6.0] - 2026-03-04
 
 - chore: sync uv lockfile version metadata
