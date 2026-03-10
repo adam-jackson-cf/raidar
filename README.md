@@ -43,6 +43,8 @@ make experiment-run \
 
 This writes canonical artifacts into `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
 
+Supported Codex thinking tiers include `codex/gpt-5.4-low`, `codex/gpt-5.4-medium`, `codex/gpt-5.4-high`, and `codex/gpt-5.4-extra-high`.
+
 ## Review Workflow
 
 The active review workflow is local artifact analysis based on [docs/analyze-results.md](/Users/adamjackson/Projects/raidar/docs/analyze-results.md).
