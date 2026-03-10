@@ -80,7 +80,7 @@ class TestGenerateMatrixEntries:
                 retry_void=1,
             ),
             runs=[
-                {"agent": "codex-cli", "model": "codex/gpt-5.2-high"},
+                {"agent": "codex-cli", "model": "codex/gpt-5.4-high"},
                 {"agent": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
             ],
             scenario_path="scenario.yaml",
@@ -99,7 +99,7 @@ class TestGenerateMatrixEntries:
                 retry_void=1,
             ),
             runs=[
-                {"agent": "codex-cli", "model": "codex/gpt-5.2-high"},
+                {"agent": "codex-cli", "model": "codex/gpt-5.4-high"},
                 {"agent": "codex-cli", "model": "codex/gpt-5.1"},
             ],
             scenario_path="scenario.yaml",
@@ -108,7 +108,7 @@ class TestGenerateMatrixEntries:
 
         assert len(entries) == 2
         models = {e.model for e in entries}
-        assert "codex/gpt-5.2-high" in models
+        assert "codex/gpt-5.4-high" in models
         assert "codex/gpt-5.1" in models
 
     def test_empty_config_generates_empty_list(self):
@@ -139,7 +139,7 @@ class TestGenerateMatrixEntries:
                 retry_void=1,
             ),
             runs=[
-                {"agent": "codex-cli", "model": "codex/gpt-5.2-high"},
+                {"agent": "codex-cli", "model": "codex/gpt-5.4-high"},
                 {"agent": "claude-code", "model": "anthropic/claude-sonnet-4-5"},
                 {"agent": "cursor", "model": "openai/gpt-4o-mini"},
             ],

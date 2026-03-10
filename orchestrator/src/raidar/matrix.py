@@ -86,7 +86,7 @@ matrix:
     retry_void: 1
   runs:
     - agent: codex-cli
-      model: codex/gpt-5.2-high
+      model: codex/gpt-5.4-high
     - agent: claude-code
       model: anthropic/claude-sonnet-4-5
   scenario_path: scenarios/homepage-implementation/v001/scenario.yaml
