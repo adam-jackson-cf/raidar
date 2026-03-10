@@ -156,8 +156,8 @@ class TestAggregateResults:
         assert result["by_agent"]["codex-cli"]["count"] == 2
         assert isinstance(result["by_agent"]["codex-cli"]["avg_score"], float)
 
-    def test_void_runs_excluded_from_scored_aggregates(self, sample_eval_run: EvalRun):
-        """Void runs should not affect scored validity-rate/average."""
+    def test_unscored_runs_excluded_from_scored_aggregates(self, sample_eval_run: EvalRun):
+        """Unscored runs should not affect scored validity-rate/average."""
         valid = sample_eval_run.model_copy(deep=True)
         valid.id = "valid-run"
         valid.scores.unscored = False
@@ -165,7 +165,7 @@ class TestAggregateResults:
         valid.scores.performance_gates.checks = []
 
         unscored_run = sample_eval_run.model_copy(deep=True)
-        unscored_run.id = "void-run"
+        unscored_run.id = "unscored-run"
         unscored_run.scores.unscored = True
         unscored_run.scores.unscored_reasons = ["provider_rate_limit"]
         unscored_run.scores.execution_validity.checks = []

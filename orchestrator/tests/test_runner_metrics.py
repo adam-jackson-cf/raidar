@@ -20,7 +20,7 @@ from raidar.runner import (
     ScorecardBuildContext,
     WorkspaceContext,
     _build_verifier_scenario_spec,
-    _classify_void_reasons,
+    _classify_unscored_reasons,
     _ensure_experiment_baseline_workspace,
     _load_verifier_outputs,
     _normalized_shell_subcommands,
@@ -185,7 +185,7 @@ def _sample_scorecard_context(
         agent_dir=results_dir / "runs" / "run-1234" / "agent",
         harbor_dir=results_dir / "runs" / "run-1234" / "harbor",
         run_json_path=results_dir / "runs" / "run-1234" / "run.json",
-        analysis_path=results_dir / "runs" / "run-1234" / "report.md",
+        report_path=results_dir / "runs" / "run-1234" / "report.md",
     )
     execution = ExecutionPhaseResult(
         harbor_result=HarborExecutionResult(
@@ -1037,24 +1037,24 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
     ]
 
 
-def test_classify_void_reasons_rate_limit():
-    reasons = _classify_void_reasons(
+def test_classify_unscored_reasons_rate_limit():
+    reasons = _classify_unscored_reasons(
         terminated_early=True,
         termination_reason="Codex turn failed: Rate limit reached for gpt-5.2-codex.",
     )
     assert "provider_rate_limit" in reasons
 
 
-def test_classify_void_reasons_timeout():
-    reasons = _classify_void_reasons(
+def test_classify_unscored_reasons_timeout():
+    reasons = _classify_unscored_reasons(
         terminated_early=True,
         termination_reason="Timeout expired after 420s before trial result.json was written.",
     )
     assert reasons == ["harbor_timeout"]
 
 
-def test_classify_void_reasons_compose_version_unsupported():
-    reasons = _classify_void_reasons(
+def test_classify_unscored_reasons_compose_version_unsupported():
+    reasons = _classify_unscored_reasons(
         terminated_early=True,
         termination_reason=(
             "Unsupported docker compose version 2.39.2. Require >= 2.40.1 for Harbor runs."
@@ -1063,8 +1063,8 @@ def test_classify_void_reasons_compose_version_unsupported():
     assert reasons == ["compose_version_unsupported"]
 
 
-def test_classify_void_reasons_empty_when_not_terminated():
-    reasons = _classify_void_reasons(
+def test_classify_unscored_reasons_empty_when_not_terminated():
+    reasons = _classify_unscored_reasons(
         terminated_early=False,
         termination_reason=None,
     )

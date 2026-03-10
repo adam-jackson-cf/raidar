@@ -284,7 +284,7 @@ class RunLayout:
     agent_dir: Path
     harbor_dir: Path
     run_json_path: Path
-    analysis_path: Path
+    report_path: Path
 
 
 @dataclass(frozen=True, slots=True)
@@ -678,7 +678,7 @@ def cleanup_stale_harbor_resources(
 
 
 def cleanup_stale_harbor_containers() -> None:
-    """Remove stale Harbor task containers that can block/slow future runs."""
+    """Remove stale Harbor scenario-run containers that can block future runs."""
     try:
         listing = subprocess.run(
             ["docker", "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Status}}"],
@@ -1413,7 +1413,7 @@ def initialize_run(request: RunRequest) -> RunLayout:
         agent_dir=agent_dir,
         harbor_dir=harbor_dir,
         run_json_path=root_dir / "run.json",
-        analysis_path=root_dir / "summary.md",
+        report_path=root_dir / "report.md",
     )
 
 
@@ -1987,7 +1987,7 @@ def write_run_analysis(
     lines.append(f"- workspace_changed_files: `{change_meta.get('changed_files')}`")
     lines.append(f"- workspace_diff_artifact: `{change_meta.get('artifact')}`")
     lines.append(f"- workspace_diff_error: `{change_meta.get('error')}`")
-    layout.analysis_path.write_text("\n".join(lines) + "\n")
+    layout.report_path.write_text("\n".join(lines) + "\n")
 
 
 def _agent_event_stream_pointer(agent_dir: Path, agent: str) -> Path:
@@ -3247,8 +3247,8 @@ def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in text for pattern in patterns)
 
 
-def _classify_void_reasons(terminated_early: bool, termination_reason: str | None) -> list[str]:
-    """Classify agent/provider issues that void a run and require repeat."""
+def _classify_unscored_reasons(terminated_early: bool, termination_reason: str | None) -> list[str]:
+    """Classify agent/provider issues that unscore a run and require a rerun."""
     if not terminated_early and not termination_reason:
         return []
 
@@ -3279,7 +3279,7 @@ def _scorecard_run_metadata(
         "run_label": layout.run_label,
         "canonical_run_dir": str(layout.root_dir),
         "run_json_path": str(layout.run_json_path),
-        "run_report_path": str(layout.analysis_path),
+        "run_report_path": str(layout.report_path),
         "rerun_required": unscored,
         "unscored_reasons": unscored_reasons,
     }
@@ -3388,7 +3388,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     )
     performance_gates = build_performance_gates_score(outputs=outputs)
     resource_efficiency = build_optimization_score(execution.process_metrics)
-    unscored_reasons = _classify_void_reasons(
+    unscored_reasons = _classify_unscored_reasons(
         execution.terminated_early,
         execution.termination_reason,
     )

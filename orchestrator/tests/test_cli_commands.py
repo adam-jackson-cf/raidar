@@ -53,12 +53,12 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
         timeout=300,
         repeats=5,
         repeat_parallel=2,
-        retry_void=7,
+        rerun_unscored=7,
     )
 
     resolved = options.resolved()
 
-    assert resolved.retry_void == 1
+    assert resolved.rerun_unscored == 1
     assert resolved.scenario.is_absolute()
 
 
@@ -474,7 +474,7 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
         timeout=300,
         repeats=1,
         repeat_parallel=1,
-        retry_void=1,
+        rerun_unscored=1,
     )
     request = type("Request", (), {"scenario": scenario})()
     run = EvalRun(
@@ -530,12 +530,12 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
     _persist_experiment_execution(
         resolved=options,
         request=request,
-        task_def=scenario,
+        scenario_def=scenario,
         execution_dir=tmp_path / "experiments" / "exp-01",
         started_at=datetime(2026, 3, 10, 13, 0, 0, tzinfo=UTC),
         runs=[run],
         retries_used=1,
-        unresolved_void=0,
+        unresolved_unscored=0,
         echo=False,
     )
 

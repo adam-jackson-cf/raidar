@@ -70,7 +70,7 @@ Acceptance:
 
 1. Canonical parity unchanged.
 2. Lower median and p95 `agent_overhead_sec`.
-3. No increase in void rate due to orchestration changes.
+3. No increase in unscored rate due to orchestration changes.
 
 ## P1: Safe Reuse Without Eval Contamination
 

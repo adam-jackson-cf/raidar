@@ -93,7 +93,7 @@ experiment-run:
 		--model "$(MODEL)" \
 		--repeats "$(RUN_COUNT)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
-		--retry-void "$(RERUN_UNSCORED)"
+		--rerun-unscored "$(RERUN_UNSCORED)"
 
 matrix-run:
 	$(call require_var,SCENARIO)

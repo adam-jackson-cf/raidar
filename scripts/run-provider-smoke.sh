@@ -8,7 +8,7 @@ SCENARIO_PATH="../scenarios/hello-world-smoke/v001/scenario.yaml"
 TIMEOUT_SEC="300"
 REPEATS="1"
 REPEAT_PARALLEL="1"
-RETRY_VOID="0"
+RERUN_UNSCORED="0"
 FAST_MODE="0"
 AGENT=""
 MODEL=""
@@ -25,7 +25,7 @@ Optional:
   --timeout          Timeout in seconds, default: 300
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
-  --retry-void       Void retry budget (0|1), default: 0
+  --rerun-unscored   Unscored rerun budget (0|1), default: 0
   --fast             Enable fast smoke mode (custom Harbor agents + prebuilt image reuse)
   --help             Show this help text
 USAGE
@@ -61,8 +61,8 @@ while [[ $# -gt 0 ]]; do
       REPEAT_PARALLEL="$2"
       shift 2
       ;;
-    --retry-void)
-      RETRY_VOID="$2"
+    --rerun-unscored)
+      RERUN_UNSCORED="$2"
       shift 2
       ;;
     --fast)
@@ -133,4 +133,4 @@ uv run raidar experiment run \
   --timeout "$TIMEOUT_SEC" \
   --repeats "$REPEATS" \
   --repeat-parallel "$REPEAT_PARALLEL" \
-  --retry-void "$RETRY_VOID"
+  --rerun-unscored "$RERUN_UNSCORED"

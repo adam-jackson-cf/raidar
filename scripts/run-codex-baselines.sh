@@ -46,7 +46,7 @@ for model in "${models[@]}"; do
     --timeout "$TIMEOUT_SEC" \
     --repeats "$REPEATS" \
     --repeat-parallel "$REPEAT_PARALLEL" \
-    --retry-void "$RERUN_UNSCORED"
+    --rerun-unscored "$RERUN_UNSCORED"
 done
 
 echo
