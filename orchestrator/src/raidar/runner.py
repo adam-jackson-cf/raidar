@@ -2986,7 +2986,7 @@ def evaluate_coverage(
     gate_history: list[GateEvent],
     threshold: float | None,
 ) -> CoverageScore:
-    """Evaluate test coverage threshold compliance."""
+    """Evaluate whether measured test coverage meets the configured threshold."""
     measured, source = _coverage_from_summary_file(workspace)
     if measured is None:
         measured, source = _coverage_from_gate_history(gate_history)

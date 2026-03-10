@@ -10,11 +10,11 @@ Perform one repo-wide, breaking vocabulary migration so the implementation, pers
 - `run` = one scored execution inside an experiment
 - `trace` = execution telemetry/log/event stream for a run
 
-This plan assumes:
-- historical artifacts are rewritten in place
+This plan now reflects the implemented migration:
+- historical generated artifacts remain immutable evidence and are not rewritten in place
 - no backward-compatibility aliases are kept
-- `docs/analyze-results.md` stays at the same path but its contents are fully rewritten
-- `docs/references/` is out of scope unless separately approved, per repo rules
+- `docs/analyze-results.md` stays at the same path with fully migrated contents
+- `docs/references/` is included because explicit user approval was granted and the reference docs were updated
 
 ## Current Status (2026-03-10)
 
@@ -38,6 +38,7 @@ Decision update:
 
 - Historical generated experiment artifacts under `experiments/` are treated as immutable evidence and are not rewritten in place. Rewriting archived traces, stack traces, and raw Harbor outputs would mutate historical evidence rather than complete the source migration. The migration completion bar is therefore: all live code/docs/contracts use the new vocabulary, and all newly generated experiments use the migrated artifact schema and paths.
 - The public CLI flag is `--rerun-unscored`. Only matrix YAML keeps `retry_void`, as an explicitly retained config-schema exception.
+- The homepage implementation Codex experiment matrix has been rerun on the migrated surface, and those artifacts are the canonical post-migration validation set for analysis.
 
 ## Chosen Vocabulary
 
