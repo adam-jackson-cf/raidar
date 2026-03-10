@@ -62,6 +62,39 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
     assert resolved.scenario.is_absolute()
 
 
+def test_experiment_run_uses_agent_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    scenario_path.write_text("name: placeholder\n")
+    captured: dict[str, object] = {}
+
+    def fake_execute_run_options(options, **kwargs):
+        captured["options"] = options
+        captured.update(kwargs)
+
+    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+
+    result = runner.invoke(
+        main,
+        [
+            "experiment",
+            "run",
+            "--scenario",
+            str(scenario_path),
+            "--agent",
+            "codex-cli",
+            "--model",
+            "codex/gpt-5.4-high",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert captured["force_experiment_summary"] is True
+    assert captured["cleanup_before_runs"] is True
+    assert captured["echo"] is True
+    assert captured["execution_suffix"] == "codex-cli__codex-gpt-5.4-high"
+
+
 def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -> None:
     runner = CliRunner()
     task_dir = tmp_path / "scenarios" / "sample-task"

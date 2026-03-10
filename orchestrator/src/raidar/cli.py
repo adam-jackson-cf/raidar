@@ -133,6 +133,10 @@ def _persist_eval_run(run: EvalRun) -> Path:
     return result_path
 
 
+def _experiment_execution_suffix(options: RunCliOptions) -> str:
+    return f"{options.agent}__{options.model.replace('/', '-')}"
+
+
 def _build_repeat_request(base_request: RunRequest, repeat_index: int) -> RunRequest:
     run_request = _runner_api().RunRequest
     return run_request(
@@ -916,6 +920,7 @@ def experiment_run(
         force_experiment_summary=True,
         cleanup_before_runs=True,
         echo=True,
+        execution_suffix=_experiment_execution_suffix(options),
     )
 
 
