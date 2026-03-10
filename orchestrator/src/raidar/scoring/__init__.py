@@ -13,8 +13,8 @@ from ..schemas.scorecard import (
     VisualScore,
 )
 from .acceptance import evaluate_acceptance
-from .efficiency import evaluate_efficiency
 from .functional import evaluate_functional
+from .verification_stability import evaluate_verification_stability
 from .visual import evaluate_visual
 
 
@@ -55,7 +55,7 @@ def evaluate_all(
             threshold=visual_config.threshold,
         )
 
-    verification_stability = evaluate_efficiency(gate_events)
+    verification_stability = evaluate_verification_stability(gate_events)
 
     return Scorecard(
         functional=functional,
@@ -69,7 +69,7 @@ __all__ = [
     "evaluate_functional",
     "evaluate_acceptance",
     "evaluate_visual",
-    "evaluate_efficiency",
+    "evaluate_verification_stability",
     "evaluate_all",
     "WEIGHTS",
     "get_weights",

@@ -24,7 +24,7 @@ make quality
 These remain implementation details behind the public surface:
 
 - `uv run --project orchestrator raidar ...`
-- `scripts/run-provider-smoke.sh`
+- `scripts/run-agent-smoke.sh`
 - `scripts/run-codex-baselines.sh`
 
 ## Notes

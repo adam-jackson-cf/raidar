@@ -19,7 +19,9 @@ def calculate_verification_stability_score(
     return round(score, 3)
 
 
-def evaluate_efficiency(gate_events: list[GateEvent]) -> VerificationStabilityScore:
+def evaluate_verification_stability(
+    gate_events: list[GateEvent],
+) -> VerificationStabilityScore:
     """Evaluate verification stability from gate execution history."""
 
     total_failures = sum(1 for event in gate_events if event.exit_code != 0)

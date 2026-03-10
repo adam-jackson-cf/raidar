@@ -179,8 +179,8 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == 0.0
 
-    def test_composite_uses_optimization_when_valid(self):
-        """Composite score should use optimization score after run validity."""
+    def test_composite_uses_resource_efficiency_when_valid(self):
+        """Composite score should use resource-efficiency score after run validity."""
         scorecard = Scorecard(
             execution_validity=ExecutionValidityScore(
                 checks=[

@@ -31,11 +31,11 @@ make env-setup
 Run one smoke experiment:
 
 ```bash
-make agent-validate AGENT=claude-code MODEL=anthropic/claude-haiku-4-5
+make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.4-high
 make experiment-run \
   SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
-  AGENT=claude-code \
-  MODEL=anthropic/claude-haiku-4-5 \
+  AGENT=codex-cli \
+  MODEL=codex/gpt-5.4-high \
   RUN_COUNT=1 \
   RUN_PARALLELISM=1 \
   RERUN_UNSCORED=0
