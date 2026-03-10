@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORCH_DIR="$ROOT_DIR/orchestrator"
-TASK_PATH="../tasks/homepage-implementation/v001/task.yaml"
+SCENARIO_PATH="../scenarios/homepage-implementation/v001/scenario.yaml"
 AGENT="codex-cli"
 REPEATS="${REPEATS:-5}"
 REPEAT_PARALLEL="${REPEAT_PARALLEL:-1}"
@@ -24,19 +24,23 @@ fi
 
 cd "$ORCH_DIR"
 uv run raidar harbor cleanup
-uv run raidar provider validate --agent "$AGENT" --model "codex/gpt-5.2-high"
+uv run raidar agent validate --agent "$AGENT" --model "codex/gpt-5.4-high"
 
 models=(
   "codex/gpt-5.2-low"
   "codex/gpt-5.2-medium"
   "codex/gpt-5.2-high"
+  "codex/gpt-5.4-low"
+  "codex/gpt-5.4-medium"
+  "codex/gpt-5.4-high"
+  "codex/gpt-5.4-extra-high"
 )
 
 for model in "${models[@]}"; do
   echo
   echo "Running baseline for $model (repeats=$REPEATS, parallel=$REPEAT_PARALLEL, retry_void=$RETRY_VOID, timeout=${TIMEOUT_SEC}s)"
-  uv run raidar suite run \
-    --task "$TASK_PATH" \
+  uv run raidar experiment run \
+    --scenario "$SCENARIO_PATH" \
     --agent "$AGENT" \
     --model "$model" \
     --timeout "$TIMEOUT_SEC" \

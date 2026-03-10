@@ -9,7 +9,7 @@ Use the repo-root `Makefile` for common workflows.
 ```bash
 make env-setup
 make agent-list
-make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high
+make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.4-high
 make scenario-info SCENARIO_DIR=scenarios/homepage-implementation/v001
 make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
 make experiment-run SCENARIO=... AGENT=... MODEL=...

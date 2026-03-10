@@ -40,7 +40,7 @@ help:
 	@echo "Environment and validation:"
 	@echo "  make env-setup"
 	@echo "  make agent-list"
-	@echo "  make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.2-high"
+	@echo "  make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.4-high"
 	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001"
 	@echo "  make scenario-info SCENARIO_DIR=scenarios/homepage-implementation/v001"
 	@echo "  make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml"

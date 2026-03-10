@@ -4,7 +4,7 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ORCH_DIR="$ROOT_DIR/orchestrator"
 
-TASK_PATH="../tasks/hello-world-smoke/v001/task.yaml"
+SCENARIO_PATH="../scenarios/hello-world-smoke/v001/scenario.yaml"
 TIMEOUT_SEC="300"
 REPEATS="1"
 REPEAT_PARALLEL="1"
@@ -18,8 +18,8 @@ usage() {
 Usage: scripts/run-provider-smoke.sh --agent <agent> --model <provider/model> [options]
 
 Required:
-  --agent            Harness agent (codex-cli|claude-code|gemini)
-  --model            Model id (e.g. codex/gpt-5.2-high)
+  --agent            Agent id (codex-cli|claude-code|gemini)
+  --model            Model id (e.g. codex/gpt-5.4-high)
 
 Optional:
   --timeout          Timeout in seconds, default: 300
@@ -121,13 +121,13 @@ fi
 cd "$ORCH_DIR"
 uv run raidar harbor cleanup
 
-uv run raidar provider validate \
+uv run raidar agent validate \
   --agent "$AGENT" \
   --model "$MODEL" \
   --timeout "$TIMEOUT_SEC"
 
-uv run raidar suite run \
-  --task "$TASK_PATH" \
+uv run raidar experiment run \
+  --scenario "$SCENARIO_PATH" \
   --agent "$AGENT" \
   --model "$MODEL" \
   --timeout "$TIMEOUT_SEC" \
