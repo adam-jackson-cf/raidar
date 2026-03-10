@@ -27,12 +27,12 @@ Completed in the current repository state:
 - Codex CLI now supports `gpt-5.4` thinking tiers (`low`, `medium`, `high`, `extra high`) and the Codex smoke suite is green across the supported Codex models.
 - `suite` at the top level of matrix configs remains an intentional repo contract and is not treated as unfinished migration work.
 - `retry_void` remains the current matrix-config field name for the same reason; public Make variables are migrated to `RERUN_UNSCORED`.
-- The latest generated human review artifact is `experiments/eval-analysis-homepage-20260310-140956.html`, derived from the fresh homepage Codex experiment set.
+- The latest generated human review artifact is `experiments/eval-analysis-homepage-20260310-141537.html`, derived from the fresh homepage Codex experiment set.
 
 Migration completion notes:
 
 - A fresh homepage Codex experiment set completed on March 10, 2026 across `codex/gpt-5.2-{low,medium,high}` and `codex/gpt-5.4-{low,medium,high,extra-high}`.
-- The corresponding human review artifact is now generated at `experiments/eval-analysis-homepage-20260310-140956.html` using the workflow in `docs/analyze-results.md`.
+- The corresponding human review artifact is now generated at `experiments/eval-analysis-homepage-20260310-141537.html` using the workflow in `docs/analyze-results.md`.
 - No remaining repository code, docs, test, or command-surface tasks are required for this migration.
 
 Decision update:
