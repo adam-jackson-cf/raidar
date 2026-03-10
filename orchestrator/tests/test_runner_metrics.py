@@ -491,6 +491,20 @@ def test_normalized_shell_subcommands_returns_empty_for_blank() -> None:
     assert _normalized_shell_subcommands("   ") == []
 
 
+def test_normalized_shell_subcommands_handles_heredoc_followed_by_verification() -> None:
+    commands = _normalized_shell_subcommands(
+        "/bin/bash -lc \"cat > src/app/page.tsx <<'EOF'\n"
+        "export default function Home() {\n"
+        "\treturn <main>Harbor smoke test ready</main>;\n"
+        "}\n"
+        "EOF\n"
+        "bun run typecheck\n"
+        'bun run lint"'
+    )
+
+    assert commands[-2:] == ["bun run typecheck", "bun run lint"]
+
+
 def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
     trial_dir = tmp_path / "trial"
     agent_dir = trial_dir / "agent"

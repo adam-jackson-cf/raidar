@@ -2136,17 +2136,53 @@ def _split_normalized_subcommands(tokens: list[str]) -> list[str]:
     return subcommands
 
 
+_HEREDOC_PATTERN = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
+
+
+def _shell_command_segments(command_text: str) -> list[str]:
+    segments: list[str] = []
+    lines = command_text.splitlines()
+    idx = 0
+
+    while idx < len(lines):
+        line = lines[idx].strip()
+        idx += 1
+        if not line:
+            continue
+
+        heredoc_match = _HEREDOC_PATTERN.search(line)
+        if not heredoc_match:
+            segments.append(line)
+            continue
+
+        terminator = heredoc_match.group(1)
+        heredoc_lines = [line]
+        while idx < len(lines):
+            heredoc_line = lines[idx]
+            heredoc_lines.append(heredoc_line)
+            idx += 1
+            if heredoc_line.strip() == terminator:
+                break
+        segments.append("\n".join(heredoc_lines).strip())
+
+    return segments
+
+
 def _normalized_shell_subcommands(command: str) -> list[str]:
     command_text = _unwrap_shell_wrapper(command)
     if not command_text:
         return []
-    try:
-        tokens = shlex.split(command_text)
-    except ValueError:
-        return [_normalize_verification_alias(command_text)]
-    if not tokens:
-        return []
-    return _split_normalized_subcommands(tokens)
+    subcommands: list[str] = []
+    for segment in _shell_command_segments(command_text):
+        try:
+            tokens = shlex.split(segment)
+        except ValueError:
+            subcommands.append(_normalize_verification_alias(segment))
+            continue
+        if not tokens:
+            continue
+        subcommands.extend(_split_normalized_subcommands(tokens))
+    return subcommands
 
 
 def _unwrap_shell_wrapper(command: str) -> str:
