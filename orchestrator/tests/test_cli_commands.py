@@ -2,6 +2,7 @@
 
 import json
 import tomllib
+from datetime import UTC, datetime
 from pathlib import Path
 
 import click
@@ -11,9 +12,11 @@ from raidar.cli import (
     RunCliOptions,
     _assert_no_generated_artifact_changes,
     _generated_artifact_paths,
+    _persist_experiment_execution,
     main,
 )
 from raidar.schemas.scenario import ScenarioDefinition
+from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
 
 
 def test_cli_version_matches_pyproject_version() -> None:
@@ -443,3 +446,98 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
     assert new_dir.exists()
     assert not archive_root.exists()
     assert "would-archive: experiments/" in result.output
+
+
+def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: Path) -> None:
+    scenario = ScenarioDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "scenario_revision": "v001",
+            "description": "Smoke scenario",
+            "difficulty": "easy",
+            "category": "smoke",
+            "timeout_sec": 300,
+            "starter": {"root": "starter"},
+            "verification": {
+                "gates": [],
+                "required_commands": [],
+            },
+            "acceptance": {},
+            "metrics": [{"type": "core", "id": "functional"}],
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+    options = RunCliOptions(
+        scenario=tmp_path / "scenario.yaml",
+        agent="codex-cli",
+        model="codex/gpt-5.4-high",
+        timeout=300,
+        repeats=1,
+        repeat_parallel=1,
+        retry_void=1,
+    )
+    request = type("Request", (), {"scenario": scenario})()
+    run = EvalRun(
+        id="run-01",
+        timestamp="2026-03-10T13:00:00+00:00",
+        config=EvalConfig(
+            model="codex/gpt-5.4-high",
+            agent="codex-cli",
+            scenario_name="hello-world-smoke",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="v2:functional",
+        ),
+        duration_sec=1.0,
+        scores=Scorecard(),
+    )
+
+    captured: dict[str, object] = {}
+
+    def fake_runner_api():
+        return type(
+            "RunnerApi",
+            (),
+            {
+                "scenario_evaluation_profile": staticmethod(lambda _scenario: "v2:functional"),
+                "scenario_metrics": staticmethod(lambda _scenario: ["functional"]),
+            },
+        )()
+
+    def fake_experiment_api():
+        def create_experiment_summary(**kwargs):
+            captured.update(kwargs)
+            return {"experiment_id": "exp-01"}
+
+        return type(
+            "ExperimentApi",
+            (),
+            {
+                "create_experiment_summary": staticmethod(create_experiment_summary),
+                "persist_experiment": staticmethod(
+                    lambda *_args, **_kwargs: (
+                        tmp_path / "experiment.json",
+                        tmp_path / "experiment-summary.json",
+                        tmp_path / "report.md",
+                    )
+                ),
+            },
+        )()
+
+    monkeypatch.setattr("raidar.cli._runner_api", fake_runner_api)
+    monkeypatch.setattr("raidar.cli._experiment_api", fake_experiment_api)
+
+    _persist_experiment_execution(
+        resolved=options,
+        request=request,
+        task_def=scenario,
+        execution_dir=tmp_path / "experiments" / "exp-01",
+        started_at=datetime(2026, 3, 10, 13, 0, 0, tzinfo=UTC),
+        runs=[run],
+        retries_used=1,
+        unresolved_void=0,
+        echo=False,
+    )
+
+    assert captured["reruns_used"] == 1
+    assert "retries_used" not in captured

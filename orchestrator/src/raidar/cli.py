@@ -435,7 +435,7 @@ def _persist_experiment_execution(
         runs=runs,
         started_at=started_at,
         rerun_unscored_limit=resolved.retry_void,
-        retries_used=retries_used,
+        reruns_used=retries_used,
         unresolved_unscored_count=unresolved_void,
     )
     experiment_json_path, summary_path, report_path = experiment_api.persist_experiment(
