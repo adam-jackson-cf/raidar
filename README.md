@@ -17,7 +17,7 @@ Prerequisites:
 
 - `uv`
 - Docker with `docker compose`
-- at least one provider API key in `orchestrator/.env`
+- at least one agent API key in `orchestrator/.env`
 
 Bootstrap the environment:
 
@@ -64,7 +64,7 @@ The repository has three primary concerns:
 
 A scenario consists of:
 
-- task instruction
+- prompt instruction
 - rules
 - starter
 - metrics via ordered `metrics[]` in `scenario.yaml`

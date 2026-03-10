@@ -24,7 +24,7 @@ class ExperimentConfig(BaseModel):
         description="Number of runs per scenario/agent/model/evaluation_profile pair",
     )
     repeat_parallel: int = Field(ge=1, description="Parallel workers within one experiment")
-    retry_void: int = Field(ge=0, le=1, description="Retry budget for voided runs")
+    retry_void: int = Field(ge=0, le=1, description="Retry budget for unscored runs")
 
 
 class MatrixConfig(BaseModel):

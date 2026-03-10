@@ -24,15 +24,17 @@ Completed in the current repository state:
 - Canonical artifact roots and filenames are migrated to `experiments/`, `experiment.json`, `experiment-summary.json`, and `report.md`.
 - Verifier metric ids and persisted scorecard fields use `acceptance`, `verification-stability`, `execution-validity`, `resource-efficiency`, `metric_results`, and `unscored_reasons`.
 - `docs/references/` has now also been updated because explicit user approval was granted after this plan was written.
+- Codex CLI now supports `gpt-5.4` thinking tiers (`low`, `medium`, `high`, `extra high`) and the Codex smoke suite is green across the supported Codex models.
 - `suite` at the top level of matrix configs remains an intentional repo contract and is not treated as unfinished migration work.
 - `retry_void` remains the current matrix-config field name for the same reason; public Make variables are migrated to `RERUN_UNSCORED`.
 
 Remaining work before the migration can be treated as fully complete:
 
-- Update the internal Codex smoke/baseline scripts to the migrated command surface and scenario paths.
-- Add Codex CLI support for GPT-5.4 thinking tiers (`low`, `medium`, `high`, `extra high`) and cover them with tests.
-- Rewrite generated historical experiment metadata that still embeds stale absolute repo paths from `/Users/adamjackson/Projects/typescript-ui-eval/...`.
-- Run smoke validation and fresh Codex experiments against the migrated surface, then analyze the resulting experiment artifacts via `docs/analyze-results.md`.
+- Run a fresh homepage Codex experiment matrix against the migrated surface, then analyze the resulting experiment artifacts via `docs/analyze-results.md`.
+
+Decision update:
+
+- Historical generated experiment artifacts under `experiments/` are treated as immutable evidence and are not rewritten in place. Rewriting archived traces, stack traces, and raw Harbor outputs would mutate historical evidence rather than complete the source migration. The migration completion bar is therefore: all live code/docs/contracts use the new vocabulary, and all newly generated experiments use the migrated artifact schema and paths.
 
 ## Chosen Vocabulary
 
