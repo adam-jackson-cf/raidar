@@ -15,7 +15,7 @@ MODEL=""
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/run-provider-smoke.sh --agent <agent> --model <model> [options]
+Usage: scripts/run-agent-smoke.sh --agent <agent> --model <model> [options]
 
 Required:
   --agent            Agent id (codex-cli|claude-code|gemini)

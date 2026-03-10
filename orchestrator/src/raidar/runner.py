@@ -2801,7 +2801,7 @@ def collect_process_metrics(
     *,
     agent: str,
 ) -> ProcessMetrics:
-    """Collect optimization metrics from agent execution logs."""
+    """Collect resource-efficiency metrics from agent execution logs."""
     if not trial_dir:
         return _empty_process_metrics()
 
@@ -3231,8 +3231,8 @@ def build_performance_gates_score(*, outputs: EvaluationOutputs) -> PerformanceG
     return PerformanceGatesScore(checks=checks)
 
 
-def build_optimization_score(metrics: ProcessMetrics) -> ResourceEfficiencyScore:
-    """Build optimization score model from process metrics."""
+def build_resource_efficiency_score(metrics: ProcessMetrics) -> ResourceEfficiencyScore:
+    """Build resource-efficiency score model from process metrics."""
     return ResourceEfficiencyScore(
         uncached_input_tokens=metrics.uncached_input_tokens,
         output_tokens=metrics.output_tokens,
@@ -3387,7 +3387,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         events=execution.events,
     )
     performance_gates = build_performance_gates_score(outputs=outputs)
-    resource_efficiency = build_optimization_score(execution.process_metrics)
+    resource_efficiency = build_resource_efficiency_score(execution.process_metrics)
     unscored_reasons = _classify_unscored_reasons(
         execution.terminated_early,
         execution.termination_reason,

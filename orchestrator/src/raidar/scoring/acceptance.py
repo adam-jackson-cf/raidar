@@ -116,7 +116,7 @@ def check_no_pattern(workspace: Path, pattern: str) -> tuple[bool, str]:
 
 
 def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> AcceptanceCheck:
-    """Run a single deterministic compliance check."""
+    """Run a single deterministic acceptance check."""
     if check.type == "import_present":
         passed, evidence = check_import_present(workspace, check.pattern)
     elif check.type == "file_exists":
@@ -184,7 +184,7 @@ def run_llm_judge(
     if judge_model is None:
         judge_model = settings.llm_judge.model
 
-    prompt = f"""You are evaluating code compliance with project guidelines.
+    prompt = f"""You are evaluating code acceptance against project guidelines.
 
 ## Project Rules
 {rules_content}

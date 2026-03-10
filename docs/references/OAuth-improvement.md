@@ -35,7 +35,7 @@ Goal: support Codex CLI usage in Harbor with secure non-interactive authenticati
 ## Validation Checklist
 
 - `make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.4-high`
-- `./scripts/run-provider-smoke.sh --agent codex-cli --model codex/gpt-5.4-high`
+- `./scripts/run-agent-smoke.sh --agent codex-cli --model codex/gpt-5.4-high`
 
 ## Status
 

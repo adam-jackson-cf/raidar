@@ -10,7 +10,7 @@
 ### Internal or legacy command surfaces
 
 - `uv run --project orchestrator raidar ...`
-- `scripts/run-provider-smoke.sh`
+- `scripts/run-agent-smoke.sh`
 - `scripts/run-codex-baselines.sh`
 
 ### Public Make targets to prefer in docs
