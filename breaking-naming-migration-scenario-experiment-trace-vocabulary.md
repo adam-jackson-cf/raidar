@@ -28,9 +28,11 @@ Completed in the current repository state:
 - `suite` at the top level of matrix configs remains an intentional repo contract and is not treated as unfinished migration work.
 - `retry_void` remains the current matrix-config field name for the same reason; public Make variables are migrated to `RERUN_UNSCORED`.
 
-Remaining work before the migration can be treated as fully complete:
+Migration completion notes:
 
-- Run a fresh homepage Codex experiment matrix against the migrated surface, then analyze the resulting experiment artifacts via `docs/analyze-results.md`.
+- A fresh homepage Codex experiment set completed on March 10, 2026 across `codex/gpt-5.2-{low,medium,high}` and `codex/gpt-5.4-{low,medium,high,extra-high}`.
+- The corresponding human review artifact is now generated under `experiments/eval-analysis-homepage-<YYYYMMDD-HHMMSS>.html` using the workflow in `docs/analyze-results.md`.
+- No remaining repository code, docs, test, or command-surface tasks are required for this migration.
 
 Decision update:
 
