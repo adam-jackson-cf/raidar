@@ -134,7 +134,7 @@ make scenario-validate SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml
 make experiment-run \
   SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml \
   AGENT=codex-cli \
-  MODEL=codex/gpt-5.2-high
+  MODEL=codex/gpt-5.4-high
 ```
 
 ## 5. Revision Pattern

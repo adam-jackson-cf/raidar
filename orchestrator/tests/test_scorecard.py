@@ -202,8 +202,8 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == scorecard.resource_efficiency.score
 
-    def test_composite_zero_when_voided(self):
-        """Composite score must be 0 when run is voided."""
+    def test_composite_zero_when_unscored(self):
+        """Composite score must be 0 when run is unscored."""
         scorecard = Scorecard(
             unscored=True,
             unscored_reasons=["provider_rate_limit"],

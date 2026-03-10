@@ -164,14 +164,14 @@ class TestAggregateResults:
         valid.scores.execution_validity.checks = []
         valid.scores.performance_gates.checks = []
 
-        voided = sample_eval_run.model_copy(deep=True)
-        voided.id = "void-run"
-        voided.scores.unscored = True
-        voided.scores.unscored_reasons = ["provider_rate_limit"]
-        voided.scores.execution_validity.checks = []
-        voided.scores.performance_gates.checks = []
+        unscored_run = sample_eval_run.model_copy(deep=True)
+        unscored_run.id = "void-run"
+        unscored_run.scores.unscored = True
+        unscored_run.scores.unscored_reasons = ["provider_rate_limit"]
+        unscored_run.scores.execution_validity.checks = []
+        unscored_run.scores.performance_gates.checks = []
 
-        result = aggregate_results([valid, voided])
+        result = aggregate_results([valid, unscored_run])
         stats = result["by_agent"][valid.config.agent]
         assert stats["count"] == 2
         assert stats["scored_count"] == 1
