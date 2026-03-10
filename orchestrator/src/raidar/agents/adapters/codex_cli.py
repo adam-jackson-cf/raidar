@@ -22,6 +22,10 @@ class CodexCliAdapter(AgentAdapter):
         "gpt-5.2-low": ("gpt-5.2-codex", "low"),
         "gpt-5.2-medium": ("gpt-5.2-codex", "medium"),
         "gpt-5.2-high": ("gpt-5.2-codex", "high"),
+        "gpt-5.4-low": ("gpt-5.4", "low"),
+        "gpt-5.4-medium": ("gpt-5.4", "medium"),
+        "gpt-5.4-high": ("gpt-5.4", "high"),
+        "gpt-5.4-extra-high": ("gpt-5.4", "xhigh"),
     }
 
     def __init__(self, config: AgentRunConfig) -> None:

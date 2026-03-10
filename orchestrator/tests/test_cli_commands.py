@@ -286,7 +286,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
     _write_experiment_summary(
         experiments_root / "20260222-110000Z__homepage-implementation__v001",
         scenario_name="homepage-implementation",
-        model="codex/gpt-5.2-high",
+        model="codex/gpt-5.4-high",
         agent="codex-cli",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression",
         created_at="2026-02-22T11:00:00+00:00",
@@ -374,7 +374,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     _write_experiment_summary(
         other_model_dir,
         scenario_name="hello-world-smoke",
-        model="codex/gpt-5.2-high",
+        model="codex/gpt-5.4-high",
         agent="codex-cli",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",

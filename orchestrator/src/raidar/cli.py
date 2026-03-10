@@ -48,6 +48,7 @@ INTEGRATION_TEST_TARGET = "tests/test_runner_harbor_env_and_cleanup.py"
 TYPECHECK_TARGETS = [
     "src/raidar/watcher",
     "src/raidar/agents/adapters",
+    "tests/test_codex_cli_adapter.py",
     "tests/test_claude_code_cli_adapter.py",
     "tests/test_gemini_cli_adapter.py",
 ]
