@@ -65,7 +65,7 @@ class RunCliOptions:
     timeout: int
     repeats: int
     repeat_parallel: int
-    retry_void: int
+    rerun_unscored: int
 
     def resolved(self) -> RunCliOptions:
         return RunCliOptions(
@@ -75,7 +75,7 @@ class RunCliOptions:
             timeout=self.timeout,
             repeats=self.repeats,
             repeat_parallel=self.repeat_parallel,
-            retry_void=min(self.retry_void, 1),
+            rerun_unscored=min(self.rerun_unscored, 1),
         )
 
 
@@ -226,12 +226,12 @@ def _count_unscored(runs: list[EvalRun]) -> int:
     return sum(1 for run in runs if _run_is_unscored(run))
 
 
-def _run_with_void_retries(
+def _run_with_unscored_reruns(
     *,
     request: RunRequest,
     repeats: int,
     repeat_parallel: int,
-    retry_void: int,
+    rerun_unscored: int,
 ) -> tuple[list[EvalRun], int, int]:
     all_runs: list[EvalRun] = []
     next_repeat_index = 1
@@ -253,7 +253,7 @@ def _run_with_void_retries(
     pending_batch = _count_unscored(initial_runs)
     next_repeat_index += len(initial_runs)
 
-    if pending_batch > 0 and retry_void > 0:
+    if pending_batch > 0 and rerun_unscored > 0:
         retries_used = 1
         try:
             retry_runs = _execute_repeat_batch(
@@ -314,7 +314,7 @@ def _echo_run_header(options: RunCliOptions, scenario_name: str) -> None:
     click.echo(f"Model: {options.model}")
     click.echo(f"Repeats: {options.repeats}")
     click.echo(f"Repeat parallelism: {options.repeat_parallel}")
-    click.echo(f"Retry unscored budget: {options.retry_void}")
+    click.echo(f"Rerun unscored budget: {options.rerun_unscored}")
 
 
 def _echo_single_run_result(result: EvalRun) -> None:
@@ -377,14 +377,14 @@ def _execute_repeat_runs(
     request: RunRequest,
     repeats: int,
     repeat_parallel: int,
-    retry_void: int,
+    rerun_unscored: int,
 ) -> tuple[list[EvalRun], int, int]:
     try:
-        return _run_with_void_retries(
+        return _run_with_unscored_reruns(
             request=request,
             repeats=max(1, repeats),
             repeat_parallel=repeat_parallel,
-            retry_void=retry_void,
+            rerun_unscored=rerun_unscored,
         )
     except Exception as exc:
         raise click.ClickException(str(exc)) from exc
@@ -393,7 +393,7 @@ def _execute_repeat_runs(
 def _single_run_execution_result(
     *,
     resolved: RunCliOptions,
-    task_def: ScenarioDefinition,
+    scenario_def: ScenarioDefinition,
     runs: list[EvalRun],
     retries_used: int,
     echo: bool,
@@ -402,8 +402,8 @@ def _single_run_execution_result(
         _echo_single_run_result(runs[0])
     return SuiteExecutionResult(
         scenario_path=resolved.scenario,
-        scenario_name=task_def.name,
-        scenario_revision=task_def.scenario_revision,
+        scenario_name=scenario_def.name,
+        scenario_revision=scenario_def.scenario_revision,
         runs=runs,
         retries_used=retries_used,
     )
@@ -413,12 +413,12 @@ def _persist_experiment_execution(
     *,
     resolved: RunCliOptions,
     request: RunRequest,
-    task_def: ScenarioDefinition,
+    scenario_def: ScenarioDefinition,
     execution_dir: Path,
     started_at: datetime,
     runs: list[EvalRun],
     retries_used: int,
-    unresolved_void: int,
+    unresolved_unscored: int,
     echo: bool,
 ) -> SuiteExecutionResult:
     runner_api = _runner_api()
@@ -434,9 +434,9 @@ def _persist_experiment_execution(
         repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
         runs=runs,
         started_at=started_at,
-        rerun_unscored_limit=resolved.retry_void,
+        rerun_unscored_limit=resolved.rerun_unscored,
         reruns_used=retries_used,
-        unresolved_unscored_count=unresolved_void,
+        unresolved_unscored_count=unresolved_unscored,
     )
     experiment_json_path, summary_path, report_path = experiment_api.persist_experiment(
         execution_dir,
@@ -446,8 +446,8 @@ def _persist_experiment_execution(
         _echo_experiment_result(experiment_json_path, summary_path, report_path, retries_used, runs)
     return SuiteExecutionResult(
         scenario_path=resolved.scenario,
-        scenario_name=task_def.name,
-        scenario_revision=task_def.scenario_revision,
+        scenario_name=scenario_def.name,
+        scenario_revision=scenario_def.scenario_revision,
         runs=runs,
         retries_used=retries_used,
         experiment_json_path=experiment_json_path,
@@ -468,7 +468,7 @@ def _execute_run_options(
     if cleanup_before_runs:
         _cleanup_stale_harbor_before_runs()
 
-    task_def, started_at, execution_dir, request = _prepared_run_request(
+    scenario_def, started_at, execution_dir, request = _prepared_run_request(
         resolved,
         execution_suffix=execution_suffix,
     )
@@ -480,13 +480,13 @@ def _execute_run_options(
         request=request,
         repeats=resolved.repeats,
         repeat_parallel=resolved.repeat_parallel,
-        retry_void=resolved.retry_void,
+        rerun_unscored=resolved.rerun_unscored,
     )
 
     if resolved.repeats == 1 and not force_experiment_summary:
         return _single_run_execution_result(
             resolved=resolved,
-            task_def=task_def,
+            scenario_def=scenario_def,
             runs=runs,
             retries_used=retries_used,
             echo=echo,
@@ -495,12 +495,12 @@ def _execute_run_options(
     return _persist_experiment_execution(
         resolved=resolved,
         request=request,
-        task_def=task_def,
+        scenario_def=scenario_def,
         execution_dir=execution_dir,
         started_at=started_at,
         runs=runs,
         retries_used=retries_used,
-        unresolved_void=unresolved_unscored,
+        unresolved_unscored=unresolved_unscored,
         echo=echo,
     )
 
@@ -809,10 +809,10 @@ def _execution_matches_filters(
     help="Parallel workers for repeat runs",
 )
 @click.option(
-    "--retry-void",
+    "--rerun-unscored",
     type=click.IntRange(min=0, max=1),
     default=0,
-    help="Retry budget for unscored runs (0 or 1; at most one retry per failure)",
+    help="Rerun budget for unscored runs (0 or 1; at most one rerun per failure)",
 )
 def run(
     scenario: Path,
@@ -821,7 +821,7 @@ def run(
     timeout: int,
     repeats: int,
     repeat_parallel: int,
-    retry_void: int,
+    rerun_unscored: int,
 ) -> None:
     """Run one scenario with the specified agent and model."""
     options = RunCliOptions(
@@ -831,7 +831,7 @@ def run(
         timeout=timeout,
         repeats=repeats,
         repeat_parallel=repeat_parallel,
-        retry_void=retry_void,
+        rerun_unscored=rerun_unscored,
     )
     _execute_run_options(
         options,
@@ -887,10 +887,10 @@ def experiment() -> None:
     help="Parallel workers for repeat runs",
 )
 @click.option(
-    "--retry-void",
+    "--rerun-unscored",
     type=click.IntRange(min=0, max=1),
     default=1,
-    help="Retry budget for unscored runs (0 or 1)",
+    help="Rerun budget for unscored runs (0 or 1)",
 )
 def experiment_run(
     scenario: Path,
@@ -899,7 +899,7 @@ def experiment_run(
     timeout: int,
     repeats: int,
     repeat_parallel: int,
-    retry_void: int,
+    rerun_unscored: int,
 ) -> None:
     """Run a repeated experiment with deterministic aggregate output."""
     options = RunCliOptions(
@@ -909,7 +909,7 @@ def experiment_run(
         timeout=timeout,
         repeats=repeats,
         repeat_parallel=repeat_parallel,
-        retry_void=retry_void,
+        rerun_unscored=rerun_unscored,
     )
     _execute_run_options(
         options,
@@ -1500,12 +1500,12 @@ def matrix(
         "Experiment settings: "
         f"timeout={experiment_config.timeout_sec}s, repeats={experiment_config.repeats}, "
         "repeat_parallel="
-        f"{experiment_config.repeat_parallel}, retry_void={experiment_config.retry_void}"
+        f"{experiment_config.repeat_parallel}, rerun_unscored={experiment_config.retry_void}"
     )
 
     if dry_run:
         _echo_matrix_dry_run(
-            task_defs=scenario_defs,
+            scenario_defs=scenario_defs,
             entries=entries,
             repeats=experiment_config.repeats,
         )
@@ -1526,42 +1526,44 @@ def matrix(
     click.echo(f"Matrix completed: {successes} experiments succeeded, {failures} failed.")
 
 
-def _load_matrix_scenarios(task_paths: tuple[Path, ...]) -> list[tuple[Path, ScenarioDefinition]]:
-    task_defs: list[tuple[Path, ScenarioDefinition]] = []
-    for task_path in task_paths:
-        click.echo(f"Loading scenario from {task_path}")
-        task_defs.append((task_path, _runner_api().load_scenario(task_path)))
-    return task_defs
+def _load_matrix_scenarios(
+    scenario_paths: tuple[Path, ...],
+) -> list[tuple[Path, ScenarioDefinition]]:
+    scenario_defs: list[tuple[Path, ScenarioDefinition]] = []
+    for scenario_path in scenario_paths:
+        click.echo(f"Loading scenario from {scenario_path}")
+        scenario_defs.append((scenario_path, _runner_api().load_scenario(scenario_path)))
+    return scenario_defs
 
 
 def _echo_matrix_dry_run(
     *,
-    task_defs: list[tuple[Path, ScenarioDefinition]],
+    scenario_defs: list[tuple[Path, ScenarioDefinition]],
     entries: list[object],
     repeats: int,
 ) -> None:
-    for _task_path, task_def in task_defs:
+    for _scenario_path, scenario_def in scenario_defs:
         for entry in entries:
             click.echo(
-                f"[dry-run] {task_def.name}@{task_def.scenario_revision}: "
+                f"[dry-run] {scenario_def.name}@{scenario_def.scenario_revision}: "
                 f"{entry.agent}/{entry.model} x{repeats}"
             )
 
 
 def _matrix_job_options(
     *,
-    task_path: Path,
+    scenario_path: Path,
     entry: object,
     suite_config: object,
 ) -> RunCliOptions:
     return RunCliOptions(
-        scenario=task_path,
+        scenario=scenario_path,
         agent=entry.agent,
         model=entry.model,
         timeout=suite_config.timeout_sec,
         repeats=suite_config.repeats,
         repeat_parallel=suite_config.repeat_parallel,
-        retry_void=suite_config.retry_void,
+        rerun_unscored=suite_config.retry_void,
     )
 
 
@@ -1575,9 +1577,9 @@ def _run_matrix_jobs(
     failures = 0
 
     def _run_matrix_job(job: tuple[Path, ScenarioDefinition, object]) -> SuiteExecutionResult:
-        task_path, _task_def, entry = job
+        scenario_path, _scenario_def, entry = job
         options = _matrix_job_options(
-            task_path=task_path,
+            scenario_path=scenario_path,
             entry=entry,
             suite_config=suite_config,
         )
@@ -1593,32 +1595,32 @@ def _run_matrix_jobs(
         with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as executor:
             future_map = {executor.submit(_run_matrix_job, job): job for job in jobs}
             for future in concurrent.futures.as_completed(future_map):
-                _task_path, task_def, entry = future_map[future]
+                _scenario_path, scenario_def, entry = future_map[future]
                 try:
                     result = future.result()
                 except Exception as exc:
-                    click.echo(f"[{task_def.name}] {entry.agent}/{entry.model} failed: {exc}")
+                    click.echo(f"[{scenario_def.name}] {entry.agent}/{entry.model} failed: {exc}")
                     failures += 1
                     continue
                 successes += 1
                 click.echo(
-                    f"[{task_def.name}] {entry.agent}/{entry.model} -> {result.summary_path}"
+                    f"[{scenario_def.name}] {entry.agent}/{entry.model} -> {result.summary_path}"
                 )
         return successes, failures
 
-    for task_path, task_def, entry in jobs:
+    for scenario_path, scenario_def, entry in jobs:
         click.echo(
-            f"Running experiment: {task_def.name}@{task_def.scenario_revision} "
+            f"Running experiment: {scenario_def.name}@{scenario_def.scenario_revision} "
             f"{entry.agent}/{entry.model}"
         )
         try:
-            result = _run_matrix_job((task_path, task_def, entry))
+            result = _run_matrix_job((scenario_path, scenario_def, entry))
         except Exception as exc:
-            click.echo(f"[{task_def.name}] {entry.agent}/{entry.model} failed: {exc}")
+            click.echo(f"[{scenario_def.name}] {entry.agent}/{entry.model} failed: {exc}")
             failures += 1
             continue
         successes += 1
-        click.echo(f"[{task_def.name}] experiment summary: {result.summary_path}")
+        click.echo(f"[{scenario_def.name}] experiment summary: {result.summary_path}")
 
     return successes, failures
 

@@ -35,6 +35,7 @@ Remaining work before the migration can be treated as fully complete:
 Decision update:
 
 - Historical generated experiment artifacts under `experiments/` are treated as immutable evidence and are not rewritten in place. Rewriting archived traces, stack traces, and raw Harbor outputs would mutate historical evidence rather than complete the source migration. The migration completion bar is therefore: all live code/docs/contracts use the new vocabulary, and all newly generated experiments use the migrated artifact schema and paths.
+- The public CLI flag is `--rerun-unscored`. Only matrix YAML keeps `retry_void`, as an explicitly retained config-schema exception.
 
 ## Chosen Vocabulary
 
