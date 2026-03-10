@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.0] - 2026-03-10
+
+- feat: add codex gpt-5.4 thinking support
+- fix: isolate experiment run directories by model
+- fix: recognize heredoc verification commands in codex traces
+- fix: pass rerun metadata to experiment summaries
+- refactor: finish migration naming cleanup
+- refactor: finish unscored rerun migration
+- refactor: finish scenario migration cleanup
+- refactor: remove legacy comparison package
+- refactor: migrate scenario experiment trace vocabulary
+- docs: record homepage analysis artifact
+- docs: record codex migration validation
+- docs: finalize migration wording cleanup
+- docs: mark naming migration complete
+- docs: close remaining migration cleanup
+- docs: refresh codex script command surface
+- docs: refresh codex migration plan and scripts
+- docs: rename new scenario reference
+- docs: finish scenario migration reference docs
+- chore: restore coverage database
+
 ## [0.6.0] - 2026-03-08
 
 - chore: ignore visual explainer artifacts
