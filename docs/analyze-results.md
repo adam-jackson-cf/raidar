@@ -2,6 +2,8 @@
 
 Use this guide to analyze the latest experiment for each `(scenario_name, scenario_revision, agent, model, evaluation_profile)` combination.
 
+Metric definitions, prerequisites, and interpretation notes live in [metrics.md](./metrics.md). This guide stays focused on artifact review and comparison workflow.
+
 ## Canonical Inputs
 
 - Experiment records: `experiments/*/experiment.json`
@@ -47,16 +49,18 @@ Compute and report both:
 If any run fails execution validity, mark the experiment `INVALID_FOR_RANKING`.
 If all scored runs pass execution validity, mark the experiment `RANKABLE`.
 
-## Metric Renames
+## Supported Metrics
 
-Use only the migrated metric names:
+Use only the current metric names:
 
+- `functional`
 - `acceptance`
 - `verification-stability`
 - `execution-validity`
 - `resource-efficiency`
 - `test-coverage`
 - `requirements-coverage`
+- `llm-judge`
 - `visual-regression`
 - `artifact-checks`
 
@@ -65,6 +69,7 @@ Use only the migrated metric names:
 - Use `scenario_name@scenario_revision` as the scope label.
 - Attribute every numeric claim to an artifact path.
 - Separate orchestrator defects from scenario acceptance failures.
+- Treat `run.json.scores.metric_results[]` as supplemental module output; core metrics live on named score fields such as `functional`, `acceptance`, and `visual`.
 - Treat `artifact-checks` as audit-only unless the experiment contract explicitly makes them gating.
 
 ## Output Artifact

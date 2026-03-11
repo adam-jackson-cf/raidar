@@ -3,7 +3,7 @@ repos:
     hooks:
       - id: ci-quality-preflight
         name: CI quality preflight (fast)
-        entry: bash scripts/pre-commit-quality-preflight.sh
+        entry: bash scripts/checks/pre-commit-quality-preflight.sh
         language: system
         pass_filenames: false
         always_run: true

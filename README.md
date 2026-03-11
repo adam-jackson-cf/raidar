@@ -26,7 +26,9 @@ cp orchestrator/.env.example orchestrator/.env
 make env-setup
 ```
 
-## Start Here
+Use `make help` from the repo root for the supported command surface and target descriptions.
+
+## Quick Start
 
 Run one smoke experiment:
 
@@ -43,20 +45,7 @@ make experiment-run \
 
 This writes canonical artifacts into `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
 
-Supported Codex thinking tiers include `codex/gpt-5.4-low`, `codex/gpt-5.4-medium`, `codex/gpt-5.4-high`, and `codex/gpt-5.4-extra-high`.
-
-## Review Workflow
-
-The active review workflow is local artifact analysis based on [docs/analyze-results.md](/Users/adamjackson/Projects/raidar/docs/analyze-results.md).
-
-- `experiments/.../runs/*/run.json` is the canonical per-run scorecard and evidence pointer.
-- `experiments/.../experiment-summary.json` is the canonical repeat aggregate.
-- `experiments/.../report.md` is the human-readable experiment summary generated from the same canonical data.
-- `make experiments-list` and `make experiments-prune` are the supported artifact inspection helpers.
-
-`docs/analyze-results.md` is preserved as the reference review prompt and should guide any replacement dashboard or analysis surface built in-repo.
-
-## System Overview
+## What Raidar Does
 
 The repository has three primary concerns:
 
@@ -64,47 +53,32 @@ The repository has three primary concerns:
 - `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
 
-A scenario consists of:
+Raidar is built to answer one practical question: how well does a given agent and model perform against delivery scenarios that look like real project work. It helps you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions.
 
-- prompt instruction
-- rules
-- starter
-- metrics via ordered `metrics[]` in `scenario.yaml`
-- derived `evaluation_profile` in format `v2:<metric-id>+...`
+## Experiment Flow
 
-## Orchestrator Flow
+1. Define a scenario contract in `scenarios/.../scenario.yaml` plus prompt, rules, starter, and optional visual reference.
+2. Validate the agent/model pair and the scenario contract before running.
+3. Run one experiment for one agent/model pair, or use `make matrix-run` when you want a structured comparison across a config.
+4. Review artifacts in `experiments/`, especially `run.json`, `experiment-summary.json`, and `report.md`.
+5. Use the evidence to improve prompts, rules, starter quality, scenario design, or the agent/model choice.
 
-```mermaid
-flowchart TD
-    A["experiment run CLI"] --> B["Load scenario.yaml + prompt/rules/starter"]
-    B --> C["Validate required metrics[] and scenario dependencies"]
-    C --> D["Derive evaluation_profile: v2:<metric-id>+... (ordered)"]
-    D --> E["Create experiment folder in experiments/<timestamp>__<scenario>__<revision>"]
-    E --> F["Create baseline workspace snapshot from scenario starter"]
-    F --> G["For each repeat (run-01..run-N): launch Harbor agent run"]
-    G --> H["Build verifier scenario spec including metrics[]"]
-    H --> I["Run verifier core checks and module evaluations"]
-    I --> J["Persist run outputs: run.json"]
-    J --> K["Aggregate experiment-summary.json and experiment.json"]
-    K --> L["Write report.md and evidence artifacts"]
-```
+## Questions This Helps Answer
 
-## Key Actions
+- Which agent/model pair produces the most reliable result for a given scenario?
+- Where is a result failing: functional correctness, acceptance, verification stability, execution validity, visual quality, or efficiency?
+- Does an agent satisfy the stated scenario requirements and back them with tests?
+- Does a visually sensitive scenario stay close to the intended reference design?
+- Are repeated runs stable enough to trust for ranking and decision-making?
 
-From the repo root:
+## Core Concepts
 
-```bash
-make env-setup
-make agent-list
-make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.4-high
-make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001
-make scenario-info SCENARIO_DIR=scenarios/homepage-implementation/v001
-make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
-make experiment-run SCENARIO=... AGENT=... MODEL=...
-make matrix-run SCENARIO=... CONFIG=matrix.yaml
-make experiments-list
-make experiments-prune KEEP_PER_MODEL=1
-make quality
-```
+- A `scenario` is the contract: prompt, rules, starter, verification settings, acceptance requirements, metrics, and optional visual baseline.
+- An `experiment` is one agent/model pair run against one scenario, usually with repeats.
+- A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and agent logs.
+- An `evaluation_profile` is the ordered metric capability set derived from `metrics[]`; use it as part of the identity when comparing experiments.
 
-Detailed command policy: [docs/command-surface.md](/Users/adamjackson/Projects/raidar/docs/command-surface.md)
+## Go Deeper
+
+- [docs/metrics.md](/Users/adamjackson/Projects/raidar/docs/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
+- [docs/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/raidar/docs/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.

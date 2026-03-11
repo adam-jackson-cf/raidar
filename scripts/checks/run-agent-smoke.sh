@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 ORCH_DIR="$ROOT_DIR/orchestrator"
 
 SCENARIO_PATH="../scenarios/hello-world-smoke/v001/scenario.yaml"
@@ -15,7 +15,7 @@ MODEL=""
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/run-agent-smoke.sh --agent <agent> --model <model> [options]
+Usage: scripts/checks/run-agent-smoke.sh --agent <agent> --model <model> [options]
 
 Required:
   --agent            Agent id (codex-cli|claude-code|gemini)
