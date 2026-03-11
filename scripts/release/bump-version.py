@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Version bump and changelog generator for Raidar.
 
@@ -18,7 +17,7 @@ import subprocess
 from datetime import UTC, datetime
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = REPO_ROOT / "orchestrator" / "pyproject.toml"
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 

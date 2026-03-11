@@ -16,10 +16,11 @@
 - Export types from component files
 
 ## Quality Gates
-Before committing, ensure:
+Before reporting completion, ensure:
 1. `bun run typecheck` passes
-2. `bunx ultracite check src` passes
-3. `bun test` passes
+2. `bun run lint` passes
+3. `bun run test:coverage` passes and coverage remains at least 80%
+4. `bun run build` succeeds
 
 ## Error Handling
 - Use try/catch with typed error handling

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Verify that CLI version is sourced from package metadata."""
 
 from __future__ import annotations
@@ -7,7 +6,7 @@ import ast
 import tomllib
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = REPO_ROOT / "orchestrator" / "pyproject.toml"
 CLI_PATH = REPO_ROOT / "orchestrator" / "src" / "raidar" / "cli.py"
 
