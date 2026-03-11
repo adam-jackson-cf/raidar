@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.1] - 2026-03-11
+
+- fix: gate fast smoke env wiring and document env surface
+- docs: trim env example to common local setup
+
 ## [0.7.0] - 2026-03-11
 
 - refactor: align terminology around harnesses and agent specs
