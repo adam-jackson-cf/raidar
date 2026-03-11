@@ -80,5 +80,5 @@ Raidar is built to answer one practical question: how well does a given agent an
 
 ## Go Deeper
 
-- [docs/metrics.md](/Users/adamjackson/Projects/raidar/docs/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
-- [docs/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/raidar/docs/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
+- [docs/references/metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
+- [docs/references/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/raidar/docs/references/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
