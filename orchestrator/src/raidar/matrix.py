@@ -1,27 +1,27 @@
-"""Configuration matrix for comparing agent/model combinations."""
+"""Configuration matrix for comparing agent specs."""
 
 from pathlib import Path
 
 import yaml
 from pydantic import BaseModel, Field
 
-from .agents.config import Agent, AgentRunConfig, ModelTarget
+from .agents.config import AgentSpec, Harness, ModelTarget
 
 
-class AgentModelPair(BaseModel):
-    """Explicit agent/model pairing."""
+class AgentSpecInput(BaseModel):
+    """Explicit harness/model pairing for one agent spec."""
 
-    agent: str = Field(description="Agent identifier (matches Agent enum values)")
+    harness: str = Field(description="Harness identifier (matches Harness enum values)")
     model: str = Field(description="Model string provider/name passed to Harbor")
 
 
 class ExperimentConfig(BaseModel):
-    """Experiment execution settings for every matrix pair."""
+    """Experiment execution settings for every matrix agent spec."""
 
     timeout_sec: int = Field(gt=0, description="Scenario timeout in seconds for each experiment")
     repeats: int = Field(
         ge=1,
-        description="Number of runs per scenario/agent/model/evaluation_profile pair",
+        description="Number of runs per scenario/agent-spec/evaluation-profile pair",
     )
     repeat_parallel: int = Field(ge=1, description="Parallel workers within one experiment")
     retry_void: int = Field(ge=0, le=1, description="Retry budget for unscored runs")
@@ -30,25 +30,23 @@ class ExperimentConfig(BaseModel):
 class MatrixConfig(BaseModel):
     """Configuration for a matrix of experiment runs."""
 
-    runs: list[AgentModelPair] = Field(
+    agents: list[AgentSpecInput] = Field(
         min_length=1,
-        description="List of agent/model pairs to execute",
+        description="List of agent specs to execute",
     )
-    suite: ExperimentConfig = Field(description="Experiment execution settings")
-    scenario_path: str = Field(description="Path to scenario.yaml")
-    experiments_path: str = Field(default="experiments", description="Path to experiment outputs")
+    experiment: ExperimentConfig = Field(description="Experiment execution settings")
 
 
-class MatrixEntry(BaseModel):
-    """Single entry in the configuration matrix."""
+class MatrixAgentSpec(BaseModel):
+    """Single agent spec entry in the configuration matrix."""
 
-    agent: str
+    harness: str
     model: str
 
-    def to_agent_config(self) -> AgentRunConfig:
-        """Convert to AgentRunConfig."""
-        return AgentRunConfig(
-            agent=Agent(self.agent),
+    def to_agent_spec(self) -> AgentSpec:
+        """Convert to AgentSpec."""
+        return AgentSpec(
+            harness=Harness(self.harness),
             model=ModelTarget.from_string(self.model),
         )
 
@@ -57,7 +55,7 @@ class MatrixEntry(BaseModel):
         """Generate unique workspace suffix for this entry."""
 
         model_safe = self.model.replace("/", "-")
-        return f"{self.agent}_{model_safe}"
+        return f"{self.harness}_{model_safe}"
 
 
 def load_matrix_config(path: Path) -> MatrixConfig:
@@ -68,10 +66,10 @@ def load_matrix_config(path: Path) -> MatrixConfig:
     return MatrixConfig.model_validate(data.get("matrix", data))
 
 
-def generate_matrix_entries(config: MatrixConfig) -> list[MatrixEntry]:
+def generate_matrix_entries(config: MatrixConfig) -> list[MatrixAgentSpec]:
     """Generate all combinations from a matrix configuration."""
 
-    return [MatrixEntry(agent=pair.agent, model=pair.model) for pair in config.runs]
+    return [MatrixAgentSpec(harness=spec.harness, model=spec.model) for spec in config.agents]
 
 
 def create_example_matrix() -> str:
@@ -79,16 +77,14 @@ def create_example_matrix() -> str:
 
     return """# Experiment matrix configuration
 matrix:
-  suite:
+  experiment:
     timeout_sec: 1800
     repeats: 3
     repeat_parallel: 1
     retry_void: 1
-  runs:
-    - agent: codex-cli
+  agents:
+    - harness: codex-cli
       model: codex/gpt-5.4-high
-    - agent: claude-code
+    - harness: claude-code
       model: anthropic/claude-sonnet-4-5
-  scenario_path: scenarios/homepage-implementation/v001/scenario.yaml
-  experiments_path: experiments
 """

@@ -208,7 +208,7 @@ class Scorecard(BaseModel):
     run_id: str = ""
     scenario_name: str = ""
     scenario_revision: str = ""
-    agent: str = ""
+    harness: str = ""
     model: str = ""
     starter_root: str = ""
     duration_sec: float = 0.0
@@ -276,7 +276,7 @@ class EvalConfig(BaseModel):
     """Configuration for an experiment run."""
 
     model: str = Field(description="Model identifier (provider/name)")
-    agent: str = Field(description="Agent name")
+    harness: str = Field(description="Harness name")
     scenario_name: str = Field(description="Scenario identifier")
     scenario_revision: str = Field(description="Scenario revision")
     starter_root: str = Field(description="Scenario-local starter root path")

@@ -1,6 +1,6 @@
 # Review Surface Experiment Review Spec
 
-This document defines the detail view for one representative experiment. The `Experiment Review` explains why a configuration is strong or weak, how the conclusion compares to the benchmark, how stable the result is, and what evidence supports the diagnosis.
+This document defines the detail view for one representative experiment. The `Experiment Review` explains why an `AgentSpec` is strong or weak, how the conclusion compares to the benchmark, how stable the result is, and what evidence supports the diagnosis.
 
 ## Review Questions
 
@@ -19,7 +19,7 @@ The Experiment Review should be organized into six sections, in this order.
 
 The header should show:
 
-- configuration label
+- `AgentSpec` label
 - scenario name and revision
 - representative experiment id
 - benchmark identity and compatibility state
@@ -39,7 +39,7 @@ These are related, but they are not interchangeable.
 
 ### 2. Change Context
 
-This section explains what changed since the previous representative experiment for the same configuration.
+This section explains what changed since the previous representative experiment for the same `AgentSpec`.
 
 Show:
 

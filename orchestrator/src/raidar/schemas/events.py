@@ -22,7 +22,7 @@ class GateEvent(BaseModel):
 
 
 class TraceEvent(BaseModel):
-    """Event from an agent trace log."""
+    """Event from a harness trace log."""
 
     timestamp: str = Field(description="ISO timestamp")
     event_type: Literal[

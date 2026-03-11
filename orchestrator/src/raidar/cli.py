@@ -18,7 +18,8 @@ import click
 import yaml
 from dotenv import load_dotenv
 
-from .agents.config import Agent, AgentRunConfig, ModelTarget
+from .agents.adapters.registry import registry
+from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
 
 if TYPE_CHECKING:
@@ -39,10 +40,10 @@ if ENV_PATH.exists():
 @click.group()
 @click.version_option(package_name="raidar")
 def main() -> None:
-    """Scenario/experiment orchestrator for agent/model evaluation runs."""
+    """Scenario/experiment orchestrator for harness/model evaluation runs."""
 
 
-AGENT_CHOICES = [agent.value for agent in Agent]
+HARNESS_CHOICES = [harness.value for harness in Harness]
 VERSION_DIR_PATTERN = re.compile(r"^v(\d+)$")
 INTEGRATION_TEST_TARGET = "tests/test_runner_harbor_env_and_cleanup.py"
 TYPECHECK_TARGETS = [
@@ -60,7 +61,7 @@ class RunCliOptions:
     """Normalized CLI options for scenario execution commands."""
 
     scenario: Path
-    agent: str
+    harness: str
     model: str
     timeout: int
     repeats: int
@@ -70,7 +71,7 @@ class RunCliOptions:
     def resolved(self) -> RunCliOptions:
         return RunCliOptions(
             scenario=self.scenario.resolve(),
-            agent=self.agent,
+            harness=self.harness,
             model=self.model,
             timeout=self.timeout,
             repeats=self.repeats,
@@ -134,7 +135,7 @@ def _persist_eval_run(run: EvalRun) -> Path:
 
 
 def _experiment_execution_suffix(options: RunCliOptions) -> str:
-    return f"{options.agent}__{options.model.replace('/', '-')}"
+    return f"{options.harness}__{options.model.replace('/', '-')}"
 
 
 def _build_repeat_request(base_request: RunRequest, repeat_index: int) -> RunRequest:
@@ -276,9 +277,9 @@ def _run_with_unscored_reruns(
     return all_runs, retries_used, pending_batch
 
 
-def _build_agent_run_config(options: RunCliOptions) -> AgentRunConfig:
-    return AgentRunConfig(
-        agent=Agent(options.agent),
+def _build_agent_spec(options: RunCliOptions) -> AgentSpec:
+    return AgentSpec(
+        harness=Harness(options.harness),
         model=ModelTarget.from_string(options.model),
         timeout_sec=options.timeout,
     )
@@ -300,7 +301,7 @@ def _execution_id(
 def _build_run_request(
     options: RunCliOptions, scenario_def: ScenarioDefinition, execution_dir: Path
 ) -> RunRequest:
-    config = _build_agent_run_config(options)
+    config = _build_agent_spec(options)
     execution_dir.mkdir(parents=True, exist_ok=True)
     return _runner_api().RunRequest(
         scenario=scenario_def,
@@ -314,7 +315,7 @@ def _build_run_request(
 def _echo_run_header(options: RunCliOptions, scenario_name: str) -> None:
     click.echo(f"Loading scenario from {options.scenario}")
     click.echo(f"Scenario: {scenario_name}")
-    click.echo(f"Agent: {options.agent}")
+    click.echo(f"Harness: {options.harness}")
     click.echo(f"Model: {options.model}")
     click.echo(f"Repeats: {options.repeats}")
     click.echo(f"Repeat parallelism: {options.repeat_parallel}")
@@ -430,7 +431,7 @@ def _persist_experiment_execution(
     experiment_summary = experiment_api.create_experiment_summary(
         scenario_name=request.scenario.name,
         scenario_revision=request.scenario.scenario_revision,
-        agent=resolved.agent,
+        harness=resolved.harness,
         model=resolved.model,
         evaluation_profile=runner_api.scenario_evaluation_profile(request.scenario),
         metrics=runner_api.scenario_metrics(request.scenario),
@@ -695,7 +696,7 @@ def _execution_record(execution_dir: Path) -> dict[str, object]:
         "created_at_utc": payload.get("created_at_utc"),
         "scenario_name": scenario_name,
         "scenario_revision": scenario_revision,
-        "agent": config_dict.get("agent"),
+        "harness": config_dict.get("harness"),
         "model": config_dict.get("model"),
         "evaluation_profile": config_dict.get("evaluation_profile"),
         "metrics": config_dict.get("metrics"),
@@ -756,18 +757,18 @@ def _execution_matches_filters(
     *,
     scenario: str | None,
     model: str | None,
-    agent: str | None,
+    harness: str | None,
     evaluation_profile: str | None,
 ) -> bool:
     scenario_value = str(record.get("scenario_name", "")).lower()
     model_value = str(record.get("model", "")).lower()
-    agent_value = str(record.get("agent", "")).lower()
+    harness_value = str(record.get("harness", "")).lower()
     evaluation_profile_value = str(record.get("evaluation_profile", "")).lower()
     if scenario and scenario.lower() not in scenario_value:
         return False
     if model and model.lower() not in model_value:
         return False
-    if agent and agent.lower() not in agent_value:
+    if harness and harness.lower() not in harness_value:
         return False
     return not (evaluation_profile and evaluation_profile.lower() not in evaluation_profile_value)
 
@@ -781,11 +782,11 @@ def _execution_matches_filters(
     help="Path to scenario.yaml file",
 )
 @click.option(
-    "--agent",
+    "--harness",
     "-a",
-    type=click.Choice(AGENT_CHOICES),
+    type=click.Choice(HARNESS_CHOICES),
     required=True,
-    help="Agent to use",
+    help="Harness to use",
 )
 @click.option(
     "--model",
@@ -820,17 +821,17 @@ def _execution_matches_filters(
 )
 def run(
     scenario: Path,
-    agent: str,
+    harness: str,
     model: str,
     timeout: int,
     repeats: int,
     repeat_parallel: int,
     rerun_unscored: int,
 ) -> None:
-    """Run one scenario with the specified agent and model."""
+    """Run one scenario with the specified harness and model."""
     options = RunCliOptions(
         scenario=scenario,
-        agent=agent,
+        harness=harness,
         model=model,
         timeout=timeout,
         repeats=repeats,
@@ -859,11 +860,11 @@ def experiment() -> None:
     help="Path to scenario.yaml file",
 )
 @click.option(
-    "--agent",
+    "--harness",
     "-a",
-    type=click.Choice(AGENT_CHOICES),
+    type=click.Choice(HARNESS_CHOICES),
     required=True,
-    help="Agent to use",
+    help="Harness to use",
 )
 @click.option(
     "--model",
@@ -898,7 +899,7 @@ def experiment() -> None:
 )
 def experiment_run(
     scenario: Path,
-    agent: str,
+    harness: str,
     model: str,
     timeout: int,
     repeats: int,
@@ -908,7 +909,7 @@ def experiment_run(
     """Run a repeated experiment with deterministic aggregate output."""
     options = RunCliOptions(
         scenario=scenario,
-        agent=agent,
+        harness=harness,
         model=model,
         timeout=timeout,
         repeats=repeats,
@@ -1070,7 +1071,7 @@ def experiments() -> None:
 )
 @click.option("--scenario", type=str, help="Filter by scenario name substring.")
 @click.option("--model", type=str, help="Filter by model substring.")
-@click.option("--agent", type=str, help="Filter by agent substring.")
+@click.option("--harness", type=str, help="Filter by harness substring.")
 @click.option(
     "--evaluation-profile",
     type=str,
@@ -1088,7 +1089,7 @@ def experiments_list(
     experiments_root: Path,
     scenario: str | None,
     model: str | None,
-    agent: str | None,
+    harness: str | None,
     evaluation_profile: str | None,
     limit: int,
     as_json: bool,
@@ -1102,7 +1103,7 @@ def experiments_list(
             record,
             scenario=scenario,
             model=model,
-            agent=agent,
+            harness=harness,
             evaluation_profile=evaluation_profile,
         ):
             continue
@@ -1121,7 +1122,8 @@ def experiments_list(
         click.echo(
             f"{index:02d}. {row['execution_id']} | "
             f"scenario={row['scenario_name']}@{row['scenario_revision']} | "
-            f"agent={row.get('agent') or 'unknown'} | model={row.get('model') or 'unknown'} | "
+            f"harness={row.get('harness') or 'unknown'} | "
+            f"model={row.get('model') or 'unknown'} | "
             f"evaluation_profile={row.get('evaluation_profile') or 'unknown'} | "
             f"runs={row.get('run_count_total') or 0} | unscored={row.get('unscored_count') or 0}"
         )
@@ -1176,25 +1178,30 @@ def experiments_prune(
 
 
 @main.group()
-def agent() -> None:
-    """Agent and adapter workflows."""
+def harness() -> None:
+    """Harness discovery and validation workflows."""
 
 
-@agent.command("list")
-def agent_list() -> None:
-    """List supported agent CLI adapters and rule files."""
-    click.echo("Supported agents:")
-    for agent in AGENT_CHOICES:
-        click.echo(f"  {agent:12} -> {SYSTEM_RULES.get(agent, '(no rule mapping)')}")
+@harness.command("list")
+def harness_list() -> None:
+    """List supported harness adapters, rule files, and model coverage."""
+    click.echo("Supported harnesses:")
+    for harness_name in Harness:
+        adapter_class = registry.adapter_class(harness_name)
+        click.echo(
+            f"  {harness_name.value:12} -> "
+            f"{SYSTEM_RULES.get(harness_name.value, '(no rule mapping)')}"
+        )
+        click.echo(f"  {'':12} models: {adapter_class.supported_model_summary()}")
 
 
-@agent.command("validate")
+@harness.command("validate")
 @click.option(
-    "--agent",
+    "--harness",
     "-a",
-    type=click.Choice(AGENT_CHOICES),
+    type=click.Choice(HARNESS_CHOICES),
     required=True,
-    help="Agent to validate.",
+    help="Harness to validate.",
 )
 @click.option(
     "--model",
@@ -1207,16 +1214,16 @@ def agent_list() -> None:
     "--timeout",
     type=int,
     default=1800,
-    help="Timeout used to build the agent run config.",
+    help="Timeout used to build the agent spec.",
 )
-def agent_validate(
-    agent: str,
+def harness_validate(
+    harness: str,
     model: str,
     timeout: int,
 ) -> None:
-    """Validate agent adapter wiring and environment requirements."""
-    config = AgentRunConfig(
-        agent=Agent(agent),
+    """Validate harness adapter wiring and environment requirements."""
+    config = AgentSpec(
+        harness=Harness(harness),
         model=ModelTarget.from_string(model),
         timeout_sec=timeout,
     )
@@ -1224,10 +1231,10 @@ def agent_validate(
     adapter.validate()
     runtime_keys = sorted(adapter.runtime_env().keys())
 
-    click.echo("Agent validation passed.")
-    click.echo(f"  agent: {agent}")
+    click.echo("Harness validation passed.")
+    click.echo(f"  harness: {harness}")
     click.echo(f"  model: {model}")
-    click.echo(f"  harbor_agent: {adapter.harbor_agent()}")
+    click.echo(f"  harbor_harness: {adapter.harbor_harness()}")
     click.echo(f"  model_argument: {adapter.model_argument()}")
     click.echo(f"  runtime_env_keys: {', '.join(runtime_keys) if runtime_keys else '(none)'}")
 
@@ -1235,6 +1242,41 @@ def agent_validate(
 @main.group()
 def scenario() -> None:
     """Scenario lifecycle commands."""
+
+
+def _scenario_revision_paths(scenario_root: Path) -> list[Path]:
+    if not scenario_root.is_dir():
+        return []
+    return sorted(scenario_root.glob("v*/scenario.yaml"), key=_scenario_revision_sort_key)
+
+
+def _list_scenarios_with_revisions(scenarios_root: Path) -> list[tuple[str, tuple[str, ...]]]:
+    if not scenarios_root.exists():
+        return []
+
+    scenarios: list[tuple[str, tuple[str, ...]]] = []
+    for scenario_root in sorted(path for path in scenarios_root.iterdir() if path.is_dir()):
+        revision_paths = _scenario_revision_paths(scenario_root)
+        if not revision_paths:
+            continue
+        scenario_def = _runner_api().load_scenario(revision_paths[-1])
+        revisions = tuple(path.parent.name for path in revision_paths)
+        scenarios.append((scenario_def.name, revisions))
+    return sorted(scenarios, key=lambda entry: entry[0])
+
+
+@scenario.command("list")
+@click.option(
+    "--scenarios-root",
+    type=click.Path(path_type=Path),
+    default=REPO_ROOT / "scenarios",
+    show_default=True,
+    help="Root directory containing scenario folders.",
+)
+def scenario_list(scenarios_root: Path) -> None:
+    """List available scenarios and their revisions."""
+    for scenario_id, revisions in _list_scenarios_with_revisions(scenarios_root.resolve()):
+        click.echo(f"{scenario_id} | revisions: {', '.join(revisions)}")
 
 
 @scenario.command("init")
@@ -1425,11 +1467,11 @@ def scenario_clone_revision(path: Path, from_revision: str, to_revision: str | N
     help="Path to scenario revision directory",
 )
 @click.option(
-    "--agent",
+    "--harness",
     "-a",
-    type=click.Choice(sorted(set(AGENT_CHOICES + ["copilot", "cursor", "pi"]))),
+    type=click.Choice(HARNESS_CHOICES),
     required=True,
-    help="Agent to inject rules for",
+    help="Harness to inject rules for",
 )
 @click.option(
     "--starter",
@@ -1440,13 +1482,13 @@ def scenario_clone_revision(path: Path, from_revision: str, to_revision: str | N
 )
 def inject(
     scenario: Path,
-    agent: str,
+    harness: str,
     starter: Path,
 ) -> None:
     """Inject rules into a starter workspace for testing."""
-    click.echo(f"Injecting rules for {agent}")
+    click.echo(f"Injecting rules for {harness}")
     rules_dir = scenario / "rules"
-    result = inject_rules(rules_dir, starter, agent)
+    result = inject_rules(rules_dir, starter, harness)
     click.echo(f"Injected: {result}")
 
 
@@ -1484,7 +1526,7 @@ def matrix(
     dry_run: bool,
 ) -> None:
     """Run an experiment matrix from configuration."""
-    from .matrix import MatrixConfig, MatrixEntry, generate_matrix_entries, load_matrix_config
+    from .matrix import MatrixAgentSpec, MatrixConfig, generate_matrix_entries, load_matrix_config
 
     scenario_paths = tuple(path.resolve() for path in scenario)
     if not scenario_paths:
@@ -1493,14 +1535,13 @@ def matrix(
 
     click.echo(f"Loading matrix from {config}")
     matrix_config: MatrixConfig = load_matrix_config(config)
-    entries: list[MatrixEntry] = generate_matrix_entries(matrix_config)
+    entries: list[MatrixAgentSpec] = generate_matrix_entries(matrix_config)
     total_entries = len(entries) * len(scenario_defs)
     click.echo(
-        "Matrix defined for "
-        f"{len(matrix_config.runs)} agent/model pairs ({total_entries} experiments)"
+        f"Matrix defined for {len(matrix_config.agents)} agent specs ({total_entries} experiments)"
     )
 
-    experiment_config = matrix_config.suite
+    experiment_config = matrix_config.experiment
     click.echo(
         "Experiment settings: "
         f"timeout={experiment_config.timeout_sec}s, repeats={experiment_config.repeats}, "
@@ -1524,7 +1565,7 @@ def matrix(
     ]
     successes, failures = _run_matrix_jobs(
         jobs=jobs,
-        suite_config=experiment_config,
+        experiment_config=experiment_config,
         parallel=parallel,
     )
 
@@ -1551,7 +1592,7 @@ def _echo_matrix_dry_run(
         for entry in entries:
             click.echo(
                 f"[dry-run] {scenario_def.name}@{scenario_def.scenario_revision}: "
-                f"{entry.agent}/{entry.model} x{repeats}"
+                f"{entry.harness}/{entry.model} x{repeats}"
             )
 
 
@@ -1559,23 +1600,23 @@ def _matrix_job_options(
     *,
     scenario_path: Path,
     entry: object,
-    suite_config: object,
+    experiment_config: object,
 ) -> RunCliOptions:
     return RunCliOptions(
         scenario=scenario_path,
-        agent=entry.agent,
+        harness=entry.harness,
         model=entry.model,
-        timeout=suite_config.timeout_sec,
-        repeats=suite_config.repeats,
-        repeat_parallel=suite_config.repeat_parallel,
-        rerun_unscored=suite_config.retry_void,
+        timeout=experiment_config.timeout_sec,
+        repeats=experiment_config.repeats,
+        repeat_parallel=experiment_config.repeat_parallel,
+        rerun_unscored=experiment_config.retry_void,
     )
 
 
 def _run_matrix_jobs(
     *,
     jobs: list[tuple[Path, ScenarioDefinition, object]],
-    suite_config: object,
+    experiment_config: object,
     parallel: int,
 ) -> tuple[int, int]:
     successes = 0
@@ -1586,14 +1627,14 @@ def _run_matrix_jobs(
         options = _matrix_job_options(
             scenario_path=scenario_path,
             entry=entry,
-            suite_config=suite_config,
+            experiment_config=experiment_config,
         )
         return _execute_run_options(
             options,
             force_experiment_summary=True,
             cleanup_before_runs=False,
             echo=False,
-            execution_suffix=f"{entry.agent}__{entry.model.replace('/', '-')}",
+            execution_suffix=f"{entry.harness}__{entry.model.replace('/', '-')}",
         )
 
     if parallel > 1:
@@ -1604,24 +1645,24 @@ def _run_matrix_jobs(
                 try:
                     result = future.result()
                 except Exception as exc:
-                    click.echo(f"[{scenario_def.name}] {entry.agent}/{entry.model} failed: {exc}")
+                    click.echo(f"[{scenario_def.name}] {entry.harness}/{entry.model} failed: {exc}")
                     failures += 1
                     continue
                 successes += 1
                 click.echo(
-                    f"[{scenario_def.name}] {entry.agent}/{entry.model} -> {result.summary_path}"
+                    f"[{scenario_def.name}] {entry.harness}/{entry.model} -> {result.summary_path}"
                 )
         return successes, failures
 
     for scenario_path, scenario_def, entry in jobs:
         click.echo(
             f"Running experiment: {scenario_def.name}@{scenario_def.scenario_revision} "
-            f"{entry.agent}/{entry.model}"
+            f"{entry.harness}/{entry.model}"
         )
         try:
             result = _run_matrix_job((scenario_path, scenario_def, entry))
         except Exception as exc:
-            click.echo(f"[{scenario_def.name}] {entry.agent}/{entry.model} failed: {exc}")
+            click.echo(f"[{scenario_def.name}] {entry.harness}/{entry.model} failed: {exc}")
             failures += 1
             continue
         successes += 1
@@ -1717,6 +1758,15 @@ def _echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
         click.echo(f"Quality Gates: {', '.join(gates)}")
 
 
+def _echo_available_revisions(scenario_root: Path) -> None:
+    revision_paths = _scenario_revision_paths(scenario_root)
+    if not revision_paths:
+        return
+    click.echo("Available Revisions:")
+    for scenario_yaml in revision_paths:
+        click.echo(f"  {scenario_yaml.parent.name}: {scenario_yaml.resolve()}")
+
+
 def _echo_rule_variants(scenario_dir: Path) -> None:
     rules_dir = scenario_dir / "rules"
     if not rules_dir.exists():
@@ -1757,10 +1807,14 @@ def _echo_acceptance_config(task_def: ScenarioDefinition) -> None:
 )
 def info(scenario: Path) -> None:
     """Show scenario information and details."""
-    scenario_yaml = _resolve_scenario_yaml(scenario)
+    scenario_input = scenario.resolve()
+    scenario_yaml = _resolve_scenario_yaml(scenario_input)
     scenario_def = _runner_api().load_scenario(scenario_yaml)
 
     _echo_scenario_summary(scenario_def)
+    click.echo(f"Scenario YAML: {scenario_yaml}")
+    if scenario_input.is_dir() and not (scenario_input / "scenario.yaml").is_file():
+        _echo_available_revisions(scenario_input)
     _echo_rule_variants(scenario_yaml.parent)
     _echo_visual_config(scenario_def)
     _echo_acceptance_config(scenario_def)

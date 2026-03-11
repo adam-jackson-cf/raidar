@@ -29,7 +29,7 @@ class TestSaveAndLoadRun:
         loaded = load_run(path)
 
         assert loaded.id == sample_eval_run.id
-        assert loaded.config.agent == sample_eval_run.config.agent
+        assert loaded.config.harness == sample_eval_run.config.harness
         assert loaded.config.model == sample_eval_run.config.model
 
     def test_save_creates_directory_if_missing(self, sample_eval_run: EvalRun, tmp_path: Path):
@@ -85,13 +85,13 @@ class TestAggregateResults:
 
         assert result["total_runs"] == 0
 
-    def test_aggregates_by_agent(self, sample_eval_run: EvalRun):
-        """Should aggregate results by agent."""
+    def test_aggregates_by_harness(self, sample_eval_run: EvalRun):
+        """Should aggregate results by harness."""
         runs = [sample_eval_run]
         result = aggregate_results(runs)
 
-        assert "by_agent" in result
-        assert sample_eval_run.config.agent in result["by_agent"]
+        assert "by_harness" in result
+        assert sample_eval_run.config.harness in result["by_harness"]
 
     def test_aggregates_by_model(self, sample_eval_run: EvalRun):
         """Should aggregate results by model."""
@@ -120,7 +120,7 @@ class TestAggregateResults:
             timestamp=datetime.now(UTC).isoformat(),
             config=EvalConfig(
                 model="openai/gpt-4o",
-                agent="codex-cli",
+                harness="codex-cli",
                 scenario_name="test",
                 scenario_revision="v001",
                 starter_root="starter",
@@ -137,7 +137,7 @@ class TestAggregateResults:
             timestamp=datetime.now(UTC).isoformat(),
             config=EvalConfig(
                 model="openai/gpt-4o",
-                agent="codex-cli",
+                harness="codex-cli",
                 scenario_name="test",
                 scenario_revision="v001",
                 starter_root="starter",
@@ -153,8 +153,8 @@ class TestAggregateResults:
         result = aggregate_results([run1, run2])
 
         # Both have default scores, so average should be equal to one
-        assert result["by_agent"]["codex-cli"]["count"] == 2
-        assert isinstance(result["by_agent"]["codex-cli"]["avg_score"], float)
+        assert result["by_harness"]["codex-cli"]["count"] == 2
+        assert isinstance(result["by_harness"]["codex-cli"]["avg_score"], float)
 
     def test_unscored_runs_excluded_from_scored_aggregates(self, sample_eval_run: EvalRun):
         """Unscored runs should not affect scored validity-rate/average."""
@@ -172,7 +172,7 @@ class TestAggregateResults:
         unscored_run.scores.performance_gates.checks = []
 
         result = aggregate_results([valid, unscored_run])
-        stats = result["by_agent"][valid.config.agent]
+        stats = result["by_harness"][valid.config.harness]
         assert stats["count"] == 2
         assert stats["scored_count"] == 1
         assert stats["unscored_count"] == 1
@@ -189,13 +189,13 @@ class TestExportCsv:
         sample_eval_run.scores.metric_results = []
         sample_eval_run.scores.metadata["harbor"] = {
             "phase_timings_sec": {},
-            "agent_overhead_sec": 1.23,
+            "harness_overhead_sec": 1.23,
         }
         output = tmp_path / "runs.csv"
         export_to_csv([sample_eval_run], output)
         payload = output.read_text(encoding="utf-8")
         assert "evaluation_profile" in payload
         assert "metric_results" in payload
-        assert "agent_overhead_sec" in payload
+        assert "harness_overhead_sec" in payload
         assert "1.23" in payload
         assert sample_eval_run.config.evaluation_profile in payload

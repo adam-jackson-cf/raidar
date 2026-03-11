@@ -14,30 +14,52 @@ End-to-end flow for scenario execution, Harbor runtime orchestration, and experi
    - `acceptance`
    - ordered `metrics`
 3. Resolve the starter from the scenario revision directory (`scenario_dir / starter.root`).
-4. Copy the starter into the run workspace and inject one rules file from `scenarios/<scenario>/v###/rules/`.
+4. Copy the starter into the run workspace and inject one rules file from `scenarios/<scenario>/v###/rules/` for the selected harness.
 
 ## 2. Execution Layout
 
 Each experiment writes to one execution root:
 
-`experiments/<timestamp>__<scenario>__<revision>__<agent>__<model>__xN/`
+`experiments/<timestamp>__<scenario>__<revision>__<harness>__<model>__xN/`
 
 Inside that root:
 - `workspace/baseline/`: prepared starter baseline snapshot shared by the experiment runs.
-- `runs/`: canonical run artifacts (`run-01`, `run-02`, ... each with `workspace/`, `agent/`, `verifier/`, `harbor/`, `run.json`, `report.md`, and any captured evidence).
+- `runs/`: canonical run artifacts (`run-01`, `run-02`, ... each with `workspace/`, `harness/`, `verifier/`, `harbor/`, `run.json`, `report.md`, and any captured evidence).
 - `experiment.json`: full experiment record.
 - `experiment-summary.json`: aggregate experiment output.
 - `report.md`: human-readable experiment summary.
 
 ## 3. Run Lifecycle
 
-1. CLI command (`experiment run` or `matrix`) builds `RunRequest` from scenario + agent config.
+1. CLI command (`experiment run` or `matrix`) builds `RunRequest` from the scenario plus an `AgentSpec`.
 2. Runner prepares the workspace, validates starter preflight commands, and builds the Harbor scenario bundle.
 3. Runner captures any configured pre-run evidence after preflight succeeds.
-4. Harbor executes the agent/model pair.
+4. Harbor executes the harness/model pair.
 5. Runner hydrates the workspace from `final-app.tar.gz`, captures post-run evidence, then prunes transient workspace folders (`node_modules`, `.next`, etc.).
 6. Verifier artifacts are loaded and normalized into score outputs.
 7. Scorecard metadata persists run pointers, process metrics, starter fingerprints, evidence pointers, and prune metadata.
+
+## 3.1 Matrix Config Contract
+
+Use the refactored public matrix schema:
+
+```yaml
+matrix:
+  experiment:
+    timeout_sec: 1800
+    repeats: 3
+    repeat_parallel: 1
+    retry_void: 1
+  agents:
+    - harness: codex-cli
+      model: codex/gpt-5.4-high
+    - harness: claude-code
+      model: anthropic/claude-sonnet-4-5
+  scenario_path: scenarios/homepage-implementation/v001/scenario.yaml
+  experiments_path: experiments
+```
+
+`AgentSpec` means `harness + model`. Current implementation internals may still refer to `suite`, `runs`, or `agent` while the rename is in progress, but public docs and authored config examples should use `experiment`, `agents`, and `harness`.
 
 ## 4. Scoring Pipeline
 
@@ -72,7 +94,7 @@ Use these artifact paths for human or automated review:
 - `experiments/*/runs/*/run.json`
 - `experiments/*/runs/*/verifier/scorecard.json`
 - `experiments/*/runs/*/verifier/execution-validity.json`
-- `experiments/*/runs/*/agent/*.txt`
+- `experiments/*/runs/*/harness/*.txt` for harness logs
 
 ## 6. Cleanup Lifecycle
 

@@ -31,6 +31,91 @@ def test_cli_version_matches_pyproject_version() -> None:
     assert result.output.strip().endswith(expected_version)
 
 
+def test_harness_list_includes_model_variations() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(main, ["harness", "list"])
+
+    assert result.exit_code == 0, result.output
+    assert "claude-code  -> CLAUDE.md" in result.output
+    assert (
+        "models: anthropic/claude-haiku-4-5, anthropic/claude-opus-4-6, "
+        "anthropic/claude-sonnet-4-5, anthropic/claude-sonnet-4-6"
+    ) in result.output
+    assert (
+        "models: codex/* (known aliases: codex/gpt-5.2-high, codex/gpt-5.2-low, "
+        "codex/gpt-5.2-medium, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
+        "codex/gpt-5.4-low, codex/gpt-5.4-medium)"
+    ) in result.output
+    assert (
+        "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
+        "google/gemini-3.1-pro-preview"
+    ) in result.output
+    assert "models: cursor/*, openai/*, anthropic/*, google/*, deepseek/*" in result.output
+    assert "models: github/*" in result.output
+    assert "models: inflection/*" in result.output
+
+
+def test_scenario_list_returns_scenario_ids_with_revisions(tmp_path: Path) -> None:
+    runner = CliRunner()
+    scenarios_root = tmp_path / "scenarios"
+    alpha_root = scenarios_root / "alpha-task"
+    beta_root = scenarios_root / "beta-task"
+
+    alpha_v1 = runner.invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(alpha_root),
+            "--name",
+            "alpha-task",
+            "--scenario-revision",
+            "v001",
+        ],
+    )
+    assert alpha_v1.exit_code == 0, alpha_v1.output
+
+    alpha_v2 = runner.invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(alpha_root),
+            "--name",
+            "alpha-task",
+            "--scenario-revision",
+            "v002",
+        ],
+    )
+    assert alpha_v2.exit_code == 0, alpha_v2.output
+
+    beta_v1 = runner.invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(beta_root),
+            "--name",
+            "beta-task",
+            "--scenario-revision",
+            "v001",
+        ],
+    )
+    assert beta_v1.exit_code == 0, beta_v1.output
+
+    result = runner.invoke(main, ["scenario", "list", "--scenarios-root", str(scenarios_root)])
+
+    assert result.exit_code == 0, result.output
+    assert result.output.strip().splitlines() == [
+        "alpha-task | revisions: v001, v002",
+        "beta-task | revisions: v001",
+    ]
+
+
 def test_generated_artifact_paths_filters_prefixes() -> None:
     paths = [
         "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
@@ -48,7 +133,7 @@ def test_generated_artifact_paths_filters_prefixes() -> None:
 def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) -> None:
     options = RunCliOptions(
         scenario=tmp_path / "scenario.yaml",
-        agent="gemini",
+        harness="gemini",
         model="google/gemini-3-flash-preview",
         timeout=300,
         repeats=5,
@@ -62,7 +147,7 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
     assert resolved.scenario.is_absolute()
 
 
-def test_experiment_run_uses_agent_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
+def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     scenario_path = tmp_path / "scenario.yaml"
     scenario_path.write_text("name: placeholder\n")
@@ -81,7 +166,7 @@ def test_experiment_run_uses_agent_model_execution_suffix(tmp_path: Path, monkey
             "run",
             "--scenario",
             str(scenario_path),
-            "--agent",
+            "--harness",
             "codex-cli",
             "--model",
             "codex/gpt-5.4-high",
@@ -270,6 +355,10 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     info_result = runner.invoke(main, ["info", "--scenario", str(scenario_dir)])
     assert info_result.exit_code == 0, info_result.output
     assert "Revision: v10" in info_result.output
+    assert f"Scenario YAML: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
+    assert "Available Revisions:" in info_result.output
+    assert f"  v2: {scenario_dir / 'v2' / 'scenario.yaml'}" in info_result.output
+    assert f"  v10: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert (
         "Evaluation Profile: "
         "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
@@ -282,7 +371,7 @@ def _write_experiment_summary(
     *,
     scenario_name: str,
     model: str,
-    agent: str,
+    harness: str,
     evaluation_profile: str,
     created_at: str,
     run_count_total: int = 1,
@@ -293,7 +382,7 @@ def _write_experiment_summary(
         "created_at_utc": created_at,
         "config": {
             "scenario_name": scenario_name,
-            "agent": agent,
+            "harness": harness,
             "model": model,
             "evaluation_profile": evaluation_profile,
         },
@@ -315,7 +404,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
         experiments_root / "20260222-100000Z__hello-world-smoke__v001",
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        agent="claude-code",
+        harness="claude-code",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",
     )
@@ -323,7 +412,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
         experiments_root / "20260222-110000Z__homepage-implementation__v001",
         scenario_name="homepage-implementation",
         model="codex/gpt-5.4-high",
-        agent="codex-cli",
+        harness="codex-cli",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression",
         created_at="2026-02-22T11:00:00+00:00",
     )
@@ -395,7 +484,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         old_dir,
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        agent="claude-code",
+        harness="claude-code",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-20T10:00:00+00:00",
     )
@@ -403,7 +492,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         new_dir,
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        agent="claude-code",
+        harness="claude-code",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-21T10:00:00+00:00",
     )
@@ -411,7 +500,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         other_model_dir,
         scenario_name="hello-world-smoke",
         model="codex/gpt-5.4-high",
-        agent="codex-cli",
+        harness="codex-cli",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",
     )
@@ -447,7 +536,7 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
         old_dir,
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        agent="claude-code",
+        harness="claude-code",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-20T10:00:00+00:00",
     )
@@ -455,7 +544,7 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
         new_dir,
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
-        agent="claude-code",
+        harness="claude-code",
         evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-21T10:00:00+00:00",
     )
@@ -502,7 +591,7 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
     )
     options = RunCliOptions(
         scenario=tmp_path / "scenario.yaml",
-        agent="codex-cli",
+        harness="codex-cli",
         model="codex/gpt-5.4-high",
         timeout=300,
         repeats=1,
@@ -515,7 +604,7 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
         timestamp="2026-03-10T13:00:00+00:00",
         config=EvalConfig(
             model="codex/gpt-5.4-high",
-            agent="codex-cli",
+            harness="codex-cli",
             scenario_name="hello-world-smoke",
             scenario_revision="v001",
             starter_root="starter",

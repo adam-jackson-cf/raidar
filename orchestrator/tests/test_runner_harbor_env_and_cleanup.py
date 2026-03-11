@@ -369,7 +369,7 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
 ) -> None:
     request = SimpleNamespace(
         scenario=object(),
-        config=SimpleNamespace(agent=SimpleNamespace(value="gemini")),
+        config=SimpleNamespace(harness=SimpleNamespace(value="gemini")),
     )
     phase = SimpleNamespace(
         harbor_request=object(),
@@ -384,7 +384,9 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
 
     def fake_collect_process_metrics(*args, **kwargs):
         del args, kwargs
-        raise RuntimeError("Missing token usage metrics for agent `gemini` in trial `/tmp/trial`.")
+        raise RuntimeError(
+            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`."
+        )
 
     monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
     monkeypatch.setattr(runner, "collect_process_metrics", fake_collect_process_metrics)
@@ -404,7 +406,7 @@ def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
 ) -> None:
     request = SimpleNamespace(
         scenario=object(),
-        config=SimpleNamespace(agent=SimpleNamespace(value="gemini")),
+        config=SimpleNamespace(harness=SimpleNamespace(value="gemini")),
     )
     phase = SimpleNamespace(
         harbor_request=object(),
@@ -419,7 +421,9 @@ def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
 
     def fake_collect_process_metrics(*args, **kwargs):
         del args, kwargs
-        raise RuntimeError("Missing token usage metrics for agent `gemini` in trial `/tmp/trial`.")
+        raise RuntimeError(
+            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`."
+        )
 
     monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
     monkeypatch.setattr(runner, "collect_process_metrics", fake_collect_process_metrics)

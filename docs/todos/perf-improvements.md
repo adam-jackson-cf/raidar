@@ -2,7 +2,7 @@
 
 ## Objective
 
-Reduce orchestrator and agent startup latency for local runs while preserving experiment validity.
+Reduce orchestrator and harness startup latency for local runs while preserving experiment validity.
 
 ## Hard Constraints
 
@@ -28,7 +28,7 @@ Reviewed latest commits on `main` as of March 1, 2026:
 
 ## What Is Already Implemented (From History)
 
-1. Adapter-level provider probe hook is implemented in agent adapters.
+1. Adapter-level provider probe hook is implemented in harness adapters.
 2. Provider preflight execution and failure classification are implemented.
 3. Provider preflight caching exists in `.preflight-cache` and is lock-guarded for the cache key.
 4. Provider preflight is integrated into `_prepare_workspace_phase`.
@@ -69,7 +69,7 @@ Status note: this reduces wasted expensive runs when provider auth/billing/netwo
 Acceptance:
 
 1. Canonical parity unchanged.
-2. Lower median and p95 `agent_overhead_sec`.
+2. Lower median and p95 `harness_overhead_sec`.
 3. No increase in unscored rate due to orchestration changes.
 
 ## P1: Safe Reuse Without Eval Contamination
@@ -80,7 +80,7 @@ Acceptance:
    - starter fingerprint
    - lockfile hash
    - required command list
-   - agent/model
+   - harness/model (`AgentSpec`)
 3. Add starter preflight lock symmetry for duplicate-call prevention.
 4. Cache Harbor bundle static segments (`environment`, `tests`) by fingerprint while preserving per-run mutable workspace materialization.
 
@@ -137,6 +137,6 @@ Acceptance:
 1. Implement P0 timing instrumentation first.
 2. Add provider/starter cache hit/miss telemetry.
 3. Re-baseline with the existing experiment matrix and compare:
-   - startup-to-agent-execution latency
-   - `agent_overhead_sec`
+   - startup-to-harness-execution latency
+   - `harness_overhead_sec`
    - parity outputs

@@ -1,6 +1,6 @@
 # Creating a New Scenario
 
-Use this guide to create a versioned scenario that runs in the orchestrator.
+Use this guide to create a versioned scenario that runs in the orchestrator for any supported `AgentSpec` (`harness + model`).
 
 ## 1. Create Versioned Scenario Structure
 
@@ -113,7 +113,7 @@ The profile shown in run and experiment artifacts is derived from metric order a
 
 ## 3. Create Rules Files
 
-Populate `scenarios/<scenario>/v001/rules/` with agent-mapped files:
+Populate `scenarios/<scenario>/v001/rules/` with harness-mapped files:
 - `AGENTS.md`
 - `CLAUDE.md`
 - `GEMINI.md`
@@ -133,9 +133,11 @@ make scenario-validate SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml
 ```bash
 make experiment-run \
   SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml \
-  AGENT=codex-cli \
+  HARNESS=codex-cli \
   MODEL=codex/gpt-5.4-high
 ```
+
+3. When you compare multiple `AgentSpec`s, author the matrix config with top-level `experiment` and `agents` blocks, and set `harness` on each `agents[]` entry.
 
 ## 5. Revision Pattern
 

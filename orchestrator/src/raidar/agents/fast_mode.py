@@ -1,11 +1,11 @@
-"""Fast smoke-mode helpers for Harbor runs."""
+"""Fast smoke-mode helpers for Harbor harnesses."""
 
 from __future__ import annotations
 
 import os
 from pathlib import Path
 
-from .config import Agent
+from .config import Harness
 
 FAST_MODE_ENV_VAR = "HARBOR_SMOKE_FAST"
 FAST_IMAGE_REUSE_ENV_VAR = "HARBOR_SMOKE_FAST_REUSE_IMAGE"
@@ -14,10 +14,10 @@ FAST_IMAGE_PREFIX_ENV_VAR = "HARBOR_SMOKE_FAST_IMAGE_PREFIX"
 _TRUE_VALUES = {"1", "true", "yes", "on"}
 _FALSE_VALUES = {"0", "false", "no", "off"}
 
-FAST_AGENT_IMPORT_PATHS: dict[Agent, str] = {
-    Agent.CODEX_CLI: "raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent",
-    Agent.CLAUDE_CODE: "raidar.agents.harbor_agents.fast_cli_agents:FastClaudeCodeCliAgent",
-    Agent.GEMINI: "raidar.agents.harbor_agents.fast_cli_agents:FastGeminiCliAgent",
+FAST_HARNESS_IMPORT_PATHS: dict[Harness, str] = {
+    Harness.CODEX_CLI: "raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent",
+    Harness.CLAUDE_CODE: "raidar.agents.harbor_agents.fast_cli_agents:FastClaudeCodeCliAgent",
+    Harness.GEMINI: "raidar.agents.harbor_agents.fast_cli_agents:FastGeminiCliAgent",
 }
 
 
@@ -44,19 +44,19 @@ def fast_image_prefix() -> str:
     return prefix or "ts-ui-eval-smoke-fast"
 
 
-def fast_agent_import_path(agent: Agent) -> str | None:
-    """Return custom Harbor agent import path for supported CLI agents."""
-    return FAST_AGENT_IMPORT_PATHS.get(agent)
+def fast_harness_import_path(harness: Harness) -> str | None:
+    """Return custom Harbor import path for supported CLI harnesses."""
+    return FAST_HARNESS_IMPORT_PATHS.get(harness)
 
 
-def agent_src_path() -> Path:
+def harness_src_path() -> Path:
     """Return absolute path to orchestrator/src for PYTHONPATH injection."""
     return Path(__file__).resolve().parents[2]
 
 
-def with_agent_pythonpath(env: dict[str, str]) -> dict[str, str]:
-    """Ensure Harbor process can import repository-local Harbor agents."""
-    path_parts = [str(agent_src_path())]
+def with_harness_pythonpath(env: dict[str, str]) -> dict[str, str]:
+    """Ensure Harbor process can import repository-local Harbor harnesses."""
+    path_parts = [str(harness_src_path())]
     current = env.get("PYTHONPATH") or os.environ.get("PYTHONPATH")
     if current:
         path_parts.append(current)

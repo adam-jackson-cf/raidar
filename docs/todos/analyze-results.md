@@ -1,8 +1,10 @@
 # Analyze Results
 
-Use this guide to analyze the latest experiment for each `(scenario_name, scenario_revision, agent, model, evaluation_profile)` combination.
+Use this guide to analyze the latest experiment for each `(scenario_name, scenario_revision, harness, model, evaluation_profile)` combination.
 
 Metric definitions, prerequisites, and interpretation notes live in [metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md). This guide stays focused on artifact review and comparison workflow.
+
+`AgentSpec` means `harness + model`.
 
 ## Canonical Inputs
 
@@ -14,14 +16,14 @@ Metric definitions, prerequisites, and interpretation notes live in [metrics.md]
 - Verifier scorecards: `experiments/*/runs/*/verifier/scorecard.json`
 - Execution-validity artifacts: `experiments/*/runs/*/verifier/execution-validity.json`
 - Performance-gates artifacts: `experiments/*/runs/*/verifier/performance-gates.json`
-- Agent traces: `experiments/*/runs/*/agent/*.trajectory.json`
-- Agent logs: `experiments/*/runs/*/agent/*.txt`
+- Harness traces: `experiments/*/runs/*/harness/*.trajectory.json`
+- Harness logs: `experiments/*/runs/*/harness/*.txt`
 
 Do not read from legacy `evals/` roots.
 
 ## Identity Rules
 
-For each unique `(scenario_name, scenario_revision, agent, model, evaluation_profile)`:
+For each unique `(scenario_name, scenario_revision, harness, model, evaluation_profile)`:
 
 1. Read identity from `experiment-summary.json.config`.
 2. Select the latest experiment by `created_at_utc`.

@@ -1,4 +1,4 @@
-"""Shared test fixtures for agentic evaluation system."""
+"""Shared test fixtures for AgentSpec evaluation."""
 
 import json
 from datetime import UTC, datetime
@@ -86,7 +86,7 @@ def sample_scorecard() -> Scorecard:
         run_id="test-run-001",
         scenario_name="test-task",
         scenario_revision="v001",
-        agent="codex-cli",
+        harness="codex-cli",
         model="openai/gpt-4o",
         starter_root="starter",
         duration_sec=120.5,
@@ -130,7 +130,7 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
         timestamp=datetime.now(UTC).isoformat(),
         config=EvalConfig(
             model="openai/gpt-4o",
-            agent="codex-cli",
+            harness="codex-cli",
             scenario_name="test-task",
             scenario_revision="v001",
             starter_root="starter",

@@ -161,7 +161,9 @@ class VerificationConfig(BaseModel):
     )
     required_commands: list[list[str]] = Field(
         default_factory=list,
-        description="Verification commands the agent must execute during the scenario run",
+        description=(
+            "Verification commands the selected AgentSpec must execute during the scenario run"
+        ),
     )
     gates: list[VerificationGate] = Field(default_factory=list)
 

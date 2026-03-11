@@ -1,4 +1,4 @@
-"""Reusable adapter for agent CLIs discovered via env or PATH."""
+"""Reusable adapter for harness CLIs discovered via env or PATH."""
 
 from __future__ import annotations
 
@@ -6,21 +6,27 @@ import os
 import shutil
 from collections.abc import Iterable
 
-from ..config import AgentRunConfig
-from .base import AgentAdapter
+from ..config import AgentSpec
+from .base import HarnessAdapter
 
 
-class ExternalCliAdapter(AgentAdapter):
-    """Shared adapter for agents launched via a dedicated CLI binary."""
+class ExternalCliAdapter(HarnessAdapter):
+    """Shared adapter for harnesses launched via a dedicated CLI binary."""
 
     CLI_ENV_VAR: str = ""
     DEFAULT_BINARY: str = ""
     REQUIRED_ENV_VARS: tuple[str, ...] = ()
     ALLOWED_PROVIDERS: tuple[str, ...] | None = None
 
-    def __init__(self, config: AgentRunConfig) -> None:
+    def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
         self._resolved_cli: str | None = None
+
+    @classmethod
+    def supported_model_summary(cls) -> str:
+        if not cls.ALLOWED_PROVIDERS:
+            return "(any provider/model)"
+        return ", ".join(f"{provider}/*" for provider in cls.ALLOWED_PROVIDERS)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -33,7 +39,9 @@ class ExternalCliAdapter(AgentAdapter):
             candidate = shutil.which(self.DEFAULT_BINARY)
         if not candidate:
             hint = f"Set {self.CLI_ENV_VAR}" if self.CLI_ENV_VAR else "Install the CLI"
-            raise FileNotFoundError(f"CLI binary for {self.config.agent.value} not found. {hint}.")
+            raise FileNotFoundError(
+                f"CLI binary for {self.config.harness.value} not found. {hint}."
+            )
         self._resolved_cli = candidate
         return candidate
 
@@ -45,12 +53,12 @@ class ExternalCliAdapter(AgentAdapter):
         for env_var in self.REQUIRED_ENV_VARS:
             if not os.environ.get(env_var):
                 raise OSError(
-                    f"Environment variable {env_var} must be set for {self.config.agent.value}."
+                    f"Environment variable {env_var} must be set for {self.config.harness.value}."
                 )
         if self.ALLOWED_PROVIDERS and self.config.model.provider not in self.ALLOWED_PROVIDERS:
             allowed = ", ".join(self.ALLOWED_PROVIDERS)
             raise ValueError(
-                f"{self.config.agent.value} agent only supports providers: {allowed}. "
+                f"{self.config.harness.value} harness only supports providers: {allowed}. "
                 f"Received '{self.config.model.provider}'."
             )
 
@@ -61,5 +69,5 @@ class ExternalCliAdapter(AgentAdapter):
         return env
 
     def extra_harbor_args(self) -> Iterable[str]:
-        # Harbor expects the agent binary on PATH. Provide a hint via env var only.
+        # Harbor expects the harness binary on PATH. Provide a hint via env var only.
         return []

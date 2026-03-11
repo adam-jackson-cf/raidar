@@ -1,22 +1,22 @@
-"""Default Harbor-backed agent adapters."""
+"""Default Harbor-backed harness adapters."""
 
 from __future__ import annotations
 
-from ..config import Agent
-from .base import AgentAdapter
+from ..config import Harness
+from .base import HarnessAdapter
 
 
-class HarborAgentAdapter(AgentAdapter):
+class HarborHarnessAdapter(HarnessAdapter):
     """Adapter that simply proxies to Harbor with minimal validation."""
 
-    provider_constraints: dict[Agent, set[str]] = {}
+    provider_constraints: dict[Harness, set[str]] = {}
 
     def validate(self) -> None:  # noqa: D401
-        allowed = self.provider_constraints.get(self.config.agent)
+        allowed = self.provider_constraints.get(self.config.harness)
         if allowed and self.config.model.provider not in allowed:
             allowed_str = ", ".join(sorted(allowed))
             raise ValueError(
-                f"{self.config.agent.value} agent requires model providers: {allowed_str}. "
+                f"{self.config.harness.value} harness requires model providers: {allowed_str}. "
                 f"Received '{self.config.model.provider}'."
             )
 
