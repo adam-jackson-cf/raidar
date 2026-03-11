@@ -10,18 +10,18 @@ REPEATS="1"
 REPEAT_PARALLEL="1"
 RERUN_UNSCORED="0"
 FAST_MODE="0"
-AGENT=""
+HARNESS=""
 MODEL=""
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/checks/run-agent-smoke.sh --agent <agent> --model <model> [options]
+Usage: scripts/checks/run-agent-smoke.sh --harness <harness> [--model <model>] [options]
 
 Required:
-  --agent            Agent id (codex-cli|claude-code|gemini)
-  --model            Model id (e.g. codex/gpt-5.4-high)
+  --harness          Harness id (codex-cli|claude-code|gemini)
 
 Optional:
+  --model            Model id; defaults to codex/gpt-5.4-low for codex-cli
   --timeout          Timeout in seconds, default: 300
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
@@ -41,9 +41,13 @@ require_env_present() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --agent)
-      AGENT="$2"
+    --harness)
+      HARNESS="$2"
       shift 2
+      ;;
+    --agent)
+      echo "--agent is no longer supported; use --harness" >&2
+      exit 1
       ;;
     --model)
       MODEL="$2"
@@ -81,13 +85,23 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-if [[ -z "$AGENT" || -z "$MODEL" ]]; then
+if [[ -z "$HARNESS" ]]; then
   usage
   exit 1
 fi
 
-if [[ "$AGENT" != "codex-cli" && "$AGENT" != "claude-code" && "$AGENT" != "gemini" ]]; then
-  echo "Unsupported --agent '$AGENT'. Expected one of: codex-cli, claude-code, gemini" >&2
+if [[ "$HARNESS" != "codex-cli" && "$HARNESS" != "claude-code" && "$HARNESS" != "gemini" ]]; then
+  echo "Unsupported --harness '$HARNESS'. Expected one of: codex-cli, claude-code, gemini" >&2
+  exit 1
+fi
+
+if [[ -z "$MODEL" && "$HARNESS" == "codex-cli" ]]; then
+  MODEL="codex/gpt-5.4-low"
+fi
+
+if [[ -z "$MODEL" ]]; then
+  echo "Missing required --model for harness '$HARNESS'" >&2
+  usage
   exit 1
 fi
 
@@ -98,7 +112,7 @@ if [[ -f "$ORCH_DIR/.env" ]]; then
   set +a
 fi
 
-case "$AGENT" in
+case "$HARNESS" in
   codex-cli)
     require_env_present OPENAI_API_KEY
     ;;
@@ -121,14 +135,14 @@ fi
 cd "$ORCH_DIR"
 uv run raidar harbor cleanup
 
-uv run raidar agent validate \
-  --agent "$AGENT" \
+uv run raidar harness validate \
+  --harness "$HARNESS" \
   --model "$MODEL" \
   --timeout "$TIMEOUT_SEC"
 
 uv run raidar experiment run \
   --scenario "$SCENARIO_PATH" \
-  --agent "$AGENT" \
+  --harness "$HARNESS" \
   --model "$MODEL" \
   --timeout "$TIMEOUT_SEC" \
   --repeats "$REPEATS" \

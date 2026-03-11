@@ -805,7 +805,7 @@ def _execution_matches_filters(
     "--repeats",
     type=click.IntRange(min=1),
     default=1,
-    help="Number of repeated runs for the same configuration",
+    help="Number of repeated runs for the same configuration (use for smoke/debug loops)",
 )
 @click.option(
     "--repeat-parallel",
@@ -828,7 +828,7 @@ def run(
     repeat_parallel: int,
     rerun_unscored: int,
 ) -> None:
-    """Run one scenario with the specified harness and model."""
+    """Run one scenario with the specified harness and model for smoke/debug workflows."""
     options = RunCliOptions(
         scenario=scenario,
         harness=harness,
@@ -1505,8 +1505,40 @@ def inject(
     "--config",
     "-c",
     type=click.Path(exists=True, path_type=Path),
-    required=True,
     help="Path to matrix configuration YAML",
+)
+@click.option(
+    "--selector",
+    type=click.Choice(["all", "codex", "gemini", "claude"]),
+    help="Generate a matrix config on the fly for the selected harness family.",
+)
+@click.option(
+    "--timeout",
+    type=click.IntRange(min=1),
+    default=1800,
+    show_default=True,
+    help="Scenario timeout used for selector-generated matrix configs.",
+)
+@click.option(
+    "--repeats",
+    type=click.IntRange(min=1),
+    default=5,
+    show_default=True,
+    help="Repeat count used for selector-generated matrix configs.",
+)
+@click.option(
+    "--repeat-parallel",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help="Repeat parallelism used for selector-generated matrix configs.",
+)
+@click.option(
+    "--rerun-unscored",
+    type=click.IntRange(min=0, max=1),
+    default=0,
+    show_default=True,
+    help="Unscored rerun budget used for selector-generated matrix configs.",
 )
 @click.option(
     "--parallel",
@@ -1521,20 +1553,43 @@ def inject(
 )
 def matrix(
     scenario: tuple[Path, ...],
-    config: Path,
+    config: Path | None,
+    selector: str | None,
+    timeout: int,
+    repeats: int,
+    repeat_parallel: int,
+    rerun_unscored: int,
     parallel: int,
     dry_run: bool,
 ) -> None:
     """Run an experiment matrix from configuration."""
-    from .matrix import MatrixAgentSpec, MatrixConfig, generate_matrix_entries, load_matrix_config
+    from .matrix import (
+        MatrixAgentSpec,
+        MatrixConfig,
+        build_selected_matrix_config,
+        generate_matrix_entries,
+        load_matrix_config,
+    )
 
     scenario_paths = tuple(path.resolve() for path in scenario)
     if not scenario_paths:
         raise click.ClickException("At least one --scenario path is required.")
+    if (config is None) == (selector is None):
+        raise click.ClickException("Provide exactly one of --config or --selector.")
     scenario_defs = _load_matrix_scenarios(scenario_paths)
 
-    click.echo(f"Loading matrix from {config}")
-    matrix_config: MatrixConfig = load_matrix_config(config)
+    if config is not None:
+        click.echo(f"Loading matrix from {config}")
+        matrix_config: MatrixConfig = load_matrix_config(config)
+    else:
+        click.echo(f"Generating matrix from selector '{selector}'")
+        matrix_config = build_selected_matrix_config(
+            selector=selector,
+            timeout_sec=timeout,
+            repeats=repeats,
+            repeat_parallel=repeat_parallel,
+            retry_void=rerun_unscored,
+        )
     entries: list[MatrixAgentSpec] = generate_matrix_entries(matrix_config)
     total_entries = len(entries) * len(scenario_defs)
     click.echo(

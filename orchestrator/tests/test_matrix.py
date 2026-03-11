@@ -8,7 +8,9 @@ from raidar.matrix import (
     ExperimentConfig,
     MatrixAgentSpec,
     MatrixConfig,
+    build_selected_matrix_config,
     generate_matrix_entries,
+    matrix_selector_choices,
 )
 
 
@@ -145,3 +147,46 @@ class TestGenerateMatrixEntries:
         entries = generate_matrix_entries(config)
 
         assert len(entries) == 3
+
+
+def test_matrix_selector_choices_are_public_and_stable() -> None:
+    assert matrix_selector_choices() == ("all", "codex", "gemini", "claude")
+
+
+def test_build_selected_matrix_config_for_codex() -> None:
+    config = build_selected_matrix_config(
+        selector="codex",
+        timeout_sec=1800,
+        repeats=5,
+        repeat_parallel=1,
+        retry_void=0,
+    )
+
+    assert config.experiment.timeout_sec == 1800
+    assert config.experiment.repeats == 5
+    assert all(spec.harness == "codex-cli" for spec in config.agents)
+    assert [spec.model for spec in config.agents] == [
+        "codex/gpt-5.2-high",
+        "codex/gpt-5.2-low",
+        "codex/gpt-5.2-medium",
+        "codex/gpt-5.4-extra-high",
+        "codex/gpt-5.4-high",
+        "codex/gpt-5.4-low",
+        "codex/gpt-5.4-medium",
+    ]
+
+
+def test_build_selected_matrix_config_for_all() -> None:
+    config = build_selected_matrix_config(
+        selector="all",
+        timeout_sec=1800,
+        repeats=5,
+        repeat_parallel=1,
+        retry_void=0,
+    )
+
+    harnesses = [spec.harness for spec in config.agents]
+    assert harnesses.count("codex-cli") == 7
+    assert harnesses.count("gemini") == 3
+    assert harnesses.count("claude-code") == 4
+    assert len(config.agents) == 14

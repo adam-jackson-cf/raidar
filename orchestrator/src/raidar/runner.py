@@ -422,6 +422,44 @@ def _resolve_homepage_screenshot_command(
     return None
 
 
+def _visual_reference_assets(request: RunRequest) -> list[tuple[Path, Path]]:
+    """Return scenario-local visual reference assets and their relative targets."""
+    if request.scenario.visual is None:
+        return []
+    reference_path = Path(request.scenario.visual.reference_image)
+    if reference_path.is_absolute():
+        return []
+    source_reference = (request.scenario_dir / reference_path).resolve()
+    if not source_reference.exists():
+        return []
+
+    assets = [(source_reference, reference_path)]
+    for sibling in sorted(
+        source_reference.parent.glob(f"{source_reference.stem}-region-*{source_reference.suffix}")
+    ):
+        assets.append((sibling, reference_path.parent / sibling.name))
+    return assets
+
+
+def _visual_region_names(request: RunRequest) -> list[str]:
+    """Return authored or inferred visual region names for one scenario."""
+    if request.scenario.visual is None:
+        return []
+    configured = [region.name for region in request.scenario.visual.regions]
+    if configured:
+        return configured
+
+    prefix = f"{Path(request.scenario.visual.reference_image).stem}-region-"
+    suffix = Path(request.scenario.visual.reference_image).suffix
+    inferred: list[str] = []
+    for _, relative_target in _visual_reference_assets(request):
+        filename = relative_target.name
+        if not filename.startswith(prefix) or not filename.endswith(suffix):
+            continue
+        inferred.append(filename[len(prefix) : len(filename) - len(suffix)])
+    return inferred
+
+
 def scenario_evaluation_profile(scenario: ScenarioDefinition) -> str:
     """Derive deterministic evaluation-profile identifier for a scenario."""
     return f"v2:{'+'.join(scenario_metrics(scenario))}"
@@ -1059,6 +1097,7 @@ def _scenario_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
         "reference_image": request.scenario.visual.reference_image,
         "screenshot_command": request.scenario.visual.screenshot_command,
         "threshold": request.scenario.visual.threshold,
+        "regions": [region.model_dump(mode="json") for region in request.scenario.visual.regions],
     }
 
 
@@ -1243,15 +1282,10 @@ def _copy_workspace_into_bundle(
     )
     if not request.scenario.visual:
         return
-    reference_path = Path(request.scenario.visual.reference_image)
-    if reference_path.is_absolute():
-        return
-    source_reference = (request.scenario_dir / reference_path).resolve()
-    if not source_reference.exists():
-        return
-    target_reference = app_dir / reference_path
-    target_reference.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source_reference, target_reference)
+    for source_reference, relative_target in _visual_reference_assets(request):
+        target_reference = app_dir / relative_target
+        target_reference.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(source_reference, target_reference)
 
 
 def _load_scenario_prompt(task: ScenarioDefinition, scenario_dir: Path) -> str:
@@ -1357,8 +1391,6 @@ tar \
   --exclude='./node_modules' \
   --exclude='./.next' \
   --exclude='./jobs' \
-  --exclude='./actual.png' \
-  --exclude='./diff.png' \
   -czf /logs/agent/final-app.tar.gz \
   -C /app .
 """
@@ -1873,6 +1905,98 @@ def persist_verifier_artifacts(
         target = verifier_dir / filename
         copied[filename] = str(shutil.copy2(source, target))
     return copied
+
+
+def _copy_optional_visual_asset(source: Path, target: Path) -> str | None:
+    if not source.exists():
+        return None
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return str(shutil.copy2(source, target))
+
+
+def _persist_visual_evidence_artifacts(
+    *,
+    request: RunRequest,
+    workspace: Path,
+    run_root_dir: Path,
+) -> dict[str, Any]:
+    """Persist visual evidence assets into the canonical run directory."""
+    if request.scenario.visual is None:
+        return {
+            "actual": None,
+            "reference": None,
+            "diff": None,
+            "regions": [],
+        }
+
+    visual_dir = run_root_dir / "visual"
+    main_reference_name = Path(request.scenario.visual.reference_image).name
+    main_artifacts = {
+        "actual": _copy_optional_visual_asset(workspace / "actual.png", visual_dir / "actual.png"),
+        "reference": None,
+        "diff": _copy_optional_visual_asset(workspace / "diff.png", visual_dir / "diff.png"),
+    }
+    region_artifacts: list[dict[str, str | None]] = []
+
+    for source_reference, relative_target in _visual_reference_assets(request):
+        copied = _copy_optional_visual_asset(source_reference, visual_dir / relative_target.name)
+        if relative_target.name == main_reference_name:
+            main_artifacts["reference"] = copied
+
+    reference_stem = Path(request.scenario.visual.reference_image).stem
+    reference_suffix = Path(request.scenario.visual.reference_image).suffix
+    for region_name in _visual_region_names(request):
+        region_artifacts.append(
+            {
+                "name": region_name,
+                "actual": _copy_optional_visual_asset(
+                    workspace / f"actual-region-{region_name}.png",
+                    visual_dir / f"actual-region-{region_name}.png",
+                ),
+                "reference": _copy_optional_visual_asset(
+                    request.scenario_dir
+                    / Path(request.scenario.visual.reference_image).parent
+                    / f"{reference_stem}-region-{region_name}{reference_suffix}",
+                    visual_dir / f"{reference_stem}-region-{region_name}{reference_suffix}",
+                ),
+                "diff": _copy_optional_visual_asset(
+                    workspace / f"diff-region-{region_name}.png",
+                    visual_dir / f"diff-region-{region_name}.png",
+                ),
+            }
+        )
+
+    return {
+        "actual": main_artifacts["actual"],
+        "reference": main_artifacts["reference"],
+        "diff": main_artifacts["diff"],
+        "regions": region_artifacts,
+    }
+
+
+def _rebind_visual_evidence_paths(
+    scorecard_visual: VisualScore | None, evidence: dict[str, Any]
+) -> None:
+    """Replace transient /app visual paths with canonical run artifact paths."""
+    if scorecard_visual is None:
+        return
+
+    scorecard_visual.actual_path = evidence.get("actual")
+    scorecard_visual.reference_path = evidence.get("reference")
+    scorecard_visual.diff_path = evidence.get("diff")
+
+    regional_paths = {
+        entry.get("name"): entry for entry in evidence.get("regions", []) if isinstance(entry, dict)
+    }
+    for region in scorecard_visual.regional_scores:
+        if not isinstance(region, dict):
+            continue
+        region_paths = regional_paths.get(region.get("name"))
+        if region_paths is None:
+            continue
+        region["actual_path"] = region_paths.get("actual")
+        region["reference_path"] = region_paths.get("reference")
+        region["diff_path"] = region_paths.get("diff")
 
 
 def persist_harness_artifacts(
@@ -3542,6 +3666,12 @@ def _persist_artifacts_phase(
         "homepage_pre": str(phase.pre_screenshot_path) if phase.pre_screenshot_path else None,
         "homepage_post": None,
         "final_workspace_archive": None,
+        "visual": {
+            "actual": None,
+            "reference": None,
+            "diff": None,
+            "regions": [],
+        },
         "errors": list(phase.evidence_errors),
     }
     if phase.screenshot_command and not execution.terminated_early:
@@ -3560,6 +3690,13 @@ def _persist_artifacts_phase(
                 evidence_artifacts["homepage_post"] = str(post_path)
             if post_error:
                 evidence_artifacts["errors"].append(f"homepage-post capture failed: {post_error}")
+            visual_artifacts = _persist_visual_evidence_artifacts(
+                request=request,
+                workspace=phase.context.workspace,
+                run_root_dir=phase.layout.root_dir,
+            )
+            evidence_artifacts["visual"] = visual_artifacts
+            _rebind_visual_evidence_paths(execution.outputs.visual, visual_artifacts)
         if hydrate_error:
             evidence_artifacts["errors"].append(hydrate_error)
 
