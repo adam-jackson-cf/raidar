@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.0] - 2026-03-11
+
+- refactor: simplify repo docs and scripts
+
 ## [0.7.0] - 2026-03-10
 
 - feat: add codex gpt-5.4 thinking support
