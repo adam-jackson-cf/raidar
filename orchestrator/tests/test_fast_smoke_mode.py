@@ -32,6 +32,21 @@ def test_fast_mode_uses_harness_import_path(monkeypatch) -> None:
     assert "raidar.agents.harbor_agents.fast_cli_agents:FastGeminiCliAgent" in command
 
 
+def test_standard_mode_uses_harbor_harness(monkeypatch) -> None:
+    monkeypatch.delenv("HARBOR_SMOKE_FAST", raising=False)
+    adapter = _gemini_adapter(monkeypatch)
+
+    command = adapter.build_harbor_command(
+        task_path=Path("/tmp/scenario"),
+        job_name="job",
+        jobs_dir=Path("/tmp/jobs"),
+    )
+
+    assert "--agent-import-path" not in command
+    assert "-a" in command
+    assert "gemini-cli" in command
+
+
 def test_fast_mode_runtime_env_includes_pythonpath(monkeypatch) -> None:
     monkeypatch.setenv("HARBOR_SMOKE_FAST", "1")
     adapter = _gemini_adapter(monkeypatch)
@@ -40,3 +55,12 @@ def test_fast_mode_runtime_env_includes_pythonpath(monkeypatch) -> None:
 
     assert "PYTHONPATH" in env
     assert str(harness_src_path()) in env["PYTHONPATH"]
+
+
+def test_standard_mode_runtime_env_does_not_inject_pythonpath(monkeypatch) -> None:
+    monkeypatch.delenv("HARBOR_SMOKE_FAST", raising=False)
+    adapter = _gemini_adapter(monkeypatch)
+
+    env = adapter.runtime_env()
+
+    assert "PYTHONPATH" not in env

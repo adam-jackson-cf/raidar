@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from ..config import AgentSpec, Harness
 from .base import HarnessAdapter
 from .claude_code_cli import ClaudeCodeCliAdapter
@@ -13,33 +11,28 @@ from .cursor_cli import CursorCliAdapter
 from .gemini_cli import GeminiCliAdapter
 from .pi_cli import PiCliAdapter
 
-AdapterFactory = Callable[[AgentSpec], HarnessAdapter]
 AdapterType = type[HarnessAdapter]
 
 
 class AdapterRegistry:
-    """Simple registry mapping harnesses to adapter factories."""
+    """Simple registry mapping harnesses to adapter classes."""
 
     def __init__(self) -> None:
-        self._factories: dict[Harness, AdapterFactory] = {}
+        self._adapters: dict[Harness, AdapterType] = {}
 
-    def register(self, harness: Harness, factory: AdapterFactory) -> None:
-        self._factories[harness] = factory
+    def register(self, harness: Harness, adapter_class: AdapterType) -> None:
+        self._adapters[harness] = adapter_class
 
     def resolve(self, spec: AgentSpec) -> HarnessAdapter:
-        if spec.harness not in self._factories:
+        if spec.harness not in self._adapters:
             raise ValueError(f"No adapter registered for harness {spec.harness.value}")
-        return self._factories[spec.harness](spec)
+        return self._adapters[spec.harness](spec)
 
     def adapter_class(self, harness: Harness) -> AdapterType:
-        factory = self._factories.get(harness)
-        if factory is None:
+        adapter_class = self._adapters.get(harness)
+        if adapter_class is None:
             raise ValueError(f"No adapter registered for harness {harness.value}")
-        if not isinstance(factory, type) or not issubclass(factory, HarnessAdapter):
-            raise TypeError(
-                f"Registered factory for harness {harness.value} is not an adapter class"
-            )
-        return factory
+        return adapter_class
 
 
 registry = AdapterRegistry()

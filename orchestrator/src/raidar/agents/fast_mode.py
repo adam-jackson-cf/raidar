@@ -46,6 +46,8 @@ def fast_image_prefix() -> str:
 
 def fast_harness_import_path(harness: Harness) -> str | None:
     """Return custom Harbor import path for supported CLI harnesses."""
+    if not is_fast_mode_enabled():
+        return None
     return FAST_HARNESS_IMPORT_PATHS.get(harness)
 
 
@@ -56,6 +58,8 @@ def harness_src_path() -> Path:
 
 def with_harness_pythonpath(env: dict[str, str]) -> dict[str, str]:
     """Ensure Harbor process can import repository-local Harbor harnesses."""
+    if not is_fast_mode_enabled():
+        return env
     path_parts = [str(harness_src_path())]
     current = env.get("PYTHONPATH") or os.environ.get("PYTHONPATH")
     if current:

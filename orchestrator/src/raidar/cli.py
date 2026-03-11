@@ -1189,8 +1189,7 @@ def harness_list() -> None:
     for harness_name in Harness:
         adapter_class = registry.adapter_class(harness_name)
         click.echo(
-            f"  {harness_name.value:12} -> "
-            f"{SYSTEM_RULES.get(harness_name.value, '(no rule mapping)')}"
+            f"  {harness_name.value:12} -> {SYSTEM_RULES.get(harness_name, '(no rule mapping)')}"
         )
         click.echo(f"  {'':12} models: {adapter_class.supported_model_summary()}")
 
@@ -1488,7 +1487,7 @@ def inject(
     """Inject rules into a starter workspace for testing."""
     click.echo(f"Injecting rules for {harness}")
     rules_dir = scenario / "rules"
-    result = inject_rules(rules_dir, starter, harness)
+    result = inject_rules(rules_dir, starter, Harness(harness))
     click.echo(f"Injected: {result}")
 
 
