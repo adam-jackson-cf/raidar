@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## [0.7.0] - 2026-03-11
 
+- refactor: align terminology around harnesses and agent specs
+- chore: checkpoint current repo state
+
+## [0.7.0] - 2026-03-11
+
 - docs: reorganize review surface artifacts
 
 ## [0.7.0] - 2026-03-11
