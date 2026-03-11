@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .agents.config import AgentSpec
+from .agents.config import AgentSpec, Harness
 from .agents.fast_mode import (
     fast_image_prefix,
     is_fast_image_reuse_enabled,
@@ -379,7 +379,7 @@ def _ensure_experiment_baseline_workspace(
     starter_dir: Path,
     experiment_baseline_dir: Path,
     scenario_dir: Path,
-    harness: str,
+    harness: Harness,
 ) -> None:
     with _experiment_baseline_lock(experiment_baseline_dir):
         if experiment_baseline_dir.exists():
@@ -997,7 +997,7 @@ def prepare_workspace(
     starter_dir: Path,
     target_dir: Path,
     scenario_dir: Path,
-    harness: str,
+    harness: Harness,
 ) -> tuple[Path, Path | None]:
     """Prepare workspace by copying the starter and injecting rules.
 
@@ -1465,7 +1465,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
         starter_dir=starter_source.path,
         experiment_baseline_dir=experiment_baseline_dir,
         scenario_dir=request.scenario_dir,
-        harness=request.config.harness.value,
+        harness=request.config.harness,
     )
 
     workspace_dir = _repeat_workspace_dir(request)
@@ -1479,7 +1479,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
     )
 
     injected_rules: Path | None = None
-    injected_rule_name = SYSTEM_RULES.get(request.config.harness.value)
+    injected_rule_name = SYSTEM_RULES.get(request.config.harness)
     if injected_rule_name:
         candidate = workspace_dir / injected_rule_name
         if candidate.exists():
