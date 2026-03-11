@@ -23,7 +23,7 @@ def _run(
         run_id=run_id,
         scenario_name="homepage",
         scenario_revision="v001",
-        agent="codex-cli",
+        harness="codex-cli",
         model="codex/gpt-5.4-low",
         starter_root="starter",
         duration_sec=duration,
@@ -60,7 +60,7 @@ def _run(
         timestamp=datetime.now(UTC).isoformat(),
         config=EvalConfig(
             model="codex/gpt-5.4-low",
-            agent="codex-cli",
+            harness="codex-cli",
             scenario_name="homepage",
             scenario_revision="v001",
             starter_root="starter",
@@ -89,7 +89,7 @@ def test_create_experiment_summary_aggregates() -> None:
     summary = create_experiment_summary(
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
-        agent="codex-cli",
+        harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
             "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
@@ -140,7 +140,7 @@ def test_create_experiment_summary_excludes_unscored_runs_from_stats() -> None:
     summary = create_experiment_summary(
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
-        agent="codex-cli",
+        harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
             "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
@@ -175,7 +175,7 @@ def test_create_experiment_summary_includes_rerun_metadata() -> None:
     summary = create_experiment_summary(
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
-        agent="codex-cli",
+        harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
             "v2:functional+acceptance+verification-stability+"
@@ -231,7 +231,7 @@ def test_persist_experiment_writes_experiment_summary_and_report(tmp_path: Path)
         },
         "config": {
             "scenario_name": "homepage",
-            "agent": "codex-cli",
+            "harness": "codex-cli",
             "model": "codex/gpt-5.4-low",
             "evaluation_profile": (
                 "v2:functional+acceptance+verification-stability+"

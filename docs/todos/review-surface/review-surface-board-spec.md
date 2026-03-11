@@ -1,13 +1,13 @@
 # Review Surface Board Spec
 
-This document defines the interaction and information model for the `Scenario Board`. The board is the fast triage view for one scenario. It is optimized for scanability, comparator clarity, and confidence-aware selection of experiments to inspect next.
+This document defines the interaction and information model for the `Scenario Board`. The board is the fast triage view for one scenario. It is optimized for scanability, comparator clarity, and confidence-aware selection of `AgentSpec`s to inspect next.
 
 ## Board Questions
 
 The board should let a reviewer answer these questions quickly:
 
-- Which configurations meet the scenario bar?
-- Which configurations are ahead of or behind the benchmark?
+- Which `AgentSpec`s meet the scenario bar?
+- Which `AgentSpec`s are ahead of or behind the benchmark?
 - Which conclusions are trustworthy versus provisional?
 - Which experiments are worth opening for deeper diagnosis?
 
@@ -16,16 +16,16 @@ The board should let a reviewer answer these questions quickly:
 The board header should show:
 
 - scenario name and revision
-- pinned benchmark configuration or `No benchmark pinned`
+- pinned benchmark `AgentSpec` or `No benchmark pinned`
 - representative-result rule summary
 - cohort size
 - freshness summary, such as latest representative completion time
 
 Optional cohort summary chips may include:
 
-- configurations meeting the scenario bar
-- configurations below the bar
-- configurations with low-confidence representatives
+- `AgentSpec`s meeting the scenario bar
+- `AgentSpec`s below the bar
+- `AgentSpec`s with low-confidence representatives
 
 ## Row Model
 
@@ -33,7 +33,7 @@ Each row represents one review identity and one representative experiment.
 
 | Row field | Purpose |
 | --- | --- |
-| configuration label | human-readable harness + model identity |
+| `AgentSpec` label | human-readable harness + model identity |
 | representative badge | shows selection rule outcome, such as `x3 scored`, `Low Confidence`, or `Unavailable` |
 | absolute status | `Meets Scenario Bar`, `Below Scenario Bar`, or `Unavailable` |
 | confidence chip | `High`, `Medium`, `Low`, or `Very Low` |
@@ -102,7 +102,7 @@ The board should support filters for:
 - benchmark delta state
 - absolute status
 - confidence band
-- agent harness
+- harness
 - model
 - scenario revision
 - evidence availability gaps

@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 
 from raidar.agents.adapters.gemini_cli import GeminiCliAdapter
-from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
+from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 
-def _config(model: str, provider: str = "google") -> AgentRunConfig:
-    return AgentRunConfig(
-        agent=Agent.GEMINI,
+def _config(model: str, provider: str = "google") -> AgentSpec:
+    return AgentSpec(
+        harness=Harness.GEMINI,
         model=ModelTarget(provider=provider, name=model),
     )
 
@@ -20,9 +20,9 @@ def test_registry_resolves_gemini_adapter():
     assert isinstance(adapter, GeminiCliAdapter)
 
 
-def test_harbor_agent_name_is_gemini_cli():
+def test_harbor_harness_name_is_gemini_cli():
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
-    assert adapter.harbor_agent() == "gemini-cli"
+    assert adapter.harbor_harness() == "gemini-cli"
 
 
 def test_validate_rejects_non_google_provider():

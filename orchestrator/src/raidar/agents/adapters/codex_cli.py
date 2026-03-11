@@ -1,4 +1,4 @@
-"""Codex CLI agent adapter."""
+"""Codex CLI harness adapter."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
-from ..config import AgentRunConfig
-from ..fast_mode import fast_agent_import_path, with_agent_pythonpath
-from .base import AgentAdapter
+from ..config import AgentSpec
+from ..fast_mode import fast_harness_import_path, with_harness_pythonpath
+from .base import HarnessAdapter
 
 
-class CodexCliAdapter(AgentAdapter):
-    """Adapter enforcing Codex CLI agent + model pairing."""
+class CodexCliAdapter(HarnessAdapter):
+    """Adapter enforcing Codex CLI harness + model pairing."""
 
-    HARBOR_AGENT_NAME = "codex"
+    HARBOR_HARNESS_NAME = "codex"
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     OPENAI_API_ENV = "OPENAI_API_KEY"
     MODEL_ALIAS_MAP: dict[str, tuple[str, str]] = {
@@ -28,7 +28,12 @@ class CodexCliAdapter(AgentAdapter):
         "gpt-5.4-extra-high": ("gpt-5.4", "xhigh"),
     }
 
-    def __init__(self, config: AgentRunConfig) -> None:
+    @classmethod
+    def supported_model_summary(cls) -> str:
+        aliases = ", ".join(f"codex/{model}" for model in sorted(cls.MODEL_ALIAS_MAP))
+        return f"codex/* (known aliases: {aliases})"
+
+    def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
         self._cli_path: str | None = None
 
@@ -59,11 +64,11 @@ class CodexCliAdapter(AgentAdapter):
         if not os.environ.get(self.OPENAI_API_ENV):
             raise OSError("Codex Harbor runs require an API key. Set OPENAI_API_KEY.")
 
-    def harbor_agent(self) -> str:
-        return self.HARBOR_AGENT_NAME
+    def harbor_harness(self) -> str:
+        return self.HARBOR_HARNESS_NAME
 
-    def harbor_agent_import_path(self) -> str | None:
-        return fast_agent_import_path(self.config.agent)
+    def harbor_harness_import_path(self) -> str | None:
+        return fast_harness_import_path(self.config.harness)
 
     def _resolve_model_alias(self) -> tuple[str, str | None]:
         mapped = self.MODEL_ALIAS_MAP.get(self.config.model.name)
@@ -85,7 +90,7 @@ class CodexCliAdapter(AgentAdapter):
         env: dict[str, str] = {}
         cli_path = self._resolve_cli()
         env[self.CLI_ENV_VAR] = cli_path
-        return with_agent_pythonpath(env)
+        return with_harness_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
         # Ensure Codex CLI trace artifacts always have a stable home.

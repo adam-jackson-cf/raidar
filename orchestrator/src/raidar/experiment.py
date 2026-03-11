@@ -59,7 +59,7 @@ def _uncached_tokens(run: EvalRun) -> int:
 
 def _experiment_id(
     scenario_name: str,
-    agent: str,
+    harness: str,
     model: str,
     repeats: int,
     started_utc: datetime,
@@ -67,7 +67,7 @@ def _experiment_id(
     return (
         f"{started_utc.strftime('%Y%m%d-%H%M%SZ')}__"
         f"{scenario_name.lower().replace(' ', '-')}__"
-        f"{agent}__"
+        f"{harness}__"
         f"{model.replace('/', '-')}"
         f"__x{repeats}"
     )
@@ -142,7 +142,7 @@ def create_experiment_summary(
     *,
     scenario_name: str,
     scenario_revision: str,
-    agent: str,
+    harness: str,
     model: str,
     evaluation_profile: str,
     metrics: list[str],
@@ -158,7 +158,7 @@ def create_experiment_summary(
 
     started_utc = started_at.astimezone(UTC)
     finished_utc = datetime.now(UTC)
-    experiment_id = _experiment_id(scenario_name, agent, model, repeats, started_utc)
+    experiment_id = _experiment_id(scenario_name, harness, model, repeats, started_utc)
     unscored_runs, scored_runs, valid_runs = _partition_runs(runs)
     run_pointers = [_run_pointer(run) for run in runs]
     first_run = runs[0] if runs else None
@@ -176,7 +176,7 @@ def create_experiment_summary(
         "config": {
             "scenario_name": scenario_name,
             "scenario_revision": scenario_revision,
-            "agent": agent,
+            "harness": harness,
             "model": model,
             "evaluation_profile": evaluation_profile,
             "metrics": metrics,
@@ -239,7 +239,7 @@ def persist_experiment(
         f"- experiment_id: `{experiment_id}`",
         f"- scenario: `{config.get('scenario_name')}`",
         f"- scenario_revision: `{config.get('scenario_revision')}`",
-        f"- agent: `{config.get('agent')}`",
+        f"- harness: `{config.get('harness')}`",
         f"- model: `{config.get('model')}`",
         f"- evaluation_profile: `{config.get('evaluation_profile')}`",
         f"- metrics: `{config.get('metrics')}`",

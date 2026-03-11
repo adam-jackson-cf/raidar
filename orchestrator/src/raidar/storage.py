@@ -145,29 +145,29 @@ def aggregate_results(runs: list[EvalRun]) -> dict:
         return {"total_runs": 0}
 
     # Group by configuration
-    by_agent: dict[str, list[EvalRun]] = {}
+    by_harness: dict[str, list[EvalRun]] = {}
     by_model: dict[str, list[EvalRun]] = {}
     by_starter: dict[str, list[EvalRun]] = {}
     by_config: dict[str, list[EvalRun]] = {}
 
     for run in runs:
-        agent = run.config.agent
+        harness = run.config.harness
         model = run.config.model
         starter_key = run.config.starter_root
         config_key = (
-            f"{agent}|{model}|{run.config.scenario_name}|"
+            f"{harness}|{model}|{run.config.scenario_name}|"
             f"{run.config.scenario_revision}|{run.config.starter_root}|"
             f"{run.config.evaluation_profile}|{','.join(_metric_ids(run))}"
         )
 
-        by_agent.setdefault(agent, []).append(run)
+        by_harness.setdefault(harness, []).append(run)
         by_model.setdefault(model, []).append(run)
         by_starter.setdefault(starter_key, []).append(run)
         by_config.setdefault(config_key, []).append(run)
 
     return {
         "total_runs": len(runs),
-        "by_agent": {h: _group_stats(r) for h, r in by_agent.items()},
+        "by_harness": {h: _group_stats(r) for h, r in by_harness.items()},
         "by_model": {m: _group_stats(r) for m, r in by_model.items()},
         "by_starter": {key: _group_stats(r) for key, r in by_starter.items()},
         "by_config": {key: _group_stats(r) for key, r in by_config.items()},
@@ -187,7 +187,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
     fieldnames = [
         "run_id",
         "timestamp",
-        "agent",
+        "harness",
         "model",
         "scenario_name",
         "scenario_revision",
@@ -227,10 +227,10 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "composite_score",
         "trial_total_sec",
         "environment_setup_sec",
-        "agent_setup_sec",
-        "agent_execution_sec",
+        "harness_setup_sec",
+        "harness_execution_sec",
         "verifier_sec",
-        "agent_overhead_sec",
+        "harness_overhead_sec",
         "artifact_checks_passed",
         "artifact_checks_missing_patterns",
     ]
@@ -253,7 +253,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
             row = {
                 "run_id": run.id,
                 "timestamp": run.timestamp,
-                "agent": run.config.agent,
+                "harness": run.config.harness,
                 "model": run.config.model,
                 "scenario_name": run.config.scenario_name,
                 "scenario_revision": run.config.scenario_revision,
@@ -307,10 +307,10 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
                 "composite_score": run.scores.composite_score,
                 "trial_total_sec": phase_timings.get("trial_total_sec"),
                 "environment_setup_sec": phase_timings.get("environment_setup_sec"),
-                "agent_setup_sec": phase_timings.get("agent_setup_sec"),
-                "agent_execution_sec": phase_timings.get("agent_execution_sec"),
+                "harness_setup_sec": phase_timings.get("harness_setup_sec"),
+                "harness_execution_sec": phase_timings.get("harness_execution_sec"),
                 "verifier_sec": phase_timings.get("verifier_sec"),
-                "agent_overhead_sec": harbor_meta.get("agent_overhead_sec"),
+                "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
                 "artifact_checks_passed": (
                     artifact_checks.passed if artifact_checks is not None else None
                 ),
@@ -350,7 +350,7 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         [
             "\n## Summary Table\n",
             (
-                "| Agent | Model | Scenario | Unscored | Execution Valid | Perf Gates | "
+                "| Harness | Model | Scenario | Unscored | Execution Valid | Perf Gates | "
                 "Composite | Diagnostic | "
                 "Functional | Acceptance | Visual | Verification Stability |"
             ),
@@ -364,7 +364,7 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         func_status = "PASS" if run.scores.functional.passed else "FAIL"
         scenario_ref = f"{run.config.scenario_name}@{run.config.scenario_revision}"
         lines.append(
-            f"| {run.config.agent} | {run.config.model} | {scenario_ref} | "
+            f"| {run.config.harness} | {run.config.model} | {scenario_ref} | "
             f"{run.scores.unscored} | {run.scores.execution_validity.passed} | "
             f"{run.scores.performance_gates.passed} | "
             f"{run.scores.composite_score:.3f} | "
@@ -503,7 +503,7 @@ def generate_comparison_report(runs: list[EvalRun]) -> str:
     _append_summary_table(lines, runs)
 
     agg = aggregate_results(runs)
-    _append_aggregate_section(lines, "By Agent", agg.get("by_agent", {}))
+    _append_aggregate_section(lines, "By Harness", agg.get("by_harness", {}))
     _append_aggregate_section(lines, "By Model", agg.get("by_model", {}))
     _append_starter_section(lines, agg.get("by_starter", {}))
     _append_stability_section(lines, agg.get("by_config", {}))

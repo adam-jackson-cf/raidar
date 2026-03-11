@@ -1,4 +1,4 @@
-"""Claude Code CLI agent adapter."""
+"""Claude Code CLI harness adapter."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
-from ..config import AgentRunConfig
-from ..fast_mode import fast_agent_import_path, with_agent_pythonpath
-from .base import AgentAdapter
+from ..config import AgentSpec
+from ..fast_mode import fast_harness_import_path, with_harness_pythonpath
+from .base import HarnessAdapter
 
 
-class ClaudeCodeCliAdapter(AgentAdapter):
-    """Adapter enforcing Claude Code CLI agent + model pairing."""
+class ClaudeCodeCliAdapter(HarnessAdapter):
+    """Adapter enforcing Claude Code CLI harness + model pairing."""
 
-    HARBOR_AGENT_NAME = "claude-code"
+    HARBOR_HARNESS_NAME = "claude-code"
     CLI_ENV_VAR = "CLAUDE_CODE_CLI_PATH"
     API_KEY_ENV = "CLAUDE_CODE_API_KEY"
     ANTHROPIC_API_ENV = "ANTHROPIC_API_KEY"
@@ -26,7 +26,11 @@ class ClaudeCodeCliAdapter(AgentAdapter):
         "claude-haiku-4-5",
     }
 
-    def __init__(self, config: AgentRunConfig) -> None:
+    @classmethod
+    def supported_model_summary(cls) -> str:
+        return ", ".join(f"anthropic/{model}" for model in sorted(cls.SUPPORTED_MODELS))
+
+    def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
         self._cli_path: str | None = None
 
@@ -63,11 +67,11 @@ class ClaudeCodeCliAdapter(AgentAdapter):
                 "Set ANTHROPIC_API_KEY or CLAUDE_CODE_API_KEY."
             )
 
-    def harbor_agent(self) -> str:
-        return self.HARBOR_AGENT_NAME
+    def harbor_harness(self) -> str:
+        return self.HARBOR_HARNESS_NAME
 
-    def harbor_agent_import_path(self) -> str | None:
-        return fast_agent_import_path(self.config.agent)
+    def harbor_harness_import_path(self) -> str | None:
+        return fast_harness_import_path(self.config.harness)
 
     def model_argument(self) -> str:
         return f"{self.config.model.provider}/{self.config.model.name}"
@@ -79,7 +83,7 @@ class ClaudeCodeCliAdapter(AgentAdapter):
         env: dict[str, str] = {}
         cli_path = self._resolve_cli()
         env[self.CLI_ENV_VAR] = cli_path
-        return with_agent_pythonpath(env)
+        return with_harness_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
         # Ensure Claude Code trace artifacts always have a stable home.

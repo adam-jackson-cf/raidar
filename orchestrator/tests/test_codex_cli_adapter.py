@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 
 from raidar.agents.adapters.codex_cli import CodexCliAdapter
-from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
+from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 
-def _config(model: str, provider: str = "codex") -> AgentRunConfig:
-    return AgentRunConfig(
-        agent=Agent.CODEX_CLI,
+def _config(model: str, provider: str = "codex") -> AgentSpec:
+    return AgentSpec(
+        harness=Harness.CODEX_CLI,
         model=ModelTarget(provider=provider, name=model),
     )
 

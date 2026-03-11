@@ -5,12 +5,12 @@ from pathlib import Path
 import pytest
 
 from raidar.agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
+from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 
-def _config(model: str, provider: str = "anthropic") -> AgentRunConfig:
-    return AgentRunConfig(
-        agent=Agent.CLAUDE_CODE,
+def _config(model: str, provider: str = "anthropic") -> AgentSpec:
+    return AgentSpec(
+        harness=Harness.CLAUDE_CODE,
         model=ModelTarget(provider=provider, name=model),
     )
 

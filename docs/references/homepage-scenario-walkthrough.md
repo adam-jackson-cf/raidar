@@ -12,7 +12,7 @@ Use the homepage scenario as the reference example for how Raidar scenario desig
 ## Scenario Anatomy
 
 - `prompt/task.md` defines the user-facing job: implement the page, run the required verification commands, cover every requirement with tests, and only report completion after those commands succeed.
-- `starter/` defines the baseline workspace the agent starts from.
+- `starter/` defines the baseline workspace the harness starts from.
 - `rules/` defines local coding guidance for the scenario. These rules should support the scenario contract rather than redefine conflicting gates.
 - `verification.required_commands` defines the commands the run is expected to satisfy before completion.
 - `verification.gates` defines the tracked gate history used during scoring and stability analysis.
@@ -25,7 +25,7 @@ Use the homepage scenario as the reference example for how Raidar scenario desig
 ## What Each Layer Teaches
 
 - The prompt teaches task framing.
-- The starter teaches what the agent inherits versus what it must create.
+- The starter teaches what the harness inherits versus what it must create.
 - Verification teaches the difference between "did the workflow pass" and "did it pass consistently."
 - Acceptance teaches the difference between output requirements and toolchain success.
 - Metrics teach which signals matter for comparison, diagnosis, and ranking.
@@ -38,15 +38,15 @@ Use these supported entrypoints from the repo root:
 ```bash
 make scenario-info SCENARIO_DIR=scenarios/homepage-implementation/v001
 make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
-make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml AGENT=... MODEL=...
+make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... MODEL=...
 make experiments-list
 ```
 
-Use `make matrix-run` when you want a structured comparison across multiple models or agents instead of a single experiment run.
+Use `make matrix-run` when you want a structured comparison across multiple `AgentSpec`s instead of a single experiment run. Author the matrix config with top-level `experiment` and `agents` blocks, and set `harness` on each `agents[]` entry.
 
 ## What This Scenario Can Tell You
 
-- Can an agent build the required homepage and keep the normal quality workflow intact?
+- Can a harness build the required homepage and keep the normal quality workflow intact?
 - Does it satisfy the stated business requirements, not just build successfully?
 - Does it add or update tests that actually cover those requirements?
 - Does the implementation stay visually close to the intended design?
@@ -55,7 +55,7 @@ Use `make matrix-run` when you want a structured comparison across multiple mode
 
 ## What This Scenario Cannot Tell You On Its Own
 
-- How an agent performs outside UI-heavy delivery work.
+- How a harness performs outside UI-heavy delivery work.
 - Whether a model is universally "better" rather than better for this scenario contract.
 - Whether the reference design itself was the right product choice.
 - Whether the scenario contract captures every qualitative judgment a reviewer may still care about.
@@ -64,5 +64,5 @@ Use `make matrix-run` when you want a structured comparison across multiple mode
 
 - Start with `make scenario-info` to understand the active contract.
 - Run the scenario and inspect `experiments/.../runs/*/run.json` for one-repeat details.
-- Use `experiment-summary.json` to compare repeats for the same `(scenario, revision, agent, model, evaluation_profile)` identity.
+- Use `experiment-summary.json` to compare repeats for the same `(scenario, revision, harness, model, evaluation_profile)` identity.
 - Use [analyze-results.md](/Users/adamjackson/Projects/raidar/docs/todos/analyze-results.md) for the review procedure and [metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md) when you need metric-by-metric interpretation.

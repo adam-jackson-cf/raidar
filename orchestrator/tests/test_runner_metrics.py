@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
+from raidar.agents.config import AgentSpec, Harness, ModelTarget
 from raidar.audit.workspace_diff import directory_fingerprint
 from raidar.runner import (
     EvaluationOutputs,
@@ -96,9 +96,9 @@ def _sample_scenario() -> ScenarioDefinition:
     )
 
 
-def _sample_agent_config() -> AgentRunConfig:
-    return AgentRunConfig(
-        agent=Agent.CODEX_CLI,
+def _sample_agent_config() -> AgentSpec:
+    return AgentSpec(
+        harness=Harness.CODEX_CLI,
         model=ModelTarget(provider="openai", name="gpt-5"),
         timeout_sec=1800,
     )
@@ -182,7 +182,7 @@ def _sample_scorecard_context(
         root_dir=results_dir / "runs" / "run-1234",
         workspace_dir=results_dir / "runs" / "run-1234" / "workspace",
         verifier_dir=results_dir / "runs" / "run-1234" / "verifier",
-        agent_dir=results_dir / "runs" / "run-1234" / "agent",
+        harness_dir=results_dir / "runs" / "run-1234" / "harness",
         harbor_dir=results_dir / "runs" / "run-1234" / "harbor",
         run_json_path=results_dir / "runs" / "run-1234" / "run.json",
         report_path=results_dir / "runs" / "run-1234" / "report.md",
@@ -196,7 +196,7 @@ def _sample_scorecard_context(
         ),
         terminated_early=terminated_early,
         termination_reason=termination_reason,
-        process_metrics=collect_process_metrics(_sample_scenario(), None, agent="codex-cli"),
+        process_metrics=collect_process_metrics(_sample_scenario(), None, harness="codex-cli"),
         events=[],
         outputs=_sample_evaluation_outputs(),
         duration_sec=12.5,
@@ -205,7 +205,7 @@ def _sample_scorecard_context(
         starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
         scenario_revision_meta={"scenario_yaml_hash": "abc"},
         verifier_artifacts={"scorecard": "verifier/scorecard.json"},
-        agent_artifacts={"log": "agent/codex.txt"},
+        harness_artifacts={"log": "harness/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
         evidence_artifacts={"homepage_pre": None, "homepage_post": None, "errors": []},
         workspace_prune={"removed": [], "reclaimed_bytes": 0},
@@ -240,9 +240,9 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
     start_barrier = threading.Barrier(3)
 
     def fake_prepare_workspace(
-        starter_dir: Path, target_dir: Path, scenario_dir: Path, agent: str
+        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
     ) -> tuple[Path, Path | None]:
-        del starter_dir, scenario_dir, agent
+        del starter_dir, scenario_dir, harness
         nonlocal call_count
         with call_lock:
             call_count += 1
@@ -261,7 +261,7 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
                 starter_dir=starter_dir,
                 experiment_baseline_dir=experiment_baseline_dir,
                 scenario_dir=scenario_dir,
-                agent="codex-cli",
+                harness="codex-cli",
             )
         except Exception as exc:  # pragma: no cover - assertion below surfaces failure
             failures.append(exc)
@@ -279,9 +279,9 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
 
 def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    codex_log = agent_dir / "codex.txt"
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    codex_log = harness_dir / "codex.txt"
     entries = [
         {
             "type": "item.completed",
@@ -312,7 +312,7 @@ def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
     ]
     codex_log.write_text("\n".join(json.dumps(entry) for entry in entries))
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="codex-cli")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
 
     assert metrics.uncached_input_tokens == 750
     assert metrics.output_tokens == 100
@@ -332,9 +332,9 @@ def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
 
 def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    codex_log = agent_dir / "codex.txt"
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    codex_log = harness_dir / "codex.txt"
     entries = [
         {
             "type": "item.completed",
@@ -403,7 +403,7 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
         }
     )
 
-    metrics = collect_process_metrics(scenario, trial_dir, agent="codex-cli")
+    metrics = collect_process_metrics(scenario, trial_dir, harness="codex-cli")
 
     assert metrics.required_verification_commands == 2
     assert metrics.executed_required_verification_commands == 2
@@ -411,9 +411,9 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
 
 def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "gemini-cli.trajectory.json").write_text(
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "gemini-cli.trajectory.json").write_text(
         json.dumps({"messages": [{"tokens": {"input": 20, "cached": 5, "output": 3}}]})
     )
     command_dir = trial_dir / "agent" / "command-0"
@@ -429,7 +429,7 @@ def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
 
     assert metrics.command_count == 3
     assert metrics.failed_command_count == 0
@@ -442,9 +442,9 @@ def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_
 
 def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "gemini-cli.trajectory.json").write_text(
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "gemini-cli.trajectory.json").write_text(
         json.dumps(
             {
                 "messages": [
@@ -463,7 +463,7 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -507,9 +507,9 @@ def test_normalized_shell_subcommands_handles_heredoc_followed_by_verification()
 
 def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "gemini-cli.trajectory.json").write_text(
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "gemini-cli.trajectory.json").write_text(
         json.dumps({"messages": [{"tokens": {"input": 10, "cached": 2, "output": 1}}]})
     )
     command_dir = trial_dir / "agent" / "command-0"
@@ -519,7 +519,7 @@ def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
         "the implementation with a successful build and typecheck."
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -586,7 +586,7 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="claude-code")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
 
     assert metrics.command_count == 2
     assert metrics.failed_command_count == 0
@@ -599,9 +599,9 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
 
 def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "claude-code.txt").write_text(
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "claude-code.txt").write_text(
         "\n".join(
             [
                 json.dumps(
@@ -654,7 +654,7 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="claude-code")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -666,9 +666,9 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
 
 def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "claude-code.txt").write_text(
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "claude-code.txt").write_text(
         "\n".join(
             [
                 json.dumps(
@@ -699,7 +699,7 @@ def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="claude-code")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
 
     assert metrics.uncached_input_tokens == 600
     assert metrics.output_tokens == 111
@@ -707,9 +707,9 @@ def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
 
 def test_collect_process_metrics_extracts_gemini_usage_from_trajectory(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "gemini-cli.trajectory.json").write_text(
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "gemini-cli.trajectory.json").write_text(
         json.dumps(
             {
                 "messages": [
@@ -719,9 +719,9 @@ def test_collect_process_metrics_extracts_gemini_usage_from_trajectory(tmp_path:
             }
         )
     )
-    (agent_dir / "gemini-cli.txt").write_text("$ bun run typecheck\n")
+    (harness_dir / "gemini-cli.txt").write_text("$ bun run typecheck\n")
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
 
     assert metrics.uncached_input_tokens == 170
     assert metrics.output_tokens == 22
@@ -729,12 +729,12 @@ def test_collect_process_metrics_extracts_gemini_usage_from_trajectory(tmp_path:
 
 def test_collect_process_metrics_raises_when_usage_missing(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    agent_dir = trial_dir / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    (agent_dir / "gemini-cli.trajectory.json").write_text(json.dumps({"messages": []}))
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "gemini-cli.trajectory.json").write_text(json.dumps({"messages": []}))
 
     with pytest.raises(RuntimeError, match="Missing token usage metrics"):
-        collect_process_metrics(_sample_scenario(), trial_dir, agent="gemini")
+        collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
 
 
 def test_evaluate_coverage_reads_summary_file(tmp_path: Path):

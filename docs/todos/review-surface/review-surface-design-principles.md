@@ -1,14 +1,15 @@
 # Review Surface Design Principles
 
-This document defines the replacement for the current experiment review outputs. The target is a review surface that helps a user decide which agent configuration is stronger on a scenario, why it is stronger, how much to trust that conclusion, and what to try next. It must not behave like a metric dump.
+This document defines the replacement for the current experiment review outputs. The target is a review surface that helps a user decide which `AgentSpec` is stronger on a scenario, why it is stronger, how much to trust that conclusion, and what to try next. It must not behave like a metric dump.
 
 ## Scope and Terms
 
-- `agent configuration`: one harness plus one model, for example `codex-cli + codex/gpt-5.4`.
-- `Scenario Board`: the high-level view for one scenario, showing one representative experiment for each agent configuration.
+- `harness`: the executable/runtime surface previously called an agent.
+- `AgentSpec`: one harness plus one model, for example `codex-cli + codex/gpt-5.4`.
+- `Scenario Board`: the high-level view for one scenario, showing one representative experiment for each `AgentSpec`.
 - `Experiment Review`: the detailed view for one representative experiment, including runs, evidence, and change context.
-- `benchmark`: the pinned comparison configuration for the scenario, for example `claude-code + opus`.
-- `representative experiment`: the experiment that stands for a configuration on the board. This is not simply `latest`.
+- `benchmark`: the pinned comparison `AgentSpec` for the scenario, for example `claude-code + opus`.
+- `representative experiment`: the experiment that stands for an `AgentSpec` on the board. This is not simply `latest`.
 
 Use `Scenario Board` and `Experiment Review` in the product language. Do not call the overview a leaderboard. `Leaderboard` encourages one-number ranking and hides the actual question, which is comparative task performance.
 
@@ -18,10 +19,10 @@ Use `Scenario Board` and `Experiment Review` in the product language. Do not cal
    Every view should begin with a verdict, a primary strength, a primary weakness, and a next-step hypothesis.
 
 2. Separate absolute status from relative comparison.
-   A configuration can be below the benchmark and still meet the scenario bar. It can also be ahead of the benchmark and still have weak reliability. The surface must show both.
+   An `AgentSpec` can be below the benchmark and still meet the scenario bar. It can also be ahead of the benchmark and still have weak reliability. The surface must show both.
 
 3. Treat comparison as hierarchical, not ambiguous.
-   Benchmark comparison is primary. Previous representative experiment for the same configuration is secondary. Cohort context is optional and exploratory.
+   Benchmark comparison is primary. Previous representative experiment for the same `AgentSpec` is secondary. Cohort context is optional and exploratory.
 
 4. Make confidence first-class.
    Verdict language must weaken when the representative experiment is noisy, undersampled, or missing evidence.
@@ -30,7 +31,7 @@ Use `Scenario Board` and `Experiment Review` in the product language. Do not cal
    For a homepage implementation task, the first question is design replication. Cost and speed matter, but they are supporting context unless the task explicitly prioritizes them.
 
 6. Evidence must sit next to diagnosis.
-   If the surface says a configuration is weak on scenario fidelity, the user should be able to inspect the relevant screenshots, diffs, regions, or equivalent scenario-family evidence immediately.
+   If the surface says an `AgentSpec` is weak on scenario fidelity, the user should be able to inspect the relevant screenshots, diffs, regions, or equivalent scenario-family evidence immediately.
 
 7. Missing signals must be explicit.
    `Unavailable` is a valid state. Missing judge output, missing regional evidence, or insufficient run count must never collapse into an implied pass.
@@ -45,7 +46,7 @@ The board must not use `latest experiment` as its default unit. It must use a de
 Recommended rule:
 
 1. Start from the current scenario revision only.
-2. Select the latest completed experiment for the configuration that meets the minimum scored-run threshold for that scenario family.
+2. Select the latest completed experiment for the `AgentSpec` that meets the minimum scored-run threshold for that scenario family.
 3. If no experiment meets the minimum threshold, show the best available completed experiment as `Low Confidence` instead of pretending it is normal.
 4. If only incomplete or unscored experiments exist, show `Unavailable`.
 
@@ -56,8 +57,8 @@ The representative-result rule must be visible in the product so the user knows 
 The surface should support three comparison modes, with clear priority.
 
 - `Benchmark delta`: primary comparison. This answers, `Are we better, worse, or at parity with the pinned benchmark?`
-- `Self-trend`: secondary comparison. This answers, `Did the last change improve or regress this configuration?`
-- `Cohort standing`: tertiary comparison. This answers, `Where does this configuration sit among the current scenario cohort?`
+- `Self-trend`: secondary comparison. This answers, `Did the last change improve or regress this `AgentSpec`?`
+- `Cohort standing`: tertiary comparison. This answers, `Where does this `AgentSpec` sit among the current scenario cohort?`
 
 Do not silently substitute `current best valid configuration` for a benchmark. If no benchmark is pinned, say so explicitly.
 
@@ -71,7 +72,7 @@ The review surface should derive a small set of stable dimensions plus a separat
 | --- | --- | --- |
 | `Task Fidelity` | Did the implementation satisfy the authored task and hard acceptance bar? | `functional`, `acceptance`, `requirements_coverage`, `llm-judge` |
 | `Scenario Fidelity` | How closely did the output match the scenario-specific target? | `visual` for UI tasks, equivalent scenario-family evidence for non-visual tasks |
-| `Workflow Discipline` | Did the agent behave cleanly around required verification and iteration? | required verification commands, first-pass verification success, repeat failures, gate history |
+| `Workflow Discipline` | Did the harness behave cleanly around required verification and iteration? | required verification commands, first-pass verification success, repeat failures, gate history |
 | `Execution Reliability` | Did the run complete cleanly and preserve evaluation validity? | `execution_validity`, termination reason, timeout / early termination signals |
 | `Confidence` | How much trust should the product place in the verdict? | scored run count, reruns, unscored rate, cross-run variance, missing evidence |
 
@@ -96,7 +97,7 @@ The surface needs explicit derivation rules before implementation. The product s
 - Deterministic authored failures dominate this dimension.
 - Requirement coverage and requirement-to-test mapping cannot contradict deterministic failures without explanation.
 - LLM judge findings can enrich diagnosis, but they cannot rescue deterministic failures.
-- A configuration that fails a core authored check must not present as broadly strong because softer submetrics averaged well.
+- An `AgentSpec` that fails a core authored check must not present as broadly strong because softer submetrics averaged well.
 
 ### Scenario Fidelity Rules
 
@@ -107,7 +108,7 @@ The surface needs explicit derivation rules before implementation. The product s
 
 ### Workflow Discipline Rules
 
-- This dimension is about agent behavior, not task outcome.
+- This dimension is about harness behavior, not task outcome.
 - Required verification command execution and first-pass verification success belong here.
 - Outcome failures that are really authored-task failures should not be misbucketed as workflow failures.
 
@@ -134,7 +135,7 @@ The surface needs explicit derivation rules before implementation. The product s
 
 The `Scenario Board` is the fast view for one scenario. It answers:
 
-- Which agent configurations are worth inspecting?
+- Which `AgentSpec`s are worth inspecting?
 - Which ones meet the scenario bar?
 - Which ones are ahead or behind the benchmark?
 - How much confidence should we place in each conclusion?

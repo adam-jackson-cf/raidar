@@ -14,7 +14,7 @@ This document defines the evidence contract for the review surface. The goal is 
 
 Every representative experiment should expose the following envelope before scenario-family details are rendered:
 
-- review identity: scenario, revision, agent, model, evaluation profile
+- review identity: scenario, revision, harness, model, evaluation profile
 - representative selection reason
 - benchmark identity and compatibility status
 - previous representative experiment, when available
@@ -132,7 +132,7 @@ Rules:
 
 ## Change-Context Requirements
 
-Every Experiment Review should show what changed since the previous representative experiment for the same configuration.
+Every Experiment Review should show what changed since the previous representative experiment for the same `AgentSpec`.
 
 The change context model must surface:
 

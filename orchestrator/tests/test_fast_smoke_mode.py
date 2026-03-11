@@ -3,21 +3,21 @@
 from pathlib import Path
 
 from raidar.agents.adapters.gemini_cli import GeminiCliAdapter
-from raidar.agents.config import Agent, AgentRunConfig, ModelTarget
-from raidar.agents.fast_mode import agent_src_path
+from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.agents.fast_mode import harness_src_path
 
 
 def _gemini_adapter(monkeypatch) -> GeminiCliAdapter:
     monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
-    config = AgentRunConfig(
-        agent=Agent.GEMINI,
+    config = AgentSpec(
+        harness=Harness.GEMINI,
         model=ModelTarget(provider="google", name="gemini-3-flash-preview"),
     )
     return GeminiCliAdapter(config)
 
 
-def test_fast_mode_uses_agent_import_path(monkeypatch) -> None:
+def test_fast_mode_uses_harness_import_path(monkeypatch) -> None:
     monkeypatch.setenv("HARBOR_SMOKE_FAST", "1")
     adapter = _gemini_adapter(monkeypatch)
 
@@ -39,4 +39,4 @@ def test_fast_mode_runtime_env_includes_pythonpath(monkeypatch) -> None:
     env = adapter.runtime_env()
 
     assert "PYTHONPATH" in env
-    assert str(agent_src_path()) in env["PYTHONPATH"]
+    assert str(harness_src_path()) in env["PYTHONPATH"]

@@ -6,7 +6,7 @@ Borrowed from enaible's install.py SYSTEM_RULES pattern.
 import shutil
 from pathlib import Path
 
-# Mapping from CLI/agent name to expected rule filename
+# Mapping from harness id to expected rule filename
 SYSTEM_RULES: dict[str, str] = {
     "claude-code": "CLAUDE.md",
     "codex-cli": "AGENTS.md",
@@ -17,29 +17,29 @@ SYSTEM_RULES: dict[str, str] = {
 }
 
 
-def get_rule_filename(agent: str) -> str:
-    """Get the rule filename for a given agent."""
-    if agent not in SYSTEM_RULES:
-        raise ValueError(f"Unknown agent '{agent}'. Supported: {list(SYSTEM_RULES.keys())}")
-    return SYSTEM_RULES[agent]
+def get_rule_filename(harness: str) -> str:
+    """Get the rule filename for a given harness."""
+    if harness not in SYSTEM_RULES:
+        raise ValueError(f"Unknown harness '{harness}'. Supported: {list(SYSTEM_RULES.keys())}")
+    return SYSTEM_RULES[harness]
 
 
 def inject_rules(
     scenario_rules_dir: Path,
     target_dir: Path,
-    agent: str,
+    harness: str,
 ) -> Path:
-    """Inject rule file for the specified agent into target directory.
+    """Inject rule file for the specified harness into target directory.
 
     Args:
         scenario_rules_dir: Path to scenario rules directory
         target_dir: Path to workspace target directory
-        agent: Agent name (claude-code, codex, etc)
+        harness: Harness id (claude-code, codex-cli, etc)
 
     Returns:
         Path to injected rule file
     """
-    target_filename = get_rule_filename(agent)
+    target_filename = get_rule_filename(harness)
     if not scenario_rules_dir.exists():
         raise FileNotFoundError(f"Rules directory not found: {scenario_rules_dir}")
 
@@ -49,7 +49,7 @@ def inject_rules(
         # Try finding any markdown file in the rules directory
         md_files = list(scenario_rules_dir.glob("*.md"))
         if not md_files:
-            raise FileNotFoundError(f"No rule file found for {agent} in {scenario_rules_dir}")
+            raise FileNotFoundError(f"No rule file found for {harness} in {scenario_rules_dir}")
         source_file = md_files[0]
 
     target_path = target_dir / target_filename

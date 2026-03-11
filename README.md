@@ -2,7 +2,7 @@
 
 <h1>Raidar</h1>
 
-**Scenario evaluation of CLI agent + model pairs to improve delivery performance using Harbor-based runs**
+**Scenario evaluation of CLI harness + model pairs (`AgentSpec`s) to improve delivery performance using Harbor-based runs**
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.11%2B-blue.svg?style=flat-square)
@@ -17,7 +17,7 @@ Prerequisites:
 
 - `uv`
 - Docker with `docker compose`
-- at least one agent API key in `orchestrator/.env`
+- at least one harness/provider API key in `orchestrator/.env`
 
 Bootstrap the environment:
 
@@ -30,13 +30,13 @@ Use `make help` from the repo root for the supported command surface and target 
 
 ## Quick Start
 
-Run one smoke experiment:
+Run one smoke experiment for one `AgentSpec` (`harness + model`).
 
 ```bash
-make agent-validate AGENT=codex-cli MODEL=codex/gpt-5.4-high
+make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-high
 make experiment-run \
   SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
-  AGENT=codex-cli \
+  HARNESS=codex-cli \
   MODEL=codex/gpt-5.4-high \
   RUN_COUNT=1 \
   RUN_PARALLELISM=1 \
@@ -44,6 +44,24 @@ make experiment-run \
 ```
 
 This writes canonical artifacts into `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
+
+Author matrix configs with the refactored public schema:
+
+```yaml
+matrix:
+  experiment:
+    timeout_sec: 1800
+    repeats: 3
+    repeat_parallel: 1
+    retry_void: 1
+  agents:
+    - harness: codex-cli
+      model: codex/gpt-5.4-high
+    - harness: claude-code
+      model: anthropic/claude-sonnet-4-5
+```
+
+Then run `make matrix-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml CONFIG=matrix.yaml`.
 
 ## What Raidar Does
 
@@ -53,30 +71,35 @@ The repository has three primary concerns:
 - `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
 
-Raidar is built to answer one practical question: how well does a given agent and model perform against delivery scenarios that look like real project work. It helps you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions.
+Raidar is built to answer one practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It helps you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions.
 
 ## Experiment Flow
 
 1. Define a scenario contract in `scenarios/.../scenario.yaml` plus prompt, rules, starter, and optional visual reference.
-2. Validate the agent/model pair and the scenario contract before running.
-3. Run one experiment for one agent/model pair, or use `make matrix-run` when you want a structured comparison across a config.
+2. Validate the harness/model pair and the scenario contract before running.
+3. Run one experiment for one `AgentSpec`, or use `make matrix-run` when you want a structured comparison across a matrix config.
 4. Review artifacts in `experiments/`, especially `run.json`, `experiment-summary.json`, and `report.md`.
-5. Use the evidence to improve prompts, rules, starter quality, scenario design, or the agent/model choice.
+5. Use the evidence to improve prompts, rules, starter quality, scenario design, or the `AgentSpec` choice.
 
 ## Questions This Helps Answer
 
-- Which agent/model pair produces the most reliable result for a given scenario?
+- Which `AgentSpec` produces the most reliable result for a given scenario?
 - Where is a result failing: functional correctness, acceptance, verification stability, execution validity, visual quality, or efficiency?
-- Does an agent satisfy the stated scenario requirements and back them with tests?
+- Does a harness satisfy the stated scenario requirements and back them with tests?
 - Does a visually sensitive scenario stay close to the intended reference design?
 - Are repeated runs stable enough to trust for ranking and decision-making?
 
 ## Core Concepts
 
 - A `scenario` is the contract: prompt, rules, starter, verification settings, acceptance requirements, metrics, and optional visual baseline.
-- An `experiment` is one agent/model pair run against one scenario, usually with repeats.
-- A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and agent logs.
+- A `harness` is the executable/runtime surface previously referred to as an agent.
+- An `AgentSpec` is one harness plus one model.
+- An `experiment` is one `AgentSpec` run against one scenario, usually with repeats.
+- A `matrix config` uses top-level `experiment` and `agents` blocks; each entry in `agents` must declare a `harness` and `model`.
+- A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and harness logs.
 - An `evaluation_profile` is the ordered metric capability set derived from `metrics[]`; use it as part of the identity when comparing experiments.
+
+Canonical artifact paths use `runs/` and `harness/` under each experiment.
 
 ## Go Deeper
 

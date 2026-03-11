@@ -1,1 +1,1 @@
-"""Scenario orchestrator for testing agent/model combinations with Harbor."""
+"""Scenario orchestrator for testing AgentSpecs with Harbor."""

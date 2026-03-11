@@ -11,11 +11,12 @@ This document defines the derivation model for the review surface. It does not r
 
 ## Canonical Units
 
-- `review identity`: `(scenario_name, scenario_revision, agent, model, evaluation_profile)`.
+- `review identity`: `(scenario_name, scenario_revision, harness, model, evaluation_profile)`.
 - `representative experiment`: the single experiment chosen to represent one review identity on the Scenario Board.
 - `review run set`: all scored runs inside the representative experiment.
 - `benchmark identity`: the pinned review identity for the same scenario and revision. There is no silent fallback to `current best`.
 - `evidence anchor run`: the run shown first in detail-view evidence blocks. For visual scenarios, this should be the valid scored run closest to the experiment median on `Scenario Fidelity`.
+
 
 ## Representative Experiment Selection
 
@@ -26,7 +27,7 @@ The Scenario Board must select one representative experiment per review identity
 3. For each remaining experiment, compute sample adequacy against the scenario-family threshold table below.
 4. Prefer the most recent experiment that meets the minimum scored-run threshold.
 5. If no experiment meets the threshold, choose the most recent experiment with at least one scored run and mark it `Low Confidence`.
-6. If no completed experiment has any scored runs, mark the configuration `Unavailable`.
+6. If no completed experiment has any scored runs, mark the `AgentSpec` `Unavailable`.
 
 ### Minimum Scored-Run Thresholds
 
@@ -107,7 +108,7 @@ Rules:
 
 ### Workflow Discipline
 
-`Workflow Discipline` measures whether the agent behaved cleanly around verification and iteration.
+`Workflow Discipline` measures whether the harness behaved cleanly around verification and iteration.
 
 | Component | Input | Weight |
 | --- | --- | --- |

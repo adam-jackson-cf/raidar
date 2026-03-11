@@ -20,7 +20,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .agents.config import AgentRunConfig
+from .agents.config import AgentSpec
 from .agents.fast_mode import (
     fast_image_prefix,
     is_fast_image_reuse_enabled,
@@ -135,7 +135,7 @@ KEYWORD_COMMAND_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("bun run test", ("run test", "test command", "testing", "tests")),
     ("bun run build", ("build", "compil", "next build")),
 )
-AGENT_NPM_PACKAGES: dict[str, str] = {
+HARNESS_NPM_PACKAGES: dict[str, str] = {
     "codex-cli": "@openai/codex",
     "claude-code": "@anthropic-ai/claude-code",
     "gemini": "@google/gemini-cli",
@@ -199,7 +199,7 @@ class RunRequest:
     """Input bundle for running a scenario."""
 
     scenario: ScenarioDefinition
-    config: AgentRunConfig
+    config: AgentSpec
     scenario_dir: Path
     execution_dir: Path
     repeat_index: int = 1
@@ -253,7 +253,7 @@ class CommandRecord:
 
 @dataclass(frozen=True, slots=True)
 class ProcessMetrics:
-    """Process metrics extracted from Harbor agent logs."""
+    """Process metrics extracted from Harbor harness logs."""
 
     uncached_input_tokens: int
     output_tokens: int
@@ -281,7 +281,7 @@ class RunLayout:
     root_dir: Path
     workspace_dir: Path
     verifier_dir: Path
-    agent_dir: Path
+    harness_dir: Path
     harbor_dir: Path
     run_json_path: Path
     report_path: Path
@@ -333,7 +333,7 @@ class PersistedArtifacts:
     starter_meta: dict
     scenario_revision_meta: dict[str, str | None]
     verifier_artifacts: dict[str, str]
-    agent_artifacts: dict[str, str]
+    harness_artifacts: dict[str, str]
     harbor_artifacts: dict[str, str]
     evidence_artifacts: dict[str, Any]
     workspace_prune: dict[str, Any]
@@ -379,7 +379,7 @@ def _ensure_experiment_baseline_workspace(
     starter_dir: Path,
     experiment_baseline_dir: Path,
     scenario_dir: Path,
-    agent: str,
+    harness: str,
 ) -> None:
     with _experiment_baseline_lock(experiment_baseline_dir):
         if experiment_baseline_dir.exists():
@@ -388,7 +388,7 @@ def _ensure_experiment_baseline_workspace(
             starter_dir=starter_dir,
             target_dir=experiment_baseline_dir,
             scenario_dir=scenario_dir,
-            agent=agent,
+            harness=harness,
         )
 
 
@@ -959,7 +959,7 @@ def prepare_workspace(
     starter_dir: Path,
     target_dir: Path,
     scenario_dir: Path,
-    agent: str,
+    harness: str,
 ) -> tuple[Path, Path | None]:
     """Prepare workspace by copying the starter and injecting rules.
 
@@ -967,7 +967,7 @@ def prepare_workspace(
         starter_dir: Path to resolved starter template/version
         target_dir: Path to create workspace
         scenario_dir: Path to scenario directory (contains rules/)
-        agent: Agent name for rule file selection
+        harness: Harness id for rule file selection
     Returns:
         Tuple of workspace path and injected rules file (if any)
     """
@@ -985,7 +985,7 @@ def prepare_workspace(
     injected_rules: Path | None = None
     rules_dir = scenario_dir / "rules"
     if rules_dir.exists():
-        injected_rules = inject_rules(rules_dir, target_dir, agent)
+        injected_rules = inject_rules(rules_dir, target_dir, harness)
 
     return target_dir, injected_rules
 
@@ -1128,8 +1128,8 @@ def _task_environment_toml(image_name: str | None) -> str:
     return "\n".join(lines)
 
 
-def _agent_npm_package(agent: str) -> str | None:
-    return AGENT_NPM_PACKAGES.get(agent)
+def _harness_npm_package(harness: str) -> str | None:
+    return HARNESS_NPM_PACKAGES.get(harness)
 
 
 def _docker_image_exists(image_name: str, run_env: dict[str, str]) -> bool:
@@ -1291,7 +1291,7 @@ def _render_environment_dockerfile(request: RunRequest) -> str:
     dockerfile = """FROM oven/bun:1
 WORKDIR /app
 """
-    cli_package = _agent_npm_package(request.config.agent.value)
+    cli_package = _harness_npm_package(request.config.harness.value)
     if cli_package:
         dockerfile += """RUN apt-get update && apt-get install -y --no-install-recommends \\
   npm \\
@@ -1399,9 +1399,9 @@ def initialize_run(request: RunRequest) -> RunLayout:
         shutil.rmtree(root_dir)
     workspace_dir = root_dir / "workspace"
     verifier_dir = root_dir / "verifier"
-    agent_dir = root_dir / "agent"
+    harness_dir = root_dir / "harness"
     harbor_dir = root_dir / "harbor"
-    for path in (workspace_dir, verifier_dir, agent_dir, harbor_dir):
+    for path in (workspace_dir, verifier_dir, harness_dir, harbor_dir):
         path.mkdir(parents=True, exist_ok=True)
     return RunLayout(
         run_id=run_id,
@@ -1410,7 +1410,7 @@ def initialize_run(request: RunRequest) -> RunLayout:
         root_dir=root_dir,
         workspace_dir=workspace_dir,
         verifier_dir=verifier_dir,
-        agent_dir=agent_dir,
+        harness_dir=harness_dir,
         harbor_dir=harbor_dir,
         run_json_path=root_dir / "run.json",
         report_path=root_dir / "report.md",
@@ -1433,7 +1433,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
         starter_dir=starter_source.path,
         experiment_baseline_dir=experiment_baseline_dir,
         scenario_dir=request.scenario_dir,
-        agent=request.config.agent.value,
+        harness=request.config.harness.value,
     )
 
     workspace_dir = _repeat_workspace_dir(request)
@@ -1447,7 +1447,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
     )
 
     injected_rules: Path | None = None
-    injected_rule_name = SYSTEM_RULES.get(request.config.agent.value)
+    injected_rule_name = SYSTEM_RULES.get(request.config.harness.value)
     if injected_rule_name:
         candidate = workspace_dir / injected_rule_name
         if candidate.exists():
@@ -1522,7 +1522,7 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
 
 
 def _harbor_process_timeout(task_timeout_sec: int) -> int:
-    """Allow Harbor build + verifier overhead beyond agent task timeout."""
+    """Allow Harbor build + verifier overhead beyond harness task timeout."""
     return max(task_timeout_sec + HARBOR_TIMEOUT_BUFFER_SEC, int(task_timeout_sec * 1.25))
 
 
@@ -1725,8 +1725,8 @@ def _harbor_phase_timings(trial_dir: Path | None) -> dict[str, float]:
     timings = {
         "trial_total_sec": _duration_seconds(payload.get("started_at"), payload.get("finished_at")),
         "environment_setup_sec": _phase_duration(payload, "environment_setup"),
-        "agent_setup_sec": _phase_duration(payload, "agent_setup"),
-        "agent_execution_sec": _phase_duration(payload, "agent_execution"),
+        "harness_setup_sec": _phase_duration(payload, "agent_setup"),
+        "harness_execution_sec": _phase_duration(payload, "agent_execution"),
         "verifier_sec": _phase_duration(payload, "verifier"),
     }
     return {key: value for key, value in timings.items() if value is not None}
@@ -1875,10 +1875,10 @@ def persist_verifier_artifacts(
     return copied
 
 
-def persist_agent_artifacts(
-    harbor_result: HarborExecutionResult, agent_dir: Path
+def persist_harness_artifacts(
+    harbor_result: HarborExecutionResult, harness_dir: Path
 ) -> dict[str, str]:
-    """Persist Harbor agent transcripts and command history."""
+    """Persist Harbor harness transcripts and command history."""
     if not harbor_result.trial_dir:
         return {}
     source = harbor_result.trial_dir / "agent"
@@ -1897,20 +1897,20 @@ def persist_agent_artifacts(
     ):
         src = source / filename
         if src.exists():
-            copied[filename] = str(shutil.copy2(src, agent_dir / filename))
-    final_app = agent_dir / "final-app.tar.gz"
+            copied[filename] = str(shutil.copy2(src, harness_dir / filename))
+    final_app = harness_dir / "final-app.tar.gz"
     if final_app.exists():
         copied["project.final.tar.gz"] = str(
-            shutil.copy2(final_app, agent_dir / "project.final.tar.gz")
+            shutil.copy2(final_app, harness_dir / "project.final.tar.gz")
         )
 
     setup_dir = source / "setup"
     if setup_dir.exists():
-        target = agent_dir / "setup"
+        target = harness_dir / "setup"
         shutil.copytree(setup_dir, target, dirs_exist_ok=True)
         copied["setup"] = str(target)
 
-    commands_dir = agent_dir / "commands"
+    commands_dir = harness_dir / "commands"
     commands_dir.mkdir(parents=True, exist_ok=True)
     for command_dir in sorted(source.glob("command-*")):
         if not command_dir.is_dir():
@@ -1954,7 +1954,7 @@ def write_run_analysis(
         f"- run_id: `{layout.run_id}`",
         f"- started_at_utc: `{layout.start_time.isoformat()}`",
         f"- scenario: `{request.scenario.name}`",
-        f"- agent: `{request.config.agent.value}`",
+        f"- harness: `{request.config.harness.value}`",
         f"- model: `{request.config.model.qualified_name}`",
         f"- run_label: `{layout.run_label}`",
         f"- execution_valid: `{scorecard.execution_validity.passed}`",
@@ -1973,10 +1973,10 @@ def write_run_analysis(
         "",
         "## Key Artifacts",
         f"- verifier_scorecard: `{layout.verifier_dir / 'scorecard.json'}`",
-        f"- agent_trajectory: `{layout.agent_dir / 'trajectory.json'}`",
+        f"- harness_trajectory: `{layout.harness_dir / 'trajectory.json'}`",
     ]
-    event_stream = _agent_event_stream_pointer(layout.agent_dir, request.config.agent.value)
-    lines.append(f"- agent_event_stream: `{event_stream}`")
+    event_stream = _harness_event_stream_pointer(layout.harness_dir, request.config.harness.value)
+    lines.append(f"- harness_event_stream: `{event_stream}`")
     lines.append(f"- homepage_pre_screenshot: `{evidence_meta.get('homepage_pre')}`")
     lines.append(f"- homepage_post_screenshot: `{evidence_meta.get('homepage_post')}`")
     lines.append(f"- final_workspace_archive: `{evidence_meta.get('final_workspace_archive')}`")
@@ -1990,20 +1990,20 @@ def write_run_analysis(
     layout.report_path.write_text("\n".join(lines) + "\n")
 
 
-def _agent_event_stream_pointer(agent_dir: Path, agent: str) -> Path:
-    if agent == "codex-cli":
-        return agent_dir / "codex.txt"
-    if agent == "claude-code":
-        return agent_dir / "commands"
-    if agent == "gemini":
-        return agent_dir / "commands"
-    if agent == "cursor":
-        return agent_dir / "commands"
-    if agent == "copilot":
-        return agent_dir / "commands"
-    if agent == "pi":
-        return agent_dir / "commands"
-    raise ValueError(f"Unsupported agent for artifact summary: {agent}")
+def _harness_event_stream_pointer(harness_dir: Path, harness: str) -> Path:
+    if harness == "codex-cli":
+        return harness_dir / "codex.txt"
+    if harness == "claude-code":
+        return harness_dir / "commands"
+    if harness == "gemini":
+        return harness_dir / "commands"
+    if harness == "cursor":
+        return harness_dir / "commands"
+    if harness == "copilot":
+        return harness_dir / "commands"
+    if harness == "pi":
+        return harness_dir / "commands"
+    raise ValueError(f"Unsupported harness for artifact summary: {harness}")
 
 
 def _read_jsonl_dicts(path: Path) -> list[dict]:
@@ -2336,19 +2336,19 @@ def _usage_from_gemini_trajectory(trial_dir: Path) -> tuple[int, int, int] | Non
     return input_tokens, cached_tokens, output_tokens
 
 
-def _usage_tuple_for_agent(trial_dir: Path, agent: str) -> tuple[int, int, int] | None:
+def _usage_tuple_for_harness(trial_dir: Path, harness: str) -> tuple[int, int, int] | None:
     trial_usage = _usage_from_trial_result(trial_dir)
     if trial_usage:
         return trial_usage
-    if agent == "codex-cli":
+    if harness == "codex-cli":
         return _usage_from_codex_log(trial_dir)
-    if agent == "claude-code":
+    if harness == "claude-code":
         return _usage_from_claude_log(trial_dir)
-    if agent == "gemini":
+    if harness == "gemini":
         return _usage_from_gemini_trajectory(trial_dir)
-    if agent in {"cursor", "copilot", "pi"}:
+    if harness in {"cursor", "copilot", "pi"}:
         return None
-    raise ValueError(f"Unsupported agent for usage extraction: {agent}")
+    raise ValueError(f"Unsupported harness for usage extraction: {harness}")
 
 
 def _command_output(item: dict) -> str:
@@ -2384,47 +2384,47 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
     return records
 
 
-def _command_records_for_agent(trial_dir: Path, agent: str) -> list[CommandRecord]:
-    if agent == "codex-cli":
+def _command_records_for_harness(trial_dir: Path, harness: str) -> list[CommandRecord]:
+    if harness == "codex-cli":
         return _command_records(_read_jsonl_dicts(trial_dir / "agent" / "codex.txt"))
-    if agent == "claude-code":
+    if harness == "claude-code":
         return _command_records_from_claude_stdout(trial_dir)
-    if agent == "gemini":
-        stdout_records = _command_records_from_agent_stdout(
+    if harness == "gemini":
+        stdout_records = _command_records_from_harness_stdout(
             trial_dir,
             additional_stdout_files=("gemini-cli.txt",),
         )
         if stdout_records:
             return stdout_records
         return _command_records_from_gemini_trajectory(trial_dir)
-    if agent == "cursor":
-        return _command_records_from_agent_stdout(trial_dir)
-    if agent == "copilot":
-        return _command_records_from_agent_stdout(trial_dir)
-    if agent == "pi":
-        return _command_records_from_agent_stdout(trial_dir)
-    raise ValueError(f"Unsupported agent for command extraction: {agent}")
+    if harness == "cursor":
+        return _command_records_from_harness_stdout(trial_dir)
+    if harness == "copilot":
+        return _command_records_from_harness_stdout(trial_dir)
+    if harness == "pi":
+        return _command_records_from_harness_stdout(trial_dir)
+    raise ValueError(f"Unsupported harness for command extraction: {harness}")
 
 
-def _agent_emits_structured_trace_events(agent: str) -> bool:
-    if agent == "codex-cli":
+def _harness_emits_structured_trace_events(harness: str) -> bool:
+    if harness == "codex-cli":
         return True
-    if agent in {"claude-code", "gemini", "cursor", "copilot", "pi"}:
+    if harness in {"claude-code", "gemini", "cursor", "copilot", "pi"}:
         return False
-    raise ValueError(f"Unsupported agent for trace event extraction: {agent}")
+    raise ValueError(f"Unsupported harness for trace event extraction: {harness}")
 
 
-def _command_records_from_agent_stdout(
+def _command_records_from_harness_stdout(
     trial_dir: Path,
     *,
     additional_stdout_files: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
-    agent_dir = trial_dir / "agent"
-    if not agent_dir.exists():
+    harness_dir = trial_dir / "agent"
+    if not harness_dir.exists():
         return []
     records: list[CommandRecord] = []
-    stdout_paths: list[Path] = sorted(agent_dir.glob("command-*/stdout.txt"))
-    stdout_paths.extend(agent_dir / name for name in additional_stdout_files)
+    stdout_paths: list[Path] = sorted(harness_dir.glob("command-*/stdout.txt"))
+    stdout_paths.extend(harness_dir / name for name in additional_stdout_files)
     for stdout_path in stdout_paths:
         if not stdout_path.exists():
             continue
@@ -2799,21 +2799,21 @@ def collect_process_metrics(
     scenario: ScenarioDefinition,
     trial_dir: Path | None,
     *,
-    agent: str,
+    harness: str,
 ) -> ProcessMetrics:
-    """Collect resource-efficiency metrics from agent execution logs."""
+    """Collect resource-efficiency metrics from harness execution logs."""
     if not trial_dir:
         return _empty_process_metrics()
 
-    usage_tuple = _usage_tuple_for_agent(trial_dir, agent)
+    usage_tuple = _usage_tuple_for_harness(trial_dir, harness)
     if usage_tuple is None:
         raise RuntimeError(
-            f"Missing token usage metrics for agent `{agent}` in trial `{trial_dir}`."
+            f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`."
         )
     input_tokens, cached_input_tokens, output_tokens = usage_tuple
     uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
 
-    records = _command_records_for_agent(trial_dir, agent)
+    records = _command_records_for_harness(trial_dir, harness)
     verification_patterns = _verification_command_strings(scenario)
     attempts_by_pattern, failures_by_pattern = _verification_attempts(
         records, verification_patterns
@@ -2905,12 +2905,12 @@ def _events_from_item(timestamp: str, item: dict) -> list[TraceEvent]:
 def collect_trace_events(
     trial_dir: Path | None,
     *,
-    agent: str,
+    harness: str,
 ) -> list[TraceEvent]:
-    """Project agent logs into normalized trace events."""
+    """Project harness logs into normalized trace events."""
     if not trial_dir:
         return []
-    if not _agent_emits_structured_trace_events(agent):
+    if not _harness_emits_structured_trace_events(harness):
         return []
 
     events: list[TraceEvent] = []
@@ -3166,7 +3166,7 @@ def _completion_claim_consistent(events: list[TraceEvent], gates_passed: bool) -
         return GateCheck(
             name="completion_claim_integrity",
             passed=False,
-            evidence="Agent claimed completion before all quality gates were passing.",
+            evidence="Harness run claimed completion before all quality gates were passing.",
         )
     evidence = (
         "No completion claim detected."
@@ -3248,7 +3248,7 @@ def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
 
 
 def _classify_unscored_reasons(terminated_early: bool, termination_reason: str | None) -> list[str]:
-    """Classify agent/provider issues that unscore a run and require a rerun."""
+    """Classify harness/provider issues that unscore a run and require a rerun."""
     if not terminated_early and not termination_reason:
         return []
 
@@ -3258,7 +3258,7 @@ def _classify_unscored_reasons(terminated_early: bool, termination_reason: str |
         ("compose_version_unsupported", ("unsupported docker compose version",)),
         ("provider_rate_limit", ("rate limit",)),
         ("provider_stream_disconnect", ("stream disconnected before completion",)),
-        ("agent_unavailable", ("harbor not installed",)),
+        ("harness_unavailable", ("harbor not installed",)),
         ("harbor_cli_failure", ("harbor exited with code",)),
         ("harbor_trial_exception", ("harbor trial exception",)),
     ]
@@ -3267,7 +3267,7 @@ def _classify_unscored_reasons(terminated_early: bool, termination_reason: str |
         if _contains_any(reason, patterns):
             reasons.append(code)
     if "codex turn failed" in reason and not reasons:
-        reasons.append("provider_or_agent_turn_failure")
+        reasons.append("provider_or_harness_turn_failure")
 
     return list(dict.fromkeys(reasons))
 
@@ -3290,7 +3290,7 @@ def _scorecard_harbor_metadata(
 ) -> dict[str, Any]:
     harbor_timings = _harbor_phase_timings(execution.harbor_result.trial_dir)
     trial_total_sec = harbor_timings.get("trial_total_sec")
-    agent_overhead_sec = (
+    harness_overhead_sec = (
         round(max(0.0, execution.duration_sec - trial_total_sec), 3)
         if trial_total_sec is not None
         else None
@@ -3304,7 +3304,7 @@ def _scorecard_harbor_metadata(
         "job_dir": str(execution.harbor_result.job_dir),
         "trial_dir": trial_dir,
         "phase_timings_sec": harbor_timings,
-        "agent_overhead_sec": agent_overhead_sec,
+        "harness_overhead_sec": harness_overhead_sec,
         "artifacts": artifacts.harbor_artifacts,
     }
 
@@ -3359,7 +3359,7 @@ def _scorecard_metadata(
         "starter": artifacts.starter_meta,
         "scenario": artifacts.scenario_revision_meta,
         "harbor": _scorecard_harbor_metadata(execution, artifacts),
-        "agent": {"artifacts": artifacts.agent_artifacts},
+        "harness": {"artifacts": artifacts.harness_artifacts},
         "verifier": _scorecard_verifier_metadata(execution, artifacts),
         "process": _scorecard_process_metadata(execution.process_metrics),
         "evidence": artifacts.evidence_artifacts,
@@ -3405,7 +3405,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         run_id=layout.run_id,
         scenario_name=request.scenario.name,
         scenario_revision=request.scenario.scenario_revision,
-        agent=request.config.agent.value,
+        harness=request.config.harness.value,
         model=request.config.model.qualified_name,
         starter_root=request.scenario.starter.root,
         duration_sec=execution.duration_sec,
@@ -3495,7 +3495,7 @@ def _execute_harbor_phase(
         process_metrics = collect_process_metrics(
             request.scenario,
             harbor_result.trial_dir,
-            agent=request.config.agent.value,
+            harness=request.config.harness.value,
         )
     except RuntimeError as exc:
         message = str(exc)
@@ -3505,7 +3505,7 @@ def _execute_harbor_phase(
             raise
     events = collect_trace_events(
         harbor_result.trial_dir,
-        agent=request.config.agent.value,
+        harness=request.config.harness.value,
     )
 
     verifier_outputs: EvaluationOutputs | None = None
@@ -3575,7 +3575,9 @@ def _persist_artifacts_phase(
         verifier_artifacts=persist_verifier_artifacts(
             execution.harbor_result, phase.layout.verifier_dir
         ),
-        agent_artifacts=persist_agent_artifacts(execution.harbor_result, phase.layout.agent_dir),
+        harness_artifacts=persist_harness_artifacts(
+            execution.harbor_result, phase.layout.harness_dir
+        ),
         harbor_artifacts=persist_harbor_artifacts(execution.harbor_result, phase.layout.harbor_dir),
         evidence_artifacts=evidence_artifacts,
         workspace_prune=workspace_prune,
@@ -3615,7 +3617,7 @@ def run_task(request: RunRequest) -> EvalRun:
         timestamp=prepared.layout.start_time.isoformat(),
         config=EvalConfig(
             model=request.config.model.qualified_name,
-            agent=request.config.agent.value,
+            harness=request.config.harness.value,
             scenario_name=request.scenario.name,
             scenario_revision=request.scenario.scenario_revision,
             starter_root=request.scenario.starter.root,

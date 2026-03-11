@@ -273,7 +273,7 @@ def parse_pi_trace(trace_dir: Path) -> list[TraceEvent]:
     return _parse_structured_cli_trace(trace_dir, ("*.jsonl", "*.json"), "assistant")
 
 
-def parse_trace(agent: str, trace_dir: Path) -> list[TraceEvent]:
+def parse_trace(harness: str, trace_dir: Path) -> list[TraceEvent]:
     parsers: dict[str, callable] = {
         "codex-cli": parse_codex_trace,
         "claude-code": parse_claude_trace,
@@ -282,14 +282,14 @@ def parse_trace(agent: str, trace_dir: Path) -> list[TraceEvent]:
         "copilot": parse_copilot_trace,
         "pi": parse_pi_trace,
     }
-    parser = parsers.get(agent)
+    parser = parsers.get(harness)
     if parser is None:
         return []
     return parser(trace_dir)
 
 
-def parser_supports_structured_traces(agent: str) -> bool:
-    return agent in {"claude-code", "gemini", "cursor", "copilot", "pi"}
+def parser_supports_structured_traces(harness: str) -> bool:
+    return harness in {"claude-code", "gemini", "cursor", "copilot", "pi"}
 
 
 TraceFormat = Literal["json", "jsonl"]

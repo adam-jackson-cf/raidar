@@ -1,6 +1,6 @@
-"""Base interface for agent adapters.
+"""Base interface for harness adapters.
 
-Adapters encapsulate agent-specific validation, workspace preparation,
+Adapters encapsulate harness-specific validation, workspace preparation,
 model compatibility checks, and Harbor argument generation.
 """
 
@@ -11,15 +11,20 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
-    from ..config import AgentRunConfig
+    from ..config import AgentSpec
 
 
-class AgentAdapter:
-    """Base adapter contract for all agent integrations."""
+class HarnessAdapter:
+    """Base adapter contract for all harness integrations."""
 
     terminal_bench_dataset = "terminal-bench@2.0"
 
-    def __init__(self, config: AgentRunConfig) -> None:
+    @classmethod
+    def supported_model_summary(cls) -> str:
+        """Describe the model variants the adapter accepts for CLI discovery output."""
+        return "(model coverage not declared)"
+
+    def __init__(self, config: AgentSpec) -> None:
         self.config = config
 
     # ------------------------------------------------------------------
@@ -32,18 +37,18 @@ class AgentAdapter:
         """Allow adapters to mutate the workspace before Harbor runs."""
 
     def runtime_env(self) -> dict[str, str]:
-        """Extra environment variables required for the agent runtime."""
+        """Extra environment variables required for the harness runtime."""
         return {}
 
     # ------------------------------------------------------------------
     # Harbor command wiring
     # ------------------------------------------------------------------
-    def harbor_agent(self) -> str:
-        """Return the Harbor agent identifier."""
-        return self.config.agent.value
+    def harbor_harness(self) -> str:
+        """Return the Harbor harness identifier passed through Harbor's agent flag."""
+        return self.config.harness.value
 
-    def harbor_agent_import_path(self) -> str | None:
-        """Optional Harbor import path for custom repository-local agents."""
+    def harbor_harness_import_path(self) -> str | None:
+        """Optional Harbor import path for custom repository-local harnesses."""
         return None
 
     def model_argument(self) -> str:
@@ -76,11 +81,11 @@ class AgentAdapter:
         if jobs_dir is not None:
             cmd.extend(["--jobs-dir", str(jobs_dir)])
 
-        import_path = self.harbor_agent_import_path()
+        import_path = self.harbor_harness_import_path()
         if import_path:
             cmd.extend(["--agent-import-path", import_path])
         else:
-            cmd.extend(["-a", self.harbor_agent()])
+            cmd.extend(["-a", self.harbor_harness()])
 
         cmd.extend(
             [

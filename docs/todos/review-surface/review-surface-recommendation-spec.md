@@ -83,7 +83,7 @@ The recommendation layer should use recurring diagnosis patterns.
 | Strong fidelity, weak `Workflow Discipline` | tighten verification workflow or guardrails |
 | Strong task outcome, weak `Execution Reliability` | reduce instability before optimizing fidelity |
 | Low `Confidence` because of sample size or missing evidence | recommend more runs or evidence completion before optimization |
-| Gap caused by authored scenario mismatch | recommend scenario contract remediation before agent tuning |
+| Gap caused by authored scenario mismatch | recommend scenario contract remediation before harness tuning |
 
 ## Confidence Gating
 
@@ -108,7 +108,7 @@ Do not produce an optimization recommendation when:
 - experiment confidence is `Very Low`
 - primary scenario-family evidence is missing
 - benchmark comparison is unavailable and self-trend is also unavailable
-- the dominant issue is a scenario contract defect rather than agent behavior
+- the dominant issue is a scenario contract defect rather than harness behavior
 
 In these cases, the system should emit `Need stronger evidence before recommending a change`.
 

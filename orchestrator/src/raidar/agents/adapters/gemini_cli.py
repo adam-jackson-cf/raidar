@@ -1,4 +1,4 @@
-"""Gemini CLI agent adapter."""
+"""Gemini CLI harness adapter."""
 
 from __future__ import annotations
 
@@ -7,15 +7,15 @@ import shutil
 from collections.abc import Iterable
 from pathlib import Path
 
-from ..config import AgentRunConfig
-from ..fast_mode import fast_agent_import_path, with_agent_pythonpath
-from .base import AgentAdapter
+from ..config import AgentSpec
+from ..fast_mode import fast_harness_import_path, with_harness_pythonpath
+from .base import HarnessAdapter
 
 
-class GeminiCliAdapter(AgentAdapter):
-    """Adapter enforcing Gemini agent + model pairing."""
+class GeminiCliAdapter(HarnessAdapter):
+    """Adapter enforcing Gemini harness + model pairing."""
 
-    HARBOR_AGENT_NAME = "gemini-cli"
+    HARBOR_HARNESS_NAME = "gemini-cli"
     CLI_ENV_VAR = "GEMINI_CLI_PATH"
     GEMINI_API_ENV = "GEMINI_API_KEY"
     SUPPORTED_MODELS: set[str] = {
@@ -24,7 +24,11 @@ class GeminiCliAdapter(AgentAdapter):
         "gemini-3-flash-preview",
     }
 
-    def __init__(self, config: AgentRunConfig) -> None:
+    @classmethod
+    def supported_model_summary(cls) -> str:
+        return ", ".join(f"google/{model}" for model in sorted(cls.SUPPORTED_MODELS))
+
+    def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
         self._cli_path: str | None = None
 
@@ -58,11 +62,11 @@ class GeminiCliAdapter(AgentAdapter):
         if not os.environ.get(self.GEMINI_API_ENV):
             raise OSError("Gemini Harbor runs require an API key. Set GEMINI_API_KEY.")
 
-    def harbor_agent(self) -> str:
-        return self.HARBOR_AGENT_NAME
+    def harbor_harness(self) -> str:
+        return self.HARBOR_HARNESS_NAME
 
-    def harbor_agent_import_path(self) -> str | None:
-        return fast_agent_import_path(self.config.agent)
+    def harbor_harness_import_path(self) -> str | None:
+        return fast_harness_import_path(self.config.harness)
 
     def model_argument(self) -> str:
         return f"{self.config.model.provider}/{self.config.model.name}"
@@ -74,7 +78,7 @@ class GeminiCliAdapter(AgentAdapter):
         env: dict[str, str] = {}
         cli_path = self._resolve_cli()
         env[self.CLI_ENV_VAR] = cli_path
-        return with_agent_pythonpath(env)
+        return with_harness_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
         # Ensure Gemini trace artifacts always have a stable home.
