@@ -121,6 +121,21 @@ class AcceptanceConfig(BaseModel):
 class VisualConfig(BaseModel):
     """Visual regression configuration."""
 
+    class VisualRegionClip(BaseModel):
+        """Viewport clip for one authored visual region."""
+
+        x: int = Field(ge=0)
+        y: int = Field(ge=0)
+        width: int = Field(gt=0)
+        height: int = Field(gt=0)
+
+    class VisualRegion(BaseModel):
+        """One authored visual region used for capture and scoring."""
+
+        name: str = Field(description="Stable authored region name")
+        weight: float = Field(default=1.0, gt=0, description="Relative scoring weight")
+        clip: "VisualConfig.VisualRegionClip" = Field(description="Viewport clip rectangle")
+
     reference_image: str = Field(description="Path to reference image")
     screenshot_command: list[str] = Field(
         default_factory=lambda: ["bun", "run", "capture-screenshot"],
@@ -132,6 +147,10 @@ class VisualConfig(BaseModel):
         ge=0,
         le=1,
         description="Minimum similarity threshold",
+    )
+    regions: list[VisualRegion] = Field(
+        default_factory=list,
+        description="Authored visual regions for local capture and scoring",
     )
 
     @field_validator("screenshot_command")

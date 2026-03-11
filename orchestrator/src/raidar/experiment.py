@@ -138,6 +138,20 @@ def _aggregate_block(
     }
 
 
+def _sample_policy(metrics: list[str]) -> dict[str, object]:
+    if "visual-regression" in metrics:
+        return {
+            "scenario_family": "visual-ui-implementation",
+            "minimum_scored_runs": 3,
+            "preferred_scored_runs": 5,
+        }
+    return {
+        "scenario_family": "code-delivery-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+    }
+
+
 def create_experiment_summary(
     *,
     scenario_name: str,
@@ -167,6 +181,12 @@ def create_experiment_summary(
     starter_fingerprint = (
         starter_meta.get("fingerprint") if isinstance(starter_meta, dict) else None
     )
+    sample_policy = _sample_policy(metrics)
+    preferred_scored_runs = int(sample_policy["preferred_scored_runs"])
+    minimum_scored_runs = int(sample_policy["minimum_scored_runs"])
+    achieved_scored_runs = len(scored_runs)
+    sample_adequacy = round(min(achieved_scored_runs / max(1, preferred_scored_runs), 1.0), 6)
+    sample_class = "review" if repeats >= preferred_scored_runs else "smoke"
 
     return {
         "experiment_id": experiment_id,
@@ -186,13 +206,22 @@ def create_experiment_summary(
             "reruns_used": reruns_used,
             "starter_root": starter_root,
             "starter_fingerprint": starter_fingerprint,
+            "sample_class": sample_class,
         },
         "aggregate": _aggregate_block(runs, unscored_runs, scored_runs, valid_runs),
         "runs": run_pointers,
+        "sample": {
+            **sample_policy,
+            "sample_class": sample_class,
+            "achieved_scored_runs": achieved_scored_runs,
+            "minimum_met": achieved_scored_runs >= minimum_scored_runs,
+            "preferred_met": achieved_scored_runs >= preferred_scored_runs,
+            "sample_adequacy": sample_adequacy,
+        },
         "rerun": {
             "target_scored_runs": repeats,
-            "achieved_scored_runs": len(scored_runs),
-            "target_met": len(scored_runs) >= repeats,
+            "achieved_scored_runs": achieved_scored_runs,
+            "target_met": achieved_scored_runs >= repeats,
             "unresolved_unscored_count": unresolved_unscored_count,
         },
     }
@@ -206,11 +235,69 @@ def _experiment_summary_payload(experiment: dict[str, object]) -> dict[str, obje
         "completed_at_utc": experiment.get("completed_at_utc"),
         "config": experiment.get("config"),
         "aggregate": experiment.get("aggregate"),
+        "sample": experiment.get("sample"),
         "rerun": experiment.get("rerun"),
         "run_count": (
             len(experiment.get("runs", [])) if isinstance(experiment.get("runs"), list) else 0
         ),
     }
+
+
+def _append_sample_lines(lines: list[str], sample: object) -> None:
+    if not isinstance(sample, dict):
+        return
+    lines.extend(
+        [
+            "",
+            "## Sample",
+            f"- scenario_family: `{sample.get('scenario_family')}`",
+            f"- minimum_scored_runs: `{sample.get('minimum_scored_runs')}`",
+            f"- preferred_scored_runs: `{sample.get('preferred_scored_runs')}`",
+            f"- sample_class: `{sample.get('sample_class')}`",
+            f"- achieved_scored_runs: `{sample.get('achieved_scored_runs')}`",
+            f"- minimum_met: `{sample.get('minimum_met')}`",
+            f"- preferred_met: `{sample.get('preferred_met')}`",
+            f"- sample_adequacy: `{sample.get('sample_adequacy')}`",
+        ]
+    )
+
+
+def _append_metric_outcome_lines(lines: list[str], metric_outcomes: object) -> None:
+    if not isinstance(metric_outcomes, dict):
+        return
+    lines.extend(["", "## metric_outcomes"])
+    if not metric_outcomes:
+        lines.append("- metric_outcomes: `{}`")
+        return
+    for metric_id, outcome in sorted(metric_outcomes.items()):
+        if not isinstance(outcome, dict):
+            continue
+        lines.append(
+            f"- {metric_id}: pass_count=`{outcome.get('pass_count')}` "
+            f"fail_count=`{outcome.get('fail_count')}` "
+            f"sample_size=`{outcome.get('sample_size')}` "
+            f"pass_rate=`{outcome.get('pass_rate')}`"
+        )
+
+
+def _append_run_lines(lines: list[str], runs: object) -> None:
+    if not isinstance(runs, list):
+        return
+    lines.extend(["", "## Runs"])
+    if not runs:
+        lines.append("- runs: `[]`")
+        return
+    for run in runs:
+        if not isinstance(run, dict):
+            continue
+        lines.append(
+            f"- {run.get('run_id')}: unscored=`{run.get('unscored')}` "
+            f"run_valid=`{run.get('run_valid')}` "
+            f"performance_gates_passed=`{run.get('performance_gates_passed')}` "
+            f"composite_score=`{run.get('composite_score')}` "
+            f"duration_sec=`{run.get('duration_sec')}` "
+            f"canonical_run_dir=`{run.get('canonical_run_dir')}`"
+        )
 
 
 def persist_experiment(
@@ -233,6 +320,7 @@ def persist_experiment(
     rerun = experiment_summary.get("rerun", {})
     runs = experiment_summary.get("runs", [])
     metric_outcomes = aggregate.get("metric_outcomes", {}) if isinstance(aggregate, dict) else {}
+    sample = experiment_summary.get("sample", {})
     lines = [
         "# Experiment Summary",
         "",
@@ -247,6 +335,7 @@ def persist_experiment(
         f"- repeat_parallel: `{config.get('repeat_parallel')}`",
         f"- rerun_unscored_limit: `{config.get('rerun_unscored_limit')}`",
         f"- reruns_used: `{config.get('reruns_used')}`",
+        f"- sample_class: `{config.get('sample_class')}`",
         "",
         "## Aggregate",
         f"- run_count_total: `{aggregate.get('run_count_total')}`",
@@ -272,36 +361,9 @@ def persist_experiment(
             f"`{(aggregate.get('diagnostic_score', {}) or {}).get('mean', 0.0):.6f}`"
         ),
     ]
-    if isinstance(metric_outcomes, dict):
-        lines.extend(["", "## metric_outcomes"])
-        if metric_outcomes:
-            for metric_id, outcome in sorted(metric_outcomes.items()):
-                if not isinstance(outcome, dict):
-                    continue
-                lines.append(
-                    f"- {metric_id}: pass_count=`{outcome.get('pass_count')}` "
-                    f"fail_count=`{outcome.get('fail_count')}` "
-                    f"sample_size=`{outcome.get('sample_size')}` "
-                    f"pass_rate=`{outcome.get('pass_rate')}`"
-                )
-        else:
-            lines.append("- metric_outcomes: `{}`")
-    if isinstance(runs, list):
-        lines.extend(["", "## Runs"])
-        if runs:
-            for run in runs:
-                if not isinstance(run, dict):
-                    continue
-                lines.append(
-                    f"- {run.get('run_id')}: unscored=`{run.get('unscored')}` "
-                    f"run_valid=`{run.get('run_valid')}` "
-                    f"performance_gates_passed=`{run.get('performance_gates_passed')}` "
-                    f"composite_score=`{run.get('composite_score')}` "
-                    f"duration_sec=`{run.get('duration_sec')}` "
-                    f"canonical_run_dir=`{run.get('canonical_run_dir')}`"
-                )
-        else:
-            lines.append("- runs: `[]`")
+    _append_sample_lines(lines, sample)
+    _append_metric_outcome_lines(lines, metric_outcomes)
+    _append_run_lines(lines, runs)
     report_path = experiment_dir / "report.md"
     report_path.write_text("\n".join(lines) + "\n")
     return experiment_json_path, summary_path, report_path

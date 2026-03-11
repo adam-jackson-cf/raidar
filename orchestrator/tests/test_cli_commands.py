@@ -178,6 +178,94 @@ def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monk
     assert captured["cleanup_before_runs"] is True
     assert captured["echo"] is True
     assert captured["execution_suffix"] == "codex-cli__codex-gpt-5.4-high"
+    assert captured["options"].repeats == 5
+
+
+def test_matrix_dry_run_supports_selector_generation(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    scenario_path.write_text("name: placeholder\n")
+    scenario = ScenarioDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "scenario_revision": "v001",
+            "description": "Smoke scenario",
+            "difficulty": "easy",
+            "category": "smoke",
+            "timeout_sec": 300,
+            "starter": {"root": "starter"},
+            "verification": {"gates": [], "required_commands": []},
+            "acceptance": {},
+            "metrics": [{"type": "core", "id": "functional"}],
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+
+    monkeypatch.setattr(
+        "raidar.cli._load_matrix_scenarios",
+        lambda scenario_paths: [(scenario_paths[0], scenario)],
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "matrix",
+            "--scenario",
+            str(scenario_path),
+            "--selector",
+            "gemini",
+            "--repeats",
+            "2",
+            "--dry-run",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "Generating matrix from selector 'gemini'" in result.output
+    assert "Matrix defined for 3 agent specs (3 experiments)" in result.output
+    assert (
+        "[dry-run] hello-world-smoke@v001: gemini/google/gemini-3-flash-preview x2" in result.output
+    )
+
+
+def test_matrix_requires_exactly_one_of_config_or_selector(tmp_path: Path) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    config_path = tmp_path / "matrix.yaml"
+    model_name = "codex/gpt-5.4-high"
+    scenario_path.write_text("name: placeholder\n")
+    config_path.write_text(
+        "\n".join(
+            [
+                "matrix:",
+                "  experiment:",
+                "    timeout_sec: 1800",
+                "    repeats: 5",
+                "    repeat_parallel: 1",
+                "    retry_void: 0",
+                "  agents:",
+                "    - harness: codex-cli",
+                f"      model: {model_name}",
+            ]
+        )
+        + "\n"
+    )
+
+    result = runner.invoke(
+        main,
+        [
+            "matrix",
+            "--scenario",
+            str(scenario_path),
+            "--config",
+            str(config_path),
+            "--selector",
+            "codex",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Provide exactly one of --config or --selector." in result.output
 
 
 def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -> None:

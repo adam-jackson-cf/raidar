@@ -6,12 +6,22 @@ import path from "node:path";
 const APP_DIR = "/app";
 const LOG_DIR = "/logs/verifier";
 const ODIFF_TOLERANCE = "0.03";
-const GLOBAL_VISUAL_WEIGHT = 0.35;
-const REGIONAL_VISUAL_WEIGHT = 0.65;
-const VISUAL_REGION_WEIGHTS = [
-  { name: "hero", weight: 0.35 },
-  { name: "features", weight: 0.45 },
-  { name: "footer", weight: 0.2 },
+const DEFAULT_VISUAL_REGIONS = [
+  {
+    name: "hero",
+    weight: 0.35,
+    clip: { x: 0, y: 0, width: 1440, height: 320 },
+  },
+  {
+    name: "features",
+    weight: 0.45,
+    clip: { x: 0, y: 320, width: 1440, height: 420 },
+  },
+  {
+    name: "footer",
+    weight: 0.2,
+    clip: { x: 0, y: 740, width: 1440, height: 160 },
+  },
 ];
 
 function ensureDir(dirPath) {
@@ -78,6 +88,52 @@ function runOdiffSimilarity(referencePath, actualPath, diffPath) {
     raw_output: odiffOutput.trim(),
     exit_code: odiff.exit_code,
   };
+}
+
+function clamp01(value) {
+  return Math.max(0, Math.min(1, value));
+}
+
+function accentuateSimilarity(similarity, threshold) {
+  if (threshold === null || threshold === undefined) {
+    return clamp01(similarity);
+  }
+  return clamp01(similarity + (similarity - threshold) * 2);
+}
+
+function thresholdMarginScore(similarity, threshold) {
+  if (threshold === null || threshold === undefined) {
+    return null;
+  }
+  const lowerBound = Math.max(0, threshold - 0.05);
+  return clamp01((similarity - lowerBound) / Math.max(1e-9, 1 - lowerBound));
+}
+
+function resolveVisualRegions(visualSpec) {
+  const configuredRegions =
+    Array.isArray(visualSpec?.regions) && visualSpec.regions.length > 0
+      ? visualSpec.regions
+      : DEFAULT_VISUAL_REGIONS;
+  return configuredRegions.filter(
+    (region) =>
+      typeof region?.name === "string" &&
+      region.name.length > 0 &&
+      typeof region?.weight === "number" &&
+      region.weight > 0
+  );
+}
+
+function regionEvidenceStatus(expectedCount, availableCount) {
+  if (expectedCount === 0) {
+    return "not_configured";
+  }
+  if (availableCount === 0) {
+    return "missing";
+  }
+  if (availableCount < expectedCount) {
+    return "partial";
+  }
+  return "present";
 }
 
 function walkFiles(rootDir) {
@@ -468,7 +524,7 @@ function buildPerformanceGateChecks({
       `measured=${coverage.measured}, source=${coverage.source}`,
   });
   const visualPassed = visual
-    ? visual.capture_succeeded && visual.threshold_met === true
+    ? visual.capture_succeeded && visual.global_threshold_met === true
     : true;
   checks.push({
     name: "visual_threshold_met",
@@ -476,7 +532,8 @@ function buildPerformanceGateChecks({
     evidence: visual
       ? (
           `captured=${visual.capture_succeeded}, ` +
-          `similarity=${visual.similarity}, threshold=${visual.threshold}`
+          `global_similarity=${visual.global_similarity}, threshold=${visual.threshold}, ` +
+          `global_threshold_met=${visual.global_threshold_met}`
         )
       : "Visual threshold not configured.",
   });
@@ -484,10 +541,16 @@ function buildPerformanceGateChecks({
     ? visual.regional_scores
     : [];
   const regionalThreshold = visual?.threshold ?? null;
+  const expectedRegionCount =
+    typeof visual?.expected_region_count === "number" ? visual.expected_region_count : 0;
+  const regionalStatus =
+    typeof visual?.region_evidence_status === "string"
+      ? visual.region_evidence_status
+      : regionEvidenceStatus(expectedRegionCount, regionScores.length);
   const regionalVisualPassed =
-    regionalThreshold === null ||
-    regionScores.length === 0 ||
-    regionScores.every((region) => region.similarity >= regionalThreshold);
+    regionalThreshold === null || expectedRegionCount === 0
+      ? true
+      : regionalStatus === "present" && visual?.regional_threshold_met === true;
   const worstRegion =
     regionScores.length > 0
       ? regionScores.reduce((worst, current) =>
@@ -498,12 +561,17 @@ function buildPerformanceGateChecks({
     name: "visual_regions_threshold_met",
     passed: regionalVisualPassed,
     evidence:
-      regionScores.length === 0
-        ? "Region visual scores unavailable; check skipped."
+      expectedRegionCount === 0
+        ? "Region visual scoring not configured."
+        : regionScores.length === 0
+          ? (
+              `Region visual scores unavailable; status=${regionalStatus}, ` +
+              `expected_regions=${expectedRegionCount}, available_regions=0`
+            )
         : (
-            `threshold=${regionalThreshold}, ` +
+            `threshold=${regionalThreshold}, status=${regionalStatus}, ` +
             `worst_region=${worstRegion.name}:${worstRegion.similarity.toFixed(4)}, ` +
-            `regions=${regionScores.length}`
+            `regions=${regionScores.length}/${expectedRegionCount}`
           ),
   });
   checks.push({
@@ -639,23 +707,28 @@ function main() {
     const screenshot = runCommand(scenarioSpec.visual.screenshot_command || []);
     const actualPath = path.join(APP_DIR, "actual.png");
     const diffPath = path.join(APP_DIR, "diff.png");
+    const referencePath = path.isAbsolute(scenarioSpec.visual.reference_image)
+      ? scenarioSpec.visual.reference_image
+      : path.join(APP_DIR, scenarioSpec.visual.reference_image);
     const captureSucceeded =
       screenshot.exit_code === 0 && fs.existsSync(actualPath);
     let similarity = 0;
     let globalSimilarity = 0;
     let regionalSimilarity = null;
+    let worstRegionSimilarity = null;
+    let thresholdMargin = null;
+    let regionPassRate = null;
     let regionalWeightTotal = 0;
     let diffOutput = null;
     const regionalScores = [];
+    const visualRegions = resolveVisualRegions(scenarioSpec.visual);
+    const expectedRegionCount = visualRegions.length;
     const captureOutput = `${screenshot.stdout}\\n${screenshot.stderr}`.trim();
     let captureError = null;
     if (!captureSucceeded) {
       captureError = captureOutput || `exit_code=${screenshot.exit_code}`;
     }
     if (captureSucceeded) {
-      const referencePath = path.isAbsolute(scenarioSpec.visual.reference_image)
-        ? scenarioSpec.visual.reference_image
-        : path.join(APP_DIR, scenarioSpec.visual.reference_image);
       if (fs.existsSync(referencePath)) {
         const globalCompare = runOdiffSimilarity(referencePath, actualPath, diffPath);
         globalSimilarity = globalCompare.similarity;
@@ -666,7 +739,7 @@ function main() {
         const referenceDir = path.dirname(referencePath);
         let weightedRegionalSum = 0;
 
-        for (const region of VISUAL_REGION_WEIGHTS) {
+        for (const region of visualRegions) {
           const actualRegionPath = path.join(APP_DIR, `actual-region-${region.name}.png`);
           const referenceRegionPath = path.join(
             referenceDir,
@@ -685,6 +758,10 @@ function main() {
             name: region.name,
             weight: region.weight,
             similarity: regionCompare.similarity,
+            threshold_met:
+              scenarioSpec.visual.threshold === null
+                ? null
+                : regionCompare.similarity >= scenarioSpec.visual.threshold,
             actual_path: actualRegionPath,
             reference_path: referenceRegionPath,
             diff_path: regionCompare.diff_path,
@@ -694,22 +771,64 @@ function main() {
           regionalWeightTotal += region.weight;
         }
 
-        if (regionalWeightTotal > 0) {
+        if (regionalScores.length > 0 && regionalWeightTotal > 0) {
           regionalSimilarity = weightedRegionalSum / regionalWeightTotal;
-          similarity =
-            GLOBAL_VISUAL_WEIGHT * globalSimilarity +
-            REGIONAL_VISUAL_WEIGHT * regionalSimilarity;
+          worstRegionSimilarity = regionalScores.reduce((worst, current) =>
+            current.similarity < worst.similarity ? current : worst
+          ).similarity;
+          thresholdMargin = thresholdMarginScore(worstRegionSimilarity, scenarioSpec.visual.threshold);
+          const emphasizedRegional = accentuateSimilarity(
+            regionalSimilarity,
+            scenarioSpec.visual.threshold
+          );
+          const emphasizedWorstRegion = accentuateSimilarity(
+            worstRegionSimilarity,
+            scenarioSpec.visual.threshold
+          );
+          similarity = clamp01(
+            globalSimilarity * 0.3 +
+            emphasizedRegional * 0.45 +
+            emphasizedWorstRegion * 0.25
+          );
         } else {
-          similarity = globalSimilarity;
+          thresholdMargin = thresholdMarginScore(globalSimilarity, scenarioSpec.visual.threshold);
+          similarity = clamp01(
+            globalSimilarity * 0.6 +
+            accentuateSimilarity(globalSimilarity, scenarioSpec.visual.threshold) * 0.4
+          );
         }
       }
     }
     const threshold = scenarioSpec.visual.threshold ?? null;
+    const availableRegionCount = regionalScores.length;
+    const evidenceStatus = regionEvidenceStatus(expectedRegionCount, availableRegionCount);
+    if (threshold !== null) {
+      const passingRegions = regionalScores.filter((region) => region.similarity >= threshold).length;
+      regionPassRate =
+        expectedRegionCount === 0 ? null : passingRegions / expectedRegionCount;
+    }
+    const globalThresholdMet = threshold === null ? null : globalSimilarity >= threshold;
+    const regionalThresholdMet =
+      threshold === null
+        ? null
+        : (
+            expectedRegionCount > 0 &&
+            evidenceStatus === "present" &&
+            regionalScores.every((region) => region.similarity >= threshold)
+          );
     visual = {
       similarity,
       global_similarity: globalSimilarity,
       regional_similarity: regionalSimilarity,
+      worst_region_similarity: worstRegionSimilarity,
+      threshold_margin_score: thresholdMargin,
+      region_pass_rate: regionPassRate,
       regional_weight_sum: regionalWeightTotal,
+      expected_region_count: expectedRegionCount,
+      available_region_count: availableRegionCount,
+      region_evidence_status: evidenceStatus,
+      actual_path: captureSucceeded ? actualPath : null,
+      reference_path: fs.existsSync(referencePath) ? referencePath : null,
       regional_scores: regionalScores,
       diff_path: diffOutput,
       capture_succeeded: captureSucceeded,
@@ -717,7 +836,16 @@ function main() {
       odiff_tolerance: Number.parseFloat(ODIFF_TOLERANCE),
       threshold,
       score: similarity,
-      threshold_met: threshold === null ? null : similarity >= threshold,
+      threshold_met:
+        threshold === null
+          ? null
+          : (
+              expectedRegionCount > 0
+                ? globalThresholdMet === true && regionalThresholdMet === true
+                : globalThresholdMet
+            ),
+      global_threshold_met: globalThresholdMet,
+      regional_threshold_met: regionalThresholdMet,
     };
   }
 

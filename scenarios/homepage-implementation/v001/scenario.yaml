@@ -126,6 +126,28 @@ visual:
   reference_image: ./reference/homepage.png
   screenshot_command: ["bun", "run", "capture-screenshot"]
   threshold: 0.95
+  regions:
+    - name: hero
+      weight: 0.35
+      clip:
+        x: 0
+        y: 0
+        width: 1440
+        height: 320
+    - name: features
+      weight: 0.45
+      clip:
+        x: 0
+        y: 320
+        width: 1440
+        height: 420
+    - name: footer
+      weight: 0.2
+      clip:
+        x: 0
+        y: 740
+        width: 1440
+        height: 160
 
 prompt:
   entry: prompt/task.md

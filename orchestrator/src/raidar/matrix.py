@@ -1,11 +1,17 @@
 """Configuration matrix for comparing agent specs."""
 
 from pathlib import Path
+from typing import Literal
 
 import yaml
 from pydantic import BaseModel, Field
 
+from .agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
+from .agents.adapters.codex_cli import CodexCliAdapter
+from .agents.adapters.gemini_cli import GeminiCliAdapter
 from .agents.config import AgentSpec, Harness, ModelTarget
+
+MatrixSelector = Literal["all", "codex", "gemini", "claude"]
 
 
 class AgentSpecInput(BaseModel):
@@ -72,6 +78,55 @@ def generate_matrix_entries(config: MatrixConfig) -> list[MatrixAgentSpec]:
     return [MatrixAgentSpec(harness=spec.harness, model=spec.model) for spec in config.agents]
 
 
+def matrix_selector_choices() -> tuple[str, ...]:
+    """Return supported on-the-fly matrix selectors."""
+
+    return ("all", "codex", "gemini", "claude")
+
+
+def _selector_agent_specs(selector: MatrixSelector) -> list[AgentSpecInput]:
+    codex_specs = [
+        AgentSpecInput(harness=Harness.CODEX_CLI.value, model=f"codex/{model_name}")
+        for model_name in sorted(CodexCliAdapter.MODEL_ALIAS_MAP)
+    ]
+    gemini_specs = [
+        AgentSpecInput(harness=Harness.GEMINI.value, model=f"google/{model_name}")
+        for model_name in sorted(GeminiCliAdapter.SUPPORTED_MODELS)
+    ]
+    claude_specs = [
+        AgentSpecInput(harness=Harness.CLAUDE_CODE.value, model=f"anthropic/{model_name}")
+        for model_name in sorted(ClaudeCodeCliAdapter.SUPPORTED_MODELS)
+    ]
+    groups: dict[str, list[AgentSpecInput]] = {
+        "codex": codex_specs,
+        "gemini": gemini_specs,
+        "claude": claude_specs,
+        "all": [*codex_specs, *gemini_specs, *claude_specs],
+    }
+    return groups[selector]
+
+
+def build_selected_matrix_config(
+    *,
+    selector: MatrixSelector,
+    timeout_sec: int,
+    repeats: int,
+    repeat_parallel: int,
+    retry_void: int,
+) -> MatrixConfig:
+    """Build a matrix config from a predefined selector."""
+
+    return MatrixConfig(
+        experiment=ExperimentConfig(
+            timeout_sec=timeout_sec,
+            repeats=repeats,
+            repeat_parallel=repeat_parallel,
+            retry_void=retry_void,
+        ),
+        agents=_selector_agent_specs(selector),
+    )
+
+
 def create_example_matrix() -> str:
     """Create example matrix configuration YAML."""
 
@@ -79,7 +134,7 @@ def create_example_matrix() -> str:
 matrix:
   experiment:
     timeout_sec: 1800
-    repeats: 3
+    repeats: 5
     repeat_parallel: 1
     retry_void: 1
   agents:

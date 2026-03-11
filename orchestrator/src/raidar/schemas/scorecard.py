@@ -1,6 +1,6 @@
 """Scorecard schemas for experiment results."""
 
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, computed_field
 
@@ -55,22 +55,31 @@ class VisualScore(BaseModel):
     """Visual regression score."""
 
     similarity: float = 0.0
+    global_similarity: float | None = None
+    regional_similarity: float | None = None
+    worst_region_similarity: float | None = None
+    threshold_margin_score: float | None = None
+    region_pass_rate: float | None = None
+    expected_region_count: int = 0
+    available_region_count: int = 0
+    region_evidence_status: Literal["present", "partial", "missing", "not_configured"] = (
+        "not_configured"
+    )
+    actual_path: str | None = None
+    reference_path: str | None = None
     diff_path: str | None = None
     capture_succeeded: bool = False
     capture_error: str | None = None
     threshold: float | None = None
+    threshold_met: bool | None = None
+    global_threshold_met: bool | None = None
+    regional_threshold_met: bool | None = None
+    regional_scores: list[dict[str, Any]] = Field(default_factory=list)
 
     @computed_field
     @property
     def score(self) -> float:
         return self.similarity
-
-    @computed_field
-    @property
-    def threshold_met(self) -> bool | None:
-        if self.threshold is None:
-            return None
-        return self.similarity >= self.threshold
 
 
 class VerificationStabilityScore(BaseModel):

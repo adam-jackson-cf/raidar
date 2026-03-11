@@ -124,8 +124,13 @@ def test_create_experiment_summary_aggregates() -> None:
         "execution-validity",
         "resource-efficiency",
     ]
+    assert summary["config"]["sample_class"] == "smoke"
     assert summary["config"]["starter_root"] == "starter"
     assert summary["config"]["starter_fingerprint"] is None
+    assert summary["sample"]["scenario_family"] == "code-delivery-nonvisual"
+    assert summary["sample"]["minimum_scored_runs"] == 3
+    assert summary["sample"]["preferred_scored_runs"] == 5
+    assert summary["sample"]["sample_adequacy"] == 0.4
 
 
 def test_create_experiment_summary_excludes_unscored_runs_from_stats() -> None:
@@ -202,6 +207,40 @@ def test_create_experiment_summary_includes_rerun_metadata() -> None:
     assert summary["rerun"]["unresolved_unscored_count"] == 0
     assert summary["aggregate"]["metric_outcomes"]["artifact-checks"]["pass_count"] == 1
     assert summary["aggregate"]["metric_outcomes"]["artifact-checks"]["pass_rate"] == 1.0
+
+
+def test_create_experiment_summary_marks_visual_review_samples() -> None:
+    run_a = _run("run-a", run_valid=True, duration=120.0)
+    summary = create_experiment_summary(
+        scenario_name="Homepage Scenario",
+        scenario_revision="v001",
+        harness="codex-cli",
+        model="codex/gpt-5.4-low",
+        evaluation_profile=(
+            "v2:functional+acceptance+verification-stability+execution-validity+"
+            "resource-efficiency+visual-regression"
+        ),
+        metrics=[
+            "functional",
+            "acceptance",
+            "verification-stability",
+            "execution-validity",
+            "resource-efficiency",
+            "visual-regression",
+        ],
+        repeats=5,
+        repeat_parallel=1,
+        runs=[run_a],
+        started_at=datetime.now(UTC),
+    )
+
+    assert summary["config"]["sample_class"] == "review"
+    assert summary["sample"]["scenario_family"] == "visual-ui-implementation"
+    assert summary["sample"]["minimum_scored_runs"] == 3
+    assert summary["sample"]["preferred_scored_runs"] == 5
+    assert summary["sample"]["minimum_met"] is False
+    assert summary["sample"]["preferred_met"] is False
+    assert summary["sample"]["sample_adequacy"] == 0.2
 
 
 def test_persist_experiment_writes_experiment_summary_and_report(tmp_path: Path) -> None:

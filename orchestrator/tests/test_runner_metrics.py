@@ -872,10 +872,43 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                     ]
                 },
                 "visual": {
-                    "similarity": 0.97,
-                    "diff_path": None,
+                    "similarity": 0.91,
+                    "global_similarity": 0.97,
+                    "regional_similarity": 0.95,
+                    "worst_region_similarity": 0.91,
+                    "threshold_margin_score": 0.2,
+                    "region_pass_rate": 0.5,
+                    "expected_region_count": 2,
+                    "available_region_count": 2,
+                    "region_evidence_status": "present",
+                    "actual_path": "/tmp/run/visual/actual.png",
+                    "reference_path": "/tmp/run/visual/reference.png",
+                    "diff_path": "/tmp/run/visual/diff.png",
                     "capture_succeeded": True,
                     "threshold": 0.95,
+                    "threshold_met": False,
+                    "global_threshold_met": True,
+                    "regional_threshold_met": False,
+                    "regional_scores": [
+                        {
+                            "name": "hero",
+                            "weight": 0.5,
+                            "similarity": 0.98,
+                            "threshold_met": True,
+                            "actual_path": "/tmp/run/visual/actual-region-hero.png",
+                            "reference_path": "/tmp/run/visual/reference-region-hero.png",
+                            "diff_path": "/tmp/run/visual/diff-region-hero.png",
+                        },
+                        {
+                            "name": "footer",
+                            "weight": 0.5,
+                            "similarity": 0.91,
+                            "threshold_met": False,
+                            "actual_path": "/tmp/run/visual/actual-region-footer.png",
+                            "reference_path": "/tmp/run/visual/reference-region-footer.png",
+                            "diff_path": "/tmp/run/visual/diff-region-footer.png",
+                        },
+                    ],
                 },
                 "verification_stability": {
                     "total_gate_failures": 0,
@@ -944,7 +977,12 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs is not None
     assert outputs.functional.passed is True
     assert outputs.visual is not None
-    assert outputs.visual.threshold_met is True
+    assert outputs.visual.threshold_met is False
+    assert outputs.visual.global_threshold_met is True
+    assert outputs.visual.regional_threshold_met is False
+    assert outputs.visual.region_evidence_status == "present"
+    assert outputs.visual.worst_region_similarity == 0.91
+    assert outputs.visual.regional_scores[1]["name"] == "footer"
     assert outputs.metric_results == [
         MetricResult(
             metric_id="artifact-checks",
@@ -1103,6 +1141,7 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     source_reference = scenario_dir / reference_rel
     source_reference.parent.mkdir(parents=True, exist_ok=True)
     source_reference.write_bytes(b"png-binary")
+    (scenario_dir / "references" / "hero-region-nav.png").write_bytes(b"region-binary")
 
     scenario = ScenarioDefinition.model_validate(
         {
@@ -1120,6 +1159,13 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
                 "reference_image": str(reference_rel),
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
                 "threshold": 0.95,
+                "regions": [
+                    {
+                        "name": "nav",
+                        "weight": 1.0,
+                        "clip": {"x": 0, "y": 0, "width": 1200, "height": 120},
+                    }
+                ],
             },
             "acceptance": {},
             "metrics": [
@@ -1161,10 +1207,23 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
         bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
     )
     copied_reference = bundle / "environment" / "app" / reference_rel
+    copied_region_reference = bundle / "environment" / "app" / "references" / "hero-region-nav.png"
+    scenario_spec = json.loads(
+        (bundle / "tests" / "scenario-spec.json").read_text(encoding="utf-8")
+    )
 
     assert copied_reference.exists()
     assert copied_reference.read_bytes() == b"png-binary"
+    assert copied_region_reference.exists()
+    assert copied_region_reference.read_bytes() == b"region-binary"
     assert (bundle / "tests" / "scenario-spec.json").exists()
+    assert scenario_spec["visual"]["regions"] == [
+        {
+            "name": "nav",
+            "weight": 1.0,
+            "clip": {"x": 0, "y": 0, "width": 1200, "height": 120},
+        }
+    ]
     assert (
         (bundle / "tests" / "score-scenario.mjs")
         .read_text(encoding="utf-8")
