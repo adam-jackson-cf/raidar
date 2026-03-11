@@ -2,7 +2,7 @@
 
 Use this guide to analyze the latest experiment for each `(scenario_name, scenario_revision, agent, model, evaluation_profile)` combination.
 
-Metric definitions, prerequisites, and interpretation notes live in [metrics.md](./metrics.md). This guide stays focused on artifact review and comparison workflow.
+Metric definitions, prerequisites, and interpretation notes live in [metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md). This guide stays focused on artifact review and comparison workflow.
 
 ## Canonical Inputs
 

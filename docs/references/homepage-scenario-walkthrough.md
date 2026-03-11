@@ -65,4 +65,4 @@ Use `make matrix-run` when you want a structured comparison across multiple mode
 - Start with `make scenario-info` to understand the active contract.
 - Run the scenario and inspect `experiments/.../runs/*/run.json` for one-repeat details.
 - Use `experiment-summary.json` to compare repeats for the same `(scenario, revision, agent, model, evaluation_profile)` identity.
-- Use [analyze-results.md](./analyze-results.md) for the review procedure and [metrics.md](./metrics.md) when you need metric-by-metric interpretation.
+- Use [analyze-results.md](/Users/adamjackson/Projects/raidar/docs/todos/analyze-results.md) for the review procedure and [metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md) when you need metric-by-metric interpretation.
