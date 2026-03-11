@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## [0.7.0] - 2026-03-11
 
+- docs: reorganize review surface artifacts
+
+## [0.7.0] - 2026-03-11
+
 - refactor: simplify repo docs and scripts
 
 ## [0.7.0] - 2026-03-10
