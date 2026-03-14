@@ -12,14 +12,34 @@ import raidar.runner as runner
 
 
 class _AdapterStub:
+    def __init__(self, *, import_path: str | None = None) -> None:
+        self._import_path = import_path
+
     def runtime_env(self) -> dict[str, str]:
         return {"ADAPTER_FLAG": "1", "COMPOSE_BAKE": "1"}
 
+    def harbor_harness_import_path(self) -> str | None:
+        return self._import_path
 
-def test_build_harbor_run_env_forces_compose_bake_off(tmp_path, monkeypatch) -> None:
+
+def test_build_harbor_run_env_preserves_standard_harness_secrets(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
     env = runner._build_harbor_run_env(_AdapterStub())
+
+    assert env["ADAPTER_FLAG"] == "1"
+    assert env["COMPOSE_BAKE"] == "false"
+    assert env["OPENAI_API_KEY"] == "test-openai-key"
+    assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" not in env
+    assert "DOCKER_CONFIG" not in env
+
+
+def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(monkeypatch) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    env = runner._build_harbor_run_env(
+        _AdapterStub(import_path="raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent")
+    )
 
     assert env["ADAPTER_FLAG"] == "1"
     assert env["COMPOSE_BAKE"] == "false"

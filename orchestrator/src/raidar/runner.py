@@ -877,7 +877,8 @@ def _has_ancestor_in_set(
 def _build_harbor_run_env(adapter: Any) -> dict[str, str]:
     run_env = os.environ.copy()
     run_env.update(adapter.runtime_env())
-    _inject_secret_file_env(run_env)
+    if adapter.harbor_harness_import_path():
+        _inject_secret_file_env(run_env)
     # Workaround for docker compose v2.39.x bake hang in non-interactive runs.
     run_env["COMPOSE_BAKE"] = "false"
     return run_env
