@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.7.2] - 2026-03-14
+
+- fix: preserve provider env for standard Harbor runs
+
 ## [0.7.1] - 2026-03-11
 
 - fix: gate fast smoke env wiring and document env surface
