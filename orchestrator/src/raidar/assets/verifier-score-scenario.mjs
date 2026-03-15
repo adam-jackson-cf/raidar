@@ -5,6 +5,7 @@ import path from "node:path";
 
 const APP_DIR = "/app";
 const LOG_DIR = "/logs/verifier";
+const VISUAL_CONFIG_PATH = path.join(APP_DIR, ".raidar-visual-config.json");
 const ODIFF_TOLERANCE = "0.03";
 const DEFAULT_VISUAL_REGIONS = [
   {
@@ -119,7 +120,7 @@ function resolveVisualRegions(visualSpec) {
       typeof region?.name === "string" &&
       region.name.length > 0 &&
       typeof region?.weight === "number" &&
-      region.weight > 0
+      region.weight > 0,
   );
 }
 
@@ -184,7 +185,9 @@ function globToRegex(pattern) {
 
 function filesMatchingPattern(pattern) {
   const matcher = globToRegex(pattern);
-  const allFiles = walkFiles(APP_DIR).map((file) => path.relative(APP_DIR, file));
+  const allFiles = walkFiles(APP_DIR).map((file) =>
+    path.relative(APP_DIR, file),
+  );
   return allFiles.filter((file) => matcher.test(file));
 }
 
@@ -194,7 +197,9 @@ function fileExistsByPattern(pattern) {
 
 function runDeterministicCheck(check, sourceFiles) {
   if (check.type === "import_present") {
-    const match = sourceFiles.find((sourceFile) => sourceFile.content.includes(check.pattern));
+    const match = sourceFiles.find((sourceFile) =>
+      sourceFile.content.includes(check.pattern),
+    );
     return {
       rule: check.description,
       type: "deterministic",
@@ -217,7 +222,9 @@ function runDeterministicCheck(check, sourceFiles) {
         evidence: `Invalid regex pattern '${check.pattern}'`,
       };
     }
-    const match = sourceFiles.find((sourceFile) => regex.test(sourceFile.content));
+    const match = sourceFiles.find((sourceFile) =>
+      regex.test(sourceFile.content),
+    );
     return {
       rule: check.description,
       type: "deterministic",
@@ -342,7 +349,8 @@ function qualityScore({
   return (
     functional.score * (weights.functional / nonVisualTotal) +
     acceptanceScore * (weights.acceptance / nonVisualTotal) +
-    verificationStabilityScore * (weights.verification_stability / nonVisualTotal)
+    verificationStabilityScore *
+      (weights.verification_stability / nonVisualTotal)
   );
 }
 
@@ -358,7 +366,10 @@ function starterIntegrityCheck(scenarioSpec) {
   const payload = readJson(packagePath, {});
   const scripts = payload.scripts || {};
   for (const scriptName of ["typecheck", "lint", "test"]) {
-    if ((scripts[scriptName] || "") !== (scenarioSpec.baseline_scripts?.[scriptName] || "")) {
+    if (
+      (scripts[scriptName] || "") !==
+      (scenarioSpec.baseline_scripts?.[scriptName] || "")
+    ) {
       return {
         name: "stack_integrity",
         passed: false,
@@ -398,7 +409,10 @@ function checkRequirementMappings(requirements, testSources) {
   let mappedSatisfied = 0;
 
   for (const requirement of requirements) {
-    const result = runDeterministicCheck(requirement.check, collectSourceFiles());
+    const result = runDeterministicCheck(
+      requirement.check,
+      collectSourceFiles(),
+    );
     if (result.passed) {
       satisfied += 1;
     } else {
@@ -407,9 +421,11 @@ function checkRequirementMappings(requirements, testSources) {
 
     const patterns = requirement.required_test_patterns || [];
     const missingPatterns = patterns.filter(
-      (pattern) => !testSources.some((content) => new RegExp(pattern, "mi").test(content))
+      (pattern) =>
+        !testSources.some((content) => new RegExp(pattern, "mi").test(content)),
     );
-    const mappedForRequirement = patterns.length > 0 && missingPatterns.length === 0;
+    const mappedForRequirement =
+      patterns.length > 0 && missingPatterns.length === 0;
     if (mappedForRequirement) {
       mapped += 1;
       if (result.passed) {
@@ -530,11 +546,9 @@ function buildPerformanceGateChecks({
     name: "visual_threshold_met",
     passed: visualPassed,
     evidence: visual
-      ? (
-          `captured=${visual.capture_succeeded}, ` +
-          `global_similarity=${visual.global_similarity}, threshold=${visual.threshold}, ` +
-          `global_threshold_met=${visual.global_threshold_met}`
-        )
+      ? `captured=${visual.capture_succeeded}, ` +
+        `global_similarity=${visual.global_similarity}, threshold=${visual.threshold}, ` +
+        `global_threshold_met=${visual.global_threshold_met}`
       : "Visual threshold not configured.",
   });
   const regionScores = Array.isArray(visual?.regional_scores)
@@ -542,7 +556,9 @@ function buildPerformanceGateChecks({
     : [];
   const regionalThreshold = visual?.threshold ?? null;
   const expectedRegionCount =
-    typeof visual?.expected_region_count === "number" ? visual.expected_region_count : 0;
+    typeof visual?.expected_region_count === "number"
+      ? visual.expected_region_count
+      : 0;
   const regionalStatus =
     typeof visual?.region_evidence_status === "string"
       ? visual.region_evidence_status
@@ -554,7 +570,7 @@ function buildPerformanceGateChecks({
   const worstRegion =
     regionScores.length > 0
       ? regionScores.reduce((worst, current) =>
-          current.similarity < worst.similarity ? current : worst
+          current.similarity < worst.similarity ? current : worst,
         )
       : null;
   checks.push({
@@ -564,15 +580,11 @@ function buildPerformanceGateChecks({
       expectedRegionCount === 0
         ? "Region visual scoring not configured."
         : regionScores.length === 0
-          ? (
-              `Region visual scores unavailable; status=${regionalStatus}, ` +
-              `expected_regions=${expectedRegionCount}, available_regions=0`
-            )
-        : (
-            `threshold=${regionalThreshold}, status=${regionalStatus}, ` +
+          ? `Region visual scores unavailable; status=${regionalStatus}, ` +
+            `expected_regions=${expectedRegionCount}, available_regions=0`
+          : `threshold=${regionalThreshold}, status=${regionalStatus}, ` +
             `worst_region=${worstRegion.name}:${worstRegion.similarity.toFixed(4)}, ` +
-            `regions=${regionScores.length}/${expectedRegionCount}`
-          ),
+            `regions=${regionScores.length}/${expectedRegionCount}`,
   });
   checks.push({
     name: "all_requirements_present",
@@ -585,7 +597,8 @@ function buildPerformanceGateChecks({
     name: "requirement_test_gaps",
     passed:
       requirements.satisfied_requirements === 0 ||
-      requirements.mapped_satisfied_requirements >= requirements.satisfied_requirements,
+      requirements.mapped_satisfied_requirements >=
+        requirements.satisfied_requirements,
     evidence:
       `mapped_satisfied=${requirements.mapped_satisfied_requirements}/` +
       `${requirements.satisfied_requirements}, ` +
@@ -619,11 +632,14 @@ function main() {
   }
   ensureDir(LOG_DIR);
   const scenarioSpec = readJson(scenarioSpecPath, {});
-  const metricDefinitions = Array.isArray(scenarioSpec.metrics) ? scenarioSpec.metrics : [];
+  const metricDefinitions = Array.isArray(scenarioSpec.metrics)
+    ? scenarioSpec.metrics
+    : [];
   const sourceFiles = collectSourceFiles();
-  const deterministicChecks = scenarioSpec.acceptance?.deterministic_checks || [];
+  const deterministicChecks =
+    scenarioSpec.acceptance?.deterministic_checks || [];
   const acceptanceChecks = deterministicChecks.map((check) =>
-    runDeterministicCheck(check, sourceFiles)
+    runDeterministicCheck(check, sourceFiles),
   );
   const gateHistory = [];
   let gateFailures = 0;
@@ -645,7 +661,10 @@ function main() {
       if (gate.on_failure === "terminate") break;
       if (
         gateFailures >=
-        Number.parseInt(String(scenarioSpec.verification?.max_gate_failures || "3"), 10)
+        Number.parseInt(
+          String(scenarioSpec.verification?.max_gate_failures || "3"),
+          10,
+        )
       ) {
         break;
       }
@@ -673,7 +692,7 @@ function main() {
   const testSources = collectTestSources();
   const requirementsCoverage = checkRequirementMappings(
     scenarioSpec.acceptance?.requirements || [],
-    testSources
+    testSources,
   );
 
   const coverageFromFile = coverageFromSummary();
@@ -692,7 +711,8 @@ function main() {
       }
     }
   }
-  const coverageThreshold = scenarioSpec.verification?.coverage_threshold ?? null;
+  const coverageThreshold =
+    scenarioSpec.verification?.coverage_threshold ?? null;
   const testCoverage = {
     threshold: coverageThreshold,
     measured: coverageMeasured,
@@ -704,6 +724,12 @@ function main() {
 
   let visual = null;
   if (scenarioSpec.visual) {
+    writeJson(VISUAL_CONFIG_PATH, {
+      viewport: scenarioSpec.visual.viewport || null,
+      regions: scenarioSpec.visual.regions || [],
+      threshold: scenarioSpec.visual.threshold ?? null,
+      reference_image: scenarioSpec.visual.reference_image || null,
+    });
     const screenshot = runCommand(scenarioSpec.visual.screenshot_command || []);
     const actualPath = path.join(APP_DIR, "actual.png");
     const diffPath = path.join(APP_DIR, "diff.png");
@@ -730,7 +756,11 @@ function main() {
     }
     if (captureSucceeded) {
       if (fs.existsSync(referencePath)) {
-        const globalCompare = runOdiffSimilarity(referencePath, actualPath, diffPath);
+        const globalCompare = runOdiffSimilarity(
+          referencePath,
+          actualPath,
+          diffPath,
+        );
         globalSimilarity = globalCompare.similarity;
         diffOutput = globalCompare.diff_path;
 
@@ -740,19 +770,28 @@ function main() {
         let weightedRegionalSum = 0;
 
         for (const region of visualRegions) {
-          const actualRegionPath = path.join(APP_DIR, `actual-region-${region.name}.png`);
+          const actualRegionPath = path.join(
+            APP_DIR,
+            `actual-region-${region.name}.png`,
+          );
           const referenceRegionPath = path.join(
             referenceDir,
-            `${referenceStem}-region-${region.name}${referenceExt}`
+            `${referenceStem}-region-${region.name}${referenceExt}`,
           );
-          const regionDiffPath = path.join(APP_DIR, `diff-region-${region.name}.png`);
-          if (!fs.existsSync(actualRegionPath) || !fs.existsSync(referenceRegionPath)) {
+          const regionDiffPath = path.join(
+            APP_DIR,
+            `diff-region-${region.name}.png`,
+          );
+          if (
+            !fs.existsSync(actualRegionPath) ||
+            !fs.existsSync(referenceRegionPath)
+          ) {
             continue;
           }
           const regionCompare = runOdiffSimilarity(
             referenceRegionPath,
             actualRegionPath,
-            regionDiffPath
+            regionDiffPath,
           );
           regionalScores.push({
             name: region.name,
@@ -774,48 +813,62 @@ function main() {
         if (regionalScores.length > 0 && regionalWeightTotal > 0) {
           regionalSimilarity = weightedRegionalSum / regionalWeightTotal;
           worstRegionSimilarity = regionalScores.reduce((worst, current) =>
-            current.similarity < worst.similarity ? current : worst
+            current.similarity < worst.similarity ? current : worst,
           ).similarity;
-          thresholdMargin = thresholdMarginScore(worstRegionSimilarity, scenarioSpec.visual.threshold);
+          thresholdMargin = thresholdMarginScore(
+            worstRegionSimilarity,
+            scenarioSpec.visual.threshold,
+          );
           const emphasizedRegional = accentuateSimilarity(
             regionalSimilarity,
-            scenarioSpec.visual.threshold
+            scenarioSpec.visual.threshold,
           );
           const emphasizedWorstRegion = accentuateSimilarity(
             worstRegionSimilarity,
-            scenarioSpec.visual.threshold
+            scenarioSpec.visual.threshold,
           );
           similarity = clamp01(
             globalSimilarity * 0.3 +
-            emphasizedRegional * 0.45 +
-            emphasizedWorstRegion * 0.25
+              emphasizedRegional * 0.45 +
+              emphasizedWorstRegion * 0.25,
           );
         } else {
-          thresholdMargin = thresholdMarginScore(globalSimilarity, scenarioSpec.visual.threshold);
+          thresholdMargin = thresholdMarginScore(
+            globalSimilarity,
+            scenarioSpec.visual.threshold,
+          );
           similarity = clamp01(
             globalSimilarity * 0.6 +
-            accentuateSimilarity(globalSimilarity, scenarioSpec.visual.threshold) * 0.4
+              accentuateSimilarity(
+                globalSimilarity,
+                scenarioSpec.visual.threshold,
+              ) *
+                0.4,
           );
         }
       }
     }
     const threshold = scenarioSpec.visual.threshold ?? null;
     const availableRegionCount = regionalScores.length;
-    const evidenceStatus = regionEvidenceStatus(expectedRegionCount, availableRegionCount);
+    const evidenceStatus = regionEvidenceStatus(
+      expectedRegionCount,
+      availableRegionCount,
+    );
     if (threshold !== null) {
-      const passingRegions = regionalScores.filter((region) => region.similarity >= threshold).length;
+      const passingRegions = regionalScores.filter(
+        (region) => region.similarity >= threshold,
+      ).length;
       regionPassRate =
         expectedRegionCount === 0 ? null : passingRegions / expectedRegionCount;
     }
-    const globalThresholdMet = threshold === null ? null : globalSimilarity >= threshold;
+    const globalThresholdMet =
+      threshold === null ? null : globalSimilarity >= threshold;
     const regionalThresholdMet =
       threshold === null
         ? null
-        : (
-            expectedRegionCount > 0 &&
-            evidenceStatus === "present" &&
-            regionalScores.every((region) => region.similarity >= threshold)
-          );
+        : expectedRegionCount > 0 &&
+          evidenceStatus === "present" &&
+          regionalScores.every((region) => region.similarity >= threshold);
     visual = {
       similarity,
       global_similarity: globalSimilarity,
@@ -839,11 +892,9 @@ function main() {
       threshold_met:
         threshold === null
           ? null
-          : (
-              expectedRegionCount > 0
-                ? globalThresholdMet === true && regionalThresholdMet === true
-                : globalThresholdMet
-            ),
+          : expectedRegionCount > 0
+            ? globalThresholdMet === true && regionalThresholdMet === true
+            : globalThresholdMet,
       global_threshold_met: globalThresholdMet,
       regional_threshold_met: regionalThresholdMet,
     };
@@ -853,7 +904,10 @@ function main() {
   const failingGateNames = gateHistory
     .filter((event) => event.exit_code !== 0)
     .map((event) => event.gate_name);
-  const repeats = Math.max(0, failingGateNames.length - new Set(failingGateNames).size);
+  const repeats = Math.max(
+    0,
+    failingGateNames.length - new Set(failingGateNames).size,
+  );
   const verificationStability = {
     total_gate_failures: gateFailures,
     unique_failure_categories: new Set(failingGateNames).size,
@@ -913,8 +967,14 @@ function main() {
 
   writeJson(path.join(LOG_DIR, "scorecard.json"), scorecard);
   writeJson(path.join(LOG_DIR, "gate-history.json"), gateHistory);
-  writeJson(path.join(LOG_DIR, "execution-validity.json"), scorecard.execution_validity);
-  writeJson(path.join(LOG_DIR, "performance-gates.json"), scorecard.performance_gates);
+  writeJson(
+    path.join(LOG_DIR, "execution-validity.json"),
+    scorecard.execution_validity,
+  );
+  writeJson(
+    path.join(LOG_DIR, "performance-gates.json"),
+    scorecard.performance_gates,
+  );
   const rewardValue = scorecard.execution_validity.passed ? quality : 0;
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), `${rewardValue}`);
 }

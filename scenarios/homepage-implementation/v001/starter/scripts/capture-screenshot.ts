@@ -1,23 +1,10 @@
 import { chromium } from "@playwright/test";
 import { spawn, type ChildProcess } from "node:child_process";
+import { loadRuntimeVisualContract } from "./visual-contract";
 
 const APP_URL = "http://127.0.0.1:3000";
 const SERVER_START_TIMEOUT_MS = 45_000;
-const VIEWPORT = { width: 1440, height: 900 };
-const REGION_CLIPS = [
-  {
-    name: "hero",
-    clip: { x: 0, y: 0, width: 1440, height: 320 },
-  },
-  {
-    name: "features",
-    clip: { x: 0, y: 320, width: 1440, height: 420 },
-  },
-  {
-    name: "footer",
-    clip: { x: 0, y: 740, width: 1440, height: 160 },
-  },
-] as const;
+const VISUAL_CONTRACT = loadRuntimeVisualContract(process.cwd());
 
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,7 +48,7 @@ async function captureScreenshot() {
     await waitForServer(APP_URL, SERVER_START_TIMEOUT_MS);
 
     const browser = await chromium.launch();
-    const page = await browser.newPage({ viewport: VIEWPORT });
+    const page = await browser.newPage({ viewport: VISUAL_CONTRACT.viewport });
 
     await page.goto(APP_URL);
     await page.waitForLoadState("networkidle");
@@ -71,7 +58,7 @@ async function captureScreenshot() {
       path: "./actual.png",
       fullPage: false,
     });
-    for (const region of REGION_CLIPS) {
+    for (const region of VISUAL_CONTRACT.regions) {
       await page.screenshot({
         path: `./actual-region-${region.name}.png`,
         fullPage: false,
