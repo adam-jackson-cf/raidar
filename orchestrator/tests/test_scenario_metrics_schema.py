@@ -127,3 +127,30 @@ def test_screenshot_command_rejects_shell_redirection() -> None:
 
     with pytest.raises(ValidationError, match="must not include shell operators"):
         ScenarioDefinition.model_validate(payload)
+
+
+def test_setup_actions_reject_shell_wrappers() -> None:
+    payload = _base_scenario_payload()
+    payload["verification"]["setup_actions"] = [["bash", "-lc", "git init"]]
+
+    with pytest.raises(ValidationError, match="must be an argv list"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_visual_viewport_parses_when_configured() -> None:
+    payload = _base_scenario_payload()
+    payload["visual"] = {
+        "reference_image": "reference.png",
+        "screenshot_command": ["bun", "run", "capture-screenshot"],
+        "viewport": {"width": 1440, "height": 1024},
+        "threshold": 0.95,
+        "regions": [],
+    }
+    payload["metrics"].append({"type": "core", "id": "visual-regression"})
+
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert scenario.visual is not None
+    assert scenario.visual.viewport is not None
+    assert scenario.visual.viewport.width == 1440
+    assert scenario.visual.viewport.height == 1024

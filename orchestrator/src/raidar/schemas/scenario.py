@@ -121,6 +121,12 @@ class AcceptanceConfig(BaseModel):
 class VisualConfig(BaseModel):
     """Visual regression configuration."""
 
+    class VisualViewport(BaseModel):
+        """Viewport used for authored visual captures."""
+
+        width: int = Field(gt=0)
+        height: int = Field(gt=0)
+
     class VisualRegionClip(BaseModel):
         """Viewport clip for one authored visual region."""
 
@@ -141,6 +147,10 @@ class VisualConfig(BaseModel):
         default_factory=lambda: ["bun", "run", "capture-screenshot"],
         min_length=1,
         description="Command argv to capture screenshot",
+    )
+    viewport: "VisualConfig.VisualViewport | None" = Field(
+        default=None,
+        description="Authored viewport used for screenshot capture",
     )
     threshold: float = Field(
         default=0.95,
@@ -184,6 +194,10 @@ class VerificationConfig(BaseModel):
             "Verification commands the selected AgentSpec must execute during the scenario run"
         ),
     )
+    setup_actions: list[list[str]] = Field(
+        default_factory=list,
+        description="Workspace setup commands to execute before verification gates",
+    )
     gates: list[VerificationGate] = Field(default_factory=list)
 
     @field_validator("required_commands")
@@ -191,6 +205,14 @@ class VerificationConfig(BaseModel):
     def _validate_required_commands(cls, value: list[list[str]]) -> list[list[str]]:
         return [
             _validate_argv_command(command, field_name="verification.required_commands[]")
+            for command in value
+        ]
+
+    @field_validator("setup_actions")
+    @classmethod
+    def _validate_setup_actions(cls, value: list[list[str]]) -> list[list[str]]:
+        return [
+            _validate_argv_command(command, field_name="verification.setup_actions[]")
             for command in value
         ]
 

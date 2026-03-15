@@ -376,6 +376,7 @@ def _experiment_baseline_lock(experiment_baseline_dir: Path) -> threading.Lock:
 
 def _ensure_experiment_baseline_workspace(
     *,
+    scenario: ScenarioDefinition,
     starter_dir: Path,
     experiment_baseline_dir: Path,
     scenario_dir: Path,
@@ -389,6 +390,11 @@ def _ensure_experiment_baseline_workspace(
             target_dir=experiment_baseline_dir,
             scenario_dir=scenario_dir,
             harness=harness,
+        )
+        _run_workspace_setup_actions(
+            workspace=experiment_baseline_dir,
+            env=os.environ.copy(),
+            setup_actions=scenario.verification.setup_actions,
         )
 
 
@@ -600,10 +606,12 @@ def _workspace_changes_from_baseline(
 
 
 def _preflight_cache_key(request: RunRequest, context: WorkspaceContext) -> str:
+    setup_actions = getattr(request.scenario.verification, "setup_actions", [])
     payload = {
         "scenario_name": request.scenario.name,
         "scenario_yaml_hash": _hash_bytes((request.scenario_dir / "scenario.yaml").read_bytes()),
         "starter_fingerprint": context.starter_source.fingerprint,
+        "setup_actions": setup_actions,
         "required_commands": request.scenario.verification.required_commands,
     }
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
@@ -655,11 +663,36 @@ def _run_starter_preflight_command(
     )
 
 
+def _run_workspace_setup_actions(
+    *,
+    workspace: Path,
+    env: dict[str, str],
+    setup_actions: list[list[str]],
+) -> None:
+    for command in setup_actions:
+        completed = subprocess.run(
+            command,
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=_command_timeout(command),
+            env=env,
+        )
+        if completed.returncode == 0:
+            continue
+        output = (completed.stdout + "\n" + completed.stderr).strip()[:8000]
+        rendered = " ".join(shlex.quote(part) for part in command)
+        raise StarterPreflightError(
+            f"Starter setup action failed: `{rendered}` exited {completed.returncode}\n{output}"
+        )
+
+
 def _write_starter_preflight_cache(
     *,
     cache_file: Path,
     scenario_name: str,
     starter_fingerprint: str,
+    setup_actions: list[list[str]],
     required_commands: list[list[str]],
 ) -> None:
     cache_file.write_text(
@@ -668,6 +701,7 @@ def _write_starter_preflight_cache(
                 "scenario_name": scenario_name,
                 "starter_fingerprint": starter_fingerprint,
                 "validated_at": datetime.now(UTC).isoformat(),
+                "setup_actions": setup_actions,
                 "required_commands": required_commands,
             },
             indent=2,
@@ -678,6 +712,7 @@ def _write_starter_preflight_cache(
 def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> None:
     """Validate starter baseline commands once per scenario revision."""
     required_commands = request.scenario.verification.required_commands
+    setup_actions = getattr(request.scenario.verification, "setup_actions", [])
     if not required_commands:
         return
 
@@ -701,6 +736,7 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
         cache_file=cache_file,
         scenario_name=request.scenario.name,
         starter_fingerprint=context.starter_source.fingerprint,
+        setup_actions=setup_actions,
         required_commands=required_commands,
     )
 
@@ -1097,6 +1133,11 @@ def _scenario_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
     return {
         "reference_image": request.scenario.visual.reference_image,
         "screenshot_command": request.scenario.visual.screenshot_command,
+        "viewport": (
+            request.scenario.visual.viewport.model_dump(mode="json")
+            if request.scenario.visual.viewport is not None
+            else None
+        ),
         "threshold": request.scenario.visual.threshold,
         "regions": [region.model_dump(mode="json") for region in request.scenario.visual.regions],
     }
@@ -1463,6 +1504,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
 
     experiment_baseline_dir = request.execution_dir / "workspace" / "baseline"
     _ensure_experiment_baseline_workspace(
+        scenario=request.scenario,
         starter_dir=starter_source.path,
         experiment_baseline_dir=experiment_baseline_dir,
         scenario_dir=request.scenario_dir,

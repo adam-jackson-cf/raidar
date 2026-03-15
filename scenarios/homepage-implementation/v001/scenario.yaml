@@ -12,6 +12,9 @@ verification:
   max_gate_failures: 3
   coverage_threshold: 0.8
   min_quality_score: 0.9
+  setup_actions:
+    - ["git", "init"]
+    - ["git", "config", "core.hooksPath", ".githooks"]
   required_commands:
     - ["bun", "run", "typecheck"]
     - ["bun", "run", "lint"]
@@ -26,6 +29,9 @@ verification:
       on_failure: continue
     - name: coverage
       command: ["bun", "run", "test:coverage"]
+      on_failure: continue
+    - name: build
+      command: ["bun", "run", "build"]
       on_failure: continue
 
 acceptance:
@@ -79,20 +85,32 @@ acceptance:
       pattern: Contact
       description: Includes contact navigation copy
     - type: import_present
-      pattern: Features
-      description: Includes a features section heading
+      pattern: Everything You Need
+      description: Includes the authored features section heading
+    - type: import_present
+      pattern: Lightning Fast
+      description: Includes the first authored feature card
+    - type: import_present
+      pattern: Secure by Default
+      description: Includes the second authored feature card
+    - type: import_present
+      pattern: Team Collaboration
+      description: Includes the third authored feature card
+    - type: import_present
+      pattern: All rights reserved
+      description: Includes footer copyright copy
     - type: no_pattern
       pattern: "style={{"
       description: Avoids inline styles
     - type: file_exists
-      pattern: src/components/**/*.tsx
-      description: Uses component structure
+      pattern: src/components/sections/**/*.tsx
+      description: Uses the expected section component structure
   llm_judge_rubric:
-    - criterion: Component composition follows shadcn patterns
+    - criterion: Implementation follows the scenario's section and shared-ui structure
       weight: 0.4
-    - criterion: Error handling follows AGENTS.md patterns
+    - criterion: Styling uses shared theming tokens and design-system primitives consistently
       weight: 0.3
-    - criterion: Code organisation matches project conventions
+    - criterion: Visual hierarchy and polish align with the authored reference design
       weight: 0.3
 
 metrics:
@@ -125,27 +143,37 @@ metrics:
 visual:
   reference_image: ./reference/homepage.png
   screenshot_command: ["bun", "run", "capture-screenshot"]
+  viewport:
+    width: 1440
+    height: 1024
   threshold: 0.95
   regions:
-    - name: hero
+    - name: header
       weight: 0.35
       clip:
         x: 0
         y: 0
         width: 1440
-        height: 320
-    - name: features
+        height: 96
+    - name: hero
       weight: 0.45
       clip:
         x: 0
-        y: 320
+        y: 96
         width: 1440
-        height: 420
+        height: 344
+    - name: features
+      weight: 0.35
+      clip:
+        x: 0
+        y: 440
+        width: 1440
+        height: 424
     - name: footer
       weight: 0.2
       clip:
         x: 0
-        y: 740
+        y: 864
         width: 1440
         height: 160
 

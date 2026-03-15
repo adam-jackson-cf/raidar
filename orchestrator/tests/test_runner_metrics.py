@@ -64,6 +64,10 @@ def _sample_scenario() -> ScenarioDefinition:
                 "root": "starter",
             },
             "verification": {
+                "setup_actions": [
+                    ["git", "init"],
+                    ["git", "config", "core.hooksPath", ".githooks"],
+                ],
                 "gates": [
                     {
                         "name": "typecheck",
@@ -91,6 +95,13 @@ def _sample_scenario() -> ScenarioDefinition:
                 {"type": "core", "id": "resource-efficiency"},
                 {"type": "core", "id": "test-coverage"},
             ],
+            "visual": {
+                "reference_image": "./reference/homepage.png",
+                "screenshot_command": ["bun", "run", "capture-screenshot"],
+                "viewport": {"width": 1440, "height": 1024},
+                "threshold": 0.95,
+                "regions": [],
+            },
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -258,6 +269,7 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
         try:
             start_barrier.wait(timeout=1.0)
             _ensure_experiment_baseline_workspace(
+                scenario=_sample_scenario(),
                 starter_dir=starter_dir,
                 experiment_baseline_dir=experiment_baseline_dir,
                 scenario_dir=scenario_dir,
@@ -275,6 +287,46 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
 
     assert not failures
     assert call_count == 1
+
+
+def test_ensure_experiment_baseline_workspace_runs_setup_actions_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario_dir = tmp_path / "scenario" / "v001"
+    starter_dir = scenario_dir / "starter"
+    starter_dir.mkdir(parents=True, exist_ok=True)
+    experiment_baseline_dir = tmp_path / "experiments" / "experiment-01" / "workspace" / "baseline"
+    setup_calls: list[list[str]] = []
+
+    def fake_prepare_workspace(
+        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+    ) -> tuple[Path, Path | None]:
+        del starter_dir, scenario_dir, harness
+        target_dir.mkdir(parents=True, exist_ok=True)
+        return target_dir, None
+
+    def fake_run_setup_actions(
+        *, workspace: Path, env: dict[str, str], setup_actions: list[list[str]]
+    ) -> None:
+        del env
+        assert workspace == experiment_baseline_dir
+        setup_calls.extend(setup_actions)
+
+    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
+
+    _ensure_experiment_baseline_workspace(
+        scenario=_sample_scenario(),
+        starter_dir=starter_dir,
+        experiment_baseline_dir=experiment_baseline_dir,
+        scenario_dir=scenario_dir,
+        harness="codex-cli",
+    )
+
+    assert setup_calls == [
+        ["git", "init"],
+        ["git", "config", "core.hooksPath", ".githooks"],
+    ]
 
 
 def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
@@ -1073,6 +1125,7 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
         {"type": "core", "id": "resource-efficiency"},
         {"type": "core", "id": "test-coverage"},
     ]
+    assert scenario_spec["visual"]["viewport"] == {"width": 1440, "height": 1024}
 
 
 def test_classify_unscored_reasons_rate_limit():
