@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.8.0] - 2026-03-16
+
+- feat: tighten homepage scenario baseline contract
+- refactor: strengthened the homepage scenario revision 001 to be a better baseline and ensure metric usage is suitable/working
+
 ## [0.7.2] - 2026-03-14
 
 - fix: preserve provider env for standard Harbor runs
