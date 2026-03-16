@@ -135,7 +135,7 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
             scenario_revision="v001",
             starter_root="starter",
             evaluation_profile=(
-                "v2:functional+acceptance+verification-stability+"
+                "functional+acceptance+verification-stability+"
                 "execution-validity+resource-efficiency"
             ),
         ),

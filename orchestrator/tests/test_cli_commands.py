@@ -77,7 +77,7 @@ def test_scenario_list_returns_scenario_ids_with_revisions(tmp_path: Path) -> No
     )
     assert alpha_v1.exit_code == 0, alpha_v1.output
 
-    alpha_v2 = runner.invoke(
+    alpha_revision_two = runner.invoke(
         main,
         [
             "scenario",
@@ -90,7 +90,7 @@ def test_scenario_list_returns_scenario_ids_with_revisions(tmp_path: Path) -> No
             "v002",
         ],
     )
-    assert alpha_v2.exit_code == 0, alpha_v2.output
+    assert alpha_revision_two.exit_code == 0, alpha_revision_two.output
 
     beta_v1 = runner.invoke(
         main,
@@ -410,7 +410,7 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     runner = CliRunner()
     scenario_dir = tmp_path / "scenarios" / "sample-task"
 
-    init_v2 = runner.invoke(
+    init_revision_two = runner.invoke(
         main,
         [
             "scenario",
@@ -423,7 +423,7 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
             "v2",
         ],
     )
-    assert init_v2.exit_code == 0, init_v2.output
+    assert init_revision_two.exit_code == 0, init_revision_two.output
 
     init_v10 = runner.invoke(
         main,
@@ -449,7 +449,7 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     assert f"  v10: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert (
         "Evaluation Profile: "
-        "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
+        "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
         in info_result.output
     )
 
@@ -493,7 +493,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",
     )
     _write_experiment_summary(
@@ -501,7 +501,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
         scenario_name="homepage-implementation",
         model="codex/gpt-5.4-high",
         harness="codex-cli",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression",
         created_at="2026-02-22T11:00:00+00:00",
     )
 
@@ -520,7 +520,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
     assert "homepage-implementation@v001" in text_result.output
     assert "hello-world-smoke@v001" not in text_result.output
     assert (
-        "evaluation_profile=v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
+        "evaluation_profile=functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
         in text_result.output
     )
 
@@ -556,7 +556,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
     assert isinstance(rows, list)
     assert rows[0]["execution_id"] == "20260222-110000Z__homepage-implementation__v001"
     assert rows[0]["evaluation_profile"] == (
-        "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
+        "functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
     )
 
 
@@ -573,7 +573,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-20T10:00:00+00:00",
     )
     _write_experiment_summary(
@@ -581,7 +581,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-21T10:00:00+00:00",
     )
     _write_experiment_summary(
@@ -589,7 +589,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         scenario_name="hello-world-smoke",
         model="codex/gpt-5.4-high",
         harness="codex-cli",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-22T10:00:00+00:00",
     )
 
@@ -625,7 +625,7 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-20T10:00:00+00:00",
     )
     _write_experiment_summary(
@@ -633,7 +633,7 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
         scenario_name="hello-world-smoke",
         model="anthropic/claude-haiku-4-5",
         harness="claude-code",
-        evaluation_profile="v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency",
+        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
         created_at="2026-02-21T10:00:00+00:00",
     )
 
@@ -696,7 +696,7 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
             scenario_name="hello-world-smoke",
             scenario_revision="v001",
             starter_root="starter",
-            evaluation_profile="v2:functional",
+            evaluation_profile="functional",
         ),
         duration_sec=1.0,
         scores=Scorecard(),
@@ -709,7 +709,7 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
             "RunnerApi",
             (),
             {
-                "scenario_evaluation_profile": staticmethod(lambda _scenario: "v2:functional"),
+                "scenario_evaluation_profile": staticmethod(lambda _scenario: "functional"),
                 "scenario_metrics": staticmethod(lambda _scenario: ["functional"]),
             },
         )()

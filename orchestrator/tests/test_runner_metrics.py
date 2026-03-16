@@ -1,6 +1,7 @@
 """Tests for execution-validity and resource-efficiency helpers."""
 
 import json
+import subprocess
 import threading
 import time
 from datetime import UTC, datetime
@@ -8,6 +9,7 @@ from pathlib import Path
 
 import pytest
 
+import raidar.runner as runner
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 from raidar.audit.workspace_diff import directory_fingerprint
 from raidar.runner import (
@@ -85,6 +87,7 @@ def _sample_scenario() -> ScenarioDefinition:
                 ],
                 "coverage_threshold": 0.8,
                 "min_quality_score": 0.9,
+                "workflow": {"atomic_commits_required": False},
             },
             "acceptance": {},
             "metrics": [
@@ -99,7 +102,31 @@ def _sample_scenario() -> ScenarioDefinition:
                 "reference_image": "./reference/homepage.png",
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
                 "viewport": {"width": 1440, "height": 1024},
-                "threshold": 0.95,
+                "scoring": {
+                    "weights": {
+                        "global": 0.25,
+                        "regional": 0.45,
+                        "worst_region": 0.25,
+                        "region_pass_rate": 0.05,
+                    },
+                    "bands": {
+                        "global": {"lower": 0.85, "upper": 0.96},
+                        "regional": {"lower": 0.8, "upper": 0.95},
+                        "worst_region": {"lower": 0.75, "upper": 0.94},
+                    },
+                    "gamma": 2,
+                    "region_pass_threshold": 0.9,
+                },
+                "pass_policy": {
+                    "fail_if_global_below": 0.9,
+                    "fail_if_worst_region_below": 0.85,
+                    "minimum_score": 70,
+                    "minimum_region_pass_rate": 0.75,
+                    "minimum_worst_region": 0.88,
+                    "high_fidelity_score": 85,
+                    "high_fidelity_global": 0.95,
+                    "high_fidelity_worst_region": 0.92,
+                },
                 "regions": [],
             },
             "prompt": {"entry": "prompt/task.md"},
@@ -218,7 +245,7 @@ def _sample_scorecard_context(
         verifier_artifacts={"scorecard": "verifier/scorecard.json"},
         harness_artifacts={"log": "harness/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
-        evidence_artifacts={"homepage_pre": None, "homepage_post": None, "errors": []},
+        evidence_artifacts={"homepage_post": None, "errors": []},
         workspace_prune={"removed": [], "reclaimed_bytes": 0},
         workspace_changes={
             "added": [],
@@ -925,11 +952,14 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                 },
                 "visual": {
                     "similarity": 0.91,
+                    "contract_version": "oracle",
                     "global_similarity": 0.97,
                     "regional_similarity": 0.95,
                     "worst_region_similarity": 0.91,
-                    "threshold_margin_score": 0.2,
-                    "region_pass_rate": 0.5,
+                    "region_decent_pass_rate": 0.5,
+                    "policy_score": 91.0,
+                    "passed": True,
+                    "fidelity_tier": "passed",
                     "expected_region_count": 2,
                     "available_region_count": 2,
                     "region_evidence_status": "present",
@@ -937,16 +967,13 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                     "reference_path": "/tmp/run/visual/reference.png",
                     "diff_path": "/tmp/run/visual/diff.png",
                     "capture_succeeded": True,
-                    "threshold": 0.95,
-                    "threshold_met": False,
-                    "global_threshold_met": True,
-                    "regional_threshold_met": False,
                     "regional_scores": [
                         {
                             "name": "hero",
                             "weight": 0.5,
+                            "normalized_weight": 0.5,
                             "similarity": 0.98,
-                            "threshold_met": True,
+                            "decent_pass": True,
                             "actual_path": "/tmp/run/visual/actual-region-hero.png",
                             "reference_path": "/tmp/run/visual/reference-region-hero.png",
                             "diff_path": "/tmp/run/visual/diff-region-hero.png",
@@ -954,8 +981,9 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
                         {
                             "name": "footer",
                             "weight": 0.5,
+                            "normalized_weight": 0.5,
                             "similarity": 0.91,
-                            "threshold_met": False,
+                            "decent_pass": True,
                             "actual_path": "/tmp/run/visual/actual-region-footer.png",
                             "reference_path": "/tmp/run/visual/reference-region-footer.png",
                             "diff_path": "/tmp/run/visual/diff-region-footer.png",
@@ -1029,9 +1057,9 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs is not None
     assert outputs.functional.passed is True
     assert outputs.visual is not None
-    assert outputs.visual.threshold_met is False
-    assert outputs.visual.global_threshold_met is True
-    assert outputs.visual.regional_threshold_met is False
+    assert outputs.visual.passed is True
+    assert outputs.visual.fidelity_tier == "passed"
+    assert outputs.visual.policy_score == 91.0
     assert outputs.visual.region_evidence_status == "present"
     assert outputs.visual.worst_region_similarity == 0.91
     assert outputs.visual.regional_scores[1]["name"] == "footer"
@@ -1105,7 +1133,7 @@ def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
 def test_scenario_evaluation_profile_uses_ordered_metrics():
     scenario = _sample_scenario()
     assert scenario_evaluation_profile(scenario) == (
-        "v2:functional+acceptance+verification-stability+"
+        "functional+acceptance+verification-stability+"
         "execution-validity+resource-efficiency+test-coverage"
     )
 
@@ -1126,6 +1154,107 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
         {"type": "core", "id": "test-coverage"},
     ]
     assert scenario_spec["visual"]["viewport"] == {"width": 1440, "height": 1024}
+    assert scenario_spec["visual"]["scoring"]["weights"]["global"] == 0.25
+    assert scenario_spec["visual"]["pass_policy"]["minimum_score"] == 70
+    assert scenario_spec["verification"]["workflow"] == {"atomic_commits_required": False}
+
+
+def test_build_scorecard_fails_execution_validity_without_required_atomic_commit(
+    tmp_path: Path,
+) -> None:
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    score_context.request.scenario.verification.workflow.atomic_commits_required = True
+
+    scorecard = build_scorecard(score_context)
+
+    atomic_check = next(
+        check
+        for check in scorecard.execution_validity.checks
+        if check.name == "atomic_commits_present"
+    )
+    assert atomic_check.passed is False
+    assert scorecard.execution_validity.passed is False
+
+
+def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
+    tmp_path: Path,
+) -> None:
+    app_dir = tmp_path / "app"
+    logs_dir = tmp_path / "logs"
+    tests_dir = tmp_path / "tests"
+    app_dir.mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (app_dir / "package.json").write_text("{}", encoding="utf-8")
+    (app_dir / "bun.lock").write_text("", encoding="utf-8")
+    (app_dir / "src" / "components" / "sections").mkdir(parents=True, exist_ok=True)
+    (app_dir / "src" / "components" / "sections" / "Hero.tsx").write_text(
+        "export function Hero() { return null; }\n",
+        encoding="utf-8",
+    )
+    (app_dir / "src" / "components" / "sections" / "nested").mkdir(parents=True, exist_ok=True)
+    (app_dir / "src" / "components" / "sections" / "nested" / "Footer.tsx").write_text(
+        "export function Footer() { return null; }\n",
+        encoding="utf-8",
+    )
+
+    scenario_spec_path = tests_dir / "scenario-spec.json"
+    scenario_spec_path.write_text(
+        json.dumps(
+            {
+                "metrics": [],
+                "verification": {
+                    "max_gate_failures": 3,
+                    "coverage_threshold": None,
+                    "min_quality_score": 0,
+                    "gates": [],
+                    "workflow": {"atomic_commits_required": False},
+                },
+                "acceptance": {
+                    "deterministic_checks": [
+                        {
+                            "type": "file_exists",
+                            "pattern": "src/components/sections/**/*.tsx",
+                            "description": "direct or nested section component exists",
+                        }
+                    ],
+                    "requirements": [],
+                },
+                "weights": {
+                    "functional": 0.25,
+                    "acceptance": 0.25,
+                    "visual": 0.25,
+                    "verification_stability": 0.25,
+                },
+                "baseline_scripts": {},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    score_script = tests_dir / "score-scenario.mjs"
+    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
+
+    completed = subprocess.run(
+        ["bun", str(score_script), str(scenario_spec_path)],
+        cwd=tests_dir,
+        env={
+            **runner.os.environ,
+            "RAIDAR_APP_DIR": str(app_dir),
+            "RAIDAR_LOG_DIR": str(logs_dir),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    scorecard = json.loads((logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+    assert scorecard["acceptance"]["checks"][0]["passed"] is True
 
 
 def test_classify_unscored_reasons_rate_limit():
@@ -1211,7 +1340,29 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
             "visual": {
                 "reference_image": str(reference_rel),
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
-                "threshold": 0.95,
+                "scoring": {
+                    "weights": {
+                        "global": 0.25,
+                        "regional": 0.45,
+                        "worst_region": 0.25,
+                        "region_pass_rate": 0.05,
+                    },
+                    "bands": {
+                        "global": {"lower": 0.85, "upper": 0.96},
+                        "regional": {"lower": 0.8, "upper": 0.95},
+                        "worst_region": {"lower": 0.75, "upper": 0.94},
+                    },
+                },
+                "pass_policy": {
+                    "fail_if_global_below": 0.9,
+                    "fail_if_worst_region_below": 0.85,
+                    "minimum_score": 70,
+                    "minimum_region_pass_rate": 0.75,
+                    "minimum_worst_region": 0.88,
+                    "high_fidelity_score": 85,
+                    "high_fidelity_global": 0.95,
+                    "high_fidelity_worst_region": 0.92,
+                },
                 "regions": [
                     {
                         "name": "nav",
@@ -1391,7 +1542,29 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
             "visual": {
                 "reference_image": "reference/homepage.png",
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
-                "threshold": 0.95,
+                "scoring": {
+                    "weights": {
+                        "global": 0.25,
+                        "regional": 0.45,
+                        "worst_region": 0.25,
+                        "region_pass_rate": 0.05,
+                    },
+                    "bands": {
+                        "global": {"lower": 0.85, "upper": 0.96},
+                        "regional": {"lower": 0.8, "upper": 0.95},
+                        "worst_region": {"lower": 0.75, "upper": 0.94},
+                    },
+                },
+                "pass_policy": {
+                    "fail_if_global_below": 0.9,
+                    "fail_if_worst_region_below": 0.85,
+                    "minimum_score": 70,
+                    "minimum_region_pass_rate": 0.75,
+                    "minimum_worst_region": 0.88,
+                    "high_fidelity_score": 85,
+                    "high_fidelity_global": 0.95,
+                    "high_fidelity_worst_region": 0.92,
+                },
             },
             "acceptance": {},
             "metrics": [

@@ -65,7 +65,7 @@ def _run(
             scenario_revision="v001",
             starter_root="starter",
             evaluation_profile=(
-                "v2:functional+acceptance+verification-stability+"
+                "functional+acceptance+verification-stability+"
                 "execution-validity+resource-efficiency"
             ),
         ),
@@ -92,7 +92,7 @@ def test_create_experiment_summary_aggregates() -> None:
         harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
-            "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
+            "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
         ),
         metrics=[
             "functional",
@@ -148,7 +148,7 @@ def test_create_experiment_summary_excludes_unscored_runs_from_stats() -> None:
         harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
-            "v2:functional+acceptance+verification-stability+execution-validity+resource-efficiency"
+            "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
         ),
         metrics=[
             "functional",
@@ -183,7 +183,7 @@ def test_create_experiment_summary_includes_rerun_metadata() -> None:
         harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
-            "v2:functional+acceptance+verification-stability+"
+            "functional+acceptance+verification-stability+"
             "execution-validity+resource-efficiency+artifact-checks"
         ),
         metrics=[
@@ -217,7 +217,7 @@ def test_create_experiment_summary_marks_visual_review_samples() -> None:
         harness="codex-cli",
         model="codex/gpt-5.4-low",
         evaluation_profile=(
-            "v2:functional+acceptance+verification-stability+execution-validity+"
+            "functional+acceptance+verification-stability+execution-validity+"
             "resource-efficiency+visual-regression"
         ),
         metrics=[
@@ -273,7 +273,7 @@ def test_persist_experiment_writes_experiment_summary_and_report(tmp_path: Path)
             "harness": "codex-cli",
             "model": "codex/gpt-5.4-low",
             "evaluation_profile": (
-                "v2:functional+acceptance+verification-stability+"
+                "functional+acceptance+verification-stability+"
                 "execution-validity+resource-efficiency"
             ),
             "metrics": [

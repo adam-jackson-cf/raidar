@@ -1837,7 +1837,12 @@ def _echo_visual_config(task_def: ScenarioDefinition) -> None:
     click.echo()
     click.echo("Visual Config:")
     click.echo(f"  Reference: {task_def.visual.reference_image}")
-    click.echo(f"  Threshold: {task_def.visual.threshold}")
+    click.echo(
+        "  Visual Pass Policy: "
+        f"score>={task_def.visual.pass_policy.minimum_score}, "
+        f"global>={task_def.visual.pass_policy.fail_if_global_below}, "
+        f"worst_region>={task_def.visual.pass_policy.minimum_worst_region}"
+    )
 
 
 def _echo_acceptance_config(task_def: ScenarioDefinition) -> None:

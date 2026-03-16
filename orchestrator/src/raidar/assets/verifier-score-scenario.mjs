@@ -3,8 +3,8 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 
-const APP_DIR = "/app";
-const LOG_DIR = "/logs/verifier";
+const APP_DIR = process.env.RAIDAR_APP_DIR || "/app";
+const LOG_DIR = process.env.RAIDAR_LOG_DIR || "/logs/verifier";
 const VISUAL_CONFIG_PATH = path.join(APP_DIR, ".raidar-visual-config.json");
 const ODIFF_TOLERANCE = "0.03";
 const DEFAULT_VISUAL_REGIONS = [
@@ -95,19 +95,73 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, value));
 }
 
-function accentuateSimilarity(similarity, threshold) {
-  if (threshold === null || threshold === undefined) {
-    return clamp01(similarity);
+function normalizeWeightRegions(regions) {
+  const total = regions.reduce((sum, region) => sum + region.weight, 0);
+  if (total <= 0) {
+    return regions.map((region) => ({ ...region, normalized_weight: 0 }));
   }
-  return clamp01(similarity + (similarity - threshold) * 2);
+  return regions.map((region) => ({
+    ...region,
+    normalized_weight: region.weight / total,
+  }));
 }
 
-function thresholdMarginScore(similarity, threshold) {
-  if (threshold === null || threshold === undefined) {
-    return null;
+function scoringComponent(value, band, gamma) {
+  if (!band || typeof band.lower !== "number" || typeof band.upper !== "number") {
+    return 0;
   }
-  const lowerBound = Math.max(0, threshold - 0.05);
-  return clamp01((similarity - lowerBound) / Math.max(1e-9, 1 - lowerBound));
+  const normalized = clamp01(
+    (value - band.lower) / Math.max(1e-9, band.upper - band.lower),
+  );
+  return normalized ** gamma;
+}
+
+function visualScoreV2({ globalSimilarity, regionalSimilarity, worstRegionSimilarity, regionPassRate, scoring }) {
+  const weights = scoring?.weights || {};
+  const bands = scoring?.bands || {};
+  const gamma =
+    typeof scoring?.gamma === "number" && Number.isFinite(scoring.gamma)
+      ? scoring.gamma
+      : 2;
+  return (
+    100 *
+    (scoringComponent(globalSimilarity, bands.global, gamma) *
+      (weights.global ?? 0) +
+      scoringComponent(regionalSimilarity, bands.regional, gamma) *
+        (weights.regional ?? 0) +
+      scoringComponent(worstRegionSimilarity, bands.worst_region, gamma) *
+        (weights.worst_region ?? 0) +
+      clamp01(regionPassRate) * (weights.region_pass_rate ?? 0))
+  );
+}
+
+function visualPassPolicyOutcome({
+  globalSimilarity,
+  worstRegionSimilarity,
+  regionPassRate,
+  scoreV2,
+  passPolicy,
+}) {
+  const failGlobal = passPolicy?.fail_if_global_below ?? 0.9;
+  const failWorst = passPolicy?.fail_if_worst_region_below ?? 0.85;
+  if (globalSimilarity < failGlobal || worstRegionSimilarity < failWorst) {
+    return { passed: false, tier: "failed" };
+  }
+  const passed =
+    scoreV2 >= (passPolicy?.minimum_score ?? 70) &&
+    regionPassRate >= (passPolicy?.minimum_region_pass_rate ?? 0.75) &&
+    worstRegionSimilarity >= (passPolicy?.minimum_worst_region ?? 0.88);
+  if (!passed) {
+    return { passed: false, tier: "failed" };
+  }
+  const highFidelity =
+    scoreV2 >= (passPolicy?.high_fidelity_score ?? 85) &&
+    globalSimilarity >= (passPolicy?.high_fidelity_global ?? 0.95) &&
+    worstRegionSimilarity >= (passPolicy?.high_fidelity_worst_region ?? 0.92);
+  return {
+    passed: true,
+    tier: highFidelity ? "high_fidelity" : "passed",
+  };
 }
 
 function resolveVisualRegions(visualSpec) {
@@ -115,13 +169,14 @@ function resolveVisualRegions(visualSpec) {
     Array.isArray(visualSpec?.regions) && visualSpec.regions.length > 0
       ? visualSpec.regions
       : DEFAULT_VISUAL_REGIONS;
-  return configuredRegions.filter(
+  const validRegions = configuredRegions.filter(
     (region) =>
       typeof region?.name === "string" &&
       region.name.length > 0 &&
       typeof region?.weight === "number" &&
       region.weight > 0,
   );
+  return normalizeWeightRegions(validRegions);
 }
 
 function regionEvidenceStatus(expectedCount, availableCount) {
@@ -175,12 +230,36 @@ function collectTestSources() {
 }
 
 function globToRegex(pattern) {
-  const escaped = pattern.replace(/[.+^${}()|[\\]\\\\]/g, "\\\\$&");
-  const regex = escaped
-    .replaceAll("**", "###DOUBLESTAR###")
-    .replaceAll("*", "[^/]*")
-    .replaceAll("###DOUBLESTAR###", ".*");
-  return new RegExp(`^${regex}$`);
+  let regex = "^";
+  for (let idx = 0; idx < pattern.length; ) {
+    const char = pattern[idx];
+    const next = pattern[idx + 1];
+    const following = pattern[idx + 2];
+    if (char === "*" && next === "*" && following === "/") {
+      regex += "(?:.*/)?";
+      idx += 3;
+      continue;
+    }
+    if (char === "*" && next === "*") {
+      regex += ".*";
+      idx += 2;
+      continue;
+    }
+    if (char === "*") {
+      regex += "[^/]*";
+      idx += 1;
+      continue;
+    }
+    if (char === "?") {
+      regex += "[^/]";
+      idx += 1;
+      continue;
+    }
+    regex += /[\\^$+?.()|[\]{}]/.test(char) ? `\\${char}` : char;
+    idx += 1;
+  }
+  regex += "$";
+  return new RegExp(regex);
 }
 
 function filesMatchingPattern(pattern) {
@@ -539,52 +618,17 @@ function buildPerformanceGateChecks({
       `threshold=${coverage.threshold}, ` +
       `measured=${coverage.measured}, source=${coverage.source}`,
   });
-  const visualPassed = visual
-    ? visual.capture_succeeded && visual.global_threshold_met === true
-    : true;
   checks.push({
-    name: "visual_threshold_met",
-    passed: visualPassed,
+    name: "visual_passed",
+    passed: visual ? visual.capture_succeeded && visual.passed === true : true,
     evidence: visual
       ? `captured=${visual.capture_succeeded}, ` +
-        `global_similarity=${visual.global_similarity}, threshold=${visual.threshold}, ` +
-        `global_threshold_met=${visual.global_threshold_met}`
+        `global_similarity=${visual.global_similarity}, ` +
+        `regional_similarity=${visual.regional_similarity}, ` +
+        `worst_region_similarity=${visual.worst_region_similarity}, ` +
+        `region_decent_pass_rate=${visual.region_decent_pass_rate}, ` +
+        `policy_score=${visual.policy_score}, passed=${visual.passed}, fidelity_tier=${visual.fidelity_tier}`
       : "Visual threshold not configured.",
-  });
-  const regionScores = Array.isArray(visual?.regional_scores)
-    ? visual.regional_scores
-    : [];
-  const regionalThreshold = visual?.threshold ?? null;
-  const expectedRegionCount =
-    typeof visual?.expected_region_count === "number"
-      ? visual.expected_region_count
-      : 0;
-  const regionalStatus =
-    typeof visual?.region_evidence_status === "string"
-      ? visual.region_evidence_status
-      : regionEvidenceStatus(expectedRegionCount, regionScores.length);
-  const regionalVisualPassed =
-    regionalThreshold === null || expectedRegionCount === 0
-      ? true
-      : regionalStatus === "present" && visual?.regional_threshold_met === true;
-  const worstRegion =
-    regionScores.length > 0
-      ? regionScores.reduce((worst, current) =>
-          current.similarity < worst.similarity ? current : worst,
-        )
-      : null;
-  checks.push({
-    name: "visual_regions_threshold_met",
-    passed: regionalVisualPassed,
-    evidence:
-      expectedRegionCount === 0
-        ? "Region visual scoring not configured."
-        : regionScores.length === 0
-          ? `Region visual scores unavailable; status=${regionalStatus}, ` +
-            `expected_regions=${expectedRegionCount}, available_regions=0`
-          : `threshold=${regionalThreshold}, status=${regionalStatus}, ` +
-            `worst_region=${worstRegion.name}:${worstRegion.similarity.toFixed(4)}, ` +
-            `regions=${regionScores.length}/${expectedRegionCount}`,
   });
   checks.push({
     name: "all_requirements_present",
@@ -727,7 +771,8 @@ function main() {
     writeJson(VISUAL_CONFIG_PATH, {
       viewport: scenarioSpec.visual.viewport || null,
       regions: scenarioSpec.visual.regions || [],
-      threshold: scenarioSpec.visual.threshold ?? null,
+      scoring: scenarioSpec.visual.scoring || null,
+      pass_policy: scenarioSpec.visual.pass_policy || null,
       reference_image: scenarioSpec.visual.reference_image || null,
     });
     const screenshot = runCommand(scenarioSpec.visual.screenshot_command || []);
@@ -742,9 +787,10 @@ function main() {
     let globalSimilarity = 0;
     let regionalSimilarity = null;
     let worstRegionSimilarity = null;
-    let thresholdMargin = null;
-    let regionPassRate = null;
-    let regionalWeightTotal = 0;
+    let regionPassRate = 1;
+    let scoreV2 = 0;
+    let passV2 = false;
+    let tierV2 = "failed";
     let diffOutput = null;
     const regionalScores = [];
     const visualRegions = resolveVisualRegions(scenarioSpec.visual);
@@ -796,87 +842,70 @@ function main() {
           regionalScores.push({
             name: region.name,
             weight: region.weight,
+            normalized_weight: region.normalized_weight,
             similarity: regionCompare.similarity,
-            threshold_met:
-              scenarioSpec.visual.threshold === null
-                ? null
-                : regionCompare.similarity >= scenarioSpec.visual.threshold,
+            decent_pass:
+              regionCompare.similarity >=
+              (scenarioSpec.visual.scoring?.region_pass_threshold ?? 0.9),
             actual_path: actualRegionPath,
             reference_path: referenceRegionPath,
             diff_path: regionCompare.diff_path,
             odiff_exit_code: regionCompare.exit_code,
           });
-          weightedRegionalSum += region.weight * regionCompare.similarity;
-          regionalWeightTotal += region.weight;
+          weightedRegionalSum +=
+            region.normalized_weight * regionCompare.similarity;
         }
 
-        if (regionalScores.length > 0 && regionalWeightTotal > 0) {
-          regionalSimilarity = weightedRegionalSum / regionalWeightTotal;
+        if (regionalScores.length > 0) {
+          regionalSimilarity = weightedRegionalSum;
           worstRegionSimilarity = regionalScores.reduce((worst, current) =>
             current.similarity < worst.similarity ? current : worst,
           ).similarity;
-          thresholdMargin = thresholdMarginScore(
-            worstRegionSimilarity,
-            scenarioSpec.visual.threshold,
-          );
-          const emphasizedRegional = accentuateSimilarity(
-            regionalSimilarity,
-            scenarioSpec.visual.threshold,
-          );
-          const emphasizedWorstRegion = accentuateSimilarity(
-            worstRegionSimilarity,
-            scenarioSpec.visual.threshold,
-          );
-          similarity = clamp01(
-            globalSimilarity * 0.3 +
-              emphasizedRegional * 0.45 +
-              emphasizedWorstRegion * 0.25,
-          );
         } else {
-          thresholdMargin = thresholdMarginScore(
-            globalSimilarity,
-            scenarioSpec.visual.threshold,
-          );
-          similarity = clamp01(
-            globalSimilarity * 0.6 +
-              accentuateSimilarity(
-                globalSimilarity,
-                scenarioSpec.visual.threshold,
-              ) *
-                0.4,
-          );
+          regionalSimilarity = globalSimilarity;
+          worstRegionSimilarity = globalSimilarity;
         }
+        const regionPassThreshold =
+          scenarioSpec.visual.scoring?.region_pass_threshold ?? 0.9;
+        const passingRegions = regionalScores.filter(
+          (region) => region.similarity >= regionPassThreshold,
+        ).length;
+        regionPassRate =
+          expectedRegionCount === 0 ? 1 : passingRegions / expectedRegionCount;
+        scoreV2 = visualScoreV2({
+          globalSimilarity,
+          regionalSimilarity: regionalSimilarity ?? globalSimilarity,
+          worstRegionSimilarity: worstRegionSimilarity ?? globalSimilarity,
+          regionPassRate,
+          scoring: scenarioSpec.visual.scoring,
+        });
+        const policyOutcome = visualPassPolicyOutcome({
+          globalSimilarity,
+          worstRegionSimilarity: worstRegionSimilarity ?? globalSimilarity,
+          regionPassRate,
+          scoreV2,
+          passPolicy: scenarioSpec.visual.pass_policy,
+        });
+        passV2 = policyOutcome.passed;
+        tierV2 = policyOutcome.tier;
+        similarity = clamp01(scoreV2 / 100);
       }
     }
-    const threshold = scenarioSpec.visual.threshold ?? null;
     const availableRegionCount = regionalScores.length;
     const evidenceStatus = regionEvidenceStatus(
       expectedRegionCount,
       availableRegionCount,
     );
-    if (threshold !== null) {
-      const passingRegions = regionalScores.filter(
-        (region) => region.similarity >= threshold,
-      ).length;
-      regionPassRate =
-        expectedRegionCount === 0 ? null : passingRegions / expectedRegionCount;
-    }
-    const globalThresholdMet =
-      threshold === null ? null : globalSimilarity >= threshold;
-    const regionalThresholdMet =
-      threshold === null
-        ? null
-        : expectedRegionCount > 0 &&
-          evidenceStatus === "present" &&
-          regionalScores.every((region) => region.similarity >= threshold);
     visual = {
       similarity,
       global_similarity: globalSimilarity,
       regional_similarity: regionalSimilarity,
       worst_region_similarity: worstRegionSimilarity,
-      threshold_margin_score: thresholdMargin,
-      region_pass_rate: regionPassRate,
-      regional_weight_sum: regionalWeightTotal,
+      contract_version: "oracle",
+      region_decent_pass_rate: regionPassRate,
+      policy_score: scoreV2,
+      passed: passV2,
+      fidelity_tier: tierV2,
       expected_region_count: expectedRegionCount,
       available_region_count: availableRegionCount,
       region_evidence_status: evidenceStatus,
@@ -887,16 +916,7 @@ function main() {
       capture_succeeded: captureSucceeded,
       capture_error: captureError,
       odiff_tolerance: Number.parseFloat(ODIFF_TOLERANCE),
-      threshold,
       score: similarity,
-      threshold_met:
-        threshold === null
-          ? null
-          : expectedRegionCount > 0
-            ? globalThresholdMet === true && regionalThresholdMet === true
-            : globalThresholdMet,
-      global_threshold_met: globalThresholdMet,
-      regional_threshold_met: regionalThresholdMet,
     };
   }
 

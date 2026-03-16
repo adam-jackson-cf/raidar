@@ -58,8 +58,11 @@ class VisualScore(BaseModel):
     global_similarity: float | None = None
     regional_similarity: float | None = None
     worst_region_similarity: float | None = None
-    threshold_margin_score: float | None = None
-    region_pass_rate: float | None = None
+    contract_version: str | None = None
+    region_decent_pass_rate: float | None = None
+    policy_score: float | None = None
+    passed: bool | None = None
+    fidelity_tier: Literal["failed", "passed", "high_fidelity"] | None = None
     expected_region_count: int = 0
     available_region_count: int = 0
     region_evidence_status: Literal["present", "partial", "missing", "not_configured"] = (
@@ -70,10 +73,6 @@ class VisualScore(BaseModel):
     diff_path: str | None = None
     capture_succeeded: bool = False
     capture_error: str | None = None
-    threshold: float | None = None
-    threshold_met: bool | None = None
-    global_threshold_met: bool | None = None
-    regional_threshold_met: bool | None = None
     regional_scores: list[dict[str, Any]] = Field(default_factory=list)
 
     @computed_field

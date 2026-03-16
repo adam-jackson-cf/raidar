@@ -102,7 +102,6 @@ def evaluate_visual(
     workspace: Path,
     reference_image: Path,
     screenshot_command: list[str],
-    threshold: float | None = None,
 ) -> VisualScore:
     """Evaluate visual similarity to reference design.
 
@@ -110,14 +109,9 @@ def evaluate_visual(
         workspace: Path to workspace directory
         reference_image: Path to reference design image
         screenshot_command: Command argv to capture screenshot
-        threshold: Minimum similarity threshold (not used in scoring, for reference)
-
     Returns:
         VisualScore with similarity and diff path
     """
-    if threshold is None:
-        threshold = settings.visual.similarity_threshold
-
     actual_path = workspace / "actual.png"
     diff_path = workspace / "diff.png"
 
@@ -127,7 +121,7 @@ def evaluate_visual(
             similarity=0.0,
             diff_path=None,
             capture_succeeded=False,
-            threshold=threshold,
+            contract_version="legacy-direct",
         )
 
     # Compare images (odiff_threshold is used for anti-aliasing tolerance)
@@ -140,7 +134,8 @@ def evaluate_visual(
 
     return VisualScore(
         similarity=similarity,
+        global_similarity=similarity,
         diff_path=diff_output,
         capture_succeeded=True,
-        threshold=threshold,
+        contract_version="legacy-direct",
     )
