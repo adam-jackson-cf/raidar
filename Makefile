@@ -46,7 +46,7 @@ endif
 	env-setup harness-list harness-validate scenario-list scenario-init scenario-info scenario-validate \
 	smoke experiment-run matrix-run \
 	experiments-list experiments-prune \
-	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report \
+	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report auto-research-demo-smoke \
 	quality
 
 define require_var
@@ -95,6 +95,8 @@ help:
 	@echo "                                                        Show current objective and loop state"
 	@echo "  make auto-research-report OBJECTIVE_ID=..."
 	@echo "                                                        Print the current objective report"
+	@echo "  make auto-research-demo-smoke"
+	@echo "                                                        Run a PI-free scripted smoke workflow in a temporary workspace"
 
 env-setup:
 	@$(RAIDAR) env setup
@@ -219,6 +221,9 @@ auto-research-report:
 	@$(AUTO_RESEARCHER) report \
 		--objective-id "$(OBJECTIVE_ID)" \
 		--pi-binary "$(PI_BINARY)"
+
+auto-research-demo-smoke:
+	@$(AUTO_RESEARCHER) demo-smoke
 
 quality:
 	@$(RAIDAR) quality gates
