@@ -310,17 +310,18 @@ class AutoResearchEngine:
     def _create_loop(self, objective: ObjectiveState, loop_plan: LoopPlan) -> ResearchLoopState:
         if objective.scenario_ref is None or objective.scenario_slug is None:
             raise RuntimeError("Objective is missing approved scenario metadata.")
-        loop_root = self.layout.loop_root(objective.objective_id, loop_plan.loop_id)
+        resolved_loop_id = self._resolved_loop_id(objective, loop_plan.loop_id)
+        loop_root = self.layout.loop_root(objective.objective_id, resolved_loop_id)
         if loop_root.exists():
-            raise RuntimeError(f"Loop already exists: {loop_plan.loop_id}")
+            raise RuntimeError(f"Loop already exists: {resolved_loop_id}")
         candidate_root = self.layout.loop_candidate_root(
-            objective.objective_id, loop_plan.loop_id, objective.scenario_slug
+            objective.objective_id, resolved_loop_id, objective.scenario_slug
         )
         copy_tree(scenario_root_from_yaml(Path(objective.scenario_ref)), candidate_root)
         current_revision = Path(objective.scenario_ref).parent.name
         candidate_yaml = candidate_root / current_revision / "scenario.yaml"
         loop = ResearchLoopState(
-            loop_id=loop_plan.loop_id,
+            loop_id=resolved_loop_id,
             objective_id=objective.objective_id,
             title=loop_plan.title,
             hypothesis=loop_plan.hypothesis,
@@ -582,9 +583,10 @@ class AutoResearchEngine:
         self, objective: ObjectiveState, *, planned_loops: list[LoopPlan], executed_loop_id: str
     ) -> None:
         for loop_plan in planned_loops:
-            if loop_plan.loop_id == executed_loop_id:
+            resolved_loop_id = self._resolved_loop_id(objective, loop_plan.loop_id)
+            if resolved_loop_id == executed_loop_id:
                 continue
-            state_path = self.layout.loop_state_path(objective.objective_id, loop_plan.loop_id)
+            state_path = self.layout.loop_state_path(objective.objective_id, resolved_loop_id)
             if not state_path.exists():
                 continue
             loop = ResearchLoopState.model_validate(read_json(state_path))
@@ -676,6 +678,11 @@ class AutoResearchEngine:
         stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%SZ").lower()
         return f"{slugify(goal)}-{stamp}"
 
+    def _resolved_loop_id(self, objective: ObjectiveState, raw_loop_id: str) -> str:
+        if raw_loop_id in {"", ".", ".."} or "/" in raw_loop_id:
+            raise RuntimeError(f"Planner returned invalid loop id: {raw_loop_id}")
+        return f"round-{objective.planner_round:02d}__{raw_loop_id}"
+
     def _designer_instruction(self, objective: ObjectiveState, output_path: Path) -> str:
         return "\n".join(
             [
@@ -737,7 +744,7 @@ class AutoResearchEngine:
                     {
                         "loops": [
                             {
-                                "loop_id": "loop-001",
+                                "loop_id": "prompt-refinement",
                                 "title": "short title",
                                 "hypothesis": "why this may improve outcomes",
                                 "instructions": "specific bounded change direction",
@@ -747,6 +754,8 @@ class AutoResearchEngine:
                     }
                 ),
                 "Return at most the configured number of sibling research loops.",
+                "loop_id must be filesystem-safe and unique within this planner response only.",
+                "The engine will namespace every loop_id by planner round before writing state.",
             ]
         )
 

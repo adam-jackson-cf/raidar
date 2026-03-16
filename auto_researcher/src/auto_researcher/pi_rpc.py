@@ -162,7 +162,7 @@ class _PiRpcClient:
             line = self._process.stdout.readline()
             if line == "":
                 stderr = self._process.stderr.read().strip() if self._process.stderr else ""
-            raise RuntimeError(f"PI RPC process closed unexpectedly. {stderr}".strip())
+                raise RuntimeError(f"PI RPC process closed unexpectedly. {stderr}".strip())
             return json.loads(line)
 
     def send(self, command_type: str, **payload: Any) -> dict[str, Any]:

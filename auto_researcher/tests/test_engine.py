@@ -314,6 +314,10 @@ def _critic_payload() -> dict[str, Any]:
     return {"decision": "approve", "summary": "Scenario is measurable.", "risks": []}
 
 
+def _resolved_loop_id(planner_round: int, raw_loop_id: str) -> str:
+    return f"round-{planner_round:02d}__{raw_loop_id}"
+
+
 def test_init_creates_objective_artifacts_and_draft_only(tmp_path: Path) -> None:
     engine, role_runner, _raidar, layout = _make_engine(
         tmp_path,
@@ -521,7 +525,9 @@ def test_promotion_uses_research_and_benchmark_roots_and_updates_best_benchmark(
     session_dirs = {call["role"]: call["session_dir"] for call in role_runner.calls}
     assert session_dirs["planner"] != session_dirs["executor"] != session_dirs["reviewer"]
 
-    loop_state = read_json(layout.loop_state_path(created.objective_id, "loop-001"))
+    loop_state = read_json(
+        layout.loop_state_path(created.objective_id, _resolved_loop_id(1, "loop-001"))
+    )
     diff_path = Path(loop_state["latest_diff_ref"])
     diff_payload = read_json(diff_path)
     assert diff_path.is_file()
@@ -641,7 +647,118 @@ def test_mutation_boundary_violation_blocks_loop(tmp_path: Path) -> None:
 
     completed = engine.run_objective(created.objective_id)
 
-    loop_state = read_json(layout.loop_state_path(created.objective_id, "loop-001"))
+    loop_state = read_json(
+        layout.loop_state_path(created.objective_id, _resolved_loop_id(1, "loop-001"))
+    )
     assert completed.best_benchmark_ref is not None
     assert loop_state["status"] == "blocked"
     assert loop_state["stop_reason"] == "illegal-mutation-boundary"
+
+
+def test_run_namespaces_reused_loop_ids_across_planner_rounds(tmp_path: Path) -> None:
+    metric_ids = ["functional", "acceptance", "verification-stability"]
+
+    def _allowed_edit(candidate_yaml: Path) -> None:
+        (candidate_yaml.parent / "prompt" / "task.md").write_text(
+            "Iterated prompt\n", encoding="utf-8"
+        )
+
+    engine, role_runner, _raidar, layout = _make_engine(
+        tmp_path,
+        role_scripts=[
+            {"role": "designer", "payload": _design_payload()},
+            {"role": "critic", "payload": _critic_payload()},
+            {
+                "role": "planner",
+                "payload": {
+                    "loops": [
+                        {
+                            "loop_id": "loop-001",
+                            "title": "Prompt refinement",
+                            "hypothesis": "Iteration one",
+                            "instructions": "Tighten prompt wording",
+                        }
+                    ],
+                    "notes": [],
+                },
+            },
+            {
+                "role": "executor",
+                "payload": {
+                    "summary": "Iteration one change",
+                    "changed_files": ["prompt/task.md"],
+                    "rationale": "Prepare follow-up work.",
+                },
+                "edit": _allowed_edit,
+            },
+            {
+                "role": "reviewer",
+                "payload": {
+                    "recommended_action": "spawn_next",
+                    "summary": "Continue with another planner round.",
+                    "strengths": [],
+                    "concerns": [],
+                },
+            },
+            {
+                "role": "governor",
+                "payload": {"action": "spawn_next", "reasoning": "Schedule another round."},
+            },
+            {
+                "role": "planner",
+                "payload": {
+                    "loops": [
+                        {
+                            "loop_id": "loop-001",
+                            "title": "Prompt refinement again",
+                            "hypothesis": "Iteration two",
+                            "instructions": "Tighten prompt wording again",
+                        }
+                    ],
+                    "notes": [],
+                },
+            },
+            {
+                "role": "executor",
+                "payload": {
+                    "summary": "Iteration two change",
+                    "changed_files": ["prompt/task.md"],
+                    "rationale": "Final iteration.",
+                },
+                "edit": _allowed_edit,
+            },
+            {
+                "role": "reviewer",
+                "payload": {
+                    "recommended_action": "discard",
+                    "summary": "Stop after the second round.",
+                    "strengths": [],
+                    "concerns": [],
+                },
+            },
+            {"role": "governor", "payload": {"action": "discard", "reasoning": "Stop now."}},
+        ],
+        experiment_payloads=[
+            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
+            _summary_payload(composite=0.76, quality=0.81, diagnostic=0.79, metric_ids=metric_ids),
+            _summary_payload(composite=0.77, quality=0.82, diagnostic=0.8, metric_ids=metric_ids),
+        ],
+    )
+    created = engine.init_objective(_init_request(max_revisions=3, max_parallel_loops=1))
+    engine.approve_scenario(created.objective_id)
+
+    completed = engine.run_objective(created.objective_id)
+
+    assert completed.status == "completed"
+    first_loop_state = read_json(
+        layout.loop_state_path(created.objective_id, _resolved_loop_id(1, "loop-001"))
+    )
+    second_loop_state = read_json(
+        layout.loop_state_path(created.objective_id, _resolved_loop_id(2, "loop-001"))
+    )
+    assert first_loop_state["stop_reason"] == "spawn-next"
+    assert second_loop_state["stop_reason"] == "discarded"
+    planner_calls = [call for call in role_runner.calls if call["role"] == "planner"]
+    assert len(planner_calls) == 2
+    assert "unique within this planner response only" in planner_calls[0]["instruction"]
+    assert "namespace every loop_id by planner round" in planner_calls[1]["instruction"]
