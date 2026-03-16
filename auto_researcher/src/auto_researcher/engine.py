@@ -1,0 +1,808 @@
+"""Objective orchestration engine for PI-driven autoresearch."""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import Any
+
+from .models import (
+    ComparisonGuard,
+    CriticReview,
+    ExecutorMemo,
+    GovernorDecision,
+    LoopPlan,
+    ObjectiveInitRequest,
+    ObjectiveState,
+    PlannerPlan,
+    ResearchLoopState,
+    ReviewMemo,
+    RoleModelConfig,
+    ScenarioDesign,
+)
+from .pi_rpc import RoleExecution, RoleRunner
+from .raidar_cli import RaidarClient
+from .storage import (
+    WorkspaceLayout,
+    copy_tree,
+    ensure_dir,
+    experiment_summary,
+    illegal_mutations,
+    load_objective_state,
+    read_json,
+    scenario_root_from_yaml,
+    scenario_timeout_sec,
+    slugify,
+    snapshot_tree,
+    sync_tree,
+    update_scenario_document,
+    update_scenario_revision,
+    utc_now_iso,
+    write_json,
+    write_objective_state,
+    write_text,
+)
+
+DEFAULT_LOCAL_REVISION = "v001"
+
+
+@dataclass(slots=True)
+class AutoResearchEngine:
+    """Coordinate objective intake, approval, loop execution, and promotion."""
+
+    layout: WorkspaceLayout
+    role_runner: RoleRunner
+    raidar: RaidarClient
+
+    def init_objective(self, request: ObjectiveInitRequest) -> ObjectiveState:
+        self.role_runner.validate()
+        objective_id = request.objective_id or self._generate_objective_id(request.goal)
+        if self.layout.objective_state_path(objective_id).exists():
+            raise RuntimeError(f"Objective already exists: {objective_id}")
+        self._ensure_objective_dirs(objective_id)
+        objective = ObjectiveState(
+            objective_id=objective_id,
+            created_at_utc=utc_now_iso(),
+            updated_at_utc=utc_now_iso(),
+            status="drafting_scenario",
+            goal=request.goal,
+            target_harness=request.target_harness,
+            target_model=request.target_model,
+            approval_mode=request.approval_mode,
+            loop_topology=request.loop_topology,
+            max_revisions=request.max_revisions,
+            max_parallel_loops=request.max_parallel_loops,
+            benchmark_repeats=request.benchmark_repeats,
+            research_repeats=request.research_repeats,
+            mutation_surface=list(request.mutation_surface),
+            role_models=self._resolved_role_models(request.role_models),
+        )
+        self._write_brief(objective)
+        self._save_objective(objective)
+
+        design_path = self.layout.objective_plan_dir(objective_id) / "scenario-design.json"
+        self._run_role(
+            objective=objective,
+            role="designer",
+            instruction=self._designer_instruction(objective, design_path),
+        )
+        design = ScenarioDesign.model_validate(read_json(design_path))
+
+        draft_root = self.layout.objective_draft_root(objective_id, design.scenario_slug)
+        self.raidar.scenario_init(
+            path=draft_root,
+            name=design.scenario_name,
+            scenario_revision=DEFAULT_LOCAL_REVISION,
+            starter_root=design.starter_root,
+            prompt_entry=design.prompt_entry,
+            difficulty=design.difficulty,
+            category=design.category,
+            timeout_sec=design.timeout_sec,
+        )
+        draft_yaml = draft_root / DEFAULT_LOCAL_REVISION / "scenario.yaml"
+        update_scenario_document(
+            draft_yaml,
+            name=design.scenario_name,
+            description=design.description,
+            difficulty=design.difficulty,
+            category=design.category,
+            timeout_sec=design.timeout_sec,
+            starter_root=design.starter_root,
+            prompt_entry=design.prompt_entry,
+            metric_ids=design.metric_ids,
+            required_commands=design.required_commands,
+            gates=[gate.model_dump(mode="json") for gate in design.gates],
+        )
+        prompt_path = draft_root / DEFAULT_LOCAL_REVISION / design.prompt_entry
+        write_text(prompt_path, design.prompt_text.rstrip() + "\n")
+        ensure_dir(draft_root / DEFAULT_LOCAL_REVISION / design.starter_root)
+        self.raidar.scenario_validate(scenario_yaml=draft_yaml)
+
+        critic_path = self.layout.objective_review_dir(objective_id) / "scenario-review.json"
+        self._run_role(
+            objective=objective,
+            role="critic",
+            instruction=self._critic_instruction(objective, draft_yaml, design_path, critic_path),
+        )
+        CriticReview.model_validate(read_json(critic_path))
+
+        objective.status = "awaiting_scenario_approval"
+        objective.updated_at_utc = utc_now_iso()
+        objective.scenario_slug = design.scenario_slug
+        objective.scenario_name = design.scenario_name
+        objective.draft_scenario_ref = str(draft_yaml)
+        objective.frozen_metric_ids = list(design.metric_ids)
+        objective.latest_scenario_review_ref = str(critic_path)
+        self._save_objective(objective)
+        self._write_report(objective)
+        return objective
+
+    def approve_scenario(self, objective_id: str) -> ObjectiveState:
+        objective = self._load_objective(objective_id)
+        if objective.status != "awaiting_scenario_approval":
+            raise RuntimeError(
+                f"Objective must be awaiting scenario approval, got {objective.status}."
+            )
+        if objective.draft_scenario_ref is None or objective.scenario_slug is None:
+            raise RuntimeError("Objective is missing draft scenario metadata.")
+        draft_yaml = Path(objective.draft_scenario_ref)
+        draft_root = scenario_root_from_yaml(draft_yaml)
+        canonical_root = self.layout.scenarios_root / objective.scenario_slug
+        if canonical_root.exists():
+            raise RuntimeError(f"Scenario root already exists: {canonical_root}")
+        ensure_dir(canonical_root.parent)
+        copy_tree(draft_root, canonical_root)
+        scenario_yaml = canonical_root / draft_yaml.parent.name / "scenario.yaml"
+        timeout_sec = scenario_timeout_sec(scenario_yaml)
+        baseline = self.raidar.experiment_run(
+            scenario_yaml=scenario_yaml,
+            harness=objective.target_harness,
+            model=objective.target_model,
+            timeout_sec=timeout_sec,
+            repeats=objective.benchmark_repeats,
+            repeat_parallel=1,
+            experiment_kind="benchmark",
+        )
+
+        objective.status = "active"
+        objective.updated_at_utc = utc_now_iso()
+        objective.scenario_ref = str(scenario_yaml)
+        objective.best_benchmark_ref = str(baseline["summary_path"])
+        self._save_objective(objective)
+        self._write_report(objective)
+        return objective
+
+    def run_objective(self, objective_id: str) -> ObjectiveState:
+        objective = self._load_objective(objective_id)
+        if objective.status != "active":
+            raise RuntimeError(f"Objective must be active before run, got {objective.status}.")
+        if objective.scenario_ref is None or objective.best_benchmark_ref is None:
+            raise RuntimeError("Objective is missing approved scenario or benchmark baseline.")
+
+        max_plan_rounds = max(1, objective.max_revisions * objective.max_parallel_loops)
+        while objective.status == "active":
+            if self._should_stop_planning(objective, max_plan_rounds):
+                break
+            promoted, requested_follow_up = self._execute_plan_round(objective)
+            objective = self._load_objective(objective.objective_id)
+            if objective.status != "active":
+                break
+            if promoted:
+                continue
+            if not requested_follow_up:
+                objective.status = "completed"
+                objective.stop_reason = "no-further-loop-actions"
+                break
+
+        objective.updated_at_utc = utc_now_iso()
+        self._save_objective(objective)
+        self._write_report(objective)
+        return objective
+
+    def objective_status(self, objective_id: str) -> dict[str, Any]:
+        objective = self._load_objective(objective_id)
+        loops = self._loop_states(objective_id)
+        return {
+            "objective_id": objective.objective_id,
+            "status": objective.status,
+            "goal": objective.goal,
+            "scenario_ref": objective.scenario_ref,
+            "draft_scenario_ref": objective.draft_scenario_ref,
+            "best_benchmark_ref": objective.best_benchmark_ref,
+            "revision_count": objective.revision_count,
+            "max_revisions": objective.max_revisions,
+            "max_parallel_loops": objective.max_parallel_loops,
+            "loop_statuses": {loop.loop_id: loop.status for loop in loops},
+            "stop_reason": objective.stop_reason,
+        }
+
+    def render_objective_report(self, objective_id: str) -> str:
+        objective = self._load_objective(objective_id)
+        loops = self._loop_states(objective_id)
+        lines = [
+            f"# Objective {objective.objective_id}",
+            "",
+            f"- status: `{objective.status}`",
+            f"- goal: {objective.goal}",
+            f"- target: `{objective.target_harness}` / `{objective.target_model}`",
+            "- scenario_ref: "
+            f"`{objective.scenario_ref or objective.draft_scenario_ref or '(none)'}`",
+            f"- best_benchmark_ref: `{objective.best_benchmark_ref or '(none)'}`",
+            f"- revisions: `{objective.revision_count}` / `{objective.max_revisions}`",
+            f"- stop_reason: `{objective.stop_reason or '(active)'}`",
+        ]
+        if objective.frozen_metric_ids:
+            lines.append(f"- frozen_metrics: `{', '.join(objective.frozen_metric_ids)}`")
+        if loops:
+            lines.extend(["", "## Research Loops"])
+            for loop in loops:
+                lines.append(
+                    f"- {loop.loop_id}: `{loop.status}` iteration={loop.iteration} "
+                    f"candidate=`{loop.candidate_scenario_ref}`"
+                )
+        return "\n".join(lines) + "\n"
+
+    def _planner_round(self, objective: ObjectiveState) -> PlannerPlan:
+        objective.planner_round += 1
+        objective.updated_at_utc = utc_now_iso()
+        self._save_objective(objective)
+        plan_path = (
+            self.layout.objective_plan_dir(objective.objective_id)
+            / f"planner-round-{objective.planner_round:02d}.json"
+        )
+        self._run_role(
+            objective=objective,
+            role="planner",
+            instruction=self._planner_instruction(objective, plan_path),
+        )
+        plan = PlannerPlan.model_validate(read_json(plan_path))
+        seen_ids: set[str] = set()
+        for loop in plan.loops:
+            if loop.loop_id in seen_ids:
+                raise RuntimeError(f"Planner returned duplicate loop id: {loop.loop_id}")
+            seen_ids.add(loop.loop_id)
+        if len(plan.loops) > objective.max_parallel_loops:
+            raise RuntimeError("Planner exceeded max_parallel_loops constraint.")
+        return plan
+
+    def _should_stop_planning(self, objective: ObjectiveState, max_plan_rounds: int) -> bool:
+        if objective.revision_count >= objective.max_revisions:
+            objective.status = "completed"
+            objective.stop_reason = "revision-budget-exhausted"
+            return True
+        if objective.planner_round >= max_plan_rounds:
+            objective.status = "completed"
+            objective.stop_reason = "planner-round-budget-exhausted"
+            return True
+        return False
+
+    def _execute_plan_round(self, objective: ObjectiveState) -> tuple[bool, bool]:
+        plan = self._planner_round(objective)
+        if not plan.loops:
+            objective.status = "completed"
+            objective.stop_reason = "planner-returned-no-loops"
+            self._save_objective(objective)
+            return False, False
+
+        promoted = False
+        requested_follow_up = False
+        for loop_plan in plan.loops[: objective.max_parallel_loops]:
+            loop = self._create_loop(objective, loop_plan)
+            loop = self._run_loop(objective, loop)
+            if loop.status == "promoted":
+                promoted = True
+                self._mark_superseded_loops(
+                    objective,
+                    planned_loops=plan.loops,
+                    executed_loop_id=loop.loop_id,
+                )
+                break
+            if loop.stop_reason == "spawn-next":
+                requested_follow_up = True
+            objective = self._load_objective(objective.objective_id)
+            if objective.status != "active":
+                break
+        return promoted, requested_follow_up
+
+    def _create_loop(self, objective: ObjectiveState, loop_plan: LoopPlan) -> ResearchLoopState:
+        if objective.scenario_ref is None or objective.scenario_slug is None:
+            raise RuntimeError("Objective is missing approved scenario metadata.")
+        loop_root = self.layout.loop_root(objective.objective_id, loop_plan.loop_id)
+        if loop_root.exists():
+            raise RuntimeError(f"Loop already exists: {loop_plan.loop_id}")
+        candidate_root = self.layout.loop_candidate_root(
+            objective.objective_id, loop_plan.loop_id, objective.scenario_slug
+        )
+        copy_tree(scenario_root_from_yaml(Path(objective.scenario_ref)), candidate_root)
+        current_revision = Path(objective.scenario_ref).parent.name
+        candidate_yaml = candidate_root / current_revision / "scenario.yaml"
+        loop = ResearchLoopState(
+            loop_id=loop_plan.loop_id,
+            objective_id=objective.objective_id,
+            title=loop_plan.title,
+            hypothesis=loop_plan.hypothesis,
+            instructions=loop_plan.instructions,
+            created_at_utc=utc_now_iso(),
+            updated_at_utc=utc_now_iso(),
+            status="queued",
+            iteration=1,
+            max_iterations=objective.max_revisions,
+            candidate_scenario_ref=str(candidate_yaml),
+        )
+        self._save_loop(loop)
+        return loop
+
+    def _run_loop(self, objective: ObjectiveState, loop: ResearchLoopState) -> ResearchLoopState:
+        while True:
+            loop.status = "running"
+            loop.updated_at_utc = utc_now_iso()
+            self._save_loop(loop)
+
+            candidate_yaml = Path(loop.candidate_scenario_ref)
+            candidate_revision_dir = candidate_yaml.parent
+            before = snapshot_tree(candidate_revision_dir)
+            executor_path = (
+                self.layout.loop_root(objective.objective_id, loop.loop_id)
+                / "execution"
+                / f"iteration-{loop.iteration:02d}.json"
+            )
+            execution = self._run_role(
+                objective=objective,
+                role="executor",
+                instruction=self._executor_instruction(objective, loop, executor_path),
+            )
+            loop.session_paths["executor"] = str(execution.session_dir)
+            ExecutorMemo.model_validate(read_json(executor_path))
+            after = snapshot_tree(candidate_revision_dir)
+            blocked_paths = illegal_mutations(before, after, objective.mutation_surface)
+            if blocked_paths:
+                loop.status = "blocked"
+                loop.stop_reason = "illegal-mutation-boundary"
+                self._save_loop(loop)
+                self._write_report(objective)
+                return loop
+
+            research_result = self.raidar.experiment_run(
+                scenario_yaml=candidate_yaml,
+                harness=objective.target_harness,
+                model=objective.target_model,
+                timeout_sec=scenario_timeout_sec(candidate_yaml),
+                repeats=objective.research_repeats,
+                repeat_parallel=1,
+                experiment_kind="research-loop",
+            )
+            loop.latest_research_summary_ref = str(research_result["summary_path"])
+            loop.status = "review_pending"
+            loop.updated_at_utc = utc_now_iso()
+            self._save_loop(loop)
+
+            review_path = (
+                self.layout.loop_root(objective.objective_id, loop.loop_id)
+                / "reviews"
+                / f"iteration-{loop.iteration:02d}.json"
+            )
+            review_execution = self._run_role(
+                objective=objective,
+                role="reviewer",
+                instruction=self._reviewer_instruction(objective, loop, review_path),
+            )
+            loop.session_paths["reviewer"] = str(review_execution.session_dir)
+            ReviewMemo.model_validate(read_json(review_path))
+            loop.latest_review_ref = str(review_path)
+
+            governor_path = (
+                self.layout.loop_root(objective.objective_id, loop.loop_id)
+                / "governor"
+                / f"iteration-{loop.iteration:02d}.json"
+            )
+            governor_execution = self._run_role(
+                objective=objective,
+                role="governor",
+                instruction=self._governor_instruction(objective, loop, review_path, governor_path),
+            )
+            loop.session_paths["governor"] = str(governor_execution.session_dir)
+            decision = GovernorDecision.model_validate(read_json(governor_path))
+            loop.latest_governor_ref = str(governor_path)
+
+            if decision.action == "iterate":
+                if loop.iteration >= loop.max_iterations:
+                    loop.status = "completed"
+                    loop.stop_reason = "iteration-budget-exhausted"
+                    break
+                clone = self.raidar.scenario_clone_revision(
+                    path=scenario_root_from_yaml(candidate_yaml),
+                    from_revision=candidate_yaml.parent.name,
+                )
+                loop.iteration += 1
+                loop.status = "iterating"
+                loop.candidate_scenario_ref = str(clone["scenario_yaml"])
+                loop.updated_at_utc = utc_now_iso()
+                self._save_loop(loop)
+                continue
+
+            if decision.action == "promote":
+                if self._attempt_promotion(objective, loop):
+                    loop.status = "promoted"
+                    loop.stop_reason = "promoted"
+                    break
+                loop.status = "completed"
+                loop.stop_reason = "promotion-guard-rejected"
+                break
+
+            if decision.action == "discard":
+                loop.status = "discarded"
+                loop.stop_reason = "discarded"
+                break
+            if decision.action == "spawn_next":
+                loop.status = "completed"
+                loop.stop_reason = "spawn-next"
+                break
+            if decision.action == "stop":
+                objective.status = "completed"
+                objective.stop_reason = "governor-stop"
+                self._save_objective(objective)
+                loop.status = "completed"
+                loop.stop_reason = "governor-stop"
+                break
+
+            raise RuntimeError(f"Unsupported governor action: {decision.action}")
+
+        loop.updated_at_utc = utc_now_iso()
+        self._save_loop(loop)
+        self._write_report(self._load_objective(objective.objective_id))
+        return loop
+
+    def _attempt_promotion(self, objective: ObjectiveState, loop: ResearchLoopState) -> bool:
+        if objective.best_benchmark_ref is None or objective.scenario_ref is None:
+            raise RuntimeError("Objective promotion requires an approved benchmark baseline.")
+        if loop.latest_research_summary_ref is None:
+            raise RuntimeError("Cannot promote loop without a research summary.")
+
+        baseline = experiment_summary(Path(objective.best_benchmark_ref))
+        research = experiment_summary(Path(loop.latest_research_summary_ref))
+        research_guard = self._promotion_guard(research, baseline, objective.frozen_metric_ids)
+        write_json(
+            self.layout.loop_root(objective.objective_id, loop.loop_id) / "promotion-guard.json",
+            research_guard.model_dump(mode="json"),
+        )
+        if not research_guard.passed:
+            return False
+
+        confirmation = self.raidar.experiment_run(
+            scenario_yaml=Path(loop.candidate_scenario_ref),
+            harness=objective.target_harness,
+            model=objective.target_model,
+            timeout_sec=scenario_timeout_sec(Path(loop.candidate_scenario_ref)),
+            repeats=objective.benchmark_repeats,
+            repeat_parallel=1,
+            experiment_kind="benchmark",
+        )
+        confirmation_summary_ref = str(confirmation["summary_path"])
+        confirmation_guard = self._promotion_guard(
+            experiment_summary(Path(confirmation_summary_ref)),
+            baseline,
+            objective.frozen_metric_ids,
+        )
+        write_json(
+            self.layout.loop_root(objective.objective_id, loop.loop_id) / "confirmation-guard.json",
+            confirmation_guard.model_dump(mode="json"),
+        )
+        if not confirmation_guard.passed:
+            return False
+
+        promoted_yaml = self._promote_candidate_revision(objective, loop)
+        objective.scenario_ref = str(promoted_yaml)
+        objective.best_benchmark_ref = confirmation_summary_ref
+        objective.revision_count += 1
+        objective.updated_at_utc = utc_now_iso()
+        self._save_objective(objective)
+        loop.promoted_benchmark_ref = confirmation_summary_ref
+        self._save_loop(loop)
+        return True
+
+    def _promote_candidate_revision(
+        self, objective: ObjectiveState, loop: ResearchLoopState
+    ) -> Path:
+        current_yaml = Path(objective.scenario_ref or "")
+        candidate_yaml = Path(loop.candidate_scenario_ref)
+        clone = self.raidar.scenario_clone_revision(
+            path=scenario_root_from_yaml(current_yaml),
+            from_revision=current_yaml.parent.name,
+        )
+        target_revision_dir = Path(clone["revision_dir"])
+        sync_tree(candidate_yaml.parent, target_revision_dir)
+        promoted_yaml = target_revision_dir / "scenario.yaml"
+        update_scenario_revision(promoted_yaml, clone["target_revision"])
+        self.raidar.scenario_validate(scenario_yaml=promoted_yaml)
+        return promoted_yaml
+
+    def _promotion_guard(
+        self,
+        candidate: dict[str, Any],
+        baseline: dict[str, Any],
+        metric_ids: list[str],
+    ) -> ComparisonGuard:
+        candidate_agg = dict(candidate.get("aggregate") or {})
+        baseline_agg = dict(baseline.get("aggregate") or {})
+        blocking_reasons: list[str] = []
+        improved_dimensions: list[str] = []
+
+        if int(candidate_agg.get("unscored_count") or 0) != 0:
+            blocking_reasons.append("candidate-has-unscored-runs")
+        if float(candidate_agg.get("validity_rate") or 0.0) < 1.0:
+            blocking_reasons.append("candidate-validity-rate-below-1.0")
+        if float(candidate_agg.get("validity_rate") or 0.0) < float(
+            baseline_agg.get("validity_rate") or 0.0
+        ):
+            blocking_reasons.append("candidate-validity-regressed")
+        if float(candidate_agg.get("performance_pass_rate") or 0.0) < float(
+            baseline_agg.get("performance_pass_rate") or 0.0
+        ):
+            blocking_reasons.append("candidate-performance-gates-regressed")
+
+        candidate_outcomes = dict(candidate_agg.get("metric_outcomes") or {})
+        baseline_outcomes = dict(baseline_agg.get("metric_outcomes") or {})
+        for metric_id in metric_ids:
+            candidate_rate = float(
+                (dict(candidate_outcomes.get(metric_id) or {})).get("pass_rate") or 0.0
+            )
+            baseline_rate = float(
+                (dict(baseline_outcomes.get(metric_id) or {})).get("pass_rate") or 0.0
+            )
+            if candidate_rate < baseline_rate:
+                blocking_reasons.append(f"metric-regressed:{metric_id}")
+
+        for score_name in ("composite_score", "quality_score", "diagnostic_score"):
+            candidate_mean = float((dict(candidate_agg.get(score_name) or {})).get("mean") or 0.0)
+            baseline_mean = float((dict(baseline_agg.get(score_name) or {})).get("mean") or 0.0)
+            if candidate_mean > baseline_mean:
+                improved_dimensions.append(score_name)
+
+        return ComparisonGuard(
+            passed=not blocking_reasons and bool(improved_dimensions),
+            improved_dimensions=improved_dimensions,
+            blocking_reasons=blocking_reasons,
+        )
+
+    def _mark_superseded_loops(
+        self, objective: ObjectiveState, *, planned_loops: list[LoopPlan], executed_loop_id: str
+    ) -> None:
+        for loop_plan in planned_loops:
+            if loop_plan.loop_id == executed_loop_id:
+                continue
+            state_path = self.layout.loop_state_path(objective.objective_id, loop_plan.loop_id)
+            if not state_path.exists():
+                continue
+            loop = ResearchLoopState.model_validate(read_json(state_path))
+            if loop.status in {"queued", "running", "review_pending", "iterating"}:
+                loop.status = "completed"
+                loop.stop_reason = "superseded-by-promotion"
+                loop.updated_at_utc = utc_now_iso()
+                self._save_loop(loop)
+
+    def _run_role(self, *, objective: ObjectiveState, role: str, instruction: str) -> RoleExecution:
+        execution = self.role_runner.run_role(
+            objective_id=objective.objective_id,
+            role=role,
+            instruction=instruction,
+            model=self._role_model(objective, role),
+        )
+        return execution
+
+    def _role_model(self, objective: ObjectiveState, role: str) -> RoleModelConfig:
+        model = objective.role_models.get(role)
+        if model is None:
+            raise RuntimeError(f"Missing role model assignment for role: {role}")
+        return model
+
+    def _resolved_role_models(
+        self, overrides: dict[str, RoleModelConfig]
+    ) -> dict[str, RoleModelConfig]:
+        default_model = overrides.get("__default__", RoleModelConfig())
+        resolved: dict[str, RoleModelConfig] = {}
+        for role in ("designer", "critic", "planner", "executor", "reviewer", "governor"):
+            resolved[role] = overrides.get(role, default_model)
+        return resolved
+
+    def _ensure_objective_dirs(self, objective_id: str) -> None:
+        ensure_dir(self.layout.objective_root(objective_id))
+        ensure_dir(self.layout.objective_plan_dir(objective_id))
+        ensure_dir(self.layout.objective_review_dir(objective_id))
+        ensure_dir(self.layout.objective_loops_root(objective_id))
+        ensure_dir(self.layout.objectives_root)
+
+    def _write_brief(self, objective: ObjectiveState) -> None:
+        content = "\n".join(
+            [
+                f"# Objective {objective.objective_id}",
+                "",
+                objective.goal,
+                "",
+                "## Constraints",
+                f"- approval_mode: `{objective.approval_mode}`",
+                f"- loop_topology: `{objective.loop_topology}`",
+                f"- max_revisions: `{objective.max_revisions}`",
+                f"- max_parallel_loops: `{objective.max_parallel_loops}`",
+                f"- benchmark_repeats: `{objective.benchmark_repeats}`",
+                f"- research_repeats: `{objective.research_repeats}`",
+                f"- mutation_surface: `{', '.join(objective.mutation_surface)}`",
+            ]
+        )
+        write_text(self.layout.objective_brief_path(objective.objective_id), content + "\n")
+
+    def _write_report(self, objective: ObjectiveState) -> None:
+        write_text(
+            self.layout.objective_report_path(objective.objective_id),
+            self.render_objective_report(objective.objective_id),
+        )
+
+    def _save_objective(self, objective: ObjectiveState) -> None:
+        objective.updated_at_utc = utc_now_iso()
+        write_objective_state(self.layout.objective_state_path(objective.objective_id), objective)
+
+    def _load_objective(self, objective_id: str) -> ObjectiveState:
+        return load_objective_state(self.layout.objective_state_path(objective_id))
+
+    def _save_loop(self, loop: ResearchLoopState) -> None:
+        write_json(
+            self.layout.loop_state_path(loop.objective_id, loop.loop_id),
+            loop.model_dump(mode="json", exclude_none=True),
+        )
+
+    def _loop_states(self, objective_id: str) -> list[ResearchLoopState]:
+        loops_root = self.layout.objective_loops_root(objective_id)
+        if not loops_root.exists():
+            return []
+        states: list[ResearchLoopState] = []
+        for state_path in sorted(loops_root.glob("*/state.json")):
+            states.append(ResearchLoopState.model_validate(read_json(state_path)))
+        return states
+
+    def _generate_objective_id(self, goal: str) -> str:
+        stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%SZ").lower()
+        return f"{slugify(goal)}-{stamp}"
+
+    def _designer_instruction(self, objective: ObjectiveState, output_path: Path) -> str:
+        return "\n".join(
+            [
+                f"Objective goal: {objective.goal}",
+                f"Target harness: {objective.target_harness}",
+                f"Target model: {objective.target_model}",
+                f"Frozen metric count target: {max(1, len(objective.frozen_metric_ids) or 5)}",
+                f"Write JSON to: {output_path}",
+                "Required JSON keys:",
+                json.dumps(
+                    {
+                        "scenario_slug": "filesystem-safe-slug",
+                        "scenario_name": "Human-readable name",
+                        "description": "Typed scenario description",
+                        "difficulty": "easy|medium|hard",
+                        "category": "string",
+                        "timeout_sec": 1800,
+                        "starter_root": "starter",
+                        "prompt_entry": "prompt/task.md",
+                        "prompt_text": "complete draft task prompt",
+                        "metric_ids": ["functional", "acceptance"],
+                        "required_commands": [["bun", "run", "lint"]],
+                        "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
+                        "notes": ["short notes"],
+                    }
+                ),
+                "Design a typed Raidar scenario draft. Keep metrics frozen and suitable for "
+                "iteration.",
+            ]
+        )
+
+    def _critic_instruction(
+        self,
+        objective: ObjectiveState,
+        draft_yaml: Path,
+        design_path: Path,
+        output_path: Path,
+    ) -> str:
+        return "\n".join(
+            [
+                f"Objective goal: {objective.goal}",
+                f"Draft scenario yaml: {draft_yaml}",
+                f"Designer plan: {design_path}",
+                f"Write JSON review to: {output_path}",
+                'Use keys: {"decision":"approve|revise|block","summary":"...","risks":["..."]}',
+                "Review whether the draft scenario is suitable, typed, and measurable.",
+            ]
+        )
+
+    def _planner_instruction(self, objective: ObjectiveState, output_path: Path) -> str:
+        return "\n".join(
+            [
+                f"Objective goal: {objective.goal}",
+                f"Approved scenario: {objective.scenario_ref}",
+                f"Current best benchmark: {objective.best_benchmark_ref}",
+                f"Max sibling loops this round: {objective.max_parallel_loops}",
+                f"Write JSON plan to: {output_path}",
+                json.dumps(
+                    {
+                        "loops": [
+                            {
+                                "loop_id": "loop-001",
+                                "title": "short title",
+                                "hypothesis": "why this may improve outcomes",
+                                "instructions": "specific bounded change direction",
+                            }
+                        ],
+                        "notes": ["short notes"],
+                    }
+                ),
+                "Return at most the configured number of sibling research loops.",
+            ]
+        )
+
+    def _executor_instruction(
+        self, objective: ObjectiveState, loop: ResearchLoopState, output_path: Path
+    ) -> str:
+        return "\n".join(
+            [
+                f"Objective goal: {objective.goal}",
+                f"Loop title: {loop.title}",
+                f"Loop hypothesis: {loop.hypothesis}",
+                f"Candidate scenario yaml: {loop.candidate_scenario_ref}",
+                f"Allowed mutation surface: {', '.join(objective.mutation_surface)}",
+                f"Write execution memo JSON to: {output_path}",
+                json.dumps(
+                    {
+                        "summary": "what changed",
+                        "changed_files": ["prompt/task.md"],
+                        "rationale": "why these edits align with the hypothesis",
+                    }
+                ),
+                "Edit only the loop-local candidate scenario workspace.",
+            ]
+        )
+
+    def _reviewer_instruction(
+        self, objective: ObjectiveState, loop: ResearchLoopState, output_path: Path
+    ) -> str:
+        return "\n".join(
+            [
+                f"Objective goal: {objective.goal}",
+                f"Baseline benchmark summary: {objective.best_benchmark_ref}",
+                f"Research loop summary: {loop.latest_research_summary_ref}",
+                f"Candidate scenario yaml: {loop.candidate_scenario_ref}",
+                f"Write JSON review to: {output_path}",
+                json.dumps(
+                    {
+                        "recommended_action": "iterate|discard|promote|spawn_next|stop",
+                        "summary": "review summary",
+                        "strengths": ["..."],
+                        "concerns": ["..."],
+                    }
+                ),
+                "Assess the research result and recommend the next step.",
+            ]
+        )
+
+    def _governor_instruction(
+        self,
+        objective: ObjectiveState,
+        loop: ResearchLoopState,
+        review_path: Path,
+        output_path: Path,
+    ) -> str:
+        return "\n".join(
+            [
+                f"Objective goal: {objective.goal}",
+                f"Review memo: {review_path}",
+                f"Research summary: {loop.latest_research_summary_ref}",
+                f"Benchmark baseline: {objective.best_benchmark_ref}",
+                f"Revision budget remaining: {objective.max_revisions - objective.revision_count}",
+                f"Write governor JSON to: {output_path}",
+                json.dumps(
+                    {
+                        "action": "iterate|discard|promote|spawn_next|stop",
+                        "reasoning": "...",
+                    }
+                ),
+                "Choose the next action within the coded constraints.",
+            ]
+        )

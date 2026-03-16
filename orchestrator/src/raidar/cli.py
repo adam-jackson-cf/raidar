@@ -32,6 +32,8 @@ ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
 ARTIFACT_CHANGE_PREFIXES = ("experiments/",)
 EXPERIMENTS_ROOT = REPO_ROOT / "experiments"
+BENCHMARK_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / "benchmarks"
+RESEARCH_LOOP_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / "research_loops"
 DEFAULT_ARCHIVE_ROOT = Path("/tmp")
 if ENV_PATH.exists():
     load_dotenv(ENV_PATH, override=False)
@@ -44,6 +46,7 @@ def main() -> None:
 
 
 HARNESS_CHOICES = [harness.value for harness in Harness]
+EXPERIMENT_KIND_CHOICES = ["benchmark", "research-loop"]
 VERSION_DIR_PATTERN = re.compile(r"^v(\d+)$")
 INTEGRATION_TEST_TARGET = "tests/test_runner_harbor_env_and_cleanup.py"
 TYPECHECK_TARGETS = [
@@ -67,6 +70,7 @@ class RunCliOptions:
     repeats: int
     repeat_parallel: int
     rerun_unscored: int
+    experiments_root: Path = BENCHMARK_EXPERIMENTS_ROOT
 
     def resolved(self) -> RunCliOptions:
         return RunCliOptions(
@@ -77,6 +81,7 @@ class RunCliOptions:
             repeats=self.repeats,
             repeat_parallel=self.repeat_parallel,
             rerun_unscored=min(self.rerun_unscored, 1),
+            experiments_root=self.experiments_root.resolve(),
         )
 
 
@@ -298,6 +303,18 @@ def _execution_id(
     return f"{base}__{execution_suffix}"
 
 
+def _resolve_experiments_root(
+    *,
+    experiments_root: Path | None,
+    experiment_kind: str | None,
+) -> Path:
+    if experiments_root is not None:
+        return experiments_root.resolve()
+    if experiment_kind == "research-loop":
+        return RESEARCH_LOOP_EXPERIMENTS_ROOT
+    return BENCHMARK_EXPERIMENTS_ROOT
+
+
 def _build_run_request(
     options: RunCliOptions, scenario_def: ScenarioDefinition, execution_dir: Path
 ) -> RunRequest:
@@ -359,6 +376,42 @@ def _echo_experiment_result(
         )
 
 
+def _run_payload(run: EvalRun) -> dict[str, object]:
+    run_meta = run.scores.metadata.get("run", {})
+    canonical_run_dir = run_meta.get("canonical_run_dir")
+    run_json_path = run_meta.get("run_json_path")
+    return {
+        "run_id": run.id,
+        "duration_sec": run.duration_sec,
+        "terminated_early": run.terminated_early,
+        "termination_reason": run.termination_reason,
+        "unscored": _run_is_unscored(run),
+        "unscored_reasons": _run_unscored_reasons(run),
+        "execution_valid": run.scores.execution_validity.passed,
+        "performance_gates_passed": run.scores.performance_gates.passed,
+        "composite_score": run.scores.composite_score,
+        "diagnostic_score": run.scores.diagnostic_score,
+        "quality_score": run.scores.quality_score,
+        "canonical_run_dir": canonical_run_dir if isinstance(canonical_run_dir, str) else None,
+        "run_json_path": run_json_path if isinstance(run_json_path, str) else None,
+    }
+
+
+def _suite_execution_payload(result: SuiteExecutionResult) -> dict[str, object]:
+    return {
+        "scenario_path": str(result.scenario_path),
+        "scenario_name": result.scenario_name,
+        "scenario_revision": result.scenario_revision,
+        "retries_used": result.retries_used,
+        "experiment_json_path": (
+            str(result.experiment_json_path) if result.experiment_json_path is not None else None
+        ),
+        "summary_path": str(result.summary_path) if result.summary_path is not None else None,
+        "report_path": str(result.report_path) if result.report_path is not None else None,
+        "runs": [_run_payload(run) for run in result.runs],
+    }
+
+
 def _prepared_run_request(
     resolved: RunCliOptions,
     *,
@@ -372,7 +425,7 @@ def _prepared_run_request(
         started_at,
         execution_suffix=execution_suffix,
     )
-    execution_dir = EXPERIMENTS_ROOT / execution_id
+    execution_dir = resolved.experiments_root / execution_id
     request = _build_run_request(resolved, scenario_def, execution_dir)
     return scenario_def, started_at, execution_dir, request
 
@@ -819,6 +872,18 @@ def _execution_matches_filters(
     default=0,
     help="Rerun budget for unscored runs (0 or 1; at most one rerun per failure)",
 )
+@click.option(
+    "--experiment-kind",
+    type=click.Choice(EXPERIMENT_KIND_CHOICES),
+    default="benchmark",
+    show_default=True,
+    help="Experiment storage kind.",
+)
+@click.option(
+    "--experiments-root",
+    type=click.Path(path_type=Path),
+    help="Override experiment directory root.",
+)
 def run(
     scenario: Path,
     harness: str,
@@ -827,6 +892,8 @@ def run(
     repeats: int,
     repeat_parallel: int,
     rerun_unscored: int,
+    experiment_kind: str,
+    experiments_root: Path | None,
 ) -> None:
     """Run one scenario with the specified harness and model for smoke/debug workflows."""
     options = RunCliOptions(
@@ -837,6 +904,10 @@ def run(
         repeats=repeats,
         repeat_parallel=repeat_parallel,
         rerun_unscored=rerun_unscored,
+        experiments_root=_resolve_experiments_root(
+            experiments_root=experiments_root,
+            experiment_kind=experiment_kind,
+        ),
     )
     _execute_run_options(
         options,
@@ -897,6 +968,19 @@ def experiment() -> None:
     default=1,
     help="Rerun budget for unscored runs (0 or 1)",
 )
+@click.option(
+    "--experiment-kind",
+    type=click.Choice(EXPERIMENT_KIND_CHOICES),
+    default="benchmark",
+    show_default=True,
+    help="Experiment storage kind.",
+)
+@click.option(
+    "--experiments-root",
+    type=click.Path(path_type=Path),
+    help="Override experiment directory root.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
 def experiment_run(
     scenario: Path,
     harness: str,
@@ -905,6 +989,9 @@ def experiment_run(
     repeats: int,
     repeat_parallel: int,
     rerun_unscored: int,
+    experiment_kind: str,
+    experiments_root: Path | None,
+    as_json: bool,
 ) -> None:
     """Run a repeated experiment with deterministic aggregate output."""
     options = RunCliOptions(
@@ -915,14 +1002,20 @@ def experiment_run(
         repeats=repeats,
         repeat_parallel=repeat_parallel,
         rerun_unscored=rerun_unscored,
+        experiments_root=_resolve_experiments_root(
+            experiments_root=experiments_root,
+            experiment_kind=experiment_kind,
+        ),
     )
-    _execute_run_options(
+    result = _execute_run_options(
         options,
         force_experiment_summary=True,
         cleanup_before_runs=True,
-        echo=True,
+        echo=not as_json,
         execution_suffix=_experiment_execution_suffix(options),
     )
+    if as_json:
+        click.echo(json.dumps(_suite_execution_payload(result), indent=2))
 
 
 @main.group()
@@ -1065,9 +1158,15 @@ def experiments() -> None:
 @click.option(
     "--experiments-root",
     type=click.Path(path_type=Path),
-    default=EXPERIMENTS_ROOT,
-    show_default=True,
+    default=None,
     help="Experiment directory root.",
+)
+@click.option(
+    "--experiment-kind",
+    type=click.Choice(EXPERIMENT_KIND_CHOICES),
+    default="benchmark",
+    show_default=True,
+    help="Experiment storage kind.",
 )
 @click.option("--scenario", type=str, help="Filter by scenario name substring.")
 @click.option("--model", type=str, help="Filter by model substring.")
@@ -1086,7 +1185,8 @@ def experiments() -> None:
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
 def experiments_list(
-    experiments_root: Path,
+    experiments_root: Path | None,
+    experiment_kind: str,
     scenario: str | None,
     model: str | None,
     harness: str | None,
@@ -1095,7 +1195,11 @@ def experiments_list(
     as_json: bool,
 ) -> None:
     """List experiments with optional filters."""
-    dirs = _sorted_experiment_dirs(experiments_root.resolve())
+    resolved_root = _resolve_experiments_root(
+        experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+    )
+    dirs = _sorted_experiment_dirs(resolved_root)
     rows: list[dict[str, object]] = []
     for path in dirs:
         record = _execution_record(path)
@@ -1133,9 +1237,15 @@ def experiments_list(
 @click.option(
     "--experiments-root",
     type=click.Path(path_type=Path),
-    default=EXPERIMENTS_ROOT,
-    show_default=True,
+    default=None,
     help="Experiment directory root.",
+)
+@click.option(
+    "--experiment-kind",
+    type=click.Choice(EXPERIMENT_KIND_CHOICES),
+    default="benchmark",
+    show_default=True,
+    help="Experiment storage kind.",
 )
 @click.option(
     "--keep-per-model",
@@ -1151,14 +1261,18 @@ def experiments_list(
 )
 @click.option("--dry-run", is_flag=True, help="Show actions without moving files.")
 def experiments_prune(
-    experiments_root: Path,
+    experiments_root: Path | None,
+    experiment_kind: str,
     keep_per_model: int,
     archive_dir: Path | None,
     dry_run: bool,
 ) -> None:
     """Archive stale experiment artifacts while keeping latest experiments per model."""
     archive_root = (archive_dir or _default_archive_dir()).resolve()
-    experiments_root = experiments_root.resolve()
+    experiments_root = _resolve_experiments_root(
+        experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+    )
     if not dry_run:
         archive_root.mkdir(parents=True, exist_ok=True)
 
@@ -1313,6 +1427,7 @@ def scenario_list(scenarios_root: Path) -> None:
 )
 @click.option("--category", type=str, default="greenfield-ui", help="Scenario category.")
 @click.option("--timeout", type=int, default=1800, help="Scenario timeout in seconds.")
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
 def scenario_init(
     path: Path,
     name: str | None,
@@ -1322,6 +1437,7 @@ def scenario_init(
     difficulty: Literal["easy", "medium", "hard"],
     category: str,
     timeout: int,
+    as_json: bool,
 ) -> None:
     """Create a new versioned scenario descriptor with prompt artifacts and rules."""
     scenario_root = path.resolve()
@@ -1395,6 +1511,23 @@ def scenario_init(
     for filename in sorted(set(SYSTEM_RULES.values())):
         (revision_dir / "rules" / filename).write_text(rule_text + "\n", encoding="utf-8")
 
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "scenario_root": str(scenario_root),
+                    "scenario_name": scenario_name,
+                    "scenario_revision": scenario_revision,
+                    "revision_dir": str(revision_dir),
+                    "scenario_yaml": str(scenario_yaml),
+                    "prompt_path": str(prompt_path),
+                    "rules_dir": str(revision_dir / "rules"),
+                    "starter_root": starter_root,
+                },
+                indent=2,
+            )
+        )
+        return
     click.echo(f"Created scenario at {scenario_yaml}")
 
 
@@ -1439,7 +1572,10 @@ def scenario_validate(scenario: Path) -> None:
     type=str,
     help="Target scenario revision label. Defaults to the next revision after --from-revision.",
 )
-def scenario_clone_revision(path: Path, from_revision: str, to_revision: str | None) -> None:
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
+def scenario_clone_revision(
+    path: Path, from_revision: str, to_revision: str | None, as_json: bool
+) -> None:
     """Clone a scenario revision and update revision metadata."""
     try:
         result = _scenario_clone_api().clone_scenario_revision(
@@ -1450,6 +1586,20 @@ def scenario_clone_revision(path: Path, from_revision: str, to_revision: str | N
     except (FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
+    if as_json:
+        click.echo(
+            json.dumps(
+                {
+                    "scenario_root": str(result.scenario_root),
+                    "source_revision": result.source_revision,
+                    "target_revision": result.target_revision,
+                    "revision_dir": str(result.target_scenario_yaml.parent),
+                    "scenario_yaml": str(result.target_scenario_yaml),
+                },
+                indent=2,
+            )
+        )
+        return
     click.echo("Scenario revision clone completed.")
     click.echo(f"  scenario_root: {result.scenario_root}")
     click.echo(f"  source_revision: {result.source_revision}")
@@ -1546,6 +1696,18 @@ def inject(
     help="Number of parallel executions",
 )
 @click.option(
+    "--experiment-kind",
+    type=click.Choice(EXPERIMENT_KIND_CHOICES),
+    default="benchmark",
+    show_default=True,
+    help="Experiment storage kind.",
+)
+@click.option(
+    "--experiments-root",
+    type=click.Path(path_type=Path),
+    help="Override experiment directory root.",
+)
+@click.option(
     "--dry-run",
     is_flag=True,
     help="Show matrix entries without running",
@@ -1559,6 +1721,8 @@ def matrix(
     repeat_parallel: int,
     rerun_unscored: int,
     parallel: int,
+    experiment_kind: str,
+    experiments_root: Path | None,
     dry_run: bool,
 ) -> None:
     """Run an experiment matrix from configuration."""
@@ -1612,6 +1776,10 @@ def matrix(
         return
 
     _cleanup_stale_harbor_before_runs()
+    resolved_experiments_root = _resolve_experiments_root(
+        experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+    )
     jobs = [
         (scenario_path, scenario_def, entry)
         for scenario_path, scenario_def in scenario_defs
@@ -1620,6 +1788,7 @@ def matrix(
     successes, failures = _run_matrix_jobs(
         jobs=jobs,
         experiment_config=experiment_config,
+        experiments_root=resolved_experiments_root,
         parallel=parallel,
     )
 
@@ -1655,6 +1824,7 @@ def _matrix_job_options(
     scenario_path: Path,
     entry: object,
     experiment_config: object,
+    experiments_root: Path,
 ) -> RunCliOptions:
     return RunCliOptions(
         scenario=scenario_path,
@@ -1664,6 +1834,7 @@ def _matrix_job_options(
         repeats=experiment_config.repeats,
         repeat_parallel=experiment_config.repeat_parallel,
         rerun_unscored=experiment_config.retry_void,
+        experiments_root=experiments_root,
     )
 
 
@@ -1671,6 +1842,7 @@ def _run_matrix_jobs(
     *,
     jobs: list[tuple[Path, ScenarioDefinition, object]],
     experiment_config: object,
+    experiments_root: Path,
     parallel: int,
 ) -> tuple[int, int]:
     successes = 0
@@ -1682,6 +1854,7 @@ def _run_matrix_jobs(
             scenario_path=scenario_path,
             entry=entry,
             experiment_config=experiment_config,
+            experiments_root=experiments_root,
         )
         return _execute_run_options(
             options,
