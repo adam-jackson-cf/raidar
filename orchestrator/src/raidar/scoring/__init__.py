@@ -52,7 +52,6 @@ def evaluate_all(
             workspace=workspace,
             reference_image=reference_path,
             screenshot_command=visual_config.screenshot_command,
-            threshold=visual_config.threshold,
         )
 
     verification_stability = evaluate_verification_stability(gate_events)

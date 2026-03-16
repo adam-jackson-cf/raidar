@@ -12,6 +12,8 @@ verification:
   max_gate_failures: 3
   coverage_threshold: 0.8
   min_quality_score: 0.9
+  workflow:
+    atomic_commits_required: true
   setup_actions:
     - ["git", "init"]
     - ["git", "config", "core.hooksPath", ".githooks"]
@@ -146,7 +148,33 @@ visual:
   viewport:
     width: 1440
     height: 1024
-  threshold: 0.95
+  scoring:
+    weights:
+      global: 0.25
+      regional: 0.45
+      worst_region: 0.25
+      region_pass_rate: 0.05
+    bands:
+      global:
+        lower: 0.85
+        upper: 0.96
+      regional:
+        lower: 0.8
+        upper: 0.95
+      worst_region:
+        lower: 0.75
+        upper: 0.94
+    gamma: 2
+    region_pass_threshold: 0.9
+  pass_policy:
+    fail_if_global_below: 0.9
+    fail_if_worst_region_below: 0.85
+    minimum_score: 70
+    minimum_region_pass_rate: 0.75
+    minimum_worst_region: 0.88
+    high_fidelity_score: 85
+    high_fidelity_global: 0.95
+    high_fidelity_worst_region: 0.92
   regions:
     - name: header
       weight: 0.35

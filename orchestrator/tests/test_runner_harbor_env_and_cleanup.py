@@ -359,6 +359,44 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
     assert "build-err" in text
 
 
+def test_fast_task_docker_image_is_deterministic_without_fast_mode_flag(
+    tmp_path: Path,
+) -> None:
+    scenario_dir = tmp_path / "scenario" / "v001"
+    scenario_dir.mkdir(parents=True, exist_ok=True)
+    scenario_yaml = scenario_dir / "scenario.yaml"
+    scenario_yaml.write_text(
+        "name: homepage-implementation\nscenario_revision: v001\n", encoding="utf-8"
+    )
+
+    request = SimpleNamespace(
+        scenario=SimpleNamespace(name="homepage-implementation", scenario_revision="v001"),
+        scenario_dir=scenario_dir,
+    )
+    context = SimpleNamespace(starter_source=SimpleNamespace(fingerprint="starter-fingerprint"))
+
+    image_name = runner._fast_task_docker_image(request, context)
+
+    assert image_name is not None
+    assert image_name.startswith(f"{runner.fast_image_prefix()}:homepage-implementation-")
+
+
+def test_render_environment_dockerfile_includes_visual_tooling_dependencies() -> None:
+    request = SimpleNamespace(
+        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+        scenario=SimpleNamespace(visual=object()),
+    )
+
+    dockerfile = runner._render_environment_dockerfile(request)
+
+    assert "ripgrep" in dockerfile
+    assert "file" in dockerfile
+    assert "libatk-bridge2.0-0t64" in dockerfile
+    assert "libcups2t64" in dockerfile
+    assert "libcairo2" in dockerfile
+    assert "libpango-1.0-0" in dockerfile
+
+
 def test_ensure_fast_task_image_returns_immediately_when_image_exists(
     monkeypatch, tmp_path: Path
 ) -> None:

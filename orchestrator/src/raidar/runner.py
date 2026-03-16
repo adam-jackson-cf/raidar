@@ -23,7 +23,6 @@ from pydantic import ValidationError
 from .agents.config import AgentSpec, Harness
 from .agents.fast_mode import (
     fast_image_prefix,
-    is_fast_image_reuse_enabled,
 )
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .audit.workspace_diff import diff_directories
@@ -309,7 +308,6 @@ class WorkspacePreparationPhaseResult:
     context: WorkspaceContext
     harbor_request: HarborExecutionRequest
     screenshot_command: tuple[str, ...] | None
-    pre_screenshot_path: Path | None
     evidence_errors: tuple[str, ...]
 
 
@@ -468,7 +466,7 @@ def _visual_region_names(request: RunRequest) -> list[str]:
 
 def scenario_evaluation_profile(scenario: ScenarioDefinition) -> str:
     """Derive deterministic evaluation-profile identifier for a scenario."""
-    return f"v2:{'+'.join(scenario_metrics(scenario))}"
+    return "+".join(scenario_metrics(scenario))
 
 
 def scenario_metrics(scenario: ScenarioDefinition) -> list[str]:
@@ -1090,6 +1088,7 @@ def _scenario_spec_verification_block(request: RunRequest) -> dict[str, Any]:
         "max_gate_failures": request.scenario.verification.max_gate_failures,
         "coverage_threshold": request.scenario.verification.coverage_threshold,
         "min_quality_score": request.scenario.verification.min_quality_score,
+        "workflow": request.scenario.verification.workflow.model_dump(mode="json"),
         "gates": [
             {
                 "name": gate.name,
@@ -1138,7 +1137,8 @@ def _scenario_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
             if request.scenario.visual.viewport is not None
             else None
         ),
-        "threshold": request.scenario.visual.threshold,
+        "scoring": request.scenario.visual.scoring.model_dump(mode="json", by_alias=True),
+        "pass_policy": request.scenario.visual.pass_policy.model_dump(mode="json"),
         "regions": [region.model_dump(mode="json") for region in request.scenario.visual.regions],
     }
 
@@ -1173,9 +1173,6 @@ def _verifier_scorer_script() -> str:
 
 
 def _fast_task_docker_image(request: RunRequest, context: WorkspaceContext) -> str | None:
-    if not is_fast_image_reuse_enabled():
-        return None
-
     scenario_path = request.scenario_dir / "scenario.yaml"
     scenario_yaml_hash = (
         _hash_bytes(scenario_path.read_bytes()) if scenario_path.exists() else "missing"
@@ -1380,6 +1377,8 @@ COPY app/ /app/
 """
     if request.scenario.visual:
         dockerfile += """RUN apt-get update && apt-get install -y --no-install-recommends \\
+  file \\
+  ripgrep \\
   libx11-6 \\
   libxext6 \\
   libxcb1 \\
@@ -1388,8 +1387,12 @@ COPY app/ /app/
   libnss3 \\
   libdbus-1-3 \\
   libatk1.0-0 \\
+  libatk-bridge2.0-0t64 \\
+  libcairo2 \\
+  libcups2t64 \\
   libexpat1 \\
   libatspi2.0-0 \\
+  libpango-1.0-0 \\
   libxcomposite1 \\
   libxdamage1 \\
   libxfixes3 \\
@@ -2144,7 +2147,6 @@ def write_run_analysis(
     ]
     event_stream = _harness_event_stream_pointer(layout.harness_dir, request.config.harness.value)
     lines.append(f"- harness_event_stream: `{event_stream}`")
-    lines.append(f"- homepage_pre_screenshot: `{evidence_meta.get('homepage_pre')}`")
     lines.append(f"- homepage_post_screenshot: `{evidence_meta.get('homepage_post')}`")
     lines.append(f"- final_workspace_archive: `{evidence_meta.get('final_workspace_archive')}`")
     lines.append(f"- evidence_errors: `{evidence_meta.get('errors')}`")
@@ -3320,7 +3322,13 @@ def _all_gates_passed(outputs: EvaluationOutputs) -> bool:
     return outputs.functional.gates_total == outputs.functional.gates_passed
 
 
-def _completion_claim_consistent(events: list[TraceEvent], gates_passed: bool) -> GateCheck:
+def _completion_claim_consistent(
+    events: list[TraceEvent],
+    gates_passed: bool,
+    *,
+    atomic_commits_required: bool,
+    atomic_commits_present: bool,
+) -> GateCheck:
     completion_keywords = ("complete", "completed", "done", "finished")
     completion_claimed = any(
         event.event_type == "assistant_message"
@@ -3334,6 +3342,12 @@ def _completion_claim_consistent(events: list[TraceEvent], gates_passed: bool) -
             name="completion_claim_integrity",
             passed=False,
             evidence="Harness run claimed completion before all quality gates were passing.",
+        )
+    if completion_claimed and atomic_commits_required and not atomic_commits_present:
+        return GateCheck(
+            name="completion_claim_integrity",
+            passed=False,
+            evidence="Harness run claimed completion without making the required atomic commit.",
         )
     evidence = (
         "No completion claim detected."
@@ -3356,6 +3370,28 @@ def _upsert_gate_check(checks: list[GateCheck], candidate: GateCheck) -> None:
     checks.append(candidate)
 
 
+def _git_commit_count(workspace_path: Path) -> tuple[int, str]:
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD"],
+            cwd=workspace_path,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except FileNotFoundError:
+        return 0, "git not available in run environment."
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout or "No git commits found.").strip()
+        return 0, message
+    try:
+        count = int((result.stdout or "0").strip() or "0")
+    except ValueError:
+        return 0, f"Unable to parse git commit count: {(result.stdout or '').strip()}"
+    return count, f"commit_count={count}"
+
+
 def build_execution_validity_score(
     *,
     outputs: EvaluationOutputs,
@@ -3363,6 +3399,8 @@ def build_execution_validity_score(
     termination_reason: str | None,
     process_metrics: ProcessMetrics,
     events: list[TraceEvent],
+    workspace_path: Path,
+    atomic_commits_required: bool,
 ) -> ExecutionValidityScore:
     """Build execution-validity checks for the run."""
     checks = [check.model_copy(deep=True) for check in outputs.execution_validity.checks]
@@ -3387,7 +3425,24 @@ def build_execution_validity_score(
         ),
     )
 
-    completion_check = _completion_claim_consistent(events, _all_gates_passed(outputs))
+    commit_count, commit_evidence = _git_commit_count(workspace_path)
+    atomic_commits_present = commit_count > 0
+    if atomic_commits_required:
+        _upsert_gate_check(
+            checks,
+            GateCheck(
+                name="atomic_commits_present",
+                passed=atomic_commits_present,
+                evidence=commit_evidence,
+            ),
+        )
+
+    completion_check = _completion_claim_consistent(
+        events,
+        _all_gates_passed(outputs),
+        atomic_commits_required=atomic_commits_required,
+        atomic_commits_present=atomic_commits_present,
+    )
     _upsert_gate_check(checks, completion_check)
     return ExecutionValidityScore(checks=checks)
 
@@ -3552,6 +3607,8 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         termination_reason=execution.termination_reason,
         process_metrics=execution.process_metrics,
         events=execution.events,
+        workspace_path=context.context.workspace,
+        atomic_commits_required=request.scenario.verification.workflow.atomic_commits_required,
     )
     performance_gates = build_performance_gates_score(outputs=outputs)
     resource_efficiency = build_resource_efficiency_score(execution.process_metrics)
@@ -3605,16 +3662,7 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
     cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
     ensure_starter_preflight(request, context)
     screenshot_command = _resolve_homepage_screenshot_command(request.scenario, context.workspace)
-    pre_screenshot_path: Path | None = None
     evidence_errors: list[str] = []
-    if screenshot_command:
-        pre_screenshot_path, pre_error = _run_homepage_capture_command(
-            screenshot_command,
-            context.workspace,
-            layout.root_dir / "homepage-pre.png",
-        )
-        if pre_error:
-            evidence_errors.append(f"homepage-pre capture failed: {pre_error}")
     harbor_task_bundle = create_harbor_task_bundle(
         request,
         context,
@@ -3646,7 +3694,6 @@ def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseRe
         context=context,
         harbor_request=harbor_request,
         screenshot_command=tuple(screenshot_command) if screenshot_command else None,
-        pre_screenshot_path=pre_screenshot_path,
         evidence_errors=tuple(evidence_errors),
     )
 
@@ -3706,7 +3753,6 @@ def _persist_artifacts_phase(
     """Artifact persistence phase."""
     evidence_artifacts: dict[str, Any] = {
         "screenshot_command": list(phase.screenshot_command) if phase.screenshot_command else None,
-        "homepage_pre": str(phase.pre_screenshot_path) if phase.pre_screenshot_path else None,
         "homepage_post": None,
         "final_workspace_archive": None,
         "visual": {

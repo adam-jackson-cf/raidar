@@ -143,7 +143,31 @@ def test_visual_viewport_parses_when_configured() -> None:
         "reference_image": "reference.png",
         "screenshot_command": ["bun", "run", "capture-screenshot"],
         "viewport": {"width": 1440, "height": 1024},
-        "threshold": 0.95,
+        "scoring": {
+            "weights": {
+                "global": 0.25,
+                "regional": 0.45,
+                "worst_region": 0.25,
+                "region_pass_rate": 0.05,
+            },
+            "bands": {
+                "global": {"lower": 0.85, "upper": 0.96},
+                "regional": {"lower": 0.8, "upper": 0.95},
+                "worst_region": {"lower": 0.75, "upper": 0.94},
+            },
+            "gamma": 2,
+            "region_pass_threshold": 0.9,
+        },
+        "pass_policy": {
+            "fail_if_global_below": 0.9,
+            "fail_if_worst_region_below": 0.85,
+            "minimum_score": 70,
+            "minimum_region_pass_rate": 0.75,
+            "minimum_worst_region": 0.88,
+            "high_fidelity_score": 85,
+            "high_fidelity_global": 0.95,
+            "high_fidelity_worst_region": 0.92,
+        },
         "regions": [],
     }
     payload["metrics"].append({"type": "core", "id": "visual-regression"})
@@ -154,3 +178,14 @@ def test_visual_viewport_parses_when_configured() -> None:
     assert scenario.visual.viewport is not None
     assert scenario.visual.viewport.width == 1440
     assert scenario.visual.viewport.height == 1024
+    assert scenario.visual.scoring.weights.global_weight == 0.25
+    assert scenario.visual.pass_policy.minimum_score == 70
+
+
+def test_workflow_atomic_commits_flag_parses() -> None:
+    payload = _base_scenario_payload()
+    payload["verification"]["workflow"] = {"atomic_commits_required": True}
+
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert scenario.verification.workflow.atomic_commits_required is True

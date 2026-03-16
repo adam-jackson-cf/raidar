@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Annotated, Literal
 
 import yaml
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 SHELL_WRAPPER_ARGS = {"-c", "-lc", "/c", "/k", "-command", "-encodedcommand"}
 SHELL_WRAPPER_BINARIES = {
@@ -121,6 +121,57 @@ class AcceptanceConfig(BaseModel):
 class VisualConfig(BaseModel):
     """Visual regression configuration."""
 
+    class VisualBand(BaseModel):
+        """Lower/upper scoring band for one visual component."""
+
+        lower: float = Field(ge=0, le=1)
+        upper: float = Field(ge=0, le=1)
+
+        @model_validator(mode="after")
+        def _validate_bounds(self) -> "VisualConfig.VisualBand":
+            if self.upper <= self.lower:
+                raise ValueError("visual scoring bands require upper > lower")
+            return self
+
+    class VisualScoringWeights(BaseModel):
+        """Relative weights for the Oracle visual scoring formula."""
+
+        model_config = ConfigDict(populate_by_name=True)
+
+        global_weight: float = Field(alias="global", gt=0)
+        regional: float = Field(gt=0)
+        worst_region: float = Field(gt=0)
+        region_pass_rate: float = Field(gt=0)
+
+    class VisualScoringBands(BaseModel):
+        """Per-component scoring bands for the Oracle visual scoring formula."""
+
+        model_config = ConfigDict(populate_by_name=True)
+
+        global_band: "VisualConfig.VisualBand" = Field(alias="global")
+        regional: "VisualConfig.VisualBand"
+        worst_region: "VisualConfig.VisualBand"
+
+    class VisualScoringConfig(BaseModel):
+        """Continuous visual score configuration."""
+
+        weights: "VisualConfig.VisualScoringWeights"
+        bands: "VisualConfig.VisualScoringBands"
+        gamma: float = Field(default=2.0, gt=0)
+        region_pass_threshold: float = Field(default=0.9, ge=0, le=1)
+
+    class VisualPassPolicy(BaseModel):
+        """Hard visual pass/fail and tier thresholds."""
+
+        fail_if_global_below: float = Field(default=0.9, ge=0, le=1)
+        fail_if_worst_region_below: float = Field(default=0.85, ge=0, le=1)
+        minimum_score: float = Field(default=70.0, ge=0, le=100)
+        minimum_region_pass_rate: float = Field(default=0.75, ge=0, le=1)
+        minimum_worst_region: float = Field(default=0.88, ge=0, le=1)
+        high_fidelity_score: float = Field(default=85.0, ge=0, le=100)
+        high_fidelity_global: float = Field(default=0.95, ge=0, le=1)
+        high_fidelity_worst_region: float = Field(default=0.92, ge=0, le=1)
+
     class VisualViewport(BaseModel):
         """Viewport used for authored visual captures."""
 
@@ -152,11 +203,11 @@ class VisualConfig(BaseModel):
         default=None,
         description="Authored viewport used for screenshot capture",
     )
-    threshold: float = Field(
-        default=0.95,
-        ge=0,
-        le=1,
-        description="Minimum similarity threshold",
+    scoring: "VisualConfig.VisualScoringConfig" = Field(
+        description="Continuous scoring configuration for visual comparison",
+    )
+    pass_policy: "VisualConfig.VisualPassPolicy" = Field(
+        description="Visual pass/fail thresholds and tiers",
     )
     regions: list[VisualRegion] = Field(
         default_factory=list,
@@ -171,6 +222,14 @@ class VisualConfig(BaseModel):
 
 class VerificationConfig(BaseModel):
     """Verification configuration."""
+
+    class VerificationWorkflowConfig(BaseModel):
+        """Workflow requirements applied outside the task prompt."""
+
+        atomic_commits_required: bool = Field(
+            default=False,
+            description="Require at least one atomic git commit before completion is valid",
+        )
 
     max_gate_failures: int = Field(
         default=3,
@@ -199,6 +258,9 @@ class VerificationConfig(BaseModel):
         description="Workspace setup commands to execute before verification gates",
     )
     gates: list[VerificationGate] = Field(default_factory=list)
+    workflow: "VerificationConfig.VerificationWorkflowConfig" = Field(
+        default_factory=VerificationWorkflowConfig
+    )
 
     @field_validator("required_commands")
     @classmethod
