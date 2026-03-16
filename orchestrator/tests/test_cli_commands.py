@@ -9,10 +9,14 @@ import click
 from click.testing import CliRunner
 
 from raidar.cli import (
+    BENCHMARK_EXPERIMENTS_ROOT,
+    RESEARCH_LOOP_EXPERIMENTS_ROOT,
     RunCliOptions,
+    SuiteExecutionResult,
     _assert_no_generated_artifact_changes,
     _generated_artifact_paths,
     _persist_experiment_execution,
+    _resolve_experiments_root,
     main,
 )
 from raidar.schemas.scenario import ScenarioDefinition
@@ -145,6 +149,29 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
 
     assert resolved.rerun_unscored == 1
     assert resolved.scenario.is_absolute()
+    assert resolved.experiments_root.is_absolute()
+
+
+def test_resolve_experiments_root_uses_kind_defaults() -> None:
+    benchmark_root = _resolve_experiments_root(experiments_root=None, experiment_kind="benchmark")
+    research_root = _resolve_experiments_root(
+        experiments_root=None,
+        experiment_kind="research-loop",
+    )
+
+    assert benchmark_root == BENCHMARK_EXPERIMENTS_ROOT
+    assert research_root == RESEARCH_LOOP_EXPERIMENTS_ROOT
+
+
+def test_resolve_experiments_root_prefers_explicit_path(tmp_path: Path) -> None:
+    explicit = tmp_path / "custom-root"
+
+    resolved = _resolve_experiments_root(
+        experiments_root=explicit,
+        experiment_kind="research-loop",
+    )
+
+    assert resolved == explicit.resolve()
 
 
 def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
@@ -179,6 +206,104 @@ def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monk
     assert captured["echo"] is True
     assert captured["execution_suffix"] == "codex-cli__codex-gpt-5.4-high"
     assert captured["options"].repeats == 5
+
+
+def test_experiment_run_routes_research_loop_kind(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    scenario_path.write_text("name: placeholder\n")
+    captured: dict[str, object] = {}
+
+    def fake_execute_run_options(options, **kwargs):
+        captured["options"] = options
+        captured.update(kwargs)
+
+    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+
+    result = runner.invoke(
+        main,
+        [
+            "experiment",
+            "run",
+            "--scenario",
+            str(scenario_path),
+            "--harness",
+            "codex-cli",
+            "--model",
+            "codex/gpt-5.4-high",
+            "--experiment-kind",
+            "research-loop",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    options = captured["options"]
+    assert isinstance(options, RunCliOptions)
+    assert options.experiments_root == RESEARCH_LOOP_EXPERIMENTS_ROOT
+
+
+def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    scenario_path.write_text("name: placeholder\n")
+
+    run = EvalRun(
+        id="run-01",
+        timestamp="2026-03-10T13:00:00+00:00",
+        config=EvalConfig(
+            model="codex/gpt-5.4-high",
+            harness="codex-cli",
+            scenario_name="sample-task",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="functional",
+        ),
+        duration_sec=1.0,
+        scores=Scorecard(
+            metadata={
+                "run": {
+                    "canonical_run_dir": str(tmp_path / "runs" / "run-01"),
+                    "run_json_path": str(tmp_path / "runs" / "run-01" / "run.json"),
+                }
+            }
+        ),
+    )
+
+    def fake_execute_run_options(options, **kwargs):
+        assert kwargs["echo"] is False
+        return SuiteExecutionResult(
+            scenario_path=options.scenario,
+            scenario_name="sample-task",
+            scenario_revision="v001",
+            runs=[run],
+            retries_used=1,
+            experiment_json_path=tmp_path / "experiment.json",
+            summary_path=tmp_path / "experiment-summary.json",
+            report_path=tmp_path / "report.md",
+        )
+
+    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+
+    result = runner.invoke(
+        main,
+        [
+            "experiment",
+            "run",
+            "--scenario",
+            str(scenario_path),
+            "--harness",
+            "codex-cli",
+            "--model",
+            "codex/gpt-5.4-high",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["summary_path"] == str(tmp_path / "experiment-summary.json")
+    assert payload["retries_used"] == 1
+    assert payload["runs"][0]["run_json_path"] == str(tmp_path / "runs" / "run-01" / "run.json")
 
 
 def test_matrix_dry_run_supports_selector_generation(tmp_path: Path, monkeypatch) -> None:
@@ -311,6 +436,32 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
     assert (task_dir / "v001" / "prompt" / "task.md").exists()
 
 
+def test_scenario_init_json_emits_machine_readable_payload(tmp_path: Path) -> None:
+    runner = CliRunner()
+    task_dir = tmp_path / "scenarios" / "json-task"
+
+    result = runner.invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(task_dir),
+            "--name",
+            "json-task",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["scenario_name"] == "json-task"
+    assert payload["scenario_revision"] == "v001"
+    assert Path(payload["scenario_yaml"]).is_file()
+    assert Path(payload["prompt_path"]).is_file()
+    assert Path(payload["rules_dir"]).is_dir()
+
+
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "raidar.cli._changed_repo_entries",
@@ -404,6 +555,36 @@ def test_scenario_clone_revision_succeeds_without_starter_manifest(tmp_path: Pat
     )
     assert clone_result.exit_code == 0, clone_result.output
     assert (scenario_dir / "v002").exists()
+
+
+def test_scenario_clone_revision_json_emits_machine_readable_payload(tmp_path: Path) -> None:
+    runner = CliRunner()
+    scenario_dir = tmp_path / "scenarios" / "json-clone-task"
+
+    init_result = runner.invoke(
+        main,
+        ["scenario", "init", "--path", str(scenario_dir), "--name", "json-clone-task"],
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    clone_result = runner.invoke(
+        main,
+        [
+            "scenario",
+            "clone-revision",
+            "--path",
+            str(scenario_dir),
+            "--from-revision",
+            "v001",
+            "--json",
+        ],
+    )
+
+    assert clone_result.exit_code == 0, clone_result.output
+    payload = json.loads(clone_result.output)
+    assert payload["source_revision"] == "v001"
+    assert payload["target_revision"] == "v002"
+    assert Path(payload["scenario_yaml"]).is_file()
 
 
 def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> None:
