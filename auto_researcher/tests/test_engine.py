@@ -521,6 +521,16 @@ def test_promotion_uses_research_and_benchmark_roots_and_updates_best_benchmark(
     session_dirs = {call["role"]: call["session_dir"] for call in role_runner.calls}
     assert session_dirs["planner"] != session_dirs["executor"] != session_dirs["reviewer"]
 
+    loop_state = read_json(layout.loop_state_path(created.objective_id, "loop-001"))
+    diff_path = Path(loop_state["latest_diff_ref"])
+    diff_payload = read_json(diff_path)
+    assert diff_path.is_file()
+    assert diff_payload["changed_files"][0]["path"] == "prompt/task.md"
+    reviewer_call = next(call for call in role_runner.calls if call["role"] == "reviewer")
+    governor_call = next(call for call in role_runner.calls if call["role"] == "governor")
+    assert f"Diff artifact: {diff_path}" in reviewer_call["instruction"]
+    assert f"Diff artifact: {diff_path}" in governor_call["instruction"]
+
 
 def test_promotion_requires_confirmation_before_best_benchmark_changes(tmp_path: Path) -> None:
     metric_ids = ["functional", "acceptance", "verification-stability"]

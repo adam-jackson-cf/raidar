@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import tempfile
 from pathlib import Path
 from typing import Literal, cast
 
@@ -12,9 +13,17 @@ from .engine import AutoResearchEngine
 from .models import DEFAULT_MUTATION_SURFACE, ObjectiveInitRequest, RoleModelConfig
 from .pi_rpc import PiRpcRoleRunner
 from .raidar_cli import RaidarCli
-from .storage import WorkspaceLayout
+from .scripted import (
+    ScriptedRaidar,
+    ScriptedRoleRunner,
+    load_objective_fixture,
+    load_script_fixture,
+)
+from .storage import WorkspaceLayout, ensure_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_DEMO_OBJECTIVE_FIXTURE = REPO_ROOT / "auto_researcher" / "examples" / "demo-objective.yaml"
+DEFAULT_DEMO_SCRIPT_FIXTURE = REPO_ROOT / "auto_researcher" / "examples" / "demo-script.json"
 
 
 def build_engine(pi_binary: str) -> AutoResearchEngine:
@@ -23,6 +32,24 @@ def build_engine(pi_binary: str) -> AutoResearchEngine:
         layout=layout,
         role_runner=PiRpcRoleRunner(layout=layout, pi_binary=pi_binary),
         raidar=RaidarCli(layout=layout),
+    )
+
+
+def build_scripted_engine(workspace_root: Path, script_fixture: Path) -> AutoResearchEngine:
+    layout = WorkspaceLayout(workspace_root)
+    for root in (
+        layout.auto_researcher_root,
+        layout.objectives_root,
+        layout.scenarios_root,
+        layout.benchmark_experiments_root,
+        layout.research_loop_experiments_root,
+    ):
+        ensure_dir(root)
+    role_scripts, experiment_payloads = load_script_fixture(script_fixture)
+    return AutoResearchEngine(
+        layout=layout,
+        role_runner=ScriptedRoleRunner(layout=layout, scripts=role_scripts),
+        raidar=ScriptedRaidar(layout=layout, experiment_payloads=experiment_payloads),
     )
 
 
@@ -175,3 +202,55 @@ def report_command(objective_id: str, pi_binary: str) -> None:
         click.echo(engine.render_objective_report(objective_id))
     except RuntimeError as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+@main.command("demo-smoke")
+@click.option(
+    "--objective-fixture",
+    default=str(DEFAULT_DEMO_OBJECTIVE_FIXTURE),
+    show_default=True,
+    type=click.Path(exists=True, path_type=Path),
+)
+@click.option(
+    "--script-fixture",
+    default=str(DEFAULT_DEMO_SCRIPT_FIXTURE),
+    show_default=True,
+    type=click.Path(exists=True, path_type=Path),
+)
+@click.option(
+    "--workspace",
+    type=click.Path(path_type=Path),
+    help="Optional workspace root for the scripted smoke run.",
+)
+@click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
+def demo_smoke_command(
+    objective_fixture: Path,
+    script_fixture: Path,
+    workspace: Path | None,
+    as_json: bool,
+) -> None:
+    workspace_root = workspace or Path(tempfile.mkdtemp(prefix="raidar-auto-research-demo-"))
+    engine = build_scripted_engine(workspace_root, script_fixture)
+    request = load_objective_fixture(objective_fixture)
+
+    try:
+        created = engine.init_objective(request)
+        approved = engine.approve_scenario(created.objective_id)
+        completed = engine.run_objective(created.objective_id)
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+    payload = {
+        "workspace": str(workspace_root),
+        "objective_id": completed.objective_id,
+        "draft_scenario_ref": created.draft_scenario_ref,
+        "scenario_ref": approved.scenario_ref,
+        "best_benchmark_ref": completed.best_benchmark_ref,
+        "report_path": str(engine.layout.objective_report_path(completed.objective_id)),
+        "status": completed.status,
+    }
+    if as_json:
+        click.echo(json.dumps(payload, indent=2))
+        return
+    for key, value in payload.items():
+        click.echo(f"{key}={value}")

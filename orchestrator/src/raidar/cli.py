@@ -656,10 +656,10 @@ def _has_unstaged_changes(repo_root: Path) -> bool:
     return result.returncode != 0
 
 
-def _run_or_raise(cmd: list[str], cwd: Path) -> None:
+def _run_or_raise(cmd: list[str], cwd: Path, *, env: dict[str, str] | None = None) -> None:
     rendered = " ".join(cmd)
     click.echo(f"[exec] {rendered}")
-    result = subprocess.run(cmd, cwd=cwd, check=False)
+    result = subprocess.run(cmd, cwd=cwd, env=env, check=False)
     if result.returncode != 0:
         raise click.ClickException(f"Command failed ({result.returncode}): {rendered}")
 
@@ -1068,6 +1068,10 @@ def quality_gates(fix: bool, stage: bool) -> None:
         [sys.executable, "-m", "pytest", INTEGRATION_TEST_TARGET, "-x", "--tb=short"],
         ORCHESTRATOR_ROOT,
     )
+    coverage_dir = ORCHESTRATOR_ROOT / ".pytest_cache" / "coverage"
+    coverage_dir.mkdir(parents=True, exist_ok=True)
+    coverage_env = dict(os.environ)
+    coverage_env["COVERAGE_FILE"] = str(coverage_dir / ".coverage")
     _run_or_raise(
         [
             sys.executable,
@@ -1081,6 +1085,7 @@ def quality_gates(fix: bool, stage: bool) -> None:
             "--tb=short",
         ],
         ORCHESTRATOR_ROOT,
+        env=coverage_env,
     )
 
     if stage:

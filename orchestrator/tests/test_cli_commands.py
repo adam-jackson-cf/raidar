@@ -10,6 +10,7 @@ from click.testing import CliRunner
 
 from raidar.cli import (
     BENCHMARK_EXPERIMENTS_ROOT,
+    ORCHESTRATOR_ROOT,
     RESEARCH_LOOP_EXPERIMENTS_ROOT,
     RunCliOptions,
     SuiteExecutionResult,
@@ -18,6 +19,7 @@ from raidar.cli import (
     _persist_experiment_execution,
     _resolve_experiments_root,
     main,
+    quality_gates,
 )
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
@@ -172,6 +174,28 @@ def test_resolve_experiments_root_prefers_explicit_path(tmp_path: Path) -> None:
     )
 
     assert resolved == explicit.resolve()
+
+
+def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr("raidar.cli._assert_no_generated_artifact_changes", lambda repo_root: None)
+    monkeypatch.setattr("raidar.cli._has_unstaged_changes", lambda repo_root: False)
+    monkeypatch.setattr("raidar.cli.shutil.which", lambda command: "/usr/bin/lizard")
+
+    def fake_run_or_raise(cmd, cwd, *, env=None):
+        calls.append({"cmd": cmd, "cwd": cwd, "env": env})
+
+    monkeypatch.setattr("raidar.cli._run_or_raise", fake_run_or_raise)
+
+    quality_gates.callback(fix=False, stage=False)
+
+    coverage_call = next(call for call in calls if "--cov=src" in call["cmd"])
+    coverage_env = coverage_call["env"]
+    assert isinstance(coverage_env, dict)
+    assert coverage_env["COVERAGE_FILE"] == str(
+        ORCHESTRATOR_ROOT / ".pytest_cache" / "coverage" / ".coverage"
+    )
 
 
 def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:

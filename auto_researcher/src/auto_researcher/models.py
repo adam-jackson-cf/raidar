@@ -178,6 +178,7 @@ class ResearchLoopState(BaseModel):
     max_iterations: int = 3
     candidate_scenario_ref: str
     latest_research_summary_ref: str | None = None
+    latest_diff_ref: str | None = None
     latest_review_ref: str | None = None
     latest_governor_ref: str | None = None
     promoted_benchmark_ref: str | None = None

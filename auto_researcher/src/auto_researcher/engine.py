@@ -40,6 +40,7 @@ from .storage import (
     update_scenario_document,
     update_scenario_revision,
     utc_now_iso,
+    write_compact_tree_diff,
     write_json,
     write_objective_state,
     write_text,
@@ -342,7 +343,12 @@ class AutoResearchEngine:
 
             candidate_yaml = Path(loop.candidate_scenario_ref)
             candidate_revision_dir = candidate_yaml.parent
+            snapshot_dir = (
+                self.layout.loop_snapshots_dir(objective.objective_id, loop.loop_id)
+                / f"iteration-{loop.iteration:02d}-before"
+            )
             before = snapshot_tree(candidate_revision_dir)
+            copy_tree(candidate_revision_dir, snapshot_dir)
             executor_path = (
                 self.layout.loop_root(objective.objective_id, loop.loop_id)
                 / "execution"
@@ -356,6 +362,12 @@ class AutoResearchEngine:
             loop.session_paths["executor"] = str(execution.session_dir)
             ExecutorMemo.model_validate(read_json(executor_path))
             after = snapshot_tree(candidate_revision_dir)
+            diff_path = (
+                self.layout.loop_diffs_dir(objective.objective_id, loop.loop_id)
+                / f"iteration-{loop.iteration:02d}.json"
+            )
+            write_compact_tree_diff(snapshot_dir, candidate_revision_dir, diff_path)
+            loop.latest_diff_ref = str(diff_path)
             blocked_paths = illegal_mutations(before, after, objective.mutation_surface)
             if blocked_paths:
                 loop.status = "blocked"
@@ -768,6 +780,7 @@ class AutoResearchEngine:
                 f"Objective goal: {objective.goal}",
                 f"Baseline benchmark summary: {objective.best_benchmark_ref}",
                 f"Research loop summary: {loop.latest_research_summary_ref}",
+                f"Diff artifact: {loop.latest_diff_ref}",
                 f"Candidate scenario yaml: {loop.candidate_scenario_ref}",
                 f"Write JSON review to: {output_path}",
                 json.dumps(
@@ -794,6 +807,7 @@ class AutoResearchEngine:
                 f"Objective goal: {objective.goal}",
                 f"Review memo: {review_path}",
                 f"Research summary: {loop.latest_research_summary_ref}",
+                f"Diff artifact: {loop.latest_diff_ref}",
                 f"Benchmark baseline: {objective.best_benchmark_ref}",
                 f"Revision budget remaining: {objective.max_revisions - objective.revision_count}",
                 f"Write governor JSON to: {output_path}",

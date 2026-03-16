@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import difflib
 import hashlib
 import json
 import re
@@ -86,6 +87,12 @@ class WorkspaceLayout:
 
     def loop_state_path(self, objective_id: str, loop_id: str) -> Path:
         return self.loop_root(objective_id, loop_id) / "state.json"
+
+    def loop_snapshots_dir(self, objective_id: str, loop_id: str) -> Path:
+        return self.loop_root(objective_id, loop_id) / "snapshots"
+
+    def loop_diffs_dir(self, objective_id: str, loop_id: str) -> Path:
+        return self.loop_root(objective_id, loop_id) / "diffs"
 
     def loop_candidate_root(self, objective_id: str, loop_id: str, scenario_slug: str) -> Path:
         return self.loop_root(objective_id, loop_id) / "candidate" / scenario_slug
@@ -183,6 +190,66 @@ def snapshot_tree(root: Path) -> dict[str, str]:
         relpath = path.relative_to(root).as_posix()
         snapshot[relpath] = hashlib.sha256(path.read_bytes()).hexdigest()
     return snapshot
+
+
+def _read_text_if_utf8(path: Path) -> str | None:
+    try:
+        return path.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def write_compact_tree_diff(
+    before_root: Path, after_root: Path, output_path: Path
+) -> dict[str, Any]:
+    before = snapshot_tree(before_root)
+    after = snapshot_tree(after_root)
+    changed_paths = sorted(
+        path for path in set(before) | set(after) if before.get(path) != after.get(path)
+    )
+    changed_files: list[dict[str, Any]] = []
+    for relpath in changed_paths:
+        before_path = before_root / relpath
+        after_path = after_root / relpath
+        if relpath not in before:
+            change_type = "added"
+        elif relpath not in after:
+            change_type = "deleted"
+        else:
+            change_type = "modified"
+
+        entry: dict[str, Any] = {
+            "path": relpath,
+            "change_type": change_type,
+            "before_sha256": before.get(relpath),
+            "after_sha256": after.get(relpath),
+            "text_diff_available": False,
+        }
+        before_text = _read_text_if_utf8(before_path) if before_path.is_file() else ""
+        after_text = _read_text_if_utf8(after_path) if after_path.is_file() else ""
+        if before_text is not None and after_text is not None:
+            diff_lines = list(
+                difflib.unified_diff(
+                    before_text.splitlines(),
+                    after_text.splitlines(),
+                    fromfile=f"a/{relpath}",
+                    tofile=f"b/{relpath}",
+                    lineterm="",
+                    n=3,
+                )
+            )
+            entry["text_diff_available"] = True
+            entry["diff_excerpt"] = "\n".join(diff_lines[:40])
+            entry["diff_truncated"] = len(diff_lines) > 40
+        changed_files.append(entry)
+
+    payload = {
+        "before_root": str(before_root),
+        "after_root": str(after_root),
+        "changed_files": changed_files,
+    }
+    write_json(output_path, payload)
+    return payload
 
 
 def illegal_mutations(
