@@ -34,6 +34,12 @@
             ]
           }
         ],
+        "starter_files": [
+          {
+            "path": "package.json",
+            "content": "{\n  \"name\": \"demo-checkout-scenario\",\n  \"private\": true,\n  \"type\": \"module\",\n  \"devDependencies\": {\n    \"is-number\": \"^7.0.0\"\n  },\n  \"scripts\": {\n    \"lint\": \"echo lint\",\n    \"test\": \"bun test\"\n  }\n}"
+          }
+        ],
         "notes": [
           "Draft a scenario with frozen metrics."
         ]

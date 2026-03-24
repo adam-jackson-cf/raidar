@@ -51,6 +51,7 @@ RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL ?= 1
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
 ORCHESTRATOR_SMOKE_HARNESS := codex-cli
 ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-low
+ORCHESTRATOR_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
@@ -62,7 +63,7 @@ $(foreach goal,$(MATRIX_ARGS),$(eval $(goal):;@:))
 endif
 
 .PHONY: help \
-	env-setup harness-list harness-validate harbor-cleanup scenario-list scenario-init scenario-info scenario-validate \
+	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-info scenario-validate \
 	orchestrator-smoke agent-smoke research-smoke experiment-run matrix-run \
 	experiments-list experiments-prune \
 	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report \
@@ -95,6 +96,7 @@ help:
 	@echo ""
 	@echo "Experiment orchestration:"
 	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-low"
+	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
 	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
 	@echo "  make research-smoke                                    Run canonical autoresearch init+approve and clean up smoke artifacts"
@@ -136,6 +138,12 @@ harness-validate:
 harbor-cleanup:
 	@$(RAIDAR) harbor cleanup
 
+docker-check:
+	@if ! docker info >/dev/null 2>&1; then \
+		echo "Docker daemon is required for smoke workflows that use Harbor. Start Docker and retry."; \
+		exit 1; \
+	fi
+
 scenario-list:
 	@$(RAIDAR) scenario list
 
@@ -159,18 +167,18 @@ scenario-validate:
 	$(call require_var,SCENARIO)
 	@$(RAIDAR) scenario validate --scenario "$(SCENARIO)"
 
-orchestrator-smoke:
+orchestrator-smoke: docker-check
 	@$(RAIDAR) run \
 		--scenario "$(ORCHESTRATOR_SMOKE_SCENARIO)" \
 		--harness "$(ORCHESTRATOR_SMOKE_HARNESS)" \
 		--model "$(ORCHESTRATOR_SMOKE_MODEL)" \
-		--repeats 1 \
+		--repeats "$(ORCHESTRATOR_SMOKE_REPEATS)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
 		--rerun-unscored "$(RERUN_UNSCORED)" \
 		--experiment-kind "$(EXPERIMENT_KIND)" \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
-agent-smoke:
+agent-smoke: docker-check
 	$(call require_var,HARNESS)
 	$(call require_var,MODEL)
 	@$(MAKE) harbor-cleanup
@@ -188,12 +196,8 @@ agent-smoke:
 		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 
-research-smoke:
+research-smoke: docker-check
 	@set -euo pipefail; \
-		if ! docker info >/dev/null 2>&1; then \
-			echo "research-smoke requires a running Docker daemon because approve-scenario seeds a benchmark."; \
-			exit 1; \
-		fi; \
 		objective_id="research-smoke-$$(date -u +%Y%m%d%H%M%SZ)-$$$$"; \
 		objective_root="$(CURDIR)/auto_researcher/objectives/$$objective_id"; \
 		state_path="$$objective_root/objective.yaml"; \

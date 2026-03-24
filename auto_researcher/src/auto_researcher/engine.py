@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -134,6 +135,8 @@ class AutoResearchEngine:
         write_text(prompt_path, design.prompt_text.rstrip() + "\n")
         starter_root = ensure_dir(draft_root / DEFAULT_LOCAL_REVISION / design.starter_root)
         self._write_starter_files(starter_root, design.starter_files)
+        self._materialize_starter_lockfile(starter_root)
+        self._validate_starter_baseline_commands(design, starter_root)
         self.raidar.scenario_validate(scenario_yaml=draft_yaml)
 
         critic_path = self.layout.objective_review_dir(objective_id) / "scenario-review.json"
@@ -843,6 +846,53 @@ class AutoResearchEngine:
             ensure_dir(output_path.parent)
             write_text(output_path, starter_file.content)
 
+    def _materialize_starter_lockfile(self, starter_root: Path) -> None:
+        lockfile_path = starter_root / "bun.lock"
+        install = subprocess.run(
+            ["bun", "install", "--lockfile-only"],
+            cwd=starter_root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if install.returncode != 0:
+            output = (install.stdout + "\n" + install.stderr).strip()[:4000]
+            raise RuntimeError(
+                f"Failed to generate starter bun.lock with `bun install --lockfile-only`.\n{output}"
+            )
+        if not lockfile_path.is_file():
+            raise RuntimeError(
+                "Starter package.json did not produce bun.lock. Declare at least one dependency "
+                "or devDependency before scenario approval."
+            )
+
+    def _validate_starter_baseline_commands(
+        self,
+        design: ScenarioDesign,
+        starter_root: Path,
+    ) -> None:
+        seen_commands: set[tuple[str, ...]] = set()
+        starter_commands = [*design.required_commands, *(gate.command for gate in design.gates)]
+        for command in starter_commands:
+            command_key = tuple(command)
+            if command_key in seen_commands:
+                continue
+            seen_commands.add(command_key)
+            result = subprocess.run(
+                command,
+                cwd=starter_root,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            if result.returncode != 0:
+                output = (result.stdout + "\n" + result.stderr).strip()[:4000]
+                rendered = " ".join(command)
+                raise RuntimeError(
+                    "Starter baseline command failed before scenario approval: "
+                    f"`{rendered}` exited {result.returncode}\n{output}"
+                )
+
     def _designer_instruction(self, objective: ObjectiveState, output_path: Path) -> str:
         return "\n".join(
             [
@@ -854,17 +904,25 @@ class AutoResearchEngine:
                 "Allowed metric ids only: functional, acceptance, verification-stability, "
                 "execution-validity, resource-efficiency, test-coverage, "
                 "requirements-coverage, llm-judge, visual-regression.",
-                "Include `starter_files` entries relative to the starter root. At minimum provide a"
-                " valid `package.json` so starter preflight can run before the benchmark agent edits"
-                " the workspace.",
+                "Include `starter_files` entries relative to the starter root.",
+                "Always provide a valid `package.json` at the starter root.",
+                "Declare at least one dependency or devDependency so the engine can materialize "
+                "a valid `bun.lock` with `bun install --lockfile-only` before benchmark runs.",
+                "Every `required_commands` entry and every gate command must succeed on the "
+                "starter before the benchmark agent edits the workspace.",
                 "This is the first drafting step. Do not inspect unrelated repository paths.",
                 "Do not run recursive listings like `ls -R` or broad searches.",
-                "Use the objective brief and these instructions to author a minimal valid scenario.",
-                "If the goal is a smoke or validation flow, prefer an `easy` scenario with a small prompt,"
-                " a low-complexity starter, and only essential metrics and gates. Prefer the default"
-                " metric set: functional, acceptance, verification-stability, execution-validity,"
-                " resource-efficiency. Prefer a starter that uses built-in Bun capabilities and no"
-                " external dependencies.",
+                "Use the objective brief and these instructions to author a minimal valid "
+                "scenario.",
+                "If the goal is a smoke or validation flow, prefer an `easy` scenario with a "
+                "small prompt, a low-complexity starter, and only essential metrics and gates.",
+                "Prefer the default metric set: functional, acceptance, "
+                "verification-stability, execution-validity, resource-efficiency.",
+                "Prefer a starter that uses built-in Bun capabilities and keeps dependencies "
+                "minimal. If the starter would otherwise have zero packages, add one tiny "
+                "dependency or devDependency so Bun can generate `bun.lock`.",
+                "Do not add failing tests or gates to the starter baseline. If you include "
+                "`bun run test`, make sure the starter test suite already passes before edits.",
                 "Write one valid JSON object to the output path and stop after the file exists.",
                 "Required JSON keys:",
                 json.dumps(
@@ -884,8 +942,11 @@ class AutoResearchEngine:
                         "starter_files": [
                             {
                                 "path": "package.json",
-                                "content": '{"name":"smoke-starter","private":true}',
-                            }
+                                "content": (
+                                    '{"name":"smoke-starter","private":true,'
+                                    '"devDependencies":{"is-number":"^7.0.0"}}'
+                                ),
+                            },
                         ],
                         "notes": ["short notes"],
                     }

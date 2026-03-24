@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import json
+from pathlib import PurePosixPath
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 ROLE_NAMES = ("designer", "critic", "planner", "executor", "reviewer", "governor")
 DEFAULT_MUTATION_SURFACE = [
@@ -126,6 +128,39 @@ class ScenarioDesign(BaseModel):
     gates: list[ScenarioGateDesign] = Field(default_factory=list)
     starter_files: list[StarterFileDesign] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def validate_starter_files(self) -> ScenarioDesign:
+        """Require a Bun starter package.json that can materialize a lockfile."""
+        starter_files = {
+            PurePosixPath(item.path).as_posix(): item.content for item in self.starter_files
+        }
+        package_json = starter_files.get("package.json")
+        if package_json is None:
+            raise ValueError("starter_files must include package.json at the starter root.")
+        try:
+            package_payload = json.loads(package_json)
+        except json.JSONDecodeError as exc:
+            raise ValueError("starter package.json must contain valid JSON.") from exc
+        if not isinstance(package_payload, dict):
+            raise ValueError("starter package.json must decode to a JSON object.")
+
+        dependency_sections = (
+            "dependencies",
+            "devDependencies",
+            "optionalDependencies",
+            "peerDependencies",
+        )
+        has_dependencies = any(
+            isinstance(package_payload.get(section), dict) and bool(package_payload[section])
+            for section in dependency_sections
+        )
+        if not has_dependencies:
+            raise ValueError(
+                "starter package.json must declare at least one dependency or devDependency "
+                "so Bun can materialize bun.lock."
+            )
+        return self
 
 
 class CriticReview(BaseModel):

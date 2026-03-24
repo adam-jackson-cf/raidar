@@ -13,6 +13,7 @@ from typing import Any
 
 import pytest
 import yaml
+from pydantic import ValidationError
 
 from auto_researcher.engine import AutoResearchEngine
 from auto_researcher.models import ObjectiveInitRequest, ObjectiveState
@@ -393,6 +394,7 @@ def _design_payload() -> dict[str, Any]:
                         "name": "homepage-objective",
                         "private": True,
                         "type": "module",
+                        "devDependencies": {"is-number": "^7.0.0"},
                         "scripts": {
                             "lint": "echo lint",
                             "test": "bun test",
@@ -434,6 +436,7 @@ def test_init_creates_objective_artifacts_and_draft_only(tmp_path: Path) -> None
         .read_text(encoding="utf-8")
         .startswith('{"name": "homepage-objective"')
     )
+    assert (draft_yaml.parent / "starter" / "bun.lock").is_file()
     assert not any(layout.scenarios_root.rglob("scenario.yaml"))
     assert layout.objective_brief_path(objective.objective_id).is_file()
     assert layout.objective_state_path(objective.objective_id).is_file()
@@ -1144,7 +1147,10 @@ def test_designer_instruction_constrains_metric_ids_for_smoke(tmp_path: Path) ->
         created_at_utc="2026-03-24T00:00:00+00:00",
         updated_at_utc="2026-03-24T00:00:00+00:00",
         status="drafting_scenario",
-        goal="Draft and approve a minimal hello-world coding scenario for autoresearch smoke validation",
+        goal=(
+            "Draft and approve a minimal hello-world coding scenario "
+            "for autoresearch smoke validation"
+        ),
         target_harness="codex-cli",
         target_model="codex/gpt-5.4-low",
         approval_mode="scenario_only",
@@ -1168,3 +1174,44 @@ def test_designer_instruction_constrains_metric_ids_for_smoke(tmp_path: Path) ->
     assert "functional, acceptance, verification-stability" in instruction
     assert "Prefer the default metric set:" in instruction
     assert "Include `starter_files` entries relative to the starter root." in instruction
+    assert "Always provide a valid `package.json` at the starter root." in instruction
+    assert "bun install --lockfile-only" in instruction
+    assert "Every `required_commands` entry and every gate command must succeed" in instruction
+
+
+def test_init_rejects_design_without_materializable_bun_lock(tmp_path: Path) -> None:
+    design = _design_payload()
+    package_payload = json.loads(design["starter_files"][0]["content"])
+    package_payload.pop("devDependencies")
+    design["starter_files"][0]["content"] = json.dumps(package_payload)
+    engine, _, _, _ = _make_engine(
+        tmp_path,
+        role_scripts=[{"role": "designer", "payload": design}],
+    )
+
+    with pytest.raises(ValidationError, match="dependency or devDependency"):
+        engine.init_objective(_init_request())
+
+
+def test_init_rejects_design_with_failing_starter_baseline_command(tmp_path: Path) -> None:
+    design = _design_payload()
+    design["required_commands"] = [["bun", "run", "test"]]
+    design["gates"] = [{"name": "test", "command": ["bun", "run", "test"]}]
+    design["starter_files"].append(
+        {
+            "path": "test/failing.test.ts",
+            "content": (
+                'import { expect, test } from "bun:test";\n'
+                'test("baseline fails", () => {\n'
+                "  expect(1).toBe(2);\n"
+                "});\n"
+            ),
+        }
+    )
+    engine, _, _, _ = _make_engine(
+        tmp_path,
+        role_scripts=[{"role": "designer", "payload": design}],
+    )
+
+    with pytest.raises(RuntimeError, match="bun run test"):
+        engine.init_objective(_init_request())
