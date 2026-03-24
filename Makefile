@@ -3,6 +3,7 @@ SHELL := /bin/bash
 RAIDAR := uv run --project orchestrator raidar
 AUTO_RESEARCHER := uv run --project auto_researcher auto-researcher
 
+# Shared public workflow defaults.
 SCENARIO ?=
 SCENARIO_DIR ?=
 SCENARIO_REVISION ?=
@@ -35,6 +36,16 @@ RESEARCH_REPEAT_PARALLEL ?= 1
 CONTROL_PROVIDER ?= openai-codex
 CONTROL_MODEL ?= gpt-5.3-codex
 PI_BINARY ?= pi
+
+# Canonical smoke workflow defaults.
+ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
+ORCHESTRATOR_SMOKE_HARNESS := codex-cli
+ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-low
+ORCHESTRATOR_SMOKE_REPEATS ?= 1
+AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
+AGENT_SMOKE_REPEATS ?= 1
+AGENT_SMOKE_REPEAT_PARALLEL ?= 1
+AGENT_SMOKE_RERUN_UNSCORED ?= 0
 RESEARCH_SMOKE_GOAL ?= Draft and approve a minimal hello-world coding scenario for autoresearch smoke validation
 RESEARCH_SMOKE_TARGET_HARNESS ?= codex-cli
 RESEARCH_SMOKE_TARGET_MODEL ?= codex/gpt-5.4-low
@@ -48,15 +59,6 @@ RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL ?= 1
 RESEARCH_SMOKE_RESEARCH_REPEATS ?= 1
 RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL ?= 1
 
-ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
-ORCHESTRATOR_SMOKE_HARNESS := codex-cli
-ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-low
-ORCHESTRATOR_SMOKE_REPEATS ?= 1
-AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
-AGENT_SMOKE_REPEATS ?= 1
-AGENT_SMOKE_REPEAT_PARALLEL ?= 1
-AGENT_SMOKE_RERUN_UNSCORED ?= 0
-
 ifeq ($(firstword $(MAKECMDGOALS)),matrix-run)
 MATRIX_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
 $(foreach goal,$(MATRIX_ARGS),$(eval $(goal):;@:))
@@ -64,7 +66,7 @@ endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-info scenario-validate \
-	orchestrator-smoke agent-smoke research-smoke experiment-run matrix-run \
+	smoke-dry-run-check orchestrator-smoke agent-smoke research-smoke experiment-run matrix-run \
 	experiments-list experiments-prune \
 	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report \
 	quality
@@ -95,6 +97,7 @@ help:
 	@echo "  make quality                                           Run repo quality gates"
 	@echo ""
 	@echo "Experiment orchestration:"
+	@echo "  make smoke-dry-run-check                               Print the canonical smoke command shapes used by CI drift checks"
 	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-low"
 	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
 	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
@@ -166,6 +169,23 @@ scenario-info:
 scenario-validate:
 	$(call require_var,SCENARIO)
 	@$(RAIDAR) scenario validate --scenario "$(SCENARIO)"
+
+smoke-dry-run-check:
+	@$(MAKE) --no-print-directory -n orchestrator-smoke \
+		ORCHESTRATOR_SMOKE_REPEATS="2" \
+		RUN_PARALLELISM="2"
+	@$(MAKE) --no-print-directory -n agent-smoke \
+		HARNESS="$(ORCHESTRATOR_SMOKE_HARNESS)" \
+		MODEL="$(ORCHESTRATOR_SMOKE_MODEL)" \
+		AGENT_SMOKE_REPEATS="2" \
+		AGENT_SMOKE_REPEAT_PARALLEL="2"
+	@$(MAKE) --no-print-directory -n research-smoke \
+		RESEARCH_SMOKE_LOOP_EXECUTION_MODE="parallel" \
+		RESEARCH_SMOKE_MAX_PARALLEL_LOOPS="2" \
+		RESEARCH_SMOKE_BENCHMARK_REPEATS="2" \
+		RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL="2" \
+		RESEARCH_SMOKE_RESEARCH_REPEATS="2" \
+		RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL="2"
 
 orchestrator-smoke: docker-check
 	@$(RAIDAR) run \
