@@ -44,7 +44,7 @@ $(foreach goal,$(MATRIX_ARGS),$(eval $(goal):;@:))
 endif
 
 .PHONY: help \
-	env-setup harness-list harness-validate scenario-list scenario-init scenario-info scenario-validate \
+	env-setup harness-list harness-validate harbor-cleanup scenario-list scenario-init scenario-info scenario-validate \
 	smoke experiment-run matrix-run \
 	experiments-list experiments-prune \
 	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report auto-research-demo-smoke \
@@ -65,6 +65,7 @@ help:
 	@echo "  make harness-list                                      List supported harnesses and model coverage"
 	@echo "  make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
 	@echo "                                                        Validate one AgentSpec candidate"
+	@echo "  make harbor-cleanup                                    Cleanup stale Harbor processes and containers"
 	@echo "  make scenario-list                                     List available scenarios and revisions"
 	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001"
 	@echo "                                                        Scaffold a new scenario"
@@ -108,7 +109,13 @@ harness-list:
 harness-validate:
 	$(call require_var,HARNESS)
 	$(call require_var,MODEL)
-	@$(RAIDAR) harness validate --harness "$(HARNESS)" --model "$(MODEL)"
+	@$(RAIDAR) harness validate \
+		--harness "$(HARNESS)" \
+		--model "$(MODEL)" \
+		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
+
+harbor-cleanup:
+	@$(RAIDAR) harbor cleanup
 
 scenario-list:
 	@$(RAIDAR) scenario list
@@ -155,7 +162,8 @@ experiment-run:
 		--repeats "$(RUN_COUNT)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
 		--rerun-unscored "$(RERUN_UNSCORED)" \
-		--experiment-kind "$(EXPERIMENT_KIND)"
+		--experiment-kind "$(EXPERIMENT_KIND)" \
+		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
 matrix-run:
 	@if [ "$(words $(MATRIX_ARGS))" -ne 2 ]; then \
