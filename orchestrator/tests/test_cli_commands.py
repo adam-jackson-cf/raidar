@@ -1091,6 +1091,32 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
     ]
 
 
+def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    result = subprocess.run(
+        ["make", "smoke-dry-run-check"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "uv run --project orchestrator raidar run \\" in result.stdout
+    assert '--repeats "2" \\' in result.stdout
+    assert '--repeat-parallel "2" \\' in result.stdout
+    assert "uv run --project orchestrator raidar harbor cleanup" in result.stdout
+    assert "uv run --project orchestrator raidar harness validate \\" in result.stdout
+    assert "uv run --project orchestrator raidar experiment run \\" in result.stdout
+    assert "uv run --project auto_researcher auto-researcher init \\" in result.stdout
+    assert '--loop-execution-mode "parallel" \\' in result.stdout
+    assert '--max-parallel-loops "2" \\' in result.stdout
+    assert '--benchmark-repeat-parallel "2" \\' in result.stdout
+    assert '--research-repeat-parallel "2" \\' in result.stdout
+    assert "uv run --project auto_researcher auto-researcher approve-scenario" in result.stdout
+
+
 def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     workspace_root = tmp_path / "workspace"
