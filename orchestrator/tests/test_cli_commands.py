@@ -1013,18 +1013,12 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
 
     assert result.returncode == 0, result.stderr
     assert make_log.read_text(encoding="utf-8").splitlines() == [
-        f"ARGS:-C {repo_root} harbor-cleanup",
-        "ENV:1:1",
         (
-            f"ARGS:-C {repo_root} harness-validate HARNESS=codex-cli "
-            "MODEL=codex/gpt-5.4-low TIMEOUT_SEC=120"
-        ),
-        "ENV:1:1",
-        (
-            f"ARGS:-C {repo_root} experiment-run "
-            "SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
-            "HARNESS=codex-cli MODEL=codex/gpt-5.4-low TIMEOUT_SEC=120 "
-            "RUN_COUNT=2 RUN_PARALLELISM=3 RERUN_UNSCORED=1"
+            f"ARGS:-C {repo_root} agent-smoke HARNESS=codex-cli "
+            "MODEL=codex/gpt-5.4-low TIMEOUT_SEC=120 "
+            "AGENT_SMOKE_SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
+            "AGENT_SMOKE_REPEATS=2 AGENT_SMOKE_REPEAT_PARALLEL=3 "
+            "AGENT_SMOKE_RERUN_UNSCORED=1"
         ),
         "ENV:1:1",
     ]
