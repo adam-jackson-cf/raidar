@@ -45,10 +45,10 @@ make experiment-run \
 
 This writes canonical artifacts into `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
 
-Use `make smoke` when you want a fast smoke/debug pass for one `AgentSpec`.
+Use `make orchestrator-smoke` when you want a fast orchestrator smoke/debug pass for one `AgentSpec`.
 
 ```bash
-make smoke
+make orchestrator-smoke
 ```
 
 Run a structured provider comparison with the public make surface:

@@ -34,10 +34,10 @@ CONTROL_PROVIDER ?= openai-codex
 CONTROL_MODEL ?= gpt-5.4
 PI_BINARY ?= pi
 
-SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
-SMOKE_HARNESS := codex-cli
-SMOKE_MODEL := codex/gpt-5.4-low
-AGENT_SMOKE_SCENARIO ?= $(SMOKE_SCENARIO)
+ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
+ORCHESTRATOR_SMOKE_HARNESS := codex-cli
+ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-low
+AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
 AGENT_SMOKE_RERUN_UNSCORED ?= 0
@@ -49,7 +49,7 @@ endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate harbor-cleanup scenario-list scenario-init scenario-info scenario-validate \
-	smoke agent-smoke experiment-run matrix-run \
+	orchestrator-smoke agent-smoke experiment-run matrix-run \
 	experiments-list experiments-prune \
 	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report auto-research-demo-smoke \
 	quality
@@ -80,7 +80,7 @@ help:
 	@echo "  make quality                                           Run repo quality gates"
 	@echo ""
 	@echo "Experiment orchestration:"
-	@echo "  make smoke                                             Run the default smoke scenario on codex-cli with codex/gpt-5.4-low"
+	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-low"
 	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... MODEL=..."
@@ -146,11 +146,11 @@ scenario-validate:
 	$(call require_var,SCENARIO)
 	@$(RAIDAR) scenario validate --scenario "$(SCENARIO)"
 
-smoke:
+orchestrator-smoke:
 	@$(RAIDAR) run \
-		--scenario "$(SMOKE_SCENARIO)" \
-		--harness "$(SMOKE_HARNESS)" \
-		--model "$(SMOKE_MODEL)" \
+		--scenario "$(ORCHESTRATOR_SMOKE_SCENARIO)" \
+		--harness "$(ORCHESTRATOR_SMOKE_HARNESS)" \
+		--model "$(ORCHESTRATOR_SMOKE_MODEL)" \
 		--repeats 1 \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
 		--rerun-unscored "$(RERUN_UNSCORED)" \
