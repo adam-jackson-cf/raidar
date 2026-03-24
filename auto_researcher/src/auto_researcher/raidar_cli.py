@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -59,9 +60,12 @@ class RaidarCli:
     command: tuple[str, ...] = ("uv", "run", "--project", "orchestrator", "raidar")
 
     def _run(self, *args: str) -> str:
+        env = dict(os.environ)
+        env.pop("VIRTUAL_ENV", None)
         result = subprocess.run(
             [*self.command, *args],
             cwd=self.layout.repo_root,
+            env=env,
             capture_output=True,
             text=True,
             check=False,

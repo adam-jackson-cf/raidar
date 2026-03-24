@@ -7,6 +7,7 @@ import re
 import shutil
 import threading
 import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -14,7 +15,7 @@ import pytest
 import yaml
 
 from auto_researcher.engine import AutoResearchEngine
-from auto_researcher.models import ObjectiveInitRequest
+from auto_researcher.models import ObjectiveInitRequest, ObjectiveState
 from auto_researcher.pi_rpc import RoleExecution
 from auto_researcher.storage import WorkspaceLayout, read_json, read_yaml
 
@@ -104,6 +105,77 @@ class FakeRoleRunner:
         )
 
 
+class DynamicRoleRunner:
+    def __init__(
+        self,
+        layout: WorkspaceLayout,
+        payload_factory: Callable[[str, str], dict[str, Any]],
+    ) -> None:
+        self.layout = layout
+        self.payload_factory = payload_factory
+        self.calls: list[dict[str, Any]] = []
+        self._lock = threading.Lock()
+        self._call_index = 0
+
+    def validate(self) -> None:
+        return None
+
+    def run_role(
+        self,
+        *,
+        objective_id: str,
+        role: str,
+        instruction: str,
+        model: Any,
+    ) -> RoleExecution:
+        with self._lock:
+            self._call_index += 1
+            call_index = self._call_index
+
+        payload = self.payload_factory(role, instruction)
+        session_dir = self.layout.role_sessions_dir(objective_id, role)
+        session_dir.mkdir(parents=True, exist_ok=True)
+        request_path = self.layout.role_requests_dir(objective_id, role) / f"{call_index:03d}.md"
+        response_path = self.layout.role_responses_dir(objective_id, role) / f"{call_index:03d}.md"
+        events_path = self.layout.role_events_dir(objective_id, role) / f"{call_index:03d}.jsonl"
+        request_path.parent.mkdir(parents=True, exist_ok=True)
+        response_path.parent.mkdir(parents=True, exist_ok=True)
+        events_path.parent.mkdir(parents=True, exist_ok=True)
+        request_path.write_text(instruction, encoding="utf-8")
+        if payload.get("edit") is not None:
+            candidate_yaml = _extract_path("Candidate scenario yaml:", instruction)
+            assert candidate_yaml is not None
+            payload["edit"](Path(candidate_yaml))
+        output_path = _extract_output_path(instruction)
+        if output_path is not None and payload.get("payload") is not None:
+            output = Path(output_path)
+            output.parent.mkdir(parents=True, exist_ok=True)
+            output.write_text(
+                json.dumps(payload["payload"], indent=2) + "\n",
+                encoding="utf-8",
+            )
+        assistant_text = str(payload.get("assistant_text", role))
+        response_path.write_text(assistant_text, encoding="utf-8")
+        events_path.write_text("{}", encoding="utf-8")
+        with self._lock:
+            self.calls.append(
+                {
+                    "role": role,
+                    "session_dir": session_dir,
+                    "instruction": instruction,
+                    "model": model,
+                }
+            )
+        return RoleExecution(
+            role=role,
+            session_dir=session_dir,
+            request_path=request_path,
+            response_path=response_path,
+            events_path=events_path,
+            assistant_text=assistant_text,
+        )
+
+
 class FakeRaidar:
     def __init__(
         self,
@@ -113,6 +185,7 @@ class FakeRaidar:
         self.layout = layout
         self.experiment_payloads = list(experiment_payloads or [])
         self.experiment_calls: list[dict[str, Any]] = []
+        self._lock = threading.Lock()
 
     def scenario_init(
         self,
@@ -213,28 +286,32 @@ class FakeRaidar:
         experiment_kind: str,
         experiments_root: Path | None = None,
     ) -> dict[str, Any]:
-        del timeout_sec, repeats, repeat_parallel, experiments_root
-        call_index = len(self.experiment_calls) + 1
-        if experiment_kind == "benchmark":
-            root = self.layout.benchmark_experiments_root
-        else:
-            root = self.layout.research_loop_experiments_root
+        del timeout_sec, experiments_root
+        with self._lock:
+            call_index = len(self.experiment_calls) + 1
+            payload = self.experiment_payloads.pop(0)
+            if experiment_kind == "benchmark":
+                root = self.layout.benchmark_experiments_root
+            else:
+                root = self.layout.research_loop_experiments_root
         execution_dir = root / f"exp-{call_index:02d}"
         execution_dir.mkdir(parents=True, exist_ok=True)
-        payload = self.experiment_payloads.pop(0)
         (execution_dir / "experiment-summary.json").write_text(
             json.dumps(payload, indent=2) + "\n",
             encoding="utf-8",
         )
-        self.experiment_calls.append(
-            {
-                "experiment_kind": experiment_kind,
-                "scenario_yaml": scenario_yaml,
-                "harness": harness,
-                "model": model,
-                "summary_path": execution_dir / "experiment-summary.json",
-            }
-        )
+        with self._lock:
+            self.experiment_calls.append(
+                {
+                    "experiment_kind": experiment_kind,
+                    "scenario_yaml": scenario_yaml,
+                    "harness": harness,
+                    "model": model,
+                    "repeats": repeats,
+                    "repeat_parallel": repeat_parallel,
+                    "summary_path": execution_dir / "experiment-summary.json",
+                }
+            )
         return {
             "scenario_path": str(scenario_yaml),
             "scenario_name": scenario_yaml.parent.parent.name,
@@ -308,6 +385,22 @@ def _design_payload() -> dict[str, Any]:
         "metric_ids": ["functional", "acceptance", "verification-stability"],
         "required_commands": [["bun", "run", "lint"]],
         "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
+        "starter_files": [
+            {
+                "path": "package.json",
+                "content": json.dumps(
+                    {
+                        "name": "homepage-objective",
+                        "private": True,
+                        "type": "module",
+                        "scripts": {
+                            "lint": "echo lint",
+                            "test": "bun test",
+                        },
+                    }
+                ),
+            }
+        ],
         "notes": ["draft the first scenario"],
     }
 
@@ -336,6 +429,11 @@ def test_init_creates_objective_artifacts_and_draft_only(tmp_path: Path) -> None
     draft_yaml = Path(objective.draft_scenario_ref or "")
     assert draft_yaml.is_file()
     assert str(draft_yaml).startswith(str(layout.objectives_root))
+    assert (
+        (draft_yaml.parent / "starter" / "package.json")
+        .read_text(encoding="utf-8")
+        .startswith('{"name": "homepage-objective"')
+    )
     assert not any(layout.scenarios_root.rglob("scenario.yaml"))
     assert layout.objective_brief_path(objective.objective_id).is_file()
     assert layout.objective_state_path(objective.objective_id).is_file()
@@ -848,3 +946,225 @@ def test_report_includes_loop_execution_mode(tmp_path: Path) -> None:
 
     assert "- loop_execution_mode: `parallel`" in report
     assert "- max_parallel_loops: `3`" in report
+
+
+def test_run_uses_objective_repeat_parallel_settings_for_benchmark_and_research(
+    tmp_path: Path,
+) -> None:
+    metric_ids = ["functional", "acceptance", "verification-stability"]
+
+    def _allowed_edit(candidate_yaml: Path) -> None:
+        (candidate_yaml.parent / "prompt" / "task.md").write_text(
+            "Improved prompt\n",
+            encoding="utf-8",
+        )
+
+    engine, _role_runner, raidar, _layout = _make_engine(
+        tmp_path,
+        role_scripts=[
+            {"role": "designer", "payload": _design_payload()},
+            {"role": "critic", "payload": _critic_payload()},
+            {
+                "role": "planner",
+                "payload": {
+                    "loops": [
+                        {
+                            "loop_id": "loop-001",
+                            "title": "Prompt refinement",
+                            "hypothesis": "Clearer prompt improves results",
+                            "instructions": "Tighten prompt wording",
+                        }
+                    ],
+                    "notes": [],
+                },
+            },
+            {
+                "role": "executor",
+                "payload": {
+                    "summary": "Refined the prompt",
+                    "changed_files": ["prompt/task.md"],
+                    "rationale": "Sharper instruction improves outcomes.",
+                },
+                "edit": _allowed_edit,
+            },
+            {
+                "role": "reviewer",
+                "payload": {
+                    "recommended_action": "promote",
+                    "summary": "Research loop materially improved benchmark evidence.",
+                    "strengths": ["diagnostic score improved"],
+                    "concerns": [],
+                },
+            },
+            {"role": "governor", "payload": {"action": "promote", "reasoning": "Promote it."}},
+        ],
+        experiment_payloads=[
+            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
+            _summary_payload(composite=0.88, quality=0.9, diagnostic=0.91, metric_ids=metric_ids),
+            _summary_payload(composite=0.89, quality=0.91, diagnostic=0.93, metric_ids=metric_ids),
+        ],
+    )
+
+    created = engine.init_objective(
+        _init_request(
+            max_revisions=1,
+            benchmark_repeats=6,
+            benchmark_repeat_parallel=3,
+            research_repeats=4,
+            research_repeat_parallel=2,
+        )
+    )
+    engine.approve_scenario(created.objective_id)
+    engine.run_objective(created.objective_id)
+
+    benchmark_calls = [
+        call for call in raidar.experiment_calls if call["experiment_kind"] == "benchmark"
+    ]
+    research_calls = [
+        call for call in raidar.experiment_calls if call["experiment_kind"] == "research-loop"
+    ]
+
+    assert [call["repeats"] for call in benchmark_calls] == [6, 6]
+    assert [call["repeat_parallel"] for call in benchmark_calls] == [3, 3]
+    assert [call["repeats"] for call in research_calls] == [4]
+    assert [call["repeat_parallel"] for call in research_calls] == [2]
+
+
+def test_parallel_round_allows_only_one_promoted_winner_and_confirmation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    metric_ids = ["functional", "acceptance", "verification-stability"]
+    layout = WorkspaceLayout(tmp_path)
+    layout.auto_researcher_root.mkdir(parents=True, exist_ok=True)
+    layout.objectives_root.mkdir(parents=True, exist_ok=True)
+    layout.scenarios_root.mkdir(parents=True, exist_ok=True)
+    layout.benchmark_experiments_root.mkdir(parents=True, exist_ok=True)
+    layout.research_loop_experiments_root.mkdir(parents=True, exist_ok=True)
+
+    def _payload_factory(role: str, instruction: str) -> dict[str, Any]:
+        if role == "designer":
+            return {"payload": _design_payload()}
+        if role == "critic":
+            return {"payload": _critic_payload()}
+        if role == "planner":
+            return {
+                "payload": {
+                    "loops": [
+                        {
+                            "loop_id": "loop-001",
+                            "title": "Prompt refinement one",
+                            "hypothesis": "A",
+                            "instructions": "Tighten prompt wording",
+                        },
+                        {
+                            "loop_id": "loop-002",
+                            "title": "Prompt refinement two",
+                            "hypothesis": "B",
+                            "instructions": "Tighten prompt wording differently",
+                        },
+                    ],
+                    "notes": [],
+                }
+            }
+        if role == "executor":
+            return {
+                "payload": {
+                    "summary": "Refined the prompt",
+                    "changed_files": ["prompt/task.md"],
+                    "rationale": "Sharper instruction improves outcomes.",
+                },
+                "edit": lambda candidate_yaml: (
+                    candidate_yaml.parent / "prompt" / "task.md"
+                ).write_text(
+                    f"Improved prompt for {candidate_yaml.parent.parent.name}\n",
+                    encoding="utf-8",
+                ),
+            }
+        if role == "reviewer":
+            return {
+                "payload": {
+                    "recommended_action": "promote",
+                    "summary": "Research loop materially improved benchmark evidence.",
+                    "strengths": ["diagnostic score improved"],
+                    "concerns": [],
+                }
+            }
+        if role == "governor":
+            return {"payload": {"action": "promote", "reasoning": "Promote it."}}
+        raise AssertionError(f"Unexpected role: {role}\n{instruction}")
+
+    role_runner = DynamicRoleRunner(layout, _payload_factory)
+    raidar = FakeRaidar(
+        layout,
+        experiment_payloads=[
+            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
+            _summary_payload(composite=0.88, quality=0.9, diagnostic=0.91, metric_ids=metric_ids),
+            _summary_payload(composite=0.9, quality=0.92, diagnostic=0.94, metric_ids=metric_ids),
+            _summary_payload(composite=0.91, quality=0.93, diagnostic=0.95, metric_ids=metric_ids),
+        ],
+    )
+    engine = AutoResearchEngine(layout=layout, role_runner=role_runner, raidar=raidar)
+    original_attempt_promotion = AutoResearchEngine._attempt_promotion
+
+    def _slow_attempt_promotion(self, objective, loop):
+        time.sleep(0.05)
+        return original_attempt_promotion(self, objective, loop)
+
+    monkeypatch.setattr(AutoResearchEngine, "_attempt_promotion", _slow_attempt_promotion)
+
+    created = engine.init_objective(
+        _init_request(loop_execution_mode="parallel", max_revisions=1, max_parallel_loops=2)
+    )
+    engine.approve_scenario(created.objective_id)
+    completed = engine.run_objective(created.objective_id)
+
+    loop_states = [
+        read_json(layout.loop_state_path(created.objective_id, _resolved_loop_id(1, "loop-001"))),
+        read_json(layout.loop_state_path(created.objective_id, _resolved_loop_id(1, "loop-002"))),
+    ]
+    benchmark_calls = [
+        call for call in raidar.experiment_calls if call["experiment_kind"] == "benchmark"
+    ]
+    research_calls = [
+        call for call in raidar.experiment_calls if call["experiment_kind"] == "research-loop"
+    ]
+
+    assert completed.revision_count == 1
+    assert len(research_calls) == 2
+    assert len(benchmark_calls) == 2
+    assert sum(1 for state in loop_states if state["status"] == "promoted") == 1
+    assert sum(1 for state in loop_states if state["stop_reason"] == "superseded-by-promotion") == 1
+
+
+def test_designer_instruction_constrains_metric_ids_for_smoke(tmp_path: Path) -> None:
+    engine, _, _, _ = _make_engine(tmp_path, role_scripts=[])
+    objective = ObjectiveState(
+        objective_id="research-smoke-test",
+        created_at_utc="2026-03-24T00:00:00+00:00",
+        updated_at_utc="2026-03-24T00:00:00+00:00",
+        status="drafting_scenario",
+        goal="Draft and approve a minimal hello-world coding scenario for autoresearch smoke validation",
+        target_harness="codex-cli",
+        target_model="codex/gpt-5.4-low",
+        approval_mode="scenario_only",
+        loop_execution_mode="serial",
+        max_revisions=1,
+        max_parallel_loops=1,
+        benchmark_repeats=1,
+        benchmark_repeat_parallel=1,
+        research_repeats=1,
+        research_repeat_parallel=1,
+        mutation_surface=["scenario.yaml", "prompt/"],
+        role_models={},
+    )
+
+    instruction = engine._designer_instruction(  # noqa: SLF001
+        objective,
+        Path("/tmp/scenario-design.json"),
+    )
+
+    assert "Allowed metric ids only:" in instruction
+    assert "functional, acceptance, verification-stability" in instruction
+    assert "Prefer the default metric set:" in instruction
+    assert "Include `starter_files` entries relative to the starter root." in instruction

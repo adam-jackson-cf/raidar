@@ -23,6 +23,7 @@ from .models import (
     ReviewMemo,
     RoleModelConfig,
     ScenarioDesign,
+    StarterFileDesign,
 )
 from .pi_rpc import RoleExecution, RoleRunner
 from .raidar_cli import RaidarClient
@@ -87,7 +88,9 @@ class AutoResearchEngine:
             max_revisions=request.max_revisions,
             max_parallel_loops=request.max_parallel_loops,
             benchmark_repeats=request.benchmark_repeats,
+            benchmark_repeat_parallel=request.benchmark_repeat_parallel,
             research_repeats=request.research_repeats,
+            research_repeat_parallel=request.research_repeat_parallel,
             mutation_surface=list(request.mutation_surface),
             role_models=self._resolved_role_models(request.role_models),
         )
@@ -129,7 +132,8 @@ class AutoResearchEngine:
         )
         prompt_path = draft_root / DEFAULT_LOCAL_REVISION / design.prompt_entry
         write_text(prompt_path, design.prompt_text.rstrip() + "\n")
-        ensure_dir(draft_root / DEFAULT_LOCAL_REVISION / design.starter_root)
+        starter_root = ensure_dir(draft_root / DEFAULT_LOCAL_REVISION / design.starter_root)
+        self._write_starter_files(starter_root, design.starter_files)
         self.raidar.scenario_validate(scenario_yaml=draft_yaml)
 
         critic_path = self.layout.objective_review_dir(objective_id) / "scenario-review.json"
@@ -174,7 +178,7 @@ class AutoResearchEngine:
             model=objective.target_model,
             timeout_sec=timeout_sec,
             repeats=objective.benchmark_repeats,
-            repeat_parallel=1,
+            repeat_parallel=objective.benchmark_repeat_parallel,
             experiment_kind="benchmark",
         )
 
@@ -227,6 +231,10 @@ class AutoResearchEngine:
             "loop_execution_mode": objective.loop_execution_mode,
             "max_revisions": objective.max_revisions,
             "max_parallel_loops": objective.max_parallel_loops,
+            "benchmark_repeats": objective.benchmark_repeats,
+            "benchmark_repeat_parallel": objective.benchmark_repeat_parallel,
+            "research_repeats": objective.research_repeats,
+            "research_repeat_parallel": objective.research_repeat_parallel,
             "loop_statuses": {loop.loop_id: loop.status for loop in loops},
             "stop_reason": objective.stop_reason,
         }
@@ -242,6 +250,8 @@ class AutoResearchEngine:
             f"- target: `{objective.target_harness}` / `{objective.target_model}`",
             f"- loop_execution_mode: `{objective.loop_execution_mode}`",
             f"- max_parallel_loops: `{objective.max_parallel_loops}`",
+            f"- benchmark_repeat_parallel: `{objective.benchmark_repeat_parallel}`",
+            f"- research_repeat_parallel: `{objective.research_repeat_parallel}`",
             "- scenario_ref: "
             f"`{objective.scenario_ref or objective.draft_scenario_ref or '(none)'}`",
             f"- best_benchmark_ref: `{objective.best_benchmark_ref or '(none)'}`",
@@ -452,7 +462,7 @@ class AutoResearchEngine:
                 model=objective.target_model,
                 timeout_sec=scenario_timeout_sec(candidate_yaml),
                 repeats=objective.research_repeats,
-                repeat_parallel=1,
+                repeat_parallel=objective.research_repeat_parallel,
                 experiment_kind="research-loop",
             )
             loop.latest_research_summary_ref = str(research_result["summary_path"])
@@ -610,7 +620,7 @@ class AutoResearchEngine:
                 model=latest_objective.target_model,
                 timeout_sec=scenario_timeout_sec(Path(loop.candidate_scenario_ref)),
                 repeats=latest_objective.benchmark_repeats,
-                repeat_parallel=1,
+                repeat_parallel=latest_objective.benchmark_repeat_parallel,
                 experiment_kind="benchmark",
             )
             confirmation_summary_ref = str(confirmation["summary_path"])
@@ -762,7 +772,9 @@ class AutoResearchEngine:
                 f"- max_revisions: `{objective.max_revisions}`",
                 f"- max_parallel_loops: `{objective.max_parallel_loops}`",
                 f"- benchmark_repeats: `{objective.benchmark_repeats}`",
+                f"- benchmark_repeat_parallel: `{objective.benchmark_repeat_parallel}`",
                 f"- research_repeats: `{objective.research_repeats}`",
+                f"- research_repeat_parallel: `{objective.research_repeat_parallel}`",
                 f"- mutation_surface: `{', '.join(objective.mutation_surface)}`",
             ]
         )
@@ -812,6 +824,25 @@ class AutoResearchEngine:
             raise RuntimeError(f"Planner returned invalid loop id: {raw_loop_id}")
         return f"round-{objective.planner_round:02d}__{raw_loop_id}"
 
+    def _write_starter_files(
+        self,
+        starter_root: Path,
+        starter_files: list[StarterFileDesign],
+    ) -> None:
+        for starter_file in starter_files:
+            relative_path = Path(starter_file.path)
+            if (
+                relative_path.is_absolute()
+                or ".." in relative_path.parts
+                or relative_path.parts == ()
+            ):
+                raise RuntimeError(
+                    f"Designer returned invalid starter file path: {starter_file.path}"
+                )
+            output_path = starter_root / relative_path
+            ensure_dir(output_path.parent)
+            write_text(output_path, starter_file.content)
+
     def _designer_instruction(self, objective: ObjectiveState, output_path: Path) -> str:
         return "\n".join(
             [
@@ -820,6 +851,21 @@ class AutoResearchEngine:
                 f"Target model: {objective.target_model}",
                 f"Frozen metric count target: {max(1, len(objective.frozen_metric_ids) or 5)}",
                 f"Write JSON to: {output_path}",
+                "Allowed metric ids only: functional, acceptance, verification-stability, "
+                "execution-validity, resource-efficiency, test-coverage, "
+                "requirements-coverage, llm-judge, visual-regression.",
+                "Include `starter_files` entries relative to the starter root. At minimum provide a"
+                " valid `package.json` so starter preflight can run before the benchmark agent edits"
+                " the workspace.",
+                "This is the first drafting step. Do not inspect unrelated repository paths.",
+                "Do not run recursive listings like `ls -R` or broad searches.",
+                "Use the objective brief and these instructions to author a minimal valid scenario.",
+                "If the goal is a smoke or validation flow, prefer an `easy` scenario with a small prompt,"
+                " a low-complexity starter, and only essential metrics and gates. Prefer the default"
+                " metric set: functional, acceptance, verification-stability, execution-validity,"
+                " resource-efficiency. Prefer a starter that uses built-in Bun capabilities and no"
+                " external dependencies.",
+                "Write one valid JSON object to the output path and stop after the file exists.",
                 "Required JSON keys:",
                 json.dumps(
                     {
@@ -835,6 +881,12 @@ class AutoResearchEngine:
                         "metric_ids": ["functional", "acceptance"],
                         "required_commands": [["bun", "run", "lint"]],
                         "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
+                        "starter_files": [
+                            {
+                                "path": "package.json",
+                                "content": '{"name":"smoke-starter","private":true}',
+                            }
+                        ],
                         "notes": ["short notes"],
                     }
                 ),
@@ -856,6 +908,9 @@ class AutoResearchEngine:
                 f"Draft scenario yaml: {draft_yaml}",
                 f"Designer plan: {design_path}",
                 f"Write JSON review to: {output_path}",
+                "Review only the referenced draft yaml and designer plan.",
+                "Do not inspect unrelated repository paths or run recursive listings.",
+                "Write one valid JSON object to the output path and stop after the file exists.",
                 'Use keys: {"decision":"approve|revise|block","summary":"...","risks":["..."]}',
                 "Review whether the draft scenario is suitable, typed, and measurable.",
             ]

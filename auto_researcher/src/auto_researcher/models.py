@@ -41,7 +41,7 @@ class RoleModelConfig(BaseModel):
     """Control-plane PI model assignment for one role."""
 
     provider: str = "openai-codex"
-    model_id: str = "gpt-5.4"
+    model_id: str = "gpt-5.3-codex"
 
 
 class ObjectiveInitRequest(BaseModel):
@@ -56,7 +56,9 @@ class ObjectiveInitRequest(BaseModel):
     max_revisions: int = 3
     max_parallel_loops: int = 3
     benchmark_repeats: int = 5
+    benchmark_repeat_parallel: int = 1
     research_repeats: int = 3
+    research_repeat_parallel: int = 1
     mutation_surface: list[str] = Field(default_factory=lambda: list(DEFAULT_MUTATION_SURFACE))
     role_models: dict[str, RoleModelConfig] = Field(default_factory=dict)
 
@@ -76,7 +78,9 @@ class ObjectiveState(BaseModel):
     max_revisions: int
     max_parallel_loops: int
     benchmark_repeats: int
+    benchmark_repeat_parallel: int
     research_repeats: int
+    research_repeat_parallel: int
     mutation_surface: list[str]
     scenario_slug: str | None = None
     scenario_name: str | None = None
@@ -98,6 +102,13 @@ class ScenarioGateDesign(BaseModel):
     command: list[str]
 
 
+class StarterFileDesign(BaseModel):
+    """One starter workspace file authored during scenario design."""
+
+    path: str
+    content: str
+
+
 class ScenarioDesign(BaseModel):
     """Designer-authored scenario draft contract."""
 
@@ -113,6 +124,7 @@ class ScenarioDesign(BaseModel):
     metric_ids: list[str]
     required_commands: list[list[str]] = Field(default_factory=list)
     gates: list[ScenarioGateDesign] = Field(default_factory=list)
+    starter_files: list[StarterFileDesign] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
 
 

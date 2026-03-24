@@ -102,7 +102,9 @@ def main() -> None:
 @click.option("--max-revisions", default=3, show_default=True, type=int)
 @click.option("--max-parallel-loops", default=3, show_default=True, type=int)
 @click.option("--benchmark-repeats", default=5, show_default=True, type=int)
+@click.option("--benchmark-repeat-parallel", default=1, show_default=True, type=click.IntRange(1))
 @click.option("--research-repeats", default=3, show_default=True, type=int)
+@click.option("--research-repeat-parallel", default=1, show_default=True, type=click.IntRange(1))
 @click.option(
     "--mutation-surface",
     multiple=True,
@@ -111,7 +113,7 @@ def main() -> None:
     type=str,
 )
 @click.option("--control-provider", default="openai-codex", show_default=True, type=str)
-@click.option("--control-model", default="gpt-5.4", show_default=True, type=str)
+@click.option("--control-model", default="gpt-5.3-codex", show_default=True, type=str)
 @click.option(
     "--role-model",
     "role_models",
@@ -129,7 +131,9 @@ def init_command(
     max_revisions: int,
     max_parallel_loops: int,
     benchmark_repeats: int,
+    benchmark_repeat_parallel: int,
     research_repeats: int,
+    research_repeat_parallel: int,
     mutation_surface: tuple[str, ...],
     control_provider: str,
     control_model: str,
@@ -147,7 +151,9 @@ def init_command(
         max_revisions=max_revisions,
         max_parallel_loops=max_parallel_loops,
         benchmark_repeats=benchmark_repeats,
+        benchmark_repeat_parallel=benchmark_repeat_parallel,
         research_repeats=research_repeats,
+        research_repeat_parallel=research_repeat_parallel,
         mutation_surface=list(mutation_surface),
         role_models=_parse_role_models(control_provider, control_model, role_models),
     )
