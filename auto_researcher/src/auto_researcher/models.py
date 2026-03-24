@@ -34,6 +34,7 @@ ResearchLoopStatus = Literal[
     "completed",
 ]
 LoopAction = Literal["iterate", "discard", "promote", "spawn_next", "stop"]
+LoopExecutionMode = Literal["serial", "parallel"]
 
 
 class RoleModelConfig(BaseModel):
@@ -51,7 +52,7 @@ class ObjectiveInitRequest(BaseModel):
     target_model: str
     objective_id: str | None = None
     approval_mode: Literal["scenario_only"] = "scenario_only"
-    loop_topology: Literal["bounded_parallel"] = "bounded_parallel"
+    loop_execution_mode: LoopExecutionMode = "serial"
     max_revisions: int = 3
     max_parallel_loops: int = 3
     benchmark_repeats: int = 5
@@ -71,7 +72,7 @@ class ObjectiveState(BaseModel):
     target_harness: str
     target_model: str
     approval_mode: Literal["scenario_only"]
-    loop_topology: Literal["bounded_parallel"]
+    loop_execution_mode: LoopExecutionMode
     max_revisions: int
     max_parallel_loops: int
     benchmark_repeats: int

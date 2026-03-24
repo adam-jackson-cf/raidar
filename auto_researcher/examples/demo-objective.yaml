@@ -3,7 +3,7 @@ target_harness: codex-cli
 target_model: codex/gpt-5.4-low
 objective_id: demo-checkout-objective
 approval_mode: scenario_only
-loop_topology: bounded_parallel
+loop_execution_mode: serial
 max_revisions: 1
 max_parallel_loops: 1
 benchmark_repeats: 3

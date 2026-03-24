@@ -10,7 +10,11 @@ from typing import Literal, cast
 import click
 
 from .engine import AutoResearchEngine
-from .models import DEFAULT_MUTATION_SURFACE, ObjectiveInitRequest, RoleModelConfig
+from .models import (
+    DEFAULT_MUTATION_SURFACE,
+    ObjectiveInitRequest,
+    RoleModelConfig,
+)
 from .pi_rpc import PiRpcRoleRunner
 from .raidar_cli import RaidarCli
 from .scripted import (
@@ -83,8 +87,18 @@ def main() -> None:
 @click.option("--target-harness", required=True, type=str, help="Harness under evaluation.")
 @click.option("--target-model", required=True, type=str, help="Model under evaluation.")
 @click.option("--objective-id", type=str, help="Stable objective identifier.")
-@click.option("--approval-mode", default="scenario_only", show_default=True, type=str)
-@click.option("--loop-topology", default="bounded_parallel", show_default=True, type=str)
+@click.option(
+    "--approval-mode",
+    default="scenario_only",
+    show_default=True,
+    type=click.Choice(["scenario_only"]),
+)
+@click.option(
+    "--loop-execution-mode",
+    default="serial",
+    show_default=True,
+    type=click.Choice(["serial", "parallel"]),
+)
 @click.option("--max-revisions", default=3, show_default=True, type=int)
 @click.option("--max-parallel-loops", default=3, show_default=True, type=int)
 @click.option("--benchmark-repeats", default=5, show_default=True, type=int)
@@ -111,7 +125,7 @@ def init_command(
     target_model: str,
     objective_id: str | None,
     approval_mode: str,
-    loop_topology: str,
+    loop_execution_mode: str,
     max_revisions: int,
     max_parallel_loops: int,
     benchmark_repeats: int,
@@ -129,7 +143,7 @@ def init_command(
         target_model=target_model,
         objective_id=objective_id,
         approval_mode=cast(Literal["scenario_only"], approval_mode),
-        loop_topology=cast(Literal["bounded_parallel"], loop_topology),
+        loop_execution_mode=cast(Literal["serial", "parallel"], loop_execution_mode),
         max_revisions=max_revisions,
         max_parallel_loops=max_parallel_loops,
         benchmark_repeats=benchmark_repeats,

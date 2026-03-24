@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import concurrent.futures
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from threading import Lock
 from typing import Any
 
 from .models import (
@@ -50,12 +52,21 @@ DEFAULT_LOCAL_REVISION = "v001"
 
 
 @dataclass(slots=True)
+class _RoundPromotionState:
+    """Coordinate one winning promotion per planner round."""
+
+    lock: Lock = field(default_factory=Lock)
+    promoted_loop_id: str | None = None
+
+
+@dataclass(slots=True)
 class AutoResearchEngine:
     """Coordinate objective intake, approval, loop execution, and promotion."""
 
     layout: WorkspaceLayout
     role_runner: RoleRunner
     raidar: RaidarClient
+    _objective_lock: Lock = field(default_factory=Lock, init=False, repr=False)
 
     def init_objective(self, request: ObjectiveInitRequest) -> ObjectiveState:
         self.role_runner.validate()
@@ -72,7 +83,7 @@ class AutoResearchEngine:
             target_harness=request.target_harness,
             target_model=request.target_model,
             approval_mode=request.approval_mode,
-            loop_topology=request.loop_topology,
+            loop_execution_mode=request.loop_execution_mode,
             max_revisions=request.max_revisions,
             max_parallel_loops=request.max_parallel_loops,
             benchmark_repeats=request.benchmark_repeats,
@@ -213,6 +224,7 @@ class AutoResearchEngine:
             "draft_scenario_ref": objective.draft_scenario_ref,
             "best_benchmark_ref": objective.best_benchmark_ref,
             "revision_count": objective.revision_count,
+            "loop_execution_mode": objective.loop_execution_mode,
             "max_revisions": objective.max_revisions,
             "max_parallel_loops": objective.max_parallel_loops,
             "loop_statuses": {loop.loop_id: loop.status for loop in loops},
@@ -228,6 +240,8 @@ class AutoResearchEngine:
             f"- status: `{objective.status}`",
             f"- goal: {objective.goal}",
             f"- target: `{objective.target_harness}` / `{objective.target_model}`",
+            f"- loop_execution_mode: `{objective.loop_execution_mode}`",
+            f"- max_parallel_loops: `{objective.max_parallel_loops}`",
             "- scenario_ref: "
             f"`{objective.scenario_ref or objective.draft_scenario_ref or '(none)'}`",
             f"- best_benchmark_ref: `{objective.best_benchmark_ref or '(none)'}`",
@@ -287,16 +301,26 @@ class AutoResearchEngine:
             self._save_objective(objective)
             return False, False
 
+        planned_loops = plan.loops[: objective.max_parallel_loops]
+        if objective.loop_execution_mode == "parallel":
+            return self._execute_plan_round_parallel(objective, planned_loops)
+        return self._execute_plan_round_serial(objective, planned_loops)
+
+    def _execute_plan_round_serial(
+        self,
+        objective: ObjectiveState,
+        planned_loops: list[LoopPlan],
+    ) -> tuple[bool, bool]:
         promoted = False
         requested_follow_up = False
-        for loop_plan in plan.loops[: objective.max_parallel_loops]:
+        for loop_plan in planned_loops:
             loop = self._create_loop(objective, loop_plan)
             loop = self._run_loop(objective, loop)
             if loop.status == "promoted":
                 promoted = True
                 self._mark_superseded_loops(
                     objective,
-                    planned_loops=plan.loops,
+                    planned_loops=planned_loops,
                     executed_loop_id=loop.loop_id,
                 )
                 break
@@ -306,6 +330,46 @@ class AutoResearchEngine:
             if objective.status != "active":
                 break
         return promoted, requested_follow_up
+
+    def _execute_plan_round_parallel(
+        self,
+        objective: ObjectiveState,
+        planned_loops: list[LoopPlan],
+    ) -> tuple[bool, bool]:
+        promotion_state = _RoundPromotionState()
+        loop_results: dict[str, ResearchLoopState] = {}
+        max_workers = max(1, min(objective.max_parallel_loops, len(planned_loops)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_map: dict[concurrent.futures.Future[ResearchLoopState], str] = {}
+            for loop_plan in planned_loops:
+                loop = self._create_loop(objective, loop_plan)
+                future = executor.submit(
+                    self._run_loop,
+                    objective.model_copy(deep=True),
+                    loop,
+                    promotion_state,
+                )
+                future_map[future] = loop.loop_id
+            for future in concurrent.futures.as_completed(future_map):
+                loop = future.result()
+                loop_results[loop.loop_id] = loop
+
+        promoted_loop = next(
+            (loop for loop in loop_results.values() if loop.status == "promoted"),
+            None,
+        )
+        if promoted_loop is not None:
+            self._mark_superseded_loops(
+                objective,
+                planned_loops=planned_loops,
+                executed_loop_id=promoted_loop.loop_id,
+            )
+            return True, any(
+                loop.stop_reason == "spawn-next"
+                for loop in loop_results.values()
+                if loop.loop_id != promoted_loop.loop_id
+            )
+        return False, any(loop.stop_reason == "spawn-next" for loop in loop_results.values())
 
     def _create_loop(self, objective: ObjectiveState, loop_plan: LoopPlan) -> ResearchLoopState:
         if objective.scenario_ref is None or objective.scenario_slug is None:
@@ -336,7 +400,12 @@ class AutoResearchEngine:
         self._save_loop(loop)
         return loop
 
-    def _run_loop(self, objective: ObjectiveState, loop: ResearchLoopState) -> ResearchLoopState:
+    def _run_loop(
+        self,
+        objective: ObjectiveState,
+        loop: ResearchLoopState,
+        round_promotion_state: _RoundPromotionState | None = None,
+    ) -> ResearchLoopState:
         while True:
             loop.status = "running"
             loop.updated_at_utc = utc_now_iso()
@@ -418,102 +487,155 @@ class AutoResearchEngine:
             loop.session_paths["governor"] = str(governor_execution.session_dir)
             decision = GovernorDecision.model_validate(read_json(governor_path))
             loop.latest_governor_ref = str(governor_path)
-
-            if decision.action == "iterate":
-                if loop.iteration >= loop.max_iterations:
-                    loop.status = "completed"
-                    loop.stop_reason = "iteration-budget-exhausted"
-                    break
-                clone = self.raidar.scenario_clone_revision(
-                    path=scenario_root_from_yaml(candidate_yaml),
-                    from_revision=candidate_yaml.parent.name,
-                )
-                loop.iteration += 1
-                loop.status = "iterating"
-                loop.candidate_scenario_ref = str(clone["scenario_yaml"])
-                loop.updated_at_utc = utc_now_iso()
-                self._save_loop(loop)
+            should_continue = self._apply_governor_decision(
+                objective=objective,
+                loop=loop,
+                candidate_yaml=candidate_yaml,
+                decision=decision,
+                round_promotion_state=round_promotion_state,
+            )
+            if should_continue:
                 continue
-
-            if decision.action == "promote":
-                if self._attempt_promotion(objective, loop):
-                    loop.status = "promoted"
-                    loop.stop_reason = "promoted"
-                    break
-                loop.status = "completed"
-                loop.stop_reason = "promotion-guard-rejected"
-                break
-
-            if decision.action == "discard":
-                loop.status = "discarded"
-                loop.stop_reason = "discarded"
-                break
-            if decision.action == "spawn_next":
-                loop.status = "completed"
-                loop.stop_reason = "spawn-next"
-                break
-            if decision.action == "stop":
-                objective.status = "completed"
-                objective.stop_reason = "governor-stop"
-                self._save_objective(objective)
-                loop.status = "completed"
-                loop.stop_reason = "governor-stop"
-                break
-
-            raise RuntimeError(f"Unsupported governor action: {decision.action}")
+            break
 
         loop.updated_at_utc = utc_now_iso()
         self._save_loop(loop)
         self._write_report(self._load_objective(objective.objective_id))
         return loop
 
-    def _attempt_promotion(self, objective: ObjectiveState, loop: ResearchLoopState) -> bool:
-        if objective.best_benchmark_ref is None or objective.scenario_ref is None:
-            raise RuntimeError("Objective promotion requires an approved benchmark baseline.")
-        if loop.latest_research_summary_ref is None:
-            raise RuntimeError("Cannot promote loop without a research summary.")
-
-        baseline = experiment_summary(Path(objective.best_benchmark_ref))
-        research = experiment_summary(Path(loop.latest_research_summary_ref))
-        research_guard = self._promotion_guard(research, baseline, objective.frozen_metric_ids)
-        write_json(
-            self.layout.loop_root(objective.objective_id, loop.loop_id) / "promotion-guard.json",
-            research_guard.model_dump(mode="json"),
-        )
-        if not research_guard.passed:
+    def _apply_governor_decision(
+        self,
+        *,
+        objective: ObjectiveState,
+        loop: ResearchLoopState,
+        candidate_yaml: Path,
+        decision: GovernorDecision,
+        round_promotion_state: _RoundPromotionState | None,
+    ) -> bool:
+        if decision.action == "iterate":
+            return self._continue_loop_iteration(loop=loop, candidate_yaml=candidate_yaml)
+        if decision.action == "promote":
+            return self._handle_promotion_decision(
+                objective=objective,
+                loop=loop,
+                round_promotion_state=round_promotion_state,
+            )
+        if decision.action == "discard":
+            loop.status = "discarded"
+            loop.stop_reason = "discarded"
             return False
-
-        confirmation = self.raidar.experiment_run(
-            scenario_yaml=Path(loop.candidate_scenario_ref),
-            harness=objective.target_harness,
-            model=objective.target_model,
-            timeout_sec=scenario_timeout_sec(Path(loop.candidate_scenario_ref)),
-            repeats=objective.benchmark_repeats,
-            repeat_parallel=1,
-            experiment_kind="benchmark",
-        )
-        confirmation_summary_ref = str(confirmation["summary_path"])
-        confirmation_guard = self._promotion_guard(
-            experiment_summary(Path(confirmation_summary_ref)),
-            baseline,
-            objective.frozen_metric_ids,
-        )
-        write_json(
-            self.layout.loop_root(objective.objective_id, loop.loop_id) / "confirmation-guard.json",
-            confirmation_guard.model_dump(mode="json"),
-        )
-        if not confirmation_guard.passed:
+        if decision.action == "spawn_next":
+            loop.status = "completed"
+            loop.stop_reason = "spawn-next"
             return False
+        if decision.action == "stop":
+            self._complete_objective(objective.objective_id, "governor-stop")
+            loop.status = "completed"
+            loop.stop_reason = "governor-stop"
+            return False
+        raise RuntimeError(f"Unsupported governor action: {decision.action}")
 
-        promoted_yaml = self._promote_candidate_revision(objective, loop)
-        objective.scenario_ref = str(promoted_yaml)
-        objective.best_benchmark_ref = confirmation_summary_ref
-        objective.revision_count += 1
-        objective.updated_at_utc = utc_now_iso()
-        self._save_objective(objective)
-        loop.promoted_benchmark_ref = confirmation_summary_ref
+    def _continue_loop_iteration(self, *, loop: ResearchLoopState, candidate_yaml: Path) -> bool:
+        if loop.iteration >= loop.max_iterations:
+            loop.status = "completed"
+            loop.stop_reason = "iteration-budget-exhausted"
+            return False
+        clone = self.raidar.scenario_clone_revision(
+            path=scenario_root_from_yaml(candidate_yaml),
+            from_revision=candidate_yaml.parent.name,
+        )
+        loop.iteration += 1
+        loop.status = "iterating"
+        loop.candidate_scenario_ref = str(clone["scenario_yaml"])
+        loop.updated_at_utc = utc_now_iso()
         self._save_loop(loop)
         return True
+
+    def _handle_promotion_decision(
+        self,
+        *,
+        objective: ObjectiveState,
+        loop: ResearchLoopState,
+        round_promotion_state: _RoundPromotionState | None,
+    ) -> bool:
+        if round_promotion_state is not None:
+            with round_promotion_state.lock:
+                if round_promotion_state.promoted_loop_id is not None:
+                    loop.status = "completed"
+                    loop.stop_reason = "superseded-by-promotion"
+                    return False
+                if self._attempt_promotion(objective, loop):
+                    round_promotion_state.promoted_loop_id = loop.loop_id
+                    loop.status = "promoted"
+                    loop.stop_reason = "promoted"
+                    return False
+        elif self._attempt_promotion(objective, loop):
+            loop.status = "promoted"
+            loop.stop_reason = "promoted"
+            return False
+        loop.status = "completed"
+        loop.stop_reason = "promotion-guard-rejected"
+        return False
+
+    def _attempt_promotion(self, objective: ObjectiveState, loop: ResearchLoopState) -> bool:
+        with self._objective_lock:
+            latest_objective = self._load_objective(objective.objective_id)
+            if latest_objective.best_benchmark_ref is None or latest_objective.scenario_ref is None:
+                raise RuntimeError("Objective promotion requires an approved benchmark baseline.")
+            if loop.latest_research_summary_ref is None:
+                raise RuntimeError("Cannot promote loop without a research summary.")
+            if latest_objective.status != "active":
+                return False
+
+            baseline = experiment_summary(Path(latest_objective.best_benchmark_ref))
+            research = experiment_summary(Path(loop.latest_research_summary_ref))
+            research_guard = self._promotion_guard(
+                research,
+                baseline,
+                latest_objective.frozen_metric_ids,
+            )
+            promotion_guard_path = (
+                self.layout.loop_root(objective.objective_id, loop.loop_id) / "promotion-guard.json"
+            )
+            write_json(
+                promotion_guard_path,
+                research_guard.model_dump(mode="json"),
+            )
+            if not research_guard.passed:
+                return False
+
+            confirmation = self.raidar.experiment_run(
+                scenario_yaml=Path(loop.candidate_scenario_ref),
+                harness=latest_objective.target_harness,
+                model=latest_objective.target_model,
+                timeout_sec=scenario_timeout_sec(Path(loop.candidate_scenario_ref)),
+                repeats=latest_objective.benchmark_repeats,
+                repeat_parallel=1,
+                experiment_kind="benchmark",
+            )
+            confirmation_summary_ref = str(confirmation["summary_path"])
+            confirmation_guard = self._promotion_guard(
+                experiment_summary(Path(confirmation_summary_ref)),
+                baseline,
+                latest_objective.frozen_metric_ids,
+            )
+            write_json(
+                self.layout.loop_root(objective.objective_id, loop.loop_id)
+                / "confirmation-guard.json",
+                confirmation_guard.model_dump(mode="json"),
+            )
+            if not confirmation_guard.passed:
+                return False
+
+            promoted_yaml = self._promote_candidate_revision(latest_objective, loop)
+            latest_objective.scenario_ref = str(promoted_yaml)
+            latest_objective.best_benchmark_ref = confirmation_summary_ref
+            latest_objective.revision_count += 1
+            latest_objective.updated_at_utc = utc_now_iso()
+            self._save_objective(latest_objective)
+            loop.promoted_benchmark_ref = confirmation_summary_ref
+            self._save_loop(loop)
+            return True
 
     def _promote_candidate_revision(
         self, objective: ObjectiveState, loop: ResearchLoopState
@@ -636,7 +758,7 @@ class AutoResearchEngine:
                 "",
                 "## Constraints",
                 f"- approval_mode: `{objective.approval_mode}`",
-                f"- loop_topology: `{objective.loop_topology}`",
+                f"- loop_execution_mode: `{objective.loop_execution_mode}`",
                 f"- max_revisions: `{objective.max_revisions}`",
                 f"- max_parallel_loops: `{objective.max_parallel_loops}`",
                 f"- benchmark_repeats: `{objective.benchmark_repeats}`",
@@ -677,6 +799,13 @@ class AutoResearchEngine:
     def _generate_objective_id(self, goal: str) -> str:
         stamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%SZ").lower()
         return f"{slugify(goal)}-{stamp}"
+
+    def _complete_objective(self, objective_id: str, stop_reason: str) -> None:
+        with self._objective_lock:
+            objective = self._load_objective(objective_id)
+            objective.status = "completed"
+            objective.stop_reason = stop_reason
+            self._save_objective(objective)
 
     def _resolved_loop_id(self, objective: ObjectiveState, raw_loop_id: str) -> str:
         if raw_loop_id in {"", ".", ".."} or "/" in raw_loop_id:
@@ -738,6 +867,7 @@ class AutoResearchEngine:
                 f"Objective goal: {objective.goal}",
                 f"Approved scenario: {objective.scenario_ref}",
                 f"Current best benchmark: {objective.best_benchmark_ref}",
+                f"Loop execution mode: {objective.loop_execution_mode}",
                 f"Max sibling loops this round: {objective.max_parallel_loops}",
                 f"Write JSON plan to: {output_path}",
                 json.dumps(

@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import threading
+import time
 from pathlib import Path
 from typing import Any
 
@@ -330,6 +332,7 @@ def test_init_creates_objective_artifacts_and_draft_only(tmp_path: Path) -> None
     objective = engine.init_objective(_init_request())
 
     assert objective.status == "awaiting_scenario_approval"
+    assert objective.loop_execution_mode == "serial"
     draft_yaml = Path(objective.draft_scenario_ref or "")
     assert draft_yaml.is_file()
     assert str(draft_yaml).startswith(str(layout.objectives_root))
@@ -762,3 +765,86 @@ def test_run_namespaces_reused_loop_ids_across_planner_rounds(tmp_path: Path) ->
     assert len(planner_calls) == 2
     assert "unique within this planner response only" in planner_calls[0]["instruction"]
     assert "namespace every loop_id by planner round" in planner_calls[1]["instruction"]
+
+
+def test_parallel_execution_mode_runs_sibling_loops_concurrently(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    metric_ids = ["functional", "acceptance", "verification-stability"]
+    engine, _role_runner, _raidar, _layout = _make_engine(
+        tmp_path,
+        role_scripts=[
+            {"role": "designer", "payload": _design_payload()},
+            {"role": "critic", "payload": _critic_payload()},
+            {
+                "role": "planner",
+                "payload": {
+                    "loops": [
+                        {
+                            "loop_id": "loop-001",
+                            "title": "One",
+                            "hypothesis": "A",
+                            "instructions": "A",
+                        },
+                        {
+                            "loop_id": "loop-002",
+                            "title": "Two",
+                            "hypothesis": "B",
+                            "instructions": "B",
+                        },
+                    ],
+                    "notes": [],
+                },
+            },
+        ],
+        experiment_payloads=[
+            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids)
+        ],
+    )
+    created = engine.init_objective(
+        _init_request(loop_execution_mode="parallel", max_revisions=1, max_parallel_loops=2)
+    )
+    engine.approve_scenario(created.objective_id)
+
+    state_lock = threading.Lock()
+    gate = threading.Barrier(2)
+    active_count = 0
+    max_active_count = 0
+
+    def _fake_run_loop(self, objective, loop, round_promotion_state=None):  # noqa: ARG001
+        nonlocal active_count, max_active_count
+        with state_lock:
+            active_count += 1
+            max_active_count = max(max_active_count, active_count)
+        gate.wait(timeout=1.0)
+        time.sleep(0.02)
+        with state_lock:
+            active_count -= 1
+        loop.status = "discarded"
+        loop.stop_reason = "discarded"
+        return loop
+
+    monkeypatch.setattr(AutoResearchEngine, "_run_loop", _fake_run_loop)
+
+    completed = engine.run_objective(created.objective_id)
+
+    assert completed.status == "completed"
+    assert max_active_count == 2
+
+
+def test_report_includes_loop_execution_mode(tmp_path: Path) -> None:
+    engine, _role_runner, _raidar, _layout = _make_engine(
+        tmp_path,
+        role_scripts=[
+            {"role": "designer", "payload": _design_payload()},
+            {"role": "critic", "payload": _critic_payload()},
+        ],
+    )
+
+    objective = engine.init_objective(_init_request(loop_execution_mode="parallel"))
+
+    report = engine.render_objective_report(objective.objective_id)
+
+    assert "- loop_execution_mode: `parallel`" in report
+    assert "- max_parallel_loops: `3`" in report
