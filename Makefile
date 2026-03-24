@@ -26,6 +26,7 @@ OBJECTIVE_ID ?=
 TARGET_HARNESS ?=
 TARGET_MODEL ?=
 MAX_REVISIONS ?= 3
+LOOP_EXECUTION_MODE ?= serial
 MAX_PARALLEL_LOOPS ?= 3
 BENCHMARK_REPEATS ?= 5
 RESEARCH_REPEATS ?= 3
@@ -189,6 +190,7 @@ auto-research-init:
 		--goal "$(GOAL)" \
 		--target-harness "$(TARGET_HARNESS)" \
 		--target-model "$(TARGET_MODEL)" \
+		--loop-execution-mode "$(LOOP_EXECUTION_MODE)" \
 		--max-revisions "$(MAX_REVISIONS)" \
 		--max-parallel-loops "$(MAX_PARALLEL_LOOPS)" \
 		--benchmark-repeats "$(BENCHMARK_REPEATS)" \
