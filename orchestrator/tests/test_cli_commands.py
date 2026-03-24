@@ -1,6 +1,8 @@
 """Tests for CLI utility commands and helpers under the scenario migration."""
 
 import json
+import os
+import subprocess
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -956,3 +958,73 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
 
     assert captured["reruns_used"] == 1
     assert "retries_used" not in captured
+
+
+def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "checks" / "run-agent-smoke.sh"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+    fake_make = bin_dir / "make"
+    fake_make.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'ARGS:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_make.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(script_path),
+            "--harness",
+            "codex-cli",
+            "--timeout",
+            "120",
+            "--repeats",
+            "2",
+            "--repeat-parallel",
+            "3",
+            "--rerun-unscored",
+            "1",
+            "--fast",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        f"ARGS:-C {repo_root} harbor-cleanup",
+        "ENV:1:1",
+        (
+            f"ARGS:-C {repo_root} harness-validate HARNESS=codex-cli "
+            "MODEL=codex/gpt-5.4-low TIMEOUT_SEC=120"
+        ),
+        "ENV:1:1",
+        (
+            f"ARGS:-C {repo_root} experiment-run "
+            "SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
+            "HARNESS=codex-cli MODEL=codex/gpt-5.4-low TIMEOUT_SEC=120 "
+            "RUN_COUNT=2 RUN_PARALLELISM=3 RERUN_UNSCORED=1"
+        ),
+        "ENV:1:1",
+    ]
