@@ -29,10 +29,24 @@ MAX_REVISIONS ?= 3
 LOOP_EXECUTION_MODE ?= serial
 MAX_PARALLEL_LOOPS ?= 3
 BENCHMARK_REPEATS ?= 5
+BENCHMARK_REPEAT_PARALLEL ?= 1
 RESEARCH_REPEATS ?= 3
+RESEARCH_REPEAT_PARALLEL ?= 1
 CONTROL_PROVIDER ?= openai-codex
-CONTROL_MODEL ?= gpt-5.4
+CONTROL_MODEL ?= gpt-5.3-codex
 PI_BINARY ?= pi
+RESEARCH_SMOKE_GOAL ?= Draft and approve a minimal hello-world coding scenario for autoresearch smoke validation
+RESEARCH_SMOKE_TARGET_HARNESS ?= codex-cli
+RESEARCH_SMOKE_TARGET_MODEL ?= codex/gpt-5.4-low
+RESEARCH_SMOKE_CONTROL_PROVIDER ?= openai-codex
+RESEARCH_SMOKE_CONTROL_MODEL ?= gpt-5.3-codex
+RESEARCH_SMOKE_LOOP_EXECUTION_MODE ?= serial
+RESEARCH_SMOKE_MAX_REVISIONS ?= 1
+RESEARCH_SMOKE_MAX_PARALLEL_LOOPS ?= 1
+RESEARCH_SMOKE_BENCHMARK_REPEATS ?= 1
+RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL ?= 1
+RESEARCH_SMOKE_RESEARCH_REPEATS ?= 1
+RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL ?= 1
 
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
 ORCHESTRATOR_SMOKE_HARNESS := codex-cli
@@ -49,9 +63,9 @@ endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate harbor-cleanup scenario-list scenario-init scenario-info scenario-validate \
-	orchestrator-smoke agent-smoke experiment-run matrix-run \
+	orchestrator-smoke agent-smoke research-smoke experiment-run matrix-run \
 	experiments-list experiments-prune \
-	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report auto-research-demo-smoke \
+	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report \
 	quality
 
 define require_var
@@ -83,6 +97,7 @@ help:
 	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-low"
 	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
+	@echo "  make research-smoke                                    Run canonical autoresearch init+approve and clean up smoke artifacts"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... MODEL=..."
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
 	@echo "  make matrix-run scenarios/homepage-implementation/v001/scenario.yaml all"
@@ -103,8 +118,6 @@ help:
 	@echo "                                                        Show current objective and loop state"
 	@echo "  make auto-research-report OBJECTIVE_ID=..."
 	@echo "                                                        Print the current objective report"
-	@echo "  make auto-research-demo-smoke"
-	@echo "                                                        Run a PI-free scripted smoke workflow in a temporary workspace"
 
 env-setup:
 	@$(RAIDAR) env setup
@@ -175,6 +188,65 @@ agent-smoke:
 		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 
+research-smoke:
+	@set -euo pipefail; \
+		if ! docker info >/dev/null 2>&1; then \
+			echo "research-smoke requires a running Docker daemon because approve-scenario seeds a benchmark."; \
+			exit 1; \
+		fi; \
+		objective_id="research-smoke-$$(date -u +%Y%m%d%H%M%SZ)-$$$$"; \
+		objective_root="$(CURDIR)/auto_researcher/objectives/$$objective_id"; \
+		state_path="$$objective_root/objective.yaml"; \
+		scenario_root=""; \
+		scenario_preexisting="0"; \
+		benchmark_dir=""; \
+		cleanup() { \
+			if [ -n "$$benchmark_dir" ] && [ -d "$$benchmark_dir" ]; then \
+				rm -rf "$$benchmark_dir"; \
+			fi; \
+			if [ "$$scenario_preexisting" = "0" ] && [ -n "$$scenario_root" ] && [ -d "$$scenario_root" ]; then \
+				rm -rf "$$scenario_root"; \
+			fi; \
+			if [ -d "$$objective_root" ]; then \
+				rm -rf "$$objective_root"; \
+			fi; \
+		}; \
+		trap cleanup EXIT; \
+		echo "objective_id=$$objective_id"; \
+		$(MAKE) --no-print-directory auto-research-init \
+			GOAL="$(RESEARCH_SMOKE_GOAL) ($$objective_id)" \
+			OBJECTIVE_ID="$$objective_id" \
+			TARGET_HARNESS="$(RESEARCH_SMOKE_TARGET_HARNESS)" \
+			TARGET_MODEL="$(RESEARCH_SMOKE_TARGET_MODEL)" \
+			LOOP_EXECUTION_MODE="$(RESEARCH_SMOKE_LOOP_EXECUTION_MODE)" \
+			MAX_REVISIONS="$(RESEARCH_SMOKE_MAX_REVISIONS)" \
+			MAX_PARALLEL_LOOPS="$(RESEARCH_SMOKE_MAX_PARALLEL_LOOPS)" \
+			BENCHMARK_REPEATS="$(RESEARCH_SMOKE_BENCHMARK_REPEATS)" \
+			BENCHMARK_REPEAT_PARALLEL="$(RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL)" \
+			RESEARCH_REPEATS="$(RESEARCH_SMOKE_RESEARCH_REPEATS)" \
+			RESEARCH_REPEAT_PARALLEL="$(RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL)" \
+			CONTROL_PROVIDER="$(RESEARCH_SMOKE_CONTROL_PROVIDER)" \
+			CONTROL_MODEL="$(RESEARCH_SMOKE_CONTROL_MODEL)" \
+			PI_BINARY="$(PI_BINARY)"; \
+		if [ -f "$$state_path" ]; then \
+			scenario_slug="$$(sed -n 's/^scenario_slug: //p' "$$state_path" | tail -n 1)"; \
+			if [ -n "$$scenario_slug" ] && [ "$$scenario_slug" != "null" ]; then \
+				scenario_root="$(CURDIR)/scenarios/$$scenario_slug"; \
+				if [ -e "$$scenario_root" ]; then \
+					scenario_preexisting="1"; \
+				fi; \
+			fi; \
+		fi; \
+		$(MAKE) --no-print-directory auto-research-approve-scenario \
+			OBJECTIVE_ID="$$objective_id" \
+			PI_BINARY="$(PI_BINARY)"; \
+		if [ -f "$$state_path" ]; then \
+			best_benchmark_ref="$$(sed -n 's/^best_benchmark_ref: //p' "$$state_path" | tail -n 1)"; \
+			if [ -n "$$best_benchmark_ref" ] && [ "$$best_benchmark_ref" != "null" ]; then \
+				benchmark_dir="$$(dirname "$$best_benchmark_ref")"; \
+			fi; \
+		fi
+
 experiment-run:
 	$(call require_var,SCENARIO)
 	$(call require_var,HARNESS)
@@ -226,7 +298,9 @@ auto-research-init:
 		--max-revisions "$(MAX_REVISIONS)" \
 		--max-parallel-loops "$(MAX_PARALLEL_LOOPS)" \
 		--benchmark-repeats "$(BENCHMARK_REPEATS)" \
+		--benchmark-repeat-parallel "$(BENCHMARK_REPEAT_PARALLEL)" \
 		--research-repeats "$(RESEARCH_REPEATS)" \
+		--research-repeat-parallel "$(RESEARCH_REPEAT_PARALLEL)" \
 		--control-provider "$(CONTROL_PROVIDER)" \
 		--control-model "$(CONTROL_MODEL)" \
 		--pi-binary "$(PI_BINARY)" \
@@ -255,9 +329,6 @@ auto-research-report:
 	@$(AUTO_RESEARCHER) report \
 		--objective-id "$(OBJECTIVE_ID)" \
 		--pi-binary "$(PI_BINARY)"
-
-auto-research-demo-smoke:
-	@$(AUTO_RESEARCHER) demo-smoke
 
 quality:
 	@$(RAIDAR) quality gates
