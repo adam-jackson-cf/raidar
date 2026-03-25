@@ -53,7 +53,7 @@ def test_harness_list_includes_model_variations() -> None:
     assert (
         "models: codex/* (known aliases: codex/gpt-5.2-high, codex/gpt-5.2-low, "
         "codex/gpt-5.2-medium, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
-        "codex/gpt-5.4-low, codex/gpt-5.4-medium)"
+        "codex/gpt-5.4-low, codex/gpt-5.4-medium, codex/gpt-5.4-mini)"
     ) in result.output
     assert (
         "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
