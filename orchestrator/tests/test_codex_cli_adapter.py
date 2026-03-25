@@ -53,20 +53,24 @@ def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch) -> None:
         ("gpt-5.4-medium", "codex/gpt-5.4", "medium"),
         ("gpt-5.4-high", "codex/gpt-5.4", "high"),
         ("gpt-5.4-extra-high", "codex/gpt-5.4", "xhigh"),
+        ("gpt-5.4-mini", "codex/gpt-5.4-mini", None),
     ),
 )
 def test_aliases_requested_codex_models(
     monkeypatch: pytest.MonkeyPatch,
     model_name: str,
     model_argument: str,
-    reasoning_effort: str,
+    reasoning_effort: str | None,
 ) -> None:
     monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     adapter = CodexCliAdapter(_config(model_name))
     adapter.validate()
     assert adapter.model_argument() == model_argument
-    assert list(adapter.extra_harbor_args()) == ["--ak", f"reasoning_effort={reasoning_effort}"]
+    if reasoning_effort:
+        assert list(adapter.extra_harbor_args()) == ["--ak", f"reasoning_effort={reasoning_effort}"]
+    else:
+        assert list(adapter.extra_harbor_args()) == []
 
 
 def test_prepare_workspace_creates_codex_trace_dir(tmp_path: Path) -> None:
