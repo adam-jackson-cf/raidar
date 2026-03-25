@@ -33,11 +33,11 @@ Use `make help` from the repo root for the supported command surface and target 
 Run one review-grade experiment for one `AgentSpec` (`harness + model`).
 
 ```bash
-make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-low
+make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
 make experiment-run \
   SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
   HARNESS=codex-cli \
-  MODEL=codex/gpt-5.4-low \
+  MODEL=codex/gpt-5.4-mini \
   RUN_COUNT=5 \
   RUN_PARALLELISM=1 \
   RERUN_UNSCORED=0
@@ -78,7 +78,7 @@ matrix:
     - harness: codex-cli
       model: codex/gpt-5.4-high
     - harness: codex-cli
-      model: codex/gpt-5.4-low
+      model: codex/gpt-5.4-mini
     - harness: codex-cli
       model: codex/gpt-5.4-medium
 ```

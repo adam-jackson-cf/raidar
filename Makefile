@@ -40,7 +40,7 @@ PI_BINARY ?= pi
 # Canonical smoke workflow defaults.
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
 ORCHESTRATOR_SMOKE_HARNESS := codex-cli
-ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-low
+ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-mini
 ORCHESTRATOR_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
@@ -48,7 +48,7 @@ AGENT_SMOKE_REPEAT_PARALLEL ?= 1
 AGENT_SMOKE_RERUN_UNSCORED ?= 0
 RESEARCH_SMOKE_GOAL ?= Draft and approve a minimal hello-world coding scenario for autoresearch smoke validation
 RESEARCH_SMOKE_TARGET_HARNESS ?= codex-cli
-RESEARCH_SMOKE_TARGET_MODEL ?= codex/gpt-5.4-low
+RESEARCH_SMOKE_TARGET_MODEL ?= codex/gpt-5.4-mini
 RESEARCH_SMOKE_CONTROL_PROVIDER ?= openai-codex
 RESEARCH_SMOKE_CONTROL_MODEL ?= gpt-5.3-codex
 RESEARCH_SMOKE_LOOP_EXECUTION_MODE ?= serial
@@ -89,7 +89,7 @@ help:
 	@echo "Environment and validation:"
 	@echo "  make env-setup                                         Bootstrap the orchestrator environment"
 	@echo "  make harness-list                                      List supported harnesses and model coverage"
-	@echo "  make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
+	@echo "  make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
 	@echo "                                                        Validate one AgentSpec candidate"
 	@echo "  make harbor-cleanup                                    Cleanup stale Harbor processes and containers"
 	@echo "  make scenario-list                                     List available scenarios and revisions"
@@ -103,9 +103,9 @@ help:
 	@echo ""
 	@echo "Experiment orchestration:"
 	@echo "  make smoke-dry-run-check                               Print the canonical smoke command shapes used by CI drift checks"
-	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-low"
+	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-mini"
 	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
-	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-low"
+	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
 	@echo "  make research-smoke                                    Run canonical autoresearch init+approve and clean up smoke artifacts"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... MODEL=..."
