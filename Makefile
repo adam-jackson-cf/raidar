@@ -58,6 +58,9 @@ RESEARCH_SMOKE_BENCHMARK_REPEATS ?= 1
 RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL ?= 1
 RESEARCH_SMOKE_RESEARCH_REPEATS ?= 1
 RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL ?= 1
+RESEARCH_SMOKE_OBJECTIVE_ID ?= research-smoke-$(shell uuidgen | tr '[:upper:]' '[:lower:]')
+RESEARCH_SMOKE_OBJECTIVE_ROOT ?= $(CURDIR)/auto_researcher/objectives/$(RESEARCH_SMOKE_OBJECTIVE_ID)
+RESEARCH_SMOKE_STATE_PATH ?= $(RESEARCH_SMOKE_OBJECTIVE_ROOT)/objective.yaml
 
 ifeq ($(firstword $(MAKECMDGOALS)),matrix-run)
 MATRIX_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
@@ -66,7 +69,9 @@ endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-info scenario-validate \
-	smoke-dry-run-check orchestrator-smoke agent-smoke research-smoke experiment-run matrix-run \
+	smoke-dry-run-check orchestrator-smoke agent-smoke research-smoke \
+	research-smoke-init research-smoke-approve research-smoke-cleanup \
+	experiment-run matrix-run \
 	experiments-list experiments-prune \
 	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report \
 	quality
@@ -180,6 +185,7 @@ smoke-dry-run-check:
 		AGENT_SMOKE_REPEATS="2" \
 		AGENT_SMOKE_REPEAT_PARALLEL="2"
 	@$(MAKE) --no-print-directory -n research-smoke \
+		RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run" \
 		RESEARCH_SMOKE_LOOP_EXECUTION_MODE="parallel" \
 		RESEARCH_SMOKE_MAX_PARALLEL_LOOPS="2" \
 		RESEARCH_SMOKE_BENCHMARK_REPEATS="2" \
@@ -217,41 +223,49 @@ agent-smoke: docker-check
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 
 research-smoke: docker-check
+	@status=0; cleanup_status=0; \
+		$(MAKE) --no-print-directory research-smoke-init \
+			RESEARCH_SMOKE_OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" || status=$$?; \
+		if [ "$$status" -eq 0 ]; then \
+			$(MAKE) --no-print-directory research-smoke-approve \
+				RESEARCH_SMOKE_OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" || status=$$?; \
+		fi; \
+		$(MAKE) --no-print-directory research-smoke-cleanup \
+			RESEARCH_SMOKE_OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" || cleanup_status=$$?; \
+		if [ "$$status" -ne 0 ]; then \
+			exit "$$status"; \
+		fi; \
+		exit "$$cleanup_status"
+
+research-smoke-init:
+	@echo "objective_id=$(RESEARCH_SMOKE_OBJECTIVE_ID)"
+	@$(MAKE) --no-print-directory auto-research-init \
+		GOAL="$(RESEARCH_SMOKE_GOAL) ($(RESEARCH_SMOKE_OBJECTIVE_ID))" \
+		OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" \
+		TARGET_HARNESS="$(RESEARCH_SMOKE_TARGET_HARNESS)" \
+		TARGET_MODEL="$(RESEARCH_SMOKE_TARGET_MODEL)" \
+		LOOP_EXECUTION_MODE="$(RESEARCH_SMOKE_LOOP_EXECUTION_MODE)" \
+		MAX_REVISIONS="$(RESEARCH_SMOKE_MAX_REVISIONS)" \
+		MAX_PARALLEL_LOOPS="$(RESEARCH_SMOKE_MAX_PARALLEL_LOOPS)" \
+		BENCHMARK_REPEATS="$(RESEARCH_SMOKE_BENCHMARK_REPEATS)" \
+		BENCHMARK_REPEAT_PARALLEL="$(RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL)" \
+		RESEARCH_REPEATS="$(RESEARCH_SMOKE_RESEARCH_REPEATS)" \
+		RESEARCH_REPEAT_PARALLEL="$(RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL)" \
+		CONTROL_PROVIDER="$(RESEARCH_SMOKE_CONTROL_PROVIDER)" \
+		CONTROL_MODEL="$(RESEARCH_SMOKE_CONTROL_MODEL)" \
+		PI_BINARY="$(PI_BINARY)"
+
+research-smoke-approve:
+	@$(MAKE) --no-print-directory auto-research-approve-scenario \
+		OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" \
+		PI_BINARY="$(PI_BINARY)"
+
+research-smoke-cleanup:
 	@set -euo pipefail; \
-		objective_id="research-smoke-$$(date -u +%Y%m%d%H%M%SZ)-$$$$"; \
-		objective_root="$(CURDIR)/auto_researcher/objectives/$$objective_id"; \
-		state_path="$$objective_root/objective.yaml"; \
+		state_path="$(RESEARCH_SMOKE_STATE_PATH)"; \
 		scenario_root=""; \
 		scenario_preexisting="0"; \
 		benchmark_dir=""; \
-		cleanup() { \
-			if [ -n "$$benchmark_dir" ] && [ -d "$$benchmark_dir" ]; then \
-				rm -rf "$$benchmark_dir"; \
-			fi; \
-			if [ "$$scenario_preexisting" = "0" ] && [ -n "$$scenario_root" ] && [ -d "$$scenario_root" ]; then \
-				rm -rf "$$scenario_root"; \
-			fi; \
-			if [ -d "$$objective_root" ]; then \
-				rm -rf "$$objective_root"; \
-			fi; \
-		}; \
-		trap cleanup EXIT; \
-		echo "objective_id=$$objective_id"; \
-		$(MAKE) --no-print-directory auto-research-init \
-			GOAL="$(RESEARCH_SMOKE_GOAL) ($$objective_id)" \
-			OBJECTIVE_ID="$$objective_id" \
-			TARGET_HARNESS="$(RESEARCH_SMOKE_TARGET_HARNESS)" \
-			TARGET_MODEL="$(RESEARCH_SMOKE_TARGET_MODEL)" \
-			LOOP_EXECUTION_MODE="$(RESEARCH_SMOKE_LOOP_EXECUTION_MODE)" \
-			MAX_REVISIONS="$(RESEARCH_SMOKE_MAX_REVISIONS)" \
-			MAX_PARALLEL_LOOPS="$(RESEARCH_SMOKE_MAX_PARALLEL_LOOPS)" \
-			BENCHMARK_REPEATS="$(RESEARCH_SMOKE_BENCHMARK_REPEATS)" \
-			BENCHMARK_REPEAT_PARALLEL="$(RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL)" \
-			RESEARCH_REPEATS="$(RESEARCH_SMOKE_RESEARCH_REPEATS)" \
-			RESEARCH_REPEAT_PARALLEL="$(RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL)" \
-			CONTROL_PROVIDER="$(RESEARCH_SMOKE_CONTROL_PROVIDER)" \
-			CONTROL_MODEL="$(RESEARCH_SMOKE_CONTROL_MODEL)" \
-			PI_BINARY="$(PI_BINARY)"; \
 		if [ -f "$$state_path" ]; then \
 			scenario_slug="$$(sed -n 's/^scenario_slug: //p' "$$state_path" | tail -n 1)"; \
 			if [ -n "$$scenario_slug" ] && [ "$$scenario_slug" != "null" ]; then \
@@ -260,15 +274,19 @@ research-smoke: docker-check
 					scenario_preexisting="1"; \
 				fi; \
 			fi; \
-		fi; \
-		$(MAKE) --no-print-directory auto-research-approve-scenario \
-			OBJECTIVE_ID="$$objective_id" \
-			PI_BINARY="$(PI_BINARY)"; \
-		if [ -f "$$state_path" ]; then \
 			best_benchmark_ref="$$(sed -n 's/^best_benchmark_ref: //p' "$$state_path" | tail -n 1)"; \
 			if [ -n "$$best_benchmark_ref" ] && [ "$$best_benchmark_ref" != "null" ]; then \
 				benchmark_dir="$$(dirname "$$best_benchmark_ref")"; \
 			fi; \
+		fi; \
+		if [ -n "$$benchmark_dir" ] && [ -d "$$benchmark_dir" ]; then \
+			rm -rf "$$benchmark_dir"; \
+		fi; \
+		if [ "$$scenario_preexisting" = "0" ] && [ -n "$$scenario_root" ] && [ -d "$$scenario_root" ]; then \
+			rm -rf "$$scenario_root"; \
+		fi; \
+		if [ -d "$(RESEARCH_SMOKE_OBJECTIVE_ROOT)" ]; then \
+			rm -rf "$(RESEARCH_SMOKE_OBJECTIVE_ROOT)"; \
 		fi
 
 experiment-run:
@@ -355,6 +373,7 @@ auto-research-report:
 		--pi-binary "$(PI_BINARY)"
 
 quality:
+	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(RAIDAR) quality gates
 	@cd auto_researcher && uv run --project . --extra dev python -m ruff format --check .
 	@cd auto_researcher && uv run --project . --extra dev python -m ruff check .
