@@ -1109,6 +1109,11 @@ def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
     assert "uv run --project orchestrator raidar harbor cleanup" in result.stdout
     assert "uv run --project orchestrator raidar harness validate \\" in result.stdout
     assert "uv run --project orchestrator raidar experiment run \\" in result.stdout
+    assert 'RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run"' in result.stdout
+    assert "research-smoke-init" in result.stdout
+    assert "research-smoke-approve" in result.stdout
+    assert "research-smoke-cleanup" in result.stdout
+    assert "objective_id=research-smoke-dry-run" in result.stdout
     assert "uv run --project auto_researcher auto-researcher init \\" in result.stdout
     assert '--loop-execution-mode "parallel" \\' in result.stdout
     assert '--max-parallel-loops "2" \\' in result.stdout

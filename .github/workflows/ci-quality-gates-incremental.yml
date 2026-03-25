@@ -14,9 +14,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run public smoke dry-run checks
-        run: make smoke-dry-run-check
-
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
@@ -27,12 +24,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install "uv>=0.7"
 
-      - name: Install orchestrator dev dependencies
+      - name: Install repo dev dependencies
         run: |
-          cd orchestrator
-          uv sync --all-extras --frozen
+          uv sync --project orchestrator --all-extras --frozen
+          uv sync --project auto_researcher --extra dev --frozen
 
-      - name: Run consolidated CI quality gates
-        run: |
-          cd orchestrator
-          uv run raidar quality gates
+      - name: Run root quality gate
+        run: make quality
