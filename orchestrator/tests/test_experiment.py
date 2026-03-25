@@ -24,7 +24,7 @@ def _run(
         scenario_name="homepage",
         scenario_revision="v001",
         harness="codex-cli",
-        model="codex/gpt-5.4-low",
+        model="codex/gpt-5.4-mini",
         starter_root="starter",
         duration_sec=duration,
         metadata={
@@ -59,7 +59,7 @@ def _run(
         id=run_id,
         timestamp=datetime.now(UTC).isoformat(),
         config=EvalConfig(
-            model="codex/gpt-5.4-low",
+            model="codex/gpt-5.4-mini",
             harness="codex-cli",
             scenario_name="homepage",
             scenario_revision="v001",
@@ -90,7 +90,7 @@ def test_create_experiment_summary_aggregates() -> None:
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
         harness="codex-cli",
-        model="codex/gpt-5.4-low",
+        model="codex/gpt-5.4-mini",
         evaluation_profile=(
             "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
         ),
@@ -115,7 +115,7 @@ def test_create_experiment_summary_aggregates() -> None:
     assert summary["rerun"]["achieved_scored_runs"] == 2
     assert summary["rerun"]["target_met"] is True
     assert len(summary["runs"]) == 2
-    assert str(summary["experiment_id"]).endswith("__codex-gpt-5.4-low__x2")
+    assert str(summary["experiment_id"]).endswith("__codex-gpt-5.4-mini__x2")
     assert summary["config"]["scenario_revision"] == "v001"
     assert summary["config"]["metrics"] == [
         "functional",
@@ -146,7 +146,7 @@ def test_create_experiment_summary_excludes_unscored_runs_from_stats() -> None:
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
         harness="codex-cli",
-        model="codex/gpt-5.4-low",
+        model="codex/gpt-5.4-mini",
         evaluation_profile=(
             "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
         ),
@@ -181,7 +181,7 @@ def test_create_experiment_summary_includes_rerun_metadata() -> None:
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
         harness="codex-cli",
-        model="codex/gpt-5.4-low",
+        model="codex/gpt-5.4-mini",
         evaluation_profile=(
             "functional+acceptance+verification-stability+"
             "execution-validity+resource-efficiency+artifact-checks"
@@ -215,7 +215,7 @@ def test_create_experiment_summary_marks_visual_review_samples() -> None:
         scenario_name="Homepage Scenario",
         scenario_revision="v001",
         harness="codex-cli",
-        model="codex/gpt-5.4-low",
+        model="codex/gpt-5.4-mini",
         evaluation_profile=(
             "functional+acceptance+verification-stability+execution-validity+"
             "resource-efficiency+visual-regression"
@@ -271,7 +271,7 @@ def test_persist_experiment_writes_experiment_summary_and_report(tmp_path: Path)
         "config": {
             "scenario_name": "homepage",
             "harness": "codex-cli",
-            "model": "codex/gpt-5.4-low",
+            "model": "codex/gpt-5.4-mini",
             "evaluation_profile": (
                 "functional+acceptance+verification-stability+"
                 "execution-validity+resource-efficiency"

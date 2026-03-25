@@ -1152,7 +1152,7 @@ def test_designer_instruction_constrains_metric_ids_for_smoke(tmp_path: Path) ->
             "for autoresearch smoke validation"
         ),
         target_harness="codex-cli",
-        target_model="codex/gpt-5.4-low",
+        target_model="codex/gpt-5.4-mini",
         approval_mode="scenario_only",
         loop_execution_mode="serial",
         max_revisions=1,

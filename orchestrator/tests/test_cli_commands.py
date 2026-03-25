@@ -1015,7 +1015,7 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
     assert make_log.read_text(encoding="utf-8").splitlines() == [
         (
             f"ARGS:-C {repo_root} agent-smoke HARNESS=codex-cli "
-            "MODEL=codex/gpt-5.4-low TIMEOUT_SEC=120 "
+            "MODEL=codex/gpt-5.4-mini TIMEOUT_SEC=120 "
             "AGENT_SMOKE_SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
             "AGENT_SMOKE_REPEATS=2 AGENT_SMOKE_REPEAT_PARALLEL=3 "
             "AGENT_SMOKE_RERUN_UNSCORED=1"
@@ -1084,7 +1084,7 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
         (
             "UV:run --project orchestrator raidar run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--harness codex-cli --model codex/gpt-5.4-low "
+            "--harness codex-cli --model codex/gpt-5.4-mini "
             "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),

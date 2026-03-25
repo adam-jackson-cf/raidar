@@ -21,7 +21,7 @@ Required:
   --harness          Harness id (codex-cli|claude-code|gemini)
 
 Optional:
-  --model            Model id; defaults to codex/gpt-5.4-low for codex-cli
+  --model            Model id; defaults to codex/gpt-5.4-mini for codex-cli
   --timeout          Timeout in seconds, default: 300
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
@@ -88,7 +88,7 @@ if [[ "$HARNESS" != "codex-cli" && "$HARNESS" != "claude-code" && "$HARNESS" != 
 fi
 
 if [[ -z "$MODEL" && "$HARNESS" == "codex-cli" ]]; then
-  MODEL="codex/gpt-5.4-low"
+  MODEL="codex/gpt-5.4-mini"
 fi
 
 if [[ -z "$MODEL" ]]; then
