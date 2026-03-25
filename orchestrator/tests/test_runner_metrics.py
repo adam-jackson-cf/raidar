@@ -23,7 +23,7 @@ from raidar.runner import (
     WorkspaceContext,
     _build_verifier_scenario_spec,
     _classify_unscored_reasons,
-    _ensure_experiment_baseline_workspace,
+    _ensure_baseline_workspace,
     _load_verifier_outputs,
     _normalized_shell_subcommands,
     _prune_workspace_artifacts,
@@ -209,6 +209,12 @@ def _sample_scorecard_context(
     )
     context = WorkspaceContext(
         starter_source=starter_source,
+        baseline_workspace=workspace_dir,
+        baseline_cache_key="baseline-cache-key",
+        baseline_cache_status="hit",
+        baseline_cache_hit=True,
+        baseline_metadata_path=workspace_dir / "baseline-metadata.json",
+        baseline_fingerprint="baseline-fingerprint",
         workspace=workspace_dir,
         injected_rules=None,
         metadata_path=workspace_dir / ".starter-meta.json",
@@ -238,6 +244,23 @@ def _sample_scorecard_context(
         events=[],
         outputs=_sample_evaluation_outputs(),
         duration_sec=12.5,
+        prep_phase_timings_sec={"prepare_run_context": 0.123},
+        prep_total_sec=0.456,
+        cache_metadata={
+            "baseline": {
+                "hit": True,
+                "status": "hit",
+                "cache_key": "baseline-cache-key",
+                "workspace_dir": str(workspace_dir),
+                "metadata_path": str(workspace_dir / "baseline-metadata.json"),
+                "complete": True,
+                "fingerprint": "baseline-fingerprint",
+            },
+            "preflight": {"hit": False},
+            "image": {"hit": True},
+            "image_key": "image-key",
+            "image_tag": "task-env-codex-cli-image-key",
+        },
     )
     artifacts = PersistedArtifacts(
         starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
@@ -266,16 +289,20 @@ def _sample_scorecard_context(
     )
 
 
-def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
+def test_ensure_baseline_workspace_initializes_once_in_parallel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario_dir = tmp_path / "scenario" / "v001"
     starter_dir = scenario_dir / "starter"
     starter_dir.mkdir(parents=True, exist_ok=True)
-    experiment_baseline_dir = tmp_path / "experiments" / "experiment-01" / "workspace" / "baseline"
+    baseline_workspace_dir = (
+        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
+    )
     call_count = 0
     call_lock = threading.Lock()
     start_barrier = threading.Barrier(3)
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
 
     def fake_prepare_workspace(
         starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
@@ -295,10 +322,11 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
     def _run() -> None:
         try:
             start_barrier.wait(timeout=1.0)
-            _ensure_experiment_baseline_workspace(
+            _ensure_baseline_workspace(
                 scenario=_sample_scenario(),
                 starter_dir=starter_dir,
-                experiment_baseline_dir=experiment_baseline_dir,
+                baseline_workspace_dir=baseline_workspace_dir,
+                baseline_cache_key="cache-key",
                 scenario_dir=scenario_dir,
                 harness="codex-cli",
             )
@@ -316,14 +344,18 @@ def test_ensure_experiment_baseline_workspace_initializes_once_in_parallel(
     assert call_count == 1
 
 
-def test_ensure_experiment_baseline_workspace_runs_setup_actions_once(
+def test_ensure_baseline_workspace_runs_setup_actions_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     scenario_dir = tmp_path / "scenario" / "v001"
     starter_dir = scenario_dir / "starter"
     starter_dir.mkdir(parents=True, exist_ok=True)
-    experiment_baseline_dir = tmp_path / "experiments" / "experiment-01" / "workspace" / "baseline"
+    baseline_workspace_dir = (
+        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
+    )
     setup_calls: list[list[str]] = []
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
 
     def fake_prepare_workspace(
         starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
@@ -336,16 +368,17 @@ def test_ensure_experiment_baseline_workspace_runs_setup_actions_once(
         *, workspace: Path, env: dict[str, str], setup_actions: list[list[str]]
     ) -> None:
         del env
-        assert workspace == experiment_baseline_dir
+        assert workspace == baseline_workspace_dir
         setup_calls.extend(setup_actions)
 
     monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
     monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
 
-    _ensure_experiment_baseline_workspace(
+    _ensure_baseline_workspace(
         scenario=_sample_scenario(),
         starter_dir=starter_dir,
-        experiment_baseline_dir=experiment_baseline_dir,
+        baseline_workspace_dir=baseline_workspace_dir,
+        baseline_cache_key="cache-key",
         scenario_dir=scenario_dir,
         harness="codex-cli",
     )
@@ -354,6 +387,118 @@ def test_ensure_experiment_baseline_workspace_runs_setup_actions_once(
         ["git", "init"],
         ["git", "config", "core.hooksPath", ".githooks"],
     ]
+
+
+def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario_dir = tmp_path / "scenario" / "v001"
+    starter_dir = scenario_dir / "starter"
+    starter_dir.mkdir(parents=True, exist_ok=True)
+    baseline_workspace_dir = (
+        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
+    )
+    baseline_workspace_dir.mkdir(parents=True, exist_ok=True)
+    (baseline_workspace_dir / "partial.txt").write_text("stale\n", encoding="utf-8")
+
+    prepare_calls = 0
+    setup_calls = 0
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+
+    def fake_prepare_workspace(
+        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+    ) -> tuple[Path, Path | None]:
+        del starter_dir, scenario_dir, harness
+        nonlocal prepare_calls
+        prepare_calls += 1
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "fresh.txt").write_text("ready\n", encoding="utf-8")
+        return target_dir, None
+
+    def fake_run_setup_actions(
+        *, workspace: Path, env: dict[str, str], setup_actions: list[list[str]]
+    ) -> None:
+        del env, setup_actions
+        nonlocal setup_calls
+        setup_calls += 1
+        assert workspace == baseline_workspace_dir
+
+    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
+
+    cache_result = _ensure_baseline_workspace(
+        scenario=_sample_scenario(),
+        starter_dir=starter_dir,
+        baseline_workspace_dir=baseline_workspace_dir,
+        baseline_cache_key="cache-key",
+        scenario_dir=scenario_dir,
+        harness="codex-cli",
+    )
+
+    assert cache_result.hit is False
+    assert cache_result.status == "invalidated"
+    assert prepare_calls == 1
+    assert setup_calls == 1
+    assert not (baseline_workspace_dir / "partial.txt").exists()
+    assert (baseline_workspace_dir.parent / "metadata.json").exists()
+
+
+def test_ensure_baseline_workspace_rebuilds_fingerprint_mismatch_cache_entry(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    scenario_dir = tmp_path / "scenario" / "v001"
+    starter_dir = scenario_dir / "starter"
+    starter_dir.mkdir(parents=True, exist_ok=True)
+    baseline_workspace_dir = (
+        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
+    )
+    baseline_workspace_dir.mkdir(parents=True, exist_ok=True)
+    (baseline_workspace_dir / "partial.txt").write_text("tampered\n", encoding="utf-8")
+    metadata_path = baseline_workspace_dir.parent / "metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "cache_key": "cache-key",
+                "baseline_fingerprint": "sha256:not-a-match",
+                "created_at": "2026-03-25T00:00:00+00:00",
+                "harness": "codex-cli",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    prepare_calls = 0
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+
+    def fake_prepare_workspace(
+        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+    ) -> tuple[Path, Path | None]:
+        del starter_dir, scenario_dir, harness
+        nonlocal prepare_calls
+        prepare_calls += 1
+        target_dir.mkdir(parents=True, exist_ok=True)
+        (target_dir / "fresh.txt").write_text("ready\n", encoding="utf-8")
+        return target_dir, None
+
+    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", lambda **_kwargs: None)
+
+    cache_result = _ensure_baseline_workspace(
+        scenario=_sample_scenario(),
+        starter_dir=starter_dir,
+        baseline_workspace_dir=baseline_workspace_dir,
+        baseline_cache_key="cache-key",
+        scenario_dir=scenario_dir,
+        harness="codex-cli",
+    )
+
+    assert cache_result.hit is False
+    assert cache_result.status == "invalidated"
+    assert prepare_calls == 1
+    assert not (baseline_workspace_dir / "partial.txt").exists()
+    assert (baseline_workspace_dir / "fresh.txt").exists()
 
 
 def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
@@ -1180,6 +1325,33 @@ def test_build_scorecard_fails_execution_validity_without_required_atomic_commit
     assert scorecard.execution_validity.passed is False
 
 
+def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path) -> None:
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+
+    scorecard = build_scorecard(score_context)
+    harbor_meta = scorecard.metadata["harbor"]
+
+    assert harbor_meta["prep_phase_timings_sec"] == {"prepare_run_context": 0.123}
+    assert harbor_meta["prep_total_sec"] == 0.456
+    assert harbor_meta["cache"]["baseline"]["hit"] is True
+    assert harbor_meta["cache"]["baseline"]["status"] == "hit"
+    assert harbor_meta["cache"]["baseline"]["cache_key"] == "baseline-cache-key"
+    assert harbor_meta["cache"]["baseline"]["workspace_dir"] == str(score_context.context.workspace)
+    assert harbor_meta["cache"]["baseline"]["metadata_path"] == str(
+        score_context.context.baseline_metadata_path
+    )
+    assert harbor_meta["cache"]["baseline"]["complete"] is True
+    assert harbor_meta["cache"]["baseline"]["fingerprint"] == "baseline-fingerprint"
+    assert harbor_meta["cache"]["preflight"]["hit"] is False
+    assert harbor_meta["cache"]["image"]["hit"] is True
+    assert harbor_meta["cache"]["image_key"] == "image-key"
+    assert harbor_meta["cache"]["image_tag"] == "task-env-codex-cli-image-key"
+
+
 def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
     tmp_path: Path,
 ) -> None:
@@ -1400,6 +1572,12 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     )
     context = WorkspaceContext(
         starter_source=starter_source,
+        baseline_workspace=workspace,
+        baseline_cache_key="baseline-cache-key",
+        baseline_cache_status="hit",
+        baseline_cache_hit=True,
+        baseline_metadata_path=workspace / "baseline-metadata.json",
+        baseline_fingerprint="baseline-fingerprint",
         workspace=workspace,
         injected_rules=None,
         metadata_path=workspace / ".starter-meta.json",
@@ -1505,6 +1683,12 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     )
     context = WorkspaceContext(
         starter_source=starter_source,
+        baseline_workspace=workspace,
+        baseline_cache_key="baseline-cache-key",
+        baseline_cache_status="hit",
+        baseline_cache_hit=True,
+        baseline_metadata_path=workspace / "baseline-metadata.json",
+        baseline_fingerprint="baseline-fingerprint",
         workspace=workspace,
         injected_rules=None,
         metadata_path=workspace / ".starter-meta.json",
@@ -1518,7 +1702,7 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     task_toml = (bundle / "task.toml").read_text()
     dockerfile = (bundle / "environment" / "Dockerfile").read_text()
 
-    assert 'docker_image = "ts-ui-eval-smoke-fast:hello-world-smoke-' in task_toml
+    assert 'docker_image = "ts-ui-eval-smoke-fast:task-env-codex-cli-' in task_toml
     assert "@openai/codex" in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
     assert "@google/gemini-cli" not in dockerfile

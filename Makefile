@@ -42,6 +42,11 @@ ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
 ORCHESTRATOR_SMOKE_HARNESS := codex-cli
 ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-mini
 ORCHESTRATOR_SMOKE_REPEATS ?= 1
+SMOKE_MATRIX_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
+SMOKE_MATRIX_SELECTOR ?= all
+SMOKE_MATRIX_REPEATS ?= 1
+SMOKE_MATRIX_REPEAT_PARALLEL ?= 1
+SMOKE_MATRIX_RERUN_UNSCORED ?= 0
 AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
@@ -69,7 +74,7 @@ endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-info scenario-validate \
-	smoke-dry-run-check orchestrator-smoke agent-smoke research-smoke \
+	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke research-smoke \
 	research-smoke-init research-smoke-approve research-smoke-cleanup \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
@@ -105,6 +110,7 @@ help:
 	@echo "  make smoke-dry-run-check                               Print the canonical smoke command shapes used by CI drift checks"
 	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-mini"
 	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
+	@echo "  make smoke-matrix                                      Run the default hello-world smoke scenario across the full public model matrix"
 	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
 	@echo "  make research-smoke                                    Run canonical autoresearch init+approve and clean up smoke artifacts"
@@ -179,6 +185,9 @@ smoke-dry-run-check:
 	@$(MAKE) --no-print-directory -n orchestrator-smoke \
 		ORCHESTRATOR_SMOKE_REPEATS="2" \
 		RUN_PARALLELISM="2"
+	@$(MAKE) --no-print-directory -n smoke-matrix \
+		SMOKE_MATRIX_REPEATS="1" \
+		SMOKE_MATRIX_REPEAT_PARALLEL="1"
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		HARNESS="$(ORCHESTRATOR_SMOKE_HARNESS)" \
 		MODEL="$(ORCHESTRATOR_SMOKE_MODEL)" \
@@ -201,6 +210,16 @@ orchestrator-smoke: docker-check
 		--repeats "$(ORCHESTRATOR_SMOKE_REPEATS)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
 		--rerun-unscored "$(RERUN_UNSCORED)" \
+		--experiment-kind "$(EXPERIMENT_KIND)" \
+		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
+
+smoke-matrix: docker-check
+	@$(RAIDAR) matrix \
+		--scenario "$(SMOKE_MATRIX_SCENARIO)" \
+		--selector "$(SMOKE_MATRIX_SELECTOR)" \
+		--repeats "$(SMOKE_MATRIX_REPEATS)" \
+		--repeat-parallel "$(SMOKE_MATRIX_REPEAT_PARALLEL)" \
+		--rerun-unscored "$(SMOKE_MATRIX_RERUN_UNSCORED)" \
 		--experiment-kind "$(EXPERIMENT_KIND)" \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
