@@ -1133,7 +1133,7 @@ def env() -> None:
 @click.option(
     "--sync-arg",
     multiple=True,
-    help="Additional argument to pass to `uv sync`.",
+    help="Additional argument to append to the frozen `uv sync` invocation.",
 )
 def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
     """Setup local toolchain and run Harbor preflight checks."""
@@ -1145,7 +1145,7 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
 
     if install_tools:
         _run_or_raise(["uv", "python", "install", "3.12"], ORCHESTRATOR_ROOT)
-        _run_or_raise(["uv", "sync", *sync_arg], ORCHESTRATOR_ROOT)
+        _run_or_raise(["uv", "sync", "--frozen", *sync_arg], ORCHESTRATOR_ROOT)
         _run_or_raise(["uv", "tool", "install", "harbor"], ORCHESTRATOR_ROOT)
 
     result = subprocess.run(["harbor", "--version"], capture_output=True, text=True, check=False)

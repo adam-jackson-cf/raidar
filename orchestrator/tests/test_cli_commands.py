@@ -200,6 +200,42 @@ def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
     )
 
 
+def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
+    runner = CliRunner()
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr("raidar.cli._cleanup_stale_harbor_before_runs", lambda: None)
+    monkeypatch.setattr(
+        "raidar.cli._runner_api",
+        lambda: type(
+            "FakeRunnerApi",
+            (),
+            {"_docker_compose_preflight_reason": staticmethod(lambda env: None)},
+        )(),
+    )
+
+    def fake_run_or_raise(cmd, cwd, *, env=None):
+        calls.append({"cmd": cmd, "cwd": cwd, "env": env})
+
+    monkeypatch.setattr("raidar.cli._run_or_raise", fake_run_or_raise)
+    monkeypatch.setattr(
+        "raidar.cli.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout="harbor 0.0.0\n",
+            stderr="",
+        ),
+    )
+
+    result = runner.invoke(main, ["env", "setup", "--sync-arg", "--all-extras"])
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["cmd"] == ["uv", "python", "install", "3.12"]
+    assert calls[1]["cmd"] == ["uv", "sync", "--frozen", "--all-extras"]
+    assert calls[2]["cmd"] == ["uv", "tool", "install", "harbor"]
+
+
 def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
     runner = CliRunner()
     scenario_path = tmp_path / "scenario.yaml"
@@ -1091,6 +1127,67 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
     ]
 
 
+def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        ["make", "smoke-matrix"],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        (
+            "UV:run --project orchestrator raidar matrix "
+            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
+            "--selector all --repeats 1 --repeat-parallel 1 "
+            "--rerun-unscored 0 --experiment-kind benchmark"
+        ),
+    ]
+
+
 def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
     repo_root = Path(__file__).resolve().parents[2]
 
@@ -1104,6 +1201,8 @@ def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
 
     assert result.returncode == 0, result.stderr
     assert "uv run --project orchestrator raidar run \\" in result.stdout
+    assert "uv run --project orchestrator raidar matrix \\" in result.stdout
+    assert '--selector "all" \\' in result.stdout
     assert '--repeats "2" \\' in result.stdout
     assert '--repeat-parallel "2" \\' in result.stdout
     assert "uv run --project orchestrator raidar harbor cleanup" in result.stdout
