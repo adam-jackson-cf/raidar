@@ -9,6 +9,7 @@
 - Keep `README.md` as the only human entrypoint; do not duplicate exhaustive command lists in other docs.
 - Use `make scenario-info` to inspect a scenario contract.
 - Exclude `scenarios/**/starter/**` from analysis and code-quality checks by default; starter folders are representative delivery-scenario artifacts, not canonical shared product code.
+- Treat `scenarios/` and `experiments/` as build-generated runtime artifacts by default: exclude them from quality checks unless the request explicitly asks to review/analyze them.
 - Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
 - Task completion requires `make quality` to pass.
 
