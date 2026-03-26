@@ -28,6 +28,7 @@ Thumbs.db
 # Test outputs
 coverage/
 .pytest_cache/
+.cache/
 .tmp/
 experiments/
 .enaible/
