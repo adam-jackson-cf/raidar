@@ -24,6 +24,9 @@ jobs:
           python -m pip install --upgrade pip
           pip install "uv>=0.7"
 
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
       - name: Install repo dev dependencies
         run: |
           uv sync --project orchestrator --all-extras --frozen
