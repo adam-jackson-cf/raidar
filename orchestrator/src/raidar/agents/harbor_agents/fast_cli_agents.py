@@ -242,26 +242,39 @@ class FastCodexCliAgent(BaseAgent):
         env = {
             "CODEX_HOME": "/logs/agent/codex-home",
         }
-        openai_key = _secret_from_file_env("OPENAI_API_KEY") or ""
-        await _upload_secret_file(
-            environment,
-            secret_value=openai_key,
-            target_path="/tmp/agentic-eval-secrets/openai_api_key",
-        )
         reasoning_flag = ""
         if self._reasoning_effort:
             reasoning_flag = f"-c model_reasoning_effort={shlex.quote(self._reasoning_effort)} "
 
-        await environment.exec(
-            command=(
-                'mkdir -p /tmp/codex-secrets "$CODEX_HOME" && '
-                'printf \'{\\n  "OPENAI_API_KEY": "%s"\\n}\\n\' '
-                '"$(cat /tmp/agentic-eval-secrets/openai_api_key)" '
-                "> /tmp/codex-secrets/auth.json && "
-                'ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"'
-            ),
-            env=env,
-        )
+        auth_json = _secret_from_file_env("CODEX_AUTH_JSON")
+        if auth_json is not None:
+            await _upload_secret_file(
+                environment,
+                secret_value=auth_json,
+                target_path="/tmp/codex-secrets/auth.json",
+            )
+            await environment.exec(
+                command='mkdir -p /tmp/codex-secrets "$CODEX_HOME" && '
+                'ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"',
+                env=env,
+            )
+        else:
+            openai_key = _secret_from_file_env("OPENAI_API_KEY") or ""
+            await _upload_secret_file(
+                environment,
+                secret_value=openai_key,
+                target_path="/tmp/agentic-eval-secrets/openai_api_key",
+            )
+            await environment.exec(
+                command=(
+                    'mkdir -p /tmp/codex-secrets "$CODEX_HOME" && '
+                    'printf \'{\\n  "OPENAI_API_KEY": "%s"\\n}\\n\' '
+                    '"$(cat /tmp/agentic-eval-secrets/openai_api_key)" '
+                    "> /tmp/codex-secrets/auth.json && "
+                    'ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"'
+                ),
+                env=env,
+            )
         result = await environment.exec(
             command=(
                 "trap 'rm -rf /tmp/codex-secrets \"$CODEX_HOME/auth.json\"' EXIT TERM INT; "
