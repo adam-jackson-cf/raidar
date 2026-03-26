@@ -24,12 +24,13 @@ jobs:
           python -m pip install --upgrade pip
           pip install "uv>=0.7"
 
-      - name: Install orchestrator dev dependencies
-        run: |
-          cd orchestrator
-          uv sync --all-extras --frozen
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
 
-      - name: Run consolidated CI quality gates
+      - name: Install repo dev dependencies
         run: |
-          cd orchestrator
-          uv run raidar quality gates
+          uv sync --project orchestrator --all-extras --frozen
+          uv sync --project auto_researcher --extra dev --frozen
+
+      - name: Run root quality gate
+        run: make quality

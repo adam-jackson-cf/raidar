@@ -45,8 +45,8 @@ make experiment-run \
 ```
 
 Check outputs in:
-- `experiments/<experiment-id>/experiment-summary.json`
-- `experiments/<experiment-id>/runs/*/run.json`
+- `experiments/benchmarks/<experiment-id>/experiment-summary.json`
+- `experiments/benchmarks/<experiment-id>/runs/*/run.json`
 
 Verify these fields are present and consistent:
 - `config.evaluation_profile` in run and experiment config blocks.

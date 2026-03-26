@@ -2,9 +2,8 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ORCH_DIR="$ROOT_DIR/orchestrator"
 
-SCENARIO_PATH="../scenarios/hello-world-smoke/v001/scenario.yaml"
+SCENARIO_PATH="scenarios/hello-world-smoke/v001/scenario.yaml"
 TIMEOUT_SEC="300"
 REPEATS="1"
 REPEAT_PARALLEL="1"
@@ -12,6 +11,7 @@ RERUN_UNSCORED="0"
 FAST_MODE="0"
 HARNESS=""
 MODEL=""
+MAKE_ARGS=(-C "$ROOT_DIR")
 
 usage() {
   cat <<'USAGE'
@@ -21,7 +21,7 @@ Required:
   --harness          Harness id (codex-cli|claude-code|gemini)
 
 Optional:
-  --model            Model id; defaults to codex/gpt-5.4-low for codex-cli
+  --model            Model id; defaults to codex/gpt-5.4-mini for codex-cli
   --timeout          Timeout in seconds, default: 300
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
@@ -29,14 +29,6 @@ Optional:
   --fast             Enable fast smoke mode (custom Harbor agents + prebuilt image reuse)
   --help             Show this help text
 USAGE
-}
-
-require_env_present() {
-  local key="$1"
-  if [[ -z "${!key:-}" ]]; then
-    echo "Missing required environment variable: $key" >&2
-    exit 1
-  fi
 }
 
 while [[ $# -gt 0 ]]; do
@@ -96,7 +88,7 @@ if [[ "$HARNESS" != "codex-cli" && "$HARNESS" != "claude-code" && "$HARNESS" != 
 fi
 
 if [[ -z "$MODEL" && "$HARNESS" == "codex-cli" ]]; then
-  MODEL="codex/gpt-5.4-low"
+  MODEL="codex/gpt-5.4-mini"
 fi
 
 if [[ -z "$MODEL" ]]; then
@@ -105,46 +97,16 @@ if [[ -z "$MODEL" ]]; then
   exit 1
 fi
 
-if [[ -f "$ORCH_DIR/.env" ]]; then
-  set -a
-  # shellcheck disable=SC1091
-  source "$ORCH_DIR/.env"
-  set +a
-fi
-
-case "$HARNESS" in
-  codex-cli)
-    require_env_present OPENAI_API_KEY
-    ;;
-  claude-code)
-    if [[ -z "${ANTHROPIC_API_KEY:-}" && -z "${CLAUDE_CODE_API_KEY:-}" ]]; then
-      echo "Missing required environment variable: ANTHROPIC_API_KEY or CLAUDE_CODE_API_KEY" >&2
-      exit 1
-    fi
-    ;;
-  gemini)
-    require_env_present GEMINI_API_KEY
-    ;;
-esac
-
 if [[ "$FAST_MODE" == "1" ]]; then
   export HARBOR_SMOKE_FAST=1
   export HARBOR_SMOKE_FAST_REUSE_IMAGE=1
 fi
 
-cd "$ORCH_DIR"
-uv run raidar harbor cleanup
-
-uv run raidar harness validate \
-  --harness "$HARNESS" \
-  --model "$MODEL" \
-  --timeout "$TIMEOUT_SEC"
-
-uv run raidar experiment run \
-  --scenario "$SCENARIO_PATH" \
-  --harness "$HARNESS" \
-  --model "$MODEL" \
-  --timeout "$TIMEOUT_SEC" \
-  --repeats "$REPEATS" \
-  --repeat-parallel "$REPEAT_PARALLEL" \
-  --rerun-unscored "$RERUN_UNSCORED"
+make "${MAKE_ARGS[@]}" agent-smoke \
+  HARNESS="$HARNESS" \
+  MODEL="$MODEL" \
+  TIMEOUT_SEC="$TIMEOUT_SEC" \
+  AGENT_SMOKE_SCENARIO="$SCENARIO_PATH" \
+  AGENT_SMOKE_REPEATS="$REPEATS" \
+  AGENT_SMOKE_REPEAT_PARALLEL="$REPEAT_PARALLEL" \
+  AGENT_SMOKE_RERUN_UNSCORED="$RERUN_UNSCORED"

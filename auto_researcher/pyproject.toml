@@ -1,0 +1,57 @@
+[project]
+name = "auto-researcher"
+version = "0.1.0"
+description = "PI-driven objective-to-scenario autoresearch orchestration for Raidar"
+requires-python = ">=3.11"
+dependencies = [
+    "click>=8.0",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "raidar",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.1",
+    "mypy>=1.11",
+    "types-PyYAML>=6.0",
+]
+
+[project.scripts]
+auto-researcher = "auto_researcher.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/auto_researcher"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+extend-exclude = [
+    "experiments",
+    "scenarios",
+]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PLR0912", "PLR0913", "PLR0915"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.pylint]
+max-args = 5
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.mypy]
+python_version = "3.11"
+files = ["src", "tests"]
+ignore_missing_imports = true
+
+[tool.uv.sources]
+raidar = { path = "../orchestrator", editable = true }

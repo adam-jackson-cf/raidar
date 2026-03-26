@@ -12,6 +12,7 @@ import tarfile
 import threading
 import time
 import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -25,7 +26,7 @@ from .agents.fast_mode import (
     fast_image_prefix,
 )
 from .agents.rules import SYSTEM_RULES, inject_rules
-from .audit.workspace_diff import diff_directories
+from .audit.workspace_diff import diff_directories, directory_fingerprint
 from .config import settings
 from .schemas.events import GateEvent, TraceEvent
 from .schemas.scenario import RequirementSpec, ScenarioDefinition
@@ -33,7 +34,6 @@ from .schemas.scorecard import (
     AcceptanceCheck,
     AcceptanceScore,
     CoverageScore,
-    EvalConfig,
     EvalRun,
     ExecutionValidityScore,
     FunctionalScore,
@@ -180,6 +180,17 @@ WORKSPACE_PRUNE_DIRS: tuple[str, ...] = (
 )
 _SUITE_BASELINE_LOCKS_GUARD = threading.Lock()
 _SUITE_BASELINE_LOCKS: dict[Path, threading.Lock] = {}
+RAIDAR_CACHE_VERSION = "1"
+RAIDAR_CACHE_PRUNE_INTERVAL_SEC = 6 * 60 * 60
+RAIDAR_PREP_CACHE_MAX_AGE_SEC = 7 * 24 * 60 * 60
+RAIDAR_PREP_CACHE_MAX_BYTES = 2 * 1024 * 1024 * 1024
+RAIDAR_DOCKER_CACHE_MAX_AGE_SEC = 14 * 24 * 60 * 60
+RAIDAR_CACHE_LOCK_TIMEOUT_SEC = 10 * 60
+RAIDAR_CACHE_LOCK_STALE_SEC = 60 * 60
+RAIDAR_DOCKER_LABEL_MANAGED = "io.raidar.cache.managed"
+RAIDAR_DOCKER_LABEL_KEY = "io.raidar.cache.key"
+RAIDAR_DOCKER_LABEL_HARNESS = "io.raidar.cache.harness"
+RAIDAR_DOCKER_LABEL_REPO = "io.raidar.cache.repo"
 
 
 class StarterPreflightError(RuntimeError):
@@ -209,6 +220,12 @@ class WorkspaceContext:
     """Resolved starter context for a scenario run."""
 
     starter_source: StarterSource
+    baseline_workspace: Path
+    baseline_cache_key: str
+    baseline_cache_status: str
+    baseline_cache_hit: bool
+    baseline_metadata_path: Path
+    baseline_fingerprint: str
     workspace: Path
     injected_rules: Path | None
     metadata_path: Path
@@ -301,12 +318,34 @@ class HarborExecutionRequest:
 
 
 @dataclass(frozen=True, slots=True)
+class FastTaskImageRef:
+    """Content-addressed Docker image reference for fast Harbor execution."""
+
+    image_name: str
+    cache_key: str
+    tag: str
+
+
+@dataclass(frozen=True, slots=True)
+class BaselineWorkspaceCacheResult:
+    """Cache result for the shared prepared baseline workspace."""
+
+    metadata_path: Path
+    baseline_fingerprint: str
+    hit: bool
+    status: str
+
+
+@dataclass(frozen=True, slots=True)
 class WorkspacePreparationPhaseResult:
     """Workspace preparation phase output."""
 
     layout: RunLayout
     context: WorkspaceContext
     harbor_request: HarborExecutionRequest
+    prep_phase_timings_sec: dict[str, float]
+    prep_total_sec: float
+    cache_metadata: dict[str, Any]
     screenshot_command: tuple[str, ...] | None
     evidence_errors: tuple[str, ...]
 
@@ -322,6 +361,9 @@ class ExecutionPhaseResult:
     events: list[TraceEvent]
     outputs: EvaluationOutputs
     duration_sec: float
+    prep_phase_timings_sec: dict[str, float]
+    prep_total_sec: float
+    cache_metadata: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -354,6 +396,10 @@ def _slug_fragment(value: str) -> str:
     return slug or "unknown"
 
 
+def _harness_value(harness: Harness | Any) -> str:
+    return str(getattr(harness, "value", harness))
+
+
 def _run_label(repeat_index: int) -> str:
     return f"run-{repeat_index:02d}"
 
@@ -362,8 +408,127 @@ def _repeat_workspace_dir(request: RunRequest) -> Path:
     return request.execution_dir / "runs" / _run_label(request.repeat_index) / "workspace"
 
 
-def _experiment_baseline_lock(experiment_baseline_dir: Path) -> threading.Lock:
-    key = experiment_baseline_dir.resolve()
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _raidar_cache_root() -> Path:
+    return _repo_root() / ".cache" / "raidar"
+
+
+def _prep_cache_root() -> Path:
+    return _raidar_cache_root() / "prep"
+
+
+def _baseline_cache_entry_dir(cache_key: str) -> Path:
+    return _prep_cache_root() / "baselines" / cache_key
+
+
+def _baseline_cache_workspace_dir(cache_key: str) -> Path:
+    return _baseline_cache_entry_dir(cache_key) / "workspace"
+
+
+def _preflight_cache_file(cache_key: str) -> Path:
+    return _prep_cache_root() / "preflight" / f"{cache_key}.ok.json"
+
+
+def _cache_lock_root() -> Path:
+    return _raidar_cache_root() / "locks"
+
+
+def _fast_image_cache_metadata_path(cache_key: str) -> Path:
+    return _raidar_cache_root() / "images" / f"{cache_key}.json"
+
+
+def _maintenance_marker_path() -> Path:
+    return _raidar_cache_root() / "maintenance" / "last-prune.json"
+
+
+def _repo_cache_identity() -> str:
+    digest = hashlib.sha256(str(_repo_root().resolve()).encode("utf-8")).hexdigest()
+    return digest[:16]
+
+
+def _hash_json_payload(payload: dict[str, Any]) -> str:
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _effective_rule_source(request: RunRequest) -> Path | None:
+    injected_rule_name = SYSTEM_RULES.get(request.config.harness)
+    if not injected_rule_name:
+        return None
+    candidate = request.scenario_dir / "rules" / injected_rule_name
+    return candidate if candidate.exists() else None
+
+
+def _injected_rules_hash(request: RunRequest) -> str | None:
+    rule_source = _effective_rule_source(request)
+    if rule_source is None:
+        return None
+    return _hash_bytes(rule_source.read_bytes())
+
+
+def _baseline_cache_key(request: RunRequest, starter_fingerprint: str) -> str:
+    payload = {
+        "cache_version": RAIDAR_CACHE_VERSION,
+        "starter_fingerprint": starter_fingerprint,
+        "harness": request.config.harness.value,
+        "injected_rules_hash": _injected_rules_hash(request),
+        "setup_actions": getattr(request.scenario.verification, "setup_actions", []),
+    }
+    return _hash_json_payload(payload)
+
+
+def _touch_cache_path(path: Path) -> None:
+    now = time.time()
+    try:
+        os.utime(path, (now, now))
+    except FileNotFoundError:
+        return
+
+
+@contextmanager
+def _cache_key_lock(lock_key: str, *, timeout_sec: int = RAIDAR_CACHE_LOCK_TIMEOUT_SEC):
+    lock_root = _cache_lock_root()
+    lock_root.mkdir(parents=True, exist_ok=True)
+    lock_dir = lock_root / f"{lock_key}.lock"
+    deadline = time.monotonic() + timeout_sec
+
+    while True:
+        try:
+            lock_dir.mkdir(parents=False, exist_ok=False)
+            (lock_dir / "owner.json").write_text(
+                json.dumps(
+                    {
+                        "pid": os.getpid(),
+                        "created_at": datetime.now(UTC).isoformat(),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            break
+        except FileExistsError as err:
+            try:
+                age_sec = time.time() - lock_dir.stat().st_mtime
+            except FileNotFoundError:
+                continue
+            if age_sec > RAIDAR_CACHE_LOCK_STALE_SEC:
+                shutil.rmtree(lock_dir, ignore_errors=True)
+                continue
+            if time.monotonic() >= deadline:
+                raise TimeoutError(f"Timed out waiting for cache lock `{lock_key}`.") from err
+            time.sleep(0.1)
+
+    try:
+        yield
+    finally:
+        shutil.rmtree(lock_dir, ignore_errors=True)
+
+
+def _baseline_workspace_lock(baseline_workspace_dir: Path) -> threading.Lock:
+    key = baseline_workspace_dir.resolve()
     with _SUITE_BASELINE_LOCKS_GUARD:
         lock = _SUITE_BASELINE_LOCKS.get(key)
         if lock is None:
@@ -372,28 +537,99 @@ def _experiment_baseline_lock(experiment_baseline_dir: Path) -> threading.Lock:
         return lock
 
 
-def _ensure_experiment_baseline_workspace(
+def _baseline_cache_entry_metadata(
+    *,
+    baseline_workspace_dir: Path,
+    metadata_path: Path,
+    baseline_cache_key: str,
+    harness: Harness,
+) -> dict[str, str] | None:
+    if not baseline_workspace_dir.exists() or not metadata_path.exists():
+        return None
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    if payload.get("cache_key") != baseline_cache_key:
+        return None
+    if payload.get("harness") != _harness_value(harness):
+        return None
+    baseline_fingerprint = payload.get("baseline_fingerprint")
+    if not isinstance(baseline_fingerprint, str) or not baseline_fingerprint:
+        return None
+    if baseline_fingerprint != directory_fingerprint(baseline_workspace_dir):
+        return None
+    return {"baseline_fingerprint": baseline_fingerprint}
+
+
+def _ensure_baseline_workspace(
     *,
     scenario: ScenarioDefinition,
     starter_dir: Path,
-    experiment_baseline_dir: Path,
+    baseline_workspace_dir: Path,
+    baseline_cache_key: str,
     scenario_dir: Path,
     harness: Harness,
-) -> None:
-    with _experiment_baseline_lock(experiment_baseline_dir):
-        if experiment_baseline_dir.exists():
-            return
-        prepare_workspace(
-            starter_dir=starter_dir,
-            target_dir=experiment_baseline_dir,
-            scenario_dir=scenario_dir,
+) -> BaselineWorkspaceCacheResult:
+    entry_dir = baseline_workspace_dir.parent
+    metadata_path = entry_dir / "metadata.json"
+    lock_key = f"baseline-{baseline_cache_key}"
+    with _baseline_workspace_lock(baseline_workspace_dir), _cache_key_lock(lock_key):
+        entry_metadata = _baseline_cache_entry_metadata(
+            baseline_workspace_dir=baseline_workspace_dir,
+            metadata_path=metadata_path,
+            baseline_cache_key=baseline_cache_key,
             harness=harness,
         )
-        _run_workspace_setup_actions(
-            workspace=experiment_baseline_dir,
-            env=os.environ.copy(),
-            setup_actions=scenario.verification.setup_actions,
-        )
+        if entry_metadata is not None:
+            _touch_cache_path(entry_dir)
+            return BaselineWorkspaceCacheResult(
+                metadata_path=metadata_path,
+                baseline_fingerprint=entry_metadata["baseline_fingerprint"],
+                hit=True,
+                status="hit",
+            )
+        invalidated = entry_dir.exists()
+        if entry_dir.exists():
+            shutil.rmtree(entry_dir, ignore_errors=True)
+        entry_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            prepare_workspace(
+                starter_dir=starter_dir,
+                target_dir=baseline_workspace_dir,
+                scenario_dir=scenario_dir,
+                harness=harness,
+            )
+            _run_workspace_setup_actions(
+                workspace=baseline_workspace_dir,
+                env=os.environ.copy(),
+                setup_actions=scenario.verification.setup_actions,
+            )
+            baseline_fingerprint = directory_fingerprint(baseline_workspace_dir)
+            metadata_path.write_text(
+                json.dumps(
+                    {
+                        "cache_key": baseline_cache_key,
+                        "baseline_fingerprint": baseline_fingerprint,
+                        "created_at": datetime.now(UTC).isoformat(),
+                        "harness": _harness_value(harness),
+                    },
+                    indent=2,
+                ),
+                encoding="utf-8",
+            )
+            _touch_cache_path(entry_dir)
+            return BaselineWorkspaceCacheResult(
+                metadata_path=metadata_path,
+                baseline_fingerprint=baseline_fingerprint,
+                hit=False,
+                status="invalidated" if invalidated else "miss",
+            )
+        except Exception:
+            shutil.rmtree(entry_dir, ignore_errors=True)
+            raise
 
 
 def _command_timeout(command: list[str]) -> int:
@@ -604,16 +840,14 @@ def _workspace_changes_from_baseline(
 
 
 def _preflight_cache_key(request: RunRequest, context: WorkspaceContext) -> str:
-    setup_actions = getattr(request.scenario.verification, "setup_actions", [])
     payload = {
-        "scenario_name": request.scenario.name,
-        "scenario_yaml_hash": _hash_bytes((request.scenario_dir / "scenario.yaml").read_bytes()),
+        "cache_version": RAIDAR_CACHE_VERSION,
+        "baseline_cache_key": context.baseline_cache_key,
+        "harness": request.config.harness.value,
         "starter_fingerprint": context.starter_source.fingerprint,
-        "setup_actions": setup_actions,
         "required_commands": request.scenario.verification.required_commands,
     }
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    return hashlib.sha256(encoded).hexdigest()
+    return _hash_json_payload(payload)
 
 
 def _run_starter_preflight_install(workspace: Path, env: dict[str, str]) -> None:
@@ -688,55 +922,63 @@ def _run_workspace_setup_actions(
 def _write_starter_preflight_cache(
     *,
     cache_file: Path,
-    scenario_name: str,
+    harness: str,
     starter_fingerprint: str,
+    baseline_cache_key: str,
     setup_actions: list[list[str]],
     required_commands: list[list[str]],
 ) -> None:
+    cache_file.parent.mkdir(parents=True, exist_ok=True)
     cache_file.write_text(
         json.dumps(
             {
-                "scenario_name": scenario_name,
+                "cache_version": RAIDAR_CACHE_VERSION,
+                "harness": harness,
                 "starter_fingerprint": starter_fingerprint,
+                "baseline_cache_key": baseline_cache_key,
                 "validated_at": datetime.now(UTC).isoformat(),
                 "setup_actions": setup_actions,
                 "required_commands": required_commands,
             },
             indent=2,
-        )
+        ),
+        encoding="utf-8",
     )
 
 
-def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> None:
-    """Validate starter baseline commands once per scenario revision."""
+def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> bool | None:
+    """Validate starter baseline commands once per effective prep input set."""
     required_commands = request.scenario.verification.required_commands
     setup_actions = getattr(request.scenario.verification, "setup_actions", [])
     if not required_commands:
-        return
+        return None
 
-    cache_dir = request.execution_dir / ".preflight-cache"
-    cache_dir.mkdir(parents=True, exist_ok=True)
     cache_key = _preflight_cache_key(request, context)
-    cache_file = cache_dir / f"{cache_key}.ok.json"
-    if cache_file.exists():
-        return
+    cache_file = _preflight_cache_file(cache_key)
+    with _cache_key_lock(f"preflight-{cache_key}"):
+        if cache_file.exists():
+            _touch_cache_path(cache_file)
+            return True
 
-    env = os.environ.copy()
-    _run_starter_preflight_install(context.workspace, env)
+        env = os.environ.copy()
+        _run_starter_preflight_install(context.workspace, env)
 
-    has_tests = _workspace_has_tests(context.workspace)
-    for command in required_commands:
-        if _should_skip_preflight_command(command, has_tests):
-            continue
-        _run_starter_preflight_command(context.workspace, env, command)
+        has_tests = _workspace_has_tests(context.workspace)
+        for command in required_commands:
+            if _should_skip_preflight_command(command, has_tests):
+                continue
+            _run_starter_preflight_command(context.workspace, env, command)
 
-    _write_starter_preflight_cache(
-        cache_file=cache_file,
-        scenario_name=request.scenario.name,
-        starter_fingerprint=context.starter_source.fingerprint,
-        setup_actions=setup_actions,
-        required_commands=required_commands,
-    )
+        _write_starter_preflight_cache(
+            cache_file=cache_file,
+            harness=request.config.harness.value,
+            starter_fingerprint=context.starter_source.fingerprint,
+            baseline_cache_key=context.baseline_cache_key,
+            setup_actions=setup_actions,
+            required_commands=required_commands,
+        )
+        _touch_cache_path(cache_file)
+        return False
 
 
 def cleanup_stale_harbor_resources(
@@ -747,6 +989,143 @@ def cleanup_stale_harbor_resources(
         cleanup_stale_harbor_containers()
     if include_build_processes:
         cleanup_stale_harbor_build_processes()
+
+
+def _cache_last_used_epoch(path: Path) -> float:
+    return path.stat().st_mtime
+
+
+def _prune_prep_cache_entries() -> None:
+    baselines_root = _prep_cache_root() / "baselines"
+    preflight_root = _prep_cache_root() / "preflight"
+    baselines_root.mkdir(parents=True, exist_ok=True)
+    preflight_root.mkdir(parents=True, exist_ok=True)
+
+    now = time.time()
+    baseline_entries = [path for path in baselines_root.iterdir() if path.is_dir()]
+    total_bytes = 0
+    retained: list[tuple[float, int, Path]] = []
+    for entry in baseline_entries:
+        last_used = _cache_last_used_epoch(entry)
+        if now - last_used > RAIDAR_PREP_CACHE_MAX_AGE_SEC:
+            shutil.rmtree(entry, ignore_errors=True)
+            continue
+        size_bytes = _directory_size_bytes(entry)
+        total_bytes += size_bytes
+        retained.append((last_used, size_bytes, entry))
+
+    for _last_used, size_bytes, entry in sorted(retained, key=lambda item: item[0]):
+        if total_bytes <= RAIDAR_PREP_CACHE_MAX_BYTES:
+            break
+        shutil.rmtree(entry, ignore_errors=True)
+        total_bytes -= size_bytes
+
+    for cache_file in preflight_root.glob("*.ok.json"):
+        try:
+            last_used = _cache_last_used_epoch(cache_file)
+        except FileNotFoundError:
+            continue
+        if now - last_used > RAIDAR_PREP_CACHE_MAX_AGE_SEC:
+            cache_file.unlink(missing_ok=True)
+
+
+def _load_fast_image_cache_payload(metadata_path: Path) -> dict[str, Any] | None:
+    try:
+        payload = json.loads(metadata_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        metadata_path.unlink(missing_ok=True)
+        return None
+    if not isinstance(payload, dict):
+        metadata_path.unlink(missing_ok=True)
+        return None
+    return payload
+
+
+def _stale_fast_image_name(
+    metadata_path: Path, *, now: float, active_image_name: str | None
+) -> str | None:
+    payload = _load_fast_image_cache_payload(metadata_path)
+    if payload is None:
+        return None
+    image_name = payload.get("image_name")
+    if not isinstance(image_name, str):
+        metadata_path.unlink(missing_ok=True)
+        return None
+    if image_name == active_image_name:
+        return None
+    try:
+        last_used = _cache_last_used_epoch(metadata_path)
+    except FileNotFoundError:
+        return None
+    if now - last_used <= RAIDAR_DOCKER_CACHE_MAX_AGE_SEC:
+        return None
+    return image_name
+
+
+def _managed_fast_image(image_name: str, run_env: dict[str, str]) -> bool:
+    labels = _inspect_docker_image_labels(image_name, run_env)
+    return labels is not None and (
+        labels.get(RAIDAR_DOCKER_LABEL_MANAGED) == "true"
+        and labels.get(RAIDAR_DOCKER_LABEL_REPO) == _repo_cache_identity()
+    )
+
+
+def _remove_fast_image(image_name: str, run_env: dict[str, str]) -> None:
+    subprocess.run(
+        ["docker", "image", "rm", "-f", image_name],
+        capture_output=True,
+        text=True,
+        timeout=60,
+        env=run_env,
+        check=False,
+    )
+
+
+def _prune_stale_fast_images(*, run_env: dict[str, str], active_image_name: str | None) -> None:
+    images_root = _raidar_cache_root() / "images"
+    images_root.mkdir(parents=True, exist_ok=True)
+    now = time.time()
+    for metadata_path in images_root.glob("*.json"):
+        image_name = _stale_fast_image_name(
+            metadata_path,
+            now=now,
+            active_image_name=active_image_name,
+        )
+        if image_name is None:
+            continue
+        try:
+            if _managed_fast_image(image_name, run_env):
+                _remove_fast_image(image_name, run_env)
+        except FileNotFoundError:
+            return
+        metadata_path.unlink(missing_ok=True)
+
+
+def _maybe_run_cache_maintenance(*, run_env: dict[str, str], active_image_name: str | None) -> None:
+    marker_path = _maintenance_marker_path()
+    marker_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        if marker_path.exists():
+            age_sec = time.time() - marker_path.stat().st_mtime
+            if age_sec < RAIDAR_CACHE_PRUNE_INTERVAL_SEC:
+                return
+    except OSError:
+        return
+
+    try:
+        with _cache_key_lock("maintenance", timeout_sec=30):
+            if marker_path.exists():
+                age_sec = time.time() - marker_path.stat().st_mtime
+                if age_sec < RAIDAR_CACHE_PRUNE_INTERVAL_SEC:
+                    return
+            _prune_prep_cache_entries()
+            _prune_stale_fast_images(run_env=run_env, active_image_name=active_image_name)
+            marker_path.write_text(
+                json.dumps({"last_pruned_at": datetime.now(UTC).isoformat()}, indent=2),
+                encoding="utf-8",
+            )
+    except (OSError, RuntimeError, TimeoutError, ValueError):
+        return
 
 
 def cleanup_stale_harbor_containers() -> None:
@@ -1172,23 +1551,32 @@ def _verifier_scorer_script() -> str:
     return _verifier_script_template_path().read_text(encoding="utf-8")
 
 
-def _fast_task_docker_image(request: RunRequest, context: WorkspaceContext) -> str | None:
-    scenario_path = request.scenario_dir / "scenario.yaml"
-    scenario_yaml_hash = (
-        _hash_bytes(scenario_path.read_bytes()) if scenario_path.exists() else "missing"
-    )
+def _fast_task_image_reference(
+    request: RunRequest, task_bundle_path: Path
+) -> FastTaskImageRef | None:
+    environment_dir = task_bundle_path / "environment"
+    dockerfile_path = environment_dir / "Dockerfile"
+    app_dir = environment_dir / "app"
+    if not dockerfile_path.exists() or not app_dir.exists():
+        return None
+
     payload = {
-        "fast_mode_version": "1",
-        "scenario_name": request.scenario.name,
-        "scenario_revision": request.scenario.scenario_revision,
-        "scenario_yaml_hash": scenario_yaml_hash,
-        "starter_fingerprint": context.starter_source.fingerprint,
+        "cache_version": RAIDAR_CACHE_VERSION,
+        "fast_mode_version": "2",
+        "harness": request.config.harness.value,
+        "harness_package": _harness_npm_package(request.config.harness.value),
+        "dockerfile": dockerfile_path.read_text(encoding="utf-8"),
+        "app_fingerprint": directory_fingerprint(app_dir),
     }
-    digest = hashlib.sha256(
-        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
-    ).hexdigest()[:16]
-    image_tag = f"{_slug_fragment(request.scenario.name)}-{digest}"
-    return f"{fast_image_prefix()}:{image_tag}"
+    cache_key = _hash_json_payload(payload)
+    digest = cache_key[:16]
+    harness_fragment = _slug_fragment(request.config.harness.value)
+    image_tag = f"task-env-{harness_fragment}-{digest}"
+    return FastTaskImageRef(
+        image_name=f"{fast_image_prefix()}:{image_tag}",
+        cache_key=cache_key,
+        tag=image_tag,
+    )
 
 
 def _task_environment_toml(image_name: str | None) -> str:
@@ -1210,10 +1598,17 @@ def _harness_npm_package(harness: str) -> str | None:
     return HARNESS_NPM_PACKAGES.get(harness)
 
 
-def _docker_image_exists(image_name: str, run_env: dict[str, str]) -> bool:
+def _inspect_docker_image_labels(image_name: str, run_env: dict[str, str]) -> dict[str, str] | None:
     try:
         probe = subprocess.run(
-            ["docker", "image", "inspect", image_name],
+            [
+                "docker",
+                "image",
+                "inspect",
+                image_name,
+                "--format",
+                "{{json .Config.Labels}}",
+            ],
             capture_output=True,
             text=True,
             timeout=30,
@@ -1222,19 +1617,49 @@ def _docker_image_exists(image_name: str, run_env: dict[str, str]) -> bool:
         )
     except FileNotFoundError as exc:
         raise RuntimeError("Docker CLI not found.") from exc
-    return probe.returncode == 0
+    if probe.returncode != 0:
+        return None
+    labels = json.loads((probe.stdout or "null").strip() or "null")
+    if not isinstance(labels, dict):
+        return {}
+    return {str(key): str(value) for key, value in labels.items()}
 
 
-def _fast_image_build_command(image_name: str, dockerfile: Path, context_dir: Path) -> list[str]:
-    return [
+def _expected_fast_image_labels(image_ref: FastTaskImageRef, harness: str) -> dict[str, str]:
+    return {
+        RAIDAR_DOCKER_LABEL_MANAGED: "true",
+        RAIDAR_DOCKER_LABEL_KEY: image_ref.cache_key,
+        RAIDAR_DOCKER_LABEL_HARNESS: harness,
+        RAIDAR_DOCKER_LABEL_REPO: _repo_cache_identity(),
+    }
+
+
+def _fast_image_cache_hit(
+    image_ref: FastTaskImageRef, *, harness: str, run_env: dict[str, str]
+) -> bool:
+    labels = _inspect_docker_image_labels(image_ref.image_name, run_env)
+    if labels is None:
+        return False
+    expected_labels = _expected_fast_image_labels(image_ref, harness)
+    return all(labels.get(key) == value for key, value in expected_labels.items())
+
+
+def _fast_image_build_command(
+    image_ref: FastTaskImageRef, dockerfile: Path, context_dir: Path, *, harness: str
+) -> list[str]:
+    command = [
         "docker",
         "build",
+        "--load",
         "--tag",
-        image_name,
+        image_ref.image_name,
         "--file",
         str(dockerfile),
-        str(context_dir),
     ]
+    for key, value in _expected_fast_image_labels(image_ref, harness).items():
+        command.extend(["--label", f"{key}={value}"])
+    command.append(str(context_dir))
+    return command
 
 
 def _run_fast_image_build(
@@ -1267,25 +1692,61 @@ def _raise_fast_image_build_error(build_cmd: list[str], build: subprocess.Comple
     raise RuntimeError(f"Fast image build failed: `{rendered}` exited {build.returncode}\n{output}")
 
 
+def _write_fast_image_cache_metadata(
+    *, image_ref: FastTaskImageRef, harness: str, outcome: str
+) -> None:
+    metadata_path = _fast_image_cache_metadata_path(image_ref.cache_key)
+    metadata_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "cache_key": image_ref.cache_key,
+                "image_name": image_ref.image_name,
+                "image_tag": image_ref.tag,
+                "harness": harness,
+                "repo_id": _repo_cache_identity(),
+                "outcome": outcome,
+                "last_used_at": datetime.now(UTC).isoformat(),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+
 def _ensure_fast_task_image(
     *,
     task_bundle_path: Path,
-    image_name: str,
+    image_ref: FastTaskImageRef,
+    harness: str,
     run_env: dict[str, str],
     log_dir: Path,
-) -> None:
-    if _docker_image_exists(image_name, run_env):
-        return
+) -> bool:
+    if _fast_image_cache_hit(image_ref, harness=harness, run_env=run_env):
+        _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
+        return True
 
-    context_dir = task_bundle_path / "environment"
-    dockerfile = context_dir / "Dockerfile"
-    if not dockerfile.exists():
-        raise FileNotFoundError(f"Fast image build failed: missing Dockerfile {dockerfile}")
+    with _cache_key_lock(f"image-{image_ref.cache_key}"):
+        if _fast_image_cache_hit(image_ref, harness=harness, run_env=run_env):
+            _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
+            return True
 
-    build_cmd = _fast_image_build_command(image_name, dockerfile, context_dir)
-    build = _run_fast_image_build(build_cmd, run_env)
-    _write_fast_image_build_log(log_dir, build)
-    _raise_fast_image_build_error(build_cmd, build)
+        context_dir = task_bundle_path / "environment"
+        dockerfile = context_dir / "Dockerfile"
+        if not dockerfile.exists():
+            raise FileNotFoundError(f"Fast image build failed: missing Dockerfile {dockerfile}")
+
+        build_cmd = _fast_image_build_command(
+            image_ref,
+            dockerfile,
+            context_dir,
+            harness=harness,
+        )
+        build = _run_fast_image_build(build_cmd, run_env)
+        _write_fast_image_build_log(log_dir, build)
+        _raise_fast_image_build_error(build_cmd, build)
+        _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="miss")
+        return False
 
 
 def _initialize_harbor_bundle_paths(
@@ -1454,12 +1915,14 @@ def create_harbor_task_bundle(
     prompt_text = _load_scenario_prompt(request.scenario, request.scenario_dir)
     (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(prompt_text))
 
-    task_image = _fast_task_docker_image(request, context)
-    (bundle_dir / "task.toml").write_text(_render_task_toml(request, task_image))
-
     dockerfile = _render_environment_dockerfile(request)
     _validate_public_base_images(dockerfile)
-    (environment_dir / "Dockerfile").write_text(dockerfile)
+    dockerfile_path = environment_dir / "Dockerfile"
+    dockerfile_path.write_text(dockerfile)
+    image_ref = _fast_task_image_reference(request, bundle_dir)
+    (bundle_dir / "task.toml").write_text(
+        _render_task_toml(request, image_ref.image_name if image_ref else None)
+    )
     _write_verifier_artifacts(request, context, tests_dir)
     return bundle_dir
 
@@ -1505,11 +1968,13 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
         scenario_revision=request.scenario.scenario_revision,
     )
 
-    experiment_baseline_dir = request.execution_dir / "workspace" / "baseline"
-    _ensure_experiment_baseline_workspace(
+    baseline_cache_key = _baseline_cache_key(request, starter_source.fingerprint)
+    baseline_workspace_dir = _baseline_cache_workspace_dir(baseline_cache_key)
+    baseline_cache = _ensure_baseline_workspace(
         scenario=request.scenario,
         starter_dir=starter_source.path,
-        experiment_baseline_dir=experiment_baseline_dir,
+        baseline_workspace_dir=baseline_workspace_dir,
+        baseline_cache_key=baseline_cache_key,
         scenario_dir=request.scenario_dir,
         harness=request.config.harness,
     )
@@ -1518,7 +1983,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
     if workspace_dir.exists():
         shutil.rmtree(workspace_dir)
     shutil.copytree(
-        experiment_baseline_dir,
+        baseline_workspace_dir,
         workspace_dir,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
@@ -1536,6 +2001,12 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
 
     return WorkspaceContext(
         starter_source=starter_source,
+        baseline_workspace=baseline_workspace_dir,
+        baseline_cache_key=baseline_cache_key,
+        baseline_cache_status=baseline_cache.status,
+        baseline_cache_hit=baseline_cache.hit,
+        baseline_metadata_path=baseline_cache.metadata_path,
+        baseline_fingerprint=baseline_cache.baseline_fingerprint,
         workspace=workspace,
         injected_rules=injected_rules,
         metadata_path=metadata_path,
@@ -1879,18 +2350,23 @@ def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | 
 
 def build_starter_meta(request: RunRequest, context: WorkspaceContext) -> dict:
     """Build starter metadata for the scorecard."""
-    experiment_baseline_dir = request.execution_dir / "workspace" / "baseline"
+    del request
     return {
         "scenario": context.starter_source.scenario_name,
         "scenario_revision": context.starter_source.scenario_revision,
         "root": str(context.starter_source.path),
-        "experiment_baseline_dir": str(experiment_baseline_dir),
+        "baseline_workspace_dir": str(context.baseline_workspace),
+        "baseline_cache_key": context.baseline_cache_key,
+        "baseline_cache_status": context.baseline_cache_status,
+        "baseline_metadata_path": str(context.baseline_metadata_path),
+        "baseline_fingerprint": context.baseline_fingerprint,
         "run_workspace_dir": str(context.workspace),
         "fingerprint": context.starter_source.fingerprint,
         "metadata_file": context.metadata_path.name,
         "rules_file": context.injected_rules.name if context.injected_rules else None,
         "artifacts": {
             "metadata": str(context.metadata_path),
+            "baseline_metadata": str(context.baseline_metadata_path),
             **({"rules": str(context.injected_rules)} if context.injected_rules else {}),
         },
     }
@@ -3525,8 +4001,11 @@ def _scorecard_harbor_metadata(
         "raw_trial_dir": trial_dir,
         "job_dir": str(execution.harbor_result.job_dir),
         "trial_dir": trial_dir,
+        "prep_phase_timings_sec": execution.prep_phase_timings_sec,
+        "prep_total_sec": execution.prep_total_sec,
         "phase_timings_sec": harbor_timings,
         "harness_overhead_sec": harness_overhead_sec,
+        "cache": execution.cache_metadata,
         "artifacts": artifacts.harbor_artifacts,
     }
 
@@ -3652,97 +4131,17 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
 
 
 def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseResult:
-    """Workspace prep phase: context, preflight, and Harbor bundle creation."""
-    layout = initialize_run(request)
-    adapter = request.config.adapter()
-    adapter.validate()
+    from .runner_pipeline import prepare_workspace_phase
 
-    context = prepare_run_context(request)
-    adapter.prepare_workspace(context.workspace)
-    cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
-    ensure_starter_preflight(request, context)
-    screenshot_command = _resolve_homepage_screenshot_command(request.scenario, context.workspace)
-    evidence_errors: list[str] = []
-    harbor_task_bundle = create_harbor_task_bundle(
-        request,
-        context,
-        bundle_root=layout.harbor_dir / "bundle",
-    )
-
-    run_env = _build_harbor_run_env(adapter)
-    fast_task_image = _fast_task_docker_image(request, context)
-    if fast_task_image:
-        _ensure_fast_task_image(
-            task_bundle_path=harbor_task_bundle,
-            image_name=fast_task_image,
-            run_env=run_env,
-            log_dir=layout.harbor_dir,
-        )
-
-    harbor_request = HarborExecutionRequest(
-        adapter=adapter,
-        workspace=context.workspace,
-        task_bundle_path=harbor_task_bundle,
-        jobs_dir=layout.harbor_dir / "raw",
-        run_harbor_dir=layout.harbor_dir,
-        run_id=layout.run_id,
-        timeout_sec=_harbor_process_timeout(request.config.timeout_sec),
-        run_env=run_env,
-    )
-    return WorkspacePreparationPhaseResult(
-        layout=layout,
-        context=context,
-        harbor_request=harbor_request,
-        screenshot_command=tuple(screenshot_command) if screenshot_command else None,
-        evidence_errors=tuple(evidence_errors),
-    )
+    return prepare_workspace_phase(request)
 
 
 def _execute_harbor_phase(
     request: RunRequest, phase: WorkspacePreparationPhaseResult
 ) -> ExecutionPhaseResult:
-    """Harbor execution phase with verifier output loading."""
-    harbor_result = execute_harbor(phase.harbor_request)
-    terminated_early = harbor_result.terminated_early
-    termination_reason = harbor_result.termination_reason
-    try:
-        process_metrics = collect_process_metrics(
-            request.scenario,
-            harbor_result.trial_dir,
-            harness=request.config.harness.value,
-        )
-    except RuntimeError as exc:
-        message = str(exc)
-        if terminated_early and "Missing token usage metrics" in message:
-            process_metrics = _empty_process_metrics()
-        else:
-            raise
-    events = collect_trace_events(
-        harbor_result.trial_dir,
-        harness=request.config.harness.value,
-    )
+    from .runner_pipeline import execute_harbor_phase
 
-    verifier_outputs: EvaluationOutputs | None = None
-    if not terminated_early:
-        verifier_outputs, verifier_reason = _load_verifier_outputs(harbor_result.trial_dir)
-        if verifier_outputs is None:
-            terminated_early = True
-            termination_reason = verifier_reason
-
-    outputs = terminated_outputs(termination_reason) if terminated_early else verifier_outputs
-    if outputs is None:
-        outputs = terminated_outputs("Verifier outputs unavailable.")
-
-    duration_sec = (datetime.now(UTC) - phase.layout.start_time).total_seconds()
-    return ExecutionPhaseResult(
-        harbor_result=harbor_result,
-        terminated_early=terminated_early,
-        termination_reason=termination_reason,
-        process_metrics=process_metrics,
-        events=events,
-        outputs=outputs,
-        duration_sec=duration_sec,
-    )
+    return execute_harbor_phase(request, phase)
 
 
 def _persist_artifacts_phase(
@@ -3750,65 +4149,9 @@ def _persist_artifacts_phase(
     phase: WorkspacePreparationPhaseResult,
     execution: ExecutionPhaseResult,
 ) -> PersistedArtifacts:
-    """Artifact persistence phase."""
-    evidence_artifacts: dict[str, Any] = {
-        "screenshot_command": list(phase.screenshot_command) if phase.screenshot_command else None,
-        "homepage_post": None,
-        "final_workspace_archive": None,
-        "visual": {
-            "actual": None,
-            "reference": None,
-            "diff": None,
-            "regions": [],
-        },
-        "errors": list(phase.evidence_errors),
-    }
-    if phase.screenshot_command and not execution.terminated_early:
-        archive_path, hydrate_error = _hydrate_workspace_from_final_app(
-            execution.harbor_result,
-            phase.context.workspace,
-        )
-        if archive_path:
-            evidence_artifacts["final_workspace_archive"] = str(archive_path)
-            post_path, post_error = _run_homepage_capture_command(
-                list(phase.screenshot_command),
-                phase.context.workspace,
-                phase.layout.root_dir / "homepage-post.png",
-            )
-            if post_path:
-                evidence_artifacts["homepage_post"] = str(post_path)
-            if post_error:
-                evidence_artifacts["errors"].append(f"homepage-post capture failed: {post_error}")
-            visual_artifacts = _persist_visual_evidence_artifacts(
-                request=request,
-                workspace=phase.context.workspace,
-                run_root_dir=phase.layout.root_dir,
-            )
-            evidence_artifacts["visual"] = visual_artifacts
-            _rebind_visual_evidence_paths(execution.outputs.visual, visual_artifacts)
-        if hydrate_error:
-            evidence_artifacts["errors"].append(hydrate_error)
+    from .runner_pipeline import persist_artifacts_phase
 
-    workspace_prune = _prune_workspace_artifacts(phase.layout.workspace_dir)
-    workspace_changes = _workspace_changes_from_baseline(
-        baseline_workspace=request.execution_dir / "workspace" / "baseline",
-        run_workspace=phase.layout.workspace_dir,
-        run_root_dir=phase.layout.root_dir,
-    )
-    return PersistedArtifacts(
-        starter_meta=build_starter_meta(request, phase.context),
-        scenario_revision_meta=build_scenario_revision_meta(request, phase.context),
-        verifier_artifacts=persist_verifier_artifacts(
-            execution.harbor_result, phase.layout.verifier_dir
-        ),
-        harness_artifacts=persist_harness_artifacts(
-            execution.harbor_result, phase.layout.harness_dir
-        ),
-        harbor_artifacts=persist_harbor_artifacts(execution.harbor_result, phase.layout.harbor_dir),
-        evidence_artifacts=evidence_artifacts,
-        workspace_prune=workspace_prune,
-        workspace_changes=workspace_changes,
-    )
+    return persist_artifacts_phase(request, phase, execution)
 
 
 def _synthesize_scorecard_phase(
@@ -3817,42 +4160,12 @@ def _synthesize_scorecard_phase(
     execution: ExecutionPhaseResult,
     artifacts: PersistedArtifacts,
 ) -> Scorecard:
-    """Score synthesis phase from persisted artifacts and execution outputs."""
-    scorecard = build_scorecard(
-        ScorecardBuildContext(
-            request=request,
-            layout=phase.layout,
-            context=phase.context,
-            artifacts=artifacts,
-            execution=execution,
-        )
-    )
-    write_run_analysis(phase.layout, request, scorecard, execution.harbor_result)
-    return scorecard
+    from .runner_pipeline import synthesize_scorecard_phase
+
+    return synthesize_scorecard_phase(request, phase, execution, artifacts)
 
 
 def run_task(request: RunRequest) -> EvalRun:
-    """Execute a scenario and return evaluation results."""
-    prepared = _prepare_workspace_phase(request)
-    execution = _execute_harbor_phase(request, prepared)
-    artifacts = _persist_artifacts_phase(request, prepared, execution)
-    scorecard = _synthesize_scorecard_phase(request, prepared, execution, artifacts)
+    from .runner_pipeline import run_task as run_task_pipeline
 
-    return EvalRun(
-        id=prepared.layout.run_id,
-        timestamp=prepared.layout.start_time.isoformat(),
-        config=EvalConfig(
-            model=request.config.model.qualified_name,
-            harness=request.config.harness.value,
-            scenario_name=request.scenario.name,
-            scenario_revision=request.scenario.scenario_revision,
-            starter_root=request.scenario.starter.root,
-            evaluation_profile=scenario_evaluation_profile(request.scenario),
-        ),
-        duration_sec=execution.duration_sec,
-        terminated_early=execution.terminated_early,
-        termination_reason=execution.termination_reason,
-        scores=scorecard,
-        events=execution.events,
-        gate_history=execution.outputs.gate_history,
-    )
+    return run_task_pipeline(request)

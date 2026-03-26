@@ -1,0 +1,301 @@
+{
+  "schemaVersion": "2.0",
+  "generated": true,
+  "editPolicy": "do-not-edit",
+  "generatedAt": "2026-03-25T15:51:49.219380Z",
+  "sourceExecplan": "/Users/adamjackson/Projects/raidar/.plan/create-execplan/20260325T143453Z/execplan.md",
+  "requirements": [
+    {
+      "id": "R1",
+      "text": "Produce a brownfield implementation plan for orchestrator spin-up reuse and observability that resolves the remaining live Docker image warm-path issue and extends cache visibility into persisted and aggregate reporting."
+    },
+    {
+      "id": "R2",
+      "text": "Produce a brownfield refactor plan for the highest-value code-quality hotspots: typed request/option objects for CLI-heavy entrypoints, decomposition of `_promotion_guard`, consolidation of shared provider-adapter behavior, and targeted tests for low-coverage operational modules."
+    },
+    {
+      "id": "R3",
+      "text": "Exclude scenario files from implementation scope entirely, including starter folders; the plan must not schedule code or structural changes under `scenarios/**`."
+    },
+    {
+      "id": "R4",
+      "text": "Add and enforce repo guidance that `scenarios/**/starter/**` is excluded from analysis and code-quality checks because those files are representative delivery-scenario artifacts rather than canonical shared product code."
+    }
+  ],
+  "tasks": [
+    {
+      "taskRef": "P1-T1",
+      "status": "outstanding",
+      "phaseNumber": 1,
+      "taskNumber": 1,
+      "type": "Read",
+      "requirementIds": [
+        "R1",
+        "R3",
+        "R4"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/.plan/create-execplan/20260325T143453Z/context-pack.md:1"
+      ],
+      "command": "",
+      "expectedOutput": "current context confirmed",
+      "action": "Read the Context Pack and freeze scope before implementation starts."
+    },
+    {
+      "taskRef": "P1-T2",
+      "status": "outstanding",
+      "phaseNumber": 1,
+      "taskNumber": 2,
+      "type": "Code",
+      "requirementIds": [
+        "R3",
+        "R4"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/AGENTS.md:11"
+      ],
+      "command": "",
+      "expectedOutput": "policy and tooling path aligned",
+      "action": "Enforce the starter-folder analysis exclusion in the relevant analyzer/quality configuration without touching scenario files."
+    },
+    {
+      "taskRef": "P1-T3",
+      "status": "outstanding",
+      "phaseNumber": 1,
+      "taskNumber": 3,
+      "type": "Gate",
+      "requirementIds": [
+        "R3"
+      ],
+      "fileAnchors": [],
+      "command": "git diff --name-only",
+      "expectedOutput": "no `scenarios/` paths in the implementation diff",
+      "action": "Fail the implementation if any planned change spills into `scenarios/**`."
+    },
+    {
+      "taskRef": "P1-T4",
+      "status": "outstanding",
+      "phaseNumber": 1,
+      "taskNumber": 4,
+      "type": "Gate",
+      "requirementIds": [
+        "R1",
+        "R3",
+        "R4"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/.plan/create-execplan/20260325T143453Z/execplan.md:1"
+      ],
+      "command": "",
+      "expectedOutput": "Checkpoint A scope locked",
+      "action": "Do not start hotspot refactors until the orchestrator warm-path and exclusion-enforcement track is complete and verified."
+    },
+    {
+      "taskRef": "P2-T5",
+      "status": "outstanding",
+      "phaseNumber": 2,
+      "taskNumber": 5,
+      "type": "Code",
+      "requirementIds": [
+        "R1"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/runner.py:1718",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/runner.py:1961",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/runner.py:4134"
+      ],
+      "command": "",
+      "expectedOutput": "persisted fast-image artifact path implemented with cache-state traceability",
+      "action": "Replace daemon-local fast-image dependence with a generic persisted reusable artifact flow and preserve cache-state traceability."
+    },
+    {
+      "taskRef": "P2-T6",
+      "status": "outstanding",
+      "phaseNumber": 2,
+      "taskNumber": 6,
+      "type": "Code",
+      "requirementIds": [
+        "R1"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/experiment.py:155",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/storage.py:177"
+      ],
+      "command": "",
+      "expectedOutput": "aggregate reporting exposes cache-state and invalidation data",
+      "action": "Surface orchestrator cache metadata beyond raw run artifacts."
+    },
+    {
+      "taskRef": "P2-T7",
+      "status": "outstanding",
+      "phaseNumber": 2,
+      "taskNumber": 7,
+      "type": "Test",
+      "requirementIds": [
+        "R1",
+        "R4"
+      ],
+      "fileAnchors": [],
+      "command": "make orchestrator-smoke",
+      "expectedOutput": "repeated warm-path smoke succeeds with durable image/cache behavior",
+      "action": "Run the mandatory repeated orchestrator smoke verification for Checkpoint A."
+    },
+    {
+      "taskRef": "P2-T8",
+      "status": "outstanding",
+      "phaseNumber": 2,
+      "taskNumber": 8,
+      "type": "Test",
+      "requirementIds": [
+        "R1",
+        "R4"
+      ],
+      "fileAnchors": [],
+      "command": "make quality",
+      "expectedOutput": "Checkpoint A changes remain green under the full repo gate",
+      "action": "Run the full quality gate at the end of Checkpoint A before allowing hotspot refactors."
+    },
+    {
+      "taskRef": "P3-T9",
+      "status": "outstanding",
+      "phaseNumber": 3,
+      "taskNumber": 9,
+      "type": "Code",
+      "requirementIds": [
+        "R2"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/auto_researcher/src/auto_researcher/cli.py:124",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/cli.py:984",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/experiment.py:155"
+      ],
+      "command": "",
+      "expectedOutput": "request/result assembly broken into typed helpers",
+      "action": "Refactor the broad CLI and summary seams into smaller typed request/result objects."
+    },
+    {
+      "taskRef": "P3-T10",
+      "status": "outstanding",
+      "phaseNumber": 3,
+      "taskNumber": 10,
+      "type": "Code",
+      "requirementIds": [
+        "R2"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/auto_researcher/src/auto_researcher/engine.py:669"
+      ],
+      "command": "",
+      "expectedOutput": "guard logic split into independently testable evaluators",
+      "action": "Decompose `_promotion_guard` without changing promotion semantics."
+    },
+    {
+      "taskRef": "P3-T11",
+      "status": "outstanding",
+      "phaseNumber": 3,
+      "taskNumber": 11,
+      "type": "Code",
+      "requirementIds": [
+        "R2"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/agents/adapters/claude_code_cli.py:15",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/agents/adapters/gemini_cli.py:15",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/agents/adapters/codex_cli.py:15"
+      ],
+      "command": "",
+      "expectedOutput": "shared adapter behavior centralized with provider-specific rules preserved",
+      "action": "Consolidate provider-adapter duplication through reusable base helpers/contracts."
+    },
+    {
+      "taskRef": "P4-T12",
+      "status": "outstanding",
+      "phaseNumber": 4,
+      "taskNumber": 12,
+      "type": "Test",
+      "requirementIds": [
+        "R2"
+      ],
+      "fileAnchors": [
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/agents/harbor_agents/fast_cli_agents.py:1",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/scoring/acceptance.py:239",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/scoring/verification_stability.py:22",
+        "/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/watcher/gate_watcher.py:56"
+      ],
+      "command": "uv run --project orchestrator python -m pytest orchestrator/tests -q",
+      "expectedOutput": "targeted low-coverage seams have deterministic tests",
+      "action": "Add or extend tests around the operational modules named in the quality report."
+    },
+    {
+      "taskRef": "P4-T13",
+      "status": "outstanding",
+      "phaseNumber": 4,
+      "taskNumber": 13,
+      "type": "Test",
+      "requirementIds": [
+        "R2"
+      ],
+      "fileAnchors": [],
+      "command": "make quality",
+      "expectedOutput": "repo gate passes with both checkpoints complete",
+      "action": "Run the full quality gate at the end of Checkpoint B."
+    }
+  ],
+  "verificationScenarios": [
+    {
+      "scenarioId": "S1",
+      "priority": "P0",
+      "given": "Given an unchanged orchestrator smoke setup and a warm persisted fast-image artifact state",
+      "when": "When `make orchestrator-smoke` is run twice with identical inputs",
+      "then": "Then the second invocation reloads or reuses the persisted fast-image artifact path without a fresh image build",
+      "evidenceCommand": "make orchestrator-smoke",
+      "taskRefs": [
+        "P2-T7"
+      ]
+    },
+    {
+      "scenarioId": "S2",
+      "priority": "P0",
+      "given": "Given Checkpoint A changes are complete",
+      "when": "When `make quality` is run before hotspot refactors begin",
+      "then": "Then orchestrator warm-path/reporting and exclusion enforcement are green in isolation",
+      "evidenceCommand": "make quality",
+      "taskRefs": [
+        "P2-T8"
+      ]
+    },
+    {
+      "scenarioId": "S3",
+      "priority": "P1",
+      "given": "Given the refactored CLI/request seams and adapter helpers",
+      "when": "When `make quality` is run at the end of the full implementation",
+      "then": "Then public command behavior and repo gates remain green",
+      "evidenceCommand": "make quality",
+      "taskRefs": [
+        "P4-T13"
+      ]
+    },
+    {
+      "scenarioId": "S4",
+      "priority": "P1",
+      "given": "Given the scenario-exclusion hard requirement",
+      "when": "When the implementation diff is inspected",
+      "then": "Then no path under `scenarios/**` is modified",
+      "evidenceCommand": "git diff --name-only",
+      "taskRefs": [
+        "P1-T3"
+      ]
+    },
+    {
+      "scenarioId": "S5",
+      "priority": "P1",
+      "given": "Given low-coverage operational modules named in the quality report",
+      "when": "When targeted pytest coverage is executed",
+      "then": "Then new deterministic tests protect the touched operational seams",
+      "evidenceCommand": "uv run --project orchestrator python -m pytest orchestrator/tests -q",
+      "taskRefs": [
+        "P4-T12"
+      ]
+    }
+  ]
+}
