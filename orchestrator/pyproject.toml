@@ -37,6 +37,8 @@ packages = ["src/raidar"]
 line-length = 100
 target-version = "py311"
 extend-exclude = [
+    "experiments",
+    "scenarios",
     "workspace",
     "workspace-*",
     "results",
@@ -47,7 +49,7 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C90"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PLR0912", "PLR0915"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
