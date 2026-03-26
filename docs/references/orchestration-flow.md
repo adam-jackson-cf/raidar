@@ -20,7 +20,7 @@ End-to-end flow for scenario execution, Harbor runtime orchestration, and experi
 
 Each experiment writes to one execution root:
 
-`experiments/<timestamp>__<scenario>__<revision>__<harness>__<model>__xN/`
+`experiments/{benchmarks|research_loops}/<timestamp>__<scenario>__<revision>__<harness>__<model>__xN/`
 
 Inside that root:
 - `workspace/baseline/`: prepared starter baseline snapshot shared by the experiment runs.
@@ -88,7 +88,8 @@ Evaluation profile:
 ## 5. Canonical Analysis Inputs
 
 Use these artifact paths for human or automated review:
-- `experiments/*/experiment.json`
+- `experiments/benchmarks/*/experiment.json`
+- `experiments/research_loops/*/experiment.json`
 - `experiments/*/experiment-summary.json`
 - `experiments/*/report.md`
 - `experiments/*/runs/*/run.json`

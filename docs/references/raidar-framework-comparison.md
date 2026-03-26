@@ -41,7 +41,7 @@ RAIDAR is designed to support decisions about what to improve next:
 
 - prompt design
 - rules
-- starter scaffolding
+- starter scaffolding (project context, linting, tools etc)
 - scenario design
 - harness choice
 - model choice

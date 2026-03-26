@@ -1668,7 +1668,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.0" },
-    { name = "litellm", specifier = ">=1.0" },
+    { name = "litellm", specifier = "==1.81.1" },
     { name = "lizard", marker = "extra == 'dev'", specifier = ">=1.17.10" },
     { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.11" },
     { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.0" },

@@ -1,6 +1,8 @@
 """Tests for CLI utility commands and helpers under the scenario migration."""
 
 import json
+import os
+import subprocess
 import tomllib
 from datetime import UTC, datetime
 from pathlib import Path
@@ -9,14 +11,42 @@ import click
 from click.testing import CliRunner
 
 from raidar.cli import (
+    BENCHMARK_EXPERIMENTS_ROOT,
+    ORCHESTRATOR_ROOT,
+    RESEARCH_LOOP_EXPERIMENTS_ROOT,
     RunCliOptions,
+    SuiteExecutionResult,
     _assert_no_generated_artifact_changes,
     _generated_artifact_paths,
     _persist_experiment_execution,
+    _resolve_experiments_root,
     main,
+    quality_gates,
 )
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
+
+
+def _assert_smoke_dry_run_output(output: str) -> None:
+    assert "uv run --project orchestrator raidar run \\" in output
+    assert "uv run --project orchestrator raidar matrix \\" in output
+    assert '--selector "all" \\' in output
+    assert '--repeats "2" \\' in output
+    assert '--repeat-parallel "2" \\' in output
+    assert "uv run --project orchestrator raidar harbor cleanup" in output
+    assert "uv run --project orchestrator raidar harness validate \\" in output
+    assert "uv run --project orchestrator raidar experiment run \\" in output
+    assert 'RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run"' in output
+    assert "research-smoke-init" in output
+    assert "research-smoke-approve" in output
+    assert "research-smoke-cleanup" in output
+    assert "objective_id=research-smoke-dry-run" in output
+    assert "uv run --project auto_researcher auto-researcher init \\" in output
+    assert '--loop-execution-mode "parallel" \\' in output
+    assert '--max-parallel-loops "2" \\' in output
+    assert '--benchmark-repeat-parallel "2" \\' in output
+    assert '--research-repeat-parallel "2" \\' in output
+    assert "uv run --project auto_researcher auto-researcher approve-scenario" in output
 
 
 def test_cli_version_matches_pyproject_version() -> None:
@@ -45,7 +75,7 @@ def test_harness_list_includes_model_variations() -> None:
     assert (
         "models: codex/* (known aliases: codex/gpt-5.2-high, codex/gpt-5.2-low, "
         "codex/gpt-5.2-medium, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
-        "codex/gpt-5.4-low, codex/gpt-5.4-medium)"
+        "codex/gpt-5.4-low, codex/gpt-5.4-medium, codex/gpt-5.4-mini)"
     ) in result.output
     assert (
         "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
@@ -145,6 +175,87 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
 
     assert resolved.rerun_unscored == 1
     assert resolved.scenario.is_absolute()
+    assert resolved.experiments_root.is_absolute()
+
+
+def test_resolve_experiments_root_uses_kind_defaults() -> None:
+    benchmark_root = _resolve_experiments_root(experiments_root=None, experiment_kind="benchmark")
+    research_root = _resolve_experiments_root(
+        experiments_root=None,
+        experiment_kind="research-loop",
+    )
+
+    assert benchmark_root == BENCHMARK_EXPERIMENTS_ROOT
+    assert research_root == RESEARCH_LOOP_EXPERIMENTS_ROOT
+
+
+def test_resolve_experiments_root_prefers_explicit_path(tmp_path: Path) -> None:
+    explicit = tmp_path / "custom-root"
+
+    resolved = _resolve_experiments_root(
+        experiments_root=explicit,
+        experiment_kind="research-loop",
+    )
+
+    assert resolved == explicit.resolve()
+
+
+def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr("raidar.cli._assert_no_generated_artifact_changes", lambda repo_root: None)
+    monkeypatch.setattr("raidar.cli._has_unstaged_changes", lambda repo_root: False)
+    monkeypatch.setattr("raidar.cli.shutil.which", lambda command: "/usr/bin/lizard")
+
+    def fake_run_or_raise(cmd, cwd, *, env=None):
+        calls.append({"cmd": cmd, "cwd": cwd, "env": env})
+
+    monkeypatch.setattr("raidar.cli._run_or_raise", fake_run_or_raise)
+
+    quality_gates.callback(fix=False, stage=False)
+
+    coverage_call = next(call for call in calls if "--cov=src" in call["cmd"])
+    coverage_env = coverage_call["env"]
+    assert isinstance(coverage_env, dict)
+    assert coverage_env["COVERAGE_FILE"] == str(
+        ORCHESTRATOR_ROOT / ".pytest_cache" / "coverage" / ".coverage"
+    )
+
+
+def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
+    runner = CliRunner()
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setattr("raidar.cli._cleanup_stale_harbor_before_runs", lambda: None)
+    monkeypatch.setattr(
+        "raidar.cli._runner_api",
+        lambda: type(
+            "FakeRunnerApi",
+            (),
+            {"_docker_compose_preflight_reason": staticmethod(lambda env: None)},
+        )(),
+    )
+
+    def fake_run_or_raise(cmd, cwd, *, env=None):
+        calls.append({"cmd": cmd, "cwd": cwd, "env": env})
+
+    monkeypatch.setattr("raidar.cli._run_or_raise", fake_run_or_raise)
+    monkeypatch.setattr(
+        "raidar.cli.subprocess.run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args[0],
+            0,
+            stdout="harbor 0.0.0\n",
+            stderr="",
+        ),
+    )
+
+    result = runner.invoke(main, ["env", "setup", "--sync-arg", "--all-extras"])
+
+    assert result.exit_code == 0, result.output
+    assert calls[0]["cmd"] == ["uv", "python", "install", "3.12"]
+    assert calls[1]["cmd"] == ["uv", "sync", "--frozen", "--all-extras"]
+    assert calls[2]["cmd"] == ["uv", "tool", "install", "harbor"]
 
 
 def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
@@ -179,6 +290,104 @@ def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monk
     assert captured["echo"] is True
     assert captured["execution_suffix"] == "codex-cli__codex-gpt-5.4-high"
     assert captured["options"].repeats == 5
+
+
+def test_experiment_run_routes_research_loop_kind(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    scenario_path.write_text("name: placeholder\n")
+    captured: dict[str, object] = {}
+
+    def fake_execute_run_options(options, **kwargs):
+        captured["options"] = options
+        captured.update(kwargs)
+
+    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+
+    result = runner.invoke(
+        main,
+        [
+            "experiment",
+            "run",
+            "--scenario",
+            str(scenario_path),
+            "--harness",
+            "codex-cli",
+            "--model",
+            "codex/gpt-5.4-high",
+            "--experiment-kind",
+            "research-loop",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    options = captured["options"]
+    assert isinstance(options, RunCliOptions)
+    assert options.experiments_root == RESEARCH_LOOP_EXPERIMENTS_ROOT
+
+
+def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monkeypatch) -> None:
+    runner = CliRunner()
+    scenario_path = tmp_path / "scenario.yaml"
+    scenario_path.write_text("name: placeholder\n")
+
+    run = EvalRun(
+        id="run-01",
+        timestamp="2026-03-10T13:00:00+00:00",
+        config=EvalConfig(
+            model="codex/gpt-5.4-high",
+            harness="codex-cli",
+            scenario_name="sample-task",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="functional",
+        ),
+        duration_sec=1.0,
+        scores=Scorecard(
+            metadata={
+                "run": {
+                    "canonical_run_dir": str(tmp_path / "runs" / "run-01"),
+                    "run_json_path": str(tmp_path / "runs" / "run-01" / "run.json"),
+                }
+            }
+        ),
+    )
+
+    def fake_execute_run_options(options, **kwargs):
+        assert kwargs["echo"] is False
+        return SuiteExecutionResult(
+            scenario_path=options.scenario,
+            scenario_name="sample-task",
+            scenario_revision="v001",
+            runs=[run],
+            retries_used=1,
+            experiment_json_path=tmp_path / "experiment.json",
+            summary_path=tmp_path / "experiment-summary.json",
+            report_path=tmp_path / "report.md",
+        )
+
+    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+
+    result = runner.invoke(
+        main,
+        [
+            "experiment",
+            "run",
+            "--scenario",
+            str(scenario_path),
+            "--harness",
+            "codex-cli",
+            "--model",
+            "codex/gpt-5.4-high",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["summary_path"] == str(tmp_path / "experiment-summary.json")
+    assert payload["retries_used"] == 1
+    assert payload["runs"][0]["run_json_path"] == str(tmp_path / "runs" / "run-01" / "run.json")
 
 
 def test_matrix_dry_run_supports_selector_generation(tmp_path: Path, monkeypatch) -> None:
@@ -311,6 +520,32 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
     assert (task_dir / "v001" / "prompt" / "task.md").exists()
 
 
+def test_scenario_init_json_emits_machine_readable_payload(tmp_path: Path) -> None:
+    runner = CliRunner()
+    task_dir = tmp_path / "scenarios" / "json-task"
+
+    result = runner.invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(task_dir),
+            "--name",
+            "json-task",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["scenario_name"] == "json-task"
+    assert payload["scenario_revision"] == "v001"
+    assert Path(payload["scenario_yaml"]).is_file()
+    assert Path(payload["prompt_path"]).is_file()
+    assert Path(payload["rules_dir"]).is_dir()
+
+
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "raidar.cli._changed_repo_entries",
@@ -404,6 +639,36 @@ def test_scenario_clone_revision_succeeds_without_starter_manifest(tmp_path: Pat
     )
     assert clone_result.exit_code == 0, clone_result.output
     assert (scenario_dir / "v002").exists()
+
+
+def test_scenario_clone_revision_json_emits_machine_readable_payload(tmp_path: Path) -> None:
+    runner = CliRunner()
+    scenario_dir = tmp_path / "scenarios" / "json-clone-task"
+
+    init_result = runner.invoke(
+        main,
+        ["scenario", "init", "--path", str(scenario_dir), "--name", "json-clone-task"],
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    clone_result = runner.invoke(
+        main,
+        [
+            "scenario",
+            "clone-revision",
+            "--path",
+            str(scenario_dir),
+            "--from-revision",
+            "v001",
+            "--json",
+        ],
+    )
+
+    assert clone_result.exit_code == 0, clone_result.output
+    payload = json.loads(clone_result.output)
+    assert payload["source_revision"] == "v001"
+    assert payload["target_revision"] == "v002"
+    assert Path(payload["scenario_yaml"]).is_file()
 
 
 def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> None:
@@ -751,3 +1016,383 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
 
     assert captured["reruns_used"] == 1
     assert "retries_used" not in captured
+
+
+def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    script_path = repo_root / "scripts" / "checks" / "run-agent-smoke.sh"
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+    fake_make = bin_dir / "make"
+    fake_make.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'ARGS:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_make.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        [
+            "bash",
+            str(script_path),
+            "--harness",
+            "codex-cli",
+            "--timeout",
+            "120",
+            "--repeats",
+            "2",
+            "--repeat-parallel",
+            "3",
+            "--rerun-unscored",
+            "1",
+            "--fast",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        (
+            f"ARGS:-C {repo_root} agent-smoke HARNESS=codex-cli "
+            "MODEL=codex/gpt-5.4-mini TIMEOUT_SEC=120 "
+            "AGENT_SMOKE_SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
+            "AGENT_SMOKE_REPEATS=2 AGENT_SMOKE_REPEAT_PARALLEL=3 "
+            "AGENT_SMOKE_RERUN_UNSCORED=1"
+        ),
+        "ENV:1:1",
+    ]
+
+
+def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        [
+            "make",
+            "orchestrator-smoke",
+            "ORCHESTRATOR_SMOKE_REPEATS=2",
+            "RUN_PARALLELISM=2",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        (
+            "UV:run --project orchestrator raidar run "
+            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
+            "--harness codex-cli --model codex/gpt-5.4-mini "
+            "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
+            "--experiment-kind benchmark"
+        ),
+    ]
+
+
+def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        ["make", "smoke-matrix"],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        (
+            "UV:run --project orchestrator raidar matrix "
+            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
+            "--selector all --repeats 1 --repeat-parallel 1 "
+            "--rerun-unscored 0 --experiment-kind benchmark"
+        ),
+    ]
+
+
+def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    result = subprocess.run(
+        ["make", "smoke-dry-run-check"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    _assert_smoke_dry_run_output(result.stdout)
+
+
+def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    workspace_root = tmp_path / "workspace"
+    workspace_root.mkdir()
+    (workspace_root / "Makefile").write_text(
+        (repo_root / "Makefile").read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
+
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'project=""',
+                'tool=""',
+                'subcmd=""',
+                'if [ "$1" = "run" ] && [ "$2" = "--project" ]; then',
+                '  project="$3"',
+                '  tool="$4"',
+                '  subcmd="$5"',
+                "fi",
+                'objective_id=""',
+                'loop_execution_mode=""',
+                'max_parallel_loops=""',
+                'benchmark_repeats=""',
+                'benchmark_repeat_parallel=""',
+                'research_repeats=""',
+                'research_repeat_parallel=""',
+                'previous=""',
+                'for arg in "$@"; do',
+                '  case "$previous" in',
+                '    objective_id) objective_id="$arg"; previous=""; continue ;;',
+                ('    loop_execution_mode) loop_execution_mode="$arg"; previous=""; continue ;;'),
+                '    max_parallel_loops) max_parallel_loops="$arg"; previous=""; continue ;;',
+                '    benchmark_repeats) benchmark_repeats="$arg"; previous=""; continue ;;',
+                (
+                    '    benchmark_repeat_parallel) benchmark_repeat_parallel="$arg"; '
+                    'previous=""; continue ;;'
+                ),
+                '    research_repeats) research_repeats="$arg"; previous=""; continue ;;',
+                (
+                    '    research_repeat_parallel) research_repeat_parallel="$arg"; '
+                    'previous=""; continue ;;'
+                ),
+                "  esac",
+                '  case "$arg" in',
+                '    --objective-id) previous="objective_id" ;;',
+                '    --loop-execution-mode) previous="loop_execution_mode" ;;',
+                '    --max-parallel-loops) previous="max_parallel_loops" ;;',
+                '    --benchmark-repeats) previous="benchmark_repeats" ;;',
+                '    --benchmark-repeat-parallel) previous="benchmark_repeat_parallel" ;;',
+                '    --research-repeats) previous="research_repeats" ;;',
+                '    --research-repeat-parallel) previous="research_repeat_parallel" ;;',
+                "  esac",
+                "done",
+                (
+                    'if [ "$project" = "auto_researcher" ] && '
+                    '[ "$tool" = "auto-researcher" ] && [ "$subcmd" = "init" ]; then'
+                ),
+                '  objective_root="$PWD/auto_researcher/objectives/$objective_id"',
+                '  mkdir -p "$objective_root"',
+                (
+                    "  printf 'INIT:%s:%s:%s:%s:%s:%s\\n' \"$loop_execution_mode\" "
+                    '"$max_parallel_loops" "$benchmark_repeats" '
+                    '"$benchmark_repeat_parallel" "$research_repeats" '
+                    '"$research_repeat_parallel" >> "$FAKE_MAKE_LOG"'
+                ),
+                '  cat > "$objective_root/objective.yaml" <<EOF',
+                "objective_id: $objective_id",
+                "status: awaiting_scenario_approval",
+                "scenario_slug: research-smoke-fake",
+                "EOF",
+                "  exit 0",
+                "fi",
+                (
+                    'if [ "$project" = "auto_researcher" ] && '
+                    '[ "$tool" = "auto-researcher" ] && '
+                    '[ "$subcmd" = "approve-scenario" ]; then'
+                ),
+                '  objective_root="$PWD/auto_researcher/objectives/$objective_id"',
+                '  scenario_root="$PWD/scenarios/research-smoke-fake"',
+                '  benchmark_root="$PWD/experiments/benchmarks/research-smoke-fake"',
+                '  mkdir -p "$scenario_root" "$benchmark_root"',
+                '  : > "$benchmark_root/experiment-summary.json"',
+                '  cat > "$objective_root/objective.yaml" <<EOF',
+                "objective_id: $objective_id",
+                "status: active",
+                "scenario_slug: research-smoke-fake",
+                "best_benchmark_ref: "
+                "$PWD"
+                "/experiments/benchmarks/research-smoke-fake/experiment-summary.json",
+                "EOF",
+                '  printf \'APPROVE:%s\\n\' "$objective_id" >> "$FAKE_MAKE_LOG"',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        [
+            "make",
+            "research-smoke",
+            "RESEARCH_SMOKE_LOOP_EXECUTION_MODE=parallel",
+            "RESEARCH_SMOKE_MAX_PARALLEL_LOOPS=2",
+            "RESEARCH_SMOKE_BENCHMARK_REPEATS=2",
+            "RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL=2",
+            "RESEARCH_SMOKE_RESEARCH_REPEATS=2",
+            "RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL=2",
+        ],
+        cwd=workspace_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    lines = make_log.read_text(encoding="utf-8").splitlines()
+    assert lines[0] == "DOCKER:info"
+    assert (
+        "UV:run --project auto_researcher auto-researcher init" in lines[1]
+        and "--loop-execution-mode parallel" in lines[1]
+        and "--max-parallel-loops 2" in lines[1]
+        and "--benchmark-repeats 2" in lines[1]
+        and "--benchmark-repeat-parallel 2" in lines[1]
+        and "--research-repeats 2" in lines[1]
+        and "--research-repeat-parallel 2" in lines[1]
+    )
+    assert "INIT:parallel:2:2:2:2:2" in lines
+    assert any(
+        line.startswith("UV:run --project auto_researcher auto-researcher approve-scenario")
+        for line in lines
+    )
+    approve_line = next(line for line in lines if line.startswith("APPROVE:research-smoke-"))
+    objective_id = approve_line.split(":", 1)[1]
+    assert approve_line.startswith("APPROVE:research-smoke-")
+    assert not (workspace_root / "auto_researcher" / "objectives" / objective_id).exists()
+    assert not (workspace_root / "scenarios" / "research-smoke-fake").exists()
+    assert not (workspace_root / "experiments" / "benchmarks" / "research-smoke-fake").exists()
