@@ -412,7 +412,8 @@ auto-research-report:
 quality:
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(RAIDAR) quality gates
-	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src ../auto_researcher/src
+	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src
+	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -L 80 -a 5 -l python ../auto_researcher/src
 	@cd auto_researcher && uv run --project . --extra dev python -m ruff format --check .
 	@cd auto_researcher && uv run --project . --extra dev python -m ruff check .
 	@cd auto_researcher && uv run --project . --extra dev python -m mypy src tests
