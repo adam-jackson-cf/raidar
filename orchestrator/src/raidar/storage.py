@@ -238,89 +238,86 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
     with open(output_path, "w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
-
         for run in runs:
-            process_meta = run.scores.metadata.get("process", {})
-            if not isinstance(process_meta, dict):
-                process_meta = {}
-            harbor_meta = run.scores.metadata.get("harbor", {})
-            if not isinstance(harbor_meta, dict):
-                harbor_meta = {}
-            phase_timings = harbor_meta.get("phase_timings_sec", {})
-            if not isinstance(phase_timings, dict):
-                phase_timings = {}
-            artifact_checks = _artifact_checks_metric(run)
-            row = {
-                "run_id": run.id,
-                "timestamp": run.timestamp,
-                "harness": run.config.harness,
-                "model": run.config.model,
-                "scenario_name": run.config.scenario_name,
-                "scenario_revision": run.config.scenario_revision,
-                "starter_root": run.config.starter_root,
-                "evaluation_profile": run.config.evaluation_profile,
-                "metric_results": json.dumps(_metric_ids(run)),
-                "duration_sec": run.duration_sec,
-                "terminated_early": run.terminated_early,
-                "functional_passed": run.scores.functional.passed,
-                "build_succeeded": run.scores.functional.build_succeeded,
-                "tests_passed": run.scores.functional.tests_passed,
-                "tests_total": run.scores.functional.tests_total,
-                "acceptance_score": run.scores.acceptance.score,
-                "visual_similarity": run.scores.visual.similarity if run.scores.visual else None,
-                "verification_stability_score": run.scores.verification_stability.score,
-                "quality_score": run.scores.quality_score,
-                "diagnostic_score": run.scores.diagnostic_score,
-                "unscored": run.scores.unscored,
-                "unscored_reasons": json.dumps(run.scores.unscored_reasons),
-                "execution_valid": run.scores.execution_validity.passed,
-                "performance_gates_passed": run.scores.performance_gates.passed,
-                "resource_efficiency_score": run.scores.resource_efficiency.score,
-                "gate_failures": run.scores.verification_stability.total_gate_failures,
-                "repeat_failures": run.scores.verification_stability.repeat_failures,
-                "failed_command_categories": json.dumps(
-                    process_meta.get("failed_command_categories", {}),
-                    sort_keys=True,
-                ),
-                "process_failed_command_count": process_meta.get("process_failed_command_count"),
-                "first_pass_verification_successes": process_meta.get(
-                    "first_pass_verification_successes"
-                ),
-                "first_pass_verification_failures": process_meta.get(
-                    "first_pass_verification_failures"
-                ),
-                "missing_required_verification_commands": process_meta.get(
-                    "missing_required_verification_commands"
-                ),
-                "test_coverage_threshold": run.scores.test_coverage.threshold,
-                "test_coverage_measured": run.scores.test_coverage.measured,
-                "test_coverage_passed": run.scores.test_coverage.passed,
-                "requirements_presence_ratio": run.scores.requirements_coverage.presence_ratio,
-                "requirements_mapping_ratio": run.scores.requirements_coverage.mapping_ratio,
-                "requirement_pattern_gap_count": len(
-                    run.scores.requirements_coverage.requirement_pattern_gaps
-                ),
-                "requirement_pattern_gaps": json.dumps(
-                    run.scores.requirements_coverage.requirement_pattern_gaps,
-                    sort_keys=True,
-                ),
-                "composite_score": run.scores.composite_score,
-                "trial_total_sec": phase_timings.get("trial_total_sec"),
-                "environment_setup_sec": phase_timings.get("environment_setup_sec"),
-                "harness_setup_sec": phase_timings.get("harness_setup_sec"),
-                "harness_execution_sec": phase_timings.get("harness_execution_sec"),
-                "verifier_sec": phase_timings.get("verifier_sec"),
-                "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
-                "artifact_checks_passed": (
-                    artifact_checks.passed if artifact_checks is not None else None
-                ),
-                "artifact_checks_missing_patterns": (
-                    json.dumps(artifact_checks.missing_patterns)
-                    if artifact_checks is not None
-                    else None
-                ),
-            }
-            writer.writerow(row)
+            writer.writerow(_csv_row(run))
+
+
+def _dict_meta(value: object) -> dict:
+    return value if isinstance(value, dict) else {}
+
+
+def _phase_timings(run: EvalRun) -> dict:
+    harbor_meta = _dict_meta(run.scores.metadata.get("harbor", {}))
+    return _dict_meta(harbor_meta.get("phase_timings_sec", {}))
+
+
+def _csv_row(run: EvalRun) -> dict[str, object]:
+    process_meta = _dict_meta(run.scores.metadata.get("process", {}))
+    harbor_meta = _dict_meta(run.scores.metadata.get("harbor", {}))
+    phase_timings = _phase_timings(run)
+    artifact_checks = _artifact_checks_metric(run)
+    return {
+        "run_id": run.id,
+        "timestamp": run.timestamp,
+        "harness": run.config.harness,
+        "model": run.config.model,
+        "scenario_name": run.config.scenario_name,
+        "scenario_revision": run.config.scenario_revision,
+        "starter_root": run.config.starter_root,
+        "evaluation_profile": run.config.evaluation_profile,
+        "metric_results": json.dumps(_metric_ids(run)),
+        "duration_sec": run.duration_sec,
+        "terminated_early": run.terminated_early,
+        "functional_passed": run.scores.functional.passed,
+        "build_succeeded": run.scores.functional.build_succeeded,
+        "tests_passed": run.scores.functional.tests_passed,
+        "tests_total": run.scores.functional.tests_total,
+        "acceptance_score": run.scores.acceptance.score,
+        "visual_similarity": run.scores.visual.similarity if run.scores.visual else None,
+        "verification_stability_score": run.scores.verification_stability.score,
+        "quality_score": run.scores.quality_score,
+        "diagnostic_score": run.scores.diagnostic_score,
+        "unscored": run.scores.unscored,
+        "unscored_reasons": json.dumps(run.scores.unscored_reasons),
+        "execution_valid": run.scores.execution_validity.passed,
+        "performance_gates_passed": run.scores.performance_gates.passed,
+        "resource_efficiency_score": run.scores.resource_efficiency.score,
+        "gate_failures": run.scores.verification_stability.total_gate_failures,
+        "repeat_failures": run.scores.verification_stability.repeat_failures,
+        "failed_command_categories": json.dumps(
+            process_meta.get("failed_command_categories", {}),
+            sort_keys=True,
+        ),
+        "process_failed_command_count": process_meta.get("process_failed_command_count"),
+        "first_pass_verification_successes": process_meta.get("first_pass_verification_successes"),
+        "first_pass_verification_failures": process_meta.get("first_pass_verification_failures"),
+        "missing_required_verification_commands": process_meta.get(
+            "missing_required_verification_commands"
+        ),
+        "test_coverage_threshold": run.scores.test_coverage.threshold,
+        "test_coverage_measured": run.scores.test_coverage.measured,
+        "test_coverage_passed": run.scores.test_coverage.passed,
+        "requirements_presence_ratio": run.scores.requirements_coverage.presence_ratio,
+        "requirements_mapping_ratio": run.scores.requirements_coverage.mapping_ratio,
+        "requirement_pattern_gap_count": len(
+            run.scores.requirements_coverage.requirement_pattern_gaps
+        ),
+        "requirement_pattern_gaps": json.dumps(
+            run.scores.requirements_coverage.requirement_pattern_gaps,
+            sort_keys=True,
+        ),
+        "composite_score": run.scores.composite_score,
+        "trial_total_sec": phase_timings.get("trial_total_sec"),
+        "environment_setup_sec": phase_timings.get("environment_setup_sec"),
+        "harness_setup_sec": phase_timings.get("harness_setup_sec"),
+        "harness_execution_sec": phase_timings.get("harness_execution_sec"),
+        "verifier_sec": phase_timings.get("verifier_sec"),
+        "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
+        "artifact_checks_passed": artifact_checks.passed if artifact_checks is not None else None,
+        "artifact_checks_missing_patterns": (
+            json.dumps(artifact_checks.missing_patterns) if artifact_checks is not None else None
+        ),
+    }
 
 
 def _ranked_runs(runs: list[EvalRun]) -> list[EvalRun]:

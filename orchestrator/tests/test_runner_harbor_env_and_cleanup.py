@@ -1,8 +1,10 @@
 """Tests for Harbor runtime env and stale build cleanup behavior."""
 
 import json
+import shutil
 import signal
 import subprocess
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -23,6 +25,18 @@ class _AdapterStub:
         return self._import_path
 
 
+@pytest.fixture
+def repo_tmp_agentic_eval_home(monkeypatch) -> Path:
+    repo_tmp_root = Path(__file__).resolve().parents[2] / ".tmp"
+    repo_tmp_root.mkdir(exist_ok=True)
+    fake_home = Path(tempfile.mkdtemp(prefix="agentic-eval-home-", dir=repo_tmp_root))
+    monkeypatch.setattr(runner.Path, "home", classmethod(lambda cls: fake_home))
+    try:
+        yield fake_home
+    finally:
+        shutil.rmtree(fake_home, ignore_errors=True)
+
+
 def test_build_harbor_run_env_preserves_standard_harness_secrets(monkeypatch) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
@@ -35,7 +49,10 @@ def test_build_harbor_run_env_preserves_standard_harness_secrets(monkeypatch) ->
     assert "DOCKER_CONFIG" not in env
 
 
-def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(monkeypatch) -> None:
+def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(
+    monkeypatch,
+    repo_tmp_agentic_eval_home: Path,
+) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
     env = runner._build_harbor_run_env(
@@ -48,6 +65,7 @@ def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(monkeypatch
     assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" in env
     secret_file = runner.Path(env["AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY"])
     assert secret_file.exists()
+    assert secret_file.is_relative_to(repo_tmp_agentic_eval_home)
     assert secret_file.read_text(encoding="utf-8") == "test-openai-key"
     assert "DOCKER_CONFIG" not in env
 

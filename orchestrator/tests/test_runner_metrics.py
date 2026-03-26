@@ -289,6 +289,50 @@ def _sample_scorecard_context(
     )
 
 
+def _seed_workspace_tree(workspace: Path) -> None:
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "package.json").write_text("{}")
+    (workspace / "bun.lock").write_text("")
+    (workspace / "src").mkdir(parents=True, exist_ok=True)
+    (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
+
+
+def _sample_workspace_context(workspace: Path, *, scenario_name: str) -> WorkspaceContext:
+    starter_source = StarterSource(
+        scenario_name=scenario_name,
+        scenario_revision="v001",
+        path=workspace,
+        fingerprint=directory_fingerprint(workspace),
+    )
+    return WorkspaceContext(
+        starter_source=starter_source,
+        baseline_workspace=workspace,
+        baseline_cache_key="baseline-cache-key",
+        baseline_cache_status="hit",
+        baseline_cache_hit=True,
+        baseline_metadata_path=workspace / "baseline-metadata.json",
+        baseline_fingerprint="baseline-fingerprint",
+        workspace=workspace,
+        injected_rules=None,
+        metadata_path=workspace / ".starter-meta.json",
+    )
+
+
+def _make_bundle_request(
+    *,
+    scenario: ScenarioDefinition,
+    scenario_dir: Path,
+    results_dir: Path,
+) -> RunRequest:
+    return RunRequest(
+        scenario=scenario,
+        config=_sample_agent_config(),
+        scenario_dir=scenario_dir,
+        execution_dir=results_dir,
+        repeat_index=1,
+    )
+
+
 def test_ensure_baseline_workspace_initializes_once_in_parallel(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -1482,14 +1526,9 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     workspace = tmp_path / "workspace"
     scenario_dir = tmp_path / "scenario"
     results_dir = tmp_path / "results"
-    workspace.mkdir(parents=True, exist_ok=True)
     scenario_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
-
-    (workspace / "package.json").write_text("{}")
-    (workspace / "bun.lock").write_text("")
-    (workspace / "src").mkdir(parents=True, exist_ok=True)
-    (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
+    _seed_workspace_tree(workspace)
 
     reference_rel = Path("references/hero.png")
     source_reference = scenario_dir / reference_rel
@@ -1557,31 +1596,12 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     )
     (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
-    request = RunRequest(
+    request = _make_bundle_request(
         scenario=scenario,
-        config=_sample_agent_config(),
         scenario_dir=scenario_dir,
-        execution_dir=results_dir,
-        repeat_index=1,
+        results_dir=results_dir,
     )
-    starter_source = StarterSource(
-        scenario_name="homepage-implementation",
-        scenario_revision="v001",
-        path=workspace,
-        fingerprint=directory_fingerprint(workspace),
-    )
-    context = WorkspaceContext(
-        starter_source=starter_source,
-        baseline_workspace=workspace,
-        baseline_cache_key="baseline-cache-key",
-        baseline_cache_status="hit",
-        baseline_cache_hit=True,
-        baseline_metadata_path=workspace / "baseline-metadata.json",
-        baseline_fingerprint="baseline-fingerprint",
-        workspace=workspace,
-        injected_rules=None,
-        metadata_path=workspace / ".starter-meta.json",
-    )
+    context = _sample_workspace_context(workspace, scenario_name="homepage-implementation")
 
     bundle = create_harbor_task_bundle(
         request,
@@ -1631,14 +1651,9 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     workspace = tmp_path / "workspace"
     scenario_dir = tmp_path / "scenario"
     results_dir = tmp_path / "results"
-    workspace.mkdir(parents=True, exist_ok=True)
     scenario_dir.mkdir(parents=True, exist_ok=True)
     results_dir.mkdir(parents=True, exist_ok=True)
-
-    (workspace / "package.json").write_text("{}")
-    (workspace / "bun.lock").write_text("")
-    (workspace / "src").mkdir(parents=True, exist_ok=True)
-    (workspace / "src" / "index.tsx").write_text("export const App = () => null;\n")
+    _seed_workspace_tree(workspace)
     (scenario_dir / "scenario.yaml").write_text(
         "name: hello-world-smoke\nscenario_revision: v001\n"
     )
@@ -1668,31 +1683,12 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
             "prompt": {"entry": "prompt/task.md"},
         }
     )
-    request = RunRequest(
+    request = _make_bundle_request(
         scenario=scenario,
-        config=_sample_agent_config(),
         scenario_dir=scenario_dir,
-        execution_dir=results_dir,
-        repeat_index=1,
+        results_dir=results_dir,
     )
-    starter_source = StarterSource(
-        scenario_name="hello-world-smoke",
-        scenario_revision="v001",
-        path=workspace,
-        fingerprint=directory_fingerprint(workspace),
-    )
-    context = WorkspaceContext(
-        starter_source=starter_source,
-        baseline_workspace=workspace,
-        baseline_cache_key="baseline-cache-key",
-        baseline_cache_status="hit",
-        baseline_cache_hit=True,
-        baseline_metadata_path=workspace / "baseline-metadata.json",
-        baseline_fingerprint="baseline-fingerprint",
-        workspace=workspace,
-        injected_rules=None,
-        metadata_path=workspace / ".starter-meta.json",
-    )
+    context = _sample_workspace_context(workspace, scenario_name="hello-world-smoke")
 
     bundle = create_harbor_task_bundle(
         request,
