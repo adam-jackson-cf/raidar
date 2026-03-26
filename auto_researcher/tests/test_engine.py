@@ -33,14 +33,13 @@ from auto_researcher.storage import WorkspaceLayout, read_json, read_yaml
 
 def _summary_payload(
     *,
-    composite: float,
-    quality: float,
-    diagnostic: float,
+    scores: tuple[float, float, float],
     metric_ids: list[str],
     unscored_count: int = 0,
     validity_rate: float = 1.0,
     performance_pass_rate: float = 1.0,
 ) -> dict[str, Any]:
+    composite, quality, diagnostic = scores
     return {
         "aggregate": {
             "unscored_count": unscored_count,
@@ -520,9 +519,7 @@ def test_approve_promotes_exact_draft_and_seeds_benchmark(tmp_path: Path) -> Non
             {"role": "designer", "payload": _design_payload()},
             {"role": "critic", "payload": _critic_payload()},
         ],
-        experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids)
-        ],
+        experiment_payloads=[_summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids)],
     )
     created = engine.init_objective(_init_request(max_revisions=1))
 
@@ -560,9 +557,7 @@ def test_roles_use_isolated_session_paths(tmp_path: Path) -> None:
             {"role": "critic", "payload": _critic_payload()},
             {"role": "planner", "payload": {"loops": [], "notes": ["stop"]}},
         ],
-        experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids)
-        ],
+        experiment_payloads=[_summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids)],
     )
 
     created = engine.init_objective(_init_request(max_revisions=1))
@@ -614,9 +609,7 @@ def test_run_enforces_max_parallel_loop_cap(tmp_path: Path) -> None:
                 },
             },
         ],
-        experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids)
-        ],
+        experiment_payloads=[_summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids)],
     )
     created = engine.init_objective(_init_request(max_revisions=1))
     engine.approve_scenario(created.objective_id)
@@ -675,9 +668,9 @@ def test_promotion_uses_research_and_benchmark_roots_and_updates_best_benchmark(
             {"role": "governor", "payload": {"action": "promote", "reasoning": "Promote it."}},
         ],
         experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
-            _summary_payload(composite=0.88, quality=0.9, diagnostic=0.91, metric_ids=metric_ids),
-            _summary_payload(composite=0.89, quality=0.91, diagnostic=0.93, metric_ids=metric_ids),
+            _summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids),
+            _summary_payload(scores=(0.88, 0.9, 0.91), metric_ids=metric_ids),
+            _summary_payload(scores=(0.89, 0.91, 0.93), metric_ids=metric_ids),
         ],
     )
 
@@ -755,12 +748,10 @@ def test_promotion_requires_confirmation_before_best_benchmark_changes(tmp_path:
             {"role": "governor", "payload": {"action": "promote", "reasoning": "Promote it."}},
         ],
         experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
-            _summary_payload(composite=0.88, quality=0.9, diagnostic=0.91, metric_ids=metric_ids),
+            _summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids),
+            _summary_payload(scores=(0.88, 0.9, 0.91), metric_ids=metric_ids),
             _summary_payload(
-                composite=0.7,
-                quality=0.75,
-                diagnostic=0.76,
+                scores=(0.7, 0.75, 0.76),
                 metric_ids=metric_ids,
                 performance_pass_rate=0.5,
             ),
@@ -811,9 +802,7 @@ def test_mutation_boundary_violation_blocks_loop(tmp_path: Path) -> None:
                 "edit": _illegal_edit,
             },
         ],
-        experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids)
-        ],
+        experiment_payloads=[_summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids)],
     )
     created = engine.init_objective(_init_request())
     engine.approve_scenario(created.objective_id)
@@ -912,9 +901,9 @@ def test_run_namespaces_reused_loop_ids_across_planner_rounds(tmp_path: Path) ->
             {"role": "governor", "payload": {"action": "discard", "reasoning": "Stop now."}},
         ],
         experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
-            _summary_payload(composite=0.76, quality=0.81, diagnostic=0.79, metric_ids=metric_ids),
-            _summary_payload(composite=0.77, quality=0.82, diagnostic=0.8, metric_ids=metric_ids),
+            _summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids),
+            _summary_payload(scores=(0.76, 0.81, 0.79), metric_ids=metric_ids),
+            _summary_payload(scores=(0.77, 0.82, 0.8), metric_ids=metric_ids),
         ],
     )
     created = engine.init_objective(_init_request(max_revisions=3, max_parallel_loops=1))
@@ -968,9 +957,7 @@ def test_parallel_execution_mode_runs_sibling_loops_concurrently(
                 },
             },
         ],
-        experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids)
-        ],
+        experiment_payloads=[_summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids)],
     )
     created = engine.init_objective(
         _init_request(loop_execution_mode="parallel", max_revisions=1, max_parallel_loops=2)
@@ -1071,9 +1058,9 @@ def test_run_uses_objective_repeat_parallel_settings_for_benchmark_and_research(
             {"role": "governor", "payload": {"action": "promote", "reasoning": "Promote it."}},
         ],
         experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
-            _summary_payload(composite=0.88, quality=0.9, diagnostic=0.91, metric_ids=metric_ids),
-            _summary_payload(composite=0.89, quality=0.91, diagnostic=0.93, metric_ids=metric_ids),
+            _summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids),
+            _summary_payload(scores=(0.88, 0.9, 0.91), metric_ids=metric_ids),
+            _summary_payload(scores=(0.89, 0.91, 0.93), metric_ids=metric_ids),
         ],
     )
 
@@ -1170,10 +1157,10 @@ def test_parallel_round_allows_only_one_promoted_winner_and_confirmation(
     raidar = FakeRaidar(
         layout,
         experiment_payloads=[
-            _summary_payload(composite=0.75, quality=0.8, diagnostic=0.78, metric_ids=metric_ids),
-            _summary_payload(composite=0.88, quality=0.9, diagnostic=0.91, metric_ids=metric_ids),
-            _summary_payload(composite=0.9, quality=0.92, diagnostic=0.94, metric_ids=metric_ids),
-            _summary_payload(composite=0.91, quality=0.93, diagnostic=0.95, metric_ids=metric_ids),
+            _summary_payload(scores=(0.75, 0.8, 0.78), metric_ids=metric_ids),
+            _summary_payload(scores=(0.88, 0.9, 0.91), metric_ids=metric_ids),
+            _summary_payload(scores=(0.9, 0.92, 0.94), metric_ids=metric_ids),
+            _summary_payload(scores=(0.91, 0.93, 0.95), metric_ids=metric_ids),
         ],
     )
     engine = AutoResearchEngine(layout=layout, role_runner=role_runner, raidar=raidar)

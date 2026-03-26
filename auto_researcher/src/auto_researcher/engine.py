@@ -60,6 +60,57 @@ from .storage import (
 )
 
 DEFAULT_LOCAL_REVISION = "v001"
+DESIGN_EXAMPLE_JSON = json.dumps(
+    {
+        "scenario_slug": "filesystem-safe-slug",
+        "scenario_name": "Human-readable name",
+        "description": "Typed scenario description",
+        "difficulty": "easy|medium|hard",
+        "category": "string",
+        "timeout_sec": 1800,
+        "starter_root": "starter",
+        "prompt_entry": "prompt/task.md",
+        "prompt_text": "complete draft task prompt",
+        "metric_ids": ["functional", "acceptance"],
+        "required_commands": [["bun", "run", "lint"]],
+        "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
+        "deterministic_checks": [
+            {
+                "type": "no_pattern",
+                "pattern": "TODO",
+                "description": "No TODO markers remain in production files",
+            }
+        ],
+        "requirements": [
+            {
+                "id": "req-example",
+                "description": "Document one measurable requirement",
+                "check": {
+                    "type": "import_present",
+                    "pattern": "Example",
+                    "description": "Example marker exists in source",
+                },
+                "required_test_patterns": ["Example"],
+            }
+        ],
+        "llm_judge_rubric": [
+            {
+                "criterion": "The implementation satisfies the explicit acceptance criteria.",
+                "weight": 1.0,
+            }
+        ],
+        "starter_files": [
+            {
+                "path": "package.json",
+                "content": (
+                    '{"name":"smoke-starter","private":true,'
+                    '"devDependencies":{"typescript":"^5.8.3"}}'
+                ),
+            },
+        ],
+        "notes": ["short notes"],
+    }
+)
 
 
 @dataclass(slots=True)
@@ -68,6 +119,25 @@ class _RoundPromotionState:
 
     lock: Lock = field(default_factory=Lock)
     promoted_loop_id: str | None = None
+
+
+@dataclass(slots=True)
+class _ScenarioDraftReview:
+    """Stable references written during the initial scenario review round."""
+
+    design: ScenarioDesign
+    draft_yaml: Path
+    critic_path: Path
+
+
+@dataclass(slots=True)
+class _LoopIterationContext:
+    """Shared state for one research-loop iteration."""
+
+    objective: ObjectiveState
+    loop: ResearchLoopState
+    candidate_yaml: Path
+    round_promotion_state: _RoundPromotionState | None = None
 
 
 @dataclass(slots=True)
@@ -99,12 +169,15 @@ class AutoResearchEngine:
             instruction=self._critic_instruction(objective, draft_yaml, design_path, critic_path),
         )
         critic_review = CriticReview.model_validate(read_json(critic_path))
+        review = _ScenarioDraftReview(
+            design=design,
+            draft_yaml=draft_yaml,
+            critic_path=critic_path,
+        )
         if critic_review.decision == "block":
             return self._record_scenario_review(
                 objective,
-                design,
-                draft_yaml,
-                critic_path,
+                review,
                 status="blocked",
                 stop_reason="critic_blocked",
             )
@@ -112,18 +185,14 @@ class AutoResearchEngine:
         if critic_review.decision == "revise":
             return self._record_scenario_review(
                 objective,
-                design,
-                draft_yaml,
-                critic_path,
+                review,
                 status="drafting_scenario",
                 stop_reason="critic_requested_revision",
             )
 
         return self._record_scenario_review(
             objective,
-            design,
-            draft_yaml,
-            critic_path,
+            review,
             status="awaiting_scenario_approval",
             stop_reason=None,
         )
@@ -209,9 +278,7 @@ class AutoResearchEngine:
     def _record_scenario_review(
         self,
         objective: ObjectiveState,
-        design: ScenarioDesign,
-        draft_yaml: Path,
-        critic_path: Path,
+        review: _ScenarioDraftReview,
         *,
         status: ObjectiveStatus,
         stop_reason: str | None,
@@ -219,11 +286,11 @@ class AutoResearchEngine:
         objective.status = status
         objective.stop_reason = stop_reason
         objective.updated_at_utc = utc_now_iso()
-        objective.scenario_slug = design.scenario_slug
-        objective.scenario_name = design.scenario_name
-        objective.draft_scenario_ref = str(draft_yaml)
-        objective.frozen_metric_ids = list(design.metric_ids)
-        objective.latest_scenario_review_ref = str(critic_path)
+        objective.scenario_slug = review.design.scenario_slug
+        objective.scenario_name = review.design.scenario_name
+        objective.draft_scenario_ref = str(review.draft_yaml)
+        objective.frozen_metric_ids = list(review.design.metric_ids)
+        objective.latest_scenario_review_ref = str(review.critic_path)
         self._save_objective(objective)
         self._write_report(objective)
         return objective
@@ -506,96 +573,17 @@ class AutoResearchEngine:
         round_promotion_state: _RoundPromotionState | None = None,
     ) -> ResearchLoopState:
         while True:
-            loop.status = "running"
-            loop.updated_at_utc = utc_now_iso()
-            self._save_loop(loop)
-
-            candidate_yaml = Path(loop.candidate_scenario_ref)
-            candidate_revision_dir = candidate_yaml.parent
-            snapshot_dir = (
-                self.layout.loop_snapshots_dir(objective.objective_id, loop.loop_id)
-                / f"iteration-{loop.iteration:02d}-before"
-            )
-            before = snapshot_tree(candidate_revision_dir)
-            copy_tree(candidate_revision_dir, snapshot_dir)
-            executor_path = (
-                self.layout.loop_root(objective.objective_id, loop.loop_id)
-                / "execution"
-                / f"iteration-{loop.iteration:02d}.json"
-            )
-            execution = self._run_role(
-                objective=objective,
-                role="executor",
-                instruction=self._executor_instruction(objective, loop, executor_path),
-            )
-            loop.session_paths["executor"] = str(execution.session_dir)
-            ExecutorMemo.model_validate(read_json(executor_path))
-            after = snapshot_tree(candidate_revision_dir)
-            diff_path = (
-                self.layout.loop_diffs_dir(objective.objective_id, loop.loop_id)
-                / f"iteration-{loop.iteration:02d}.json"
-            )
-            write_compact_tree_diff(snapshot_dir, candidate_revision_dir, diff_path)
-            loop.latest_diff_ref = str(diff_path)
-            blocked_paths = illegal_mutations(before, after, objective.mutation_surface)
-            if blocked_paths:
-                loop.status = "blocked"
-                loop.stop_reason = "illegal-mutation-boundary"
-                self._save_loop(loop)
-                self._write_report(objective)
-                return loop
-
-            research_result = self.raidar.experiment_run(
-                ExperimentRunRequest(
-                    scenario=candidate_yaml,
-                    harness=objective.target_harness,
-                    model=objective.target_model,
-                    timeout=scenario_timeout_sec(candidate_yaml),
-                    repeats=objective.research_repeats,
-                    repeat_parallel=objective.research_repeat_parallel,
-                    rerun_unscored=1,
-                    experiment_kind="research-loop",
-                )
-            )
-            loop.latest_research_summary_ref = str(research_result.summary_path)
-            loop.status = "review_pending"
-            loop.updated_at_utc = utc_now_iso()
-            self._save_loop(loop)
-
-            review_path = (
-                self.layout.loop_root(objective.objective_id, loop.loop_id)
-                / "reviews"
-                / f"iteration-{loop.iteration:02d}.json"
-            )
-            review_execution = self._run_role(
-                objective=objective,
-                role="reviewer",
-                instruction=self._reviewer_instruction(objective, loop, review_path),
-            )
-            loop.session_paths["reviewer"] = str(review_execution.session_dir)
-            ReviewMemo.model_validate(read_json(review_path))
-            loop.latest_review_ref = str(review_path)
-
-            governor_path = (
-                self.layout.loop_root(objective.objective_id, loop.loop_id)
-                / "governor"
-                / f"iteration-{loop.iteration:02d}.json"
-            )
-            governor_execution = self._run_role(
-                objective=objective,
-                role="governor",
-                instruction=self._governor_instruction(objective, loop, review_path, governor_path),
-            )
-            loop.session_paths["governor"] = str(governor_execution.session_dir)
-            decision = GovernorDecision.model_validate(read_json(governor_path))
-            loop.latest_governor_ref = str(governor_path)
-            should_continue = self._apply_governor_decision(
+            iteration = _LoopIterationContext(
                 objective=objective,
                 loop=loop,
-                candidate_yaml=candidate_yaml,
-                decision=decision,
+                candidate_yaml=Path(loop.candidate_scenario_ref),
                 round_promotion_state=round_promotion_state,
             )
+            if self._run_executor_iteration(iteration):
+                return loop
+            self._run_research_iteration(iteration)
+            decision = self._run_review_iteration(iteration)
+            should_continue = self._apply_governor_decision(iteration, decision)
             if should_continue:
                 continue
             break
@@ -605,22 +593,113 @@ class AutoResearchEngine:
         self._write_report(self._load_objective(objective.objective_id))
         return loop
 
+    def _run_executor_iteration(self, iteration: _LoopIterationContext) -> bool:
+        loop = iteration.loop
+        objective = iteration.objective
+        candidate_revision_dir = iteration.candidate_yaml.parent
+        loop.status = "running"
+        loop.updated_at_utc = utc_now_iso()
+        self._save_loop(loop)
+
+        snapshot_dir = (
+            self.layout.loop_snapshots_dir(objective.objective_id, loop.loop_id)
+            / f"iteration-{loop.iteration:02d}-before"
+        )
+        before = snapshot_tree(candidate_revision_dir)
+        copy_tree(candidate_revision_dir, snapshot_dir)
+        executor_path = (
+            self.layout.loop_root(objective.objective_id, loop.loop_id)
+            / "execution"
+            / f"iteration-{loop.iteration:02d}.json"
+        )
+        execution = self._run_role(
+            objective=objective,
+            role="executor",
+            instruction=self._executor_instruction(objective, loop, executor_path),
+        )
+        loop.session_paths["executor"] = str(execution.session_dir)
+        ExecutorMemo.model_validate(read_json(executor_path))
+        after = snapshot_tree(candidate_revision_dir)
+        diff_path = (
+            self.layout.loop_diffs_dir(objective.objective_id, loop.loop_id)
+            / f"iteration-{loop.iteration:02d}.json"
+        )
+        write_compact_tree_diff(snapshot_dir, candidate_revision_dir, diff_path)
+        loop.latest_diff_ref = str(diff_path)
+        if not illegal_mutations(before, after, objective.mutation_surface):
+            return False
+        loop.status = "blocked"
+        loop.stop_reason = "illegal-mutation-boundary"
+        self._save_loop(loop)
+        self._write_report(objective)
+        return True
+
+    def _run_research_iteration(self, iteration: _LoopIterationContext) -> None:
+        objective = iteration.objective
+        loop = iteration.loop
+        research_result = self.raidar.experiment_run(
+            ExperimentRunRequest(
+                scenario=iteration.candidate_yaml,
+                harness=objective.target_harness,
+                model=objective.target_model,
+                timeout=scenario_timeout_sec(iteration.candidate_yaml),
+                repeats=objective.research_repeats,
+                repeat_parallel=objective.research_repeat_parallel,
+                rerun_unscored=1,
+                experiment_kind="research-loop",
+            )
+        )
+        loop.latest_research_summary_ref = str(research_result.summary_path)
+        loop.status = "review_pending"
+        loop.updated_at_utc = utc_now_iso()
+        self._save_loop(loop)
+
+    def _run_review_iteration(self, iteration: _LoopIterationContext) -> GovernorDecision:
+        objective = iteration.objective
+        loop = iteration.loop
+        review_path = (
+            self.layout.loop_root(objective.objective_id, loop.loop_id)
+            / "reviews"
+            / f"iteration-{loop.iteration:02d}.json"
+        )
+        review_execution = self._run_role(
+            objective=objective,
+            role="reviewer",
+            instruction=self._reviewer_instruction(objective, loop, review_path),
+        )
+        loop.session_paths["reviewer"] = str(review_execution.session_dir)
+        ReviewMemo.model_validate(read_json(review_path))
+        loop.latest_review_ref = str(review_path)
+
+        governor_path = (
+            self.layout.loop_root(objective.objective_id, loop.loop_id)
+            / "governor"
+            / f"iteration-{loop.iteration:02d}.json"
+        )
+        governor_execution = self._run_role(
+            objective=objective,
+            role="governor",
+            instruction=self._governor_instruction(objective, loop, review_path, governor_path),
+        )
+        loop.session_paths["governor"] = str(governor_execution.session_dir)
+        decision = GovernorDecision.model_validate(read_json(governor_path))
+        loop.latest_governor_ref = str(governor_path)
+        return decision
+
     def _apply_governor_decision(
         self,
-        *,
-        objective: ObjectiveState,
-        loop: ResearchLoopState,
-        candidate_yaml: Path,
+        iteration: _LoopIterationContext,
         decision: GovernorDecision,
-        round_promotion_state: _RoundPromotionState | None,
     ) -> bool:
+        objective = iteration.objective
+        loop = iteration.loop
         if decision.action == "iterate":
-            return self._continue_loop_iteration(loop=loop, candidate_yaml=candidate_yaml)
+            return self._continue_loop_iteration(loop=loop, candidate_yaml=iteration.candidate_yaml)
         if decision.action == "promote":
             return self._handle_promotion_decision(
                 objective=objective,
                 loop=loop,
-                round_promotion_state=round_promotion_state,
+                round_promotion_state=iteration.round_promotion_state,
             )
         if decision.action == "discard":
             loop.status = "discarded"
@@ -1029,100 +1108,47 @@ class AutoResearchEngine:
                 )
 
     def _designer_instruction(self, objective: ObjectiveState, output_path: Path) -> str:
-        return "\n".join(
-            [
-                f"Objective goal: {objective.goal}",
-                f"Target harness: {objective.target_harness}",
-                f"Target model: {objective.target_model}",
-                f"Frozen metric count target: {max(1, len(objective.frozen_metric_ids) or 5)}",
-                f"Write JSON to: {output_path}",
-                "Allowed metric ids only: functional, acceptance, verification-stability, "
-                "execution-validity, resource-efficiency, test-coverage, "
-                "requirements-coverage, llm-judge, visual-regression.",
-                "Include `starter_files` entries relative to the starter root.",
-                "Include explicit acceptance coverage with `deterministic_checks`, "
-                "`requirements`, and `llm_judge_rubric`.",
-                "Always provide a valid `package.json` at the starter root.",
-                "Declare at least one dependency or devDependency so the engine can materialize "
-                "a valid `bun.lock` with `bun install --lockfile-only` before benchmark runs.",
-                "Every `required_commands` entry and every gate command must succeed on the "
-                "starter before the benchmark agent edits the workspace.",
-                "This is the first drafting step. Do not inspect unrelated repository paths.",
-                "Do not run recursive listings like `ls -R` or broad searches.",
-                "Use the objective brief and these instructions to author a minimal valid "
-                "scenario.",
-                "If the goal is a smoke or validation flow, prefer an `easy` scenario with a "
-                "small prompt, a low-complexity starter, and only essential metrics and gates.",
-                "Prefer the default metric set: functional, acceptance, "
-                "verification-stability, execution-validity, resource-efficiency.",
-                "Prefer a starter that uses built-in Bun capabilities and keeps dependencies "
-                "minimal. If the starter would otherwise have zero packages, add one small, "
-                "scenario-relevant dependency or devDependency so Bun can generate `bun.lock`.",
-                "For TypeScript starters, prefer a relevant package like `typescript` over "
-                "unrelated filler dependencies.",
-                "Do not add failing tests or gates to the starter baseline. If you include "
-                "`bun run test`, make sure the starter test suite already passes before edits.",
-                "If the prompt requires a CLI output or exact runtime behavior, encode that "
-                "expectation in acceptance coverage and verification commands.",
-                "Write one valid JSON object to the output path and stop after the file exists.",
-                "Required JSON keys:",
-                json.dumps(
-                    {
-                        "scenario_slug": "filesystem-safe-slug",
-                        "scenario_name": "Human-readable name",
-                        "description": "Typed scenario description",
-                        "difficulty": "easy|medium|hard",
-                        "category": "string",
-                        "timeout_sec": 1800,
-                        "starter_root": "starter",
-                        "prompt_entry": "prompt/task.md",
-                        "prompt_text": "complete draft task prompt",
-                        "metric_ids": ["functional", "acceptance"],
-                        "required_commands": [["bun", "run", "lint"]],
-                        "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
-                        "deterministic_checks": [
-                            {
-                                "type": "no_pattern",
-                                "pattern": "TODO",
-                                "description": "No TODO markers remain in production files",
-                            }
-                        ],
-                        "requirements": [
-                            {
-                                "id": "req-example",
-                                "description": "Document one measurable requirement",
-                                "check": {
-                                    "type": "import_present",
-                                    "pattern": "Example",
-                                    "description": "Example marker exists in source",
-                                },
-                                "required_test_patterns": ["Example"],
-                            }
-                        ],
-                        "llm_judge_rubric": [
-                            {
-                                "criterion": (
-                                    "The implementation satisfies the explicit acceptance criteria."
-                                ),
-                                "weight": 1.0,
-                            }
-                        ],
-                        "starter_files": [
-                            {
-                                "path": "package.json",
-                                "content": (
-                                    '{"name":"smoke-starter","private":true,'
-                                    '"devDependencies":{"typescript":"^5.8.3"}}'
-                                ),
-                            },
-                        ],
-                        "notes": ["short notes"],
-                    }
-                ),
-                "Design a typed Raidar scenario draft. Keep metrics frozen and suitable for "
-                "iteration.",
-            ]
-        )
+        header_lines = [
+            f"Objective goal: {objective.goal}",
+            f"Target harness: {objective.target_harness}",
+            f"Target model: {objective.target_model}",
+            f"Frozen metric count target: {max(1, len(objective.frozen_metric_ids) or 5)}",
+            f"Write JSON to: {output_path}",
+        ]
+        guidance_lines = [
+            "Allowed metric ids only: functional, acceptance, verification-stability, "
+            "execution-validity, resource-efficiency, test-coverage, "
+            "requirements-coverage, llm-judge, visual-regression.",
+            "Include `starter_files` entries relative to the starter root.",
+            "Include explicit acceptance coverage with `deterministic_checks`, "
+            "`requirements`, and `llm_judge_rubric`.",
+            "Always provide a valid `package.json` at the starter root.",
+            "Declare at least one dependency or devDependency so the engine can materialize "
+            "a valid `bun.lock` with `bun install --lockfile-only` before benchmark runs.",
+            "Every `required_commands` entry and every gate command must succeed on the "
+            "starter before the benchmark agent edits the workspace.",
+            "This is the first drafting step. Do not inspect unrelated repository paths.",
+            "Do not run recursive listings like `ls -R` or broad searches.",
+            "Use the objective brief and these instructions to author a minimal valid scenario.",
+            "If the goal is a smoke or validation flow, prefer an `easy` scenario with a "
+            "small prompt, a low-complexity starter, and only essential metrics and gates.",
+            "Prefer the default metric set: functional, acceptance, "
+            "verification-stability, execution-validity, resource-efficiency.",
+            "Prefer a starter that uses built-in Bun capabilities and keeps dependencies "
+            "minimal. If the starter would otherwise have zero packages, add one small, "
+            "scenario-relevant dependency or devDependency so Bun can generate `bun.lock`.",
+            "For TypeScript starters, prefer a relevant package like `typescript` over "
+            "unrelated filler dependencies.",
+            "Do not add failing tests or gates to the starter baseline. If you include "
+            "`bun run test`, make sure the starter test suite already passes before edits.",
+            "If the prompt requires a CLI output or exact runtime behavior, encode that "
+            "expectation in acceptance coverage and verification commands.",
+            "Write one valid JSON object to the output path and stop after the file exists.",
+            "Required JSON keys:",
+            DESIGN_EXAMPLE_JSON,
+            "Design a typed Raidar scenario draft. Keep metrics frozen and suitable for iteration.",
+        ]
+        return "\n".join([*header_lines, *guidance_lines])
 
     def _critic_instruction(
         self,

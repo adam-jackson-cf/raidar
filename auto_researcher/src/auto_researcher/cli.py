@@ -6,7 +6,7 @@ import json
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 import click
 
@@ -98,6 +98,32 @@ def _dispatch_init_command(config: InitCommandConfig) -> None:
     click.echo(f"draft_scenario_ref={objective.draft_scenario_ref}")
 
 
+def _init_command_config(params: dict[str, Any]) -> InitCommandConfig:
+    return InitCommandConfig(
+        engine=build_engine(cast(str, params["pi_binary"])),
+        objective_request=ObjectiveInitRequest(
+            goal=cast(str, params["goal"]),
+            target_harness=cast(str, params["target_harness"]),
+            target_model=cast(str, params["target_model"]),
+            objective_id=cast(str | None, params["objective_id"]),
+            approval_mode=cast(Literal["scenario_only"], params["approval_mode"]),
+            loop_execution_mode=cast(Literal["serial", "parallel"], params["loop_execution_mode"]),
+            max_revisions=cast(int, params["max_revisions"]),
+            max_parallel_loops=cast(int, params["max_parallel_loops"]),
+            benchmark_repeats=cast(int, params["benchmark_repeats"]),
+            benchmark_repeat_parallel=cast(int, params["benchmark_repeat_parallel"]),
+            research_repeats=cast(int, params["research_repeats"]),
+            research_repeat_parallel=cast(int, params["research_repeat_parallel"]),
+            mutation_surface=list(cast(tuple[str, ...], params["mutation_surface"])),
+            role_models=_parse_role_models(
+                cast(str, params["control_provider"]),
+                cast(str, params["control_model"]),
+                cast(tuple[str, ...], params["role_models"]),
+            ),
+        ),
+    )
+
+
 @click.group()
 def main() -> None:
     """PI-driven objective-to-scenario autoresearch."""
@@ -142,46 +168,9 @@ def main() -> None:
     help="Override one role model as ROLE=provider/model.",
 )
 @click.option("--pi-binary", default="pi", show_default=True, type=str)
-def init_command(
-    goal: str,
-    target_harness: str,
-    target_model: str,
-    objective_id: str | None,
-    approval_mode: str,
-    loop_execution_mode: str,
-    max_revisions: int,
-    max_parallel_loops: int,
-    benchmark_repeats: int,
-    benchmark_repeat_parallel: int,
-    research_repeats: int,
-    research_repeat_parallel: int,
-    mutation_surface: tuple[str, ...],
-    control_provider: str,
-    control_model: str,
-    role_models: tuple[str, ...],
-    pi_binary: str,
-) -> None:
-    _dispatch_init_command(
-        InitCommandConfig(
-            engine=build_engine(pi_binary),
-            objective_request=ObjectiveInitRequest(
-                goal=goal,
-                target_harness=target_harness,
-                target_model=target_model,
-                objective_id=objective_id,
-                approval_mode=cast(Literal["scenario_only"], approval_mode),
-                loop_execution_mode=cast(Literal["serial", "parallel"], loop_execution_mode),
-                max_revisions=max_revisions,
-                max_parallel_loops=max_parallel_loops,
-                benchmark_repeats=benchmark_repeats,
-                benchmark_repeat_parallel=benchmark_repeat_parallel,
-                research_repeats=research_repeats,
-                research_repeat_parallel=research_repeat_parallel,
-                mutation_surface=list(mutation_surface),
-                role_models=_parse_role_models(control_provider, control_model, role_models),
-            ),
-        )
-    )
+@click.pass_context
+def init_command(ctx: click.Context) -> None:
+    _dispatch_init_command(_init_command_config(dict(ctx.params)))
 
 
 @main.command("approve-scenario")
