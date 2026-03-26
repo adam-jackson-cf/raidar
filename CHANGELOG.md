@@ -2,6 +2,32 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.0] - 2026-03-26
+
+- feat: add codex gpt-5.4-mini support
+- feat: expand autoresearch smoke controls and loop config
+- feat: add loop-level execution mode to autoresearch
+- feat: add autoresearch smoke demo and diff artifacts
+- feat: add pi-driven auto researcher workflow
+- fix: satisfy autoresearch quality gates
+- fix: enforce critic gate and recover approval scenario copy on failure
+- fix: harden autoresearch PI and loop id handling
+- perf: reuse orchestrator prep caches and add smoke matrix
+- refactor: tighten autoresearch lint coverage
+- refactor: extract raidar services for autoresearch
+- refactor: default smoke tests to codex gpt-5.4-mini
+- refactor: split research smoke steps for root quality
+- refactor: rename smoke target to orchestrator-smoke
+- refactor: add dedicated make agent smoke target
+- refactor: route agent smoke checks through make targets
+- docs: cover auto_researcher benchmark and loop workflows
+- docs: add orchestrator reuse execplan package
+- ci: install Bun in quality gates workflow
+- chore: ignore local cache artifacts
+- chore: tighten quality gates for implementation-agnostic debt smells
+- test: add ci smoke dry-run drift checks
+- test: cover smoke repeat and parallel make flows
+
 ## [0.8.0] - 2026-03-16
 
 - feat: tighten homepage scenario baseline contract
