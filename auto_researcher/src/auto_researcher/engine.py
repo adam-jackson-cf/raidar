@@ -26,6 +26,7 @@ from .models import (
     LoopPlan,
     ObjectiveInitRequest,
     ObjectiveState,
+    ObjectiveStatus,
     PlannerPlan,
     ResearchLoopState,
     ReviewMemo,
@@ -84,7 +85,55 @@ class AutoResearchEngine:
         if self.layout.objective_state_path(objective_id).exists():
             raise RuntimeError(f"Objective already exists: {objective_id}")
         self._ensure_objective_dirs(objective_id)
-        objective = ObjectiveState(
+        objective = self._new_objective_state(request, objective_id)
+        self._write_brief(objective)
+        self._save_objective(objective)
+
+        design, design_path = self._design_scenario(objective)
+        draft_yaml = self._materialize_draft_scenario(objective_id, design)
+
+        critic_path = self.layout.objective_review_dir(objective_id) / "scenario-review.json"
+        self._run_role(
+            objective=objective,
+            role="critic",
+            instruction=self._critic_instruction(objective, draft_yaml, design_path, critic_path),
+        )
+        critic_review = CriticReview.model_validate(read_json(critic_path))
+        if critic_review.decision == "block":
+            return self._record_scenario_review(
+                objective,
+                design,
+                draft_yaml,
+                critic_path,
+                status="blocked",
+                stop_reason="critic_blocked",
+            )
+
+        if critic_review.decision == "revise":
+            return self._record_scenario_review(
+                objective,
+                design,
+                draft_yaml,
+                critic_path,
+                status="drafting_scenario",
+                stop_reason="critic_requested_revision",
+            )
+
+        return self._record_scenario_review(
+            objective,
+            design,
+            draft_yaml,
+            critic_path,
+            status="awaiting_scenario_approval",
+            stop_reason=None,
+        )
+
+    def _new_objective_state(
+        self,
+        request: ObjectiveInitRequest,
+        objective_id: str,
+    ) -> ObjectiveState:
+        return ObjectiveState(
             objective_id=objective_id,
             created_at_utc=utc_now_iso(),
             updated_at_utc=utc_now_iso(),
@@ -103,17 +152,19 @@ class AutoResearchEngine:
             mutation_surface=list(request.mutation_surface),
             role_models=self._resolved_role_models(request.role_models),
         )
-        self._write_brief(objective)
-        self._save_objective(objective)
 
-        design_path = self.layout.objective_plan_dir(objective_id) / "scenario-design.json"
+    def _design_scenario(self, objective: ObjectiveState) -> tuple[ScenarioDesign, Path]:
+        design_path = (
+            self.layout.objective_plan_dir(objective.objective_id) / "scenario-design.json"
+        )
         self._run_role(
             objective=objective,
             role="designer",
             instruction=self._designer_instruction(objective, design_path),
         )
-        design = ScenarioDesign.model_validate(read_json(design_path))
+        return ScenarioDesign.model_validate(read_json(design_path)), design_path
 
+    def _materialize_draft_scenario(self, objective_id: str, design: ScenarioDesign) -> Path:
         draft_root = self.layout.objective_draft_root(objective_id, design.scenario_slug)
         self.raidar.scenario_init(
             ScenarioInitRequest(
@@ -153,42 +204,20 @@ class AutoResearchEngine:
         self._materialize_starter_lockfile(starter_root)
         self._validate_starter_baseline_commands(design, starter_root)
         self.raidar.scenario_validate(scenario_yaml=draft_yaml)
+        return draft_yaml
 
-        critic_path = self.layout.objective_review_dir(objective_id) / "scenario-review.json"
-        self._run_role(
-            objective=objective,
-            role="critic",
-            instruction=self._critic_instruction(objective, draft_yaml, design_path, critic_path),
-        )
-        critic_review = CriticReview.model_validate(read_json(critic_path))
-        if critic_review.decision == "block":
-            objective.status = "blocked"
-            objective.updated_at_utc = utc_now_iso()
-            objective.stop_reason = "critic_blocked"
-            objective.scenario_slug = design.scenario_slug
-            objective.scenario_name = design.scenario_name
-            objective.draft_scenario_ref = str(draft_yaml)
-            objective.frozen_metric_ids = list(design.metric_ids)
-            objective.latest_scenario_review_ref = str(critic_path)
-            self._save_objective(objective)
-            self._write_report(objective)
-            return objective
-
-        if critic_review.decision == "revise":
-            objective.status = "drafting_scenario"
-            objective.updated_at_utc = utc_now_iso()
-            objective.stop_reason = "critic_requested_revision"
-            objective.scenario_slug = design.scenario_slug
-            objective.scenario_name = design.scenario_name
-            objective.draft_scenario_ref = str(draft_yaml)
-            objective.frozen_metric_ids = list(design.metric_ids)
-            objective.latest_scenario_review_ref = str(critic_path)
-            self._save_objective(objective)
-            self._write_report(objective)
-            return objective
-
-        objective.status = "awaiting_scenario_approval"
-        objective.stop_reason = None
+    def _record_scenario_review(
+        self,
+        objective: ObjectiveState,
+        design: ScenarioDesign,
+        draft_yaml: Path,
+        critic_path: Path,
+        *,
+        status: ObjectiveStatus,
+        stop_reason: str | None,
+    ) -> ObjectiveState:
+        objective.status = status
+        objective.stop_reason = stop_reason
         objective.updated_at_utc = utc_now_iso()
         objective.scenario_slug = design.scenario_slug
         objective.scenario_name = design.scenario_name
@@ -739,47 +768,78 @@ class AutoResearchEngine:
         baseline: dict[str, Any],
         metric_ids: list[str],
     ) -> ComparisonGuard:
-        candidate_agg = dict(candidate.get("aggregate") or {})
-        baseline_agg = dict(baseline.get("aggregate") or {})
-        blocking_reasons: list[str] = []
-        improved_dimensions: list[str] = []
-
-        if int(candidate_agg.get("unscored_count") or 0) != 0:
-            blocking_reasons.append("candidate-has-unscored-runs")
-        if float(candidate_agg.get("validity_rate") or 0.0) < 1.0:
-            blocking_reasons.append("candidate-validity-rate-below-1.0")
-        if float(candidate_agg.get("validity_rate") or 0.0) < float(
-            baseline_agg.get("validity_rate") or 0.0
-        ):
-            blocking_reasons.append("candidate-validity-regressed")
-        if float(candidate_agg.get("performance_pass_rate") or 0.0) < float(
-            baseline_agg.get("performance_pass_rate") or 0.0
-        ):
-            blocking_reasons.append("candidate-performance-gates-regressed")
-
-        candidate_outcomes = dict(candidate_agg.get("metric_outcomes") or {})
-        baseline_outcomes = dict(baseline_agg.get("metric_outcomes") or {})
-        for metric_id in metric_ids:
-            candidate_rate = float(
-                (dict(candidate_outcomes.get(metric_id) or {})).get("pass_rate") or 0.0
-            )
-            baseline_rate = float(
-                (dict(baseline_outcomes.get(metric_id) or {})).get("pass_rate") or 0.0
-            )
-            if candidate_rate < baseline_rate:
-                blocking_reasons.append(f"metric-regressed:{metric_id}")
-
-        for score_name in ("composite_score", "quality_score", "diagnostic_score"):
-            candidate_mean = float((dict(candidate_agg.get(score_name) or {})).get("mean") or 0.0)
-            baseline_mean = float((dict(baseline_agg.get(score_name) or {})).get("mean") or 0.0)
-            if candidate_mean > baseline_mean:
-                improved_dimensions.append(score_name)
+        candidate_agg = self._aggregate_summary(candidate)
+        baseline_agg = self._aggregate_summary(baseline)
+        blocking_reasons = self._promotion_blocking_reasons(
+            candidate_agg,
+            baseline_agg,
+            metric_ids,
+        )
+        improved_dimensions = self._promotion_improvements(candidate_agg, baseline_agg)
 
         return ComparisonGuard(
             passed=not blocking_reasons and bool(improved_dimensions),
             improved_dimensions=improved_dimensions,
             blocking_reasons=blocking_reasons,
         )
+
+    @staticmethod
+    def _aggregate_summary(result: dict[str, Any]) -> dict[str, Any]:
+        return dict(result.get("aggregate") or {})
+
+    def _promotion_blocking_reasons(
+        self,
+        candidate_agg: dict[str, Any],
+        baseline_agg: dict[str, Any],
+        metric_ids: list[str],
+    ) -> list[str]:
+        checks = (
+            ("candidate-has-unscored-runs", int(candidate_agg.get("unscored_count") or 0) != 0),
+            ("candidate-validity-rate-below-1.0", self._rate(candidate_agg, "validity_rate") < 1.0),
+            (
+                "candidate-validity-regressed",
+                self._rate(candidate_agg, "validity_rate")
+                < self._rate(baseline_agg, "validity_rate"),
+            ),
+            (
+                "candidate-performance-gates-regressed",
+                self._rate(candidate_agg, "performance_pass_rate")
+                < self._rate(baseline_agg, "performance_pass_rate"),
+            ),
+        )
+        blocking_reasons = [reason for reason, is_blocked in checks if is_blocked]
+        blocking_reasons.extend(
+            f"metric-regressed:{metric_id}"
+            for metric_id in metric_ids
+            if self._metric_pass_rate(candidate_agg, metric_id)
+            < self._metric_pass_rate(baseline_agg, metric_id)
+        )
+        return blocking_reasons
+
+    def _promotion_improvements(
+        self,
+        candidate_agg: dict[str, Any],
+        baseline_agg: dict[str, Any],
+    ) -> list[str]:
+        return [
+            score_name
+            for score_name in ("composite_score", "quality_score", "diagnostic_score")
+            if self._score_mean(candidate_agg, score_name)
+            > self._score_mean(baseline_agg, score_name)
+        ]
+
+    @staticmethod
+    def _rate(aggregate: dict[str, Any], key: str) -> float:
+        return float(aggregate.get(key) or 0.0)
+
+    @staticmethod
+    def _metric_pass_rate(aggregate: dict[str, Any], metric_id: str) -> float:
+        outcomes = dict(aggregate.get("metric_outcomes") or {})
+        return float((dict(outcomes.get(metric_id) or {})).get("pass_rate") or 0.0)
+
+    @staticmethod
+    def _score_mean(aggregate: dict[str, Any], score_name: str) -> float:
+        return float((dict(aggregate.get(score_name) or {})).get("mean") or 0.0)
 
     def _mark_superseded_loops(
         self, objective: ObjectiveState, *, planned_loops: list[LoopPlan], executed_loop_id: str

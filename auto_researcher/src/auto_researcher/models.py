@@ -137,34 +137,8 @@ class ScenarioDesign(BaseModel):
     @model_validator(mode="after")
     def validate_starter_files(self) -> ScenarioDesign:
         """Require a Bun starter package.json that can materialize a lockfile."""
-        starter_files = {
-            PurePosixPath(item.path).as_posix(): item.content for item in self.starter_files
-        }
-        package_json = starter_files.get("package.json")
-        if package_json is None:
-            raise ValueError("starter_files must include package.json at the starter root.")
-        try:
-            package_payload = json.loads(package_json)
-        except json.JSONDecodeError as exc:
-            raise ValueError("starter package.json must contain valid JSON.") from exc
-        if not isinstance(package_payload, dict):
-            raise ValueError("starter package.json must decode to a JSON object.")
-
-        dependency_sections = (
-            "dependencies",
-            "devDependencies",
-            "optionalDependencies",
-            "peerDependencies",
-        )
-        has_dependencies = any(
-            isinstance(package_payload.get(section), dict) and bool(package_payload[section])
-            for section in dependency_sections
-        )
-        if not has_dependencies:
-            raise ValueError(
-                "starter package.json must declare at least one dependency or devDependency "
-                "so Bun can materialize bun.lock."
-            )
+        package_payload = _starter_package_payload(self.starter_files)
+        _require_starter_dependencies(package_payload)
         self.required_commands = _ensure_prompt_commands(
             self.required_commands,
             self.prompt_text,
@@ -177,6 +151,39 @@ class ScenarioDesign(BaseModel):
         if not self.llm_judge_rubric:
             self.llm_judge_rubric = _derived_llm_judge_rubric(self.prompt_text)
         return self
+
+
+def _starter_package_payload(starter_files: list[StarterFileDesign]) -> dict[str, object]:
+    file_map = {PurePosixPath(item.path).as_posix(): item.content for item in starter_files}
+    package_json = file_map.get("package.json")
+    if package_json is None:
+        raise ValueError("starter_files must include package.json at the starter root.")
+    try:
+        package_payload = json.loads(package_json)
+    except json.JSONDecodeError as exc:
+        raise ValueError("starter package.json must contain valid JSON.") from exc
+    if not isinstance(package_payload, dict):
+        raise ValueError("starter package.json must decode to a JSON object.")
+    return package_payload
+
+
+def _require_starter_dependencies(package_payload: dict[str, object]) -> None:
+    dependency_sections = (
+        "dependencies",
+        "devDependencies",
+        "optionalDependencies",
+        "peerDependencies",
+    )
+    has_dependencies = any(
+        isinstance(package_payload.get(section), dict) and bool(package_payload[section])
+        for section in dependency_sections
+    )
+    if has_dependencies:
+        return
+    raise ValueError(
+        "starter package.json must declare at least one dependency or devDependency "
+        "so Bun can materialize bun.lock."
+    )
 
 
 def _ensure_prompt_commands(
