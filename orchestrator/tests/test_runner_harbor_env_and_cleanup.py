@@ -181,6 +181,26 @@ def test_cleanup_stale_harbor_build_processes_kills_orphan_harbor_run_trees(
     ]
 
 
+def test_cleanup_stale_harbor_build_processes_ignores_ps_permission_error(
+    monkeypatch,
+) -> None:
+    def fake_run(*args, **kwargs):
+        del args, kwargs
+        raise PermissionError("[Errno 1] Operation not permitted: 'ps'")
+
+    killed: list[tuple[int, signal.Signals]] = []
+
+    def fake_kill(pid: int, sig: signal.Signals) -> None:
+        killed.append((pid, sig))
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+    monkeypatch.setattr(runner.os, "kill", fake_kill)
+
+    runner.cleanup_stale_harbor_build_processes()
+
+    assert killed == []
+
+
 def test_parse_docker_compose_version_variants() -> None:
     assert runner._parse_docker_compose_version("2.40.1") == (2, 40, 1)
     assert runner._parse_docker_compose_version("v2.40.1-desktop.1") == (2, 40, 1)

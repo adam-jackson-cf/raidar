@@ -1203,13 +1203,16 @@ def cleanup_stale_harbor_build_processes() -> None:
 
 
 def _collect_harbor_process_candidates() -> tuple[dict[int, int], list[int], list[int]] | None:
-    listing = subprocess.run(
-        ["ps", "-ax", "-o", "pid=,ppid=,command="],
-        capture_output=True,
-        text=True,
-        timeout=30,
-        check=False,
-    )
+    try:
+        listing = subprocess.run(
+            ["ps", "-ax", "-o", "pid=,ppid=,command="],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
     if listing.returncode != 0:
         return None
 
