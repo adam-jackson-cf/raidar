@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import shutil
 import subprocess
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
@@ -159,9 +160,35 @@ class AutoResearchEngine:
             role="critic",
             instruction=self._critic_instruction(objective, draft_yaml, design_path, critic_path),
         )
-        CriticReview.model_validate(read_json(critic_path))
+        critic_review = CriticReview.model_validate(read_json(critic_path))
+        if critic_review.decision == "block":
+            objective.status = "blocked"
+            objective.updated_at_utc = utc_now_iso()
+            objective.stop_reason = "critic_blocked"
+            objective.scenario_slug = design.scenario_slug
+            objective.scenario_name = design.scenario_name
+            objective.draft_scenario_ref = str(draft_yaml)
+            objective.frozen_metric_ids = list(design.metric_ids)
+            objective.latest_scenario_review_ref = str(critic_path)
+            self._save_objective(objective)
+            self._write_report(objective)
+            return objective
+
+        if critic_review.decision == "revise":
+            objective.status = "drafting_scenario"
+            objective.updated_at_utc = utc_now_iso()
+            objective.stop_reason = "critic_requested_revision"
+            objective.scenario_slug = design.scenario_slug
+            objective.scenario_name = design.scenario_name
+            objective.draft_scenario_ref = str(draft_yaml)
+            objective.frozen_metric_ids = list(design.metric_ids)
+            objective.latest_scenario_review_ref = str(critic_path)
+            self._save_objective(objective)
+            self._write_report(objective)
+            return objective
 
         objective.status = "awaiting_scenario_approval"
+        objective.stop_reason = None
         objective.updated_at_utc = utc_now_iso()
         objective.scenario_slug = design.scenario_slug
         objective.scenario_name = design.scenario_name
@@ -183,27 +210,40 @@ class AutoResearchEngine:
         draft_yaml = Path(objective.draft_scenario_ref)
         draft_root = scenario_root_from_yaml(draft_yaml)
         canonical_root = self.layout.scenarios_root / objective.scenario_slug
-        if canonical_root.exists():
-            raise RuntimeError(f"Scenario root already exists: {canonical_root}")
-        ensure_dir(canonical_root.parent)
-        copy_tree(draft_root, canonical_root)
         scenario_yaml = canonical_root / draft_yaml.parent.name / "scenario.yaml"
+        did_copy = False
+
+        if canonical_root.exists() and scenario_yaml.is_file():
+            did_copy = False
+        else:
+            if canonical_root.exists():
+                self._delete_path(canonical_root)
+            ensure_dir(canonical_root.parent)
+            copy_tree(draft_root, canonical_root)
+            did_copy = True
+
         timeout_sec = scenario_timeout_sec(scenario_yaml)
-        baseline = self.raidar.experiment_run(
-            ExperimentRunRequest(
-                scenario=scenario_yaml,
-                harness=objective.target_harness,
-                model=objective.target_model,
-                timeout=timeout_sec,
-                repeats=objective.benchmark_repeats,
-                repeat_parallel=objective.benchmark_repeat_parallel,
-                rerun_unscored=1,
-                experiment_kind="benchmark",
+        try:
+            baseline = self.raidar.experiment_run(
+                ExperimentRunRequest(
+                    scenario=scenario_yaml,
+                    harness=objective.target_harness,
+                    model=objective.target_model,
+                    timeout=timeout_sec,
+                    repeats=objective.benchmark_repeats,
+                    repeat_parallel=objective.benchmark_repeat_parallel,
+                    rerun_unscored=1,
+                    experiment_kind="benchmark",
+                )
             )
-        )
+        except Exception:
+            if did_copy:
+                self._delete_path(canonical_root)
+            raise
 
         objective.status = "active"
         objective.updated_at_utc = utc_now_iso()
+        objective.stop_reason = None
         objective.scenario_ref = str(scenario_yaml)
         objective.best_benchmark_ref = str(baseline.summary_path)
         self._save_objective(objective)
@@ -766,6 +806,14 @@ class AutoResearchEngine:
             model=self._role_model(objective, role),
         )
         return execution
+
+    def _delete_path(self, path: Path) -> None:
+        if not path.exists():
+            return
+        if path.is_dir():
+            shutil.rmtree(path)
+        else:
+            path.unlink()
 
     def _role_model(self, objective: ObjectiveState, role: str) -> RoleModelConfig:
         model = objective.role_models.get(role)
