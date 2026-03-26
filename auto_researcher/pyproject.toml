@@ -7,6 +7,7 @@ dependencies = [
     "click>=8.0",
     "pydantic>=2.0",
     "pyyaml>=6.0",
+    "raidar",
 ]
 
 [project.optional-dependencies]
@@ -44,3 +45,6 @@ testpaths = ["tests"]
 python_version = "3.11"
 files = ["src", "tests"]
 ignore_missing_imports = true
+
+[tool.uv.sources]
+raidar = { path = "../orchestrator", editable = true }

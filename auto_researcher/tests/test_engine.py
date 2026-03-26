@@ -14,6 +14,16 @@ from typing import Any
 import pytest
 import yaml
 from pydantic import ValidationError
+from raidar.application.models import (
+    ExperimentRunRequest,
+    ScenarioCloneRequest,
+    ScenarioInitRequest,
+    ScenarioInitResult,
+    ScenarioValidationResult,
+    SuiteExecutionResult,
+)
+from raidar.scenario_clone import ScenarioCloneResult
+from raidar.schemas.scenario import ScenarioDefinition
 
 from auto_researcher.engine import AutoResearchEngine
 from auto_researcher.models import ObjectiveInitRequest, ObjectiveState
@@ -188,34 +198,23 @@ class FakeRaidar:
         self.experiment_calls: list[dict[str, Any]] = []
         self._lock = threading.Lock()
 
-    def scenario_init(
-        self,
-        *,
-        path: Path,
-        name: str,
-        scenario_revision: str,
-        starter_root: str,
-        prompt_entry: str,
-        difficulty: str,
-        category: str,
-        timeout_sec: int,
-    ) -> dict[str, Any]:
-        revision_dir = path / scenario_revision
+    def scenario_init(self, request: ScenarioInitRequest) -> ScenarioInitResult:
+        revision_dir = request.path / request.scenario_revision
         (revision_dir / "rules").mkdir(parents=True, exist_ok=True)
         (revision_dir / "prompt").mkdir(parents=True, exist_ok=True)
         scenario_yaml = revision_dir / "scenario.yaml"
         scenario_yaml.write_text(
             yaml.safe_dump(
                 {
-                    "name": name,
-                    "scenario_revision": scenario_revision,
-                    "description": f"Scenario definition for {name}",
-                    "difficulty": difficulty,
-                    "category": category,
-                    "timeout_sec": timeout_sec,
+                    "name": request.name or request.path.name,
+                    "scenario_revision": request.scenario_revision,
+                    "description": f"Scenario definition for {request.name or request.path.name}",
+                    "difficulty": request.difficulty,
+                    "category": request.category,
+                    "timeout_sec": request.timeout_sec,
                     "dockerfile": "./Dockerfile",
                     "test_scripts": [],
-                    "starter": {"root": starter_root},
+                    "starter": {"root": request.starter_root},
                     "verification": {
                         "max_gate_failures": 3,
                         "min_quality_score": 0.8,
@@ -228,70 +227,55 @@ class FakeRaidar:
                         "llm_judge_rubric": [],
                     },
                     "metrics": [{"type": "core", "id": "functional"}],
-                    "prompt": {"entry": prompt_entry, "includes": []},
+                    "prompt": {"entry": request.prompt_entry, "includes": []},
                 },
                 sort_keys=False,
             ),
             encoding="utf-8",
         )
-        prompt_path = revision_dir / prompt_entry
+        prompt_path = revision_dir / request.prompt_entry
         prompt_path.parent.mkdir(parents=True, exist_ok=True)
         prompt_path.write_text("Initial prompt\n", encoding="utf-8")
-        return {
-            "scenario_root": str(path),
-            "scenario_name": name,
-            "scenario_revision": scenario_revision,
-            "revision_dir": str(revision_dir),
-            "scenario_yaml": str(scenario_yaml),
-            "prompt_path": str(prompt_path),
-            "rules_dir": str(revision_dir / "rules"),
-            "starter_root": starter_root,
-        }
+        return ScenarioInitResult(
+            scenario_root=request.path,
+            scenario_name=request.name or request.path.name,
+            scenario_revision=request.scenario_revision,
+            revision_dir=revision_dir,
+            scenario_yaml=scenario_yaml,
+            prompt_path=prompt_path,
+            rules_dir=revision_dir / "rules",
+            starter_root=request.starter_root,
+        )
 
-    def scenario_validate(self, *, scenario_yaml: Path) -> None:
+    def scenario_validate(self, *, scenario_yaml: Path) -> ScenarioValidationResult:
         assert scenario_yaml.is_file()
+        return ScenarioValidationResult(
+            scenario_path=scenario_yaml,
+            scenario=ScenarioDefinition.model_validate(read_yaml(scenario_yaml)),
+        )
 
-    def scenario_clone_revision(
-        self,
-        *,
-        path: Path,
-        from_revision: str,
-        to_revision: str | None = None,
-    ) -> dict[str, Any]:
-        numeric = int(from_revision.removeprefix("v")) + 1
-        target_revision = to_revision or f"v{numeric:03d}"
-        source_dir = path / from_revision
-        target_dir = path / target_revision
+    def scenario_clone_revision(self, request: ScenarioCloneRequest) -> ScenarioCloneResult:
+        numeric = int(request.from_revision.removeprefix("v")) + 1
+        target_revision = request.to_revision or f"v{numeric:03d}"
+        source_dir = request.path / request.from_revision
+        target_dir = request.path / target_revision
         shutil.copytree(source_dir, target_dir)
         scenario_yaml = target_dir / "scenario.yaml"
         document = read_yaml(scenario_yaml)
         document["scenario_revision"] = target_revision
         scenario_yaml.write_text(yaml.safe_dump(document, sort_keys=False), encoding="utf-8")
-        return {
-            "scenario_root": str(path),
-            "source_revision": from_revision,
-            "target_revision": target_revision,
-            "revision_dir": str(target_dir),
-            "scenario_yaml": str(scenario_yaml),
-        }
+        return ScenarioCloneResult(
+            scenario_root=request.path,
+            source_revision=request.from_revision,
+            target_revision=target_revision,
+            target_scenario_yaml=scenario_yaml,
+        )
 
-    def experiment_run(
-        self,
-        *,
-        scenario_yaml: Path,
-        harness: str,
-        model: str,
-        timeout_sec: int,
-        repeats: int,
-        repeat_parallel: int,
-        experiment_kind: str,
-        experiments_root: Path | None = None,
-    ) -> dict[str, Any]:
-        del timeout_sec, experiments_root
+    def experiment_run(self, request: ExperimentRunRequest) -> SuiteExecutionResult:
         with self._lock:
             call_index = len(self.experiment_calls) + 1
             payload = self.experiment_payloads.pop(0)
-            if experiment_kind == "benchmark":
+            if request.experiment_kind == "benchmark":
                 root = self.layout.benchmark_experiments_root
             else:
                 root = self.layout.research_loop_experiments_root
@@ -304,25 +288,25 @@ class FakeRaidar:
         with self._lock:
             self.experiment_calls.append(
                 {
-                    "experiment_kind": experiment_kind,
-                    "scenario_yaml": scenario_yaml,
-                    "harness": harness,
-                    "model": model,
-                    "repeats": repeats,
-                    "repeat_parallel": repeat_parallel,
+                    "experiment_kind": request.experiment_kind,
+                    "scenario_yaml": request.scenario,
+                    "harness": request.harness,
+                    "model": request.model,
+                    "repeats": request.repeats,
+                    "repeat_parallel": request.repeat_parallel,
                     "summary_path": execution_dir / "experiment-summary.json",
                 }
             )
-        return {
-            "scenario_path": str(scenario_yaml),
-            "scenario_name": scenario_yaml.parent.parent.name,
-            "scenario_revision": scenario_yaml.parent.name,
-            "summary_path": str(execution_dir / "experiment-summary.json"),
-            "report_path": str(execution_dir / "report.md"),
-            "experiment_json_path": str(execution_dir / "experiment.json"),
-            "runs": [],
-            "retries_used": 0,
-        }
+        return SuiteExecutionResult(
+            scenario_path=request.scenario,
+            scenario_name=request.scenario.parent.parent.name,
+            scenario_revision=request.scenario.parent.name,
+            runs=[],
+            retries_used=0,
+            experiment_json_path=execution_dir / "experiment.json",
+            summary_path=execution_dir / "experiment-summary.json",
+            report_path=execution_dir / "report.md",
+        )
 
 
 def _extract_output_path(instruction: str) -> str | None:
@@ -440,7 +424,92 @@ def test_init_creates_objective_artifacts_and_draft_only(tmp_path: Path) -> None
     assert not any(layout.scenarios_root.rglob("scenario.yaml"))
     assert layout.objective_brief_path(objective.objective_id).is_file()
     assert layout.objective_state_path(objective.objective_id).is_file()
+    draft_document = read_yaml(draft_yaml)
+    assert draft_document["acceptance"]["deterministic_checks"]
+    assert draft_document["acceptance"]["llm_judge_rubric"]
     assert len(role_runner.calls) == 2
+
+
+def test_init_derives_smoke_acceptance_contract_from_prompt(tmp_path: Path) -> None:
+    design = {
+        **_design_payload(),
+        "scenario_slug": "hello-world-smoke",
+        "scenario_name": "Hello World Smoke",
+        "prompt_text": (
+            "# Task\n\n"
+            "Implement a smoke-safe hello world.\n\n"
+            "## Requirements\n"
+            "1. Export `formatGreeting` from `src/main.ts`.\n\n"
+            "## Acceptance criteria\n"
+            "- `bun run start` outputs exactly `Hello, Raidar!`\n"
+            "- No additional runtime dependencies are introduced\n"
+        ),
+        "required_commands": [["bun", "run", "lint"], ["bun", "run", "test"]],
+        "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
+        "starter_files": [
+            {
+                "path": "package.json",
+                "content": json.dumps(
+                    {
+                        "name": "hello-world-smoke",
+                        "private": True,
+                        "type": "module",
+                        "devDependencies": {"typescript": "^5.8.3"},
+                        "scripts": {
+                            "lint": "echo lint",
+                            "test": "bun test",
+                            "start": "bun src/main.ts",
+                        },
+                    }
+                ),
+            },
+            {
+                "path": "src/main.ts",
+                "content": (
+                    "export function formatGreeting(name: string): string {\n"
+                    "  return `Hello, ${name}!`;\n"
+                    "}\n"
+                    "if (import.meta.main) {\n"
+                    "  console.log(formatGreeting('Raidar'));\n"
+                    "}\n"
+                ),
+            },
+            {
+                "path": "test/main.test.ts",
+                "content": (
+                    'import { expect, test } from "bun:test";\n'
+                    'import { formatGreeting } from "../src/main";\n'
+                    'test("formats greeting", () => {\n'
+                    '  expect(formatGreeting("Raidar")).toBe("Hello, Raidar!");\n'
+                    "});\n"
+                ),
+            },
+        ],
+    }
+    engine, _role_runner, _raidar, _layout = _make_engine(
+        tmp_path,
+        role_scripts=[
+            {"role": "designer", "payload": design},
+            {"role": "critic", "payload": _critic_payload()},
+        ],
+    )
+
+    objective = engine.init_objective(_init_request(goal="Draft hello-world smoke scenario"))
+
+    draft_yaml = Path(objective.draft_scenario_ref or "")
+    document = read_yaml(draft_yaml)
+    assert ["bun", "run", "start"] in document["verification"]["required_commands"]
+    assert any(
+        gate["command"] == ["bun", "run", "start"] for gate in document["verification"]["gates"]
+    )
+    assert any(
+        requirement["id"] == "req-start-output"
+        for requirement in document["acceptance"]["requirements"]
+    )
+    assert any(
+        "Hello, Raidar!" in criterion["criterion"]
+        for criterion in document["acceptance"]["llm_judge_rubric"]
+    )
 
 
 def test_approve_promotes_exact_draft_and_seeds_benchmark(tmp_path: Path) -> None:
@@ -1174,6 +1243,7 @@ def test_designer_instruction_constrains_metric_ids_for_smoke(tmp_path: Path) ->
     assert "functional, acceptance, verification-stability" in instruction
     assert "Prefer the default metric set:" in instruction
     assert "Include `starter_files` entries relative to the starter root." in instruction
+    assert "Include explicit acceptance coverage with `deterministic_checks`" in instruction
     assert "Always provide a valid `package.json` at the starter root." in instruction
     assert "bun install --lockfile-only" in instruction
     assert "Every `required_commands` entry and every gate command must succeed" in instruction

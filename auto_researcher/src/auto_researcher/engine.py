@@ -11,6 +11,12 @@ from pathlib import Path
 from threading import Lock
 from typing import Any
 
+from raidar.application.models import (
+    ExperimentRunRequest,
+    ScenarioCloneRequest,
+    ScenarioInitRequest,
+)
+
 from .models import (
     ComparisonGuard,
     CriticReview,
@@ -29,6 +35,7 @@ from .models import (
 from .pi_rpc import RoleExecution, RoleRunner
 from .raidar_cli import RaidarClient
 from .storage import (
+    ScenarioDocumentUpdate,
     WorkspaceLayout,
     copy_tree,
     ensure_dir,
@@ -108,28 +115,35 @@ class AutoResearchEngine:
 
         draft_root = self.layout.objective_draft_root(objective_id, design.scenario_slug)
         self.raidar.scenario_init(
-            path=draft_root,
-            name=design.scenario_name,
-            scenario_revision=DEFAULT_LOCAL_REVISION,
-            starter_root=design.starter_root,
-            prompt_entry=design.prompt_entry,
-            difficulty=design.difficulty,
-            category=design.category,
-            timeout_sec=design.timeout_sec,
+            ScenarioInitRequest(
+                path=draft_root,
+                name=design.scenario_name,
+                scenario_revision=DEFAULT_LOCAL_REVISION,
+                starter_root=design.starter_root,
+                prompt_entry=design.prompt_entry,
+                difficulty=design.difficulty,
+                category=design.category,
+                timeout_sec=design.timeout_sec,
+            )
         )
         draft_yaml = draft_root / DEFAULT_LOCAL_REVISION / "scenario.yaml"
         update_scenario_document(
             draft_yaml,
-            name=design.scenario_name,
-            description=design.description,
-            difficulty=design.difficulty,
-            category=design.category,
-            timeout_sec=design.timeout_sec,
-            starter_root=design.starter_root,
-            prompt_entry=design.prompt_entry,
-            metric_ids=design.metric_ids,
-            required_commands=design.required_commands,
-            gates=[gate.model_dump(mode="json") for gate in design.gates],
+            ScenarioDocumentUpdate(
+                name=design.scenario_name,
+                description=design.description,
+                difficulty=design.difficulty,
+                category=design.category,
+                timeout_sec=design.timeout_sec,
+                starter_root=design.starter_root,
+                prompt_entry=design.prompt_entry,
+                metric_ids=design.metric_ids,
+                required_commands=design.required_commands,
+                gates=[gate.model_dump(mode="json") for gate in design.gates],
+                deterministic_checks=design.deterministic_checks,
+                requirements=design.requirements,
+                llm_judge_rubric=design.llm_judge_rubric,
+            ),
         )
         prompt_path = draft_root / DEFAULT_LOCAL_REVISION / design.prompt_entry
         write_text(prompt_path, design.prompt_text.rstrip() + "\n")
@@ -176,19 +190,22 @@ class AutoResearchEngine:
         scenario_yaml = canonical_root / draft_yaml.parent.name / "scenario.yaml"
         timeout_sec = scenario_timeout_sec(scenario_yaml)
         baseline = self.raidar.experiment_run(
-            scenario_yaml=scenario_yaml,
-            harness=objective.target_harness,
-            model=objective.target_model,
-            timeout_sec=timeout_sec,
-            repeats=objective.benchmark_repeats,
-            repeat_parallel=objective.benchmark_repeat_parallel,
-            experiment_kind="benchmark",
+            ExperimentRunRequest(
+                scenario=scenario_yaml,
+                harness=objective.target_harness,
+                model=objective.target_model,
+                timeout=timeout_sec,
+                repeats=objective.benchmark_repeats,
+                repeat_parallel=objective.benchmark_repeat_parallel,
+                rerun_unscored=1,
+                experiment_kind="benchmark",
+            )
         )
 
         objective.status = "active"
         objective.updated_at_utc = utc_now_iso()
         objective.scenario_ref = str(scenario_yaml)
-        objective.best_benchmark_ref = str(baseline["summary_path"])
+        objective.best_benchmark_ref = str(baseline.summary_path)
         self._save_objective(objective)
         self._write_report(objective)
         return objective
@@ -460,15 +477,18 @@ class AutoResearchEngine:
                 return loop
 
             research_result = self.raidar.experiment_run(
-                scenario_yaml=candidate_yaml,
-                harness=objective.target_harness,
-                model=objective.target_model,
-                timeout_sec=scenario_timeout_sec(candidate_yaml),
-                repeats=objective.research_repeats,
-                repeat_parallel=objective.research_repeat_parallel,
-                experiment_kind="research-loop",
+                ExperimentRunRequest(
+                    scenario=candidate_yaml,
+                    harness=objective.target_harness,
+                    model=objective.target_model,
+                    timeout=scenario_timeout_sec(candidate_yaml),
+                    repeats=objective.research_repeats,
+                    repeat_parallel=objective.research_repeat_parallel,
+                    rerun_unscored=1,
+                    experiment_kind="research-loop",
+                )
             )
-            loop.latest_research_summary_ref = str(research_result["summary_path"])
+            loop.latest_research_summary_ref = str(research_result.summary_path)
             loop.status = "review_pending"
             loop.updated_at_utc = utc_now_iso()
             self._save_loop(loop)
@@ -554,12 +574,14 @@ class AutoResearchEngine:
             loop.stop_reason = "iteration-budget-exhausted"
             return False
         clone = self.raidar.scenario_clone_revision(
-            path=scenario_root_from_yaml(candidate_yaml),
-            from_revision=candidate_yaml.parent.name,
+            ScenarioCloneRequest(
+                path=scenario_root_from_yaml(candidate_yaml),
+                from_revision=candidate_yaml.parent.name,
+            )
         )
         loop.iteration += 1
         loop.status = "iterating"
-        loop.candidate_scenario_ref = str(clone["scenario_yaml"])
+        loop.candidate_scenario_ref = str(clone.target_scenario_yaml)
         loop.updated_at_utc = utc_now_iso()
         self._save_loop(loop)
         return True
@@ -618,15 +640,18 @@ class AutoResearchEngine:
                 return False
 
             confirmation = self.raidar.experiment_run(
-                scenario_yaml=Path(loop.candidate_scenario_ref),
-                harness=latest_objective.target_harness,
-                model=latest_objective.target_model,
-                timeout_sec=scenario_timeout_sec(Path(loop.candidate_scenario_ref)),
-                repeats=latest_objective.benchmark_repeats,
-                repeat_parallel=latest_objective.benchmark_repeat_parallel,
-                experiment_kind="benchmark",
+                ExperimentRunRequest(
+                    scenario=Path(loop.candidate_scenario_ref),
+                    harness=latest_objective.target_harness,
+                    model=latest_objective.target_model,
+                    timeout=scenario_timeout_sec(Path(loop.candidate_scenario_ref)),
+                    repeats=latest_objective.benchmark_repeats,
+                    repeat_parallel=latest_objective.benchmark_repeat_parallel,
+                    rerun_unscored=1,
+                    experiment_kind="benchmark",
+                )
             )
-            confirmation_summary_ref = str(confirmation["summary_path"])
+            confirmation_summary_ref = str(confirmation.summary_path)
             confirmation_guard = self._promotion_guard(
                 experiment_summary(Path(confirmation_summary_ref)),
                 baseline,
@@ -656,13 +681,15 @@ class AutoResearchEngine:
         current_yaml = Path(objective.scenario_ref or "")
         candidate_yaml = Path(loop.candidate_scenario_ref)
         clone = self.raidar.scenario_clone_revision(
-            path=scenario_root_from_yaml(current_yaml),
-            from_revision=current_yaml.parent.name,
+            ScenarioCloneRequest(
+                path=scenario_root_from_yaml(current_yaml),
+                from_revision=current_yaml.parent.name,
+            )
         )
-        target_revision_dir = Path(clone["revision_dir"])
+        target_revision_dir = clone.target_scenario_yaml.parent
         sync_tree(candidate_yaml.parent, target_revision_dir)
         promoted_yaml = target_revision_dir / "scenario.yaml"
-        update_scenario_revision(promoted_yaml, clone["target_revision"])
+        update_scenario_revision(promoted_yaml, clone.target_revision)
         self.raidar.scenario_validate(scenario_yaml=promoted_yaml)
         return promoted_yaml
 
@@ -905,6 +932,8 @@ class AutoResearchEngine:
                 "execution-validity, resource-efficiency, test-coverage, "
                 "requirements-coverage, llm-judge, visual-regression.",
                 "Include `starter_files` entries relative to the starter root.",
+                "Include explicit acceptance coverage with `deterministic_checks`, "
+                "`requirements`, and `llm_judge_rubric`.",
                 "Always provide a valid `package.json` at the starter root.",
                 "Declare at least one dependency or devDependency so the engine can materialize "
                 "a valid `bun.lock` with `bun install --lockfile-only` before benchmark runs.",
@@ -919,10 +948,14 @@ class AutoResearchEngine:
                 "Prefer the default metric set: functional, acceptance, "
                 "verification-stability, execution-validity, resource-efficiency.",
                 "Prefer a starter that uses built-in Bun capabilities and keeps dependencies "
-                "minimal. If the starter would otherwise have zero packages, add one tiny "
-                "dependency or devDependency so Bun can generate `bun.lock`.",
+                "minimal. If the starter would otherwise have zero packages, add one small, "
+                "scenario-relevant dependency or devDependency so Bun can generate `bun.lock`.",
+                "For TypeScript starters, prefer a relevant package like `typescript` over "
+                "unrelated filler dependencies.",
                 "Do not add failing tests or gates to the starter baseline. If you include "
                 "`bun run test`, make sure the starter test suite already passes before edits.",
+                "If the prompt requires a CLI output or exact runtime behavior, encode that "
+                "expectation in acceptance coverage and verification commands.",
                 "Write one valid JSON object to the output path and stop after the file exists.",
                 "Required JSON keys:",
                 json.dumps(
@@ -939,12 +972,39 @@ class AutoResearchEngine:
                         "metric_ids": ["functional", "acceptance"],
                         "required_commands": [["bun", "run", "lint"]],
                         "gates": [{"name": "lint", "command": ["bun", "run", "lint"]}],
+                        "deterministic_checks": [
+                            {
+                                "type": "no_pattern",
+                                "pattern": "TODO",
+                                "description": "No TODO markers remain in production files",
+                            }
+                        ],
+                        "requirements": [
+                            {
+                                "id": "req-example",
+                                "description": "Document one measurable requirement",
+                                "check": {
+                                    "type": "import_present",
+                                    "pattern": "Example",
+                                    "description": "Example marker exists in source",
+                                },
+                                "required_test_patterns": ["Example"],
+                            }
+                        ],
+                        "llm_judge_rubric": [
+                            {
+                                "criterion": (
+                                    "The implementation satisfies the explicit acceptance criteria."
+                                ),
+                                "weight": 1.0,
+                            }
+                        ],
                         "starter_files": [
                             {
                                 "path": "package.json",
                                 "content": (
                                     '{"name":"smoke-starter","private":true,'
-                                    '"devDependencies":{"is-number":"^7.0.0"}}'
+                                    '"devDependencies":{"typescript":"^5.8.3"}}'
                                 ),
                             },
                         ],

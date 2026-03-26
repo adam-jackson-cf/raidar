@@ -27,6 +27,28 @@ from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
 
 
+def _assert_smoke_dry_run_output(output: str) -> None:
+    assert "uv run --project orchestrator raidar run \\" in output
+    assert "uv run --project orchestrator raidar matrix \\" in output
+    assert '--selector "all" \\' in output
+    assert '--repeats "2" \\' in output
+    assert '--repeat-parallel "2" \\' in output
+    assert "uv run --project orchestrator raidar harbor cleanup" in output
+    assert "uv run --project orchestrator raidar harness validate \\" in output
+    assert "uv run --project orchestrator raidar experiment run \\" in output
+    assert 'RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run"' in output
+    assert "research-smoke-init" in output
+    assert "research-smoke-approve" in output
+    assert "research-smoke-cleanup" in output
+    assert "objective_id=research-smoke-dry-run" in output
+    assert "uv run --project auto_researcher auto-researcher init \\" in output
+    assert '--loop-execution-mode "parallel" \\' in output
+    assert '--max-parallel-loops "2" \\' in output
+    assert '--benchmark-repeat-parallel "2" \\' in output
+    assert '--research-repeat-parallel "2" \\' in output
+    assert "uv run --project auto_researcher auto-researcher approve-scenario" in output
+
+
 def test_cli_version_matches_pyproject_version() -> None:
     runner = CliRunner()
     result = runner.invoke(main, ["--version"])
@@ -1200,25 +1222,7 @@ def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert "uv run --project orchestrator raidar run \\" in result.stdout
-    assert "uv run --project orchestrator raidar matrix \\" in result.stdout
-    assert '--selector "all" \\' in result.stdout
-    assert '--repeats "2" \\' in result.stdout
-    assert '--repeat-parallel "2" \\' in result.stdout
-    assert "uv run --project orchestrator raidar harbor cleanup" in result.stdout
-    assert "uv run --project orchestrator raidar harness validate \\" in result.stdout
-    assert "uv run --project orchestrator raidar experiment run \\" in result.stdout
-    assert 'RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run"' in result.stdout
-    assert "research-smoke-init" in result.stdout
-    assert "research-smoke-approve" in result.stdout
-    assert "research-smoke-cleanup" in result.stdout
-    assert "objective_id=research-smoke-dry-run" in result.stdout
-    assert "uv run --project auto_researcher auto-researcher init \\" in result.stdout
-    assert '--loop-execution-mode "parallel" \\' in result.stdout
-    assert '--max-parallel-loops "2" \\' in result.stdout
-    assert '--benchmark-repeat-parallel "2" \\' in result.stdout
-    assert '--research-repeat-parallel "2" \\' in result.stdout
-    assert "uv run --project auto_researcher auto-researcher approve-scenario" in result.stdout
+    _assert_smoke_dry_run_output(result.stdout)
 
 
 def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> None:
@@ -1386,4 +1390,9 @@ def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> N
         line.startswith("UV:run --project auto_researcher auto-researcher approve-scenario")
         for line in lines
     )
-    assert any(line.startswith("APPROVE:research-smoke-") for line in lines)
+    approve_line = next(line for line in lines if line.startswith("APPROVE:research-smoke-"))
+    objective_id = approve_line.split(":", 1)[1]
+    assert approve_line.startswith("APPROVE:research-smoke-")
+    assert not (workspace_root / "auto_researcher" / "objectives" / objective_id).exists()
+    assert not (workspace_root / "scenarios" / "research-smoke-fake").exists()
+    assert not (workspace_root / "experiments" / "benchmarks" / "research-smoke-fake").exists()

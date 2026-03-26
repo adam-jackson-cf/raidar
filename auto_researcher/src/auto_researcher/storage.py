@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
+from raidar.schemas.scenario import DeterministicCheck, LLMJudgeCriterion, RequirementSpec
 
 from .models import ObjectiveState
 
@@ -114,6 +115,25 @@ class WorkspaceLayout:
 
     def role_prompt_path(self, role: str) -> Path:
         return self.roles_root / f"{role}.md"
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioDocumentUpdate:
+    """Typed scenario document update payload."""
+
+    name: str
+    description: str
+    difficulty: str
+    category: str
+    timeout_sec: int
+    starter_root: str
+    prompt_entry: str
+    metric_ids: list[str]
+    required_commands: list[list[str]]
+    gates: list[dict[str, Any]]
+    deterministic_checks: list[DeterministicCheck]
+    requirements: list[RequirementSpec]
+    llm_judge_rubric: list[LLMJudgeCriterion]
 
 
 def ensure_dir(path: Path) -> Path:
@@ -263,33 +283,32 @@ def illegal_mutations(
     ]
 
 
-def update_scenario_document(
-    scenario_yaml: Path,
-    *,
-    name: str,
-    description: str,
-    difficulty: str,
-    category: str,
-    timeout_sec: int,
-    starter_root: str,
-    prompt_entry: str,
-    metric_ids: list[str],
-    required_commands: list[list[str]],
-    gates: list[dict[str, Any]],
-) -> None:
+def update_scenario_document(scenario_yaml: Path, update: ScenarioDocumentUpdate) -> None:
     document = read_yaml(scenario_yaml)
-    document["name"] = name
-    document["description"] = description
-    document["difficulty"] = difficulty
-    document["category"] = category
-    document["timeout_sec"] = timeout_sec
-    document["starter"] = {"root": starter_root}
-    document["prompt"] = {"entry": prompt_entry, "includes": []}
-    document["metrics"] = [{"type": "core", "id": metric_id} for metric_id in metric_ids]
+    document["name"] = update.name
+    document["description"] = update.description
+    document["difficulty"] = update.difficulty
+    document["category"] = update.category
+    document["timeout_sec"] = update.timeout_sec
+    document["starter"] = {"root": update.starter_root}
+    document["prompt"] = {"entry": update.prompt_entry, "includes": []}
+    document["metrics"] = [{"type": "core", "id": metric_id} for metric_id in update.metric_ids]
     document["verification"] = {
         **dict(document.get("verification") or {}),
-        "required_commands": required_commands,
-        "gates": gates,
+        "required_commands": update.required_commands,
+        "gates": update.gates,
+    }
+    document["acceptance"] = {
+        **dict(document.get("acceptance") or {}),
+        "deterministic_checks": [
+            check.model_dump(mode="json") for check in update.deterministic_checks
+        ],
+        "requirements": [
+            requirement.model_dump(mode="json") for requirement in update.requirements
+        ],
+        "llm_judge_rubric": [
+            criterion.model_dump(mode="json") for criterion in update.llm_judge_rubric
+        ],
     }
     write_yaml(scenario_yaml, document)
 

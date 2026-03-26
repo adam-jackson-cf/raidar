@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal, cast
 
@@ -16,7 +17,7 @@ from .models import (
     RoleModelConfig,
 )
 from .pi_rpc import PiRpcRoleRunner
-from .raidar_cli import RaidarCli
+from .raidar_cli import RaidarServiceClient
 from .scripted import (
     ScriptedRaidar,
     ScriptedRoleRunner,
@@ -35,7 +36,7 @@ def build_engine(pi_binary: str) -> AutoResearchEngine:
     return AutoResearchEngine(
         layout=layout,
         role_runner=PiRpcRoleRunner(layout=layout, pi_binary=pi_binary),
-        raidar=RaidarCli(layout=layout),
+        raidar=RaidarServiceClient(layout=layout),
     )
 
 
@@ -75,6 +76,26 @@ def _parse_role_models(
             model_id=model_id.strip(),
         )
     return role_models
+
+
+@dataclass(frozen=True, slots=True)
+class InitCommandConfig:
+    """Typed CLI request for the autoresearch init command."""
+
+    engine: AutoResearchEngine
+    objective_request: ObjectiveInitRequest
+
+
+def _dispatch_init_command(config: InitCommandConfig) -> None:
+    """Run the init command through one typed dispatch helper."""
+
+    try:
+        objective = config.engine.init_objective(config.objective_request)
+    except RuntimeError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"objective_id={objective.objective_id}")
+    click.echo(f"status={objective.status}")
+    click.echo(f"draft_scenario_ref={objective.draft_scenario_ref}")
 
 
 @click.group()
@@ -140,30 +161,27 @@ def init_command(
     role_models: tuple[str, ...],
     pi_binary: str,
 ) -> None:
-    engine = build_engine(pi_binary)
-    request = ObjectiveInitRequest(
-        goal=goal,
-        target_harness=target_harness,
-        target_model=target_model,
-        objective_id=objective_id,
-        approval_mode=cast(Literal["scenario_only"], approval_mode),
-        loop_execution_mode=cast(Literal["serial", "parallel"], loop_execution_mode),
-        max_revisions=max_revisions,
-        max_parallel_loops=max_parallel_loops,
-        benchmark_repeats=benchmark_repeats,
-        benchmark_repeat_parallel=benchmark_repeat_parallel,
-        research_repeats=research_repeats,
-        research_repeat_parallel=research_repeat_parallel,
-        mutation_surface=list(mutation_surface),
-        role_models=_parse_role_models(control_provider, control_model, role_models),
+    _dispatch_init_command(
+        InitCommandConfig(
+            engine=build_engine(pi_binary),
+            objective_request=ObjectiveInitRequest(
+                goal=goal,
+                target_harness=target_harness,
+                target_model=target_model,
+                objective_id=objective_id,
+                approval_mode=cast(Literal["scenario_only"], approval_mode),
+                loop_execution_mode=cast(Literal["serial", "parallel"], loop_execution_mode),
+                max_revisions=max_revisions,
+                max_parallel_loops=max_parallel_loops,
+                benchmark_repeats=benchmark_repeats,
+                benchmark_repeat_parallel=benchmark_repeat_parallel,
+                research_repeats=research_repeats,
+                research_repeat_parallel=research_repeat_parallel,
+                mutation_surface=list(mutation_surface),
+                role_models=_parse_role_models(control_provider, control_model, role_models),
+            ),
+        )
     )
-    try:
-        objective = engine.init_objective(request)
-    except RuntimeError as exc:
-        raise click.ClickException(str(exc)) from exc
-    click.echo(f"objective_id={objective.objective_id}")
-    click.echo(f"status={objective.status}")
-    click.echo(f"draft_scenario_ref={objective.draft_scenario_ref}")
 
 
 @main.command("approve-scenario")

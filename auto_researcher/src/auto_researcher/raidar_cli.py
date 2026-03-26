@@ -1,13 +1,30 @@
-"""Public CLI wrapper around the Raidar evaluator boundary."""
+"""Typed in-process Raidar service boundary for autoresearch."""
 
 from __future__ import annotations
 
-import json
-import os
-import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Protocol
+
+from raidar.application.execution import dispatch_from_experiment_request
+from raidar.application.models import (
+    ExperimentRunRequest,
+    ScenarioCloneRequest,
+    ScenarioInitRequest,
+    ScenarioInitResult,
+    ScenarioValidationResult,
+    SuiteExecutionResult,
+)
+from raidar.application.scenarios import (
+    clone_scenario_revision as clone_scenario_revision_service,
+)
+from raidar.application.scenarios import (
+    init_scenario as init_scenario_service,
+)
+from raidar.application.scenarios import (
+    validate_scenario as validate_scenario_service,
+)
+from raidar.scenario_clone import ScenarioCloneResult
 
 from .storage import WorkspaceLayout
 
@@ -15,163 +32,29 @@ from .storage import WorkspaceLayout
 class RaidarClient(Protocol):
     """Evaluator boundary required by the autoresearch engine."""
 
-    def scenario_init(
-        self,
-        *,
-        path: Path,
-        name: str,
-        scenario_revision: str,
-        starter_root: str,
-        prompt_entry: str,
-        difficulty: str,
-        category: str,
-        timeout_sec: int,
-    ) -> dict[str, Any]: ...
+    def scenario_init(self, request: ScenarioInitRequest) -> ScenarioInitResult: ...
 
-    def scenario_clone_revision(
-        self,
-        *,
-        path: Path,
-        from_revision: str,
-        to_revision: str | None = None,
-    ) -> dict[str, Any]: ...
+    def scenario_clone_revision(self, request: ScenarioCloneRequest) -> ScenarioCloneResult: ...
 
-    def scenario_validate(self, *, scenario_yaml: Path) -> None: ...
+    def scenario_validate(self, *, scenario_yaml: Path) -> ScenarioValidationResult: ...
 
-    def experiment_run(
-        self,
-        *,
-        scenario_yaml: Path,
-        harness: str,
-        model: str,
-        timeout_sec: int,
-        repeats: int,
-        repeat_parallel: int,
-        experiment_kind: str,
-        experiments_root: Path | None = None,
-    ) -> dict[str, Any]: ...
+    def experiment_run(self, request: ExperimentRunRequest) -> SuiteExecutionResult: ...
 
 
 @dataclass(frozen=True, slots=True)
-class RaidarCli:
-    """Call Raidar only through its machine-readable CLI surface."""
+class RaidarServiceClient:
+    """Call Raidar through its in-process typed service boundary."""
 
     layout: WorkspaceLayout
-    command: tuple[str, ...] = ("uv", "run", "--project", "orchestrator", "raidar")
 
-    def _run(self, *args: str) -> str:
-        env = dict(os.environ)
-        env.pop("VIRTUAL_ENV", None)
-        result = subprocess.run(
-            [*self.command, *args],
-            cwd=self.layout.repo_root,
-            env=env,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-        if result.returncode != 0:
-            message = result.stderr.strip() or result.stdout.strip() or "unknown error"
-            raise RuntimeError(message)
-        return result.stdout
+    def scenario_init(self, request: ScenarioInitRequest) -> ScenarioInitResult:
+        return init_scenario_service(request)
 
-    def _run_json(self, *args: str) -> dict[str, Any]:
-        output = self._run(*args)
-        payload = json.loads(output)
-        if not isinstance(payload, dict):
-            raise RuntimeError("Expected JSON object from Raidar CLI.")
-        return payload
+    def scenario_clone_revision(self, request: ScenarioCloneRequest) -> ScenarioCloneResult:
+        return clone_scenario_revision_service(request)
 
-    def scenario_init(
-        self,
-        *,
-        path: Path,
-        name: str,
-        scenario_revision: str,
-        starter_root: str,
-        prompt_entry: str,
-        difficulty: str,
-        category: str,
-        timeout_sec: int,
-    ) -> dict[str, Any]:
-        return self._run_json(
-            "scenario",
-            "init",
-            "--path",
-            str(path),
-            "--name",
-            name,
-            "--scenario-revision",
-            scenario_revision,
-            "--starter-root",
-            starter_root,
-            "--prompt-entry",
-            prompt_entry,
-            "--difficulty",
-            difficulty,
-            "--category",
-            category,
-            "--timeout",
-            str(timeout_sec),
-            "--json",
-        )
+    def scenario_validate(self, *, scenario_yaml: Path) -> ScenarioValidationResult:
+        return validate_scenario_service(scenario_yaml)
 
-    def scenario_clone_revision(
-        self,
-        *,
-        path: Path,
-        from_revision: str,
-        to_revision: str | None = None,
-    ) -> dict[str, Any]:
-        args = [
-            "scenario",
-            "clone-revision",
-            "--path",
-            str(path),
-            "--from-revision",
-            from_revision,
-            "--json",
-        ]
-        if to_revision is not None:
-            args.extend(["--to-revision", to_revision])
-        return self._run_json(*args)
-
-    def scenario_validate(self, *, scenario_yaml: Path) -> None:
-        self._run("scenario", "validate", "--scenario", str(scenario_yaml))
-
-    def experiment_run(
-        self,
-        *,
-        scenario_yaml: Path,
-        harness: str,
-        model: str,
-        timeout_sec: int,
-        repeats: int,
-        repeat_parallel: int,
-        experiment_kind: str,
-        experiments_root: Path | None = None,
-    ) -> dict[str, Any]:
-        args = [
-            "experiment",
-            "run",
-            "--scenario",
-            str(scenario_yaml),
-            "--harness",
-            harness,
-            "--model",
-            model,
-            "--timeout",
-            str(timeout_sec),
-            "--repeats",
-            str(repeats),
-            "--repeat-parallel",
-            str(repeat_parallel),
-            "--rerun-unscored",
-            "1",
-            "--experiment-kind",
-            experiment_kind,
-            "--json",
-        ]
-        if experiments_root is not None:
-            args.extend(["--experiments-root", str(experiments_root)])
-        return self._run_json(*args)
+    def experiment_run(self, request: ExperimentRunRequest) -> SuiteExecutionResult:
+        return dispatch_from_experiment_request(request, repo_root=self.layout.repo_root)

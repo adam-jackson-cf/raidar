@@ -63,9 +63,12 @@ RESEARCH_SMOKE_BENCHMARK_REPEATS ?= 1
 RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL ?= 1
 RESEARCH_SMOKE_RESEARCH_REPEATS ?= 1
 RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL ?= 1
-RESEARCH_SMOKE_OBJECTIVE_ID ?= research-smoke-$(shell uuidgen | tr '[:upper:]' '[:lower:]')
+ifndef RESEARCH_SMOKE_OBJECTIVE_ID
+RESEARCH_SMOKE_OBJECTIVE_ID := research-smoke-$(shell uuidgen | tr '[:upper:]' '[:lower:]')
+endif
 RESEARCH_SMOKE_OBJECTIVE_ROOT ?= $(CURDIR)/auto_researcher/objectives/$(RESEARCH_SMOKE_OBJECTIVE_ID)
 RESEARCH_SMOKE_STATE_PATH ?= $(RESEARCH_SMOKE_OBJECTIVE_ROOT)/objective.yaml
+RESEARCH_SMOKE_META_PATH ?= $(RESEARCH_SMOKE_OBJECTIVE_ROOT)/research-smoke.meta
 
 ifeq ($(firstword $(MAKECMDGOALS)),matrix-run)
 MATRIX_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
@@ -257,22 +260,33 @@ research-smoke: docker-check
 		exit "$$cleanup_status"
 
 research-smoke-init:
-	@echo "objective_id=$(RESEARCH_SMOKE_OBJECTIVE_ID)"
-	@$(MAKE) --no-print-directory auto-research-init \
-		GOAL="$(RESEARCH_SMOKE_GOAL) ($(RESEARCH_SMOKE_OBJECTIVE_ID))" \
-		OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" \
-		TARGET_HARNESS="$(RESEARCH_SMOKE_TARGET_HARNESS)" \
-		TARGET_MODEL="$(RESEARCH_SMOKE_TARGET_MODEL)" \
-		LOOP_EXECUTION_MODE="$(RESEARCH_SMOKE_LOOP_EXECUTION_MODE)" \
-		MAX_REVISIONS="$(RESEARCH_SMOKE_MAX_REVISIONS)" \
-		MAX_PARALLEL_LOOPS="$(RESEARCH_SMOKE_MAX_PARALLEL_LOOPS)" \
-		BENCHMARK_REPEATS="$(RESEARCH_SMOKE_BENCHMARK_REPEATS)" \
-		BENCHMARK_REPEAT_PARALLEL="$(RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL)" \
-		RESEARCH_REPEATS="$(RESEARCH_SMOKE_RESEARCH_REPEATS)" \
-		RESEARCH_REPEAT_PARALLEL="$(RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL)" \
-		CONTROL_PROVIDER="$(RESEARCH_SMOKE_CONTROL_PROVIDER)" \
-		CONTROL_MODEL="$(RESEARCH_SMOKE_CONTROL_MODEL)" \
-		PI_BINARY="$(PI_BINARY)"
+	@set -euo pipefail; \
+		echo "objective_id=$(RESEARCH_SMOKE_OBJECTIVE_ID)"; \
+		$(MAKE) --no-print-directory auto-research-init \
+			GOAL="$(RESEARCH_SMOKE_GOAL) ($(RESEARCH_SMOKE_OBJECTIVE_ID))" \
+			OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" \
+			TARGET_HARNESS="$(RESEARCH_SMOKE_TARGET_HARNESS)" \
+			TARGET_MODEL="$(RESEARCH_SMOKE_TARGET_MODEL)" \
+			LOOP_EXECUTION_MODE="$(RESEARCH_SMOKE_LOOP_EXECUTION_MODE)" \
+			MAX_REVISIONS="$(RESEARCH_SMOKE_MAX_REVISIONS)" \
+			MAX_PARALLEL_LOOPS="$(RESEARCH_SMOKE_MAX_PARALLEL_LOOPS)" \
+			BENCHMARK_REPEATS="$(RESEARCH_SMOKE_BENCHMARK_REPEATS)" \
+			BENCHMARK_REPEAT_PARALLEL="$(RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL)" \
+			RESEARCH_REPEATS="$(RESEARCH_SMOKE_RESEARCH_REPEATS)" \
+			RESEARCH_REPEAT_PARALLEL="$(RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL)" \
+			CONTROL_PROVIDER="$(RESEARCH_SMOKE_CONTROL_PROVIDER)" \
+			CONTROL_MODEL="$(RESEARCH_SMOKE_CONTROL_MODEL)" \
+			PI_BINARY="$(PI_BINARY)"; \
+		state_path="$(RESEARCH_SMOKE_STATE_PATH)"; \
+		meta_path="$(RESEARCH_SMOKE_META_PATH)"; \
+		if [ -f "$$state_path" ]; then \
+			scenario_slug="$$(sed -n 's/^scenario_slug: //p' "$$state_path" | tail -n 1)"; \
+			scenario_preexisting="0"; \
+			if [ -n "$$scenario_slug" ] && [ "$$scenario_slug" != "null" ] && [ -e "$(CURDIR)/scenarios/$$scenario_slug" ]; then \
+				scenario_preexisting="1"; \
+			fi; \
+			printf 'scenario_preexisting=%s\n' "$$scenario_preexisting" > "$$meta_path"; \
+		fi
 
 research-smoke-approve:
 	@$(MAKE) --no-print-directory auto-research-approve-scenario \
@@ -282,16 +296,20 @@ research-smoke-approve:
 research-smoke-cleanup:
 	@set -euo pipefail; \
 		state_path="$(RESEARCH_SMOKE_STATE_PATH)"; \
+		meta_path="$(RESEARCH_SMOKE_META_PATH)"; \
 		scenario_root=""; \
 		scenario_preexisting="0"; \
 		benchmark_dir=""; \
+		if [ -f "$$meta_path" ]; then \
+			recorded_preexisting="$$(sed -n 's/^scenario_preexisting=//p' "$$meta_path" | tail -n 1)"; \
+			if [ -n "$$recorded_preexisting" ]; then \
+				scenario_preexisting="$$recorded_preexisting"; \
+			fi; \
+		fi; \
 		if [ -f "$$state_path" ]; then \
 			scenario_slug="$$(sed -n 's/^scenario_slug: //p' "$$state_path" | tail -n 1)"; \
 			if [ -n "$$scenario_slug" ] && [ "$$scenario_slug" != "null" ]; then \
 				scenario_root="$(CURDIR)/scenarios/$$scenario_slug"; \
-				if [ -e "$$scenario_root" ]; then \
-					scenario_preexisting="1"; \
-				fi; \
 			fi; \
 			best_benchmark_ref="$$(sed -n 's/^best_benchmark_ref: //p' "$$state_path" | tail -n 1)"; \
 			if [ -n "$$best_benchmark_ref" ] && [ "$$best_benchmark_ref" != "null" ]; then \

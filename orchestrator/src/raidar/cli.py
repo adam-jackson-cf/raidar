@@ -9,7 +9,6 @@ import re
 import shutil
 import subprocess
 import sys
-from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -21,6 +20,38 @@ from dotenv import load_dotenv
 from .agents.adapters.registry import registry
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
+from .application.execution import (
+    execute_run_command,
+)
+from .application.execution import (
+    experiment_execution_suffix as _service_experiment_execution_suffix,
+)
+from .application.execution import resolve_experiments_root as _service_resolve_experiments_root
+from .application.models import (
+    ExecutionDispatchRequest,
+    RunCliOptions,
+    ScenarioCloneRequest,
+    ScenarioInitRequest,
+    SuiteExecutionResult,
+)
+from .application.scenarios import (
+    clone_scenario_revision as _service_clone_scenario_revision,
+)
+from .application.scenarios import (
+    init_scenario as _service_init_scenario,
+)
+from .application.scenarios import (
+    validate_scenario as _service_validate_scenario,
+)
+from .application.serializers import (
+    scenario_clone_payload as _scenario_clone_payload,
+)
+from .application.serializers import (
+    scenario_init_payload as _scenario_init_payload,
+)
+from .application.serializers import (
+    suite_execution_payload as _service_suite_execution_payload,
+)
 
 if TYPE_CHECKING:
     from .runner import RunRequest
@@ -57,46 +88,6 @@ TYPECHECK_TARGETS = [
     "tests/test_gemini_cli_adapter.py",
 ]
 COVERAGE_FAIL_UNDER = "60"
-
-
-@dataclass(frozen=True, slots=True)
-class RunCliOptions:
-    """Normalized CLI options for scenario execution commands."""
-
-    scenario: Path
-    harness: str
-    model: str
-    timeout: int
-    repeats: int
-    repeat_parallel: int
-    rerun_unscored: int
-    experiments_root: Path = BENCHMARK_EXPERIMENTS_ROOT
-
-    def resolved(self) -> RunCliOptions:
-        return RunCliOptions(
-            scenario=self.scenario.resolve(),
-            harness=self.harness,
-            model=self.model,
-            timeout=self.timeout,
-            repeats=self.repeats,
-            repeat_parallel=self.repeat_parallel,
-            rerun_unscored=min(self.rerun_unscored, 1),
-            experiments_root=self.experiments_root.resolve(),
-        )
-
-
-@dataclass(frozen=True, slots=True)
-class SuiteExecutionResult:
-    """Canonical experiment execution outcome for experiment and matrix flows."""
-
-    scenario_path: Path
-    scenario_name: str
-    scenario_revision: str
-    runs: list[EvalRun]
-    retries_used: int
-    experiment_json_path: Path | None = None
-    summary_path: Path | None = None
-    report_path: Path | None = None
 
 
 def _runner_api() -> Any:
@@ -140,7 +131,7 @@ def _persist_eval_run(run: EvalRun) -> Path:
 
 
 def _experiment_execution_suffix(options: RunCliOptions) -> str:
-    return f"{options.harness}__{options.model.replace('/', '-')}"
+    return _service_experiment_execution_suffix(options)
 
 
 def _build_repeat_request(base_request: RunRequest, repeat_index: int) -> RunRequest:
@@ -308,11 +299,11 @@ def _resolve_experiments_root(
     experiments_root: Path | None,
     experiment_kind: str | None,
 ) -> Path:
-    if experiments_root is not None:
-        return experiments_root.resolve()
-    if experiment_kind == "research-loop":
-        return RESEARCH_LOOP_EXPERIMENTS_ROOT
-    return BENCHMARK_EXPERIMENTS_ROOT
+    return _service_resolve_experiments_root(
+        experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+        repo_root=REPO_ROOT,
+    )
 
 
 def _build_run_request(
@@ -398,18 +389,7 @@ def _run_payload(run: EvalRun) -> dict[str, object]:
 
 
 def _suite_execution_payload(result: SuiteExecutionResult) -> dict[str, object]:
-    return {
-        "scenario_path": str(result.scenario_path),
-        "scenario_name": result.scenario_name,
-        "scenario_revision": result.scenario_revision,
-        "retries_used": result.retries_used,
-        "experiment_json_path": (
-            str(result.experiment_json_path) if result.experiment_json_path is not None else None
-        ),
-        "summary_path": str(result.summary_path) if result.summary_path is not None else None,
-        "report_path": str(result.report_path) if result.report_path is not None else None,
-        "runs": [_run_payload(run) for run in result.runs],
-    }
+    return _service_suite_execution_payload(result)
 
 
 def _prepared_run_request(
@@ -522,44 +502,15 @@ def _execute_run_options(
     echo: bool,
     execution_suffix: str | None = None,
 ) -> SuiteExecutionResult:
-    resolved = options.resolved()
-    if cleanup_before_runs:
-        _cleanup_stale_harbor_before_runs()
-
-    scenario_def, started_at, execution_dir, request = _prepared_run_request(
-        resolved,
-        execution_suffix=execution_suffix,
-    )
-    if echo:
-        _echo_run_header(resolved, request.scenario.name)
-        click.echo("Running scenario...")
-
-    runs, retries_used, unresolved_unscored = _execute_repeat_runs(
-        request=request,
-        repeats=resolved.repeats,
-        repeat_parallel=resolved.repeat_parallel,
-        rerun_unscored=resolved.rerun_unscored,
-    )
-
-    if resolved.repeats == 1 and not force_experiment_summary:
-        return _single_run_execution_result(
-            resolved=resolved,
-            scenario_def=scenario_def,
-            runs=runs,
-            retries_used=retries_used,
+    return execute_run_command(
+        ExecutionDispatchRequest(
+            options=options,
+            force_experiment_summary=force_experiment_summary,
+            cleanup_before_runs=cleanup_before_runs,
             echo=echo,
-        )
-
-    return _persist_experiment_execution(
-        resolved=resolved,
-        request=request,
-        scenario_def=scenario_def,
-        execution_dir=execution_dir,
-        started_at=started_at,
-        runs=runs,
-        retries_used=retries_used,
-        unresolved_unscored=unresolved_unscored,
-        echo=echo,
+            execution_suffix=execution_suffix,
+        ),
+        repo_root=REPO_ROOT,
     )
 
 
@@ -1445,95 +1396,25 @@ def scenario_init(
     as_json: bool,
 ) -> None:
     """Create a new versioned scenario descriptor with prompt artifacts and rules."""
-    scenario_root = path.resolve()
-    scenario_name = name or scenario_root.name
-    revision_dir = scenario_root / scenario_revision
-    scenario_yaml = revision_dir / "scenario.yaml"
-    if scenario_yaml.exists():
-        raise click.ClickException(f"Scenario already exists: {scenario_yaml}")
-
-    (revision_dir / "rules").mkdir(parents=True, exist_ok=True)
-    (revision_dir / "prompt").mkdir(parents=True, exist_ok=True)
-
-    scenario_doc = {
-        "name": scenario_name,
-        "scenario_revision": scenario_revision,
-        "description": f"Scenario definition for {scenario_name}",
-        "difficulty": difficulty,
-        "category": category,
-        "timeout_sec": timeout,
-        "dockerfile": "./Dockerfile",
-        "test_scripts": [],
-        "starter": {"root": starter_root},
-        "verification": {
-            "max_gate_failures": 3,
-            "min_quality_score": 0.8,
-            "required_commands": [
-                ["bun", "run", "typecheck"],
-                ["bun", "run", "lint"],
-            ],
-            "gates": [
-                {"name": "typecheck", "command": ["bun", "run", "typecheck"]},
-                {"name": "lint", "command": ["bun", "run", "lint"]},
-            ],
-        },
-        "acceptance": {
-            "deterministic_checks": [
-                {
-                    "type": "no_pattern",
-                    "pattern": "TODO",
-                    "description": "No TODO markers remain in production files",
-                }
-            ],
-            "requirements": [],
-            "llm_judge_rubric": [],
-        },
-        "metrics": [
-            {"type": "core", "id": "functional"},
-            {"type": "core", "id": "acceptance"},
-            {"type": "core", "id": "verification-stability"},
-            {"type": "core", "id": "execution-validity"},
-            {"type": "core", "id": "resource-efficiency"},
-        ],
-        "prompt": {"entry": prompt_entry, "includes": []},
-    }
-    _write_scenario_document(scenario_yaml, scenario_doc)
-
-    prompt_path = revision_dir / prompt_entry
-    prompt_path.parent.mkdir(parents=True, exist_ok=True)
-    prompt_path.write_text(
-        (
-            "Implement the requested feature in the starter application.\n\n"
-            "Run all required verification commands before completion and "
-            "report only after they pass.\n"
-        ),
-        encoding="utf-8",
-    )
-
-    rule_text = (
-        "Follow the scenario prompt exactly. Run required verification commands before completion."
-    )
-    for filename in sorted(set(SYSTEM_RULES.values())):
-        (revision_dir / "rules" / filename).write_text(rule_text + "\n", encoding="utf-8")
-
-    if as_json:
-        click.echo(
-            json.dumps(
-                {
-                    "scenario_root": str(scenario_root),
-                    "scenario_name": scenario_name,
-                    "scenario_revision": scenario_revision,
-                    "revision_dir": str(revision_dir),
-                    "scenario_yaml": str(scenario_yaml),
-                    "prompt_path": str(prompt_path),
-                    "rules_dir": str(revision_dir / "rules"),
-                    "starter_root": starter_root,
-                },
-                indent=2,
+    try:
+        result = _service_init_scenario(
+            ScenarioInitRequest(
+                path=path,
+                name=name,
+                scenario_revision=scenario_revision,
+                starter_root=starter_root,
+                prompt_entry=prompt_entry,
+                difficulty=difficulty,
+                category=category,
+                timeout_sec=timeout,
             )
         )
+    except FileExistsError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if as_json:
+        click.echo(json.dumps(_scenario_init_payload(result), indent=2))
         return
-    click.echo(f"Created scenario at {scenario_yaml}")
+    click.echo(f"Created scenario at {result.scenario_yaml}")
 
 
 @scenario.command("validate")
@@ -1546,8 +1427,11 @@ def scenario_init(
 )
 def scenario_validate(scenario: Path) -> None:
     """Validate a scenario document and report key configuration fields."""
-    runner_api = _runner_api()
-    scenario_def = runner_api.load_scenario(_resolve_scenario_yaml(scenario))
+    try:
+        result = _service_validate_scenario(scenario)
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
+    scenario_def = result.scenario
     click.echo("Scenario validation passed.")
     click.echo(f"  name: {scenario_def.name}")
     click.echo(f"  scenario_revision: {scenario_def.scenario_revision}")
@@ -1583,27 +1467,18 @@ def scenario_clone_revision(
 ) -> None:
     """Clone a scenario revision and update revision metadata."""
     try:
-        result = _scenario_clone_api().clone_scenario_revision(
-            scenario_root=path.resolve(),
-            source_revision=from_revision,
-            target_revision=to_revision,
+        result = _service_clone_scenario_revision(
+            ScenarioCloneRequest(
+                path=path,
+                from_revision=from_revision,
+                to_revision=to_revision,
+            )
         )
     except (FileNotFoundError, FileExistsError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
 
     if as_json:
-        click.echo(
-            json.dumps(
-                {
-                    "scenario_root": str(result.scenario_root),
-                    "source_revision": result.source_revision,
-                    "target_revision": result.target_revision,
-                    "revision_dir": str(result.target_scenario_yaml.parent),
-                    "scenario_yaml": str(result.target_scenario_yaml),
-                },
-                indent=2,
-            )
-        )
+        click.echo(json.dumps(_scenario_clone_payload(result), indent=2))
         return
     click.echo("Scenario revision clone completed.")
     click.echo(f"  scenario_root: {result.scenario_root}")

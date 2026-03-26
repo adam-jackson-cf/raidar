@@ -3,10 +3,12 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import PurePosixPath
 from typing import Literal
 
 from pydantic import BaseModel, Field, model_validator
+from raidar.schemas.scenario import DeterministicCheck, LLMJudgeCriterion, RequirementSpec
 
 ROLE_NAMES = ("designer", "critic", "planner", "executor", "reviewer", "governor")
 DEFAULT_MUTATION_SURFACE = [
@@ -126,6 +128,9 @@ class ScenarioDesign(BaseModel):
     metric_ids: list[str]
     required_commands: list[list[str]] = Field(default_factory=list)
     gates: list[ScenarioGateDesign] = Field(default_factory=list)
+    deterministic_checks: list[DeterministicCheck] = Field(default_factory=list)
+    requirements: list[RequirementSpec] = Field(default_factory=list)
+    llm_judge_rubric: list[LLMJudgeCriterion] = Field(default_factory=list)
     starter_files: list[StarterFileDesign] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
 
@@ -160,7 +165,164 @@ class ScenarioDesign(BaseModel):
                 "starter package.json must declare at least one dependency or devDependency "
                 "so Bun can materialize bun.lock."
             )
+        self.required_commands = _ensure_prompt_commands(
+            self.required_commands,
+            self.prompt_text,
+        )
+        self.gates = _ensure_prompt_gates(self.gates, self.prompt_text)
+        if not self.deterministic_checks:
+            self.deterministic_checks = _derived_deterministic_checks(self.prompt_text)
+        if not self.requirements:
+            self.requirements = _derived_requirements(self.prompt_text)
+        if not self.llm_judge_rubric:
+            self.llm_judge_rubric = _derived_llm_judge_rubric(self.prompt_text)
         return self
+
+
+def _ensure_prompt_commands(
+    commands: list[list[str]],
+    prompt_text: str,
+) -> list[list[str]]:
+    normalized = [list(command) for command in commands]
+    start_command = ["bun", "run", "start"]
+    if "bun run start" not in prompt_text or start_command in normalized:
+        return normalized
+    return [*normalized, start_command]
+
+
+def _ensure_prompt_gates(
+    gates: list[ScenarioGateDesign],
+    prompt_text: str,
+) -> list[ScenarioGateDesign]:
+    normalized = [gate.model_copy(deep=True) for gate in gates]
+    start_command = ["bun", "run", "start"]
+    if "bun run start" not in prompt_text:
+        return normalized
+    if any(gate.command == start_command for gate in normalized):
+        return normalized
+    return [*normalized, ScenarioGateDesign(name="start", command=start_command)]
+
+
+def _derived_deterministic_checks(prompt_text: str) -> list[DeterministicCheck]:
+    checks = [
+        DeterministicCheck(
+            type="no_pattern",
+            pattern="TODO",
+            description="No TODO markers remain in production files",
+        )
+    ]
+    if "Hello, Raidar!" in prompt_text:
+        checks.append(
+            DeterministicCheck(
+                type="import_present",
+                pattern="Hello, Raidar!",
+                description="Greeting output literal is present in source",
+            )
+        )
+    if "formatGreeting" in prompt_text:
+        checks.append(
+            DeterministicCheck(
+                type="import_present",
+                pattern="formatGreeting",
+                description="Greeting formatter is present in source",
+            )
+        )
+    return checks
+
+
+def _derived_requirements(prompt_text: str) -> list[RequirementSpec]:
+    requirements: list[RequirementSpec] = []
+    if "Hello, Raidar!" in prompt_text:
+        requirements.append(
+            RequirementSpec(
+                id="req-start-output",
+                description="The starter app prints Hello, Raidar! for the smoke run.",
+                check=DeterministicCheck(
+                    type="import_present",
+                    pattern="Hello, Raidar!",
+                    description="Greeting output literal is present in source",
+                ),
+                required_test_patterns=["Raidar"],
+            )
+        )
+    if "formatGreeting" in prompt_text:
+        requirements.append(
+            RequirementSpec(
+                id="req-format-greeting",
+                description="The scenario exports a reusable formatGreeting helper.",
+                check=DeterministicCheck(
+                    type="import_present",
+                    pattern="formatGreeting",
+                    description="formatGreeting helper is present in source",
+                ),
+                required_test_patterns=["formatGreeting", "Raidar", "Smoke"],
+            )
+        )
+    return requirements
+
+
+def _derived_llm_judge_rubric(prompt_text: str) -> list[LLMJudgeCriterion]:
+    criteria = [
+        LLMJudgeCriterion(
+            criterion="The implementation must satisfy every explicit requirement in the prompt.",
+            weight=0.5,
+        )
+    ]
+    acceptance_lines = _prompt_section_lines(prompt_text, "Acceptance criteria")
+    if acceptance_lines:
+        weight = round(0.5 / len(acceptance_lines), 3)
+        criteria.extend(
+            LLMJudgeCriterion(
+                criterion=f"The implementation must satisfy this acceptance criterion: {line}",
+                weight=weight,
+            )
+            for line in acceptance_lines
+        )
+        return criteria
+    if "Hello, Raidar!" in prompt_text:
+        criteria.append(
+            LLMJudgeCriterion(
+                criterion=(
+                    "The application should print exactly Hello, Raidar! when run via "
+                    "bun run start."
+                ),
+                weight=0.25,
+            )
+        )
+    if re.search(r"dependency-light|No additional runtime dependencies", prompt_text):
+        criteria.append(
+            LLMJudgeCriterion(
+                criterion=(
+                    "The implementation should avoid adding unnecessary runtime dependencies."
+                ),
+                weight=0.25,
+            )
+        )
+    return criteria
+
+
+def _prompt_section_lines(prompt_text: str, heading: str) -> list[str]:
+    pattern = re.compile(
+        rf"^##\s+{re.escape(heading)}\s*$([\s\S]*?)(?=^##\s+|\Z)",
+        re.MULTILINE,
+    )
+    match = pattern.search(prompt_text)
+    if match is None:
+        return []
+    return [
+        _strip_bullet_prefix(line)
+        for raw_line in match.group(1).splitlines()
+        if (line := raw_line.strip())
+    ]
+
+
+def _strip_bullet_prefix(line: str) -> str:
+    if line.startswith("- "):
+        return line[2:].strip()
+    numbered = re.match(r"^\d+\.\s+(.*)$", line)
+    if numbered is not None:
+        return numbered.group(1).strip()
+    return line
 
 
 class CriticReview(BaseModel):
