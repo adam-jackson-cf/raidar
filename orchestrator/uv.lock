@@ -1643,7 +1643,7 @@ wheels = [
 
 [[package]]
 name = "raidar"
-version = "0.7.2"
+version = "0.9.0"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
