@@ -1,7 +1,17 @@
 SHELL := /bin/bash
 
-RAIDAR := uv run --project orchestrator raidar
-AUTO_RESEARCHER := uv run --project auto_researcher auto-researcher
+REPO_TMP_DIR ?= $(CURDIR)/.tmp
+REPO_CACHE_DIR ?= $(CURDIR)/.cache
+REPO_UV_CACHE_DIR ?= $(REPO_CACHE_DIR)/uv
+REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
+	TMPDIR="$(REPO_TMP_DIR)" \
+	TMP="$(REPO_TMP_DIR)" \
+	TEMP="$(REPO_TMP_DIR)" \
+	XDG_CACHE_HOME="$(REPO_CACHE_DIR)" \
+	UV_CACHE_DIR="$(REPO_UV_CACHE_DIR)"
+
+RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
+AUTO_RESEARCHER := $(REPO_RUNTIME_ENV) uv run --project auto_researcher auto-researcher
 
 # Shared public workflow defaults.
 SCENARIO ?=
