@@ -95,32 +95,61 @@ The repository has four primary concerns:
   - `experiments/benchmarks/` for benchmark baselines
   - `experiments/research_loops/` for bounded research-loop batches
 
-Raidar is built to answer one practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It helps you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions.  The auto_researcher capability is in beta and is designed to create an automatic way of iterating on these scenario contracts to drive improvements to delivery scenarios.  Its designed to work with codex cli (my preference) and is based on Karpathy's https://github.com/karpathy/autoresearch.
+Raidar is built to answer one practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It helps you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions. The `auto_researcher` capability is currently beta and extends that workflow with objective-led scenario iteration in partnership with an LLM. It is designed around `codex-cli` and draws on ideas from Karpathy's [autoresearch](https://github.com/karpathy/autoresearch).
 
-## Benchmark Experiment Flow
+## Raidar Modes
+
+Raidar supports two modes of use. Benchmark experiments analyze the same scenario across `AgentSpec` pairs so you can compare CLI harness and model combinations on shared evidence. Research loop experiments automate iterative work on a single scenario in partnership with an LLM so you can improve the scenario, benchmark, and supporting evidence over time.
+
+### Benchmark Experiment
 
 1. Define a scenario contract in `scenarios/.../scenario.yaml` plus prompt, rules, starter, and optional visual reference.
-2. Validate the harness/model pair and the scenario contract before running.
+2. Validate the `AgentSpec` and the scenario contract before running.
 3. Run one experiment for one `AgentSpec`, or use `make matrix-run <scenario-yaml> <all|codex|gemini|claude>` when you want a structured comparison across benchmark model sets.
 4. Review artifacts in `experiments/`, especially `run.json`, `experiment-summary.json`, and `report.md`.
 5. Use the evidence to improve prompts, rules, starter quality, scenario design, or the `AgentSpec` choice.
 
-## Auto-Researcher Research Loop Flow
+#### Example Commands
 
-Use `auto_researcher` when you want a controlled objective loop around scenario quality improvements:
+```bash
+make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
+make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
+make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
+make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
+```
 
-1. `make auto-research-init GOAL='...' TARGET_HARNESS=... TARGET_MODEL=...`: generate an objective and draft scenario.
-2. `make auto-research-approve-scenario OBJECTIVE_ID=...`: promote the drafted scenario and seed an initial benchmark in `experiments/benchmarks/`.
-3. `make auto-research-run OBJECTIVE_ID=...`: run bounded research loops (stored in `experiments/research_loops/`).
-4. `make auto-research-status OBJECTIVE_ID=...` and `make auto-research-report OBJECTIVE_ID=...`: track objective progress, best benchmark, and loop status.
-
-## Questions This Helps Answer
+#### Questions This Helps Answer
 
 - Which `AgentSpec` produces the most reliable result for a given scenario?
 - Where is a result failing: functional correctness, acceptance, verification stability, execution validity, visual quality, or efficiency?
 - Does a harness satisfy the stated scenario requirements and back them with tests?
 - Does a visually sensitive scenario stay close to the intended reference design?
 - Are repeated runs stable enough to trust for ranking and decision-making?
+
+### Research Loop Experiment
+
+1. Define an objective for a target harness and model, then draft a scenario around that goal.
+2. Approve the drafted scenario and seed the initial benchmark in `experiments/benchmarks/`.
+3. Run bounded research loops stored in `experiments/research_loops/`.
+4. Review objective progress, current benchmark state, loop outputs, and reports.
+5. Use the evidence to refine the scenario, objective framing, and benchmark promotion decisions before the next loop.
+
+#### Example Commands
+
+```bash
+make auto-research-init GOAL='Improve homepage implementation benchmark reliability' TARGET_HARNESS=codex-cli TARGET_MODEL=codex/gpt-5.4-mini
+make auto-research-approve-scenario OBJECTIVE_ID=homepage-reliability
+make auto-research-run OBJECTIVE_ID=homepage-reliability
+make auto-research-status OBJECTIVE_ID=homepage-reliability
+make auto-research-report OBJECTIVE_ID=homepage-reliability
+```
+
+#### Questions This Helps Answer
+
+- What changes to the scenario contract produce a stronger benchmark for the target harness and model?
+- Is the objective converging, or are loops exposing unresolved gaps in the scenario design?
+- Which scenario edits are improving verification clarity, acceptance coverage, or result quality over time?
+- When should the current best loop output be promoted into the next benchmark baseline?
 
 ## Core Concepts
 
