@@ -11,7 +11,6 @@ REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 	UV_CACHE_DIR="$(REPO_UV_CACHE_DIR)"
 
 RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
-AUTO_RESEARCHER := $(REPO_RUNTIME_ENV) uv run --project auto_researcher auto-researcher
 
 # Shared public workflow defaults.
 SCENARIO ?=
@@ -32,20 +31,6 @@ PROMPT_ENTRY ?=
 DIFFICULTY ?=
 CATEGORY ?=
 TIMEOUT_SEC ?=
-GOAL ?=
-OBJECTIVE_ID ?=
-TARGET_HARNESS ?=
-TARGET_MODEL ?=
-MAX_REVISIONS ?= 3
-LOOP_EXECUTION_MODE ?= serial
-MAX_PARALLEL_LOOPS ?= 3
-BENCHMARK_REPEATS ?= 5
-BENCHMARK_REPEAT_PARALLEL ?= 1
-RESEARCH_REPEATS ?= 3
-RESEARCH_REPEAT_PARALLEL ?= 1
-CONTROL_PROVIDER ?= openai-codex
-CONTROL_MODEL ?= gpt-5.3-codex
-PI_BINARY ?= pi
 
 # Canonical smoke workflow defaults.
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
@@ -61,24 +46,6 @@ AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
 AGENT_SMOKE_RERUN_UNSCORED ?= 0
-RESEARCH_SMOKE_GOAL ?= Draft and approve a minimal hello-world coding scenario for autoresearch smoke validation
-RESEARCH_SMOKE_TARGET_HARNESS ?= codex-cli
-RESEARCH_SMOKE_TARGET_MODEL ?= codex/gpt-5.4-mini
-RESEARCH_SMOKE_CONTROL_PROVIDER ?= openai-codex
-RESEARCH_SMOKE_CONTROL_MODEL ?= gpt-5.3-codex
-RESEARCH_SMOKE_LOOP_EXECUTION_MODE ?= serial
-RESEARCH_SMOKE_MAX_REVISIONS ?= 1
-RESEARCH_SMOKE_MAX_PARALLEL_LOOPS ?= 1
-RESEARCH_SMOKE_BENCHMARK_REPEATS ?= 1
-RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL ?= 1
-RESEARCH_SMOKE_RESEARCH_REPEATS ?= 1
-RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL ?= 1
-ifndef RESEARCH_SMOKE_OBJECTIVE_ID
-RESEARCH_SMOKE_OBJECTIVE_ID := research-smoke-$(shell uuidgen | tr '[:upper:]' '[:lower:]')
-endif
-RESEARCH_SMOKE_OBJECTIVE_ROOT ?= $(CURDIR)/auto_researcher/objectives/$(RESEARCH_SMOKE_OBJECTIVE_ID)
-RESEARCH_SMOKE_STATE_PATH ?= $(RESEARCH_SMOKE_OBJECTIVE_ROOT)/objective.yaml
-RESEARCH_SMOKE_META_PATH ?= $(RESEARCH_SMOKE_OBJECTIVE_ROOT)/research-smoke.meta
 
 ifeq ($(firstword $(MAKECMDGOALS)),matrix-run)
 MATRIX_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
@@ -87,11 +54,9 @@ endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-info scenario-validate \
-	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke research-smoke \
-	research-smoke-init research-smoke-approve research-smoke-cleanup \
+	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
-	auto-research-init auto-research-approve-scenario auto-research-run auto-research-status auto-research-report \
 	quality
 
 define require_var
@@ -126,7 +91,6 @@ help:
 	@echo "  make smoke-matrix                                      Run the default hello-world smoke scenario across the full public model matrix"
 	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
-	@echo "  make research-smoke                                    Run canonical autoresearch init+approve and clean up smoke artifacts"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... MODEL=..."
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
 	@echo "  make matrix-run scenarios/homepage-implementation/v001/scenario.yaml all"
@@ -137,16 +101,6 @@ help:
 	@echo "                                                        List stored experiments and summaries"
 	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
 	@echo "                                                        Preview artifact pruning decisions"
-	@echo "  make auto-research-init GOAL='...' TARGET_HARNESS=... TARGET_MODEL=..."
-	@echo "                                                        Draft an objective-scoped scenario under auto_researcher/"
-	@echo "  make auto-research-approve-scenario OBJECTIVE_ID=..."
-	@echo "                                                        Promote an approved draft scenario and seed the first benchmark"
-	@echo "  make auto-research-run OBJECTIVE_ID=..."
-	@echo "                                                        Execute bounded research loops for an approved objective"
-	@echo "  make auto-research-status OBJECTIVE_ID=..."
-	@echo "                                                        Show current objective and loop state"
-	@echo "  make auto-research-report OBJECTIVE_ID=..."
-	@echo "                                                        Print the current objective report"
 
 env-setup:
 	@$(RAIDAR) env setup
@@ -206,14 +160,6 @@ smoke-dry-run-check:
 		MODEL="$(ORCHESTRATOR_SMOKE_MODEL)" \
 		AGENT_SMOKE_REPEATS="2" \
 		AGENT_SMOKE_REPEAT_PARALLEL="2"
-	@$(MAKE) --no-print-directory -n research-smoke \
-		RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run" \
-		RESEARCH_SMOKE_LOOP_EXECUTION_MODE="parallel" \
-		RESEARCH_SMOKE_MAX_PARALLEL_LOOPS="2" \
-		RESEARCH_SMOKE_BENCHMARK_REPEATS="2" \
-		RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL="2" \
-		RESEARCH_SMOKE_RESEARCH_REPEATS="2" \
-		RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL="2"
 
 orchestrator-smoke: docker-check
 	@$(RAIDAR) run \
@@ -254,88 +200,6 @@ agent-smoke: docker-check
 		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 
-research-smoke: docker-check
-	@status=0; cleanup_status=0; \
-		$(MAKE) --no-print-directory research-smoke-init \
-			RESEARCH_SMOKE_OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" || status=$$?; \
-		if [ "$$status" -eq 0 ]; then \
-			$(MAKE) --no-print-directory research-smoke-approve \
-				RESEARCH_SMOKE_OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" || status=$$?; \
-		fi; \
-		$(MAKE) --no-print-directory research-smoke-cleanup \
-			RESEARCH_SMOKE_OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" || cleanup_status=$$?; \
-		if [ "$$status" -ne 0 ]; then \
-			exit "$$status"; \
-		fi; \
-		exit "$$cleanup_status"
-
-research-smoke-init:
-	@set -euo pipefail; \
-		echo "objective_id=$(RESEARCH_SMOKE_OBJECTIVE_ID)"; \
-		$(MAKE) --no-print-directory auto-research-init \
-			GOAL="$(RESEARCH_SMOKE_GOAL) ($(RESEARCH_SMOKE_OBJECTIVE_ID))" \
-			OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" \
-			TARGET_HARNESS="$(RESEARCH_SMOKE_TARGET_HARNESS)" \
-			TARGET_MODEL="$(RESEARCH_SMOKE_TARGET_MODEL)" \
-			LOOP_EXECUTION_MODE="$(RESEARCH_SMOKE_LOOP_EXECUTION_MODE)" \
-			MAX_REVISIONS="$(RESEARCH_SMOKE_MAX_REVISIONS)" \
-			MAX_PARALLEL_LOOPS="$(RESEARCH_SMOKE_MAX_PARALLEL_LOOPS)" \
-			BENCHMARK_REPEATS="$(RESEARCH_SMOKE_BENCHMARK_REPEATS)" \
-			BENCHMARK_REPEAT_PARALLEL="$(RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL)" \
-			RESEARCH_REPEATS="$(RESEARCH_SMOKE_RESEARCH_REPEATS)" \
-			RESEARCH_REPEAT_PARALLEL="$(RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL)" \
-			CONTROL_PROVIDER="$(RESEARCH_SMOKE_CONTROL_PROVIDER)" \
-			CONTROL_MODEL="$(RESEARCH_SMOKE_CONTROL_MODEL)" \
-			PI_BINARY="$(PI_BINARY)"; \
-		state_path="$(RESEARCH_SMOKE_STATE_PATH)"; \
-		meta_path="$(RESEARCH_SMOKE_META_PATH)"; \
-		if [ -f "$$state_path" ]; then \
-			scenario_slug="$$(sed -n 's/^scenario_slug: //p' "$$state_path" | tail -n 1)"; \
-			scenario_preexisting="0"; \
-			if [ -n "$$scenario_slug" ] && [ "$$scenario_slug" != "null" ] && [ -e "$(CURDIR)/scenarios/$$scenario_slug" ]; then \
-				scenario_preexisting="1"; \
-			fi; \
-			printf 'scenario_preexisting=%s\n' "$$scenario_preexisting" > "$$meta_path"; \
-		fi
-
-research-smoke-approve:
-	@$(MAKE) --no-print-directory auto-research-approve-scenario \
-		OBJECTIVE_ID="$(RESEARCH_SMOKE_OBJECTIVE_ID)" \
-		PI_BINARY="$(PI_BINARY)"
-
-research-smoke-cleanup:
-	@set -euo pipefail; \
-		state_path="$(RESEARCH_SMOKE_STATE_PATH)"; \
-		meta_path="$(RESEARCH_SMOKE_META_PATH)"; \
-		scenario_root=""; \
-		scenario_preexisting="0"; \
-		benchmark_dir=""; \
-		if [ -f "$$meta_path" ]; then \
-			recorded_preexisting="$$(sed -n 's/^scenario_preexisting=//p' "$$meta_path" | tail -n 1)"; \
-			if [ -n "$$recorded_preexisting" ]; then \
-				scenario_preexisting="$$recorded_preexisting"; \
-			fi; \
-		fi; \
-		if [ -f "$$state_path" ]; then \
-			scenario_slug="$$(sed -n 's/^scenario_slug: //p' "$$state_path" | tail -n 1)"; \
-			if [ -n "$$scenario_slug" ] && [ "$$scenario_slug" != "null" ]; then \
-				scenario_root="$(CURDIR)/scenarios/$$scenario_slug"; \
-			fi; \
-			best_benchmark_ref="$$(sed -n 's/^best_benchmark_ref: //p' "$$state_path" | tail -n 1)"; \
-			if [ -n "$$best_benchmark_ref" ] && [ "$$best_benchmark_ref" != "null" ]; then \
-				benchmark_dir="$$(dirname "$$best_benchmark_ref")"; \
-			fi; \
-		fi; \
-		if [ -n "$$benchmark_dir" ] && [ -d "$$benchmark_dir" ]; then \
-			rm -rf "$$benchmark_dir"; \
-		fi; \
-		if [ "$$scenario_preexisting" = "0" ] && [ -n "$$scenario_root" ] && [ -d "$$scenario_root" ]; then \
-			rm -rf "$$scenario_root"; \
-		fi; \
-		if [ -d "$(RESEARCH_SMOKE_OBJECTIVE_ROOT)" ]; then \
-			rm -rf "$(RESEARCH_SMOKE_OBJECTIVE_ROOT)"; \
-		fi
-
 experiment-run:
 	$(call require_var,SCENARIO)
 	$(call require_var,HARNESS)
@@ -375,56 +239,7 @@ experiments-prune:
 		--experiment-kind "$(EXPERIMENT_KIND)" \
 		$(if $(KEEP_PER_MODEL),--keep-per-model "$(KEEP_PER_MODEL)",)
 
-auto-research-init:
-	$(call require_var,GOAL)
-	$(call require_var,TARGET_HARNESS)
-	$(call require_var,TARGET_MODEL)
-	@$(AUTO_RESEARCHER) init \
-		--goal "$(GOAL)" \
-		--target-harness "$(TARGET_HARNESS)" \
-		--target-model "$(TARGET_MODEL)" \
-		--loop-execution-mode "$(LOOP_EXECUTION_MODE)" \
-		--max-revisions "$(MAX_REVISIONS)" \
-		--max-parallel-loops "$(MAX_PARALLEL_LOOPS)" \
-		--benchmark-repeats "$(BENCHMARK_REPEATS)" \
-		--benchmark-repeat-parallel "$(BENCHMARK_REPEAT_PARALLEL)" \
-		--research-repeats "$(RESEARCH_REPEATS)" \
-		--research-repeat-parallel "$(RESEARCH_REPEAT_PARALLEL)" \
-		--control-provider "$(CONTROL_PROVIDER)" \
-		--control-model "$(CONTROL_MODEL)" \
-		--pi-binary "$(PI_BINARY)" \
-		$(if $(OBJECTIVE_ID),--objective-id "$(OBJECTIVE_ID)",)
-
-auto-research-approve-scenario:
-	$(call require_var,OBJECTIVE_ID)
-	@$(AUTO_RESEARCHER) approve-scenario \
-		--objective-id "$(OBJECTIVE_ID)" \
-		--pi-binary "$(PI_BINARY)"
-
-auto-research-run:
-	$(call require_var,OBJECTIVE_ID)
-	@$(AUTO_RESEARCHER) run \
-		--objective-id "$(OBJECTIVE_ID)" \
-		--pi-binary "$(PI_BINARY)"
-
-auto-research-status:
-	$(call require_var,OBJECTIVE_ID)
-	@$(AUTO_RESEARCHER) status \
-		--objective-id "$(OBJECTIVE_ID)" \
-		--pi-binary "$(PI_BINARY)"
-
-auto-research-report:
-	$(call require_var,OBJECTIVE_ID)
-	@$(AUTO_RESEARCHER) report \
-		--objective-id "$(OBJECTIVE_ID)" \
-		--pi-binary "$(PI_BINARY)"
-
 quality:
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(RAIDAR) quality gates
 	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src
-	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -L 80 -a 5 -l python ../auto_researcher/src
-	@cd auto_researcher && uv run --project . --extra dev python -m ruff format --check .
-	@cd auto_researcher && uv run --project . --extra dev python -m ruff check .
-	@cd auto_researcher && uv run --project . --extra dev python -m mypy src tests
-	@cd auto_researcher && uv run --project . --extra dev python -m pytest tests -x --tb=short
