@@ -30,7 +30,7 @@ Use `make help` from the repo root for the supported command surface and target 
 
 ## Quick Start
 
-Run one review-grade experiment for one `AgentSpec` (`harness + model`).
+Run one repeatable experiment for one `AgentSpec` (`harness + model`).
 
 ```bash
 make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
@@ -43,44 +43,13 @@ make experiment-run \
   RERUN_UNSCORED=0
 ```
 
-This writes canonical artifacts into `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
+Artifacts land in `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
 
-Use `make orchestrator-smoke` when you want a fast orchestrator smoke/debug pass for one `AgentSpec`.
+Use the public make surface for faster smoke runs or structured provider-family comparisons:
 
 ```bash
 make orchestrator-smoke
-```
-
-Run a structured provider comparison with the public make surface:
-
-```bash
 make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
-```
-
-Under the hood, that generates a matrix config using the public schema:
-
-```yaml
-matrix:
-  experiment:
-    timeout_sec: 1800
-    repeats: 5
-    repeat_parallel: 1
-    retry_void: 1
-  agents:
-    - harness: codex-cli
-      model: codex/gpt-5.2-high
-    - harness: codex-cli
-      model: codex/gpt-5.2-low
-    - harness: codex-cli
-      model: codex/gpt-5.2-medium
-    - harness: codex-cli
-      model: codex/gpt-5.4-extra-high
-    - harness: codex-cli
-      model: codex/gpt-5.4-high
-    - harness: codex-cli
-      model: codex/gpt-5.4-mini
-    - harness: codex-cli
-      model: codex/gpt-5.4-medium
 ```
 
 ## What Raidar Does
@@ -89,25 +58,24 @@ The repository has four primary concerns:
 
 - `orchestrator/`: CLI and runtime pipeline that executes and scores scenarios.
 - `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
-- `auto_researcher/`: objective-led workflow for scenario design and benchmark-driven research loops.
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
-- `experiments/` uses canonical experiment kinds:
-  - `experiments/benchmarks/` for benchmark baselines
-  - `experiments/research_loops/` for bounded research-loop batches
+- `experiments/benchmarks/` and `experiments/research_loops/`: canonical artifact roots for comparison baselines and bounded loop batches.
+- `auto_researcher/`: objective-led workflow for scenario iteration and research loops.
 
-Raidar is built to answer one practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It helps you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions. The `auto_researcher` capability is currently beta and extends that workflow with objective-led scenario iteration in partnership with an LLM. It is designed around `codex-cli` and draws on ideas from Karpathy's [autoresearch](https://github.com/karpathy/autoresearch).
+Raidar answers a practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It lets you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions. The `auto_researcher` capability is currently beta, designed around `codex-cli`, and draws on ideas from Karpathy's [autoresearch](https://github.com/karpathy/autoresearch).
 
 ## Raidar Modes
 
-Raidar supports two modes of use. Benchmark experiments analyze the same scenario across `AgentSpec` pairs so you can compare CLI harness and model combinations on shared evidence. Research loop experiments automate iterative work on a single scenario in partnership with an LLM so you can improve the scenario, benchmark, and supporting evidence over time.
+Raidar supports two modes of use:
+
+1. Benchmarking `AgentSpecs` (cli harness + model pairs) - experiments compare the same scenario across `AgentSpec` on shared evidence.
+2. Research loops - experiments automate iterative work on a single scenario in partnership with an LLM.
 
 ### Benchmark Experiment
 
-1. Define a scenario contract in `scenarios/.../scenario.yaml` plus prompt, rules, starter, and optional visual reference.
-2. Validate the `AgentSpec` and the scenario contract before running.
-3. Run one experiment for one `AgentSpec`, or use `make matrix-run <scenario-yaml> <all|codex|gemini|claude>` when you want a structured comparison across benchmark model sets.
-4. Review artifacts in `experiments/`, especially `run.json`, `experiment-summary.json`, and `report.md`.
-5. Use the evidence to improve prompts, rules, starter quality, scenario design, or the `AgentSpec` choice.
+Use benchmark experiments when you want a comparison baseline for one scenario. They help you rank `AgentSpec` choices, inspect where failures cluster, and help you understand whats best for your delivery scenario.
+
+> "Whats the best AgentSpec for implementing this design in a project context that matches my own"
 
 #### Example Commands
 
@@ -118,21 +86,11 @@ make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yam
 make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
 ```
 
-#### Questions This Helps Answer
-
-- Which `AgentSpec` produces the most reliable result for a given scenario?
-- Where is a result failing: functional correctness, acceptance, verification stability, execution validity, visual quality, or efficiency?
-- Does a harness satisfy the stated scenario requirements and back them with tests?
-- Does a visually sensitive scenario stay close to the intended reference design?
-- Are repeated runs stable enough to trust for ranking and decision-making?
-
 ### Research Loop Experiment
 
-1. Define an objective for a target harness and model, then draft a scenario around that goal.
-2. Approve the drafted scenario and seed the initial benchmark in `experiments/benchmarks/`.
-3. Run bounded research loops stored in `experiments/research_loops/`.
-4. Review objective progress, current benchmark state, loop outputs, and reports.
-5. Use the evidence to refine the scenario, objective framing, and benchmark promotion decisions before the next loop.
+Use research loop experiments when you want iteration for a single AgentSpec on a scenario for a stated objective. They help you refine scenario, evaluate candidate improvements, and decide when a new result is strong enough to become the adopted approach.
+
+> "I want you to create a research loop using the Code Cli + GPT 5.4 mini AgentSpec until it matches or exceeds the best passing score on the home page scenario"
 
 #### Example Commands
 
@@ -144,21 +102,14 @@ make auto-research-status OBJECTIVE_ID=homepage-reliability
 make auto-research-report OBJECTIVE_ID=homepage-reliability
 ```
 
-#### Questions This Helps Answer
-
-- What changes to the scenario contract produce a stronger benchmark for the target harness and model?
-- Is the objective converging, or are loops exposing unresolved gaps in the scenario design?
-- Which scenario edits are improving verification clarity, acceptance coverage, or result quality over time?
-- When should the current best loop output be promoted into the next benchmark baseline?
-
 ## Core Concepts
 
 - A `scenario` is the contract: prompt, rules, starter, verification settings, acceptance requirements, metrics, and optional visual baseline.
 - A `harness` is the executable/runtime surface previously referred to as an agent.
 - An `AgentSpec` is one harness plus one model.
 - An `experiment` is one `AgentSpec` run against one scenario, usually with repeats.
-- A `benchmark` is the pinned baseline experiment used as the current comparison anchor for an autoresearch objective.
-- A `research loop` is a bounded, iterative experiment batch run to improve benchmark-facing evidence for that objective.
+- A `benchmark` is a pinned experiment used as a stable comparison anchor across runs, scenario revisions, or decision points.
+- A `research loop` is a bounded, iterative experiment batch run under `auto_researcher`.
 - An `objective` is the optimization target in `auto_researcher` (goal, target harness/model, and control settings).
 - A `matrix config` uses top-level `experiment` and `agents` blocks; each entry in `agents` must declare a `harness` and `model`.
 - A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and harness logs.
