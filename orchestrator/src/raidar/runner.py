@@ -432,6 +432,28 @@ def _preflight_cache_file(cache_key: str) -> Path:
     return _prep_cache_root() / "preflight" / f"{cache_key}.ok.json"
 
 
+def _workspace_runtime_env(workspace: Path, base_env: dict[str, str] | None = None) -> dict[str, str]:
+    env = dict(os.environ if base_env is None else base_env)
+    tmp_dir = workspace / ".tmp"
+    cache_dir = workspace / ".cache"
+    uv_cache_dir = cache_dir / "uv"
+    bun_cache_dir = cache_dir / "bun"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    uv_cache_dir.mkdir(parents=True, exist_ok=True)
+    bun_cache_dir.mkdir(parents=True, exist_ok=True)
+    env.update(
+        {
+            "TMPDIR": str(tmp_dir),
+            "TMP": str(tmp_dir),
+            "TEMP": str(tmp_dir),
+            "XDG_CACHE_HOME": str(cache_dir),
+            "UV_CACHE_DIR": str(uv_cache_dir),
+            "BUN_INSTALL_CACHE_DIR": str(bun_cache_dir),
+        }
+    )
+    return env
+
+
 def _cache_lock_root() -> Path:
     return _raidar_cache_root() / "locks"
 
@@ -604,7 +626,7 @@ def _ensure_baseline_workspace(
             )
             _run_workspace_setup_actions(
                 workspace=baseline_workspace_dir,
-                env=os.environ.copy(),
+                env=_workspace_runtime_env(baseline_workspace_dir, os.environ.copy()),
                 setup_actions=scenario.verification.setup_actions,
             )
             baseline_fingerprint = directory_fingerprint(baseline_workspace_dir)
@@ -960,7 +982,7 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
             _touch_cache_path(cache_file)
             return True
 
-        env = os.environ.copy()
+        env = _workspace_runtime_env(context.workspace, os.environ.copy())
         _run_starter_preflight_install(context.workspace, env)
 
         has_tests = _workspace_has_tests(context.workspace)

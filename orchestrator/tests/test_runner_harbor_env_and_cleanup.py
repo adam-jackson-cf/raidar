@@ -439,6 +439,66 @@ def test_ensure_starter_preflight_reuses_repo_local_cache_across_invocations(
     assert calls == [["bun", "install", "--frozen-lockfile"], ["bun", "run", "lint"]]
 
 
+def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
+    monkeypatch, tmp_path: Path
+) -> None:
+    task_dir = tmp_path / "scenario"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "scenario.yaml").write_text(
+        "name: sample\nscenario_revision: v001\n", encoding="utf-8"
+    )
+
+    request = SimpleNamespace(
+        scenario=SimpleNamespace(
+            verification=SimpleNamespace(required_commands=[["bun", "run", "lint"]])
+        ),
+        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+        scenario_dir=task_dir,
+    )
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    context = SimpleNamespace(
+        workspace=workspace,
+        baseline_cache_key="baseline-cache-key",
+        starter_source=SimpleNamespace(fingerprint="abc123"),
+    )
+
+    envs: list[dict[str, str]] = []
+
+    def fake_run(command, **kwargs):
+        envs.append(kwargs["env"])
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr(
+        runner,
+        "_preflight_cache_file",
+        lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
+    )
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: True)
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    runner.ensure_starter_preflight(request, context)
+
+    expected_tmp = workspace / ".tmp"
+    expected_cache = workspace / ".cache"
+    expected_uv_cache = expected_cache / "uv"
+    expected_bun_cache = expected_cache / "bun"
+
+    assert envs
+    for env in envs:
+        assert env["TMPDIR"] == str(expected_tmp)
+        assert env["TMP"] == str(expected_tmp)
+        assert env["TEMP"] == str(expected_tmp)
+        assert env["XDG_CACHE_HOME"] == str(expected_cache)
+        assert env["UV_CACHE_DIR"] == str(expected_uv_cache)
+        assert env["BUN_INSTALL_CACHE_DIR"] == str(expected_bun_cache)
+
+    assert expected_tmp.is_dir()
+    assert expected_uv_cache.is_dir()
+    assert expected_bun_cache.is_dir()
+
+
 def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
     monkeypatch, tmp_path: Path
 ) -> None:
