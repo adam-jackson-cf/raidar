@@ -54,6 +54,7 @@ def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch) -> None:
         ("gpt-5.4-high", "codex/gpt-5.4", "high"),
         ("gpt-5.4-extra-high", "codex/gpt-5.4", "xhigh"),
         ("gpt-5.4-mini", "codex/gpt-5.4-mini", None),
+        ("gpt-5.4-mini-low", "codex/gpt-5.4-mini", "low"),
     ),
 )
 def test_aliases_requested_codex_models(

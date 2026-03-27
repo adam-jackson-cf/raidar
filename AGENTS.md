@@ -15,6 +15,10 @@
 
 ## Smoke Testing
 
+- Harness-led `raidar` ExecPlan smoke runs must use `/Users/adamjackson/Projects/execplan-executor/scripts/setup_raidar_smoke_worktree.sh` to create the fresh detached worktree, copy the finalized ExecPlan package, and symlink `orchestrator/.env` from the canonical `raidar` checkout before launch.
+- Canonical setup shape: `/Users/adamjackson/Projects/execplan-executor/scripts/setup_raidar_smoke_worktree.sh --worktree-path /Users/adamjackson/Projects/raidar-harness-eval-<timestamp> --packet-root /Users/adamjackson/Projects/raidar/.plan/create-execplan/<artifact-id>`
+- Maintain `/Users/adamjackson/Projects/execplan-executor/smoke-findings.md` during the smoke loop as a concise `issue > action` log of real blockers and corrective actions.
+- Add a new `smoke-findings.md` entry only after a blocker or contradiction has been confirmed and a concrete action has been taken to address it; do not add entries for routine healthy progress, speculative diagnoses, or unchanged reruns.
 - `make smoke-dry-run-check`: Print the canonical smoke command shapes used by CI drift checks.
 - `make orchestrator-smoke`: Run the default hello-world orchestrator smoke scenario on `codex-cli` with `codex/gpt-5.4-mini`.
 - `make smoke-matrix`: Run the default hello-world smoke scenario across the full public model matrix.

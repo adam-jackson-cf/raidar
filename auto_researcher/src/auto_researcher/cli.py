@@ -169,7 +169,7 @@ def main() -> None:
 )
 @click.option("--pi-binary", default="pi", show_default=True, type=str)
 @click.pass_context
-def init_command(ctx: click.Context) -> None:
+def init_command(ctx: click.Context, **_: Any) -> None:
     _dispatch_init_command(_init_command_config(dict(ctx.params)))
 
 

@@ -432,7 +432,9 @@ def _preflight_cache_file(cache_key: str) -> Path:
     return _prep_cache_root() / "preflight" / f"{cache_key}.ok.json"
 
 
-def _workspace_runtime_env(workspace: Path, base_env: dict[str, str] | None = None) -> dict[str, str]:
+def _workspace_runtime_env(
+    workspace: Path, base_env: dict[str, str] | None = None
+) -> dict[str, str]:
     env = dict(os.environ if base_env is None else base_env)
     tmp_dir = workspace / ".tmp"
     cache_dir = workspace / ".cache"
