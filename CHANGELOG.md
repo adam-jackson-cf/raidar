@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.1] - 2026-03-27
+
+- fix(auto-researcher): use starter-local temp env
+- fix(orchestrator): use workspace-local temp env for starter prep
+- fix(make): use repo-local temp env for public commands
+- fix(orchestrator): restore api-key-only codex harbor auth
+- fix(orchestrator): support codex auth file for harbor smoke
+- fix(orchestrator): tolerate ps permission errors in harbor cleanup
+- docs(readme): align raidar mode experiment flows
+
 ## [0.9.0] - 2026-03-26
 
 - feat: add codex gpt-5.4-mini support
