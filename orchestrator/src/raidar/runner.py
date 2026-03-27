@@ -2456,6 +2456,35 @@ def persist_verifier_artifacts(
     return copied
 
 
+def persist_canonical_verifier_artifacts(
+    layout: RunLayout, scorecard: Scorecard, outputs: EvaluationOutputs
+) -> None:
+    """Rewrite canonical verifier artifacts from the synthesized canonical scorecard."""
+    layout.verifier_dir.mkdir(parents=True, exist_ok=True)
+    gate_history_payload = [event.model_dump(mode="json") for event in outputs.gate_history]
+    scorecard_payload = scorecard.model_dump(mode="json")
+    scorecard_payload["gate_history"] = gate_history_payload
+
+    (layout.verifier_dir / "scorecard.json").write_text(
+        json.dumps(scorecard_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (layout.verifier_dir / "gate-history.json").write_text(
+        json.dumps(gate_history_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (layout.verifier_dir / "execution-validity.json").write_text(
+        scorecard.execution_validity.model_dump_json(indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (layout.verifier_dir / "performance-gates.json").write_text(
+        scorecard.performance_gates.model_dump_json(indent=2) + "\n",
+        encoding="utf-8",
+    )
+    reward_value = scorecard.quality_score if scorecard.execution_validity.passed else 0
+    (layout.verifier_dir / "reward.txt").write_text(f"{reward_value}", encoding="utf-8")
+
+
 def _copy_optional_visual_asset(source: Path, target: Path) -> str | None:
     if not source.exists():
         return None

@@ -1532,6 +1532,73 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
     assert scorecard.metadata["run"]["unscored_reasons"] == scorecard.unscored_reasons
 
 
+def test_persist_canonical_verifier_artifacts_overwrites_stale_trial_scorecard(tmp_path: Path):
+    context = _sample_scorecard_context(
+        tmp_path,
+        terminated_early=True,
+        termination_reason=(
+            "Codex turn failed: Quota exceeded. Check your plan and billing details."
+        ),
+    )
+    verifier_dir = context.layout.verifier_dir
+    verifier_dir.mkdir(parents=True, exist_ok=True)
+    (verifier_dir / "scorecard.json").write_text(
+        json.dumps(
+            {
+                "execution_validity": {
+                    "checks": [
+                        {
+                            "name": "run_completed",
+                            "passed": True,
+                            "evidence": "Run completed without early termination.",
+                        }
+                    ],
+                    "passed": True,
+                },
+                "performance_gates": {"checks": [], "passed": True},
+                "gate_history": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    (verifier_dir / "execution-validity.json").write_text(
+        json.dumps({"checks": [{"name": "run_completed", "passed": True}], "passed": True}),
+        encoding="utf-8",
+    )
+    (verifier_dir / "performance-gates.json").write_text(
+        json.dumps({"checks": [], "passed": True}),
+        encoding="utf-8",
+    )
+    (verifier_dir / "gate-history.json").write_text(
+        json.dumps([{"gate_name": "lint"}]), encoding="utf-8"
+    )
+    (verifier_dir / "reward.txt").write_text("1", encoding="utf-8")
+
+    scorecard = build_scorecard(context)
+
+    runner.persist_canonical_verifier_artifacts(
+        context.layout, scorecard, context.execution.outputs
+    )
+
+    persisted_scorecard = json.loads((verifier_dir / "scorecard.json").read_text(encoding="utf-8"))
+    persisted_execution = json.loads(
+        (verifier_dir / "execution-validity.json").read_text(encoding="utf-8")
+    )
+    persisted_gate_history = json.loads(
+        (verifier_dir / "gate-history.json").read_text(encoding="utf-8")
+    )
+
+    run_completed_check = next(
+        check for check in persisted_execution["checks"] if check["name"] == "run_completed"
+    )
+    assert run_completed_check["passed"] is False
+    assert persisted_execution["passed"] is False
+    assert persisted_scorecard["execution_validity"]["passed"] is False
+    assert persisted_scorecard["unscored"] is True
+    assert persisted_gate_history == []
+    assert float((verifier_dir / "reward.txt").read_text(encoding="utf-8")) == 0.0
+
+
 def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Path):
     workspace = tmp_path / "workspace"
     scenario_dir = tmp_path / "scenario"

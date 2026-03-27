@@ -256,6 +256,7 @@ def synthesize_scorecard_phase(request, phase, execution, artifacts):
             execution=execution,
         )
     )
+    runner.persist_canonical_verifier_artifacts(phase.layout, scorecard, execution.outputs)
     runner.write_run_analysis(phase.layout, request, scorecard, execution.harbor_result)
     return scorecard
 
