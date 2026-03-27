@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import concurrent.futures
 import json
+import os
 import shutil
 import subprocess
 from dataclasses import dataclass, field
@@ -111,6 +112,28 @@ DESIGN_EXAMPLE_JSON = json.dumps(
         "notes": ["short notes"],
     }
 )
+
+
+def _starter_runtime_env(
+    starter_root: Path,
+    base_env: dict[str, str] | None = None,
+) -> dict[str, str]:
+    env = dict(os.environ if base_env is None else base_env)
+    tmp_dir = starter_root / ".tmp"
+    cache_dir = starter_root / ".cache"
+    bun_cache_dir = cache_dir / "bun"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    bun_cache_dir.mkdir(parents=True, exist_ok=True)
+    env.update(
+        {
+            "TMPDIR": str(tmp_dir),
+            "TMP": str(tmp_dir),
+            "TEMP": str(tmp_dir),
+            "XDG_CACHE_HOME": str(cache_dir),
+            "BUN_INSTALL_CACHE_DIR": str(bun_cache_dir),
+        }
+    )
+    return env
 
 
 @dataclass(slots=True)
@@ -1065,6 +1088,7 @@ class AutoResearchEngine:
         install = subprocess.run(
             ["bun", "install", "--lockfile-only"],
             cwd=starter_root,
+            env=_starter_runtime_env(starter_root, os.environ.copy()),
             capture_output=True,
             text=True,
             check=False,
@@ -1095,6 +1119,7 @@ class AutoResearchEngine:
             result = subprocess.run(
                 command,
                 cwd=starter_root,
+                env=_starter_runtime_env(starter_root, os.environ.copy()),
                 capture_output=True,
                 text=True,
                 check=False,

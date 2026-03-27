@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import subprocess
 import threading
 import time
 from collections.abc import Callable
@@ -1272,3 +1273,42 @@ def test_init_rejects_design_with_failing_starter_baseline_command(tmp_path: Pat
 
     with pytest.raises(RuntimeError, match="bun run test"):
         engine.init_objective(_init_request())
+
+
+def test_init_uses_workspace_local_runtime_env_for_starter_commands(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    engine, _role_runner, _raidar, _layout = _make_engine(
+        tmp_path,
+        role_scripts=[
+            {"role": "designer", "payload": _design_payload()},
+            {"role": "critic", "payload": _critic_payload()},
+        ],
+    )
+
+    envs: list[tuple[list[str], dict[str, str], Path]] = []
+
+    def fake_run(command, **kwargs):
+        envs.append((list(command), kwargs["env"], Path(kwargs["cwd"])))
+        if command == ["bun", "install", "--lockfile-only"]:
+            (Path(kwargs["cwd"]) / "bun.lock").write_text("", encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    monkeypatch.setattr("auto_researcher.engine.subprocess.run", fake_run)
+
+    engine.init_objective(_init_request())
+
+    assert len(envs) == 2
+    for command, env, cwd in envs:
+        assert command in (
+            ["bun", "install", "--lockfile-only"],
+            ["bun", "run", "lint"],
+        )
+        assert env["TMPDIR"] == str(cwd / ".tmp")
+        assert env["TMP"] == str(cwd / ".tmp")
+        assert env["TEMP"] == str(cwd / ".tmp")
+        assert env["XDG_CACHE_HOME"] == str(cwd / ".cache")
+        assert env["BUN_INSTALL_CACHE_DIR"] == str(cwd / ".cache" / "bun")
+        assert (cwd / ".tmp").is_dir()
+        assert (cwd / ".cache" / "bun").is_dir()
