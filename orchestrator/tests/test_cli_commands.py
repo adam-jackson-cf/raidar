@@ -16,6 +16,7 @@ from raidar.cli import (
     RESEARCH_LOOP_EXPERIMENTS_ROOT,
     RunCliOptions,
     SuiteExecutionResult,
+    _archive_destination,
     _assert_no_generated_artifact_changes,
     _generated_artifact_paths,
     _persist_experiment_execution,
@@ -875,7 +876,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     assert new_dir.exists()
     assert other_model_dir.exists()
     assert not old_dir.exists()
-    assert (archive_root / "experiments" / old_dir.name).exists()
+    assert _archive_destination(old_dir, archive_root).exists()
     assert "experiments_pruned=1" in result.output
 
 
@@ -920,7 +921,8 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
     assert old_dir.exists()
     assert new_dir.exists()
     assert not archive_root.exists()
-    assert "would-archive: experiments/" in result.output
+    expected_rel = _archive_destination(old_dir, archive_root).relative_to(archive_root)
+    assert f"would-archive: {expected_rel}" in result.output
 
 
 def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: Path) -> None:

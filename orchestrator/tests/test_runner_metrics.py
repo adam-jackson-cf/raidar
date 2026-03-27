@@ -1349,6 +1349,7 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
 
 
 def test_build_scorecard_fails_execution_validity_without_required_atomic_commit(
+    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     score_context = _sample_scorecard_context(
@@ -1357,6 +1358,7 @@ def test_build_scorecard_fails_execution_validity_without_required_atomic_commit
         termination_reason=None,
     )
     score_context.request.scenario.verification.workflow.atomic_commits_required = True
+    monkeypatch.setattr("raidar.runner._git_commit_count", lambda _: (0, "commit_count=0"))
 
     scorecard = build_scorecard(score_context)
 
