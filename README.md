@@ -59,17 +59,13 @@ The repository has four primary concerns:
 - `orchestrator/`: CLI and runtime pipeline that executes and scores scenarios.
 - `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
-- `experiments/benchmarks/` and `experiments/research_loops/`: canonical artifact roots for comparison baselines and bounded loop batches.
-- `auto_researcher/`: objective-led workflow for scenario iteration and research loops.
+- `experiments/benchmarks/`: canonical artifact root for comparison baselines.
 
-Raidar answers a practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It lets you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions. The `auto_researcher` capability is currently beta, designed around `codex-cli`, and draws on ideas from Karpathy's [autoresearch](https://github.com/karpathy/autoresearch).
+Raidar answers a practical question: how well does a given harness and model perform against delivery scenarios that look like real project work. It lets you compare execution quality, reliability, and efficiency against the same scenario contract instead of relying on anecdotal impressions.
 
 ## Raidar Modes
 
-Raidar supports two modes of use:
-
-1. Benchmarking `AgentSpecs` (cli harness + model pairs) - experiments compare the same scenario across `AgentSpec` on shared evidence.
-2. Research loops - experiments automate iterative work on a single scenario in partnership with an LLM.
+Raidar's stable public workflow is benchmarking `AgentSpecs` (`harness + model` pairs) against shared scenario contracts.
 
 ### Benchmark Experiment
 
@@ -86,22 +82,6 @@ make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yam
 make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
 ```
 
-### Research Loop Experiment
-
-Use research loop experiments when you want iteration for a single AgentSpec on a scenario for a stated objective. They help you refine scenario, evaluate candidate improvements, and decide when a new result is strong enough to become the adopted approach.
-
-> "I want you to create a research loop using the Code Cli + GPT 5.4 mini AgentSpec until it matches or exceeds the best passing score on the home page scenario"
-
-#### Example Commands
-
-```bash
-make auto-research-init GOAL='Improve homepage implementation benchmark reliability' TARGET_HARNESS=codex-cli TARGET_MODEL=codex/gpt-5.4-mini
-make auto-research-approve-scenario OBJECTIVE_ID=homepage-reliability
-make auto-research-run OBJECTIVE_ID=homepage-reliability
-make auto-research-status OBJECTIVE_ID=homepage-reliability
-make auto-research-report OBJECTIVE_ID=homepage-reliability
-```
-
 ## Core Concepts
 
 - A `scenario` is the contract: prompt, rules, starter, verification settings, acceptance requirements, metrics, and optional visual baseline.
@@ -109,8 +89,6 @@ make auto-research-report OBJECTIVE_ID=homepage-reliability
 - An `AgentSpec` is one harness plus one model.
 - An `experiment` is one `AgentSpec` run against one scenario, usually with repeats.
 - A `benchmark` is a pinned experiment used as a stable comparison anchor across runs, scenario revisions, or decision points.
-- A `research loop` is a bounded, iterative experiment batch run under `auto_researcher`.
-- An `objective` is the optimization target in `auto_researcher` (goal, target harness/model, and control settings).
 - A `matrix config` uses top-level `experiment` and `agents` blocks; each entry in `agents` must declare a `harness` and `model`.
 - A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and harness logs.
 - An `evaluation_profile` is the ordered metric capability set derived from `metrics[]`; use it as part of the identity when comparing experiments.
@@ -122,4 +100,3 @@ Canonical artifact paths use `runs/` and `harness/` under each experiment.
 - [docs/references/metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
 - [docs/references/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/raidar/docs/references/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
 - [docs/references/raidar-framework-comparison.md](/Users/adamjackson/Projects/raidar/docs/references/raidar-framework-comparison.md): comparison memo covering RAIDAR's delivery-focused differentiators and how it compares with Inspect AI, Promptfoo, and DeepEval.
-- [docs/references/auto-researcher.md](/Users/adamjackson/Projects/raidar/docs/references/auto-researcher.md): objective-led flow for benchmarks, research loops, and status/report outputs.

@@ -23,4 +23,3 @@
 - `make orchestrator-smoke`: Run the default hello-world orchestrator smoke scenario on `codex-cli` with `codex/gpt-5.4-mini`.
 - `make smoke-matrix`: Run the default hello-world smoke scenario across the full public model matrix.
 - `make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini`: Run the canonical agent smoke workflow through the public `make` targets.
-- `make research-smoke`: Run the canonical autoresearch smoke workflow and clean up its smoke artifacts.
