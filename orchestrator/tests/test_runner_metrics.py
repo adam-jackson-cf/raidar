@@ -411,8 +411,13 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
     def fake_run_setup_actions(
         *, workspace: Path, env: dict[str, str], setup_actions: list[list[str]]
     ) -> None:
-        del env
         assert workspace == baseline_workspace_dir
+        assert env["TMPDIR"] == str(baseline_workspace_dir / ".tmp")
+        assert env["TMP"] == str(baseline_workspace_dir / ".tmp")
+        assert env["TEMP"] == str(baseline_workspace_dir / ".tmp")
+        assert env["XDG_CACHE_HOME"] == str(baseline_workspace_dir / ".cache")
+        assert env["UV_CACHE_DIR"] == str(baseline_workspace_dir / ".cache" / "uv")
+        assert env["BUN_INSTALL_CACHE_DIR"] == str(baseline_workspace_dir / ".cache" / "bun")
         setup_calls.extend(setup_actions)
 
     monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
@@ -431,6 +436,9 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
         ["git", "init"],
         ["git", "config", "core.hooksPath", ".githooks"],
     ]
+    assert (baseline_workspace_dir / ".tmp").is_dir()
+    assert (baseline_workspace_dir / ".cache" / "uv").is_dir()
+    assert (baseline_workspace_dir / ".cache" / "bun").is_dir()
 
 
 def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
