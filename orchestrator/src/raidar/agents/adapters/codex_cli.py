@@ -18,7 +18,6 @@ class CodexCliAdapter(HarnessAdapter):
     HARBOR_HARNESS_NAME = "codex"
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     OPENAI_API_ENV = "OPENAI_API_KEY"
-    AUTH_FILE_SECRET_ENV = "AGENTIC_EVAL_SECRET_FILE_CODEX_AUTH_JSON"
     MODEL_ALIAS_MAP: dict[str, tuple[str, str]] = {
         "gpt-5.2-low": ("gpt-5.2-codex", "low"),
         "gpt-5.2-medium": ("gpt-5.2-codex", "medium"),
@@ -55,12 +54,6 @@ class CodexCliAdapter(HarnessAdapter):
         self._cli_path = candidate
         return candidate
 
-    def _resolve_auth_file(self) -> Path | None:
-        candidate = Path.home() / ".codex" / "auth.json"
-        if candidate.is_file():
-            return candidate
-        return None
-
     def validate(self) -> None:
         provider = self.config.model.provider
         if provider != "codex":
@@ -69,10 +62,8 @@ class CodexCliAdapter(HarnessAdapter):
                 f"Received '{provider}'."
             )
         self._resolve_cli()
-        if not os.environ.get(self.OPENAI_API_ENV) and self._resolve_auth_file() is None:
-            raise OSError(
-                "Codex Harbor runs require OPENAI_API_KEY or a readable ~/.codex/auth.json."
-            )
+        if not os.environ.get(self.OPENAI_API_ENV):
+            raise OSError("Codex Harbor runs require an API key. Set OPENAI_API_KEY.")
 
     def harbor_harness(self) -> str:
         return self.HARBOR_HARNESS_NAME
@@ -100,9 +91,6 @@ class CodexCliAdapter(HarnessAdapter):
         env: dict[str, str] = {}
         cli_path = self._resolve_cli()
         env[self.CLI_ENV_VAR] = cli_path
-        auth_file = self._resolve_auth_file()
-        if auth_file is not None:
-            env[self.AUTH_FILE_SECRET_ENV] = str(auth_file)
         return with_harness_pythonpath(env)
 
     def prepare_workspace(self, workspace: Path) -> None:
