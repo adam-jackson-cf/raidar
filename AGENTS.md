@@ -22,3 +22,11 @@
 - Codex-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=codex`
 - Gemini-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=gemini`
 - Claude-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=claude`
+
+## Branch Syncing
+
+- `cleanup/remove-autoresearch-from-main` is intended to merge to `main` without changing the ongoing `feat/autoresearch-v3` line of development.
+- The canonical autoresearch removal commit is `d1973d6` `refactor: remove autoresearch surface from main`.
+- When pulling `main` changes into `feat/autoresearch-v3`, prefer cherry-picking specific wanted commits instead of merging all of `main`.
+- Do not cherry-pick `d1973d6` into `feat/autoresearch-v3`.
+- If a later `main` commit depends on `d1973d6` and removes or rewires autoresearch files, skip that commit too unless the feature branch is explicitly being reconciled with the removal.
