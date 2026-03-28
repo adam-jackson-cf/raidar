@@ -161,6 +161,9 @@ smoke-dry-run-check:
 		AGENT_SMOKE_REPEATS="2" \
 		AGENT_SMOKE_REPEAT_PARALLEL="2"
 
+orchestrator-smoke smoke-matrix agent-smoke: export HARBOR_SMOKE_FAST := 1
+orchestrator-smoke smoke-matrix agent-smoke: export HARBOR_SMOKE_FAST_REUSE_IMAGE := 1
+
 orchestrator-smoke: docker-check
 	@$(RAIDAR) run \
 		--scenario "$(ORCHESTRATOR_SMOKE_SCENARIO)" \
