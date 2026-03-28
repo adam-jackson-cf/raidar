@@ -2,6 +2,12 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.3] - 2026-03-28
+
+- fix(scenarios): keep homepage iterations in revision roots
+- docs(agents): remove temporary sync notes
+- chore(main): reconcile non-autoresearch local work
+
 ## [0.9.2] - 2026-03-28
 
 - fix(ci): remove deleted auto_researcher sync step
