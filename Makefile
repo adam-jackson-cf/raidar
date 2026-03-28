@@ -53,7 +53,7 @@ $(foreach goal,$(MATRIX_ARGS),$(eval $(goal):;@:))
 endif
 
 .PHONY: help \
-	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-info scenario-validate \
+	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
 	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
@@ -78,6 +78,8 @@ help:
 	@echo "  make scenario-list                                     List available scenarios and revisions"
 	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001"
 	@echo "                                                        Scaffold a new scenario"
+	@echo "  make scenario-clone-revision SCENARIO_DIR=scenarios/homepage-implementation FROM_REVISION=v001 [TO_REVISION=v002]"
+	@echo "                                                        Create a new revision inside an existing scenario root"
 	@echo "  make scenario-info SCENARIO_DIR=scenarios/homepage-implementation [SCENARIO_REVISION=v001]"
 	@echo "                                                        Inspect a scenario and show revision yaml paths"
 	@echo "  make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml"
@@ -139,6 +141,14 @@ scenario-init:
 		$(if $(DIFFICULTY),--difficulty "$(DIFFICULTY)",) \
 		$(if $(CATEGORY),--category "$(CATEGORY)",) \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
+
+scenario-clone-revision:
+	$(call require_var,SCENARIO_DIR)
+	$(call require_var,FROM_REVISION)
+	@$(RAIDAR) scenario clone-revision \
+		--path "$(SCENARIO_DIR)" \
+		--from-revision "$(FROM_REVISION)" \
+		$(if $(TO_REVISION),--to-revision "$(TO_REVISION)",)
 
 scenario-info:
 	$(call require_var,SCENARIO_DIR)

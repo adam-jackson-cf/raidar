@@ -27,6 +27,7 @@ make env-setup
 ```
 
 Use `make help` from the repo root for the supported command surface and target descriptions.
+Create a brand-new scenario with `make scenario-init ...`; create a new revision of an existing scenario with `make scenario-clone-revision SCENARIO_DIR=scenarios/homepage-implementation FROM_REVISION=v001 [TO_REVISION=v002]`.
 
 ## Quick Start
 

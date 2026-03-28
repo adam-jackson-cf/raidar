@@ -632,6 +632,55 @@ def test_scenario_clone_revision_succeeds_without_starter_manifest(tmp_path: Pat
     assert (scenario_dir / "v002").exists()
 
 
+def test_scenario_clone_revision_skips_ignored_generated_artifacts_in_git_repo(
+    tmp_path: Path,
+) -> None:
+    runner = CliRunner()
+    scenario_dir = tmp_path / "scenarios" / "sample-task"
+
+    (tmp_path / ".gitignore").write_text(
+        ".DS_Store\n.next/\ncoverage/\nnode_modules/\n*.tsbuildinfo\n"
+    )
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+
+    init_result = runner.invoke(
+        main,
+        ["scenario", "init", "--path", str(scenario_dir), "--name", "sample-task"],
+    )
+    assert init_result.exit_code == 0, init_result.output
+
+    _create_starter_files(scenario_dir, revision="v001")
+    starter_dir = scenario_dir / "v001" / "starter"
+    (starter_dir / "tsconfig.tsbuildinfo").write_text("{}\n")
+    (starter_dir / ".next" / "cache").mkdir(parents=True, exist_ok=True)
+    (starter_dir / ".next" / "cache" / "build.txt").write_text("generated\n")
+    (starter_dir / "node_modules" / "dep").mkdir(parents=True, exist_ok=True)
+    (starter_dir / "node_modules" / "dep" / "index.js").write_text("export {};\n")
+    (starter_dir / "coverage").mkdir(parents=True, exist_ok=True)
+    (starter_dir / "coverage" / "summary.json").write_text("{}\n")
+    (scenario_dir / "v001" / ".DS_Store").write_text("junk\n")
+
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "add", "-f", str(starter_dir / "tsconfig.tsbuildinfo")],
+        check=True,
+        capture_output=True,
+    )
+
+    clone_result = runner.invoke(
+        main,
+        ["scenario", "clone-revision", "--path", str(scenario_dir), "--from-revision", "v001"],
+    )
+    assert clone_result.exit_code == 0, clone_result.output
+
+    cloned_starter = scenario_dir / "v002" / "starter"
+    assert (cloned_starter / "src" / "app" / "page.tsx").exists()
+    assert (cloned_starter / "tsconfig.tsbuildinfo").exists()
+    assert not (cloned_starter / ".next").exists()
+    assert not (cloned_starter / "node_modules").exists()
+    assert not (cloned_starter / "coverage").exists()
+    assert not (scenario_dir / "v002" / ".DS_Store").exists()
+
+
 def test_scenario_clone_revision_json_emits_machine_readable_payload(tmp_path: Path) -> None:
     runner = CliRunner()
     scenario_dir = tmp_path / "scenarios" / "json-clone-task"

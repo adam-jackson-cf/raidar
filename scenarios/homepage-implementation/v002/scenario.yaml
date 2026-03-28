@@ -1,0 +1,233 @@
+name: homepage-implementation
+scenario_revision: v002
+description: Iterate the homepage benchmark against the provided reference design with compact, verification-first execution
+difficulty: medium
+category: greenfield-ui
+timeout_sec: 1800
+dockerfile: ./Dockerfile
+test_scripts: []
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.9
+  required_commands:
+  - - bun
+    - run
+    - typecheck
+  - - bun
+    - run
+    - lint
+  - - bun
+    - run
+    - test:coverage
+  - - bun
+    - run
+    - build
+  setup_actions:
+  - - git
+    - init
+  - - git
+    - config
+    - core.hooksPath
+    - .githooks
+  gates:
+  - name: typecheck
+    command:
+    - bun
+    - run
+    - typecheck
+    on_failure: continue
+  - name: lint
+    command:
+    - bun
+    - run
+    - lint
+    on_failure: continue
+  - name: coverage
+    command:
+    - bun
+    - run
+    - test:coverage
+    on_failure: continue
+  - name: build
+    command:
+    - bun
+    - run
+    - build
+    on_failure: continue
+  workflow:
+    atomic_commits_required: true
+acceptance:
+  deterministic_checks:
+  - type: no_pattern
+    pattern: Homepage placeholder - implement the design
+    description: Replaces starter placeholder content
+  - type: import_present
+    pattern: Get Started
+    description: Includes hero call-to-action copy
+  - type: import_present
+    pattern: Contact
+    description: Includes contact navigation copy
+  - type: import_present
+    pattern: Everything You Need
+    description: Includes the authored features section heading
+  - type: import_present
+    pattern: Lightning Fast
+    description: Includes the first authored feature card
+  - type: import_present
+    pattern: Secure by Default
+    description: Includes the second authored feature card
+  - type: import_present
+    pattern: Team Collaboration
+    description: Includes the third authored feature card
+  - type: import_present
+    pattern: All rights reserved
+    description: Includes footer copyright copy
+  - type: no_pattern
+    pattern: style={{
+    description: Avoids inline styles
+  - type: file_exists
+    pattern: src/components/sections/**/*.tsx
+    description: Uses the expected section component structure
+  requirements:
+  - id: req-header-nav
+    description: Header contains logo and Home/About/Contact navigation.
+    check:
+      type: import_present
+      pattern: Contact
+      description: Header navigation includes Contact entry
+    required_test_patterns:
+    - Home
+    - About
+    - Contact
+  - id: req-hero-cta
+    description: Hero section includes headline, supporting text, and CTA.
+    check:
+      type: import_present
+      pattern: Get Started
+      description: Hero call-to-action copy exists
+    required_test_patterns:
+    - Get Started
+    - Build Better Products Faster
+  - id: req-features-grid
+    description: Features section renders three feature cards.
+    check:
+      type: import_present
+      pattern: Everything You Need
+      description: Features section heading exists
+    required_test_patterns:
+    - Everything You Need
+    - Lightning Fast
+    - Secure by Default
+    - Team Collaboration
+  - id: req-footer
+    description: Footer contains copyright text.
+    check:
+      type: import_present
+      pattern: All rights reserved
+      description: Footer copyright copy exists
+    required_test_patterns:
+    - All rights reserved
+  llm_judge_rubric:
+  - criterion: Implementation follows the scenario's section and shared-ui structure
+    weight: 0.4
+  - criterion: Styling uses shared theming tokens and design-system primitives consistently
+    weight: 0.3
+  - criterion: Visual hierarchy and polish align with the authored reference design
+    weight: 0.3
+visual:
+  reference_image: ./reference/homepage.png
+  screenshot_command:
+  - bun
+  - run
+  - capture-screenshot
+  viewport:
+    width: 1440
+    height: 1024
+  scoring:
+    weights:
+      global_weight: 0.25
+      regional: 0.45
+      worst_region: 0.25
+      region_pass_rate: 0.05
+    bands:
+      global_band:
+        lower: 0.85
+        upper: 0.96
+      regional:
+        lower: 0.8
+        upper: 0.95
+      worst_region:
+        lower: 0.75
+        upper: 0.94
+    gamma: 2.0
+    region_pass_threshold: 0.9
+  pass_policy:
+    fail_if_global_below: 0.9
+    fail_if_worst_region_below: 0.85
+    minimum_score: 70.0
+    minimum_region_pass_rate: 0.75
+    minimum_worst_region: 0.88
+    high_fidelity_score: 85.0
+    high_fidelity_global: 0.95
+    high_fidelity_worst_region: 0.92
+  regions:
+  - name: header
+    weight: 0.35
+    clip:
+      x: 0
+      y: 0
+      width: 1440
+      height: 96
+  - name: hero
+    weight: 0.45
+    clip:
+      x: 0
+      y: 96
+      width: 1440
+      height: 344
+  - name: features
+    weight: 0.35
+    clip:
+      x: 0
+      y: 440
+      width: 1440
+      height: 424
+  - name: footer
+    weight: 0.2
+    clip:
+      x: 0
+      y: 864
+      width: 1440
+      height: 160
+metrics:
+- type: core
+  id: functional
+- type: core
+  id: acceptance
+- type: core
+  id: verification-stability
+- type: core
+  id: execution-validity
+- type: core
+  id: resource-efficiency
+- type: core
+  id: test-coverage
+- type: core
+  id: requirements-coverage
+- type: core
+  id: llm-judge
+- type: core
+  id: visual-regression
+- type: artifact-checks
+  id: artifact-checks
+  config:
+    required_paths:
+    - src/app/page.tsx
+    - src/components/**/*.tsx
+    path_match: glob
+prompt:
+  entry: prompt/task.md
+  includes: []

@@ -8,6 +8,8 @@
 - LiteLLM must stay exact-pinned to a known-safe release across manifests and lockfiles. Do not use `1.82.7` or `1.82.8`.
 - Keep `README.md` as the only human entrypoint; do not duplicate exhaustive command lists in other docs.
 - Use `make scenario-info` to inspect a scenario contract.
+- Use `make scenario-clone-revision SCENARIO_DIR=scenarios/<scenario-id> FROM_REVISION=v001 [TO_REVISION=v002]` to create a new revision inside an existing scenario root.
+- Use `make scenario-init` only for brand-new scenario roots. If the intent is another revision of an existing scenario, do not create a sibling scenario directory; clone the revision inside the existing root instead.
 - Exclude `scenarios/**/starter/**` from analysis and code-quality checks by default; starter folders are representative delivery-scenario artifacts, not canonical shared product code.
 - Treat `scenarios/` and `experiments/` as build-generated runtime artifacts by default: exclude them from quality checks unless the request explicitly asks to review/analyze them.
 - Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
