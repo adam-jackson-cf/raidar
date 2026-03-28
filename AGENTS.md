@@ -29,4 +29,5 @@
 - The canonical autoresearch removal commit is `d1973d6` `refactor: remove autoresearch surface from main`.
 - When pulling `main` changes into `feat/autoresearch-v3`, prefer cherry-picking specific wanted commits instead of merging all of `main`.
 - Do not cherry-pick `d1973d6` into `feat/autoresearch-v3`.
+- Do not cherry-pick later cleanup commits that assume `auto_researcher/` is absent from `main`, including CI or workflow updates that remove direct `auto_researcher` setup steps.
 - If a later `main` commit depends on `d1973d6` and removes or rewires autoresearch files, skip that commit too unless the feature branch is explicitly being reconciled with the removal.
