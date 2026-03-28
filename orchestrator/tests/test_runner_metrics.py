@@ -4,6 +4,7 @@ import json
 import subprocess
 import threading
 import time
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -1779,6 +1780,72 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     assert "@openai/codex" in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
     assert "@google/gemini-cli" not in dockerfile
+
+
+def test_create_harbor_task_bundle_uses_injected_rules_filename_in_instruction(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    scenario_dir = tmp_path / "scenario"
+    results_dir = tmp_path / "results"
+    scenario_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    _seed_workspace_tree(workspace)
+    (workspace / "GEMINI.md").write_text("gemini rules\n", encoding="utf-8")
+    (scenario_dir / "scenario.yaml").write_text(
+        "name: hello-world-smoke\nscenario_revision: v001\n"
+    )
+    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "prompt" / "task.md").write_text("Print hello world\n")
+
+    scenario = ScenarioDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "scenario_revision": "v001",
+            "description": "test task",
+            "difficulty": "easy",
+            "category": "greenfield-ui",
+            "timeout_sec": 1800,
+            "starter": {
+                "root": "starter",
+            },
+            "verification": {"gates": [], "required_commands": []},
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+            ],
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+    request = RunRequest(
+        scenario=scenario,
+        config=AgentSpec(
+            harness=Harness.GEMINI,
+            model=ModelTarget(provider="google", name="gemini-3-flash-preview"),
+            timeout_sec=1800,
+        ),
+        scenario_dir=scenario_dir,
+        execution_dir=results_dir,
+        repeat_index=1,
+    )
+    context = replace(
+        _sample_workspace_context(workspace, scenario_name="hello-world-smoke"),
+        injected_rules=workspace / "GEMINI.md",
+    )
+
+    bundle = create_harbor_task_bundle(
+        request,
+        context,
+        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+    )
+
+    instruction = (bundle / "instruction.md").read_text(encoding="utf-8")
+
+    assert "You are working in `/app`." in instruction
+    assert "Follow rules in `/app/GEMINI.md`." in instruction
+    assert "Follow rules in `/app/AGENTS.md`." not in instruction
 
 
 def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path):

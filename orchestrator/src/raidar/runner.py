@@ -1826,8 +1826,11 @@ def _load_scenario_prompt(task: ScenarioDefinition, scenario_dir: Path) -> str:
     return "\n\n".join(chunk for chunk in prompt_chunks if chunk)
 
 
-def _bundle_instruction_text(prompt: str) -> str:
-    return prompt.strip() + "\n\nYou are working in `/app`.\nFollow rules in `/app/AGENTS.md`.\n"
+def _bundle_instruction_text(prompt: str, rules_filename: str = "AGENTS.md") -> str:
+    return (
+        prompt.strip()
+        + f"\n\nYou are working in `/app`.\nFollow rules in `/app/{rules_filename}`.\n"
+    )
 
 
 def _render_task_toml(request: RunRequest, task_image: str | None) -> str:
@@ -1940,7 +1943,10 @@ def create_harbor_task_bundle(
     bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(bundle_root)
     _copy_workspace_into_bundle(request, context, app_dir)
     prompt_text = _load_scenario_prompt(request.scenario, request.scenario_dir)
-    (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(prompt_text))
+    rules_filename = context.injected_rules.name if context.injected_rules else "AGENTS.md"
+    (bundle_dir / "instruction.md").write_text(
+        _bundle_instruction_text(prompt_text, rules_filename)
+    )
 
     dockerfile = _render_environment_dockerfile(request)
     _validate_public_base_images(dockerfile)

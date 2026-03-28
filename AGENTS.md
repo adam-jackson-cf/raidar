@@ -15,11 +15,10 @@
 
 ## Smoke Testing
 
-- Harness-led `raidar` ExecPlan smoke runs must use `/Users/adamjackson/Projects/execplan-executor/scripts/setup_raidar_smoke_worktree.sh` to create the fresh detached worktree, copy the finalized ExecPlan package, and symlink `orchestrator/.env` from the canonical `raidar` checkout before launch.
-- Canonical setup shape: `/Users/adamjackson/Projects/execplan-executor/scripts/setup_raidar_smoke_worktree.sh --worktree-path /Users/adamjackson/Projects/raidar-harness-eval-<timestamp> --packet-root /Users/adamjackson/Projects/raidar/.plan/create-execplan/<artifact-id>`
-- Maintain `/Users/adamjackson/Projects/execplan-executor/smoke-findings.md` during the smoke loop as a concise `issue > action` log of real blockers and corrective actions.
-- Add a new `smoke-findings.md` entry only after a blocker or contradiction has been confirmed and a concrete action has been taken to address it; do not add entries for routine healthy progress, speculative diagnoses, or unchanged reruns.
-- `make smoke-dry-run-check`: Print the canonical smoke command shapes used by CI drift checks.
-- `make orchestrator-smoke`: Run the default hello-world orchestrator smoke scenario on `codex-cli` with `codex/gpt-5.4-mini`.
-- `make smoke-matrix`: Run the default hello-world smoke scenario across the full public model matrix.
-- `make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini`: Run the canonical agent smoke workflow through the public `make` targets.
+- Public smoke targets run in fast mode by default. `make orchestrator-smoke`, `make smoke-matrix`, and `make agent-smoke` now set `HARBOR_SMOKE_FAST=1` and `HARBOR_SMOKE_FAST_REUSE_IMAGE=1` automatically, so Codex, Gemini, and Claude smokes use the repo-local fast Harbor agent path without extra env setup.
+- Use the public `make` targets for smoke runs rather than setting fast-mode env vars manually.
+- Small single smoke on low-cost Codex: `make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini-low TIMEOUT_SEC=300`
+- Full default smoke matrix: `make smoke-matrix`
+- Codex-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=codex`
+- Gemini-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=gemini`
+- Claude-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=claude`

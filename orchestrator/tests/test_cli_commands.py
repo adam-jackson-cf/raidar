@@ -1103,6 +1103,11 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
             [
                 "#!/bin/sh",
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
             ]
         )
         + "\n",
@@ -1138,6 +1143,7 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
             "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
+        "ENV:1:1",
     ]
 
 
@@ -1170,6 +1176,11 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
             [
                 "#!/bin/sh",
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
             ]
         )
         + "\n",
@@ -1199,6 +1210,87 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
             "--selector all --repeats 1 --repeat-parallel 1 "
             "--rerun-unscored 0 --experiment-kind benchmark"
         ),
+        "ENV:1:1",
+    ]
+
+
+def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        [
+            "make",
+            "agent-smoke",
+            "HARNESS=gemini",
+            "MODEL=google/gemini-3-flash-preview",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        "UV:run --project orchestrator raidar harbor cleanup",
+        "ENV:1:1",
+        (
+            "UV:run --project orchestrator raidar harness validate "
+            "--harness gemini --model google/gemini-3-flash-preview"
+        ),
+        "ENV:1:1",
+        (
+            "UV:run --project orchestrator raidar experiment run "
+            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
+            "--harness gemini --model google/gemini-3-flash-preview "
+            "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
+            "--experiment-kind benchmark"
+        ),
+        "ENV:1:1",
     ]
 
 
