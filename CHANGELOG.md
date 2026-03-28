@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.9.2] - 2026-03-28
+
+- fix(ci): remove deleted auto_researcher sync step
+- fix: route public smoke targets through fast agents
+- fix(orchestrator): rewrite canonical verifier artifacts
+- fix: align homepage loop and low-model orchestration
+- refactor: remove autoresearch surface from main
+- docs: add branch syncing guidance
+- docs(readme): trim benchmark and mode guidance
+- chore: remove stale plan and scenario artifacts
+- chore: ignore autoresearch objective artifacts
+
 ## [0.9.1] - 2026-03-27
 
 - fix(auto-researcher): use starter-local temp env
