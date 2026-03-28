@@ -15,14 +15,28 @@ import raidar.runner as runner
 
 
 class _AdapterStub:
-    def __init__(self, *, import_path: str | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        import_path: str | None = None,
+        excluded_keys: set[str] | None = None,
+        local_secret_files: dict[str, Path] | None = None,
+    ) -> None:
         self._import_path = import_path
+        self._excluded_keys = excluded_keys or set()
+        self._local_secret_files = local_secret_files or {}
 
     def runtime_env(self) -> dict[str, str]:
         return {"ADAPTER_FLAG": "1", "COMPOSE_BAKE": "1"}
 
     def harbor_harness_import_path(self) -> str | None:
         return self._import_path
+
+    def excluded_run_env_keys(self) -> set[str]:
+        return self._excluded_keys
+
+    def local_secret_files(self) -> dict[str, Path]:
+        return self._local_secret_files
 
 
 @pytest.fixture
@@ -70,6 +84,43 @@ def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(
     assert "DOCKER_CONFIG" not in env
 
 
+def test_build_harbor_run_env_uses_local_secret_files_for_custom_harnesses(
+    repo_tmp_agentic_eval_home: Path,
+    tmp_path: Path,
+) -> None:
+    auth_json_path = tmp_path / "auth.json"
+    auth_json_path.write_text('{"access_token":"token"}', encoding="utf-8")
+
+    env = runner._build_harbor_run_env(
+        _AdapterStub(
+            import_path="raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent",
+            local_secret_files={"CODEX_AUTH_JSON": auth_json_path},
+        )
+    )
+
+    assert env["ADAPTER_FLAG"] == "1"
+    secret_file = runner.Path(env["AGENTIC_EVAL_SECRET_FILE_CODEX_AUTH_JSON"])
+    assert secret_file.exists()
+    assert secret_file.is_relative_to(repo_tmp_agentic_eval_home)
+    assert secret_file.read_text(encoding="utf-8") == '{"access_token":"token"}'
+
+
+def test_build_harbor_run_env_excludes_adapter_blocked_env_keys(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+
+    env = runner._build_harbor_run_env(
+        _AdapterStub(
+            import_path="raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent",
+            excluded_keys={"OPENAI_API_KEY"},
+        )
+    )
+
+    assert "OPENAI_API_KEY" not in env
+    assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" not in env
+
+
 class _ExecAdapterStub:
     def build_harbor_command(self, *, task_path: Path, job_name: str, jobs_dir: Path) -> list[str]:
         del task_path, job_name, jobs_dir
@@ -86,6 +137,15 @@ class _ExecAdapterStub:
 
     def harbor_harness_import_path(self) -> str | None:
         return None
+
+    def excluded_run_env_keys(self) -> set[str]:
+        return set()
+
+    def local_secret_files(self) -> dict[str, Path]:
+        return {}
+
+    def execution_metadata(self) -> dict[str, str]:
+        return {}
 
 
 def test_cleanup_stale_harbor_build_processes_only_kills_orphans(

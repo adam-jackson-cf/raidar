@@ -346,6 +346,7 @@ class WorkspacePreparationPhaseResult:
     prep_phase_timings_sec: dict[str, float]
     prep_total_sec: float
     cache_metadata: dict[str, Any]
+    auth_metadata: dict[str, Any]
     screenshot_command: tuple[str, ...] | None
     evidence_errors: tuple[str, ...]
 
@@ -364,6 +365,7 @@ class ExecutionPhaseResult:
     prep_phase_timings_sec: dict[str, float]
     prep_total_sec: float
     cache_metadata: dict[str, Any]
+    auth_metadata: dict[str, Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -1317,8 +1319,11 @@ def _has_ancestor_in_set(
 def _build_harbor_run_env(adapter: Any) -> dict[str, str]:
     run_env = os.environ.copy()
     run_env.update(adapter.runtime_env())
+    for key in adapter.excluded_run_env_keys():
+        run_env.pop(key, None)
     if adapter.harbor_harness_import_path():
         _inject_secret_file_env(run_env)
+        _inject_local_secret_file_env(run_env, adapter.local_secret_files())
     # Workaround for docker compose v2.39.x bake hang in non-interactive runs.
     run_env["COMPOSE_BAKE"] = "false"
     return run_env
@@ -1340,11 +1345,27 @@ def _inject_secret_file_env(run_env: dict[str, str]) -> None:
         )
 
 
+def _inject_local_secret_file_env(run_env: dict[str, str], secret_files: dict[str, Path]) -> None:
+    for key, source_path in secret_files.items():
+        run_env[f"{SECRET_FILE_ENV_PREFIX}{key}"] = str(
+            _write_harbor_secret_file_from_path(secret_name=key, source_path=source_path)
+        )
+
+
 def _write_harbor_secret_file(*, secret_name: str, secret_value: str) -> Path:
     secret_dir = Path.home() / ".agentic-eval" / "secrets"
     secret_dir.mkdir(parents=True, exist_ok=True)
     secret_path = secret_dir / f"{secret_name.lower()}-{uuid.uuid4().hex}"
     secret_path.write_text(secret_value, encoding="utf-8")
+    secret_path.chmod(0o600)
+    return secret_path
+
+
+def _write_harbor_secret_file_from_path(*, secret_name: str, source_path: Path) -> Path:
+    secret_dir = Path.home() / ".agentic-eval" / "secrets"
+    secret_dir.mkdir(parents=True, exist_ok=True)
+    secret_path = secret_dir / f"{secret_name.lower()}-{uuid.uuid4().hex}"
+    secret_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")
     secret_path.chmod(0o600)
     return secret_path
 
@@ -4068,6 +4089,7 @@ def _scorecard_harbor_metadata(
         "phase_timings_sec": harbor_timings,
         "harness_overhead_sec": harness_overhead_sec,
         "cache": execution.cache_metadata,
+        "auth": execution.auth_metadata,
         "artifacts": artifacts.harbor_artifacts,
     }
 

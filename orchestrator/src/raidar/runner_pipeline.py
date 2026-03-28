@@ -22,6 +22,7 @@ def prepare_workspace_phase(request):
     layout = runner.initialize_run(request)
     adapter = request.config.adapter()
     adapter.validate()
+    auth_metadata = adapter.execution_metadata()
 
     prep_phase_timings: dict[str, float] = {}
     cache_metadata: dict[str, object] = {
@@ -120,6 +121,7 @@ def prepare_workspace_phase(request):
         prep_phase_timings_sec=prep_phase_timings,
         prep_total_sec=prep_total_sec,
         cache_metadata=cache_metadata,
+        auth_metadata=auth_metadata,
         screenshot_command=tuple(screenshot_command) if screenshot_command else None,
         evidence_errors=tuple(evidence_errors),
     )
@@ -174,6 +176,7 @@ def execute_harbor_phase(request, phase):
         prep_phase_timings_sec=getattr(phase, "prep_phase_timings_sec", {}),
         prep_total_sec=getattr(phase, "prep_total_sec", 0.0),
         cache_metadata=getattr(phase, "cache_metadata", {}),
+        auth_metadata=getattr(phase, "auth_metadata", {}),
     )
 
 

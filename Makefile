@@ -19,6 +19,7 @@ SCENARIO_REVISION ?=
 NAME ?=
 HARNESS ?=
 MODEL ?=
+DEVICE_AUTH ?=
 RUN_COUNT ?= 5
 RUN_PARALLELISM ?= 1
 RERUN_UNSCORED ?= 0
@@ -53,7 +54,7 @@ $(foreach goal,$(MATRIX_ARGS),$(eval $(goal):;@:))
 endif
 
 .PHONY: help \
-	env-setup harness-list harness-validate harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
+	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
 	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
@@ -74,6 +75,7 @@ help:
 	@echo "  make harness-list                                      List supported harnesses and model coverage"
 	@echo "  make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
 	@echo "                                                        Validate one AgentSpec candidate"
+	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup                                    Cleanup stale Harbor processes and containers"
 	@echo "  make scenario-list                                     List available scenarios and revisions"
 	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001"
@@ -117,6 +119,11 @@ harness-validate:
 		--harness "$(HARNESS)" \
 		--model "$(MODEL)" \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
+
+codex-auth-setup:
+	@$(RAIDAR) harness setup-auth \
+		--harness "codex-cli" \
+		$(if $(filter 1 true yes on,$(DEVICE_AUTH)),--device-auth,)
 
 harbor-cleanup:
 	@$(RAIDAR) harbor cleanup
@@ -202,11 +209,13 @@ agent-smoke: docker-check
 	@$(MAKE) harness-validate \
 		HARNESS="$(HARNESS)" \
 		MODEL="$(MODEL)" \
+		$(if $(filter codex-cli,$(HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 	@$(MAKE) experiment-run \
 		SCENARIO="$(AGENT_SMOKE_SCENARIO)" \
 		HARNESS="$(HARNESS)" \
 		MODEL="$(MODEL)" \
+		$(if $(filter codex-cli,$(HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
 		RUN_COUNT="$(AGENT_SMOKE_REPEATS)" \
 		RUN_PARALLELISM="$(AGENT_SMOKE_REPEAT_PARALLEL)" \
 		RERUN_UNSCORED="$(AGENT_SMOKE_RERUN_UNSCORED)" \

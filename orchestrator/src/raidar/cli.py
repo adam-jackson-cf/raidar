@@ -17,6 +17,12 @@ import click
 import yaml
 from dotenv import load_dotenv
 
+from .agents.adapters.codex_auth import (
+    CODEX_AUTH_MODE_ENV,
+    codex_auth_json_path,
+    has_file_backed_codex_auth,
+)
+from .agents.adapters.codex_cli import CodexCliAdapter
 from .agents.adapters.registry import registry
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
@@ -1305,7 +1311,64 @@ def harness_validate(
     click.echo(f"  model: {model}")
     click.echo(f"  harbor_harness: {adapter.harbor_harness()}")
     click.echo(f"  model_argument: {adapter.model_argument()}")
+    for key, value in adapter.execution_metadata().items():
+        if value is not None:
+            click.echo(f"  {key}: {value}")
     click.echo(f"  runtime_env_keys: {', '.join(runtime_keys) if runtime_keys else '(none)'}")
+
+
+@harness.command("setup-auth")
+@click.option(
+    "--harness",
+    "-a",
+    type=click.Choice(HARNESS_CHOICES),
+    required=True,
+    help="Harness to set up auth for.",
+)
+@click.option(
+    "--device-auth",
+    is_flag=True,
+    help="Use Codex device-code login instead of the browser callback flow.",
+)
+def harness_setup_auth(
+    harness: str,
+    device_auth: bool,
+) -> None:
+    """Set up harness authentication for supported interactive providers."""
+    if harness != Harness.CODEX_CLI.value:
+        raise click.ClickException(
+            f"Harness auth setup is only implemented for {Harness.CODEX_CLI.value}."
+        )
+
+    auth_path = codex_auth_json_path()
+    if has_file_backed_codex_auth(auth_path):
+        click.echo("Codex auth is already configured.")
+        click.echo("  auth_mode: chatgpt")
+        click.echo(f"  auth_json_path: {auth_path}")
+        return
+
+    command = [CodexCliAdapter.resolve_cli_path(), "login"]
+    if device_auth:
+        command.append("--device-auth")
+
+    completed = subprocess.run(command, check=False)
+    if completed.returncode != 0:
+        raise click.ClickException(
+            f"Codex login failed with exit code {completed.returncode}. "
+            "Resolve the login error and retry `make codex-auth-setup`."
+        )
+
+    if not has_file_backed_codex_auth(auth_path):
+        raise click.ClickException(
+            "Codex login completed but no file-backed auth.json was found. "
+            f"Configure Codex to use file-backed credentials in {auth_path.parent} "
+            f'(for example via `cli_auth_credentials_store = "file"`) and retry. '
+            f"{CODEX_AUTH_MODE_ENV}=chatgpt requires file-backed auth."
+        )
+
+    click.echo("Codex auth setup complete.")
+    click.echo("  auth_mode: chatgpt")
+    click.echo(f"  auth_json_path: {auth_path}")
 
 
 @main.group()

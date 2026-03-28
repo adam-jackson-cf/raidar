@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import click
+import pytest
 from click.testing import CliRunner
 
 from raidar.cli import (
@@ -75,6 +76,91 @@ def test_harness_list_includes_model_variations() -> None:
     assert "models: cursor/*, openai/*, anthropic/*, google/*, deepseek/*" in result.output
     assert "models: github/*" in result.output
     assert "models: inflection/*" in result.output
+
+
+def test_harness_validate_reports_codex_auth_mode(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runner = CliRunner()
+    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("CODEX_HOME", str(tmp_path / ".codex"))
+
+    result = runner.invoke(
+        main,
+        ["harness", "validate", "--harness", "codex-cli", "--model", "codex/gpt-5.4-mini"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert "auth_mode: api" in result.output
+    assert "auth_mode_requested: auto" in result.output
+    assert "auth_source: OPENAI_API_KEY" in result.output
+
+
+def test_harness_setup_auth_is_noop_when_auth_exists(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runner = CliRunner()
+    auth_dir = tmp_path / ".codex"
+    auth_dir.mkdir()
+    (auth_dir / "auth.json").write_text('{"access_token":"token"}', encoding="utf-8")
+    monkeypatch.setenv("CODEX_HOME", str(auth_dir))
+
+    result = runner.invoke(main, ["harness", "setup-auth", "--harness", "codex-cli"])
+
+    assert result.exit_code == 0, result.output
+    assert "Codex auth is already configured." in result.output
+    assert f"auth_json_path: {auth_dir / 'auth.json'}" in result.output
+
+
+def test_harness_setup_auth_runs_codex_login_with_device_auth(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runner = CliRunner()
+    auth_dir = tmp_path / ".codex"
+    auth_dir.mkdir()
+    auth_path = auth_dir / "auth.json"
+    monkeypatch.setenv("CODEX_HOME", str(auth_dir))
+    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+    commands: list[list[str]] = []
+
+    def fake_run(command, check=False):
+        del check
+        commands.append(command)
+        auth_path.write_text('{"access_token":"token"}', encoding="utf-8")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("raidar.cli.subprocess.run", fake_run)
+
+    result = runner.invoke(
+        main,
+        ["harness", "setup-auth", "--harness", "codex-cli", "--device-auth"],
+    )
+
+    assert result.exit_code == 0, result.output
+    assert commands == [["/usr/local/bin/codex", "login", "--device-auth"]]
+    assert "Codex auth setup complete." in result.output
+
+
+def test_harness_setup_auth_fails_when_login_does_not_create_auth_json(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    runner = CliRunner()
+    auth_dir = tmp_path / ".codex"
+    auth_dir.mkdir()
+    monkeypatch.setenv("CODEX_HOME", str(auth_dir))
+    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+
+    def fake_run(command, check=False):
+        del check
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("raidar.cli.subprocess.run", fake_run)
+
+    result = runner.invoke(main, ["harness", "setup-auth", "--harness", "codex-cli"])
+
+    assert result.exit_code != 0
+    assert "no file-backed auth.json was found" in result.output
 
 
 def test_scenario_list_returns_scenario_ids_with_revisions(tmp_path: Path) -> None:
@@ -1340,6 +1426,87 @@ def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
             "--experiment-kind benchmark"
         ),
         "ENV:1:1",
+    ]
+
+
+def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" '
+                    '"${CODEX_AUTH_MODE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+
+    result = subprocess.run(
+        [
+            "make",
+            "agent-smoke",
+            "HARNESS=codex-cli",
+            "MODEL=codex/gpt-5.4-mini-low",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        "UV:run --project orchestrator raidar harbor cleanup",
+        "ENV:1:1:",
+        (
+            "UV:run --project orchestrator raidar harness validate "
+            "--harness codex-cli --model codex/gpt-5.4-mini-low"
+        ),
+        "ENV:1:1:chatgpt",
+        (
+            "UV:run --project orchestrator raidar experiment run "
+            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
+            "--harness codex-cli --model codex/gpt-5.4-mini-low "
+            "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
+            "--experiment-kind benchmark"
+        ),
+        "ENV:1:1:chatgpt",
     ]
 
 

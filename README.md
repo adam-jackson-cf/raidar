@@ -17,7 +17,7 @@ Prerequisites:
 
 - `uv`
 - Docker with `docker compose`
-- at least one harness/provider API key in `orchestrator/.env`
+- either `OPENAI_API_KEY` in `orchestrator/.env` or file-backed Codex auth for Codex CLI runs
 
 Bootstrap the environment:
 
@@ -25,6 +25,8 @@ Bootstrap the environment:
 cp orchestrator/.env.example orchestrator/.env
 make env-setup
 ```
+
+For Codex CLI, the default auth policy is `CODEX_AUTH_MODE=auto`: prefer file-backed ChatGPT login from `~/.codex/auth.json`, otherwise fall back to `OPENAI_API_KEY`. Use `make codex-auth-setup` to create or validate file-backed Codex auth. Add `DEVICE_AUTH=1` for headless/device-code login. API keys remain the recommended default for most automation.
 
 Use `make help` from the repo root for the supported command surface and target descriptions.
 Create a brand-new scenario with `make scenario-init ...`; create a new revision of an existing scenario with `make scenario-clone-revision SCENARIO_DIR=scenarios/homepage-implementation FROM_REVISION=v001 [TO_REVISION=v002]`.
@@ -34,6 +36,7 @@ Create a brand-new scenario with `make scenario-init ...`; create a new revision
 Run one repeatable experiment for one `AgentSpec` (`harness + model`).
 
 ```bash
+make codex-auth-setup
 make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
 make experiment-run \
   SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
@@ -52,6 +55,9 @@ Use the public make surface for faster smoke runs or structured provider-family 
 make orchestrator-smoke
 make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
 ```
+
+If your local Codex login is stored in the OS keyring instead of `~/.codex/auth.json`, Raidar cannot transport that session into Harbor. Switch Codex to file-backed credential storage before using ChatGPT auth with Raidar.
+`make agent-smoke HARNESS=codex-cli ...` now forces `CODEX_AUTH_MODE=chatgpt` by default so the single Codex smoke path uses file-backed Codex login unless you explicitly choose a different surface.
 
 ## What Raidar Does
 
@@ -77,6 +83,7 @@ Use benchmark experiments when you want a comparison baseline for one scenario. 
 #### Example Commands
 
 ```bash
+make codex-auth-setup
 make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
 make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
 make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=codex-cli MODEL=codex/gpt-5.4-mini

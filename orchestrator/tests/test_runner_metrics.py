@@ -262,6 +262,7 @@ def _sample_scorecard_context(
             "image_key": "image-key",
             "image_tag": "task-env-codex-cli-image-key",
         },
+        auth_metadata={"auth_mode": "chatgpt", "auth_mode_requested": "auto"},
     )
     artifacts = PersistedArtifacts(
         starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
@@ -1405,6 +1406,7 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
     assert harbor_meta["cache"]["image"]["hit"] is True
     assert harbor_meta["cache"]["image_key"] == "image-key"
     assert harbor_meta["cache"]["image_tag"] == "task-env-codex-cli-image-key"
+    assert harbor_meta["auth"]["auth_mode"] == "chatgpt"
 
 
 def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(

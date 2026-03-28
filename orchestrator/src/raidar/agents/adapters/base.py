@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
     from ..config import AgentSpec
@@ -38,6 +38,18 @@ class HarnessAdapter:
 
     def runtime_env(self) -> dict[str, str]:
         """Extra environment variables required for the harness runtime."""
+        return {}
+
+    def excluded_run_env_keys(self) -> set[str]:
+        """Environment keys that should not be forwarded into Harbor runs."""
+        return set()
+
+    def local_secret_files(self) -> dict[str, Path]:
+        """Local file artifacts that should be copied into Harbor as secret files."""
+        return {}
+
+    def execution_metadata(self) -> dict[str, Any]:
+        """Adapter metadata that should be surfaced in validation and run artifacts."""
         return {}
 
     # ------------------------------------------------------------------
