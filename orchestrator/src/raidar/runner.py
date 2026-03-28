@@ -432,7 +432,9 @@ def _preflight_cache_file(cache_key: str) -> Path:
     return _prep_cache_root() / "preflight" / f"{cache_key}.ok.json"
 
 
-def _workspace_runtime_env(workspace: Path, base_env: dict[str, str] | None = None) -> dict[str, str]:
+def _workspace_runtime_env(
+    workspace: Path, base_env: dict[str, str] | None = None
+) -> dict[str, str]:
     env = dict(os.environ if base_env is None else base_env)
     tmp_dir = workspace / ".tmp"
     cache_dir = workspace / ".cache"
@@ -1824,8 +1826,11 @@ def _load_scenario_prompt(task: ScenarioDefinition, scenario_dir: Path) -> str:
     return "\n\n".join(chunk for chunk in prompt_chunks if chunk)
 
 
-def _bundle_instruction_text(prompt: str) -> str:
-    return prompt.strip() + "\n\nYou are working in `/app`.\nFollow rules in `/app/AGENTS.md`.\n"
+def _bundle_instruction_text(prompt: str, rules_filename: str = "AGENTS.md") -> str:
+    return (
+        prompt.strip()
+        + f"\n\nYou are working in `/app`.\nFollow rules in `/app/{rules_filename}`.\n"
+    )
 
 
 def _render_task_toml(request: RunRequest, task_image: str | None) -> str:
@@ -1938,7 +1943,10 @@ def create_harbor_task_bundle(
     bundle_dir, environment_dir, app_dir, tests_dir = _initialize_harbor_bundle_paths(bundle_root)
     _copy_workspace_into_bundle(request, context, app_dir)
     prompt_text = _load_scenario_prompt(request.scenario, request.scenario_dir)
-    (bundle_dir / "instruction.md").write_text(_bundle_instruction_text(prompt_text))
+    rules_filename = context.injected_rules.name if context.injected_rules else "AGENTS.md"
+    (bundle_dir / "instruction.md").write_text(
+        _bundle_instruction_text(prompt_text, rules_filename)
+    )
 
     dockerfile = _render_environment_dockerfile(request)
     _validate_public_base_images(dockerfile)
@@ -2452,6 +2460,35 @@ def persist_verifier_artifacts(
         target = verifier_dir / filename
         copied[filename] = str(shutil.copy2(source, target))
     return copied
+
+
+def persist_canonical_verifier_artifacts(
+    layout: RunLayout, scorecard: Scorecard, outputs: EvaluationOutputs
+) -> None:
+    """Rewrite canonical verifier artifacts from the synthesized canonical scorecard."""
+    layout.verifier_dir.mkdir(parents=True, exist_ok=True)
+    gate_history_payload = [event.model_dump(mode="json") for event in outputs.gate_history]
+    scorecard_payload = scorecard.model_dump(mode="json")
+    scorecard_payload["gate_history"] = gate_history_payload
+
+    (layout.verifier_dir / "scorecard.json").write_text(
+        json.dumps(scorecard_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (layout.verifier_dir / "gate-history.json").write_text(
+        json.dumps(gate_history_payload, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (layout.verifier_dir / "execution-validity.json").write_text(
+        scorecard.execution_validity.model_dump_json(indent=2) + "\n",
+        encoding="utf-8",
+    )
+    (layout.verifier_dir / "performance-gates.json").write_text(
+        scorecard.performance_gates.model_dump_json(indent=2) + "\n",
+        encoding="utf-8",
+    )
+    reward_value = scorecard.quality_score if scorecard.execution_validity.passed else 0
+    (layout.verifier_dir / "reward.txt").write_text(f"{reward_value}", encoding="utf-8")
 
 
 def _copy_optional_visual_asset(source: Path, target: Path) -> str | None:

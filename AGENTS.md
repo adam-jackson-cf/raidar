@@ -15,8 +15,19 @@
 
 ## Smoke Testing
 
-- `make smoke-dry-run-check`: Print the canonical smoke command shapes used by CI drift checks.
-- `make orchestrator-smoke`: Run the default hello-world orchestrator smoke scenario on `codex-cli` with `codex/gpt-5.4-mini`.
-- `make smoke-matrix`: Run the default hello-world smoke scenario across the full public model matrix.
-- `make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini`: Run the canonical agent smoke workflow through the public `make` targets.
-- `make research-smoke`: Run the canonical autoresearch smoke workflow and clean up its smoke artifacts.
+- Public smoke targets run in fast mode by default. `make orchestrator-smoke`, `make smoke-matrix`, and `make agent-smoke` now set `HARBOR_SMOKE_FAST=1` and `HARBOR_SMOKE_FAST_REUSE_IMAGE=1` automatically, so Codex, Gemini, and Claude smokes use the repo-local fast Harbor agent path without extra env setup.
+- Use the public `make` targets for smoke runs rather than setting fast-mode env vars manually.
+- Small single smoke on low-cost Codex: `make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini-low TIMEOUT_SEC=300`
+- Full default smoke matrix: `make smoke-matrix`
+- Codex-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=codex`
+- Gemini-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=gemini`
+- Claude-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=claude`
+
+## Branch Syncing
+
+- `cleanup/remove-autoresearch-from-main` is intended to merge to `main` without changing the ongoing `feat/autoresearch-v3` line of development.
+- The canonical autoresearch removal commit is `d1973d6` `refactor: remove autoresearch surface from main`.
+- When pulling `main` changes into `feat/autoresearch-v3`, prefer cherry-picking specific wanted commits instead of merging all of `main`.
+- Do not cherry-pick `d1973d6` into `feat/autoresearch-v3`.
+- Do not cherry-pick later cleanup commits that assume `auto_researcher/` is absent from `main`, including CI or workflow updates that remove direct `auto_researcher` setup steps.
+- If a later `main` commit depends on `d1973d6` and removes or rewires autoresearch files, skip that commit too unless the feature branch is explicitly being reconciled with the removal.

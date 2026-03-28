@@ -34,6 +34,7 @@ experiments/
 .enaible/
 .plan/
 next-session.md
+auto_researcher/objectives/
 
 # Screenshots
 actual.png
@@ -42,3 +43,4 @@ diff.png
 
 # Lock files (keep bun.lock for scaffold)
 .enaible/
+.plan/

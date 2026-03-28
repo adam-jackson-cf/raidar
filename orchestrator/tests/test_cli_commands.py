@@ -37,17 +37,6 @@ def _assert_smoke_dry_run_output(output: str) -> None:
     assert "uv run --project orchestrator raidar harbor cleanup" in output
     assert "uv run --project orchestrator raidar harness validate \\" in output
     assert "uv run --project orchestrator raidar experiment run \\" in output
-    assert 'RESEARCH_SMOKE_OBJECTIVE_ID="research-smoke-dry-run"' in output
-    assert "research-smoke-init" in output
-    assert "research-smoke-approve" in output
-    assert "research-smoke-cleanup" in output
-    assert "objective_id=research-smoke-dry-run" in output
-    assert "uv run --project auto_researcher auto-researcher init \\" in output
-    assert '--loop-execution-mode "parallel" \\' in output
-    assert '--max-parallel-loops "2" \\' in output
-    assert '--benchmark-repeat-parallel "2" \\' in output
-    assert '--research-repeat-parallel "2" \\' in output
-    assert "uv run --project auto_researcher auto-researcher approve-scenario" in output
 
 
 def test_cli_version_matches_pyproject_version() -> None:
@@ -76,7 +65,8 @@ def test_harness_list_includes_model_variations() -> None:
     assert (
         "models: codex/* (known aliases: codex/gpt-5.2-high, codex/gpt-5.2-low, "
         "codex/gpt-5.2-medium, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
-        "codex/gpt-5.4-low, codex/gpt-5.4-medium, codex/gpt-5.4-mini)"
+        "codex/gpt-5.4-low, codex/gpt-5.4-medium, codex/gpt-5.4-mini, "
+        "codex/gpt-5.4-mini-low)"
     ) in result.output
     assert (
         "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
@@ -1113,6 +1103,11 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
             [
                 "#!/bin/sh",
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
             ]
         )
         + "\n",
@@ -1148,6 +1143,7 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
             "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
+        "ENV:1:1",
     ]
 
 
@@ -1180,6 +1176,11 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
             [
                 "#!/bin/sh",
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+                (
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                ),
             ]
         )
         + "\n",
@@ -1209,33 +1210,12 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
             "--selector all --repeats 1 --repeat-parallel 1 "
             "--rerun-unscored 0 --experiment-kind benchmark"
         ),
+        "ENV:1:1",
     ]
 
 
-def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
+def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
-
-    result = subprocess.run(
-        ["make", "smoke-dry-run-check"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    _assert_smoke_dry_run_output(result.stdout)
-
-
-def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    workspace_root = tmp_path / "workspace"
-    workspace_root.mkdir()
-    (workspace_root / "Makefile").write_text(
-        (repo_root / "Makefile").read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
     make_log = tmp_path / "make.log"
@@ -1263,89 +1243,11 @@ def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> N
             [
                 "#!/bin/sh",
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                'project=""',
-                'tool=""',
-                'subcmd=""',
-                'if [ "$1" = "run" ] && [ "$2" = "--project" ]; then',
-                '  project="$3"',
-                '  tool="$4"',
-                '  subcmd="$5"',
-                "fi",
-                'objective_id=""',
-                'loop_execution_mode=""',
-                'max_parallel_loops=""',
-                'benchmark_repeats=""',
-                'benchmark_repeat_parallel=""',
-                'research_repeats=""',
-                'research_repeat_parallel=""',
-                'previous=""',
-                'for arg in "$@"; do',
-                '  case "$previous" in',
-                '    objective_id) objective_id="$arg"; previous=""; continue ;;',
-                ('    loop_execution_mode) loop_execution_mode="$arg"; previous=""; continue ;;'),
-                '    max_parallel_loops) max_parallel_loops="$arg"; previous=""; continue ;;',
-                '    benchmark_repeats) benchmark_repeats="$arg"; previous=""; continue ;;',
                 (
-                    '    benchmark_repeat_parallel) benchmark_repeat_parallel="$arg"; '
-                    'previous=""; continue ;;'
+                    "printf 'ENV:%s:%s\\n' "
+                    '"${HARBOR_SMOKE_FAST:-}" '
+                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
                 ),
-                '    research_repeats) research_repeats="$arg"; previous=""; continue ;;',
-                (
-                    '    research_repeat_parallel) research_repeat_parallel="$arg"; '
-                    'previous=""; continue ;;'
-                ),
-                "  esac",
-                '  case "$arg" in',
-                '    --objective-id) previous="objective_id" ;;',
-                '    --loop-execution-mode) previous="loop_execution_mode" ;;',
-                '    --max-parallel-loops) previous="max_parallel_loops" ;;',
-                '    --benchmark-repeats) previous="benchmark_repeats" ;;',
-                '    --benchmark-repeat-parallel) previous="benchmark_repeat_parallel" ;;',
-                '    --research-repeats) previous="research_repeats" ;;',
-                '    --research-repeat-parallel) previous="research_repeat_parallel" ;;',
-                "  esac",
-                "done",
-                (
-                    'if [ "$project" = "auto_researcher" ] && '
-                    '[ "$tool" = "auto-researcher" ] && [ "$subcmd" = "init" ]; then'
-                ),
-                '  objective_root="$PWD/auto_researcher/objectives/$objective_id"',
-                '  mkdir -p "$objective_root"',
-                (
-                    "  printf 'INIT:%s:%s:%s:%s:%s:%s\\n' \"$loop_execution_mode\" "
-                    '"$max_parallel_loops" "$benchmark_repeats" '
-                    '"$benchmark_repeat_parallel" "$research_repeats" '
-                    '"$research_repeat_parallel" >> "$FAKE_MAKE_LOG"'
-                ),
-                '  cat > "$objective_root/objective.yaml" <<EOF',
-                "objective_id: $objective_id",
-                "status: awaiting_scenario_approval",
-                "scenario_slug: research-smoke-fake",
-                "EOF",
-                "  exit 0",
-                "fi",
-                (
-                    'if [ "$project" = "auto_researcher" ] && '
-                    '[ "$tool" = "auto-researcher" ] && '
-                    '[ "$subcmd" = "approve-scenario" ]; then'
-                ),
-                '  objective_root="$PWD/auto_researcher/objectives/$objective_id"',
-                '  scenario_root="$PWD/scenarios/research-smoke-fake"',
-                '  benchmark_root="$PWD/experiments/benchmarks/research-smoke-fake"',
-                '  mkdir -p "$scenario_root" "$benchmark_root"',
-                '  : > "$benchmark_root/experiment-summary.json"',
-                '  cat > "$objective_root/objective.yaml" <<EOF',
-                "objective_id: $objective_id",
-                "status: active",
-                "scenario_slug: research-smoke-fake",
-                "best_benchmark_ref: "
-                "$PWD"
-                "/experiments/benchmarks/research-smoke-fake/experiment-summary.json",
-                "EOF",
-                '  printf \'APPROVE:%s\\n\' "$objective_id" >> "$FAKE_MAKE_LOG"',
-                "  exit 0",
-                "fi",
-                "exit 0",
             ]
         )
         + "\n",
@@ -1360,15 +1262,11 @@ def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> N
     result = subprocess.run(
         [
             "make",
-            "research-smoke",
-            "RESEARCH_SMOKE_LOOP_EXECUTION_MODE=parallel",
-            "RESEARCH_SMOKE_MAX_PARALLEL_LOOPS=2",
-            "RESEARCH_SMOKE_BENCHMARK_REPEATS=2",
-            "RESEARCH_SMOKE_BENCHMARK_REPEAT_PARALLEL=2",
-            "RESEARCH_SMOKE_RESEARCH_REPEATS=2",
-            "RESEARCH_SMOKE_RESEARCH_REPEAT_PARALLEL=2",
+            "agent-smoke",
+            "HARNESS=gemini",
+            "MODEL=google/gemini-3-flash-preview",
         ],
-        cwd=workspace_root,
+        cwd=repo_root,
         env=env,
         capture_output=True,
         text=True,
@@ -1376,25 +1274,36 @@ def test_research_smoke_make_target_forwards_parallel_shape(tmp_path: Path) -> N
     )
 
     assert result.returncode == 0, result.stderr
-    lines = make_log.read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "DOCKER:info"
-    assert (
-        "UV:run --project auto_researcher auto-researcher init" in lines[1]
-        and "--loop-execution-mode parallel" in lines[1]
-        and "--max-parallel-loops 2" in lines[1]
-        and "--benchmark-repeats 2" in lines[1]
-        and "--benchmark-repeat-parallel 2" in lines[1]
-        and "--research-repeats 2" in lines[1]
-        and "--research-repeat-parallel 2" in lines[1]
+    assert make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        "UV:run --project orchestrator raidar harbor cleanup",
+        "ENV:1:1",
+        (
+            "UV:run --project orchestrator raidar harness validate "
+            "--harness gemini --model google/gemini-3-flash-preview"
+        ),
+        "ENV:1:1",
+        (
+            "UV:run --project orchestrator raidar experiment run "
+            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
+            "--harness gemini --model google/gemini-3-flash-preview "
+            "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
+            "--experiment-kind benchmark"
+        ),
+        "ENV:1:1",
+    ]
+
+
+def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    result = subprocess.run(
+        ["make", "smoke-dry-run-check"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
     )
-    assert "INIT:parallel:2:2:2:2:2" in lines
-    assert any(
-        line.startswith("UV:run --project auto_researcher auto-researcher approve-scenario")
-        for line in lines
-    )
-    approve_line = next(line for line in lines if line.startswith("APPROVE:research-smoke-"))
-    objective_id = approve_line.split(":", 1)[1]
-    assert approve_line.startswith("APPROVE:research-smoke-")
-    assert not (workspace_root / "auto_researcher" / "objectives" / objective_id).exists()
-    assert not (workspace_root / "scenarios" / "research-smoke-fake").exists()
-    assert not (workspace_root / "experiments" / "benchmarks" / "research-smoke-fake").exists()
+
+    assert result.returncode == 0, result.stderr
+    _assert_smoke_dry_run_output(result.stdout)

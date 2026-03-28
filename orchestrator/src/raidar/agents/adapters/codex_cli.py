@@ -27,6 +27,7 @@ class CodexCliAdapter(HarnessAdapter):
         "gpt-5.4-high": ("gpt-5.4", "high"),
         "gpt-5.4-extra-high": ("gpt-5.4", "xhigh"),
         "gpt-5.4-mini": ("gpt-5.4-mini", ""),
+        "gpt-5.4-mini-low": ("gpt-5.4-mini", "low"),
     }
 
     @classmethod
