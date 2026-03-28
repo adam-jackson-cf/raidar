@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.10.0] - 2026-03-28
+
+- feat(codex): add oauth onboarding and smoke auth defaults
+
 ## [0.9.3] - 2026-03-28
 
 - fix(scenarios): keep homepage iterations in revision roots
