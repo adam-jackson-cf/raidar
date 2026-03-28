@@ -1,0 +1,104 @@
+name: Homepage Iteration Benchmark for codex/gpt-5.4-mini-low
+scenario_revision: v001
+description: Typed Raidar scenario for iterating a homepage implementation with deterministic
+  acceptance checks, stable verification gates, and benchmark-oriented prompt quality.
+difficulty: easy
+category: frontend-validation
+timeout_sec: 1800
+dockerfile: ./Dockerfile
+test_scripts: []
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  min_quality_score: 0.8
+  required_commands:
+  - - bun
+    - install
+    - --lockfile-only
+  - - bun
+    - run
+    - lint
+  - - bun
+    - run
+    - test
+  - - bun
+    - run
+    - verify
+  gates:
+  - name: lint
+    command:
+    - bun
+    - run
+    - lint
+  - name: test
+    command:
+    - bun
+    - run
+    - test
+  - name: verify
+    command:
+    - bun
+    - run
+    - verify
+acceptance:
+  deterministic_checks:
+  - type: no_pattern
+    pattern: TODO
+    description: No TODO markers remain in production files
+  - type: no_pattern
+    pattern: lorem ipsum
+    description: Homepage copy avoids placeholder filler text
+  requirements:
+  - id: req-semantic-landmarks
+    description: Homepage output includes semantic page landmarks for structure and
+      accessibility
+    check:
+      type: import_present
+      pattern: <main
+      description: Main landmark exists in homepage output
+    required_test_patterns:
+    - contains semantic landmarks
+  - id: req-core-sections
+    description: Homepage output includes hero, features, proof, and cta sections
+    check:
+      type: import_present
+      pattern: id="hero"
+      description: Hero section id exists
+    required_test_patterns:
+    - contains required section ids
+  - id: req-primary-cta
+    description: Homepage output includes a primary CTA marker for deterministic verification
+    check:
+      type: import_present
+      pattern: data-testid="primary-cta"
+      description: Primary CTA marker exists
+    required_test_patterns:
+    - contains primary CTA marker
+  llm_judge_rubric:
+  - criterion: The homepage clearly communicates value proposition, target user benefit,
+      and next action above the fold.
+    weight: 0.3
+  - criterion: The structure, section flow, and copy quality are coherent, specific,
+      and production-ready without generic filler.
+    weight: 0.3
+  - criterion: The implementation demonstrates strong UX clarity and accessibility-aware
+      semantics while staying concise.
+    weight: 0.2
+  - criterion: All explicit acceptance requirements are satisfied while preserving
+      lint/test/verify reliability.
+    weight: 0.2
+metrics:
+- type: core
+  id: functional
+- type: core
+  id: acceptance
+- type: core
+  id: verification-stability
+- type: core
+  id: execution-validity
+- type: core
+  id: resource-efficiency
+prompt:
+  entry: prompt/task.md
+  includes: []
