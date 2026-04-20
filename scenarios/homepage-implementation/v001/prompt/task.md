@@ -7,11 +7,11 @@ The page should include:
 3. A features section displaying 3 features in a grid
 4. A footer with copyright text
 
-Treat the header navigation, hero copy, feature-card copy, and footer copy as verification-critical: add or update `src/test/homepage.test.tsx` so the exact `Home`, `About`, `Contact`, `Get Started`, `Build Better Products Faster`, `Everything You Need`, `Lightning Fast`, `Secure by Default`, `Team Collaboration`, and `All rights reserved` strings are asserted in tests, not only present in the component tree.
+Treat the header navigation, hero CTA, features grid, and footer as verification-critical: add or update `src/test/homepage.test.tsx` with semantic assertions that prove the required landmarks, interactive elements, and card count are present. Prefer role-based queries and structural checks over brittle exact-copy assertions.
 
 The design reference image is available at ./reference/homepage.png
 Implement the page within the project's existing app, components, and theming structure.
 
-After the first implementation pass, prioritize the required verification commands and coverage gates before any extra visual polish. Run the required checks, capture at most one screenshot sanity check, and do not spend time on cleaning up dev-only screenshot artifacts or other cosmetic refinements if any required verification command remains unrun or failing.
+After the first implementation pass, capture at most one screenshot sanity check and do not spend time on cleaning up dev-only screenshot artifacts or other cosmetic refinements before the core implementation is stable.
 
 Keep the page compact and close to the reference proportions: a simple top bar, a centered hero with moderate headline sizing, a tightly stacked 3-card feature grid, and a visible footer within the initial desktop viewport crop. Avoid oversized hero text, excess vertical padding, or spacing that pushes the footer out of frame.

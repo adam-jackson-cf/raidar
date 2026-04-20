@@ -291,3 +291,11 @@ class FastCodexCliAgent(BaseAgent):
             env=env,
         )
         _set_context_metadata(context, result.return_code, "/logs/agent/codex.txt")
+
+
+class CodexCliHarborAgent(FastCodexCliAgent):
+    """Codex Harbor agent for runs that need file-backed session auth support."""
+
+    @staticmethod
+    def name() -> str:
+        return "codex-cli-harbor"

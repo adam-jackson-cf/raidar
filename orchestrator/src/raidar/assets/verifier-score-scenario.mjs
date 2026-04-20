@@ -479,10 +479,96 @@ function starterIntegrityCheck(scenarioSpec) {
   };
 }
 
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function testEvidenceLabel(evidence) {
+  if (evidence?.type === "query_role") {
+    const parts = [evidence.role];
+    if (evidence.level !== undefined) {
+      parts.push(`level=${evidence.level}`);
+    }
+    if (evidence.name) {
+      parts.push(`name=${evidence.name}`);
+    }
+    return `query_role:${parts.join(",")} x${evidence.min_count || 1}`;
+  }
+  if (evidence?.type === "query_text") {
+    return `query_text:${evidence.pattern} x${evidence.min_count || 1}`;
+  }
+  return String(evidence?.type || "unknown");
+}
+
+function countRoleQueryMatches(testSources, evidence) {
+  const role = escapeRegExp(evidence?.role || "");
+  if (!role) {
+    return 0;
+  }
+  const queryPattern = new RegExp(
+    String.raw`(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['"])${role}\1(?<options>\s*,\s*\{[\s\S]*?\})?`,
+    "gmi",
+  );
+  let count = 0;
+  for (const source of testSources) {
+    for (const match of source.matchAll(queryPattern)) {
+      const options = match.groups?.options || "";
+      if (
+        evidence.level !== undefined &&
+        !new RegExp(String.raw`level\s*:\s*${evidence.level}\b`, "mi").test(options)
+      ) {
+        continue;
+      }
+      if (
+        evidence.name &&
+        !new RegExp(escapeRegExp(evidence.name), "mi").test(options)
+      ) {
+        continue;
+      }
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function countTextQueryMatches(testSources, evidence) {
+  const pattern = evidence?.pattern;
+  if (!pattern) {
+    return 0;
+  }
+  const byTextPattern = /(?:screen\.)?(?:get|find|query)(?:All)?ByText\s*\(/mi;
+  const matchPattern = new RegExp(pattern, "gmi");
+  let count = 0;
+  for (const source of testSources) {
+    if (!byTextPattern.test(source)) {
+      continue;
+    }
+    count += [...source.matchAll(matchPattern)].length;
+  }
+  return count;
+}
+
+function missingTestEvidence(requiredEvidence, testSources) {
+  const missing = [];
+  for (const evidence of requiredEvidence || []) {
+    const minCount = Number(evidence?.min_count || 1);
+    let matched = 0;
+    if (evidence?.type === "query_role") {
+      matched = countRoleQueryMatches(testSources, evidence);
+    } else if (evidence?.type === "query_text") {
+      matched = countTextQueryMatches(testSources, evidence);
+    }
+    if (matched < minCount) {
+      missing.push(testEvidenceLabel(evidence));
+    }
+  }
+  return missing;
+}
+
 function checkRequirementMappings(requirements, testSources) {
   const missingRequirementIds = [];
   const requirementGapIds = [];
-  const requirementPatternGaps = {};
+  const requirementTestEvidenceGaps = {};
   let satisfied = 0;
   let mapped = 0;
   let mappedSatisfied = 0;
@@ -498,23 +584,20 @@ function checkRequirementMappings(requirements, testSources) {
       missingRequirementIds.push(requirement.id);
     }
 
-    const patterns = requirement.required_test_patterns || [];
-    const missingPatterns = patterns.filter(
-      (pattern) =>
-        !testSources.some((content) => new RegExp(pattern, "mi").test(content)),
+    const missingEvidence = missingTestEvidence(
+      requirement.required_test_evidence || [],
+      testSources,
     );
-    const mappedForRequirement =
-      patterns.length > 0 && missingPatterns.length === 0;
+    const mappedForRequirement = missingEvidence.length === 0;
     if (mappedForRequirement) {
       mapped += 1;
       if (result.passed) {
         mappedSatisfied += 1;
       }
-    } else {
+    }
+    if (missingEvidence.length > 0) {
       requirementGapIds.push(requirement.id);
-      if (missingPatterns.length > 0) {
-        requirementPatternGaps[requirement.id] = missingPatterns;
-      }
+      requirementTestEvidenceGaps[requirement.id] = missingEvidence;
     }
   }
 
@@ -526,7 +609,7 @@ function checkRequirementMappings(requirements, testSources) {
     mapped_satisfied_requirements: mappedSatisfied,
     missing_requirement_ids: missingRequirementIds,
     requirement_gap_ids: requirementGapIds,
-    requirement_pattern_gaps: requirementPatternGaps,
+    requirement_test_evidence_gaps: requirementTestEvidenceGaps,
     presence_ratio: total === 0 ? 1 : satisfied / total,
     mapping_ratio: total === 0 ? 1 : mapped / total,
   };
@@ -648,7 +731,7 @@ function buildPerformanceGateChecks({
       `${requirements.satisfied_requirements}, ` +
       `mapped_total=${requirements.mapped_requirements}/${requirements.total_requirements}, ` +
       `gaps=${JSON.stringify(requirements.requirement_gap_ids)}, ` +
-      `pattern_gaps=${JSON.stringify(requirements.requirement_pattern_gaps)}`,
+      `evidence_gaps=${JSON.stringify(requirements.requirement_test_evidence_gaps)}`,
   });
   checks.push({
     name: "minimum_quality_score",
@@ -1044,7 +1127,7 @@ try {
       mapped_satisfied_requirements: 0,
       missing_requirement_ids: [],
       requirement_gap_ids: [],
-      requirement_pattern_gaps: {},
+      requirement_test_evidence_gaps: {},
       presence_ratio: 0,
       mapping_ratio: 0,
     },

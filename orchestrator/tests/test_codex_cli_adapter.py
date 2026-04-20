@@ -67,7 +67,9 @@ def test_validate_accepts_file_backed_chatgpt_auth(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
+    assert adapter.harbor_harness_import_path() == CodexCliAdapter.HARBOR_IMPORT_PATH
     assert adapter.local_secret_files() == {"CODEX_AUTH_JSON": auth_path}
+    assert "PYTHONPATH" in adapter.runtime_env()
 
 
 def test_auto_mode_prefers_chatgpt_over_api_key(
@@ -83,6 +85,7 @@ def test_auto_mode_prefers_chatgpt_over_api_key(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
+    assert adapter.harbor_harness_import_path() == CodexCliAdapter.HARBOR_IMPORT_PATH
     assert adapter.excluded_run_env_keys() == {"OPENAI_API_KEY"}
     assert adapter.local_secret_files() == {"CODEX_AUTH_JSON": auth_path}
 
@@ -100,6 +103,7 @@ def test_api_mode_uses_api_key_even_when_auth_file_exists(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "api"
+    assert adapter.harbor_harness_import_path() is None
     assert adapter.excluded_run_env_keys() == set()
     assert adapter.local_secret_files() == {}
 
@@ -120,6 +124,10 @@ def test_chatgpt_mode_requires_file_backed_auth(
 @pytest.mark.parametrize(
     ("model_name", "model_argument", "reasoning_effort"),
     (
+        ("gpt-5.3-codex-spark-low", "codex/gpt-5.3-codex-spark", "low"),
+        ("gpt-5.3-codex-spark-medium", "codex/gpt-5.3-codex-spark", "medium"),
+        ("gpt-5.3-codex-spark-high", "codex/gpt-5.3-codex-spark", "high"),
+        ("gpt-5.3-codex-spark-xhigh", "codex/gpt-5.3-codex-spark", "xhigh"),
         ("gpt-5.2-low", "codex/gpt-5.2-codex", "low"),
         ("gpt-5.2-medium", "codex/gpt-5.2-codex", "medium"),
         ("gpt-5.2-high", "codex/gpt-5.2-codex", "high"),

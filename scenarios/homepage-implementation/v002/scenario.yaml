@@ -10,7 +10,7 @@ starter:
   root: starter
 verification:
   max_gate_failures: 3
-  coverage_threshold: 0.8
+  coverage_threshold: 1.0
   min_quality_score: 0.9
   required_commands:
   - - bun
@@ -98,38 +98,42 @@ acceptance:
       type: import_present
       pattern: Contact
       description: Header navigation includes Contact entry
-    required_test_patterns:
-    - Home
-    - About
-    - Contact
+    required_test_evidence:
+    - type: query_role
+      role: navigation
+    - type: query_role
+      role: link
+      min_count: 3
   - id: req-hero-cta
     description: Hero section includes headline, supporting text, and CTA.
     check:
       type: import_present
       pattern: Get Started
       description: Hero call-to-action copy exists
-    required_test_patterns:
-    - Get Started
-    - Build Better Products Faster
+    required_test_evidence:
+    - type: query_role
+      role: heading
+    - type: query_role
+      role: button
   - id: req-features-grid
     description: Features section renders three feature cards.
     check:
       type: import_present
       pattern: Everything You Need
       description: Features section heading exists
-    required_test_patterns:
-    - Everything You Need
-    - Lightning Fast
-    - Secure by Default
-    - Team Collaboration
+    required_test_evidence:
+    - type: query_role
+      role: article
+      min_count: 3
   - id: req-footer
     description: Footer contains copyright text.
     check:
       type: import_present
       pattern: All rights reserved
       description: Footer copyright copy exists
-    required_test_patterns:
-    - All rights reserved
+    required_test_evidence:
+    - type: query_role
+      role: contentinfo
   llm_judge_rubric:
   - criterion: Implementation follows the scenario's section and shared-ui structure
     weight: 0.4

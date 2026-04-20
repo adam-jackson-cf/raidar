@@ -118,7 +118,7 @@ class RequirementsCoverageScore(BaseModel):
     mapped_satisfied_requirements: int = 0
     missing_requirement_ids: list[str] = Field(default_factory=list)
     requirement_gap_ids: list[str] = Field(default_factory=list)
-    requirement_pattern_gaps: dict[str, list[str]] = Field(default_factory=dict)
+    requirement_test_evidence_gaps: dict[str, list[str]] = Field(default_factory=dict)
 
     @computed_field
     @property

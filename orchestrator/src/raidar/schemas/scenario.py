@@ -91,15 +91,54 @@ class DeterministicCheck(BaseModel):
     description: str = Field(description="Human-readable description")
 
 
+class QueryRoleTestEvidence(BaseModel):
+    """Structured evidence that tests query an element by ARIA role."""
+
+    type: Literal["query_role"] = "query_role"
+    role: str = Field(description="ARIA role asserted by the test")
+    min_count: int = Field(
+        default=1,
+        ge=1,
+        description="Minimum number of qualifying role queries expected across test sources",
+    )
+    level: int | None = Field(
+        default=None,
+        ge=1,
+        description="Optional heading level or role-specific level constraint",
+    )
+    name: str | None = Field(
+        default=None,
+        description="Optional accessible-name hint when a named role query is required",
+    )
+
+
+class QueryTextTestEvidence(BaseModel):
+    """Structured evidence that tests query text intentionally."""
+
+    type: Literal["query_text"] = "query_text"
+    pattern: str = Field(description="Regex-compatible text pattern expected in a text query")
+    min_count: int = Field(
+        default=1,
+        ge=1,
+        description="Minimum number of qualifying text queries expected across test sources",
+    )
+
+
+TestEvidenceSpec = Annotated[
+    QueryRoleTestEvidence | QueryTextTestEvidence,
+    Field(discriminator="type"),
+]
+
+
 class RequirementSpec(BaseModel):
-    """Scenario requirement with deterministic presence and test mapping checks."""
+    """Scenario requirement with deterministic presence and optional test evidence checks."""
 
     id: str = Field(description="Stable requirement identifier")
     description: str = Field(description="Requirement description")
     check: DeterministicCheck = Field(description="Deterministic check for requirement presence")
-    required_test_patterns: list[str] = Field(
+    required_test_evidence: list[TestEvidenceSpec] = Field(
         default_factory=list,
-        description="Patterns that must appear in test sources to satisfy test mapping",
+        description="Optional structured evidence that tests cover the requirement conceptually",
     )
 
 

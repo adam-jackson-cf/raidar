@@ -169,6 +169,10 @@ def test_build_selected_matrix_config_for_codex() -> None:
         "codex/gpt-5.2-high",
         "codex/gpt-5.2-low",
         "codex/gpt-5.2-medium",
+        "codex/gpt-5.3-codex-spark-high",
+        "codex/gpt-5.3-codex-spark-low",
+        "codex/gpt-5.3-codex-spark-medium",
+        "codex/gpt-5.3-codex-spark-xhigh",
         "codex/gpt-5.4-extra-high",
         "codex/gpt-5.4-high",
         "codex/gpt-5.4-low",
@@ -188,7 +192,7 @@ def test_build_selected_matrix_config_for_all() -> None:
     )
 
     harnesses = [spec.harness for spec in config.agents]
-    assert harnesses.count("codex-cli") == 9
+    assert harnesses.count("codex-cli") == 13
     assert harnesses.count("gemini") == 3
     assert harnesses.count("claude-code") == 4
-    assert len(config.agents) == 16
+    assert len(config.agents) == 20

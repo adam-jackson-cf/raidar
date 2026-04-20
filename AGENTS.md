@@ -15,6 +15,10 @@
 - Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
 - Task completion requires `make quality` to pass.
 
+## Known Matrix Configs
+
+- `.configs/homepage-v001-codex-oauth-matrix.yaml`: Homepage implementation revision `v001` Codex-only benchmark using OAuth/session auth across `gpt-5.4-medium`, `gpt-5.4-high`, `gpt-5.4-mini-low`, and `gpt-5.3-codex-spark-medium`.
+
 ## Smoke Testing
 
 - Public smoke targets run in fast mode by default. `make orchestrator-smoke`, `make smoke-matrix`, and `make agent-smoke` now set `HARBOR_SMOKE_FAST=1` and `HARBOR_SMOKE_FAST_REUSE_IMAGE=1` automatically, so Codex, Gemini, and Claude smokes use the repo-local fast Harbor agent path without extra env setup.

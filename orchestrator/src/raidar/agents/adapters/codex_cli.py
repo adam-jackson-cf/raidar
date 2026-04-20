@@ -8,7 +8,7 @@ from collections.abc import Iterable
 from pathlib import Path
 
 from ..config import AgentSpec
-from ..fast_mode import fast_harness_import_path, with_harness_pythonpath
+from ..fast_mode import fast_harness_import_path, harness_src_path, with_harness_pythonpath
 from .base import HarnessAdapter
 from .codex_auth import OPENAI_API_KEY_ENV, ResolvedCodexAuth, resolve_codex_auth
 
@@ -19,7 +19,12 @@ class CodexCliAdapter(HarnessAdapter):
     HARBOR_HARNESS_NAME = "codex"
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     OPENAI_API_ENV = OPENAI_API_KEY_ENV
+    HARBOR_IMPORT_PATH = "raidar.agents.harbor_agents.fast_cli_agents:CodexCliHarborAgent"
     MODEL_ALIAS_MAP: dict[str, tuple[str, str]] = {
+        "gpt-5.3-codex-spark-high": ("gpt-5.3-codex-spark", "high"),
+        "gpt-5.3-codex-spark-low": ("gpt-5.3-codex-spark", "low"),
+        "gpt-5.3-codex-spark-medium": ("gpt-5.3-codex-spark", "medium"),
+        "gpt-5.3-codex-spark-xhigh": ("gpt-5.3-codex-spark", "xhigh"),
         "gpt-5.2-low": ("gpt-5.2-codex", "low"),
         "gpt-5.2-medium": ("gpt-5.2-codex", "medium"),
         "gpt-5.2-high": ("gpt-5.2-codex", "high"),
@@ -82,6 +87,8 @@ class CodexCliAdapter(HarnessAdapter):
         return self.HARBOR_HARNESS_NAME
 
     def harbor_harness_import_path(self) -> str | None:
+        if self._resolve_auth().resolved_mode == "chatgpt":
+            return self.HARBOR_IMPORT_PATH
         return fast_harness_import_path(self.config.harness)
 
     def _resolve_model_alias(self) -> tuple[str, str | None]:
@@ -104,7 +111,16 @@ class CodexCliAdapter(HarnessAdapter):
         env: dict[str, str] = {}
         cli_path = self._resolve_cli()
         env[self.CLI_ENV_VAR] = cli_path
-        return with_harness_pythonpath(env)
+        if self.harbor_harness_import_path():
+            if fast_harness_import_path(self.config.harness):
+                return with_harness_pythonpath(env)
+            path_parts = [str(harness_src_path())]
+            current = os.environ.get("PYTHONPATH")
+            if current:
+                path_parts.append(current)
+            env["PYTHONPATH"] = os.pathsep.join(path_parts)
+            return env
+        return env
 
     def excluded_run_env_keys(self) -> set[str]:
         auth = self._resolve_auth()

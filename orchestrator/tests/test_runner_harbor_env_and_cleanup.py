@@ -1,6 +1,7 @@
 """Tests for Harbor runtime env and stale build cleanup behavior."""
 
 import json
+import os
 import shutil
 import signal
 import subprocess
@@ -146,6 +147,57 @@ class _ExecAdapterStub:
 
     def execution_metadata(self) -> dict[str, str]:
         return {}
+
+
+def _patch_smoke_prepare_workspace_dependencies(
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    tmp_path: Path,
+    built_images: dict[str, dict[str, str]],
+    preflight_calls: list[str],
+    runtime_preflight_calls: list[str],
+) -> None:
+    monkeypatch.setattr(runner, "_raidar_cache_root", lambda: tmp_path / ".cache" / "raidar")
+    monkeypatch.setattr(runner, "_maybe_run_cache_maintenance", lambda **_kwargs: None)
+    monkeypatch.setattr(
+        runner,
+        "_run_starter_preflight_install",
+        lambda workspace, env: preflight_calls.append(f"install:{workspace.name}"),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_run_starter_preflight_command",
+        lambda workspace, env, command: preflight_calls.append(
+            f"{workspace.name}:{' '.join(command)}"
+        ),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_inspect_docker_image_labels",
+        lambda image_name, run_env: built_images.get(image_name),
+    )
+    monkeypatch.setattr(
+        runner,
+        "_ensure_harbor_runtime_preflight",
+        lambda *, image_ref, run_env, log_dir: runtime_preflight_calls.append(image_ref.image_name),
+    )
+
+    def fake_run_fast_image_build(
+        build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int
+    ):
+        del run_env, timeout_sec
+        image_name = build_cmd[build_cmd.index("--tag") + 1]
+        labels: dict[str, str] = {}
+        label_indices = [idx for idx, token in enumerate(build_cmd) if token == "--label"]
+        for idx in label_indices:
+            key, value = build_cmd[idx + 1].split("=", 1)
+            labels[key] = value
+        built_images[image_name] = labels
+        return runner.FastImageBuildResult(
+            completed_process=subprocess.CompletedProcess(build_cmd, 0, stdout="built", stderr="")
+        )
+
+    monkeypatch.setattr(runner, "_run_fast_image_build", fake_run_fast_image_build)
 
 
 def test_cleanup_stale_harbor_build_processes_only_kills_orphans(
@@ -298,6 +350,60 @@ def test_docker_compose_preflight_reason_allows_supported_versions(monkeypatch) 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
     assert runner._docker_compose_preflight_reason({}) is None
+
+
+def test_ensure_harbor_runtime_preflight_runs_git_check(monkeypatch, tmp_path: Path) -> None:
+    calls: list[list[str]] = []
+
+    def fake_run(*args, **kwargs):
+        del kwargs
+        calls.append(list(args[0]))
+        return subprocess.CompletedProcess(args[0], 0, stdout="git version 2.51.0\n", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    image_ref = runner.FastTaskImageRef(
+        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-abcd1234",
+        cache_key="cache-key",
+        tag="task-env-codex-cli-abcd1234",
+    )
+    runner._ensure_harbor_runtime_preflight(
+        image_ref=image_ref,
+        run_env={"PATH": os.environ.get("PATH", "")},
+        log_dir=tmp_path,
+    )
+
+    assert calls == [["docker", "run", "--rm", image_ref.image_name, "git", "--version"]]
+    assert (tmp_path / "runtime-git-preflight.log").read_text(encoding="utf-8") == (
+        "git version 2.51.0\n"
+    )
+
+
+def test_ensure_harbor_runtime_preflight_raises_when_git_missing(
+    monkeypatch, tmp_path: Path
+) -> None:
+    def fake_run(*args, **kwargs):
+        del kwargs
+        return subprocess.CompletedProcess(
+            args[0],
+            127,
+            stdout="",
+            stderr="bash: git: command not found\n",
+        )
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    image_ref = runner.FastTaskImageRef(
+        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-abcd1234",
+        cache_key="cache-key",
+        tag="task-env-codex-cli-abcd1234",
+    )
+    with pytest.raises(RuntimeError, match="Harbor runtime preflight failed"):
+        runner._ensure_harbor_runtime_preflight(
+            image_ref=image_ref,
+            run_env={},
+            log_dir=tmp_path,
+        )
 
 
 def test_redact_sensitive_text_masks_inline_env_and_json_values() -> None:
@@ -559,6 +665,77 @@ def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
     assert expected_bun_cache.is_dir()
 
 
+def test_ensure_starter_preflight_runs_against_baseline_workspace(
+    monkeypatch, tmp_path: Path
+) -> None:
+    task_dir = tmp_path / "scenario"
+    task_dir.mkdir(parents=True, exist_ok=True)
+    (task_dir / "scenario.yaml").write_text(
+        "name: sample\nscenario_revision: v001\n", encoding="utf-8"
+    )
+
+    request = SimpleNamespace(
+        scenario=SimpleNamespace(
+            verification=SimpleNamespace(required_commands=[["bun", "run", "lint"]])
+        ),
+        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+        scenario_dir=task_dir,
+    )
+    baseline_workspace = tmp_path / "baseline-workspace"
+    run_workspace = tmp_path / "run-workspace"
+    baseline_workspace.mkdir(parents=True, exist_ok=True)
+    run_workspace.mkdir(parents=True, exist_ok=True)
+    context = SimpleNamespace(
+        workspace=run_workspace,
+        baseline_workspace=baseline_workspace,
+        baseline_cache_key="baseline-cache-key",
+        starter_source=SimpleNamespace(fingerprint="abc123"),
+    )
+
+    called_workspaces: list[Path] = []
+
+    def fake_install(workspace: Path, env: dict[str, str]) -> None:
+        del env
+        called_workspaces.append(workspace)
+
+    def fake_command(workspace: Path, env: dict[str, str], command: list[str]) -> None:
+        del env, command
+        called_workspaces.append(workspace)
+
+    monkeypatch.setattr(
+        runner,
+        "_preflight_cache_file",
+        lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
+    )
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: True)
+    monkeypatch.setattr(runner, "_run_starter_preflight_install", fake_install)
+    monkeypatch.setattr(runner, "_run_starter_preflight_command", fake_command)
+
+    runner.ensure_starter_preflight(request, context)
+
+    assert called_workspaces == [baseline_workspace, baseline_workspace]
+
+
+def test_cache_key_lock_reclaims_dead_owner_immediately(tmp_path: Path, monkeypatch) -> None:
+    lock_root = tmp_path / "locks"
+    lock_dir = lock_root / "image-dead.lock"
+    lock_dir.mkdir(parents=True, exist_ok=True)
+    (lock_dir / "owner.json").write_text(
+        json.dumps({"pid": 999999, "created_at": "2026-04-10T00:00:00+00:00"}),
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: lock_root)
+
+    with runner._cache_key_lock("image-dead", timeout_sec=1):
+        assert lock_dir.exists()
+        payload = json.loads((lock_dir / "owner.json").read_text(encoding="utf-8"))
+        assert payload["pid"] == os.getpid()
+
+    assert not lock_dir.exists()
+
+
 def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -595,6 +772,7 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
             harness="codex-cli",
             run_env={},
             log_dir=tmp_path / "logs",
+            task_timeout_sec=300,
         )
 
     build_log = tmp_path / "logs" / "fast-image-build.log"
@@ -631,6 +809,26 @@ def test_fast_task_image_reference_is_content_addressed_by_harness(
     assert image_ref.cache_key != other_ref.cache_key
 
 
+def test_fast_image_build_command_uses_classic_docker_build(tmp_path: Path) -> None:
+    dockerfile = tmp_path / "Dockerfile"
+    dockerfile.write_text("FROM oven/bun:1\n", encoding="utf-8")
+    image_ref = runner.FastTaskImageRef(
+        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-cachekey",
+        cache_key="cachekey",
+        tag="task-env-codex-cli-cachekey",
+    )
+
+    command = runner._fast_image_build_command(
+        image_ref,
+        dockerfile,
+        tmp_path,
+        harness="codex-cli",
+    )
+
+    assert command[:2] == ["docker", "build"]
+    assert "--load" not in command
+
+
 def test_render_environment_dockerfile_includes_visual_tooling_dependencies() -> None:
     request = SimpleNamespace(
         config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
@@ -639,12 +837,16 @@ def test_render_environment_dockerfile_includes_visual_tooling_dependencies() ->
 
     dockerfile = runner._render_environment_dockerfile(request)
 
+    assert "git" in dockerfile
     assert "ripgrep" in dockerfile
     assert "file" in dockerfile
     assert "libatk-bridge2.0-0t64" in dockerfile
     assert "libcups2t64" in dockerfile
     assert "libcairo2" in dockerfile
     assert "libpango-1.0-0" in dockerfile
+    assert dockerfile.index("RUN bunx playwright install chromium") < dockerfile.index(
+        "COPY app/ /app/"
+    )
 
 
 def test_ensure_fast_task_image_returns_immediately_when_image_exists(
@@ -669,11 +871,19 @@ def test_ensure_fast_task_image_returns_immediately_when_image_exists(
         lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
     )
     monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: True)
+    preflight_calls: list[str] = []
 
     def fail_if_called(*_args, **_kwargs):
         raise AssertionError("subprocess.run should not be called when image already exists")
 
     monkeypatch.setattr(runner.subprocess, "run", fail_if_called)
+    monkeypatch.setattr(
+        runner,
+        "_ensure_harbor_runtime_preflight",
+        lambda *, image_ref, run_env, log_dir: preflight_calls.append(
+            f"{image_ref.image_name}:{log_dir.name}"
+        ),
+    )
 
     cache_hit = runner._ensure_fast_task_image(
         task_bundle_path=bundle_path,
@@ -681,10 +891,126 @@ def test_ensure_fast_task_image_returns_immediately_when_image_exists(
         harness="codex-cli",
         run_env={},
         log_dir=tmp_path / "logs",
+        task_timeout_sec=300,
     )
 
     assert cache_hit is True
+    assert preflight_calls == [f"{image_ref.image_name}:logs"]
     assert not (tmp_path / "logs" / "fast-image-build.log").exists()
+
+
+def test_ensure_fast_task_image_rebuilds_when_cached_image_fails_runtime_preflight(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle_path = tmp_path / "bundle"
+    docker_context = bundle_path / "environment"
+    docker_context.mkdir(parents=True, exist_ok=True)
+    (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
+    (docker_context / "app").mkdir(parents=True, exist_ok=True)
+    (docker_context / "app" / "package.json").write_text("{}", encoding="utf-8")
+    image_ref = runner.FastTaskImageRef(
+        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-cachekey",
+        cache_key="cachekey",
+        tag="task-env-codex-cli-cachekey",
+    )
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    monkeypatch.setattr(
+        runner,
+        "_fast_image_cache_metadata_path",
+        lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
+    )
+    monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: True)
+
+    build_calls: list[list[str]] = []
+
+    def fake_build(build_cmd, run_env, *, timeout_sec):
+        del run_env, timeout_sec
+        build_calls.append(build_cmd)
+        return runner.FastImageBuildResult(
+            completed_process=subprocess.CompletedProcess(
+                build_cmd, 0, stdout="build-ok", stderr=""
+            )
+        )
+
+    preflight_attempts: list[str] = []
+
+    def fake_runtime_preflight(*, image_ref, run_env, log_dir):
+        del run_env, log_dir
+        preflight_attempts.append(image_ref.image_name)
+        if len(preflight_attempts) < 3:
+            raise RuntimeError("git missing")
+
+    monkeypatch.setattr(runner, "_run_fast_image_build", fake_build)
+    monkeypatch.setattr(runner, "_ensure_harbor_runtime_preflight", fake_runtime_preflight)
+
+    cache_hit = runner._ensure_fast_task_image(
+        task_bundle_path=bundle_path,
+        image_ref=image_ref,
+        harness="codex-cli",
+        run_env={},
+        log_dir=tmp_path / "logs",
+        task_timeout_sec=300,
+    )
+
+    assert cache_hit is False
+    assert len(build_calls) == 1
+    assert len(preflight_attempts) == 3
+
+
+def test_ensure_fast_task_image_writes_log_and_raises_on_build_timeout(
+    monkeypatch, tmp_path: Path
+) -> None:
+    bundle_path = tmp_path / "bundle"
+    docker_context = bundle_path / "environment"
+    docker_context.mkdir(parents=True, exist_ok=True)
+    (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
+    (docker_context / "app").mkdir(parents=True, exist_ok=True)
+    (docker_context / "app" / "package.json").write_text("{}", encoding="utf-8")
+    image_ref = runner.FastTaskImageRef(
+        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-timeout",
+        cache_key="timeout-key",
+        tag="task-env-codex-cli-timeout",
+    )
+
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    monkeypatch.setattr(
+        runner,
+        "_fast_image_cache_metadata_path",
+        lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
+    )
+    monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: False)
+
+    def fake_build(build_cmd, run_env, *, timeout_sec):
+        del run_env
+        return runner.FastImageBuildResult(
+            completed_process=subprocess.CompletedProcess(
+                build_cmd,
+                returncode=124,
+                stdout="partial-out",
+                stderr="partial-err",
+            ),
+            timed_out=True,
+            timeout_sec=timeout_sec,
+        )
+
+    monkeypatch.setattr(runner, "_run_fast_image_build", fake_build)
+
+    with pytest.raises(RuntimeError, match="Fast image build timed out after 300s"):
+        runner._ensure_fast_task_image(
+            task_bundle_path=bundle_path,
+            image_ref=image_ref,
+            harness="codex-cli",
+            run_env={},
+            log_dir=tmp_path / "logs",
+            task_timeout_sec=300,
+        )
+
+    build_log = tmp_path / "logs" / "fast-image-build.log"
+    assert build_log.exists()
+    text = build_log.read_text(encoding="utf-8")
+    assert "partial-out" in text
+    assert "partial-err" in text
 
 
 def test_prepare_workspace_phase_reuses_smoke_prep_and_fast_image_across_invocations(
@@ -758,39 +1084,15 @@ def test_prepare_workspace_phase_reuses_smoke_prep_and_fast_image_across_invocat
 
     built_images: dict[str, dict[str, str]] = {}
     preflight_calls: list[str] = []
+    runtime_preflight_calls: list[str] = []
 
-    monkeypatch.setattr(runner, "_raidar_cache_root", lambda: tmp_path / ".cache" / "raidar")
-    monkeypatch.setattr(runner, "_maybe_run_cache_maintenance", lambda **_kwargs: None)
-    monkeypatch.setattr(
-        runner,
-        "_run_starter_preflight_install",
-        lambda workspace, env: preflight_calls.append(f"install:{workspace.name}"),
+    _patch_smoke_prepare_workspace_dependencies(
+        monkeypatch,
+        tmp_path=tmp_path,
+        built_images=built_images,
+        preflight_calls=preflight_calls,
+        runtime_preflight_calls=runtime_preflight_calls,
     )
-    monkeypatch.setattr(
-        runner,
-        "_run_starter_preflight_command",
-        lambda workspace, env, command: preflight_calls.append(
-            f"{workspace.name}:{' '.join(command)}"
-        ),
-    )
-    monkeypatch.setattr(
-        runner,
-        "_inspect_docker_image_labels",
-        lambda image_name, run_env: built_images.get(image_name),
-    )
-
-    def fake_run_fast_image_build(build_cmd: list[str], run_env: dict[str, str]):
-        del run_env
-        image_name = build_cmd[build_cmd.index("--tag") + 1]
-        labels: dict[str, str] = {}
-        label_indices = [idx for idx, token in enumerate(build_cmd) if token == "--label"]
-        for idx in label_indices:
-            key, value = build_cmd[idx + 1].split("=", 1)
-            labels[key] = value
-        built_images[image_name] = labels
-        return subprocess.CompletedProcess(build_cmd, 0, stdout="built", stderr="")
-
-    monkeypatch.setattr(runner, "_run_fast_image_build", fake_run_fast_image_build)
 
     phase_one = runner._prepare_workspace_phase(request_one)
     phase_two = runner._prepare_workspace_phase(request_two)
@@ -810,6 +1112,9 @@ def test_prepare_workspace_phase_reuses_smoke_prep_and_fast_image_across_invocat
     assert preflight_calls == ["install:workspace", "workspace:bun run lint"]
     assert phase_one.cache_metadata["image_key"] == phase_two.cache_metadata["image_key"]
     assert phase_one.cache_metadata["image_tag"] == phase_two.cache_metadata["image_tag"]
+    expected_image = f"{runner.fast_image_prefix()}:{phase_one.cache_metadata['image_tag']}"
+    assert runtime_preflight_calls
+    assert all(image_name == expected_image for image_name in runtime_preflight_calls)
 
 
 def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missing(
@@ -849,6 +1154,47 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
     assert result.process_metrics.command_count == 0
 
 
+def test_execute_harbor_phase_recovers_timeout_when_verifier_outputs_exist(
+    monkeypatch, tmp_path: Path
+) -> None:
+    request = SimpleNamespace(
+        scenario=object(),
+        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+    )
+    phase = SimpleNamespace(
+        harbor_request=object(),
+        layout=SimpleNamespace(start_time=datetime.now(UTC)),
+    )
+    trial_dir = tmp_path / "trial"
+    trial_dir.mkdir(parents=True, exist_ok=True)
+    harbor_result = runner.HarborExecutionResult(
+        terminated_early=True,
+        termination_reason="Timeout expired after 420s before trial result.json was written.",
+        job_dir=tmp_path / "jobs" / "orchestrator-run-01",
+        trial_dir=trial_dir,
+    )
+
+    monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
+    monkeypatch.setattr(
+        runner,
+        "collect_process_metrics",
+        lambda *args, **kwargs: runner._empty_process_metrics(),
+    )
+    monkeypatch.setattr(runner, "collect_trace_events", lambda *args, **kwargs: [])
+    verifier_outputs = runner.terminated_outputs(None)
+    monkeypatch.setattr(
+        runner,
+        "_load_verifier_outputs",
+        lambda _trial_dir: (verifier_outputs, None),
+    )
+
+    result = runner._execute_harbor_phase(request, phase)
+
+    assert result.terminated_early is False
+    assert result.termination_reason is None
+    assert result.outputs == verifier_outputs
+
+
 def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -879,3 +1225,36 @@ def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
 
     with pytest.raises(RuntimeError, match="Missing token usage metrics"):
         runner._execute_harbor_phase(request, phase)
+
+
+def test_execute_harbor_preserves_trial_dir_on_timeout(monkeypatch, tmp_path: Path) -> None:
+    jobs_dir = tmp_path / "jobs"
+    job_dir = jobs_dir / "orchestrator-run-01"
+    trial_dir = job_dir / "bundle__abc123"
+    (trial_dir / "agent").mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr(
+        runner,
+        "_run_harbor_process",
+        lambda **kwargs: "Timeout expired after 420s before trial result.json was written.",
+    )
+    monkeypatch.setattr(runner, "cleanup_stale_harbor_resources", lambda: None)
+
+    adapter = SimpleNamespace(
+        build_harbor_command=lambda **kwargs: ["harbor", "run"],
+    )
+    request = runner.HarborExecutionRequest(
+        adapter=adapter,
+        workspace=tmp_path,
+        task_bundle_path=tmp_path / "bundle",
+        jobs_dir=jobs_dir,
+        run_harbor_dir=tmp_path / "harbor",
+        run_id="run-01",
+        timeout_sec=420,
+        run_env={},
+    )
+
+    result = runner.execute_harbor(request)
+
+    assert result.terminated_early is True
+    assert result.trial_dir == trial_dir

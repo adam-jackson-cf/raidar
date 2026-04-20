@@ -65,7 +65,9 @@ def test_harness_list_includes_model_variations() -> None:
     ) in result.output
     assert (
         "models: codex/* (known aliases: codex/gpt-5.2-high, codex/gpt-5.2-low, "
-        "codex/gpt-5.2-medium, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
+        "codex/gpt-5.2-medium, codex/gpt-5.3-codex-spark-high, "
+        "codex/gpt-5.3-codex-spark-low, codex/gpt-5.3-codex-spark-medium, "
+        "codex/gpt-5.3-codex-spark-xhigh, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
         "codex/gpt-5.4-low, codex/gpt-5.4-medium, codex/gpt-5.4-mini, "
         "codex/gpt-5.4-mini-low)"
     ) in result.output
@@ -1172,6 +1174,7 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["FAKE_MAKE_LOG"] = str(make_log)
+    env.pop("CODEX_AUTH_MODE", None)
 
     result = subprocess.run(
         [
@@ -1253,6 +1256,7 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["FAKE_MAKE_LOG"] = str(make_log)
+    env.pop("CODEX_AUTH_MODE", None)
 
     result = subprocess.run(
         [
@@ -1474,6 +1478,7 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
     env = os.environ.copy()
     env["PATH"] = f"{bin_dir}:{env['PATH']}"
     env["FAKE_MAKE_LOG"] = str(make_log)
+    env.pop("CODEX_AUTH_MODE", None)
 
     result = subprocess.run(
         [

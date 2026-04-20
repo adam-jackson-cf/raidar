@@ -222,8 +222,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "test_coverage_passed",
         "requirements_presence_ratio",
         "requirements_mapping_ratio",
-        "requirement_pattern_gap_count",
-        "requirement_pattern_gaps",
+        "requirement_test_evidence_gap_count",
+        "requirement_test_evidence_gaps",
         "composite_score",
         "trial_total_sec",
         "environment_setup_sec",
@@ -299,11 +299,11 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "test_coverage_passed": run.scores.test_coverage.passed,
         "requirements_presence_ratio": run.scores.requirements_coverage.presence_ratio,
         "requirements_mapping_ratio": run.scores.requirements_coverage.mapping_ratio,
-        "requirement_pattern_gap_count": len(
-            run.scores.requirements_coverage.requirement_pattern_gaps
+        "requirement_test_evidence_gap_count": len(
+            run.scores.requirements_coverage.requirement_test_evidence_gaps
         ),
-        "requirement_pattern_gaps": json.dumps(
-            run.scores.requirements_coverage.requirement_pattern_gaps,
+        "requirement_test_evidence_gaps": json.dumps(
+            run.scores.requirements_coverage.requirement_test_evidence_gaps,
             sort_keys=True,
         ),
         "composite_score": run.scores.composite_score,
@@ -470,7 +470,7 @@ def _append_invalid_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
             f"- run_id={run.id}, model={run.config.model}, "
             f"diagnostic={run.scores.diagnostic_score:.3f}, "
             f"gaps={run.scores.requirements_coverage.requirement_gap_ids}, "
-            f"pattern_gaps={run.scores.requirements_coverage.requirement_pattern_gaps}"
+            f"evidence_gaps={run.scores.requirements_coverage.requirement_test_evidence_gaps}"
         )
 
 

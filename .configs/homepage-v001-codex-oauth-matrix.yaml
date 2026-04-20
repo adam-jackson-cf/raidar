@@ -1,0 +1,15 @@
+matrix:
+  experiment:
+    timeout_sec: 1800
+    repeats: 5
+    repeat_parallel: 1
+    retry_void: 0
+  agents:
+    - harness: codex-cli
+      model: codex/gpt-5.4-medium
+    - harness: codex-cli
+      model: codex/gpt-5.4-high
+    - harness: codex-cli
+      model: codex/gpt-5.4-mini-low
+    - harness: codex-cli
+      model: codex/gpt-5.3-codex-spark-medium

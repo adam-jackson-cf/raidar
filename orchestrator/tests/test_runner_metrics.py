@@ -1015,6 +1015,42 @@ def test_collect_process_metrics_raises_when_usage_missing(tmp_path: Path):
         collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
 
 
+def test_collect_process_metrics_detects_git_commit_bypass_commands(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    agent_dir = trial_dir / "agent"
+    agent_dir.mkdir(parents=True, exist_ok=True)
+    codex_log = agent_dir / "codex.txt"
+    entries = [
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "command_execution",
+                "command": (
+                    "/bin/bash -lc 'git add src/app/page.tsx && "
+                    'git commit --no-verify -m "feat: bypass hooks"\''
+                ),
+                "exit_code": 0,
+                "status": "completed",
+            },
+        },
+        {
+            "type": "turn.completed",
+            "usage": {
+                "input_tokens": 12,
+                "cached_input_tokens": 0,
+                "output_tokens": 6,
+            },
+        },
+    ]
+    codex_log.write_text("\n".join(json.dumps(entry) for entry in entries), encoding="utf-8")
+
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
+
+    assert metrics.git_commit_verification_bypass_commands == [
+        "git commit --no-verify -m 'feat: bypass hooks'"
+    ]
+
+
 def test_evaluate_coverage_reads_summary_file(tmp_path: Path):
     workspace = tmp_path / "workspace"
     coverage_dir = workspace / "coverage"
@@ -1076,7 +1112,10 @@ def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):
                 pattern="Get Started",
                 description="CTA string exists",
             ),
-            required_test_patterns=["CTA", "Get Started"],
+            required_test_evidence=[
+                {"type": "query_role", "role": "button"},
+                {"type": "query_role", "role": "heading"},
+            ],
         )
     ]
 
@@ -1086,10 +1125,12 @@ def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):
     assert result.mapped_requirements == 0
     assert result.mapped_satisfied_requirements == 0
     assert result.requirement_gap_ids == ["req-cta"]
-    assert result.requirement_pattern_gaps == {"req-cta": ["Get Started"]}
+    assert result.requirement_test_evidence_gaps == {
+        "req-cta": ["query_role:button x1", "query_role:heading x1"]
+    }
 
 
-def test_evaluate_requirements_matches_patterns_case_insensitively(tmp_path: Path):
+def test_evaluate_requirements_matches_role_queries_and_counts(tmp_path: Path):
     workspace = tmp_path / "workspace"
     src_app = workspace / "src" / "app"
     src_app.mkdir(parents=True, exist_ok=True)
@@ -1097,8 +1138,12 @@ def test_evaluate_requirements_matches_patterns_case_insensitively(tmp_path: Pat
         "export default function Home(){ return <h1>Get Started</h1>; }"
     )
     (src_app / "page.test.tsx").write_text(
-        "it('renders nav', () => { expect('nav-link-about').toBeTruthy();"
-        " expect('nav-link-contact').toBeTruthy(); })"
+        "it('renders nav', () => {"
+        " screen.getByRole('navigation');"
+        " screen.getAllByRole('link');"
+        " screen.getAllByRole('link');"
+        " screen.getByRole('button');"
+        "})"
     )
 
     requirements = [
@@ -1110,7 +1155,11 @@ def test_evaluate_requirements_matches_patterns_case_insensitively(tmp_path: Pat
                 pattern="Get Started",
                 description="Placeholder deterministic check",
             ),
-            required_test_patterns=["About", "Contact"],
+            required_test_evidence=[
+                {"type": "query_role", "role": "navigation"},
+                {"type": "query_role", "role": "link", "min_count": 2},
+                {"type": "query_role", "role": "button"},
+            ],
         )
     ]
 
@@ -1120,7 +1169,7 @@ def test_evaluate_requirements_matches_patterns_case_insensitively(tmp_path: Pat
     assert result.mapped_requirements == 1
     assert result.mapped_satisfied_requirements == 1
     assert result.requirement_gap_ids == []
-    assert result.requirement_pattern_gaps == {}
+    assert result.requirement_test_evidence_gaps == {}
 
 
 def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
@@ -1309,7 +1358,7 @@ def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
                     "mapped_satisfied_requirements": 0,
                     "missing_requirement_ids": [],
                     "requirement_gap_ids": [],
-                    "requirement_pattern_gaps": {},
+                    "requirement_test_evidence_gaps": {},
                 },
                 "execution_validity": {"checks": []},
                 "performance_gates": {"checks": []},
@@ -1378,6 +1427,116 @@ def test_build_scorecard_fails_execution_validity_without_required_atomic_commit
         if check.name == "atomic_commits_present"
     )
     assert atomic_check.passed is False
+    assert scorecard.execution_validity.passed is False
+
+
+def test_build_scorecard_accepts_observed_required_verification_from_gate_history(
+    tmp_path: Path,
+) -> None:
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    gate_history = [
+        GateEvent(
+            timestamp="2026-01-01T00:00:00Z",
+            gate_name="typecheck",
+            command="bun run typecheck",
+            exit_code=0,
+            stdout="",
+            stderr="",
+            failure_category=None,
+            is_repeat=False,
+        ),
+        GateEvent(
+            timestamp="2026-01-01T00:00:01Z",
+            gate_name="lint",
+            command="bun run lint",
+            exit_code=0,
+            stdout="",
+            stderr="",
+            failure_category=None,
+            is_repeat=False,
+        ),
+        GateEvent(
+            timestamp="2026-01-01T00:00:02Z",
+            gate_name="coverage",
+            command="bun run test:coverage",
+            exit_code=0,
+            stdout="",
+            stderr="",
+            failure_category=None,
+            is_repeat=False,
+        ),
+        GateEvent(
+            timestamp="2026-01-01T00:00:03Z",
+            gate_name="build",
+            command="bun run build",
+            exit_code=0,
+            stdout="",
+            stderr="",
+            failure_category=None,
+            is_repeat=False,
+        ),
+    ]
+    score_context = replace(
+        score_context,
+        execution=replace(
+            score_context.execution,
+            process_metrics=replace(
+                score_context.execution.process_metrics,
+                required_verification_commands=3,
+                executed_required_verification_commands=3,
+            ),
+            outputs=replace(
+                score_context.execution.outputs,
+                gate_history=gate_history,
+            ),
+        ),
+    )
+
+    scorecard = build_scorecard(score_context)
+
+    verification_check = next(
+        check
+        for check in scorecard.execution_validity.checks
+        if check.name == "required_verification_commands_executed"
+    )
+    assert verification_check.passed is True
+    assert verification_check.evidence == "observed=3/3, explicit=3/3"
+
+
+def test_build_scorecard_fails_when_git_commit_bypasses_verification_hooks(
+    tmp_path: Path,
+) -> None:
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    score_context = replace(
+        score_context,
+        execution=replace(
+            score_context.execution,
+            process_metrics=replace(
+                score_context.execution.process_metrics,
+                git_commit_verification_bypass_commands=[
+                    "git commit --no-verify -m 'feat: bypass'"
+                ],
+            ),
+        ),
+    )
+
+    scorecard = build_scorecard(score_context)
+
+    bypass_check = next(
+        check
+        for check in scorecard.execution_validity.checks
+        if check.name == "commit_verification_hooks_not_bypassed"
+    )
+    assert bypass_check.passed is False
+    assert "git commit --no-verify" in str(bypass_check.evidence)
     assert scorecard.execution_validity.passed is False
 
 
@@ -1719,7 +1878,9 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     assert r"/(\d+)\s+passed/gi" in score_script
     assert r"/(\d+)\s+failed/gi" in score_script
     assert r"/([0-9]+(?:\.[0-9]+)?)\s*%/" in score_script
-    assert 'new RegExp(pattern, "mi").test(content)' in score_script
+    assert "required_test_evidence" in score_script
+    assert "countRoleQueryMatches" in score_script
+    assert "missingTestEvidence" in score_script
 
 
 def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
@@ -1779,6 +1940,7 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     dockerfile = (bundle / "environment" / "Dockerfile").read_text()
 
     assert 'docker_image = "ts-ui-eval-smoke-fast:task-env-codex-cli-' in task_toml
+    assert "git \\" in dockerfile
     assert "@openai/codex" in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
     assert "@google/gemini-cli" not in dockerfile
@@ -1942,6 +2104,49 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
 
     command = _resolve_homepage_screenshot_command(scenario, workspace)
     assert command is None
+
+
+def test_ensure_workspace_capture_dependencies_installs_when_next_missing(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "package.json").write_text('{"name":"app"}\n')
+    (workspace / "bun.lock").write_text("lockfileVersion = 1\n")
+
+    calls: list[tuple[list[str], Path]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append((command, Path(kwargs["cwd"])))
+        (workspace / "node_modules" / "next").mkdir(parents=True, exist_ok=True)
+        (workspace / "node_modules" / "next" / "package.json").write_text("{}\n")
+        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+
+    monkeypatch.setattr(subprocess, "run", fake_run)
+
+    error = runner._ensure_workspace_capture_dependencies(workspace)
+
+    assert error is None
+    assert calls == [(["bun", "install", "--frozen-lockfile"], workspace)]
+
+
+def test_ensure_workspace_capture_dependencies_skips_when_next_present(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    (workspace / "node_modules" / "next").mkdir(parents=True, exist_ok=True)
+    (workspace / "node_modules" / "next" / "package.json").write_text("{}\n")
+    (workspace / "package.json").write_text('{"name":"app"}\n')
+    (workspace / "bun.lock").write_text("lockfileVersion = 1\n")
+
+    def fail_run(*args, **kwargs):
+        raise AssertionError("subprocess.run should not be called")
+
+    monkeypatch.setattr(subprocess, "run", fail_run)
+
+    error = runner._ensure_workspace_capture_dependencies(workspace)
+
+    assert error is None
 
 
 def test_prune_workspace_artifacts_removes_transient_directories(tmp_path: Path):

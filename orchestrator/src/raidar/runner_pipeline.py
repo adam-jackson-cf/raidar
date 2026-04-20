@@ -14,6 +14,27 @@ def _runner():
     return runner_module
 
 
+def _resolve_harbor_outputs(runner, harbor_result, terminated_early, termination_reason):
+    verifier_outputs = None
+    verifier_reason = None
+    if harbor_result.trial_dir is not None:
+        verifier_outputs, verifier_reason = runner._load_verifier_outputs(harbor_result.trial_dir)
+
+    recovered_from_timeout = (
+        terminated_early
+        and verifier_outputs is not None
+        and termination_reason is not None
+        and "timeout expired" in termination_reason.lower()
+    )
+    if recovered_from_timeout:
+        return verifier_outputs, False, None
+    if not terminated_early and verifier_outputs is None:
+        return None, True, verifier_reason
+    if terminated_early:
+        return runner.terminated_outputs(termination_reason), True, termination_reason
+    return verifier_outputs, False, None
+
+
 def prepare_workspace_phase(request):
     """Workspace prep phase: context, preflight, and Harbor bundle creation."""
 
@@ -99,6 +120,12 @@ def prepare_workspace_phase(request):
             harness=request.config.harness.value,
             run_env=run_env,
             log_dir=layout.harbor_dir,
+            task_timeout_sec=request.config.timeout_sec,
+        )
+        runner._ensure_harbor_runtime_preflight(
+            image_ref=image_ref,
+            run_env=run_env,
+            log_dir=layout.harbor_dir,
         )
     prep_phase_timings["_ensure_fast_task_image"] = round(time.perf_counter() - phase_started, 3)
     cache_metadata["image"] = {"hit": image_hit}
@@ -151,15 +178,11 @@ def execute_harbor_phase(request, phase):
         harness=request.config.harness.value,
     )
 
-    verifier_outputs = None
-    if not terminated_early:
-        verifier_outputs, verifier_reason = runner._load_verifier_outputs(harbor_result.trial_dir)
-        if verifier_outputs is None:
-            terminated_early = True
-            termination_reason = verifier_reason
-
-    outputs = (
-        runner.terminated_outputs(termination_reason) if terminated_early else verifier_outputs
+    outputs, terminated_early, termination_reason = _resolve_harbor_outputs(
+        runner,
+        harbor_result,
+        terminated_early,
+        termination_reason,
     )
     if outputs is None:
         outputs = runner.terminated_outputs("Verifier outputs unavailable.")

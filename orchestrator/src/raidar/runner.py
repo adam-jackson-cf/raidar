@@ -51,6 +51,7 @@ from .starter import StarterSource
 
 SCORING_SCHEMA_VERSION = "2.0.0"
 HARBOR_TIMEOUT_BUFFER_SEC = 120
+FAST_IMAGE_BUILD_MIN_TIMEOUT_SEC = 120
 MIN_DOCKER_COMPOSE_VERSION = (2, 40, 1)
 HARBOR_RATE_LIMIT_RETRY_DELAY_SEC = 20
 HARBOR_RATE_LIMIT_MAX_ATTEMPTS = 2
@@ -285,6 +286,7 @@ class ProcessMetrics:
     first_pass_verification_successes: int = 0
     first_pass_verification_failures: int = 0
     missing_required_verification_commands: int = 0
+    git_commit_verification_bypass_commands: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True, slots=True)
@@ -324,6 +326,15 @@ class FastTaskImageRef:
     image_name: str
     cache_key: str
     tag: str
+
+
+@dataclass(frozen=True, slots=True)
+class FastImageBuildResult:
+    """Result of a fast Harbor task image build."""
+
+    completed_process: subprocess.CompletedProcess[str]
+    timed_out: bool = False
+    timeout_sec: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -514,6 +525,26 @@ def _touch_cache_path(path: Path) -> None:
         return
 
 
+def _cache_lock_owner_pid(lock_dir: Path) -> int | None:
+    owner_path = lock_dir / "owner.json"
+    try:
+        payload = json.loads(owner_path.read_text(encoding="utf-8"))
+    except (FileNotFoundError, OSError, json.JSONDecodeError):
+        return None
+    pid = payload.get("pid")
+    return pid if isinstance(pid, int) and pid > 0 else None
+
+
+def _process_exists(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
 @contextmanager
 def _cache_key_lock(lock_key: str, *, timeout_sec: int = RAIDAR_CACHE_LOCK_TIMEOUT_SEC):
     lock_root = _cache_lock_root()
@@ -539,6 +570,10 @@ def _cache_key_lock(lock_key: str, *, timeout_sec: int = RAIDAR_CACHE_LOCK_TIMEO
             try:
                 age_sec = time.time() - lock_dir.stat().st_mtime
             except FileNotFoundError:
+                continue
+            owner_pid = _cache_lock_owner_pid(lock_dir)
+            if owner_pid is not None and not _process_exists(owner_pid):
+                shutil.rmtree(lock_dir, ignore_errors=True)
                 continue
             if age_sec > RAIDAR_CACHE_LOCK_STALE_SEC:
                 shutil.rmtree(lock_dir, ignore_errors=True)
@@ -742,6 +777,10 @@ def _run_homepage_capture_command(
     actual_path = workspace / "actual.png"
     actual_path.unlink(missing_ok=True)
 
+    install_error = _ensure_workspace_capture_dependencies(workspace)
+    if install_error:
+        return None, install_error
+
     try:
         completed = subprocess.run(
             command,
@@ -767,6 +806,36 @@ def _run_homepage_capture_command(
     shutil.copy2(actual_path, output_path)
     actual_path.unlink(missing_ok=True)
     return output_path, None
+
+
+def _ensure_workspace_capture_dependencies(workspace: Path) -> str | None:
+    package_json = workspace / "package.json"
+    lockfile = workspace / "bun.lock"
+    node_modules = workspace / "node_modules"
+    next_package = node_modules / "next" / "package.json"
+    if not package_json.exists() or not lockfile.exists() or next_package.exists():
+        return None
+
+    try:
+        completed = subprocess.run(
+            ["bun", "install", "--frozen-lockfile"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+            timeout=settings.timeouts.screenshot,
+            check=False,
+            env=_workspace_runtime_env(workspace),
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired) as exc:
+        return f"Failed to install workspace dependencies before capture: {exc}"
+
+    if completed.returncode != 0:
+        output = (completed.stdout + "\n" + completed.stderr).strip()[:4000]
+        return (
+            "Failed to install workspace dependencies before capture: "
+            f"`bun install --frozen-lockfile` exited {completed.returncode}: {output}"
+        )
+    return None
 
 
 def _safe_extract_tarball(archive_path: Path, target_dir: Path) -> None:
@@ -979,6 +1048,8 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
     if not required_commands:
         return None
 
+    preflight_workspace = getattr(context, "baseline_workspace", context.workspace)
+
     cache_key = _preflight_cache_key(request, context)
     cache_file = _preflight_cache_file(cache_key)
     with _cache_key_lock(f"preflight-{cache_key}"):
@@ -986,14 +1057,14 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
             _touch_cache_path(cache_file)
             return True
 
-        env = _workspace_runtime_env(context.workspace, os.environ.copy())
-        _run_starter_preflight_install(context.workspace, env)
+        env = _workspace_runtime_env(preflight_workspace, os.environ.copy())
+        _run_starter_preflight_install(preflight_workspace, env)
 
-        has_tests = _workspace_has_tests(context.workspace)
+        has_tests = _workspace_has_tests(preflight_workspace)
         for command in required_commands:
             if _should_skip_preflight_command(command, has_tests):
                 continue
-            _run_starter_preflight_command(context.workspace, env, command)
+            _run_starter_preflight_command(preflight_workspace, env, command)
 
         _write_starter_preflight_cache(
             cache_file=cache_file,
@@ -1546,7 +1617,10 @@ def _scenario_spec_acceptance_block(request: RunRequest) -> dict[str, Any]:
                     "pattern": requirement.check.pattern,
                     "description": requirement.check.description,
                 },
-                "required_test_patterns": requirement.required_test_patterns,
+                "required_test_evidence": [
+                    evidence.model_dump(mode="json")
+                    for evidence in requirement.required_test_evidence
+                ],
             }
             for requirement in request.scenario.acceptance.requirements
         ],
@@ -1698,7 +1772,6 @@ def _fast_image_build_command(
     command = [
         "docker",
         "build",
-        "--load",
         "--tag",
         image_ref.image_name,
         "--file",
@@ -1711,33 +1784,133 @@ def _fast_image_build_command(
 
 
 def _run_fast_image_build(
-    build_cmd: list[str], run_env: dict[str, str]
-) -> subprocess.CompletedProcess:
+    build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int
+) -> FastImageBuildResult:
+    build_env = dict(run_env)
+    # Use the classic builder for task images. It has been more reliable than buildx
+    # on local OrbStack storage and still produces a locally-available image.
+    build_env["DOCKER_BUILDKIT"] = "0"
     try:
-        return subprocess.run(
+        completed = subprocess.run(
             build_cmd,
             capture_output=True,
             text=True,
-            timeout=1800,
+            timeout=timeout_sec,
+            env=build_env,
+            check=False,
+        )
+        return FastImageBuildResult(completed_process=completed)
+    except subprocess.TimeoutExpired as exc:
+        stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
+        stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
+        return FastImageBuildResult(
+            completed_process=subprocess.CompletedProcess(
+                build_cmd,
+                returncode=124,
+                stdout=stdout,
+                stderr=stderr,
+            ),
+            timed_out=True,
+            timeout_sec=timeout_sec,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Docker CLI not found.") from exc
+
+
+def _fast_image_build_timeout(task_timeout_sec: int) -> int:
+    """Bound pre-Harbor image builds to the scenario budget."""
+    return max(FAST_IMAGE_BUILD_MIN_TIMEOUT_SEC, task_timeout_sec)
+
+
+def _run_runtime_preflight_command(
+    *,
+    image_name: str,
+    run_env: dict[str, str],
+    command: list[str],
+    log_path: Path,
+) -> None:
+    docker_cmd = ["docker", "run", "--rm", image_name, *command]
+    try:
+        completed = subprocess.run(
+            docker_cmd,
+            capture_output=True,
+            text=True,
+            timeout=60,
             env=run_env,
             check=False,
         )
     except FileNotFoundError as exc:
         raise RuntimeError("Docker CLI not found.") from exc
 
+    output = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    log_path.write_text((output + "\n") if output else "", encoding="utf-8")
+    if completed.returncode == 0:
+        return
 
-def _write_fast_image_build_log(log_dir: Path, build: subprocess.CompletedProcess) -> None:
+    rendered = " ".join(shlex.quote(part) for part in docker_cmd)
+    excerpt = output[:8000]
+    if excerpt:
+        raise RuntimeError(
+            f"Harbor runtime preflight failed: `{rendered}` exited {completed.returncode}\n"
+            f"{excerpt}"
+        )
+    raise RuntimeError(
+        f"Harbor runtime preflight failed: `{rendered}` exited {completed.returncode}"
+    )
+
+
+def _ensure_harbor_runtime_preflight(
+    *,
+    image_ref: FastTaskImageRef,
+    run_env: dict[str, str],
+    log_dir: Path,
+) -> None:
+    _run_runtime_preflight_command(
+        image_name=image_ref.image_name,
+        run_env=run_env,
+        command=["git", "--version"],
+        log_path=log_dir / "runtime-git-preflight.log",
+    )
+
+
+def _cached_fast_image_is_ready(
+    *,
+    image_ref: FastTaskImageRef,
+    harness: str,
+    run_env: dict[str, str],
+    log_dir: Path,
+) -> bool:
+    if not _fast_image_cache_hit(image_ref, harness=harness, run_env=run_env):
+        return False
+    try:
+        _ensure_harbor_runtime_preflight(image_ref=image_ref, run_env=run_env, log_dir=log_dir)
+    except RuntimeError:
+        return False
+    return True
+
+
+def _write_fast_image_build_log(log_dir: Path, build: FastImageBuildResult) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
     build_log = log_dir / "fast-image-build.log"
-    build_log.write_text((build.stdout or "") + "\n" + (build.stderr or ""))
+    completed = build.completed_process
+    build_log.write_text((completed.stdout or "") + "\n" + (completed.stderr or ""))
 
 
-def _raise_fast_image_build_error(build_cmd: list[str], build: subprocess.CompletedProcess) -> None:
-    if build.returncode == 0:
+def _raise_fast_image_build_error(build_cmd: list[str], build: FastImageBuildResult) -> None:
+    completed = build.completed_process
+    if completed.returncode == 0:
         return
-    output = ((build.stdout or "") + "\n" + (build.stderr or "")).strip()[:8000]
+    output = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip()[:8000]
     rendered = " ".join(shlex.quote(part) for part in build_cmd)
-    raise RuntimeError(f"Fast image build failed: `{rendered}` exited {build.returncode}\n{output}")
+    if build.timed_out:
+        suffix = f"\n{output}" if output else ""
+        raise RuntimeError(
+            f"Fast image build timed out after {build.timeout_sec}s: `{rendered}`{suffix}"
+        )
+    raise RuntimeError(
+        f"Fast image build failed: `{rendered}` exited {completed.returncode}\n{output}"
+    )
 
 
 def _write_fast_image_cache_metadata(
@@ -1769,13 +1942,24 @@ def _ensure_fast_task_image(
     harness: str,
     run_env: dict[str, str],
     log_dir: Path,
+    task_timeout_sec: int,
 ) -> bool:
-    if _fast_image_cache_hit(image_ref, harness=harness, run_env=run_env):
+    if _cached_fast_image_is_ready(
+        image_ref=image_ref,
+        harness=harness,
+        run_env=run_env,
+        log_dir=log_dir,
+    ):
         _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
         return True
 
     with _cache_key_lock(f"image-{image_ref.cache_key}"):
-        if _fast_image_cache_hit(image_ref, harness=harness, run_env=run_env):
+        if _cached_fast_image_is_ready(
+            image_ref=image_ref,
+            harness=harness,
+            run_env=run_env,
+            log_dir=log_dir,
+        ):
             _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
             return True
 
@@ -1790,9 +1974,14 @@ def _ensure_fast_task_image(
             context_dir,
             harness=harness,
         )
-        build = _run_fast_image_build(build_cmd, run_env)
+        build = _run_fast_image_build(
+            build_cmd,
+            run_env,
+            timeout_sec=_fast_image_build_timeout(task_timeout_sec),
+        )
         _write_fast_image_build_log(log_dir, build)
         _raise_fast_image_build_error(build_cmd, build)
+        _ensure_harbor_runtime_preflight(image_ref=image_ref, run_env=run_env, log_dir=log_dir)
         _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="miss")
         return False
 
@@ -1875,6 +2064,9 @@ timeout_sec = {float(request.config.timeout_sec)}
 def _render_environment_dockerfile(request: RunRequest) -> str:
     dockerfile = """FROM oven/bun:1
 WORKDIR /app
+RUN apt-get update && apt-get install -y --no-install-recommends \\
+  git \\
+  && rm -rf /var/lib/apt/lists/*
 """
     cli_package = _harness_npm_package(request.config.harness.value)
     if cli_package:
@@ -1885,7 +2077,6 @@ WORKDIR /app
         dockerfile += f"RUN npm install -g {cli_package}\n"
     dockerfile += """COPY app/package.json app/bun.lock /app/
 RUN bun install --frozen-lockfile
-COPY app/ /app/
 """
     if request.scenario.visual:
         dockerfile += """RUN apt-get update && apt-get install -y --no-install-recommends \\
@@ -1914,6 +2105,8 @@ COPY app/ /app/
   libasound2 \\
   && rm -rf /var/lib/apt/lists/*
 RUN bunx playwright install chromium
+"""
+    dockerfile += """COPY app/ /app/
 """
     return dockerfile
 
@@ -2090,6 +2283,7 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
         )
         if execution_error is None:
             break
+        trial_dir = _select_trial_dir(job_dir)
         should_retry = (
             attempt < HARBOR_RATE_LIMIT_MAX_ATTEMPTS
             and execution_error.startswith("Harbor exited with code")
@@ -2099,13 +2293,17 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
             return _terminated_harbor_result(
                 job_dir=job_dir,
                 reason=execution_error,
-                trial_dir=None,
+                trial_dir=trial_dir,
             )
         cleanup_stale_harbor_resources()
         time.sleep(HARBOR_RATE_LIMIT_RETRY_DELAY_SEC)
 
     if execution_error:
-        return _terminated_harbor_result(job_dir=job_dir, reason=execution_error, trial_dir=None)
+        return _terminated_harbor_result(
+            job_dir=job_dir,
+            reason=execution_error,
+            trial_dir=_select_trial_dir(job_dir),
+        )
 
     trial_dir = _select_trial_dir(job_dir)
     failure_reason = detect_trial_failure(trial_dir) if trial_dir else None
@@ -2801,6 +2999,96 @@ def _normalize_command(command: str) -> str:
     return command.strip()
 
 
+def _strip_shell_env_prefix(tokens: list[str]) -> tuple[dict[str, str], list[str]]:
+    env_assignments: dict[str, str] = {}
+    idx = 0
+    if idx < len(tokens) and tokens[idx] == "env":
+        idx += 1
+    while idx < len(tokens):
+        token = tokens[idx]
+        if "=" not in token or token.startswith("-"):
+            break
+        key, value = token.split("=", 1)
+        if not key or not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", key):
+            break
+        env_assignments[key] = value
+        idx += 1
+    return env_assignments, tokens[idx:]
+
+
+def _git_command_tokens(command: str) -> tuple[dict[str, str], list[str]]:
+    try:
+        tokens = shlex.split(command)
+    except ValueError:
+        lowered = command.lower().strip()
+        if "git" not in lowered:
+            return {}, []
+        return {}, lowered.split()
+    env_assignments, tokens = _strip_shell_env_prefix(tokens)
+    if not tokens or tokens[0] != "git":
+        return env_assignments, []
+    idx = _git_subcommand_index(tokens)
+    return env_assignments, tokens[idx:]
+
+
+def _git_option_consumes_value(token: str) -> bool:
+    return token in {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--super-prefix"}
+
+
+def _git_subcommand_index(tokens: list[str]) -> int:
+    idx = 1
+    while idx < len(tokens):
+        token = tokens[idx]
+        if _git_option_consumes_value(token):
+            idx += 2
+            continue
+        if token.startswith("-c") and token != "-c":
+            idx += 1
+            continue
+        if token == "--":
+            return idx + 1
+        if token.startswith("-"):
+            idx += 1
+            continue
+        break
+    return idx
+
+
+def _is_git_commit_command(command: str) -> bool:
+    _env_assignments, tokens = _git_command_tokens(command)
+    return bool(tokens) and tokens[0] == "commit"
+
+
+def _git_commit_uses_verification_bypass(command: str) -> bool:
+    env_assignments, tokens = _git_command_tokens(command)
+    if not tokens or tokens[0] != "commit":
+        return False
+
+    bypass_env_values = {
+        "HUSKY": {"0"},
+        "HUSKY_SKIP_HOOKS": {"1", "true", "yes"},
+        "NO_VERIFY": {"1", "true", "yes"},
+    }
+    for key, truthy_values in bypass_env_values.items():
+        value = env_assignments.get(key)
+        if value is None:
+            continue
+        if value.lower() in truthy_values:
+            return True
+
+    lowered = command.lower()
+    if "core.hookspath=/dev/null" in lowered:
+        return True
+
+    return "--no-verify" in tokens or "-n" in tokens
+
+
+def _should_record_command(command: str, *, include_git_commit: bool) -> bool:
+    if _looks_like_shell_command(command):
+        return True
+    return include_git_commit and _is_git_commit_command(command)
+
+
 def _is_shell_separator(token: str) -> bool:
     return token in {"&&", "||", ";"}
 
@@ -3088,7 +3376,9 @@ def _command_output(item: dict) -> str:
     return "\n".join(part for part in (stdout, stderr) if part)
 
 
-def _command_records(entries: list[dict]) -> list[CommandRecord]:
+def _command_records(
+    entries: list[dict], *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     records: list[CommandRecord] = []
     for entry in entries:
         item = _extract_item_completed(entry)
@@ -3099,7 +3389,7 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
         output = _command_output(item)
         commands = _normalized_shell_subcommands(str(item.get("command", "")))
         for command in commands:
-            if not _looks_like_shell_command(command):
+            if not _should_record_command(command, include_git_commit=include_git_commit):
                 continue
             records.append(
                 CommandRecord(
@@ -3112,25 +3402,39 @@ def _command_records(entries: list[dict]) -> list[CommandRecord]:
     return records
 
 
-def _command_records_for_harness(trial_dir: Path, harness: str) -> list[CommandRecord]:
+def _command_records_for_harness(
+    trial_dir: Path, harness: str, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     if harness == "codex-cli":
-        return _command_records(_read_jsonl_dicts(trial_dir / "agent" / "codex.txt"))
+        return _command_records(
+            _read_jsonl_dicts(trial_dir / "agent" / "codex.txt"),
+            include_git_commit=include_git_commit,
+        )
     if harness == "claude-code":
-        return _command_records_from_claude_stdout(trial_dir)
+        return _command_records_from_claude_stdout(trial_dir, include_git_commit=include_git_commit)
     if harness == "gemini":
         stdout_records = _command_records_from_harness_stdout(
             trial_dir,
             additional_stdout_files=("gemini-cli.txt",),
+            include_git_commit=include_git_commit,
         )
         if stdout_records:
             return stdout_records
-        return _command_records_from_gemini_trajectory(trial_dir)
+        return _command_records_from_gemini_trajectory(
+            trial_dir, include_git_commit=include_git_commit
+        )
     if harness == "cursor":
-        return _command_records_from_harness_stdout(trial_dir)
+        return _command_records_from_harness_stdout(
+            trial_dir, include_git_commit=include_git_commit
+        )
     if harness == "copilot":
-        return _command_records_from_harness_stdout(trial_dir)
+        return _command_records_from_harness_stdout(
+            trial_dir, include_git_commit=include_git_commit
+        )
     if harness == "pi":
-        return _command_records_from_harness_stdout(trial_dir)
+        return _command_records_from_harness_stdout(
+            trial_dir, include_git_commit=include_git_commit
+        )
     raise ValueError(f"Unsupported harness for command extraction: {harness}")
 
 
@@ -3146,6 +3450,7 @@ def _command_records_from_harness_stdout(
     trial_dir: Path,
     *,
     additional_stdout_files: tuple[str, ...] = (),
+    include_git_commit: bool = False,
 ) -> list[CommandRecord]:
     harness_dir = trial_dir / "agent"
     if not harness_dir.exists():
@@ -3156,11 +3461,15 @@ def _command_records_from_harness_stdout(
     for stdout_path in stdout_paths:
         if not stdout_path.exists():
             continue
-        records.extend(_command_records_from_stdout(stdout_path))
+        records.extend(
+            _command_records_from_stdout(stdout_path, include_git_commit=include_git_commit)
+        )
     return records
 
 
-def _command_records_from_claude_stdout(trial_dir: Path) -> list[CommandRecord]:
+def _command_records_from_claude_stdout(
+    trial_dir: Path, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     agent_dir = trial_dir / "agent"
     if not agent_dir.exists():
         return []
@@ -3170,11 +3479,17 @@ def _command_records_from_claude_stdout(trial_dir: Path) -> list[CommandRecord]:
     for stdout_path in stdout_paths:
         if not stdout_path.exists():
             continue
-        records.extend(_command_records_from_claude_stdout_file(stdout_path))
+        records.extend(
+            _command_records_from_claude_stdout_file(
+                stdout_path, include_git_commit=include_git_commit
+            )
+        )
     return records
 
 
-def _command_records_from_claude_stdout_file(stdout_path: Path) -> list[CommandRecord]:
+def _command_records_from_claude_stdout_file(
+    stdout_path: Path, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     try:
         lines = stdout_path.read_text(errors="ignore").splitlines()
     except OSError:
@@ -3188,13 +3503,16 @@ def _command_records_from_claude_stdout_file(stdout_path: Path) -> list[CommandR
             continue
         payload = _line_as_json_dict(stripped)
         if payload is None:
-            records.extend(_command_records_from_line(stripped))
+            records.extend(
+                _command_records_from_line(stripped, include_git_commit=include_git_commit)
+            )
             continue
         _append_claude_tool_use_records(
             payload=payload,
             output=stripped,
             records=records,
             record_idx_by_tool_use_id=record_idx_by_tool_use_id,
+            include_git_commit=include_git_commit,
         )
         _mark_claude_failed_tool_records(
             payload=payload,
@@ -3210,11 +3528,12 @@ def _append_claude_tool_use_records(
     output: str,
     records: list[CommandRecord],
     record_idx_by_tool_use_id: dict[str, int],
+    include_git_commit: bool = False,
 ) -> None:
     for tool_use_id, command in _claude_bash_tool_use_commands(payload):
         matched_indexes: list[int] = []
         for normalized in _normalized_shell_subcommands(command):
-            if not _looks_like_shell_command(normalized):
+            if not _should_record_command(normalized, include_git_commit=include_git_commit):
                 continue
             matched_indexes.append(len(records))
             records.append(
@@ -3299,65 +3618,85 @@ def _claude_failed_tool_result_ids(payload: dict) -> list[str]:
     return failed_tool_ids
 
 
-def _command_records_from_stdout(stdout_path: Path) -> list[CommandRecord]:
+def _command_records_from_stdout(
+    stdout_path: Path, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     try:
         lines = stdout_path.read_text(errors="ignore").splitlines()
     except OSError:
         return []
     records: list[CommandRecord] = []
     for line in lines:
-        records.extend(_command_records_from_line(line))
+        records.extend(_command_records_from_line(line, include_git_commit=include_git_commit))
     return records
 
 
-def _command_records_from_line(line: str) -> list[CommandRecord]:
+def _command_records_from_line(
+    line: str, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     stripped = line.strip()
     if not stripped:
         return []
     if stripped.startswith("$ "):
-        return _prompt_command_record(stripped[2:], output=stripped)
+        return _prompt_command_record(
+            stripped[2:],
+            output=stripped,
+            include_git_commit=include_git_commit,
+        )
     if _line_is_command_intent(stripped):
         return []
     if not _line_reports_command_execution(stripped):
         return []
-    quoted_records = _quoted_command_records(stripped)
+    quoted_records = _quoted_command_records(stripped, include_git_commit=include_git_commit)
     if quoted_records:
         return quoted_records
-    return _keyword_command_records(stripped)
+    return _keyword_command_records(stripped, include_git_commit=include_git_commit)
 
 
-def _prompt_command_record(command_text: str, *, output: str) -> list[CommandRecord]:
+def _prompt_command_record(
+    command_text: str, *, output: str, include_git_commit: bool = False
+) -> list[CommandRecord]:
     commands = _normalized_shell_subcommands(command_text)
     return [
         CommandRecord(command=command, failed=False, output=output)
         for command in commands
-        if _looks_like_shell_command(command)
+        if _should_record_command(command, include_git_commit=include_git_commit)
     ]
 
 
-def _quoted_command_records(line: str) -> list[CommandRecord]:
+def _quoted_command_records(line: str, *, include_git_commit: bool = False) -> list[CommandRecord]:
     commands: list[str] = []
     for match in BACKTICK_COMMAND_PATTERN.findall(line):
         commands.extend(_normalized_shell_subcommands(match))
-    commands = [command for command in commands if _looks_like_shell_command(command)]
+    commands = [
+        command
+        for command in commands
+        if _should_record_command(command, include_git_commit=include_git_commit)
+    ]
     if not commands:
         return []
     failed = _line_reports_command_failure(line)
     return [CommandRecord(command=command, failed=failed, output=line) for command in commands]
 
 
-def _command_records_from_gemini_trajectory(trial_dir: Path) -> list[CommandRecord]:
+def _command_records_from_gemini_trajectory(
+    trial_dir: Path, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     payload = _load_json_dict(trial_dir / "agent" / "gemini-cli.trajectory.json")
     messages = payload.get("messages")
     if not isinstance(messages, list):
         return []
     records: list[CommandRecord] = []
     for message in messages:
-        records.extend(_command_records_from_gemini_message(message))
+        records.extend(
+            _command_records_from_gemini_message(message, include_git_commit=include_git_commit)
+        )
     return records
 
 
-def _command_records_from_gemini_message(message: dict) -> list[CommandRecord]:
+def _command_records_from_gemini_message(
+    message: dict, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     if not isinstance(message, dict):
         return []
     tool_calls = message.get("toolCalls")
@@ -3365,11 +3704,15 @@ def _command_records_from_gemini_message(message: dict) -> list[CommandRecord]:
         return []
     records: list[CommandRecord] = []
     for tool_call in tool_calls:
-        records.extend(_command_records_from_gemini_tool_call(tool_call))
+        records.extend(
+            _command_records_from_gemini_tool_call(tool_call, include_git_commit=include_git_commit)
+        )
     return records
 
 
-def _command_records_from_gemini_tool_call(tool_call: dict) -> list[CommandRecord]:
+def _command_records_from_gemini_tool_call(
+    tool_call: dict, *, include_git_commit: bool = False
+) -> list[CommandRecord]:
     if not isinstance(tool_call, dict):
         return []
     if tool_call.get("name") != "run_shell_command":
@@ -3389,16 +3732,18 @@ def _command_records_from_gemini_tool_call(tool_call: dict) -> list[CommandRecor
             output=command_text,
         )
         for command in commands
-        if _looks_like_shell_command(command)
+        if _should_record_command(command, include_git_commit=include_git_commit)
     ]
 
 
-def _keyword_command_records(line: str) -> list[CommandRecord]:
+def _keyword_command_records(line: str, *, include_git_commit: bool = False) -> list[CommandRecord]:
     lowered = f" {line.lower()} "
     commands: list[str] = []
     for command, keywords in KEYWORD_COMMAND_PATTERNS:
         if any(keyword in lowered for keyword in keywords):
             commands.append(command)
+    if include_git_commit and " git " in lowered and " commit " in lowered:
+        commands.append("git commit")
     deduped = list(dict.fromkeys(commands))
     if not deduped:
         return []
@@ -3439,6 +3784,18 @@ def _verification_attempts(
         if record.failed:
             failures_by_pattern[matched] += 1
     return attempts_by_pattern, failures_by_pattern
+
+
+def _observed_verification_attempts(
+    gate_history: list[GateEvent], verification_patterns: list[str]
+) -> dict[str, int]:
+    attempts_by_pattern: dict[str, int] = {pattern: 0 for pattern in verification_patterns}
+    for event in gate_history:
+        matched = _command_matches_pattern(event.command, verification_patterns)
+        if not matched:
+            continue
+        attempts_by_pattern[matched] += 1
+    return attempts_by_pattern
 
 
 def _first_pass_status(
@@ -3516,6 +3873,17 @@ def _count_executed_required(attempts_by_pattern: dict[str, int]) -> int:
     return sum(1 for count in attempts_by_pattern.values() if count > 0)
 
 
+def _git_commit_bypass_commands(records: list[CommandRecord]) -> list[str]:
+    commands: list[str] = []
+    for record in records:
+        if not _is_git_commit_command(record.command):
+            continue
+        if not _git_commit_uses_verification_bypass(record.command):
+            continue
+        commands.append(record.command)
+    return list(dict.fromkeys(commands))
+
+
 def _first_pass_counts(first_pass_status: dict[str, str]) -> tuple[int, int, int]:
     passed = sum(1 for status in first_pass_status.values() if status == "pass")
     failed = sum(1 for status in first_pass_status.values() if status == "fail")
@@ -3542,6 +3910,7 @@ def collect_process_metrics(
     uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
 
     records = _command_records_for_harness(trial_dir, harness)
+    git_commit_records = _command_records_for_harness(trial_dir, harness, include_git_commit=True)
     verification_patterns = _verification_command_strings(scenario)
     attempts_by_pattern, failures_by_pattern = _verification_attempts(
         records, verification_patterns
@@ -3572,6 +3941,7 @@ def collect_process_metrics(
         first_pass_verification_successes=first_pass_successes,
         first_pass_verification_failures=first_pass_failures,
         missing_required_verification_commands=missing_required,
+        git_commit_verification_bypass_commands=_git_commit_bypass_commands(git_commit_records),
     )
 
 
@@ -3740,22 +4110,93 @@ def _test_file_paths(workspace: Path) -> list[Path]:
     return test_paths
 
 
-def _has_test_pattern(test_sources: list[str], pattern: str) -> bool:
-    return any(re.search(pattern, source, re.MULTILINE | re.IGNORECASE) for source in test_sources)
+def _test_evidence_label(evidence: dict[str, Any]) -> str:
+    evidence_type = str(evidence.get("type", "unknown"))
+    if evidence_type == "query_role":
+        role = str(evidence.get("role", "unknown"))
+        min_count = int(evidence.get("min_count", 1) or 1)
+        parts = [role]
+        if evidence.get("level") is not None:
+            parts.append(f"level={evidence['level']}")
+        if evidence.get("name"):
+            parts.append(f"name={evidence['name']}")
+        return f"query_role:{','.join(parts)} x{min_count}"
+    if evidence_type == "query_text":
+        pattern = str(evidence.get("pattern", "unknown"))
+        min_count = int(evidence.get("min_count", 1) or 1)
+        return f"query_text:{pattern} x{min_count}"
+    return evidence_type
+
+
+def _count_role_query_matches(test_sources: list[str], evidence: dict[str, Any]) -> int:
+    role = re.escape(str(evidence.get("role", "")))
+    if not role:
+        return 0
+    query_pattern = re.compile(
+        r"(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['\"])"
+        + role
+        + r"\1(?P<options>\s*,\s*\{[\s\S]*?\})?",
+        re.MULTILINE,
+    )
+    level = evidence.get("level")
+    name = evidence.get("name")
+    count = 0
+    for source in test_sources:
+        for match in query_pattern.finditer(source):
+            options = match.group("options") or ""
+            if level is not None and not re.search(rf"level\s*:\s*{int(level)}\b", options):
+                continue
+            if name is not None and not re.search(re.escape(str(name)), options, re.IGNORECASE):
+                continue
+            count += 1
+    return count
+
+
+def _count_text_query_matches(test_sources: list[str], evidence: dict[str, Any]) -> int:
+    pattern = str(evidence.get("pattern", ""))
+    if not pattern:
+        return 0
+    count = 0
+    query_pattern = re.compile(r"(?:screen\.)?(?:get|find|query)(?:All)?ByText\s*\(", re.MULTILINE)
+    for source in test_sources:
+        if not query_pattern.search(source):
+            continue
+        count += len(re.findall(pattern, source, re.MULTILINE | re.IGNORECASE))
+    return count
+
+
+def _missing_test_evidence(
+    test_sources: list[str],
+    required_test_evidence: list[Any],
+) -> list[str]:
+    missing: list[str] = []
+    for evidence in required_test_evidence:
+        payload = evidence.model_dump(mode="json") if hasattr(evidence, "model_dump") else evidence
+        evidence_type = payload.get("type")
+        min_count = int(payload.get("min_count", 1) or 1)
+        if evidence_type == "query_role":
+            matched = _count_role_query_matches(test_sources, payload)
+        elif evidence_type == "query_text":
+            matched = _count_text_query_matches(test_sources, payload)
+        else:
+            matched = 0
+        if matched < min_count:
+            missing.append(_test_evidence_label(payload))
+    return missing
 
 
 def evaluate_requirements(
     workspace: Path,
     requirements: list[RequirementSpec],
 ) -> RequirementsCoverageScore:
-    """Evaluate requirement implementation and requirement-to-test mapping."""
+    """Evaluate requirement implementation and optional requirement-to-test mapping."""
     if not requirements:
         return RequirementsCoverageScore()
 
     test_sources = [path.read_text(errors="ignore") for path in _test_file_paths(workspace)]
     missing_ids: list[str] = []
     gap_ids: list[str] = []
-    pattern_gaps: dict[str, list[str]] = {}
+    evidence_gaps: dict[str, list[str]] = {}
     satisfied = 0
     mapped = 0
     mapped_satisfied = 0
@@ -3769,17 +4210,16 @@ def evaluate_requirements(
         else:
             missing_ids.append(requirement.id)
 
-        mapped_for_requirement = bool(requirement.required_test_patterns) and not missing_patterns
+        mapped_for_requirement = not missing_patterns
         mapped, mapped_satisfied = _apply_requirement_mapping_counts(
             mapped=mapped,
             mapped_satisfied=mapped_satisfied,
             mapped_for_requirement=mapped_for_requirement,
             requirement_passed=requirement_check.passed,
         )
-        if not mapped_for_requirement:
+        if missing_patterns:
             gap_ids.append(requirement.id)
-            if missing_patterns:
-                pattern_gaps[requirement.id] = missing_patterns
+            evidence_gaps[requirement.id] = missing_patterns
 
     return RequirementsCoverageScore(
         total_requirements=len(requirements),
@@ -3788,7 +4228,7 @@ def evaluate_requirements(
         mapped_satisfied_requirements=mapped_satisfied,
         missing_requirement_ids=missing_ids,
         requirement_gap_ids=gap_ids,
-        requirement_pattern_gaps=pattern_gaps,
+        requirement_test_evidence_gaps=evidence_gaps,
     )
 
 
@@ -3798,12 +4238,8 @@ def _requirement_status(
     test_sources: list[str],
 ) -> tuple[AcceptanceCheck, list[str]]:
     requirement_check = run_deterministic_check(requirement.check, workspace)
-    missing_patterns = [
-        pattern
-        for pattern in requirement.required_test_patterns
-        if not _has_test_pattern(test_sources, pattern)
-    ]
-    return requirement_check, missing_patterns
+    missing_evidence = _missing_test_evidence(test_sources, requirement.required_test_evidence)
+    return requirement_check, missing_evidence
 
 
 def _apply_requirement_mapping_counts(
@@ -3960,6 +4396,7 @@ def build_execution_validity_score(
     events: list[TraceEvent],
     workspace_path: Path,
     atomic_commits_required: bool,
+    verification_patterns: list[str],
 ) -> ExecutionValidityScore:
     """Build execution-validity checks for the run."""
     checks = [check.model_copy(deep=True) for check in outputs.execution_validity.checks]
@@ -3972,15 +4409,47 @@ def build_execution_validity_score(
         ),
     )
 
-    required_count = process_metrics.required_verification_commands
-    required_executed = process_metrics.executed_required_verification_commands
-    required_commands_passed = required_count == 0 or required_executed == required_count
+    configured_required_count = len(verification_patterns)
+    explicit_required_executed = process_metrics.executed_required_verification_commands
+    observed_attempts = _observed_verification_attempts(outputs.gate_history, verification_patterns)
+    observed_required_executed = _count_executed_required(observed_attempts)
+    required_count = configured_required_count
+    if not outputs.gate_history and process_metrics.required_verification_commands > 0:
+        required_count = process_metrics.required_verification_commands
+    if required_count == 0:
+        required_commands_passed = True
+        required_commands_evidence = "required=0"
+    elif outputs.gate_history:
+        required_commands_passed = observed_required_executed == required_count
+        required_commands_evidence = (
+            f"observed={observed_required_executed}/{required_count}, "
+            f"explicit={explicit_required_executed}/{required_count}"
+        )
+    else:
+        required_commands_passed = explicit_required_executed == required_count
+        required_commands_evidence = (
+            f"explicit={explicit_required_executed}/{required_count} (gate history unavailable)"
+        )
     _upsert_gate_check(
         checks,
         GateCheck(
             name="required_verification_commands_executed",
             passed=required_commands_passed,
-            evidence=f"executed={required_executed}/{required_count}",
+            evidence=required_commands_evidence,
+        ),
+    )
+
+    bypass_commands = process_metrics.git_commit_verification_bypass_commands
+    _upsert_gate_check(
+        checks,
+        GateCheck(
+            name="commit_verification_hooks_not_bypassed",
+            passed=not bypass_commands,
+            evidence=(
+                "No git commit verification bypass detected."
+                if not bypass_commands
+                else f"bypass_commands={bypass_commands}"
+            ),
         ),
     )
 
@@ -4124,6 +4593,9 @@ def _scorecard_process_metadata(process_metrics: ProcessMetrics) -> dict[str, An
         "missing_required_verification_commands": (
             process_metrics.missing_required_verification_commands
         ),
+        "git_commit_verification_bypass_commands": (
+            process_metrics.git_commit_verification_bypass_commands
+        ),
     }
 
 
@@ -4172,6 +4644,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         events=execution.events,
         workspace_path=context.context.workspace,
         atomic_commits_required=request.scenario.verification.workflow.atomic_commits_required,
+        verification_patterns=_verification_command_strings(request.scenario),
     )
     performance_gates = build_performance_gates_score(outputs=outputs)
     resource_efficiency = build_resource_efficiency_score(execution.process_metrics)
