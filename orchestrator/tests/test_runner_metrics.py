@@ -1,5 +1,6 @@
 """Tests for execution-validity and resource-efficiency helpers."""
 
+import errno
 import json
 import subprocess
 import threading
@@ -2166,6 +2167,32 @@ def test_prune_workspace_artifacts_removes_transient_directories(tmp_path: Path)
     assert not (workspace / "node_modules").exists()
     assert not (workspace / ".next").exists()
     assert (workspace / "src" / "app.tsx").exists()
+
+
+def test_prune_workspace_artifacts_retries_transient_enotempty(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    workspace = tmp_path / "workspace"
+    target = workspace / "node_modules"
+    (target / "next" / "dist").mkdir(parents=True, exist_ok=True)
+    (target / "next" / "dist" / "server.js").write_text("console.log('x')\n")
+
+    original_rmtree = runner.shutil.rmtree
+    calls: list[Path] = []
+
+    def flaky_rmtree(path: Path) -> None:
+        calls.append(Path(path))
+        if len(calls) == 1:
+            raise OSError(errno.ENOTEMPTY, "Directory not empty", str(path))
+        original_rmtree(path)
+
+    monkeypatch.setattr(runner.shutil, "rmtree", flaky_rmtree)
+
+    prune = _prune_workspace_artifacts(workspace)
+
+    assert prune["removed"] == ["node_modules"]
+    assert len(calls) == 2
+    assert not target.exists()
 
 
 def test_workspace_changes_from_baseline_reports_added_modified_removed(tmp_path: Path):

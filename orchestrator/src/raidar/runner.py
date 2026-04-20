@@ -1,5 +1,6 @@
 """Task execution via Harbor."""
 
+import errno
 import hashlib
 import json
 import os
@@ -873,6 +874,24 @@ def _directory_size_bytes(path: Path) -> int:
     return total
 
 
+def _remove_tree_with_retries(path: Path, *, attempts: int = 3, delay_sec: float = 0.2) -> None:
+    last_error: OSError | None = None
+    transient_errnos = {errno.ENOTEMPTY, errno.EBUSY, errno.EPERM}
+    for attempt in range(attempts):
+        try:
+            shutil.rmtree(path)
+            return
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            last_error = exc
+            if exc.errno not in transient_errnos or attempt == attempts - 1:
+                raise
+            time.sleep(delay_sec)
+    if last_error is not None:
+        raise last_error
+
+
 def _prune_workspace_artifacts(workspace: Path) -> dict[str, Any]:
     removed: list[str] = []
     reclaimed_bytes = 0
@@ -881,7 +900,7 @@ def _prune_workspace_artifacts(workspace: Path) -> dict[str, Any]:
         if not candidate.exists():
             continue
         reclaimed_bytes += _directory_size_bytes(candidate)
-        shutil.rmtree(candidate)
+        _remove_tree_with_retries(candidate)
         removed.append(dirname)
     return {
         "removed": removed,
