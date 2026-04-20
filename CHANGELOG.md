@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.11.0] - 2026-04-20
+
+- feat(runner): harden harbor fast-mode execution
+
 ## [0.10.0] - 2026-03-28
 
 - feat(codex): add oauth onboarding and smoke auth defaults
