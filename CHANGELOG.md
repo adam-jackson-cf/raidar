@@ -4,6 +4,11 @@ All notable changes to this project are documented in this file.
 
 ## [0.11.1] - 2026-04-21
 
+- docs: add harness optimization notes
+- chore: restore coverage database
+
+## [0.11.1] - 2026-04-21
+
 - fix(runner): retry transient workspace prune failures
 - refactor(models): separate provider and reasoning config
 
