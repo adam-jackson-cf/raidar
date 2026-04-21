@@ -1,0 +1,68 @@
+# Harness Improvements Todo
+
+## Context
+
+Raidar `main` is the realized first evaluation-suite version and is still CLI-first, with no meaningful dashboard or frontend. `feat/autoresearch-v3` is the in-flight branch for automatic experiment iteration, benchmark/research-loop separation, and objective-led scenario improvement.
+
+Reviewed sources:
+
+- [Meta-Harness: End-to-End Optimization of Model Harnesses](https://arxiv.org/abs/2603.28052)
+- [AutoHarness paper](https://arxiv.org/abs/2603.03329)
+- [LangChain: Improving Deep Agents with Harness Engineering](https://blog.langchain.com/improving-deep-agents-with-harness-engineering/)
+- [deepagents better-harness example](https://github.com/langchain-ai/deepagents/tree/main/examples/better-harness)
+- [AutoHarness repo](https://github.com/aiming-lab/AutoHarness)
+
+## Findings
+
+- Harness design is now a first-class optimization surface. Prompt, tool, middleware, context, and harness-code changes can materially improve outcomes without changing the base model.
+- `feat/autoresearch-v3` is directionally correct. It already has the important control-plane shape: objective state, bounded loops, benchmark vs research-loop roots, mutation guards, promotion guards, and confirmation reruns.
+- The biggest Raidar gap is not another loop abstraction. It is evidence ergonomics: trace capture, local trace payloads, train/holdout semantics, and operator visibility.
+- AutoHarness should not be folded in wholesale. It is strongest as a governance/audit/session framework, while Raidar should remain benchmark-first.
+- `better-harness` is useful as a research-loop pattern: bounded editable surfaces, proposer workspace, train/holdout/scorecard cases, and keep/discard decisions.
+
+## Recommended Work
+
+1. Add explicit `train`, `holdout`, and `scorecard` case splits to research-loop workflows.
+2. Add an editable-surface manifest to autoresearch objectives and loop reports.
+3. Convert loop artifacts into a decision ledger:
+   - candidate diff
+   - research summary
+   - reviewer memo
+   - governor verdict
+   - promotion guard
+   - confirmation guard
+4. Persist trace references and local trace payload snapshots when available.
+5. Add a thin operator surface over existing artifacts:
+   - benchmark vs research-loop navigation
+   - loop status table
+   - blocked/unscored reasons
+   - diff summary
+   - promotion outcome
+   - trace links
+6. Keep promotion conservative:
+   - no validity regressions
+   - no frozen-metric regressions
+   - no unscored candidate runs
+   - confirmation rerun before promotion
+   - bounded mutation surface remains enforced
+
+## Capability Matrix
+
+| Capability | Raidar `main` | Raidar `feat/autoresearch-v3` | deepagents `better-harness` | AutoHarness |
+| --- | --- | --- | --- | --- |
+| Scenario-contract eval suite | Strong | Strong | Weak | Weak |
+| Repeatable benchmark runs / comparisons | Strong | Strong | Partial | Weak |
+| Separate benchmark vs research-loop roots | Weak | Strong | Partial | Weak |
+| Automated outer-loop iteration | No | Strong | Strong | No |
+| Bounded editable / mutation surfaces | Partial | Strong | Strong | Strong |
+| Explicit train / holdout / scorecard loop splits | No | No | Strong | No |
+| Conservative promotion guards / confirmation reruns | Partial | Strong | Partial | No |
+| Trace / artifact persistence for debugging | Partial | Partial | Strong | Strong |
+| Governance / permissions / constitutions | Low | Low | Low | Strong |
+| Operator dashboard / richer UI | Low | Low | Low | Strong |
+
+## Implementation Bias
+
+- Fold train/holdout/scorecard semantics, editable-surface manifests, and decision-ledger artifacts into `feat/autoresearch-v3`.
+- Fold richer trace/evidence capture and the thin inspection surface into `main` once stable.
+- Borrow governance ideas from AutoHarness only where they improve evaluation trust or safety. Do not convert Raidar into a general-purpose agent governance wrapper.
