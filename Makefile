@@ -18,6 +18,7 @@ SCENARIO_DIR ?=
 SCENARIO_REVISION ?=
 NAME ?=
 HARNESS ?=
+PROVIDER ?=
 MODEL ?=
 DEVICE_AUTH ?=
 RUN_COUNT ?= 5
@@ -36,7 +37,8 @@ TIMEOUT_SEC ?=
 # Canonical smoke workflow defaults.
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
 ORCHESTRATOR_SMOKE_HARNESS := codex-cli
-ORCHESTRATOR_SMOKE_MODEL := codex/gpt-5.4-mini
+ORCHESTRATOR_SMOKE_PROVIDER := openai
+ORCHESTRATOR_SMOKE_MODEL := gpt-5.4-mini
 ORCHESTRATOR_SMOKE_REPEATS ?= 1
 SMOKE_MATRIX_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 SMOKE_MATRIX_SELECTOR ?= all
@@ -73,7 +75,7 @@ help:
 	@echo "Environment and validation:"
 	@echo "  make env-setup                                         Bootstrap the orchestrator environment"
 	@echo "  make harness-list                                      List supported harnesses and model coverage"
-	@echo "  make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
+	@echo "  make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.4-mini"
 	@echo "                                                        Validate one AgentSpec candidate"
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup                                    Cleanup stale Harbor processes and containers"
@@ -90,12 +92,12 @@ help:
 	@echo ""
 	@echo "Experiment orchestration:"
 	@echo "  make smoke-dry-run-check                               Print the canonical smoke command shapes used by CI drift checks"
-	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with codex/gpt-5.4-mini"
+	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with openai/gpt-5.4-mini"
 	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
 	@echo "  make smoke-matrix                                      Run the default hello-world smoke scenario across the full public model matrix"
-	@echo "  make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini"
+	@echo "  make agent-smoke HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.4-mini"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
-	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... MODEL=..."
+	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... PROVIDER=... MODEL=..."
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
 	@echo "  make matrix-run scenarios/homepage-implementation/v001/scenario.yaml all"
 	@echo "                                                        Run a generated matrix for all benchmark model sets"
@@ -114,9 +116,11 @@ harness-list:
 
 harness-validate:
 	$(call require_var,HARNESS)
+	$(call require_var,PROVIDER)
 	$(call require_var,MODEL)
 	@$(RAIDAR) harness validate \
 		--harness "$(HARNESS)" \
+		--provider "$(PROVIDER)" \
 		--model "$(MODEL)" \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
@@ -174,6 +178,7 @@ smoke-dry-run-check:
 		SMOKE_MATRIX_REPEAT_PARALLEL="1"
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		HARNESS="$(ORCHESTRATOR_SMOKE_HARNESS)" \
+		PROVIDER="$(ORCHESTRATOR_SMOKE_PROVIDER)" \
 		MODEL="$(ORCHESTRATOR_SMOKE_MODEL)" \
 		AGENT_SMOKE_REPEATS="2" \
 		AGENT_SMOKE_REPEAT_PARALLEL="2"
@@ -185,6 +190,7 @@ orchestrator-smoke: docker-check
 	@$(RAIDAR) run \
 		--scenario "$(ORCHESTRATOR_SMOKE_SCENARIO)" \
 		--harness "$(ORCHESTRATOR_SMOKE_HARNESS)" \
+		--provider "$(ORCHESTRATOR_SMOKE_PROVIDER)" \
 		--model "$(ORCHESTRATOR_SMOKE_MODEL)" \
 		--repeats "$(ORCHESTRATOR_SMOKE_REPEATS)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
@@ -204,16 +210,19 @@ smoke-matrix: docker-check
 
 agent-smoke: docker-check
 	$(call require_var,HARNESS)
+	$(call require_var,PROVIDER)
 	$(call require_var,MODEL)
 	@$(MAKE) harbor-cleanup
 	@$(MAKE) harness-validate \
 		HARNESS="$(HARNESS)" \
+		PROVIDER="$(PROVIDER)" \
 		MODEL="$(MODEL)" \
 		$(if $(filter codex-cli,$(HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 	@$(MAKE) experiment-run \
 		SCENARIO="$(AGENT_SMOKE_SCENARIO)" \
 		HARNESS="$(HARNESS)" \
+		PROVIDER="$(PROVIDER)" \
 		MODEL="$(MODEL)" \
 		$(if $(filter codex-cli,$(HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
 		RUN_COUNT="$(AGENT_SMOKE_REPEATS)" \
@@ -225,10 +234,12 @@ agent-smoke: docker-check
 experiment-run:
 	$(call require_var,SCENARIO)
 	$(call require_var,HARNESS)
+	$(call require_var,PROVIDER)
 	$(call require_var,MODEL)
 	@$(RAIDAR) experiment run \
 		--scenario "$(SCENARIO)" \
 		--harness "$(HARNESS)" \
+		--provider "$(PROVIDER)" \
 		--model "$(MODEL)" \
 		--repeats "$(RUN_COUNT)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \

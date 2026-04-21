@@ -21,7 +21,8 @@ class TestMatrixAgentSpec:
         """Workspace suffix should be safe for filesystem."""
         entry = MatrixAgentSpec(
             harness="codex-cli",
-            model="openai/gpt-4o",
+            provider="openai",
+            model="gpt-4o",
         )
         suffix = entry.workspace_suffix
         assert "/" not in suffix
@@ -32,7 +33,8 @@ class TestMatrixAgentSpec:
         """Should convert to AgentSpec correctly."""
         entry = MatrixAgentSpec(
             harness="claude-code",
-            model="anthropic/claude-sonnet-4-5",
+            provider="anthropic",
+            model="claude-sonnet-4-5",
         )
         config = entry.to_agent_spec()
         assert config.harness.value == "claude-code"
@@ -47,7 +49,8 @@ class TestMatrixAgentSpec:
         """Should parse requested Claude model variants."""
         entry = MatrixAgentSpec(
             harness="claude-code",
-            model=f"anthropic/{model_name}",
+            provider="anthropic",
+            model=model_name,
         )
         config = entry.to_agent_spec()
         assert config.harness.value == "claude-code"
@@ -62,7 +65,8 @@ class TestMatrixAgentSpec:
         """Should parse requested Gemini model variants."""
         entry = MatrixAgentSpec(
             harness="gemini",
-            model=f"google/{model_name}",
+            provider="google",
+            model=model_name,
         )
         config = entry.to_agent_spec()
         assert config.harness.value == "gemini"
@@ -83,8 +87,17 @@ class TestGenerateMatrixEntries:
                 retry_void=1,
             ),
             agents=[
-                AgentSpecInput(harness="codex-cli", model="codex/gpt-5.4-high"),
-                AgentSpecInput(harness="claude-code", model="anthropic/claude-sonnet-4-5"),
+                AgentSpecInput(
+                    harness="codex-cli",
+                    provider="openai",
+                    model="gpt-5.4",
+                    reasoning_effort="high",
+                ),
+                AgentSpecInput(
+                    harness="claude-code",
+                    provider="anthropic",
+                    model="claude-sonnet-4-5",
+                ),
             ],
         )
         entries = generate_matrix_entries(config)
@@ -101,16 +114,21 @@ class TestGenerateMatrixEntries:
                 retry_void=1,
             ),
             agents=[
-                AgentSpecInput(harness="codex-cli", model="codex/gpt-5.4-high"),
-                AgentSpecInput(harness="codex-cli", model="codex/gpt-5.1"),
+                AgentSpecInput(
+                    harness="codex-cli",
+                    provider="openai",
+                    model="gpt-5.4",
+                    reasoning_effort="high",
+                ),
+                AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.1"),
             ],
         )
         entries = generate_matrix_entries(config)
 
         assert len(entries) == 2
-        models = {e.model for e in entries}
-        assert "codex/gpt-5.4-high" in models
-        assert "codex/gpt-5.1" in models
+        models = {(e.provider, e.model) for e in entries}
+        assert ("openai", "gpt-5.4") in models
+        assert ("openai", "gpt-5.1") in models
 
     def test_empty_config_generates_empty_list(self):
         """Empty config should raise validation error."""
@@ -139,9 +157,18 @@ class TestGenerateMatrixEntries:
                 retry_void=1,
             ),
             agents=[
-                AgentSpecInput(harness="codex-cli", model="codex/gpt-5.4-high"),
-                AgentSpecInput(harness="claude-code", model="anthropic/claude-sonnet-4-5"),
-                AgentSpecInput(harness="cursor", model="openai/gpt-4o-mini"),
+                AgentSpecInput(
+                    harness="codex-cli",
+                    provider="openai",
+                    model="gpt-5.4",
+                    reasoning_effort="high",
+                ),
+                AgentSpecInput(
+                    harness="claude-code",
+                    provider="anthropic",
+                    model="claude-sonnet-4-5",
+                ),
+                AgentSpecInput(harness="cursor", provider="openai", model="gpt-4o-mini"),
             ],
         )
         entries = generate_matrix_entries(config)
@@ -165,20 +192,20 @@ def test_build_selected_matrix_config_for_codex() -> None:
     assert config.experiment.timeout_sec == 1800
     assert config.experiment.repeats == 5
     assert all(spec.harness == "codex-cli" for spec in config.agents)
-    assert [spec.model for spec in config.agents] == [
-        "codex/gpt-5.2-high",
-        "codex/gpt-5.2-low",
-        "codex/gpt-5.2-medium",
-        "codex/gpt-5.3-codex-spark-high",
-        "codex/gpt-5.3-codex-spark-low",
-        "codex/gpt-5.3-codex-spark-medium",
-        "codex/gpt-5.3-codex-spark-xhigh",
-        "codex/gpt-5.4-extra-high",
-        "codex/gpt-5.4-high",
-        "codex/gpt-5.4-low",
-        "codex/gpt-5.4-medium",
-        "codex/gpt-5.4-mini",
-        "codex/gpt-5.4-mini-low",
+    assert [(spec.provider, spec.model, spec.reasoning_effort) for spec in config.agents] == [
+        ("openai", "gpt-5.2", "low"),
+        ("openai", "gpt-5.2", "medium"),
+        ("openai", "gpt-5.2", "high"),
+        ("openai", "gpt-5.3-codex-spark", "low"),
+        ("openai", "gpt-5.3-codex-spark", "medium"),
+        ("openai", "gpt-5.3-codex-spark", "high"),
+        ("openai", "gpt-5.3-codex-spark", "xhigh"),
+        ("openai", "gpt-5.4", "low"),
+        ("openai", "gpt-5.4", "medium"),
+        ("openai", "gpt-5.4", "high"),
+        ("openai", "gpt-5.4", "xhigh"),
+        ("openai", "gpt-5.4-mini", None),
+        ("openai", "gpt-5.4-mini", "low"),
     ]
 
 
@@ -194,5 +221,5 @@ def test_build_selected_matrix_config_for_all() -> None:
     harnesses = [spec.harness for spec in config.agents]
     assert harnesses.count("codex-cli") == 13
     assert harnesses.count("gemini") == 3
-    assert harnesses.count("claude-code") == 4
-    assert len(config.agents) == 20
+    assert harnesses.count("claude-code") == 5
+    assert len(config.agents) == 21

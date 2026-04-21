@@ -21,6 +21,10 @@ class ModelTarget(BaseModel):
 
     provider: str = Field(description="Model provider (openai, anthropic, etc)")
     name: str = Field(description="Model identifier within provider")
+    reasoning_effort: str | None = Field(
+        default=None,
+        description="Optional normalized reasoning/thinking effort for supported models",
+    )
 
     @property
     def qualified_name(self) -> str:

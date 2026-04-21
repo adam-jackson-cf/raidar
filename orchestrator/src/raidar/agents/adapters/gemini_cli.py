@@ -58,6 +58,11 @@ class GeminiCliAdapter(HarnessAdapter):
                 "Gemini adapter only supports models: "
                 f"{supported}. Received '{self.config.model.name}'."
             )
+        if self.config.model.reasoning_effort is not None:
+            raise ValueError(
+                "Gemini adapter does not yet expose normalized reasoning_effort controls. "
+                "Use the default model behavior for now."
+            )
         self._resolve_cli()
         if not os.environ.get(self.GEMINI_API_ENV):
             raise OSError("Gemini Harbor runs require an API key. Set GEMINI_API_KEY.")

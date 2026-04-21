@@ -20,26 +20,22 @@ class CodexCliAdapter(HarnessAdapter):
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     OPENAI_API_ENV = OPENAI_API_KEY_ENV
     HARBOR_IMPORT_PATH = "raidar.agents.harbor_agents.fast_cli_agents:CodexCliHarborAgent"
-    MODEL_ALIAS_MAP: dict[str, tuple[str, str]] = {
-        "gpt-5.3-codex-spark-high": ("gpt-5.3-codex-spark", "high"),
-        "gpt-5.3-codex-spark-low": ("gpt-5.3-codex-spark", "low"),
-        "gpt-5.3-codex-spark-medium": ("gpt-5.3-codex-spark", "medium"),
-        "gpt-5.3-codex-spark-xhigh": ("gpt-5.3-codex-spark", "xhigh"),
-        "gpt-5.2-low": ("gpt-5.2-codex", "low"),
-        "gpt-5.2-medium": ("gpt-5.2-codex", "medium"),
-        "gpt-5.2-high": ("gpt-5.2-codex", "high"),
-        "gpt-5.4-low": ("gpt-5.4", "low"),
-        "gpt-5.4-medium": ("gpt-5.4", "medium"),
-        "gpt-5.4-high": ("gpt-5.4", "high"),
-        "gpt-5.4-extra-high": ("gpt-5.4", "xhigh"),
-        "gpt-5.4-mini": ("gpt-5.4-mini", ""),
-        "gpt-5.4-mini-low": ("gpt-5.4-mini", "low"),
+    SUPPORTED_MODELS: set[str] = {
+        "gpt-5.2",
+        "gpt-5.3-codex-spark",
+        "gpt-5.4",
+        "gpt-5.4-mini",
+    }
+    SUPPORTED_REASONING: dict[str, tuple[str, ...]] = {
+        "gpt-5.2": ("low", "medium", "high"),
+        "gpt-5.3-codex-spark": ("low", "medium", "high", "xhigh"),
+        "gpt-5.4": ("low", "medium", "high", "xhigh"),
+        "gpt-5.4-mini": ("low",),
     }
 
     @classmethod
     def supported_model_summary(cls) -> str:
-        aliases = ", ".join(f"codex/{model}" for model in sorted(cls.MODEL_ALIAS_MAP))
-        return f"codex/* (known aliases: {aliases})"
+        return ", ".join(f"openai/{model}" for model in sorted(cls.SUPPORTED_MODELS))
 
     def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
@@ -75,11 +71,26 @@ class CodexCliAdapter(HarnessAdapter):
 
     def validate(self) -> None:
         provider = self.config.model.provider
-        if provider != "codex":
+        if provider != "openai":
             raise ValueError(
-                "Codex CLI adapter only supports models with provider 'codex'. "
+                "Codex CLI adapter only supports models with provider 'openai'. "
                 f"Received '{provider}'."
             )
+        if self.config.model.name not in self.SUPPORTED_MODELS:
+            supported = ", ".join(sorted(self.SUPPORTED_MODELS))
+            raise ValueError(
+                "Codex CLI adapter only supports models: "
+                f"{supported}. Received '{self.config.model.name}'."
+            )
+        reasoning_effort = self.config.model.reasoning_effort
+        if reasoning_effort is not None:
+            allowed = self.SUPPORTED_REASONING.get(self.config.model.name, ())
+            if reasoning_effort not in allowed:
+                allowed_rendered = ", ".join(allowed) if allowed else "(none)"
+                raise ValueError(
+                    f"Model '{self.config.model.name}' only supports reasoning levels: "
+                    f"{allowed_rendered}. Received '{reasoning_effort}'."
+                )
         self._resolve_cli()
         self._resolve_auth()
 
@@ -91,18 +102,11 @@ class CodexCliAdapter(HarnessAdapter):
             return self.HARBOR_IMPORT_PATH
         return fast_harness_import_path(self.config.harness)
 
-    def _resolve_model_alias(self) -> tuple[str, str | None]:
-        mapped = self.MODEL_ALIAS_MAP.get(self.config.model.name)
-        if not mapped:
-            return self.config.model.name, None
-        return mapped[0], mapped[1]
-
     def model_argument(self) -> str:
-        model_name, _ = self._resolve_model_alias()
-        return f"{self.config.model.provider}/{model_name}"
+        return f"{self.config.model.provider}/{self.config.model.name}"
 
     def extra_harbor_args(self) -> Iterable[str]:
-        _, reasoning_effort = self._resolve_model_alias()
+        reasoning_effort = self.config.model.reasoning_effort
         if not reasoning_effort:
             return []
         return ["--ak", f"reasoning_effort={reasoning_effort}"]

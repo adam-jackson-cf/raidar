@@ -282,7 +282,11 @@ def _run_with_unscored_reruns(
 def _build_agent_spec(options: RunCliOptions) -> AgentSpec:
     return AgentSpec(
         harness=Harness(options.harness),
-        model=ModelTarget.from_string(options.model),
+        model=ModelTarget(
+            provider=options.provider,
+            name=options.model,
+            reasoning_effort=options.reasoning_effort,
+        ),
         timeout_sec=options.timeout,
     )
 
@@ -803,7 +807,19 @@ def _execution_matches_filters(
     "-m",
     type=str,
     required=True,
-    help="Model in format provider/name (e.g., openai/gpt-5)",
+    help="Model identifier within provider (e.g., gpt-5.4-mini)",
+)
+@click.option(
+    "--provider",
+    "-p",
+    type=str,
+    required=True,
+    help="Upstream model provider (openai, anthropic, google).",
+)
+@click.option(
+    "--reasoning-effort",
+    type=click.Choice(["low", "medium", "high", "xhigh", "max"]),
+    help="Optional normalized reasoning/thinking effort for supported models.",
 )
 @click.option(
     "--timeout",
@@ -845,6 +861,8 @@ def run(
     scenario: Path,
     harness: str,
     model: str,
+    provider: str,
+    reasoning_effort: str | None,
     timeout: int,
     repeats: int,
     repeat_parallel: int,
@@ -856,7 +874,9 @@ def run(
     options = RunCliOptions(
         scenario=scenario,
         harness=harness,
+        provider=provider,
         model=model,
+        reasoning_effort=reasoning_effort,
         timeout=timeout,
         repeats=repeats,
         repeat_parallel=repeat_parallel,
@@ -899,7 +919,19 @@ def experiment() -> None:
     "-m",
     type=str,
     required=True,
-    help="Model in format provider/name",
+    help="Model identifier within provider.",
+)
+@click.option(
+    "--provider",
+    "-p",
+    type=str,
+    required=True,
+    help="Upstream model provider (openai, anthropic, google).",
+)
+@click.option(
+    "--reasoning-effort",
+    type=click.Choice(["low", "medium", "high", "xhigh", "max"]),
+    help="Optional normalized reasoning/thinking effort for supported models.",
 )
 @click.option(
     "--timeout",
@@ -942,6 +974,8 @@ def experiment_run(
     scenario: Path,
     harness: str,
     model: str,
+    provider: str,
+    reasoning_effort: str | None,
     timeout: int,
     repeats: int,
     repeat_parallel: int,
@@ -954,7 +988,9 @@ def experiment_run(
     options = RunCliOptions(
         scenario=scenario,
         harness=harness,
+        provider=provider,
         model=model,
+        reasoning_effort=reasoning_effort,
         timeout=timeout,
         repeats=repeats,
         repeat_parallel=repeat_parallel,
@@ -1283,7 +1319,19 @@ def harness_list() -> None:
     "-m",
     type=str,
     required=True,
-    help="Model in provider/name format.",
+    help="Model identifier within provider.",
+)
+@click.option(
+    "--provider",
+    "-p",
+    type=str,
+    required=True,
+    help="Upstream model provider (openai, anthropic, google).",
+)
+@click.option(
+    "--reasoning-effort",
+    type=click.Choice(["low", "medium", "high", "xhigh", "max"]),
+    help="Optional normalized reasoning/thinking effort for supported models.",
 )
 @click.option(
     "--timeout",
@@ -1294,12 +1342,18 @@ def harness_list() -> None:
 def harness_validate(
     harness: str,
     model: str,
+    provider: str,
+    reasoning_effort: str | None,
     timeout: int,
 ) -> None:
     """Validate harness adapter wiring and environment requirements."""
     config = AgentSpec(
         harness=Harness(harness),
-        model=ModelTarget.from_string(model),
+        model=ModelTarget(
+            provider=provider,
+            name=model,
+            reasoning_effort=reasoning_effort,
+        ),
         timeout_sec=timeout,
     )
     adapter = config.adapter()
@@ -1308,7 +1362,10 @@ def harness_validate(
 
     click.echo("Harness validation passed.")
     click.echo(f"  harness: {harness}")
+    click.echo(f"  provider: {provider}")
     click.echo(f"  model: {model}")
+    if reasoning_effort is not None:
+        click.echo(f"  reasoning_effort: {reasoning_effort}")
     click.echo(f"  harbor_harness: {adapter.harbor_harness()}")
     click.echo(f"  model_argument: {adapter.model_argument()}")
     for key, value in adapter.execution_metadata().items():
@@ -1756,9 +1813,12 @@ def _echo_matrix_dry_run(
 ) -> None:
     for _scenario_path, scenario_def in scenario_defs:
         for entry in entries:
+            reasoning_label = (
+                f" [{entry.reasoning_effort}]" if getattr(entry, "reasoning_effort", None) else ""
+            )
             click.echo(
                 f"[dry-run] {scenario_def.name}@{scenario_def.scenario_revision}: "
-                f"{entry.harness}/{entry.model} x{repeats}"
+                f"{entry.harness}/{entry.provider}/{entry.model}{reasoning_label} x{repeats}"
             )
 
 
@@ -1772,7 +1832,9 @@ def _matrix_job_options(
     return RunCliOptions(
         scenario=scenario_path,
         harness=entry.harness,
+        provider=entry.provider,
         model=entry.model,
+        reasoning_effort=entry.reasoning_effort,
         timeout=experiment_config.timeout_sec,
         repeats=experiment_config.repeats,
         repeat_parallel=experiment_config.repeat_parallel,
@@ -1804,7 +1866,7 @@ def _run_matrix_jobs(
             force_experiment_summary=True,
             cleanup_before_runs=False,
             echo=False,
-            execution_suffix=f"{entry.harness}__{entry.model.replace('/', '-')}",
+            execution_suffix=_experiment_execution_suffix(options),
         )
 
     if parallel > 1:

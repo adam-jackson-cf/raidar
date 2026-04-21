@@ -6,10 +6,18 @@ matrix:
     retry_void: 0
   agents:
     - harness: codex-cli
-      model: codex/gpt-5.4-medium
+      provider: openai
+      model: gpt-5.4
+      reasoning_effort: medium
     - harness: codex-cli
-      model: codex/gpt-5.4-high
+      provider: openai
+      model: gpt-5.4
+      reasoning_effort: high
     - harness: codex-cli
-      model: codex/gpt-5.4-mini-low
+      provider: openai
+      model: gpt-5.4-mini
+      reasoning_effort: low
     - harness: codex-cli
-      model: codex/gpt-5.3-codex-spark-medium
+      provider: openai
+      model: gpt-5.3-codex-spark
+      reasoning_effort: medium

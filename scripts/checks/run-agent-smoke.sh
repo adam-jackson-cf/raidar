@@ -10,6 +10,7 @@ REPEAT_PARALLEL="1"
 RERUN_UNSCORED="0"
 FAST_MODE="0"
 HARNESS=""
+PROVIDER=""
 MODEL=""
 MAKE_ARGS=(-C "$ROOT_DIR")
 
@@ -21,7 +22,8 @@ Required:
   --harness          Harness id (codex-cli|claude-code|gemini)
 
 Optional:
-  --model            Model id; defaults to codex/gpt-5.4-mini for codex-cli
+  --provider         Upstream provider; defaults to openai for codex-cli
+  --model            Model id; defaults to gpt-5.4-mini for codex-cli
   --timeout          Timeout in seconds, default: 300
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
@@ -43,6 +45,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --model)
       MODEL="$2"
+      shift 2
+      ;;
+    --provider)
+      PROVIDER="$2"
       shift 2
       ;;
     --timeout)
@@ -88,11 +94,21 @@ if [[ "$HARNESS" != "codex-cli" && "$HARNESS" != "claude-code" && "$HARNESS" != 
 fi
 
 if [[ -z "$MODEL" && "$HARNESS" == "codex-cli" ]]; then
-  MODEL="codex/gpt-5.4-mini"
+  MODEL="gpt-5.4-mini"
+fi
+
+if [[ -z "$PROVIDER" && "$HARNESS" == "codex-cli" ]]; then
+  PROVIDER="openai"
 fi
 
 if [[ -z "$MODEL" ]]; then
   echo "Missing required --model for harness '$HARNESS'" >&2
+  usage
+  exit 1
+fi
+
+if [[ -z "$PROVIDER" ]]; then
+  echo "Missing required --provider for harness '$HARNESS'" >&2
   usage
   exit 1
 fi
@@ -104,6 +120,7 @@ fi
 
 make "${MAKE_ARGS[@]}" agent-smoke \
   HARNESS="$HARNESS" \
+  PROVIDER="$PROVIDER" \
   MODEL="$MODEL" \
   TIMEOUT_SEC="$TIMEOUT_SEC" \
   AGENT_SMOKE_SCENARIO="$SCENARIO_PATH" \

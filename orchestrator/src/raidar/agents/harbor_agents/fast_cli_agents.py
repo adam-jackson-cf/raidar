@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shlex
 import tempfile
@@ -60,6 +61,65 @@ def _secret_from_file_env(secret_name: str) -> str | None:
     if not secret_path.exists():
         return None
     return secret_path.read_text(encoding="utf-8").rstrip("\n")
+
+
+async def _claude_secret_paths(environment: BaseEnvironment) -> dict[str, str]:
+    secret_paths: dict[str, str] = {}
+    anthropic_key = _secret_from_file_env("ANTHROPIC_API_KEY")
+    if not anthropic_key:
+        anthropic_key = _secret_from_file_env("CLAUDE_CODE_API_KEY")
+    if anthropic_key:
+        path = "/tmp/agentic-eval-secrets/anthropic_api_key"
+        await _upload_secret_file(environment, secret_value=anthropic_key, target_path=path)
+        secret_paths["ANTHROPIC_API_KEY"] = path
+        secret_paths["CLAUDE_CODE_API_KEY"] = path
+    oauth_token = _secret_from_file_env("CLAUDE_CODE_OAUTH_TOKEN")
+    if oauth_token:
+        path = "/tmp/agentic-eval-secrets/claude_code_oauth_token"
+        await _upload_secret_file(environment, secret_value=oauth_token, target_path=path)
+        secret_paths["CLAUDE_CODE_OAUTH_TOKEN"] = path
+    return secret_paths
+
+
+def _claude_base_env() -> dict[str, str]:
+    env: dict[str, str] = {
+        "FORCE_AUTO_BACKGROUND_TASKS": "1",
+        "ENABLE_BACKGROUND_TASKS": "1",
+        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+        "CLAUDE_CONFIG_DIR": "/logs/agent/sessions",
+    }
+    for key in (
+        "ANTHROPIC_BASE_URL",
+        "CLAUDE_CODE_MAX_OUTPUT_TOKENS",
+        "MAX_THINKING_TOKENS",
+    ):
+        value = os.environ.get(key)
+        if value:
+            env[key] = value
+    return env
+
+
+def _configure_claude_model_env(env: dict[str, str], model_name: str | None) -> None:
+    if "ANTHROPIC_BASE_URL" in env:
+        env["ANTHROPIC_MODEL"] = model_name or env.get("ANTHROPIC_MODEL", "")
+        if env["ANTHROPIC_MODEL"]:
+            env["CLAUDE_CODE_SUBAGENT_MODEL"] = env["ANTHROPIC_MODEL"]
+            env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = env["ANTHROPIC_MODEL"]
+            env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = env["ANTHROPIC_MODEL"]
+            env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = env["ANTHROPIC_MODEL"]
+        return
+    env["ANTHROPIC_MODEL"] = _model_name(model_name)
+
+
+def _claude_settings_flag(*, effort: str | None, thinking_mode: str | None) -> str:
+    if not (effort or thinking_mode):
+        return ""
+    settings_payload: dict[str, object] = {}
+    if thinking_mode:
+        settings_payload["thinking"] = {"type": thinking_mode}
+    if effort:
+        settings_payload["output_config"] = {"effort": effort}
+    return f"--settings {shlex.quote(json.dumps(settings_payload))} "
 
 
 class FastGeminiCliAgent(BaseAgent):
@@ -131,6 +191,17 @@ class FastClaudeCodeCliAgent(BaseAgent):
         "NotebookRead TodoRead TodoWrite Agent Skill SlashCommand Task WebSearch"
     )
 
+    def __init__(
+        self,
+        effort: str | None = None,
+        thinking_mode: str | None = None,
+        *args,
+        **kwargs,
+    ):
+        super().__init__(*args, **kwargs)
+        self._effort = effort
+        self._thinking_mode = thinking_mode
+
     @staticmethod
     def name() -> str:
         return "fast-claude-code"
@@ -149,45 +220,13 @@ class FastClaudeCodeCliAgent(BaseAgent):
         context: AgentContext,
     ) -> None:
         escaped_instruction = shlex.quote(instruction)
-        env: dict[str, str] = {
-            "FORCE_AUTO_BACKGROUND_TASKS": "1",
-            "ENABLE_BACKGROUND_TASKS": "1",
-            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-            "CLAUDE_CONFIG_DIR": "/logs/agent/sessions",
-        }
-        secret_paths: dict[str, str] = {}
-        anthropic_key = _secret_from_file_env("ANTHROPIC_API_KEY")
-        if not anthropic_key:
-            anthropic_key = _secret_from_file_env("CLAUDE_CODE_API_KEY")
-        if anthropic_key:
-            path = "/tmp/agentic-eval-secrets/anthropic_api_key"
-            await _upload_secret_file(environment, secret_value=anthropic_key, target_path=path)
-            secret_paths["ANTHROPIC_API_KEY"] = path
-            secret_paths["CLAUDE_CODE_API_KEY"] = path
-        oauth_token = _secret_from_file_env("CLAUDE_CODE_OAUTH_TOKEN")
-        if oauth_token:
-            path = "/tmp/agentic-eval-secrets/claude_code_oauth_token"
-            await _upload_secret_file(environment, secret_value=oauth_token, target_path=path)
-            secret_paths["CLAUDE_CODE_OAUTH_TOKEN"] = path
-        for key in (
-            "ANTHROPIC_BASE_URL",
-            "CLAUDE_CODE_MAX_OUTPUT_TOKENS",
-            "MAX_THINKING_TOKENS",
-        ):
-            value = os.environ.get(key)
-            if value:
-                env[key] = value
-
-        if "ANTHROPIC_BASE_URL" in env:
-            env["ANTHROPIC_MODEL"] = self.model_name or env.get("ANTHROPIC_MODEL", "")
-            if env["ANTHROPIC_MODEL"]:
-                env["CLAUDE_CODE_SUBAGENT_MODEL"] = env["ANTHROPIC_MODEL"]
-                env["ANTHROPIC_DEFAULT_SONNET_MODEL"] = env["ANTHROPIC_MODEL"]
-                env["ANTHROPIC_DEFAULT_OPUS_MODEL"] = env["ANTHROPIC_MODEL"]
-                env["ANTHROPIC_DEFAULT_HAIKU_MODEL"] = env["ANTHROPIC_MODEL"]
-        else:
-            model = _model_name(self.model_name)
-            env["ANTHROPIC_MODEL"] = model
+        env = _claude_base_env()
+        secret_paths = await _claude_secret_paths(environment)
+        _configure_claude_model_env(env, self.model_name)
+        settings_flag = _claude_settings_flag(
+            effort=self._effort,
+            thinking_mode=self._thinking_mode,
+        )
 
         await environment.exec(
             command=(
@@ -203,7 +242,7 @@ class FastClaudeCodeCliAgent(BaseAgent):
         secret_prefix = _secret_export_prefix(secret_paths)
         claude_command = (
             f"{secret_prefix}claude --verbose --output-format stream-json "
-            f"-p {escaped_instruction} --allowedTools {self._ALLOWED_TOOLS} "
+            f"{settings_flag}-p {escaped_instruction} --allowedTools {self._ALLOWED_TOOLS} "
             "2>&1 </dev/null | tee /logs/agent/claude-code.txt"
         )
         result = await environment.exec(

@@ -1,325 +1,255 @@
-# Analyze Results
+# Homepage Matrix Gate Review
 
-Use this guide to analyze the latest experiment for each
-`(scenario_name, scenario_revision, harness, model, evaluation_profile)`
-combination and produce a deterministic comparison report.
+Date: 2026-04-20
+Scenario: `homepage-implementation@v002`
+Harness family reviewed: `codex-cli`
 
-Metric definitions, prerequisites, and interpretation notes live in
-[metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md).
-This guide stays focused on artifact review, ranking, and recommendation
-workflow.
+## Scope
 
-`AgentSpec` means `harness + model`.
+I reviewed the latest available homepage experiment artifacts under
+`experiments/benchmarks` and classified each observed failure as one of:
 
-## Objective
+- scenario / test / gate failure
+- harness / orchestration / configuration failure
+- incomplete artifact set that should not be treated as a scored failure
 
-Produce a deterministic comparison of the latest experiment for each
-combination, then generate exhaustive, impact-ranked recommendations to
-improve score outcomes.
+Canonical artifacts used:
 
-Focus on:
+- experiment summaries under `experiments/benchmarks/*/experiment-summary.json`
+- run records under `experiments/benchmarks/*/runs/*/run.json`
+- verifier gate artifacts under `experiments/benchmarks/*/runs/*/verifier/*.json`
+- harness logs under `experiments/benchmarks/*/runs/*/harness/*.txt`
 
-1. Cross-agent comparison: which combination performs best and why.
-2. Per-agent localized improvements across:
-   - scaffold (`AGENTS.md` rules, quality gates, verification commands)
-   - task prompt iteration strategy
-   - bespoke tools when they improve deterministic outcomes
-3. Actionable next experiments with one-variable-at-a-time design.
+## Executive Summary
 
-## Canonical Inputs
+Not all failures in the reviewed homepage matrix are scenario failures.
 
-Use only these artifact paths:
+Confirmed breakdown:
 
-- Experiment records: `experiments/*/experiment.json`
-- Experiment summaries: `experiments/*/experiment-summary.json`
-- Experiment reports: `experiments/*/report.md`
-- Run records: `experiments/*/runs/*/run.json`
-- Run reports: `experiments/*/runs/*/report.md`
-- Verifier scorecards: `experiments/*/runs/*/verifier/scorecard.json`
-- Execution-validity artifacts:
-  `experiments/*/runs/*/verifier/execution-validity.json`
-- Performance-gates artifacts:
-  `experiments/*/runs/*/verifier/performance-gates.json`
-- Harness traces: `experiments/*/runs/*/harness/*.trajectory.json`
-- Harness logs: `experiments/*/runs/*/harness/*.txt`
+1. `codex/gpt-5.2-high`, `codex/gpt-5.2-low`, and `codex/gpt-5.2-medium`
+   failed because the selected model alias is not supported with the current
+   Codex ChatGPT auth mode. These are harness / configuration failures, not
+   scenario failures.
+2. The targeted rerun for `codex/gpt-5.3-codex-spark-high` completed 5/5 scored
+   valid runs. Its failed performance gates are genuine scenario-result
+   failures, not orchestration failures.
+3. The partially created `codex/gpt-5.3-codex-spark-low`,
+   `codex/gpt-5.3-codex-spark-medium`, and
+   `codex/gpt-5.3-codex-spark-xhigh` directories are incomplete and should not
+   be counted as either scenario failures or successful benchmark rows.
 
-Do not read from legacy `evals/`, `results/`, or other pre-experiment roots.
+## Experiment Classification
 
-## Experiment Selection Rule
+| AgentSpec | Latest artifact | Ranking status | Quality status | Classification |
+| --- | --- | --- | --- | --- |
+| `codex/gpt-5.2-high` | [summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-152835Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-high/experiment-summary.json>) | `INVALID_FOR_RANKING` | No scored runs | Harness / configuration failure |
+| `codex/gpt-5.2-low` | [summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-153549Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-low/experiment-summary.json>) | `INVALID_FOR_RANKING` | No scored runs | Harness / configuration failure |
+| `codex/gpt-5.2-medium` | [summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-154051Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-medium/experiment-summary.json>) | `INVALID_FOR_RANKING` | No scored runs | Harness / configuration failure |
+| `codex/gpt-5.3-codex-spark-high` | [summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/experiment-summary.json>) | `RANKABLE` | Failed performance gates in all runs | Scenario gate failures |
+| `codex/gpt-5.3-codex-spark-low` | no summary | Not rankable | Unknown | Incomplete artifact set |
+| `codex/gpt-5.3-codex-spark-medium` | no summary | Not rankable | Unknown | Incomplete artifact set |
+| `codex/gpt-5.3-codex-spark-xhigh` | no summary | Not rankable | Unknown | Incomplete artifact set |
 
-For each unique
-`(scenario_name, scenario_revision, harness, model, evaluation_profile)`:
+## Findings
 
-1. Read identity from `experiment-summary.json.config`.
-2. Select the latest experiment by `created_at_utc`.
-3. Analyze only that latest experiment for ranking.
-4. Use run-level artifacts linked in `experiment-summary.json.runs[]` and the
-   canonical run directories under `experiments/*/runs/*`.
+### F1. `gpt-5.2-*` homepage rows are not scenario failures
 
-Treat `evaluation_profile` plus `metrics` as the capability identity for
-comparisons. Do not collapse different metric sets into one benchmark row.
+All three `gpt-5.2-*` experiments produced 5/5 unscored runs with
+`provider_or_harness_turn_failure`.
 
-## Gate-First Interpretation
+Evidence:
 
-Treat completion and deterministic validity criteria as first-class
-requirements.
+- [run-01 json, high](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-152835Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-high/runs/run-01/run.json>)
+  `termination_reason = Codex turn failed ... "The 'gpt-5.2-codex' model is not supported when using Codex with a ChatGPT account."`
+- [run-01 harness log, high](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-152835Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-high/runs/run-01/harness/codex.txt>)
+  shows the same 400 `invalid_request_error`
+- matching evidence exists for:
+  - [low run-01](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-153549Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-low/runs/run-01/run.json>)
+  - [medium run-01](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-154051Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-medium/runs/run-01/run.json>)
 
-For each latest experiment, compute and report both statuses:
+Why this matters:
 
-1. `ranking_status`
-   - `RANKABLE` when all are true:
-     - `rerun.target_met == true`
-     - `rerun.unresolved_unscored_count == 0`
-     - `aggregate.run_count_scored >= config.repeats`
-     - `aggregate.validity_rate == 1.0`
-   - `INVALID_FOR_RANKING` otherwise
-2. `quality_status`
-   - based on scored quality outcomes from:
-     - `run.json.scores.functional`
-     - `run.json.scores.acceptance`
-     - `run.json.scores.visual` when present
-     - `run.json.scores.verification_stability`
-     - `experiment-summary.json.aggregate.metric_outcomes`
+- these rows do not tell us anything about homepage scenario quality
+- they should be treated as invalid benchmark rows caused by auth/model
+  incompatibility
+- the verifier failures under execution validity are downstream artifacts of the
+  immediate harness failure, not primary scenario evidence
 
-If an experiment is `INVALID_FOR_RANKING`:
+Supporting gate artifact:
 
-- keep it in the report
-- rank it below all `RANKABLE` experiments
-- use `aggregate.composite_score.mean` only as diagnostic context, not as a
-  justification to override invalidity
+- [execution-validity, high run-01](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-152835Z__homepage-implementation__v002__codex-cli__codex-gpt-5.2-high/runs/run-01/verifier/execution-validity.json>)
+  fails `run_completed` because the provider rejected the model before any task
+  work began
 
-## Benchmark Score Interpretation
+### F2. The completed `spark-high` rerun is operationally healthy
 
-Use the implementation's current summary fields instead of inventing a legacy
-weighted score.
+The targeted rerun for `codex/gpt-5.3-codex-spark-high` completed all 5 repeats
+with:
 
-For each latest experiment, treat these fields as the benchmark inputs:
+- `run_count_scored = 5`
+- `valid_count = 5`
+- `validity_rate = 1.0`
+- `unscored_count = 0`
 
-- Ranking benchmark: `experiment-summary.json.aggregate.composite_score.mean`
-- Quality benchmark: `experiment-summary.json.aggregate.quality_score.mean`
-- Diagnostic benchmark: `experiment-summary.json.aggregate.diagnostic_score.mean`
-- Validity benchmark: `experiment-summary.json.aggregate.validity_rate`
-- Performance benchmark:
-  `experiment-summary.json.aggregate.performance_pass_rate`
-- Efficiency benchmarks:
-  - `experiment-summary.json.aggregate.duration_sec.mean`
-  - `experiment-summary.json.aggregate.uncached_input_tokens.mean`
+Evidence:
 
-Primary sort order:
+- [spark-high experiment summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/experiment-summary.json>)
+- [run-01](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-01/run.json>)
+- [run-05](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-05/run.json>)
 
-1. `ranking_status` (`RANKABLE` before `INVALID_FOR_RANKING`)
-2. `aggregate.composite_score.mean` descending
-3. `aggregate.quality_score.mean` descending
-4. `aggregate.validity_rate` descending
-5. `created_at_utc` descending
+Execution-validity checks passed in every scored run.
 
-When a benchmark input is missing:
+Evidence:
 
-1. State the missing artifact path and field.
-2. Keep the experiment in the comparison.
-3. Do not fabricate substitute values.
-4. Downgrade confidence for the affected comparison claim.
+- [run-01 execution-validity](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-01/verifier/execution-validity.json>)
+- [run-05 execution-validity](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-05/verifier/execution-validity.json>)
 
-## Required Fields
+Observed execution-validity failure frequency across 5 runs:
 
-Always report these exact fields when present:
+- `run_completed`: `0`
+- `stack_integrity`: `0`
+- `completion_claim_integrity`: `0`
+- `required_verification_commands_executed`: `0`
+- `commit_verification_hooks_not_bypassed`: `0`
+- `atomic_commits_present`: `0`
 
-- `experiment-summary.json.config.scenario_name`
-- `experiment-summary.json.config.scenario_revision`
-- `experiment-summary.json.config.harness`
-- `experiment-summary.json.config.model`
-- `experiment-summary.json.config.evaluation_profile`
-- `experiment-summary.json.config.metrics`
-- `experiment-summary.json.config.repeats`
-- `experiment-summary.json.aggregate.run_count_scored`
-- `experiment-summary.json.aggregate.valid_count`
-- `experiment-summary.json.aggregate.validity_rate`
-- `experiment-summary.json.aggregate.performance_pass_count`
-- `experiment-summary.json.aggregate.performance_pass_rate`
-- `experiment-summary.json.aggregate.composite_score`
-- `experiment-summary.json.aggregate.quality_score`
-- `experiment-summary.json.aggregate.diagnostic_score`
-- `experiment-summary.json.aggregate.duration_sec`
-- `experiment-summary.json.aggregate.uncached_input_tokens`
-- `experiment-summary.json.aggregate.metric_outcomes`
-- `experiment-summary.json.rerun.target_met`
-- `experiment-summary.json.rerun.unresolved_unscored_count`
-- `run.json.config.evaluation_profile`
-- `run.json.scores.functional`
-- `run.json.scores.acceptance`
-- `run.json.scores.visual`
-- `run.json.scores.verification_stability`
-- `run.json.scores.execution_validity`
-- `run.json.scores.performance_gates`
-- `run.json.scores.resource_efficiency`
-- `run.json.scores.requirements_coverage`
-- `run.json.scores.test_coverage`
-- `run.json.scores.metric_results[]`
-- `run.json.scores.metadata.process`
+This confirms the `spark-high` failures are not caused by orchestration breakage.
 
-## Supported Metrics
+### F3. The `spark-high` failed performance gates are genuine scenario-result failures
 
-Use only the current metric ids:
+The completed `spark-high` rerun has `performance_pass_count = 0/5`.
 
-- `functional`
-- `acceptance`
-- `verification-stability`
-- `execution-validity`
-- `resource-efficiency`
-- `test-coverage`
-- `requirements-coverage`
-- `llm-judge`
-- `visual-regression`
-- `artifact-checks`
+Evidence:
 
-Treat `run.json.scores.metric_results[]` as module output for configured
-non-core metrics and audit-style extensions. Core metrics live on their named
-score fields.
+- [spark-high experiment summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/experiment-summary.json>)
 
-## Required Diagnostics
+Failed performance-gate frequencies across 5 scored runs:
 
-For each experiment and for cross-agent comparison, compute and report:
+- `all_requirements_present`: `5/5`
+- `requirement_test_gaps`: `5/5`
+- `minimum_quality_score`: `5/5`
+- `visual_passed`: `2/5`
 
-1. Identity profile:
-   - `scenario_name`
-   - `scenario_revision`
-   - `harness`
-   - `model`
-   - `evaluation_profile`
-   - configured `metrics`
-2. Ranking profile:
-   - `ranking_status`
-   - `quality_status`
-   - `run_count_scored / repeats`
-   - `valid_count / run_count_scored`
-   - `performance_pass_count / run_count_scored`
-3. Benchmark profile:
-   - `composite_score.mean`
-   - `quality_score.mean`
-   - `diagnostic_score.mean`
-   - `duration_sec.mean/median/stddev`
-   - `uncached_input_tokens.mean/median/stddev`
-4. Process quality profile from `run.json.scores.metadata.process`:
-   - mean `command_count`
-   - mean `failed_command_count`
-   - mean `process_failed_command_count`
-   - mean `verification_rounds`
-   - mean `repeated_verification_failures`
-   - mean `missing_required_verification_commands`
-   - mean required-verification execution rate:
-     `executed_required_verification_commands / required_verification_commands`
-   - distribution of `failed_command_categories`
-5. Deterministic-check profile from run score fields and verifier artifacts:
-   - failing `execution_validity.checks` frequency
-   - failing `performance_gates.checks` frequency
-   - failing acceptance checks frequency
-   - requirement gap frequency from
-     `requirements_coverage.requirement_gap_ids` and
-     `requirements_coverage.requirement_pattern_gaps`
-   - metric outcome pass/fail counts from
-     `experiment-summary.json.aggregate.metric_outcomes`
-6. Harness log pattern profile:
-   - command execution and failure motifs
-   - verification loop behavior (`run`, `fix`, `re-run` cycles)
-   - tool usage breadth and repeated failure patterns
-   - incomplete or aborted turn signatures
+Evidence:
 
-## Evidence Rules
+- [run-01 performance-gates](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-01/verifier/performance-gates.json>)
+- [run-03 performance-gates](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-03/verifier/performance-gates.json>)
+- [run-05 performance-gates](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-05/verifier/performance-gates.json>)
 
-For every material claim:
+These failures are scenario-side because the underlying checks are about
+homepage content, structure, semantic evidence, and visual similarity.
 
-1. Provide abbreviated evidence in one short line.
-2. Provide a direct artifact path.
-3. Prefer experiment-level evidence first, then run-level evidence for detail.
-4. For log-derived claims, apply the same pattern categories across harnesses;
-   do not use harness-specific grading standards.
+Representative evidence:
 
-## Recommendation Rules
+- `all_requirements_present`:
+  `satisfied=2/4, missing=["req-hero-cta","req-features-grid"]`
+- `requirement_test_gaps`:
+  missing semantic evidence for `navigation`, `link x3`, `heading`, `button`,
+  `article x3`, and `contentinfo`
+- `minimum_quality_score`:
+  quality scores between `0.784` and `0.845`, below the required `0.900`
+- `visual_passed`:
+  failed in `run-03` and `run-05` due reduced similarity and region pass rate
 
-Produce exhaustive recommendations, ranked by expected impact highest first.
+### F4. Acceptance and requirement failures align with the failed performance gates
 
-For each recommendation, include:
+The `spark-high` runs repeatedly missed the same authored-copy and structure
+expectations.
 
-1. `scope`: `global` or a specific
-   `(scenario_name, scenario_revision, harness, model, evaluation_profile)`
-2. `lever`: `scaffold`, `prompt`, or `tooling`
-3. `change`: exact proposed adjustment
-4. `expected_metric_effect`: explicit metrics or statuses expected to improve
-5. `risk_to_determinism`: concrete risk and mitigation
-6. `experiment_design`: one-variable-at-a-time A/B test with success criteria
-7. `priority`: `P0`, `P1`, `P2`, or `P3`
+Requirement gap frequency across 5 runs:
 
-Do not recommend relaxing deterministic checks, gate thresholds, or scoring
-criteria.
+- `req-header-nav`: `5`
+- `req-hero-cta`: `5`
+- `req-features-grid`: `5`
+- `req-footer`: `5`
 
-## Output Format
+Representative acceptance failures:
 
-Return a report with these sections:
+- `Includes hero call-to-action copy`: `5/5`
+- `Includes the authored features section heading`: `5/5`
+- `Includes the first authored feature card`: `5/5`
+- `Includes the second authored feature card`: `5/5`
+- `Includes the third authored feature card`: `5/5`
+- `Uses the expected section component structure`: `4/5`
 
-1. `## Ranked Agents (Latest Experiment Per Combination)`
-2. `## Scoring Breakdown`
-3. `## Reliability and Failure Anatomy`
-4. `## Per-Agent Insights`
-5. `## Ranked Recommendations (Exhaustive)`
-6. `## Suggested Experiment Backlog`
-7. `## Contradictions and Knock-On Effects`
+Evidence:
 
-In `Ranked Agents`, include a benchmark table with one row per latest
-experiment and these columns:
+- [run-01 acceptance + requirements in run.json](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-01/run.json>)
+- [run-04 run.json](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/runs/run-04/run.json>)
 
-- `scenario`
-- `revision`
-- `harness`
-- `model`
-- `evaluation_profile`
-- `experiment_id`
-- `ranking_status`
-- `quality_status`
-- `scored_runs/repeats`
-- `valid_count`
-- `validity_rate`
-- `performance_pass_rate`
-- `quality_score_mean`
-- `diagnostic_score_mean`
-- `composite_score_mean`
-- `duration_mean_sec`
-- `uncached_input_tokens_mean`
-- `top_failure_modes`
+This again points to scenario-output mismatch, not orchestrator malfunction.
 
-In `Scoring Breakdown`:
+### F5. `spark-low`, `spark-medium`, and `spark-xhigh` are incomplete, not failed
 
-- explain why the ordering follows `ranking_status` first and
-  `composite_score.mean` second
-- call out any metric families configured in `metrics` that materially changed
-  comparability between rows
-- separate benchmark interpretation from recommendation content
+These directories exist:
 
-In `Suggested Experiment Backlog`, include numbered experiments with:
+- [spark-low dir](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-185638Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-low>)
+- [spark-medium dir](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190008Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-medium>)
+- [spark-xhigh dir](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190248Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-xhigh>)
 
-1. hypothesis
-2. change
-3. fixed controls
-4. measurement window
-5. pass/fail criteria
+But they do not contain:
 
-## Hard Constraints
+- `experiment-summary.json`
+- `run.json`
 
-1. Never treat deterministic-check failures as harness defects.
-2. Always treat orchestrator implementation failures separately from scenario
-   scoring failures.
-3. Never relax thresholds, execution-validity checks, performance gates, or
-   scoring criteria during analysis.
-4. If evidence is missing, state exactly which artifact path and field are
-   missing and continue with available deterministic evidence.
-5. Treat `artifact-checks` as audit-only unless the configured experiment
-   contract explicitly makes it gating.
-6. Do not use the visual explainer skill or require visual companion output for
-   this workflow.
+So they are incomplete artifacts from the interrupted full matrix and should not
+be interpreted as either passed runs or scenario gate failures.
 
-## Output Artifact
+## Process Quality Profile For The Completed `spark-high` Rerun
 
-Write any derived human review as:
+Source:
+[spark-high summary](</Users/adamjackson/Projects/raidar/experiments/benchmarks/20260420-190114Z__homepage-implementation__v002__codex-cli__codex-gpt-5.3-codex-spark-high/experiment-summary.json>)
+and its five `run.json` files.
 
-- `experiments/eval-analysis-<scenario>-<YYYYMMDD-HHMMSS>.md`
+- mean `command_count`: `3.2`
+- mean `failed_command_count`: `1.4`
+- mean `process_failed_command_count`: `0.0`
+- mean `verification_rounds`: `2.0`
+- mean `repeated_verification_failures`: `0.6`
+- mean `missing_required_verification_commands`: `3.0`
+- mean required-verification execution rate: `0.25`
+- failed command categories distribution: `{}`
 
-Create the directory if needed.
+Interpretation:
+
+- the model usually needed at least one local fix-and-rerun loop
+- failures happened inside normal verification / commit-hook iteration, not due
+  to harness crashes
+- the verifier still observed the full required gate set, which is why
+  execution-validity passed despite low explicit command coverage
+
+## Conclusion
+
+Confirmed:
+
+1. The `spark-high` performance failures are real scenario-result failures.
+   They come from missing authored copy, missing required semantic evidence,
+   sub-threshold quality score, and occasional visual-regression failure.
+2. The `gpt-5.2-*` rows are not scenario failures. They are model/auth
+   incompatibility failures in the Codex ChatGPT harness configuration.
+3. The `spark-low`, `spark-medium`, and `spark-xhigh` directories from the
+   interrupted full matrix are incomplete artifacts and should not be scored or
+   interpreted as gate failures.
+
+So the correct statement is:
+
+- the completed `spark-high` gate failures are scenario failures
+- the observed `gpt-5.2-*` failures are orchestration / harness failures
+- the remaining partial directories are incomplete and non-diagnostic
+
+## Recommended Next Actions
+
+1. Remove or remap the `gpt-5.2-*` matrix entries when running Codex under
+   ChatGPT auth mode.
+   Evidence: unsupported-model 400 in the harness logs for all three variants.
+2. Do not include incomplete `spark-low`, `spark-medium`, or `spark-xhigh`
+   directories in ranking output. Re-run those specs cleanly if comparison is
+   still needed.
+3. Treat `spark-high` as the current valid scenario baseline and iterate the
+   scenario scaffold/prompt against its repeated requirement failures:
+   - require the exact authored hero CTA copy
+   - require the authored feature section heading and feature card strings
+   - enforce the expected `src/components/sections/**/*.tsx` structure
+   - require semantic test evidence that satisfies the role-based checks
+4. Re-run `spark-high` only after prompt/scaffold updates if the goal is to
+   improve benchmark quality rather than just prove orchestration health.

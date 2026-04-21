@@ -20,10 +20,16 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
     API_KEY_ENV = "CLAUDE_CODE_API_KEY"
     ANTHROPIC_API_ENV = "ANTHROPIC_API_KEY"
     SUPPORTED_MODELS: set[str] = {
+        "claude-opus-4-7",
         "claude-opus-4-6",
         "claude-sonnet-4-6",
         "claude-sonnet-4-5",
         "claude-haiku-4-5",
+    }
+    SUPPORTED_REASONING: dict[str, tuple[str, ...]] = {
+        "claude-opus-4-7": ("low", "medium", "high", "xhigh", "max"),
+        "claude-opus-4-6": ("low", "medium", "high", "max"),
+        "claude-sonnet-4-6": ("low", "medium", "high", "max"),
     }
 
     @classmethod
@@ -60,6 +66,15 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
                 "Claude Code CLI adapter only supports models: "
                 f"{supported}. Received '{self.config.model.name}'."
             )
+        reasoning_effort = self.config.model.reasoning_effort
+        if reasoning_effort is not None:
+            allowed = self.SUPPORTED_REASONING.get(self.config.model.name, ())
+            if reasoning_effort not in allowed:
+                allowed_rendered = ", ".join(allowed) if allowed else "(none)"
+                raise ValueError(
+                    f"Model '{self.config.model.name}' only supports reasoning levels: "
+                    f"{allowed_rendered}. Received '{reasoning_effort}'."
+                )
         self._resolve_cli()
         if not (os.environ.get(self.ANTHROPIC_API_ENV) or os.environ.get(self.API_KEY_ENV)):
             raise OSError(
@@ -77,7 +92,11 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
         return f"{self.config.model.provider}/{self.config.model.name}"
 
     def extra_harbor_args(self) -> Iterable[str]:
-        return []
+        default_effort = "high" if self.config.model.name in self.SUPPORTED_REASONING else None
+        reasoning_effort = self.config.model.reasoning_effort or default_effort
+        if not reasoning_effort:
+            return []
+        return ["--ak", "thinking_mode=adaptive", "--ak", f"effort={reasoning_effort}"]
 
     def runtime_env(self) -> dict[str, str]:
         env: dict[str, str] = {}

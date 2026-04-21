@@ -7,7 +7,6 @@ import yaml
 from pydantic import BaseModel, Field
 
 from .agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from .agents.adapters.codex_cli import CodexCliAdapter
 from .agents.adapters.gemini_cli import GeminiCliAdapter
 from .agents.config import AgentSpec, Harness, ModelTarget
 
@@ -18,7 +17,12 @@ class AgentSpecInput(BaseModel):
     """Explicit harness/model pairing for one agent spec."""
 
     harness: str = Field(description="Harness identifier (matches Harness enum values)")
-    model: str = Field(description="Model string provider/name passed to Harbor")
+    provider: str = Field(description="Upstream model provider")
+    model: str = Field(description="Upstream model identifier passed to Harbor")
+    reasoning_effort: str | None = Field(
+        default=None,
+        description="Optional normalized reasoning/thinking effort",
+    )
 
 
 class ExperimentConfig(BaseModel):
@@ -47,20 +51,28 @@ class MatrixAgentSpec(BaseModel):
     """Single agent spec entry in the configuration matrix."""
 
     harness: str
+    provider: str
     model: str
+    reasoning_effort: str | None = None
 
     def to_agent_spec(self) -> AgentSpec:
         """Convert to AgentSpec."""
         return AgentSpec(
             harness=Harness(self.harness),
-            model=ModelTarget.from_string(self.model),
+            model=ModelTarget(
+                provider=self.provider,
+                name=self.model,
+                reasoning_effort=self.reasoning_effort,
+            ),
         )
 
     @property
     def workspace_suffix(self) -> str:
         """Generate unique workspace suffix for this entry."""
 
-        model_safe = self.model.replace("/", "-")
+        model_safe = f"{self.provider}-{self.model}"
+        if self.reasoning_effort:
+            return f"{self.harness}_{model_safe}_{self.reasoning_effort}"
         return f"{self.harness}_{model_safe}"
 
 
@@ -75,7 +87,15 @@ def load_matrix_config(path: Path) -> MatrixConfig:
 def generate_matrix_entries(config: MatrixConfig) -> list[MatrixAgentSpec]:
     """Generate all combinations from a matrix configuration."""
 
-    return [MatrixAgentSpec(harness=spec.harness, model=spec.model) for spec in config.agents]
+    return [
+        MatrixAgentSpec(
+            harness=spec.harness,
+            provider=spec.provider,
+            model=spec.model,
+            reasoning_effort=spec.reasoning_effort,
+        )
+        for spec in config.agents
+    ]
 
 
 def matrix_selector_choices() -> tuple[str, ...]:
@@ -86,15 +106,86 @@ def matrix_selector_choices() -> tuple[str, ...]:
 
 def _selector_agent_specs(selector: MatrixSelector) -> list[AgentSpecInput]:
     codex_specs = [
-        AgentSpecInput(harness=Harness.CODEX_CLI.value, model=f"codex/{model_name}")
-        for model_name in sorted(CodexCliAdapter.MODEL_ALIAS_MAP)
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.2",
+            reasoning_effort="low",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.2",
+            reasoning_effort="medium",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.2",
+            reasoning_effort="high",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            reasoning_effort="low",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            reasoning_effort="medium",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            reasoning_effort="high",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.3-codex-spark",
+            reasoning_effort="xhigh",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.4",
+            reasoning_effort="low",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.4",
+            reasoning_effort="medium",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.4",
+            reasoning_effort="high",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.4",
+            reasoning_effort="xhigh",
+        ),
+        AgentSpecInput(harness=Harness.CODEX_CLI.value, provider="openai", model="gpt-5.4-mini"),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.4-mini",
+            reasoning_effort="low",
+        ),
     ]
     gemini_specs = [
-        AgentSpecInput(harness=Harness.GEMINI.value, model=f"google/{model_name}")
+        AgentSpecInput(harness=Harness.GEMINI.value, provider="google", model=model_name)
         for model_name in sorted(GeminiCliAdapter.SUPPORTED_MODELS)
     ]
     claude_specs = [
-        AgentSpecInput(harness=Harness.CLAUDE_CODE.value, model=f"anthropic/{model_name}")
+        AgentSpecInput(harness=Harness.CLAUDE_CODE.value, provider="anthropic", model=model_name)
         for model_name in sorted(ClaudeCodeCliAdapter.SUPPORTED_MODELS)
     ]
     groups: dict[str, list[AgentSpecInput]] = {
@@ -139,7 +230,10 @@ matrix:
     retry_void: 1
   agents:
     - harness: codex-cli
-      model: codex/gpt-5.4-high
+      provider: openai
+      model: gpt-5.4
+      reasoning_effort: high
     - harness: claude-code
-      model: anthropic/claude-sonnet-4-5
+      provider: anthropic
+      model: claude-sonnet-4-5
 """

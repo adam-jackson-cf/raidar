@@ -18,18 +18,22 @@ class RunCliOptions:
 
     scenario: Path
     harness: str
+    provider: str
     model: str
     timeout: int
     repeats: int
     repeat_parallel: int
     rerun_unscored: int
     experiments_root: Path = Path(".")
+    reasoning_effort: str | None = None
 
     def resolved(self) -> RunCliOptions:
         return RunCliOptions(
             scenario=self.scenario.resolve(),
             harness=self.harness,
+            provider=self.provider,
             model=self.model,
+            reasoning_effort=self.reasoning_effort,
             timeout=self.timeout,
             repeats=self.repeats,
             repeat_parallel=self.repeat_parallel,
@@ -55,6 +59,7 @@ class ExperimentRunRequest:
 
     scenario: Path
     harness: str
+    provider: str
     model: str
     timeout: int
     repeats: int
@@ -62,6 +67,7 @@ class ExperimentRunRequest:
     rerun_unscored: int
     experiment_kind: ExperimentKind
     experiments_root: Path | None = None
+    reasoning_effort: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

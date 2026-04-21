@@ -42,7 +42,10 @@ def resolve_experiments_root(
 def experiment_execution_suffix(options: RunCliOptions) -> str:
     """Return the canonical experiment execution suffix."""
 
-    return f"{options.harness}__{options.model.replace('/', '-')}"
+    suffix = f"{options.harness}__{options.provider}-{options.model}"
+    if options.reasoning_effort:
+        suffix = f"{suffix}__{options.reasoning_effort}"
+    return suffix
 
 
 def execute_run_command(
@@ -125,7 +128,9 @@ def dispatch_from_experiment_request(
     options = RunCliOptions(
         scenario=request.scenario,
         harness=request.harness,
+        provider=request.provider,
         model=request.model,
+        reasoning_effort=request.reasoning_effort,
         timeout=request.timeout,
         repeats=request.repeats,
         repeat_parallel=request.repeat_parallel,
@@ -291,7 +296,11 @@ def _run_with_unscored_reruns(
 def _build_agent_spec(options: RunCliOptions) -> AgentSpec:
     return AgentSpec(
         harness=Harness(options.harness),
-        model=ModelTarget.from_string(options.model),
+        model=ModelTarget(
+            provider=options.provider,
+            name=options.model,
+            reasoning_effort=options.reasoning_effort,
+        ),
         timeout_sec=options.timeout,
     )
 

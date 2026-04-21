@@ -78,7 +78,6 @@ def resolve_codex_auth(
     has_api_key = (
         api_key_present if api_key_present is not None else bool(os.environ.get(OPENAI_API_KEY_ENV))
     )
-
     if normalized_mode == "chatgpt":
         if has_auth_json:
             return ResolvedCodexAuth(

@@ -60,16 +60,11 @@ def test_harness_list_includes_model_variations() -> None:
     assert result.exit_code == 0, result.output
     assert "claude-code  -> CLAUDE.md" in result.output
     assert (
-        "models: anthropic/claude-haiku-4-5, anthropic/claude-opus-4-6, "
+        "models: anthropic/claude-haiku-4-5, anthropic/claude-opus-4-6, anthropic/claude-opus-4-7, "
         "anthropic/claude-sonnet-4-5, anthropic/claude-sonnet-4-6"
     ) in result.output
     assert (
-        "models: codex/* (known aliases: codex/gpt-5.2-high, codex/gpt-5.2-low, "
-        "codex/gpt-5.2-medium, codex/gpt-5.3-codex-spark-high, "
-        "codex/gpt-5.3-codex-spark-low, codex/gpt-5.3-codex-spark-medium, "
-        "codex/gpt-5.3-codex-spark-xhigh, codex/gpt-5.4-extra-high, codex/gpt-5.4-high, "
-        "codex/gpt-5.4-low, codex/gpt-5.4-medium, codex/gpt-5.4-mini, "
-        "codex/gpt-5.4-mini-low)"
+        "models: openai/gpt-5.2, openai/gpt-5.3-codex-spark, openai/gpt-5.4, openai/gpt-5.4-mini"
     ) in result.output
     assert (
         "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
@@ -90,7 +85,16 @@ def test_harness_validate_reports_codex_auth_mode(
 
     result = runner.invoke(
         main,
-        ["harness", "validate", "--harness", "codex-cli", "--model", "codex/gpt-5.4-mini"],
+        [
+            "harness",
+            "validate",
+            "--harness",
+            "codex-cli",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-5.4-mini",
+        ],
     )
 
     assert result.exit_code == 0, result.output
@@ -243,7 +247,8 @@ def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) 
     options = RunCliOptions(
         scenario=tmp_path / "scenario.yaml",
         harness="gemini",
-        model="google/gemini-3-flash-preview",
+        provider="google",
+        model="gemini-3-flash-preview",
         timeout=300,
         repeats=5,
         repeat_parallel=2,
@@ -358,8 +363,12 @@ def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monk
             str(scenario_path),
             "--harness",
             "codex-cli",
+            "--provider",
+            "openai",
             "--model",
-            "codex/gpt-5.4-high",
+            "gpt-5.4",
+            "--reasoning-effort",
+            "high",
         ],
     )
 
@@ -367,7 +376,7 @@ def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monk
     assert captured["force_experiment_summary"] is True
     assert captured["cleanup_before_runs"] is True
     assert captured["echo"] is True
-    assert captured["execution_suffix"] == "codex-cli__codex-gpt-5.4-high"
+    assert captured["execution_suffix"] == "codex-cli__openai-gpt-5.4__high"
     assert captured["options"].repeats == 5
 
 
@@ -392,8 +401,12 @@ def test_experiment_run_routes_research_loop_kind(tmp_path: Path, monkeypatch) -
             str(scenario_path),
             "--harness",
             "codex-cli",
+            "--provider",
+            "openai",
             "--model",
-            "codex/gpt-5.4-high",
+            "gpt-5.4",
+            "--reasoning-effort",
+            "high",
             "--experiment-kind",
             "research-loop",
         ],
@@ -456,8 +469,12 @@ def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monk
             str(scenario_path),
             "--harness",
             "codex-cli",
+            "--provider",
+            "openai",
             "--model",
-            "codex/gpt-5.4-high",
+            "gpt-5.4",
+            "--reasoning-effort",
+            "high",
             "--json",
         ],
     )
@@ -1074,7 +1091,9 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
     options = RunCliOptions(
         scenario=tmp_path / "scenario.yaml",
         harness="codex-cli",
-        model="codex/gpt-5.4-high",
+        provider="openai",
+        model="gpt-5.4",
+        reasoning_effort="high",
         timeout=300,
         repeats=1,
         repeat_parallel=1,
@@ -1203,7 +1222,7 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
     assert make_log.read_text(encoding="utf-8").splitlines() == [
         (
             f"ARGS:-C {repo_root} agent-smoke HARNESS=codex-cli "
-            "MODEL=codex/gpt-5.4-mini TIMEOUT_SEC=120 "
+            "PROVIDER=openai MODEL=gpt-5.4-mini TIMEOUT_SEC=120 "
             "AGENT_SMOKE_SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
             "AGENT_SMOKE_REPEATS=2 AGENT_SMOKE_REPEAT_PARALLEL=3 "
             "AGENT_SMOKE_RERUN_UNSCORED=1"
@@ -1278,7 +1297,7 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
         (
             "UV:run --project orchestrator raidar run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--harness codex-cli --model codex/gpt-5.4-mini "
+            "--harness codex-cli --provider openai --model gpt-5.4-mini "
             "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
@@ -1403,7 +1422,8 @@ def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
             "make",
             "agent-smoke",
             "HARNESS=gemini",
-            "MODEL=google/gemini-3-flash-preview",
+            "PROVIDER=google",
+            "MODEL=gemini-3-flash-preview",
         ],
         cwd=repo_root,
         env=env,
@@ -1419,13 +1439,13 @@ def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
         "ENV:1:1",
         (
             "UV:run --project orchestrator raidar harness validate "
-            "--harness gemini --model google/gemini-3-flash-preview"
+            "--harness gemini --provider google --model gemini-3-flash-preview"
         ),
         "ENV:1:1",
         (
             "UV:run --project orchestrator raidar experiment run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--harness gemini --model google/gemini-3-flash-preview "
+            "--harness gemini --provider google --model gemini-3-flash-preview "
             "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
@@ -1485,7 +1505,8 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
             "make",
             "agent-smoke",
             "HARNESS=codex-cli",
-            "MODEL=codex/gpt-5.4-mini-low",
+            "PROVIDER=openai",
+            "MODEL=gpt-5.4-mini",
         ],
         cwd=repo_root,
         env=env,
@@ -1501,13 +1522,13 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
         "ENV:1:1:",
         (
             "UV:run --project orchestrator raidar harness validate "
-            "--harness codex-cli --model codex/gpt-5.4-mini-low"
+            "--harness codex-cli --provider openai --model gpt-5.4-mini"
         ),
         "ENV:1:1:chatgpt",
         (
             "UV:run --project orchestrator raidar experiment run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--harness codex-cli --model codex/gpt-5.4-mini-low "
+            "--harness codex-cli --provider openai --model gpt-5.4-mini "
             "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
