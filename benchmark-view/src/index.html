@@ -6,199 +6,326 @@
     <title>Raidar Benchmark Review</title>
     <style>
       :root {
-        --bg: #f7f5ef;
-        --surface: #fffdfa;
-        --surface-2: #f0ede4;
-        --ink: #211f1b;
-        --muted: #6f6a60;
-        --rule: #ded8ca;
-        --rule-strong: #c9c0ad;
-        --good: #0f766e;
-        --bad: #a33a2b;
-        --warn: #9a6a13;
-        --mark: #2f5d50;
-        --mark-2: #7a4d2a;
-        --code: #27231d;
+        /* Axiom source tokens from Refero */
+        --color-midnight-ink: #000000;
+        --color-deep-graphite: #111111;
+        --color-charcoal-surface: #191919;
+        --color-dark-slate: #202020;
+        --color-medium-gray: #3a3a3a;
+        --color-stone-accent: #606060;
+        --color-light-steel: #b4b4b4;
+        --color-almost-white: #eeeeee;
+        --color-highlight-orange: #da5c2c;
+
+        --font-berkeleymono: "BerkeleyMono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --font-inter: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+        --font-weight-regular: 400;
+        --font-weight-bold: 700;
+
+        --text-caption: 12px;
+        --leading-caption: 1.5;
+        --text-body: 14px;
+        --leading-body: 1.43;
+        --text-heading: 20px;
+        --leading-heading: 1.4;
+        --text-heading-lg: 24px;
+        --leading-heading-lg: 1.33;
+        --text-display: 32px;
+        --leading-display: 1.25;
+
+        --spacing-unit: 8px;
+        --spacing-8: 8px;
+        --spacing-16: 16px;
+        --spacing-24: 24px;
+        --spacing-32: 32px;
+        --spacing-40: 40px;
+        --spacing-48: 48px;
+        --spacing-64: 64px;
+        --spacing-80: 80px;
+        --spacing-96: 96px;
+
+        --section-gap: var(--spacing-40);
+        --card-padding: var(--spacing-32);
+        --element-gap: var(--spacing-8);
+        --radius-default: 2px;
+        --radius-pill: 9999px;
+        --shadow-subtle: rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;
+        --surface-base-black: var(--color-midnight-ink);
+        --surface-header-footer: var(--color-deep-graphite);
+        --surface-card-component: var(--color-charcoal-surface);
+
+        /* Dashboard semantic layer */
+        --app-bg: var(--surface-base-black);
+        --app-surface: var(--surface-card-component);
+        --app-surface-raised: var(--surface-header-footer);
+        --app-surface-hover: var(--color-dark-slate);
+        --app-text: var(--color-almost-white);
+        --app-text-muted: var(--color-light-steel);
+        --app-text-subtle: var(--color-stone-accent);
+        --app-border: var(--color-medium-gray);
+        --app-border-soft: var(--color-dark-slate);
+        --app-accent: var(--color-highlight-orange);
+        --app-accent-text: var(--color-almost-white);
+        --app-attention: var(--color-highlight-orange);
+        --app-chart-primary: var(--color-highlight-orange);
+        --app-chart-secondary: var(--color-light-steel);
+        --app-chart-muted: var(--color-stone-accent);
       }
 
       * { box-sizing: border-box; }
 
-      html { background: var(--bg); color: var(--ink); }
+      html { background: var(--app-bg); color: var(--app-text); }
 
       body {
         margin: 0;
-        font-family: Aptos, "Helvetica Neue", Helvetica, sans-serif;
-        font-size: 14px;
-        line-height: 1.45;
+        font-family: var(--font-berkeleymono);
+        font-size: var(--text-body);
+        font-weight: var(--font-weight-regular);
+        line-height: var(--leading-body);
+        font-variant-numeric: tabular-nums;
       }
 
-      button, select { font: inherit; }
+      button, input { font: inherit; }
 
       .shell {
-        max-width: 1380px;
+        max-width: 1440px;
         margin: 0 auto;
-        padding: 24px;
+        padding: var(--spacing-32);
       }
 
       .topbar {
-        display: flex;
-        align-items: flex-end;
-        justify-content: space-between;
-        gap: 24px;
-        padding-bottom: 18px;
-        border-bottom: 1px solid var(--rule);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: var(--spacing-16);
+        padding: var(--spacing-16) 0 var(--spacing-24);
+        border-bottom: 1px solid var(--app-border);
       }
 
       h1, h2, h3, p { margin: 0; }
 
       h1 {
-        font-size: 24px;
-        font-weight: 650;
-        letter-spacing: -0.02em;
+        color: var(--app-text);
+        font-size: var(--text-display);
+        font-weight: var(--font-weight-bold);
+        line-height: var(--leading-display);
+        letter-spacing: normal;
       }
 
       h2 {
-        font-size: 17px;
-        font-weight: 650;
-        letter-spacing: -0.01em;
+        color: var(--app-text);
+        font-size: var(--text-heading);
+        font-weight: var(--font-weight-bold);
+        line-height: var(--leading-heading);
+        letter-spacing: normal;
       }
 
       h3 {
-        font-size: 14px;
-        font-weight: 650;
+        color: var(--app-text);
+        font-size: var(--text-body);
+        font-weight: var(--font-weight-bold);
+        line-height: var(--leading-body);
       }
 
       .meta {
-        color: var(--muted);
-        margin-top: 4px;
+        color: var(--app-text-muted);
+        margin-top: var(--spacing-8);
       }
 
       .controls {
-        display: flex;
-        gap: 10px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(240px, 1fr));
+        gap: var(--element-gap);
         align-items: center;
-        flex-wrap: wrap;
-        justify-content: flex-end;
       }
 
-      select, .search {
+      .autocomplete-field {
+        position: relative;
         height: 34px;
-        border: 1px solid var(--rule-strong);
-        background: var(--surface);
-        color: var(--ink);
-        border-radius: 8px;
-        padding: 0 10px;
-        min-width: 180px;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface);
+        border-radius: var(--radius-default);
+        min-width: 0;
+        width: 100%;
+        box-shadow: var(--shadow-subtle);
       }
 
-      .search { min-width: 220px; }
+      .autocomplete-field:focus-within {
+        border-color: var(--app-accent);
+        outline: 1px solid var(--app-accent);
+        outline-offset: 0;
+      }
+
+      .completion-text,
+      .filter-input {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        width: 100%;
+        padding: 0 66px 0 var(--spacing-16);
+        white-space: pre;
+      }
+
+      .completion-text {
+        color: var(--app-text-subtle);
+        overflow: hidden;
+        pointer-events: none;
+        user-select: none;
+      }
+
+      .filter-input {
+        z-index: 1;
+        border: 0;
+        background: transparent;
+        color: var(--app-text);
+        outline: 0;
+      }
+
+      .filter-input::placeholder {
+        color: var(--app-text-subtle);
+      }
+
+      .field-button {
+        position: absolute;
+        z-index: 2;
+        top: 50%;
+        width: 22px;
+        height: 22px;
+        transform: translateY(-50%);
+        border: 0;
+        background: transparent;
+        color: var(--app-text-muted);
+        cursor: pointer;
+        line-height: 1;
+        padding: 0;
+      }
+
+      .field-button:hover,
+      .field-button:focus-visible {
+        color: var(--app-text);
+        outline: 0;
+      }
+
+      .clear-filter {
+        right: 32px;
+        display: none;
+      }
+
+      .options-toggle {
+        right: var(--spacing-8);
+        display: block;
+      }
+
+      .autocomplete-field.has-value .clear-filter {
+        display: block;
+      }
+
+      .options-list {
+        position: absolute;
+        z-index: 5;
+        top: calc(100% + 4px);
+        left: 0;
+        right: 0;
+        display: none;
+        max-height: 230px;
+        overflow: auto;
+        margin: 0;
+        padding: var(--spacing-8);
+        list-style: none;
+        border: 1px solid var(--app-border);
+        background: var(--app-surface-raised);
+        box-shadow: var(--shadow-subtle);
+      }
+
+      .autocomplete-field.is-open .options-list {
+        display: grid;
+        gap: 2px;
+      }
+
+      .option-button {
+        width: 100%;
+        min-height: 30px;
+        border: 0;
+        background: transparent;
+        color: var(--app-text-muted);
+        cursor: pointer;
+        padding: 0 var(--spacing-8);
+        text-align: left;
+      }
+
+      .option-button:hover,
+      .option-button:focus-visible {
+        background: var(--app-surface-hover);
+        color: var(--app-text);
+        outline: 0;
+      }
 
       .layout {
-        display: grid;
-        grid-template-columns: 280px minmax(0, 1fr);
-        gap: 20px;
-        padding-top: 20px;
+        display: block;
+        padding-top: var(--spacing-24);
       }
 
-      .side,
       .panel {
-        background: var(--surface);
-        border: 1px solid var(--rule);
-        border-radius: 10px;
+        background: var(--app-surface);
+        border: 1px solid var(--app-border-soft);
+        border-radius: var(--radius-default);
+        box-shadow: var(--shadow-subtle);
         min-width: 0;
       }
 
-      .side { align-self: start; }
-
-      .side-section {
-        padding: 14px;
-        border-bottom: 1px solid var(--rule);
-      }
-
-      .side-section:last-child { border-bottom: 0; }
-
-      .fact-list {
-        display: grid;
-        gap: 10px;
-        margin-top: 12px;
-      }
-
-      .fact {
-        display: flex;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .fact span:first-child { color: var(--muted); }
-      .fact strong { font-weight: 650; }
-
-      .filter-list {
-        display: grid;
-        gap: 4px;
-        margin-top: 10px;
-      }
-
-      .filter-button {
-        width: 100%;
-        border: 0;
-        background: transparent;
-        color: var(--ink);
-        display: flex;
-        justify-content: space-between;
-        gap: 10px;
-        text-align: left;
-        padding: 7px 8px;
-        border-radius: 7px;
-        cursor: pointer;
-      }
-
-      .filter-button:hover,
-      .filter-button.active { background: var(--surface-2); }
-
-      .filter-button .count { color: var(--muted); }
-
       .main {
         display: grid;
-        gap: 16px;
+        gap: var(--spacing-24);
         min-width: 0;
       }
 
       .panel-header {
         display: flex;
         justify-content: space-between;
-        gap: 16px;
+        gap: var(--spacing-16);
         align-items: baseline;
         flex-wrap: wrap;
-        padding: 14px 16px;
-        border-bottom: 1px solid var(--rule);
+        padding: var(--spacing-24) var(--card-padding);
+        border-bottom: 1px solid var(--app-border-soft);
       }
 
-      .panel-body { padding: 16px; }
+      .panel-body { padding: var(--card-padding); }
 
       .note {
         max-width: 620px;
-        color: var(--muted);
+        color: var(--app-text-muted);
       }
 
       .scoreline {
         display: grid;
         grid-template-columns: repeat(4, minmax(0, 1fr));
-        border-bottom: 1px solid var(--rule);
+        border-bottom: 1px solid var(--app-border-soft);
       }
 
       .measure {
-        padding: 14px 16px;
-        border-right: 1px solid var(--rule);
+        padding: var(--spacing-24) var(--card-padding);
+        border-right: 1px solid var(--app-border-soft);
       }
 
       .measure:last-child { border-right: 0; }
-      .measure span { color: var(--muted); display: block; margin-bottom: 4px; }
-      .measure strong { font-size: 22px; letter-spacing: -0.02em; }
+      .measure span {
+        color: var(--app-text-muted);
+        display: block;
+        margin-bottom: var(--spacing-8);
+      }
+      .measure strong {
+        color: var(--app-text);
+        font-size: var(--text-heading-lg);
+        font-weight: var(--font-weight-bold);
+        line-height: var(--leading-heading-lg);
+        letter-spacing: normal;
+      }
 
       .charts {
         display: grid;
         grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-        gap: 16px;
+        gap: var(--spacing-24);
       }
 
       .chart-wrap { min-height: 300px; }
@@ -206,109 +333,186 @@
       svg { width: 100%; height: auto; display: block; }
 
       .axis text,
-      .chart-label { fill: var(--muted); font-size: 11px; }
+      .chart-label {
+        fill: var(--app-text-muted);
+        font-family: var(--font-berkeleymono);
+        font-size: var(--text-caption);
+      }
 
       .axis line,
       .axis path,
-      .grid-line { stroke: var(--rule); stroke-width: 1; }
+      .grid-line { stroke: var(--app-border); stroke-width: 1; }
 
-      .point { fill: var(--mark); opacity: 0.84; }
-      .point.low { fill: var(--bad); }
-      .point.medium { fill: var(--warn); }
-      .line { fill: none; stroke: var(--mark); stroke-width: 2; }
-      .line.secondary { stroke: var(--mark-2); }
+      .point { fill: var(--app-chart-primary); opacity: 0.9; }
+      .point.low { fill: var(--app-chart-muted); }
+      .point.medium { fill: var(--app-chart-secondary); }
+      .line { fill: none; stroke: var(--app-chart-primary); stroke-width: 2; }
+      .line.secondary { stroke: var(--app-chart-secondary); }
 
       .empty {
-        color: var(--muted);
-        padding: 18px;
-        border: 1px dashed var(--rule-strong);
-        border-radius: 8px;
+        color: var(--app-text-muted);
+        padding: var(--spacing-24);
+        border: 1px dashed var(--app-border);
+        border-radius: var(--radius-default);
       }
 
       .table-wrap {
         max-width: 100%;
-        overflow: auto;
+        overflow: hidden;
       }
 
       table {
         width: 100%;
+        table-layout: fixed;
         border-collapse: collapse;
-        min-width: 900px;
       }
 
       th, td {
-        border-bottom: 1px solid var(--rule);
-        padding: 9px 10px;
+        border-bottom: 1px solid var(--app-border-soft);
+        padding: var(--spacing-8);
         text-align: left;
-        white-space: nowrap;
         vertical-align: top;
+        overflow-wrap: anywhere;
       }
 
       th {
-        color: var(--muted);
-        font-weight: 650;
-        background: #fbf8f1;
+        color: var(--app-text-muted);
+        font-weight: var(--font-weight-bold);
+        background: var(--app-surface-raised);
         position: sticky;
         top: 0;
       }
 
+      th:nth-child(1),
+      td:nth-child(1) { width: 18%; }
+      th:nth-child(2),
+      td:nth-child(2) { width: 7%; }
+      th:nth-child(3),
+      td:nth-child(3) { width: 24%; }
+      th:nth-child(4),
+      td:nth-child(4),
+      th:nth-child(5),
+      td:nth-child(5),
+      th:nth-child(6),
+      td:nth-child(6),
+      th:nth-child(7),
+      td:nth-child(7),
+      th:nth-child(8),
+      td:nth-child(8),
+      th:nth-child(9),
+      td:nth-child(9) {
+        width: 8%;
+        white-space: nowrap;
+      }
+
+      tr:hover td { background: var(--app-surface-hover); }
+
       td.numeric,
       th.numeric { text-align: right; }
 
-      .delta-good { color: var(--good); font-weight: 650; }
-      .delta-bad { color: var(--bad); font-weight: 650; }
-      .delta-flat { color: var(--muted); font-weight: 650; }
+      .delta-good,
+      .delta-bad,
+      .delta-flat { font-weight: var(--font-weight-bold); }
+
+      .delta-good { color: var(--app-text); }
+      .delta-bad { color: var(--app-attention); }
+      .delta-flat { color: var(--app-text-muted); }
 
       .status {
         font-variant-numeric: tabular-nums;
-        color: var(--code);
+        color: var(--app-text-muted);
       }
 
       .mono {
-        font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
-        font-size: 12px;
+        font-family: var(--font-berkeleymono);
+        font-size: var(--text-caption);
+        line-height: var(--leading-caption);
       }
 
       .split {
         display: grid;
         grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: 16px;
+        gap: var(--spacing-24);
       }
 
       .compact-list {
         display: grid;
-        gap: 10px;
+        gap: var(--spacing-16);
       }
 
       .compact-row {
         display: grid;
         grid-template-columns: minmax(0, 1fr) auto;
-        gap: 10px;
+        gap: var(--spacing-16);
         align-items: baseline;
-        padding-bottom: 10px;
-        border-bottom: 1px solid var(--rule);
+        padding-bottom: var(--spacing-16);
+        border-bottom: 1px solid var(--app-border-soft);
       }
 
       .compact-row:last-child { border-bottom: 0; padding-bottom: 0; }
-      .compact-row p { color: var(--muted); margin-top: 2px; }
+      .compact-row p { color: var(--app-text-muted); margin-top: var(--spacing-8); }
 
       @media (max-width: 980px) {
-        .layout,
         .charts,
         .split { grid-template-columns: 1fr; }
-        .topbar { align-items: stretch; flex-direction: column; }
-        .controls { justify-content: flex-start; }
+        .controls { grid-template-columns: 1fr; }
         .scoreline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .measure:nth-child(2) { border-right: 0; }
-        .measure:nth-child(-n + 2) { border-bottom: 1px solid var(--rule); }
+        .measure:nth-child(-n + 2) { border-bottom: 1px solid var(--app-border-soft); }
+        table { font-size: var(--text-caption); }
       }
 
       @media (max-width: 560px) {
-        .shell { padding: 16px; }
+        .shell { padding: var(--spacing-16); }
         .scoreline { grid-template-columns: 1fr; }
-        .measure { border-right: 0; border-bottom: 1px solid var(--rule); }
+        .measure { border-right: 0; border-bottom: 1px solid var(--app-border-soft); }
         .measure:last-child { border-bottom: 0; }
-        select, .search { width: 100%; min-width: 0; }
+        th, td { padding: 6px 4px; }
+      }
+
+      @media (max-width: 700px) {
+        table,
+        thead,
+        tbody,
+        tr,
+        th,
+        td {
+          display: block;
+          width: auto;
+        }
+
+        thead { display: none; }
+
+        tbody {
+          display: grid;
+          gap: var(--spacing-8);
+        }
+
+        tr {
+          border: 1px solid var(--app-border-soft);
+          border-radius: var(--radius-default);
+          background: var(--app-surface-raised);
+        }
+
+        th:nth-child(n),
+        td:nth-child(n) {
+          width: auto;
+          white-space: normal;
+        }
+
+        td {
+          display: flex;
+          justify-content: space-between;
+          gap: var(--spacing-16);
+          padding: var(--spacing-8);
+          text-align: right;
+        }
+
+        td::before {
+          content: attr(data-label);
+          color: var(--app-text-muted);
+          text-align: left;
+        }
       }
     </style>
   </head>
@@ -320,41 +524,24 @@
           <p class="meta" id="datasetMeta">Loading benchmark artifacts.</p>
         </div>
         <div class="controls" aria-label="Benchmark filters">
-          <input class="search" id="search" type="search" placeholder="Filter model, harness, scenario" />
-          <select id="scenarioSelect" aria-label="Scenario filter"></select>
-          <select id="modelSelect" aria-label="Model filter"></select>
+          <div class="autocomplete-field" id="scenarioField">
+            <span class="completion-text" id="scenarioCompletion" aria-hidden="true"></span>
+            <input class="filter-input" id="scenarioInput" type="text" placeholder="All scenarios" aria-label="Scenario filter" autocomplete="off" spellcheck="false" />
+            <button class="field-button clear-filter" id="scenarioClear" type="button" aria-label="Clear scenario filter">x</button>
+            <button class="field-button options-toggle" id="scenarioToggle" type="button" aria-label="Show scenario options" aria-expanded="false">v</button>
+            <ul class="options-list" id="scenarioOptions" aria-label="Scenario options"></ul>
+          </div>
+          <div class="autocomplete-field" id="modelField">
+            <span class="completion-text" id="modelCompletion" aria-hidden="true"></span>
+            <input class="filter-input" id="modelInput" type="text" placeholder="All models" aria-label="Model and harness filter" autocomplete="off" spellcheck="false" />
+            <button class="field-button clear-filter" id="modelClear" type="button" aria-label="Clear model filter">x</button>
+            <button class="field-button options-toggle" id="modelToggle" type="button" aria-label="Show model options" aria-expanded="false">v</button>
+            <ul class="options-list" id="modelOptions" aria-label="Model options"></ul>
+          </div>
         </div>
       </header>
 
       <div class="layout">
-        <aside class="side" aria-label="Dataset summary">
-          <section class="side-section">
-            <h2>Dataset</h2>
-            <div class="fact-list" id="facts"></div>
-          </section>
-          <section class="side-section">
-            <h2>Scenarios</h2>
-            <div class="filter-list" id="scenarioList"></div>
-          </section>
-          <section class="side-section">
-            <h2>Reading guide</h2>
-            <div class="compact-list">
-              <div>
-                <h3>Composite</h3>
-                <p class="meta">Primary score from the scenario scoring profile.</p>
-              </div>
-              <div>
-                <h3>Gate pass rate</h3>
-                <p class="meta">Verification stability signal across repeated runs.</p>
-              </div>
-              <div>
-                <h3>Tokens and duration</h3>
-                <p class="meta">Efficiency signals; compare only within similar run shapes.</p>
-              </div>
-            </div>
-          </section>
-        </aside>
-
         <section class="main">
           <section class="panel" aria-labelledby="summaryTitle">
             <div class="panel-header">
@@ -410,11 +597,11 @@
                 <thead>
                   <tr>
                     <th>Scenario</th>
-                    <th>Revision</th>
+                    <th>Rev</th>
                     <th>Model</th>
-                    <th class="numeric">Composite</th>
+                    <th class="numeric">Score</th>
                     <th class="numeric">Quality</th>
-                    <th class="numeric">Gate pass</th>
+                    <th class="numeric">Gates</th>
                     <th class="numeric">Duration</th>
                     <th class="numeric">Tokens</th>
                     <th class="numeric">Runs</th>
@@ -431,16 +618,37 @@
     <script type="module">
       const res = await fetch('./data.json');
       const data = await res.json();
+      const datasetMeta = document.getElementById('datasetMeta');
+      const selectionNote = document.getElementById('selectionNote');
+      const scenarioField = document.getElementById('scenarioField');
+      const scenarioInput = document.getElementById('scenarioInput');
+      const scenarioCompletion = document.getElementById('scenarioCompletion');
+      const scenarioClear = document.getElementById('scenarioClear');
+      const scenarioToggle = document.getElementById('scenarioToggle');
+      const scenarioOptions = document.getElementById('scenarioOptions');
+      const modelField = document.getElementById('modelField');
+      const modelInput = document.getElementById('modelInput');
+      const modelCompletion = document.getElementById('modelCompletion');
+      const modelClear = document.getElementById('modelClear');
+      const modelToggle = document.getElementById('modelToggle');
+      const modelOptions = document.getElementById('modelOptions');
+      const scatter = document.getElementById('scatter');
+      const trajectory = document.getElementById('trajectory');
+      const trajectoryNote = document.getElementById('trajectoryNote');
+      const deltaList = document.getElementById('deltaList');
+      const riskList = document.getElementById('riskList');
+      const runRows = document.getElementById('runRows');
       const rows = (data.rows || []).filter(
         (row) => typeof row.mean_score === 'number' && (row.run_count_scored ?? 0) > 0,
       );
       const deltas = data.deltas || [];
 
       const state = {
-        scenario: 'all',
-        model: 'all',
-        query: '',
+        scenarioQuery: '',
+        modelQuery: '',
       };
+      const scenarioSuggestions = [...new Set(rows.map((row) => row.scenario))].sort();
+      const modelSuggestions = [...new Set(rows.map((row) => row.model))].sort();
 
       const fmt = (value, digits = 3) =>
         typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : 'n/a';
@@ -455,12 +663,6 @@
         return date.toISOString().slice(0, 10);
       };
 
-      const by = (items, key) => items.reduce((acc, item) => {
-        const value = item[key] || 'unknown';
-        acc[value] = (acc[value] || 0) + 1;
-        return acc;
-      }, {});
-
       const average = (items, key) => {
         const values = items.map((item) => item[key]).filter((value) => typeof value === 'number');
         return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
@@ -469,52 +671,101 @@
       const latestTime = (row) => new Date(row.completed_at || row.created_at || row.run_id || 0).getTime() || 0;
 
       function applyFilters() {
-        const query = state.query.trim().toLowerCase();
+        const scenarioQuery = state.scenarioQuery.trim().toLowerCase();
+        const modelQuery = state.modelQuery.trim().toLowerCase();
         return rows.filter((row) => {
-          const scenarioMatch = state.scenario === 'all' || row.scenario === state.scenario;
-          const modelMatch = state.model === 'all' || row.model === state.model;
-          const text = `${row.scenario} ${row.model} ${row.harness} ${row.revision}`.toLowerCase();
-          const queryMatch = !query || text.includes(query);
-          return scenarioMatch && modelMatch && queryMatch;
+          const scenarioText = `${row.scenario} ${row.revision}`.toLowerCase();
+          const modelText = `${row.model} ${row.harness}`.toLowerCase();
+          const scenarioMatch = !scenarioQuery || scenarioText.includes(scenarioQuery);
+          const modelMatch = !modelQuery || modelText.includes(modelQuery);
+          return scenarioMatch && modelMatch;
+        });
+      }
+
+      function inlineCompletion(value, suggestions) {
+        const query = value.trim().toLowerCase();
+        if (!query) return '';
+        return suggestions.find((suggestion) => {
+          const suggestionLower = suggestion.toLowerCase();
+          return suggestionLower.startsWith(query) && suggestionLower !== query;
+        }) || '';
+      }
+
+      function updateCompletion(input, completion, suggestions) {
+        const suggestion = inlineCompletion(input.value, suggestions);
+        completion.textContent = suggestion || '';
+        input.dataset.completion = suggestion;
+        input.closest('.autocomplete-field').classList.toggle('has-value', Boolean(input.value));
+      }
+
+      function matchingOptions(value, suggestions) {
+        const query = value.trim().toLowerCase();
+        return suggestions
+          .filter((suggestion) => !query || suggestion.toLowerCase().includes(query))
+          .slice(0, 12);
+      }
+
+      function setMenuOpen(field, toggle, isOpen) {
+        field.classList.toggle('is-open', isOpen);
+        toggle.setAttribute('aria-expanded', String(isOpen));
+      }
+
+      function renderOptions(input, optionsNode, suggestions, applyValue) {
+        const options = matchingOptions(input.value, suggestions);
+        optionsNode.replaceChildren();
+        if (!options.length) {
+          const emptyItem = document.createElement('li');
+          const emptyButton = document.createElement('button');
+          emptyButton.className = 'option-button';
+          emptyButton.type = 'button';
+          emptyButton.disabled = true;
+          emptyButton.textContent = 'No matching options';
+          emptyItem.append(emptyButton);
+          optionsNode.append(emptyItem);
+          return;
+        }
+        for (const option of options) {
+          const item = document.createElement('li');
+          const button = document.createElement('button');
+          button.className = 'option-button';
+          button.type = 'button';
+          button.textContent = option;
+          button.addEventListener('click', () => applyValue(option));
+          item.append(button);
+          optionsNode.append(item);
+        }
+      }
+
+      function syncMenus() {
+        renderOptions(scenarioInput, scenarioOptions, scenarioSuggestions, (value) => {
+          state.scenarioQuery = value;
+          render();
+          setMenuOpen(scenarioField, scenarioToggle, false);
+          scenarioInput.focus();
+        });
+        renderOptions(modelInput, modelOptions, modelSuggestions, (value) => {
+          state.modelQuery = value;
+          render();
+          setMenuOpen(modelField, modelToggle, false);
+          modelInput.focus();
         });
       }
 
       function populateControls() {
-        const scenarioCounts = by(rows, 'scenario');
-        const scenarios = Object.keys(scenarioCounts).sort();
-        const models = [...new Set(rows.map((row) => row.model))].sort();
-        scenarioSelect.innerHTML = ['all', ...scenarios]
-          .map((scenario) => `<option value="${scenario}">${scenario === 'all' ? 'All scenarios' : scenario}</option>`)
-          .join('');
-        modelSelect.innerHTML = ['all', ...models]
-          .map((model) => `<option value="${model}">${model === 'all' ? 'All models' : model}</option>`)
-          .join('');
-        scenarioList.innerHTML = [
-          ['all', rows.length],
-          ...Object.entries(scenarioCounts).sort((a, b) => b[1] - a[1]),
-        ]
-          .map(([scenario, count]) => `<button class="filter-button ${state.scenario === scenario ? 'active' : ''}" data-scenario="${scenario}"><span>${scenario === 'all' ? 'All scenarios' : scenario}</span><span class="count">${count}</span></button>`)
-          .join('');
-      }
-
-      function renderFacts(filtered) {
-        const factItems = [
-          ['Runs in view', filtered.length],
-          ['Scenarios', new Set(filtered.map((row) => row.scenario)).size],
-          ['Models', new Set(filtered.map((row) => row.model)).size],
-          ['Generated', dateLabel(data.generated_at)],
-        ];
-        facts.innerHTML = factItems
-          .map(([label, value]) => `<div class="fact"><span>${label}</span><strong>${value}</strong></div>`)
-          .join('');
+        scenarioInput.value = state.scenarioQuery;
+        modelInput.value = state.modelQuery;
+        updateCompletion(scenarioInput, scenarioCompletion, scenarioSuggestions);
+        updateCompletion(modelInput, modelCompletion, modelSuggestions);
+        syncMenus();
       }
 
       function renderMeasures(filtered) {
+        const meanDuration = average(filtered, 'duration_sec');
         const measures = [
           ['Composite mean', fmt(average(filtered, 'mean_score'))],
           ['Quality mean', fmt(average(filtered, 'quality_score'))],
           ['Gate pass rate', pct(average(filtered, 'performance_pass_rate'))],
-          ['Mean duration', `${fmt(average(filtered, 'duration_sec'), 1)}s`],
+          ['Mean duration', typeof meanDuration === 'number' ? `${fmt(meanDuration, 1)}s` : 'n/a'],
         ];
         document.getElementById('measures').innerHTML = measures
           .map(([label, value]) => `<div class="measure"><span>${label}</span><strong>${value}</strong></div>`)
@@ -662,15 +913,15 @@
           .sort((a, b) => latestTime(b) - latestTime(a))
           .map((row) => `
             <tr>
-              <td>${row.scenario}</td>
-              <td class="mono">${row.revision}</td>
-              <td>${row.model}</td>
-              <td class="numeric">${fmt(row.mean_score)}</td>
-              <td class="numeric">${fmt(row.quality_score)}</td>
-              <td class="numeric">${pct(row.performance_pass_rate)}</td>
-              <td class="numeric">${fmt(row.duration_sec, 1)}s</td>
-              <td class="numeric">${compact(row.uncached_input_tokens)}</td>
-              <td class="numeric">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td>
+              <td data-label="Scenario">${row.scenario}</td>
+              <td class="mono" data-label="Rev">${row.revision}</td>
+              <td data-label="Model">${row.model}</td>
+              <td class="numeric" data-label="Score">${fmt(row.mean_score)}</td>
+              <td class="numeric" data-label="Quality">${fmt(row.quality_score)}</td>
+              <td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td>
+              <td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td>
+              <td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td>
+              <td class="numeric" data-label="Runs">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td>
             </tr>`).join('');
       }
 
@@ -681,7 +932,6 @@
         selectionNote.textContent = filtered.length
           ? `${filtered.length} scored artifacts match the current filters.`
           : 'No scored artifacts match the current filters.';
-        renderFacts(filtered);
         renderMeasures(filtered);
         renderScatter(filtered);
         renderTrajectory(filtered);
@@ -690,26 +940,54 @@
         renderRows(filtered);
       }
 
-      scenarioSelect.addEventListener('change', (event) => {
-        state.scenario = event.target.value;
+      scenarioInput.addEventListener('input', (event) => {
+        state.scenarioQuery = event.target.value;
+        setMenuOpen(scenarioField, scenarioToggle, true);
         render();
       });
-      modelSelect.addEventListener('change', (event) => {
-        state.model = event.target.value;
+      modelInput.addEventListener('input', (event) => {
+        state.modelQuery = event.target.value;
+        setMenuOpen(modelField, modelToggle, true);
         render();
       });
-      search.addEventListener('input', (event) => {
-        state.query = event.target.value;
+      scenarioInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || !scenarioInput.dataset.completion) return;
+        event.preventDefault();
+        state.scenarioQuery = scenarioInput.dataset.completion;
         render();
       });
-      scenarioList.addEventListener('click', (event) => {
-        const button = event.target.closest('button[data-scenario]');
-        if (!button) return;
-        state.scenario = button.dataset.scenario;
-        scenarioSelect.value = state.scenario;
+      modelInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Tab' || !modelInput.dataset.completion) return;
+        event.preventDefault();
+        state.modelQuery = modelInput.dataset.completion;
         render();
       });
-
+      scenarioClear.addEventListener('click', () => {
+        state.scenarioQuery = '';
+        render();
+        scenarioInput.focus();
+      });
+      modelClear.addEventListener('click', () => {
+        state.modelQuery = '';
+        render();
+        modelInput.focus();
+      });
+      scenarioToggle.addEventListener('click', () => {
+        const willOpen = !scenarioField.classList.contains('is-open');
+        setMenuOpen(modelField, modelToggle, false);
+        setMenuOpen(scenarioField, scenarioToggle, willOpen);
+        scenarioInput.focus();
+      });
+      modelToggle.addEventListener('click', () => {
+        const willOpen = !modelField.classList.contains('is-open');
+        setMenuOpen(scenarioField, scenarioToggle, false);
+        setMenuOpen(modelField, modelToggle, willOpen);
+        modelInput.focus();
+      });
+      document.addEventListener('click', (event) => {
+        if (!scenarioField.contains(event.target)) setMenuOpen(scenarioField, scenarioToggle, false);
+        if (!modelField.contains(event.target)) setMenuOpen(modelField, modelToggle, false);
+      });
       render();
     </script>
   </body>
