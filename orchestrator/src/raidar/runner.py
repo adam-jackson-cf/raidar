@@ -1672,10 +1672,21 @@ def _scenario_spec_weights_block() -> dict[str, float]:
     }
 
 
+def _scenario_score_profile_block(request: RunRequest) -> dict[str, Any]:
+    if request.scenario.score_profile is None:
+        return {
+            "id": "legacy-resource-efficiency-v1",
+            "baseline_lineage": None,
+            "weights": {"resource-efficiency": 1.0},
+        }
+    return request.scenario.score_profile.model_dump(mode="json")
+
+
 def _build_verifier_scenario_spec(request: RunRequest, context: WorkspaceContext) -> dict:
     return {
         "scenario_name": request.scenario.name,
         "metrics": _scenario_spec_metrics_block(request),
+        "score_profile": _scenario_score_profile_block(request),
         "verification": _scenario_spec_verification_block(request),
         "acceptance": _scenario_spec_acceptance_block(request),
         "visual": _scenario_spec_visual_block(request),
@@ -2670,6 +2681,7 @@ def build_scenario_revision_meta(
         "scenario_fingerprint": _hash_bytes(seed),
         "evaluation_profile": scenario_evaluation_profile(request.scenario),
         "metrics": scenario_metrics(request.scenario),
+        "score_profile": _scenario_score_profile_block(request),
     }
 
 
@@ -4692,6 +4704,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         termination_reason=execution.termination_reason,
         unscored=unscored,
         unscored_reasons=unscored_reasons,
+        score_profile=_scenario_score_profile_block(request),
         functional=outputs.functional,
         acceptance=outputs.acceptance,
         visual=outputs.visual,

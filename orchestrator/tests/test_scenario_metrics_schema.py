@@ -39,6 +39,33 @@ def test_metrics_modules_valid_payload_parses() -> None:
     ]
 
 
+def test_score_profile_weights_must_reference_enabled_metrics() -> None:
+    payload = _base_scenario_payload()
+    payload["score_profile"] = {
+        "id": "code-delivery-v1",
+        "weights": {"requirements-coverage": 0.5, "resource-efficiency": 0.5},
+    }
+
+    with pytest.raises(ValidationError, match="score_profile.weights references metrics"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_score_profile_accepts_weighted_enabled_metrics() -> None:
+    payload = _base_scenario_payload()
+    payload["score_profile"] = {
+        "id": "code-delivery-v1",
+        "baseline_lineage": "code-delivery",
+        "weights": {"functional": 0.6, "acceptance": 0.3, "resource-efficiency": 0.1},
+    }
+
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert scenario.score_profile is not None
+    assert scenario.score_profile.id == "code-delivery-v1"
+    assert scenario.score_profile.baseline_lineage == "code-delivery"
+    assert scenario.score_profile.weights["functional"] == 0.6
+
+
 def test_metrics_modules_reject_duplicate_ids() -> None:
     payload = _base_scenario_payload()
     payload["metrics"].append({"type": "core", "id": "functional"})

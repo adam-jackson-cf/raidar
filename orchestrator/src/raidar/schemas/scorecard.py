@@ -224,6 +224,7 @@ class Scorecard(BaseModel):
     termination_reason: str | None = None
     unscored: bool = False
     unscored_reasons: list[str] = Field(default_factory=list)
+    score_profile: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     functional: FunctionalScore = Field(default_factory=FunctionalScore)
     acceptance: AcceptanceScore = Field(default_factory=AcceptanceScore)
@@ -267,7 +268,55 @@ class Scorecard(BaseModel):
             return 0.0
         if not self.execution_validity.passed:
             return 0.0
-        return self.resource_efficiency.score
+        weights = self.score_profile.get("weights") or {"resource-efficiency": 1.0}
+        weighted_score = 0.0
+        total_weight = 0.0
+        for metric_id, raw_weight in weights.items():
+            weight = float(raw_weight)
+            if weight <= 0:
+                continue
+            weighted_score += self._score_profile_metric(str(metric_id)) * weight
+            total_weight += weight
+        if total_weight <= 0:
+            return 0.0
+        return round(weighted_score / total_weight, 3)
+
+    def _score_profile_metric(self, metric_id: str) -> float:
+        """Return the scalar score used by a score-profile metric."""
+        metric_scores = {
+            "functional": self.functional.score,
+            "acceptance": self.acceptance.score,
+            "verification-stability": self.verification_stability.score,
+            "execution-validity": 1.0 if self.execution_validity.passed else 0.0,
+            "resource-efficiency": self.resource_efficiency.score,
+            "test-coverage": self._test_coverage_profile_score(),
+            "requirements-coverage": self._requirements_coverage_profile_score(),
+            "visual-regression": self.visual.score if self.visual else 0.0,
+            "artifact-checks": self._artifact_checks_profile_score(),
+        }
+        return metric_scores.get(metric_id, 0.0)
+
+    def _test_coverage_profile_score(self) -> float:
+        if self.test_coverage.threshold is None:
+            return 1.0 if self.test_coverage.passed else 0.0
+        if self.test_coverage.measured is None:
+            return 0.0
+        return min(1.0, self.test_coverage.measured / self.test_coverage.threshold)
+
+    def _requirements_coverage_profile_score(self) -> float:
+        return (
+            self.requirements_coverage.presence_ratio * 0.5
+            + self.requirements_coverage.mapping_ratio * 0.5
+        )
+
+    def _artifact_checks_profile_score(self) -> float:
+        artifact_results = [
+            result for result in self.metric_results if result.metric_id == "artifact-checks"
+        ]
+        if not artifact_results:
+            return 0.0
+        passed = sum(1 for result in artifact_results if result.passed)
+        return passed / len(artifact_results)
 
     @computed_field
     @property

@@ -1,0 +1,145 @@
+name: skill-benchmark-coding-test
+scenario_revision: v002
+description: Lint-stable TypeScript utility benchmark with explicit verification guidance
+difficulty: medium
+category: greenfield-code
+timeout_sec: 1800
+dockerfile: ./Dockerfile
+test_scripts: []
+starter:
+  root: starter
+verification:
+  max_gate_failures: 4
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+  - - bun
+    - run
+    - typecheck
+  - - bun
+    - run
+    - lint
+  - - bun
+    - run
+    - test
+  - - bun
+    - run
+    - test:coverage
+  setup_actions: []
+  gates:
+  - name: typecheck
+    command:
+    - bun
+    - run
+    - typecheck
+    on_failure: continue
+  - name: lint
+    command:
+    - bun
+    - run
+    - lint
+    on_failure: continue
+  - name: test
+    command:
+    - bun
+    - run
+    - test
+    on_failure: continue
+  - name: coverage
+    command:
+    - bun
+    - run
+    - test:coverage
+    on_failure: continue
+  workflow:
+    atomic_commits_required: false
+acceptance:
+  deterministic_checks:
+  - type: file_exists
+    pattern: src/lib/math.ts
+    description: Creates the math utility module
+  - type: file_exists
+    pattern: src/test/math.test.ts
+    description: Creates deterministic unit tests for the math utility
+  - type: import_present
+    pattern: export function sumEven
+    description: Exports `sumEven` as a named function
+  - type: import_present
+    pattern: Number.isInteger
+    description: Checks integer-ness explicitly before summing
+  - type: import_present
+    pattern: describe
+    description: Uses a Vitest suite for the utility tests
+  - type: import_present
+    pattern: it(
+    description: Uses deterministic Vitest cases
+  - type: no_pattern
+    pattern: TODO
+    description: No TODO markers remain in production or test files
+  requirements:
+  - id: req-export-sum-even
+    description: '`src/lib/math.ts` exports `sumEven(nums: number[]): number`.'
+    check:
+      type: import_present
+      pattern: export function sumEven
+      description: Named `sumEven` export exists
+    required_test_evidence: []
+  - id: req-integer-filter
+    description: '`sumEven` includes only integer values when calculating the sum.'
+    check:
+      type: import_present
+      pattern: Number.isInteger
+      description: Integer filtering is explicit
+    required_test_evidence: []
+  - id: req-even-filter
+    description: '`sumEven` includes only even values when calculating the sum.'
+    check:
+      type: import_present
+      pattern: '% 2'
+      description: Even-number filtering is explicit
+    required_test_evidence: []
+  - id: req-tests-created
+    description: '`src/test/math.test.ts` covers the utility with deterministic Vitest
+      cases.'
+    check:
+      type: file_exists
+      pattern: src/test/math.test.ts
+      description: Unit test file exists
+    required_test_evidence: []
+  llm_judge_rubric: []
+metrics:
+- type: core
+  id: functional
+- type: core
+  id: acceptance
+- type: core
+  id: verification-stability
+- type: core
+  id: execution-validity
+- type: core
+  id: resource-efficiency
+- type: core
+  id: test-coverage
+- type: core
+  id: requirements-coverage
+- type: artifact-checks
+  id: artifact-checks
+  config:
+    required_paths:
+    - src/lib/math.ts
+    - src/test/math.test.ts
+    path_match: glob
+score_profile:
+  id: code-delivery-utility-v1
+  baseline_lineage: skill-benchmark-coding-test
+  weights:
+    functional: 0.3
+    acceptance: 0.2
+    requirements-coverage: 0.2
+    test-coverage: 0.15
+    artifact-checks: 0.1
+    verification-stability: 0.03
+    resource-efficiency: 0.02
+prompt:
+  entry: prompt/task.md
+  includes: []

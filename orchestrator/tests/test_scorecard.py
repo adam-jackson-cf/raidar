@@ -202,6 +202,40 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == scorecard.resource_efficiency.score
 
+    def test_composite_uses_score_profile_weights_when_present(self):
+        """Composite score should follow explicit score-profile weights."""
+        scorecard = Scorecard(
+            score_profile={
+                "id": "code-delivery-v1",
+                "weights": {
+                    "functional": 0.5,
+                    "acceptance": 0.25,
+                    "resource-efficiency": 0.25,
+                },
+            },
+            functional=FunctionalScore(
+                passed=True,
+                build_succeeded=True,
+                tests_passed=1,
+                tests_total=2,
+            ),
+            acceptance=AcceptanceScore(),
+            resource_efficiency=ResourceEfficiencyScore(
+                uncached_input_tokens=150000,
+                output_tokens=2000,
+                command_count=10,
+                failed_command_count=0,
+                verification_rounds=1,
+                repeated_verification_failures=0,
+            ),
+        )
+
+        expected = round(
+            (0.5 * 0.5) + (1.0 * 0.25) + (scorecard.resource_efficiency.score * 0.25),
+            3,
+        )
+        assert scorecard.composite_score == expected
+
     def test_composite_zero_when_unscored(self):
         """Composite score must be 0 when run is unscored."""
         scorecard = Scorecard(

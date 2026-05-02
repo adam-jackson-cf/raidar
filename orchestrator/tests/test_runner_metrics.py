@@ -39,7 +39,12 @@ from raidar.runner import (
     scenario_evaluation_profile,
 )
 from raidar.schemas.events import GateEvent
-from raidar.schemas.scenario import DeterministicCheck, RequirementSpec, ScenarioDefinition
+from raidar.schemas.scenario import (
+    DeterministicCheck,
+    RequirementSpec,
+    ScenarioDefinition,
+    ScoreProfileConfig,
+)
 from raidar.schemas.scorecard import (
     AcceptanceScore,
     CoverageScore,
@@ -1406,6 +1411,32 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
     assert scenario_spec["visual"]["scoring"]["weights"]["global"] == 0.25
     assert scenario_spec["visual"]["pass_policy"]["minimum_score"] == 70
     assert scenario_spec["verification"]["workflow"] == {"atomic_commits_required": False}
+    assert scenario_spec["score_profile"] == {
+        "id": "legacy-resource-efficiency-v1",
+        "baseline_lineage": None,
+        "weights": {"resource-efficiency": 1.0},
+    }
+
+
+def test_build_scorecard_carries_scenario_score_profile(tmp_path: Path):
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    score_context.request.scenario.score_profile = ScoreProfileConfig(
+        id="code-delivery-v1",
+        baseline_lineage="code-delivery",
+        weights={"functional": 0.7, "resource-efficiency": 0.3},
+    )
+
+    scorecard = build_scorecard(score_context)
+
+    assert scorecard.score_profile == {
+        "id": "code-delivery-v1",
+        "baseline_lineage": "code-delivery",
+        "weights": {"functional": 0.7, "resource-efficiency": 0.3},
+    }
 
 
 def test_build_scorecard_fails_execution_validity_without_required_atomic_commit(

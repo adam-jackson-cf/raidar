@@ -330,6 +330,18 @@ CoreMetricId = Literal[
     "visual-regression",
 ]
 
+ScoreProfileMetricId = Literal[
+    "functional",
+    "acceptance",
+    "verification-stability",
+    "execution-validity",
+    "resource-efficiency",
+    "test-coverage",
+    "requirements-coverage",
+    "visual-regression",
+    "artifact-checks",
+]
+
 
 class CoreMetricDefinition(BaseModel):
     """Built-in metric definition."""
@@ -362,6 +374,36 @@ MetricDefinition = Annotated[
 ]
 
 
+class ScoreProfileConfig(BaseModel):
+    """Stable scoring contract used to compare scenario revisions."""
+
+    id: str = Field(
+        default="legacy-resource-efficiency-v1",
+        description="Stable score profile identifier; changing this starts a new baseline",
+    )
+    baseline_lineage: str | None = Field(
+        default=None,
+        description="Optional lineage identifier for comparable benchmark revisions",
+    )
+    weights: dict[ScoreProfileMetricId, float] = Field(
+        default_factory=lambda: {"resource-efficiency": 1.0},
+        description="Composite score weights by metric id",
+    )
+
+    @field_validator("weights")
+    @classmethod
+    def _validate_weights(
+        cls, value: dict[ScoreProfileMetricId, float]
+    ) -> dict[ScoreProfileMetricId, float]:
+        if not value:
+            raise ValueError("score_profile.weights must not be empty")
+        if any(weight < 0 for weight in value.values()):
+            raise ValueError("score_profile.weights must be non-negative")
+        if sum(value.values()) <= 0:
+            raise ValueError("score_profile.weights must include positive total weight")
+        return value
+
+
 class ScenarioDefinition(BaseModel):
     """Complete scenario definition matching the YAML format."""
 
@@ -381,6 +423,10 @@ class ScenarioDefinition(BaseModel):
         min_length=1,
         description="Ordered metric definitions enabled for this scenario",
     )
+    score_profile: ScoreProfileConfig | None = Field(
+        default=None,
+        description="Optional stable scoring contract; omitted scenarios use legacy scoring",
+    )
     prompt: PromptConfig = Field(description="Prompt artifact configuration")
 
     def metric_ids(self) -> list[str]:
@@ -392,6 +438,11 @@ class ScenarioDefinition(BaseModel):
         metric_ids = self.metric_ids()
         if len(metric_ids) != len(set(metric_ids)):
             raise ValueError("metrics contains duplicate metric ids")
+        self._validate_metric_dependencies(metric_ids)
+        self._validate_score_profile_metrics(metric_ids)
+        return self
+
+    def _validate_metric_dependencies(self, metric_ids: list[str]) -> None:
         if "test-coverage" in metric_ids and self.verification.coverage_threshold is None:
             raise ValueError(
                 "metrics includes test-coverage without verification.coverage_threshold"
@@ -404,7 +455,15 @@ class ScenarioDefinition(BaseModel):
             raise ValueError("metrics includes llm-judge without acceptance.llm_judge_rubric")
         if "visual-regression" in metric_ids and self.visual is None:
             raise ValueError("metrics includes visual-regression without visual config")
-        return self
+
+    def _validate_score_profile_metrics(self, metric_ids: list[str]) -> None:
+        if self.score_profile is not None:
+            missing_weighted_metrics = sorted(set(self.score_profile.weights) - set(metric_ids))
+            if missing_weighted_metrics:
+                raise ValueError(
+                    "score_profile.weights references metrics not enabled in metrics: "
+                    + ", ".join(missing_weighted_metrics)
+                )
 
     @classmethod
     def from_yaml(cls, path: Path) -> "ScenarioDefinition":
