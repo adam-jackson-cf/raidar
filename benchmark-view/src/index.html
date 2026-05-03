@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Raidar Benchmark Review</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' fill='%23000'/%3E%3Cpath d='M3 12 8 3l5 9H3z' fill='%23da5c2c'/%3E%3C/svg%3E" />
     <style>
       :root {
-        /* Axiom source tokens from Refero */
         --color-midnight-ink: #000000;
         --color-deep-graphite: #111111;
         --color-charcoal-surface: #191919;
@@ -16,12 +16,10 @@
         --color-light-steel: #b4b4b4;
         --color-almost-white: #eeeeee;
         --color-highlight-orange: #da5c2c;
-
         --font-berkeleymono: "BerkeleyMono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
         --font-inter: "Inter", ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
         --font-weight-regular: 400;
         --font-weight-bold: 700;
-
         --text-caption: 12px;
         --leading-caption: 1.5;
         --text-body: 14px;
@@ -32,32 +30,18 @@
         --leading-heading-lg: 1.33;
         --text-display: 32px;
         --leading-display: 1.25;
-
-        --spacing-unit: 8px;
         --spacing-8: 8px;
         --spacing-16: 16px;
         --spacing-24: 24px;
         --spacing-32: 32px;
         --spacing-40: 40px;
-        --spacing-48: 48px;
-        --spacing-64: 64px;
-        --spacing-80: 80px;
-        --spacing-96: 96px;
-
-        --section-gap: var(--spacing-40);
-        --card-padding: var(--spacing-32);
+        --card-padding: var(--spacing-24);
         --element-gap: var(--spacing-8);
         --radius-default: 2px;
-        --radius-pill: 9999px;
         --shadow-subtle: rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;
-        --surface-base-black: var(--color-midnight-ink);
-        --surface-header-footer: var(--color-deep-graphite);
-        --surface-card-component: var(--color-charcoal-surface);
-
-        /* Dashboard semantic layer */
-        --app-bg: var(--surface-base-black);
-        --app-surface: var(--surface-card-component);
-        --app-surface-raised: var(--surface-header-footer);
+        --app-bg: var(--color-midnight-ink);
+        --app-surface: var(--color-charcoal-surface);
+        --app-surface-raised: var(--color-deep-graphite);
         --app-surface-hover: var(--color-dark-slate);
         --app-text: var(--color-almost-white);
         --app-text-muted: var(--color-light-steel);
@@ -73,9 +57,7 @@
       }
 
       * { box-sizing: border-box; }
-
       html { background: var(--app-bg); color: var(--app-text); }
-
       body {
         margin: 0;
         font-family: var(--font-berkeleymono);
@@ -84,435 +66,124 @@
         line-height: var(--leading-body);
         font-variant-numeric: tabular-nums;
       }
-
       button, input { font: inherit; }
-
-      .shell {
-        max-width: 1440px;
-        margin: 0 auto;
-        padding: var(--spacing-32);
-      }
-
-      .topbar {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr);
-        gap: var(--spacing-16);
-        padding: var(--spacing-16) 0 var(--spacing-24);
-        border-bottom: 1px solid var(--app-border);
-      }
-
+      button { color: inherit; }
       h1, h2, h3, p { margin: 0; }
-
-      h1 {
-        color: var(--app-text);
-        font-size: var(--text-display);
-        font-weight: var(--font-weight-bold);
-        line-height: var(--leading-display);
-        letter-spacing: normal;
-      }
-
-      h2 {
-        color: var(--app-text);
-        font-size: var(--text-heading);
-        font-weight: var(--font-weight-bold);
-        line-height: var(--leading-heading);
-        letter-spacing: normal;
-      }
-
-      h3 {
-        color: var(--app-text);
-        font-size: var(--text-body);
-        font-weight: var(--font-weight-bold);
-        line-height: var(--leading-body);
-      }
-
-      .meta {
-        color: var(--app-text-muted);
-        margin-top: var(--spacing-8);
-      }
-
-      .controls {
-        display: grid;
-        grid-template-columns: repeat(2, minmax(240px, 1fr));
-        gap: var(--element-gap);
-        align-items: center;
-      }
-
-      .autocomplete-field {
-        position: relative;
-        height: 34px;
-        border: 1px solid var(--app-border);
-        background: var(--app-surface);
-        border-radius: var(--radius-default);
-        min-width: 0;
-        width: 100%;
-        box-shadow: var(--shadow-subtle);
-      }
-
-      .autocomplete-field:focus-within {
-        border-color: var(--app-accent);
-        outline: 1px solid var(--app-accent);
-        outline-offset: 0;
-      }
-
-      .completion-text,
-      .filter-input {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        min-width: 0;
-        width: 100%;
-        padding: 0 66px 0 var(--spacing-16);
-        white-space: pre;
-      }
-
-      .completion-text {
-        color: var(--app-text-subtle);
-        overflow: hidden;
-        pointer-events: none;
-        user-select: none;
-      }
-
-      .filter-input {
-        z-index: 1;
-        border: 0;
-        background: transparent;
-        color: var(--app-text);
-        outline: 0;
-      }
-
-      .filter-input::placeholder {
-        color: var(--app-text-subtle);
-      }
-
-      .field-button {
-        position: absolute;
-        z-index: 2;
-        top: 50%;
-        width: 22px;
-        height: 22px;
-        transform: translateY(-50%);
-        border: 0;
-        background: transparent;
-        color: var(--app-text-muted);
-        cursor: pointer;
-        line-height: 1;
-        padding: 0;
-      }
-
-      .field-button:hover,
-      .field-button:focus-visible {
-        color: var(--app-text);
-        outline: 0;
-      }
-
-      .clear-filter {
-        right: 32px;
-        display: none;
-      }
-
-      .options-toggle {
-        right: var(--spacing-8);
-        display: block;
-      }
-
-      .autocomplete-field.has-value .clear-filter {
-        display: block;
-      }
-
-      .options-list {
-        position: absolute;
-        z-index: 5;
-        top: calc(100% + 4px);
-        left: 0;
-        right: 0;
-        display: none;
-        max-height: 230px;
-        overflow: auto;
-        margin: 0;
-        padding: var(--spacing-8);
-        list-style: none;
-        border: 1px solid var(--app-border);
-        background: var(--app-surface-raised);
-        box-shadow: var(--shadow-subtle);
-      }
-
-      .autocomplete-field.is-open .options-list {
-        display: grid;
-        gap: 2px;
-      }
-
-      .option-button {
-        width: 100%;
-        min-height: 30px;
-        border: 0;
-        background: transparent;
-        color: var(--app-text-muted);
-        cursor: pointer;
-        padding: 0 var(--spacing-8);
-        text-align: left;
-      }
-
-      .option-button:hover,
-      .option-button:focus-visible {
-        background: var(--app-surface-hover);
-        color: var(--app-text);
-        outline: 0;
-      }
-
-      .layout {
-        display: block;
-        padding-top: var(--spacing-24);
-      }
-
-      .panel {
-        background: var(--app-surface);
-        border: 1px solid var(--app-border-soft);
-        border-radius: var(--radius-default);
-        box-shadow: var(--shadow-subtle);
-        min-width: 0;
-      }
-
-      .main {
-        display: grid;
-        gap: var(--spacing-24);
-        min-width: 0;
-      }
-
-      .panel-header {
-        display: flex;
-        justify-content: space-between;
-        gap: var(--spacing-16);
-        align-items: baseline;
-        flex-wrap: wrap;
-        padding: var(--spacing-24) var(--card-padding);
-        border-bottom: 1px solid var(--app-border-soft);
-      }
-
+      h1 { font-size: var(--text-display); line-height: var(--leading-display); }
+      h2 { font-size: var(--text-heading); line-height: var(--leading-heading); }
+      h3 { font-size: var(--text-body); line-height: var(--leading-body); }
+      .shell { max-width: 1440px; margin: 0 auto; padding: var(--spacing-32); }
+      .topbar { display: grid; gap: var(--spacing-16); padding: var(--spacing-16) 0 var(--spacing-24); border-bottom: 1px solid var(--app-border); }
+      .meta, .note, .subtle { color: var(--app-text-muted); }
+      .meta { margin-top: var(--spacing-8); }
+      .controls { display: grid; grid-template-columns: repeat(3, minmax(180px, 1fr)); gap: var(--element-gap); align-items: start; }
+      .quick-links { display: flex; gap: var(--spacing-8); flex-wrap: wrap; }
+      .quick-links a { border: 1px solid var(--app-border); color: var(--app-text-muted); text-decoration: none; padding: 6px var(--spacing-8); border-radius: var(--radius-default); }
+      .quick-links a:hover, .quick-links a:focus-visible { color: var(--app-text); border-color: var(--app-text-muted); outline: 0; }
+      .control-label { display: block; color: var(--app-text-muted); font-size: var(--text-caption); margin-bottom: 4px; }
+      .autocomplete-field { position: relative; height: 34px; border: 1px solid var(--app-border); background: var(--app-surface); border-radius: var(--radius-default); width: 100%; box-shadow: var(--shadow-subtle); }
+      .autocomplete-field:focus-within { border-color: var(--app-accent); outline: 1px solid var(--app-accent); }
+      .completion-text, .filter-input { position: absolute; inset: 0; display: flex; align-items: center; width: 100%; padding: 0 66px 0 var(--spacing-16); white-space: pre; }
+      .completion-text { color: var(--app-text-subtle); overflow: hidden; pointer-events: none; user-select: none; }
+      .filter-input { z-index: 1; border: 0; background: transparent; color: var(--app-text); outline: 0; }
+      .filter-input::placeholder { color: var(--app-text-subtle); }
+      .field-button { position: absolute; z-index: 2; top: 50%; width: 22px; height: 22px; transform: translateY(-50%); border: 0; background: transparent; color: var(--app-text-muted); cursor: pointer; line-height: 1; padding: 0; }
+      .field-button:hover, .field-button:focus-visible { color: var(--app-text); outline: 0; }
+      .clear-filter { right: 32px; display: none; }
+      .options-toggle { right: var(--spacing-8); display: block; }
+      .autocomplete-field.has-value .clear-filter { display: block; }
+      .options-list { position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0; display: none; max-height: 260px; overflow: auto; margin: 0; padding: var(--spacing-8); list-style: none; border: 1px solid var(--app-border); background: var(--app-surface-raised); box-shadow: var(--shadow-subtle); }
+      .autocomplete-field.is-open .options-list { display: grid; gap: 2px; }
+      .option-button { width: 100%; min-height: 30px; border: 0; background: transparent; color: var(--app-text-muted); cursor: pointer; padding: 0 var(--spacing-8); text-align: left; }
+      .option-button:hover, .option-button:focus-visible, .option-button[aria-selected="true"] { background: var(--app-surface-hover); color: var(--app-text); outline: 0; }
+      .layout { display: grid; gap: var(--spacing-24); padding-top: var(--spacing-24); }
+      .panel { background: var(--app-surface); border: 1px solid var(--app-border-soft); border-radius: var(--radius-default); box-shadow: var(--shadow-subtle); min-width: 0; }
+      .panel-header { display: flex; justify-content: space-between; gap: var(--spacing-16); align-items: baseline; flex-wrap: wrap; padding: var(--spacing-24) var(--card-padding); border-bottom: 1px solid var(--app-border-soft); }
       .panel-body { padding: var(--card-padding); }
-
-      .note {
-        max-width: 620px;
-        color: var(--app-text-muted);
-      }
-
-      .scoreline {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        border-bottom: 1px solid var(--app-border-soft);
-      }
-
-      .measure {
-        padding: var(--spacing-24) var(--card-padding);
-        border-right: 1px solid var(--app-border-soft);
-      }
-
+      .strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--app-border-soft); }
+      .decision { padding: var(--spacing-24); border-right: 1px solid var(--app-border-soft); min-width: 0; }
+      .decision:last-child { border-right: 0; }
+      .decision span, .measure span { color: var(--app-text-muted); display: block; margin-bottom: var(--spacing-8); }
+      .decision strong { display: block; font-size: var(--text-heading); line-height: var(--leading-heading); overflow-wrap: anywhere; }
+      .decision p { margin-top: var(--spacing-8); color: var(--app-text-muted); }
+      .measure-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); border-top: 1px solid var(--app-border-soft); }
+      .measure { padding: var(--spacing-16) var(--spacing-24); border-right: 1px solid var(--app-border-soft); }
       .measure:last-child { border-right: 0; }
-      .measure span {
-        color: var(--app-text-muted);
-        display: block;
-        margin-bottom: var(--spacing-8);
-      }
-      .measure strong {
-        color: var(--app-text);
-        font-size: var(--text-heading-lg);
-        font-weight: var(--font-weight-bold);
-        line-height: var(--leading-heading-lg);
-        letter-spacing: normal;
-      }
-
-      .charts {
-        display: grid;
-        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-        gap: var(--spacing-24);
-      }
-
-      .chart-wrap { min-height: 300px; }
-
-      svg { width: 100%; height: auto; display: block; }
-
-      .axis text,
-      .chart-label {
-        fill: var(--app-text-muted);
-        font-family: var(--font-berkeleymono);
-        font-size: var(--text-caption);
-      }
-
-      .axis line,
-      .axis path,
-      .grid-line { stroke: var(--app-border); stroke-width: 1; }
-
-      .point { fill: var(--app-chart-primary); opacity: 0.9; }
-      .point.low { fill: var(--app-chart-muted); }
-      .point.medium { fill: var(--app-chart-secondary); }
-      .line { fill: none; stroke: var(--app-chart-primary); stroke-width: 2; }
-      .line.secondary { stroke: var(--app-chart-secondary); }
-
-      .empty {
-        color: var(--app-text-muted);
-        padding: var(--spacing-24);
-        border: 1px dashed var(--app-border);
-        border-radius: var(--radius-default);
-      }
-
-      .table-wrap {
-        max-width: 100%;
-        overflow: hidden;
-      }
-
-      table {
-        width: 100%;
-        table-layout: fixed;
-        border-collapse: collapse;
-      }
-
-      th, td {
-        border-bottom: 1px solid var(--app-border-soft);
-        padding: var(--spacing-8);
-        text-align: left;
-        vertical-align: top;
-        overflow-wrap: anywhere;
-      }
-
-      th {
-        color: var(--app-text-muted);
-        font-weight: var(--font-weight-bold);
-        background: var(--app-surface-raised);
-        position: sticky;
-        top: 0;
-      }
-
-      th:nth-child(1),
-      td:nth-child(1) { width: 18%; }
-      th:nth-child(2),
-      td:nth-child(2) { width: 7%; }
-      th:nth-child(3),
-      td:nth-child(3) { width: 24%; }
-      th:nth-child(4),
-      td:nth-child(4),
-      th:nth-child(5),
-      td:nth-child(5),
-      th:nth-child(6),
-      td:nth-child(6),
-      th:nth-child(7),
-      td:nth-child(7),
-      th:nth-child(8),
-      td:nth-child(8),
-      th:nth-child(9),
-      td:nth-child(9) {
-        width: 8%;
-        white-space: nowrap;
-      }
-
+      .measure strong { font-size: var(--text-heading-lg); }
+      .scenario-tabs, .revision-tabs, .toolbar { display: flex; gap: var(--spacing-8); flex-wrap: wrap; }
+      .tab, .ghost-button { border: 1px solid var(--app-border); background: transparent; color: var(--app-text-muted); cursor: pointer; padding: 6px var(--spacing-8); border-radius: var(--radius-default); }
+      .tab:hover, .ghost-button:hover { color: var(--app-text); border-color: var(--app-text-muted); }
+      .tab.active, .ghost-button.active { background: var(--app-accent); border-color: var(--app-accent); color: var(--app-accent-text); }
+      .grid-two { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr); gap: var(--spacing-24); }
+      .grid-three { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--spacing-16); }
+      .empty { color: var(--app-text-muted); padding: var(--spacing-24); border: 1px dashed var(--app-border); border-radius: var(--radius-default); }
+      .table-wrap { max-width: 100%; overflow: hidden; }
+      table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+      th, td { border-bottom: 1px solid var(--app-border-soft); padding: var(--spacing-8); text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+      th { color: var(--app-text-muted); font-weight: var(--font-weight-bold); background: var(--app-surface-raised); position: sticky; top: 0; z-index: 1; }
+      th.numeric, td.numeric { text-align: right; }
+      th button { width: 100%; border: 0; background: transparent; color: inherit; cursor: pointer; padding: 0; text-align: inherit; }
       tr:hover td { background: var(--app-surface-hover); }
-
-      td.numeric,
-      th.numeric { text-align: right; }
-
-      .delta-good,
-      .delta-bad,
-      .delta-flat { font-weight: var(--font-weight-bold); }
-
-      .delta-good { color: var(--app-text); }
-      .delta-bad { color: var(--app-attention); }
-      .delta-flat { color: var(--app-text-muted); }
-
-      .status {
-        font-variant-numeric: tabular-nums;
-        color: var(--app-text-muted);
-      }
-
-      .mono {
-        font-family: var(--font-berkeleymono);
-        font-size: var(--text-caption);
-        line-height: var(--leading-caption);
-      }
-
-      .split {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        gap: var(--spacing-24);
-      }
-
-      .compact-list {
-        display: grid;
-        gap: var(--spacing-16);
-      }
-
-      .compact-row {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: var(--spacing-16);
-        align-items: baseline;
-        padding-bottom: var(--spacing-16);
-        border-bottom: 1px solid var(--app-border-soft);
-      }
-
+      .rank-col { width: 48px; }
+      .small-col { width: 78px; }
+      .model-col { width: 25%; }
+      .scenario-col { width: 20%; }
+      .checkbox-col { width: 46px; }
+      .mono { font-family: var(--font-berkeleymono); font-size: var(--text-caption); line-height: var(--leading-caption); }
+      .status { color: var(--app-text-muted); }
+      .good { color: var(--app-text); font-weight: var(--font-weight-bold); }
+      .bad { color: var(--app-attention); font-weight: var(--font-weight-bold); }
+      .flat { color: var(--app-text-muted); font-weight: var(--font-weight-bold); }
+      .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--spacing-8); }
+      .badge { border: 1px solid var(--app-border); color: var(--app-text-muted); padding: 2px 6px; border-radius: var(--radius-default); font-size: var(--text-caption); }
+      .badge.attention { border-color: var(--app-attention); color: var(--app-attention); }
+      .compact-list { display: grid; gap: var(--spacing-16); }
+      .compact-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--spacing-16); align-items: baseline; padding-bottom: var(--spacing-16); border-bottom: 1px solid var(--app-border-soft); }
       .compact-row:last-child { border-bottom: 0; padding-bottom: 0; }
       .compact-row p { color: var(--app-text-muted); margin-top: var(--spacing-8); }
-
-      @media (max-width: 980px) {
-        .charts,
-        .split { grid-template-columns: 1fr; }
-        .controls { grid-template-columns: 1fr; }
-        .scoreline { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .measure:nth-child(2) { border-right: 0; }
-        .measure:nth-child(-n + 2) { border-bottom: 1px solid var(--app-border-soft); }
-        table { font-size: var(--text-caption); }
+      .chart-label { fill: var(--app-text-muted); font-family: var(--font-berkeleymono); font-size: var(--text-caption); }
+      .grid-line { stroke: var(--app-border); stroke-width: 1; }
+      .threshold { stroke: var(--app-attention); stroke-width: 1; stroke-dasharray: 4 4; opacity: 0.8; }
+      .point { fill: var(--app-chart-primary); opacity: 0.9; cursor: pointer; }
+      .point.low { fill: var(--app-chart-muted); }
+      .point.medium { fill: var(--app-chart-secondary); }
+      .point.selected { stroke: var(--app-text); stroke-width: 2; }
+      .line { fill: none; stroke: var(--app-chart-primary); stroke-width: 2; }
+      svg { width: 100%; height: auto; display: block; }
+      .timeline { display: grid; gap: var(--spacing-8); }
+      .timeline-row { display: grid; grid-template-columns: minmax(180px, 0.8fr) minmax(0, 1.4fr) 110px; gap: var(--spacing-16); align-items: center; padding: var(--spacing-8); border-bottom: 1px solid var(--app-border-soft); }
+      .revision-cells { display: grid; gap: 4px; }
+      .revision-cell { display: grid; grid-template-columns: 56px minmax(0, 1fr) 58px; gap: var(--spacing-8); align-items: center; }
+      .bar-track { height: 8px; background: var(--app-surface-raised); border: 1px solid var(--app-border-soft); }
+      .bar { height: 100%; background: var(--app-chart-primary); }
+      .diff-tabs { display: flex; gap: var(--spacing-8); flex-wrap: wrap; margin-bottom: var(--spacing-16); }
+      .diff-view { display: grid; gap: 2px; max-height: 440px; overflow: auto; background: var(--app-surface-raised); border: 1px solid var(--app-border-soft); padding: var(--spacing-8); }
+      .diff-line { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: var(--spacing-8); font-size: var(--text-caption); white-space: pre-wrap; }
+      .diff-line.added { color: var(--app-text); background: rgba(218, 92, 44, 0.10); }
+      .diff-line.removed { color: var(--app-attention); }
+      .diff-line.context { color: var(--app-text-muted); }
+      .compare-drawer { border: 1px solid var(--app-border); background: var(--app-surface-raised); padding: var(--spacing-16); display: none; }
+      .compare-drawer.active { display: block; }
+      .evidence-path { display: block; color: var(--app-text-muted); overflow-wrap: anywhere; }
+      .cluster-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--spacing-16); }
+      .cluster { border: 1px solid var(--app-border-soft); padding: var(--spacing-16); background: var(--app-surface-raised); }
+      .cluster strong { display: block; font-size: var(--text-heading); }
+      @media (max-width: 1100px) {
+        .controls, .grid-two, .grid-three, .cluster-grid { grid-template-columns: 1fr; }
+        .strip, .measure-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .timeline-row { grid-template-columns: 1fr; }
       }
-
-      @media (max-width: 560px) {
-        .shell { padding: var(--spacing-16); }
-        .scoreline { grid-template-columns: 1fr; }
-        .measure { border-right: 0; border-bottom: 1px solid var(--app-border-soft); }
-        .measure:last-child { border-bottom: 0; }
-        th, td { padding: 6px 4px; }
-      }
-
       @media (max-width: 700px) {
-        table,
-        thead,
-        tbody,
-        tr,
-        th,
-        td {
-          display: block;
-          width: auto;
-        }
-
+        .shell { padding: var(--spacing-16); }
+        .strip, .measure-grid { grid-template-columns: 1fr; }
+        .decision, .measure { border-right: 0; border-bottom: 1px solid var(--app-border-soft); }
+        table, thead, tbody, tr, th, td { display: block; width: auto; }
         thead { display: none; }
-
-        tbody {
-          display: grid;
-          gap: var(--spacing-8);
-        }
-
-        tr {
-          border: 1px solid var(--app-border-soft);
-          border-radius: var(--radius-default);
-          background: var(--app-surface-raised);
-        }
-
-        th:nth-child(n),
-        td:nth-child(n) {
-          width: auto;
-          white-space: normal;
-        }
-
-        td {
-          display: flex;
-          justify-content: space-between;
-          gap: var(--spacing-16);
-          padding: var(--spacing-8);
-          text-align: right;
-        }
-
-        td::before {
-          content: attr(data-label);
-          color: var(--app-text-muted);
-          text-align: left;
-        }
+        tbody { display: grid; gap: var(--spacing-8); }
+        tr { border: 1px solid var(--app-border-soft); background: var(--app-surface-raised); }
+        td { display: flex; justify-content: space-between; gap: var(--spacing-16); text-align: right; }
+        td::before { content: attr(data-label); color: var(--app-text-muted); text-align: left; }
+        .checkbox-col { display: block; }
       }
     </style>
   </head>
@@ -524,204 +195,124 @@
           <p class="meta" id="datasetMeta">Loading benchmark artifacts.</p>
         </div>
         <div class="controls" aria-label="Benchmark filters">
-          <div class="autocomplete-field" id="scenarioField">
-            <span class="completion-text" id="scenarioCompletion" aria-hidden="true"></span>
-            <input class="filter-input" id="scenarioInput" type="text" placeholder="All scenarios" aria-label="Scenario filter" autocomplete="off" spellcheck="false" />
-            <button class="field-button clear-filter" id="scenarioClear" type="button" aria-label="Clear scenario filter">x</button>
-            <button class="field-button options-toggle" id="scenarioToggle" type="button" aria-label="Show scenario options" aria-expanded="false">v</button>
-            <ul class="options-list" id="scenarioOptions" aria-label="Scenario options"></ul>
-          </div>
-          <div class="autocomplete-field" id="modelField">
-            <span class="completion-text" id="modelCompletion" aria-hidden="true"></span>
-            <input class="filter-input" id="modelInput" type="text" placeholder="All models" aria-label="Model and harness filter" autocomplete="off" spellcheck="false" />
-            <button class="field-button clear-filter" id="modelClear" type="button" aria-label="Clear model filter">x</button>
-            <button class="field-button options-toggle" id="modelToggle" type="button" aria-label="Show model options" aria-expanded="false">v</button>
-            <ul class="options-list" id="modelOptions" aria-label="Model options"></ul>
-          </div>
+          <label><span class="control-label">Scenario</span><div class="autocomplete-field" id="scenarioField" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-owns="scenarioOptions"><span class="completion-text" id="scenarioCompletion" aria-hidden="true"></span><input class="filter-input" id="scenarioInput" type="text" placeholder="All scenarios" aria-label="Scenario filter" autocomplete="off" spellcheck="false" /><button class="field-button clear-filter" id="scenarioClear" type="button" aria-label="Clear scenario filter">x</button><button class="field-button options-toggle" id="scenarioToggle" type="button" aria-label="Show scenario options">v</button><ul class="options-list" id="scenarioOptions" role="listbox" aria-label="Scenario options" hidden></ul></div></label>
+          <label><span class="control-label">Revision</span><div class="autocomplete-field" id="revisionField" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-owns="revisionOptions"><span class="completion-text" id="revisionCompletion" aria-hidden="true"></span><input class="filter-input" id="revisionInput" type="text" placeholder="All revisions" aria-label="Revision filter" autocomplete="off" spellcheck="false" /><button class="field-button clear-filter" id="revisionClear" type="button" aria-label="Clear revision filter">x</button><button class="field-button options-toggle" id="revisionToggle" type="button" aria-label="Show revision options">v</button><ul class="options-list" id="revisionOptions" role="listbox" aria-label="Revision options" hidden></ul></div></label>
+          <label><span class="control-label">AgentSpec</span><div class="autocomplete-field" id="agentField" role="combobox" aria-haspopup="listbox" aria-expanded="false" aria-owns="agentOptions"><span class="completion-text" id="agentCompletion" aria-hidden="true"></span><input class="filter-input" id="agentInput" type="text" placeholder="All harnesses and models" aria-label="AgentSpec filter" autocomplete="off" spellcheck="false" /><button class="field-button clear-filter" id="agentClear" type="button" aria-label="Clear AgentSpec filter">x</button><button class="field-button options-toggle" id="agentToggle" type="button" aria-label="Show AgentSpec options">v</button><ul class="options-list" id="agentOptions" role="listbox" aria-label="AgentSpec options" hidden></ul></div></label>
         </div>
+        <nav class="quick-links" aria-label="Review sections"><a href="#decisionTitle">Decision summary</a><a href="#leaderboardTitle">AgentSpec leaderboard</a><a href="#trajectoryTitle">Revision trajectory</a><a href="#diffTitle">Scenario diff</a><a href="#evidenceTitle">Evidence paths</a></nav>
       </header>
 
       <div class="layout">
-        <section class="main">
-          <section class="panel" aria-labelledby="summaryTitle">
-            <div class="panel-header">
-              <div>
-                <h2 id="summaryTitle">Current selection</h2>
-                <p class="note" id="selectionNote"></p>
-              </div>
-            </div>
-            <div class="scoreline" id="measures"></div>
-          </section>
-
-          <section class="charts">
-            <article class="panel chart-wrap" aria-labelledby="scatterTitle">
-              <div class="panel-header">
-                <h2 id="scatterTitle">Score against run time</h2>
-                <p class="note">Higher and further left is better.</p>
-              </div>
-              <div class="panel-body" id="scatter"></div>
-            </article>
-            <article class="panel chart-wrap" aria-labelledby="trajectoryTitle">
-              <div class="panel-header">
-                <h2 id="trajectoryTitle">Revision trajectory</h2>
-                <p class="note" id="trajectoryNote">Latest comparable chain in view.</p>
-              </div>
-              <div class="panel-body" id="trajectory"></div>
-            </article>
-          </section>
-
-          <section class="split">
-            <article class="panel" aria-labelledby="deltaTitle">
-              <div class="panel-header">
-                <h2 id="deltaTitle">Revision deltas</h2>
-                <p class="note">Adjacent revisions only.</p>
-              </div>
-              <div class="panel-body compact-list" id="deltaList"></div>
-            </article>
-            <article class="panel" aria-labelledby="riskTitle">
-              <div class="panel-header">
-                <h2 id="riskTitle">Runs needing attention</h2>
-                <p class="note">Invalid, unscored, or unstable samples.</p>
-              </div>
-              <div class="panel-body compact-list" id="riskList"></div>
-            </article>
-          </section>
-
-          <section class="panel" aria-labelledby="tableTitle">
-            <div class="panel-header">
-              <h2 id="tableTitle">Benchmark runs</h2>
-              <p class="note">Sorted by latest artifact time.</p>
-            </div>
-            <div class="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Scenario</th>
-                    <th>Rev</th>
-                    <th>Model</th>
-                    <th class="numeric">Score</th>
-                    <th class="numeric">Quality</th>
-                    <th class="numeric">Gates</th>
-                    <th class="numeric">Duration</th>
-                    <th class="numeric">Tokens</th>
-                    <th class="numeric">Runs</th>
-                  </tr>
-                </thead>
-                <tbody id="runRows"></tbody>
-              </table>
-            </div>
-          </section>
+        <section class="panel" aria-labelledby="decisionTitle">
+          <div class="panel-header"><div><h2 id="decisionTitle">Decision summary</h2><p class="note" id="selectionNote"></p></div><div class="toolbar" id="scenarioTabs"></div></div>
+          <div class="panel-body" id="scenarioBrief"></div>
+          <div class="strip" id="decisionStrip"></div>
+          <div class="measure-grid" id="measureGrid"></div>
         </section>
+
+        <section class="panel" aria-labelledby="leaderboardTitle">
+          <div class="panel-header"><div><h2 id="leaderboardTitle">AgentSpec leaderboard</h2><p class="note">Ranked by score, validity, gate stability, sample confidence, and efficiency.</p></div><div class="revision-tabs" id="revisionTabs"></div></div>
+          <div class="panel-body"><div class="compare-drawer" id="compareDrawer"></div></div>
+          <div class="table-wrap"><table><thead><tr><th class="checkbox-col">Cmp</th><th class="rank-col">Rank</th><th class="model-col"><button data-sort="agent_spec">AgentSpec</button></th><th class="small-col numeric"><button data-sort="decision_score">Decision</button></th><th class="small-col numeric"><button data-sort="mean_score">Score</button></th><th class="small-col numeric"><button data-sort="valid_rate">Valid</button></th><th class="small-col numeric"><button data-sort="performance_pass_rate">Gates</button></th><th class="small-col numeric"><button data-sort="duration_sec">Duration</button></th><th class="small-col numeric"><button data-sort="uncached_input_tokens">Tokens</button></th><th class="small-col numeric"><button data-sort="sample_adequacy">Sample</button></th></tr></thead><tbody id="leaderRows"></tbody></table></div>
+        </section>
+
+        <section class="grid-two">
+          <article class="panel" aria-labelledby="scatterTitle"><div class="panel-header"><h2 id="scatterTitle">Score against run time</h2><p class="note">Threshold bands expose fast acceptable runs and outliers.</p></div><div class="panel-body" id="scatter"></div></article>
+          <article class="panel" aria-labelledby="trajectoryTitle"><div class="panel-header"><h2 id="trajectoryTitle">Revision trajectory</h2><p class="note" id="trajectoryNote">First-to-last movement for comparable AgentSpecs.</p></div><div class="panel-body" id="trajectory"></div></article>
+        </section>
+
+        <section class="grid-two">
+          <article class="panel" aria-labelledby="deltaTitle"><div class="panel-header"><h2 id="deltaTitle">Revision deltas</h2><p class="note">Adjacent and first-to-last changes.</p></div><div class="panel-body compact-list" id="deltaList"></div></article>
+          <article class="panel" aria-labelledby="riskTitle"><div class="panel-header"><h2 id="riskTitle">Failure clusters</h2><p class="note">Invalid, unscored, unstable, sparse, slow, and costly samples.</p></div><div class="panel-body" id="riskList"></div></article>
+        </section>
+
+        <section class="panel" aria-labelledby="diffTitle"><div class="panel-header"><div><h2 id="diffTitle">Scenario revision diff</h2><p class="note" id="diffNote">Review what changed before trusting revision movement.</p></div><div class="diff-tabs" id="diffTabs"></div></div><div class="panel-body" id="diffBody"></div></section>
+
+        <section class="grid-two">
+          <article class="panel" aria-labelledby="metricTitle"><div class="panel-header"><h2 id="metricTitle">Metric breakdown</h2><p class="note">Composite evidence by metric outcome when present.</p></div><div class="panel-body" id="metricBreakdown"></div></article>
+          <article class="panel" aria-labelledby="evidenceTitle"><div class="panel-header"><h2 id="evidenceTitle">Evidence paths</h2><p class="note">Artifact roots and summaries for drilldown.</p></div><div class="panel-body compact-list" id="evidenceList"></div></article>
+        </section>
+
+        <section class="panel" aria-labelledby="runsTitle"><div class="panel-header"><h2 id="runsTitle">Benchmark runs</h2><p class="note">Sortable live artifacts, not a static report.</p></div><div class="table-wrap"><table><thead><tr><th class="scenario-col"><button data-run-sort="scenario">Scenario</button></th><th class="small-col"><button data-run-sort="revision">Rev</button></th><th class="model-col"><button data-run-sort="agent_spec">AgentSpec</button></th><th class="numeric"><button data-run-sort="mean_score">Score</button></th><th class="numeric"><button data-run-sort="quality_score">Quality</button></th><th class="numeric"><button data-run-sort="performance_pass_rate">Gates</button></th><th class="numeric"><button data-run-sort="duration_sec">Duration</button></th><th class="numeric"><button data-run-sort="uncached_input_tokens">Tokens</button></th><th class="numeric"><button data-run-sort="run_count_scored">Runs</button></th></tr></thead><tbody id="runRows"></tbody></table></div></section>
       </div>
     </main>
 
     <script type="module">
       const res = await fetch('./data.json');
       const data = await res.json();
-      const datasetMeta = document.getElementById('datasetMeta');
-      const selectionNote = document.getElementById('selectionNote');
-      const scenarioField = document.getElementById('scenarioField');
-      const scenarioInput = document.getElementById('scenarioInput');
-      const scenarioCompletion = document.getElementById('scenarioCompletion');
-      const scenarioClear = document.getElementById('scenarioClear');
-      const scenarioToggle = document.getElementById('scenarioToggle');
-      const scenarioOptions = document.getElementById('scenarioOptions');
-      const modelField = document.getElementById('modelField');
-      const modelInput = document.getElementById('modelInput');
-      const modelCompletion = document.getElementById('modelCompletion');
-      const modelClear = document.getElementById('modelClear');
-      const modelToggle = document.getElementById('modelToggle');
-      const modelOptions = document.getElementById('modelOptions');
-      const scatter = document.getElementById('scatter');
-      const trajectory = document.getElementById('trajectory');
-      const trajectoryNote = document.getElementById('trajectoryNote');
-      const deltaList = document.getElementById('deltaList');
-      const riskList = document.getElementById('riskList');
-      const runRows = document.getElementById('runRows');
-      const rows = (data.rows || []).filter(
-        (row) => typeof row.mean_score === 'number' && (row.run_count_scored ?? 0) > 0,
-      );
-      const deltas = data.deltas || [];
-
-      const state = {
-        scenarioQuery: '',
-        modelQuery: '',
-      };
-      const scenarioSuggestions = [...new Set(rows.map((row) => row.scenario))].sort();
-      const modelSuggestions = [...new Set(rows.map((row) => row.model))].sort();
-
-      const fmt = (value, digits = 3) =>
-        typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : 'n/a';
-      const pct = (value) =>
-        typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100)}%` : 'n/a';
-      const compact = (value) =>
-        typeof value === 'number' && Number.isFinite(value) ? Intl.NumberFormat('en', { notation: 'compact' }).format(value) : 'n/a';
-      const dateLabel = (value) => {
-        if (!value) return 'unknown date';
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return 'unknown date';
-        return date.toISOString().slice(0, 10);
-      };
-
-      const average = (items, key) => {
-        const values = items.map((item) => item[key]).filter((value) => typeof value === 'number');
-        return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null;
-      };
-
+      const allRows = data.rows || [];
+      const scoredRows = allRows.filter((row) => typeof row.mean_score === 'number' && (row.run_count_scored ?? 0) > 0);
+      const allScenarios = data.scenarios || [];
+      const scenarioDiffs = data.scenario_diffs || [];
+      const allDeltas = data.deltas || [];
+      const state = { scenarioQuery: '', revisionQuery: '', agentQuery: '', sort: 'decision_score', sortDir: -1, runSort: 'completed_at', runSortDir: -1, selected: new Set(), diffKey: null, diffFile: 'prompt' };
+      const $ = (id) => document.getElementById(id);
+      const fmt = (value, digits = 3) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : 'n/a';
+      const pct = (value) => typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100)}%` : 'n/a';
+      const compact = (value) => typeof value === 'number' && Number.isFinite(value) ? Intl.NumberFormat('en', { notation: 'compact' }).format(value) : 'n/a';
       const latestTime = (row) => new Date(row.completed_at || row.created_at || row.run_id || 0).getTime() || 0;
+      const rowKey = (row) => row.run_id;
+      const esc = (value) => String(value ?? '').replace(/[&<>"]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[char]);
+      const avg = (items, key) => { const values = items.map((item) => item[key]).filter((value) => typeof value === 'number'); return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null; };
+      const best = (items, sortFn) => items.slice().sort(sortFn)[0] || null;
+      const numericSort = (key, dir) => (a, b) => (((a[key] ?? -Infinity) - (b[key] ?? -Infinity)) * dir) || latestTime(b) - latestTime(a);
+      const textSort = (key, dir) => (a, b) => String(a[key] ?? '').localeCompare(String(b[key] ?? '')) * dir || latestTime(b) - latestTime(a);
+      const rowPasses = (row) => (row.valid_rate ?? 0) >= 1 && (row.performance_pass_rate ?? 0) >= 1;
+      const suggestions = {
+        scenario: [...new Set(scoredRows.map((row) => row.scenario))].sort(),
+        revision: [...new Set(scoredRows.map((row) => row.revision))].sort(),
+        agent: [...new Set(scoredRows.flatMap((row) => [row.agent_spec, row.model, row.harness]))].sort(),
+      };
 
-      function applyFilters() {
-        const scenarioQuery = state.scenarioQuery.trim().toLowerCase();
-        const modelQuery = state.modelQuery.trim().toLowerCase();
-        return rows.filter((row) => {
-          const scenarioText = `${row.scenario} ${row.revision}`.toLowerCase();
-          const modelText = `${row.model} ${row.harness}`.toLowerCase();
-          const scenarioMatch = !scenarioQuery || scenarioText.includes(scenarioQuery);
-          const modelMatch = !modelQuery || modelText.includes(modelQuery);
-          return scenarioMatch && modelMatch;
-        });
+      function rowMatchesFilters(row) {
+        const scenario = state.scenarioQuery.trim().toLowerCase();
+        const revision = state.revisionQuery.trim().toLowerCase();
+        const agent = state.agentQuery.trim().toLowerCase();
+        const scenarioText = `${row.scenario || ''} ${row.revision || ''}`.toLowerCase();
+        const agentText = `${row.agent_spec || ''} ${row.model || ''} ${row.harness || ''}`.toLowerCase();
+        const scenarioMatch = !scenario || scenarioText.includes(scenario);
+        const revisionMatch = !revision || String(row.revision || '').toLowerCase().includes(revision);
+        const agentMatch = !agent || agentText.includes(agent);
+        return scenarioMatch && revisionMatch && agentMatch;
       }
 
-      function inlineCompletion(value, suggestions) {
+      function rowsInView() {
+        return scoredRows.filter(rowMatchesFilters);
+      }
+
+      function scenarioMeta(rows) {
+        const first = rows[0];
+        if (!first) return null;
+        const selected = allScenarios.find((item) => item.scenario === first.scenario && item.revision === first.revision);
+        return selected || allScenarios.find((item) => item.scenario === first.scenario) || null;
+      }
+
+      function updateField(input, completion, field, value, list) {
+        input.value = value;
         const query = value.trim().toLowerCase();
-        if (!query) return '';
-        return suggestions.find((suggestion) => {
-          const suggestionLower = suggestion.toLowerCase();
-          return suggestionLower.startsWith(query) && suggestionLower !== query;
-        }) || '';
+        const match = query ? list.find((item) => item.toLowerCase().startsWith(query) && item.toLowerCase() !== query) : '';
+        completion.textContent = match || '';
+        input.dataset.completion = match || '';
+        field.classList.toggle('has-value', Boolean(value));
       }
 
-      function updateCompletion(input, completion, suggestions) {
-        const suggestion = inlineCompletion(input.value, suggestions);
-        completion.textContent = suggestion || '';
-        input.dataset.completion = suggestion;
-        input.closest('.autocomplete-field').classList.toggle('has-value', Boolean(input.value));
-      }
-
-      function matchingOptions(value, suggestions) {
+      function matchingOptions(value, list) {
         const query = value.trim().toLowerCase();
-        return suggestions
-          .filter((suggestion) => !query || suggestion.toLowerCase().includes(query))
-          .slice(0, 12);
+        return list.filter((item) => !query || item.toLowerCase().includes(query)).slice(0, 14);
       }
 
-      function setMenuOpen(field, toggle, isOpen) {
-        field.classList.toggle('is-open', isOpen);
-        toggle.setAttribute('aria-expanded', String(isOpen));
+      function setOpen(field, open) {
+        field.classList.toggle('is-open', open);
+        field.setAttribute('aria-expanded', String(open));
+        const list = field.querySelector('.options-list');
+        if (list) list.hidden = !open;
       }
 
-      function renderOptions(input, optionsNode, suggestions, applyValue) {
-        const options = matchingOptions(input.value, suggestions);
-        optionsNode.replaceChildren();
+      function renderOptions(input, node, list, applyValue) {
+        const options = matchingOptions(input.value, list);
+        node.replaceChildren();
         if (!options.length) {
-          const emptyItem = document.createElement('li');
-          const emptyButton = document.createElement('button');
-          emptyButton.className = 'option-button';
-          emptyButton.type = 'button';
-          emptyButton.disabled = true;
-          emptyButton.textContent = 'No matching options';
-          emptyItem.append(emptyButton);
-          optionsNode.append(emptyItem);
+          node.innerHTML = '<li><button class="option-button" type="button" disabled>No matching options</button></li>';
           return;
         }
         for (const option of options) {
@@ -729,264 +320,153 @@
           const button = document.createElement('button');
           button.className = 'option-button';
           button.type = 'button';
+          button.role = 'option';
           button.textContent = option;
           button.addEventListener('click', () => applyValue(option));
           item.append(button);
-          optionsNode.append(item);
+          node.append(item);
         }
       }
 
-      function syncMenus() {
-        renderOptions(scenarioInput, scenarioOptions, scenarioSuggestions, (value) => {
-          state.scenarioQuery = value;
-          render();
-          setMenuOpen(scenarioField, scenarioToggle, false);
-          scenarioInput.focus();
-        });
-        renderOptions(modelInput, modelOptions, modelSuggestions, (value) => {
-          state.modelQuery = value;
-          render();
-          setMenuOpen(modelField, modelToggle, false);
-          modelInput.focus();
-        });
+      function renderControls() {
+        updateField($('scenarioInput'), $('scenarioCompletion'), $('scenarioField'), state.scenarioQuery, suggestions.scenario);
+        updateField($('revisionInput'), $('revisionCompletion'), $('revisionField'), state.revisionQuery, suggestions.revision);
+        updateField($('agentInput'), $('agentCompletion'), $('agentField'), state.agentQuery, suggestions.agent);
+        renderOptions($('scenarioInput'), $('scenarioOptions'), suggestions.scenario, (value) => { state.scenarioQuery = value; setOpen($('scenarioField'), false); render(); });
+        renderOptions($('revisionInput'), $('revisionOptions'), suggestions.revision, (value) => { state.revisionQuery = value; setOpen($('revisionField'), false); render(); });
+        renderOptions($('agentInput'), $('agentOptions'), suggestions.agent, (value) => { state.agentQuery = value; setOpen($('agentField'), false); render(); });
       }
 
-      function populateControls() {
-        scenarioInput.value = state.scenarioQuery;
-        modelInput.value = state.modelQuery;
-        updateCompletion(scenarioInput, scenarioCompletion, scenarioSuggestions);
-        updateCompletion(modelInput, modelCompletion, modelSuggestions);
-        syncMenus();
+      function renderTabs(rows) {
+        const scenarios = [...new Set(scoredRows.map((row) => row.scenario))].sort();
+        $('scenarioTabs').innerHTML = [''].concat(scenarios).map((scenario) => `<button class="tab ${state.scenarioQuery === scenario ? 'active' : ''}" type="button" data-scenario-tab="${esc(scenario)}">${scenario || 'All scenarios'}</button>`).join('');
+        const revisions = [...new Set(rows.map((row) => row.revision))].sort();
+        $('revisionTabs').innerHTML = [''].concat(revisions).map((revision) => `<button class="tab ${state.revisionQuery === revision ? 'active' : ''}" type="button" data-revision-tab="${esc(revision)}">${revision || 'All revisions'}</button>`).join('');
       }
 
-      function renderMeasures(filtered) {
-        const meanDuration = average(filtered, 'duration_sec');
-        const measures = [
-          ['Composite mean', fmt(average(filtered, 'mean_score'))],
-          ['Quality mean', fmt(average(filtered, 'quality_score'))],
-          ['Gate pass rate', pct(average(filtered, 'performance_pass_rate'))],
-          ['Mean duration', typeof meanDuration === 'number' ? `${fmt(meanDuration, 1)}s` : 'n/a'],
-        ];
-        document.getElementById('measures').innerHTML = measures
-          .map(([label, value]) => `<div class="measure"><span>${label}</span><strong>${value}</strong></div>`)
-          .join('');
+      function renderSummary(rows) {
+        $('datasetMeta').textContent = `${scoredRows.length} scored benchmark artifacts. ${new Set(scoredRows.map((row) => row.scenario)).size} scenarios. Generated ${(data.generated_at || '').slice(0, 10)}.`;
+        $('selectionNote').textContent = rows.length ? `${rows.length} scored artifacts match the current filters.` : 'No scored artifacts match the current filters.';
+        const meta = scenarioMeta(rows);
+        $('scenarioBrief').innerHTML = meta ? `<h3>${esc(meta.scenario)} <span class="mono">${esc(meta.revision)}</span></h3><p class="meta">${esc(meta.description || 'No scenario description found.')}</p><div class="badge-row"><span class="badge">${esc(meta.category || 'unknown category')}</span><span class="badge">${esc(meta.difficulty || 'unknown difficulty')}</span><span class="badge">${meta.timeout_sec ?? 'n/a'}s timeout</span><span class="badge">${meta.metrics?.length ?? 0} metrics</span><span class="badge">${meta.quality_gates?.length ?? 0} gates</span><span class="badge">${meta.deterministic_checks ?? 0} deterministic checks</span>${meta.visual_reference ? '<span class="badge">visual baseline</span>' : ''}</div>` : '<div class="empty">Select a scenario to inspect the contract metadata.</div>';
+        const acceptable = rows.filter(rowPasses);
+        const bestOverall = best(rows, (a, b) => b.decision_score - a.decision_score || b.mean_score - a.mean_score);
+        const reliable = best(rows, (a, b) => (b.valid_rate - a.valid_rate) || (b.performance_pass_rate - a.performance_pass_rate) || (b.sample_adequacy - a.sample_adequacy));
+        const fastest = best(acceptable.length ? acceptable : rows, (a, b) => (a.duration_sec - b.duration_sec) || b.mean_score - a.mean_score);
+        const value = best(rows, (a, b) => ((b.mean_score || 0) / Math.max(b.uncached_input_tokens || 1, 1)) - ((a.mean_score || 0) / Math.max(a.uncached_input_tokens || 1, 1)));
+        const card = (label, row, detail) => `<div class="decision"><span>${label}</span><strong>${row ? esc(row.agent_spec) : 'n/a'}</strong><p>${row ? detail(row) : 'No scored artifacts in view.'}</p></div>`;
+        $('decisionStrip').innerHTML = [
+          card('Best AgentSpec', bestOverall, (row) => `decision ${fmt(row.decision_score)} · score ${fmt(row.mean_score)} · sample ${pct(row.sample_adequacy)}`),
+          card('Most reliable', reliable, (row) => `valid ${pct(row.valid_rate)} · gates ${pct(row.performance_pass_rate)} · runs ${row.run_count_scored}/${row.run_count_total}`),
+          card('Fastest acceptable', fastest, (row) => `${fmt(row.duration_sec, 1)}s · score ${fmt(row.mean_score)} · gates ${pct(row.performance_pass_rate)}`),
+          card('Best value', value, (row) => `${compact(row.uncached_input_tokens)} tokens · score ${fmt(row.mean_score)} · ${fmt((row.mean_score || 0) / Math.max(row.uncached_input_tokens || 1, 1) * 100000, 2)} per 100K`),
+        ].join('');
+        const health = rows.filter((row) => row.valid_rate < 1 || row.performance_pass_rate < 1 || row.unscored_count > 0).length;
+        $('measureGrid').innerHTML = [
+          ['Mean score', fmt(avg(rows, 'mean_score'))], ['Mean quality', fmt(avg(rows, 'quality_score'))], ['Gate pass', pct(avg(rows, 'performance_pass_rate'))], ['Valid rate', pct(avg(rows, 'valid_rate'))], ['Mean duration', `${fmt(avg(rows, 'duration_sec'), 1)}s`], ['Attention', String(health)],
+        ].map(([label, value]) => `<div class="measure"><span>${label}</span><strong>${value}</strong></div>`).join('');
       }
 
-      function scale(value, domainMin, domainMax, rangeMin, rangeMax) {
-        if (domainMax === domainMin) return (rangeMin + rangeMax) / 2;
-        return rangeMin + ((value - domainMin) / (domainMax - domainMin)) * (rangeMax - rangeMin);
+      function renderLeaderboard(rows) {
+        const sorted = rows.slice().sort(typeof rows[0]?.[state.sort] === 'string' ? textSort(state.sort, state.sortDir) : numericSort(state.sort, state.sortDir));
+        $('leaderRows').innerHTML = sorted.map((row, index) => `<tr><td data-label="Compare"><input type="checkbox" data-compare="${esc(rowKey(row))}" ${state.selected.has(rowKey(row)) ? 'checked' : ''} /></td><td data-label="Rank">${index + 1}</td><td data-label="AgentSpec"><strong>${esc(row.agent_spec)}</strong><div class="mono">${esc(row.scenario)} · ${esc(row.revision)}</div></td><td class="numeric" data-label="Decision">${fmt(row.decision_score)}</td><td class="numeric" data-label="Score">${fmt(row.mean_score)}</td><td class="numeric" data-label="Valid">${pct(row.valid_rate)}</td><td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td><td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td><td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td><td class="numeric" data-label="Sample">${pct(row.sample_adequacy)}</td></tr>`).join('') || '<tr><td colspan="10"><div class="empty">No leaderboard rows match the current filters.</div></td></tr>';
+        const selectedRows = scoredRows.filter((row) => state.selected.has(rowKey(row)));
+        $('compareDrawer').classList.toggle('active', selectedRows.length > 0);
+        $('compareDrawer').innerHTML = selectedRows.length ? `<h3>Compare selected AgentSpecs</h3><div class="table-wrap"><table><thead><tr><th>AgentSpec</th><th class="numeric">Score</th><th class="numeric">Valid</th><th class="numeric">Gates</th><th class="numeric">Duration</th><th class="numeric">Tokens</th><th>Evidence</th></tr></thead><tbody>${selectedRows.slice(0, 4).map((row) => `<tr><td>${esc(row.agent_spec)}<div class="mono">${esc(row.scenario)} ${esc(row.revision)}</div></td><td class="numeric">${fmt(row.mean_score)}</td><td class="numeric">${pct(row.valid_rate)}</td><td class="numeric">${pct(row.performance_pass_rate)}</td><td class="numeric">${fmt(row.duration_sec, 1)}s</td><td class="numeric">${compact(row.uncached_input_tokens)}</td><td><span class="evidence-path mono">${esc(row.artifact_paths?.summary || row.artifact_paths?.root)}</span></td></tr>`).join('')}</tbody></table></div>` : '';
       }
 
-      function renderScatter(filtered) {
-        if (!filtered.length) {
-          scatter.innerHTML = '<div class="empty">No scored runs match the current filters.</div>';
-          return;
-        }
-        const width = 680;
-        const height = 300;
-        const pad = { top: 20, right: 22, bottom: 42, left: 50 };
-        const durations = filtered.map((row) => row.duration_sec).filter((value) => typeof value === 'number');
-        const scores = filtered.map((row) => row.mean_score).filter((value) => typeof value === 'number');
-        const minDuration = Math.min(...durations);
-        const maxDuration = Math.max(...durations);
-        const minScore = Math.max(0, Math.min(...scores) - 0.03);
-        const maxScore = Math.min(1, Math.max(...scores) + 0.03);
-        const points = filtered.map((row) => {
-          const x = scale(row.duration_sec, minDuration, maxDuration, pad.left, width - pad.right);
-          const y = scale(row.mean_score, minScore, maxScore, height - pad.bottom, pad.top);
-          const cls = row.mean_score < 0.7 ? 'low' : row.mean_score < 0.9 ? 'medium' : '';
-          return `<circle class="point ${cls}" cx="${x}" cy="${y}" r="5"><title>${row.scenario} ${row.revision} ${row.model}: ${fmt(row.mean_score)} / ${fmt(row.duration_sec, 1)}s</title></circle>`;
-        }).join('');
-        scatter.innerHTML = `
-          <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Composite score plotted against duration">
-            <line class="grid-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" />
-            <line class="grid-line" x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" />
-            <text class="chart-label" x="${pad.left}" y="${height - 12}">${fmt(minDuration, 0)}s</text>
-            <text class="chart-label" text-anchor="end" x="${width - pad.right}" y="${height - 12}">${fmt(maxDuration, 0)}s</text>
-            <text class="chart-label" x="6" y="${height - pad.bottom}">${fmt(minScore)}</text>
-            <text class="chart-label" x="6" y="${pad.top + 4}">${fmt(maxScore)}</text>
-            ${points}
-          </svg>`;
+      function scale(value, domainMin, domainMax, rangeMin, rangeMax) { return domainMax === domainMin ? (rangeMin + rangeMax) / 2 : rangeMin + ((value - domainMin) / (domainMax - domainMin)) * (rangeMax - rangeMin); }
+
+      function renderScatter(rows) {
+        if (!rows.length) { $('scatter').innerHTML = '<div class="empty">No scored runs match the current filters.</div>'; return; }
+        const width = 720, height = 320, pad = { top: 22, right: 30, bottom: 48, left: 54 };
+        const durations = rows.map((row) => row.duration_sec).filter(Number.isFinite);
+        const scores = rows.map((row) => row.mean_score).filter(Number.isFinite);
+        const minDuration = Math.min(...durations), maxDuration = Math.max(...durations), minScore = Math.max(0, Math.min(...scores) - 0.03), maxScore = Math.min(1, Math.max(...scores) + 0.03);
+        const topRows = rows.slice().sort((a, b) => b.decision_score - a.decision_score).slice(0, 3);
+        const labels = new Set(topRows.map(rowKey));
+        const thresholdY = scale(0.9, minScore, maxScore, height - pad.bottom, pad.top);
+        const points = rows.map((row) => { const x = scale(row.duration_sec, minDuration, maxDuration, pad.left, width - pad.right); const y = scale(row.mean_score, minScore, maxScore, height - pad.bottom, pad.top); const cls = row.mean_score < 0.7 ? 'low' : row.mean_score < 0.9 ? 'medium' : ''; return `<g><circle class="point ${cls} ${state.selected.has(rowKey(row)) ? 'selected' : ''}" data-point="${esc(rowKey(row))}" cx="${x}" cy="${y}" r="5"><title>${esc(row.agent_spec)}: ${fmt(row.mean_score)} / ${fmt(row.duration_sec, 1)}s</title></circle>${labels.has(rowKey(row)) ? `<text class="chart-label" x="${Math.min(width - 160, x + 8)}" y="${Math.max(18, y - 8)}">${esc(row.model.slice(0, 26))}</text>` : ''}</g>`; }).join('');
+        $('scatter').innerHTML = `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Composite score plotted against duration"><line class="grid-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" /><line class="grid-line" x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" /><line class="threshold" x1="${pad.left}" y1="${thresholdY}" x2="${width - pad.right}" y2="${thresholdY}" /><text class="chart-label" x="${pad.left}" y="${height - 14}">${fmt(minDuration, 0)}s</text><text class="chart-label" text-anchor="end" x="${width - pad.right}" y="${height - 14}">${fmt(maxDuration, 0)}s</text><text class="chart-label" x="6" y="${height - pad.bottom}">${fmt(minScore)}</text><text class="chart-label" x="6" y="${pad.top + 4}">${fmt(maxScore)}</text><text class="chart-label" x="${width - 164}" y="${thresholdY - 6}">0.900 score threshold</text>${points}</svg>`;
       }
 
-      function selectedChain(filtered) {
+      function renderTrajectory(rows) {
+        const scenario = state.scenarioQuery || rows[0]?.scenario || '';
+        const candidates = scoredRows.filter((row) => !scenario || row.scenario === scenario || `${row.scenario} ${row.revision}`.toLowerCase().includes(scenario.toLowerCase()));
         const groups = new Map();
-        for (const row of filtered) {
-          const key = `${row.scenario}::${row.model}`;
-          if (!groups.has(key)) groups.set(key, []);
-          groups.get(key).push(row);
-        }
-
-        const latestByRevision = (group) => {
-          const revisions = new Map();
-          for (const row of group) {
-            const current = revisions.get(row.revision);
-            if (!current || latestTime(row) > latestTime(current)) {
-              revisions.set(row.revision, row);
-            }
-          }
-          return [...revisions.values()].sort((a, b) => String(a.revision).localeCompare(String(b.revision)));
-        };
-
-        return [...groups.values()]
-          .map(latestByRevision)
-          .filter((group) => group.length > 1)
-          .sort((a, b) => (b.length - a.length) || (latestTime(b[b.length - 1]) - latestTime(a[a.length - 1])))[0] || [];
+        for (const row of candidates) { const key = `${row.scenario}:${row.agent_spec}`; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(row); }
+        const chains = [...groups.values()].map((group) => [...new Map(group.sort((a, b) => latestTime(b) - latestTime(a)).map((row) => [row.revision, row])).values()].sort((a, b) => a.revision.localeCompare(b.revision))).filter((group) => group.length > 1).sort((a, b) => b.length - a.length || b.at(-1).mean_score - a.at(-1).mean_score).slice(0, 8);
+        if (!chains.length) { $('trajectory').innerHTML = '<div class="empty">No multi-revision AgentSpec chain in the current scenario.</div>'; return; }
+        $('trajectoryNote').textContent = `${chains.length} comparable multi-revision AgentSpec chain${chains.length === 1 ? '' : 's'}.`;
+        $('trajectory').innerHTML = `<div class="timeline">${chains.map((chain) => { const first = chain[0], last = chain.at(-1); const delta = last.mean_score - first.mean_score; return `<div class="timeline-row"><div><strong>${esc(first.agent_spec)}</strong><div class="mono">${esc(first.scenario)}</div></div><div class="revision-cells">${chain.map((row) => `<div class="revision-cell"><span class="mono">${esc(row.revision)}</span><span class="bar-track"><span class="bar" style="width:${Math.round((row.mean_score || 0) * 100)}%"></span></span><span class="numeric mono">${fmt(row.mean_score)}</span></div>`).join('')}</div><div class="${delta > 0 ? 'good' : delta < 0 ? 'bad' : 'flat'}">${delta >= 0 ? '+' : ''}${fmt(delta)}</div></div>`; }).join('')}</div>`;
       }
 
-      function renderTrajectory(filtered) {
-        const chain = selectedChain(filtered);
-        if (chain.length < 2) {
-          trajectoryNote.textContent = 'Select a scenario/model with multiple revisions.';
-          trajectory.innerHTML = '<div class="empty">Select a scenario/model with multiple revisions to see a trajectory.</div>';
-          return;
-        }
-        trajectoryNote.textContent = `${chain[0].scenario} · ${chain[0].model}`;
-        const width = 480;
-        const height = 300;
-        const pad = { top: 20, right: 20, bottom: 44, left: 46 };
-        const minScore = Math.max(0, Math.min(...chain.map((row) => row.mean_score)) - 0.01);
-        const maxScore = Math.min(1, Math.max(...chain.map((row) => row.mean_score)) + 0.01);
-        const coords = chain.map((row, index) => ({
-          row,
-          x: scale(index, 0, chain.length - 1, pad.left, width - pad.right),
-          y: scale(row.mean_score, minScore, maxScore, height - pad.bottom, pad.top),
-        }));
-        const path = coords.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x} ${point.y}`).join(' ');
-        trajectory.innerHTML = `
-          <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Revision score trajectory">
-            <line class="grid-line" x1="${pad.left}" y1="${pad.top}" x2="${pad.left}" y2="${height - pad.bottom}" />
-            <line class="grid-line" x1="${pad.left}" y1="${height - pad.bottom}" x2="${width - pad.right}" y2="${height - pad.bottom}" />
-            <path class="line" d="${path}" />
-            ${coords.map((point) => `<circle class="point" cx="${point.x}" cy="${point.y}" r="5"><title>${point.row.revision}: ${fmt(point.row.mean_score)}</title></circle>`).join('')}
-            ${coords.map((point) => `<text class="chart-label" text-anchor="middle" x="${point.x}" y="${height - 16}">${point.row.revision}</text>`).join('')}
-            <text class="chart-label" x="6" y="${height - pad.bottom}">${fmt(minScore)}</text>
-            <text class="chart-label" x="6" y="${pad.top + 4}">${fmt(maxScore)}</text>
-          </svg>`;
+      function renderDeltas(rows) {
+        const keys = new Set(rows.map((row) => `${row.scenario}:${row.model}`));
+        const visible = allDeltas.filter((delta) => keys.has(delta.key) || rows.some((row) => row.scenario === delta.scenario)).sort((a, b) => Number(b.first_to_last) - Number(a.first_to_last) || Math.abs(b.delta) - Math.abs(a.delta)).slice(0, 10);
+        $('deltaList').innerHTML = visible.length ? visible.map((delta) => `<div class="compact-row"><div><h3>${esc(delta.scenario)} <span class="mono">${esc(delta.from_revision)}→${esc(delta.to_revision)}</span></h3><p>${esc(delta.agent_spec || delta.model)} · ${delta.first_to_last ? 'first-to-last' : 'adjacent'} · duration ${delta.duration_delta >= 0 ? '+' : ''}${fmt(delta.duration_delta, 1)}s · tokens ${delta.token_delta >= 0 ? '+' : ''}${compact(delta.token_delta)}</p></div><div class="${delta.delta > 0 ? 'good' : delta.delta < 0 ? 'bad' : 'flat'}">${delta.delta >= 0 ? '+' : ''}${fmt(delta.delta)}</div></div>`).join('') : '<div class="empty">No revision deltas in the current selection.</div>';
       }
 
-      function deltaClass(value) {
-        if (value > 0.0005) return 'delta-good';
-        if (value < -0.0005) return 'delta-bad';
-        return 'delta-flat';
+      function renderRisks(rows) {
+        const clusters = [
+          ['Invalid', rows.filter((row) => row.valid_rate < 1)], ['Gate unstable', rows.filter((row) => row.performance_pass_rate < 1)], ['Unscored', allRows.filter((row) => (row.unscored_count ?? 0) > 0 && rowMatchesFilters(row))], ['Sparse sample', rows.filter((row) => (row.sample_adequacy ?? 0) < 1)], ['Slow', rows.filter((row) => (row.duration_sec ?? 0) > avg(rows, 'duration_sec') * 1.4)], ['Token heavy', rows.filter((row) => (row.uncached_input_tokens ?? 0) > avg(rows, 'uncached_input_tokens') * 1.3)],
+        ];
+        $('riskList').innerHTML = `<div class="cluster-grid">${clusters.map(([label, items]) => `<div class="cluster"><span class="subtle">${label}</span><strong>${items.length}</strong><p class="meta">${items.slice(0, 2).map((row) => row.model || row.agent_spec).join(', ') || 'No rows'}</p></div>`).join('')}</div>`;
       }
 
-      function renderDeltas(filtered) {
-        const keys = new Set(filtered.map((row) => `${row.scenario}:${row.model}`));
-        const visible = deltas.filter((delta) => keys.has(delta.key)).slice(-8).reverse();
-        if (!visible.length) {
-          deltaList.innerHTML = '<div class="empty">No adjacent revision pairs in the current selection.</div>';
-          return;
-        }
-        deltaList.innerHTML = visible.map((delta) => `
-          <div class="compact-row">
-            <div>
-              <h3>${delta.scenario} <span class="mono">${delta.from_revision}→${delta.to_revision}</span></h3>
-              <p>${delta.model}</p>
-            </div>
-            <div class="${deltaClass(delta.delta)}">${delta.delta >= 0 ? '+' : ''}${fmt(delta.delta)}</div>
-          </div>`).join('');
+      function renderDiff(rows) {
+        const scenario = state.scenarioQuery || rows[0]?.scenario;
+        const visible = scenarioDiffs.filter((diff) => !scenario || diff.scenario === scenario || diff.scenario.includes(scenario));
+        if (!state.diffKey && visible.length) state.diffKey = visible[0].key;
+        const active = visible.find((diff) => diff.key === state.diffKey) || visible[0];
+        $('diffTabs').innerHTML = visible.map((diff) => `<button class="tab ${active?.key === diff.key ? 'active' : ''}" type="button" data-diff-key="${esc(diff.key)}">${esc(diff.from_revision)}→${esc(diff.to_revision)}</button>`).join('');
+        if (!active) { $('diffBody').innerHTML = '<div class="empty">No adjacent scenario revision diff is available for this selection.</div>'; return; }
+        const file = active.files[state.diffFile] || active.files.prompt;
+        $('diffNote').textContent = `${active.scenario} ${active.from_revision} to ${active.to_revision}. ${active.summary.join(', ')}.`;
+        $('diffBody').innerHTML = `<div class="badge-row">${active.summary.map((item) => `<span class="badge ${active.comparable_warnings.includes(item) ? 'attention' : ''}">${esc(item)}</span>`).join('')}</div><div class="diff-tabs"><button class="ghost-button ${state.diffFile === 'prompt' ? 'active' : ''}" data-diff-file="prompt">Prompt</button><button class="ghost-button ${state.diffFile === 'scenario' ? 'active' : ''}" data-diff-file="scenario">Scenario YAML</button></div><p class="meta mono">${esc(file.path || '')} · +${file.diff.added} / -${file.diff.removed}${file.diff.truncated ? ' · truncated' : ''}</p><div class="diff-view">${file.diff.lines.map((line) => `<div class="diff-line ${line.type}"><span>${line.type === 'added' ? '+' : line.type === 'removed' ? '-' : ' '}</span><code>${esc(line.text)}</code></div>`).join('')}</div>`;
       }
 
-      function renderRisks(filtered) {
-        const risks = filtered
-          .filter((row) => row.valid_rate < 1 || row.performance_pass_rate < 1 || row.unscored_count > 0)
-          .sort((a, b) => (a.valid_rate - b.valid_rate) || (a.performance_pass_rate - b.performance_pass_rate))
-          .slice(0, 8);
-        if (!risks.length) {
-          riskList.innerHTML = '<div class="empty">No invalid, unscored, or gate-unstable scored runs in view.</div>';
-          return;
-        }
-        riskList.innerHTML = risks.map((row) => `
-          <div class="compact-row">
-            <div>
-              <h3>${row.scenario} <span class="mono">${row.revision}</span></h3>
-              <p>${row.model}</p>
-            </div>
-            <div class="status">valid ${pct(row.valid_rate)} / gates ${pct(row.performance_pass_rate)}</div>
-          </div>`).join('');
+      function renderMetricBreakdown(rows) {
+        const row = best(rows, (a, b) => b.decision_score - a.decision_score);
+        if (!row) { $('metricBreakdown').innerHTML = '<div class="empty">No row selected for metric breakdown.</div>'; return; }
+        const outcomes = Object.entries(row.metric_outcomes || {});
+        $('metricBreakdown').innerHTML = `<h3>${esc(row.agent_spec)}</h3><p class="meta">${esc(row.scenario)} ${esc(row.revision)} · score ${fmt(row.mean_score)} · diagnostic ${fmt(row.diagnostic_score)}</p>${outcomes.length ? `<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="numeric">Pass</th><th class="numeric">Fail</th><th class="numeric">Rate</th></tr></thead><tbody>${outcomes.map(([metric, outcome]) => `<tr><td>${esc(metric)}</td><td class="numeric">${outcome.pass_count ?? 'n/a'}</td><td class="numeric">${outcome.fail_count ?? 'n/a'}</td><td class="numeric">${pct(outcome.pass_rate)}</td></tr>`).join('')}</tbody></table></div>` : `<div class="empty">No metric outcome table was emitted for this artifact. Metrics in profile: ${(row.metrics || []).map(esc).join(', ') || 'n/a'}.</div>`}`;
       }
 
-      function renderRows(filtered) {
-        runRows.innerHTML = filtered
-          .slice()
-          .sort((a, b) => latestTime(b) - latestTime(a))
-          .map((row) => `
-            <tr>
-              <td data-label="Scenario">${row.scenario}</td>
-              <td class="mono" data-label="Rev">${row.revision}</td>
-              <td data-label="Model">${row.model}</td>
-              <td class="numeric" data-label="Score">${fmt(row.mean_score)}</td>
-              <td class="numeric" data-label="Quality">${fmt(row.quality_score)}</td>
-              <td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td>
-              <td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td>
-              <td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td>
-              <td class="numeric" data-label="Runs">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td>
-            </tr>`).join('');
+      function renderEvidence(rows) {
+        const top = rows.slice().sort((a, b) => b.decision_score - a.decision_score).slice(0, 8);
+        $('evidenceList').innerHTML = top.length ? top.map((row) => `<div class="compact-row"><div><h3>${esc(row.agent_spec)}</h3><p>${esc(row.scenario)} ${esc(row.revision)} · run ${esc(row.run_id)}</p><span class="evidence-path mono">${esc(row.artifact_paths?.summary || '')}</span><span class="evidence-path mono">${esc(row.artifact_paths?.experiment || '')}</span><span class="evidence-path mono">${esc(row.artifact_paths?.report || row.artifact_paths?.root || '')}</span></div><div class="status">${fmt(row.mean_score)}</div></div>`).join('') : '<div class="empty">No evidence paths match the current filters.</div>';
+      }
+
+      function renderRuns(rows) {
+        const sorted = rows.slice().sort(typeof rows[0]?.[state.runSort] === 'string' ? textSort(state.runSort, state.runSortDir) : numericSort(state.runSort, state.runSortDir));
+        $('runRows').innerHTML = sorted.map((row) => `<tr><td data-label="Scenario">${esc(row.scenario)}</td><td data-label="Rev" class="mono">${esc(row.revision)}</td><td data-label="AgentSpec">${esc(row.agent_spec)}</td><td class="numeric" data-label="Score">${fmt(row.mean_score)}</td><td class="numeric" data-label="Quality">${fmt(row.quality_score)}</td><td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td><td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td><td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td><td class="numeric" data-label="Runs">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td></tr>`).join('') || '<tr><td colspan="9"><div class="empty">No runs match the current filters.</div></td></tr>';
       }
 
       function render() {
-        populateControls();
-        const filtered = applyFilters();
-        datasetMeta.textContent = `${rows.length} scored benchmark artifacts. ${new Set(rows.map((row) => row.scenario)).size} scenarios. Generated ${dateLabel(data.generated_at)}.`;
-        selectionNote.textContent = filtered.length
-          ? `${filtered.length} scored artifacts match the current filters.`
-          : 'No scored artifacts match the current filters.';
-        renderMeasures(filtered);
-        renderScatter(filtered);
-        renderTrajectory(filtered);
-        renderDeltas(filtered);
-        renderRisks(filtered);
-        renderRows(filtered);
+        renderControls();
+        const rows = rowsInView();
+        renderTabs(rows); renderSummary(rows); renderLeaderboard(rows); renderScatter(rows); renderTrajectory(rows); renderDeltas(rows); renderRisks(rows); renderDiff(rows); renderMetricBreakdown(rows); renderEvidence(rows); renderRuns(rows);
       }
 
-      scenarioInput.addEventListener('input', (event) => {
-        state.scenarioQuery = event.target.value;
-        setMenuOpen(scenarioField, scenarioToggle, true);
-        render();
-      });
-      modelInput.addEventListener('input', (event) => {
-        state.modelQuery = event.target.value;
-        setMenuOpen(modelField, modelToggle, true);
-        render();
-      });
-      scenarioInput.addEventListener('keydown', (event) => {
-        if (event.key !== 'Tab' || !scenarioInput.dataset.completion) return;
-        event.preventDefault();
-        state.scenarioQuery = scenarioInput.dataset.completion;
-        render();
-      });
-      modelInput.addEventListener('keydown', (event) => {
-        if (event.key !== 'Tab' || !modelInput.dataset.completion) return;
-        event.preventDefault();
-        state.modelQuery = modelInput.dataset.completion;
-        render();
-      });
-      scenarioClear.addEventListener('click', () => {
-        state.scenarioQuery = '';
-        render();
-        scenarioInput.focus();
-      });
-      modelClear.addEventListener('click', () => {
-        state.modelQuery = '';
-        render();
-        modelInput.focus();
-      });
-      scenarioToggle.addEventListener('click', () => {
-        const willOpen = !scenarioField.classList.contains('is-open');
-        setMenuOpen(modelField, modelToggle, false);
-        setMenuOpen(scenarioField, scenarioToggle, willOpen);
-        scenarioInput.focus();
-      });
-      modelToggle.addEventListener('click', () => {
-        const willOpen = !modelField.classList.contains('is-open');
-        setMenuOpen(scenarioField, scenarioToggle, false);
-        setMenuOpen(modelField, modelToggle, willOpen);
-        modelInput.focus();
-      });
+      function bindField(name, stateKey) {
+        const input = $(`${name}Input`), field = $(`${name}Field`), clear = $(`${name}Clear`), toggle = $(`${name}Toggle`);
+        input.addEventListener('input', (event) => { state[stateKey] = event.target.value; setOpen(field, true); render(); });
+        input.addEventListener('keydown', (event) => { if (event.key === 'Escape') setOpen(field, false); if (event.key === 'Tab' && input.dataset.completion) { event.preventDefault(); state[stateKey] = input.dataset.completion; setOpen(field, false); render(); } if (event.key === 'Enter' && input.dataset.completion) { event.preventDefault(); state[stateKey] = input.dataset.completion; setOpen(field, false); render(); } });
+        clear.addEventListener('click', () => { state[stateKey] = ''; setOpen(field, false); render(); input.focus(); });
+        toggle.addEventListener('click', (event) => { event.stopPropagation(); setOpen($('scenarioField'), false); setOpen($('revisionField'), false); setOpen($('agentField'), false); setOpen(field, !field.classList.contains('is-open')); input.focus(); });
+      }
+      bindField('scenario', 'scenarioQuery'); bindField('revision', 'revisionQuery'); bindField('agent', 'agentQuery');
+      document.addEventListener('click', (event) => { for (const name of ['scenario', 'revision', 'agent']) if (!$(`${name}Field`).contains(event.target)) setOpen($(`${name}Field`), false); });
       document.addEventListener('click', (event) => {
-        if (!scenarioField.contains(event.target)) setMenuOpen(scenarioField, scenarioToggle, false);
-        if (!modelField.contains(event.target)) setMenuOpen(modelField, modelToggle, false);
+        const scenario = event.target.closest('[data-scenario-tab]'); if (scenario) { state.scenarioQuery = scenario.dataset.scenarioTab; state.diffKey = null; render(); }
+        const revision = event.target.closest('[data-revision-tab]'); if (revision) { state.revisionQuery = revision.dataset.revisionTab; render(); }
+        const sort = event.target.closest('[data-sort]'); if (sort) { const key = sort.dataset.sort; const lowerIsBetter = ['duration_sec', 'uncached_input_tokens'].includes(key); state.sortDir = state.sort === key ? state.sortDir * -1 : (lowerIsBetter ? 1 : -1); state.sort = key; render(); }
+        const runSort = event.target.closest('[data-run-sort]'); if (runSort) { const key = runSort.dataset.runSort; const lowerIsBetter = ['duration_sec', 'uncached_input_tokens'].includes(key); state.runSortDir = state.runSort === key ? state.runSortDir * -1 : (lowerIsBetter ? 1 : -1); state.runSort = key; render(); }
+        const diff = event.target.closest('[data-diff-key]'); if (diff) { state.diffKey = diff.dataset.diffKey; render(); }
+        const diffFile = event.target.closest('[data-diff-file]'); if (diffFile) { state.diffFile = diffFile.dataset.diffFile; render(); }
+        const compare = event.target.closest('[data-compare]'); if (compare) { compare.checked ? state.selected.add(compare.dataset.compare) : state.selected.delete(compare.dataset.compare); render(); }
+        const point = event.target.closest('[data-point]'); if (point) { state.selected.has(point.dataset.point) ? state.selected.delete(point.dataset.point) : state.selected.add(point.dataset.point); render(); }
       });
       render();
     </script>

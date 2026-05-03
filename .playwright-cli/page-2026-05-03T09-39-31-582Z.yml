@@ -1,0 +1,458 @@
+- main [ref=e2]:
+  - generic [ref=e3]:
+    - generic [ref=e4]:
+      - heading "Benchmark review" [level=1] [ref=e5]
+      - paragraph [ref=e6]: 45 scored benchmark artifacts. 3 scenarios. Generated 2026-05-03.
+    - generic "Benchmark filters" [ref=e7]:
+      - generic [ref=e8]:
+        - generic [ref=e9]: Scenario
+        - combobox [ref=e10]:
+          - textbox "Scenario filter" [ref=e11]:
+            - /placeholder: All scenarios
+            - text: skill-benchmark-coding-test
+          - button "Clear scenario filter" [ref=e1585] [cursor=pointer]: x
+          - button "Show scenario options" [ref=e12] [cursor=pointer]: v
+      - generic [ref=e13]:
+        - generic [ref=e14]: Revision
+        - combobox [ref=e15]:
+          - textbox "Revision filter" [ref=e16]:
+            - /placeholder: All revisions
+          - button "Show revision options" [ref=e17] [cursor=pointer]: v
+      - generic [ref=e18]:
+        - generic [ref=e19]: AgentSpec
+        - combobox [ref=e20]:
+          - textbox "AgentSpec filter" [ref=e21]:
+            - /placeholder: All harnesses and models
+          - button "Show AgentSpec options" [ref=e22] [cursor=pointer]: v
+    - navigation "Review sections" [ref=e23]:
+      - link "Decision summary" [ref=e24] [cursor=pointer]:
+        - /url: "#decisionTitle"
+      - link "AgentSpec leaderboard" [ref=e25] [cursor=pointer]:
+        - /url: "#leaderboardTitle"
+      - link "Revision trajectory" [ref=e26] [cursor=pointer]:
+        - /url: "#trajectoryTitle"
+      - link "Scenario diff" [ref=e27] [cursor=pointer]:
+        - /url: "#diffTitle"
+      - link "Evidence paths" [ref=e28] [cursor=pointer]:
+        - /url: "#evidenceTitle"
+  - generic [ref=e29]:
+    - region "Decision summary" [ref=e30]:
+      - generic [ref=e31]:
+        - generic [ref=e32]:
+          - heading "Decision summary" [level=2] [ref=e33]
+          - paragraph [ref=e34]: 3 scored artifacts match the current filters.
+        - generic [ref=e35]:
+          - button "All scenarios" [ref=e1586] [cursor=pointer]
+          - button "hello-world-smoke" [ref=e1587] [cursor=pointer]
+          - button "homepage-implementation" [ref=e1588] [cursor=pointer]
+          - button "skill-benchmark-coding-test" [ref=e1589] [cursor=pointer]
+      - generic [ref=e40]:
+        - heading "skill-benchmark-coding-test v001" [level=3] [ref=e1590]
+        - paragraph [ref=e1591]: Baseline TypeScript utility benchmark with explicit delivery-quality scoring
+        - generic [ref=e1592]:
+          - generic [ref=e1593]: greenfield-code
+          - generic [ref=e1594]: medium
+          - generic [ref=e1595]: 1800s timeout
+          - generic [ref=e1596]: 9 metrics
+          - generic [ref=e1597]: 4 gates
+          - generic [ref=e1598]: 7 deterministic checks
+      - generic [ref=e51]:
+        - generic [ref=e1599]:
+          - generic [ref=e1600]: Best AgentSpec
+          - strong [ref=e1601]: codex-cli · gpt-5.4-mini
+          - paragraph [ref=e1602]: decision 0.947 · score 0.998 · sample 60%
+        - generic [ref=e1603]:
+          - generic [ref=e1604]: Most reliable
+          - strong [ref=e1605]: codex-cli · gpt-5.4-mini
+          - paragraph [ref=e1606]: valid 100% · gates 100% · runs 3/3
+        - generic [ref=e1607]:
+          - generic [ref=e1608]: Fastest acceptable
+          - strong [ref=e1609]: codex-cli · gpt-5.4-mini
+          - paragraph [ref=e1610]: 83.4s · score 0.998 · gates 100%
+        - generic [ref=e1611]:
+          - generic [ref=e1612]: Best value
+          - strong [ref=e1613]: codex-cli · gpt-5.4-mini
+          - paragraph [ref=e1614]: 13K tokens · score 0.998 · 7.76 per 100K
+      - generic [ref=e68]:
+        - generic [ref=e1615]:
+          - generic [ref=e1616]: Mean score
+          - strong [ref=e1617]: "0.996"
+        - generic [ref=e1618]:
+          - generic [ref=e1619]: Mean quality
+          - strong [ref=e1620]: "0.990"
+        - generic [ref=e1621]:
+          - generic [ref=e1622]: Gate pass
+          - strong [ref=e1623]: 78%
+        - generic [ref=e1624]:
+          - generic [ref=e1625]: Valid rate
+          - strong [ref=e1626]: 100%
+        - generic [ref=e1627]:
+          - generic [ref=e1628]: Mean duration
+          - strong [ref=e1629]: 89.0s
+        - generic [ref=e1630]:
+          - generic [ref=e1631]: Attention
+          - strong [ref=e1632]: "1"
+    - region "AgentSpec leaderboard" [ref=e87]:
+      - generic [ref=e88]:
+        - generic [ref=e89]:
+          - heading "AgentSpec leaderboard" [level=2] [ref=e90]
+          - paragraph [ref=e91]: Ranked by score, validity, gate stability, sample confidence, and efficiency.
+        - generic [ref=e92]:
+          - button "All revisions" [ref=e1633] [cursor=pointer]
+          - button "v001" [ref=e1634] [cursor=pointer]
+          - button "v002" [ref=e1635] [cursor=pointer]
+          - button "v003" [ref=e1636] [cursor=pointer]
+      - table [ref=e99]:
+        - rowgroup [ref=e100]:
+          - row "Cmp Rank AgentSpec Decision Score Valid Gates Duration Tokens Sample" [ref=e101]:
+            - columnheader "Cmp" [ref=e102]
+            - columnheader "Rank" [ref=e103]
+            - columnheader "AgentSpec" [ref=e104]:
+              - button "AgentSpec" [ref=e105] [cursor=pointer]
+            - columnheader "Decision" [ref=e106]:
+              - button "Decision" [ref=e107] [cursor=pointer]
+            - columnheader "Score" [ref=e108]:
+              - button "Score" [ref=e109] [cursor=pointer]
+            - columnheader "Valid" [ref=e110]:
+              - button "Valid" [ref=e111] [cursor=pointer]
+            - columnheader "Gates" [ref=e112]:
+              - button "Gates" [ref=e113] [cursor=pointer]
+            - columnheader "Duration" [ref=e114]:
+              - button "Duration" [ref=e115] [cursor=pointer]
+            - columnheader "Tokens" [ref=e116]:
+              - button "Tokens" [ref=e117] [cursor=pointer]
+            - columnheader "Sample" [ref=e118]:
+              - button "Sample" [ref=e119] [cursor=pointer]
+        - rowgroup [ref=e120]:
+          - row "1 codex-cli · gpt-5.4-mini skill-benchmark-coding-test · v003 0.947 0.998 100% 100% 83.4s 13K 60%" [ref=e1637]:
+            - cell [ref=e1638]:
+              - checkbox [ref=e1639]
+            - cell "1" [ref=e1640]
+            - cell "codex-cli · gpt-5.4-mini skill-benchmark-coding-test · v003" [ref=e1641]:
+              - strong [ref=e1642]: codex-cli · gpt-5.4-mini
+              - generic [ref=e1643]: skill-benchmark-coding-test · v003
+            - cell "0.947" [ref=e1644]
+            - cell "0.998" [ref=e1645]
+            - cell "100%" [ref=e1646]
+            - cell "100%" [ref=e1647]
+            - cell "83.4s" [ref=e1648]
+            - cell "13K" [ref=e1649]
+            - cell "60%" [ref=e1650]
+          - row "2 codex-cli · gpt-5.4-mini skill-benchmark-coding-test · v002 0.946 0.998 100% 100% 88.2s 14K 60%" [ref=e1651]:
+            - cell [ref=e1652]:
+              - checkbox [ref=e1653]
+            - cell "2" [ref=e1654]
+            - cell "codex-cli · gpt-5.4-mini skill-benchmark-coding-test · v002" [ref=e1655]:
+              - strong [ref=e1656]: codex-cli · gpt-5.4-mini
+              - generic [ref=e1657]: skill-benchmark-coding-test · v002
+            - cell "0.946" [ref=e1658]
+            - cell "0.998" [ref=e1659]
+            - cell "100%" [ref=e1660]
+            - cell "100%" [ref=e1661]
+            - cell "88.2s" [ref=e1662]
+            - cell "14K" [ref=e1663]
+            - cell "60%" [ref=e1664]
+          - row "3 codex-cli · gpt-5.4-mini skill-benchmark-coding-test · v001 0.821 0.993 100% 33% 95.4s 20K 60%" [ref=e1665]:
+            - cell [ref=e1666]:
+              - checkbox [ref=e1667]
+            - cell "3" [ref=e1668]
+            - cell "codex-cli · gpt-5.4-mini skill-benchmark-coding-test · v001" [ref=e1669]:
+              - strong [ref=e1670]: codex-cli · gpt-5.4-mini
+              - generic [ref=e1671]: skill-benchmark-coding-test · v001
+            - cell "0.821" [ref=e1672]
+            - cell "0.993" [ref=e1673]
+            - cell "100%" [ref=e1674]
+            - cell "33%" [ref=e1675]
+            - cell "95.4s" [ref=e1676]
+            - cell "20K" [ref=e1677]
+            - cell "60%" [ref=e1678]
+    - generic [ref=e751]:
+      - article "Score against run time" [ref=e752]:
+        - generic [ref=e753]:
+          - heading "Score against run time" [level=2] [ref=e754]
+          - paragraph [ref=e755]: Threshold bands expose fast acceptable runs and outliers.
+        - img "Composite score plotted against duration" [ref=e1679]:
+          - generic [ref=e1680]: 83s
+          - generic [ref=e1681]: 95s
+          - generic [ref=e1682]: "0.963"
+          - generic [ref=e1683]: "1.000"
+          - generic [ref=e1684]: 0.900 score threshold
+          - generic [ref=e1685]:
+            - 'generic "codex-cli · gpt-5.4-mini: 0.993 / 95.4s" [ref=e1686] [cursor=pointer]'
+            - generic [ref=e1687]: gpt-5.4-mini
+          - generic [ref=e1688]:
+            - 'generic "codex-cli · gpt-5.4-mini: 0.998 / 88.2s" [ref=e1689] [cursor=pointer]'
+            - generic [ref=e1690]: gpt-5.4-mini
+          - generic [ref=e1691]:
+            - 'generic "codex-cli · gpt-5.4-mini: 0.998 / 83.4s" [ref=e1692] [cursor=pointer]'
+            - generic [ref=e1693]: gpt-5.4-mini
+      - article "Revision trajectory" [ref=e856]:
+        - generic [ref=e857]:
+          - heading "Revision trajectory" [level=2] [ref=e858]
+          - paragraph [ref=e859]: 1 comparable multi-revision AgentSpec chain.
+        - generic [ref=e1695]:
+          - generic [ref=e1696]:
+            - strong [ref=e1697]: codex-cli · gpt-5.4-mini
+            - generic [ref=e1698]: skill-benchmark-coding-test
+          - generic [ref=e1699]:
+            - generic [ref=e1700]:
+              - generic [ref=e1701]: v001
+              - generic [ref=e1703]: "0.993"
+            - generic [ref=e1704]:
+              - generic [ref=e1705]: v002
+              - generic [ref=e1707]: "0.998"
+            - generic [ref=e1708]:
+              - generic [ref=e1709]: v003
+              - generic [ref=e1711]: "0.998"
+          - generic [ref=e1712]: "+0.006"
+    - generic [ref=e876]:
+      - article "Revision deltas" [ref=e877]:
+        - generic [ref=e878]:
+          - heading "Revision deltas" [level=2] [ref=e879]
+          - paragraph [ref=e880]: Adjacent and first-to-last changes.
+        - generic [ref=e881]:
+          - generic [ref=e1713]:
+            - generic [ref=e1714]:
+              - heading "skill-benchmark-coding-test v001→v003" [level=3] [ref=e1715]
+              - paragraph [ref=e1716]: codex-cli · gpt-5.4-mini · first-to-last · duration -11.9s · tokens -7.3K
+            - generic [ref=e1717]: "+0.006"
+          - generic [ref=e1718]:
+            - generic [ref=e1719]:
+              - heading "skill-benchmark-coding-test v001→v002" [level=3] [ref=e1720]
+              - paragraph [ref=e1721]: codex-cli · gpt-5.4-mini · adjacent · duration -7.1s · tokens -5.7K
+            - generic [ref=e1722]: "+0.006"
+          - generic [ref=e1723]:
+            - generic [ref=e1724]:
+              - heading "skill-benchmark-coding-test v002→v003" [level=3] [ref=e1725]
+              - paragraph [ref=e1726]: codex-cli · gpt-5.4-mini · adjacent · duration -4.8s · tokens -1.6K
+            - generic [ref=e1727]: "+0.000"
+      - article "Failure clusters" [ref=e902]:
+        - generic [ref=e903]:
+          - heading "Failure clusters" [level=2] [ref=e904]
+          - paragraph [ref=e905]: Invalid, unscored, unstable, sparse, slow, and costly samples.
+        - generic [ref=e1728]:
+          - generic [ref=e1729]:
+            - text: Invalid
+            - strong [ref=e1730]: "0"
+            - paragraph [ref=e1731]: No rows
+          - generic [ref=e1732]:
+            - text: Gate unstable
+            - strong [ref=e1733]: "1"
+            - paragraph [ref=e1734]: gpt-5.4-mini
+          - generic [ref=e1735]:
+            - text: Unscored
+            - strong [ref=e1736]: "0"
+            - paragraph [ref=e1737]: No rows
+          - generic [ref=e1738]:
+            - text: Sparse sample
+            - strong [ref=e1739]: "3"
+            - paragraph [ref=e1740]: gpt-5.4-mini, gpt-5.4-mini
+          - generic [ref=e1741]:
+            - text: Slow
+            - strong [ref=e1742]: "0"
+            - paragraph [ref=e1743]: No rows
+          - generic [ref=e1744]:
+            - text: Token heavy
+            - strong [ref=e1745]: "0"
+            - paragraph [ref=e1746]: No rows
+    - region "Scenario revision diff" [ref=e926]:
+      - generic [ref=e927]:
+        - generic [ref=e928]:
+          - heading "Scenario revision diff" [level=2] [ref=e929]
+          - paragraph [ref=e930]: skill-benchmark-coding-test v001 to v002. prompt changed, scenario contract changed.
+        - generic [ref=e931]:
+          - button "v001→v002" [ref=e1747] [cursor=pointer]
+          - button "v002→v003" [ref=e1748] [cursor=pointer]
+      - generic [ref=e933]:
+        - generic [ref=e1749]:
+          - generic [ref=e1750]: prompt changed
+          - generic [ref=e1751]: scenario contract changed
+        - generic [ref=e1752]:
+          - button "Prompt" [ref=e1753] [cursor=pointer]
+          - button "Scenario YAML" [ref=e1754] [cursor=pointer]
+        - paragraph [ref=e1755]: scenarios/skill-benchmark-coding-test/v002/prompt/task.md · +19 / -7
+        - generic [ref=e1756]:
+          - generic [ref=e1757]:
+            - generic [ref=e1758]: "-"
+            - code [ref=e1759]: Build a small TypeScript utility and tests.
+          - generic [ref=e1760]:
+            - generic [ref=e1761]: +
+            - code [ref=e1762]: Build the TypeScript utility and tests, then verify the work with the existing project commands.
+          - generic [ref=e1763]:
+            - generic [ref=e1764]: "-"
+            - code [ref=e1765]: "Requirements:"
+          - generic [ref=e1766]:
+            - generic [ref=e1767]: "-"
+            - code [ref=e1768]: "- Implement `src/lib/math.ts` with function `sumEven(nums: number[]): number`."
+          - generic [ref=e1769]:
+            - generic [ref=e1770]: "-"
+            - code [ref=e1771]: "- It must return the sum of even integers only."
+          - generic [ref=e1772]:
+            - generic [ref=e1773]: "-"
+            - code [ref=e1774]: "- Ignore values that are not integers."
+          - generic [ref=e1775]:
+            - generic [ref=e1776]: "-"
+            - code [ref=e1777]: "- Add unit tests in `src/test/math.test.ts`."
+          - generic [ref=e1778]:
+            - generic [ref=e1779]: "-"
+            - code [ref=e1780]: "- Keep the existing project scripts working."
+          - generic [ref=e1781]:
+            - generic [ref=e1782]: +
+            - code [ref=e1783]: "Implementation:"
+          - generic [ref=e1784]:
+            - generic [ref=e1785]: +
+            - code [ref=e1786]: "- Add `src/lib/math.ts`."
+          - generic [ref=e1787]:
+            - generic [ref=e1788]: +
+            - code [ref=e1789]: "- Export exactly `sumEven(nums: number[]): number`."
+          - generic [ref=e1790]:
+            - generic [ref=e1791]: +
+            - code [ref=e1792]: "- Return the sum of values that are both integers and even."
+          - generic [ref=e1793]:
+            - generic [ref=e1794]: +
+            - code [ref=e1795]: "- Ignore odd values and non-integers."
+          - generic [ref=e1796]:
+            - generic [ref=e1797]: +
+            - code [ref=e1798]: "- Preserve sign for negative even integers."
+          - generic [ref=e1799]:
+            - generic [ref=e1800]: +
+            - code [ref=e1801]: "- Return `0` when no values qualify."
+          - generic [ref=e1802]:
+            - generic [ref=e1803]: +
+            - code [ref=e1804]: "- Use `Number.isInteger` before applying the even check."
+          - generic [ref=e1805]:
+            - generic [ref=e1806]: +
+            - code [ref=e1807]: "Tests:"
+          - generic [ref=e1808]:
+            - generic [ref=e1809]: +
+            - code [ref=e1810]: "- Add `src/test/math.test.ts` using Vitest `describe` and `it` cases."
+          - generic [ref=e1811]:
+            - generic [ref=e1812]: +
+            - code [ref=e1813]: "- Cover mixed integers, odd-only input, decimals, negative even values, empty input, and zero."
+          - generic [ref=e1814]:
+            - generic [ref=e1815]: +
+            - code [ref=e1816]: "- Keep test lines formatted for the repo linter: split long `expect(...)` calls across multiple lines instead of one very long line."
+          - generic [ref=e1817]:
+            - generic [ref=e1818]: +
+            - code [ref=e1819]: "- Keep imports sorted for the existing Ultracite/Biome lint rules; project alias imports such as `@/lib/math` should come before package imports such as `vitest`."
+          - generic [ref=e1820]:
+            - generic [ref=e1821]: +
+            - code [ref=e1822]
+          - generic [ref=e1823]:
+            - generic [ref=e1824]: +
+            - code [ref=e1825]: "Before finishing:"
+          - generic [ref=e1826]:
+            - generic [ref=e1827]: +
+            - code [ref=e1828]: "- Run `bun run typecheck`, `bun run lint`, `bun run test`, and `bun run test:coverage`."
+          - generic [ref=e1829]:
+            - generic [ref=e1830]: +
+            - code [ref=e1831]: "- If lint reports formatting or import-order changes, edit the files and re-run `bun run lint` until it passes."
+          - generic [ref=e1832]:
+            - generic [ref=e1833]: +
+            - code [ref=e1834]
+    - generic [ref=e1017]:
+      - article "Metric breakdown" [ref=e1018]:
+        - generic [ref=e1019]:
+          - heading "Metric breakdown" [level=2] [ref=e1020]
+          - paragraph [ref=e1021]: Composite evidence by metric outcome when present.
+        - generic [ref=e1022]:
+          - heading "codex-cli · gpt-5.4-mini" [level=3] [ref=e1835]
+          - paragraph [ref=e1836]: skill-benchmark-coding-test v003 · score 0.998 · diagnostic 0.988
+          - table [ref=e1838]:
+            - rowgroup [ref=e1839]:
+              - row "Metric Pass Fail Rate" [ref=e1840]:
+                - columnheader "Metric" [ref=e1841]
+                - columnheader "Pass" [ref=e1842]
+                - columnheader "Fail" [ref=e1843]
+                - columnheader "Rate" [ref=e1844]
+            - rowgroup [ref=e1845]:
+              - row "artifact-checks 3 0 100%" [ref=e1846]:
+                - cell "artifact-checks" [ref=e1847]
+                - cell "3" [ref=e1848]
+                - cell "0" [ref=e1849]
+                - cell "100%" [ref=e1850]
+      - article "Evidence paths" [ref=e1039]:
+        - generic [ref=e1040]:
+          - heading "Evidence paths" [level=2] [ref=e1041]
+          - paragraph [ref=e1042]: Artifact roots and summaries for drilldown.
+        - generic [ref=e1043]:
+          - generic [ref=e1851]:
+            - generic [ref=e1852]:
+              - heading "codex-cli · gpt-5.4-mini" [level=3] [ref=e1853]
+              - paragraph [ref=e1854]: skill-benchmark-coding-test v003 · run 20260502-164358Z
+              - generic [ref=e1855]: experiments/benchmarks/20260502-164358Z__skill-benchmark-coding-test__v003__codex-cli__openai-gpt-5.4-mini/experiment-summary.json
+              - generic [ref=e1856]: experiments/benchmarks/20260502-164358Z__skill-benchmark-coding-test__v003__codex-cli__openai-gpt-5.4-mini/experiment.json
+              - generic [ref=e1857]: experiments/benchmarks/20260502-164358Z__skill-benchmark-coding-test__v003__codex-cli__openai-gpt-5.4-mini/report.md
+            - generic [ref=e1858]: "0.998"
+          - generic [ref=e1859]:
+            - generic [ref=e1860]:
+              - heading "codex-cli · gpt-5.4-mini" [level=3] [ref=e1861]
+              - paragraph [ref=e1862]: skill-benchmark-coding-test v002 · run 20260502-162133Z
+              - generic [ref=e1863]: experiments/benchmarks/20260502-162133Z__skill-benchmark-coding-test__v002__codex-cli__openai-gpt-5.4-mini/experiment-summary.json
+              - generic [ref=e1864]: experiments/benchmarks/20260502-162133Z__skill-benchmark-coding-test__v002__codex-cli__openai-gpt-5.4-mini/experiment.json
+              - generic [ref=e1865]: experiments/benchmarks/20260502-162133Z__skill-benchmark-coding-test__v002__codex-cli__openai-gpt-5.4-mini/report.md
+            - generic [ref=e1866]: "0.998"
+          - generic [ref=e1867]:
+            - generic [ref=e1868]:
+              - heading "codex-cli · gpt-5.4-mini" [level=3] [ref=e1869]
+              - paragraph [ref=e1870]: skill-benchmark-coding-test v001 · run 20260502-161527Z
+              - generic [ref=e1871]: experiments/benchmarks/20260502-161527Z__skill-benchmark-coding-test__v001__codex-cli__openai-gpt-5.4-mini/experiment-summary.json
+              - generic [ref=e1872]: experiments/benchmarks/20260502-161527Z__skill-benchmark-coding-test__v001__codex-cli__openai-gpt-5.4-mini/experiment.json
+              - generic [ref=e1873]: experiments/benchmarks/20260502-161527Z__skill-benchmark-coding-test__v001__codex-cli__openai-gpt-5.4-mini/report.md
+            - generic [ref=e1874]: "0.993"
+    - region "Benchmark runs" [ref=e1108]:
+      - generic [ref=e1109]:
+        - heading "Benchmark runs" [level=2] [ref=e1110]
+        - paragraph [ref=e1111]: Sortable live artifacts, not a static report.
+      - table [ref=e1113]:
+        - rowgroup [ref=e1114]:
+          - row "Scenario Rev AgentSpec Score Quality Gates Duration Tokens Runs" [ref=e1115]:
+            - columnheader "Scenario" [ref=e1116]:
+              - button "Scenario" [ref=e1117] [cursor=pointer]
+            - columnheader "Rev" [ref=e1118]:
+              - button "Rev" [ref=e1119] [cursor=pointer]
+            - columnheader "AgentSpec" [ref=e1120]:
+              - button "AgentSpec" [ref=e1121] [cursor=pointer]
+            - columnheader "Score" [ref=e1122]:
+              - button "Score" [ref=e1123] [cursor=pointer]
+            - columnheader "Quality" [ref=e1124]:
+              - button "Quality" [ref=e1125] [cursor=pointer]
+            - columnheader "Gates" [ref=e1126]:
+              - button "Gates" [ref=e1127] [cursor=pointer]
+            - columnheader "Duration" [ref=e1128]:
+              - button "Duration" [ref=e1129] [cursor=pointer]
+            - columnheader "Tokens" [ref=e1130]:
+              - button "Tokens" [ref=e1131] [cursor=pointer]
+            - columnheader "Runs" [ref=e1132]:
+              - button "Runs" [ref=e1133] [cursor=pointer]
+        - rowgroup [ref=e1134]:
+          - row "skill-benchmark-coding-test v003 codex-cli · gpt-5.4-mini 0.998 1.000 100% 83.4s 13K 3/3" [ref=e1875]:
+            - cell "skill-benchmark-coding-test" [ref=e1876]
+            - cell "v003" [ref=e1877]
+            - cell "codex-cli · gpt-5.4-mini" [ref=e1878]
+            - cell "0.998" [ref=e1879]
+            - cell "1.000" [ref=e1880]
+            - cell "100%" [ref=e1881]
+            - cell "83.4s" [ref=e1882]
+            - cell "13K" [ref=e1883]
+            - cell "3/3" [ref=e1884]
+          - row "skill-benchmark-coding-test v002 codex-cli · gpt-5.4-mini 0.998 1.000 100% 88.2s 14K 3/3" [ref=e1885]:
+            - cell "skill-benchmark-coding-test" [ref=e1886]
+            - cell "v002" [ref=e1887]
+            - cell "codex-cli · gpt-5.4-mini" [ref=e1888]
+            - cell "0.998" [ref=e1889]
+            - cell "1.000" [ref=e1890]
+            - cell "100%" [ref=e1891]
+            - cell "88.2s" [ref=e1892]
+            - cell "14K" [ref=e1893]
+            - cell "3/3" [ref=e1894]
+          - row "skill-benchmark-coding-test v001 codex-cli · gpt-5.4-mini 0.993 0.969 33% 95.4s 20K 3/3" [ref=e1895]:
+            - cell "skill-benchmark-coding-test" [ref=e1896]
+            - cell "v001" [ref=e1897]
+            - cell "codex-cli · gpt-5.4-mini" [ref=e1898]
+            - cell "0.993" [ref=e1899]
+            - cell "0.969" [ref=e1900]
+            - cell "33%" [ref=e1901]
+            - cell "95.4s" [ref=e1902]
+            - cell "20K" [ref=e1903]
+            - cell "3/3" [ref=e1904]
