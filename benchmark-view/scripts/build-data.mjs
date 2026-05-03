@@ -21,6 +21,9 @@ function readText(filePath) {
     return '';
   }
 }
+function listDirs(dirPath) {
+  try { return fs.readdirSync(dirPath).filter((name) => fs.statSync(path.join(dirPath, name)).isDirectory()); } catch { return []; }
+}
 
 function parseRun(dirName) {
   const parts = dirName.split('__');
@@ -186,6 +189,41 @@ function classifyRevisionChange(beforeMeta, afterMeta, files) {
   return flags.length ? flags : ['metadata unchanged'];
 }
 
+function readRunDiagnostics(experimentDir) {
+  const runsDir = path.join(experimentDir, 'runs');
+  const runIds = listDirs(runsDir);
+  const diagnostics = [];
+  for (const runId of runIds) {
+    const runDir = path.join(runsDir, runId);
+    const verifier = path.join(runDir, 'verifier');
+    const scorecard = readJson(path.join(verifier, 'scorecard.json'));
+    const gateHistory = readJson(path.join(verifier, 'gate-history.json'));
+    const performance = readJson(path.join(verifier, 'performance-gates.json'));
+    const validity = readJson(path.join(verifier, 'execution-validity.json'));
+    const workspaceDiff = readJson(path.join(runDir, 'workspace-diff.json'));
+    const reportPath = path.join(runDir, 'report.md');
+    const gateItems = Array.isArray(gateHistory?.gates) ? gateHistory.gates : (Array.isArray(performance?.gates) ? performance.gates : []);
+    const failingGates = gateItems.filter((g) => (g?.passed === false) || String(g?.status || '').toLowerCase().includes('fail')).map((g) => g.name || g.id || 'unknown-gate');
+    diagnostics.push({
+      run_id: runId,
+      failing_gates: failingGates,
+      acceptance_fail_ids: Array.isArray(scorecard?.acceptance?.failed_ids) ? scorecard.acceptance.failed_ids : [],
+      requirement_missing_ids: Array.isArray(scorecard?.requirements?.missing_ids) ? scorecard.requirements.missing_ids : [],
+      validity_ok: validity?.valid ?? null,
+      workspace_diff_summary: workspaceDiff?.summary ?? null,
+      paths: {
+        scorecard: fs.existsSync(path.join(verifier, 'scorecard.json')) ? path.relative(repoRoot, path.join(verifier, 'scorecard.json')) : null,
+        gate_history: fs.existsSync(path.join(verifier, 'gate-history.json')) ? path.relative(repoRoot, path.join(verifier, 'gate-history.json')) : null,
+        performance_gates: fs.existsSync(path.join(verifier, 'performance-gates.json')) ? path.relative(repoRoot, path.join(verifier, 'performance-gates.json')) : null,
+        execution_validity: fs.existsSync(path.join(verifier, 'execution-validity.json')) ? path.relative(repoRoot, path.join(verifier, 'execution-validity.json')) : null,
+        workspace_diff: fs.existsSync(path.join(runDir, 'workspace-diff.json')) ? path.relative(repoRoot, path.join(runDir, 'workspace-diff.json')) : null,
+        report: fs.existsSync(reportPath) ? path.relative(repoRoot, reportPath) : null,
+      },
+    });
+  }
+  return diagnostics;
+}
+
 const rows = [];
 if (fs.existsSync(benchRoot)) {
   for (const dir of fs.readdirSync(benchRoot)) {
@@ -232,8 +270,10 @@ if (fs.existsSync(benchRoot)) {
         experiment: fs.existsSync(experimentPath) ? path.relative(repoRoot, experimentPath) : null,
         report: fs.existsSync(path.join(full, 'report.md')) ? path.relative(repoRoot, path.join(full, 'report.md')) : null,
       },
+      run_diagnostics: readRunDiagnostics(full),
     };
     row.agent_spec = `${row.harness} · ${row.model}`;
+    row.latest_group_key = `${row.scenario}:${row.revision}:${row.agent_spec}`;
     row.decision_score = decisionScore(row);
     rows.push(row);
   }

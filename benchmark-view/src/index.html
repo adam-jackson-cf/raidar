@@ -223,17 +223,26 @@
 
         <section class="grid-two">
           <article class="panel" aria-labelledby="deltaTitle"><div class="panel-header"><h2 id="deltaTitle">Revision deltas</h2><p class="note">Adjacent and first-to-last changes.</p></div><div class="panel-body compact-list" id="deltaList"></div></article>
-          <article class="panel" aria-labelledby="riskTitle"><div class="panel-header"><h2 id="riskTitle">Failure clusters</h2><p class="note">Invalid, unscored, unstable, sparse, slow, and costly samples.</p></div><div class="panel-body" id="riskList"></div></article>
+          <article class="panel" aria-labelledby="riskTitle"><div class="panel-header"><h2 id="riskTitle">Failure root causes</h2><p class="note">Failing gate names, affected AgentSpecs, scenario revisions, and run-level evidence.</p></div><div class="panel-body" id="riskList"></div></article>
         </section>
+        <section class="grid-two">
+          <article class="panel" aria-labelledby="coverageTitle"><div class="panel-header"><h2 id="coverageTitle">Signal coverage matrix</h2><p class="note">Shows which diagnostic signals exist in artifacts.</p></div><div class="panel-body" id="coverageMatrix"></div></article>
+          <article class="panel" aria-labelledby="attribTitle"><div class="panel-header"><h2 id="attribTitle">Revision improvement attribution</h2><p class="note">Score and reliability movement with comparability guardrails.</p></div><div class="panel-body compact-list" id="attributionList"></div></article>
+        </section>
+        <section class="grid-two">
+          <article class="panel" aria-labelledby="stabilityTitle"><div class="panel-header"><h2 id="stabilityTitle">AgentSpec revision stability</h2><p class="note">How each AgentSpec behaves across revisions for a scenario family.</p></div><div class="panel-body compact-list" id="stabilityList"></div></article>
+          <article class="panel" aria-labelledby="playbookTitle"><div class="panel-header"><h2 id="playbookTitle">Improvement playbook</h2><p class="note">Suggested next amendments based on weak signals.</p></div><div class="panel-body compact-list" id="playbookList"></div></article>
+        </section>
+        <section class="panel" aria-labelledby="portfolioTitle"><div class="panel-header"><h2 id="portfolioTitle">Benchmark scenario portfolio</h2><p class="note">Coverage across common SWE task families.</p></div><div class="table-wrap" id="portfolioTable"></div></section>
 
         <section class="panel" aria-labelledby="diffTitle"><div class="panel-header"><div><h2 id="diffTitle">Scenario revision diff</h2><p class="note" id="diffNote">Review what changed before trusting revision movement.</p></div><div class="diff-tabs" id="diffTabs"></div></div><div class="panel-body" id="diffBody"></div></section>
 
         <section class="grid-two">
           <article class="panel" aria-labelledby="metricTitle"><div class="panel-header"><h2 id="metricTitle">Metric breakdown</h2><p class="note">Composite evidence by metric outcome when present.</p></div><div class="panel-body" id="metricBreakdown"></div></article>
-          <article class="panel" aria-labelledby="evidenceTitle"><div class="panel-header"><h2 id="evidenceTitle">Evidence paths</h2><p class="note">Artifact roots and summaries for drilldown.</p></div><div class="panel-body compact-list" id="evidenceList"></div></article>
+          <article class="panel" aria-labelledby="evidenceTitle"><div class="panel-header"><h2 id="evidenceTitle">Evidence paths</h2><p class="note">Artifact roots and run-level drilldown.</p></div><div class="panel-body compact-list" id="evidenceList"></div></article>
         </section>
-
-        <section class="panel" aria-labelledby="runsTitle"><div class="panel-header"><h2 id="runsTitle">Benchmark runs</h2><p class="note">Sortable live artifacts, not a static report.</p></div><div class="table-wrap"><table><thead><tr><th class="scenario-col"><button data-run-sort="scenario">Scenario</button></th><th class="small-col"><button data-run-sort="revision">Rev</button></th><th class="model-col"><button data-run-sort="agent_spec">AgentSpec</button></th><th class="numeric"><button data-run-sort="mean_score">Score</button></th><th class="numeric"><button data-run-sort="quality_score">Quality</button></th><th class="numeric"><button data-run-sort="performance_pass_rate">Gates</button></th><th class="numeric"><button data-run-sort="duration_sec">Duration</button></th><th class="numeric"><button data-run-sort="uncached_input_tokens">Tokens</button></th><th class="numeric"><button data-run-sort="run_count_scored">Runs</button></th></tr></thead><tbody id="runRows"></tbody></table></div></section>
+        <section class="panel" aria-labelledby="explorerTitle"><div class="panel-header"><h2 id="explorerTitle">Evidence explorer</h2><p class="note">Raw runs and artifact paths for deep inspection.</p><div class="toolbar"><button class="ghost-button" id="evidenceToggle" type="button">Show evidence explorer</button></div></div><div class="panel-body compare-drawer" id="evidenceExplorer"><div class="table-wrap"><table><thead><tr><th class="scenario-col"><button data-run-sort="scenario">Scenario</button></th><th class="small-col"><button data-run-sort="revision">Rev</button></th><th class="model-col"><button data-run-sort="agent_spec">AgentSpec</button></th><th class="numeric"><button data-run-sort="mean_score">Score</button></th><th class="numeric"><button data-run-sort="quality_score">Quality</button></th><th class="numeric"><button data-run-sort="performance_pass_rate">Gates</button></th><th class="numeric"><button data-run-sort="duration_sec">Duration</button></th><th class="numeric"><button data-run-sort="uncached_input_tokens">Tokens</button></th><th class="numeric"><button data-run-sort="run_count_scored">Runs</button></th></tr></thead><tbody id="runRows"></tbody></table></div></div></section>
+        <section class="panel" aria-labelledby="diagTitle"><div class="panel-header"><h2 id="diagTitle">Run diagnostic drawer</h2><p class="note">Per-run gate failures, acceptance gaps, requirements gaps, and workspace diff summary.</p></div><div class="panel-body" id="runDrawer"></div></section>
       </div>
     </main>
 
@@ -245,7 +254,7 @@
       const allScenarios = data.scenarios || [];
       const scenarioDiffs = data.scenario_diffs || [];
       const allDeltas = data.deltas || [];
-      const state = { scenarioQuery: '', revisionQuery: '', agentQuery: '', sort: 'decision_score', sortDir: -1, runSort: 'completed_at', runSortDir: -1, selected: new Set(), diffKey: null, diffFile: 'prompt' };
+      const state = { scenarioQuery: '', revisionQuery: '', agentQuery: '', sort: 'decision_score', sortDir: -1, runSort: 'completed_at', runSortDir: -1, selected: new Set(), diffKey: null, diffFile: 'prompt', mode: 'latest', tradeoffMode: 'best_overall', showExplorer: false, selectedRun: null };
       const $ = (id) => document.getElementById(id);
       const fmt = (value, digits = 3) => typeof value === 'number' && Number.isFinite(value) ? value.toFixed(digits) : 'n/a';
       const pct = (value) => typeof value === 'number' && Number.isFinite(value) ? `${Math.round(value * 100)}%` : 'n/a';
@@ -277,7 +286,16 @@
       }
 
       function rowsInView() {
-        return scoredRows.filter(rowMatchesFilters);
+        const filtered = scoredRows.filter(rowMatchesFilters);
+        if (state.mode === 'historical') return filtered;
+        if (state.mode === 'both') return filtered;
+        const latestByKey = new Map();
+        for (const row of filtered) {
+          const key = row.latest_group_key || `${row.scenario}:${row.revision}:${row.agent_spec}`;
+          const prev = latestByKey.get(key);
+          if (!prev || latestTime(row) > latestTime(prev)) latestByKey.set(key, row);
+        }
+        return [...latestByKey.values()];
       }
 
       function scenarioMeta(rows) {
@@ -342,6 +360,9 @@
         $('scenarioTabs').innerHTML = [''].concat(scenarios).map((scenario) => `<button class="tab ${state.scenarioQuery === scenario ? 'active' : ''}" type="button" data-scenario-tab="${esc(scenario)}">${scenario || 'All scenarios'}</button>`).join('');
         const revisions = [...new Set(rows.map((row) => row.revision))].sort();
         $('revisionTabs').innerHTML = [''].concat(revisions).map((revision) => `<button class="tab ${state.revisionQuery === revision ? 'active' : ''}" type="button" data-revision-tab="${esc(revision)}">${revision || 'All revisions'}</button>`).join('');
+        const mode = `<button class="tab ${state.mode === 'latest' ? 'active' : ''}" type="button" data-mode="latest">Latest only</button><button class="tab ${state.mode === 'historical' ? 'active' : ''}" type="button" data-mode="historical">Include historical</button><button class="tab ${state.mode === 'both' ? 'active' : ''}" type="button" data-mode="both">Show run repeats</button>`;
+        const tradeoff = `<button class="tab ${state.tradeoffMode === 'best_overall' ? 'active' : ''}" type="button" data-tradeoff="best_overall">Highest quality</button><button class="tab ${state.tradeoffMode === 'most_reliable' ? 'active' : ''}" type="button" data-tradeoff="most_reliable">Most reliable</button><button class="tab ${state.tradeoffMode === 'fastest_acceptable' ? 'active' : ''}" type="button" data-tradeoff="fastest_acceptable">Fastest acceptable</button><button class="tab ${state.tradeoffMode === 'best_value' ? 'active' : ''}" type="button" data-tradeoff="best_value">Best value</button>`;
+        $('revisionTabs').innerHTML += mode + tradeoff;
       }
 
       function renderSummary(rows) {
@@ -354,8 +375,10 @@
         const reliable = best(rows, (a, b) => (b.valid_rate - a.valid_rate) || (b.performance_pass_rate - a.performance_pass_rate) || (b.sample_adequacy - a.sample_adequacy));
         const fastest = best(acceptable.length ? acceptable : rows, (a, b) => (a.duration_sec - b.duration_sec) || b.mean_score - a.mean_score);
         const value = best(rows, (a, b) => ((b.mean_score || 0) / Math.max(b.uncached_input_tokens || 1, 1)) - ((a.mean_score || 0) / Math.max(a.uncached_input_tokens || 1, 1)));
+        const recommended = state.tradeoffMode === 'most_reliable' ? reliable : state.tradeoffMode === 'fastest_acceptable' ? fastest : state.tradeoffMode === 'best_value' ? value : bestOverall;
         const card = (label, row, detail) => `<div class="decision"><span>${label}</span><strong>${row ? esc(row.agent_spec) : 'n/a'}</strong><p>${row ? detail(row) : 'No scored artifacts in view.'}</p></div>`;
         $('decisionStrip').innerHTML = [
+          card('Tradeoff recommendation', recommended, (row) => `mode ${state.tradeoffMode.replaceAll('_', ' ')} · score ${fmt(row.mean_score)} · gates ${pct(row.performance_pass_rate)}`),
           card('Best AgentSpec', bestOverall, (row) => `decision ${fmt(row.decision_score)} · score ${fmt(row.mean_score)} · sample ${pct(row.sample_adequacy)}`),
           card('Most reliable', reliable, (row) => `valid ${pct(row.valid_rate)} · gates ${pct(row.performance_pass_rate)} · runs ${row.run_count_scored}/${row.run_count_total}`),
           card('Fastest acceptable', fastest, (row) => `${fmt(row.duration_sec, 1)}s · score ${fmt(row.mean_score)} · gates ${pct(row.performance_pass_rate)}`),
@@ -408,10 +431,81 @@
       }
 
       function renderRisks(rows) {
-        const clusters = [
-          ['Invalid', rows.filter((row) => row.valid_rate < 1)], ['Gate unstable', rows.filter((row) => row.performance_pass_rate < 1)], ['Unscored', allRows.filter((row) => (row.unscored_count ?? 0) > 0 && rowMatchesFilters(row))], ['Sparse sample', rows.filter((row) => (row.sample_adequacy ?? 0) < 1)], ['Slow', rows.filter((row) => (row.duration_sec ?? 0) > avg(rows, 'duration_sec') * 1.4)], ['Token heavy', rows.filter((row) => (row.uncached_input_tokens ?? 0) > avg(rows, 'uncached_input_tokens') * 1.3)],
+        const causes = new Map();
+        for (const row of rows) {
+          for (const run of (row.run_diagnostics || [])) {
+            for (const gate of (run.failing_gates || [])) {
+              const key = gate || 'unknown-gate';
+              if (!causes.has(key)) causes.set(key, { gate: key, count: 0, specs: new Set(), revs: new Set(), runs: [], path: run.paths?.gate_history || run.paths?.performance_gates || '' });
+              const item = causes.get(key);
+              item.count += 1; item.specs.add(row.agent_spec); item.revs.add(`${row.scenario}:${row.revision}`); if (item.runs.length < 4) item.runs.push(run.run_id);
+            }
+          }
+        }
+        const ordered = [...causes.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+        $('riskList').innerHTML = ordered.length ? `<div class="compact-list">${ordered.map((c) => `<div class="compact-row"><div><h3>${esc(c.gate)}</h3><p>Failures ${c.count} · AgentSpecs ${c.specs.size} · Revisions ${c.revs.size}</p><p class="mono">Runs: ${esc(c.runs.join(', '))}</p><span class="evidence-path mono">${esc(c.path)}</span></div><div class="bad">${c.count}</div></div>`).join('')}</div>` : '<div class="empty">No run-level gate failures in the current filters.</div>';
+      }
+      function renderCoverage(rows) {
+        const defs = [
+          ['Composite score', (r) => typeof r.mean_score === 'number'],
+          ['Quality score', (r) => typeof r.quality_score === 'number'],
+          ['Diagnostic score', (r) => typeof r.diagnostic_score === 'number'],
+          ['Gate names', (r) => (r.run_diagnostics || []).some((x) => (x.failing_gates || []).length >= 0)],
+          ['Acceptance IDs', (r) => (r.run_diagnostics || []).some((x) => (x.acceptance_fail_ids || []).length > 0)],
+          ['Requirements coverage', (r) => (r.run_diagnostics || []).some((x) => (x.requirement_missing_ids || []).length >= 0)],
+          ['Workspace diff', (r) => (r.run_diagnostics || []).some((x) => x.workspace_diff_summary)],
+          ['Sample adequacy', (r) => typeof r.sample_adequacy === 'number'],
+          ['Gate pass by name', (r) => (r.run_diagnostics || []).some((x) => (x.failing_gates || []).length > 0)],
+          ['Test coverage signal', (r) => (r.metrics || []).some((m) => String(m).includes('coverage'))],
+          ['Visual regions signal', (r) => (r.metrics || []).some((m) => String(m).includes('visual'))],
+          ['Run-level scorecards', (r) => (r.run_diagnostics || []).some((x) => x.paths?.scorecard)],
         ];
-        $('riskList').innerHTML = `<div class="cluster-grid">${clusters.map(([label, items]) => `<div class="cluster"><span class="subtle">${label}</span><strong>${items.length}</strong><p class="meta">${items.slice(0, 2).map((row) => row.model || row.agent_spec).join(', ') || 'No rows'}</p></div>`).join('')}</div>`;
+        $('coverageMatrix').innerHTML = `<div class="table-wrap"><table><thead><tr><th>Signal</th><th class="numeric">Coverage</th></tr></thead><tbody>${defs.map(([name, fn]) => { const count = rows.filter(fn).length; return `<tr><td>${name}</td><td class="numeric">${count}/${rows.length || 0}</td></tr>`; }).join('')}</tbody></table></div>`;
+      }
+      function comparabilityLabel(diff) {
+        if (!diff) return 'unknown';
+        const warns = diff.comparable_warnings || [];
+        if (!warns.length) return 'comparable';
+        if (warns.some((w) => /quality gates changed|evaluation profile changed|visual baseline changed/.test(w))) return 'not comparable';
+        return 'partially comparable';
+      }
+      function renderAttribution(rows) {
+        const visible = (data.scenario_diffs || []).filter((d) => !state.scenarioQuery || d.scenario.includes(state.scenarioQuery)).slice(0, 8);
+        $('attributionList').innerHTML = visible.length ? visible.map((d) => {
+          const matching = rows.filter((r) => r.scenario === d.scenario && (r.revision === d.from_revision || r.revision === d.to_revision));
+          const from = matching.filter((r) => r.revision === d.from_revision);
+          const to = matching.filter((r) => r.revision === d.to_revision);
+          const delta = (avg(to, 'mean_score') ?? 0) - (avg(from, 'mean_score') ?? 0);
+          const gates = (avg(to, 'performance_pass_rate') ?? 0) - (avg(from, 'performance_pass_rate') ?? 0);
+          return `<div class="compact-row"><div><h3>${esc(d.scenario)} <span class="mono">${esc(d.from_revision)}→${esc(d.to_revision)}</span></h3><p>score ${delta >= 0 ? '+' : ''}${fmt(delta)} · gates ${gates >= 0 ? '+' : ''}${pct(gates)} · ${esc(comparabilityLabel(d))}</p><p class="mono">${esc((d.summary || []).join(', '))}</p></div><div class="${delta >= 0 ? 'good' : 'bad'}">${delta >= 0 ? '+' : ''}${fmt(delta)}</div></div>`;
+        }).join('') : '<div class="empty">No revision attribution available for current filters.</div>';
+      }
+      function renderStability(rows) {
+        const groups = new Map();
+        for (const r of rows) { const k = `${r.scenario}:${r.agent_spec}`; if (!groups.has(k)) groups.set(k, []); groups.get(k).push(r); }
+        const items = [...groups.entries()].map(([k, vals]) => {
+          const scores = vals.map((v) => v.mean_score).filter((v) => typeof v === 'number');
+          const std = scores.length > 1 ? Math.sqrt(scores.map((s) => Math.pow(s - (scores.reduce((a, b) => a + b, 0) / scores.length), 2)).reduce((a, b) => a + b, 0) / scores.length) : 0;
+          return { k, vals, std };
+        }).sort((a, b) => b.vals.length - a.vals.length).slice(0, 8);
+        $('stabilityList').innerHTML = items.length ? items.map((i) => `<div class="compact-row"><div><h3>${esc(i.vals[0].agent_spec)}</h3><p>${esc(i.vals[0].scenario)} · revisions ${i.vals.map((v) => v.revision).join(', ')}</p></div><div class="status">std ${fmt(i.std)}</div></div>`).join('') : '<div class="empty">No multi-revision stability chains for current filters.</div>';
+      }
+      function renderPlaybook(rows) {
+        const suggestions = [];
+        if ((avg(rows, 'performance_pass_rate') ?? 1) < 0.9) suggestions.push('Low gate pass: add verification checklist and known lint/build pitfalls to the prompt.');
+        if ((avg(rows, 'sample_adequacy') ?? 1) < 1) suggestions.push('Sparse sample: run more repeats before trusting deltas.');
+        if ((avg(rows, 'valid_rate') ?? 1) < 1) suggestions.push('Low validity: treat score as provisional until validity is fixed.');
+        if ((avg(rows, 'uncached_input_tokens') ?? 0) > 50000) suggestions.push('High token usage: reduce prompt ambiguity and remove irrelevant starter noise.');
+        $('playbookList').innerHTML = suggestions.length ? suggestions.map((s) => `<div class="compact-row"><div><p>${esc(s)}</p></div><div class="status">next</div></div>`).join('') : '<div class="empty">No critical weak-signal playbook items in current filters.</div>';
+      }
+      function renderPortfolio(rows) {
+        const families = [
+          ['Greenfield utility', 'skill-benchmark-coding-test'],
+          ['Full page UI', 'homepage-implementation'],
+          ['Smoke/instruction following', 'hello-world-smoke'],
+          ['Bug fix', null], ['Refactor', null], ['Frontend component', null], ['Coverage expansion', null], ['API/data flow', null], ['Dependency/tooling', null], ['Performance', null],
+        ];
+        $('portfolioTable').innerHTML = `<table><thead><tr><th>Task family</th><th>Scenario exists</th><th class="numeric">Revision count</th><th>Evidence quality</th></tr></thead><tbody>${families.map(([name, key]) => { const rowsFor = key ? scoredRows.filter((r) => r.scenario.includes(key)) : []; const revs = new Set(rowsFor.map((r) => r.revision)); const quality = rowsFor.length ? `${Math.round((avg(rowsFor, 'performance_pass_rate') || 0) * 100)}% gates` : 'missing'; return `<tr><td>${name}</td><td>${rowsFor.length ? 'yes' : 'no'}</td><td class="numeric">${revs.size}</td><td>${quality}</td></tr>`; }).join('')}</tbody></table>`;
       }
 
       function renderDiff(rows) {
@@ -435,18 +529,23 @@
 
       function renderEvidence(rows) {
         const top = rows.slice().sort((a, b) => b.decision_score - a.decision_score).slice(0, 8);
-        $('evidenceList').innerHTML = top.length ? top.map((row) => `<div class="compact-row"><div><h3>${esc(row.agent_spec)}</h3><p>${esc(row.scenario)} ${esc(row.revision)} · run ${esc(row.run_id)}</p><span class="evidence-path mono">${esc(row.artifact_paths?.summary || '')}</span><span class="evidence-path mono">${esc(row.artifact_paths?.experiment || '')}</span><span class="evidence-path mono">${esc(row.artifact_paths?.report || row.artifact_paths?.root || '')}</span></div><div class="status">${fmt(row.mean_score)}</div></div>`).join('') : '<div class="empty">No evidence paths match the current filters.</div>';
+        $('evidenceList').innerHTML = top.length ? top.map((row) => `<div class="compact-row"><div><h3>${esc(row.agent_spec)}</h3><p>${esc(row.scenario)} ${esc(row.revision)} · run ${esc(row.run_id)}</p><span class="evidence-path mono">${esc(row.artifact_paths?.summary || '')}</span><span class="evidence-path mono">${esc(row.artifact_paths?.experiment || '')}</span><span class="evidence-path mono">${esc(row.artifact_paths?.report || row.artifact_paths?.root || '')}</span>${(row.run_diagnostics || []).slice(0,2).map((rd)=>`<p class="mono">run ${esc(rd.run_id)} · gates: ${esc((rd.failing_gates||[]).join(', ') || 'none')}</p><span class="evidence-path mono">${esc(rd.paths?.scorecard || '')}</span>`).join('')}</div><div class="status">${fmt(row.mean_score)}</div></div>`).join('') : '<div class="empty">No evidence paths match the current filters.</div>';
       }
 
       function renderRuns(rows) {
+        $('evidenceExplorer').classList.toggle('active', state.showExplorer);
+        $('evidenceToggle').textContent = state.showExplorer ? 'Hide evidence explorer' : 'Show evidence explorer';
         const sorted = rows.slice().sort(typeof rows[0]?.[state.runSort] === 'string' ? textSort(state.runSort, state.runSortDir) : numericSort(state.runSort, state.runSortDir));
-        $('runRows').innerHTML = sorted.map((row) => `<tr><td data-label="Scenario">${esc(row.scenario)}</td><td data-label="Rev" class="mono">${esc(row.revision)}</td><td data-label="AgentSpec">${esc(row.agent_spec)}</td><td class="numeric" data-label="Score">${fmt(row.mean_score)}</td><td class="numeric" data-label="Quality">${fmt(row.quality_score)}</td><td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td><td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td><td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td><td class="numeric" data-label="Runs">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td></tr>`).join('') || '<tr><td colspan="9"><div class="empty">No runs match the current filters.</div></td></tr>';
+        $('runRows').innerHTML = sorted.map((row) => `<tr data-run-row="${esc(row.run_id)}"><td data-label="Scenario">${esc(row.scenario)}</td><td data-label="Rev" class="mono">${esc(row.revision)}</td><td data-label="AgentSpec">${esc(row.agent_spec)}</td><td class="numeric" data-label="Score">${fmt(row.mean_score)}</td><td class="numeric" data-label="Quality">${fmt(row.quality_score)}</td><td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td><td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td><td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td><td class="numeric" data-label="Runs">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td></tr>`).join('') || '<tr><td colspan="9"><div class="empty">No runs match the current filters.</div></td></tr>';
+        const selected = allRows.find((r) => r.run_id === state.selectedRun) || sorted[0];
+        const diag = (selected?.run_diagnostics || [])[0];
+        $('runDrawer').innerHTML = selected ? `<h3>${esc(selected.agent_spec)} <span class="mono">${esc(selected.scenario)} ${esc(selected.revision)} · ${esc(selected.run_id)}</span></h3>${diag ? `<p>Failing gates: ${esc((diag.failing_gates || []).join(', ') || 'none')}</p><p>Acceptance gaps: ${esc((diag.acceptance_fail_ids || []).join(', ') || 'none')}</p><p>Requirement gaps: ${esc((diag.requirement_missing_ids || []).join(', ') || 'none')}</p><p class="mono">Workspace diff: ${esc(JSON.stringify(diag.workspace_diff_summary || {}))}</p><span class="evidence-path mono">${esc(diag.paths?.scorecard || '')}</span><span class="evidence-path mono">${esc(diag.paths?.gate_history || diag.paths?.performance_gates || '')}</span>` : '<div class="empty">No run diagnostics emitted for this benchmark artifact.</div>'}` : '<div class="empty">No run selected.</div>';
       }
 
       function render() {
         renderControls();
         const rows = rowsInView();
-        renderTabs(rows); renderSummary(rows); renderLeaderboard(rows); renderScatter(rows); renderTrajectory(rows); renderDeltas(rows); renderRisks(rows); renderDiff(rows); renderMetricBreakdown(rows); renderEvidence(rows); renderRuns(rows);
+        renderTabs(rows); renderSummary(rows); renderLeaderboard(rows); renderScatter(rows); renderTrajectory(rows); renderDeltas(rows); renderRisks(rows); renderCoverage(rows); renderAttribution(rows); renderStability(rows); renderPlaybook(rows); renderPortfolio(rows); renderDiff(rows); renderMetricBreakdown(rows); renderEvidence(rows); renderRuns(rows);
       }
 
       function bindField(name, stateKey) {
@@ -461,6 +560,9 @@
       document.addEventListener('click', (event) => {
         const scenario = event.target.closest('[data-scenario-tab]'); if (scenario) { state.scenarioQuery = scenario.dataset.scenarioTab; state.diffKey = null; render(); }
         const revision = event.target.closest('[data-revision-tab]'); if (revision) { state.revisionQuery = revision.dataset.revisionTab; render(); }
+        const mode = event.target.closest('[data-mode]'); if (mode) { state.mode = mode.dataset.mode; render(); }
+        const tradeoff = event.target.closest('[data-tradeoff]'); if (tradeoff) { state.tradeoffMode = tradeoff.dataset.tradeoff; render(); }
+        const runRow = event.target.closest('[data-run-row]'); if (runRow) { state.selectedRun = runRow.dataset.runRow; render(); }
         const sort = event.target.closest('[data-sort]'); if (sort) { const key = sort.dataset.sort; const lowerIsBetter = ['duration_sec', 'uncached_input_tokens'].includes(key); state.sortDir = state.sort === key ? state.sortDir * -1 : (lowerIsBetter ? 1 : -1); state.sort = key; render(); }
         const runSort = event.target.closest('[data-run-sort]'); if (runSort) { const key = runSort.dataset.runSort; const lowerIsBetter = ['duration_sec', 'uncached_input_tokens'].includes(key); state.runSortDir = state.runSort === key ? state.runSortDir * -1 : (lowerIsBetter ? 1 : -1); state.runSort = key; render(); }
         const diff = event.target.closest('[data-diff-key]'); if (diff) { state.diffKey = diff.dataset.diffKey; render(); }
@@ -468,6 +570,7 @@
         const compare = event.target.closest('[data-compare]'); if (compare) { compare.checked ? state.selected.add(compare.dataset.compare) : state.selected.delete(compare.dataset.compare); render(); }
         const point = event.target.closest('[data-point]'); if (point) { state.selected.has(point.dataset.point) ? state.selected.delete(point.dataset.point) : state.selected.add(point.dataset.point); render(); }
       });
+      $('evidenceToggle').addEventListener('click', () => { state.showExplorer = !state.showExplorer; render(); });
       render();
     </script>
   </body>
