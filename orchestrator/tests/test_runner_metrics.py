@@ -1578,12 +1578,42 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
         terminated_early=False,
         termination_reason=None,
     )
+    trial_dir = tmp_path / "jobs" / "orchestrator-run-1234" / "trial-01"
+    verifier_dir = trial_dir / "verifier"
+    verifier_dir.mkdir(parents=True, exist_ok=True)
+    (trial_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "started_at": "2026-05-13T00:00:00",
+                "finished_at": "2026-05-13T00:00:10",
+            }
+        ),
+        encoding="utf-8",
+    )
+    raw_timings = {
+        "functional_build": 11.423,
+        "functional_test": 0.357,
+        "gates": [{"gate_name": "lint", "command": "bun run lint", "duration_sec": 1.234}],
+    }
+    (verifier_dir / "scorecard.json").write_text(
+        json.dumps({"metadata": {"command_timings_sec": raw_timings}}),
+        encoding="utf-8",
+    )
+    score_context = replace(
+        score_context,
+        execution=replace(
+            score_context.execution,
+            harbor_result=replace(score_context.execution.harbor_result, trial_dir=trial_dir),
+        ),
+    )
 
     scorecard = build_scorecard(score_context)
     harbor_meta = scorecard.metadata["harbor"]
 
     assert harbor_meta["prep_phase_timings_sec"] == {"prepare_run_context": 0.123}
     assert harbor_meta["prep_total_sec"] == 0.456
+    assert harbor_meta["orchestration_overhead_excluding_test_sec"] == 2.5
+    assert harbor_meta["harness_overhead_sec"] == 2.5
     assert harbor_meta["cache"]["baseline"]["hit"] is True
     assert harbor_meta["cache"]["baseline"]["status"] == "hit"
     assert harbor_meta["cache"]["baseline"]["cache_key"] == "baseline-cache-key"
@@ -1598,6 +1628,7 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
     assert harbor_meta["cache"]["image_key"] == "image-key"
     assert harbor_meta["cache"]["image_tag"] == "task-env-codex-cli-image-key"
     assert harbor_meta["auth"]["auth_mode"] == "chatgpt"
+    assert scorecard.metadata["verifier"]["command_timings_sec"] == raw_timings
 
 
 def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
@@ -1907,6 +1938,10 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     assert "metric_results" in score_script
     assert "verification_stability" in score_script
     assert r"const testPattern = /\.(test|spec)\.tsx?$/" in score_script
+    assert "NEXT_TELEMETRY_DISABLED" in score_script
+    assert "command_timings_sec" in score_script
+    assert "hasWorkspaceTestFiles()" in score_script
+    assert "No test files found, exiting with code 1" in score_script
     assert r"/(\d+)\s+passed/gi" in score_script
     assert r"/(\d+)\s+failed/gi" in score_script
     assert r"/([0-9]+(?:\.[0-9]+)?)\s*%/" in score_script
@@ -1915,12 +1950,7 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     assert "missingTestEvidence" in score_script
 
 
-def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
-    tmp_path: Path, monkeypatch
-):
-    monkeypatch.setenv("HARBOR_SMOKE_FAST", "1")
-    monkeypatch.setenv("HARBOR_SMOKE_FAST_REUSE_IMAGE", "1")
-
+def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Path, monkeypatch):
     workspace = tmp_path / "workspace"
     scenario_dir = tmp_path / "scenario"
     results_dir = tmp_path / "results"
@@ -1971,7 +2001,7 @@ def test_create_harbor_task_bundle_fast_mode_sets_image_and_cli_install(
     task_toml = (bundle / "task.toml").read_text()
     dockerfile = (bundle / "environment" / "Dockerfile").read_text()
 
-    assert 'docker_image = "ts-ui-eval-smoke-fast:task-env-codex-cli-' in task_toml
+    assert 'docker_image = "raidar-task-env:task-env-codex-cli-' in task_toml
     assert "git \\" in dockerfile
     assert "@openai/codex" in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
@@ -2041,7 +2071,71 @@ def test_create_harbor_task_bundle_uses_injected_rules_filename_in_instruction(t
 
     assert "You are working in `/app`." in instruction
     assert "Follow rules in `/app/GEMINI.md`." in instruction
+    assert "Avoid broad dependency-directory inspection such as `node_modules`" in instruction
+    assert "Do not emit progress updates" in instruction
     assert "Follow rules in `/app/AGENTS.md`." not in instruction
+
+
+def test_create_harbor_task_bundle_omits_redundant_codex_rules_reference(tmp_path: Path):
+    workspace = tmp_path / "workspace"
+    scenario_dir = tmp_path / "scenario"
+    results_dir = tmp_path / "results"
+    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "prompt" / "task.md").write_text("Change the page\n")
+    workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "AGENTS.md").write_text("Run verification commands.\n")
+    (workspace / "package.json").write_text("{}\n")
+    (workspace / "bun.lock").write_text("\n")
+
+    scenario = ScenarioDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "scenario_revision": "v001",
+            "description": "test task",
+            "difficulty": "easy",
+            "category": "greenfield-ui",
+            "timeout_sec": 1800,
+            "starter": {"root": "starter"},
+            "verification": {"gates": [], "required_commands": []},
+            "acceptance": {},
+            "metrics": [
+                {"type": "core", "id": "functional"},
+                {"type": "core", "id": "acceptance"},
+                {"type": "core", "id": "verification-stability"},
+                {"type": "core", "id": "execution-validity"},
+                {"type": "core", "id": "resource-efficiency"},
+            ],
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+    request = RunRequest(
+        scenario=scenario,
+        config=AgentSpec(
+            harness=Harness.CODEX_CLI,
+            model=ModelTarget(provider="openai", name="gpt-5.5", reasoning_effort="low"),
+            timeout_sec=1800,
+        ),
+        scenario_dir=scenario_dir,
+        execution_dir=results_dir,
+        repeat_index=1,
+    )
+    context = _sample_workspace_context(workspace, scenario_name="hello-world-smoke")
+
+    bundle = create_harbor_task_bundle(
+        request,
+        context,
+        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+    )
+
+    instruction = (bundle / "instruction.md").read_text(encoding="utf-8")
+    image_ref = runner._task_image_reference(request, bundle)
+    task_toml = (bundle / "task.toml").read_text(encoding="utf-8")
+
+    assert "You are working in `/app`." in instruction
+    assert "Follow rules in `/app/AGENTS.md`." not in instruction
+    assert "Avoid broad dependency-directory inspection such as `node_modules`" in instruction
+    assert image_ref is not None
+    assert image_ref.image_name in task_toml
 
 
 def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path):

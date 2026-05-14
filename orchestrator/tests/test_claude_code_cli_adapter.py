@@ -33,13 +33,23 @@ def test_validate_rejects_unsupported_model(monkeypatch: pytest.MonkeyPatch):
         adapter.validate()
 
 
-def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
+def test_validate_requires_credentials(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.delenv("CLAUDE_CODE_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_OAUTH_TOKEN", raising=False)
     adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-5"))
-    with pytest.raises(OSError, match="require an API key"):
+    with pytest.raises(OSError, match="require credentials"):
         adapter.validate()
+
+
+def test_validate_accepts_oauth_token_only(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.delenv("CLAUDE_CODE_API_KEY", raising=False)
+    monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token")
+    adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-5"))
+    adapter.validate()
 
 
 @pytest.mark.parametrize(

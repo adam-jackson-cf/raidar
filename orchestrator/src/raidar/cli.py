@@ -22,7 +22,7 @@ from .agents.adapters.codex_auth import (
     codex_auth_json_path,
     has_file_backed_codex_auth,
 )
-from .agents.adapters.codex_cli import CodexCliAdapter
+from .agents.adapters.harbor_cli import resolve_cli_executable
 from .agents.adapters.registry import registry
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
@@ -1404,7 +1404,14 @@ def harness_setup_auth(
         click.echo(f"  auth_json_path: {auth_path}")
         return
 
-    command = [CodexCliAdapter.resolve_cli_path(), "login"]
+    command = [
+        resolve_cli_executable(
+            cli_env_var="CODEX_CLI_PATH",
+            default_binary="codex",
+            harness_label=Harness.CODEX_CLI.value,
+        ),
+        "login",
+    ]
     if device_auth:
         command.append("--device-auth")
 

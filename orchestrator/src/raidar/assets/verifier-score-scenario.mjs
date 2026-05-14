@@ -42,16 +42,21 @@ function writeJson(jsonPath, payload) {
 }
 
 function runCommand(argv, cwd = APP_DIR) {
+  const startedAt = Date.now();
   const result = spawnSync(argv[0], argv.slice(1), {
     cwd,
     encoding: "utf8",
-    env: process.env,
+    env: {
+      ...process.env,
+      NEXT_TELEMETRY_DISABLED: process.env.NEXT_TELEMETRY_DISABLED || "1",
+    },
   });
   return {
     command: argv.join(" "),
     exit_code: typeof result.status === "number" ? result.status : -1,
     stdout: result.stdout || "",
     stderr: result.stderr || "",
+    duration_sec: (Date.now() - startedAt) / 1000,
   };
 }
 
@@ -195,12 +200,14 @@ function regionEvidenceStatus(expectedCount, availableCount) {
 function walkFiles(rootDir) {
   const queue = [rootDir];
   const files = [];
+  const excludedDirs = new Set(["node_modules", ".next", ".git"]);
   while (queue.length > 0) {
     const current = queue.pop();
     const entries = fs.readdirSync(current, { withFileTypes: true });
     for (const entry of entries) {
       const entryPath = path.join(current, entry.name);
       if (entry.isDirectory()) {
+        if (excludedDirs.has(entry.name)) continue;
         queue.push(entryPath);
       } else {
         files.push(entryPath);
@@ -227,6 +234,12 @@ function collectTestSources() {
   return sourceFiles
     .filter((sourceFile) => testPattern.test(sourceFile.path))
     .map((sourceFile) => sourceFile.content);
+}
+
+function hasWorkspaceTestFiles() {
+  return walkFiles(APP_DIR).some((file) =>
+    /\.(test|spec)\.(?:[cm]?[jt]sx?)$/.test(file),
+  );
 }
 
 function globToRegex(pattern) {
@@ -780,6 +793,7 @@ function main() {
       exit_code: result.exit_code,
       stdout: result.stdout,
       stderr: result.stderr,
+      duration_sec: result.duration_sec,
       failure_category: null,
       is_repeat: false,
     });
@@ -799,7 +813,15 @@ function main() {
   }
 
   const buildResult = runCommand(["bun", "run", "build"]);
-  const testResult = runCommand(["bun", "run", "test"]);
+  const testResult = hasWorkspaceTestFiles()
+    ? runCommand(["bun", "run", "test"])
+    : {
+        command: "bun run test",
+        exit_code: 1,
+        stdout: "",
+        stderr: "No test files found, exiting with code 1",
+        duration_sec: 0,
+      };
   const testOutput = `${testResult.stdout}\\n${testResult.stderr}`;
   const testCounts = parseTestCounts(testOutput);
   const noTests = /No tests found|No test files found/i.test(testOutput);
@@ -1065,6 +1087,17 @@ function main() {
       passed: performanceGateChecks.every((check) => check.passed),
     },
     metric_results: metricResults,
+    metadata: {
+      command_timings_sec: {
+        gates: gateHistory.map((event) => ({
+          gate_name: event.gate_name,
+          command: event.command,
+          duration_sec: event.duration_sec,
+        })),
+        functional_build: buildResult.duration_sec,
+        functional_test: testResult.duration_sec,
+      },
+    },
     gate_history: gateHistory,
   };
 

@@ -40,10 +40,10 @@ def prepare_workspace_phase(request):
 
     runner = _runner()
     prep_started = time.perf_counter()
-    layout = runner.initialize_run(request)
     adapter = request.config.adapter()
     adapter.validate()
     auth_metadata = adapter.execution_metadata()
+    layout = runner.initialize_run(request)
 
     prep_phase_timings: dict[str, float] = {}
     cache_metadata: dict[str, object] = {
@@ -102,7 +102,7 @@ def prepare_workspace_phase(request):
     prep_phase_timings["create_harbor_task_bundle"] = round(time.perf_counter() - phase_started, 3)
 
     run_env = runner._build_harbor_run_env(adapter)
-    image_ref = runner._fast_task_image_reference(request, harbor_task_bundle)
+    image_ref = runner._task_image_reference(request, harbor_task_bundle)
     if image_ref:
         cache_metadata["image_key"] = image_ref.cache_key
         cache_metadata["image_tag"] = image_ref.tag
@@ -114,7 +114,7 @@ def prepare_workspace_phase(request):
     phase_started = time.perf_counter()
     image_hit = None
     if image_ref:
-        image_hit = runner._ensure_fast_task_image(
+        image_hit = runner._ensure_task_image(
             task_bundle_path=harbor_task_bundle,
             image_ref=image_ref,
             harness=request.config.harness.value,
@@ -122,12 +122,7 @@ def prepare_workspace_phase(request):
             log_dir=layout.harbor_dir,
             task_timeout_sec=request.config.timeout_sec,
         )
-        runner._ensure_harbor_runtime_preflight(
-            image_ref=image_ref,
-            run_env=run_env,
-            log_dir=layout.harbor_dir,
-        )
-    prep_phase_timings["_ensure_fast_task_image"] = round(time.perf_counter() - phase_started, 3)
+    prep_phase_timings["_ensure_task_image"] = round(time.perf_counter() - phase_started, 3)
     cache_metadata["image"] = {"hit": image_hit}
 
     harbor_request = runner.HarborExecutionRequest(

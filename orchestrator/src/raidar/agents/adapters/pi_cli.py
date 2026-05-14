@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from ..config import AgentSpec
 from .external_cli import ExternalCliAdapter
 
 
@@ -13,6 +12,3 @@ class PiCliAdapter(ExternalCliAdapter):
     DEFAULT_BINARY = "pi"
     REQUIRED_ENV_VARS = ("PI_API_TOKEN",)
     ALLOWED_PROVIDERS = ("inflection",)
-
-    def __init__(self, config: AgentSpec) -> None:
-        super().__init__(config)

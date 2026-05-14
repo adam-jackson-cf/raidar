@@ -23,8 +23,9 @@ import yaml
 from pydantic import ValidationError
 
 from .agents.config import AgentSpec, Harness
-from .agents.fast_mode import (
-    fast_image_prefix,
+from .agents.harbor_routing import (
+    is_task_image_reuse_enabled,
+    task_image_prefix,
 )
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .audit.workspace_diff import diff_directories, directory_fingerprint
@@ -52,7 +53,7 @@ from .starter import StarterSource
 
 SCORING_SCHEMA_VERSION = "2.0.0"
 HARBOR_TIMEOUT_BUFFER_SEC = 120
-FAST_IMAGE_BUILD_MIN_TIMEOUT_SEC = 120
+TASK_IMAGE_BUILD_MIN_TIMEOUT_SEC = 120
 MIN_DOCKER_COMPOSE_VERSION = (2, 40, 1)
 HARBOR_RATE_LIMIT_RETRY_DELAY_SEC = 20
 HARBOR_RATE_LIMIT_MAX_ATTEMPTS = 2
@@ -90,14 +91,14 @@ VERIFIED_WITH_PATTERN = re.compile(r"\bverif(?:y|ied|ying)\b.*\bwith\b")
 INLINE_SECRET_PATTERN = re.compile(
     r"\b("
     r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
-    r"GEMINI_API_KEY|GOOGLE_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
+    r"GEMINI_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
     r"GOOGLE_APPLICATION_CREDENTIALS"
     r")=([^\s\"']+)"
 )
 JSON_SECRET_PATTERN = re.compile(
     r'"('
     r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
-    r"GEMINI_API_KEY|GOOGLE_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
+    r"GEMINI_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
     r"GOOGLE_APPLICATION_CREDENTIALS"
     r')"\s*:\s*"([^"]+)"'
 )
@@ -108,7 +109,6 @@ SECRET_ENV_KEYS: tuple[str, ...] = (
     "CLAUDE_CODE_API_KEY",
     "CLAUDE_CODE_OAUTH_TOKEN",
     "GEMINI_API_KEY",
-    "GOOGLE_API_KEY",
 )
 SECRET_FILE_ENV_PREFIX = "AGENTIC_EVAL_SECRET_FILE_"
 PUBLIC_REGISTRY_HOSTS: set[str] = {
@@ -321,8 +321,8 @@ class HarborExecutionRequest:
 
 
 @dataclass(frozen=True, slots=True)
-class FastTaskImageRef:
-    """Content-addressed Docker image reference for fast Harbor execution."""
+class TaskImageRef:
+    """Content-addressed Docker image reference for Harbor execution."""
 
     image_name: str
     cache_key: str
@@ -330,8 +330,8 @@ class FastTaskImageRef:
 
 
 @dataclass(frozen=True, slots=True)
-class FastImageBuildResult:
-    """Result of a fast Harbor task image build."""
+class TaskImageBuildResult:
+    """Result of a Harbor task image build."""
 
     completed_process: subprocess.CompletedProcess[str]
     timed_out: bool = False
@@ -474,7 +474,7 @@ def _cache_lock_root() -> Path:
     return _raidar_cache_root() / "locks"
 
 
-def _fast_image_cache_metadata_path(cache_key: str) -> Path:
+def _task_image_cache_metadata_path(cache_key: str) -> Path:
     return _raidar_cache_root() / "images" / f"{cache_key}.json"
 
 
@@ -1145,7 +1145,7 @@ def _prune_prep_cache_entries() -> None:
             cache_file.unlink(missing_ok=True)
 
 
-def _load_fast_image_cache_payload(metadata_path: Path) -> dict[str, Any] | None:
+def _load_task_image_cache_payload(metadata_path: Path) -> dict[str, Any] | None:
     try:
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
@@ -1157,10 +1157,10 @@ def _load_fast_image_cache_payload(metadata_path: Path) -> dict[str, Any] | None
     return payload
 
 
-def _stale_fast_image_name(
+def _stale_task_image_name(
     metadata_path: Path, *, now: float, active_image_name: str | None
 ) -> str | None:
-    payload = _load_fast_image_cache_payload(metadata_path)
+    payload = _load_task_image_cache_payload(metadata_path)
     if payload is None:
         return None
     image_name = payload.get("image_name")
@@ -1178,7 +1178,7 @@ def _stale_fast_image_name(
     return image_name
 
 
-def _managed_fast_image(image_name: str, run_env: dict[str, str]) -> bool:
+def _managed_task_image(image_name: str, run_env: dict[str, str]) -> bool:
     labels = _inspect_docker_image_labels(image_name, run_env)
     return labels is not None and (
         labels.get(RAIDAR_DOCKER_LABEL_MANAGED) == "true"
@@ -1186,7 +1186,7 @@ def _managed_fast_image(image_name: str, run_env: dict[str, str]) -> bool:
     )
 
 
-def _remove_fast_image(image_name: str, run_env: dict[str, str]) -> None:
+def _remove_task_image(image_name: str, run_env: dict[str, str]) -> None:
     subprocess.run(
         ["docker", "image", "rm", "-f", image_name],
         capture_output=True,
@@ -1197,12 +1197,12 @@ def _remove_fast_image(image_name: str, run_env: dict[str, str]) -> None:
     )
 
 
-def _prune_stale_fast_images(*, run_env: dict[str, str], active_image_name: str | None) -> None:
+def _prune_stale_task_images(*, run_env: dict[str, str], active_image_name: str | None) -> None:
     images_root = _raidar_cache_root() / "images"
     images_root.mkdir(parents=True, exist_ok=True)
     now = time.time()
     for metadata_path in images_root.glob("*.json"):
-        image_name = _stale_fast_image_name(
+        image_name = _stale_task_image_name(
             metadata_path,
             now=now,
             active_image_name=active_image_name,
@@ -1210,8 +1210,8 @@ def _prune_stale_fast_images(*, run_env: dict[str, str], active_image_name: str 
         if image_name is None:
             continue
         try:
-            if _managed_fast_image(image_name, run_env):
-                _remove_fast_image(image_name, run_env)
+            if _managed_task_image(image_name, run_env):
+                _remove_task_image(image_name, run_env)
         except FileNotFoundError:
             return
         metadata_path.unlink(missing_ok=True)
@@ -1235,7 +1235,7 @@ def _maybe_run_cache_maintenance(*, run_env: dict[str, str], active_image_name: 
                 if age_sec < RAIDAR_CACHE_PRUNE_INTERVAL_SEC:
                     return
             _prune_prep_cache_entries()
-            _prune_stale_fast_images(run_env=run_env, active_image_name=active_image_name)
+            _prune_stale_task_images(run_env=run_env, active_image_name=active_image_name)
             marker_path.write_text(
                 json.dumps({"last_pruned_at": datetime.now(UTC).isoformat()}, indent=2),
                 encoding="utf-8",
@@ -1703,29 +1703,32 @@ def _verifier_scorer_script() -> str:
     return _verifier_script_template_path().read_text(encoding="utf-8")
 
 
-def _fast_task_image_reference(
-    request: RunRequest, task_bundle_path: Path
-) -> FastTaskImageRef | None:
+def _task_image_reference(request: RunRequest, task_bundle_path: Path) -> TaskImageRef | None:
+    if not is_task_image_reuse_enabled():
+        return None
     environment_dir = task_bundle_path / "environment"
     dockerfile_path = environment_dir / "Dockerfile"
     app_dir = environment_dir / "app"
+    tests_dir = task_bundle_path / "tests"
     if not dockerfile_path.exists() or not app_dir.exists():
         return None
 
     payload = {
         "cache_version": RAIDAR_CACHE_VERSION,
-        "fast_mode_version": "2",
+        "task_image_version": "3",
         "harness": request.config.harness.value,
         "harness_package": _harness_npm_package(request.config.harness.value),
+        "harness_cli_version": _harness_cli_version(request.config.harness.value),
         "dockerfile": dockerfile_path.read_text(encoding="utf-8"),
         "app_fingerprint": directory_fingerprint(app_dir),
+        "tests_fingerprint": directory_fingerprint(tests_dir) if tests_dir.exists() else None,
     }
     cache_key = _hash_json_payload(payload)
     digest = cache_key[:16]
     harness_fragment = _slug_fragment(request.config.harness.value)
     image_tag = f"task-env-{harness_fragment}-{digest}"
-    return FastTaskImageRef(
-        image_name=f"{fast_image_prefix()}:{image_tag}",
+    return TaskImageRef(
+        image_name=f"{task_image_prefix()}:{image_tag}",
         cache_key=cache_key,
         tag=image_tag,
     )
@@ -1748,6 +1751,46 @@ def _task_environment_toml(image_name: str | None) -> str:
 
 def _harness_npm_package(harness: str) -> str | None:
     return HARNESS_NPM_PACKAGES.get(harness)
+
+
+def _codex_cli_npm_version() -> str | None:
+    version_output = _harness_cli_version("codex-cli")
+    if not version_output:
+        return None
+    match = re.search(r"(\d+\.\d+\.\d+)", version_output)
+    return match.group(1) if match else None
+
+
+def _harness_npm_install_spec(harness: str) -> str | None:
+    package = _harness_npm_package(harness)
+    if package is None:
+        return None
+    if harness != "codex-cli":
+        return package
+    version = _codex_cli_npm_version()
+    return f"{package}@{version}" if version else package
+
+
+def _harness_cli_version(harness: str) -> str | None:
+    """Return the locally resolved CLI version that should invalidate task images."""
+    if harness != "codex-cli":
+        return None
+    executable = os.environ.get("CODEX_CLI_PATH") or shutil.which("codex")
+    if not executable:
+        return None
+    try:
+        completed = subprocess.run(
+            [executable, "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    if completed.returncode != 0:
+        return None
+    return (completed.stdout or "").strip() or None
 
 
 def _inspect_docker_image_labels(image_name: str, run_env: dict[str, str]) -> dict[str, str] | None:
@@ -1777,7 +1820,7 @@ def _inspect_docker_image_labels(image_name: str, run_env: dict[str, str]) -> di
     return {str(key): str(value) for key, value in labels.items()}
 
 
-def _expected_fast_image_labels(image_ref: FastTaskImageRef, harness: str) -> dict[str, str]:
+def _expected_task_image_labels(image_ref: TaskImageRef, harness: str) -> dict[str, str]:
     return {
         RAIDAR_DOCKER_LABEL_MANAGED: "true",
         RAIDAR_DOCKER_LABEL_KEY: image_ref.cache_key,
@@ -1786,18 +1829,18 @@ def _expected_fast_image_labels(image_ref: FastTaskImageRef, harness: str) -> di
     }
 
 
-def _fast_image_cache_hit(
-    image_ref: FastTaskImageRef, *, harness: str, run_env: dict[str, str]
+def _task_image_cache_hit(
+    image_ref: TaskImageRef, *, harness: str, run_env: dict[str, str]
 ) -> bool:
     labels = _inspect_docker_image_labels(image_ref.image_name, run_env)
     if labels is None:
         return False
-    expected_labels = _expected_fast_image_labels(image_ref, harness)
+    expected_labels = _expected_task_image_labels(image_ref, harness)
     return all(labels.get(key) == value for key, value in expected_labels.items())
 
 
-def _fast_image_build_command(
-    image_ref: FastTaskImageRef, dockerfile: Path, context_dir: Path, *, harness: str
+def _task_image_build_command(
+    image_ref: TaskImageRef, dockerfile: Path, context_dir: Path, *, harness: str
 ) -> list[str]:
     command = [
         "docker",
@@ -1807,15 +1850,15 @@ def _fast_image_build_command(
         "--file",
         str(dockerfile),
     ]
-    for key, value in _expected_fast_image_labels(image_ref, harness).items():
+    for key, value in _expected_task_image_labels(image_ref, harness).items():
         command.extend(["--label", f"{key}={value}"])
     command.append(str(context_dir))
     return command
 
 
-def _run_fast_image_build(
+def _run_task_image_build(
     build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int
-) -> FastImageBuildResult:
+) -> TaskImageBuildResult:
     build_env = dict(run_env)
     # Use the classic builder for task images. It has been more reliable than buildx
     # on local OrbStack storage and still produces a locally-available image.
@@ -1829,11 +1872,11 @@ def _run_fast_image_build(
             env=build_env,
             check=False,
         )
-        return FastImageBuildResult(completed_process=completed)
+        return TaskImageBuildResult(completed_process=completed)
     except subprocess.TimeoutExpired as exc:
         stdout = exc.stdout.decode() if isinstance(exc.stdout, bytes) else (exc.stdout or "")
         stderr = exc.stderr.decode() if isinstance(exc.stderr, bytes) else (exc.stderr or "")
-        return FastImageBuildResult(
+        return TaskImageBuildResult(
             completed_process=subprocess.CompletedProcess(
                 build_cmd,
                 returncode=124,
@@ -1847,9 +1890,9 @@ def _run_fast_image_build(
         raise RuntimeError("Docker CLI not found.") from exc
 
 
-def _fast_image_build_timeout(task_timeout_sec: int) -> int:
+def _task_image_build_timeout(task_timeout_sec: int) -> int:
     """Bound pre-Harbor image builds to the scenario budget."""
-    return max(FAST_IMAGE_BUILD_MIN_TIMEOUT_SEC, task_timeout_sec)
+    return max(TASK_IMAGE_BUILD_MIN_TIMEOUT_SEC, task_timeout_sec)
 
 
 def _run_runtime_preflight_command(
@@ -1892,7 +1935,7 @@ def _run_runtime_preflight_command(
 
 def _ensure_harbor_runtime_preflight(
     *,
-    image_ref: FastTaskImageRef,
+    image_ref: TaskImageRef,
     run_env: dict[str, str],
     log_dir: Path,
 ) -> None:
@@ -1904,14 +1947,14 @@ def _ensure_harbor_runtime_preflight(
     )
 
 
-def _cached_fast_image_is_ready(
+def _cached_task_image_is_ready(
     *,
-    image_ref: FastTaskImageRef,
+    image_ref: TaskImageRef,
     harness: str,
     run_env: dict[str, str],
     log_dir: Path,
 ) -> bool:
-    if not _fast_image_cache_hit(image_ref, harness=harness, run_env=run_env):
+    if not _task_image_cache_hit(image_ref, harness=harness, run_env=run_env):
         return False
     try:
         _ensure_harbor_runtime_preflight(image_ref=image_ref, run_env=run_env, log_dir=log_dir)
@@ -1920,14 +1963,14 @@ def _cached_fast_image_is_ready(
     return True
 
 
-def _write_fast_image_build_log(log_dir: Path, build: FastImageBuildResult) -> None:
+def _write_task_image_build_log(log_dir: Path, build: TaskImageBuildResult) -> None:
     log_dir.mkdir(parents=True, exist_ok=True)
-    build_log = log_dir / "fast-image-build.log"
+    build_log = log_dir / "task-image-build.log"
     completed = build.completed_process
     build_log.write_text((completed.stdout or "") + "\n" + (completed.stderr or ""))
 
 
-def _raise_fast_image_build_error(build_cmd: list[str], build: FastImageBuildResult) -> None:
+def _raise_task_image_build_error(build_cmd: list[str], build: TaskImageBuildResult) -> None:
     completed = build.completed_process
     if completed.returncode == 0:
         return
@@ -1936,17 +1979,17 @@ def _raise_fast_image_build_error(build_cmd: list[str], build: FastImageBuildRes
     if build.timed_out:
         suffix = f"\n{output}" if output else ""
         raise RuntimeError(
-            f"Fast image build timed out after {build.timeout_sec}s: `{rendered}`{suffix}"
+            f"Task image build timed out after {build.timeout_sec}s: `{rendered}`{suffix}"
         )
     raise RuntimeError(
-        f"Fast image build failed: `{rendered}` exited {completed.returncode}\n{output}"
+        f"Task image build failed: `{rendered}` exited {completed.returncode}\n{output}"
     )
 
 
-def _write_fast_image_cache_metadata(
-    *, image_ref: FastTaskImageRef, harness: str, outcome: str
+def _write_task_image_cache_metadata(
+    *, image_ref: TaskImageRef, harness: str, outcome: str
 ) -> None:
-    metadata_path = _fast_image_cache_metadata_path(image_ref.cache_key)
+    metadata_path = _task_image_cache_metadata_path(image_ref.cache_key)
     metadata_path.parent.mkdir(parents=True, exist_ok=True)
     metadata_path.write_text(
         json.dumps(
@@ -1965,54 +2008,54 @@ def _write_fast_image_cache_metadata(
     )
 
 
-def _ensure_fast_task_image(
+def _ensure_task_image(
     *,
     task_bundle_path: Path,
-    image_ref: FastTaskImageRef,
+    image_ref: TaskImageRef,
     harness: str,
     run_env: dict[str, str],
     log_dir: Path,
     task_timeout_sec: int,
 ) -> bool:
-    if _cached_fast_image_is_ready(
+    if _cached_task_image_is_ready(
         image_ref=image_ref,
         harness=harness,
         run_env=run_env,
         log_dir=log_dir,
     ):
-        _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
+        _write_task_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
         return True
 
     with _cache_key_lock(f"image-{image_ref.cache_key}"):
-        if _cached_fast_image_is_ready(
+        if _cached_task_image_is_ready(
             image_ref=image_ref,
             harness=harness,
             run_env=run_env,
             log_dir=log_dir,
         ):
-            _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
+            _write_task_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
             return True
 
         context_dir = task_bundle_path / "environment"
         dockerfile = context_dir / "Dockerfile"
         if not dockerfile.exists():
-            raise FileNotFoundError(f"Fast image build failed: missing Dockerfile {dockerfile}")
+            raise FileNotFoundError(f"Task image build failed: missing Dockerfile {dockerfile}")
 
-        build_cmd = _fast_image_build_command(
+        build_cmd = _task_image_build_command(
             image_ref,
             dockerfile,
             context_dir,
             harness=harness,
         )
-        build = _run_fast_image_build(
+        build = _run_task_image_build(
             build_cmd,
             run_env,
-            timeout_sec=_fast_image_build_timeout(task_timeout_sec),
+            timeout_sec=_task_image_build_timeout(task_timeout_sec),
         )
-        _write_fast_image_build_log(log_dir, build)
-        _raise_fast_image_build_error(build_cmd, build)
+        _write_task_image_build_log(log_dir, build)
+        _raise_task_image_build_error(build_cmd, build)
         _ensure_harbor_runtime_preflight(image_ref=image_ref, run_env=run_env, log_dir=log_dir)
-        _write_fast_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="miss")
+        _write_task_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="miss")
         return False
 
 
@@ -2066,10 +2109,23 @@ def _load_scenario_prompt(task: ScenarioDefinition, scenario_dir: Path) -> str:
     return "\n\n".join(chunk for chunk in prompt_chunks if chunk)
 
 
-def _bundle_instruction_text(prompt: str, rules_filename: str = "AGENTS.md") -> str:
+def _bundle_instruction_text(
+    prompt: str, rules_filename: str = "AGENTS.md", *, include_rules_reference: bool = True
+) -> str:
+    rules_reference = (
+        f"Follow rules in `/app/{rules_filename}`.\n" if include_rules_reference else ""
+    )
     return (
         prompt.strip()
-        + f"\n\nYou are working in `/app`.\nFollow rules in `/app/{rules_filename}`.\n"
+        + f"\n\nYou are working in `/app`.\n{rules_reference}"
+        + "The `/app` workspace is not a git repository; do not run git commands unless "
+        "the task explicitly requires Git.\n"
+        + "Avoid broad dependency-directory inspection such as `node_modules` unless "
+        "the task explicitly requires dependency internals.\n"
+        + "Inspect only the files needed for the task; do not list the workspace just "
+        "to confirm common project files exist.\n"
+        + "Do not emit progress updates; make the requested changes, run required "
+        "verification, then provide a concise final result.\n"
     )
 
 
@@ -2100,11 +2156,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \\
 """
     cli_package = _harness_npm_package(request.config.harness.value)
     if cli_package:
+        install_spec = _harness_npm_install_spec(request.config.harness.value)
         dockerfile += """RUN apt-get update && apt-get install -y --no-install-recommends \\
   npm \\
   && rm -rf /var/lib/apt/lists/*
 """
-        dockerfile += f"RUN npm install -g {cli_package}\n"
+        dockerfile += f"RUN npm install -g {install_spec}\n"
     dockerfile += """COPY app/package.json app/bun.lock /app/
 RUN bun install --frozen-lockfile
 """
@@ -2189,18 +2246,22 @@ def create_harbor_task_bundle(
     prompt_text = _load_scenario_prompt(request.scenario, request.scenario_dir)
     rules_filename = context.injected_rules.name if context.injected_rules else "AGENTS.md"
     (bundle_dir / "instruction.md").write_text(
-        _bundle_instruction_text(prompt_text, rules_filename)
+        _bundle_instruction_text(
+            prompt_text,
+            rules_filename,
+            include_rules_reference=request.config.harness != Harness.CODEX_CLI,
+        )
     )
 
     dockerfile = _render_environment_dockerfile(request)
     _validate_public_base_images(dockerfile)
     dockerfile_path = environment_dir / "Dockerfile"
     dockerfile_path.write_text(dockerfile)
-    image_ref = _fast_task_image_reference(request, bundle_dir)
+    _write_verifier_artifacts(request, context, tests_dir)
+    image_ref = _task_image_reference(request, bundle_dir)
     (bundle_dir / "task.toml").write_text(
         _render_task_toml(request, image_ref.image_name if image_ref else None)
     )
-    _write_verifier_artifacts(request, context, tests_dir)
     return bundle_dir
 
 
@@ -2314,12 +2375,11 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
         if execution_error is None:
             break
         trial_dir = _select_trial_dir(job_dir)
-        should_retry = (
-            attempt < HARBOR_RATE_LIMIT_MAX_ATTEMPTS
-            and execution_error.startswith("Harbor exited with code")
-            and _is_registry_rate_limited(request.run_harbor_dir)
-        )
-        if not should_retry:
+        if not _should_retry_harbor_rate_limit(
+            attempt=attempt,
+            execution_error=execution_error,
+            run_harbor_dir=request.run_harbor_dir,
+        ):
             return _terminated_harbor_result(
                 job_dir=job_dir,
                 reason=execution_error,
@@ -2349,6 +2409,16 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
         termination_reason=None,
         job_dir=job_dir,
         trial_dir=trial_dir,
+    )
+
+
+def _should_retry_harbor_rate_limit(
+    *, attempt: int, execution_error: str, run_harbor_dir: Path
+) -> bool:
+    return (
+        attempt < HARBOR_RATE_LIMIT_MAX_ATTEMPTS
+        and execution_error.startswith("Harbor exited with code")
+        and _is_registry_rate_limited(run_harbor_dir)
     )
 
 
@@ -4571,7 +4641,7 @@ def _scorecard_harbor_metadata(
 ) -> dict[str, Any]:
     harbor_timings = _harbor_phase_timings(execution.harbor_result.trial_dir)
     trial_total_sec = harbor_timings.get("trial_total_sec")
-    harness_overhead_sec = (
+    orchestration_overhead_excluding_test_sec = (
         round(max(0.0, execution.duration_sec - trial_total_sec), 3)
         if trial_total_sec is not None
         else None
@@ -4587,7 +4657,8 @@ def _scorecard_harbor_metadata(
         "prep_phase_timings_sec": execution.prep_phase_timings_sec,
         "prep_total_sec": execution.prep_total_sec,
         "phase_timings_sec": harbor_timings,
-        "harness_overhead_sec": harness_overhead_sec,
+        "harness_overhead_sec": orchestration_overhead_excluding_test_sec,
+        "orchestration_overhead_excluding_test_sec": orchestration_overhead_excluding_test_sec,
         "cache": execution.cache_metadata,
         "auth": execution.auth_metadata,
         "artifacts": artifacts.harbor_artifacts,
@@ -4598,9 +4669,17 @@ def _scorecard_verifier_metadata(
     execution: ExecutionPhaseResult, artifacts: PersistedArtifacts
 ) -> dict[str, Any]:
     verifier_scorecard_path = _verifier_scorecard_path(execution.harbor_result.trial_dir)
+    verifier_payload = _load_json_dict(verifier_scorecard_path) if verifier_scorecard_path else {}
+    verifier_metadata = verifier_payload.get("metadata")
+    command_timings = (
+        verifier_metadata.get("command_timings_sec")
+        if isinstance(verifier_metadata, dict)
+        else None
+    )
     return {
         "scorecard": str(verifier_scorecard_path) if verifier_scorecard_path else None,
         "artifacts": artifacts.verifier_artifacts,
+        "command_timings_sec": command_timings,
     }
 
 

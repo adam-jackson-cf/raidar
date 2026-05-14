@@ -193,6 +193,10 @@ def test_build_selected_matrix_config_for_codex() -> None:
     assert config.experiment.repeats == 5
     assert all(spec.harness == "codex-cli" for spec in config.agents)
     assert [(spec.provider, spec.model, spec.reasoning_effort) for spec in config.agents] == [
+        ("openai", "gpt-5.5", "low"),
+        ("openai", "gpt-5.5", "medium"),
+        ("openai", "gpt-5.5", "high"),
+        ("openai", "gpt-5.5", "xhigh"),
         ("openai", "gpt-5.2", "low"),
         ("openai", "gpt-5.2", "medium"),
         ("openai", "gpt-5.2", "high"),
@@ -219,7 +223,7 @@ def test_build_selected_matrix_config_for_all() -> None:
     )
 
     harnesses = [spec.harness for spec in config.agents]
-    assert harnesses.count("codex-cli") == 13
+    assert harnesses.count("codex-cli") == 17
     assert harnesses.count("gemini") == 3
     assert harnesses.count("claude-code") == 5
-    assert len(config.agents) == 21
+    assert len(config.agents) == 25

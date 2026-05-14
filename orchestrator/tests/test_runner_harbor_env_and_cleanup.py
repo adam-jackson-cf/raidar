@@ -71,7 +71,7 @@ def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
     env = runner._build_harbor_run_env(
-        _AdapterStub(import_path="raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent")
+        _AdapterStub(import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent")
     )
 
     assert env["ADAPTER_FLAG"] == "1"
@@ -94,7 +94,7 @@ def test_build_harbor_run_env_uses_local_secret_files_for_custom_harnesses(
 
     env = runner._build_harbor_run_env(
         _AdapterStub(
-            import_path="raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent",
+            import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
             local_secret_files={"CODEX_AUTH_JSON": auth_json_path},
         )
     )
@@ -113,7 +113,7 @@ def test_build_harbor_run_env_excludes_adapter_blocked_env_keys(
 
     env = runner._build_harbor_run_env(
         _AdapterStub(
-            import_path="raidar.agents.harbor_agents.fast_cli_agents:FastCodexCliAgent",
+            import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
             excluded_keys={"OPENAI_API_KEY"},
         )
     )
@@ -149,7 +149,7 @@ class _ExecAdapterStub:
         return {}
 
 
-def _patch_smoke_prepare_workspace_dependencies(
+def _patch_prepare_workspace_dependencies(
     monkeypatch: pytest.MonkeyPatch,
     *,
     tmp_path: Path,
@@ -182,7 +182,7 @@ def _patch_smoke_prepare_workspace_dependencies(
         lambda *, image_ref, run_env, log_dir: runtime_preflight_calls.append(image_ref.image_name),
     )
 
-    def fake_run_fast_image_build(
+    def fake_run_task_image_build(
         build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int
     ):
         del run_env, timeout_sec
@@ -193,11 +193,11 @@ def _patch_smoke_prepare_workspace_dependencies(
             key, value = build_cmd[idx + 1].split("=", 1)
             labels[key] = value
         built_images[image_name] = labels
-        return runner.FastImageBuildResult(
+        return runner.TaskImageBuildResult(
             completed_process=subprocess.CompletedProcess(build_cmd, 0, stdout="built", stderr="")
         )
 
-    monkeypatch.setattr(runner, "_run_fast_image_build", fake_run_fast_image_build)
+    monkeypatch.setattr(runner, "_run_task_image_build", fake_run_task_image_build)
 
 
 def test_cleanup_stale_harbor_build_processes_only_kills_orphans(
@@ -362,8 +362,8 @@ def test_ensure_harbor_runtime_preflight_runs_git_check(monkeypatch, tmp_path: P
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-abcd1234",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-abcd1234",
         cache_key="cache-key",
         tag="task-env-codex-cli-abcd1234",
     )
@@ -393,8 +393,8 @@ def test_ensure_harbor_runtime_preflight_raises_when_git_missing(
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-abcd1234",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-abcd1234",
         cache_key="cache-key",
         tag="task-env-codex-cli-abcd1234",
     )
@@ -736,7 +736,7 @@ def test_cache_key_lock_reclaims_dead_owner_immediately(tmp_path: Path, monkeypa
     assert not lock_dir.exists()
 
 
-def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
+def test_ensure_task_image_writes_log_and_raises_on_build_failure(
     monkeypatch, tmp_path: Path
 ) -> None:
     bundle_path = tmp_path / "bundle"
@@ -745,8 +745,8 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
     (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
     (docker_context / "app").mkdir(parents=True, exist_ok=True)
     (docker_context / "app" / "package.json").write_text("{}", encoding="utf-8")
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-cachekey",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-cachekey",
         cache_key="cachekey",
         tag="task-env-codex-cli-cachekey",
     )
@@ -754,10 +754,10 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
     monkeypatch.setattr(
         runner,
-        "_fast_image_cache_metadata_path",
+        "_task_image_cache_metadata_path",
         lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
     )
-    monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(runner, "_task_image_cache_hit", lambda *_args, **_kwargs: False)
 
     def fake_run(command, **kwargs):
         del kwargs
@@ -765,8 +765,8 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    with pytest.raises(RuntimeError, match="Fast image build failed"):
-        runner._ensure_fast_task_image(
+    with pytest.raises(RuntimeError, match="Task image build failed"):
+        runner._ensure_task_image(
             task_bundle_path=bundle_path,
             image_ref=image_ref,
             harness="codex-cli",
@@ -775,22 +775,26 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_failure(
             task_timeout_sec=300,
         )
 
-    build_log = tmp_path / "logs" / "fast-image-build.log"
+    build_log = tmp_path / "logs" / "task-image-build.log"
     assert build_log.exists()
     text = build_log.read_text(encoding="utf-8")
     assert "build-out" in text
     assert "build-err" in text
 
 
-def test_fast_task_image_reference_is_content_addressed_by_harness(
-    tmp_path: Path,
+def test_task_image_reference_is_content_addressed_by_harness(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setenv("RAIDAR_TASK_IMAGE_PREFIX", "custom-task-env")
     bundle_path = tmp_path / "bundle"
     app_dir = bundle_path / "environment" / "app"
+    tests_dir = bundle_path / "tests"
     app_dir.mkdir(parents=True, exist_ok=True)
+    tests_dir.mkdir(parents=True, exist_ok=True)
     (bundle_path / "environment" / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
     (app_dir / "package.json").write_text("{}", encoding="utf-8")
     (app_dir / "bun.lock").write_text("", encoding="utf-8")
+    (tests_dir / "test.sh").write_text("echo first\n", encoding="utf-8")
 
     request = SimpleNamespace(
         config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
@@ -799,26 +803,52 @@ def test_fast_task_image_reference_is_content_addressed_by_harness(
         config=SimpleNamespace(harness=SimpleNamespace(value="gemini")),
     )
 
-    image_ref = runner._fast_task_image_reference(request, bundle_path)
-    other_ref = runner._fast_task_image_reference(other_request, bundle_path)
+    image_ref = runner._task_image_reference(request, bundle_path)
+    other_ref = runner._task_image_reference(other_request, bundle_path)
 
     assert image_ref is not None
-    assert image_ref.image_name.startswith(f"{runner.fast_image_prefix()}:task-env-codex-cli-")
+    assert image_ref.image_name.startswith("custom-task-env:task-env-codex-cli-")
     assert other_ref is not None
-    assert other_ref.image_name.startswith(f"{runner.fast_image_prefix()}:task-env-gemini-")
+    assert other_ref.image_name.startswith("custom-task-env:task-env-gemini-")
     assert image_ref.cache_key != other_ref.cache_key
 
+    (tests_dir / "test.sh").write_text("echo second\n", encoding="utf-8")
+    changed_tests_ref = runner._task_image_reference(request, bundle_path)
 
-def test_fast_image_build_command_uses_classic_docker_build(tmp_path: Path) -> None:
+    assert changed_tests_ref is not None
+    assert changed_tests_ref.cache_key != image_ref.cache_key
+
+
+def test_task_image_reference_respects_reuse_disable_switch(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    bundle_path = tmp_path / "bundle"
+    app_dir = bundle_path / "environment" / "app"
+    app_dir.mkdir(parents=True, exist_ok=True)
+    (bundle_path / "environment" / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
+    (app_dir / "package.json").write_text("{}", encoding="utf-8")
+
+    request = SimpleNamespace(
+        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+    )
+
+    assert runner._task_image_reference(request, bundle_path) is not None
+
+    monkeypatch.setenv("RAIDAR_TASK_IMAGE_REUSE", "0")
+
+    assert runner._task_image_reference(request, bundle_path) is None
+
+
+def test_task_image_build_command_uses_classic_docker_build(tmp_path: Path) -> None:
     dockerfile = tmp_path / "Dockerfile"
     dockerfile.write_text("FROM oven/bun:1\n", encoding="utf-8")
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-cachekey",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-cachekey",
         cache_key="cachekey",
         tag="task-env-codex-cli-cachekey",
     )
 
-    command = runner._fast_image_build_command(
+    command = runner._task_image_build_command(
         image_ref,
         dockerfile,
         tmp_path,
@@ -849,7 +879,7 @@ def test_render_environment_dockerfile_includes_visual_tooling_dependencies() ->
     )
 
 
-def test_ensure_fast_task_image_returns_immediately_when_image_exists(
+def test_ensure_task_image_returns_immediately_when_image_exists(
     monkeypatch, tmp_path: Path
 ) -> None:
     bundle_path = tmp_path / "bundle"
@@ -858,8 +888,8 @@ def test_ensure_fast_task_image_returns_immediately_when_image_exists(
     (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
     (docker_context / "app").mkdir(parents=True, exist_ok=True)
     (docker_context / "app" / "package.json").write_text("{}", encoding="utf-8")
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-cachekey",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-cachekey",
         cache_key="cachekey",
         tag="task-env-codex-cli-cachekey",
     )
@@ -867,10 +897,10 @@ def test_ensure_fast_task_image_returns_immediately_when_image_exists(
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
     monkeypatch.setattr(
         runner,
-        "_fast_image_cache_metadata_path",
+        "_task_image_cache_metadata_path",
         lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
     )
-    monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(runner, "_task_image_cache_hit", lambda *_args, **_kwargs: True)
     preflight_calls: list[str] = []
 
     def fail_if_called(*_args, **_kwargs):
@@ -885,7 +915,7 @@ def test_ensure_fast_task_image_returns_immediately_when_image_exists(
         ),
     )
 
-    cache_hit = runner._ensure_fast_task_image(
+    cache_hit = runner._ensure_task_image(
         task_bundle_path=bundle_path,
         image_ref=image_ref,
         harness="codex-cli",
@@ -896,10 +926,10 @@ def test_ensure_fast_task_image_returns_immediately_when_image_exists(
 
     assert cache_hit is True
     assert preflight_calls == [f"{image_ref.image_name}:logs"]
-    assert not (tmp_path / "logs" / "fast-image-build.log").exists()
+    assert not (tmp_path / "logs" / "task-image-build.log").exists()
 
 
-def test_ensure_fast_task_image_rebuilds_when_cached_image_fails_runtime_preflight(
+def test_ensure_task_image_rebuilds_when_cached_image_fails_runtime_preflight(
     monkeypatch, tmp_path: Path
 ) -> None:
     bundle_path = tmp_path / "bundle"
@@ -908,8 +938,8 @@ def test_ensure_fast_task_image_rebuilds_when_cached_image_fails_runtime_preflig
     (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
     (docker_context / "app").mkdir(parents=True, exist_ok=True)
     (docker_context / "app" / "package.json").write_text("{}", encoding="utf-8")
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-cachekey",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-cachekey",
         cache_key="cachekey",
         tag="task-env-codex-cli-cachekey",
     )
@@ -917,17 +947,17 @@ def test_ensure_fast_task_image_rebuilds_when_cached_image_fails_runtime_preflig
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
     monkeypatch.setattr(
         runner,
-        "_fast_image_cache_metadata_path",
+        "_task_image_cache_metadata_path",
         lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
     )
-    monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(runner, "_task_image_cache_hit", lambda *_args, **_kwargs: True)
 
     build_calls: list[list[str]] = []
 
     def fake_build(build_cmd, run_env, *, timeout_sec):
         del run_env, timeout_sec
         build_calls.append(build_cmd)
-        return runner.FastImageBuildResult(
+        return runner.TaskImageBuildResult(
             completed_process=subprocess.CompletedProcess(
                 build_cmd, 0, stdout="build-ok", stderr=""
             )
@@ -941,10 +971,10 @@ def test_ensure_fast_task_image_rebuilds_when_cached_image_fails_runtime_preflig
         if len(preflight_attempts) < 3:
             raise RuntimeError("git missing")
 
-    monkeypatch.setattr(runner, "_run_fast_image_build", fake_build)
+    monkeypatch.setattr(runner, "_run_task_image_build", fake_build)
     monkeypatch.setattr(runner, "_ensure_harbor_runtime_preflight", fake_runtime_preflight)
 
-    cache_hit = runner._ensure_fast_task_image(
+    cache_hit = runner._ensure_task_image(
         task_bundle_path=bundle_path,
         image_ref=image_ref,
         harness="codex-cli",
@@ -958,7 +988,7 @@ def test_ensure_fast_task_image_rebuilds_when_cached_image_fails_runtime_preflig
     assert len(preflight_attempts) == 3
 
 
-def test_ensure_fast_task_image_writes_log_and_raises_on_build_timeout(
+def test_ensure_task_image_writes_log_and_raises_on_build_timeout(
     monkeypatch, tmp_path: Path
 ) -> None:
     bundle_path = tmp_path / "bundle"
@@ -967,8 +997,8 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_timeout(
     (docker_context / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
     (docker_context / "app").mkdir(parents=True, exist_ok=True)
     (docker_context / "app" / "package.json").write_text("{}", encoding="utf-8")
-    image_ref = runner.FastTaskImageRef(
-        image_name="ts-ui-eval-smoke-fast:task-env-codex-cli-timeout",
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-timeout",
         cache_key="timeout-key",
         tag="task-env-codex-cli-timeout",
     )
@@ -976,14 +1006,14 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_timeout(
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
     monkeypatch.setattr(
         runner,
-        "_fast_image_cache_metadata_path",
+        "_task_image_cache_metadata_path",
         lambda cache_key: tmp_path / "image-metadata" / f"{cache_key}.json",
     )
-    monkeypatch.setattr(runner, "_fast_image_cache_hit", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(runner, "_task_image_cache_hit", lambda *_args, **_kwargs: False)
 
     def fake_build(build_cmd, run_env, *, timeout_sec):
         del run_env
-        return runner.FastImageBuildResult(
+        return runner.TaskImageBuildResult(
             completed_process=subprocess.CompletedProcess(
                 build_cmd,
                 returncode=124,
@@ -994,10 +1024,10 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_timeout(
             timeout_sec=timeout_sec,
         )
 
-    monkeypatch.setattr(runner, "_run_fast_image_build", fake_build)
+    monkeypatch.setattr(runner, "_run_task_image_build", fake_build)
 
-    with pytest.raises(RuntimeError, match="Fast image build timed out after 300s"):
-        runner._ensure_fast_task_image(
+    with pytest.raises(RuntimeError, match="Task image build timed out after 300s"):
+        runner._ensure_task_image(
             task_bundle_path=bundle_path,
             image_ref=image_ref,
             harness="codex-cli",
@@ -1006,14 +1036,14 @@ def test_ensure_fast_task_image_writes_log_and_raises_on_build_timeout(
             task_timeout_sec=300,
         )
 
-    build_log = tmp_path / "logs" / "fast-image-build.log"
+    build_log = tmp_path / "logs" / "task-image-build.log"
     assert build_log.exists()
     text = build_log.read_text(encoding="utf-8")
     assert "partial-out" in text
     assert "partial-err" in text
 
 
-def test_prepare_workspace_phase_reuses_smoke_prep_and_fast_image_across_invocations(
+def test_prepare_workspace_phase_reuses_prep_and_task_image_across_invocations(
     monkeypatch, tmp_path: Path
 ) -> None:
     scenario_dir = tmp_path / "scenarios" / "hello-world-smoke" / "v001"
@@ -1086,7 +1116,7 @@ def test_prepare_workspace_phase_reuses_smoke_prep_and_fast_image_across_invocat
     preflight_calls: list[str] = []
     runtime_preflight_calls: list[str] = []
 
-    _patch_smoke_prepare_workspace_dependencies(
+    _patch_prepare_workspace_dependencies(
         monkeypatch,
         tmp_path=tmp_path,
         built_images=built_images,
@@ -1107,14 +1137,29 @@ def test_prepare_workspace_phase_reuses_smoke_prep_and_fast_image_across_invocat
     assert phase_two.cache_metadata["preflight"]["hit"] is True
     assert phase_one.cache_metadata["image"]["hit"] is False
     assert phase_two.cache_metadata["image"]["hit"] is True
-    assert (phase_one.layout.harbor_dir / "fast-image-build.log").exists()
-    assert not (phase_two.layout.harbor_dir / "fast-image-build.log").exists()
+    assert (phase_one.layout.harbor_dir / "task-image-build.log").exists()
+    assert not (phase_two.layout.harbor_dir / "task-image-build.log").exists()
     assert preflight_calls == ["install:workspace", "workspace:bun run lint"]
     assert phase_one.cache_metadata["image_key"] == phase_two.cache_metadata["image_key"]
     assert phase_one.cache_metadata["image_tag"] == phase_two.cache_metadata["image_tag"]
-    expected_image = f"{runner.fast_image_prefix()}:{phase_one.cache_metadata['image_tag']}"
+    expected_image = f"{runner.task_image_prefix()}:{phase_one.cache_metadata['image_tag']}"
     assert runtime_preflight_calls
     assert all(image_name == expected_image for image_name in runtime_preflight_calls)
+
+
+def test_prepare_workspace_phase_validates_before_initializing_run(monkeypatch) -> None:
+    class FailingAdapter:
+        def validate(self) -> None:
+            raise ValueError("invalid harness")
+
+    def fail_initialize_run(_request):
+        raise AssertionError("initialize_run should not run before adapter validation")
+
+    monkeypatch.setattr(runner, "initialize_run", fail_initialize_run)
+    request = SimpleNamespace(config=SimpleNamespace(adapter=lambda: FailingAdapter()))
+
+    with pytest.raises(ValueError, match="invalid harness"):
+        runner._prepare_workspace_phase(request)
 
 
 def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missing(

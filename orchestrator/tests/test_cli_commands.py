@@ -32,11 +32,9 @@ from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
 def _assert_smoke_dry_run_output(output: str) -> None:
     assert "uv run --project orchestrator raidar run \\" in output
     assert "uv run --project orchestrator raidar matrix \\" in output
-    assert '--selector "all" \\' in output
+    assert '--config ".configs/hello-world-smoke-trio-matrix.yaml" \\' in output
     assert '--repeats "2" \\' in output
     assert '--repeat-parallel "2" \\' in output
-    assert "uv run --project orchestrator raidar harbor cleanup" in output
-    assert "uv run --project orchestrator raidar harness validate \\" in output
     assert "uv run --project orchestrator raidar experiment run \\" in output
 
 
@@ -64,7 +62,8 @@ def test_harness_list_includes_model_variations() -> None:
         "anthropic/claude-sonnet-4-5, anthropic/claude-sonnet-4-6"
     ) in result.output
     assert (
-        "models: openai/gpt-5.2, openai/gpt-5.3-codex-spark, openai/gpt-5.4, openai/gpt-5.4-mini"
+        "models: openai/gpt-5.2, openai/gpt-5.3-codex-spark, openai/gpt-5.4, "
+        "openai/gpt-5.4-mini, openai/gpt-5.5"
     ) in result.output
     assert (
         "models: google/gemini-3-flash-preview, google/gemini-3-pro-preview, "
@@ -1180,8 +1179,8 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
                 'printf \'ARGS:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
                 (
                     "printf 'ENV:%s:%s\\n' "
-                    '"${HARBOR_SMOKE_FAST:-}" '
-                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
                 ),
             ]
         )
@@ -1209,7 +1208,6 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
             "3",
             "--rerun-unscored",
             "1",
-            "--fast",
         ],
         cwd=repo_root,
         env=env,
@@ -1222,12 +1220,12 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
     assert make_log.read_text(encoding="utf-8").splitlines() == [
         (
             f"ARGS:-C {repo_root} agent-smoke HARNESS=codex-cli "
-            "PROVIDER=openai MODEL=gpt-5.4-mini TIMEOUT_SEC=120 "
+            "PROVIDER=openai MODEL=gpt-5.5 TIMEOUT_SEC=120 "
             "AGENT_SMOKE_SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
             "AGENT_SMOKE_REPEATS=2 AGENT_SMOKE_REPEAT_PARALLEL=3 "
             "AGENT_SMOKE_RERUN_UNSCORED=1"
         ),
-        "ENV:1:1",
+        "ENV::",
     ]
 
 
@@ -1262,8 +1260,8 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
                 (
                     "printf 'ENV:%s:%s\\n' "
-                    '"${HARBOR_SMOKE_FAST:-}" '
-                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
                 ),
             ]
         )
@@ -1297,11 +1295,11 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
         (
             "UV:run --project orchestrator raidar run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--harness codex-cli --provider openai --model gpt-5.4-mini "
+            "--harness codex-cli --provider openai --model gpt-5.5 --reasoning-effort low "
             "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
-        "ENV:1:1",
+        "ENV::",
     ]
 
 
@@ -1336,8 +1334,8 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
                 (
                     "printf 'ENV:%s:%s\\n' "
-                    '"${HARBOR_SMOKE_FAST:-}" '
-                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
                 ),
             ]
         )
@@ -1365,14 +1363,14 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
         (
             "UV:run --project orchestrator raidar matrix "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--selector all --repeats 1 --repeat-parallel 1 "
-            "--rerun-unscored 0 --experiment-kind benchmark"
+            "--config .configs/hello-world-smoke-trio-matrix.yaml "
+            "--experiment-kind benchmark"
         ),
-        "ENV:1:1",
+        "ENV::",
     ]
 
 
-def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
+def test_agent_smoke_make_target_uses_canonical_routing(tmp_path: Path) -> None:
     repo_root = Path(__file__).resolve().parents[2]
     bin_dir = tmp_path / "bin"
     bin_dir.mkdir()
@@ -1403,8 +1401,8 @@ def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
                 (
                     "printf 'ENV:%s:%s\\n' "
-                    '"${HARBOR_SMOKE_FAST:-}" '
-                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" >> "$FAKE_MAKE_LOG"'
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
                 ),
             ]
         )
@@ -1435,13 +1433,6 @@ def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
     assert result.returncode == 0, result.stderr
     assert make_log.read_text(encoding="utf-8").splitlines() == [
         "DOCKER:info",
-        "UV:run --project orchestrator raidar harbor cleanup",
-        "ENV:1:1",
-        (
-            "UV:run --project orchestrator raidar harness validate "
-            "--harness gemini --provider google --model gemini-3-flash-preview"
-        ),
-        "ENV:1:1",
         (
             "UV:run --project orchestrator raidar experiment run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
@@ -1449,7 +1440,7 @@ def test_agent_smoke_make_target_exports_fast_smoke_env(tmp_path: Path) -> None:
             "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
-        "ENV:1:1",
+        "ENV::",
     ]
 
 
@@ -1484,8 +1475,8 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
                 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
                 (
                     "printf 'ENV:%s:%s:%s\\n' "
-                    '"${HARBOR_SMOKE_FAST:-}" '
-                    '"${HARBOR_SMOKE_FAST_REUSE_IMAGE:-}" '
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
                     '"${CODEX_AUTH_MODE:-}" >> "$FAKE_MAKE_LOG"'
                 ),
             ]
@@ -1507,6 +1498,7 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
             "HARNESS=codex-cli",
             "PROVIDER=openai",
             "MODEL=gpt-5.4-mini",
+            "AGENT_SMOKE_REASONING_EFFORT=low",
         ],
         cwd=repo_root,
         env=env,
@@ -1518,22 +1510,64 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
     assert result.returncode == 0, result.stderr
     assert make_log.read_text(encoding="utf-8").splitlines() == [
         "DOCKER:info",
-        "UV:run --project orchestrator raidar harbor cleanup",
-        "ENV:1:1:",
-        (
-            "UV:run --project orchestrator raidar harness validate "
-            "--harness codex-cli --provider openai --model gpt-5.4-mini"
-        ),
-        "ENV:1:1:chatgpt",
         (
             "UV:run --project orchestrator raidar experiment run "
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--harness codex-cli --provider openai --model gpt-5.4-mini "
+            "--harness codex-cli --provider openai --model gpt-5.4-mini --reasoning-effort low "
             "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
             "--experiment-kind benchmark"
         ),
-        "ENV:1:1:chatgpt",
+        "ENV:::chatgpt",
     ]
+
+
+def test_agent_smoke_make_target_reports_pre_experiment_boundary_time(tmp_path: Path) -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+
+    fake_docker = bin_dir / "docker"
+    fake_docker.write_text(
+        "\n".join(
+            [
+                "#!/bin/sh",
+                'if [ "$1" = "info" ]; then',
+                "  exit 0",
+                "fi",
+                "exit 0",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    fake_docker.chmod(0o755)
+
+    fake_uv = bin_dir / "uv"
+    fake_uv.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    fake_uv.chmod(0o755)
+
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+
+    result = subprocess.run(
+        [
+            "make",
+            "agent-smoke",
+            "HARNESS=codex-cli",
+            "PROVIDER=openai",
+            "MODEL=gpt-5.5",
+            "AGENT_SMOKE_REASONING_EFFORT=low",
+        ],
+        cwd=repo_root,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "pre_experiment_sec=" in result.stdout
+    assert "(boundary=before experiment-run)" in result.stdout
 
 
 def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:

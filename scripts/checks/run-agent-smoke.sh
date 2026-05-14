@@ -8,7 +8,6 @@ TIMEOUT_SEC="300"
 REPEATS="1"
 REPEAT_PARALLEL="1"
 RERUN_UNSCORED="0"
-FAST_MODE="0"
 HARNESS=""
 PROVIDER=""
 MODEL=""
@@ -23,12 +22,11 @@ Required:
 
 Optional:
   --provider         Upstream provider; defaults to openai for codex-cli
-  --model            Model id; defaults to gpt-5.4-mini for codex-cli
+  --model            Model id; defaults to gpt-5.5 for codex-cli
   --timeout          Timeout in seconds, default: 300
   --repeats          Repeat count, default: 1
   --repeat-parallel  Repeat parallelism, default: 1
   --rerun-unscored   Unscored rerun budget (0|1), default: 0
-  --fast             Enable fast smoke mode (custom Harbor agents + prebuilt image reuse)
   --help             Show this help text
 USAGE
 }
@@ -67,10 +65,6 @@ while [[ $# -gt 0 ]]; do
       RERUN_UNSCORED="$2"
       shift 2
       ;;
-    --fast)
-      FAST_MODE="1"
-      shift
-      ;;
     --help|-h)
       usage
       exit 0
@@ -94,7 +88,7 @@ if [[ "$HARNESS" != "codex-cli" && "$HARNESS" != "claude-code" && "$HARNESS" != 
 fi
 
 if [[ -z "$MODEL" && "$HARNESS" == "codex-cli" ]]; then
-  MODEL="gpt-5.4-mini"
+  MODEL="gpt-5.5"
 fi
 
 if [[ -z "$PROVIDER" && "$HARNESS" == "codex-cli" ]]; then
@@ -111,11 +105,6 @@ if [[ -z "$PROVIDER" ]]; then
   echo "Missing required --provider for harness '$HARNESS'" >&2
   usage
   exit 1
-fi
-
-if [[ "$FAST_MODE" == "1" ]]; then
-  export HARBOR_SMOKE_FAST=1
-  export HARBOR_SMOKE_FAST_REUSE_IMAGE=1
 fi
 
 make "${MAKE_ARGS[@]}" agent-smoke \

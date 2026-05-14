@@ -9,6 +9,8 @@ from raidar.agents.adapters.codex_auth import CODEX_AUTH_MODE_ENV
 from raidar.agents.adapters.codex_cli import CodexCliAdapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
+CODEX_HARBOR_AGENT = "raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent"
+
 
 def _config(
     model: str,
@@ -71,7 +73,7 @@ def test_validate_accepts_file_backed_chatgpt_auth(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
-    assert adapter.harbor_harness_import_path() == CodexCliAdapter.HARBOR_IMPORT_PATH
+    assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
     assert adapter.local_secret_files() == {"CODEX_AUTH_JSON": auth_path}
     assert "PYTHONPATH" in adapter.runtime_env()
 
@@ -89,7 +91,7 @@ def test_auto_mode_prefers_chatgpt_over_api_key(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
-    assert adapter.harbor_harness_import_path() == CodexCliAdapter.HARBOR_IMPORT_PATH
+    assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
     assert adapter.excluded_run_env_keys() == {"OPENAI_API_KEY"}
     assert adapter.local_secret_files() == {"CODEX_AUTH_JSON": auth_path}
 
@@ -107,7 +109,7 @@ def test_api_mode_uses_api_key_even_when_auth_file_exists(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "api"
-    assert adapter.harbor_harness_import_path() is None
+    assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
     assert adapter.excluded_run_env_keys() == set()
     assert adapter.local_secret_files() == {}
 
@@ -128,6 +130,10 @@ def test_chatgpt_mode_requires_file_backed_auth(
 @pytest.mark.parametrize(
     ("model_name", "model_argument", "reasoning_effort"),
     (
+        ("gpt-5.5", "openai/gpt-5.5", "low"),
+        ("gpt-5.5", "openai/gpt-5.5", "medium"),
+        ("gpt-5.5", "openai/gpt-5.5", "high"),
+        ("gpt-5.5", "openai/gpt-5.5", "xhigh"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "low"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "medium"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "high"),

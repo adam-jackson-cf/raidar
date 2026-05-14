@@ -231,6 +231,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "harness_execution_sec",
         "verifier_sec",
         "harness_overhead_sec",
+        "orchestration_overhead_excluding_test_sec",
         "artifact_checks_passed",
         "artifact_checks_missing_patterns",
     ]
@@ -313,6 +314,9 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "harness_execution_sec": phase_timings.get("harness_execution_sec"),
         "verifier_sec": phase_timings.get("verifier_sec"),
         "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
+        "orchestration_overhead_excluding_test_sec": harbor_meta.get(
+            "orchestration_overhead_excluding_test_sec"
+        ),
         "artifact_checks_passed": artifact_checks.passed if artifact_checks is not None else None,
         "artifact_checks_missing_patterns": (
             json.dumps(artifact_checks.missing_patterns) if artifact_checks is not None else None

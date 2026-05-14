@@ -1,4 +1,4 @@
-"""Custom Harbor agents with no setup phase for smoke runs."""
+"""Repository-local Harbor agents for supported CLI harnesses."""
 
 from __future__ import annotations
 
@@ -122,12 +122,12 @@ def _claude_settings_flag(*, effort: str | None, thinking_mode: str | None) -> s
     return f"--settings {shlex.quote(json.dumps(settings_payload))} "
 
 
-class FastGeminiCliAgent(BaseAgent):
-    """Gemini CLI agent that assumes binary is already available in the image."""
+class GeminiCliHarborAgent(BaseAgent):
+    """Gemini CLI Harbor agent that assumes the binary is available in the image."""
 
     @staticmethod
     def name() -> str:
-        return "fast-gemini-cli"
+        return "gemini-cli-harbor"
 
     def version(self) -> str | None:
         return None
@@ -158,13 +158,12 @@ class FastGeminiCliAgent(BaseAgent):
         gemini_key = _secret_from_file_env("GEMINI_API_KEY")
         if gemini_key:
             path = "/tmp/agentic-eval-secrets/gemini_api_key"
-            await _upload_secret_file(environment, secret_value=gemini_key, target_path=path)
+            await _upload_secret_file(
+                environment,
+                secret_value=gemini_key,
+                target_path=path,
+            )
             secret_paths["GEMINI_API_KEY"] = path
-        google_key = _secret_from_file_env("GOOGLE_API_KEY")
-        if google_key:
-            path = "/tmp/agentic-eval-secrets/google_api_key"
-            await _upload_secret_file(environment, secret_value=google_key, target_path=path)
-            secret_paths["GOOGLE_API_KEY"] = path
 
         secret_prefix = _secret_export_prefix(secret_paths)
         result = await environment.exec(
@@ -183,8 +182,8 @@ class FastGeminiCliAgent(BaseAgent):
         _set_context_metadata(context, result.return_code, "/logs/agent/gemini-cli.txt")
 
 
-class FastClaudeCodeCliAgent(BaseAgent):
-    """Claude Code CLI agent that skips install/setup and executes directly."""
+class ClaudeCodeCliHarborAgent(BaseAgent):
+    """Claude Code CLI Harbor agent that executes directly in the task image."""
 
     _ALLOWED_TOOLS = (
         "Bash Edit Write Read Glob Grep LS WebFetch NotebookEdit "
@@ -204,7 +203,7 @@ class FastClaudeCodeCliAgent(BaseAgent):
 
     @staticmethod
     def name() -> str:
-        return "fast-claude-code"
+        return "claude-code-harbor"
 
     def version(self) -> str | None:
         return None
@@ -252,8 +251,8 @@ class FastClaudeCodeCliAgent(BaseAgent):
         _set_context_metadata(context, result.return_code, "/logs/agent/claude-code.txt")
 
 
-class FastCodexCliAgent(BaseAgent):
-    """Codex CLI agent that skips install/setup and executes directly."""
+class CodexCliHarborAgent(BaseAgent):
+    """Codex CLI Harbor agent that executes directly in the task image."""
 
     def __init__(self, reasoning_effort: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -261,7 +260,7 @@ class FastCodexCliAgent(BaseAgent):
 
     @staticmethod
     def name() -> str:
-        return "fast-codex"
+        return "codex-cli-harbor"
 
     def version(self) -> str | None:
         return None
@@ -321,20 +320,14 @@ class FastCodexCliAgent(BaseAgent):
         result = await environment.exec(
             command=(
                 "trap 'rm -rf /tmp/codex-secrets \"$CODEX_HOME/auth.json\"' EXIT TERM INT; "
-                "codex exec --dangerously-bypass-approvals-and-sandbox "
-                "--skip-git-repo-check --json "
+                "codex exec --ignore-user-config --ephemeral "
+                "--disable plugins "
+                "--dangerously-bypass-approvals-and-sandbox "
+                "--skip-git-repo-check --cd /app --json "
                 f"--model {shlex.quote(model)} {reasoning_flag}"
                 f"-- {escaped_instruction} "
-                "2>&1 </dev/null | tee /logs/agent/codex.txt"
+                "> /logs/agent/codex.txt 2>&1 </dev/null"
             ),
             env=env,
         )
         _set_context_metadata(context, result.return_code, "/logs/agent/codex.txt")
-
-
-class CodexCliHarborAgent(FastCodexCliAgent):
-    """Codex Harbor agent for runs that need file-backed session auth support."""
-
-    @staticmethod
-    def name() -> str:
-        return "codex-cli-harbor"

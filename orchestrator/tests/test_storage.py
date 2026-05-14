@@ -190,6 +190,7 @@ class TestExportCsv:
         sample_eval_run.scores.metadata["harbor"] = {
             "phase_timings_sec": {},
             "harness_overhead_sec": 1.23,
+            "orchestration_overhead_excluding_test_sec": 1.23,
         }
         output = tmp_path / "runs.csv"
         export_to_csv([sample_eval_run], output)
@@ -197,5 +198,6 @@ class TestExportCsv:
         assert "evaluation_profile" in payload
         assert "metric_results" in payload
         assert "harness_overhead_sec" in payload
+        assert "orchestration_overhead_excluding_test_sec" in payload
         assert "1.23" in payload
         assert sample_eval_run.config.evaluation_profile in payload
