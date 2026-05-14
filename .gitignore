@@ -44,3 +44,6 @@ diff.png
 # Lock files (keep bun.lock for scaffold)
 .enaible/
 .plan/
+
+# Infisical local state
+.infisical.json
