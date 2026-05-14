@@ -1,13 +1,13 @@
-"""Repository-local Harbor agents used for fast smoke mode."""
+"""Repository-local Harbor agents used for Harbor routing."""
 
-from .fast_cli_agents import (
-    FastClaudeCodeCliAgent,
-    FastCodexCliAgent,
-    FastGeminiCliAgent,
+from .cli_agents import (
+    ClaudeCodeCliHarborAgent,
+    CodexCliHarborAgent,
+    GeminiCliHarborAgent,
 )
 
 __all__ = [
-    "FastCodexCliAgent",
-    "FastClaudeCodeCliAgent",
-    "FastGeminiCliAgent",
+    "CodexCliHarborAgent",
+    "ClaudeCodeCliHarborAgent",
+    "GeminiCliHarborAgent",
 ]

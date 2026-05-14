@@ -109,6 +109,30 @@ def _selector_agent_specs(selector: MatrixSelector) -> list[AgentSpecInput]:
         AgentSpecInput(
             harness=Harness.CODEX_CLI.value,
             provider="openai",
+            model="gpt-5.5",
+            reasoning_effort="low",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.5",
+            reasoning_effort="medium",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.5",
+            reasoning_effort="high",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
+            model="gpt-5.5",
+            reasoning_effort="xhigh",
+        ),
+        AgentSpecInput(
+            harness=Harness.CODEX_CLI.value,
+            provider="openai",
             model="gpt-5.2",
             reasoning_effort="low",
         ),

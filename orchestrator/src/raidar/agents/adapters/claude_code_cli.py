@@ -3,33 +3,44 @@
 from __future__ import annotations
 
 import os
-import shutil
 from collections.abc import Iterable
-from pathlib import Path
 
 from ..config import AgentSpec
-from ..fast_mode import fast_harness_import_path, with_harness_pythonpath
-from .base import HarnessAdapter
+from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 
-class ClaudeCodeCliAdapter(HarnessAdapter):
+class ClaudeCodeCliAdapter(HarborCliAdapter):
     """Adapter enforcing Claude Code CLI harness + model pairing."""
 
     HARBOR_HARNESS_NAME = "claude-code"
     CLI_ENV_VAR = "CLAUDE_CODE_CLI_PATH"
+    DEFAULT_BINARY = "claude"
+    WORKSPACE_SESSION_DIR = ".claude"
     API_KEY_ENV = "CLAUDE_CODE_API_KEY"
     ANTHROPIC_API_ENV = "ANTHROPIC_API_KEY"
-    SUPPORTED_MODELS: set[str] = {
-        "claude-opus-4-7",
-        "claude-opus-4-6",
-        "claude-sonnet-4-6",
-        "claude-sonnet-4-5",
-        "claude-haiku-4-5",
-    }
-    SUPPORTED_REASONING: dict[str, tuple[str, ...]] = {
-        "claude-opus-4-7": ("low", "medium", "high", "xhigh", "max"),
-        "claude-opus-4-6": ("low", "medium", "high", "max"),
-        "claude-sonnet-4-6": ("low", "medium", "high", "max"),
+    OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
+    SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
+        "claude-opus-4-7": SupportedModelProfile(
+            display_label="Claude Opus 4.7",
+            reasoning_levels=("low", "medium", "high", "xhigh", "max"),
+            default_reasoning="high",
+        ),
+        "claude-opus-4-6": SupportedModelProfile(
+            display_label="Claude Opus 4.6",
+            reasoning_levels=("low", "medium", "high", "max"),
+            default_reasoning="high",
+        ),
+        "claude-sonnet-4-6": SupportedModelProfile(
+            display_label="Claude Sonnet 4.6",
+            reasoning_levels=("low", "medium", "high", "max"),
+            default_reasoning="high",
+        ),
+        "claude-sonnet-4-5": SupportedModelProfile(
+            display_label="Claude Sonnet 4.5",
+        ),
+        "claude-haiku-4-5": SupportedModelProfile(
+            display_label="Claude Haiku 4.5",
+        ),
     }
 
     @classmethod
@@ -38,20 +49,6 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
 
     def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
-        self._cli_path: str | None = None
-
-    def _resolve_cli(self) -> str:
-        if self._cli_path:
-            return self._cli_path
-        candidate = os.environ.get(self.CLI_ENV_VAR)
-        if not candidate:
-            candidate = shutil.which("claude")
-        if not candidate:
-            raise FileNotFoundError(
-                "Claude Code CLI not found. Set CLAUDE_CODE_CLI_PATH or add 'claude' to PATH."
-            )
-        self._cli_path = candidate
-        return candidate
 
     def validate(self) -> None:
         provider = self.config.model.provider
@@ -60,7 +57,8 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
                 "Claude Code CLI adapter only supports models with provider 'anthropic'. "
                 f"Received '{provider}'."
             )
-        if self.config.model.name not in self.SUPPORTED_MODELS:
+        model_profile = self.SUPPORTED_MODELS.get(self.config.model.name)
+        if model_profile is None:
             supported = ", ".join(sorted(self.SUPPORTED_MODELS))
             raise ValueError(
                 "Claude Code CLI adapter only supports models: "
@@ -68,7 +66,7 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
             )
         reasoning_effort = self.config.model.reasoning_effort
         if reasoning_effort is not None:
-            allowed = self.SUPPORTED_REASONING.get(self.config.model.name, ())
+            allowed = model_profile.reasoning_levels
             if reasoning_effort not in allowed:
                 allowed_rendered = ", ".join(allowed) if allowed else "(none)"
                 raise ValueError(
@@ -76,35 +74,20 @@ class ClaudeCodeCliAdapter(HarnessAdapter):
                     f"{allowed_rendered}. Received '{reasoning_effort}'."
                 )
         self._resolve_cli()
-        if not (os.environ.get(self.ANTHROPIC_API_ENV) or os.environ.get(self.API_KEY_ENV)):
+        if not (
+            os.environ.get(self.ANTHROPIC_API_ENV)
+            or os.environ.get(self.API_KEY_ENV)
+            or os.environ.get(self.OAUTH_TOKEN_ENV)
+        ):
             raise OSError(
-                "Claude Code Harbor runs require an API key. "
-                "Set ANTHROPIC_API_KEY or CLAUDE_CODE_API_KEY."
+                "Claude Code Harbor runs require credentials. "
+                "Set ANTHROPIC_API_KEY, CLAUDE_CODE_API_KEY, or CLAUDE_CODE_OAUTH_TOKEN."
             )
 
-    def harbor_harness(self) -> str:
-        return self.HARBOR_HARNESS_NAME
-
-    def harbor_harness_import_path(self) -> str | None:
-        return fast_harness_import_path(self.config.harness)
-
-    def model_argument(self) -> str:
-        return f"{self.config.model.provider}/{self.config.model.name}"
-
     def extra_harbor_args(self) -> Iterable[str]:
-        default_effort = "high" if self.config.model.name in self.SUPPORTED_REASONING else None
+        model_profile = self.SUPPORTED_MODELS[self.config.model.name]
+        default_effort = model_profile.default_reasoning
         reasoning_effort = self.config.model.reasoning_effort or default_effort
         if not reasoning_effort:
             return []
         return ["--ak", "thinking_mode=adaptive", "--ak", f"effort={reasoning_effort}"]
-
-    def runtime_env(self) -> dict[str, str]:
-        env: dict[str, str] = {}
-        cli_path = self._resolve_cli()
-        env[self.CLI_ENV_VAR] = cli_path
-        return with_harness_pythonpath(env)
-
-    def prepare_workspace(self, workspace: Path) -> None:
-        # Ensure Claude Code trace artifacts always have a stable home.
-        claude_session_dir = workspace / ".claude"
-        claude_session_dir.mkdir(exist_ok=True)

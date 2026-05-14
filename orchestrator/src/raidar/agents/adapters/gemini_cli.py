@@ -3,25 +3,30 @@
 from __future__ import annotations
 
 import os
-import shutil
 from collections.abc import Iterable
-from pathlib import Path
 
 from ..config import AgentSpec
-from ..fast_mode import fast_harness_import_path, with_harness_pythonpath
-from .base import HarnessAdapter
+from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 
-class GeminiCliAdapter(HarnessAdapter):
+class GeminiCliAdapter(HarborCliAdapter):
     """Adapter enforcing Gemini harness + model pairing."""
 
     HARBOR_HARNESS_NAME = "gemini-cli"
     CLI_ENV_VAR = "GEMINI_CLI_PATH"
+    DEFAULT_BINARY = "gemini"
+    WORKSPACE_SESSION_DIR = ".gemini"
     GEMINI_API_ENV = "GEMINI_API_KEY"
-    SUPPORTED_MODELS: set[str] = {
-        "gemini-3.1-pro-preview",
-        "gemini-3-pro-preview",
-        "gemini-3-flash-preview",
+    SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
+        "gemini-3.1-pro-preview": SupportedModelProfile(
+            display_label="Gemini 3.1 Pro Preview",
+        ),
+        "gemini-3-pro-preview": SupportedModelProfile(
+            display_label="Gemini 3 Pro Preview",
+        ),
+        "gemini-3-flash-preview": SupportedModelProfile(
+            display_label="Gemini 3 Flash Preview",
+        ),
     }
 
     @classmethod
@@ -30,20 +35,6 @@ class GeminiCliAdapter(HarnessAdapter):
 
     def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
-        self._cli_path: str | None = None
-
-    def _resolve_cli(self) -> str:
-        if self._cli_path:
-            return self._cli_path
-        candidate = os.environ.get(self.CLI_ENV_VAR)
-        if not candidate:
-            candidate = shutil.which("gemini")
-        if not candidate:
-            raise FileNotFoundError(
-                "Gemini CLI not found. Set GEMINI_CLI_PATH or add 'gemini' to PATH."
-            )
-        self._cli_path = candidate
-        return candidate
 
     def validate(self) -> None:
         provider = self.config.model.provider
@@ -67,25 +58,5 @@ class GeminiCliAdapter(HarnessAdapter):
         if not os.environ.get(self.GEMINI_API_ENV):
             raise OSError("Gemini Harbor runs require an API key. Set GEMINI_API_KEY.")
 
-    def harbor_harness(self) -> str:
-        return self.HARBOR_HARNESS_NAME
-
-    def harbor_harness_import_path(self) -> str | None:
-        return fast_harness_import_path(self.config.harness)
-
-    def model_argument(self) -> str:
-        return f"{self.config.model.provider}/{self.config.model.name}"
-
     def extra_harbor_args(self) -> Iterable[str]:
         return []
-
-    def runtime_env(self) -> dict[str, str]:
-        env: dict[str, str] = {}
-        cli_path = self._resolve_cli()
-        env[self.CLI_ENV_VAR] = cli_path
-        return with_harness_pythonpath(env)
-
-    def prepare_workspace(self, workspace: Path) -> None:
-        # Ensure Gemini trace artifacts always have a stable home.
-        gemini_session_dir = workspace / ".gemini"
-        gemini_session_dir.mkdir(exist_ok=True)

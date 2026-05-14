@@ -37,11 +37,13 @@ Run one repeatable experiment for one `AgentSpec` (`harness + model`).
 
 ```bash
 make codex-auth-setup
-make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
+make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5 REASONING_EFFORT=low
 make experiment-run \
   SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
   HARNESS=codex-cli \
-  MODEL=codex/gpt-5.4-mini \
+  PROVIDER=openai \
+  MODEL=gpt-5.5 \
+  REASONING_EFFORT=low \
   RUN_COUNT=5 \
   RUN_PARALLELISM=1 \
   RERUN_UNSCORED=0
@@ -49,7 +51,7 @@ make experiment-run \
 
 Artifacts land in `experiments/`, including per-run `run.json`, experiment-level `experiment.json`, `experiment-summary.json`, and `report.md`.
 
-Use the public make surface for faster smoke runs or structured provider-family comparisons:
+Use the public make surface for smoke runs or structured provider-family comparisons:
 
 ```bash
 make orchestrator-smoke
@@ -85,8 +87,8 @@ Use benchmark experiments when you want a comparison baseline for one scenario. 
 ```bash
 make codex-auth-setup
 make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
-make harness-validate HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
-make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=codex-cli MODEL=codex/gpt-5.4-mini
+make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5 REASONING_EFFORT=low
+make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5 REASONING_EFFORT=low
 make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
 ```
 
