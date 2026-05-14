@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.0] - 2026-05-14
+
+- feat: improve benchmark web view ux
+- feat: further improvements to benchmark web view
+- feat: add benchmark scenario iteration tooling
+- refactor: consolidate harbor cli smoke adapters
+- refactor: improve benchmark dashboard filters
+- chore: ignore infisical state file
+- chore: remove stale benchmark review artifacts
+
 ## [0.11.1] - 2026-04-21
 
 - docs: add harness optimization notes
