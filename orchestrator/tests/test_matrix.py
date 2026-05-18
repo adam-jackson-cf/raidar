@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from raidar.matrix import (
+    CODEX_SELECTOR_MODEL_CATALOG,
     AgentSpecInput,
     ExperimentConfig,
     MatrixAgentSpec,
@@ -211,6 +212,23 @@ def test_build_selected_matrix_config_for_codex() -> None:
         ("openai", "gpt-5.4-mini", None),
         ("openai", "gpt-5.4-mini", "low"),
     ]
+
+
+def test_codex_selector_matches_model_catalog() -> None:
+    config = build_selected_matrix_config(
+        selector="codex",
+        timeout_sec=1800,
+        repeats=5,
+        repeat_parallel=1,
+        retry_void=0,
+    )
+
+    expected = [
+        (model, reasoning_effort)
+        for model, reasoning_efforts in CODEX_SELECTOR_MODEL_CATALOG
+        for reasoning_effort in reasoning_efforts
+    ]
+    assert [(spec.model, spec.reasoning_effort) for spec in config.agents] == expected
 
 
 def test_build_selected_matrix_config_for_all() -> None:

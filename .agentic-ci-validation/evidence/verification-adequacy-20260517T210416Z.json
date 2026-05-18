@@ -1,0 +1,14 @@
+{
+  "adapter": "verification-adequacy",
+  "command": [
+    "test",
+    "-f",
+    ".agentic-ci-validation/imported/verification-results.json"
+  ],
+  "cwd": "/Users/adamjackson/Projects/complete/raidar",
+  "signal": "verification adequacy",
+  "state": "failed",
+  "stderr_excerpt": "",
+  "stdout_excerpt": "",
+  "summary": "adapter exited with status exit status: 1"
+}

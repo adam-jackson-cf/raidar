@@ -6,6 +6,7 @@ from .codex_cli import CodexCliAdapter
 from .copilot_cli import CopilotCliAdapter
 from .cursor_cli import CursorCliAdapter
 from .external_cli import ExternalCliAdapter
+from .factory import adapter_class_for_harness, resolve_adapter
 from .gemini_cli import GeminiCliAdapter
 from .harbor_cli import HarborCliAdapter
 from .pi_cli import PiCliAdapter
@@ -17,6 +18,8 @@ __all__ = [
     "CodexCliAdapter",
     "CopilotCliAdapter",
     "CursorCliAdapter",
+    "adapter_class_for_harness",
+    "resolve_adapter",
     "GeminiCliAdapter",
     "PiCliAdapter",
     "ExternalCliAdapter",

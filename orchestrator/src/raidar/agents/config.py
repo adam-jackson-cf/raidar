@@ -46,9 +46,3 @@ class AgentSpec(BaseModel):
     harness: Harness = Field(description="Harness to use (claude-code, codex-cli, etc)")
     model: ModelTarget = Field(description="Model configuration")
     timeout_sec: int = Field(default=1800, description="Scenario timeout in seconds")
-
-    def adapter(self):  # type: ignore[override]
-        """Resolve the registered adapter for this harness."""
-        from .adapters.registry import registry
-
-        return registry.resolve(self)

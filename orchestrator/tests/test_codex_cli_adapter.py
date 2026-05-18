@@ -7,6 +7,7 @@ import pytest
 
 from raidar.agents.adapters.codex_auth import CODEX_AUTH_MODE_ENV
 from raidar.agents.adapters.codex_cli import CodexCliAdapter
+from raidar.agents.adapters.factory import resolve_adapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 CODEX_HARBOR_AGENT = "raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent"
@@ -32,7 +33,7 @@ def _write_codex_auth(tmp_path: Path) -> Path:
 
 
 def test_registry_resolves_codex_adapter() -> None:
-    adapter = _config("gpt-5.4", reasoning_effort="high").adapter()
+    adapter = resolve_adapter(_config("gpt-5.4", reasoning_effort="high"))
     assert isinstance(adapter, CodexCliAdapter)
 
 

@@ -11,6 +11,16 @@ from .agents.adapters.gemini_cli import GeminiCliAdapter
 from .agents.config import AgentSpec, Harness, ModelTarget
 
 MatrixSelector = Literal["all", "codex", "gemini", "claude"]
+ReasoningEffort = Literal["low", "medium", "high", "xhigh"]
+
+CODEX_REASONING_EFFORTS: tuple[ReasoningEffort, ...] = ("low", "medium", "high", "xhigh")
+CODEX_SELECTOR_MODEL_CATALOG: tuple[tuple[str, tuple[ReasoningEffort | None, ...]], ...] = (
+    ("gpt-5.5", CODEX_REASONING_EFFORTS),
+    ("gpt-5.2", ("low", "medium", "high")),
+    ("gpt-5.3-codex-spark", CODEX_REASONING_EFFORTS),
+    ("gpt-5.4", CODEX_REASONING_EFFORTS),
+    ("gpt-5.4-mini", (None, "low")),
+)
 
 
 class AgentSpecInput(BaseModel):
@@ -104,114 +114,37 @@ def matrix_selector_choices() -> tuple[str, ...]:
     return ("all", "codex", "gemini", "claude")
 
 
-def _selector_agent_specs(selector: MatrixSelector) -> list[AgentSpecInput]:
-    codex_specs = [
+def _codex_selector_agent_specs() -> list[AgentSpecInput]:
+    return [
         AgentSpecInput(
             harness=Harness.CODEX_CLI.value,
             provider="openai",
-            model="gpt-5.5",
-            reasoning_effort="low",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.5",
-            reasoning_effort="medium",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.5",
-            reasoning_effort="high",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.5",
-            reasoning_effort="xhigh",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.2",
-            reasoning_effort="low",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.2",
-            reasoning_effort="medium",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.2",
-            reasoning_effort="high",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.3-codex-spark",
-            reasoning_effort="low",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.3-codex-spark",
-            reasoning_effort="medium",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.3-codex-spark",
-            reasoning_effort="high",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.3-codex-spark",
-            reasoning_effort="xhigh",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.4",
-            reasoning_effort="low",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.4",
-            reasoning_effort="medium",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.4",
-            reasoning_effort="high",
-        ),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.4",
-            reasoning_effort="xhigh",
-        ),
-        AgentSpecInput(harness=Harness.CODEX_CLI.value, provider="openai", model="gpt-5.4-mini"),
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model="gpt-5.4-mini",
-            reasoning_effort="low",
-        ),
+            model=model,
+            reasoning_effort=reasoning_effort,
+        )
+        for model, reasoning_efforts in CODEX_SELECTOR_MODEL_CATALOG
+        for reasoning_effort in reasoning_efforts
     ]
-    gemini_specs = [
+
+
+def _gemini_selector_agent_specs() -> list[AgentSpecInput]:
+    return [
         AgentSpecInput(harness=Harness.GEMINI.value, provider="google", model=model_name)
         for model_name in sorted(GeminiCliAdapter.SUPPORTED_MODELS)
     ]
-    claude_specs = [
+
+
+def _claude_selector_agent_specs() -> list[AgentSpecInput]:
+    return [
         AgentSpecInput(harness=Harness.CLAUDE_CODE.value, provider="anthropic", model=model_name)
         for model_name in sorted(ClaudeCodeCliAdapter.SUPPORTED_MODELS)
     ]
+
+
+def _selector_agent_specs(selector: MatrixSelector) -> list[AgentSpecInput]:
+    codex_specs = _codex_selector_agent_specs()
+    gemini_specs = _gemini_selector_agent_specs()
+    claude_specs = _claude_selector_agent_specs()
     groups: dict[str, list[AgentSpecInput]] = {
         "codex": codex_specs,
         "gemini": gemini_specs,

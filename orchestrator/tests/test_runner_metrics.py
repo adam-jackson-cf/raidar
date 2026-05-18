@@ -1708,6 +1708,74 @@ def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
     assert scorecard["acceptance"]["checks"][0]["passed"] is True
 
 
+def test_verifier_rejects_unsafe_no_pattern_regex(tmp_path: Path) -> None:
+    app_dir = tmp_path / "app"
+    logs_dir = tmp_path / "logs"
+    tests_dir = tmp_path / "tests"
+    (app_dir / "src").mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (app_dir / "package.json").write_text("{}", encoding="utf-8")
+    (app_dir / "bun.lock").write_text("", encoding="utf-8")
+    (app_dir / "src" / "App.tsx").write_text("export const value = 'aaaa';\n", encoding="utf-8")
+
+    scenario_spec_path = tests_dir / "scenario-spec.json"
+    scenario_spec_path.write_text(
+        json.dumps(
+            {
+                "metrics": [],
+                "verification": {
+                    "max_gate_failures": 3,
+                    "coverage_threshold": None,
+                    "min_quality_score": 0,
+                    "gates": [],
+                    "workflow": {"atomic_commits_required": False},
+                },
+                "acceptance": {
+                    "deterministic_checks": [
+                        {
+                            "type": "no_pattern",
+                            "pattern": "(a+)+$",
+                            "description": "unsafe regex is rejected",
+                        }
+                    ],
+                    "requirements": [],
+                },
+                "weights": {
+                    "functional": 0.25,
+                    "acceptance": 0.25,
+                    "visual": 0.25,
+                    "verification_stability": 0.25,
+                },
+                "baseline_scripts": {},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    score_script = tests_dir / "score-scenario.mjs"
+    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
+
+    completed = subprocess.run(
+        ["bun", str(score_script), str(scenario_spec_path)],
+        cwd=tests_dir,
+        env={
+            **runner.os.environ,
+            "RAIDAR_APP_DIR": str(app_dir),
+            "RAIDAR_LOG_DIR": str(logs_dir),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    scorecard = json.loads((logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+    check = scorecard["acceptance"]["checks"][0]
+    assert check["passed"] is False
+    assert "Unsafe regex pattern" in check["evidence"]
+
+
 def test_classify_unscored_reasons_rate_limit():
     reasons = _classify_unscored_reasons(
         terminated_early=True,

@@ -242,49 +242,118 @@ function hasWorkspaceTestFiles() {
   );
 }
 
-function globToRegex(pattern) {
-  let regex = "^";
-  for (let idx = 0; idx < pattern.length; ) {
-    const char = pattern[idx];
-    const next = pattern[idx + 1];
-    const following = pattern[idx + 2];
-    if (char === "*" && next === "*" && following === "/") {
-      regex += "(?:.*/)?";
-      idx += 3;
+function globToParts(pattern) {
+  return String(pattern).split("/");
+}
+
+function globSegmentMatches(pattern, value) {
+  let patternIndex = 0;
+  let valueIndex = 0;
+  let starIndex = -1;
+  let starValueIndex = 0;
+  while (valueIndex < value.length) {
+    if (
+      patternIndex < pattern.length &&
+      (pattern[patternIndex] === "?" || pattern[patternIndex] === value[valueIndex])
+    ) {
+      patternIndex += 1;
+      valueIndex += 1;
       continue;
     }
-    if (char === "*" && next === "*") {
-      regex += ".*";
-      idx += 2;
+    if (patternIndex < pattern.length && pattern[patternIndex] === "*") {
+      starIndex = patternIndex;
+      starValueIndex = valueIndex;
+      patternIndex += 1;
       continue;
     }
-    if (char === "*") {
-      regex += "[^/]*";
-      idx += 1;
-      continue;
+    if (starIndex === -1) {
+      return false;
     }
-    if (char === "?") {
-      regex += "[^/]";
-      idx += 1;
-      continue;
-    }
-    regex += /[\\^$+?.()|[\]{}]/.test(char) ? `\\${char}` : char;
-    idx += 1;
+    patternIndex = starIndex + 1;
+    starValueIndex += 1;
+    valueIndex = starValueIndex;
   }
-  regex += "$";
-  return new RegExp(regex);
+  while (patternIndex < pattern.length && pattern[patternIndex] === "*") {
+    patternIndex += 1;
+  }
+  return patternIndex === pattern.length;
+}
+
+function globPartsMatch(patternParts, fileParts) {
+  if (patternParts.length === 0) {
+    return fileParts.length === 0;
+  }
+  const [head, ...tail] = patternParts;
+  if (head === "**") {
+    return (
+      globPartsMatch(tail, fileParts) ||
+      (fileParts.length > 0 && globPartsMatch(patternParts, fileParts.slice(1)))
+    );
+  }
+  return (
+    fileParts.length > 0 &&
+    globSegmentMatches(head, fileParts[0]) &&
+    globPartsMatch(tail, fileParts.slice(1))
+  );
 }
 
 function filesMatchingPattern(pattern) {
-  const matcher = globToRegex(pattern);
+  const matcher = globToParts(pattern);
   const allFiles = walkFiles(APP_DIR).map((file) =>
     path.relative(APP_DIR, file),
   );
-  return allFiles.filter((file) => matcher.test(file));
+  return allFiles.filter((file) => globPartsMatch(matcher, file.split(path.sep)));
 }
 
 function fileExistsByPattern(pattern) {
   return filesMatchingPattern(pattern).length > 0;
+}
+
+function hasNestedQuantifier(pattern) {
+  const nestedQuantifierPattern =
+    /\((?:[^()\\]|\\.|\\([^()]*\\))*[+*](?:[^()\\]|\\.)*\)[+*{]/;
+  return nestedQuantifierPattern.test(pattern);
+}
+
+function hasAmbiguousAlternation(pattern) {
+  const groupPattern = /\(([^()\\]*(?:\\.[^()\\]*)*)\)([+*]|\{\d+,?\d*\})/g;
+  for (const match of pattern.matchAll(groupPattern)) {
+    const alternatives = match[1].split("|");
+    if (alternatives.length < 2) continue;
+    const sorted = alternatives
+      .filter((alternative) => alternative.length > 0)
+      .sort((left, right) => left.length - right.length);
+    for (let index = 0; index < sorted.length; index += 1) {
+      for (let other = index + 1; other < sorted.length; other += 1) {
+        if (sorted[other].startsWith(sorted[index])) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
+function validateSafeRegexPattern(pattern) {
+  if (typeof pattern !== "string") {
+    return { valid: false, reason: "Pattern must be a string" };
+  }
+  if (pattern.length > 512) {
+    return { valid: false, reason: "Pattern exceeds 512 characters" };
+  }
+  if (hasNestedQuantifier(pattern)) {
+    return {
+      valid: false,
+      reason: "Pattern contains nested quantifiers with ReDoS risk",
+    };
+  }
+  if (hasAmbiguousAlternation(pattern)) {
+    return {
+      valid: false,
+      reason: "Pattern contains ambiguous repeated alternation with ReDoS risk",
+    };
+  }
+  return { valid: true, reason: "Pattern passed regex safety validation" };
 }
 
 function runDeterministicCheck(check, sourceFiles) {
@@ -303,6 +372,15 @@ function runDeterministicCheck(check, sourceFiles) {
   }
 
   if (check.type === "no_pattern") {
+    const validation = validateSafeRegexPattern(check.pattern);
+    if (!validation.valid) {
+      return {
+        rule: check.description,
+        type: "deterministic",
+        passed: false,
+        evidence: `Unsafe regex pattern '${check.pattern}': ${validation.reason}`,
+      };
+    }
     let regex;
     try {
       regex = new RegExp(check.pattern);
@@ -514,28 +592,23 @@ function testEvidenceLabel(evidence) {
 }
 
 function countRoleQueryMatches(testSources, evidence) {
-  const role = escapeRegExp(evidence?.role || "");
+  const role = String(evidence?.role || "");
   if (!role) {
     return 0;
   }
-  const queryPattern = new RegExp(
-    String.raw`(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['"])${role}\1(?<options>\s*,\s*\{[\s\S]*?\})?`,
-    "gmi",
-  );
+  const queryPattern =
+    /(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['"])(?<role>[^'"]+)\1(?<options>\s*,\s*\{[\s\S]*?\})?/gmi;
   let count = 0;
   for (const source of testSources) {
     for (const match of source.matchAll(queryPattern)) {
-      const options = match.groups?.options || "";
-      if (
-        evidence.level !== undefined &&
-        !new RegExp(String.raw`level\s*:\s*${evidence.level}\b`, "mi").test(options)
-      ) {
+      if (match.groups?.role !== role) {
         continue;
       }
-      if (
-        evidence.name &&
-        !new RegExp(escapeRegExp(evidence.name), "mi").test(options)
-      ) {
+      const options = match.groups?.options || "";
+      if (evidence.level !== undefined && !options.includes(`level: ${evidence.level}`)) {
+        continue;
+      }
+      if (evidence.name && !options.toLowerCase().includes(String(evidence.name).toLowerCase())) {
         continue;
       }
       count += 1;
@@ -550,13 +623,13 @@ function countTextQueryMatches(testSources, evidence) {
     return 0;
   }
   const byTextPattern = /(?:screen\.)?(?:get|find|query)(?:All)?ByText\s*\(/mi;
-  const matchPattern = new RegExp(pattern, "gmi");
+  const needle = String(pattern).toLowerCase();
   let count = 0;
   for (const source of testSources) {
     if (!byTextPattern.test(source)) {
       continue;
     }
-    count += [...source.matchAll(matchPattern)].length;
+    count += source.toLowerCase().split(needle).length - 1;
   }
   return count;
 }

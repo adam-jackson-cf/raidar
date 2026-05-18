@@ -221,7 +221,7 @@ orchestrator-smoke: docker-check
 smoke-matrix: docker-check
 	$(RAIDAR) matrix \
 		--scenario "$(SMOKE_MATRIX_SCENARIO)" \
-		--config "$(SMOKE_MATRIX_CONFIG)" \
+		$(if $(SMOKE_MATRIX_SELECTOR),--selector "$(SMOKE_MATRIX_SELECTOR)",--config "$(SMOKE_MATRIX_CONFIG)") \
 		--experiment-kind "$(EXPERIMENT_KIND)"
 
 agent-smoke: docker-check

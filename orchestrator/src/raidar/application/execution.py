@@ -16,8 +16,15 @@ from raidar.application.models import (
     RunCliOptions,
     SuiteExecutionResult,
 )
+from raidar.application.scenario_catalog import (
+    load_scenario,
+    scenario_evaluation_profile,
+    scenario_metrics,
+)
 from raidar.experiment import create_experiment_summary, persist_experiment
-from raidar.runner import RunRequest, StarterPreflightError, load_scenario, run_task
+from raidar.runner import RunRequest, StarterPreflightError
+from raidar.runtime.maintenance import cleanup_stale_harbor_resources
+from raidar.runtime.pipeline import run_task
 
 BENCHMARK_EXPERIMENTS_ROOT_NAME = "benchmarks"
 RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME = "research_loops"
@@ -89,8 +96,8 @@ def execute_run_command(
         scenario_revision=run_request.scenario.scenario_revision,
         harness=resolved.harness,
         model=resolved.model,
-        evaluation_profile=_runner_api().scenario_evaluation_profile(run_request.scenario),
-        metrics=_runner_api().scenario_metrics(run_request.scenario),
+        evaluation_profile=scenario_evaluation_profile(run_request.scenario),
+        metrics=scenario_metrics(run_request.scenario),
         repeats=resolved.repeats,
         repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
         runs=runs,
@@ -164,14 +171,8 @@ def _load_project_env(repo_root: Path) -> None:
         load_dotenv(env_path, override=False)
 
 
-def _runner_api():
-    from raidar import runner as runner_module
-
-    return runner_module
-
-
 def _cleanup_stale_harbor_before_runs() -> None:
-    _runner_api().cleanup_stale_harbor_resources(
+    cleanup_stale_harbor_resources(
         include_containers=True,
         include_build_processes=True,
     )

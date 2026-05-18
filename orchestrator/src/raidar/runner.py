@@ -14,7 +14,6 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
-from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -22,7 +21,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
-from .agents.config import AgentSpec, Harness
+from .agents.config import Harness
 from .agents.harbor_routing import (
     is_task_image_reuse_enabled,
     task_image_prefix,
@@ -30,13 +29,37 @@ from .agents.harbor_routing import (
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .audit.workspace_diff import diff_directories, directory_fingerprint
 from .config import settings
+from .runtime.harbor import (
+    format_version as _format_version,
+)
+from .runtime.harbor import (
+    parse_docker_compose_version as _parse_docker_compose_version,
+)
+from .runtime.harbor import (
+    validate_public_base_images as _validate_public_base_images,
+)
+from .runtime.models import (
+    BaselineWorkspaceCacheResult,
+    CommandRecord,
+    EvaluationOutputs,
+    ExecutionPhaseResult,
+    HarborExecutionRequest,
+    HarborExecutionResult,
+    PersistedArtifacts,
+    ProcessMetrics,
+    RunLayout,
+    RunRequest,
+    ScorecardBuildContext,
+    TaskImageBuildResult,
+    TaskImageRef,
+    WorkspaceContext,
+)
 from .schemas.events import GateEvent, TraceEvent
 from .schemas.scenario import RequirementSpec, ScenarioDefinition
 from .schemas.scorecard import (
     AcceptanceCheck,
     AcceptanceScore,
     CoverageScore,
-    EvalRun,
     ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
@@ -66,11 +89,6 @@ HARNESS_STALE_BUILDX_PATTERN = re.compile(
     r"docker-buildx bake .*--allow fs\.read=.*harbor-task-[^/]+/environment"
 )
 HARNESS_STALE_RUN_PATTERN = re.compile(r"\bharbor run --path .*harbor-task-")
-DOCKER_COMPOSE_VERSION_PATTERN = re.compile(r"(?:^|[^0-9])v?(\d+)\.(\d+)\.(\d+)(?:[^0-9]|$)")
-DOCKERFILE_FROM_PATTERN = re.compile(
-    r"^\s*FROM(?:\s+--platform=[^\s]+)?\s+([^\s]+)",
-    re.IGNORECASE | re.MULTILINE,
-)
 BACKTICK_COMMAND_PATTERN = re.compile(r"`([^`\n]+)`")
 SHELL_COMMAND_PREFIX_PATTERN = re.compile(r"^(?:bun|npm|npx|pnpm|yarn|biome|tsc|next|vitest)\b")
 COMMAND_INTENT_PATTERN = re.compile(r"\b(i will|i'll|i am going to|i'm going to|i plan to)\b")
@@ -111,20 +129,6 @@ SECRET_ENV_KEYS: tuple[str, ...] = (
     "GEMINI_API_KEY",
 )
 SECRET_FILE_ENV_PREFIX = "AGENTIC_EVAL_SECRET_FILE_"
-PUBLIC_REGISTRY_HOSTS: set[str] = {
-    "docker.io",
-    "index.docker.io",
-    "registry-1.docker.io",
-    "ghcr.io",
-    "quay.io",
-    "mcr.microsoft.com",
-    "public.ecr.aws",
-    "gcr.io",
-    "us.gcr.io",
-    "eu.gcr.io",
-    "asia.gcr.io",
-    "registry.k8s.io",
-}
 REGISTRY_RATE_LIMIT_PATTERN = re.compile(
     r"(?:toomanyrequests|too many requests|pull rate limit|rate limit exceeded|429)",
     re.IGNORECASE,
@@ -204,205 +208,6 @@ def load_scenario(scenario_path: Path) -> ScenarioDefinition:
     with open(scenario_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return ScenarioDefinition.model_validate(data)
-
-
-@dataclass(frozen=True, slots=True)
-class RunRequest:
-    """Input bundle for running a scenario."""
-
-    scenario: ScenarioDefinition
-    config: AgentSpec
-    scenario_dir: Path
-    execution_dir: Path
-    repeat_index: int = 1
-
-
-@dataclass(frozen=True, slots=True)
-class WorkspaceContext:
-    """Resolved starter context for a scenario run."""
-
-    starter_source: StarterSource
-    baseline_workspace: Path
-    baseline_cache_key: str
-    baseline_cache_status: str
-    baseline_cache_hit: bool
-    baseline_metadata_path: Path
-    baseline_fingerprint: str
-    workspace: Path
-    injected_rules: Path | None
-    metadata_path: Path
-
-
-@dataclass(frozen=True, slots=True)
-class EvaluationOutputs:
-    """Computed scoring outputs for a run."""
-
-    functional: FunctionalScore
-    acceptance: AcceptanceScore
-    visual: VisualScore | None
-    verification_stability: VerificationStabilityScore
-    test_coverage: CoverageScore
-    requirements_coverage: RequirementsCoverageScore
-    execution_validity: ExecutionValidityScore
-    performance_gates: PerformanceGatesScore
-    metric_results: list[MetricResult]
-    gate_history: list[GateEvent]
-
-
-@dataclass(frozen=True, slots=True)
-class HarborExecutionResult:
-    """Outcome of the Harbor execution phase."""
-
-    terminated_early: bool
-    termination_reason: str | None
-    job_dir: Path
-    trial_dir: Path | None
-
-
-@dataclass(frozen=True, slots=True)
-class CommandRecord:
-    """Normalized command execution record from Codex logs."""
-
-    command: str
-    failed: bool
-    output: str
-    exit_code: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class ProcessMetrics:
-    """Process metrics extracted from Harbor harness logs."""
-
-    uncached_input_tokens: int
-    output_tokens: int
-    command_count: int
-    failed_command_count: int
-    process_failed_command_count: int
-    verification_rounds: int
-    repeated_verification_failures: int
-    required_verification_commands: int
-    executed_required_verification_commands: int
-    failed_command_categories: dict[str, int] = field(default_factory=dict)
-    required_verification_first_pass: dict[str, str] = field(default_factory=dict)
-    first_pass_verification_successes: int = 0
-    first_pass_verification_failures: int = 0
-    missing_required_verification_commands: int = 0
-    git_commit_verification_bypass_commands: list[str] = field(default_factory=list)
-
-
-@dataclass(frozen=True, slots=True)
-class RunLayout:
-    """Filesystem layout for a canonical evaluation run directory."""
-
-    run_id: str
-    start_time: datetime
-    run_label: str
-    root_dir: Path
-    workspace_dir: Path
-    verifier_dir: Path
-    harness_dir: Path
-    harbor_dir: Path
-    run_json_path: Path
-    report_path: Path
-
-
-@dataclass(frozen=True, slots=True)
-class HarborExecutionRequest:
-    """Typed Harbor execution request."""
-
-    adapter: Any
-    workspace: Path
-    task_bundle_path: Path
-    jobs_dir: Path
-    run_harbor_dir: Path
-    run_id: str
-    timeout_sec: int
-    run_env: dict[str, str]
-
-
-@dataclass(frozen=True, slots=True)
-class TaskImageRef:
-    """Content-addressed Docker image reference for Harbor execution."""
-
-    image_name: str
-    cache_key: str
-    tag: str
-
-
-@dataclass(frozen=True, slots=True)
-class TaskImageBuildResult:
-    """Result of a Harbor task image build."""
-
-    completed_process: subprocess.CompletedProcess[str]
-    timed_out: bool = False
-    timeout_sec: int | None = None
-
-
-@dataclass(frozen=True, slots=True)
-class BaselineWorkspaceCacheResult:
-    """Cache result for the shared prepared baseline workspace."""
-
-    metadata_path: Path
-    baseline_fingerprint: str
-    hit: bool
-    status: str
-
-
-@dataclass(frozen=True, slots=True)
-class WorkspacePreparationPhaseResult:
-    """Workspace preparation phase output."""
-
-    layout: RunLayout
-    context: WorkspaceContext
-    harbor_request: HarborExecutionRequest
-    prep_phase_timings_sec: dict[str, float]
-    prep_total_sec: float
-    cache_metadata: dict[str, Any]
-    auth_metadata: dict[str, Any]
-    screenshot_command: tuple[str, ...] | None
-    evidence_errors: tuple[str, ...]
-
-
-@dataclass(frozen=True, slots=True)
-class ExecutionPhaseResult:
-    """Harbor execution + verifier loading phase output."""
-
-    harbor_result: HarborExecutionResult
-    terminated_early: bool
-    termination_reason: str | None
-    process_metrics: ProcessMetrics
-    events: list[TraceEvent]
-    outputs: EvaluationOutputs
-    duration_sec: float
-    prep_phase_timings_sec: dict[str, float]
-    prep_total_sec: float
-    cache_metadata: dict[str, Any]
-    auth_metadata: dict[str, Any]
-
-
-@dataclass(frozen=True, slots=True)
-class PersistedArtifacts:
-    """Persisted artifact metadata used for score synthesis."""
-
-    starter_meta: dict
-    scenario_revision_meta: dict[str, str | None]
-    verifier_artifacts: dict[str, str]
-    harness_artifacts: dict[str, str]
-    harbor_artifacts: dict[str, str]
-    evidence_artifacts: dict[str, Any]
-    workspace_prune: dict[str, Any]
-    workspace_changes: dict[str, Any]
-
-
-@dataclass(frozen=True, slots=True)
-class ScorecardBuildContext:
-    """Input bundle for scorecard synthesis."""
-
-    request: RunRequest
-    layout: RunLayout
-    context: WorkspaceContext
-    artifacts: PersistedArtifacts
-    execution: ExecutionPhaseResult
 
 
 def _slug_fragment(value: str) -> str:
@@ -736,10 +541,14 @@ def _visual_reference_assets(request: RunRequest) -> list[tuple[Path, Path]]:
         return []
 
     assets = [(source_reference, reference_path)]
-    for sibling in sorted(
-        source_reference.parent.glob(f"{source_reference.stem}-region-*{source_reference.suffix}")
-    ):
-        assets.append((sibling, reference_path.parent / sibling.name))
+    assets.extend(
+        (sibling, reference_path.parent / sibling.name)
+        for sibling in sorted(
+            source_reference.parent.glob(
+                f"{source_reference.stem}-region-*{source_reference.suffix}"
+            )
+        )
+    )
     return assets
 
 
@@ -848,7 +657,17 @@ def _safe_extract_tarball(archive_path: Path, target_dir: Path) -> None:
                 f"{target_root}{os.sep}"
             ):
                 raise RuntimeError(f"Unsafe tar member path: {member.name}")
-        archive.extractall(path=target_root, filter="data")
+            if member.isdir():
+                member_target.mkdir(parents=True, exist_ok=True)
+                continue
+            if not member.isfile():
+                raise RuntimeError(f"Unsupported tar member type: {member.name}")
+            member_target.parent.mkdir(parents=True, exist_ok=True)
+            source = archive.extractfile(member)
+            if source is None:
+                raise RuntimeError(f"Unable to read tar member: {member.name}")
+            with source, member_target.open("wb") as destination:
+                shutil.copyfileobj(source, destination)
 
 
 def _hydrate_workspace_from_final_app(
@@ -1460,14 +1279,6 @@ def _write_harbor_secret_file_from_path(*, secret_name: str, source_path: Path) 
     return secret_path
 
 
-def _parse_docker_compose_version(raw: str) -> tuple[int, int, int] | None:
-    match = DOCKER_COMPOSE_VERSION_PATTERN.search(raw.strip())
-    if not match:
-        return None
-    major, minor, patch = match.groups()
-    return int(major), int(minor), int(patch)
-
-
 def _read_docker_compose_version(run_env: dict[str, str]) -> tuple[int, int, int] | None:
     for cmd in (["docker", "compose", "version", "--short"], ["docker", "compose", "version"]):
         try:
@@ -1489,10 +1300,6 @@ def _read_docker_compose_version(run_env: dict[str, str]) -> tuple[int, int, int
     return None
 
 
-def _format_version(version: tuple[int, int, int]) -> str:
-    return ".".join(str(part) for part in version)
-
-
 def _docker_compose_preflight_reason(run_env: dict[str, str]) -> str | None:
     version = _read_docker_compose_version(run_env)
     if version is None:
@@ -1504,33 +1311,6 @@ def _docker_compose_preflight_reason(run_env: dict[str, str]) -> str | None:
             f"Unsupported docker compose version {detected}. Require >= {required} for Harbor runs."
         )
     return None
-
-
-def _dockerfile_from_images(dockerfile_content: str) -> list[str]:
-    return [match.group(1) for match in DOCKERFILE_FROM_PATTERN.finditer(dockerfile_content)]
-
-
-def _image_registry_host(image: str) -> str | None:
-    first_segment = image.split("/", 1)[0].strip().lower()
-    if not first_segment or first_segment == "scratch":
-        return None
-    if "." in first_segment or ":" in first_segment or first_segment == "localhost":
-        return first_segment
-    return None
-
-
-def _validate_public_base_images(dockerfile_content: str) -> None:
-    for image in _dockerfile_from_images(dockerfile_content):
-        if image.startswith("$"):
-            raise ValueError(
-                f"Dockerfile FROM image must be explicit, found unresolved variable: {image}."
-            )
-        host = _image_registry_host(image)
-        if host and host not in PUBLIC_REGISTRY_HOSTS:
-            raise ValueError(
-                f"Dockerfile uses private or unsupported registry host '{host}' in FROM '{image}'. "
-                "Only public registries are allowed."
-            )
 
 
 def _is_registry_rate_limited(run_harbor_dir: Path) -> bool:
@@ -1901,8 +1681,9 @@ def _run_runtime_preflight_command(
     run_env: dict[str, str],
     command: list[str],
     log_path: Path,
+    docker_args: list[str] | None = None,
 ) -> None:
-    docker_cmd = ["docker", "run", "--rm", image_name, *command]
+    docker_cmd = ["docker", "run", "--rm", *(docker_args or []), image_name, *command]
     try:
         completed = subprocess.run(
             docker_cmd,
@@ -1944,6 +1725,29 @@ def _ensure_harbor_runtime_preflight(
         run_env=run_env,
         command=["git", "--version"],
         log_path=log_dir / "runtime-git-preflight.log",
+    )
+    _run_runtime_preflight_command(
+        image_name=image_ref.image_name,
+        run_env=run_env,
+        command=[
+            "sh",
+            "-lc",
+            (
+                "test ! -d /tmp/agentic-eval-secrets && "
+                "! touch /.raidar-root-write-probe 2>/dev/null && "
+                "touch /tmp/raidar-tmp-write-probe && "
+                "! grep -q '00000000' /proc/net/route && "
+                "! grep -E ' /app | /workspace ' /proc/self/mountinfo"
+            ),
+        ],
+        log_path=log_dir / "runtime-isolation-preflight.log",
+        docker_args=[
+            "--network",
+            "none",
+            "--read-only",
+            "--tmpfs",
+            "/tmp:rw,noexec,nosuid,size=16m",
+        ],
     )
 
 
@@ -2849,26 +2653,26 @@ def _persist_visual_evidence_artifacts(
 
     reference_stem = Path(request.scenario.visual.reference_image).stem
     reference_suffix = Path(request.scenario.visual.reference_image).suffix
-    for region_name in _visual_region_names(request):
-        region_artifacts.append(
-            {
-                "name": region_name,
-                "actual": _copy_optional_visual_asset(
-                    workspace / f"actual-region-{region_name}.png",
-                    visual_dir / f"actual-region-{region_name}.png",
-                ),
-                "reference": _copy_optional_visual_asset(
-                    request.scenario_dir
-                    / Path(request.scenario.visual.reference_image).parent
-                    / f"{reference_stem}-region-{region_name}{reference_suffix}",
-                    visual_dir / f"{reference_stem}-region-{region_name}{reference_suffix}",
-                ),
-                "diff": _copy_optional_visual_asset(
-                    workspace / f"diff-region-{region_name}.png",
-                    visual_dir / f"diff-region-{region_name}.png",
-                ),
-            }
-        )
+    region_artifacts = [
+        {
+            "name": region_name,
+            "actual": _copy_optional_visual_asset(
+                workspace / f"actual-region-{region_name}.png",
+                visual_dir / f"actual-region-{region_name}.png",
+            ),
+            "reference": _copy_optional_visual_asset(
+                request.scenario_dir
+                / Path(request.scenario.visual.reference_image).parent
+                / f"{reference_stem}-region-{region_name}{reference_suffix}",
+                visual_dir / f"{reference_stem}-region-{region_name}{reference_suffix}",
+            ),
+            "diff": _copy_optional_visual_asset(
+                workspace / f"diff-region-{region_name}.png",
+                visual_dir / f"diff-region-{region_name}.png",
+            ),
+        }
+        for region_name in _visual_region_names(request)
+    ]
 
     return {
         "actual": main_artifacts["actual"],
@@ -3339,11 +3143,8 @@ def _command_failed(item: dict) -> bool:
 
 
 def _verification_command_strings(task: ScenarioDefinition) -> list[str]:
-    patterns: list[str] = []
-    for gate in task.verification.gates:
-        patterns.append(shlex.join(gate.command))
-    for command in task.verification.required_commands:
-        patterns.append(shlex.join(command))
+    patterns = [shlex.join(gate.command) for gate in task.verification.gates]
+    patterns.extend(shlex.join(command) for command in task.verification.required_commands)
     deduped = list(dict.fromkeys(patterns))
     return [pattern for pattern in deduped if pattern]
 
@@ -4796,44 +4597,3 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         metric_results=outputs.metric_results,
         metadata=metadata,
     )
-
-
-def _prepare_workspace_phase(request: RunRequest) -> WorkspacePreparationPhaseResult:
-    from .runner_pipeline import prepare_workspace_phase
-
-    return prepare_workspace_phase(request)
-
-
-def _execute_harbor_phase(
-    request: RunRequest, phase: WorkspacePreparationPhaseResult
-) -> ExecutionPhaseResult:
-    from .runner_pipeline import execute_harbor_phase
-
-    return execute_harbor_phase(request, phase)
-
-
-def _persist_artifacts_phase(
-    request: RunRequest,
-    phase: WorkspacePreparationPhaseResult,
-    execution: ExecutionPhaseResult,
-) -> PersistedArtifacts:
-    from .runner_pipeline import persist_artifacts_phase
-
-    return persist_artifacts_phase(request, phase, execution)
-
-
-def _synthesize_scorecard_phase(
-    request: RunRequest,
-    phase: WorkspacePreparationPhaseResult,
-    execution: ExecutionPhaseResult,
-    artifacts: PersistedArtifacts,
-) -> Scorecard:
-    from .runner_pipeline import synthesize_scorecard_phase
-
-    return synthesize_scorecard_phase(request, phase, execution, artifacts)
-
-
-def run_task(request: RunRequest) -> EvalRun:
-    from .runner_pipeline import run_task as run_task_pipeline
-
-    return run_task_pipeline(request)

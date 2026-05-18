@@ -1,0 +1,262 @@
+{
+  "cold_run": {
+    "analyzer_events": [
+      {
+        "action": "run",
+        "analyzer": "complexity-delta",
+        "artifact": ".agentic-ci-validation/evidence/complexity-delta-20260517T210404Z.json",
+        "duration_ms": 864,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "semantic-duplication",
+        "artifact": ".agentic-ci-validation/evidence/semantic-duplication-20260517T210405Z.json",
+        "duration_ms": 393,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "semantic-refactor-risk",
+        "artifact": ".agentic-ci-validation/evidence/semantic-refactor-risk-20260517T210405Z.json",
+        "duration_ms": 34,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "test-coverage",
+        "artifact": ".agentic-ci-validation/evidence/test-coverage-20260517T210415Z.json",
+        "duration_ms": 10088,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "security-sensitivity",
+        "artifact": ".agentic-ci-validation/evidence/security-sensitivity-20260517T210415Z.json",
+        "duration_ms": 384,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "dependency-vulnerabilities",
+        "artifact": ".agentic-ci-validation/evidence/dependency-vulnerabilities-20260517T210415Z.json",
+        "duration_ms": 142,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "secrets",
+        "artifact": ".agentic-ci-validation/evidence/secrets-20260517T210416Z.json",
+        "duration_ms": 104,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "verification-adequacy",
+        "artifact": ".agentic-ci-validation/evidence/verification-adequacy-20260517T210416Z.json",
+        "duration_ms": 6,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "git-collaboration-signals",
+        "artifact": ".agentic-ci-validation/evidence/git-collaboration-signals-20260517T210416Z.json",
+        "duration_ms": 23,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "capability-blind-spots",
+        "artifact": ".agentic-ci-validation/evidence/capability-blind-spots-20260517T210416Z.json",
+        "duration_ms": 320,
+        "reason": "missing or stale warm evidence"
+      },
+      {
+        "action": "run",
+        "analyzer": "reviewer-actionability",
+        "artifact": ".agentic-ci-validation/evidence/reviewer-actionability-20260517T210416Z.json",
+        "duration_ms": 328,
+        "reason": "missing or stale warm evidence"
+      }
+    ],
+    "ready": false,
+    "validation_run": "20260517T210416Z"
+  },
+  "freshness_artifact": ".agentic-ci-validation/validation/latest-validation-run.json",
+  "profile": "python",
+  "review_projection": ".agentic-ci-validation/review/latest-review.md",
+  "selected_repo": "/Users/adamjackson/Projects/complete/raidar",
+  "selected_repo_context": "user-selected existing Python repository",
+  "synthetic_fixtures_primary_proof": false,
+  "timing_units": "milliseconds",
+  "warm_runs": [
+    {
+      "analyzer_events": [
+        {
+          "action": "skip",
+          "analyzer": "complexity-delta",
+          "artifact": ".agentic-ci-validation/evidence/complexity-delta-20260517T210404Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "semantic-duplication",
+          "artifact": ".agentic-ci-validation/evidence/semantic-duplication-20260517T210405Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "semantic-refactor-risk",
+          "artifact": ".agentic-ci-validation/evidence/semantic-refactor-risk-20260517T210405Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "test-coverage",
+          "artifact": ".agentic-ci-validation/evidence/test-coverage-20260517T210415Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "security-sensitivity",
+          "artifact": ".agentic-ci-validation/evidence/security-sensitivity-20260517T210415Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "dependency-vulnerabilities",
+          "artifact": ".agentic-ci-validation/evidence/dependency-vulnerabilities-20260517T210415Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "secrets",
+          "artifact": ".agentic-ci-validation/evidence/secrets-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "verification-adequacy",
+          "artifact": ".agentic-ci-validation/evidence/verification-adequacy-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "git-collaboration-signals",
+          "artifact": ".agentic-ci-validation/evidence/git-collaboration-signals-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "capability-blind-spots",
+          "artifact": ".agentic-ci-validation/evidence/capability-blind-spots-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "reviewer-actionability",
+          "artifact": ".agentic-ci-validation/evidence/reviewer-actionability-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        }
+      ],
+      "duration_ms": 0,
+      "ready": false,
+      "validation_run": "20260517T210425Z"
+    },
+    {
+      "analyzer_events": [
+        {
+          "action": "skip",
+          "analyzer": "complexity-delta",
+          "artifact": ".agentic-ci-validation/evidence/complexity-delta-20260517T210404Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "semantic-duplication",
+          "artifact": ".agentic-ci-validation/evidence/semantic-duplication-20260517T210405Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "semantic-refactor-risk",
+          "artifact": ".agentic-ci-validation/evidence/semantic-refactor-risk-20260517T210405Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "test-coverage",
+          "artifact": ".agentic-ci-validation/evidence/test-coverage-20260517T210415Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "security-sensitivity",
+          "artifact": ".agentic-ci-validation/evidence/security-sensitivity-20260517T210415Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "dependency-vulnerabilities",
+          "artifact": ".agentic-ci-validation/evidence/dependency-vulnerabilities-20260517T210415Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "secrets",
+          "artifact": ".agentic-ci-validation/evidence/secrets-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "verification-adequacy",
+          "artifact": ".agentic-ci-validation/evidence/verification-adequacy-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "git-collaboration-signals",
+          "artifact": ".agentic-ci-validation/evidence/git-collaboration-signals-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "capability-blind-spots",
+          "artifact": ".agentic-ci-validation/evidence/capability-blind-spots-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        },
+        {
+          "action": "skip",
+          "analyzer": "reviewer-actionability",
+          "artifact": ".agentic-ci-validation/evidence/reviewer-actionability-20260517T210416Z.json",
+          "duration_ms": 0,
+          "reason": "fingerprint unchanged"
+        }
+      ],
+      "duration_ms": 0,
+      "ready": false,
+      "validation_run": "20260517T210433Z"
+    }
+  ]
+}

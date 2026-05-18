@@ -469,13 +469,15 @@ def _append_invalid_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
         return
 
     ranked = sorted(invalid_runs, key=lambda item: item.scores.diagnostic_score, reverse=True)
-    for run in ranked:
-        lines.append(
+    lines.extend(
+        (
             f"- run_id={run.id}, model={run.config.model}, "
             f"diagnostic={run.scores.diagnostic_score:.3f}, "
             f"gaps={run.scores.requirements_coverage.requirement_gap_ids}, "
             f"evidence_gaps={run.scores.requirements_coverage.requirement_test_evidence_gaps}"
         )
+        for run in ranked
+    )
 
 
 def _append_unscored_runs(lines: list[str], runs: list[EvalRun]) -> None:
@@ -484,11 +486,13 @@ def _append_unscored_runs(lines: list[str], runs: list[EvalRun]) -> None:
     if not unscored:
         lines.append("- No unscored runs.")
         return
-    for run in unscored:
-        lines.append(
+    lines.extend(
+        (
             f"- run_id={run.id}, model={run.config.model}, reasons={run.scores.unscored_reasons}, "
             f"termination_reason={run.termination_reason}"
         )
+        for run in unscored
+    )
 
 
 def generate_comparison_report(runs: list[EvalRun]) -> str:

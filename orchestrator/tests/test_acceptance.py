@@ -3,6 +3,7 @@
 from raidar.scoring.acceptance import (
     JudgeResult,
     parse_judge_response,
+    validate_safe_regex_pattern,
 )
 
 
@@ -102,3 +103,25 @@ class TestJudgeResult:
         assert result.passed is True
         assert result.evidence == "Test evidence"
         assert result.raw_response == "raw"
+
+
+class TestRegexSafetyValidation:
+    """Test deterministic no-pattern regex safety validation."""
+
+    def test_accepts_bounded_plain_regex(self):
+        safe, reason = validate_safe_regex_pattern(r"console\.log\(")
+
+        assert safe is True
+        assert reason == "Pattern passed regex safety validation"
+
+    def test_rejects_nested_quantifiers(self):
+        safe, reason = validate_safe_regex_pattern(r"(a+)+$")
+
+        assert safe is False
+        assert "nested quantifiers" in reason
+
+    def test_rejects_ambiguous_repeated_alternation(self):
+        safe, reason = validate_safe_regex_pattern(r"(a|aa)+$")
+
+        assert safe is False
+        assert "ambiguous repeated alternation" in reason

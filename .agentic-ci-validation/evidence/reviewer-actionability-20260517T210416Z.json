@@ -1,0 +1,16 @@
+{
+  "adapter": "reviewer-actionability",
+  "command": [
+    "python3",
+    "-m",
+    "compileall",
+    "-q",
+    "."
+  ],
+  "cwd": "/Users/adamjackson/Projects/complete/raidar/orchestrator",
+  "signal": "reviewer actionability",
+  "state": "fresh",
+  "stderr_excerpt": "",
+  "stdout_excerpt": "",
+  "summary": "adapter completed with real command evidence"
+}

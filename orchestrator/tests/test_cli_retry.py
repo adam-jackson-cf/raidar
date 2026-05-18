@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import click
 
 from raidar import cli
+from raidar.application import execution
 from raidar.runner import StarterPreflightError
 
 
@@ -21,9 +22,9 @@ def test_run_with_unscored_reruns_reruns_only_once(monkeypatch):
             return [_unscored_run(True), _unscored_run(True)]
         return [_unscored_run(True), _unscored_run(True)]
 
-    monkeypatch.setattr(cli, "_execute_repeat_batch", fake_execute_repeat_batch)
+    monkeypatch.setattr(execution, "_execute_repeat_batch", fake_execute_repeat_batch)
 
-    runs, retries_used, unresolved_unscored = cli._run_with_unscored_reruns(
+    runs, retries_used, unresolved_unscored = execution._run_with_unscored_reruns(
         request=SimpleNamespace(),
         repeats=2,
         repeat_parallel=1,
@@ -43,9 +44,9 @@ def test_run_with_unscored_reruns_skips_rerun_when_budget_zero(monkeypatch):
         calls.append(batch_size)
         return [_unscored_run(True), _unscored_run(True)]
 
-    monkeypatch.setattr(cli, "_execute_repeat_batch", fake_execute_repeat_batch)
+    monkeypatch.setattr(execution, "_execute_repeat_batch", fake_execute_repeat_batch)
 
-    runs, retries_used, unresolved_unscored = cli._run_with_unscored_reruns(
+    runs, retries_used, unresolved_unscored = execution._run_with_unscored_reruns(
         request=SimpleNamespace(),
         repeats=2,
         repeat_parallel=1,
@@ -65,11 +66,7 @@ def test_cleanup_stale_harbor_before_runs_invokes_full_cleanup(monkeypatch):
         called["include_containers"] = include_containers
         called["include_build_processes"] = include_build_processes
 
-    monkeypatch.setattr(
-        cli,
-        "_runner_api",
-        lambda: SimpleNamespace(cleanup_stale_harbor_resources=fake_cleanup),
-    )
+    monkeypatch.setattr(cli, "cleanup_stale_harbor_resources", fake_cleanup)
 
     cli._cleanup_stale_harbor_before_runs()
 
@@ -83,10 +80,10 @@ def test_run_with_unscored_reruns_abort_on_starter_preflight_error(monkeypatch):
     def fail_preflight(*, request, batch_size, repeat_parallel, start_index):
         raise StarterPreflightError("Starter preflight failed: bun run lint exited 1")
 
-    monkeypatch.setattr(cli, "_execute_repeat_batch", fail_preflight)
+    monkeypatch.setattr(execution, "_execute_repeat_batch", fail_preflight)
 
     try:
-        cli._run_with_unscored_reruns(
+        execution._run_with_unscored_reruns(
             request=SimpleNamespace(),
             repeats=2,
             repeat_parallel=1,

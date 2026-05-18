@@ -22,8 +22,8 @@ from .agents.adapters.codex_auth import (
     codex_auth_json_path,
     has_file_backed_codex_auth,
 )
+from .agents.adapters.factory import adapter_class_for_harness, resolve_adapter
 from .agents.adapters.harbor_cli import resolve_cli_executable
-from .agents.adapters.registry import registry
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .application.execution import (
@@ -39,6 +39,11 @@ from .application.models import (
     ScenarioCloneRequest,
     ScenarioInitRequest,
     SuiteExecutionResult,
+)
+from .application.scenario_catalog import (
+    load_scenario,
+    scenario_evaluation_profile,
+    scenario_metrics,
 )
 from .application.scenarios import (
     clone_scenario_revision as _service_clone_scenario_revision,
@@ -58,11 +63,13 @@ from .application.serializers import (
 from .application.serializers import (
     suite_execution_payload as _service_suite_execution_payload,
 )
+from .runtime.maintenance import (
+    cleanup_stale_harbor_resources,
+    docker_compose_preflight_reason,
+)
 
 if TYPE_CHECKING:
-    from .runner import RunRequest
     from .schemas.scenario import ScenarioDefinition
-    from .schemas.scorecard import EvalRun
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
@@ -96,18 +103,6 @@ TYPECHECK_TARGETS = [
 COVERAGE_FAIL_UNDER = "60"
 
 
-def _runner_api() -> Any:
-    from . import runner as runner_module
-
-    return runner_module
-
-
-def _experiment_api() -> Any:
-    from . import experiment as experiment_module
-
-    return experiment_module
-
-
 def _scenario_clone_api() -> Any:
     from . import scenario_clone as scenario_clone_module
 
@@ -115,193 +110,14 @@ def _scenario_clone_api() -> Any:
 
 
 def _cleanup_stale_harbor_before_runs() -> None:
-    _runner_api().cleanup_stale_harbor_resources(
+    cleanup_stale_harbor_resources(
         include_containers=True,
         include_build_processes=True,
     )
 
 
-def _summary_result_path(run: EvalRun) -> Path:
-    run_meta = run.scores.metadata.get("run", {})
-    run_json_path = run_meta.get("run_json_path")
-    if not isinstance(run_json_path, str):
-        raise click.ClickException("Canonical run.json path missing from run metadata.")
-    return Path(run_json_path)
-
-
-def _persist_eval_run(run: EvalRun) -> Path:
-    result_path = _summary_result_path(run)
-    result_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(run.model_dump_json(indent=2))
-    return result_path
-
-
 def _experiment_execution_suffix(options: RunCliOptions) -> str:
     return _service_experiment_execution_suffix(options)
-
-
-def _build_repeat_request(base_request: RunRequest, repeat_index: int) -> RunRequest:
-    run_request = _runner_api().RunRequest
-    return run_request(
-        scenario=base_request.scenario,
-        config=base_request.config,
-        scenario_dir=base_request.scenario_dir,
-        execution_dir=base_request.execution_dir,
-        repeat_index=repeat_index,
-    )
-
-
-def _execute_run_request(run_request: RunRequest) -> EvalRun:
-    run = _runner_api().run_task(run_request)
-    _persist_eval_run(run)
-    return run
-
-
-def _execute_repeat_index(request: RunRequest, repeat_index: int) -> EvalRun:
-    try:
-        return _execute_run_request(_build_repeat_request(request, repeat_index))
-    except _runner_api().StarterPreflightError:
-        raise
-    except Exception as exc:
-        raise click.ClickException(f"Repeat {repeat_index} failed: {exc}") from exc
-
-
-def _execute_repeat_batch_sequential(
-    *,
-    request: RunRequest,
-    batch_size: int,
-    start_index: int,
-) -> list[EvalRun]:
-    runs: list[EvalRun] = []
-    for offset in range(batch_size):
-        runs.append(_execute_repeat_index(request, start_index + offset))
-    return runs
-
-
-def _execute_repeat_batch_parallel(
-    *,
-    request: RunRequest,
-    batch_size: int,
-    repeat_parallel: int,
-    start_index: int,
-) -> list[EvalRun]:
-    resolved_parallel = max(1, min(repeat_parallel, batch_size))
-    by_index: dict[int, EvalRun] = {}
-    with concurrent.futures.ThreadPoolExecutor(max_workers=resolved_parallel) as executor:
-        future_map = {
-            executor.submit(_execute_repeat_index, request, start_index + offset): offset
-            for offset in range(batch_size)
-        }
-        for future in concurrent.futures.as_completed(future_map):
-            offset = future_map[future]
-            by_index[offset] = future.result()
-    return [by_index[idx] for idx in sorted(by_index)]
-
-
-def _execute_repeat_batch(
-    *,
-    request: RunRequest,
-    batch_size: int,
-    repeat_parallel: int,
-    start_index: int,
-) -> list[EvalRun]:
-    if batch_size <= 0:
-        return []
-    if repeat_parallel <= 1:
-        return _execute_repeat_batch_sequential(
-            request=request,
-            batch_size=batch_size,
-            start_index=start_index,
-        )
-    return _execute_repeat_batch_parallel(
-        request=request,
-        batch_size=batch_size,
-        repeat_parallel=repeat_parallel,
-        start_index=start_index,
-    )
-
-
-def _run_is_unscored(run: EvalRun) -> bool:
-    return bool(run.scores.unscored)
-
-
-def _run_unscored_reasons(run: EvalRun) -> list[str]:
-    return list(run.scores.unscored_reasons)
-
-
-def _count_unscored(runs: list[EvalRun]) -> int:
-    return sum(1 for run in runs if _run_is_unscored(run))
-
-
-def _run_with_unscored_reruns(
-    *,
-    request: RunRequest,
-    repeats: int,
-    repeat_parallel: int,
-    rerun_unscored: int,
-) -> tuple[list[EvalRun], int, int]:
-    all_runs: list[EvalRun] = []
-    next_repeat_index = 1
-    pending_batch = repeats
-    retries_used = 0
-
-    try:
-        initial_runs = _execute_repeat_batch(
-            request=request,
-            batch_size=pending_batch,
-            repeat_parallel=repeat_parallel,
-            start_index=next_repeat_index,
-        )
-    except _runner_api().StarterPreflightError as exc:
-        raise click.ClickException(
-            f"Fatal starter preflight error. Experiment aborted without retries: {exc}"
-        ) from exc
-    all_runs.extend(initial_runs)
-    pending_batch = _count_unscored(initial_runs)
-    next_repeat_index += len(initial_runs)
-
-    if pending_batch > 0 and rerun_unscored > 0:
-        retries_used = 1
-        try:
-            retry_runs = _execute_repeat_batch(
-                request=request,
-                batch_size=pending_batch,
-                repeat_parallel=repeat_parallel,
-                start_index=next_repeat_index,
-            )
-        except _runner_api().StarterPreflightError as exc:
-            raise click.ClickException(
-                f"Fatal starter preflight error. Experiment aborted without retries: {exc}"
-            ) from exc
-        all_runs.extend(retry_runs)
-        pending_batch = _count_unscored(retry_runs)
-
-    return all_runs, retries_used, pending_batch
-
-
-def _build_agent_spec(options: RunCliOptions) -> AgentSpec:
-    return AgentSpec(
-        harness=Harness(options.harness),
-        model=ModelTarget(
-            provider=options.provider,
-            name=options.model,
-            reasoning_effort=options.reasoning_effort,
-        ),
-        timeout_sec=options.timeout,
-    )
-
-
-def _execution_id(
-    scenario_name: str,
-    scenario_revision: str,
-    started_at: datetime,
-    execution_suffix: str | None = None,
-) -> str:
-    scenario_slug = scenario_name.lower().replace(" ", "-")
-    base = f"{started_at.strftime('%Y%m%d-%H%M%SZ')}__{scenario_slug}__{scenario_revision}"
-    if not execution_suffix:
-        return base
-    return f"{base}__{execution_suffix}"
 
 
 def _resolve_experiments_root(
@@ -316,192 +132,8 @@ def _resolve_experiments_root(
     )
 
 
-def _build_run_request(
-    options: RunCliOptions, scenario_def: ScenarioDefinition, execution_dir: Path
-) -> RunRequest:
-    config = _build_agent_spec(options)
-    execution_dir.mkdir(parents=True, exist_ok=True)
-    return _runner_api().RunRequest(
-        scenario=scenario_def,
-        config=config,
-        scenario_dir=options.scenario.parent,
-        execution_dir=execution_dir,
-        repeat_index=1,
-    )
-
-
-def _echo_run_header(options: RunCliOptions, scenario_name: str) -> None:
-    click.echo(f"Loading scenario from {options.scenario}")
-    click.echo(f"Scenario: {scenario_name}")
-    click.echo(f"Harness: {options.harness}")
-    click.echo(f"Model: {options.model}")
-    click.echo(f"Repeats: {options.repeats}")
-    click.echo(f"Repeat parallelism: {options.repeat_parallel}")
-    click.echo(f"Rerun unscored budget: {options.rerun_unscored}")
-
-
-def _echo_single_run_result(result: EvalRun) -> None:
-    run_meta = result.scores.metadata.get("run", {})
-    canonical_dir = run_meta.get("canonical_run_dir")
-    if isinstance(canonical_dir, str):
-        click.echo(f"Canonical run dir: {canonical_dir}")
-    result_path = _summary_result_path(result)
-    click.echo(f"Result saved to {result_path}")
-    click.echo(f"Run ID: {result.id}")
-    click.echo(f"Duration: {result.duration_sec:.1f}s")
-    click.echo(f"Terminated early: {result.terminated_early}")
-    click.echo(f"Unscored result: {_run_is_unscored(result)}")
-    if _run_is_unscored(result):
-        click.echo(f"Unscored reasons: {_run_unscored_reasons(result)}")
-    if result.termination_reason:
-        click.echo(f"Reason: {result.termination_reason}")
-
-
-def _echo_experiment_result(
-    experiment_json_path: Path,
-    summary_path: Path,
-    report_path: Path,
-    retries_used: int,
-    runs: list[EvalRun],
-) -> None:
-    click.echo(f"Experiment record: {experiment_json_path}")
-    click.echo(f"Experiment summary: {summary_path}")
-    click.echo(f"Experiment report: {report_path}")
-    click.echo(f"Unscored retries used: {retries_used}")
-    for run in runs:
-        click.echo(
-            f"Run {run.id}: unscored={_run_is_unscored(run)}, "
-            f"execution_valid={run.scores.execution_validity.passed}, "
-            f"performance_gates={run.scores.performance_gates.passed}, "
-            f"composite={run.scores.composite_score:.3f}, duration={run.duration_sec:.1f}s"
-        )
-
-
-def _run_payload(run: EvalRun) -> dict[str, object]:
-    run_meta = run.scores.metadata.get("run", {})
-    canonical_run_dir = run_meta.get("canonical_run_dir")
-    run_json_path = run_meta.get("run_json_path")
-    return {
-        "run_id": run.id,
-        "duration_sec": run.duration_sec,
-        "terminated_early": run.terminated_early,
-        "termination_reason": run.termination_reason,
-        "unscored": _run_is_unscored(run),
-        "unscored_reasons": _run_unscored_reasons(run),
-        "execution_valid": run.scores.execution_validity.passed,
-        "performance_gates_passed": run.scores.performance_gates.passed,
-        "composite_score": run.scores.composite_score,
-        "diagnostic_score": run.scores.diagnostic_score,
-        "quality_score": run.scores.quality_score,
-        "canonical_run_dir": canonical_run_dir if isinstance(canonical_run_dir, str) else None,
-        "run_json_path": run_json_path if isinstance(run_json_path, str) else None,
-    }
-
-
 def _suite_execution_payload(result: SuiteExecutionResult) -> dict[str, object]:
     return _service_suite_execution_payload(result)
-
-
-def _prepared_run_request(
-    resolved: RunCliOptions,
-    *,
-    execution_suffix: str | None,
-) -> tuple[ScenarioDefinition, datetime, Path, RunRequest]:
-    scenario_def = _runner_api().load_scenario(resolved.scenario)
-    started_at = datetime.now(UTC)
-    execution_id = _execution_id(
-        scenario_def.name,
-        scenario_def.scenario_revision,
-        started_at,
-        execution_suffix=execution_suffix,
-    )
-    execution_dir = resolved.experiments_root / execution_id
-    request = _build_run_request(resolved, scenario_def, execution_dir)
-    return scenario_def, started_at, execution_dir, request
-
-
-def _execute_repeat_runs(
-    *,
-    request: RunRequest,
-    repeats: int,
-    repeat_parallel: int,
-    rerun_unscored: int,
-) -> tuple[list[EvalRun], int, int]:
-    try:
-        return _run_with_unscored_reruns(
-            request=request,
-            repeats=max(1, repeats),
-            repeat_parallel=repeat_parallel,
-            rerun_unscored=rerun_unscored,
-        )
-    except Exception as exc:
-        raise click.ClickException(str(exc)) from exc
-
-
-def _single_run_execution_result(
-    *,
-    resolved: RunCliOptions,
-    scenario_def: ScenarioDefinition,
-    runs: list[EvalRun],
-    retries_used: int,
-    echo: bool,
-) -> SuiteExecutionResult:
-    if echo:
-        _echo_single_run_result(runs[0])
-    return SuiteExecutionResult(
-        scenario_path=resolved.scenario,
-        scenario_name=scenario_def.name,
-        scenario_revision=scenario_def.scenario_revision,
-        runs=runs,
-        retries_used=retries_used,
-    )
-
-
-def _persist_experiment_execution(
-    *,
-    resolved: RunCliOptions,
-    request: RunRequest,
-    scenario_def: ScenarioDefinition,
-    execution_dir: Path,
-    started_at: datetime,
-    runs: list[EvalRun],
-    retries_used: int,
-    unresolved_unscored: int,
-    echo: bool,
-) -> SuiteExecutionResult:
-    runner_api = _runner_api()
-    experiment_api = _experiment_api()
-    experiment_summary = experiment_api.create_experiment_summary(
-        scenario_name=request.scenario.name,
-        scenario_revision=request.scenario.scenario_revision,
-        harness=resolved.harness,
-        model=resolved.model,
-        evaluation_profile=runner_api.scenario_evaluation_profile(request.scenario),
-        metrics=runner_api.scenario_metrics(request.scenario),
-        repeats=resolved.repeats,
-        repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
-        runs=runs,
-        started_at=started_at,
-        rerun_unscored_limit=resolved.rerun_unscored,
-        reruns_used=retries_used,
-        unresolved_unscored_count=unresolved_unscored,
-    )
-    experiment_json_path, summary_path, report_path = experiment_api.persist_experiment(
-        execution_dir,
-        experiment_summary,
-    )
-    if echo:
-        _echo_experiment_result(experiment_json_path, summary_path, report_path, retries_used, runs)
-    return SuiteExecutionResult(
-        scenario_path=resolved.scenario,
-        scenario_name=scenario_def.name,
-        scenario_revision=scenario_def.scenario_revision,
-        runs=runs,
-        retries_used=retries_used,
-        experiment_json_path=experiment_json_path,
-        summary_path=summary_path,
-        report_path=report_path,
-    )
 
 
 def _execute_run_options(
@@ -1105,7 +737,7 @@ def harbor() -> None:
 )
 def harbor_cleanup(include_containers: bool, include_build_processes: bool) -> None:
     """Cleanup stale Harbor processes and containers."""
-    _runner_api().cleanup_stale_harbor_resources(
+    cleanup_stale_harbor_resources(
         include_containers=include_containers,
         include_build_processes=include_build_processes,
     )
@@ -1132,7 +764,7 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
     """Setup local toolchain and run Harbor preflight checks."""
     _cleanup_stale_harbor_before_runs()
 
-    reason = _runner_api()._docker_compose_preflight_reason(dict(os.environ))
+    reason = docker_compose_preflight_reason(dict(os.environ))
     if reason:
         raise click.ClickException(reason)
 
@@ -1299,7 +931,7 @@ def harness_list() -> None:
     """List supported harness adapters, rule files, and model coverage."""
     click.echo("Supported harnesses:")
     for harness_name in Harness:
-        adapter_class = registry.adapter_class(harness_name)
+        adapter_class = adapter_class_for_harness(harness_name)
         click.echo(
             f"  {harness_name.value:12} -> {SYSTEM_RULES.get(harness_name, '(no rule mapping)')}"
         )
@@ -1356,7 +988,7 @@ def harness_validate(
         ),
         timeout_sec=timeout,
     )
-    adapter = config.adapter()
+    adapter = resolve_adapter(config)
     adapter.validate()
     runtime_keys = sorted(adapter.runtime_env().keys())
 
@@ -1455,7 +1087,7 @@ def _list_scenarios_with_revisions(scenarios_root: Path) -> list[tuple[str, tupl
         revision_paths = _scenario_revision_paths(scenario_root)
         if not revision_paths:
             continue
-        scenario_def = _runner_api().load_scenario(revision_paths[-1])
+        scenario_def = load_scenario(revision_paths[-1])
         revisions = tuple(path.parent.name for path in revision_paths)
         scenarios.append((scenario_def.name, revisions))
     return sorted(scenarios, key=lambda entry: entry[0])
@@ -1808,7 +1440,7 @@ def _load_matrix_scenarios(
     scenario_defs: list[tuple[Path, ScenarioDefinition]] = []
     for scenario_path in scenario_paths:
         click.echo(f"Loading scenario from {scenario_path}")
-        scenario_defs.append((scenario_path, _runner_api().load_scenario(scenario_path)))
+        scenario_defs.append((scenario_path, load_scenario(scenario_path)))
     return scenario_defs
 
 
@@ -1982,15 +1614,14 @@ def init_matrix() -> None:
 
 
 def _echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
-    runner_api = _runner_api()
     click.echo(f"Scenario: {scenario_def.name}")
     click.echo(f"Revision: {scenario_def.scenario_revision}")
     click.echo(f"Description: {scenario_def.description}")
     click.echo(f"Difficulty: {scenario_def.difficulty}")
     click.echo(f"Category: {scenario_def.category}")
     click.echo(f"Timeout: {scenario_def.timeout_sec // 60} minutes")
-    click.echo(f"Evaluation Profile: {runner_api.scenario_evaluation_profile(scenario_def)}")
-    click.echo(f"Metrics: {', '.join(runner_api.scenario_metrics(scenario_def))}")
+    click.echo(f"Evaluation Profile: {scenario_evaluation_profile(scenario_def)}")
+    click.echo(f"Metrics: {', '.join(scenario_metrics(scenario_def))}")
 
     if scenario_def.verification.gates:
         gates = [g.name for g in scenario_def.verification.gates]
@@ -2053,7 +1684,7 @@ def info(scenario: Path) -> None:
     """Show scenario information and details."""
     scenario_input = scenario.resolve()
     scenario_yaml = _resolve_scenario_yaml(scenario_input)
-    scenario_def = _runner_api().load_scenario(scenario_yaml)
+    scenario_def = load_scenario(scenario_yaml)
 
     _echo_scenario_summary(scenario_def)
     click.echo(f"Scenario YAML: {scenario_yaml}")

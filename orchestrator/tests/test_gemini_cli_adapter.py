@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from raidar.agents.adapters.factory import resolve_adapter
 from raidar.agents.adapters.gemini_cli import GeminiCliAdapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
@@ -16,7 +17,7 @@ def _config(model: str, provider: str = "google") -> AgentSpec:
 
 
 def test_registry_resolves_gemini_adapter():
-    adapter = _config("gemini-3-pro-preview").adapter()
+    adapter = resolve_adapter(_config("gemini-3-pro-preview"))
     assert isinstance(adapter, GeminiCliAdapter)
 
 

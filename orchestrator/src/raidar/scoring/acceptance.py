@@ -94,11 +94,42 @@ def check_file_exists(workspace: Path, pattern: str) -> tuple[bool, str]:
     return False, f"No files matching '{pattern}'"
 
 
+def _has_nested_quantifier(pattern: str) -> bool:
+    nested_quantifier = re.compile(r"\((?:[^()\\]|\\.|\([^()]*\))*[+*](?:[^()\\]|\\.)*\)[+*{]")
+    return bool(nested_quantifier.search(pattern))
+
+
+def _has_ambiguous_repeated_alternation(pattern: str) -> bool:
+    group_pattern = re.compile(r"\(([^()\\]*(?:\\.[^()\\]*)*)\)([+*]|\{\d+,?\d*\})")
+    for match in group_pattern.finditer(pattern):
+        alternatives = [part for part in match.group(1).split("|") if part]
+        alternatives.sort(key=len)
+        for index, alternative in enumerate(alternatives):
+            if any(other.startswith(alternative) for other in alternatives[index + 1 :]):
+                return True
+    return False
+
+
+def validate_safe_regex_pattern(pattern: str) -> tuple[bool, str]:
+    """Validate scenario-authored regex before compiling it."""
+    if len(pattern) > 512:
+        return False, "Pattern exceeds 512 characters"
+    if _has_nested_quantifier(pattern):
+        return False, "Pattern contains nested quantifiers with ReDoS risk"
+    if _has_ambiguous_repeated_alternation(pattern):
+        return False, "Pattern contains ambiguous repeated alternation with ReDoS risk"
+    return True, "Pattern passed regex safety validation"
+
+
 def check_no_pattern(workspace: Path, pattern: str) -> tuple[bool, str]:
     """Check that a pattern does NOT appear in source files."""
     src_dir = workspace / "src"
     if not src_dir.exists():
         return True, "src directory not found (pattern check passes)"
+
+    safe, reason = validate_safe_regex_pattern(pattern)
+    if not safe:
+        return False, f"Unsafe regex pattern '{pattern}': {reason}"
 
     regex = re.compile(pattern)
 

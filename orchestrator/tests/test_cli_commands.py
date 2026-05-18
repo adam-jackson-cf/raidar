@@ -11,6 +11,8 @@ import click
 import pytest
 from click.testing import CliRunner
 
+from raidar.application import execution
+from raidar.application.models import ExecutionDispatchRequest
 from raidar.cli import (
     BENCHMARK_EXPERIMENTS_ROOT,
     ORCHESTRATOR_ROOT,
@@ -20,7 +22,6 @@ from raidar.cli import (
     _archive_destination,
     _assert_no_generated_artifact_changes,
     _generated_artifact_paths,
-    _persist_experiment_execution,
     _resolve_experiments_root,
     main,
     quality_gates,
@@ -311,12 +312,8 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
 
     monkeypatch.setattr("raidar.cli._cleanup_stale_harbor_before_runs", lambda: None)
     monkeypatch.setattr(
-        "raidar.cli._runner_api",
-        lambda: type(
-            "FakeRunnerApi",
-            (),
-            {"_docker_compose_preflight_reason": staticmethod(lambda env: None)},
-        )(),
+        "raidar.cli.docker_compose_preflight_reason",
+        lambda env: None,
     )
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
@@ -1068,7 +1065,7 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
     assert f"would-archive: {expected_rel}" in result.output
 
 
-def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: Path) -> None:
+def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> None:
     scenario = ScenarioDefinition.model_validate(
         {
             "name": "hello-world-smoke",
@@ -1116,49 +1113,48 @@ def test_persist_experiment_execution_passes_reruns_used(monkeypatch, tmp_path: 
 
     captured: dict[str, object] = {}
 
-    def fake_runner_api():
-        return type(
-            "RunnerApi",
-            (),
-            {
-                "scenario_evaluation_profile": staticmethod(lambda _scenario: "functional"),
-                "scenario_metrics": staticmethod(lambda _scenario: ["functional"]),
-            },
-        )()
+    def fake_create_experiment_summary(**kwargs):
+        captured.update(kwargs)
+        return {"experiment_id": "exp-01"}
 
-    def fake_experiment_api():
-        def create_experiment_summary(**kwargs):
-            captured.update(kwargs)
-            return {"experiment_id": "exp-01"}
+    monkeypatch.setattr(execution, "_load_project_env", lambda _repo_root: None)
+    monkeypatch.setattr(execution, "_cleanup_stale_harbor_before_runs", lambda: None)
+    monkeypatch.setattr(
+        execution,
+        "_prepared_run_request",
+        lambda *_args, **_kwargs: (
+            scenario,
+            datetime(2026, 3, 10, 13, 0, 0, tzinfo=UTC),
+            tmp_path / "experiments" / "exp-01",
+            request,
+        ),
+    )
+    monkeypatch.setattr(
+        execution,
+        "_execute_repeat_runs",
+        lambda **_kwargs: ([run], 1, 0),
+    )
+    monkeypatch.setattr(execution, "scenario_evaluation_profile", lambda _scenario: "functional")
+    monkeypatch.setattr(execution, "scenario_metrics", lambda _scenario: ["functional"])
+    monkeypatch.setattr(execution, "create_experiment_summary", fake_create_experiment_summary)
+    monkeypatch.setattr(
+        execution,
+        "persist_experiment",
+        lambda *_args, **_kwargs: (
+            tmp_path / "experiment.json",
+            tmp_path / "experiment-summary.json",
+            tmp_path / "report.md",
+        ),
+    )
 
-        return type(
-            "ExperimentApi",
-            (),
-            {
-                "create_experiment_summary": staticmethod(create_experiment_summary),
-                "persist_experiment": staticmethod(
-                    lambda *_args, **_kwargs: (
-                        tmp_path / "experiment.json",
-                        tmp_path / "experiment-summary.json",
-                        tmp_path / "report.md",
-                    )
-                ),
-            },
-        )()
-
-    monkeypatch.setattr("raidar.cli._runner_api", fake_runner_api)
-    monkeypatch.setattr("raidar.cli._experiment_api", fake_experiment_api)
-
-    _persist_experiment_execution(
-        resolved=options,
-        request=request,
-        scenario_def=scenario,
-        execution_dir=tmp_path / "experiments" / "exp-01",
-        started_at=datetime(2026, 3, 10, 13, 0, 0, tzinfo=UTC),
-        runs=[run],
-        retries_used=1,
-        unresolved_unscored=0,
-        echo=False,
+    execution.execute_run_command(
+        ExecutionDispatchRequest(
+            options=options,
+            force_experiment_summary=True,
+            cleanup_before_runs=True,
+            echo=False,
+        ),
+        repo_root=tmp_path,
     )
 
     assert captured["reruns_used"] == 1

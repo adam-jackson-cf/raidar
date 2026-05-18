@@ -1,10 +1,18 @@
-"""Top-level run pipeline extracted from the runner module."""
+"""Top-level runtime phase pipeline for one evaluation run."""
 
 from __future__ import annotations
 
 import time
 from datetime import UTC, datetime
 
+from raidar.agents.adapters.factory import resolve_adapter
+from raidar.runtime.models import (
+    ExecutionPhaseResult,
+    HarborExecutionRequest,
+    PersistedArtifacts,
+    ScorecardBuildContext,
+    WorkspacePreparationPhaseResult,
+)
 from raidar.schemas.scorecard import EvalConfig, EvalRun
 
 
@@ -40,7 +48,7 @@ def prepare_workspace_phase(request):
 
     runner = _runner()
     prep_started = time.perf_counter()
-    adapter = request.config.adapter()
+    adapter = resolve_adapter(request.config)
     adapter.validate()
     auth_metadata = adapter.execution_metadata()
     layout = runner.initialize_run(request)
@@ -125,7 +133,7 @@ def prepare_workspace_phase(request):
     prep_phase_timings["_ensure_task_image"] = round(time.perf_counter() - phase_started, 3)
     cache_metadata["image"] = {"hit": image_hit}
 
-    harbor_request = runner.HarborExecutionRequest(
+    harbor_request = HarborExecutionRequest(
         adapter=adapter,
         workspace=context.workspace,
         task_bundle_path=harbor_task_bundle,
@@ -136,7 +144,7 @@ def prepare_workspace_phase(request):
         run_env=run_env,
     )
     prep_total_sec = round(time.perf_counter() - prep_started, 3)
-    return runner.WorkspacePreparationPhaseResult(
+    return WorkspacePreparationPhaseResult(
         layout=layout,
         context=context,
         harbor_request=harbor_request,
@@ -183,7 +191,7 @@ def execute_harbor_phase(request, phase):
         outputs = runner.terminated_outputs("Verifier outputs unavailable.")
 
     duration_sec = (datetime.now(UTC) - phase.layout.start_time).total_seconds()
-    return runner.ExecutionPhaseResult(
+    return ExecutionPhaseResult(
         harbor_result=harbor_result,
         terminated_early=terminated_early,
         termination_reason=termination_reason,
@@ -246,7 +254,7 @@ def persist_artifacts_phase(request, phase, execution):
         run_workspace=phase.layout.workspace_dir,
         run_root_dir=phase.layout.root_dir,
     )
-    return runner.PersistedArtifacts(
+    return PersistedArtifacts(
         starter_meta=runner.build_starter_meta(request, phase.context),
         scenario_revision_meta=runner.build_scenario_revision_meta(request, phase.context),
         verifier_artifacts=runner.persist_verifier_artifacts(
@@ -269,7 +277,7 @@ def synthesize_scorecard_phase(request, phase, execution, artifacts):
 
     runner = _runner()
     scorecard = runner.build_scorecard(
-        runner.ScorecardBuildContext(
+        ScorecardBuildContext(
             request=request,
             layout=phase.layout,
             context=phase.context,

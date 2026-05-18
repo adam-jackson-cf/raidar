@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from raidar.agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
+from raidar.agents.adapters.factory import resolve_adapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 
@@ -16,7 +17,7 @@ def _config(model: str, provider: str = "anthropic") -> AgentSpec:
 
 
 def test_registry_resolves_claude_adapter():
-    adapter = _config("claude-sonnet-4-5").adapter()
+    adapter = resolve_adapter(_config("claude-sonnet-4-5"))
     assert isinstance(adapter, ClaudeCodeCliAdapter)
 
 

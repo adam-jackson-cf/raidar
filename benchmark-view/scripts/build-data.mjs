@@ -21,6 +21,24 @@ function readText(filePath) {
     return '';
   }
 }
+
+function sanitizeDashboardValue(value) {
+  if (Array.isArray(value)) return value.map(sanitizeDashboardValue);
+  if (!value || typeof value !== 'object') {
+    if (
+      typeof value === 'string' &&
+      value.length >= 48 &&
+      /^[A-Za-z0-9+/=_-]+$/.test(value)
+    ) {
+      return '[redacted-high-entropy-value]';
+    }
+    return value;
+  }
+  return Object.fromEntries(
+    Object.entries(value).map(([key, entry]) => [key, sanitizeDashboardValue(entry)]),
+  );
+}
+
 function listDirs(dirPath) {
   try { return fs.readdirSync(dirPath).filter((name) => fs.statSync(path.join(dirPath, name)).isDirectory()); } catch { return []; }
 }
@@ -71,8 +89,9 @@ function decisionScore(row) {
 }
 
 function firstScalar(text, key) {
-  const match = text.match(new RegExp(`^${key}:\\s*(.+)$`, 'm'));
-  return match ? match[1].replace(/^['"]|['"]$/g, '').trim() : null;
+  const prefix = `${key}:`;
+  const line = text.split('\n').find((candidate) => candidate.startsWith(prefix));
+  return line ? line.slice(prefix.length).replace(/^['"]|['"]$/g, '').trim() : null;
 }
 
 function countBetween(text, startKey, endKeys, pattern) {
@@ -399,10 +418,10 @@ fs.writeFileSync(
   JSON.stringify(
     {
       generated_at: new Date().toISOString(),
-      rows,
-      scenarios,
-      scenario_diffs: scenarioDiffs,
-      deltas,
+      rows: sanitizeDashboardValue(rows),
+      scenarios: sanitizeDashboardValue(scenarios),
+      scenario_diffs: sanitizeDashboardValue(scenarioDiffs),
+      deltas: sanitizeDashboardValue(deltas),
     },
     null,
     2,

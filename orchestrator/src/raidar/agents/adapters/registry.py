@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from ..config import AgentSpec, Harness
+from typing import TYPE_CHECKING
+
+from ..config import Harness
 from .base import HarnessAdapter
 from .claude_code_cli import ClaudeCodeCliAdapter
 from .codex_cli import CodexCliAdapter
@@ -10,6 +12,9 @@ from .copilot_cli import CopilotCliAdapter
 from .cursor_cli import CursorCliAdapter
 from .gemini_cli import GeminiCliAdapter
 from .pi_cli import PiCliAdapter
+
+if TYPE_CHECKING:
+    from ..config import AgentSpec
 
 AdapterType = type[HarnessAdapter]
 

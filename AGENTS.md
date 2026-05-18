@@ -12,17 +12,17 @@
 - Use `make scenario-init` only for brand-new scenario roots. If the intent is another revision of an existing scenario, do not create a sibling scenario directory; clone the revision inside the existing root instead.
 - Exclude `scenarios/**/starter/**` from analysis and code-quality checks by default; starter folders are representative delivery-scenario artifacts, not canonical shared product code.
 - Treat `scenarios/` and `experiments/` as build-generated runtime artifacts by default: exclude them from quality checks unless the request explicitly asks to review/analyze them.
-- Matrix configs must define the top-level `suite` block with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`.
+- Matrix configs must define `matrix.experiment` with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`, plus `matrix.agents` entries with `harness`, `provider`, `model`, and optional `reasoning_effort`.
 - Task completion requires `make quality` to pass.
 
 ## Known Matrix Configs
 
-- `.configs/homepage-v001-codex-oauth-matrix.yaml`: Homepage implementation revision `v001` Codex-only benchmark using OAuth/session auth across `gpt-5.4-medium`, `gpt-5.4-high`, `gpt-5.4-mini-low`, and `gpt-5.3-codex-spark-medium`.
+- `.configs/homepage-v001-codex-oauth-matrix.yaml`: Homepage implementation revision `v001` Codex-only benchmark using OAuth/session auth across `gpt-5.5-low`, `gpt-5.5-medium`, `gpt-5.4-mini-low`, and `gpt-5.3-codex-spark-low`.
 
 ## Smoke Testing
 
-- Public smoke targets run in fast mode by default. `make orchestrator-smoke`, `make smoke-matrix`, and `make agent-smoke` now set `HARBOR_SMOKE_FAST=1` and `HARBOR_SMOKE_FAST_REUSE_IMAGE=1` automatically, so Codex, Gemini, and Claude smokes use the repo-local fast Harbor agent path without extra env setup.
-- Use the public `make` targets for smoke runs rather than setting fast-mode env vars manually.
+- Public smoke targets run through the repo-local Harbor agent path by default. Use `make orchestrator-smoke`, `make smoke-matrix`, and `make agent-smoke` without setting fast-mode env vars manually.
+- Use the public `make` targets for smoke runs rather than invoking Raidar implementation commands directly.
 - Small single smoke on low-cost Codex: `make agent-smoke HARNESS=codex-cli MODEL=codex/gpt-5.4-mini-low TIMEOUT_SEC=300`
 - Full default smoke matrix: `make smoke-matrix`
 - Codex-only default smoke matrix: `make smoke-matrix SMOKE_MATRIX_SELECTOR=codex`

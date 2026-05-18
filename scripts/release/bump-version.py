@@ -62,7 +62,9 @@ def get_commits_since_last_bump() -> list[str]:
 
     filtered: list[str] = []
     for commit in commits:
-        if commit.startswith("chore: bump version") or commit.startswith("chore(release):"):
+        if commit.startswith("chore: bump version") or commit.startswith(
+            "chore(release):"
+        ):
             break
         filtered.append(commit)
     return filtered
@@ -135,12 +137,10 @@ def generate_changelog_entry(version: str, commits: list[dict[str, str]]) -> str
         by_type.setdefault(key, []).append(commit["raw"])
 
     for kind in type_order:
-        for raw in by_type.get(kind, []):
-            lines.append(f"- {raw}")
+        lines.extend(f"- {raw}" for raw in by_type.get(kind, []))
 
     for kind in sorted(set(by_type) - set(type_order)):
-        for raw in by_type[kind]:
-            lines.append(f"- {raw}")
+        lines.extend(f"- {raw}" for raw in by_type[kind])
 
     lines.append("")
     return "\n".join(lines)

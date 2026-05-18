@@ -1,0 +1,79 @@
+[
+  {
+    "analyzer": "complexity-delta",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/complexity-delta-20260517T210404Z.json"
+  },
+  {
+    "analyzer": "semantic-duplication",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/semantic-duplication-20260517T210405Z.json"
+  },
+  {
+    "analyzer": "semantic-refactor-risk",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/semantic-refactor-risk-20260517T210405Z.json"
+  },
+  {
+    "analyzer": "test-coverage",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/test-coverage-20260517T210415Z.json"
+  },
+  {
+    "analyzer": "security-sensitivity",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/security-sensitivity-20260517T210415Z.json"
+  },
+  {
+    "analyzer": "dependency-vulnerabilities",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/dependency-vulnerabilities-20260517T210415Z.json"
+  },
+  {
+    "analyzer": "secrets",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/secrets-20260517T210416Z.json"
+  },
+  {
+    "analyzer": "verification-adequacy",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/verification-adequacy-20260517T210416Z.json"
+  },
+  {
+    "analyzer": "git-collaboration-signals",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/git-collaboration-signals-20260517T210416Z.json"
+  },
+  {
+    "analyzer": "capability-blind-spots",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/capability-blind-spots-20260517T210416Z.json"
+  },
+  {
+    "analyzer": "reviewer-actionability",
+    "action": "skip",
+    "reason": "fingerprint unchanged",
+    "duration_ms": 0,
+    "artifact": ".agentic-ci-validation/evidence/reviewer-actionability-20260517T210416Z.json"
+  }
+]

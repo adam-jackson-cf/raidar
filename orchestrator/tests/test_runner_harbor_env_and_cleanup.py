@@ -13,6 +13,7 @@ from types import SimpleNamespace
 import pytest
 
 import raidar.runner as runner
+from raidar.runtime import pipeline
 
 
 class _AdapterStub:
@@ -373,7 +374,18 @@ def test_ensure_harbor_runtime_preflight_runs_git_check(monkeypatch, tmp_path: P
         log_dir=tmp_path,
     )
 
-    assert calls == [["docker", "run", "--rm", image_ref.image_name, "git", "--version"]]
+    assert calls[0] == ["docker", "run", "--rm", image_ref.image_name, "git", "--version"]
+    assert calls[1][:8] == [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=16m",
+    ]
+    assert calls[1][8] == image_ref.image_name
     assert (tmp_path / "runtime-git-preflight.log").read_text(encoding="utf-8") == (
         "git version 2.51.0\n"
     )
@@ -404,6 +416,51 @@ def test_ensure_harbor_runtime_preflight_raises_when_git_missing(
             run_env={},
             log_dir=tmp_path,
         )
+
+
+def test_ensure_harbor_runtime_preflight_runs_isolation_probe(monkeypatch, tmp_path: Path) -> None:
+    commands: list[list[str]] = []
+
+    def fake_run(*args, **kwargs):
+        del kwargs
+        commands.append(args[0])
+        return subprocess.CompletedProcess(args[0], 0, stdout="ok\n", stderr="")
+
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    image_ref = runner.TaskImageRef(
+        image_name="raidar-task-env:task-env-codex-cli-abcd1234",
+        cache_key="cache-key",
+        tag="task-env-codex-cli-abcd1234",
+    )
+
+    runner._ensure_harbor_runtime_preflight(
+        image_ref=image_ref,
+        run_env={},
+        log_dir=tmp_path,
+    )
+
+    assert commands[0] == [
+        "docker",
+        "run",
+        "--rm",
+        "raidar-task-env:task-env-codex-cli-abcd1234",
+        "git",
+        "--version",
+    ]
+    assert commands[1][:8] == [
+        "docker",
+        "run",
+        "--rm",
+        "--network",
+        "none",
+        "--read-only",
+        "--tmpfs",
+        "/tmp:rw,noexec,nosuid,size=16m",
+    ]
+    assert commands[1][8] == "raidar-task-env:task-env-codex-cli-abcd1234"
+    assert any("test ! -d /tmp/agentic-eval-secrets" in part for part in commands[1])
+    assert (tmp_path / "runtime-isolation-preflight.log").read_text(encoding="utf-8") == "ok\n"
 
 
 def test_redact_sensitive_text_masks_inline_env_and_json_values() -> None:
@@ -1094,7 +1151,6 @@ def test_prepare_workspace_phase_reuses_prep_and_task_image_across_invocations(
     config = SimpleNamespace(
         harness=runner.Harness.CODEX_CLI,
         timeout_sec=300,
-        adapter=lambda: adapter,
     )
     scenario = runner.load_scenario(scenario_dir / "scenario.yaml")
     request_one = runner.RunRequest(
@@ -1123,9 +1179,10 @@ def test_prepare_workspace_phase_reuses_prep_and_task_image_across_invocations(
         preflight_calls=preflight_calls,
         runtime_preflight_calls=runtime_preflight_calls,
     )
+    monkeypatch.setattr(pipeline, "resolve_adapter", lambda _config: adapter)
 
-    phase_one = runner._prepare_workspace_phase(request_one)
-    phase_two = runner._prepare_workspace_phase(request_two)
+    phase_one = pipeline.prepare_workspace_phase(request_one)
+    phase_two = pipeline.prepare_workspace_phase(request_two)
 
     assert phase_one.cache_metadata["baseline"]["hit"] is False
     assert phase_one.cache_metadata["baseline"]["status"] == "miss"
@@ -1156,10 +1213,11 @@ def test_prepare_workspace_phase_validates_before_initializing_run(monkeypatch) 
         raise AssertionError("initialize_run should not run before adapter validation")
 
     monkeypatch.setattr(runner, "initialize_run", fail_initialize_run)
-    request = SimpleNamespace(config=SimpleNamespace(adapter=lambda: FailingAdapter()))
+    monkeypatch.setattr(pipeline, "resolve_adapter", lambda _config: FailingAdapter())
+    request = SimpleNamespace(config=SimpleNamespace())
 
     with pytest.raises(ValueError, match="invalid harness"):
-        runner._prepare_workspace_phase(request)
+        pipeline.prepare_workspace_phase(request)
 
 
 def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missing(
@@ -1190,7 +1248,7 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
     monkeypatch.setattr(runner, "collect_process_metrics", fake_collect_process_metrics)
     monkeypatch.setattr(runner, "collect_trace_events", lambda *args, **kwargs: [])
 
-    result = runner._execute_harbor_phase(request, phase)
+    result = pipeline.execute_harbor_phase(request, phase)
 
     assert result.terminated_early is True
     assert result.termination_reason == harbor_result.termination_reason
@@ -1233,7 +1291,7 @@ def test_execute_harbor_phase_recovers_timeout_when_verifier_outputs_exist(
         lambda _trial_dir: (verifier_outputs, None),
     )
 
-    result = runner._execute_harbor_phase(request, phase)
+    result = pipeline.execute_harbor_phase(request, phase)
 
     assert result.terminated_early is False
     assert result.termination_reason is None
@@ -1269,7 +1327,7 @@ def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
     monkeypatch.setattr(runner, "collect_trace_events", lambda *args, **kwargs: [])
 
     with pytest.raises(RuntimeError, match="Missing token usage metrics"):
-        runner._execute_harbor_phase(request, phase)
+        pipeline.execute_harbor_phase(request, phase)
 
 
 def test_execute_harbor_preserves_trial_dir_on_timeout(monkeypatch, tmp_path: Path) -> None:
