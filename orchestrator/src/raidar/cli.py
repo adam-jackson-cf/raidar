@@ -27,6 +27,9 @@ from .agents.adapters.harbor_cli import resolve_cli_executable
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .application.execution import (
+    build_run_cli_options as _service_build_run_cli_options,
+)
+from .application.execution import (
     execute_run_command,
 )
 from .application.execution import (
@@ -503,7 +506,7 @@ def run(
     experiments_root: Path | None,
 ) -> None:
     """Run one scenario with the specified harness and model for smoke/debug workflows."""
-    options = RunCliOptions(
+    options = _service_build_run_cli_options(
         scenario=scenario,
         harness=harness,
         provider=provider,
@@ -513,10 +516,9 @@ def run(
         repeats=repeats,
         repeat_parallel=repeat_parallel,
         rerun_unscored=rerun_unscored,
-        experiments_root=_resolve_experiments_root(
-            experiments_root=experiments_root,
-            experiment_kind=experiment_kind,
-        ),
+        experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+        repo_root=REPO_ROOT,
     )
     _execute_run_options(
         options,
@@ -617,7 +619,7 @@ def experiment_run(
     as_json: bool,
 ) -> None:
     """Run a repeated experiment with deterministic aggregate output."""
-    options = RunCliOptions(
+    options = _service_build_run_cli_options(
         scenario=scenario,
         harness=harness,
         provider=provider,
@@ -627,10 +629,9 @@ def experiment_run(
         repeats=repeats,
         repeat_parallel=repeat_parallel,
         rerun_unscored=rerun_unscored,
-        experiments_root=_resolve_experiments_root(
-            experiments_root=experiments_root,
-            experiment_kind=experiment_kind,
-        ),
+        experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+        repo_root=REPO_ROOT,
     )
     result = _execute_run_options(
         options,
@@ -1428,6 +1429,7 @@ def matrix(
         jobs=jobs,
         experiment_config=experiment_config,
         experiments_root=resolved_experiments_root,
+        experiment_kind=experiment_kind,
         parallel=parallel,
     )
 
@@ -1467,8 +1469,9 @@ def _matrix_job_options(
     entry: object,
     experiment_config: object,
     experiments_root: Path,
+    experiment_kind: str,
 ) -> RunCliOptions:
-    return RunCliOptions(
+    return _service_build_run_cli_options(
         scenario=scenario_path,
         harness=entry.harness,
         provider=entry.provider,
@@ -1479,6 +1482,8 @@ def _matrix_job_options(
         repeat_parallel=experiment_config.repeat_parallel,
         rerun_unscored=experiment_config.retry_void,
         experiments_root=experiments_root,
+        experiment_kind=experiment_kind,
+        repo_root=REPO_ROOT,
     )
 
 
@@ -1487,6 +1492,7 @@ def _run_matrix_jobs(
     jobs: list[tuple[Path, ScenarioDefinition, object]],
     experiment_config: object,
     experiments_root: Path,
+    experiment_kind: str,
     parallel: int,
 ) -> tuple[int, int]:
     successes = 0
@@ -1499,6 +1505,7 @@ def _run_matrix_jobs(
             entry=entry,
             experiment_config=experiment_config,
             experiments_root=experiments_root,
+            experiment_kind=experiment_kind,
         )
         return _execute_run_options(
             options,

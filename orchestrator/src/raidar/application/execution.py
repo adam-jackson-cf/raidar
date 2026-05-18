@@ -21,7 +21,11 @@ from raidar.application.scenario_catalog import (
     scenario_evaluation_profile,
     scenario_metrics,
 )
-from raidar.experiment import create_experiment_summary, persist_experiment
+from raidar.experiment import (
+    ExperimentSummaryInput,
+    create_experiment_summary,
+    persist_experiment,
+)
 from raidar.runner import RunRequest, StarterPreflightError
 from raidar.runtime.maintenance import cleanup_stale_harbor_resources
 from raidar.runtime.pipeline import run_task
@@ -55,6 +59,41 @@ def experiment_execution_suffix(options: RunCliOptions) -> str:
     return suffix
 
 
+def build_run_cli_options(
+    *,
+    scenario: Path,
+    harness: str,
+    provider: str,
+    model: str,
+    reasoning_effort: str | None,
+    timeout: int,
+    repeats: int,
+    repeat_parallel: int,
+    rerun_unscored: int,
+    experiments_root: Path | None,
+    experiment_kind: str | None,
+    repo_root: Path,
+) -> RunCliOptions:
+    """Build canonical run options from command or matrix inputs."""
+
+    return RunCliOptions(
+        scenario=scenario,
+        harness=harness,
+        provider=provider,
+        model=model,
+        reasoning_effort=reasoning_effort,
+        timeout=timeout,
+        repeats=repeats,
+        repeat_parallel=repeat_parallel,
+        rerun_unscored=rerun_unscored,
+        experiments_root=resolve_experiments_root(
+            experiments_root=experiments_root,
+            experiment_kind=experiment_kind,
+            repo_root=repo_root,
+        ),
+    )
+
+
 def execute_run_command(
     request: ExecutionDispatchRequest, *, repo_root: Path
 ) -> SuiteExecutionResult:
@@ -81,33 +120,66 @@ def execute_run_command(
     )
 
     if resolved.repeats == 1 and not request.force_experiment_summary:
-        if request.echo:
-            _echo_single_run_result(runs[0])
-        return SuiteExecutionResult(
-            scenario_path=resolved.scenario,
-            scenario_name=scenario_def.name,
-            scenario_revision=scenario_def.scenario_revision,
+        return _single_suite_result(
+            resolved=resolved,
+            scenario_def=scenario_def,
             runs=runs,
             retries_used=retries_used,
+            echo=request.echo,
         )
 
-    summary = create_experiment_summary(
-        scenario_name=run_request.scenario.name,
-        scenario_revision=run_request.scenario.scenario_revision,
-        harness=resolved.harness,
-        model=resolved.model,
-        evaluation_profile=scenario_evaluation_profile(run_request.scenario),
-        metrics=scenario_metrics(run_request.scenario),
-        repeats=resolved.repeats,
-        repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
+    experiment_json_path, summary_path, report_path = _persist_experiment_summary(
+        resolved=resolved,
+        run_request=run_request,
         runs=runs,
         started_at=started_at,
-        rerun_unscored_limit=resolved.rerun_unscored,
-        reruns_used=retries_used,
-        unresolved_unscored_count=unresolved_unscored,
+        retries_used=retries_used,
+        unresolved_unscored=unresolved_unscored,
+        execution_dir=execution_dir,
     )
-    experiment_json_path, summary_path, report_path = persist_experiment(execution_dir, summary)
-    if request.echo:
+    return _experiment_suite_result(
+        resolved=resolved,
+        scenario_def=scenario_def,
+        runs=runs,
+        retries_used=retries_used,
+        experiment_json_path=experiment_json_path,
+        summary_path=summary_path,
+        report_path=report_path,
+        echo=request.echo,
+    )
+
+
+def _single_suite_result(
+    *,
+    resolved: RunCliOptions,
+    scenario_def,
+    runs: list,
+    retries_used: int,
+    echo: bool,
+) -> SuiteExecutionResult:
+    if echo:
+        _echo_single_run_result(runs[0])
+    return SuiteExecutionResult(
+        scenario_path=resolved.scenario,
+        scenario_name=scenario_def.name,
+        scenario_revision=scenario_def.scenario_revision,
+        runs=runs,
+        retries_used=retries_used,
+    )
+
+
+def _experiment_suite_result(
+    *,
+    resolved: RunCliOptions,
+    scenario_def,
+    runs: list,
+    retries_used: int,
+    experiment_json_path: Path,
+    summary_path: Path,
+    report_path: Path,
+    echo: bool,
+) -> SuiteExecutionResult:
+    if echo:
         _echo_experiment_result(experiment_json_path, summary_path, report_path, retries_used, runs)
     return SuiteExecutionResult(
         scenario_path=resolved.scenario,
@@ -132,7 +204,7 @@ def dispatch_from_experiment_request(
 ) -> SuiteExecutionResult:
     """Convert an experiment request into the canonical dispatch request."""
 
-    options = RunCliOptions(
+    options = build_run_cli_options(
         scenario=request.scenario,
         harness=request.harness,
         provider=request.provider,
@@ -142,11 +214,9 @@ def dispatch_from_experiment_request(
         repeats=request.repeats,
         repeat_parallel=request.repeat_parallel,
         rerun_unscored=request.rerun_unscored,
-        experiments_root=resolve_experiments_root(
-            experiments_root=request.experiments_root,
-            experiment_kind=request.experiment_kind,
-            repo_root=repo_root,
-        ),
+        experiments_root=request.experiments_root,
+        experiment_kind=request.experiment_kind,
+        repo_root=repo_root,
     )
     resolved_suffix = execution_suffix
     if resolved_suffix is None and force_experiment_summary:
@@ -161,6 +231,36 @@ def dispatch_from_experiment_request(
         ),
         repo_root=repo_root,
     )
+
+
+def _persist_experiment_summary(
+    *,
+    resolved: RunCliOptions,
+    run_request: RunRequest,
+    runs: list,
+    started_at: datetime,
+    retries_used: int,
+    unresolved_unscored: int,
+    execution_dir: Path,
+) -> tuple[Path, Path, Path]:
+    summary = create_experiment_summary(
+        ExperimentSummaryInput(
+            scenario_name=run_request.scenario.name,
+            scenario_revision=run_request.scenario.scenario_revision,
+            harness=resolved.harness,
+            model=resolved.model,
+            evaluation_profile=scenario_evaluation_profile(run_request.scenario),
+            metrics=scenario_metrics(run_request.scenario),
+            repeats=resolved.repeats,
+            repeat_parallel=max(1, min(resolved.repeat_parallel, resolved.repeats)),
+            runs=runs,
+            started_at=started_at,
+            rerun_unscored_limit=resolved.rerun_unscored,
+            reruns_used=retries_used,
+            unresolved_unscored_count=unresolved_unscored,
+        )
+    )
+    return persist_experiment(execution_dir, summary)
 
 
 def _load_project_env(repo_root: Path) -> None:

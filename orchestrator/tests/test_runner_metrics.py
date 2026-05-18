@@ -184,49 +184,18 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
     )
 
 
-def _sample_scorecard_context(
-    tmp_path: Path,
-    *,
-    terminated_early: bool,
-    termination_reason: str | None,
-) -> ScorecardBuildContext:
-    scenario_dir = tmp_path / "scenario"
-    workspace_dir = tmp_path / "workspace"
-    results_dir = tmp_path / "results"
-    scenario_dir.mkdir(parents=True, exist_ok=True)
-    workspace_dir.mkdir(parents=True, exist_ok=True)
-    results_dir.mkdir(parents=True, exist_ok=True)
-    (scenario_dir / "scenario.yaml").write_text("name: sample-task\nscenario_revision: v001\n")
-    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
-
-    starter_source = StarterSource(
-        scenario_name="homepage-implementation",
-        scenario_revision="v001",
-        path=workspace_dir,
-        fingerprint=directory_fingerprint(workspace_dir),
-    )
-
-    request = RunRequest(
+def _sample_run_request(scenario_dir: Path, results_dir: Path) -> RunRequest:
+    return RunRequest(
         scenario=_sample_scenario(),
         config=_sample_agent_config(),
         scenario_dir=scenario_dir,
         execution_dir=results_dir,
         repeat_index=1,
     )
-    context = WorkspaceContext(
-        starter_source=starter_source,
-        baseline_workspace=workspace_dir,
-        baseline_cache_key="baseline-cache-key",
-        baseline_cache_status="hit",
-        baseline_cache_hit=True,
-        baseline_metadata_path=workspace_dir / "baseline-metadata.json",
-        baseline_fingerprint="baseline-fingerprint",
-        workspace=workspace_dir,
-        injected_rules=None,
-        metadata_path=workspace_dir / ".starter-meta.json",
-    )
-    layout = RunLayout(
+
+
+def _sample_run_layout(results_dir: Path) -> RunLayout:
+    return RunLayout(
         run_id="run-1234",
         start_time=datetime.now(UTC),
         run_label="run-01",
@@ -238,7 +207,16 @@ def _sample_scorecard_context(
         run_json_path=results_dir / "runs" / "run-1234" / "run.json",
         report_path=results_dir / "runs" / "run-1234" / "report.md",
     )
-    execution = ExecutionPhaseResult(
+
+
+def _sample_execution_phase(
+    tmp_path: Path,
+    workspace_dir: Path,
+    *,
+    terminated_early: bool,
+    termination_reason: str | None,
+) -> ExecutionPhaseResult:
+    return ExecutionPhaseResult(
         harbor_result=HarborExecutionResult(
             terminated_early=terminated_early,
             termination_reason=termination_reason,
@@ -270,7 +248,10 @@ def _sample_scorecard_context(
         },
         auth_metadata={"auth_mode": "chatgpt", "auth_mode_requested": "auto"},
     )
-    artifacts = PersistedArtifacts(
+
+
+def _sample_persisted_artifacts() -> PersistedArtifacts:
+    return PersistedArtifacts(
         starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
         scenario_revision_meta={"scenario_yaml_hash": "abc"},
         verifier_artifacts={"scorecard": "verifier/scorecard.json"},
@@ -288,12 +269,38 @@ def _sample_scorecard_context(
             "error": None,
         },
     )
+
+
+def _sample_scorecard_context(
+    tmp_path: Path,
+    *,
+    terminated_early: bool,
+    termination_reason: str | None,
+) -> ScorecardBuildContext:
+    scenario_dir = tmp_path / "scenario"
+    workspace_dir = tmp_path / "workspace"
+    results_dir = tmp_path / "results"
+    scenario_dir.mkdir(parents=True, exist_ok=True)
+    workspace_dir.mkdir(parents=True, exist_ok=True)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "scenario.yaml").write_text("name: sample-task\nscenario_revision: v001\n")
+    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
+
     return ScorecardBuildContext(
-        request=request,
-        layout=layout,
-        context=context,
-        artifacts=artifacts,
-        execution=execution,
+        request=_sample_run_request(scenario_dir, results_dir),
+        layout=_sample_run_layout(results_dir),
+        context=_sample_workspace_context(
+            workspace_dir,
+            scenario_name="homepage-implementation",
+        ),
+        artifacts=_sample_persisted_artifacts(),
+        execution=_sample_execution_phase(
+            tmp_path,
+            workspace_dir,
+            terminated_early=terminated_early,
+            termination_reason=termination_reason,
+        ),
     )
 
 
@@ -339,6 +346,145 @@ def _make_bundle_request(
         execution_dir=results_dir,
         repeat_index=1,
     )
+
+
+def _verifier_scorecard_payload(*, include_metric_results: bool = True) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "functional": {
+            "passed": True,
+            "tests_passed": 4,
+            "tests_total": 4,
+            "build_succeeded": True,
+            "gates_passed": 4,
+            "gates_total": 4,
+        },
+        "acceptance": {
+            "checks": [
+                {
+                    "rule": "Placeholder removed",
+                    "type": "deterministic",
+                    "passed": True,
+                    "evidence": "ok",
+                }
+            ]
+        },
+        "visual": {
+            "similarity": 0.91,
+            "contract_version": "oracle",
+            "global_similarity": 0.97,
+            "regional_similarity": 0.95,
+            "worst_region_similarity": 0.91,
+            "region_decent_pass_rate": 0.5,
+            "policy_score": 91.0,
+            "passed": True,
+            "fidelity_tier": "passed",
+            "expected_region_count": 2,
+            "available_region_count": 2,
+            "region_evidence_status": "present",
+            "actual_path": "/tmp/run/visual/actual.png",
+            "reference_path": "/tmp/run/visual/reference.png",
+            "diff_path": "/tmp/run/visual/diff.png",
+            "capture_succeeded": True,
+            "regional_scores": [
+                {
+                    "name": "hero",
+                    "weight": 0.5,
+                    "normalized_weight": 0.5,
+                    "similarity": 0.98,
+                    "decent_pass": True,
+                    "actual_path": "/tmp/run/visual/actual-region-hero.png",
+                    "reference_path": "/tmp/run/visual/reference-region-hero.png",
+                    "diff_path": "/tmp/run/visual/diff-region-hero.png",
+                },
+                {
+                    "name": "footer",
+                    "weight": 0.5,
+                    "normalized_weight": 0.5,
+                    "similarity": 0.91,
+                    "decent_pass": True,
+                    "actual_path": "/tmp/run/visual/actual-region-footer.png",
+                    "reference_path": "/tmp/run/visual/reference-region-footer.png",
+                    "diff_path": "/tmp/run/visual/diff-region-footer.png",
+                },
+            ],
+        },
+        "verification_stability": {
+            "total_gate_failures": 0,
+            "unique_failure_categories": 0,
+            "repeat_failures": 0,
+        },
+        "test_coverage": {
+            "threshold": 0.8,
+            "measured": 0.9,
+            "source": "coverage-summary",
+            "passed": True,
+        },
+        "requirements_coverage": {
+            "total_requirements": 1,
+            "satisfied_requirements": 1,
+            "mapped_requirements": 1,
+            "missing_requirement_ids": [],
+            "requirement_gap_ids": [],
+        },
+        "execution_validity": {
+            "checks": [
+                {
+                    "name": "run_completed",
+                    "passed": True,
+                    "evidence": "done",
+                }
+            ]
+        },
+        "performance_gates": {
+            "checks": [
+                {
+                    "name": "quality_gates_passed",
+                    "passed": True,
+                    "evidence": "2/2 gates passed",
+                }
+            ]
+        },
+        "gate_history": [
+            {
+                "timestamp": "2026-01-01T00:00:00Z",
+                "gate_name": "typecheck",
+                "command": "bun run typecheck",
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+                "failure_category": None,
+                "is_repeat": False,
+            }
+        ],
+    }
+    if include_metric_results:
+        payload["metric_results"] = [
+            {
+                "metric_id": "artifact-checks",
+                "passed": False,
+                "matched_count": 0,
+                "missing_patterns": ["src/components/**/*.tsx"],
+                "evidence": "artifact-checks matches (src/components/**/*.tsx:0)",
+            }
+        ]
+    return payload
+
+
+def _stale_verifier_scorecard_payload() -> dict[str, object]:
+    return {
+        "execution_validity": {
+            "checks": [
+                {
+                    "name": "run_completed",
+                    "passed": True,
+                    "evidence": "Run completed without early termination.",
+                }
+            ],
+            "passed": True,
+        },
+        "performance_gates": {"checks": [], "passed": True},
+        "gate_history": [],
+    }
 
 
 def test_ensure_baseline_workspace_initializes_once_in_parallel(
@@ -1183,127 +1329,7 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     verifier_dir = trial_dir / "verifier"
     verifier_dir.mkdir(parents=True, exist_ok=True)
     scorecard_path = verifier_dir / "scorecard.json"
-    scorecard_path.write_text(
-        json.dumps(
-            {
-                "functional": {
-                    "passed": True,
-                    "tests_passed": 4,
-                    "tests_total": 4,
-                    "build_succeeded": True,
-                    "gates_passed": 4,
-                    "gates_total": 4,
-                },
-                "acceptance": {
-                    "checks": [
-                        {
-                            "rule": "Placeholder removed",
-                            "type": "deterministic",
-                            "passed": True,
-                            "evidence": "ok",
-                        }
-                    ]
-                },
-                "visual": {
-                    "similarity": 0.91,
-                    "contract_version": "oracle",
-                    "global_similarity": 0.97,
-                    "regional_similarity": 0.95,
-                    "worst_region_similarity": 0.91,
-                    "region_decent_pass_rate": 0.5,
-                    "policy_score": 91.0,
-                    "passed": True,
-                    "fidelity_tier": "passed",
-                    "expected_region_count": 2,
-                    "available_region_count": 2,
-                    "region_evidence_status": "present",
-                    "actual_path": "/tmp/run/visual/actual.png",
-                    "reference_path": "/tmp/run/visual/reference.png",
-                    "diff_path": "/tmp/run/visual/diff.png",
-                    "capture_succeeded": True,
-                    "regional_scores": [
-                        {
-                            "name": "hero",
-                            "weight": 0.5,
-                            "normalized_weight": 0.5,
-                            "similarity": 0.98,
-                            "decent_pass": True,
-                            "actual_path": "/tmp/run/visual/actual-region-hero.png",
-                            "reference_path": "/tmp/run/visual/reference-region-hero.png",
-                            "diff_path": "/tmp/run/visual/diff-region-hero.png",
-                        },
-                        {
-                            "name": "footer",
-                            "weight": 0.5,
-                            "normalized_weight": 0.5,
-                            "similarity": 0.91,
-                            "decent_pass": True,
-                            "actual_path": "/tmp/run/visual/actual-region-footer.png",
-                            "reference_path": "/tmp/run/visual/reference-region-footer.png",
-                            "diff_path": "/tmp/run/visual/diff-region-footer.png",
-                        },
-                    ],
-                },
-                "verification_stability": {
-                    "total_gate_failures": 0,
-                    "unique_failure_categories": 0,
-                    "repeat_failures": 0,
-                },
-                "test_coverage": {
-                    "threshold": 0.8,
-                    "measured": 0.9,
-                    "source": "coverage-summary",
-                    "passed": True,
-                },
-                "requirements_coverage": {
-                    "total_requirements": 1,
-                    "satisfied_requirements": 1,
-                    "mapped_requirements": 1,
-                    "missing_requirement_ids": [],
-                    "requirement_gap_ids": [],
-                },
-                "execution_validity": {
-                    "checks": [
-                        {
-                            "name": "run_completed",
-                            "passed": True,
-                            "evidence": "done",
-                        }
-                    ]
-                },
-                "performance_gates": {
-                    "checks": [
-                        {
-                            "name": "quality_gates_passed",
-                            "passed": True,
-                            "evidence": "2/2 gates passed",
-                        }
-                    ]
-                },
-                "metric_results": [
-                    {
-                        "metric_id": "artifact-checks",
-                        "passed": False,
-                        "matched_count": 0,
-                        "missing_patterns": ["src/components/**/*.tsx"],
-                        "evidence": "artifact-checks matches (src/components/**/*.tsx:0)",
-                    }
-                ],
-                "gate_history": [
-                    {
-                        "timestamp": "2026-01-01T00:00:00Z",
-                        "gate_name": "typecheck",
-                        "command": "bun run typecheck",
-                        "exit_code": 0,
-                        "stdout": "",
-                        "stderr": "",
-                        "failure_category": None,
-                        "is_repeat": False,
-                    }
-                ],
-            }
-        )
-    )
+    scorecard_path.write_text(json.dumps(_verifier_scorecard_payload()))
 
     outputs, reason = _load_verifier_outputs(trial_dir)
 
@@ -1334,43 +1360,7 @@ def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
     verifier_dir = trial_dir / "verifier"
     verifier_dir.mkdir(parents=True, exist_ok=True)
     (verifier_dir / "scorecard.json").write_text(
-        json.dumps(
-            {
-                "functional": {
-                    "passed": True,
-                    "tests_passed": 1,
-                    "tests_total": 1,
-                    "build_succeeded": True,
-                    "gates_passed": 1,
-                    "gates_total": 1,
-                },
-                "acceptance": {"checks": []},
-                "visual": None,
-                "verification_stability": {
-                    "total_gate_failures": 0,
-                    "unique_failure_categories": 0,
-                    "repeat_failures": 0,
-                },
-                "test_coverage": {
-                    "threshold": None,
-                    "measured": None,
-                    "source": None,
-                    "passed": True,
-                },
-                "requirements_coverage": {
-                    "total_requirements": 0,
-                    "satisfied_requirements": 0,
-                    "mapped_requirements": 0,
-                    "mapped_satisfied_requirements": 0,
-                    "missing_requirement_ids": [],
-                    "requirement_gap_ids": [],
-                    "requirement_test_evidence_gaps": {},
-                },
-                "execution_validity": {"checks": []},
-                "performance_gates": {"checks": []},
-                "gate_history": [],
-            }
-        )
+        json.dumps(_verifier_scorecard_payload(include_metric_results=False))
     )
     outputs, reason = _load_verifier_outputs(trial_dir)
     assert outputs is None
@@ -1836,22 +1826,7 @@ def test_persist_canonical_verifier_artifacts_overwrites_stale_trial_scorecard(t
     verifier_dir = context.layout.verifier_dir
     verifier_dir.mkdir(parents=True, exist_ok=True)
     (verifier_dir / "scorecard.json").write_text(
-        json.dumps(
-            {
-                "execution_validity": {
-                    "checks": [
-                        {
-                            "name": "run_completed",
-                            "passed": True,
-                            "evidence": "Run completed without early termination.",
-                        }
-                    ],
-                    "passed": True,
-                },
-                "performance_gates": {"checks": [], "passed": True},
-                "gate_history": [],
-            }
-        ),
+        json.dumps(_stale_verifier_scorecard_payload()),
         encoding="utf-8",
     )
     (verifier_dir / "execution-validity.json").write_text(

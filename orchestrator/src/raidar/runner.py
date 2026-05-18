@@ -14,6 +14,7 @@ import threading
 import time
 import uuid
 from contextlib import contextmanager
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -54,6 +55,14 @@ from .runtime.models import (
     TaskImageRef,
     WorkspaceContext,
 )
+from .runtime.wait import (
+    HARBOR_RATE_LIMIT_RETRY_DELAY_SEC as _HARBOR_RATE_LIMIT_RETRY_DELAY_SEC,
+)
+from .runtime.wait import (
+    wait_for_cache_lock_retry,
+    wait_for_harbor_rate_limit_retry,
+    wait_for_remove_tree_retry,
+)
 from .schemas.events import GateEvent, TraceEvent
 from .schemas.scenario import RequirementSpec, ScenarioDefinition
 from .schemas.scorecard import (
@@ -78,7 +87,7 @@ SCORING_SCHEMA_VERSION = "2.0.0"
 HARBOR_TIMEOUT_BUFFER_SEC = 120
 TASK_IMAGE_BUILD_MIN_TIMEOUT_SEC = 120
 MIN_DOCKER_COMPOSE_VERSION = (2, 40, 1)
-HARBOR_RATE_LIMIT_RETRY_DELAY_SEC = 20
+HARBOR_RATE_LIMIT_RETRY_DELAY_SEC = _HARBOR_RATE_LIMIT_RETRY_DELAY_SEC
 HARBOR_RATE_LIMIT_MAX_ATTEMPTS = 2
 HARNESS_STALE_CONTAINER_PATTERN = re.compile(r"^harbor-task.*-main-1$")
 HARBOR_GIT_MULTIBRANCH_PATTERN = re.compile(r"^git-multibranch__.+-main-1$")
@@ -197,6 +206,20 @@ RAIDAR_DOCKER_LABEL_MANAGED = "io.raidar.cache.managed"
 RAIDAR_DOCKER_LABEL_KEY = "io.raidar.cache.key"
 RAIDAR_DOCKER_LABEL_HARNESS = "io.raidar.cache.harness"
 RAIDAR_DOCKER_LABEL_REPO = "io.raidar.cache.repo"
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionValidityInput:
+    """Canonical input contract for execution-validity scoring."""
+
+    outputs: EvaluationOutputs
+    terminated_early: bool
+    termination_reason: str | None
+    process_metrics: ProcessMetrics
+    events: list[TraceEvent]
+    workspace_path: Path
+    atomic_commits_required: bool
+    verification_patterns: list[str]
 
 
 class StarterPreflightError(RuntimeError):
@@ -386,7 +409,7 @@ def _cache_key_lock(lock_key: str, *, timeout_sec: int = RAIDAR_CACHE_LOCK_TIMEO
                 continue
             if time.monotonic() >= deadline:
                 raise TimeoutError(f"Timed out waiting for cache lock `{lock_key}`.") from err
-            time.sleep(0.1)
+            wait_for_cache_lock_retry()
 
     try:
         yield
@@ -706,7 +729,7 @@ def _remove_tree_with_retries(path: Path, *, attempts: int = 3, delay_sec: float
             last_error = exc
             if exc.errno not in transient_errnos or attempt == attempts - 1:
                 raise
-            time.sleep(delay_sec)
+            wait_for_remove_tree_retry(delay_sec)
     if last_error is not None:
         raise last_error
 
@@ -2190,7 +2213,7 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
                 trial_dir=trial_dir,
             )
         cleanup_stale_harbor_resources()
-        time.sleep(HARBOR_RATE_LIMIT_RETRY_DELAY_SEC)
+        wait_for_harbor_rate_limit_retry()
 
     if execution_error:
         return _terminated_harbor_result(
@@ -4290,38 +4313,41 @@ def _git_commit_count(workspace_path: Path) -> tuple[int, str]:
 
 
 def build_execution_validity_score(
-    *,
-    outputs: EvaluationOutputs,
-    terminated_early: bool,
-    termination_reason: str | None,
-    process_metrics: ProcessMetrics,
-    events: list[TraceEvent],
-    workspace_path: Path,
-    atomic_commits_required: bool,
-    verification_patterns: list[str],
+    validity_input: ExecutionValidityInput,
 ) -> ExecutionValidityScore:
     """Build execution-validity checks for the run."""
-    checks = [check.model_copy(deep=True) for check in outputs.execution_validity.checks]
+    checks = [
+        check.model_copy(deep=True) for check in validity_input.outputs.execution_validity.checks
+    ]
     _upsert_gate_check(
         checks,
         GateCheck(
             name="run_completed",
-            passed=not terminated_early,
-            evidence=termination_reason or "Run completed without early termination.",
+            passed=not validity_input.terminated_early,
+            evidence=validity_input.termination_reason
+            or "Run completed without early termination.",
         ),
     )
 
-    configured_required_count = len(verification_patterns)
-    explicit_required_executed = process_metrics.executed_required_verification_commands
-    observed_attempts = _observed_verification_attempts(outputs.gate_history, verification_patterns)
+    configured_required_count = len(validity_input.verification_patterns)
+    explicit_required_executed = (
+        validity_input.process_metrics.executed_required_verification_commands
+    )
+    observed_attempts = _observed_verification_attempts(
+        validity_input.outputs.gate_history,
+        validity_input.verification_patterns,
+    )
     observed_required_executed = _count_executed_required(observed_attempts)
     required_count = configured_required_count
-    if not outputs.gate_history and process_metrics.required_verification_commands > 0:
-        required_count = process_metrics.required_verification_commands
+    if (
+        not validity_input.outputs.gate_history
+        and validity_input.process_metrics.required_verification_commands > 0
+    ):
+        required_count = validity_input.process_metrics.required_verification_commands
     if required_count == 0:
         required_commands_passed = True
         required_commands_evidence = "required=0"
-    elif outputs.gate_history:
+    elif validity_input.outputs.gate_history:
         required_commands_passed = observed_required_executed == required_count
         required_commands_evidence = (
             f"observed={observed_required_executed}/{required_count}, "
@@ -4341,7 +4367,7 @@ def build_execution_validity_score(
         ),
     )
 
-    bypass_commands = process_metrics.git_commit_verification_bypass_commands
+    bypass_commands = validity_input.process_metrics.git_commit_verification_bypass_commands
     _upsert_gate_check(
         checks,
         GateCheck(
@@ -4355,9 +4381,9 @@ def build_execution_validity_score(
         ),
     )
 
-    commit_count, commit_evidence = _git_commit_count(workspace_path)
+    commit_count, commit_evidence = _git_commit_count(validity_input.workspace_path)
     atomic_commits_present = commit_count > 0
-    if atomic_commits_required:
+    if validity_input.atomic_commits_required:
         _upsert_gate_check(
             checks,
             GateCheck(
@@ -4368,9 +4394,9 @@ def build_execution_validity_score(
         )
 
     completion_check = _completion_claim_consistent(
-        events,
-        _all_gates_passed(outputs),
-        atomic_commits_required=atomic_commits_required,
+        validity_input.events,
+        _all_gates_passed(validity_input.outputs),
+        atomic_commits_required=validity_input.atomic_commits_required,
         atomic_commits_present=atomic_commits_present,
     )
     _upsert_gate_check(checks, completion_check)
@@ -4548,14 +4574,18 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     outputs = execution.outputs
 
     execution_validity = build_execution_validity_score(
-        outputs=outputs,
-        terminated_early=execution.terminated_early,
-        termination_reason=execution.termination_reason,
-        process_metrics=execution.process_metrics,
-        events=execution.events,
-        workspace_path=context.context.workspace,
-        atomic_commits_required=request.scenario.verification.workflow.atomic_commits_required,
-        verification_patterns=_verification_command_strings(request.scenario),
+        ExecutionValidityInput(
+            outputs=outputs,
+            terminated_early=execution.terminated_early,
+            termination_reason=execution.termination_reason,
+            process_metrics=execution.process_metrics,
+            events=execution.events,
+            workspace_path=context.context.workspace,
+            atomic_commits_required=(
+                request.scenario.verification.workflow.atomic_commits_required
+            ),
+            verification_patterns=_verification_command_strings(request.scenario),
+        )
     )
     performance_gates = build_performance_gates_score(outputs=outputs)
     resource_efficiency = build_resource_efficiency_score(execution.process_metrics)

@@ -515,7 +515,11 @@ def test_execute_harbor_retries_once_on_registry_rate_limit(monkeypatch, tmp_pat
     monkeypatch.setattr(runner, "_run_harbor_process", fake_run_harbor_process)
     monkeypatch.setattr(runner, "_is_registry_rate_limited", lambda _: True)
     monkeypatch.setattr(runner, "cleanup_stale_harbor_resources", lambda: None)
-    monkeypatch.setattr(runner.time, "sleep", lambda seconds: sleeps.append(seconds))
+    monkeypatch.setattr(
+        runner,
+        "wait_for_harbor_rate_limit_retry",
+        lambda: sleeps.append(runner.HARBOR_RATE_LIMIT_RETRY_DELAY_SEC),
+    )
     monkeypatch.setattr(runner, "detect_trial_failure", lambda _: None)
 
     result = runner.execute_harbor(request)

@@ -12,12 +12,11 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.application import execution
-from raidar.application.models import ExecutionDispatchRequest
+from raidar.application.models import ExecutionDispatchRequest, RunCliOptions
 from raidar.cli import (
     BENCHMARK_EXPERIMENTS_ROOT,
     ORCHESTRATOR_ROOT,
     RESEARCH_LOOP_EXPERIMENTS_ROOT,
-    RunCliOptions,
     SuiteExecutionResult,
     _archive_destination,
     _assert_no_generated_artifact_changes,
@@ -28,6 +27,22 @@ from raidar.cli import (
 )
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
+
+
+def _run_options(tmp_path: Path, **overrides: object) -> RunCliOptions:
+    values = {
+        "scenario": tmp_path / "scenario.yaml",
+        "harness": "codex-cli",
+        "provider": "openai",
+        "model": "gpt-5.4",
+        "reasoning_effort": "high",
+        "timeout": 300,
+        "repeats": 1,
+        "repeat_parallel": 1,
+        "rerun_unscored": 1,
+    }
+    values.update(overrides)
+    return RunCliOptions(**values)
 
 
 def _assert_smoke_dry_run_output(output: str) -> None:
@@ -244,12 +259,11 @@ def test_generated_artifact_paths_filters_prefixes() -> None:
 
 
 def test_run_cli_options_resolved_caps_retry_and_resolves_paths(tmp_path: Path) -> None:
-    options = RunCliOptions(
-        scenario=tmp_path / "scenario.yaml",
+    options = _run_options(
+        tmp_path,
         harness="gemini",
         provider="google",
         model="gemini-3-flash-preview",
-        timeout=300,
         repeats=5,
         repeat_parallel=2,
         rerun_unscored=7,
@@ -1084,17 +1098,7 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
             "prompt": {"entry": "prompt/task.md"},
         }
     )
-    options = RunCliOptions(
-        scenario=tmp_path / "scenario.yaml",
-        harness="codex-cli",
-        provider="openai",
-        model="gpt-5.4",
-        reasoning_effort="high",
-        timeout=300,
-        repeats=1,
-        repeat_parallel=1,
-        rerun_unscored=1,
-    )
+    options = _run_options(tmp_path)
     request = type("Request", (), {"scenario": scenario})()
     run = EvalRun(
         id="run-01",
@@ -1113,8 +1117,8 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
 
     captured: dict[str, object] = {}
 
-    def fake_create_experiment_summary(**kwargs):
-        captured.update(kwargs)
+    def fake_create_experiment_summary(summary_input):
+        captured["summary_input"] = summary_input
         return {"experiment_id": "exp-01"}
 
     monkeypatch.setattr(execution, "_load_project_env", lambda _repo_root: None)
@@ -1157,8 +1161,9 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
         repo_root=tmp_path,
     )
 
-    assert captured["reruns_used"] == 1
-    assert "retries_used" not in captured
+    summary_input = captured["summary_input"]
+    assert summary_input.reruns_used == 1
+    assert not hasattr(summary_input, "retries_used")
 
 
 def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:

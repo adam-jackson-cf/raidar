@@ -3,11 +3,47 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean, median, pstdev
 
 from .schemas.scorecard import EvalRun
+
+
+@dataclass(frozen=True, slots=True)
+class ExperimentSummaryInput:
+    """Canonical input contract for experiment summary aggregation."""
+
+    scenario_name: str
+    scenario_revision: str
+    harness: str
+    model: str
+    evaluation_profile: str
+    metrics: list[str]
+    repeats: int
+    repeat_parallel: int
+    runs: list[EvalRun]
+    started_at: datetime
+    rerun_unscored_limit: int = 0
+    reruns_used: int = 0
+    unresolved_unscored_count: int = 0
+
+
+@dataclass(frozen=True, slots=True)
+class _ExperimentSummaryContext:
+    started_utc: datetime
+    finished_utc: datetime
+    experiment_id: str
+    unscored_runs: list[EvalRun]
+    scored_runs: list[EvalRun]
+    valid_runs: list[EvalRun]
+    run_pointers: list[dict[str, object]]
+    starter_root: str | None
+    starter_fingerprint: object
+    sample_policy: dict[str, object]
+    sample_class: str
+    achieved_scored_runs: int
 
 
 def experiment_workspace(base_workspace: Path, run_index: int) -> Path:
@@ -152,78 +188,111 @@ def _sample_policy(metrics: list[str]) -> dict[str, object]:
     }
 
 
-def create_experiment_summary(
-    *,
-    scenario_name: str,
-    scenario_revision: str,
-    harness: str,
-    model: str,
-    evaluation_profile: str,
-    metrics: list[str],
-    repeats: int,
-    repeat_parallel: int,
-    runs: list[EvalRun],
-    started_at: datetime,
-    rerun_unscored_limit: int = 0,
-    reruns_used: int = 0,
-    unresolved_unscored_count: int = 0,
-) -> dict[str, object]:
-    """Build deterministic summary metrics for an experiment."""
-
-    started_utc = started_at.astimezone(UTC)
+def _summary_context(summary_input: ExperimentSummaryInput) -> _ExperimentSummaryContext:
+    started_utc = summary_input.started_at.astimezone(UTC)
     finished_utc = datetime.now(UTC)
-    experiment_id = _experiment_id(scenario_name, harness, model, repeats, started_utc)
-    unscored_runs, scored_runs, valid_runs = _partition_runs(runs)
-    run_pointers = [_run_pointer(run) for run in runs]
-    first_run = runs[0] if runs else None
+    experiment_id = _experiment_id(
+        summary_input.scenario_name,
+        summary_input.harness,
+        summary_input.model,
+        summary_input.repeats,
+        started_utc,
+    )
+    unscored_runs, scored_runs, valid_runs = _partition_runs(summary_input.runs)
+    run_pointers = [_run_pointer(run) for run in summary_input.runs]
+    first_run = summary_input.runs[0] if summary_input.runs else None
     starter_meta = first_run.scores.metadata.get("starter", {}) if first_run else {}
     starter_root = first_run.config.starter_root if first_run is not None else None
     starter_fingerprint = (
         starter_meta.get("fingerprint") if isinstance(starter_meta, dict) else None
     )
-    sample_policy = _sample_policy(metrics)
+    sample_policy = _sample_policy(summary_input.metrics)
     preferred_scored_runs = int(sample_policy["preferred_scored_runs"])
-    minimum_scored_runs = int(sample_policy["minimum_scored_runs"])
     achieved_scored_runs = len(scored_runs)
-    sample_adequacy = round(min(achieved_scored_runs / max(1, preferred_scored_runs), 1.0), 6)
-    sample_class = "review" if repeats >= preferred_scored_runs else "smoke"
+    sample_class = "review" if summary_input.repeats >= preferred_scored_runs else "smoke"
+    return _ExperimentSummaryContext(
+        started_utc=started_utc,
+        finished_utc=finished_utc,
+        experiment_id=experiment_id,
+        unscored_runs=unscored_runs,
+        scored_runs=scored_runs,
+        valid_runs=valid_runs,
+        run_pointers=run_pointers,
+        starter_root=starter_root,
+        starter_fingerprint=starter_fingerprint,
+        sample_policy=sample_policy,
+        sample_class=sample_class,
+        achieved_scored_runs=achieved_scored_runs,
+    )
+
+
+def _summary_config(
+    summary_input: ExperimentSummaryInput, context: _ExperimentSummaryContext
+) -> dict[str, object]:
+    return {
+        "scenario_name": summary_input.scenario_name,
+        "scenario_revision": summary_input.scenario_revision,
+        "harness": summary_input.harness,
+        "model": summary_input.model,
+        "evaluation_profile": summary_input.evaluation_profile,
+        "metrics": summary_input.metrics,
+        "repeats": summary_input.repeats,
+        "repeat_parallel": summary_input.repeat_parallel,
+        "rerun_unscored_limit": summary_input.rerun_unscored_limit,
+        "reruns_used": summary_input.reruns_used,
+        "starter_root": context.starter_root,
+        "starter_fingerprint": context.starter_fingerprint,
+        "sample_class": context.sample_class,
+    }
+
+
+def _summary_sample(context: _ExperimentSummaryContext) -> dict[str, object]:
+    preferred_scored_runs = int(context.sample_policy["preferred_scored_runs"])
+    minimum_scored_runs = int(context.sample_policy["minimum_scored_runs"])
+    sample_adequacy = round(
+        min(context.achieved_scored_runs / max(1, preferred_scored_runs), 1.0), 6
+    )
+    return {
+        **context.sample_policy,
+        "sample_class": context.sample_class,
+        "achieved_scored_runs": context.achieved_scored_runs,
+        "minimum_met": context.achieved_scored_runs >= minimum_scored_runs,
+        "preferred_met": context.achieved_scored_runs >= preferred_scored_runs,
+        "sample_adequacy": sample_adequacy,
+    }
+
+
+def _summary_rerun(
+    summary_input: ExperimentSummaryInput, context: _ExperimentSummaryContext
+) -> dict[str, object]:
+    return {
+        "target_scored_runs": summary_input.repeats,
+        "achieved_scored_runs": context.achieved_scored_runs,
+        "target_met": context.achieved_scored_runs >= summary_input.repeats,
+        "unresolved_unscored_count": summary_input.unresolved_unscored_count,
+    }
+
+
+def create_experiment_summary(summary_input: ExperimentSummaryInput) -> dict[str, object]:
+    """Build deterministic summary metrics for an experiment."""
+
+    context = _summary_context(summary_input)
 
     return {
-        "experiment_id": experiment_id,
-        "created_at_utc": finished_utc.isoformat(),
-        "started_at_utc": started_utc.isoformat(),
-        "completed_at_utc": finished_utc.isoformat(),
-        "config": {
-            "scenario_name": scenario_name,
-            "scenario_revision": scenario_revision,
-            "harness": harness,
-            "model": model,
-            "evaluation_profile": evaluation_profile,
-            "metrics": metrics,
-            "repeats": repeats,
-            "repeat_parallel": repeat_parallel,
-            "rerun_unscored_limit": rerun_unscored_limit,
-            "reruns_used": reruns_used,
-            "starter_root": starter_root,
-            "starter_fingerprint": starter_fingerprint,
-            "sample_class": sample_class,
-        },
-        "aggregate": _aggregate_block(runs, unscored_runs, scored_runs, valid_runs),
-        "runs": run_pointers,
-        "sample": {
-            **sample_policy,
-            "sample_class": sample_class,
-            "achieved_scored_runs": achieved_scored_runs,
-            "minimum_met": achieved_scored_runs >= minimum_scored_runs,
-            "preferred_met": achieved_scored_runs >= preferred_scored_runs,
-            "sample_adequacy": sample_adequacy,
-        },
-        "rerun": {
-            "target_scored_runs": repeats,
-            "achieved_scored_runs": achieved_scored_runs,
-            "target_met": achieved_scored_runs >= repeats,
-            "unresolved_unscored_count": unresolved_unscored_count,
-        },
+        "experiment_id": context.experiment_id,
+        "created_at_utc": context.finished_utc.isoformat(),
+        "started_at_utc": context.started_utc.isoformat(),
+        "completed_at_utc": context.finished_utc.isoformat(),
+        "config": _summary_config(summary_input, context),
+        "aggregate": _aggregate_block(
+            summary_input.runs,
+            context.unscored_runs,
+            context.scored_runs,
+            context.valid_runs,
+        ),
+        "runs": context.run_pointers,
+        "sample": _summary_sample(context),
+        "rerun": _summary_rerun(summary_input, context),
     }
 
 
@@ -300,28 +369,8 @@ def _append_run_lines(lines: list[str], runs: object) -> None:
         )
 
 
-def persist_experiment(
-    results_dir: Path, experiment_summary: dict[str, object]
-) -> tuple[Path, Path, Path]:
-    """Write experiment artifacts and return the three canonical output paths."""
-
-    experiment_dir = results_dir
-    experiment_dir.mkdir(parents=True, exist_ok=True)
-    experiment_id = str(experiment_summary["experiment_id"])
-
-    experiment_json_path = experiment_dir / "experiment.json"
-    experiment_json_path.write_text(json.dumps(experiment_summary, indent=2))
-
-    summary_path = experiment_dir / "experiment-summary.json"
-    summary_path.write_text(json.dumps(_experiment_summary_payload(experiment_summary), indent=2))
-
-    aggregate = experiment_summary.get("aggregate", {})
-    config = experiment_summary.get("config", {})
-    rerun = experiment_summary.get("rerun", {})
-    runs = experiment_summary.get("runs", [])
-    metric_outcomes = aggregate.get("metric_outcomes", {}) if isinstance(aggregate, dict) else {}
-    sample = experiment_summary.get("sample", {})
-    lines = [
+def _report_header_lines(experiment_id: str, config: dict[str, object]) -> list[str]:
+    return [
         "# Experiment Summary",
         "",
         f"- experiment_id: `{experiment_id}`",
@@ -336,6 +385,11 @@ def persist_experiment(
         f"- rerun_unscored_limit: `{config.get('rerun_unscored_limit')}`",
         f"- reruns_used: `{config.get('reruns_used')}`",
         f"- sample_class: `{config.get('sample_class')}`",
+    ]
+
+
+def _report_aggregate_lines(aggregate: dict[str, object], rerun: dict[str, object]) -> list[str]:
+    return [
         "",
         "## Aggregate",
         f"- run_count_total: `{aggregate.get('run_count_total')}`",
@@ -361,9 +415,42 @@ def persist_experiment(
             f"`{(aggregate.get('diagnostic_score', {}) or {}).get('mean', 0.0):.6f}`"
         ),
     ]
+
+
+def _experiment_report_lines(experiment_summary: dict[str, object]) -> list[str]:
+    experiment_id = str(experiment_summary["experiment_id"])
+    aggregate = experiment_summary.get("aggregate", {})
+    config = experiment_summary.get("config", {})
+    rerun = experiment_summary.get("rerun", {})
+    runs = experiment_summary.get("runs", [])
+    metric_outcomes = aggregate.get("metric_outcomes", {}) if isinstance(aggregate, dict) else {}
+    sample = experiment_summary.get("sample", {})
+    typed_aggregate = aggregate if isinstance(aggregate, dict) else {}
+    typed_config = config if isinstance(config, dict) else {}
+    typed_rerun = rerun if isinstance(rerun, dict) else {}
+
+    lines = _report_header_lines(experiment_id, typed_config)
+    lines.extend(_report_aggregate_lines(typed_aggregate, typed_rerun))
     _append_sample_lines(lines, sample)
     _append_metric_outcome_lines(lines, metric_outcomes)
     _append_run_lines(lines, runs)
+    return lines
+
+
+def persist_experiment(
+    results_dir: Path, experiment_summary: dict[str, object]
+) -> tuple[Path, Path, Path]:
+    """Write experiment artifacts and return the three canonical output paths."""
+
+    experiment_dir = results_dir
+    experiment_dir.mkdir(parents=True, exist_ok=True)
+
+    experiment_json_path = experiment_dir / "experiment.json"
+    experiment_json_path.write_text(json.dumps(experiment_summary, indent=2))
+
+    summary_path = experiment_dir / "experiment-summary.json"
+    summary_path.write_text(json.dumps(_experiment_summary_payload(experiment_summary), indent=2))
+
     report_path = experiment_dir / "report.md"
-    report_path.write_text("\n".join(lines) + "\n")
+    report_path.write_text("\n".join(_experiment_report_lines(experiment_summary)) + "\n")
     return experiment_json_path, summary_path, report_path

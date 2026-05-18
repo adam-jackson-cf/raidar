@@ -19,8 +19,7 @@ def _current_project_version() -> str:
     return version
 
 
-def _check_cli_version_option() -> None:
-    module = ast.parse(CLI_PATH.read_text(encoding="utf-8"), filename=str(CLI_PATH))
+def _main_function(module: ast.Module) -> ast.FunctionDef:
     main_fn = next(
         (
             node
@@ -31,7 +30,10 @@ def _check_cli_version_option() -> None:
     )
     if main_fn is None:
         raise ValueError(f"Could not locate main() in {CLI_PATH}")
+    return main_fn
 
+
+def _version_option_decorator(main_fn: ast.FunctionDef) -> ast.Call:
     version_option = next(
         (
             deco
@@ -43,17 +45,32 @@ def _check_cli_version_option() -> None:
         None,
     )
     if version_option is None:
-        raise ValueError(f"main() is missing click.version_option decorator in {CLI_PATH}")
+        raise ValueError(
+            f"main() is missing click.version_option decorator in {CLI_PATH}"
+        )
+    return version_option
 
-    version_kw = next((kw for kw in version_option.keywords if kw.arg == "version"), None)
-    if version_kw is not None:
-        raise ValueError("click.version_option must not use a hardcoded `version=` value")
 
-    package_kw = next((kw for kw in version_option.keywords if kw.arg == "package_name"), None)
+def _keyword(call: ast.Call, name: str) -> ast.keyword | None:
+    return next((kw for kw in call.keywords if kw.arg == name), None)
+
+
+def _check_cli_version_option() -> None:
+    module = ast.parse(CLI_PATH.read_text(encoding="utf-8"), filename=str(CLI_PATH))
+    version_option = _version_option_decorator(_main_function(module))
+    if _keyword(version_option, "version") is not None:
+        raise ValueError(
+            "click.version_option must not use a hardcoded `version=` value"
+        )
+
+    package_kw = _keyword(version_option, "package_name")
     if package_kw is None:
-        raise ValueError("click.version_option must define `package_name=\"raidar\"`")
-    if not isinstance(package_kw.value, ast.Constant) or package_kw.value.value != "raidar":
-        raise ValueError("click.version_option package_name must be exactly \"raidar\"")
+        raise ValueError('click.version_option must define `package_name="raidar"`')
+    if (
+        not isinstance(package_kw.value, ast.Constant)
+        or package_kw.value.value != "raidar"
+    ):
+        raise ValueError('click.version_option package_name must be exactly "raidar"')
 
 
 def main() -> int:
