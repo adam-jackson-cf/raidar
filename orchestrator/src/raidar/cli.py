@@ -26,6 +26,7 @@ from .agents.adapters.factory import adapter_class_for_harness, resolve_adapter
 from .agents.adapters.harbor_cli import resolve_cli_executable
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
+from .application import repo_state
 from .application.execution import (
     build_run_cli_options as _service_build_run_cli_options,
 )
@@ -77,7 +78,6 @@ if TYPE_CHECKING:
 REPO_ROOT = Path(__file__).resolve().parents[3]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[2]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
-ARTIFACT_CHANGE_PREFIXES = ("experiments/",)
 EXPERIMENTS_ROOT = REPO_ROOT / "experiments"
 BENCHMARK_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / "benchmarks"
 RESEARCH_LOOP_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / "research_loops"
@@ -157,99 +157,6 @@ def _execute_run_options(
         ),
         repo_root=REPO_ROOT,
     )
-
-
-def _repo_paths_from_git_cmd(args: list[str]) -> list[str]:
-    result = subprocess.run(args, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise click.ClickException(result.stderr.strip() or f"Command failed: {' '.join(args)}")
-    return [line.strip() for line in result.stdout.splitlines() if line.strip()]
-
-
-def _repo_name_status_from_git_cmd(args: list[str]) -> list[tuple[str, str]]:
-    result = subprocess.run(args, capture_output=True, text=True, check=False)
-    if result.returncode != 0:
-        raise click.ClickException(result.stderr.strip() or f"Command failed: {' '.join(args)}")
-    entries: list[tuple[str, str]] = []
-    for raw_line in result.stdout.splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        parts = line.split("\t")
-        if len(parts) < 2:
-            continue
-        status = parts[0]
-        path = parts[-1]
-        entries.append((status, path))
-    return entries
-
-
-def _changed_repo_paths(repo_root: Path) -> list[str]:
-    staged = _repo_paths_from_git_cmd(
-        ["git", "-C", str(repo_root), "diff", "--name-only", "--cached"]
-    )
-    unstaged = _repo_paths_from_git_cmd(["git", "-C", str(repo_root), "diff", "--name-only"])
-    untracked = _repo_paths_from_git_cmd(
-        ["git", "-C", str(repo_root), "ls-files", "--others", "--exclude-standard"]
-    )
-    return sorted(set(staged + unstaged + untracked))
-
-
-def _generated_artifact_paths(paths: list[str]) -> list[str]:
-    return sorted(
-        path
-        for path in paths
-        if any(path.startswith(prefix) for prefix in ARTIFACT_CHANGE_PREFIXES)
-    )
-
-
-def _changed_repo_entries(repo_root: Path) -> list[tuple[str, str]]:
-    staged = _repo_name_status_from_git_cmd(
-        ["git", "-C", str(repo_root), "diff", "--name-status", "--cached"]
-    )
-    unstaged = _repo_name_status_from_git_cmd(
-        ["git", "-C", str(repo_root), "diff", "--name-status"]
-    )
-    untracked = [
-        (("??"), path)
-        for path in _repo_paths_from_git_cmd(
-            ["git", "-C", str(repo_root), "ls-files", "--others", "--exclude-standard"]
-        )
-    ]
-    seen: set[tuple[str, str]] = set()
-    deduped: list[tuple[str, str]] = []
-    for entry in staged + unstaged + untracked:
-        if entry in seen:
-            continue
-        seen.add(entry)
-        deduped.append(entry)
-    return deduped
-
-
-def _assert_no_generated_artifact_changes(repo_root: Path) -> None:
-    changed_entries = _changed_repo_entries(repo_root)
-    matches = [
-        path
-        for status, path in changed_entries
-        if not status.startswith("D")
-        and any(path.startswith(prefix) for prefix in ARTIFACT_CHANGE_PREFIXES)
-    ]
-    if not matches:
-        return
-    listed = "\n".join(f"- {path}" for path in matches)
-    raise click.ClickException(
-        "Generated Harbor artifacts must not be committed. Remove these changes:\n" + listed
-    )
-
-
-def _has_unstaged_changes(repo_root: Path) -> bool:
-    result = subprocess.run(
-        ["git", "-C", str(repo_root), "diff", "--quiet"],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-    return result.returncode != 0
 
 
 def _run_or_raise(cmd: list[str], cwd: Path, *, env: dict[str, str] | None = None) -> None:
@@ -649,23 +556,22 @@ def quality() -> None:
     """Quality gate commands."""
 
 
-@quality.command("gates")
-@click.option("--fix", is_flag=True, help="Apply auto-fixes where supported.")
-@click.option("--stage", is_flag=True, help="Stage tracked file updates after fixes.")
-def quality_gates(fix: bool, stage: bool) -> None:
-    """Run deterministic quality gates for orchestrator source."""
+def _validate_quality_gate_options(*, fix: bool, stage: bool) -> None:
     if stage and not fix:
         raise click.ClickException("--stage is only supported together with --fix.")
-    if fix and _has_unstaged_changes(REPO_ROOT):
+    if fix and repo_state.has_unstaged_changes(REPO_ROOT):
         raise click.ClickException(
             "Unstaged changes detected. Stage or stash before running --fix."
         )
 
-    _assert_no_generated_artifact_changes(REPO_ROOT)
 
+def _assert_quality_gate_requirements() -> None:
+    repo_state.assert_no_generated_artifact_changes(REPO_ROOT)
     if shutil.which("lizard") is None:
         raise click.ClickException("Missing required command: lizard")
 
+
+def _run_ruff_quality_gates(*, fix: bool) -> None:
     if fix:
         _run_or_raise(
             [sys.executable, "-m", "ruff", "format", "--force-exclude"], ORCHESTRATOR_ROOT
@@ -674,16 +580,27 @@ def quality_gates(fix: bool, stage: bool) -> None:
             [sys.executable, "-m", "ruff", "check", ".", "--fix", "--force-exclude"],
             ORCHESTRATOR_ROOT,
         )
-    else:
-        _run_or_raise(
-            [sys.executable, "-m", "ruff", "format", "--check", "--force-exclude"],
-            ORCHESTRATOR_ROOT,
-        )
-        _run_or_raise(
-            [sys.executable, "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"],
-            ORCHESTRATOR_ROOT,
-        )
+        return
 
+    _run_or_raise(
+        [sys.executable, "-m", "ruff", "format", "--check", "--force-exclude"],
+        ORCHESTRATOR_ROOT,
+    )
+    _run_or_raise(
+        [sys.executable, "-m", "ruff", "check", ".", "--no-fix", "--force-exclude"],
+        ORCHESTRATOR_ROOT,
+    )
+
+
+def _coverage_env() -> dict[str, str]:
+    coverage_dir = ORCHESTRATOR_ROOT / ".pytest_cache" / "coverage"
+    coverage_dir.mkdir(parents=True, exist_ok=True)
+    coverage_env = dict(os.environ)
+    coverage_env["COVERAGE_FILE"] = str(coverage_dir / ".coverage")
+    return coverage_env
+
+
+def _run_orchestrator_quality_gates() -> None:
     _run_or_raise(["lizard", "-C", "10", "-l", "python", "src"], ORCHESTRATOR_ROOT)
     _run_or_raise(
         [sys.executable, "-m", "mypy", "--follow-imports=skip", *TYPECHECK_TARGETS],
@@ -694,10 +611,6 @@ def quality_gates(fix: bool, stage: bool) -> None:
         [sys.executable, "-m", "pytest", INTEGRATION_TEST_TARGET, "-x", "--tb=short"],
         ORCHESTRATOR_ROOT,
     )
-    coverage_dir = ORCHESTRATOR_ROOT / ".pytest_cache" / "coverage"
-    coverage_dir.mkdir(parents=True, exist_ok=True)
-    coverage_env = dict(os.environ)
-    coverage_env["COVERAGE_FILE"] = str(coverage_dir / ".coverage")
     _run_or_raise(
         [
             sys.executable,
@@ -711,8 +624,19 @@ def quality_gates(fix: bool, stage: bool) -> None:
             "--tb=short",
         ],
         ORCHESTRATOR_ROOT,
-        env=coverage_env,
+        env=_coverage_env(),
     )
+
+
+@quality.command("gates")
+@click.option("--fix", is_flag=True, help="Apply auto-fixes where supported.")
+@click.option("--stage", is_flag=True, help="Stage tracked file updates after fixes.")
+def quality_gates(fix: bool, stage: bool) -> None:
+    """Run deterministic quality gates for orchestrator source."""
+    _validate_quality_gate_options(fix=fix, stage=stage)
+    _assert_quality_gate_requirements()
+    _run_ruff_quality_gates(fix=fix)
+    _run_orchestrator_quality_gates()
 
     if stage:
         _run_or_raise(["git", "-C", str(REPO_ROOT), "add", "-u"], REPO_ROOT)

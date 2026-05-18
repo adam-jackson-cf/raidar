@@ -348,125 +348,246 @@ def _make_bundle_request(
     )
 
 
-def _verifier_scorecard_payload(*, include_metric_results: bool = True) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "functional": {
-            "passed": True,
-            "tests_passed": 4,
-            "tests_total": 4,
-            "build_succeeded": True,
-            "gates_passed": 4,
-            "gates_total": 4,
+def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
+    return ScenarioDefinition.model_validate(
+        {
+            "name": "homepage-implementation",
+            "scenario_revision": "v001",
+            "description": "test task",
+            "difficulty": "medium",
+            "category": "greenfield-ui",
+            "timeout_sec": 1800,
+            "starter": {"root": "starter"},
+            "verification": {"gates": [], "required_commands": []},
+            "visual": {
+                "reference_image": str(reference_image),
+                "screenshot_command": ["bun", "run", "capture-screenshot"],
+                "scoring": _visual_bundle_scoring(),
+                "pass_policy": _visual_bundle_pass_policy(),
+                "regions": [_visual_bundle_region()],
+            },
+            "acceptance": {},
+            "metrics": _visual_bundle_metrics(),
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+
+
+def _visual_bundle_scoring() -> dict[str, object]:
+    return {
+        "weights": {
+            "global": 0.25,
+            "regional": 0.45,
+            "worst_region": 0.25,
+            "region_pass_rate": 0.05,
         },
-        "acceptance": {
-            "checks": [
-                {
-                    "rule": "Placeholder removed",
-                    "type": "deterministic",
-                    "passed": True,
-                    "evidence": "ok",
-                }
-            ]
+        "bands": {
+            "global": {"lower": 0.85, "upper": 0.96},
+            "regional": {"lower": 0.8, "upper": 0.95},
+            "worst_region": {"lower": 0.75, "upper": 0.94},
         },
-        "visual": {
-            "similarity": 0.91,
-            "contract_version": "oracle",
-            "global_similarity": 0.97,
-            "regional_similarity": 0.95,
-            "worst_region_similarity": 0.91,
-            "region_decent_pass_rate": 0.5,
-            "policy_score": 91.0,
-            "passed": True,
-            "fidelity_tier": "passed",
-            "expected_region_count": 2,
-            "available_region_count": 2,
-            "region_evidence_status": "present",
-            "actual_path": "/tmp/run/visual/actual.png",
-            "reference_path": "/tmp/run/visual/reference.png",
-            "diff_path": "/tmp/run/visual/diff.png",
-            "capture_succeeded": True,
-            "regional_scores": [
-                {
-                    "name": "hero",
-                    "weight": 0.5,
-                    "normalized_weight": 0.5,
-                    "similarity": 0.98,
-                    "decent_pass": True,
-                    "actual_path": "/tmp/run/visual/actual-region-hero.png",
-                    "reference_path": "/tmp/run/visual/reference-region-hero.png",
-                    "diff_path": "/tmp/run/visual/diff-region-hero.png",
-                },
-                {
-                    "name": "footer",
-                    "weight": 0.5,
-                    "normalized_weight": 0.5,
-                    "similarity": 0.91,
-                    "decent_pass": True,
-                    "actual_path": "/tmp/run/visual/actual-region-footer.png",
-                    "reference_path": "/tmp/run/visual/reference-region-footer.png",
-                    "diff_path": "/tmp/run/visual/diff-region-footer.png",
-                },
-            ],
-        },
-        "verification_stability": {
-            "total_gate_failures": 0,
-            "unique_failure_categories": 0,
-            "repeat_failures": 0,
-        },
-        "test_coverage": {
-            "threshold": 0.8,
-            "measured": 0.9,
-            "source": "coverage-summary",
-            "passed": True,
-        },
-        "requirements_coverage": {
-            "total_requirements": 1,
-            "satisfied_requirements": 1,
-            "mapped_requirements": 1,
-            "missing_requirement_ids": [],
-            "requirement_gap_ids": [],
-        },
-        "execution_validity": {
-            "checks": [
-                {
-                    "name": "run_completed",
-                    "passed": True,
-                    "evidence": "done",
-                }
-            ]
-        },
-        "performance_gates": {
-            "checks": [
-                {
-                    "name": "quality_gates_passed",
-                    "passed": True,
-                    "evidence": "2/2 gates passed",
-                }
-            ]
-        },
-        "gate_history": [
-            {
-                "timestamp": "2026-01-01T00:00:00Z",
-                "gate_name": "typecheck",
-                "command": "bun run typecheck",
-                "exit_code": 0,
-                "stdout": "",
-                "stderr": "",
-                "failure_category": None,
-                "is_repeat": False,
-            }
-        ],
     }
-    if include_metric_results:
-        payload["metric_results"] = [
+
+
+def _visual_bundle_pass_policy() -> dict[str, object]:
+    return {
+        "fail_if_global_below": 0.9,
+        "fail_if_worst_region_below": 0.85,
+        "minimum_score": 70,
+        "minimum_region_pass_rate": 0.75,
+        "minimum_worst_region": 0.88,
+        "high_fidelity_score": 85,
+        "high_fidelity_global": 0.95,
+        "high_fidelity_worst_region": 0.92,
+    }
+
+
+def _visual_bundle_region() -> dict[str, object]:
+    return {
+        "name": "nav",
+        "weight": 1.0,
+        "clip": {"x": 0, "y": 0, "width": 1200, "height": 120},
+    }
+
+
+def _visual_bundle_metrics() -> list[dict[str, str]]:
+    return [
+        {"type": "core", "id": "functional"},
+        {"type": "core", "id": "acceptance"},
+        {"type": "core", "id": "verification-stability"},
+        {"type": "core", "id": "execution-validity"},
+        {"type": "core", "id": "resource-efficiency"},
+        {"type": "core", "id": "visual-regression"},
+    ]
+
+
+def _assert_verifier_script_contains_contracts(score_script: str) -> None:
+    expected_snippets = [
+        "scenarioSpec.acceptance?.deterministic_checks",
+        "metric_results",
+        "verification_stability",
+        r"const testPattern = /\.(test|spec)\.tsx?$/",
+        "NEXT_TELEMETRY_DISABLED",
+        "command_timings_sec",
+        "hasWorkspaceTestFiles()",
+        "No test files found, exiting with code 1",
+        r"/(\d+)\s+passed/gi",
+        r"/(\d+)\s+failed/gi",
+        r"/([0-9]+(?:\.[0-9]+)?)\s*%/",
+        "required_test_evidence",
+        "countRoleQueryMatches",
+        "missingTestEvidence",
+    ]
+    for snippet in expected_snippets:
+        assert snippet in score_script
+
+
+def _verifier_functional_payload() -> dict[str, object]:
+    return {
+        "passed": True,
+        "tests_passed": 4,
+        "tests_total": 4,
+        "build_succeeded": True,
+        "gates_passed": 4,
+        "gates_total": 4,
+    }
+
+
+def _verifier_acceptance_payload() -> dict[str, object]:
+    return {
+        "checks": [
             {
-                "metric_id": "artifact-checks",
-                "passed": False,
-                "matched_count": 0,
-                "missing_patterns": ["src/components/**/*.tsx"],
-                "evidence": "artifact-checks matches (src/components/**/*.tsx:0)",
+                "rule": "Placeholder removed",
+                "type": "deterministic",
+                "passed": True,
+                "evidence": "ok",
             }
         ]
+    }
+
+
+def _verifier_visual_region(name: str, similarity: float) -> dict[str, object]:
+    return {
+        "name": name,
+        "weight": 0.5,
+        "normalized_weight": 0.5,
+        "similarity": similarity,
+        "decent_pass": True,
+        "actual_path": f"/tmp/run/visual/actual-region-{name}.png",
+        "reference_path": f"/tmp/run/visual/reference-region-{name}.png",
+        "diff_path": f"/tmp/run/visual/diff-region-{name}.png",
+    }
+
+
+def _verifier_visual_payload() -> dict[str, object]:
+    return {
+        "similarity": 0.91,
+        "contract_version": "oracle",
+        "global_similarity": 0.97,
+        "regional_similarity": 0.95,
+        "worst_region_similarity": 0.91,
+        "region_decent_pass_rate": 0.5,
+        "policy_score": 91.0,
+        "passed": True,
+        "fidelity_tier": "passed",
+        "expected_region_count": 2,
+        "available_region_count": 2,
+        "region_evidence_status": "present",
+        "actual_path": "/tmp/run/visual/actual.png",
+        "reference_path": "/tmp/run/visual/reference.png",
+        "diff_path": "/tmp/run/visual/diff.png",
+        "capture_succeeded": True,
+        "regional_scores": [
+            _verifier_visual_region("hero", 0.98),
+            _verifier_visual_region("footer", 0.91),
+        ],
+    }
+
+
+def _verifier_stability_payload() -> dict[str, object]:
+    return {
+        "total_gate_failures": 0,
+        "unique_failure_categories": 0,
+        "repeat_failures": 0,
+    }
+
+
+def _verifier_coverage_payload() -> dict[str, object]:
+    return {
+        "threshold": 0.8,
+        "measured": 0.9,
+        "source": "coverage-summary",
+        "passed": True,
+    }
+
+
+def _verifier_requirements_payload() -> dict[str, object]:
+    return {
+        "total_requirements": 1,
+        "satisfied_requirements": 1,
+        "mapped_requirements": 1,
+        "missing_requirement_ids": [],
+        "requirement_gap_ids": [],
+    }
+
+
+def _verifier_execution_validity_payload() -> dict[str, object]:
+    return {"checks": [{"name": "run_completed", "passed": True, "evidence": "done"}]}
+
+
+def _verifier_performance_payload() -> dict[str, object]:
+    return {
+        "checks": [
+            {
+                "name": "quality_gates_passed",
+                "passed": True,
+                "evidence": "2/2 gates passed",
+            }
+        ]
+    }
+
+
+def _verifier_gate_history_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "timestamp": "2026-01-01T00:00:00Z",
+            "gate_name": "typecheck",
+            "command": "bun run typecheck",
+            "exit_code": 0,
+            "stdout": "",
+            "stderr": "",
+            "failure_category": None,
+            "is_repeat": False,
+        }
+    ]
+
+
+def _verifier_metric_results_payload() -> list[dict[str, object]]:
+    return [
+        {
+            "metric_id": "artifact-checks",
+            "passed": False,
+            "matched_count": 0,
+            "missing_patterns": ["src/components/**/*.tsx"],
+            "evidence": "artifact-checks matches (src/components/**/*.tsx:0)",
+        }
+    ]
+
+
+def _verifier_scorecard_payload(*, include_metric_results: bool = True) -> dict[str, object]:
+    payload: dict[str, object] = {
+        "functional": _verifier_functional_payload(),
+        "acceptance": _verifier_acceptance_payload(),
+        "visual": _verifier_visual_payload(),
+        "verification_stability": _verifier_stability_payload(),
+        "test_coverage": _verifier_coverage_payload(),
+        "requirements_coverage": _verifier_requirements_payload(),
+        "execution_validity": _verifier_execution_validity_payload(),
+        "performance_gates": _verifier_performance_payload(),
+        "gate_history": _verifier_gate_history_payload(),
+    }
+    if include_metric_results:
+        payload["metric_results"] = _verifier_metric_results_payload()
     return payload
 
 
@@ -1766,6 +1887,80 @@ def test_verifier_rejects_unsafe_no_pattern_regex(tmp_path: Path) -> None:
     assert "Unsafe regex pattern" in check["evidence"]
 
 
+def test_verifier_no_pattern_uses_bounded_literal_matching(tmp_path: Path) -> None:
+    app_dir = tmp_path / "app"
+    logs_dir = tmp_path / "logs"
+    tests_dir = tmp_path / "tests"
+    (app_dir / "src").mkdir(parents=True, exist_ok=True)
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    tests_dir.mkdir(parents=True, exist_ok=True)
+    (app_dir / "package.json").write_text("{}", encoding="utf-8")
+    (app_dir / "bun.lock").write_text("", encoding="utf-8")
+    (app_dir / "src" / "App.tsx").write_text("export const value = 'ok';\n", encoding="utf-8")
+
+    scenario_spec_path = tests_dir / "scenario-spec.json"
+    scenario_spec_path.write_text(
+        json.dumps(
+            {
+                "metrics": [],
+                "verification": {
+                    "max_gate_failures": 3,
+                    "coverage_threshold": None,
+                    "min_quality_score": 0,
+                    "gates": [],
+                    "workflow": {"atomic_commits_required": False},
+                },
+                "acceptance": {
+                    "deterministic_checks": [
+                        {
+                            "type": "no_pattern",
+                            "pattern": r"console\.log\(",
+                            "description": "literal console logging is absent",
+                        },
+                        {
+                            "type": "no_pattern",
+                            "pattern": r"console\.(log|warn)\(",
+                            "description": "regex alternation is rejected",
+                        },
+                    ],
+                    "requirements": [],
+                },
+                "weights": {
+                    "functional": 0.25,
+                    "acceptance": 0.25,
+                    "visual": 0.25,
+                    "verification_stability": 0.25,
+                },
+                "baseline_scripts": {},
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    score_script = tests_dir / "score-scenario.mjs"
+    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
+
+    completed = subprocess.run(
+        ["bun", str(score_script), str(scenario_spec_path)],
+        cwd=tests_dir,
+        env={
+            **runner.os.environ,
+            "RAIDAR_APP_DIR": str(app_dir),
+            "RAIDAR_LOG_DIR": str(logs_dir),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    scorecard = json.loads((logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+    checks = scorecard["acceptance"]["checks"]
+    assert checks[0]["passed"] is True
+    assert checks[1]["passed"] is False
+    assert "bounded literal matching" in checks[1]["evidence"]
+
+
 def test_classify_unscored_reasons_rate_limit():
     reasons = _classify_unscored_reasons(
         terminated_early=True,
@@ -1881,64 +2076,7 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     source_reference.write_bytes(b"png-binary")
     (scenario_dir / "references" / "hero-region-nav.png").write_bytes(b"region-binary")
 
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "homepage-implementation",
-            "scenario_revision": "v001",
-            "description": "test task",
-            "difficulty": "medium",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {
-                "root": "starter",
-            },
-            "verification": {"gates": [], "required_commands": []},
-            "visual": {
-                "reference_image": str(reference_rel),
-                "screenshot_command": ["bun", "run", "capture-screenshot"],
-                "scoring": {
-                    "weights": {
-                        "global": 0.25,
-                        "regional": 0.45,
-                        "worst_region": 0.25,
-                        "region_pass_rate": 0.05,
-                    },
-                    "bands": {
-                        "global": {"lower": 0.85, "upper": 0.96},
-                        "regional": {"lower": 0.8, "upper": 0.95},
-                        "worst_region": {"lower": 0.75, "upper": 0.94},
-                    },
-                },
-                "pass_policy": {
-                    "fail_if_global_below": 0.9,
-                    "fail_if_worst_region_below": 0.85,
-                    "minimum_score": 70,
-                    "minimum_region_pass_rate": 0.75,
-                    "minimum_worst_region": 0.88,
-                    "high_fidelity_score": 85,
-                    "high_fidelity_global": 0.95,
-                    "high_fidelity_worst_region": 0.92,
-                },
-                "regions": [
-                    {
-                        "name": "nav",
-                        "weight": 1.0,
-                        "clip": {"x": 0, "y": 0, "width": 1200, "height": 120},
-                    }
-                ],
-            },
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-                {"type": "core", "id": "visual-regression"},
-            ],
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
+    scenario = _visual_bundle_scenario(reference_rel)
     (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
     request = _make_bundle_request(
@@ -1964,33 +2102,14 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     assert copied_region_reference.exists()
     assert copied_region_reference.read_bytes() == b"region-binary"
     assert (bundle / "tests" / "scenario-spec.json").exists()
-    assert scenario_spec["visual"]["regions"] == [
-        {
-            "name": "nav",
-            "weight": 1.0,
-            "clip": {"x": 0, "y": 0, "width": 1200, "height": 120},
-        }
-    ]
+    assert scenario_spec["visual"]["regions"] == [_visual_bundle_region()]
     assert (
         (bundle / "tests" / "score-scenario.mjs")
         .read_text(encoding="utf-8")
         .startswith("#!/usr/bin/env bun")
     )
     score_script = (bundle / "tests" / "score-scenario.mjs").read_text(encoding="utf-8")
-    assert "scenarioSpec.acceptance?.deterministic_checks" in score_script
-    assert "metric_results" in score_script
-    assert "verification_stability" in score_script
-    assert r"const testPattern = /\.(test|spec)\.tsx?$/" in score_script
-    assert "NEXT_TELEMETRY_DISABLED" in score_script
-    assert "command_timings_sec" in score_script
-    assert "hasWorkspaceTestFiles()" in score_script
-    assert "No test files found, exiting with code 1" in score_script
-    assert r"/(\d+)\s+passed/gi" in score_script
-    assert r"/(\d+)\s+failed/gi" in score_script
-    assert r"/([0-9]+(?:\.[0-9]+)?)\s*%/" in score_script
-    assert "required_test_evidence" in score_script
-    assert "countRoleQueryMatches" in score_script
-    assert "missingTestEvidence" in score_script
+    _assert_verifier_script_contains_contracts(score_script)
 
 
 def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Path, monkeypatch):

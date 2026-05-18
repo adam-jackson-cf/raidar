@@ -112,7 +112,11 @@ function normalizeWeightRegions(regions) {
 }
 
 function scoringComponent(value, band, gamma) {
-  if (!band || typeof band.lower !== "number" || typeof band.upper !== "number") {
+  if (
+    !band ||
+    typeof band.lower !== "number" ||
+    typeof band.upper !== "number"
+  ) {
     return 0;
   }
   const normalized = clamp01(
@@ -121,7 +125,13 @@ function scoringComponent(value, band, gamma) {
   return normalized ** gamma;
 }
 
-function visualScoreV2({ globalSimilarity, regionalSimilarity, worstRegionSimilarity, regionPassRate, scoring }) {
+function visualScoreV2({
+  globalSimilarity,
+  regionalSimilarity,
+  worstRegionSimilarity,
+  regionPassRate,
+  scoring,
+}) {
   const weights = scoring?.weights || {};
   const bands = scoring?.bands || {};
   const gamma =
@@ -254,7 +264,8 @@ function globSegmentMatches(pattern, value) {
   while (valueIndex < value.length) {
     if (
       patternIndex < pattern.length &&
-      (pattern[patternIndex] === "?" || pattern[patternIndex] === value[valueIndex])
+      (pattern[patternIndex] === "?" ||
+        pattern[patternIndex] === value[valueIndex])
     ) {
       patternIndex += 1;
       valueIndex += 1;
@@ -302,7 +313,9 @@ function filesMatchingPattern(pattern) {
   const allFiles = walkFiles(APP_DIR).map((file) =>
     path.relative(APP_DIR, file),
   );
-  return allFiles.filter((file) => globPartsMatch(matcher, file.split(path.sep)));
+  return allFiles.filter((file) =>
+    globPartsMatch(matcher, file.split(path.sep)),
+  );
 }
 
 function fileExistsByPattern(pattern) {
@@ -356,6 +369,71 @@ function validateSafeRegexPattern(pattern) {
   return { valid: true, reason: "Pattern passed regex safety validation" };
 }
 
+function regexPatternToLiteral(pattern) {
+  let literal = "";
+  const metacharacters = new Set([
+    "^",
+    "$",
+    ".",
+    "*",
+    "+",
+    "?",
+    "(",
+    ")",
+    "[",
+    "]",
+    "{",
+    "}",
+    "|",
+  ]);
+  const supportedEscapes = new Set([
+    "\\",
+    "^",
+    "$",
+    ".",
+    "*",
+    "+",
+    "?",
+    "(",
+    ")",
+    "[",
+    "]",
+    "{",
+    "}",
+    "|",
+    "-",
+  ]);
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index];
+    if (char === "\\") {
+      const next = pattern[index + 1];
+      if (!next) {
+        return {
+          valid: false,
+          reason: "Pattern has a trailing escape",
+        };
+      }
+      if (!supportedEscapes.has(next)) {
+        return {
+          valid: false,
+          reason: `Pattern escape '\\${next}' is not supported by bounded literal matching`,
+        };
+      }
+      literal += next;
+      index += 1;
+      continue;
+    }
+    if (metacharacters.has(char)) {
+      return {
+        valid: false,
+        reason: `Pattern metacharacter '${char}' is not supported by bounded literal matching`,
+      };
+    }
+    literal += char;
+  }
+  return { valid: true, literal };
+}
+
 function runDeterministicCheck(check, sourceFiles) {
   if (check.type === "import_present") {
     const match = sourceFiles.find((sourceFile) =>
@@ -381,19 +459,17 @@ function runDeterministicCheck(check, sourceFiles) {
         evidence: `Unsafe regex pattern '${check.pattern}': ${validation.reason}`,
       };
     }
-    let regex;
-    try {
-      regex = new RegExp(check.pattern);
-    } catch {
+    const literal = regexPatternToLiteral(check.pattern);
+    if (!literal.valid) {
       return {
         rule: check.description,
         type: "deterministic",
         passed: false,
-        evidence: `Invalid regex pattern '${check.pattern}'`,
+        evidence: `Unsafe regex pattern '${check.pattern}': ${literal.reason}`,
       };
     }
     const match = sourceFiles.find((sourceFile) =>
-      regex.test(sourceFile.content),
+      sourceFile.content.includes(literal.literal),
     );
     return {
       rule: check.description,
@@ -597,7 +673,7 @@ function countRoleQueryMatches(testSources, evidence) {
     return 0;
   }
   const queryPattern =
-    /(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['"])(?<role>[^'"]+)\1(?<options>\s*,\s*\{[\s\S]*?\})?/gmi;
+    /(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['"])(?<role>[^'"]+)\1(?<options>\s*,\s*\{[\s\S]*?\})?/gim;
   let count = 0;
   for (const source of testSources) {
     for (const match of source.matchAll(queryPattern)) {
@@ -605,10 +681,16 @@ function countRoleQueryMatches(testSources, evidence) {
         continue;
       }
       const options = match.groups?.options || "";
-      if (evidence.level !== undefined && !options.includes(`level: ${evidence.level}`)) {
+      if (
+        evidence.level !== undefined &&
+        !options.includes(`level: ${evidence.level}`)
+      ) {
         continue;
       }
-      if (evidence.name && !options.toLowerCase().includes(String(evidence.name).toLowerCase())) {
+      if (
+        evidence.name &&
+        !options.toLowerCase().includes(String(evidence.name).toLowerCase())
+      ) {
         continue;
       }
       count += 1;
@@ -622,7 +704,7 @@ function countTextQueryMatches(testSources, evidence) {
   if (!pattern) {
     return 0;
   }
-  const byTextPattern = /(?:screen\.)?(?:get|find|query)(?:All)?ByText\s*\(/mi;
+  const byTextPattern = /(?:screen\.)?(?:get|find|query)(?:All)?ByText\s*\(/im;
   const needle = String(pattern).toLowerCase();
   let count = 0;
   for (const source of testSources) {

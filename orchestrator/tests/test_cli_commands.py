@@ -13,14 +13,16 @@ from click.testing import CliRunner
 
 from raidar.application import execution
 from raidar.application.models import ExecutionDispatchRequest, RunCliOptions
+from raidar.application.repo_state import (
+    assert_no_generated_artifact_changes,
+    generated_artifact_paths,
+)
 from raidar.cli import (
     BENCHMARK_EXPERIMENTS_ROOT,
     ORCHESTRATOR_ROOT,
     RESEARCH_LOOP_EXPERIMENTS_ROOT,
     SuiteExecutionResult,
     _archive_destination,
-    _assert_no_generated_artifact_changes,
-    _generated_artifact_paths,
     _resolve_experiments_root,
     main,
     quality_gates,
@@ -251,7 +253,7 @@ def test_generated_artifact_paths_filters_prefixes() -> None:
         "orchestrator/src/raidar/cli.py",
     ]
 
-    matches = _generated_artifact_paths(paths)
+    matches = generated_artifact_paths(paths)
 
     assert matches == [
         "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
@@ -301,8 +303,10 @@ def test_resolve_experiments_root_prefers_explicit_path(tmp_path: Path) -> None:
 def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
-    monkeypatch.setattr("raidar.cli._assert_no_generated_artifact_changes", lambda repo_root: None)
-    monkeypatch.setattr("raidar.cli._has_unstaged_changes", lambda repo_root: False)
+    monkeypatch.setattr(
+        "raidar.cli.repo_state.assert_no_generated_artifact_changes", lambda repo_root: None
+    )
+    monkeypatch.setattr("raidar.cli.repo_state.has_unstaged_changes", lambda repo_root: False)
     monkeypatch.setattr("raidar.cli.shutil.which", lambda command: "/usr/bin/lizard")
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
@@ -654,7 +658,7 @@ def test_scenario_init_json_emits_machine_readable_payload(tmp_path: Path) -> No
 
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.cli._changed_repo_entries",
+        "raidar.application.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "D",
@@ -663,12 +667,12 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
         ],
     )
 
-    _assert_no_generated_artifact_changes(tmp_path)
+    assert_no_generated_artifact_changes(tmp_path)
 
 
 def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.cli._changed_repo_entries",
+        "raidar.application.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "M",
@@ -682,7 +686,7 @@ def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, mon
     )
 
     try:
-        _assert_no_generated_artifact_changes(tmp_path)
+        assert_no_generated_artifact_changes(tmp_path)
     except click.ClickException as exc:
         assert "Generated Harbor artifacts must not be committed" in str(exc)
     else:

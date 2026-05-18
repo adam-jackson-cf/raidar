@@ -313,6 +313,7 @@ class CodexCliHarborAgent(BaseAgent):
                     'printf \'{\\n  "OPENAI_API_KEY": "%s"\\n}\\n\' '
                     '"$(cat /tmp/agentic-eval-secrets/openai_api_key)" '
                     "> /tmp/codex-secrets/auth.json && "
+                    "chmod 600 /tmp/codex-secrets/auth.json && "
                     'ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"'
                 ),
                 env=env,
