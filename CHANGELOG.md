@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.1] - 2026-05-19
+
+- fix: stabilize agent smoke warm prep
+- refactor: enforce runtime fan-out boundaries
+- refactor: normalize duplicated orchestrator paths
+- refactor: clean up orchestrator dispatch and release bumping
+- refactor: implement code quality cleanup plan
+- refactor: clean up orchestrator execution contracts
+- chore: commit outstanding workspace updates
+
 ## [0.12.0] - 2026-05-14
 
 - feat: improve benchmark web view ux
