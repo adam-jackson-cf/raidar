@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -67,6 +68,21 @@ def _preflight_cache_key(request: RunRequest, context: WorkspaceContext) -> str:
         "required_commands": request.scenario.verification.required_commands,
     }
     return _hash_json_payload(payload)
+
+
+def _preflight_scratch_workspace(cache_file: Path) -> Path:
+    return cache_file.with_name(f"{cache_file.name}.workspace")
+
+
+def _copy_preflight_workspace(source_workspace: Path, preflight_workspace: Path) -> None:
+    if preflight_workspace.exists():
+        shutil.rmtree(preflight_workspace)
+    shutil.copytree(
+        source_workspace,
+        preflight_workspace,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("node_modules", ".next", ".cache", ".tmp", "jobs"),
+    )
 
 
 def _run_starter_preflight_install(workspace: Path, env: dict[str, str]) -> None:
@@ -166,7 +182,7 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
     if not required_commands:
         return None
 
-    preflight_workspace = getattr(context, "baseline_workspace", context.workspace)
+    source_workspace = getattr(context, "baseline_workspace", context.workspace)
 
     cache_key = _preflight_cache_key(request, context)
     cache_file = _preflight_cache_file(cache_key)
@@ -175,14 +191,19 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
             _touch_cache_path(cache_file)
             return True
 
-        env = _workspace_runtime_env(preflight_workspace, os.environ.copy())
-        _run_starter_preflight_install(preflight_workspace, env)
+        preflight_workspace = _preflight_scratch_workspace(cache_file)
+        _copy_preflight_workspace(source_workspace, preflight_workspace)
+        try:
+            env = _workspace_runtime_env(preflight_workspace, os.environ.copy())
+            _run_starter_preflight_install(preflight_workspace, env)
 
-        has_tests = _workspace_has_tests(preflight_workspace)
-        for command in required_commands:
-            if _should_skip_preflight_command(command, has_tests):
-                continue
-            _run_starter_preflight_command(preflight_workspace, env, command)
+            has_tests = _workspace_has_tests(preflight_workspace)
+            for command in required_commands:
+                if _should_skip_preflight_command(command, has_tests):
+                    continue
+                _run_starter_preflight_command(preflight_workspace, env, command)
+        finally:
+            shutil.rmtree(preflight_workspace, ignore_errors=True)
 
         _write_starter_preflight_cache(
             StarterPreflightCacheWrite(

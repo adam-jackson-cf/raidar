@@ -419,7 +419,12 @@ def _assert_prepare_workspace_cache_reuse(
     assert phase_two.cache_metadata["image"]["hit"] is True
     assert (phase_one.layout.harbor_dir / "task-image-build.log").exists()
     assert not (phase_two.layout.harbor_dir / "task-image-build.log").exists()
-    assert patch_state.preflight_calls == ["install:workspace", "workspace:bun run lint"]
+    assert len(patch_state.preflight_calls) == 2
+    install_name = patch_state.preflight_calls[0].removeprefix("install:")
+    command_name, command_text = patch_state.preflight_calls[1].split(":", 1)
+    assert install_name
+    assert install_name == command_name
+    assert command_text == "bun run lint"
     assert phase_one.cache_metadata["image_key"] == phase_two.cache_metadata["image_key"]
     assert phase_one.cache_metadata["image_tag"] == phase_two.cache_metadata["image_tag"]
     _assert_runtime_preflight_image(phase_one, patch_state)

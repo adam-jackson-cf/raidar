@@ -92,12 +92,16 @@ def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
 
     runner.ensure_starter_preflight(request, context)
 
-    expected_tmp = context.workspace / ".tmp"
-    expected_cache = context.workspace / ".cache"
+    assert envs
+    preflight_workspace = Path(envs[0]["TMPDIR"]).parent
+    assert preflight_workspace != context.workspace
+    assert preflight_workspace.parent == tmp_path / "preflight"
+
+    expected_tmp = preflight_workspace / ".tmp"
+    expected_cache = preflight_workspace / ".cache"
     expected_uv_cache = expected_cache / "uv"
     expected_bun_cache = expected_cache / "bun"
 
-    assert envs
     for env in envs:
         assert env["TMPDIR"] == str(expected_tmp)
         assert env["TMP"] == str(expected_tmp)
@@ -106,9 +110,7 @@ def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
         assert env["UV_CACHE_DIR"] == str(expected_uv_cache)
         assert env["BUN_INSTALL_CACHE_DIR"] == str(expected_bun_cache)
 
-    assert expected_tmp.is_dir()
-    assert expected_uv_cache.is_dir()
-    assert expected_bun_cache.is_dir()
+    assert not preflight_workspace.exists()
 
 
 def test_ensure_starter_preflight_runs_against_baseline_workspace(
@@ -131,6 +133,7 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
     run_workspace = tmp_path / "run-workspace"
     baseline_workspace.mkdir(parents=True, exist_ok=True)
     run_workspace.mkdir(parents=True, exist_ok=True)
+    (baseline_workspace / "package.json").write_text("{}", encoding="utf-8")
     context = SimpleNamespace(
         workspace=run_workspace,
         baseline_workspace=baseline_workspace,
@@ -143,10 +146,13 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
     def fake_install(workspace: Path, env: dict[str, str]) -> None:
         del env
         called_workspaces.append(workspace)
+        (workspace / "node_modules").mkdir()
+        (workspace / "node_modules" / "installed.txt").write_text("ok", encoding="utf-8")
 
     def fake_command(workspace: Path, env: dict[str, str], command: list[str]) -> None:
         del env, command
         called_workspaces.append(workspace)
+        (workspace / "command-ran.txt").write_text("ok", encoding="utf-8")
 
     monkeypatch.setattr(
         runner,
@@ -160,7 +166,15 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
 
     runner.ensure_starter_preflight(request, context)
 
-    assert called_workspaces == [baseline_workspace, baseline_workspace]
+    assert len(called_workspaces) == 2
+    assert called_workspaces[0] == called_workspaces[1]
+    preflight_workspace = called_workspaces[0]
+    assert preflight_workspace != baseline_workspace
+    assert preflight_workspace != run_workspace
+    assert preflight_workspace.parent == tmp_path / "preflight"
+    assert not preflight_workspace.exists()
+    assert not (baseline_workspace / "node_modules").exists()
+    assert not (baseline_workspace / "command-ran.txt").exists()
 
 
 def test_cache_key_lock_reclaims_dead_owner_immediately(tmp_path: Path, monkeypatch) -> None:

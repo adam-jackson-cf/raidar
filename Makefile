@@ -49,6 +49,12 @@ AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
 AGENT_SMOKE_RERUN_UNSCORED ?= 0
 AGENT_SMOKE_REASONING_EFFORT ?= low
+AGENT_SMOKE_HARNESS ?= $(ORCHESTRATOR_SMOKE_HARNESS)
+AGENT_SMOKE_PROVIDER ?= $(ORCHESTRATOR_SMOKE_PROVIDER)
+AGENT_SMOKE_MODEL ?= $(ORCHESTRATOR_SMOKE_MODEL)
+AGENT_SMOKE_EFFECTIVE_HARNESS = $(if $(HARNESS),$(HARNESS),$(AGENT_SMOKE_HARNESS))
+AGENT_SMOKE_EFFECTIVE_PROVIDER = $(if $(PROVIDER),$(PROVIDER),$(AGENT_SMOKE_PROVIDER))
+AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 
 ifeq ($(firstword $(MAKECMDGOALS)),matrix-run)
 MATRIX_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
@@ -96,7 +102,7 @@ help:
 	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with openai/gpt-5.5 [low]"
 	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
 	@echo "  make smoke-matrix                                      Run the default hello-world smoke scenario across the smoke trio matrix"
-	@echo "  make agent-smoke HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5"
+	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5]"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... PROVIDER=... MODEL=..."
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
@@ -225,19 +231,20 @@ smoke-matrix: docker-check
 		--experiment-kind "$(EXPERIMENT_KIND)"
 
 agent-smoke: docker-check
-	$(call require_var,HARNESS)
-	$(call require_var,PROVIDER)
-	$(call require_var,MODEL)
+	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_HARNESS)" ] || [ -z "$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" ] || [ -z "$(AGENT_SMOKE_EFFECTIVE_MODEL)" ]; then \
+		echo "Missing agent smoke defaults: set HARNESS, PROVIDER, and MODEL"; \
+		exit 1; \
+	fi
 	@start_time=$$(python3 -c 'import time; print(time.perf_counter())'); \
 	pre_experiment_sec=$$(python3 -c "import time; print(round(time.perf_counter() - float('$$start_time'), 3))"); \
 	echo "pre_experiment_sec=$$pre_experiment_sec (boundary=before experiment-run)"
 	@$(MAKE) experiment-run \
 		SCENARIO="$(AGENT_SMOKE_SCENARIO)" \
-		HARNESS="$(HARNESS)" \
-		PROVIDER="$(PROVIDER)" \
-		MODEL="$(MODEL)" \
-		$(if $(filter codex-cli,$(HARNESS)),REASONING_EFFORT="$(AGENT_SMOKE_REASONING_EFFORT)",) \
-		$(if $(filter codex-cli,$(HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
+		HARNESS="$(AGENT_SMOKE_EFFECTIVE_HARNESS)" \
+		PROVIDER="$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" \
+		MODEL="$(AGENT_SMOKE_EFFECTIVE_MODEL)" \
+		$(if $(filter codex-cli,$(AGENT_SMOKE_EFFECTIVE_HARNESS)),REASONING_EFFORT="$(AGENT_SMOKE_REASONING_EFFORT)",) \
+		$(if $(filter codex-cli,$(AGENT_SMOKE_EFFECTIVE_HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
 		RUN_COUNT="$(AGENT_SMOKE_REPEATS)" \
 		RUN_PARALLELISM="$(AGENT_SMOKE_REPEAT_PARALLEL)" \
 		RERUN_UNSCORED="$(AGENT_SMOKE_RERUN_UNSCORED)" \
