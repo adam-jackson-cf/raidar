@@ -15,7 +15,7 @@ from raidar.application.models import (
     ScenarioInitResult,
     ScenarioValidationResult,
 )
-from raidar.runner import load_scenario
+from raidar.application.scenario_catalog import load_scenario
 from raidar.scenario_clone import ScenarioCloneResult
 from raidar.scenario_clone import clone_scenario_revision as clone_revision
 

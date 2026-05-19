@@ -1,5 +1,6 @@
 """Tests for canonical Harbor routing."""
 
+# ruff: noqa: F403, F405
 from pathlib import Path
 
 from raidar.agents.adapters.gemini_cli import GeminiCliAdapter

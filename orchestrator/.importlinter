@@ -1,0 +1,41 @@
+[importlinter]
+root_package = raidar
+
+[importlinter:contract:runtime-boundary]
+name = Runtime modules do not import application or CLI layers
+type = forbidden
+source_modules =
+    raidar.runtime
+forbidden_modules =
+    raidar.application
+    raidar.cli
+
+[importlinter:contract:application-boundary]
+name = Application modules do not import the CLI layer
+type = forbidden
+source_modules =
+    raidar.application
+forbidden_modules =
+    raidar.cli
+
+[importlinter:contract:schema-boundary]
+name = Schemas stay independent of runtime, application, agents, and CLI layers
+type = forbidden
+source_modules =
+    raidar.schemas
+forbidden_modules =
+    raidar.runtime
+    raidar.application
+    raidar.agents
+    raidar.cli
+
+[importlinter:contract:scoring-boundary]
+name = Scoring stays independent of runtime, application, agents, and CLI layers
+type = forbidden
+source_modules =
+    raidar.scoring
+forbidden_modules =
+    raidar.runtime
+    raidar.application
+    raidar.agents
+    raidar.cli

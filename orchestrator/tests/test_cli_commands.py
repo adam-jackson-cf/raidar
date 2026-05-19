@@ -1,35 +1,36 @@
 """Tests for CLI utility commands and helpers under the scenario migration."""
 
-import json
-import os
-import subprocess
-import tomllib
-from dataclasses import dataclass
-from datetime import UTC, datetime
-from pathlib import Path
-
-import click
 import pytest
-from click.testing import CliRunner
 
-from raidar.application import execution
-from raidar.application.models import ExecutionDispatchRequest, RunCliOptions
-from raidar.application.repo_state import (
-    assert_no_generated_artifact_changes,
-    generated_artifact_paths,
-)
-from raidar.cli import (
-    BENCHMARK_EXPERIMENTS_ROOT,
-    ORCHESTRATOR_ROOT,
-    RESEARCH_LOOP_EXPERIMENTS_ROOT,
-    SuiteExecutionResult,
-    _archive_destination,
-    _resolve_experiments_root,
-    main,
-    quality_gates,
-)
-from raidar.schemas.scenario import ScenarioDefinition
-from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
+from tests import cli_commands_support as support
+
+json = support.json
+os = support.os
+subprocess = support.subprocess
+tomllib = support.tomllib
+dataclass = support.dataclass
+UTC = support.UTC
+datetime = support.datetime
+Path = support.Path
+click = support.click
+CliRunner = support.CliRunner
+execution = support.execution
+ExecutionDispatchRequest = support.ExecutionDispatchRequest
+RunCliOptions = support.RunCliOptions
+assert_no_generated_artifact_changes = support.assert_no_generated_artifact_changes
+generated_artifact_paths = support.generated_artifact_paths
+BENCHMARK_EXPERIMENTS_ROOT = support.BENCHMARK_EXPERIMENTS_ROOT
+ORCHESTRATOR_ROOT = support.ORCHESTRATOR_ROOT
+RESEARCH_LOOP_EXPERIMENTS_ROOT = support.RESEARCH_LOOP_EXPERIMENTS_ROOT
+SuiteExecutionResult = support.SuiteExecutionResult
+_archive_destination = support._archive_destination
+_resolve_experiments_root = support._resolve_experiments_root
+main = support.main
+quality_gates = support.quality_gates
+ScenarioDefinition = support.ScenarioDefinition
+EvalConfig = support.EvalConfig
+EvalRun = support.EvalRun
+Scorecard = support.Scorecard
 
 DEFAULT_EXPERIMENT_PROFILE = (
     "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
@@ -380,7 +381,7 @@ def test_harness_setup_auth_runs_codex_login_with_device_auth(
         auth_path.write_text('{"access_token":"token"}', encoding="utf-8")
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("raidar.cli.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.commands.harness.subprocess.run", fake_run)
 
     result = runner.invoke(
         main,
@@ -405,7 +406,7 @@ def test_harness_setup_auth_fails_when_login_does_not_create_auth_json(
         del check
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("raidar.cli.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.commands.harness.subprocess.run", fake_run)
 
     result = runner.invoke(main, ["harness", "setup-auth", "--harness", "codex-cli"])
 
@@ -490,15 +491,18 @@ def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(
-        "raidar.cli.repo_state.assert_no_generated_artifact_changes", lambda repo_root: None
+        "raidar.commands.quality.repo_state.assert_no_generated_artifact_changes",
+        lambda repo_root: None,
     )
-    monkeypatch.setattr("raidar.cli.repo_state.has_unstaged_changes", lambda repo_root: False)
-    monkeypatch.setattr("raidar.cli.shutil.which", lambda command: "/usr/bin/lizard")
+    monkeypatch.setattr(
+        "raidar.commands.quality.repo_state.has_unstaged_changes", lambda repo_root: False
+    )
+    monkeypatch.setattr("raidar.commands.quality.shutil.which", lambda command: "/usr/bin/lizard")
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
         calls.append({"cmd": cmd, "cwd": cwd, "env": env})
 
-    monkeypatch.setattr("raidar.cli._run_or_raise", fake_run_or_raise)
+    monkeypatch.setattr("raidar.commands.quality.run_or_raise", fake_run_or_raise)
 
     quality_gates.callback(fix=False, stage=False)
 
@@ -514,18 +518,18 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
     runner = CliRunner()
     calls: list[dict[str, object]] = []
 
-    monkeypatch.setattr("raidar.cli._cleanup_stale_harbor_before_runs", lambda: None)
+    monkeypatch.setattr("raidar.commands.env_harbor.cleanup_stale_harbor_before_runs", lambda: None)
     monkeypatch.setattr(
-        "raidar.cli.docker_compose_preflight_reason",
+        "raidar.commands.env_harbor.docker_compose_preflight_reason",
         lambda env: None,
     )
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
         calls.append({"cmd": cmd, "cwd": cwd, "env": env})
 
-    monkeypatch.setattr("raidar.cli._run_or_raise", fake_run_or_raise)
+    monkeypatch.setattr("raidar.commands.env_harbor.run_or_raise", fake_run_or_raise)
     monkeypatch.setattr(
-        "raidar.cli.subprocess.run",
+        "raidar.commands.env_harbor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0],
             0,
@@ -552,7 +556,10 @@ def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monk
         captured["options"] = options
         captured.update(kwargs)
 
-    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+    monkeypatch.setattr(
+        "raidar.commands.run_experiment.execute_run_options",
+        fake_execute_run_options,
+    )
 
     result = runner.invoke(
         main,
@@ -590,7 +597,10 @@ def test_experiment_run_routes_research_loop_kind(tmp_path: Path, monkeypatch) -
         captured["options"] = options
         captured.update(kwargs)
 
-    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+    monkeypatch.setattr(
+        "raidar.commands.run_experiment.execute_run_options",
+        fake_execute_run_options,
+    )
 
     result = runner.invoke(
         main,
@@ -638,7 +648,10 @@ def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monk
             report_path=tmp_path / "report.md",
         )
 
-    monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
+    monkeypatch.setattr(
+        "raidar.commands.run_experiment.execute_run_options",
+        fake_execute_run_options,
+    )
 
     result = _invoke_experiment_run_json(runner, scenario_path)
 
@@ -670,7 +683,7 @@ def test_matrix_dry_run_supports_selector_generation(tmp_path: Path, monkeypatch
     )
 
     monkeypatch.setattr(
-        "raidar.cli._load_matrix_scenarios",
+        "raidar.commands.matrix_report.load_matrix_scenarios",
         lambda scenario_paths: [(scenario_paths[0], scenario)],
     )
 
@@ -1236,7 +1249,7 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
     monkeypatch.setattr(execution, "_cleanup_stale_harbor_before_runs", lambda: None)
     monkeypatch.setattr(
         execution,
-        "_prepared_run_request",
+        "prepared_run_request",
         lambda *_args, **_kwargs: (
             scenario,
             datetime(2026, 3, 10, 13, 0, 0, tzinfo=UTC),
@@ -1246,7 +1259,7 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
     )
     monkeypatch.setattr(
         execution,
-        "_execute_repeat_runs",
+        "execute_repeat_runs",
         lambda **_kwargs: ([run], 1, 0),
     )
     monkeypatch.setattr(execution, "scenario_evaluation_profile", lambda _scenario: "functional")

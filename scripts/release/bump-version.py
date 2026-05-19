@@ -59,7 +59,9 @@ def get_commits_since_last_bump() -> list[str]:
         cwd=REPO_ROOT,
         check=True,
     )
-    commits = [record.strip() for record in result.stdout.split("\x1e") if record.strip()]
+    commits = [
+        record.strip() for record in result.stdout.split("\x1e") if record.strip()
+    ]
 
     filtered: list[str] = []
     for commit in commits:

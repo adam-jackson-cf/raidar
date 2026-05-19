@@ -8,9 +8,9 @@ def cleanup_stale_harbor_resources(
 ) -> None:
     """Cleanup stale Harbor containers and orphan build processes."""
 
-    from raidar import runner
+    from raidar.runtime.harbor_cleanup import cleanup_stale_harbor_resources
 
-    runner.cleanup_stale_harbor_resources(
+    cleanup_stale_harbor_resources(
         include_containers=include_containers,
         include_build_processes=include_build_processes,
     )
@@ -19,6 +19,6 @@ def cleanup_stale_harbor_resources(
 def docker_compose_preflight_reason(env: dict[str, str]) -> str | None:
     """Return a Docker Compose preflight failure reason, when one exists."""
 
-    from raidar import runner
+    from raidar.runtime.harbor_preflight import _docker_compose_preflight_reason
 
-    return runner._docker_compose_preflight_reason(env)
+    return _docker_compose_preflight_reason(env)

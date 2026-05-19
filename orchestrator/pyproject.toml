@@ -24,6 +24,7 @@ dev = [
     "pre-commit>=3.0",
     "lizard>=1.17.10",
     "mypy>=1.11",
+    "import-linter>=2.0",
 ]
 
 [project.scripts]
@@ -52,7 +53,7 @@ extend-exclude = [
 ]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "UP", "B", "SIM", "C90", "PLR0912", "PLR0915"]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "C90", "PERF", "PLR0912", "PLR0915"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

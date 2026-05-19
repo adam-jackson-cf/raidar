@@ -1,63 +1,100 @@
 """Tests for execution-validity and resource-efficiency helpers."""
 
-import errno
-import json
-import subprocess
-import threading
-import time
-from dataclasses import dataclass, replace
-from datetime import UTC, datetime
-from pathlib import Path
-
 import pytest
 
-import raidar.runner as runner
-from raidar.agents.config import AgentSpec, Harness, ModelTarget
-from raidar.audit.workspace_diff import directory_fingerprint
-from raidar.runner import (
-    EvaluationOutputs,
-    ExecutionPhaseResult,
-    HarborExecutionResult,
-    PersistedArtifacts,
-    RunLayout,
-    RunRequest,
-    ScorecardBuildContext,
-    WorkspaceContext,
-    _build_verifier_scenario_spec,
-    _classify_unscored_reasons,
-    _ensure_baseline_workspace,
-    _load_verifier_outputs,
-    _normalized_shell_subcommands,
-    _prune_workspace_artifacts,
-    _resolve_homepage_screenshot_command,
-    _workspace_changes_from_baseline,
-    build_scorecard,
-    collect_process_metrics,
-    create_harbor_task_bundle,
-    evaluate_coverage,
-    evaluate_requirements,
-    scenario_evaluation_profile,
-)
-from raidar.schemas.events import GateEvent
-from raidar.schemas.scenario import (
-    DeterministicCheck,
-    RequirementSpec,
-    ScenarioDefinition,
-    ScoreProfileConfig,
-)
-from raidar.schemas.scorecard import (
-    AcceptanceScore,
-    CoverageScore,
-    ExecutionValidityScore,
-    FunctionalScore,
-    MetricResult,
-    PerformanceGatesScore,
-    VerificationStabilityScore,
-)
-from raidar.schemas.scorecard import (
-    RequirementsCoverageScore as RequirementCoverageScore,
-)
-from raidar.starter.catalog import StarterSource
+from tests import runtime_process_metrics_support as process_support
+from tests import runtime_scorecard_workspace_support as runtime_support
+
+errno = process_support.errno
+json = process_support.json
+subprocess = process_support.subprocess
+threading = process_support.threading
+time = process_support.time
+dataclass = process_support.dataclass
+replace = process_support.replace
+UTC = process_support.UTC
+datetime = process_support.datetime
+Path = process_support.Path
+AgentSpec = process_support.AgentSpec
+Harness = process_support.Harness
+ModelTarget = process_support.ModelTarget
+process_metrics_runtime = process_support.process_metrics_runtime
+_normalized_shell_subcommands = process_support._normalized_shell_subcommands
+collect_process_metrics = process_support.collect_process_metrics
+GateEvent = process_support.GateEvent
+DeterministicCheck = process_support.DeterministicCheck
+RequirementSpec = process_support.RequirementSpec
+ScenarioDefinition = process_support.ScenarioDefinition
+ScoreProfileConfig = process_support.ScoreProfileConfig
+AcceptanceScore = process_support.AcceptanceScore
+CoverageScore = process_support.CoverageScore
+ExecutionValidityScore = process_support.ExecutionValidityScore
+FunctionalScore = process_support.FunctionalScore
+MetricResult = process_support.MetricResult
+PerformanceGatesScore = process_support.PerformanceGatesScore
+VerificationStabilityScore = process_support.VerificationStabilityScore
+RequirementCoverageScore = process_support.RequirementCoverageScore
+directory_fingerprint = runtime_support.directory_fingerprint
+artifacts_runtime = runtime_support.artifacts_runtime
+scorecard_runtime = runtime_support.scorecard_runtime
+task_bundle_runtime = runtime_support.task_bundle_runtime
+workspace_runtime = runtime_support.workspace_runtime
+workspace_artifacts_runtime = runtime_support.workspace_artifacts_runtime
+workspace_cache_runtime = runtime_support.workspace_cache_runtime
+_load_verifier_outputs = runtime_support._load_verifier_outputs
+EvaluationOutputs = runtime_support.EvaluationOutputs
+ExecutionPhaseResult = runtime_support.ExecutionPhaseResult
+HarborExecutionResult = runtime_support.HarborExecutionResult
+PersistedArtifacts = runtime_support.PersistedArtifacts
+RunLayout = runtime_support.RunLayout
+RunRequest = runtime_support.RunRequest
+ScorecardBuildContext = runtime_support.ScorecardBuildContext
+WorkspaceContext = runtime_support.WorkspaceContext
+BaselineWorkspaceRequest = runtime_support.BaselineWorkspaceRequest
+_classify_unscored_reasons = runtime_support._classify_unscored_reasons
+build_scorecard = runtime_support.build_scorecard
+evaluate_coverage = runtime_support.evaluate_coverage
+evaluate_requirements = runtime_support.evaluate_requirements
+_build_verifier_scenario_spec = runtime_support._build_verifier_scenario_spec
+_task_image_reference = runtime_support._task_image_reference
+_verifier_scorer_script = runtime_support._verifier_scorer_script
+_ensure_baseline_workspace = runtime_support._ensure_baseline_workspace
+_prune_workspace_artifacts = runtime_support._prune_workspace_artifacts
+_resolve_homepage_screenshot_command = runtime_support._resolve_homepage_screenshot_command
+_workspace_changes_from_baseline = runtime_support._workspace_changes_from_baseline
+create_harbor_task_bundle = runtime_support.create_harbor_task_bundle
+scenario_evaluation_profile = runtime_support.scenario_evaluation_profile
+StarterSource = runtime_support.StarterSource
+
+
+class _RuntimeProxy:
+    _modules = (
+        workspace_runtime,
+        workspace_artifacts_runtime,
+        workspace_cache_runtime,
+        artifacts_runtime,
+        scorecard_runtime,
+        task_bundle_runtime,
+        process_metrics_runtime,
+    )
+
+    def __getattr__(self, name: str):
+        for module in self._modules:
+            if hasattr(module, name):
+                return getattr(module, name)
+        raise AttributeError(name)
+
+    def __setattr__(self, name: str, value) -> None:
+        patched = False
+        for module in self._modules:
+            if hasattr(module, name):
+                setattr(module, name, value)
+                patched = True
+        if not patched:
+            super().__setattr__(name, value)
+
+
+runner = _RuntimeProxy()
 
 
 @dataclass(frozen=True)
@@ -1038,7 +1075,7 @@ def test_ensure_baseline_workspace_initializes_once_in_parallel(
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir, None
 
-    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr("raidar.runtime.workspace.prepare_workspace", fake_prepare_workspace)
 
     failures: list[Exception] = []
 
@@ -1088,8 +1125,11 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
         assert env["BUN_INSTALL_CACHE_DIR"] == str(baseline_workspace_dir / ".cache" / "bun")
         setup_calls.extend(setup_actions)
 
-    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
-    monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
+    monkeypatch.setattr("raidar.runtime.workspace.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr(
+        "raidar.runtime.starter_preflight._run_workspace_setup_actions",
+        fake_run_setup_actions,
+    )
 
     _ensure_baseline_workspace(_baseline_workspace_request(fixture))
 
@@ -1133,8 +1173,11 @@ def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
         setup_calls += 1
         assert workspace == baseline_workspace_dir
 
-    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
-    monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
+    monkeypatch.setattr("raidar.runtime.workspace.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr(
+        "raidar.runtime.starter_preflight._run_workspace_setup_actions",
+        fake_run_setup_actions,
+    )
 
     cache_result = _ensure_baseline_workspace(_baseline_workspace_request(fixture))
 
@@ -1169,8 +1212,11 @@ def test_ensure_baseline_workspace_rebuilds_fingerprint_mismatch_cache_entry(
         (target_dir / "fresh.txt").write_text("ready\n", encoding="utf-8")
         return target_dir, None
 
-    monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
-    monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", lambda **_kwargs: None)
+    monkeypatch.setattr("raidar.runtime.workspace.prepare_workspace", fake_prepare_workspace)
+    monkeypatch.setattr(
+        "raidar.runtime.starter_preflight._run_workspace_setup_actions",
+        lambda **_kwargs: None,
+    )
 
     cache_result = _ensure_baseline_workspace(_baseline_workspace_request(fixture))
 
@@ -1710,7 +1756,9 @@ def test_build_scorecard_fails_execution_validity_without_required_atomic_commit
         termination_reason=None,
     )
     score_context.request.scenario.verification.workflow.atomic_commits_required = True
-    monkeypatch.setattr("raidar.runner._git_commit_count", lambda _: (0, "commit_count=0"))
+    monkeypatch.setattr(
+        "raidar.runtime.scorecard._git_commit_count", lambda _: (0, "commit_count=0")
+    )
 
     scorecard = build_scorecard(score_context)
 
