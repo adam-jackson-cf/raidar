@@ -9,10 +9,14 @@ from raidar.agents.adapters.gemini_cli import GeminiCliAdapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 
-def _config(model: str, provider: str = "google") -> AgentSpec:
+def _config(
+    model: str,
+    provider: str = "google",
+    reasoning_effort: str | None = None,
+) -> AgentSpec:
     return AgentSpec(
         harness=Harness.GEMINI,
-        model=ModelTarget(provider=provider, name=model),
+        model=ModelTarget(provider=provider, name=model, reasoning_effort=reasoning_effort),
     )
 
 
@@ -44,6 +48,15 @@ def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
     with pytest.raises(OSError, match="require an API key"):
+        adapter.validate()
+
+
+def test_validate_rejects_reasoning_effort(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+    adapter = GeminiCliAdapter(_config("gemini-3-pro-preview", reasoning_effort="high"))
+
+    with pytest.raises(ValueError, match="does not yet expose normalized reasoning_effort"):
         adapter.validate()
 
 

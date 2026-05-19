@@ -25,6 +25,38 @@ def _set_context_metadata(context: AgentContext, return_code: int, log_file: str
     context.metadata = {"return_code": return_code, "log_file": log_file}
 
 
+class CliHarborAgentBase(BaseAgent):
+    """Shared lifecycle and execution helpers for repository-local CLI agents."""
+
+    log_file: str = ""
+
+    def version(self) -> str | None:
+        return None
+
+    async def setup(self, environment: BaseEnvironment) -> None:
+        del environment
+        return None
+
+    def _model_name(self) -> str:
+        return _model_name(self.model_name)
+
+    def _quote_instruction(self, instruction: str) -> str:
+        return shlex.quote(instruction)
+
+    async def _exec_agent_command(
+        self,
+        environment: BaseEnvironment,
+        context: AgentContext,
+        *,
+        command: str,
+        env: dict[str, str],
+        log_file: str | None = None,
+    ) -> None:
+        resolved_log_file = log_file or self.log_file
+        result = await environment.exec(command=command, env=env)
+        _set_context_metadata(context, result.return_code, resolved_log_file)
+
+
 async def _upload_secret_file(
     environment: BaseEnvironment,
     *,
@@ -122,19 +154,14 @@ def _claude_settings_flag(*, effort: str | None, thinking_mode: str | None) -> s
     return f"--settings {shlex.quote(json.dumps(settings_payload))} "
 
 
-class GeminiCliHarborAgent(BaseAgent):
+class GeminiCliHarborAgent(CliHarborAgentBase):
     """Gemini CLI Harbor agent that assumes the binary is available in the image."""
+
+    log_file = "/logs/agent/gemini-cli.txt"
 
     @staticmethod
     def name() -> str:
         return "gemini-cli-harbor"
-
-    def version(self) -> str | None:
-        return None
-
-    async def setup(self, environment: BaseEnvironment) -> None:
-        del environment
-        return None
 
     async def run(
         self,
@@ -142,8 +169,8 @@ class GeminiCliHarborAgent(BaseAgent):
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
-        model = _model_name(self.model_name)
-        escaped_instruction = shlex.quote(instruction)
+        model = self._model_name()
+        escaped_instruction = self._quote_instruction(instruction)
         env: dict[str, str] = {}
         for key in (
             "GOOGLE_APPLICATION_CREDENTIALS",
@@ -166,7 +193,9 @@ class GeminiCliHarborAgent(BaseAgent):
             secret_paths["GEMINI_API_KEY"] = path
 
         secret_prefix = _secret_export_prefix(secret_paths)
-        result = await environment.exec(
+        await self._exec_agent_command(
+            environment,
+            context,
             command=(
                 f"{secret_prefix}gemini -p {escaped_instruction} -y -m {model} "
                 "2>&1 </dev/null | tee /logs/agent/gemini-cli.txt"
@@ -179,12 +208,12 @@ class GeminiCliHarborAgent(BaseAgent):
                 "| head -n 1 | xargs -r -I{} cp {} /logs/agent/gemini-cli.trajectory.json"
             )
         )
-        _set_context_metadata(context, result.return_code, "/logs/agent/gemini-cli.txt")
 
 
-class ClaudeCodeCliHarborAgent(BaseAgent):
+class ClaudeCodeCliHarborAgent(CliHarborAgentBase):
     """Claude Code CLI Harbor agent that executes directly in the task image."""
 
+    log_file = "/logs/agent/claude-code.txt"
     _ALLOWED_TOOLS = (
         "Bash Edit Write Read Glob Grep LS WebFetch NotebookEdit "
         "NotebookRead TodoRead TodoWrite Agent Skill SlashCommand Task WebSearch"
@@ -205,20 +234,13 @@ class ClaudeCodeCliHarborAgent(BaseAgent):
     def name() -> str:
         return "claude-code-harbor"
 
-    def version(self) -> str | None:
-        return None
-
-    async def setup(self, environment: BaseEnvironment) -> None:
-        del environment
-        return None
-
     async def run(
         self,
         instruction: str,
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
-        escaped_instruction = shlex.quote(instruction)
+        escaped_instruction = self._quote_instruction(instruction)
         env = _claude_base_env()
         secret_paths = await _claude_secret_paths(environment)
         _configure_claude_model_env(env, self.model_name)
@@ -244,15 +266,18 @@ class ClaudeCodeCliHarborAgent(BaseAgent):
             f"{settings_flag}-p {escaped_instruction} --allowedTools {self._ALLOWED_TOOLS} "
             "2>&1 </dev/null | tee /logs/agent/claude-code.txt"
         )
-        result = await environment.exec(
+        await self._exec_agent_command(
+            environment,
+            context,
             command=claude_command,
             env=env,
         )
-        _set_context_metadata(context, result.return_code, "/logs/agent/claude-code.txt")
 
 
-class CodexCliHarborAgent(BaseAgent):
+class CodexCliHarborAgent(CliHarborAgentBase):
     """Codex CLI Harbor agent that executes directly in the task image."""
+
+    log_file = "/logs/agent/codex.txt"
 
     def __init__(self, reasoning_effort: str | None = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -262,21 +287,14 @@ class CodexCliHarborAgent(BaseAgent):
     def name() -> str:
         return "codex-cli-harbor"
 
-    def version(self) -> str | None:
-        return None
-
-    async def setup(self, environment: BaseEnvironment) -> None:
-        del environment
-        return None
-
     async def run(
         self,
         instruction: str,
         environment: BaseEnvironment,
         context: AgentContext,
     ) -> None:
-        model = _model_name(self.model_name)
-        escaped_instruction = shlex.quote(instruction)
+        model = self._model_name()
+        escaped_instruction = self._quote_instruction(instruction)
         env = {
             "CODEX_HOME": "/logs/agent/codex-home",
         }
@@ -318,7 +336,9 @@ class CodexCliHarborAgent(BaseAgent):
                 ),
                 env=env,
             )
-        result = await environment.exec(
+        await self._exec_agent_command(
+            environment,
+            context,
             command=(
                 "trap 'rm -rf /tmp/codex-secrets \"$CODEX_HOME/auth.json\"' EXIT TERM INT; "
                 "codex exec --ignore-user-config --ephemeral "
@@ -331,4 +351,3 @@ class CodexCliHarborAgent(BaseAgent):
             ),
             env=env,
         )
-        _set_context_metadata(context, result.return_code, "/logs/agent/codex.txt")

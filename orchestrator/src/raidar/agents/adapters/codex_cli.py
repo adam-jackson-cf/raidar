@@ -14,6 +14,8 @@ class CodexCliAdapter(HarborCliAdapter):
     """Adapter enforcing Codex CLI harness + model pairing."""
 
     HARBOR_HARNESS_NAME = "codex"
+    REQUIRED_PROVIDER = "openai"
+    ADAPTER_LABEL = "Codex CLI adapter"
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     DEFAULT_BINARY = "codex"
     WORKSPACE_SESSION_DIR = ".codex"
@@ -41,10 +43,6 @@ class CodexCliAdapter(HarborCliAdapter):
         ),
     }
 
-    @classmethod
-    def supported_model_summary(cls) -> str:
-        return ", ".join(f"openai/{model}" for model in sorted(cls.SUPPORTED_MODELS))
-
     def __init__(self, config: AgentSpec) -> None:
         super().__init__(config)
         self._resolved_auth: ResolvedCodexAuth | None = None
@@ -55,30 +53,7 @@ class CodexCliAdapter(HarborCliAdapter):
         self._resolved_auth = resolve_codex_auth()
         return self._resolved_auth
 
-    def validate(self) -> None:
-        provider = self.config.model.provider
-        if provider != "openai":
-            raise ValueError(
-                "Codex CLI adapter only supports models with provider 'openai'. "
-                f"Received '{provider}'."
-            )
-        model_profile = self.SUPPORTED_MODELS.get(self.config.model.name)
-        if model_profile is None:
-            supported = ", ".join(sorted(self.SUPPORTED_MODELS))
-            raise ValueError(
-                "Codex CLI adapter only supports models: "
-                f"{supported}. Received '{self.config.model.name}'."
-            )
-        reasoning_effort = self.config.model.reasoning_effort
-        if reasoning_effort is not None:
-            allowed = model_profile.reasoning_levels
-            if reasoning_effort not in allowed:
-                allowed_rendered = ", ".join(allowed) if allowed else "(none)"
-                raise ValueError(
-                    f"Model '{self.config.model.name}' only supports reasoning levels: "
-                    f"{allowed_rendered}. Received '{reasoning_effort}'."
-                )
-        self._resolve_cli()
+    def _validate_credentials(self) -> None:
         self._resolve_auth()
 
     def extra_harbor_args(self) -> Iterable[str]:

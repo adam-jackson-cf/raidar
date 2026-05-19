@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean, median, pstdev
 
+from .run_metadata import uncached_input_tokens
 from .schemas.scorecard import EvalRun
 
 
@@ -86,13 +87,6 @@ def _stat_summary(values: list[float]) -> dict[str, float]:
     }
 
 
-def _uncached_tokens(run: EvalRun) -> int:
-    process = run.scores.metadata.get("process", {})
-    if not isinstance(process, dict):
-        return 0
-    return int(process.get("uncached_input_tokens", 0) or 0)
-
-
 def _experiment_id(
     scenario_name: str,
     harness: str,
@@ -149,7 +143,7 @@ def _aggregate_block(
     quality_scores = [run.scores.quality_score for run in scored_runs]
     diagnostic_scores = [run.scores.diagnostic_score for run in scored_runs]
     durations = [run.duration_sec for run in scored_runs]
-    tokens = [float(_uncached_tokens(run)) for run in scored_runs]
+    tokens = [float(uncached_input_tokens(run)) for run in scored_runs]
     scored_count = len(scored_runs)
     total_count = len(runs)
     valid_count = len(valid_runs)

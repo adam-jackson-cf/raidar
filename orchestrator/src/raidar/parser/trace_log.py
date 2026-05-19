@@ -89,19 +89,23 @@ def _coerce_timestamp(entry: dict) -> str:
 
 
 def _append_command_event(events: list[TraceEvent], timestamp: str, command: str | None) -> None:
-    if not command:
-        return
-    events.append(
-        TraceEvent(timestamp=timestamp, event_type="bash_command", data={"command": command})
-    )
+    _append_value_event(events, timestamp, "bash_command", "command", command)
 
 
 def _append_file_event(events: list[TraceEvent], timestamp: str, file_path: str | None) -> None:
-    if not file_path:
+    _append_value_event(events, timestamp, "file_change", "file_path", file_path)
+
+
+def _append_value_event(
+    events: list[TraceEvent],
+    timestamp: str,
+    event_type: str,
+    data_key: str,
+    value: str | None,
+) -> None:
+    if not value:
         return
-    events.append(
-        TraceEvent(timestamp=timestamp, event_type="file_change", data={"file_path": file_path})
-    )
+    events.append(TraceEvent(timestamp=timestamp, event_type=event_type, data={data_key: value}))
 
 
 def _append_gate_event(
@@ -253,43 +257,49 @@ def parse_codex_entry(entry: dict) -> TraceEvent | None:
     return None
 
 
-def parse_claude_trace(trace_dir: Path) -> list[TraceEvent]:
+def _parse_assistant_structured_trace(trace_dir: Path) -> list[TraceEvent]:
     return _parse_structured_cli_trace(trace_dir, ("*.jsonl", "*.json"), "assistant")
+
+
+def parse_claude_trace(trace_dir: Path) -> list[TraceEvent]:
+    return _parse_assistant_structured_trace(trace_dir)
 
 
 def parse_gemini_trace(trace_dir: Path) -> list[TraceEvent]:
-    return _parse_structured_cli_trace(trace_dir, ("*.jsonl", "*.json"), "assistant")
+    return _parse_assistant_structured_trace(trace_dir)
 
 
 def parse_cursor_trace(trace_dir: Path) -> list[TraceEvent]:
-    return _parse_structured_cli_trace(trace_dir, ("*.jsonl", "*.json"), "assistant")
+    return _parse_assistant_structured_trace(trace_dir)
 
 
 def parse_copilot_trace(trace_dir: Path) -> list[TraceEvent]:
-    return _parse_structured_cli_trace(trace_dir, ("*.jsonl", "*.json"), "assistant")
+    return _parse_assistant_structured_trace(trace_dir)
 
 
 def parse_pi_trace(trace_dir: Path) -> list[TraceEvent]:
-    return _parse_structured_cli_trace(trace_dir, ("*.jsonl", "*.json"), "assistant")
+    return _parse_assistant_structured_trace(trace_dir)
+
+
+TRACE_PARSERS = {
+    "codex-cli": parse_codex_trace,
+    "claude-code": parse_claude_trace,
+    "gemini": parse_gemini_trace,
+    "cursor": parse_cursor_trace,
+    "copilot": parse_copilot_trace,
+    "pi": parse_pi_trace,
+}
 
 
 def parse_trace(harness: str, trace_dir: Path) -> list[TraceEvent]:
-    parsers: dict[str, callable] = {
-        "codex-cli": parse_codex_trace,
-        "claude-code": parse_claude_trace,
-        "gemini": parse_gemini_trace,
-        "cursor": parse_cursor_trace,
-        "copilot": parse_copilot_trace,
-        "pi": parse_pi_trace,
-    }
-    parser = parsers.get(harness)
+    parser = TRACE_PARSERS.get(harness)
     if parser is None:
         return []
     return parser(trace_dir)
 
 
 def parser_supports_structured_traces(harness: str) -> bool:
-    return harness in {"claude-code", "gemini", "cursor", "copilot", "pi"}
+    return harness in TRACE_PARSERS and harness != "codex-cli"
 
 
 TraceFormat = Literal["json", "jsonl"]

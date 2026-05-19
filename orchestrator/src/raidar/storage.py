@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
+from .run_metadata import uncached_input_tokens
 from .schemas.scorecard import EvalRun
 
 
@@ -51,13 +52,6 @@ def _variance(values: list[float]) -> float:
         return 0.0
     mean = sum(values) / len(values)
     return sum((value - mean) ** 2 for value in values) / len(values)
-
-
-def _uncached_tokens(run: EvalRun) -> int:
-    process = run.scores.metadata.get("process", {})
-    if not isinstance(process, dict):
-        return 0
-    return int(process.get("uncached_input_tokens", 0) or 0)
 
 
 def _metric_ids(run: EvalRun) -> list[str]:
@@ -440,7 +434,7 @@ def _append_valid_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
         return
 
     duration_values = [run.duration_sec for run in valid_runs]
-    token_values = [_uncached_tokens(run) for run in valid_runs]
+    token_values = [uncached_input_tokens(run) for run in valid_runs]
     min_duration = min(duration_values)
     max_duration = max(duration_values)
     min_tokens = min(token_values)
@@ -451,11 +445,11 @@ def _append_valid_cost_time(lines: list[str], runs: list[EvalRun]) -> None:
     )
     for run in ranked:
         duration_norm = _normalized_lower_better(run.duration_sec, min_duration, max_duration)
-        token_norm = _normalized_lower_better(_uncached_tokens(run), min_tokens, max_tokens)
+        token_norm = _normalized_lower_better(uncached_input_tokens(run), min_tokens, max_tokens)
         index = round((duration_norm + token_norm) / 2, 3)
         lines.append(
             f"- run_id={run.id}, model={run.config.model}, index={index:.3f}, "
-            f"duration={run.duration_sec:.1f}s, uncached_tokens={_uncached_tokens(run)}"
+            f"duration={run.duration_sec:.1f}s, uncached_tokens={uncached_input_tokens(run)}"
         )
 
 

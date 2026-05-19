@@ -30,20 +30,19 @@ def run_command(command: list[str], cwd: Path, timeout: int | None = None) -> tu
 
 def check_build(workspace: Path) -> bool:
     """Check if the build succeeds."""
-    code, stdout, stderr = run_command(
-        ["bun", "run", "build"],
-        workspace,
-        timeout=settings.timeouts.build,
-    )
-    return code == 0
+    return _check_package_script(workspace, "build", timeout=settings.timeouts.build)
 
 
 def check_typecheck(workspace: Path) -> bool:
     """Check if typecheck passes."""
+    return _check_package_script(workspace, "typecheck", timeout=settings.timeouts.typecheck)
+
+
+def _check_package_script(workspace: Path, script_name: str, *, timeout: int) -> bool:
     code, stdout, stderr = run_command(
-        ["bun", "run", "typecheck"],
+        ["bun", "run", script_name],
         workspace,
-        timeout=settings.timeouts.typecheck,
+        timeout=timeout,
     )
     return code == 0
 

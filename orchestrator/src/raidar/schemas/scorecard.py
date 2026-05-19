@@ -143,30 +143,25 @@ class GateCheck(BaseModel):
     evidence: str | None = Field(default=None, description="Check evidence")
 
 
-class ExecutionValidityScore(BaseModel):
+class GateAggregateScore(BaseModel):
+    """Aggregate pass/fail result for hard gate checks."""
+
+    checks: list[GateCheck] = Field(default_factory=list)
+
+    @computed_field
+    @property
+    def passed(self) -> bool:
+        if not self.checks:
+            return True
+        return all(check.passed for check in self.checks)
+
+
+class ExecutionValidityScore(GateAggregateScore):
     """Hard-gate execution validity aggregate."""
 
-    checks: list[GateCheck] = Field(default_factory=list)
 
-    @computed_field
-    @property
-    def passed(self) -> bool:
-        if not self.checks:
-            return True
-        return all(check.passed for check in self.checks)
-
-
-class PerformanceGatesScore(BaseModel):
+class PerformanceGatesScore(GateAggregateScore):
     """Performance gate aggregate for scored scenario outcomes."""
-
-    checks: list[GateCheck] = Field(default_factory=list)
-
-    @computed_field
-    @property
-    def passed(self) -> bool:
-        if not self.checks:
-            return True
-        return all(check.passed for check in self.checks)
 
 
 class ResourceEfficiencyScore(BaseModel):

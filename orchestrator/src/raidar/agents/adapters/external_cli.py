@@ -3,10 +3,8 @@
 from __future__ import annotations
 
 import os
-import shutil
 from collections.abc import Iterable
 
-from ..config import AgentSpec
 from .base import HarnessAdapter
 
 
@@ -18,32 +16,11 @@ class ExternalCliAdapter(HarnessAdapter):
     REQUIRED_ENV_VARS: tuple[str, ...] = ()
     ALLOWED_PROVIDERS: tuple[str, ...] | None = None
 
-    def __init__(self, config: AgentSpec) -> None:
-        super().__init__(config)
-        self._resolved_cli: str | None = None
-
     @classmethod
     def supported_model_summary(cls) -> str:
         if not cls.ALLOWED_PROVIDERS:
             return "(any provider/model)"
         return ", ".join(f"{provider}/*" for provider in cls.ALLOWED_PROVIDERS)
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-    def _resolve_cli(self) -> str:
-        if self._resolved_cli:
-            return self._resolved_cli
-        candidate = os.environ.get(self.CLI_ENV_VAR)
-        if not candidate and self.DEFAULT_BINARY:
-            candidate = shutil.which(self.DEFAULT_BINARY)
-        if not candidate:
-            hint = f"Set {self.CLI_ENV_VAR}" if self.CLI_ENV_VAR else "Install the CLI"
-            raise FileNotFoundError(
-                f"CLI binary for {self.config.harness.value} not found. {hint}."
-            )
-        self._resolved_cli = candidate
-        return candidate
 
     # ------------------------------------------------------------------
     # Adapter overrides

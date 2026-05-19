@@ -45,7 +45,7 @@ def init_scenario(request: ScenarioInitRequest) -> ScenarioInitResult:
     layout = _scenario_init_layout(request)
     _ensure_new_scenario(layout)
     _create_scenario_init_dirs(layout)
-    _write_yaml_mapping(layout.scenario_yaml, _scenario_doc(request, layout))
+    write_scenario_document(layout.scenario_yaml, _scenario_doc(request, layout))
     _write_scenario_prompt(layout)
     _write_scenario_rules(layout)
     return _scenario_init_result(request, layout)
@@ -176,17 +176,39 @@ def resolve_scenario_yaml(path: Path) -> Path:
     candidates = list(resolved.glob("v*/scenario.yaml"))
     if not candidates:
         raise FileNotFoundError(f"scenario.yaml not found in {resolved}")
-    return max(candidates, key=_scenario_revision_sort_key)
+    return max(candidates, key=scenario_revision_sort_key)
 
 
-def _scenario_revision_sort_key(scenario_yaml: Path) -> tuple[int, str]:
+def scenario_revision_sort_key(scenario_yaml: Path) -> tuple[int, str]:
+    """Sort scenario.yaml paths by numeric revision directory when possible."""
+
     revision_dir = scenario_yaml.parent.name
     if not revision_dir.startswith("v") or not revision_dir[1:].isdigit():
         return (-1, revision_dir)
     return (int(revision_dir[1:]), revision_dir)
 
 
-def _write_yaml_mapping(path: Path, payload: dict[str, Any]) -> None:
+def scenario_revision_paths(scenario_root: Path) -> list[Path]:
+    """Return scenario revisions sorted by canonical revision ordering."""
+
+    if not scenario_root.is_dir():
+        return []
+    return sorted(scenario_root.glob("v*/scenario.yaml"), key=scenario_revision_sort_key)
+
+
+def load_scenario_document(path: Path) -> dict[str, Any]:
+    """Load a scenario YAML document as a mapping."""
+
+    with path.open(encoding="utf-8") as handle:
+        payload = yaml.safe_load(handle) or {}
+    if not isinstance(payload, dict):
+        raise ValueError(f"Scenario document must be a mapping: {path}")
+    return payload
+
+
+def write_scenario_document(path: Path, payload: dict[str, Any]) -> None:
+    """Write a scenario YAML mapping with stable key order."""
+
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as handle:
         yaml.safe_dump(payload, handle, sort_keys=False)

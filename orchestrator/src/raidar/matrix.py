@@ -128,16 +128,30 @@ def _codex_selector_agent_specs() -> list[AgentSpecInput]:
 
 
 def _gemini_selector_agent_specs() -> list[AgentSpecInput]:
-    return [
-        AgentSpecInput(harness=Harness.GEMINI.value, provider="google", model=model_name)
-        for model_name in sorted(GeminiCliAdapter.SUPPORTED_MODELS)
-    ]
+    return _model_selector_agent_specs(
+        harness=Harness.GEMINI,
+        provider="google",
+        model_names=GeminiCliAdapter.SUPPORTED_MODELS,
+    )
 
 
 def _claude_selector_agent_specs() -> list[AgentSpecInput]:
+    return _model_selector_agent_specs(
+        harness=Harness.CLAUDE_CODE,
+        provider="anthropic",
+        model_names=ClaudeCodeCliAdapter.SUPPORTED_MODELS,
+    )
+
+
+def _model_selector_agent_specs(
+    *,
+    harness: Harness,
+    provider: str,
+    model_names,
+) -> list[AgentSpecInput]:
     return [
-        AgentSpecInput(harness=Harness.CLAUDE_CODE.value, provider="anthropic", model=model_name)
-        for model_name in sorted(ClaudeCodeCliAdapter.SUPPORTED_MODELS)
+        AgentSpecInput(harness=harness.value, provider=provider, model=model_name)
+        for model_name in sorted(model_names)
     ]
 
 

@@ -5,7 +5,6 @@ from __future__ import annotations
 import concurrent.futures
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -14,16 +13,15 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 import click
-import yaml
 from dotenv import load_dotenv
 
+from .agents.adapters.base import resolve_cli_executable
 from .agents.adapters.codex_auth import (
     CODEX_AUTH_MODE_ENV,
     codex_auth_json_path,
     has_file_backed_codex_auth,
 )
 from .agents.adapters.factory import adapter_class_for_harness, resolve_adapter
-from .agents.adapters.harbor_cli import resolve_cli_executable
 from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .application import repo_state
@@ -55,6 +53,12 @@ from .application.scenarios import (
 )
 from .application.scenarios import (
     init_scenario as _service_init_scenario,
+)
+from .application.scenarios import (
+    resolve_scenario_yaml as _service_resolve_scenario_yaml,
+)
+from .application.scenarios import (
+    scenario_revision_paths as _service_scenario_revision_paths,
 )
 from .application.scenarios import (
     validate_scenario as _service_validate_scenario,
@@ -95,7 +99,6 @@ def main() -> None:
 
 HARNESS_CHOICES = [harness.value for harness in Harness]
 EXPERIMENT_KIND_CHOICES = ["benchmark", "research-loop"]
-VERSION_DIR_PATTERN = re.compile(r"^v(\d+)$")
 INTEGRATION_TEST_TARGET = "tests/test_runner_harbor_env_and_cleanup.py"
 TYPECHECK_TARGETS = [
     "src/raidar/watcher",
@@ -195,39 +198,11 @@ def _load_json_file(path: Path) -> dict[str, object] | None:
     return payload
 
 
-def _load_scenario_document(path: Path) -> dict[str, Any]:
-    with path.open(encoding="utf-8") as handle:
-        payload = yaml.safe_load(handle) or {}
-    if not isinstance(payload, dict):
-        raise click.ClickException(f"Scenario document must be a mapping: {path}")
-    return payload
-
-
-def _write_scenario_document(path: Path, payload: dict[str, Any]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(payload, handle, sort_keys=False)
-
-
-def _scenario_revision_sort_key(scenario_yaml: Path) -> tuple[int, str]:
-    revision_dir = scenario_yaml.parent.name
-    match = VERSION_DIR_PATTERN.fullmatch(revision_dir)
-    if match is None:
-        return (-1, revision_dir)
-    return (int(match.group(1)), revision_dir)
-
-
 def _resolve_scenario_yaml(path: Path) -> Path:
-    resolved = path.resolve()
-    if resolved.is_file():
-        return resolved
-    scenario_yaml = resolved / "scenario.yaml"
-    if scenario_yaml.is_file():
-        return scenario_yaml
-    candidates = list(resolved.glob("v*/scenario.yaml"))
-    if not candidates:
-        raise click.ClickException(f"scenario.yaml not found in {resolved}")
-    return max(candidates, key=_scenario_revision_sort_key)
+    try:
+        return _service_resolve_scenario_yaml(path)
+    except FileNotFoundError as exc:
+        raise click.ClickException(str(exc)) from exc
 
 
 def _execution_payload(execution_dir: Path) -> dict[str, object]:
@@ -939,9 +914,7 @@ def scenario() -> None:
 
 
 def _scenario_revision_paths(scenario_root: Path) -> list[Path]:
-    if not scenario_root.is_dir():
-        return []
-    return sorted(scenario_root.glob("v*/scenario.yaml"), key=_scenario_revision_sort_key)
+    return _service_scenario_revision_paths(scenario_root)
 
 
 def _list_scenarios_with_revisions(scenarios_root: Path) -> list[tuple[str, tuple[str, ...]]]:

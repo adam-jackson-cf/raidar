@@ -2624,17 +2624,22 @@ def _verifier_scorecard_path(trial_dir: Path | None) -> Path | None:
 
 
 def _parse_gate_history(payload: dict[str, Any]) -> list[GateEvent]:
-    gate_history_payload = payload.get("gate_history")
-    if not isinstance(gate_history_payload, list):
-        raise ValueError("scorecard.gate_history must be a list")
-    return [GateEvent.model_validate(item) for item in gate_history_payload]
+    return _parse_scorecard_list(payload, "gate_history", GateEvent)
 
 
 def _parse_module_results(payload: dict[str, Any]) -> list[MetricResult]:
-    metric_results_payload = payload.get("metric_results")
-    if not isinstance(metric_results_payload, list):
-        raise ValueError("scorecard.metric_results must be a list")
-    return [MetricResult.model_validate(item) for item in metric_results_payload]
+    return _parse_scorecard_list(payload, "metric_results", MetricResult)
+
+
+def _parse_scorecard_list(
+    payload: dict[str, Any],
+    field_name: str,
+    model_type,
+):
+    items = payload.get(field_name)
+    if not isinstance(items, list):
+        raise ValueError(f"scorecard.{field_name} must be a list")
+    return [model_type.model_validate(item) for item in items]
 
 
 def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:

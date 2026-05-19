@@ -3,7 +3,14 @@
 import json
 from pathlib import Path
 
-from raidar.parser.trace_log import parse_cursor_trace, parse_trace
+from raidar.parser.trace_log import (
+    parse_claude_trace,
+    parse_copilot_trace,
+    parse_cursor_trace,
+    parse_gemini_trace,
+    parse_pi_trace,
+    parse_trace,
+)
 
 
 def _write_jsonl(tmp_dir: Path, name: str, lines: list[dict]) -> None:
@@ -38,6 +45,26 @@ def test_parse_cursor_trace_jsonl(tmp_path):
     assert "assistant_message" in event_types
     assert "bash_command" in event_types
     assert "file_change" in event_types
+
+
+def test_structured_parser_exports_share_behavior(tmp_path):
+    """Structured parser exports should preserve the same trace semantics."""
+    _write_jsonl(
+        tmp_path,
+        "trace.jsonl",
+        [{"timestamp": "2024-01-01T00:00:00Z", "role": "user", "text": "Open"}],
+    )
+
+    parsers = (
+        parse_claude_trace,
+        parse_gemini_trace,
+        parse_cursor_trace,
+        parse_copilot_trace,
+        parse_pi_trace,
+    )
+    assert [
+        [(event.event_type, event.data) for event in parser(tmp_path)] for parser in parsers
+    ] == [[("user_prompt", {"content": "Open"})]] * len(parsers)
 
 
 def test_parse_copilot_trace_gate_and_tool(tmp_path):

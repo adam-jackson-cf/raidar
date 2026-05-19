@@ -1012,12 +1012,16 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
         ],
     )
     assert init_v10.exit_code == 0, init_v10.output
+    non_numeric_revision = scenario_dir / "vx" / "scenario.yaml"
+    non_numeric_revision.parent.mkdir(parents=True)
+    non_numeric_revision.write_text("name: sample-task\nscenario_revision: vx\n", encoding="utf-8")
 
     info_result = runner.invoke(main, ["info", "--scenario", str(scenario_dir)])
     assert info_result.exit_code == 0, info_result.output
     assert "Revision: v10" in info_result.output
     assert f"Scenario YAML: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert "Available Revisions:" in info_result.output
+    assert f"  vx: {scenario_dir / 'vx' / 'scenario.yaml'}" in info_result.output
     assert f"  v2: {scenario_dir / 'v2' / 'scenario.yaml'}" in info_result.output
     assert f"  v10: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert (

@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from collections.abc import Iterable
 
-from ..config import AgentSpec
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 
@@ -13,6 +12,8 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
     """Adapter enforcing Claude Code CLI harness + model pairing."""
 
     HARBOR_HARNESS_NAME = "claude-code"
+    REQUIRED_PROVIDER = "anthropic"
+    ADAPTER_LABEL = "Claude Code CLI adapter"
     CLI_ENV_VAR = "CLAUDE_CODE_CLI_PATH"
     DEFAULT_BINARY = "claude"
     WORKSPACE_SESSION_DIR = ".claude"
@@ -43,37 +44,7 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
         ),
     }
 
-    @classmethod
-    def supported_model_summary(cls) -> str:
-        return ", ".join(f"anthropic/{model}" for model in sorted(cls.SUPPORTED_MODELS))
-
-    def __init__(self, config: AgentSpec) -> None:
-        super().__init__(config)
-
-    def validate(self) -> None:
-        provider = self.config.model.provider
-        if provider != "anthropic":
-            raise ValueError(
-                "Claude Code CLI adapter only supports models with provider 'anthropic'. "
-                f"Received '{provider}'."
-            )
-        model_profile = self.SUPPORTED_MODELS.get(self.config.model.name)
-        if model_profile is None:
-            supported = ", ".join(sorted(self.SUPPORTED_MODELS))
-            raise ValueError(
-                "Claude Code CLI adapter only supports models: "
-                f"{supported}. Received '{self.config.model.name}'."
-            )
-        reasoning_effort = self.config.model.reasoning_effort
-        if reasoning_effort is not None:
-            allowed = model_profile.reasoning_levels
-            if reasoning_effort not in allowed:
-                allowed_rendered = ", ".join(allowed) if allowed else "(none)"
-                raise ValueError(
-                    f"Model '{self.config.model.name}' only supports reasoning levels: "
-                    f"{allowed_rendered}. Received '{reasoning_effort}'."
-                )
-        self._resolve_cli()
+    def _validate_credentials(self) -> None:
         if not (
             os.environ.get(self.ANTHROPIC_API_ENV)
             or os.environ.get(self.API_KEY_ENV)

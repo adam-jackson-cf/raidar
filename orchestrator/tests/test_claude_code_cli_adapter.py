@@ -9,10 +9,14 @@ from raidar.agents.adapters.factory import resolve_adapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 
 
-def _config(model: str, provider: str = "anthropic") -> AgentSpec:
+def _config(
+    model: str,
+    provider: str = "anthropic",
+    reasoning_effort: str | None = None,
+) -> AgentSpec:
     return AgentSpec(
         harness=Harness.CLAUDE_CODE,
-        model=ModelTarget(provider=provider, name=model),
+        model=ModelTarget(provider=provider, name=model, reasoning_effort=reasoning_effort),
     )
 
 
@@ -51,6 +55,31 @@ def test_validate_accepts_oauth_token_only(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "oauth-token")
     adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-5"))
     adapter.validate()
+
+
+def test_validate_rejects_unsupported_reasoning_effort(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-5", reasoning_effort="high"))
+
+    with pytest.raises(ValueError, match="only supports reasoning levels: \\(none\\)"):
+        adapter.validate()
+
+
+def test_default_reasoning_effort_is_forwarded_for_supported_models(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-6"))
+    adapter.validate()
+
+    assert list(adapter.extra_harbor_args()) == [
+        "--ak",
+        "thinking_mode=adaptive",
+        "--ak",
+        "effort=high",
+    ]
 
 
 @pytest.mark.parametrize(

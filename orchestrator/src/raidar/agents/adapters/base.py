@@ -6,6 +6,8 @@ model compatibility checks, and Harbor argument generation.
 
 from __future__ import annotations
 
+import os
+import shutil
 from collections.abc import Iterable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -14,10 +16,29 @@ if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
     from ..config import AgentSpec
 
 
+def resolve_cli_executable(
+    *,
+    cli_env_var: str,
+    default_binary: str,
+    harness_label: str,
+) -> str:
+    """Resolve a harness CLI executable from env override or PATH."""
+    candidate = os.environ.get(cli_env_var)
+    if not candidate and default_binary:
+        candidate = shutil.which(default_binary)
+    if not candidate:
+        raise FileNotFoundError(
+            f"{harness_label} CLI not found. Set {cli_env_var} or add '{default_binary}' to PATH."
+        )
+    return candidate
+
+
 class HarnessAdapter:
     """Base adapter contract for all harness integrations."""
 
     terminal_bench_dataset = "terminal-bench@2.0"
+    CLI_ENV_VAR: str = ""
+    DEFAULT_BINARY: str = ""
 
     @classmethod
     def supported_model_summary(cls) -> str:
@@ -26,6 +47,7 @@ class HarnessAdapter:
 
     def __init__(self, config: AgentSpec) -> None:
         self.config = config
+        self._cli_path: str | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle hooks
@@ -51,6 +73,17 @@ class HarnessAdapter:
     def execution_metadata(self) -> dict[str, Any]:
         """Adapter metadata that should be surfaced in validation and run artifacts."""
         return {}
+
+    def _resolve_cli(self) -> str:
+        """Resolve and cache this adapter's CLI executable."""
+        if self._cli_path:
+            return self._cli_path
+        self._cli_path = resolve_cli_executable(
+            cli_env_var=self.CLI_ENV_VAR,
+            default_binary=self.DEFAULT_BINARY,
+            harness_label=self.config.harness.value,
+        )
+        return self._cli_path
 
     # ------------------------------------------------------------------
     # Harbor command wiring
