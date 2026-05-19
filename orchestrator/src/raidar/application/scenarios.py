@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -18,26 +19,66 @@ from raidar.runner import load_scenario
 from raidar.scenario_clone import ScenarioCloneResult
 from raidar.scenario_clone import clone_scenario_revision as clone_revision
 
+SCENARIO_PROMPT_TEXT = (
+    "Implement the requested feature in the starter application.\n\n"
+    "Run all required verification commands before completion and "
+    "report only after they pass.\n"
+)
+SCENARIO_RULE_TEXT = (
+    "Follow the scenario prompt exactly. Run required verification commands before completion."
+)
+
+
+@dataclass(frozen=True)
+class ScenarioInitLayout:
+    scenario_root: Path
+    scenario_name: str
+    revision_dir: Path
+    scenario_yaml: Path
+    prompt_path: Path
+    rules_dir: Path
+
 
 def init_scenario(request: ScenarioInitRequest) -> ScenarioInitResult:
     """Create a new versioned scenario descriptor with prompt artifacts and rules."""
 
+    layout = _scenario_init_layout(request)
+    _ensure_new_scenario(layout)
+    _create_scenario_init_dirs(layout)
+    _write_yaml_mapping(layout.scenario_yaml, _scenario_doc(request, layout))
+    _write_scenario_prompt(layout)
+    _write_scenario_rules(layout)
+    return _scenario_init_result(request, layout)
+
+
+def _scenario_init_layout(request: ScenarioInitRequest) -> ScenarioInitLayout:
     scenario_root = request.path.resolve()
-    scenario_name = request.name or scenario_root.name
     revision_dir = scenario_root / request.scenario_revision
-    scenario_yaml = revision_dir / "scenario.yaml"
-    if scenario_yaml.exists():
-        raise FileExistsError(f"Scenario already exists: {scenario_yaml}")
+    return ScenarioInitLayout(
+        scenario_root=scenario_root,
+        scenario_name=request.name or scenario_root.name,
+        revision_dir=revision_dir,
+        scenario_yaml=revision_dir / "scenario.yaml",
+        prompt_path=revision_dir / request.prompt_entry,
+        rules_dir=revision_dir / "rules",
+    )
 
-    rules_dir = revision_dir / "rules"
-    prompt_dir = revision_dir / "prompt"
-    rules_dir.mkdir(parents=True, exist_ok=True)
-    prompt_dir.mkdir(parents=True, exist_ok=True)
 
-    scenario_doc: dict[str, Any] = {
-        "name": scenario_name,
+def _ensure_new_scenario(layout: ScenarioInitLayout) -> None:
+    if layout.scenario_yaml.exists():
+        raise FileExistsError(f"Scenario already exists: {layout.scenario_yaml}")
+
+
+def _create_scenario_init_dirs(layout: ScenarioInitLayout) -> None:
+    layout.rules_dir.mkdir(parents=True, exist_ok=True)
+    (layout.revision_dir / "prompt").mkdir(parents=True, exist_ok=True)
+
+
+def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> dict[str, Any]:
+    return {
+        "name": layout.scenario_name,
         "scenario_revision": request.scenario_revision,
-        "description": f"Scenario definition for {scenario_name}",
+        "description": f"Scenario definition for {layout.scenario_name}",
         "difficulty": request.difficulty,
         "category": request.category,
         "timeout_sec": request.timeout_sec,
@@ -76,33 +117,29 @@ def init_scenario(request: ScenarioInitRequest) -> ScenarioInitResult:
         ],
         "prompt": {"entry": request.prompt_entry, "includes": []},
     }
-    _write_yaml_mapping(scenario_yaml, scenario_doc)
 
-    prompt_path = revision_dir / request.prompt_entry
-    prompt_path.parent.mkdir(parents=True, exist_ok=True)
-    prompt_path.write_text(
-        (
-            "Implement the requested feature in the starter application.\n\n"
-            "Run all required verification commands before completion and "
-            "report only after they pass.\n"
-        ),
-        encoding="utf-8",
-    )
 
-    rule_text = (
-        "Follow the scenario prompt exactly. Run required verification commands before completion."
-    )
+def _write_scenario_prompt(layout: ScenarioInitLayout) -> None:
+    layout.prompt_path.parent.mkdir(parents=True, exist_ok=True)
+    layout.prompt_path.write_text(SCENARIO_PROMPT_TEXT, encoding="utf-8")
+
+
+def _write_scenario_rules(layout: ScenarioInitLayout) -> None:
     for filename in sorted(set(SYSTEM_RULES.values())):
-        (rules_dir / filename).write_text(rule_text + "\n", encoding="utf-8")
+        (layout.rules_dir / filename).write_text(SCENARIO_RULE_TEXT + "\n", encoding="utf-8")
 
+
+def _scenario_init_result(
+    request: ScenarioInitRequest, layout: ScenarioInitLayout
+) -> ScenarioInitResult:
     return ScenarioInitResult(
-        scenario_root=scenario_root,
-        scenario_name=scenario_name,
+        scenario_root=layout.scenario_root,
+        scenario_name=layout.scenario_name,
         scenario_revision=request.scenario_revision,
-        revision_dir=revision_dir,
-        scenario_yaml=scenario_yaml,
-        prompt_path=prompt_path,
-        rules_dir=rules_dir,
+        revision_dir=layout.revision_dir,
+        scenario_yaml=layout.scenario_yaml,
+        prompt_path=layout.prompt_path,
+        rules_dir=layout.rules_dir,
         starter_root=request.starter_root,
     )
 

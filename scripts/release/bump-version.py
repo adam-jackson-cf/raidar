@@ -22,7 +22,8 @@ PYPROJECT_PATH = REPO_ROOT / "orchestrator" / "pyproject.toml"
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 
 VERSION_PATTERN = re.compile(r'^version\s*=\s*"(\d+\.\d+\.\d+)"', re.MULTILINE)
-COMMIT_TYPE_PATTERN = re.compile(r"^(\w+)(?:\(.+\))?:\s*(.+)$")
+COMMIT_TYPE_PATTERN = re.compile(r"^(\w+)(?:\(.+\))?(!)?:\s*(.+)$")
+BREAKING_CHANGE_PATTERN = re.compile(r"(^|\n)BREAKING[ -]CHANGE:", re.IGNORECASE)
 
 BUMP_TYPES = {
     "feat": "minor",
@@ -50,19 +51,20 @@ def format_version(major: int, minor: int, patch: int) -> str:
 
 
 def get_commits_since_last_bump() -> list[str]:
-    """Get commit subjects since the last release commit."""
+    """Get commit subjects and bodies since the last release commit."""
     result = subprocess.run(
-        ["git", "log", "--oneline", "--format=%s", "--no-merges", "-100"],
+        ["git", "log", "--format=%s%n%b%x1e", "--no-merges", "-100"],
         capture_output=True,
         text=True,
         cwd=REPO_ROOT,
         check=True,
     )
-    commits = [line for line in result.stdout.strip().split("\n") if line]
+    commits = [record.strip() for record in result.stdout.split("\x1e") if record.strip()]
 
     filtered: list[str] = []
     for commit in commits:
-        if commit.startswith("chore: bump version") or commit.startswith(
+        subject = commit.splitlines()[0]
+        if subject.startswith("chore: bump version") or subject.startswith(
             "chore(release):"
         ):
             break
@@ -76,22 +78,25 @@ def analyze_commits(commits: list[str]) -> tuple[str, list[dict[str, str]]]:
     categorized: list[dict[str, str]] = []
 
     for commit in commits:
-        if "BREAKING CHANGE" in commit.upper():
+        subject = commit.splitlines()[0]
+        if BREAKING_CHANGE_PATTERN.search(commit):
             bump_type = "major"
 
-        match = COMMIT_TYPE_PATTERN.match(commit)
+        match = COMMIT_TYPE_PATTERN.match(subject)
         if match:
             commit_type = match.group(1).lower()
-            categorized.append({"type": commit_type, "raw": commit})
+            categorized.append({"type": commit_type, "raw": subject})
 
-            if commit_type in BUMP_TYPES:
+            if match.group(2):
+                bump_type = "major"
+            elif commit_type in BUMP_TYPES:
                 candidate = BUMP_TYPES[commit_type]
                 if bump_type == "none":
                     bump_type = candidate
                 elif bump_type == "patch" and candidate == "minor":
                     bump_type = "minor"
         else:
-            categorized.append({"type": "other", "raw": commit})
+            categorized.append({"type": "other", "raw": subject})
 
     return bump_type, categorized
 

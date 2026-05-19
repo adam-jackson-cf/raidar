@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -10,6 +11,62 @@ from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import EvalRun
 
 ExperimentKind = Literal["benchmark", "research-loop"]
+
+
+@dataclass(frozen=True, slots=True)
+class RunCliOptionsBuildRequest:
+    """Input for building normalized run CLI options."""
+
+    scenario: Path
+    harness: str
+    provider: str
+    model: str
+    reasoning_effort: str | None
+    timeout: int
+    repeats: int
+    repeat_parallel: int
+    rerun_unscored: int
+    experiments_root: Path | None
+    experiment_kind: str | None
+    repo_root: Path
+
+
+@dataclass(frozen=True, slots=True)
+class SuiteResultRequest:
+    """Input for assembling a suite execution result."""
+
+    resolved: RunCliOptions
+    scenario: ScenarioDefinition
+    runs: list[EvalRun]
+    retries_used: int
+    echo: bool
+    experiment_json_path: Path | None = None
+    summary_path: Path | None = None
+    report_path: Path | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class ExperimentSummaryPersistenceRequest:
+    """Input for persisting experiment summary artifacts."""
+
+    resolved: RunCliOptions
+    scenario: ScenarioDefinition
+    runs: list[EvalRun]
+    started_at: datetime
+    retries_used: int
+    unresolved_unscored: int
+    execution_dir: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ExperimentDispatchSettings:
+    """Execution settings for an experiment request dispatch."""
+
+    repo_root: Path
+    force_experiment_summary: bool = True
+    cleanup_before_runs: bool = True
+    echo: bool = False
+    execution_suffix: str | None = None
 
 
 @dataclass(frozen=True, slots=True)

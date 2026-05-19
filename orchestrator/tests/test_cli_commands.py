@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import tomllib
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -30,6 +31,36 @@ from raidar.cli import (
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
 
+DEFAULT_EXPERIMENT_PROFILE = (
+    "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
+)
+
+
+@dataclass(frozen=True)
+class ExperimentSummaryFixture:
+    execution_dir: Path
+    scenario_name: str
+    model: str
+    harness: str
+    created_at: str
+    evaluation_profile: str = DEFAULT_EXPERIMENT_PROFILE
+    run_count_total: int = 1
+    unscored_count: int = 0
+
+
+@dataclass(frozen=True)
+class FakeCommandEnv:
+    repo_root: Path
+    make_log: Path
+    env: dict[str, str]
+
+
+@dataclass(frozen=True)
+class PruneExperimentDirs:
+    old_dir: Path
+    new_dir: Path
+    other_model_dir: Path
+
 
 def _run_options(tmp_path: Path, **overrides: object) -> RunCliOptions:
     values = {
@@ -54,6 +85,202 @@ def _assert_smoke_dry_run_output(output: str) -> None:
     assert '--repeats "2" \\' in output
     assert '--repeat-parallel "2" \\' in output
     assert "uv run --project orchestrator raidar experiment run \\" in output
+
+
+def _init_scenario_revision(
+    runner: CliRunner, scenario_root: Path, name: str, revision: str
+) -> None:
+    result = runner.invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(scenario_root),
+            "--name",
+            name,
+            "--scenario-revision",
+            revision,
+        ],
+    )
+    assert result.exit_code == 0, result.output
+
+
+def _sample_machine_readable_run(tmp_path: Path) -> EvalRun:
+    run_dir = tmp_path / "runs" / "run-01"
+    return EvalRun(
+        id="run-01",
+        timestamp="2026-03-10T13:00:00+00:00",
+        config=EvalConfig(
+            model="codex/gpt-5.4-high",
+            harness="codex-cli",
+            scenario_name="sample-task",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="functional",
+        ),
+        duration_sec=1.0,
+        scores=Scorecard(
+            metadata={
+                "run": {
+                    "canonical_run_dir": str(run_dir),
+                    "run_json_path": str(run_dir / "run.json"),
+                }
+            }
+        ),
+    )
+
+
+def _invoke_experiment_run_json(runner: CliRunner, scenario_path: Path):
+    return runner.invoke(
+        main,
+        [
+            "experiment",
+            "run",
+            "--scenario",
+            str(scenario_path),
+            "--harness",
+            "codex-cli",
+            "--provider",
+            "openai",
+            "--model",
+            "gpt-5.4",
+            "--reasoning-effort",
+            "high",
+            "--json",
+        ],
+    )
+
+
+def _fake_command_env(tmp_path: Path, *, codex_auth_mode: bool = False) -> FakeCommandEnv:
+    repo_root = Path(__file__).resolve().parents[2]
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    make_log = tmp_path / "make.log"
+    _write_fake_docker(bin_dir)
+    _write_fake_uv(bin_dir, codex_auth_mode=codex_auth_mode)
+    env = os.environ.copy()
+    env["PATH"] = f"{bin_dir}:{env['PATH']}"
+    env["FAKE_MAKE_LOG"] = str(make_log)
+    env.pop("CODEX_AUTH_MODE", None)
+    return FakeCommandEnv(repo_root=repo_root, make_log=make_log, env=env)
+
+
+def _fake_make_script_env(tmp_path: Path) -> FakeCommandEnv:
+    fake_env = _fake_command_env(tmp_path)
+    _write_fake_make(tmp_path / "bin")
+    return fake_env
+
+
+def _write_fake_docker(bin_dir: Path) -> None:
+    _write_executable(
+        bin_dir / "docker",
+        [
+            "#!/bin/sh",
+            'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+            'if [ "$1" = "info" ]; then',
+            "  exit 0",
+            "fi",
+            "exit 0",
+        ],
+    )
+
+
+def _write_fake_uv(bin_dir: Path, *, codex_auth_mode: bool = False) -> None:
+    env_line = (
+        "printf 'ENV:%s:%s:%s\\n' "
+        '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+        '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+        '"${CODEX_AUTH_MODE:-}" >> "$FAKE_MAKE_LOG"'
+    )
+    if not codex_auth_mode:
+        env_line = (
+            "printf 'ENV:%s:%s\\n' "
+            '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+            '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
+        )
+    _write_executable(
+        bin_dir / "uv",
+        ["#!/bin/sh", 'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"', env_line],
+    )
+
+
+def _write_fake_make(bin_dir: Path) -> None:
+    _write_executable(
+        bin_dir / "make",
+        [
+            "#!/bin/sh",
+            'printf \'ARGS:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
+            (
+                "printf 'ENV:%s:%s\\n' "
+                '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
+                '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
+            ),
+        ],
+    )
+
+
+def _write_executable(path: Path, lines: list[str]) -> None:
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    path.chmod(0o755)
+
+
+def _run_with_fake_commands(fake_env: FakeCommandEnv, args: list[str]):
+    return subprocess.run(
+        args,
+        cwd=fake_env.repo_root,
+        env=fake_env.env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _minimal_cli_scenario() -> ScenarioDefinition:
+    return ScenarioDefinition.model_validate(
+        {
+            "name": "hello-world-smoke",
+            "scenario_revision": "v001",
+            "description": "Smoke scenario",
+            "difficulty": "easy",
+            "category": "smoke",
+            "timeout_sec": 300,
+            "starter": {"root": "starter"},
+            "verification": {"gates": [], "required_commands": []},
+            "acceptance": {},
+            "metrics": [{"type": "core", "id": "functional"}],
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+
+
+def _minimal_eval_run() -> EvalRun:
+    return EvalRun(
+        id="run-01",
+        timestamp="2026-03-10T13:00:00+00:00",
+        config=EvalConfig(
+            model="codex/gpt-5.4-high",
+            harness="codex-cli",
+            scenario_name="hello-world-smoke",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="functional",
+        ),
+        duration_sec=1.0,
+        scores=Scorecard(),
+    )
+
+
+def _dispatch_execute_run_command(options: RunCliOptions, repo_root: Path) -> None:
+    execution.execute_run_command(
+        ExecutionDispatchRequest(
+            options=options,
+            force_experiment_summary=True,
+            cleanup_before_runs=True,
+            echo=False,
+        ),
+        repo_root=repo_root,
+    )
 
 
 def test_cli_version_matches_pyproject_version() -> None:
@@ -192,50 +419,9 @@ def test_scenario_list_returns_scenario_ids_with_revisions(tmp_path: Path) -> No
     alpha_root = scenarios_root / "alpha-task"
     beta_root = scenarios_root / "beta-task"
 
-    alpha_v1 = runner.invoke(
-        main,
-        [
-            "scenario",
-            "init",
-            "--path",
-            str(alpha_root),
-            "--name",
-            "alpha-task",
-            "--scenario-revision",
-            "v001",
-        ],
-    )
-    assert alpha_v1.exit_code == 0, alpha_v1.output
-
-    alpha_revision_two = runner.invoke(
-        main,
-        [
-            "scenario",
-            "init",
-            "--path",
-            str(alpha_root),
-            "--name",
-            "alpha-task",
-            "--scenario-revision",
-            "v002",
-        ],
-    )
-    assert alpha_revision_two.exit_code == 0, alpha_revision_two.output
-
-    beta_v1 = runner.invoke(
-        main,
-        [
-            "scenario",
-            "init",
-            "--path",
-            str(beta_root),
-            "--name",
-            "beta-task",
-            "--scenario-revision",
-            "v001",
-        ],
-    )
-    assert beta_v1.exit_code == 0, beta_v1.output
+    _init_scenario_revision(runner, alpha_root, "alpha-task", "v001")
+    _init_scenario_revision(runner, alpha_root, "alpha-task", "v002")
+    _init_scenario_revision(runner, beta_root, "beta-task", "v001")
 
     result = runner.invoke(main, ["scenario", "list", "--scenarios-root", str(scenarios_root)])
 
@@ -437,27 +623,7 @@ def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monk
     scenario_path = tmp_path / "scenario.yaml"
     scenario_path.write_text("name: placeholder\n")
 
-    run = EvalRun(
-        id="run-01",
-        timestamp="2026-03-10T13:00:00+00:00",
-        config=EvalConfig(
-            model="codex/gpt-5.4-high",
-            harness="codex-cli",
-            scenario_name="sample-task",
-            scenario_revision="v001",
-            starter_root="starter",
-            evaluation_profile="functional",
-        ),
-        duration_sec=1.0,
-        scores=Scorecard(
-            metadata={
-                "run": {
-                    "canonical_run_dir": str(tmp_path / "runs" / "run-01"),
-                    "run_json_path": str(tmp_path / "runs" / "run-01" / "run.json"),
-                }
-            }
-        ),
-    )
+    run = _sample_machine_readable_run(tmp_path)
 
     def fake_execute_run_options(options, **kwargs):
         assert kwargs["echo"] is False
@@ -474,24 +640,7 @@ def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monk
 
     monkeypatch.setattr("raidar.cli._execute_run_options", fake_execute_run_options)
 
-    result = runner.invoke(
-        main,
-        [
-            "experiment",
-            "run",
-            "--scenario",
-            str(scenario_path),
-            "--harness",
-            "codex-cli",
-            "--provider",
-            "openai",
-            "--model",
-            "gpt-5.4",
-            "--reasoning-effort",
-            "high",
-            "--json",
-        ],
-    )
+    result = _invoke_experiment_run_json(runner, scenario_path)
 
     assert result.exit_code == 0, result.output
     payload = json.loads(result.output)
@@ -878,103 +1027,112 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     )
 
 
-def _write_experiment_summary(
-    execution_dir: Path,
-    *,
-    scenario_name: str,
-    model: str,
-    harness: str,
-    evaluation_profile: str,
-    created_at: str,
-    run_count_total: int = 1,
-    unscored_count: int = 0,
-) -> None:
-    execution_dir.mkdir(parents=True, exist_ok=True)
+def _write_experiment_summary(fixture: ExperimentSummaryFixture) -> None:
+    fixture.execution_dir.mkdir(parents=True, exist_ok=True)
     payload = {
-        "created_at_utc": created_at,
+        "created_at_utc": fixture.created_at,
         "config": {
-            "scenario_name": scenario_name,
-            "harness": harness,
-            "model": model,
-            "evaluation_profile": evaluation_profile,
+            "scenario_name": fixture.scenario_name,
+            "harness": fixture.harness,
+            "model": fixture.model,
+            "evaluation_profile": fixture.evaluation_profile,
         },
         "aggregate": {
-            "run_count_total": run_count_total,
-            "unscored_count": unscored_count,
+            "run_count_total": fixture.run_count_total,
+            "unscored_count": fixture.unscored_count,
         },
     }
-    (execution_dir / "experiment-summary.json").write_text(
+    (fixture.execution_dir / "experiment-summary.json").write_text(
         json.dumps(payload),
         encoding="utf-8",
+    )
+
+
+def _seed_experiment_list_summaries(experiments_root: Path) -> None:
+    _write_experiment_summary(
+        ExperimentSummaryFixture(
+            experiments_root / "20260222-100000Z__hello-world-smoke__v001",
+            scenario_name="hello-world-smoke",
+            model="anthropic/claude-haiku-4-5",
+            harness="claude-code",
+            created_at="2026-02-22T10:00:00+00:00",
+        )
+    )
+    _write_experiment_summary(
+        ExperimentSummaryFixture(
+            experiments_root / "20260222-110000Z__homepage-implementation__v001",
+            scenario_name="homepage-implementation",
+            model="codex/gpt-5.4-high",
+            harness="codex-cli",
+            evaluation_profile=f"{DEFAULT_EXPERIMENT_PROFILE}+visual-regression",
+            created_at="2026-02-22T11:00:00+00:00",
+        )
+    )
+
+
+def _invoke_experiments_list(runner: CliRunner, experiments_root: Path, *args: str):
+    return runner.invoke(
+        main,
+        ["experiments", "list", "--experiments-root", str(experiments_root), *args],
+    )
+
+
+def _assert_filtered_experiment_text(output: str) -> None:
+    assert "homepage-implementation@v001" in output
+    assert "hello-world-smoke@v001" not in output
+    assert (
+        "evaluation_profile=functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
+        in output
+    )
+
+
+def _seed_prune_summaries(experiments_root: Path) -> PruneExperimentDirs:
+    dirs = PruneExperimentDirs(
+        old_dir=experiments_root / "20260220-100000Z__hello-world-smoke__v001",
+        new_dir=experiments_root / "20260221-100000Z__hello-world-smoke__v001",
+        other_model_dir=experiments_root / "20260222-100000Z__hello-world-smoke__v001",
+    )
+    _write_experiment_summary(
+        _summary_fixture(dirs.old_dir, "anthropic/claude-haiku-4-5", "2026-02-20T10:00:00+00:00")
+    )
+    _write_experiment_summary(
+        _summary_fixture(dirs.new_dir, "anthropic/claude-haiku-4-5", "2026-02-21T10:00:00+00:00")
+    )
+    _write_experiment_summary(
+        _summary_fixture(dirs.other_model_dir, "codex/gpt-5.4-high", "2026-02-22T10:00:00+00:00")
+    )
+    return dirs
+
+
+def _summary_fixture(execution_dir: Path, model: str, created_at: str):
+    harness = "codex-cli" if model.startswith("codex/") else "claude-code"
+    return ExperimentSummaryFixture(
+        execution_dir,
+        scenario_name="hello-world-smoke",
+        model=model,
+        harness=harness,
+        created_at=created_at,
     )
 
 
 def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
     runner = CliRunner()
     experiments_root = tmp_path / "experiments"
-    _write_experiment_summary(
-        experiments_root / "20260222-100000Z__hello-world-smoke__v001",
-        scenario_name="hello-world-smoke",
-        model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
-        created_at="2026-02-22T10:00:00+00:00",
-    )
-    _write_experiment_summary(
-        experiments_root / "20260222-110000Z__homepage-implementation__v001",
-        scenario_name="homepage-implementation",
-        model="codex/gpt-5.4-high",
-        harness="codex-cli",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression",
-        created_at="2026-02-22T11:00:00+00:00",
-    )
+    _seed_experiment_list_summaries(experiments_root)
 
-    text_result = runner.invoke(
-        main,
-        [
-            "experiments",
-            "list",
-            "--experiments-root",
-            str(experiments_root),
-            "--scenario",
-            "homepage",
-        ],
-    )
+    text_result = _invoke_experiments_list(runner, experiments_root, "--scenario", "homepage")
     assert text_result.exit_code == 0, text_result.output
-    assert "homepage-implementation@v001" in text_result.output
-    assert "hello-world-smoke@v001" not in text_result.output
-    assert (
-        "evaluation_profile=functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
-        in text_result.output
-    )
+    _assert_filtered_experiment_text(text_result.output)
 
-    profile_result = runner.invoke(
-        main,
-        [
-            "experiments",
-            "list",
-            "--experiments-root",
-            str(experiments_root),
-            "--evaluation-profile",
-            "visual-regression",
-            "--json",
-        ],
+    profile_result = _invoke_experiments_list(
+        runner, experiments_root, "--evaluation-profile", "visual-regression", "--json"
     )
     assert profile_result.exit_code == 0, profile_result.output
     profile_rows = json.loads(profile_result.output)
     assert len(profile_rows) == 1
     assert profile_rows[0]["scenario_name"] == "homepage-implementation"
 
-    json_result = runner.invoke(
-        main,
-        [
-            "experiments",
-            "list",
-            "--experiments-root",
-            str(experiments_root),
-            "--json",
-        ],
-    )
+    json_result = _invoke_experiments_list(runner, experiments_root, "--json")
     assert json_result.exit_code == 0, json_result.output
     rows = json.loads(json_result.output)
     assert isinstance(rows, list)
@@ -988,34 +1146,7 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
     runner = CliRunner()
     experiments_root = tmp_path / "experiments"
     archive_root = tmp_path / "archive"
-
-    old_dir = experiments_root / "20260220-100000Z__hello-world-smoke__v001"
-    new_dir = experiments_root / "20260221-100000Z__hello-world-smoke__v001"
-    other_model_dir = experiments_root / "20260222-100000Z__hello-world-smoke__v001"
-    _write_experiment_summary(
-        old_dir,
-        scenario_name="hello-world-smoke",
-        model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
-        created_at="2026-02-20T10:00:00+00:00",
-    )
-    _write_experiment_summary(
-        new_dir,
-        scenario_name="hello-world-smoke",
-        model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
-        created_at="2026-02-21T10:00:00+00:00",
-    )
-    _write_experiment_summary(
-        other_model_dir,
-        scenario_name="hello-world-smoke",
-        model="codex/gpt-5.4-high",
-        harness="codex-cli",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
-        created_at="2026-02-22T10:00:00+00:00",
-    )
+    dirs = _seed_prune_summaries(experiments_root)
 
     result = runner.invoke(
         main,
@@ -1031,10 +1162,10 @@ def test_experiments_prune_keeps_latest_per_model(tmp_path: Path) -> None:
         ],
     )
     assert result.exit_code == 0, result.output
-    assert new_dir.exists()
-    assert other_model_dir.exists()
-    assert not old_dir.exists()
-    assert _archive_destination(old_dir, archive_root).exists()
+    assert dirs.new_dir.exists()
+    assert dirs.other_model_dir.exists()
+    assert not dirs.old_dir.exists()
+    assert _archive_destination(dirs.old_dir, archive_root).exists()
     assert "experiments_pruned=1" in result.output
 
 
@@ -1045,20 +1176,22 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
     old_dir = experiments_root / "20260220-100000Z__hello-world-smoke__v001"
     new_dir = experiments_root / "20260221-100000Z__hello-world-smoke__v001"
     _write_experiment_summary(
-        old_dir,
-        scenario_name="hello-world-smoke",
-        model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
-        created_at="2026-02-20T10:00:00+00:00",
+        ExperimentSummaryFixture(
+            old_dir,
+            scenario_name="hello-world-smoke",
+            model="anthropic/claude-haiku-4-5",
+            harness="claude-code",
+            created_at="2026-02-20T10:00:00+00:00",
+        )
     )
     _write_experiment_summary(
-        new_dir,
-        scenario_name="hello-world-smoke",
-        model="anthropic/claude-haiku-4-5",
-        harness="claude-code",
-        evaluation_profile="functional+acceptance+verification-stability+execution-validity+resource-efficiency",
-        created_at="2026-02-21T10:00:00+00:00",
+        ExperimentSummaryFixture(
+            new_dir,
+            scenario_name="hello-world-smoke",
+            model="anthropic/claude-haiku-4-5",
+            harness="claude-code",
+            created_at="2026-02-21T10:00:00+00:00",
+        )
     )
 
     result = runner.invoke(
@@ -1084,40 +1217,10 @@ def test_experiments_prune_dry_run_does_not_move_directories(tmp_path: Path) -> 
 
 
 def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> None:
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "hello-world-smoke",
-            "scenario_revision": "v001",
-            "description": "Smoke scenario",
-            "difficulty": "easy",
-            "category": "smoke",
-            "timeout_sec": 300,
-            "starter": {"root": "starter"},
-            "verification": {
-                "gates": [],
-                "required_commands": [],
-            },
-            "acceptance": {},
-            "metrics": [{"type": "core", "id": "functional"}],
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
+    scenario = _minimal_cli_scenario()
     options = _run_options(tmp_path)
     request = type("Request", (), {"scenario": scenario})()
-    run = EvalRun(
-        id="run-01",
-        timestamp="2026-03-10T13:00:00+00:00",
-        config=EvalConfig(
-            model="codex/gpt-5.4-high",
-            harness="codex-cli",
-            scenario_name="hello-world-smoke",
-            scenario_revision="v001",
-            starter_root="starter",
-            evaluation_profile="functional",
-        ),
-        duration_sec=1.0,
-        scores=Scorecard(),
-    )
+    run = _minimal_eval_run()
 
     captured: dict[str, object] = {}
 
@@ -1155,15 +1258,7 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
         ),
     )
 
-    execution.execute_run_command(
-        ExecutionDispatchRequest(
-            options=options,
-            force_experiment_summary=True,
-            cleanup_before_runs=True,
-            echo=False,
-        ),
-        repo_root=tmp_path,
-    )
+    _dispatch_execute_run_command(options, tmp_path)
 
     summary_input = captured["summary_input"]
     assert summary_input.reruns_used == 1
@@ -1171,35 +1266,11 @@ def test_execute_run_command_passes_reruns_used(monkeypatch, tmp_path: Path) -> 
 
 
 def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    script_path = repo_root / "scripts" / "checks" / "run-agent-smoke.sh"
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    make_log = tmp_path / "make.log"
-    fake_make = bin_dir / "make"
-    fake_make.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'ARGS:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                (
-                    "printf 'ENV:%s:%s\\n' "
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
-                ),
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_make.chmod(0o755)
+    fake_env = _fake_make_script_env(tmp_path)
+    script_path = fake_env.repo_root / "scripts" / "checks" / "run-agent-smoke.sh"
 
-    env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["FAKE_MAKE_LOG"] = str(make_log)
-    env.pop("CODEX_AUTH_MODE", None)
-
-    result = subprocess.run(
+    result = _run_with_fake_commands(
+        fake_env,
         [
             "bash",
             str(script_path),
@@ -1214,17 +1285,12 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
             "--rerun-unscored",
             "1",
         ],
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert make_log.read_text(encoding="utf-8").splitlines() == [
+    assert fake_env.make_log.read_text(encoding="utf-8").splitlines() == [
         (
-            f"ARGS:-C {repo_root} agent-smoke HARNESS=codex-cli "
+            f"ARGS:-C {fake_env.repo_root} agent-smoke HARNESS=codex-cli "
             "PROVIDER=openai MODEL=gpt-5.5 TIMEOUT_SEC=120 "
             "AGENT_SMOKE_SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml "
             "AGENT_SMOKE_REPEATS=2 AGENT_SMOKE_REPEAT_PARALLEL=3 "
@@ -1235,67 +1301,20 @@ def test_run_agent_smoke_script_uses_make_targets(tmp_path: Path) -> None:
 
 
 def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    make_log = tmp_path / "make.log"
+    fake_env = _fake_command_env(tmp_path)
 
-    fake_docker = bin_dir / "docker"
-    fake_docker.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                'if [ "$1" = "info" ]; then',
-                "  exit 0",
-                "fi",
-                "exit 0",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_docker.chmod(0o755)
-
-    fake_uv = bin_dir / "uv"
-    fake_uv.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                (
-                    "printf 'ENV:%s:%s\\n' "
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
-                ),
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_uv.chmod(0o755)
-
-    env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["FAKE_MAKE_LOG"] = str(make_log)
-    env.pop("CODEX_AUTH_MODE", None)
-
-    result = subprocess.run(
+    result = _run_with_fake_commands(
+        fake_env,
         [
             "make",
             "orchestrator-smoke",
             "ORCHESTRATOR_SMOKE_REPEATS=2",
             "RUN_PARALLELISM=2",
         ],
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert make_log.read_text(encoding="utf-8").splitlines() == [
+    assert fake_env.make_log.read_text(encoding="utf-8").splitlines() == [
         "DOCKER:info",
         (
             "UV:run --project orchestrator raidar run "
@@ -1309,61 +1328,15 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
 
 
 def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    make_log = tmp_path / "make.log"
+    fake_env = _fake_command_env(tmp_path)
 
-    fake_docker = bin_dir / "docker"
-    fake_docker.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                'if [ "$1" = "info" ]; then',
-                "  exit 0",
-                "fi",
-                "exit 0",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_docker.chmod(0o755)
-
-    fake_uv = bin_dir / "uv"
-    fake_uv.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                (
-                    "printf 'ENV:%s:%s\\n' "
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
-                ),
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_uv.chmod(0o755)
-
-    env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["FAKE_MAKE_LOG"] = str(make_log)
-
-    result = subprocess.run(
+    result = _run_with_fake_commands(
+        fake_env,
         ["make", "smoke-matrix"],
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert make_log.read_text(encoding="utf-8").splitlines() == [
+    assert fake_env.make_log.read_text(encoding="utf-8").splitlines() == [
         "DOCKER:info",
         (
             "UV:run --project orchestrator raidar matrix "
@@ -1376,51 +1349,10 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
 
 
 def test_agent_smoke_make_target_uses_canonical_routing(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    make_log = tmp_path / "make.log"
+    fake_env = _fake_command_env(tmp_path)
 
-    fake_docker = bin_dir / "docker"
-    fake_docker.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                'if [ "$1" = "info" ]; then',
-                "  exit 0",
-                "fi",
-                "exit 0",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_docker.chmod(0o755)
-
-    fake_uv = bin_dir / "uv"
-    fake_uv.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                (
-                    "printf 'ENV:%s:%s\\n' "
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" >> "$FAKE_MAKE_LOG"'
-                ),
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_uv.chmod(0o755)
-
-    env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["FAKE_MAKE_LOG"] = str(make_log)
-
-    result = subprocess.run(
+    result = _run_with_fake_commands(
+        fake_env,
         [
             "make",
             "agent-smoke",
@@ -1428,15 +1360,10 @@ def test_agent_smoke_make_target_uses_canonical_routing(tmp_path: Path) -> None:
             "PROVIDER=google",
             "MODEL=gemini-3-flash-preview",
         ],
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert make_log.read_text(encoding="utf-8").splitlines() == [
+    assert fake_env.make_log.read_text(encoding="utf-8").splitlines() == [
         "DOCKER:info",
         (
             "UV:run --project orchestrator raidar experiment run "
@@ -1450,53 +1377,10 @@ def test_agent_smoke_make_target_uses_canonical_routing(tmp_path: Path) -> None:
 
 
 def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    bin_dir = tmp_path / "bin"
-    bin_dir.mkdir()
-    make_log = tmp_path / "make.log"
+    fake_env = _fake_command_env(tmp_path, codex_auth_mode=True)
 
-    fake_docker = bin_dir / "docker"
-    fake_docker.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'DOCKER:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                'if [ "$1" = "info" ]; then',
-                "  exit 0",
-                "fi",
-                "exit 0",
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_docker.chmod(0o755)
-
-    fake_uv = bin_dir / "uv"
-    fake_uv.write_text(
-        "\n".join(
-            [
-                "#!/bin/sh",
-                'printf \'UV:%s\\n\' "$*" >> "$FAKE_MAKE_LOG"',
-                (
-                    "printf 'ENV:%s:%s:%s\\n' "
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
-                    '"${RAIDAR_TASK_IMAGE_REUSE:-}" '
-                    '"${CODEX_AUTH_MODE:-}" >> "$FAKE_MAKE_LOG"'
-                ),
-            ]
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-    fake_uv.chmod(0o755)
-
-    env = os.environ.copy()
-    env["PATH"] = f"{bin_dir}:{env['PATH']}"
-    env["FAKE_MAKE_LOG"] = str(make_log)
-    env.pop("CODEX_AUTH_MODE", None)
-
-    result = subprocess.run(
+    result = _run_with_fake_commands(
+        fake_env,
         [
             "make",
             "agent-smoke",
@@ -1505,15 +1389,10 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
             "MODEL=gpt-5.4-mini",
             "AGENT_SMOKE_REASONING_EFFORT=low",
         ],
-        cwd=repo_root,
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert make_log.read_text(encoding="utf-8").splitlines() == [
+    assert fake_env.make_log.read_text(encoding="utf-8").splitlines() == [
         "DOCKER:info",
         (
             "UV:run --project orchestrator raidar experiment run "

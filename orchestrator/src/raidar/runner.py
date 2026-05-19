@@ -209,6 +209,124 @@ RAIDAR_DOCKER_LABEL_REPO = "io.raidar.cache.repo"
 
 
 @dataclass(frozen=True, slots=True)
+class BaselineWorkspaceRequest:
+    """Input for preparing or reusing a cached baseline workspace."""
+
+    scenario: ScenarioDefinition
+    starter_dir: Path
+    baseline_workspace_dir: Path
+    baseline_cache_key: str
+    scenario_dir: Path
+    harness: Harness
+
+
+@dataclass(frozen=True, slots=True)
+class StarterPreflightCacheWrite:
+    """Cache payload for starter preflight validation."""
+
+    cache_file: Path
+    harness: str
+    starter_fingerprint: str
+    baseline_cache_key: str
+    setup_actions: list[list[str]]
+    required_commands: list[list[str]]
+
+
+@dataclass(frozen=True, slots=True)
+class RuntimePreflightRequest:
+    """Docker runtime preflight command input."""
+
+    image_name: str
+    run_env: dict[str, str]
+    command: list[str]
+    log_path: Path
+    docker_args: list[str] | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class TaskImageEnsureRequest:
+    """Input for validating or building a reusable Harbor task image."""
+
+    task_bundle_path: Path
+    image_ref: TaskImageRef
+    harness: str
+    run_env: dict[str, str]
+    log_dir: Path
+    task_timeout_sec: int
+
+
+@dataclass(frozen=True, slots=True)
+class HarborProcessRequest:
+    """Input for one Harbor process attempt."""
+
+    harbor_cmd: list[str]
+    workspace: Path
+    timeout_sec: int
+    run_env: dict[str, str]
+    run_harbor_dir: Path
+    job_dir: Path
+
+
+@dataclass(frozen=True, slots=True)
+class VisualEvidenceRequest:
+    """Input for persisting visual evidence assets."""
+
+    request: RunRequest
+    workspace: Path
+    run_root_dir: Path
+
+
+@dataclass(frozen=True, slots=True)
+class ClaudeToolUseAppendRequest:
+    """Input for appending Claude tool-use command records."""
+
+    payload: dict
+    output: str
+    records: list[CommandRecord]
+    record_idx_by_tool_use_id: dict[str, int]
+    include_git_commit: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class ScorecardMetadataInput:
+    """Input for scorecard metadata assembly."""
+
+    layout: RunLayout
+    execution: ExecutionPhaseResult
+    artifacts: PersistedArtifacts
+    unscored: bool
+    unscored_reasons: list[str]
+
+
+@dataclass(frozen=True, slots=True)
+class ScorecardComponents:
+    """Scores and metadata assembled before final scorecard construction."""
+
+    execution_validity: ExecutionValidityScore
+    performance_gates: PerformanceGatesScore
+    resource_efficiency: ResourceEfficiencyScore
+    unscored: bool
+    unscored_reasons: list[str]
+    metadata: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class ProcessMetricsBuildInput:
+    """Parsed process evidence used to assemble resource metrics."""
+
+    input_tokens: int
+    cached_input_tokens: int
+    output_tokens: int
+    records: list[CommandRecord]
+    git_commit_records: list[CommandRecord]
+    verification_patterns: list[str]
+    attempts_by_pattern: dict[str, int]
+    failures_by_pattern: dict[str, int]
+    first_pass_status: dict[str, str]
+    failure_categories: dict[str, int]
+
+
+@dataclass(frozen=True, slots=True)
 class ExecutionValidityInput:
     """Canonical input contract for execution-validity scoring."""
 
@@ -427,99 +545,121 @@ def _baseline_workspace_lock(baseline_workspace_dir: Path) -> threading.Lock:
         return lock
 
 
-def _baseline_cache_entry_metadata(
-    *,
-    baseline_workspace_dir: Path,
-    metadata_path: Path,
-    baseline_cache_key: str,
-    harness: Harness,
-) -> dict[str, str] | None:
+def _baseline_cache_entry_metadata(request: BaselineWorkspaceRequest) -> dict[str, str] | None:
+    metadata_path = request.baseline_workspace_dir.parent / "metadata.json"
+    payload = _load_baseline_cache_payload(request.baseline_workspace_dir, metadata_path)
+    if payload is None or not _baseline_cache_payload_matches(request, payload):
+        return None
+
+    baseline_fingerprint = payload.get("baseline_fingerprint")
+    if not isinstance(baseline_fingerprint, str) or not baseline_fingerprint:
+        return None
+    if baseline_fingerprint != directory_fingerprint(request.baseline_workspace_dir):
+        return None
+    return {"baseline_fingerprint": baseline_fingerprint}
+
+
+def _load_baseline_cache_payload(
+    baseline_workspace_dir: Path, metadata_path: Path
+) -> dict[str, Any] | None:
     if not baseline_workspace_dir.exists() or not metadata_path.exists():
         return None
     try:
         payload = json.loads(metadata_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
-    if not isinstance(payload, dict):
-        return None
-    if payload.get("cache_key") != baseline_cache_key:
-        return None
-    if payload.get("harness") != _harness_value(harness):
-        return None
-    baseline_fingerprint = payload.get("baseline_fingerprint")
-    if not isinstance(baseline_fingerprint, str) or not baseline_fingerprint:
-        return None
-    if baseline_fingerprint != directory_fingerprint(baseline_workspace_dir):
-        return None
-    return {"baseline_fingerprint": baseline_fingerprint}
+    return payload if isinstance(payload, dict) else None
 
 
-def _ensure_baseline_workspace(
-    *,
-    scenario: ScenarioDefinition,
-    starter_dir: Path,
-    baseline_workspace_dir: Path,
-    baseline_cache_key: str,
-    scenario_dir: Path,
-    harness: Harness,
-) -> BaselineWorkspaceCacheResult:
-    entry_dir = baseline_workspace_dir.parent
+def _baseline_cache_payload_matches(
+    request: BaselineWorkspaceRequest, payload: dict[str, Any]
+) -> bool:
+    return payload.get("cache_key") == request.baseline_cache_key and payload.get(
+        "harness"
+    ) == _harness_value(request.harness)
+
+
+def _ensure_baseline_workspace(request: BaselineWorkspaceRequest) -> BaselineWorkspaceCacheResult:
+    entry_dir = request.baseline_workspace_dir.parent
     metadata_path = entry_dir / "metadata.json"
-    lock_key = f"baseline-{baseline_cache_key}"
-    with _baseline_workspace_lock(baseline_workspace_dir), _cache_key_lock(lock_key):
-        entry_metadata = _baseline_cache_entry_metadata(
-            baseline_workspace_dir=baseline_workspace_dir,
-            metadata_path=metadata_path,
-            baseline_cache_key=baseline_cache_key,
-            harness=harness,
-        )
-        if entry_metadata is not None:
-            _touch_cache_path(entry_dir)
-            return BaselineWorkspaceCacheResult(
-                metadata_path=metadata_path,
-                baseline_fingerprint=entry_metadata["baseline_fingerprint"],
-                hit=True,
-                status="hit",
-            )
+    lock_key = f"baseline-{request.baseline_cache_key}"
+    with _baseline_workspace_lock(request.baseline_workspace_dir), _cache_key_lock(lock_key):
+        hit = _baseline_workspace_cache_hit(request, metadata_path, entry_dir)
+        if hit is not None:
+            return hit
         invalidated = entry_dir.exists()
         if entry_dir.exists():
             shutil.rmtree(entry_dir, ignore_errors=True)
         entry_dir.mkdir(parents=True, exist_ok=True)
         try:
-            prepare_workspace(
-                starter_dir=starter_dir,
-                target_dir=baseline_workspace_dir,
-                scenario_dir=scenario_dir,
-                harness=harness,
-            )
-            _run_workspace_setup_actions(
-                workspace=baseline_workspace_dir,
-                env=_workspace_runtime_env(baseline_workspace_dir, os.environ.copy()),
-                setup_actions=scenario.verification.setup_actions,
-            )
-            baseline_fingerprint = directory_fingerprint(baseline_workspace_dir)
-            metadata_path.write_text(
-                json.dumps(
-                    {
-                        "cache_key": baseline_cache_key,
-                        "baseline_fingerprint": baseline_fingerprint,
-                        "created_at": datetime.now(UTC).isoformat(),
-                        "harness": _harness_value(harness),
-                    },
-                    indent=2,
-                ),
-                encoding="utf-8",
-            )
-            _touch_cache_path(entry_dir)
-            return BaselineWorkspaceCacheResult(
-                metadata_path=metadata_path,
-                baseline_fingerprint=baseline_fingerprint,
-                hit=False,
-                status="invalidated" if invalidated else "miss",
-            )
+            return _create_baseline_workspace(request, metadata_path, entry_dir, invalidated)
         except Exception:
             shutil.rmtree(entry_dir, ignore_errors=True)
             raise
+
+
+def _baseline_workspace_cache_hit(
+    request: BaselineWorkspaceRequest,
+    metadata_path: Path,
+    entry_dir: Path,
+) -> BaselineWorkspaceCacheResult | None:
+    entry_metadata = _baseline_cache_entry_metadata(request)
+    if entry_metadata is None:
+        return None
+    _touch_cache_path(entry_dir)
+    return BaselineWorkspaceCacheResult(
+        metadata_path=metadata_path,
+        baseline_fingerprint=entry_metadata["baseline_fingerprint"],
+        hit=True,
+        status="hit",
+    )
+
+
+def _create_baseline_workspace(
+    request: BaselineWorkspaceRequest,
+    metadata_path: Path,
+    entry_dir: Path,
+    invalidated: bool,
+) -> BaselineWorkspaceCacheResult:
+    prepare_workspace(
+        starter_dir=request.starter_dir,
+        target_dir=request.baseline_workspace_dir,
+        scenario_dir=request.scenario_dir,
+        harness=request.harness,
+    )
+    _run_workspace_setup_actions(
+        workspace=request.baseline_workspace_dir,
+        env=_workspace_runtime_env(request.baseline_workspace_dir, os.environ.copy()),
+        setup_actions=request.scenario.verification.setup_actions,
+    )
+    baseline_fingerprint = directory_fingerprint(request.baseline_workspace_dir)
+    _write_baseline_workspace_metadata(request, metadata_path, baseline_fingerprint)
+    _touch_cache_path(entry_dir)
+    return BaselineWorkspaceCacheResult(
+        metadata_path=metadata_path,
+        baseline_fingerprint=baseline_fingerprint,
+        hit=False,
+        status="invalidated" if invalidated else "miss",
+    )
+
+
+def _write_baseline_workspace_metadata(
+    request: BaselineWorkspaceRequest,
+    metadata_path: Path,
+    baseline_fingerprint: str,
+) -> None:
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "cache_key": request.baseline_cache_key,
+                "baseline_fingerprint": baseline_fingerprint,
+                "created_at": datetime.now(UTC).isoformat(),
+                "harness": _harness_value(request.harness),
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
 
 def _command_timeout(command: list[str]) -> int:
@@ -875,26 +1015,18 @@ def _run_workspace_setup_actions(
         )
 
 
-def _write_starter_preflight_cache(
-    *,
-    cache_file: Path,
-    harness: str,
-    starter_fingerprint: str,
-    baseline_cache_key: str,
-    setup_actions: list[list[str]],
-    required_commands: list[list[str]],
-) -> None:
-    cache_file.parent.mkdir(parents=True, exist_ok=True)
-    cache_file.write_text(
+def _write_starter_preflight_cache(request: StarterPreflightCacheWrite) -> None:
+    request.cache_file.parent.mkdir(parents=True, exist_ok=True)
+    request.cache_file.write_text(
         json.dumps(
             {
                 "cache_version": RAIDAR_CACHE_VERSION,
-                "harness": harness,
-                "starter_fingerprint": starter_fingerprint,
-                "baseline_cache_key": baseline_cache_key,
+                "harness": request.harness,
+                "starter_fingerprint": request.starter_fingerprint,
+                "baseline_cache_key": request.baseline_cache_key,
                 "validated_at": datetime.now(UTC).isoformat(),
-                "setup_actions": setup_actions,
-                "required_commands": required_commands,
+                "setup_actions": request.setup_actions,
+                "required_commands": request.required_commands,
             },
             indent=2,
         ),
@@ -928,12 +1060,14 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
             _run_starter_preflight_command(preflight_workspace, env, command)
 
         _write_starter_preflight_cache(
-            cache_file=cache_file,
-            harness=request.config.harness.value,
-            starter_fingerprint=context.starter_source.fingerprint,
-            baseline_cache_key=context.baseline_cache_key,
-            setup_actions=setup_actions,
-            required_commands=required_commands,
+            StarterPreflightCacheWrite(
+                cache_file=cache_file,
+                harness=request.config.harness.value,
+                starter_fingerprint=context.starter_source.fingerprint,
+                baseline_cache_key=context.baseline_cache_key,
+                setup_actions=setup_actions,
+                required_commands=required_commands,
+            )
         )
         _touch_cache_path(cache_file)
         return False
@@ -960,6 +1094,11 @@ def _prune_prep_cache_entries() -> None:
     preflight_root.mkdir(parents=True, exist_ok=True)
 
     now = time.time()
+    _prune_baseline_cache_entries(baselines_root, now)
+    _prune_preflight_cache_entries(preflight_root, now)
+
+
+def _prune_baseline_cache_entries(baselines_root: Path, now: float) -> None:
     baseline_entries = [path for path in baselines_root.iterdir() if path.is_dir()]
     total_bytes = 0
     retained: list[tuple[float, int, Path]] = []
@@ -978,6 +1117,8 @@ def _prune_prep_cache_entries() -> None:
         shutil.rmtree(entry, ignore_errors=True)
         total_bytes -= size_bytes
 
+
+def _prune_preflight_cache_entries(preflight_root: Path, now: float) -> None:
     for cache_file in preflight_root.glob("*.ok.json"):
         try:
             last_used = _cache_last_used_epoch(cache_file)
@@ -1698,30 +1839,24 @@ def _task_image_build_timeout(task_timeout_sec: int) -> int:
     return max(TASK_IMAGE_BUILD_MIN_TIMEOUT_SEC, task_timeout_sec)
 
 
-def _run_runtime_preflight_command(
-    *,
-    image_name: str,
-    run_env: dict[str, str],
-    command: list[str],
-    log_path: Path,
-    docker_args: list[str] | None = None,
-) -> None:
-    docker_cmd = ["docker", "run", "--rm", *(docker_args or []), image_name, *command]
+def _run_runtime_preflight_command(request: RuntimePreflightRequest) -> None:
+    docker_args = request.docker_args or []
+    docker_cmd = ["docker", "run", "--rm", *docker_args, request.image_name, *request.command]
     try:
         completed = subprocess.run(
             docker_cmd,
             capture_output=True,
             text=True,
             timeout=60,
-            env=run_env,
+            env=request.run_env,
             check=False,
         )
     except FileNotFoundError as exc:
         raise RuntimeError("Docker CLI not found.") from exc
 
     output = ((completed.stdout or "") + "\n" + (completed.stderr or "")).strip()
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    log_path.write_text((output + "\n") if output else "", encoding="utf-8")
+    request.log_path.parent.mkdir(parents=True, exist_ok=True)
+    request.log_path.write_text((output + "\n") if output else "", encoding="utf-8")
     if completed.returncode == 0:
         return
 
@@ -1744,33 +1879,37 @@ def _ensure_harbor_runtime_preflight(
     log_dir: Path,
 ) -> None:
     _run_runtime_preflight_command(
-        image_name=image_ref.image_name,
-        run_env=run_env,
-        command=["git", "--version"],
-        log_path=log_dir / "runtime-git-preflight.log",
+        RuntimePreflightRequest(
+            image_name=image_ref.image_name,
+            run_env=run_env,
+            command=["git", "--version"],
+            log_path=log_dir / "runtime-git-preflight.log",
+        )
     )
     _run_runtime_preflight_command(
-        image_name=image_ref.image_name,
-        run_env=run_env,
-        command=[
-            "sh",
-            "-lc",
-            (
-                "test ! -d /tmp/agentic-eval-secrets && "
-                "! touch /.raidar-root-write-probe 2>/dev/null && "
-                "touch /tmp/raidar-tmp-write-probe && "
-                "! grep -q '00000000' /proc/net/route && "
-                "! grep -E ' /app | /workspace ' /proc/self/mountinfo"
-            ),
-        ],
-        log_path=log_dir / "runtime-isolation-preflight.log",
-        docker_args=[
-            "--network",
-            "none",
-            "--read-only",
-            "--tmpfs",
-            "/tmp:rw,noexec,nosuid,size=16m",
-        ],
+        RuntimePreflightRequest(
+            image_name=image_ref.image_name,
+            run_env=run_env,
+            command=[
+                "sh",
+                "-lc",
+                (
+                    "test ! -d /tmp/agentic-eval-secrets && "
+                    "! touch /.raidar-root-write-probe 2>/dev/null && "
+                    "touch /tmp/raidar-tmp-write-probe && "
+                    "! grep -q '00000000' /proc/net/route && "
+                    "! grep -E ' /app | /workspace ' /proc/self/mountinfo"
+                ),
+            ],
+            log_path=log_dir / "runtime-isolation-preflight.log",
+            docker_args=[
+                "--network",
+                "none",
+                "--read-only",
+                "--tmpfs",
+                "/tmp:rw,noexec,nosuid,size=16m",
+            ],
+        )
     )
 
 
@@ -1835,55 +1974,99 @@ def _write_task_image_cache_metadata(
     )
 
 
-def _ensure_task_image(
-    *,
-    task_bundle_path: Path,
-    image_ref: TaskImageRef,
-    harness: str,
-    run_env: dict[str, str],
-    log_dir: Path,
-    task_timeout_sec: int,
-) -> bool:
-    if _cached_task_image_is_ready(
-        image_ref=image_ref,
-        harness=harness,
-        run_env=run_env,
-        log_dir=log_dir,
-    ):
-        _write_task_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
+def _ensure_task_image(request: TaskImageEnsureRequest) -> bool:
+    if _task_image_ready_for_reuse(request):
         return True
 
-    with _cache_key_lock(f"image-{image_ref.cache_key}"):
-        if _cached_task_image_is_ready(
-            image_ref=image_ref,
-            harness=harness,
-            run_env=run_env,
-            log_dir=log_dir,
-        ):
-            _write_task_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="hit")
+    with _cache_key_lock(f"image-{request.image_ref.cache_key}"):
+        if _task_image_ready_for_reuse(request):
             return True
-
-        context_dir = task_bundle_path / "environment"
-        dockerfile = context_dir / "Dockerfile"
-        if not dockerfile.exists():
-            raise FileNotFoundError(f"Task image build failed: missing Dockerfile {dockerfile}")
-
-        build_cmd = _task_image_build_command(
-            image_ref,
-            dockerfile,
-            context_dir,
-            harness=harness,
+        _build_and_verify_task_image(request)
+        _write_task_image_cache_metadata(
+            image_ref=request.image_ref,
+            harness=request.harness,
+            outcome="miss",
         )
-        build = _run_task_image_build(
-            build_cmd,
-            run_env,
-            timeout_sec=_task_image_build_timeout(task_timeout_sec),
-        )
-        _write_task_image_build_log(log_dir, build)
-        _raise_task_image_build_error(build_cmd, build)
-        _ensure_harbor_runtime_preflight(image_ref=image_ref, run_env=run_env, log_dir=log_dir)
-        _write_task_image_cache_metadata(image_ref=image_ref, harness=harness, outcome="miss")
         return False
+
+
+def _task_image_ready_for_reuse(request: TaskImageEnsureRequest) -> bool:
+    if not _cached_task_image_is_ready(
+        image_ref=request.image_ref,
+        harness=request.harness,
+        run_env=request.run_env,
+        log_dir=request.log_dir,
+    ):
+        return False
+    _write_task_image_cache_metadata(
+        image_ref=request.image_ref,
+        harness=request.harness,
+        outcome="hit",
+    )
+    return True
+
+
+def _build_and_verify_task_image(request: TaskImageEnsureRequest) -> None:
+    context_dir = request.task_bundle_path / "environment"
+    dockerfile = context_dir / "Dockerfile"
+    if not dockerfile.exists():
+        raise FileNotFoundError(f"Task image build failed: missing Dockerfile {dockerfile}")
+
+    build_cmd = _task_image_build_command(
+        request.image_ref,
+        dockerfile,
+        context_dir,
+        harness=request.harness,
+    )
+    build = _run_task_image_build(
+        build_cmd,
+        request.run_env,
+        timeout_sec=_task_image_build_timeout(request.task_timeout_sec),
+    )
+    _write_task_image_build_log(request.log_dir, build)
+    _raise_task_image_build_error(build_cmd, build)
+    _ensure_harbor_runtime_preflight(
+        image_ref=request.image_ref,
+        run_env=request.run_env,
+        log_dir=request.log_dir,
+    )
+
+
+def _copy_baseline_workspace(baseline_workspace_dir: Path, workspace_dir: Path) -> None:
+    if workspace_dir.exists():
+        shutil.rmtree(workspace_dir)
+    shutil.copytree(
+        baseline_workspace_dir,
+        workspace_dir,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
+    )
+
+
+def _injected_rules_path(workspace_dir: Path, harness: str) -> Path | None:
+    injected_rule_name = SYSTEM_RULES.get(harness)
+    if not injected_rule_name:
+        return None
+    candidate = workspace_dir / injected_rule_name
+    return candidate if candidate.exists() else None
+
+
+def _baseline_workspace_for_request(
+    request: RunRequest, starter_source
+) -> tuple[str, Path, BaselineWorkspaceCacheResult]:
+    baseline_cache_key = _baseline_cache_key(request, starter_source.fingerprint)
+    baseline_workspace_dir = _baseline_cache_workspace_dir(baseline_cache_key)
+    baseline_cache = _ensure_baseline_workspace(
+        BaselineWorkspaceRequest(
+            scenario=request.scenario,
+            starter_dir=starter_source.path,
+            baseline_workspace_dir=baseline_workspace_dir,
+            baseline_cache_key=baseline_cache_key,
+            scenario_dir=request.scenario_dir,
+            harness=request.config.harness,
+        )
+    )
+    return baseline_cache_key, baseline_workspace_dir, baseline_cache
 
 
 def _initialize_harbor_bundle_paths(
@@ -2133,36 +2316,14 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
         scenario_revision=request.scenario.scenario_revision,
     )
 
-    baseline_cache_key = _baseline_cache_key(request, starter_source.fingerprint)
-    baseline_workspace_dir = _baseline_cache_workspace_dir(baseline_cache_key)
-    baseline_cache = _ensure_baseline_workspace(
-        scenario=request.scenario,
-        starter_dir=starter_source.path,
-        baseline_workspace_dir=baseline_workspace_dir,
-        baseline_cache_key=baseline_cache_key,
-        scenario_dir=request.scenario_dir,
-        harness=request.config.harness,
+    baseline_cache_key, baseline_workspace_dir, baseline_cache = _baseline_workspace_for_request(
+        request, starter_source
     )
 
     workspace_dir = _repeat_workspace_dir(request)
-    if workspace_dir.exists():
-        shutil.rmtree(workspace_dir)
-    shutil.copytree(
-        baseline_workspace_dir,
-        workspace_dir,
-        dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
-    )
-
-    injected_rules: Path | None = None
-    injected_rule_name = SYSTEM_RULES.get(request.config.harness)
-    if injected_rule_name:
-        candidate = workspace_dir / injected_rule_name
-        if candidate.exists():
-            injected_rules = candidate
-
-    workspace = workspace_dir
-    metadata_path = record_starter_metadata(workspace, starter_source)
+    _copy_baseline_workspace(baseline_workspace_dir, workspace_dir)
+    injected_rules = _injected_rules_path(workspace_dir, request.config.harness)
+    metadata_path = record_starter_metadata(workspace_dir, starter_source)
 
     return WorkspaceContext(
         starter_source=starter_source,
@@ -2172,7 +2333,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
         baseline_cache_hit=baseline_cache.hit,
         baseline_metadata_path=baseline_cache.metadata_path,
         baseline_fingerprint=baseline_cache.baseline_fingerprint,
-        workspace=workspace,
+        workspace=workspace_dir,
         injected_rules=injected_rules,
         metadata_path=metadata_path,
     )
@@ -2183,39 +2344,10 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
     request.jobs_dir.mkdir(parents=True, exist_ok=True)
     job_name = f"orchestrator-{request.run_id}"
     job_dir = request.jobs_dir / job_name
-    harbor_cmd = request.adapter.build_harbor_command(
-        task_path=request.task_bundle_path,
-        job_name=job_name,
-        jobs_dir=request.jobs_dir,
-    )
+    process_request = _harbor_process_request(request, job_name, job_dir)
 
-    execution_error: str | None = None
-    for attempt in range(1, HARBOR_RATE_LIMIT_MAX_ATTEMPTS + 1):
-        execution_error = _run_harbor_process(
-            harbor_cmd=harbor_cmd,
-            workspace=request.workspace,
-            timeout_sec=request.timeout_sec,
-            run_env=request.run_env,
-            run_harbor_dir=request.run_harbor_dir,
-            job_dir=job_dir,
-        )
-        if execution_error is None:
-            break
-        trial_dir = _select_trial_dir(job_dir)
-        if not _should_retry_harbor_rate_limit(
-            attempt=attempt,
-            execution_error=execution_error,
-            run_harbor_dir=request.run_harbor_dir,
-        ):
-            return _terminated_harbor_result(
-                job_dir=job_dir,
-                reason=execution_error,
-                trial_dir=trial_dir,
-            )
-        cleanup_stale_harbor_resources()
-        wait_for_harbor_rate_limit_retry()
-
-    if execution_error:
+    execution_error = _run_harbor_with_retries(process_request)
+    if execution_error is not None:
         return _terminated_harbor_result(
             job_dir=job_dir,
             reason=execution_error,
@@ -2237,6 +2369,39 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
         job_dir=job_dir,
         trial_dir=trial_dir,
     )
+
+
+def _harbor_process_request(
+    request: HarborExecutionRequest, job_name: str, job_dir: Path
+) -> HarborProcessRequest:
+    return HarborProcessRequest(
+        harbor_cmd=request.adapter.build_harbor_command(
+            task_path=request.task_bundle_path,
+            job_name=job_name,
+            jobs_dir=request.jobs_dir,
+        ),
+        workspace=request.workspace,
+        timeout_sec=request.timeout_sec,
+        run_env=request.run_env,
+        run_harbor_dir=request.run_harbor_dir,
+        job_dir=job_dir,
+    )
+
+
+def _run_harbor_with_retries(request: HarborProcessRequest) -> str | None:
+    for attempt in range(1, HARBOR_RATE_LIMIT_MAX_ATTEMPTS + 1):
+        execution_error = _run_harbor_process(request)
+        if execution_error is None:
+            return None
+        if not _should_retry_harbor_rate_limit(
+            attempt=attempt,
+            execution_error=execution_error,
+            run_harbor_dir=request.run_harbor_dir,
+        ):
+            return execution_error
+        cleanup_stale_harbor_resources()
+        wait_for_harbor_rate_limit_retry()
+    return execution_error
 
 
 def _should_retry_harbor_rate_limit(
@@ -2268,22 +2433,14 @@ def _terminated_harbor_result(
     )
 
 
-def _run_harbor_process(
-    *,
-    harbor_cmd: list[str],
-    workspace: Path,
-    timeout_sec: int,
-    run_env: dict[str, str],
-    run_harbor_dir: Path,
-    job_dir: Path,
-) -> str | None:
-    run_harbor_dir.mkdir(parents=True, exist_ok=True)
-    command_path = run_harbor_dir / "command.txt"
-    stdout_path = run_harbor_dir / "harbor-stdout.log"
-    stderr_path = run_harbor_dir / "harbor-stderr.log"
-    command_path.write_text(" ".join(shlex.quote(part) for part in harbor_cmd) + "\n")
+def _run_harbor_process(request: HarborProcessRequest) -> str | None:
+    request.run_harbor_dir.mkdir(parents=True, exist_ok=True)
+    command_path = request.run_harbor_dir / "command.txt"
+    stdout_path = request.run_harbor_dir / "harbor-stdout.log"
+    stderr_path = request.run_harbor_dir / "harbor-stderr.log"
+    command_path.write_text(" ".join(shlex.quote(part) for part in request.harbor_cmd) + "\n")
 
-    preflight_reason = _docker_compose_preflight_reason(run_env)
+    preflight_reason = _docker_compose_preflight_reason(request.run_env)
     if preflight_reason:
         stdout_path.write_text("")
         stderr_path.write_text(preflight_reason + "\n")
@@ -2291,12 +2448,12 @@ def _run_harbor_process(
 
     try:
         process = subprocess.Popen(
-            harbor_cmd,
-            cwd=workspace,
+            request.harbor_cmd,
+            cwd=request.workspace,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            env=run_env,
+            env=request.run_env,
             start_new_session=True,
         )
     except FileNotFoundError:
@@ -2304,7 +2461,7 @@ def _run_harbor_process(
 
     timed_out = False
     try:
-        stdout, stderr = process.communicate(timeout=timeout_sec)
+        stdout, stderr = process.communicate(timeout=request.timeout_sec)
     except subprocess.TimeoutExpired:
         timed_out = True
         _terminate_process_group(process)
@@ -2314,7 +2471,7 @@ def _run_harbor_process(
     stderr_path.write_text(_redact_sensitive_text(stderr or ""))
 
     if timed_out:
-        return _timeout_reason(timeout_sec=timeout_sec, job_dir=job_dir)
+        return _timeout_reason(timeout_sec=request.timeout_sec, job_dir=request.job_dir)
     if process.returncode != 0:
         return f"Harbor exited with code {process.returncode}"
     return None
@@ -2645,14 +2802,10 @@ def _copy_optional_visual_asset(source: Path, target: Path) -> str | None:
     return str(shutil.copy2(source, target))
 
 
-def _persist_visual_evidence_artifacts(
-    *,
-    request: RunRequest,
-    workspace: Path,
-    run_root_dir: Path,
-) -> dict[str, Any]:
+def _persist_visual_evidence_artifacts(request: VisualEvidenceRequest) -> dict[str, Any]:
     """Persist visual evidence assets into the canonical run directory."""
-    if request.scenario.visual is None:
+    run_request = request.request
+    if run_request.scenario.visual is None:
         return {
             "actual": None,
             "reference": None,
@@ -2660,48 +2813,71 @@ def _persist_visual_evidence_artifacts(
             "regions": [],
         }
 
-    visual_dir = run_root_dir / "visual"
-    main_reference_name = Path(request.scenario.visual.reference_image).name
-    main_artifacts = {
-        "actual": _copy_optional_visual_asset(workspace / "actual.png", visual_dir / "actual.png"),
-        "reference": None,
-        "diff": _copy_optional_visual_asset(workspace / "diff.png", visual_dir / "diff.png"),
-    }
-    region_artifacts: list[dict[str, str | None]] = []
-
-    for source_reference, relative_target in _visual_reference_assets(request):
-        copied = _copy_optional_visual_asset(source_reference, visual_dir / relative_target.name)
-        if relative_target.name == main_reference_name:
-            main_artifacts["reference"] = copied
-
-    reference_stem = Path(request.scenario.visual.reference_image).stem
-    reference_suffix = Path(request.scenario.visual.reference_image).suffix
-    region_artifacts = [
-        {
-            "name": region_name,
-            "actual": _copy_optional_visual_asset(
-                workspace / f"actual-region-{region_name}.png",
-                visual_dir / f"actual-region-{region_name}.png",
-            ),
-            "reference": _copy_optional_visual_asset(
-                request.scenario_dir
-                / Path(request.scenario.visual.reference_image).parent
-                / f"{reference_stem}-region-{region_name}{reference_suffix}",
-                visual_dir / f"{reference_stem}-region-{region_name}{reference_suffix}",
-            ),
-            "diff": _copy_optional_visual_asset(
-                workspace / f"diff-region-{region_name}.png",
-                visual_dir / f"diff-region-{region_name}.png",
-            ),
-        }
-        for region_name in _visual_region_names(request)
-    ]
-
+    visual_dir = request.run_root_dir / "visual"
+    main_artifacts = _persist_main_visual_artifacts(request, visual_dir)
     return {
         "actual": main_artifacts["actual"],
         "reference": main_artifacts["reference"],
         "diff": main_artifacts["diff"],
-        "regions": region_artifacts,
+        "regions": _persist_region_visual_artifacts(request, visual_dir),
+    }
+
+
+def _persist_main_visual_artifacts(
+    request: VisualEvidenceRequest, visual_dir: Path
+) -> dict[str, str | None]:
+    run_request = request.request
+    main_reference_name = Path(run_request.scenario.visual.reference_image).name
+    artifacts = {
+        "actual": _copy_optional_visual_asset(
+            request.workspace / "actual.png",
+            visual_dir / "actual.png",
+        ),
+        "reference": None,
+        "diff": _copy_optional_visual_asset(
+            request.workspace / "diff.png",
+            visual_dir / "diff.png",
+        ),
+    }
+    for source_reference, relative_target in _visual_reference_assets(run_request):
+        copied = _copy_optional_visual_asset(source_reference, visual_dir / relative_target.name)
+        if relative_target.name == main_reference_name:
+            artifacts["reference"] = copied
+    return artifacts
+
+
+def _persist_region_visual_artifacts(
+    request: VisualEvidenceRequest, visual_dir: Path
+) -> list[dict[str, str | None]]:
+    run_request = request.request
+    reference_image = Path(run_request.scenario.visual.reference_image)
+    return [
+        _persist_region_visual_artifact(request, visual_dir, reference_image, region_name)
+        for region_name in _visual_region_names(run_request)
+    ]
+
+
+def _persist_region_visual_artifact(
+    request: VisualEvidenceRequest,
+    visual_dir: Path,
+    reference_image: Path,
+    region_name: str,
+) -> dict[str, str | None]:
+    reference_name = f"{reference_image.stem}-region-{region_name}{reference_image.suffix}"
+    return {
+        "name": region_name,
+        "actual": _copy_optional_visual_asset(
+            request.workspace / f"actual-region-{region_name}.png",
+            visual_dir / f"actual-region-{region_name}.png",
+        ),
+        "reference": _copy_optional_visual_asset(
+            request.request.scenario_dir / reference_image.parent / reference_name,
+            visual_dir / reference_name,
+        ),
+        "diff": _copy_optional_visual_asset(
+            request.workspace / f"diff-region-{region_name}.png",
+            visual_dir / f"diff-region-{region_name}.png",
+        ),
     }
 
 
@@ -3433,11 +3609,13 @@ def _command_records_from_claude_stdout_file(
             )
             continue
         _append_claude_tool_use_records(
-            payload=payload,
-            output=stripped,
-            records=records,
-            record_idx_by_tool_use_id=record_idx_by_tool_use_id,
-            include_git_commit=include_git_commit,
+            ClaudeToolUseAppendRequest(
+                payload=payload,
+                output=stripped,
+                records=records,
+                record_idx_by_tool_use_id=record_idx_by_tool_use_id,
+                include_git_commit=include_git_commit,
+            )
         )
         _mark_claude_failed_tool_records(
             payload=payload,
@@ -3447,29 +3625,25 @@ def _command_records_from_claude_stdout_file(
     return records
 
 
-def _append_claude_tool_use_records(
-    *,
-    payload: dict,
-    output: str,
-    records: list[CommandRecord],
-    record_idx_by_tool_use_id: dict[str, int],
-    include_git_commit: bool = False,
-) -> None:
-    for tool_use_id, command in _claude_bash_tool_use_commands(payload):
+def _append_claude_tool_use_records(request: ClaudeToolUseAppendRequest) -> None:
+    for tool_use_id, command in _claude_bash_tool_use_commands(request.payload):
         matched_indexes: list[int] = []
         for normalized in _normalized_shell_subcommands(command):
-            if not _should_record_command(normalized, include_git_commit=include_git_commit):
+            if not _should_record_command(
+                normalized,
+                include_git_commit=request.include_git_commit,
+            ):
                 continue
-            matched_indexes.append(len(records))
-            records.append(
+            matched_indexes.append(len(request.records))
+            request.records.append(
                 CommandRecord(
                     command=normalized,
                     failed=False,
-                    output=output,
+                    output=request.output,
                 )
             )
         if matched_indexes:
-            record_idx_by_tool_use_id[tool_use_id] = matched_indexes[0]
+            request.record_idx_by_tool_use_id[tool_use_id] = matched_indexes[0]
 
 
 def _mark_claude_failed_tool_records(
@@ -3499,35 +3673,43 @@ def _line_as_json_dict(line: str) -> dict | None:
 
 
 def _claude_bash_tool_use_commands(payload: dict) -> list[tuple[str, str]]:
-    message = payload.get("message")
-    if not isinstance(message, dict):
-        return []
-    content = message.get("content")
-    if not isinstance(content, list):
+    content = _claude_message_content(payload)
+    if content is None:
         return []
     commands: list[tuple[str, str]] = []
     for part in content:
-        if not isinstance(part, dict):
-            continue
-        if part.get("type") != "tool_use" or part.get("name") != "Bash":
-            continue
-        tool_use_id = str(part.get("id", "")).strip()
-        tool_input = part.get("input")
-        if not isinstance(tool_input, dict):
-            continue
-        command = str(tool_input.get("command", "")).strip()
-        if not tool_use_id or not command:
-            continue
-        commands.append((tool_use_id, command))
+        command = _claude_bash_tool_use_command(part)
+        if command is not None:
+            commands.append(command)
     return commands
 
 
-def _claude_failed_tool_result_ids(payload: dict) -> list[str]:
+def _claude_message_content(payload: dict) -> list | None:
     message = payload.get("message")
     if not isinstance(message, dict):
-        return []
+        return None
     content = message.get("content")
-    if not isinstance(content, list):
+    return content if isinstance(content, list) else None
+
+
+def _claude_bash_tool_use_command(part: object) -> tuple[str, str] | None:
+    if not isinstance(part, dict):
+        return None
+    if part.get("type") != "tool_use" or part.get("name") != "Bash":
+        return None
+    tool_input = part.get("input")
+    if not isinstance(tool_input, dict):
+        return None
+    tool_use_id = str(part.get("id", "")).strip()
+    command = str(tool_input.get("command", "")).strip()
+    if not tool_use_id or not command:
+        return None
+    return tool_use_id, command
+
+
+def _claude_failed_tool_result_ids(payload: dict) -> list[str]:
+    content = _claude_message_content(payload)
+    if content is None:
         return []
     failed_tool_ids: list[str] = []
     for part in content:
@@ -3832,7 +4014,6 @@ def collect_process_metrics(
             f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`."
         )
     input_tokens, cached_input_tokens, output_tokens = usage_tuple
-    uncached_input_tokens = max(0, input_tokens - cached_input_tokens)
 
     records = _command_records_for_harness(trial_dir, harness)
     git_commit_records = _command_records_for_harness(trial_dir, harness, include_git_commit=True)
@@ -3842,31 +4023,51 @@ def collect_process_metrics(
     )
     first_pass_status = _first_pass_status(records, verification_patterns)
     failure_categories = _failure_category_counts(records)
-    command_count = len(records)
-    failed_command_count = _count_failed_commands(records)
-    process_failed_command_count = _count_process_failed_commands(failure_categories)
-    verification_rounds = max(attempts_by_pattern.values(), default=0)
-    repeated_failures = _count_repeated_failures(failures_by_pattern)
-    executed_required = _count_executed_required(attempts_by_pattern)
+    return _process_metrics_from_records(
+        ProcessMetricsBuildInput(
+            input_tokens=input_tokens,
+            cached_input_tokens=cached_input_tokens,
+            output_tokens=output_tokens,
+            records=records,
+            git_commit_records=git_commit_records,
+            verification_patterns=verification_patterns,
+            attempts_by_pattern=attempts_by_pattern,
+            failures_by_pattern=failures_by_pattern,
+            first_pass_status=first_pass_status,
+            failure_categories=failure_categories,
+        )
+    )
+
+
+def _process_metrics_from_records(request: ProcessMetricsBuildInput) -> ProcessMetrics:
+    uncached_input_tokens = max(0, request.input_tokens - request.cached_input_tokens)
+    command_count = len(request.records)
+    failed_command_count = _count_failed_commands(request.records)
+    process_failed_command_count = _count_process_failed_commands(request.failure_categories)
+    verification_rounds = max(request.attempts_by_pattern.values(), default=0)
+    repeated_failures = _count_repeated_failures(request.failures_by_pattern)
+    executed_required = _count_executed_required(request.attempts_by_pattern)
     first_pass_successes, first_pass_failures, missing_required = _first_pass_counts(
-        first_pass_status
+        request.first_pass_status
     )
     return ProcessMetrics(
         uncached_input_tokens=uncached_input_tokens,
-        output_tokens=output_tokens,
+        output_tokens=request.output_tokens,
         command_count=command_count,
         failed_command_count=failed_command_count,
         process_failed_command_count=process_failed_command_count,
         verification_rounds=verification_rounds,
         repeated_verification_failures=repeated_failures,
-        required_verification_commands=len(verification_patterns),
+        required_verification_commands=len(request.verification_patterns),
         executed_required_verification_commands=executed_required,
-        failed_command_categories=failure_categories,
-        required_verification_first_pass=first_pass_status,
+        failed_command_categories=request.failure_categories,
+        required_verification_first_pass=request.first_pass_status,
         first_pass_verification_successes=first_pass_successes,
         first_pass_verification_failures=first_pass_failures,
         missing_required_verification_commands=missing_required,
-        git_commit_verification_bypass_commands=_git_commit_bypass_commands(git_commit_records),
+        git_commit_verification_bypass_commands=_git_commit_bypass_commands(
+            request.git_commit_records
+        ),
     )
 
 
@@ -4186,55 +4387,79 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
     """Create deterministic zeroed scores for terminated runs."""
     failure_reason = reason or "Run terminated before scoring."
     return EvaluationOutputs(
-        functional=FunctionalScore(
-            passed=False,
-            tests_passed=0,
-            tests_total=0,
-            build_succeeded=False,
-            gates_passed=0,
-            gates_total=0,
-        ),
-        acceptance=AcceptanceScore(
-            checks=[
-                AcceptanceCheck(
-                    rule="Evaluation run completed",
-                    type="deterministic",
-                    passed=False,
-                    evidence=failure_reason,
-                )
-            ]
-        ),
+        functional=_terminated_functional_score(),
+        acceptance=_terminated_acceptance_score(failure_reason),
         visual=None,
-        verification_stability=VerificationStabilityScore(
-            total_gate_failures=settings.verification_stability.max_gate_failures,
-            unique_failure_categories=0,
-            repeat_failures=0,
-        ),
-        test_coverage=CoverageScore(
-            threshold=None,
-            measured=None,
-            source=None,
-            passed=False,
-        ),
-        requirements_coverage=RequirementsCoverageScore(
-            total_requirements=0,
-            satisfied_requirements=0,
-            mapped_requirements=0,
-            missing_requirement_ids=[],
-            requirement_gap_ids=[],
-        ),
-        execution_validity=ExecutionValidityScore(
-            checks=[
-                GateCheck(
-                    name="run_completed",
-                    passed=False,
-                    evidence=failure_reason,
-                )
-            ]
-        ),
+        verification_stability=_terminated_verification_stability_score(),
+        test_coverage=_terminated_coverage_score(),
+        requirements_coverage=_terminated_requirements_coverage_score(),
+        execution_validity=_terminated_execution_validity_score(failure_reason),
         performance_gates=PerformanceGatesScore(checks=[]),
         metric_results=[],
         gate_history=[],
+    )
+
+
+def _terminated_functional_score() -> FunctionalScore:
+    return FunctionalScore(
+        passed=False,
+        tests_passed=0,
+        tests_total=0,
+        build_succeeded=False,
+        gates_passed=0,
+        gates_total=0,
+    )
+
+
+def _terminated_acceptance_score(failure_reason: str) -> AcceptanceScore:
+    return AcceptanceScore(
+        checks=[
+            AcceptanceCheck(
+                rule="Evaluation run completed",
+                type="deterministic",
+                passed=False,
+                evidence=failure_reason,
+            )
+        ]
+    )
+
+
+def _terminated_verification_stability_score() -> VerificationStabilityScore:
+    return VerificationStabilityScore(
+        total_gate_failures=settings.verification_stability.max_gate_failures,
+        unique_failure_categories=0,
+        repeat_failures=0,
+    )
+
+
+def _terminated_coverage_score() -> CoverageScore:
+    return CoverageScore(
+        threshold=None,
+        measured=None,
+        source=None,
+        passed=False,
+    )
+
+
+def _terminated_requirements_coverage_score() -> RequirementsCoverageScore:
+    return RequirementsCoverageScore(
+        total_requirements=0,
+        satisfied_requirements=0,
+        mapped_requirements=0,
+        missing_requirement_ids=[],
+        requirement_gap_ids=[],
+    )
+
+
+def _terminated_execution_validity_score(failure_reason: str) -> ExecutionValidityScore:
+    return ExecutionValidityScore(
+        checks=[
+            GateCheck(
+                name="run_completed",
+                passed=False,
+                evidence=failure_reason,
+            )
+        ]
     )
 
 
@@ -4250,13 +4475,7 @@ def _completion_claim_consistent(
     atomic_commits_present: bool,
 ) -> GateCheck:
     completion_keywords = ("complete", "completed", "done", "finished")
-    completion_claimed = any(
-        event.event_type == "assistant_message"
-        and any(
-            keyword in str(event.data.get("content", "")).lower() for keyword in completion_keywords
-        )
-        for event in events
-    )
+    completion_claimed = _completion_claimed(events, completion_keywords)
     if completion_claimed and not gates_passed:
         return GateCheck(
             name="completion_claim_integrity",
@@ -4278,6 +4497,19 @@ def _completion_claim_consistent(
         name="completion_claim_integrity",
         passed=True,
         evidence=evidence,
+    )
+
+
+def _completion_claimed(
+    events: list[TraceEvent],
+    completion_keywords: tuple[str, ...],
+) -> bool:
+    return any(
+        event.event_type == "assistant_message"
+        and any(
+            keyword in str(event.data.get("content", "")).lower() for keyword in completion_keywords
+        )
+        for event in events
     )
 
 
@@ -4319,88 +4551,94 @@ def build_execution_validity_score(
     checks = [
         check.model_copy(deep=True) for check in validity_input.outputs.execution_validity.checks
     ]
-    _upsert_gate_check(
-        checks,
-        GateCheck(
-            name="run_completed",
-            passed=not validity_input.terminated_early,
-            evidence=validity_input.termination_reason
-            or "Run completed without early termination.",
-        ),
-    )
-
-    configured_required_count = len(validity_input.verification_patterns)
-    explicit_required_executed = (
-        validity_input.process_metrics.executed_required_verification_commands
-    )
-    observed_attempts = _observed_verification_attempts(
-        validity_input.outputs.gate_history,
-        validity_input.verification_patterns,
-    )
-    observed_required_executed = _count_executed_required(observed_attempts)
-    required_count = configured_required_count
-    if (
-        not validity_input.outputs.gate_history
-        and validity_input.process_metrics.required_verification_commands > 0
-    ):
-        required_count = validity_input.process_metrics.required_verification_commands
-    if required_count == 0:
-        required_commands_passed = True
-        required_commands_evidence = "required=0"
-    elif validity_input.outputs.gate_history:
-        required_commands_passed = observed_required_executed == required_count
-        required_commands_evidence = (
-            f"observed={observed_required_executed}/{required_count}, "
-            f"explicit={explicit_required_executed}/{required_count}"
-        )
-    else:
-        required_commands_passed = explicit_required_executed == required_count
-        required_commands_evidence = (
-            f"explicit={explicit_required_executed}/{required_count} (gate history unavailable)"
-        )
-    _upsert_gate_check(
-        checks,
-        GateCheck(
-            name="required_verification_commands_executed",
-            passed=required_commands_passed,
-            evidence=required_commands_evidence,
-        ),
-    )
-
-    bypass_commands = validity_input.process_metrics.git_commit_verification_bypass_commands
-    _upsert_gate_check(
-        checks,
-        GateCheck(
-            name="commit_verification_hooks_not_bypassed",
-            passed=not bypass_commands,
-            evidence=(
-                "No git commit verification bypass detected."
-                if not bypass_commands
-                else f"bypass_commands={bypass_commands}"
-            ),
-        ),
-    )
+    _upsert_gate_check(checks, _run_completed_check(validity_input))
+    _upsert_gate_check(checks, _required_verification_check(validity_input))
+    _upsert_gate_check(checks, _commit_bypass_check(validity_input.process_metrics))
 
     commit_count, commit_evidence = _git_commit_count(validity_input.workspace_path)
     atomic_commits_present = commit_count > 0
     if validity_input.atomic_commits_required:
-        _upsert_gate_check(
-            checks,
-            GateCheck(
-                name="atomic_commits_present",
-                passed=atomic_commits_present,
-                evidence=commit_evidence,
-            ),
-        )
-
-    completion_check = _completion_claim_consistent(
-        validity_input.events,
-        _all_gates_passed(validity_input.outputs),
-        atomic_commits_required=validity_input.atomic_commits_required,
-        atomic_commits_present=atomic_commits_present,
+        _upsert_gate_check(checks, _atomic_commits_check(commit_evidence, atomic_commits_present))
+    _upsert_gate_check(
+        checks,
+        _completion_claim_consistent(
+            validity_input.events,
+            _all_gates_passed(validity_input.outputs),
+            atomic_commits_required=validity_input.atomic_commits_required,
+            atomic_commits_present=atomic_commits_present,
+        ),
     )
-    _upsert_gate_check(checks, completion_check)
     return ExecutionValidityScore(checks=checks)
+
+
+def _run_completed_check(validity_input: ExecutionValidityInput) -> GateCheck:
+    return GateCheck(
+        name="run_completed",
+        passed=not validity_input.terminated_early,
+        evidence=validity_input.termination_reason or "Run completed without early termination.",
+    )
+
+
+def _required_verification_check(validity_input: ExecutionValidityInput) -> GateCheck:
+    passed, evidence = _required_verification_status(validity_input)
+    return GateCheck(
+        name="required_verification_commands_executed",
+        passed=passed,
+        evidence=evidence,
+    )
+
+
+def _required_verification_status(validity_input: ExecutionValidityInput) -> tuple[bool, str]:
+    required_count = _required_verification_count(validity_input)
+    explicit_executed = validity_input.process_metrics.executed_required_verification_commands
+    observed_attempts = _observed_verification_attempts(
+        validity_input.outputs.gate_history,
+        validity_input.verification_patterns,
+    )
+    observed_executed = _count_executed_required(observed_attempts)
+    if required_count == 0:
+        return True, "required=0"
+    if validity_input.outputs.gate_history:
+        return (
+            observed_executed == required_count,
+            f"observed={observed_executed}/{required_count}, "
+            f"explicit={explicit_executed}/{required_count}",
+        )
+    return (
+        explicit_executed == required_count,
+        f"explicit={explicit_executed}/{required_count} (gate history unavailable)",
+    )
+
+
+def _required_verification_count(validity_input: ExecutionValidityInput) -> int:
+    configured_count = len(validity_input.verification_patterns)
+    if (
+        not validity_input.outputs.gate_history
+        and validity_input.process_metrics.required_verification_commands > 0
+    ):
+        return validity_input.process_metrics.required_verification_commands
+    return configured_count
+
+
+def _commit_bypass_check(process_metrics: ProcessMetrics) -> GateCheck:
+    bypass_commands = process_metrics.git_commit_verification_bypass_commands
+    return GateCheck(
+        name="commit_verification_hooks_not_bypassed",
+        passed=not bypass_commands,
+        evidence=(
+            "No git commit verification bypass detected."
+            if not bypass_commands
+            else f"bypass_commands={bypass_commands}"
+        ),
+    )
+
+
+def _atomic_commits_check(commit_evidence: str, atomic_commits_present: bool) -> GateCheck:
+    return GateCheck(
+        name="atomic_commits_present",
+        passed=atomic_commits_present,
+        evidence=commit_evidence,
+    )
 
 
 def build_performance_gates_score(*, outputs: EvaluationOutputs) -> PerformanceGatesScore:
@@ -4536,30 +4774,23 @@ def _scorecard_process_metadata(process_metrics: ProcessMetrics) -> dict[str, An
     }
 
 
-def _scorecard_metadata(
-    *,
-    layout: RunLayout,
-    execution: ExecutionPhaseResult,
-    artifacts: PersistedArtifacts,
-    unscored: bool,
-    unscored_reasons: list[str],
-) -> dict[str, Any]:
+def _scorecard_metadata(request: ScorecardMetadataInput) -> dict[str, Any]:
     return {
         "run": _scorecard_run_metadata(
-            layout,
-            unscored=unscored,
-            unscored_reasons=unscored_reasons,
+            request.layout,
+            unscored=request.unscored,
+            unscored_reasons=request.unscored_reasons,
         ),
-        "starter": artifacts.starter_meta,
-        "scenario": artifacts.scenario_revision_meta,
-        "harbor": _scorecard_harbor_metadata(execution, artifacts),
-        "harness": {"artifacts": artifacts.harness_artifacts},
-        "verifier": _scorecard_verifier_metadata(execution, artifacts),
-        "process": _scorecard_process_metadata(execution.process_metrics),
-        "evidence": artifacts.evidence_artifacts,
+        "starter": request.artifacts.starter_meta,
+        "scenario": request.artifacts.scenario_revision_meta,
+        "harbor": _scorecard_harbor_metadata(request.execution, request.artifacts),
+        "harness": {"artifacts": request.artifacts.harness_artifacts},
+        "verifier": _scorecard_verifier_metadata(request.execution, request.artifacts),
+        "process": _scorecard_process_metadata(request.execution.process_metrics),
+        "evidence": request.artifacts.evidence_artifacts,
         "workspace": {
-            "prune": artifacts.workspace_prune,
-            "changes": artifacts.workspace_changes,
+            "prune": request.artifacts.workspace_prune,
+            "changes": request.artifacts.workspace_changes,
         },
     }
 
@@ -4567,26 +4798,9 @@ def _scorecard_metadata(
 def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     """Create scorecard with populated metrics and metadata."""
 
-    request = context.request
-    layout = context.layout
-    artifacts = context.artifacts
     execution = context.execution
     outputs = execution.outputs
-
-    execution_validity = build_execution_validity_score(
-        ExecutionValidityInput(
-            outputs=outputs,
-            terminated_early=execution.terminated_early,
-            termination_reason=execution.termination_reason,
-            process_metrics=execution.process_metrics,
-            events=execution.events,
-            workspace_path=context.context.workspace,
-            atomic_commits_required=(
-                request.scenario.verification.workflow.atomic_commits_required
-            ),
-            verification_patterns=_verification_command_strings(request.scenario),
-        )
-    )
+    execution_validity = build_execution_validity_score(_execution_validity_input(context))
     performance_gates = build_performance_gates_score(outputs=outputs)
     resource_efficiency = build_resource_efficiency_score(execution.process_metrics)
     unscored_reasons = _classify_unscored_reasons(
@@ -4594,14 +4808,55 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         execution.termination_reason,
     )
     unscored = len(unscored_reasons) > 0
-    metadata = _scorecard_metadata(
-        layout=layout,
-        execution=execution,
-        artifacts=artifacts,
+    metadata = _scorecard_metadata(_scorecard_metadata_input(context, unscored, unscored_reasons))
+    return _scorecard_from_context(
+        context,
+        ScorecardComponents(
+            execution_validity=execution_validity,
+            performance_gates=performance_gates,
+            resource_efficiency=resource_efficiency,
+            unscored=unscored,
+            unscored_reasons=unscored_reasons,
+            metadata=metadata,
+        ),
+    )
+
+
+def _execution_validity_input(context: ScorecardBuildContext) -> ExecutionValidityInput:
+    return ExecutionValidityInput(
+        outputs=context.execution.outputs,
+        terminated_early=context.execution.terminated_early,
+        termination_reason=context.execution.termination_reason,
+        process_metrics=context.execution.process_metrics,
+        events=context.execution.events,
+        workspace_path=context.context.workspace,
+        atomic_commits_required=context.request.scenario.verification.workflow.atomic_commits_required,
+        verification_patterns=_verification_command_strings(context.request.scenario),
+    )
+
+
+def _scorecard_metadata_input(
+    context: ScorecardBuildContext,
+    unscored: bool,
+    unscored_reasons: list[str],
+) -> ScorecardMetadataInput:
+    return ScorecardMetadataInput(
+        layout=context.layout,
+        execution=context.execution,
+        artifacts=context.artifacts,
         unscored=unscored,
         unscored_reasons=unscored_reasons,
     )
 
+
+def _scorecard_from_context(
+    context: ScorecardBuildContext,
+    components: ScorecardComponents,
+) -> Scorecard:
+    request = context.request
+    layout = context.layout
+    execution = context.execution
+    outputs = execution.outputs
     return Scorecard(
         run_id=layout.run_id,
         scenario_name=request.scenario.name,
@@ -4612,8 +4867,8 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
-        unscored=unscored,
-        unscored_reasons=unscored_reasons,
+        unscored=components.unscored,
+        unscored_reasons=components.unscored_reasons,
         score_profile=_scenario_score_profile_block(request),
         functional=outputs.functional,
         acceptance=outputs.acceptance,
@@ -4621,9 +4876,9 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
         verification_stability=outputs.verification_stability,
         test_coverage=outputs.test_coverage,
         requirements_coverage=outputs.requirements_coverage,
-        execution_validity=execution_validity,
-        performance_gates=performance_gates,
-        resource_efficiency=resource_efficiency,
+        execution_validity=components.execution_validity,
+        performance_gates=components.performance_gates,
+        resource_efficiency=components.resource_efficiency,
         metric_results=outputs.metric_results,
-        metadata=metadata,
+        metadata=components.metadata,
     )

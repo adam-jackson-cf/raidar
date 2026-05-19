@@ -3,20 +3,81 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
+from pathlib import Path
+from types import ModuleType
 
+from raidar.agents.adapters.base import HarnessAdapter
 from raidar.agents.adapters.factory import resolve_adapter
 from raidar.runtime.models import (
     ExecutionPhaseResult,
     HarborExecutionRequest,
     PersistedArtifacts,
+    RunLayout,
+    RunRequest,
     ScorecardBuildContext,
+    WorkspaceContext,
     WorkspacePreparationPhaseResult,
 )
 from raidar.schemas.scorecard import EvalConfig, EvalRun
 
 
-def _runner():
+@dataclass(frozen=True, slots=True)
+class _WorkspacePrepStart:
+    runner: ModuleType
+    request: RunRequest
+    adapter: HarnessAdapter
+    layout: RunLayout
+    timings: dict[str, float]
+    cache_metadata: dict[str, object]
+    started_at: float
+
+
+@dataclass(frozen=True, slots=True)
+class _BaselinePrep:
+    runner: ModuleType
+    request: RunRequest
+    adapter: HarnessAdapter
+    layout: RunLayout
+    context: WorkspaceContext
+    timings: dict[str, float]
+    cache_metadata: dict[str, object]
+    started_at: float
+
+
+@dataclass(frozen=True, slots=True)
+class _BundlePrep:
+    runner: ModuleType
+    request: RunRequest
+    adapter: HarnessAdapter
+    layout: RunLayout
+    context: WorkspaceContext
+    timings: dict[str, float]
+    cache_metadata: dict[str, object]
+    started_at: float
+    screenshot_command: list[str] | None
+    evidence_errors: list[str]
+    harbor_task_bundle: Path
+    run_env: dict[str, str]
+
+
+@dataclass(frozen=True, slots=True)
+class _VisualEvidenceState:
+    evidence_artifacts: dict[str, object]
+    hydrate_error: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class _HydratedVisualEvidenceRequest:
+    runner: ModuleType
+    request: RunRequest
+    phase: WorkspacePreparationPhaseResult
+    execution: ExecutionPhaseResult
+    evidence_artifacts: dict[str, object]
+
+
+def _runner() -> ModuleType:
     from raidar import runner as runner_module
 
     return runner_module
@@ -43,18 +104,8 @@ def _resolve_harbor_outputs(runner, harbor_result, terminated_early, termination
     return verifier_outputs, False, None
 
 
-def prepare_workspace_phase(request):
-    """Workspace prep phase: context, preflight, and Harbor bundle creation."""
-
-    runner = _runner()
-    prep_started = time.perf_counter()
-    adapter = resolve_adapter(request.config)
-    adapter.validate()
-    auth_metadata = adapter.execution_metadata()
-    layout = runner.initialize_run(request)
-
-    prep_phase_timings: dict[str, float] = {}
-    cache_metadata: dict[str, object] = {
+def _initial_cache_metadata() -> dict[str, object]:
+    return {
         "baseline": {
             "hit": None,
             "status": None,
@@ -70,91 +121,187 @@ def prepare_workspace_phase(request):
         "image_tag": None,
     }
 
-    phase_started = time.perf_counter()
-    context = runner.prepare_run_context(request)
-    prep_phase_timings["prepare_run_context"] = round(time.perf_counter() - phase_started, 3)
-    cache_metadata["baseline"] = {
-        "hit": context.baseline_cache_hit,
-        "status": context.baseline_cache_status,
-        "cache_key": context.baseline_cache_key,
-        "workspace_dir": str(context.baseline_workspace),
-        "metadata_path": str(context.baseline_metadata_path),
-        "complete": True,
-        "fingerprint": context.baseline_fingerprint,
-    }
 
-    adapter.prepare_workspace(context.workspace)
+def _with_timing(
+    timings: dict[str, float],
+    key: str,
+    started_at: float,
+) -> dict[str, float]:
+    return {**timings, key: round(time.perf_counter() - started_at, 3)}
 
-    phase_started = time.perf_counter()
-    runner.cleanup_stale_harbor_resources(include_containers=True, include_build_processes=True)
-    prep_phase_timings["cleanup_stale_harbor_resources"] = round(
-        time.perf_counter() - phase_started, 3
+
+def _with_cache_entry(
+    cache_metadata: dict[str, object],
+    key: str,
+    value: object,
+) -> dict[str, object]:
+    return {**cache_metadata, key: value}
+
+
+def _prepare_workspace_start(request) -> _WorkspacePrepStart:
+    runner = _runner()
+    adapter = resolve_adapter(request.config)
+    adapter.validate()
+    return _WorkspacePrepStart(
+        runner=runner,
+        request=request,
+        adapter=adapter,
+        layout=runner.initialize_run(request),
+        timings={},
+        cache_metadata=_initial_cache_metadata(),
+        started_at=time.perf_counter(),
     )
 
+
+def _prepare_baseline_context(start: _WorkspacePrepStart) -> _BaselinePrep:
     phase_started = time.perf_counter()
-    preflight_hit = runner.ensure_starter_preflight(request, context)
-    prep_phase_timings["ensure_starter_preflight"] = round(time.perf_counter() - phase_started, 3)
-    cache_metadata["preflight"] = {"hit": preflight_hit}
-
-    screenshot_command = runner._resolve_homepage_screenshot_command(
-        request.scenario, context.workspace
+    context = start.runner.prepare_run_context(start.request)
+    timings = _with_timing(start.timings, "prepare_run_context", phase_started)
+    cache_metadata = _with_cache_entry(
+        start.cache_metadata,
+        "baseline",
+        {
+            "hit": context.baseline_cache_hit,
+            "status": context.baseline_cache_status,
+            "cache_key": context.baseline_cache_key,
+            "workspace_dir": str(context.baseline_workspace),
+            "metadata_path": str(context.baseline_metadata_path),
+            "complete": True,
+            "fingerprint": context.baseline_fingerprint,
+        },
     )
-    evidence_errors: list[str] = []
+    start.adapter.prepare_workspace(context.workspace)
+    return _BaselinePrep(
+        runner=start.runner,
+        request=start.request,
+        adapter=start.adapter,
+        layout=start.layout,
+        context=context,
+        timings=timings,
+        cache_metadata=cache_metadata,
+        started_at=start.started_at,
+    )
+
+
+def _prepare_preflight(prep: _BaselinePrep) -> _BaselinePrep:
+    phase_started = time.perf_counter()
+    prep.runner.cleanup_stale_harbor_resources(
+        include_containers=True,
+        include_build_processes=True,
+    )
+    timings = _with_timing(prep.timings, "cleanup_stale_harbor_resources", phase_started)
 
     phase_started = time.perf_counter()
-    harbor_task_bundle = runner.create_harbor_task_bundle(
-        request,
-        context,
-        bundle_root=layout.harbor_dir / "bundle",
-    )
-    prep_phase_timings["create_harbor_task_bundle"] = round(time.perf_counter() - phase_started, 3)
+    preflight_hit = prep.runner.ensure_starter_preflight(prep.request, prep.context)
+    timings = _with_timing(timings, "ensure_starter_preflight", phase_started)
+    cache_metadata = _with_cache_entry(prep.cache_metadata, "preflight", {"hit": preflight_hit})
+    return replace(prep, timings=timings, cache_metadata=cache_metadata)
 
-    run_env = runner._build_harbor_run_env(adapter)
-    image_ref = runner._task_image_reference(request, harbor_task_bundle)
+
+def _prepare_visual_inputs(prep: _BaselinePrep) -> tuple[list[str] | None, list[str]]:
+    screenshot_command = prep.runner._resolve_homepage_screenshot_command(
+        prep.request.scenario,
+        prep.context.workspace,
+    )
+    return screenshot_command, []
+
+
+def _prepare_harbor_bundle(
+    prep: _BaselinePrep,
+    screenshot_command: list[str] | None,
+    evidence_errors: list[str],
+) -> _BundlePrep:
+    phase_started = time.perf_counter()
+    harbor_task_bundle = prep.runner.create_harbor_task_bundle(
+        prep.request,
+        prep.context,
+        bundle_root=prep.layout.harbor_dir / "bundle",
+    )
+    timings = _with_timing(prep.timings, "create_harbor_task_bundle", phase_started)
+    return _BundlePrep(
+        runner=prep.runner,
+        request=prep.request,
+        adapter=prep.adapter,
+        layout=prep.layout,
+        context=prep.context,
+        timings=timings,
+        cache_metadata=prep.cache_metadata,
+        started_at=prep.started_at,
+        screenshot_command=screenshot_command,
+        evidence_errors=evidence_errors,
+        harbor_task_bundle=harbor_task_bundle,
+        run_env=prep.runner._build_harbor_run_env(prep.adapter),
+    )
+
+
+def _prepare_task_image(prep: _BundlePrep) -> _BundlePrep:
+    cache_metadata = dict(prep.cache_metadata)
+    image_ref = prep.runner._task_image_reference(prep.request, prep.harbor_task_bundle)
     if image_ref:
         cache_metadata["image_key"] = image_ref.cache_key
         cache_metadata["image_tag"] = image_ref.tag
-    runner._maybe_run_cache_maintenance(
-        run_env=run_env,
+    prep.runner._maybe_run_cache_maintenance(
+        run_env=prep.run_env,
         active_image_name=image_ref.image_name if image_ref else None,
     )
 
     phase_started = time.perf_counter()
     image_hit = None
     if image_ref:
-        image_hit = runner._ensure_task_image(
-            task_bundle_path=harbor_task_bundle,
-            image_ref=image_ref,
-            harness=request.config.harness.value,
-            run_env=run_env,
-            log_dir=layout.harbor_dir,
-            task_timeout_sec=request.config.timeout_sec,
+        image_hit = prep.runner._ensure_task_image(
+            prep.runner.TaskImageEnsureRequest(
+                task_bundle_path=prep.harbor_task_bundle,
+                image_ref=image_ref,
+                harness=prep.request.config.harness.value,
+                run_env=prep.run_env,
+                log_dir=prep.layout.harbor_dir,
+                task_timeout_sec=prep.request.config.timeout_sec,
+            )
         )
-    prep_phase_timings["_ensure_task_image"] = round(time.perf_counter() - phase_started, 3)
+    timings = _with_timing(prep.timings, "_ensure_task_image", phase_started)
     cache_metadata["image"] = {"hit": image_hit}
+    return replace(prep, timings=timings, cache_metadata=cache_metadata)
 
+
+def _harbor_request(prep: _BundlePrep) -> HarborExecutionRequest:
     harbor_request = HarborExecutionRequest(
-        adapter=adapter,
-        workspace=context.workspace,
-        task_bundle_path=harbor_task_bundle,
-        jobs_dir=layout.harbor_dir / "raw",
-        run_harbor_dir=layout.harbor_dir,
-        run_id=layout.run_id,
-        timeout_sec=runner._harbor_process_timeout(request.config.timeout_sec),
-        run_env=run_env,
+        adapter=prep.adapter,
+        workspace=prep.context.workspace,
+        task_bundle_path=prep.harbor_task_bundle,
+        jobs_dir=prep.layout.harbor_dir / "raw",
+        run_harbor_dir=prep.layout.harbor_dir,
+        run_id=prep.layout.run_id,
+        timeout_sec=prep.runner._harbor_process_timeout(prep.request.config.timeout_sec),
+        run_env=prep.run_env,
     )
-    prep_total_sec = round(time.perf_counter() - prep_started, 3)
+    return harbor_request
+
+
+def _workspace_preparation_result(prep: _BundlePrep) -> WorkspacePreparationPhaseResult:
+    prep_total_sec = round(time.perf_counter() - prep.started_at, 3)
     return WorkspacePreparationPhaseResult(
-        layout=layout,
-        context=context,
-        harbor_request=harbor_request,
-        prep_phase_timings_sec=prep_phase_timings,
+        layout=prep.layout,
+        context=prep.context,
+        harbor_request=_harbor_request(prep),
+        prep_phase_timings_sec=prep.timings,
         prep_total_sec=prep_total_sec,
-        cache_metadata=cache_metadata,
-        auth_metadata=auth_metadata,
-        screenshot_command=tuple(screenshot_command) if screenshot_command else None,
-        evidence_errors=tuple(evidence_errors),
+        cache_metadata=prep.cache_metadata,
+        auth_metadata=prep.adapter.execution_metadata(),
+        screenshot_command=tuple(prep.screenshot_command) if prep.screenshot_command else None,
+        evidence_errors=tuple(prep.evidence_errors),
     )
+
+
+def prepare_workspace_phase(request):
+    """Workspace prep phase: context, preflight, and Harbor bundle creation."""
+
+    start = _prepare_workspace_start(request)
+    baseline = _prepare_baseline_context(start)
+    baseline = _prepare_preflight(baseline)
+    screenshot_command, evidence_errors = _prepare_visual_inputs(baseline)
+    bundle = _prepare_harbor_bundle(baseline, screenshot_command, evidence_errors)
+    bundle = _prepare_task_image(bundle)
+    return _workspace_preparation_result(bundle)
 
 
 def execute_harbor_phase(request, phase):
@@ -210,43 +357,10 @@ def persist_artifacts_phase(request, phase, execution):
     """Artifact persistence phase."""
 
     runner = _runner()
-    evidence_artifacts: dict[str, object] = {
-        "screenshot_command": list(phase.screenshot_command) if phase.screenshot_command else None,
-        "homepage_post": None,
-        "final_workspace_archive": None,
-        "visual": {
-            "actual": None,
-            "reference": None,
-            "diff": None,
-            "regions": [],
-        },
-        "errors": list(phase.evidence_errors),
-    }
-    if phase.screenshot_command and not execution.terminated_early:
-        archive_path, hydrate_error = runner._hydrate_workspace_from_final_app(
-            execution.harbor_result,
-            phase.context.workspace,
-        )
-        if archive_path:
-            evidence_artifacts["final_workspace_archive"] = str(archive_path)
-            post_path, post_error = runner._run_homepage_capture_command(
-                list(phase.screenshot_command),
-                phase.context.workspace,
-                phase.layout.root_dir / "homepage-post.png",
-            )
-            if post_path:
-                evidence_artifacts["homepage_post"] = str(post_path)
-            if post_error:
-                evidence_artifacts["errors"].append(f"homepage-post capture failed: {post_error}")
-            visual_artifacts = runner._persist_visual_evidence_artifacts(
-                request=request,
-                workspace=phase.context.workspace,
-                run_root_dir=phase.layout.root_dir,
-            )
-            evidence_artifacts["visual"] = visual_artifacts
-            runner._rebind_visual_evidence_paths(execution.outputs.visual, visual_artifacts)
-        if hydrate_error:
-            evidence_artifacts["errors"].append(hydrate_error)
+    visual_state = _persist_visual_evidence(runner, request, phase, execution)
+    evidence_artifacts = visual_state.evidence_artifacts
+    if visual_state.hydrate_error:
+        evidence_artifacts["errors"].append(visual_state.hydrate_error)
 
     workspace_prune = runner._prune_workspace_artifacts(phase.layout.workspace_dir)
     workspace_changes = runner._workspace_changes_from_baseline(
@@ -270,6 +384,74 @@ def persist_artifacts_phase(request, phase, execution):
         workspace_prune=workspace_prune,
         workspace_changes=workspace_changes,
     )
+
+
+def _initial_evidence_artifacts(phase) -> dict[str, object]:
+    return {
+        "screenshot_command": list(phase.screenshot_command) if phase.screenshot_command else None,
+        "homepage_post": None,
+        "final_workspace_archive": None,
+        "visual": {
+            "actual": None,
+            "reference": None,
+            "diff": None,
+            "regions": [],
+        },
+        "errors": list(phase.evidence_errors),
+    }
+
+
+def _persist_visual_evidence(runner, request, phase, execution) -> _VisualEvidenceState:
+    evidence_artifacts = _initial_evidence_artifacts(phase)
+    if phase.screenshot_command and not execution.terminated_early:
+        return _persist_hydrated_visual_evidence(
+            _HydratedVisualEvidenceRequest(
+                runner=runner,
+                request=request,
+                phase=phase,
+                execution=execution,
+                evidence_artifacts=evidence_artifacts,
+            )
+        )
+    return _VisualEvidenceState(evidence_artifacts=evidence_artifacts, hydrate_error=None)
+
+
+def _persist_hydrated_visual_evidence(
+    request: _HydratedVisualEvidenceRequest,
+) -> _VisualEvidenceState:
+    archive_path, hydrate_error = request.runner._hydrate_workspace_from_final_app(
+        request.execution.harbor_result,
+        request.phase.context.workspace,
+    )
+    if archive_path:
+        request.evidence_artifacts["final_workspace_archive"] = str(archive_path)
+        _capture_homepage_post(request.runner, request.phase, request.evidence_artifacts)
+        visual_artifacts = request.runner._persist_visual_evidence_artifacts(
+            request.runner.VisualEvidenceRequest(
+                request=request.request,
+                workspace=request.phase.context.workspace,
+                run_root_dir=request.phase.layout.root_dir,
+            )
+        )
+        request.evidence_artifacts["visual"] = visual_artifacts
+        request.runner._rebind_visual_evidence_paths(
+            request.execution.outputs.visual, visual_artifacts
+        )
+    return _VisualEvidenceState(
+        evidence_artifacts=request.evidence_artifacts, hydrate_error=hydrate_error
+    )
+
+
+def _capture_homepage_post(runner, phase, evidence_artifacts) -> None:
+    post_path, post_error = runner._run_homepage_capture_command(
+        list(phase.screenshot_command),
+        phase.context.workspace,
+        phase.layout.root_dir / "homepage-post.png",
+    )
+    if post_path:
+        evidence_artifacts["homepage_post"] = str(post_path)
+    if post_error:
+        evidence_artifacts["errors"].append(f"homepage-post capture failed: {post_error}")
 
 
 def synthesize_scorecard_phase(request, phase, execution, artifacts):

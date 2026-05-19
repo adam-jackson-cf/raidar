@@ -11,7 +11,7 @@ import subprocess
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import TYPE_CHECKING, Any
 
 import click
 import yaml
@@ -28,7 +28,7 @@ from .agents.config import AgentSpec, Harness, ModelTarget
 from .agents.rules import SYSTEM_RULES, inject_rules
 from .application import repo_state
 from .application.execution import (
-    build_run_cli_options as _service_build_run_cli_options,
+    build_run_cli_options_from_request as _service_build_run_cli_options,
 )
 from .application.execution import (
     execute_run_command,
@@ -40,6 +40,7 @@ from .application.execution import resolve_experiments_root as _service_resolve_
 from .application.models import (
     ExecutionDispatchRequest,
     RunCliOptions,
+    RunCliOptionsBuildRequest,
     ScenarioCloneRequest,
     ScenarioInitRequest,
     SuiteExecutionResult,
@@ -139,21 +140,36 @@ def _suite_execution_payload(result: SuiteExecutionResult) -> dict[str, object]:
     return _service_suite_execution_payload(result)
 
 
+def _build_run_options_from_mapping(options: dict[str, object]) -> RunCliOptions:
+    return _service_build_run_cli_options(
+        RunCliOptionsBuildRequest(
+            scenario=options["scenario"],
+            harness=options["harness"],
+            provider=options["provider"],
+            model=options["model"],
+            reasoning_effort=options.get("reasoning_effort"),
+            timeout=options["timeout"],
+            repeats=options["repeats"],
+            repeat_parallel=options["repeat_parallel"],
+            rerun_unscored=options["rerun_unscored"],
+            experiments_root=options.get("experiments_root"),
+            experiment_kind=options.get("experiment_kind"),
+            repo_root=REPO_ROOT,
+        )
+    )
+
+
 def _execute_run_options(
     options: RunCliOptions,
-    *,
-    force_experiment_summary: bool,
-    cleanup_before_runs: bool,
-    echo: bool,
-    execution_suffix: str | None = None,
+    **settings,
 ) -> SuiteExecutionResult:
     return execute_run_command(
         ExecutionDispatchRequest(
             options=options,
-            force_experiment_summary=force_experiment_summary,
-            cleanup_before_runs=cleanup_before_runs,
-            echo=echo,
-            execution_suffix=execution_suffix,
+            force_experiment_summary=settings["force_experiment_summary"],
+            cleanup_before_runs=settings["cleanup_before_runs"],
+            echo=settings["echo"],
+            execution_suffix=settings.get("execution_suffix"),
         ),
         repo_root=REPO_ROOT,
     )
@@ -310,23 +326,26 @@ def _default_archive_dir() -> Path:
 
 def _execution_matches_filters(
     record: dict[str, object],
-    *,
-    scenario: str | None,
-    model: str | None,
-    harness: str | None,
-    evaluation_profile: str | None,
+    filters: dict[str, object],
 ) -> bool:
     scenario_value = str(record.get("scenario_name", "")).lower()
     model_value = str(record.get("model", "")).lower()
     harness_value = str(record.get("harness", "")).lower()
     evaluation_profile_value = str(record.get("evaluation_profile", "")).lower()
-    if scenario and scenario.lower() not in scenario_value:
+    scenario = filters.get("scenario")
+    model = filters.get("model")
+    harness = filters.get("harness")
+    evaluation_profile = filters.get("evaluation_profile")
+    if isinstance(scenario, str) and scenario.lower() not in scenario_value:
         return False
-    if model and model.lower() not in model_value:
+    if isinstance(model, str) and model.lower() not in model_value:
         return False
-    if harness and harness.lower() not in harness_value:
+    if isinstance(harness, str) and harness.lower() not in harness_value:
         return False
-    return not (evaluation_profile and evaluation_profile.lower() not in evaluation_profile_value)
+    return not (
+        isinstance(evaluation_profile, str)
+        and evaluation_profile.lower() not in evaluation_profile_value
+    )
 
 
 @main.command()
@@ -399,36 +418,11 @@ def _execution_matches_filters(
     type=click.Path(path_type=Path),
     help="Override experiment directory root.",
 )
-def run(
-    scenario: Path,
-    harness: str,
-    model: str,
-    provider: str,
-    reasoning_effort: str | None,
-    timeout: int,
-    repeats: int,
-    repeat_parallel: int,
-    rerun_unscored: int,
-    experiment_kind: str,
-    experiments_root: Path | None,
-) -> None:
+def run(**options) -> None:
     """Run one scenario with the specified harness and model for smoke/debug workflows."""
-    options = _service_build_run_cli_options(
-        scenario=scenario,
-        harness=harness,
-        provider=provider,
-        model=model,
-        reasoning_effort=reasoning_effort,
-        timeout=timeout,
-        repeats=repeats,
-        repeat_parallel=repeat_parallel,
-        rerun_unscored=rerun_unscored,
-        experiments_root=experiments_root,
-        experiment_kind=experiment_kind,
-        repo_root=REPO_ROOT,
-    )
+    run_options = _build_run_options_from_mapping(options)
     _execute_run_options(
-        options,
+        run_options,
         force_experiment_summary=False,
         cleanup_before_runs=True,
         echo=True,
@@ -511,43 +505,17 @@ def experiment() -> None:
     help="Override experiment directory root.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
-def experiment_run(
-    scenario: Path,
-    harness: str,
-    model: str,
-    provider: str,
-    reasoning_effort: str | None,
-    timeout: int,
-    repeats: int,
-    repeat_parallel: int,
-    rerun_unscored: int,
-    experiment_kind: str,
-    experiments_root: Path | None,
-    as_json: bool,
-) -> None:
+def experiment_run(**options) -> None:
     """Run a repeated experiment with deterministic aggregate output."""
-    options = _service_build_run_cli_options(
-        scenario=scenario,
-        harness=harness,
-        provider=provider,
-        model=model,
-        reasoning_effort=reasoning_effort,
-        timeout=timeout,
-        repeats=repeats,
-        repeat_parallel=repeat_parallel,
-        rerun_unscored=rerun_unscored,
-        experiments_root=experiments_root,
-        experiment_kind=experiment_kind,
-        repo_root=REPO_ROOT,
-    )
+    run_options = _build_run_options_from_mapping(options)
     result = _execute_run_options(
-        options,
+        run_options,
         force_experiment_summary=True,
         cleanup_before_runs=True,
-        echo=not as_json,
-        execution_suffix=_experiment_execution_suffix(options),
+        echo=not options["as_json"],
+        execution_suffix=_experiment_execution_suffix(run_options),
     )
-    if as_json:
+    if options["as_json"]:
         click.echo(json.dumps(_suite_execution_payload(result), indent=2))
 
 
@@ -739,38 +707,23 @@ def experiments() -> None:
     help="Maximum rows to display.",
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
-def experiments_list(
-    experiments_root: Path | None,
-    experiment_kind: str,
-    scenario: str | None,
-    model: str | None,
-    harness: str | None,
-    evaluation_profile: str | None,
-    limit: int,
-    as_json: bool,
-) -> None:
+def experiments_list(**options) -> None:
     """List experiments with optional filters."""
     resolved_root = _resolve_experiments_root(
-        experiments_root=experiments_root,
-        experiment_kind=experiment_kind,
+        experiments_root=options["experiments_root"],
+        experiment_kind=options["experiment_kind"],
     )
     dirs = _sorted_experiment_dirs(resolved_root)
     rows: list[dict[str, object]] = []
     for path in dirs:
         record = _execution_record(path)
-        if not _execution_matches_filters(
-            record,
-            scenario=scenario,
-            model=model,
-            harness=harness,
-            evaluation_profile=evaluation_profile,
-        ):
+        if not _execution_matches_filters(record, options):
             continue
         rows.append(record)
-        if len(rows) >= limit:
+        if len(rows) >= options["limit"]:
             break
 
-    if as_json:
+    if options["as_json"]:
         click.echo(json.dumps(rows, indent=2))
         return
     if not rows:
@@ -815,20 +768,14 @@ def experiments_list(
     help="Archive destination. Defaults to /tmp/raidar-archive/<timestamp>.",
 )
 @click.option("--dry-run", is_flag=True, help="Show actions without moving files.")
-def experiments_prune(
-    experiments_root: Path | None,
-    experiment_kind: str,
-    keep_per_model: int,
-    archive_dir: Path | None,
-    dry_run: bool,
-) -> None:
+def experiments_prune(**options) -> None:
     """Archive stale experiment artifacts while keeping latest experiments per model."""
-    archive_root = (archive_dir or _default_archive_dir()).resolve()
+    archive_root = (options["archive_dir"] or _default_archive_dir()).resolve()
     experiments_root = _resolve_experiments_root(
-        experiments_root=experiments_root,
-        experiment_kind=experiment_kind,
+        experiments_root=options["experiments_root"],
+        experiment_kind=options["experiment_kind"],
     )
-    if not dry_run:
+    if not options["dry_run"]:
         archive_root.mkdir(parents=True, exist_ok=True)
 
     kept_counts: dict[str, int] = {}
@@ -836,10 +783,10 @@ def experiments_prune(
     for execution_dir in _sorted_experiment_dirs(experiments_root):
         model_key = _execution_model_key(execution_dir)
         count = kept_counts.get(model_key, 0)
-        if count < keep_per_model:
+        if count < options["keep_per_model"]:
             kept_counts[model_key] = count + 1
             continue
-        if _archive_path(execution_dir, archive_root, dry_run=dry_run):
+        if _archive_path(execution_dir, archive_root, dry_run=options["dry_run"]):
             pruned_count += 1
 
     click.echo(f"archive_dir={archive_root}")
@@ -896,33 +843,27 @@ def harness_list() -> None:
     default=1800,
     help="Timeout used to build the agent spec.",
 )
-def harness_validate(
-    harness: str,
-    model: str,
-    provider: str,
-    reasoning_effort: str | None,
-    timeout: int,
-) -> None:
+def harness_validate(**options) -> None:
     """Validate harness adapter wiring and environment requirements."""
     config = AgentSpec(
-        harness=Harness(harness),
+        harness=Harness(options["harness"]),
         model=ModelTarget(
-            provider=provider,
-            name=model,
-            reasoning_effort=reasoning_effort,
+            provider=options["provider"],
+            name=options["model"],
+            reasoning_effort=options["reasoning_effort"],
         ),
-        timeout_sec=timeout,
+        timeout_sec=options["timeout"],
     )
     adapter = resolve_adapter(config)
     adapter.validate()
     runtime_keys = sorted(adapter.runtime_env().keys())
 
     click.echo("Harness validation passed.")
-    click.echo(f"  harness: {harness}")
-    click.echo(f"  provider: {provider}")
-    click.echo(f"  model: {model}")
-    if reasoning_effort is not None:
-        click.echo(f"  reasoning_effort: {reasoning_effort}")
+    click.echo(f"  harness: {options['harness']}")
+    click.echo(f"  provider: {options['provider']}")
+    click.echo(f"  model: {options['model']}")
+    if options["reasoning_effort"] is not None:
+        click.echo(f"  reasoning_effort: {options['reasoning_effort']}")
     click.echo(f"  harbor_harness: {adapter.harbor_harness()}")
     click.echo(f"  model_argument: {adapter.model_argument()}")
     for key, value in adapter.execution_metadata().items():
@@ -1068,34 +1009,24 @@ def scenario_list(scenarios_root: Path) -> None:
 @click.option("--category", type=str, default="greenfield-ui", help="Scenario category.")
 @click.option("--timeout", type=int, default=1800, help="Scenario timeout in seconds.")
 @click.option("--json", "as_json", is_flag=True, help="Emit JSON output.")
-def scenario_init(
-    path: Path,
-    name: str | None,
-    scenario_revision: str,
-    starter_root: str,
-    prompt_entry: str,
-    difficulty: Literal["easy", "medium", "hard"],
-    category: str,
-    timeout: int,
-    as_json: bool,
-) -> None:
+def scenario_init(**options) -> None:
     """Create a new versioned scenario descriptor with prompt artifacts and rules."""
     try:
         result = _service_init_scenario(
             ScenarioInitRequest(
-                path=path,
-                name=name,
-                scenario_revision=scenario_revision,
-                starter_root=starter_root,
-                prompt_entry=prompt_entry,
-                difficulty=difficulty,
-                category=category,
-                timeout_sec=timeout,
+                path=options["path"],
+                name=options["name"],
+                scenario_revision=options["scenario_revision"],
+                starter_root=options["starter_root"],
+                prompt_entry=options["prompt_entry"],
+                difficulty=options["difficulty"],
+                category=options["category"],
+                timeout_sec=options["timeout"],
             )
         )
     except FileExistsError as exc:
         raise click.ClickException(str(exc)) from exc
-    if as_json:
+    if options["as_json"]:
         click.echo(json.dumps(_scenario_init_payload(result), indent=2))
         return
     click.echo(f"Created scenario at {result.scenario_yaml}")
@@ -1276,62 +1207,21 @@ def inject(
     is_flag=True,
     help="Show matrix entries without running",
 )
-def matrix(
-    scenario: tuple[Path, ...],
-    config: Path | None,
-    selector: str | None,
-    timeout: int,
-    repeats: int,
-    repeat_parallel: int,
-    rerun_unscored: int,
-    parallel: int,
-    experiment_kind: str,
-    experiments_root: Path | None,
-    dry_run: bool,
-) -> None:
+def matrix(**options) -> None:
     """Run an experiment matrix from configuration."""
     from .matrix import (
-        MatrixAgentSpec,
-        MatrixConfig,
-        build_selected_matrix_config,
         generate_matrix_entries,
-        load_matrix_config,
     )
 
-    scenario_paths = tuple(path.resolve() for path in scenario)
-    if not scenario_paths:
-        raise click.ClickException("At least one --scenario path is required.")
-    if (config is None) == (selector is None):
-        raise click.ClickException("Provide exactly one of --config or --selector.")
+    scenario_paths = tuple(path.resolve() for path in options["scenario"])
+    _validate_matrix_options(options, scenario_paths)
     scenario_defs = _load_matrix_scenarios(scenario_paths)
-
-    if config is not None:
-        click.echo(f"Loading matrix from {config}")
-        matrix_config: MatrixConfig = load_matrix_config(config)
-    else:
-        click.echo(f"Generating matrix from selector '{selector}'")
-        matrix_config = build_selected_matrix_config(
-            selector=selector,
-            timeout_sec=timeout,
-            repeats=repeats,
-            repeat_parallel=repeat_parallel,
-            retry_void=rerun_unscored,
-        )
-    entries: list[MatrixAgentSpec] = generate_matrix_entries(matrix_config)
-    total_entries = len(entries) * len(scenario_defs)
-    click.echo(
-        f"Matrix defined for {len(matrix_config.agents)} agent specs ({total_entries} experiments)"
-    )
-
+    matrix_config = _matrix_config_from_options(options)
+    entries = generate_matrix_entries(matrix_config)
     experiment_config = matrix_config.experiment
-    click.echo(
-        "Experiment settings: "
-        f"timeout={experiment_config.timeout_sec}s, repeats={experiment_config.repeats}, "
-        "repeat_parallel="
-        f"{experiment_config.repeat_parallel}, rerun_unscored={experiment_config.retry_void}"
-    )
+    _echo_matrix_settings(matrix_config, scenario_defs, entries)
 
-    if dry_run:
+    if options["dry_run"]:
         _echo_matrix_dry_run(
             scenario_defs=scenario_defs,
             entries=entries,
@@ -1341,8 +1231,8 @@ def matrix(
 
     _cleanup_stale_harbor_before_runs()
     resolved_experiments_root = _resolve_experiments_root(
-        experiments_root=experiments_root,
-        experiment_kind=experiment_kind,
+        experiments_root=options["experiments_root"],
+        experiment_kind=options["experiment_kind"],
     )
     jobs = [
         (scenario_path, scenario_def, entry)
@@ -1350,14 +1240,51 @@ def matrix(
         for entry in entries
     ]
     successes, failures = _run_matrix_jobs(
-        jobs=jobs,
+        jobs,
         experiment_config=experiment_config,
         experiments_root=resolved_experiments_root,
-        experiment_kind=experiment_kind,
-        parallel=parallel,
+        experiment_kind=options["experiment_kind"],
+        parallel=options["parallel"],
     )
 
     click.echo(f"Matrix completed: {successes} experiments succeeded, {failures} failed.")
+
+
+def _validate_matrix_options(options: dict[str, object], scenario_paths: tuple[Path, ...]) -> None:
+    if not scenario_paths:
+        raise click.ClickException("At least one --scenario path is required.")
+    if (options["config"] is None) == (options["selector"] is None):
+        raise click.ClickException("Provide exactly one of --config or --selector.")
+
+
+def _matrix_config_from_options(options: dict[str, object]):
+    from .matrix import build_selected_matrix_config, load_matrix_config
+
+    if options["config"] is not None:
+        click.echo(f"Loading matrix from {options['config']}")
+        return load_matrix_config(options["config"])
+    click.echo(f"Generating matrix from selector '{options['selector']}'")
+    return build_selected_matrix_config(
+        selector=options["selector"],
+        timeout_sec=options["timeout"],
+        repeats=options["repeats"],
+        repeat_parallel=options["repeat_parallel"],
+        retry_void=options["rerun_unscored"],
+    )
+
+
+def _echo_matrix_settings(matrix_config, scenario_defs, entries) -> None:
+    total_entries = len(entries) * len(scenario_defs)
+    click.echo(
+        f"Matrix defined for {len(matrix_config.agents)} agent specs ({total_entries} experiments)"
+    )
+    experiment_config = matrix_config.experiment
+    click.echo(
+        "Experiment settings: "
+        f"timeout={experiment_config.timeout_sec}s, repeats={experiment_config.repeats}, "
+        "repeat_parallel="
+        f"{experiment_config.repeat_parallel}, rerun_unscored={experiment_config.retry_void}"
+    )
 
 
 def _load_matrix_scenarios(
@@ -1387,49 +1314,41 @@ def _echo_matrix_dry_run(
             )
 
 
-def _matrix_job_options(
-    *,
-    scenario_path: Path,
-    entry: object,
-    experiment_config: object,
-    experiments_root: Path,
-    experiment_kind: str,
-) -> RunCliOptions:
+def _matrix_job_options(request: dict[str, object]) -> RunCliOptions:
+    entry = request["entry"]
+    experiment_config = request["experiment_config"]
     return _service_build_run_cli_options(
-        scenario=scenario_path,
-        harness=entry.harness,
-        provider=entry.provider,
-        model=entry.model,
-        reasoning_effort=entry.reasoning_effort,
-        timeout=experiment_config.timeout_sec,
-        repeats=experiment_config.repeats,
-        repeat_parallel=experiment_config.repeat_parallel,
-        rerun_unscored=experiment_config.retry_void,
-        experiments_root=experiments_root,
-        experiment_kind=experiment_kind,
-        repo_root=REPO_ROOT,
+        RunCliOptionsBuildRequest(
+            scenario=request["scenario_path"],
+            harness=entry.harness,
+            provider=entry.provider,
+            model=entry.model,
+            reasoning_effort=entry.reasoning_effort,
+            timeout=experiment_config.timeout_sec,
+            repeats=experiment_config.repeats,
+            repeat_parallel=experiment_config.repeat_parallel,
+            rerun_unscored=experiment_config.retry_void,
+            experiments_root=request["experiments_root"],
+            experiment_kind=request["experiment_kind"],
+            repo_root=REPO_ROOT,
+        )
     )
 
 
 def _run_matrix_jobs(
-    *,
     jobs: list[tuple[Path, ScenarioDefinition, object]],
-    experiment_config: object,
-    experiments_root: Path,
-    experiment_kind: str,
-    parallel: int,
+    **settings,
 ) -> tuple[int, int]:
-    successes = 0
-    failures = 0
-
     def _run_matrix_job(job: tuple[Path, ScenarioDefinition, object]) -> SuiteExecutionResult:
         scenario_path, _scenario_def, entry = job
         options = _matrix_job_options(
-            scenario_path=scenario_path,
-            entry=entry,
-            experiment_config=experiment_config,
-            experiments_root=experiments_root,
-            experiment_kind=experiment_kind,
+            {
+                "scenario_path": scenario_path,
+                "entry": entry,
+                "experiment_config": settings["experiment_config"],
+                "experiments_root": settings["experiments_root"],
+                "experiment_kind": settings["experiment_kind"],
+            }
         )
         return _execute_run_options(
             options,
@@ -1439,30 +1358,42 @@ def _run_matrix_jobs(
             execution_suffix=_experiment_execution_suffix(options),
         )
 
-    if parallel > 1:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as executor:
-            future_map = {executor.submit(_run_matrix_job, job): job for job in jobs}
-            for future in concurrent.futures.as_completed(future_map):
-                _scenario_path, scenario_def, entry = future_map[future]
-                try:
-                    result = future.result()
-                except Exception as exc:
-                    click.echo(f"[{scenario_def.name}] {entry.harness}/{entry.model} failed: {exc}")
-                    failures += 1
-                    continue
-                successes += 1
-                click.echo(
-                    f"[{scenario_def.name}] {entry.harness}/{entry.model} -> {result.summary_path}"
-                )
-        return successes, failures
+    if settings["parallel"] > 1:
+        return _run_parallel_matrix_jobs(jobs, settings["parallel"], _run_matrix_job)
 
+    return _run_sequential_matrix_jobs(jobs, _run_matrix_job)
+
+
+def _run_parallel_matrix_jobs(jobs, parallel, run_matrix_job) -> tuple[int, int]:
+    successes = 0
+    failures = 0
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, parallel)) as executor:
+        future_map = {executor.submit(run_matrix_job, job): job for job in jobs}
+        for future in concurrent.futures.as_completed(future_map):
+            _scenario_path, scenario_def, entry = future_map[future]
+            try:
+                result = future.result()
+            except Exception as exc:
+                click.echo(f"[{scenario_def.name}] {entry.harness}/{entry.model} failed: {exc}")
+                failures += 1
+                continue
+            successes += 1
+            click.echo(
+                f"[{scenario_def.name}] {entry.harness}/{entry.model} -> {result.summary_path}"
+            )
+    return successes, failures
+
+
+def _run_sequential_matrix_jobs(jobs, run_matrix_job) -> tuple[int, int]:
+    successes = 0
+    failures = 0
     for scenario_path, scenario_def, entry in jobs:
         click.echo(
             f"Running experiment: {scenario_def.name}@{scenario_def.scenario_revision} "
             f"{entry.harness}/{entry.model}"
         )
         try:
-            result = _run_matrix_job((scenario_path, scenario_def, entry))
+            result = run_matrix_job((scenario_path, scenario_def, entry))
         except Exception as exc:
             click.echo(f"[{scenario_def.name}] {entry.harness}/{entry.model} failed: {exc}")
             failures += 1

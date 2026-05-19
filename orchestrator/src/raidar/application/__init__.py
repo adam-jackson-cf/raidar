@@ -1,7 +1,7 @@
 """Typed application services for the public Raidar workflows."""
 
 from .execution import (
-    build_run_cli_options,
+    build_run_cli_options_from_request,
     execute_run_command,
     experiment_execution_suffix,
     resolve_experiments_root,
@@ -10,6 +10,7 @@ from .models import (
     ExecutionDispatchRequest,
     ExperimentRunRequest,
     RunCliOptions,
+    RunCliOptionsBuildRequest,
     ScenarioCloneRequest,
     ScenarioInitRequest,
     ScenarioInitResult,
@@ -27,12 +28,13 @@ __all__ = [
     "ExecutionDispatchRequest",
     "ExperimentRunRequest",
     "RunCliOptions",
+    "RunCliOptionsBuildRequest",
     "ScenarioCloneRequest",
     "ScenarioInitRequest",
     "ScenarioInitResult",
     "ScenarioValidationResult",
     "SuiteExecutionResult",
-    "build_run_cli_options",
+    "build_run_cli_options_from_request",
     "clone_scenario_revision",
     "execute_run_command",
     "experiment_execution_suffix",

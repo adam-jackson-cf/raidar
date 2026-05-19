@@ -5,7 +5,7 @@ import json
 import subprocess
 import threading
 import time
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -60,85 +60,125 @@ from raidar.schemas.scorecard import (
 from raidar.starter.catalog import StarterSource
 
 
+@dataclass(frozen=True)
+class BaselineWorkspaceFixture:
+    scenario_dir: Path
+    starter_dir: Path
+    baseline_workspace_dir: Path
+
+
+@dataclass(frozen=True)
+class VerifierRunFixture:
+    app_dir: Path
+    logs_dir: Path
+    tests_dir: Path
+
+
+@dataclass(frozen=True)
+class HarborBundleFixture:
+    workspace: Path
+    scenario_dir: Path
+    results_dir: Path
+    scenario: ScenarioDefinition
+
+
 def _sample_scenario() -> ScenarioDefinition:
-    return ScenarioDefinition.model_validate(
-        {
-            "name": "homepage-implementation",
-            "scenario_revision": "v001",
-            "description": "test task",
-            "difficulty": "medium",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {
-                "root": "starter",
-            },
-            "verification": {
-                "setup_actions": [
-                    ["git", "init"],
-                    ["git", "config", "core.hooksPath", ".githooks"],
-                ],
-                "gates": [
-                    {
-                        "name": "typecheck",
-                        "command": ["bun", "run", "typecheck"],
-                        "on_failure": "continue",
-                    },
-                    {
-                        "name": "lint",
-                        "command": ["bun", "run", "lint"],
-                        "on_failure": "continue",
-                    },
-                ],
-                "required_commands": [
-                    ["bun", "run", "build"],
-                ],
-                "coverage_threshold": 0.8,
-                "min_quality_score": 0.9,
-                "workflow": {"atomic_commits_required": False},
-            },
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-                {"type": "core", "id": "test-coverage"},
-            ],
-            "visual": {
-                "reference_image": "./reference/homepage.png",
-                "screenshot_command": ["bun", "run", "capture-screenshot"],
-                "viewport": {"width": 1440, "height": 1024},
-                "scoring": {
-                    "weights": {
-                        "global": 0.25,
-                        "regional": 0.45,
-                        "worst_region": 0.25,
-                        "region_pass_rate": 0.05,
-                    },
-                    "bands": {
-                        "global": {"lower": 0.85, "upper": 0.96},
-                        "regional": {"lower": 0.8, "upper": 0.95},
-                        "worst_region": {"lower": 0.75, "upper": 0.94},
-                    },
-                    "gamma": 2,
-                    "region_pass_threshold": 0.9,
-                },
-                "pass_policy": {
-                    "fail_if_global_below": 0.9,
-                    "fail_if_worst_region_below": 0.85,
-                    "minimum_score": 70,
-                    "minimum_region_pass_rate": 0.75,
-                    "minimum_worst_region": 0.88,
-                    "high_fidelity_score": 85,
-                    "high_fidelity_global": 0.95,
-                    "high_fidelity_worst_region": 0.92,
-                },
-                "regions": [],
-            },
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
+    return ScenarioDefinition.model_validate(_sample_scenario_doc())
+
+
+def _sample_scenario_doc() -> dict[str, object]:
+    return {
+        "name": "homepage-implementation",
+        "scenario_revision": "v001",
+        "description": "test task",
+        "difficulty": "medium",
+        "category": "greenfield-ui",
+        "timeout_sec": 1800,
+        "starter": {"root": "starter"},
+        "verification": _sample_verification_doc(),
+        "acceptance": {},
+        "metrics": _sample_metric_docs(),
+        "visual": _sample_visual_doc(),
+        "prompt": {"entry": "prompt/task.md"},
+    }
+
+
+def _sample_verification_doc() -> dict[str, object]:
+    return {
+        "setup_actions": [
+            ["git", "init"],
+            ["git", "config", "core.hooksPath", ".githooks"],
+        ],
+        "gates": [
+            _verification_gate_doc("typecheck"),
+            _verification_gate_doc("lint"),
+        ],
+        "required_commands": [["bun", "run", "build"]],
+        "coverage_threshold": 0.8,
+        "min_quality_score": 0.9,
+        "workflow": {"atomic_commits_required": False},
+    }
+
+
+def _verification_gate_doc(name: str) -> dict[str, object]:
+    return {
+        "name": name,
+        "command": ["bun", "run", name],
+        "on_failure": "continue",
+    }
+
+
+def _sample_metric_docs() -> list[dict[str, str]]:
+    return [
+        {"type": "core", "id": "functional"},
+        {"type": "core", "id": "acceptance"},
+        {"type": "core", "id": "verification-stability"},
+        {"type": "core", "id": "execution-validity"},
+        {"type": "core", "id": "resource-efficiency"},
+        {"type": "core", "id": "test-coverage"},
+    ]
+
+
+def _sample_visual_doc() -> dict[str, object]:
+    return {
+        "reference_image": "./reference/homepage.png",
+        "screenshot_command": ["bun", "run", "capture-screenshot"],
+        "viewport": {"width": 1440, "height": 1024},
+        "scoring": _sample_visual_scoring_doc(),
+        "pass_policy": _sample_visual_pass_policy_doc(),
+        "regions": [],
+    }
+
+
+def _sample_visual_scoring_doc() -> dict[str, object]:
+    return {
+        "weights": {
+            "global": 0.25,
+            "regional": 0.45,
+            "worst_region": 0.25,
+            "region_pass_rate": 0.05,
+        },
+        "bands": {
+            "global": {"lower": 0.85, "upper": 0.96},
+            "regional": {"lower": 0.8, "upper": 0.95},
+            "worst_region": {"lower": 0.75, "upper": 0.94},
+        },
+        "gamma": 2,
+        "region_pass_threshold": 0.9,
+    }
+
+
+def _sample_visual_pass_policy_doc() -> dict[str, float | int]:
+    return {
+        "fail_if_global_below": 0.9,
+        "fail_if_worst_region_below": 0.85,
+        "minimum_score": 70,
+        "minimum_region_pass_rate": 0.75,
+        "minimum_worst_region": 0.88,
+        "high_fidelity_score": 85,
+        "high_fidelity_global": 0.95,
+        "high_fidelity_worst_region": 0.92,
+    }
 
 
 def _sample_agent_config() -> AgentSpec:
@@ -608,20 +648,384 @@ def _stale_verifier_scorecard_payload() -> dict[str, object]:
     }
 
 
-def test_ensure_baseline_workspace_initializes_once_in_parallel(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
+def _baseline_workspace_fixture(tmp_path: Path) -> BaselineWorkspaceFixture:
     scenario_dir = tmp_path / "scenario" / "v001"
     starter_dir = scenario_dir / "starter"
     starter_dir.mkdir(parents=True, exist_ok=True)
-    baseline_workspace_dir = (
-        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
+    return BaselineWorkspaceFixture(
+        scenario_dir=scenario_dir,
+        starter_dir=starter_dir,
+        baseline_workspace_dir=(
+            tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
+        ),
     )
+
+
+def _baseline_workspace_request(fixture: BaselineWorkspaceFixture):
+    return runner.BaselineWorkspaceRequest(
+        scenario=_sample_scenario(),
+        starter_dir=fixture.starter_dir,
+        baseline_workspace_dir=fixture.baseline_workspace_dir,
+        baseline_cache_key="cache-key",
+        scenario_dir=fixture.scenario_dir,
+        harness="codex-cli",
+    )
+
+
+def _patch_baseline_cache_lock(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+
+
+def _write_mismatched_baseline_metadata(fixture: BaselineWorkspaceFixture) -> None:
+    metadata_path = fixture.baseline_workspace_dir.parent / "metadata.json"
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "cache_key": "cache-key",
+                "baseline_fingerprint": "sha256:not-a-match",
+                "created_at": "2026-03-25T00:00:00+00:00",
+                "harness": "codex-cli",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+
+def _write_codex_log(trial_dir: Path, entries: list[dict[str, object]]) -> None:
+    harness_dir = trial_dir / "agent"
+    harness_dir.mkdir(parents=True, exist_ok=True)
+    (harness_dir / "codex.txt").write_text("\n".join(json.dumps(entry) for entry in entries))
+
+
+def _codex_command_entry(command: str, exit_code: int = 0) -> dict[str, object]:
+    status = "completed" if exit_code == 0 else "failed"
+    return {
+        "type": "item.completed",
+        "item": {
+            "type": "command_execution",
+            "command": f"/bin/bash -lc '{command}'",
+            "exit_code": exit_code,
+            "status": status,
+        },
+    }
+
+
+def _codex_usage_entry(
+    input_tokens: int, cached_input_tokens: int, output_tokens: int
+) -> dict[str, object]:
+    return {
+        "type": "turn.completed",
+        "usage": {
+            "input_tokens": input_tokens,
+            "cached_input_tokens": cached_input_tokens,
+            "output_tokens": output_tokens,
+        },
+    }
+
+
+def _test_and_coverage_scenario() -> ScenarioDefinition:
+    scenario_doc = _sample_scenario_doc()
+    scenario_doc["verification"] = {
+        "gates": [
+            _verification_gate_doc("test"),
+            _verification_gate_doc("test:coverage"),
+        ],
+        "required_commands": [],
+    }
+    scenario_doc["metrics"] = _standard_core_metric_docs()
+    scenario_doc.pop("visual")
+    return ScenarioDefinition.model_validate(scenario_doc)
+
+
+def _assert_codex_usage_and_failure_metrics(metrics) -> None:
+    assert metrics.uncached_input_tokens == 750
+    assert metrics.output_tokens == 100
+    assert metrics.command_count == 2
+    assert metrics.failed_command_count == 1
+    assert metrics.process_failed_command_count == 0
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 2
+    assert metrics.failed_command_categories == {}
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "missing"
+    assert metrics.required_verification_first_pass["bun run build"] == "fail"
+    assert metrics.first_pass_verification_successes == 1
+    assert metrics.first_pass_verification_failures == 1
+    assert metrics.missing_required_verification_commands == 1
+
+
+def _claude_assistant_entry(commands: list[str], usage: dict[str, int]) -> dict[str, object]:
+    return {
+        "type": "assistant",
+        "message": {
+            "id": "msg_1",
+            "usage": usage,
+            "content": [
+                {
+                    "type": "tool_use",
+                    "id": f"toolu_{index}",
+                    "name": "Bash",
+                    "input": {"command": command},
+                }
+                for index, command in enumerate(commands)
+            ],
+        },
+    }
+
+
+def _claude_tool_results(count: int) -> dict[str, object]:
+    return {
+        "type": "user",
+        "message": {
+            "content": [
+                {
+                    "type": "tool_result",
+                    "tool_use_id": f"toolu_{index}",
+                    "is_error": False,
+                }
+                for index in range(count)
+            ]
+        },
+    }
+
+
+def _write_claude_jsonl(path: Path, commands: list[str], usage: dict[str, int]) -> None:
+    entries = [_claude_assistant_entry(commands, usage), _claude_tool_results(len(commands))]
+    path.write_text("\n".join(json.dumps(entry) for entry in entries))
+
+
+def _assert_claude_required_verification(metrics) -> None:
+    assert metrics.command_count == 2
+    assert metrics.required_verification_commands == 3
+    assert metrics.executed_required_verification_commands == 2
+    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
+    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
+    assert metrics.required_verification_first_pass["bun run build"] == "missing"
+
+
+def _gate_event(index: int, gate_name: str, command: str) -> GateEvent:
+    return GateEvent(
+        timestamp=f"2026-01-01T00:00:0{index}Z",
+        gate_name=gate_name,
+        command=command,
+        exit_code=0,
+        stdout="",
+        stderr="",
+        failure_category=None,
+        is_repeat=False,
+    )
+
+
+def _successful_required_gate_history() -> list[GateEvent]:
+    return [
+        _gate_event(0, "typecheck", "bun run typecheck"),
+        _gate_event(1, "lint", "bun run lint"),
+        _gate_event(2, "coverage", "bun run test:coverage"),
+        _gate_event(3, "build", "bun run build"),
+    ]
+
+
+def _execution_validity_check(scorecard, name: str):
+    return next(check for check in scorecard.execution_validity.checks if check.name == name)
+
+
+def _score_context_with_gate_history(score_context, gate_history: list[GateEvent]):
+    return replace(
+        score_context,
+        execution=replace(
+            score_context.execution,
+            process_metrics=replace(
+                score_context.execution.process_metrics,
+                required_verification_commands=3,
+                executed_required_verification_commands=3,
+            ),
+            outputs=replace(score_context.execution.outputs, gate_history=gate_history),
+        ),
+    )
+
+
+def _score_context_with_verifier_timings(score_context, trial_dir: Path):
+    return replace(
+        score_context,
+        execution=replace(
+            score_context.execution,
+            harbor_result=replace(score_context.execution.harbor_result, trial_dir=trial_dir),
+        ),
+    )
+
+
+def _write_verifier_timing_artifacts(trial_dir: Path, raw_timings) -> None:
+    verifier_dir = trial_dir / "verifier"
+    verifier_dir.mkdir(parents=True, exist_ok=True)
+    (trial_dir / "result.json").write_text(
+        json.dumps(
+            {
+                "started_at": "2026-05-13T00:00:00",
+                "finished_at": "2026-05-13T00:00:10",
+            }
+        ),
+        encoding="utf-8",
+    )
+    (verifier_dir / "scorecard.json").write_text(
+        json.dumps({"metadata": {"command_timings_sec": raw_timings}}),
+        encoding="utf-8",
+    )
+
+
+def _verifier_fixture(tmp_path: Path) -> VerifierRunFixture:
+    fixture = VerifierRunFixture(
+        app_dir=tmp_path / "app",
+        logs_dir=tmp_path / "logs",
+        tests_dir=tmp_path / "tests",
+    )
+    fixture.logs_dir.mkdir(parents=True, exist_ok=True)
+    fixture.tests_dir.mkdir(parents=True, exist_ok=True)
+    fixture.app_dir.mkdir(parents=True, exist_ok=True)
+    (fixture.app_dir / "package.json").write_text("{}", encoding="utf-8")
+    (fixture.app_dir / "bun.lock").write_text("", encoding="utf-8")
+    return fixture
+
+
+def _write_verifier_spec(
+    fixture: VerifierRunFixture, deterministic_checks: list[dict[str, str]]
+) -> Path:
+    scenario_spec_path = fixture.tests_dir / "scenario-spec.json"
+    scenario_spec_path.write_text(
+        json.dumps(_verifier_spec_doc(deterministic_checks), indent=2),
+        encoding="utf-8",
+    )
+    return scenario_spec_path
+
+
+def _verifier_spec_doc(deterministic_checks: list[dict[str, str]]) -> dict[str, object]:
+    return {
+        "metrics": [],
+        "verification": {
+            "max_gate_failures": 3,
+            "coverage_threshold": None,
+            "min_quality_score": 0,
+            "gates": [],
+            "workflow": {"atomic_commits_required": False},
+        },
+        "acceptance": {
+            "deterministic_checks": deterministic_checks,
+            "requirements": [],
+        },
+        "weights": {
+            "functional": 0.25,
+            "acceptance": 0.25,
+            "visual": 0.25,
+            "verification_stability": 0.25,
+        },
+        "baseline_scripts": {},
+    }
+
+
+def _run_verifier_script(fixture: VerifierRunFixture, scenario_spec_path: Path):
+    score_script = fixture.tests_dir / "score-scenario.mjs"
+    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
+    return subprocess.run(
+        ["bun", str(score_script), str(scenario_spec_path)],
+        cwd=fixture.tests_dir,
+        env={
+            **runner.os.environ,
+            "RAIDAR_APP_DIR": str(fixture.app_dir),
+            "RAIDAR_LOG_DIR": str(fixture.logs_dir),
+        },
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+
+def _verifier_scorecard(fixture: VerifierRunFixture) -> dict[str, object]:
+    return json.loads((fixture.logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+
+
+def _simple_bundle_scenario() -> ScenarioDefinition:
+    scenario_doc = _sample_scenario_doc()
+    scenario_doc.update(
+        {
+            "name": "hello-world-smoke",
+            "description": "test task",
+            "difficulty": "easy",
+            "metrics": _standard_core_metric_docs(),
+        }
+    )
+    scenario_doc.pop("visual")
+    return ScenarioDefinition.model_validate(scenario_doc)
+
+
+def _standard_core_metric_docs() -> list[dict[str, str]]:
+    return [
+        {"type": "core", "id": "functional"},
+        {"type": "core", "id": "acceptance"},
+        {"type": "core", "id": "verification-stability"},
+        {"type": "core", "id": "execution-validity"},
+        {"type": "core", "id": "resource-efficiency"},
+    ]
+
+
+def _harbor_bundle_fixture(tmp_path: Path, *, prompt: str = "Print hello world\n"):
+    fixture = HarborBundleFixture(
+        workspace=tmp_path / "workspace",
+        scenario_dir=tmp_path / "scenario",
+        results_dir=tmp_path / "results",
+        scenario=_simple_bundle_scenario(),
+    )
+    fixture.scenario_dir.mkdir(parents=True, exist_ok=True)
+    fixture.results_dir.mkdir(parents=True, exist_ok=True)
+    _seed_workspace_tree(fixture.workspace)
+    (fixture.scenario_dir / "scenario.yaml").write_text(
+        "name: hello-world-smoke\nscenario_revision: v001\n"
+    )
+    (fixture.scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
+    (fixture.scenario_dir / "prompt" / "task.md").write_text(prompt)
+    return fixture
+
+
+def _create_bundle(fixture: HarborBundleFixture, harness: Harness = Harness.CODEX_CLI):
+    request = _bundle_run_request(fixture, harness)
+    context = _sample_workspace_context(fixture.workspace, scenario_name="hello-world-smoke")
+    return create_harbor_task_bundle(
+        request,
+        context,
+        bundle_root=fixture.results_dir / "runs" / "run-01" / "harbor" / "bundle",
+    )
+
+
+def _bundle_run_request(
+    fixture: HarborBundleFixture, harness: Harness = Harness.CODEX_CLI
+) -> RunRequest:
+    request = RunRequest(
+        scenario=fixture.scenario,
+        config=AgentSpec(
+            harness=harness,
+            model=_bundle_model_target(harness),
+            timeout_sec=1800,
+        ),
+        scenario_dir=fixture.scenario_dir,
+        execution_dir=fixture.results_dir,
+        repeat_index=1,
+    )
+    return request
+
+
+def _bundle_model_target(harness: Harness) -> ModelTarget:
+    if harness == Harness.GEMINI:
+        return ModelTarget(provider="google", name="gemini-3-flash-preview")
+    return ModelTarget(provider="openai", name="gpt-5.5", reasoning_effort="low")
+
+
+def test_ensure_baseline_workspace_initializes_once_in_parallel(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fixture = _baseline_workspace_fixture(tmp_path)
     call_count = 0
     call_lock = threading.Lock()
     start_barrier = threading.Barrier(3)
 
-    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
         starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
@@ -641,14 +1045,7 @@ def test_ensure_baseline_workspace_initializes_once_in_parallel(
     def _run() -> None:
         try:
             start_barrier.wait(timeout=1.0)
-            _ensure_baseline_workspace(
-                scenario=_sample_scenario(),
-                starter_dir=starter_dir,
-                baseline_workspace_dir=baseline_workspace_dir,
-                baseline_cache_key="cache-key",
-                scenario_dir=scenario_dir,
-                harness="codex-cli",
-            )
+            _ensure_baseline_workspace(_baseline_workspace_request(fixture))
         except Exception as exc:  # pragma: no cover - assertion below surfaces failure
             failures.append(exc)
 
@@ -666,15 +1063,11 @@ def test_ensure_baseline_workspace_initializes_once_in_parallel(
 def test_ensure_baseline_workspace_runs_setup_actions_once(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario_dir = tmp_path / "scenario" / "v001"
-    starter_dir = scenario_dir / "starter"
-    starter_dir.mkdir(parents=True, exist_ok=True)
-    baseline_workspace_dir = (
-        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
-    )
+    fixture = _baseline_workspace_fixture(tmp_path)
+    baseline_workspace_dir = fixture.baseline_workspace_dir
     setup_calls: list[list[str]] = []
 
-    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
         starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
@@ -698,14 +1091,7 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
     monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
     monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
 
-    _ensure_baseline_workspace(
-        scenario=_sample_scenario(),
-        starter_dir=starter_dir,
-        baseline_workspace_dir=baseline_workspace_dir,
-        baseline_cache_key="cache-key",
-        scenario_dir=scenario_dir,
-        harness="codex-cli",
-    )
+    _ensure_baseline_workspace(_baseline_workspace_request(fixture))
 
     assert setup_calls == [
         ["git", "init"],
@@ -719,19 +1105,15 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
 def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario_dir = tmp_path / "scenario" / "v001"
-    starter_dir = scenario_dir / "starter"
-    starter_dir.mkdir(parents=True, exist_ok=True)
-    baseline_workspace_dir = (
-        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
-    )
+    fixture = _baseline_workspace_fixture(tmp_path)
+    baseline_workspace_dir = fixture.baseline_workspace_dir
     baseline_workspace_dir.mkdir(parents=True, exist_ok=True)
     (baseline_workspace_dir / "partial.txt").write_text("stale\n", encoding="utf-8")
 
     prepare_calls = 0
     setup_calls = 0
 
-    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
         starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
@@ -754,14 +1136,7 @@ def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
     monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
     monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", fake_run_setup_actions)
 
-    cache_result = _ensure_baseline_workspace(
-        scenario=_sample_scenario(),
-        starter_dir=starter_dir,
-        baseline_workspace_dir=baseline_workspace_dir,
-        baseline_cache_key="cache-key",
-        scenario_dir=scenario_dir,
-        harness="codex-cli",
-    )
+    cache_result = _ensure_baseline_workspace(_baseline_workspace_request(fixture))
 
     assert cache_result.hit is False
     assert cache_result.status == "invalidated"
@@ -774,30 +1149,15 @@ def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
 def test_ensure_baseline_workspace_rebuilds_fingerprint_mismatch_cache_entry(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    scenario_dir = tmp_path / "scenario" / "v001"
-    starter_dir = scenario_dir / "starter"
-    starter_dir.mkdir(parents=True, exist_ok=True)
-    baseline_workspace_dir = (
-        tmp_path / ".cache" / "raidar" / "prep" / "baselines" / "cache-key" / "workspace"
-    )
+    fixture = _baseline_workspace_fixture(tmp_path)
+    baseline_workspace_dir = fixture.baseline_workspace_dir
     baseline_workspace_dir.mkdir(parents=True, exist_ok=True)
     (baseline_workspace_dir / "partial.txt").write_text("tampered\n", encoding="utf-8")
-    metadata_path = baseline_workspace_dir.parent / "metadata.json"
-    metadata_path.write_text(
-        json.dumps(
-            {
-                "cache_key": "cache-key",
-                "baseline_fingerprint": "sha256:not-a-match",
-                "created_at": "2026-03-25T00:00:00+00:00",
-                "harness": "codex-cli",
-            }
-        ),
-        encoding="utf-8",
-    )
+    _write_mismatched_baseline_metadata(fixture)
 
     prepare_calls = 0
 
-    monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
+    _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
         starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
@@ -812,14 +1172,7 @@ def test_ensure_baseline_workspace_rebuilds_fingerprint_mismatch_cache_entry(
     monkeypatch.setattr("raidar.runner.prepare_workspace", fake_prepare_workspace)
     monkeypatch.setattr("raidar.runner._run_workspace_setup_actions", lambda **_kwargs: None)
 
-    cache_result = _ensure_baseline_workspace(
-        scenario=_sample_scenario(),
-        starter_dir=starter_dir,
-        baseline_workspace_dir=baseline_workspace_dir,
-        baseline_cache_key="cache-key",
-        scenario_dir=scenario_dir,
-        harness="codex-cli",
-    )
+    cache_result = _ensure_baseline_workspace(_baseline_workspace_request(fixture))
 
     assert cache_result.hit is False
     assert cache_result.status == "invalidated"
@@ -830,131 +1183,32 @@ def test_ensure_baseline_workspace_rebuilds_fingerprint_mismatch_cache_entry(
 
 def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    harness_dir = trial_dir / "agent"
-    harness_dir.mkdir(parents=True, exist_ok=True)
-    codex_log = harness_dir / "codex.txt"
-    entries = [
-        {
-            "type": "item.completed",
-            "item": {
-                "type": "command_execution",
-                "command": "/bin/bash -lc 'bun run typecheck'",
-                "exit_code": 0,
-                "status": "completed",
-            },
-        },
-        {
-            "type": "item.completed",
-            "item": {
-                "type": "command_execution",
-                "command": "/bin/bash -lc 'bun run build'",
-                "exit_code": 1,
-                "status": "failed",
-            },
-        },
-        {
-            "type": "turn.completed",
-            "usage": {
-                "input_tokens": 1000,
-                "cached_input_tokens": 250,
-                "output_tokens": 100,
-            },
-        },
-    ]
-    codex_log.write_text("\n".join(json.dumps(entry) for entry in entries))
+    _write_codex_log(
+        trial_dir,
+        [
+            _codex_command_entry("bun run typecheck"),
+            _codex_command_entry("bun run build", exit_code=1),
+            _codex_usage_entry(1000, 250, 100),
+        ],
+    )
 
     metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
 
-    assert metrics.uncached_input_tokens == 750
-    assert metrics.output_tokens == 100
-    assert metrics.command_count == 2
-    assert metrics.failed_command_count == 1
-    assert metrics.process_failed_command_count == 0
-    assert metrics.required_verification_commands == 3
-    assert metrics.executed_required_verification_commands == 2
-    assert metrics.failed_command_categories == {}
-    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
-    assert metrics.required_verification_first_pass["bun run lint"] == "missing"
-    assert metrics.required_verification_first_pass["bun run build"] == "fail"
-    assert metrics.first_pass_verification_successes == 1
-    assert metrics.first_pass_verification_failures == 1
-    assert metrics.missing_required_verification_commands == 1
+    _assert_codex_usage_and_failure_metrics(metrics)
 
 
 def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path):
     trial_dir = tmp_path / "trial"
-    harness_dir = trial_dir / "agent"
-    harness_dir.mkdir(parents=True, exist_ok=True)
-    codex_log = harness_dir / "codex.txt"
-    entries = [
-        {
-            "type": "item.completed",
-            "item": {
-                "type": "command_execution",
-                "command": "/bin/bash -lc 'bun run test'",
-                "exit_code": 0,
-                "status": "completed",
-            },
-        },
-        {
-            "type": "item.completed",
-            "item": {
-                "type": "command_execution",
-                "command": "/bin/bash -lc 'bun run test:coverage'",
-                "exit_code": 0,
-                "status": "completed",
-            },
-        },
-        {
-            "type": "turn.completed",
-            "usage": {
-                "input_tokens": 10,
-                "cached_input_tokens": 0,
-                "output_tokens": 5,
-            },
-        },
-    ]
-    codex_log.write_text("\n".join(json.dumps(entry) for entry in entries))
-
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "homepage-implementation",
-            "scenario_revision": "v001",
-            "description": "test task",
-            "difficulty": "medium",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {
-                "root": "starter",
-            },
-            "verification": {
-                "gates": [
-                    {
-                        "name": "test",
-                        "command": ["bun", "run", "test"],
-                        "on_failure": "continue",
-                    },
-                    {
-                        "name": "coverage",
-                        "command": ["bun", "run", "test:coverage"],
-                        "on_failure": "continue",
-                    },
-                ],
-                "required_commands": [],
-            },
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-            ],
-            "prompt": {"entry": "prompt/task.md"},
-        }
+    _write_codex_log(
+        trial_dir,
+        [
+            _codex_command_entry("bun run test"),
+            _codex_command_entry("bun run test:coverage"),
+            _codex_usage_entry(10, 0, 5),
+        ],
     )
 
-    metrics = collect_process_metrics(scenario, trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(_test_and_coverage_scenario(), trial_dir, harness="codex-cli")
 
     assert metrics.required_verification_commands == 2
     assert metrics.executed_required_verification_commands == 2
@@ -1084,135 +1338,31 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
     trial_dir = tmp_path / "trial"
     command_dir = trial_dir / "agent" / "command-1"
     command_dir.mkdir(parents=True, exist_ok=True)
-    (command_dir / "stdout.txt").write_text(
-        "\n".join(
-            [
-                json.dumps(
-                    {
-                        "type": "assistant",
-                        "message": {
-                            "id": "msg_1",
-                            "usage": {
-                                "input_tokens": 70,
-                                "cache_read_input_tokens": 20,
-                                "output_tokens": 9,
-                            },
-                            "content": [
-                                {
-                                    "type": "tool_use",
-                                    "id": "toolu_typecheck",
-                                    "name": "Bash",
-                                    "input": {"command": "bunx tsc --noEmit"},
-                                },
-                                {
-                                    "type": "tool_use",
-                                    "id": "toolu_lint",
-                                    "name": "Bash",
-                                    "input": {"command": "npm run lint"},
-                                },
-                            ],
-                        },
-                    }
-                ),
-                json.dumps(
-                    {
-                        "type": "user",
-                        "message": {
-                            "content": [
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": "toolu_typecheck",
-                                    "is_error": False,
-                                },
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": "toolu_lint",
-                                    "is_error": False,
-                                },
-                            ]
-                        },
-                    }
-                ),
-            ]
-        )
+    _write_claude_jsonl(
+        command_dir / "stdout.txt",
+        ["bunx tsc --noEmit", "npm run lint"],
+        {"input_tokens": 70, "cache_read_input_tokens": 20, "output_tokens": 9},
     )
 
     metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
 
-    assert metrics.command_count == 2
     assert metrics.failed_command_count == 0
-    assert metrics.required_verification_commands == 3
-    assert metrics.executed_required_verification_commands == 2
-    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
-    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
-    assert metrics.required_verification_first_pass["bun run build"] == "missing"
+    _assert_claude_required_verification(metrics)
 
 
 def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_path: Path):
     trial_dir = tmp_path / "trial"
     harness_dir = trial_dir / "agent"
     harness_dir.mkdir(parents=True, exist_ok=True)
-    (harness_dir / "claude-code.txt").write_text(
-        "\n".join(
-            [
-                json.dumps(
-                    {
-                        "type": "assistant",
-                        "message": {
-                            "id": "msg_1",
-                            "usage": {
-                                "input_tokens": 50,
-                                "cache_read_input_tokens": 0,
-                                "output_tokens": 7,
-                            },
-                            "content": [
-                                {
-                                    "type": "tool_use",
-                                    "id": "toolu_typecheck",
-                                    "name": "Bash",
-                                    "input": {"command": "bun run typecheck"},
-                                },
-                                {
-                                    "type": "tool_use",
-                                    "id": "toolu_lint",
-                                    "name": "Bash",
-                                    "input": {"command": "bun run lint"},
-                                },
-                            ],
-                        },
-                    }
-                ),
-                json.dumps(
-                    {
-                        "type": "user",
-                        "message": {
-                            "content": [
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": "toolu_typecheck",
-                                    "is_error": False,
-                                },
-                                {
-                                    "type": "tool_result",
-                                    "tool_use_id": "toolu_lint",
-                                    "is_error": False,
-                                },
-                            ]
-                        },
-                    }
-                ),
-            ]
-        )
+    _write_claude_jsonl(
+        harness_dir / "claude-code.txt",
+        ["bun run typecheck", "bun run lint"],
+        {"input_tokens": 50, "cache_read_input_tokens": 0, "output_tokens": 7},
     )
 
     metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
 
-    assert metrics.command_count == 2
-    assert metrics.required_verification_commands == 3
-    assert metrics.executed_required_verification_commands == 2
-    assert metrics.required_verification_first_pass["bun run typecheck"] == "pass"
-    assert metrics.required_verification_first_pass["bun run lint"] == "pass"
-    assert metrics.required_verification_first_pass["bun run build"] == "missing"
+    _assert_claude_required_verification(metrics)
 
 
 def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
@@ -1581,70 +1731,14 @@ def test_build_scorecard_accepts_observed_required_verification_from_gate_histor
         terminated_early=False,
         termination_reason=None,
     )
-    gate_history = [
-        GateEvent(
-            timestamp="2026-01-01T00:00:00Z",
-            gate_name="typecheck",
-            command="bun run typecheck",
-            exit_code=0,
-            stdout="",
-            stderr="",
-            failure_category=None,
-            is_repeat=False,
-        ),
-        GateEvent(
-            timestamp="2026-01-01T00:00:01Z",
-            gate_name="lint",
-            command="bun run lint",
-            exit_code=0,
-            stdout="",
-            stderr="",
-            failure_category=None,
-            is_repeat=False,
-        ),
-        GateEvent(
-            timestamp="2026-01-01T00:00:02Z",
-            gate_name="coverage",
-            command="bun run test:coverage",
-            exit_code=0,
-            stdout="",
-            stderr="",
-            failure_category=None,
-            is_repeat=False,
-        ),
-        GateEvent(
-            timestamp="2026-01-01T00:00:03Z",
-            gate_name="build",
-            command="bun run build",
-            exit_code=0,
-            stdout="",
-            stderr="",
-            failure_category=None,
-            is_repeat=False,
-        ),
-    ]
-    score_context = replace(
-        score_context,
-        execution=replace(
-            score_context.execution,
-            process_metrics=replace(
-                score_context.execution.process_metrics,
-                required_verification_commands=3,
-                executed_required_verification_commands=3,
-            ),
-            outputs=replace(
-                score_context.execution.outputs,
-                gate_history=gate_history,
-            ),
-        ),
+    score_context = _score_context_with_gate_history(
+        score_context, _successful_required_gate_history()
     )
 
     scorecard = build_scorecard(score_context)
 
-    verification_check = next(
-        check
-        for check in scorecard.execution_validity.checks
-        if check.name == "required_verification_commands_executed"
+    verification_check = _execution_validity_check(
+        scorecard, "required_verification_commands_executed"
     )
     assert verification_check.passed is True
     assert verification_check.evidence == "observed=3/3, explicit=3/3"
@@ -1690,33 +1784,13 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
         termination_reason=None,
     )
     trial_dir = tmp_path / "jobs" / "orchestrator-run-1234" / "trial-01"
-    verifier_dir = trial_dir / "verifier"
-    verifier_dir.mkdir(parents=True, exist_ok=True)
-    (trial_dir / "result.json").write_text(
-        json.dumps(
-            {
-                "started_at": "2026-05-13T00:00:00",
-                "finished_at": "2026-05-13T00:00:10",
-            }
-        ),
-        encoding="utf-8",
-    )
     raw_timings = {
         "functional_build": 11.423,
         "functional_test": 0.357,
         "gates": [{"gate_name": "lint", "command": "bun run lint", "duration_sec": 1.234}],
     }
-    (verifier_dir / "scorecard.json").write_text(
-        json.dumps({"metadata": {"command_timings_sec": raw_timings}}),
-        encoding="utf-8",
-    )
-    score_context = replace(
-        score_context,
-        execution=replace(
-            score_context.execution,
-            harbor_result=replace(score_context.execution.harbor_result, trial_dir=trial_dir),
-        ),
-    )
+    _write_verifier_timing_artifacts(trial_dir, raw_timings)
+    score_context = _score_context_with_verifier_timings(score_context, trial_dir)
 
     scorecard = build_scorecard(score_context)
     harbor_meta = scorecard.metadata["harbor"]
@@ -1745,216 +1819,89 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
 def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
     tmp_path: Path,
 ) -> None:
-    app_dir = tmp_path / "app"
-    logs_dir = tmp_path / "logs"
-    tests_dir = tmp_path / "tests"
-    app_dir.mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    tests_dir.mkdir(parents=True, exist_ok=True)
-    (app_dir / "package.json").write_text("{}", encoding="utf-8")
-    (app_dir / "bun.lock").write_text("", encoding="utf-8")
-    (app_dir / "src" / "components" / "sections").mkdir(parents=True, exist_ok=True)
-    (app_dir / "src" / "components" / "sections" / "Hero.tsx").write_text(
+    fixture = _verifier_fixture(tmp_path)
+    (fixture.app_dir / "src" / "components" / "sections").mkdir(parents=True, exist_ok=True)
+    (fixture.app_dir / "src" / "components" / "sections" / "Hero.tsx").write_text(
         "export function Hero() { return null; }\n",
         encoding="utf-8",
     )
-    (app_dir / "src" / "components" / "sections" / "nested").mkdir(parents=True, exist_ok=True)
-    (app_dir / "src" / "components" / "sections" / "nested" / "Footer.tsx").write_text(
+    (fixture.app_dir / "src" / "components" / "sections" / "nested").mkdir(
+        parents=True, exist_ok=True
+    )
+    (fixture.app_dir / "src" / "components" / "sections" / "nested" / "Footer.tsx").write_text(
         "export function Footer() { return null; }\n",
         encoding="utf-8",
     )
-
-    scenario_spec_path = tests_dir / "scenario-spec.json"
-    scenario_spec_path.write_text(
-        json.dumps(
+    scenario_spec_path = _write_verifier_spec(
+        fixture,
+        [
             {
-                "metrics": [],
-                "verification": {
-                    "max_gate_failures": 3,
-                    "coverage_threshold": None,
-                    "min_quality_score": 0,
-                    "gates": [],
-                    "workflow": {"atomic_commits_required": False},
-                },
-                "acceptance": {
-                    "deterministic_checks": [
-                        {
-                            "type": "file_exists",
-                            "pattern": "src/components/sections/**/*.tsx",
-                            "description": "direct or nested section component exists",
-                        }
-                    ],
-                    "requirements": [],
-                },
-                "weights": {
-                    "functional": 0.25,
-                    "acceptance": 0.25,
-                    "visual": 0.25,
-                    "verification_stability": 0.25,
-                },
-                "baseline_scripts": {},
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
+                "type": "file_exists",
+                "pattern": "src/components/sections/**/*.tsx",
+                "description": "direct or nested section component exists",
+            }
+        ],
     )
-    score_script = tests_dir / "score-scenario.mjs"
-    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
 
-    completed = subprocess.run(
-        ["bun", str(score_script), str(scenario_spec_path)],
-        cwd=tests_dir,
-        env={
-            **runner.os.environ,
-            "RAIDAR_APP_DIR": str(app_dir),
-            "RAIDAR_LOG_DIR": str(logs_dir),
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    completed = _run_verifier_script(fixture, scenario_spec_path)
 
     assert completed.returncode == 0, completed.stderr
-    scorecard = json.loads((logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+    scorecard = _verifier_scorecard(fixture)
     assert scorecard["acceptance"]["checks"][0]["passed"] is True
 
 
 def test_verifier_rejects_unsafe_no_pattern_regex(tmp_path: Path) -> None:
-    app_dir = tmp_path / "app"
-    logs_dir = tmp_path / "logs"
-    tests_dir = tmp_path / "tests"
-    (app_dir / "src").mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    tests_dir.mkdir(parents=True, exist_ok=True)
-    (app_dir / "package.json").write_text("{}", encoding="utf-8")
-    (app_dir / "bun.lock").write_text("", encoding="utf-8")
-    (app_dir / "src" / "App.tsx").write_text("export const value = 'aaaa';\n", encoding="utf-8")
-
-    scenario_spec_path = tests_dir / "scenario-spec.json"
-    scenario_spec_path.write_text(
-        json.dumps(
+    fixture = _verifier_fixture(tmp_path)
+    (fixture.app_dir / "src").mkdir(parents=True, exist_ok=True)
+    (fixture.app_dir / "src" / "App.tsx").write_text(
+        "export const value = 'aaaa';\n", encoding="utf-8"
+    )
+    scenario_spec_path = _write_verifier_spec(
+        fixture,
+        [
             {
-                "metrics": [],
-                "verification": {
-                    "max_gate_failures": 3,
-                    "coverage_threshold": None,
-                    "min_quality_score": 0,
-                    "gates": [],
-                    "workflow": {"atomic_commits_required": False},
-                },
-                "acceptance": {
-                    "deterministic_checks": [
-                        {
-                            "type": "no_pattern",
-                            "pattern": "(a+)+$",
-                            "description": "unsafe regex is rejected",
-                        }
-                    ],
-                    "requirements": [],
-                },
-                "weights": {
-                    "functional": 0.25,
-                    "acceptance": 0.25,
-                    "visual": 0.25,
-                    "verification_stability": 0.25,
-                },
-                "baseline_scripts": {},
-            },
-            indent=2,
-        ),
-        encoding="utf-8",
+                "type": "no_pattern",
+                "pattern": "(a+)+$",
+                "description": "unsafe regex is rejected",
+            }
+        ],
     )
-    score_script = tests_dir / "score-scenario.mjs"
-    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
 
-    completed = subprocess.run(
-        ["bun", str(score_script), str(scenario_spec_path)],
-        cwd=tests_dir,
-        env={
-            **runner.os.environ,
-            "RAIDAR_APP_DIR": str(app_dir),
-            "RAIDAR_LOG_DIR": str(logs_dir),
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    completed = _run_verifier_script(fixture, scenario_spec_path)
 
     assert completed.returncode == 0, completed.stderr
-    scorecard = json.loads((logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+    scorecard = _verifier_scorecard(fixture)
     check = scorecard["acceptance"]["checks"][0]
     assert check["passed"] is False
     assert "Unsafe regex pattern" in check["evidence"]
 
 
 def test_verifier_no_pattern_uses_bounded_literal_matching(tmp_path: Path) -> None:
-    app_dir = tmp_path / "app"
-    logs_dir = tmp_path / "logs"
-    tests_dir = tmp_path / "tests"
-    (app_dir / "src").mkdir(parents=True, exist_ok=True)
-    logs_dir.mkdir(parents=True, exist_ok=True)
-    tests_dir.mkdir(parents=True, exist_ok=True)
-    (app_dir / "package.json").write_text("{}", encoding="utf-8")
-    (app_dir / "bun.lock").write_text("", encoding="utf-8")
-    (app_dir / "src" / "App.tsx").write_text("export const value = 'ok';\n", encoding="utf-8")
-
-    scenario_spec_path = tests_dir / "scenario-spec.json"
-    scenario_spec_path.write_text(
-        json.dumps(
+    fixture = _verifier_fixture(tmp_path)
+    (fixture.app_dir / "src").mkdir(parents=True, exist_ok=True)
+    (fixture.app_dir / "src" / "App.tsx").write_text(
+        "export const value = 'ok';\n", encoding="utf-8"
+    )
+    scenario_spec_path = _write_verifier_spec(
+        fixture,
+        [
             {
-                "metrics": [],
-                "verification": {
-                    "max_gate_failures": 3,
-                    "coverage_threshold": None,
-                    "min_quality_score": 0,
-                    "gates": [],
-                    "workflow": {"atomic_commits_required": False},
-                },
-                "acceptance": {
-                    "deterministic_checks": [
-                        {
-                            "type": "no_pattern",
-                            "pattern": r"console\.log\(",
-                            "description": "literal console logging is absent",
-                        },
-                        {
-                            "type": "no_pattern",
-                            "pattern": r"console\.(log|warn)\(",
-                            "description": "regex alternation is rejected",
-                        },
-                    ],
-                    "requirements": [],
-                },
-                "weights": {
-                    "functional": 0.25,
-                    "acceptance": 0.25,
-                    "visual": 0.25,
-                    "verification_stability": 0.25,
-                },
-                "baseline_scripts": {},
+                "type": "no_pattern",
+                "pattern": r"console\.log\(",
+                "description": "literal console logging is absent",
             },
-            indent=2,
-        ),
-        encoding="utf-8",
+            {
+                "type": "no_pattern",
+                "pattern": r"console\.(log|warn)\(",
+                "description": "regex alternation is rejected",
+            },
+        ],
     )
-    score_script = tests_dir / "score-scenario.mjs"
-    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
 
-    completed = subprocess.run(
-        ["bun", str(score_script), str(scenario_spec_path)],
-        cwd=tests_dir,
-        env={
-            **runner.os.environ,
-            "RAIDAR_APP_DIR": str(app_dir),
-            "RAIDAR_LOG_DIR": str(logs_dir),
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    completed = _run_verifier_script(fixture, scenario_spec_path)
 
     assert completed.returncode == 0, completed.stderr
-    scorecard = json.loads((logs_dir / "scorecard.json").read_text(encoding="utf-8"))
+    scorecard = _verifier_scorecard(fixture)
     checks = scorecard["acceptance"]["checks"]
     assert checks[0]["passed"] is True
     assert checks[1]["passed"] is False
@@ -2112,54 +2059,9 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     _assert_verifier_script_contains_contracts(score_script)
 
 
-def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Path, monkeypatch):
-    workspace = tmp_path / "workspace"
-    scenario_dir = tmp_path / "scenario"
-    results_dir = tmp_path / "results"
-    scenario_dir.mkdir(parents=True, exist_ok=True)
-    results_dir.mkdir(parents=True, exist_ok=True)
-    _seed_workspace_tree(workspace)
-    (scenario_dir / "scenario.yaml").write_text(
-        "name: hello-world-smoke\nscenario_revision: v001\n"
-    )
-    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (scenario_dir / "prompt" / "task.md").write_text("Print hello world\n")
-
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "hello-world-smoke",
-            "scenario_revision": "v001",
-            "description": "test task",
-            "difficulty": "easy",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {
-                "root": "starter",
-            },
-            "verification": {"gates": [], "required_commands": []},
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-            ],
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
-    request = _make_bundle_request(
-        scenario=scenario,
-        scenario_dir=scenario_dir,
-        results_dir=results_dir,
-    )
-    context = _sample_workspace_context(workspace, scenario_name="hello-world-smoke")
-
-    bundle = create_harbor_task_bundle(
-        request,
-        context,
-        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
-    )
+def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Path):
+    fixture = _harbor_bundle_fixture(tmp_path)
+    bundle = _create_bundle(fixture)
     task_toml = (bundle / "task.toml").read_text()
     dockerfile = (bundle / "environment" / "Dockerfile").read_text()
 
@@ -2171,62 +2073,18 @@ def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Pat
 
 
 def test_create_harbor_task_bundle_uses_injected_rules_filename_in_instruction(tmp_path: Path):
-    workspace = tmp_path / "workspace"
-    scenario_dir = tmp_path / "scenario"
-    results_dir = tmp_path / "results"
-    scenario_dir.mkdir(parents=True, exist_ok=True)
-    results_dir.mkdir(parents=True, exist_ok=True)
-    _seed_workspace_tree(workspace)
-    (workspace / "GEMINI.md").write_text("gemini rules\n", encoding="utf-8")
-    (scenario_dir / "scenario.yaml").write_text(
-        "name: hello-world-smoke\nscenario_revision: v001\n"
-    )
-    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (scenario_dir / "prompt" / "task.md").write_text("Print hello world\n")
-
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "hello-world-smoke",
-            "scenario_revision": "v001",
-            "description": "test task",
-            "difficulty": "easy",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {
-                "root": "starter",
-            },
-            "verification": {"gates": [], "required_commands": []},
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-            ],
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
-    request = RunRequest(
-        scenario=scenario,
-        config=AgentSpec(
-            harness=Harness.GEMINI,
-            model=ModelTarget(provider="google", name="gemini-3-flash-preview"),
-            timeout_sec=1800,
-        ),
-        scenario_dir=scenario_dir,
-        execution_dir=results_dir,
-        repeat_index=1,
-    )
+    fixture = _harbor_bundle_fixture(tmp_path)
+    (fixture.workspace / "GEMINI.md").write_text("gemini rules\n", encoding="utf-8")
+    request = _bundle_run_request(fixture, Harness.GEMINI)
     context = replace(
-        _sample_workspace_context(workspace, scenario_name="hello-world-smoke"),
-        injected_rules=workspace / "GEMINI.md",
+        _sample_workspace_context(fixture.workspace, scenario_name="hello-world-smoke"),
+        injected_rules=fixture.workspace / "GEMINI.md",
     )
 
     bundle = create_harbor_task_bundle(
         request,
         context,
-        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+        bundle_root=fixture.results_dir / "runs" / "run-01" / "harbor" / "bundle",
     )
 
     instruction = (bundle / "instruction.md").read_text(encoding="utf-8")
@@ -2239,54 +2097,15 @@ def test_create_harbor_task_bundle_uses_injected_rules_filename_in_instruction(t
 
 
 def test_create_harbor_task_bundle_omits_redundant_codex_rules_reference(tmp_path: Path):
-    workspace = tmp_path / "workspace"
-    scenario_dir = tmp_path / "scenario"
-    results_dir = tmp_path / "results"
-    (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
-    (scenario_dir / "prompt" / "task.md").write_text("Change the page\n")
-    workspace.mkdir(parents=True, exist_ok=True)
-    (workspace / "AGENTS.md").write_text("Run verification commands.\n")
-    (workspace / "package.json").write_text("{}\n")
-    (workspace / "bun.lock").write_text("\n")
-
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "hello-world-smoke",
-            "scenario_revision": "v001",
-            "description": "test task",
-            "difficulty": "easy",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": []},
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-            ],
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
-    request = RunRequest(
-        scenario=scenario,
-        config=AgentSpec(
-            harness=Harness.CODEX_CLI,
-            model=ModelTarget(provider="openai", name="gpt-5.5", reasoning_effort="low"),
-            timeout_sec=1800,
-        ),
-        scenario_dir=scenario_dir,
-        execution_dir=results_dir,
-        repeat_index=1,
-    )
-    context = _sample_workspace_context(workspace, scenario_name="hello-world-smoke")
+    fixture = _harbor_bundle_fixture(tmp_path, prompt="Change the page\n")
+    (fixture.workspace / "AGENTS.md").write_text("Run verification commands.\n")
+    request = _bundle_run_request(fixture)
+    context = _sample_workspace_context(fixture.workspace, scenario_name="hello-world-smoke")
 
     bundle = create_harbor_task_bundle(
         request,
         context,
-        bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+        bundle_root=fixture.results_dir / "runs" / "run-01" / "harbor" / "bundle",
     )
 
     instruction = (bundle / "instruction.md").read_text(encoding="utf-8")
@@ -2305,55 +2124,7 @@ def test_resolve_homepage_screenshot_command_uses_visual_override(tmp_path: Path
     workspace.mkdir(parents=True, exist_ok=True)
     (workspace / "package.json").write_text("{}\n")
 
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "homepage-implementation",
-            "scenario_revision": "v001",
-            "description": "task",
-            "difficulty": "medium",
-            "category": "greenfield-ui",
-            "timeout_sec": 1800,
-            "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": []},
-            "visual": {
-                "reference_image": "reference/homepage.png",
-                "screenshot_command": ["bun", "run", "capture-screenshot"],
-                "scoring": {
-                    "weights": {
-                        "global": 0.25,
-                        "regional": 0.45,
-                        "worst_region": 0.25,
-                        "region_pass_rate": 0.05,
-                    },
-                    "bands": {
-                        "global": {"lower": 0.85, "upper": 0.96},
-                        "regional": {"lower": 0.8, "upper": 0.95},
-                        "worst_region": {"lower": 0.75, "upper": 0.94},
-                    },
-                },
-                "pass_policy": {
-                    "fail_if_global_below": 0.9,
-                    "fail_if_worst_region_below": 0.85,
-                    "minimum_score": 70,
-                    "minimum_region_pass_rate": 0.75,
-                    "minimum_worst_region": 0.88,
-                    "high_fidelity_score": 85,
-                    "high_fidelity_global": 0.95,
-                    "high_fidelity_worst_region": 0.92,
-                },
-            },
-            "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-                {"type": "core", "id": "visual-regression"},
-            ],
-            "prompt": {"entry": "prompt/task.md"},
-        }
-    )
+    scenario = _sample_scenario()
 
     command = _resolve_homepage_screenshot_command(scenario, workspace)
     assert command == ["bun", "run", "capture-screenshot"]
