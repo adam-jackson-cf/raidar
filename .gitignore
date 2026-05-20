@@ -7,6 +7,7 @@ __pycache__/
 # Build outputs
 .next/
 out/
+output/
 dist/
 *.egg-info/
 
@@ -39,12 +40,15 @@ experiments/
 .enaible/
 .plan/
 next-session.md
-auto_researcher/objectives/
+auto_researcher/
 
 # Screenshots
 actual.png
 diff.png
+.design/
+.playwright-cli/
 .visual-explainer/
+benchmark-view/src/data.json
 
 # Lock files (keep bun.lock for scaffold)
 .enaible/
