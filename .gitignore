@@ -37,6 +37,8 @@ coverage/
 .clawpatch/
 .agentic-ci-validation/
 experiments/
+orchestrator/results*/
+orchestrator/workspace*/
 .enaible/
 .plan/
 next-session.md
