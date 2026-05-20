@@ -7,13 +7,13 @@ Guides creation of reusable benchmark scenario baselines with stable scoring con
 ## When to use it
 
 - Use when creating a new benchmark scenario baseline.
-- Use when deciding the stable score profile for future comparable revisions.
+- Use when deciding the stable scorer contract for future comparable revisions.
 - Do not use to author multiple revisions in advance.
 
 ## Example prompts
 
 - Create a new scenario baseline for a code-delivery benchmark.
-- Set up a scenario with an explicit score_profile before running revisions.
+- Set up a scenario with explicit scorer refs before running revisions.
 
 ## References
 

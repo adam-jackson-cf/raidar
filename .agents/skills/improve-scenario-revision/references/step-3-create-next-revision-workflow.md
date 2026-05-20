@@ -8,7 +8,7 @@ Create exactly one comparable next revision.
 
 1. Clone the latest accepted revision.
 2. Apply only the selected change.
-3. Preserve score_profile, metrics, verification, and acceptance unless starting a new baseline.
+3. Preserve `scorers[]`, scenario metric overrides, verification, acceptance, and visual config unless starting a new baseline.
 
 ## Done when
 

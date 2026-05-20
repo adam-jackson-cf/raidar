@@ -7,7 +7,7 @@ Define what the scenario should measure before authoring files.
 ## Required actions
 
 1. Capture target task, target capability, constraints, non-goals, and intended evidence.
-2. Identify whether the benchmark is delivery-quality, resource-efficiency, visual fidelity, or another profile.
+2. Identify whether the benchmark is delivery-quality, resource-efficiency, visual fidelity, or another scoring emphasis.
 3. Reject scenario-specific carryover that would not apply to future scenarios.
 
 ## Done when

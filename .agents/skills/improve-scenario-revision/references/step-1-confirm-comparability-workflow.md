@@ -6,7 +6,7 @@ Protect benchmark comparability across revisions.
 
 ## Required actions
 
-1. Compare score_profile id, weighted metrics, weights, metrics, verification, and acceptance to the baseline.
+1. Compare scorer ids, scorer versions, scorer weights, scenario metric overrides, verification, acceptance, and visual config to the baseline.
 2. Stop if the scoring contract must change.
 3. Use a new baseline for scoring-contract changes.
 

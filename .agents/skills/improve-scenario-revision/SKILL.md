@@ -18,7 +18,7 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 
 - **Purpose**: Ensure the next revision keeps the same benchmark contract.
 - **When**: Run after prior evidence is loaded and before selecting changes.
-- Compare score_profile id, weighted metrics, weights, metrics, verification, and acceptance against the baseline.
+- Compare scorer ids, scorer versions, scorer weights, scenario metric overrides, verification, acceptance, and visual config against the baseline.
 - If any contract element needs to change, stop and start a new baseline instead.
 - Treat prompt, rules, starter guidance, and non-contract implementation guidance as the normal revision surface.
 - Workflow: [references/step-1-confirm-comparability-workflow.md](references/step-1-confirm-comparability-workflow.md)
@@ -63,6 +63,6 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 
 ### Result Format
 
-- Report prior evidence, unchanged contract check, selected hypothesis, files changed, validation status, run evidence, and accept/reject decision.
+- Report prior evidence, unchanged scorer contract check, selected hypothesis, files changed, validation status, scorer and metric run evidence, and accept/reject decision.
 - State whether improvement was strict composite improvement, secondary improvement, tie, regression, or inconclusive.
 - State whether another revision should be created next, based only on completed evidence.

@@ -8,10 +8,10 @@ Prevent failed or inconclusive candidates from being counted as improvement.
 
 1. Accept only evidence-supported improvements.
 2. Archive, revise, or report regressed candidates honestly.
-3. Separate strict composite increase from secondary improvements such as lower duration or fewer tokens.
+3. Separate strict composite increase from scorer-specific gains, metric-specific gains, and secondary improvements such as lower duration or fewer tokens.
 
 ## Done when
 
 - Candidate status is explicit.
-- Evidence supports the status.
+- Scorer, metric, quality, composite, and efficiency evidence supports the status.
 - No failed candidate is counted as a successful revision.
