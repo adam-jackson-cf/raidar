@@ -469,6 +469,10 @@ class ScenarioDefinition(BaseModel):
 
     name: str = Field(description="Scenario identifier")
     scenario_revision: str = Field(description="Scenario revision identifier (for example v001)")
+    parent_revision: str | None = Field(
+        default=None,
+        description="Parent scenario revision identifier, or null for a root revision",
+    )
     description: str = Field(description="Scenario description")
     difficulty: Literal["easy", "medium", "hard"] = Field(default="medium")
     category: str = Field(description="Scenario category (greenfield-ui, etc)")
@@ -507,6 +511,8 @@ class ScenarioDefinition(BaseModel):
 
     @model_validator(mode="after")
     def _validate_scorers(self) -> "ScenarioDefinition":
+        if self.parent_revision == self.scenario_revision:
+            raise ValueError("parent_revision must differ from scenario_revision")
         if len(self.scorer_ids()) != len(set(self.scorer_ids())):
             raise ValueError("scorers contains duplicate scorer references")
         self.resolved_scorers()

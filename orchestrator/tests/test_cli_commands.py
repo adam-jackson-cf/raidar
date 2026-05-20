@@ -82,7 +82,7 @@ def _run_options(tmp_path: Path, **overrides: object) -> RunCliOptions:
 def _assert_smoke_dry_run_output(output: str) -> None:
     assert "uv run --project orchestrator raidar run \\" in output
     assert "uv run --project orchestrator raidar matrix \\" in output
-    assert '--config ".configs/hello-world-smoke-trio-matrix.yaml" \\' in output
+    assert '--config "matrices/hello-world-smoke-trio.yaml" \\' in output
     assert '--repeats "2" \\' in output
     assert '--repeat-parallel "2" \\' in output
     assert "uv run --project orchestrator raidar experiment run \\" in output
@@ -662,63 +662,100 @@ def test_experiment_run_json_emits_machine_readable_payload(tmp_path: Path, monk
     assert payload["runs"][0]["run_json_path"] == str(tmp_path / "runs" / "run-01" / "run.json")
 
 
-def test_matrix_dry_run_supports_selector_generation(tmp_path: Path, monkeypatch) -> None:
+def test_matrix_dry_run_uses_config_scenario_entries(tmp_path: Path) -> None:
     runner = CliRunner()
-    scenario_path = tmp_path / "scenario.yaml"
-    scenario_path.write_text("name: placeholder\n")
-    scenario = ScenarioDefinition.model_validate(
-        {
-            "name": "hello-world-smoke",
-            "scenario_revision": "v001",
-            "description": "Smoke scenario",
-            "difficulty": "easy",
-            "category": "smoke",
-            "timeout_sec": 300,
-            "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
-            "acceptance": {},
-            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
-            "prompt": {"entry": "prompt/task.md"},
-        }
+    scenario_root = tmp_path / "scenarios" / "hello-world-smoke"
+    revision_dir = scenario_root / "v001"
+    revision_dir.mkdir(parents=True)
+    (revision_dir / "scenario.yaml").write_text(
+        "\n".join(
+            [
+                "name: hello-world-smoke",
+                "scenario_revision: v001",
+                "parent_revision: null",
+                "description: Smoke scenario",
+                "difficulty: easy",
+                "category: smoke",
+                "timeout_sec: 300",
+                "starter:",
+                "  root: starter",
+                "verification:",
+                "  gates: []",
+                "  required_commands: []",
+                "  min_quality_score: 0.0",
+                "acceptance: {}",
+                "scorers:",
+                "  - id: resource-efficiency",
+                "    version: 1",
+                "    weight: 1.0",
+                "prompt:",
+                "  entry: prompt/task.md",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
     )
-
-    monkeypatch.setattr(
-        "raidar.commands.matrix_report.load_matrix_scenarios",
-        lambda scenario_paths: [(scenario_paths[0], scenario)],
+    config_path = tmp_path / "matrix.yaml"
+    config_path.write_text(
+        "\n".join(
+            [
+                "matrix:",
+                "  id: smoke-test",
+                f"  scenario: {scenario_root}",
+                "  experiment:",
+                "    timeout_sec: 1800",
+                "    repeats: 2",
+                "    repeat_parallel: 1",
+                "    retry_void: 0",
+                "  entries:",
+                "    - id: gemini-v001",
+                "      scenario_revision: v001",
+                "      agent:",
+                "        harness: gemini",
+                "        provider: google",
+                "        model: gemini-3-flash-preview",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
     result = runner.invoke(
         main,
         [
             "matrix",
-            "--scenario",
-            str(scenario_path),
-            "--selector",
-            "gemini",
-            "--repeats",
-            "2",
+            "--config",
+            str(config_path),
             "--dry-run",
         ],
     )
 
     assert result.exit_code == 0, result.output
-    assert "Generating matrix from selector 'gemini'" in result.output
-    assert "Matrix defined for 3 agent specs (3 experiments)" in result.output
+    assert f"Loading matrix from {config_path}" in result.output
+    assert "Matrix 'smoke-test' defined for 1 experiments" in result.output
     assert (
-        "[dry-run] hello-world-smoke@v001: gemini/google/gemini-3-flash-preview x2" in result.output
+        "[dry-run] gemini-v001: hello-world-smoke@v001: "
+        "gemini/google/gemini-3-flash-preview x2" in result.output
     )
 
 
-def test_matrix_requires_exactly_one_of_config_or_selector(tmp_path: Path) -> None:
+def test_matrix_requires_config() -> None:
     runner = CliRunner()
-    scenario_path = tmp_path / "scenario.yaml"
+    result = runner.invoke(main, ["matrix", "--dry-run"])
+
+    assert result.exit_code != 0
+    assert "Missing option '--config'" in result.output
+
+
+def test_matrix_rejects_old_agents_shape(tmp_path: Path) -> None:
+    runner = CliRunner()
     config_path = tmp_path / "matrix.yaml"
-    model_name = "codex/gpt-5.4-high"
-    scenario_path.write_text("name: placeholder\n")
     config_path.write_text(
         "\n".join(
             [
                 "matrix:",
+                "  id: legacy",
+                "  scenario: scenarios/hello-world-smoke",
                 "  experiment:",
                 "    timeout_sec: 1800",
                 "    repeats: 5",
@@ -726,7 +763,8 @@ def test_matrix_requires_exactly_one_of_config_or_selector(tmp_path: Path) -> No
                 "    retry_void: 0",
                 "  agents:",
                 "    - harness: codex-cli",
-                f"      model: {model_name}",
+                "      provider: openai",
+                "      model: gpt-5.4",
             ]
         )
         + "\n"
@@ -736,17 +774,14 @@ def test_matrix_requires_exactly_one_of_config_or_selector(tmp_path: Path) -> No
         main,
         [
             "matrix",
-            "--scenario",
-            str(scenario_path),
             "--config",
             str(config_path),
-            "--selector",
-            "codex",
+            "--dry-run",
         ],
     )
 
     assert result.exit_code != 0
-    assert "Provide exactly one of --config or --selector." in result.output
+    assert "entries" in result.output
 
 
 def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -> None:
@@ -765,6 +800,7 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
     scenario_def = ScenarioDefinition.from_yaml(scenario_yaml)
     assert scenario_def.name == "sample-task"
     assert scenario_def.scenario_revision == "v001"
+    assert scenario_def.parent_revision is None
     assert scenario_def.starter.root == "starter"
     assert scenario_def.prompt.entry == "prompt/task.md"
     assert scenario_def.verification.required_commands == [
@@ -784,6 +820,12 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
         "verification-stability",
         "resource-efficiency",
     ]
+
+    validate_result = runner.invoke(
+        main, ["scenario", "validate", "--scenario", str(scenario_yaml)]
+    )
+    assert validate_result.exit_code == 0, validate_result.output
+    assert "parent_revision: None" in validate_result.output
 
     rules_dir = task_dir / "v001" / "rules"
     assert (rules_dir / "AGENTS.md").exists()
@@ -815,6 +857,7 @@ def test_scenario_init_json_emits_machine_readable_payload(tmp_path: Path) -> No
     payload = json.loads(result.output)
     assert payload["scenario_name"] == "json-task"
     assert payload["scenario_revision"] == "v001"
+    assert payload["parent_revision"] is None
     assert Path(payload["scenario_yaml"]).is_file()
     assert Path(payload["prompt_path"]).is_file()
     assert Path(payload["rules_dir"]).is_dir()
@@ -888,10 +931,12 @@ def test_scenario_clone_revision_auto_increments(tmp_path: Path) -> None:
     )
     assert clone_result.exit_code == 0, clone_result.output
     assert "target_revision: v002" in clone_result.output
+    assert "parent_revision: v001" in clone_result.output
 
     cloned_scenario_yaml = scenario_dir / "v002" / "scenario.yaml"
     cloned_scenario = ScenarioDefinition.from_yaml(cloned_scenario_yaml)
     assert cloned_scenario.scenario_revision == "v002"
+    assert cloned_scenario.parent_revision == "v001"
     assert (scenario_dir / "v002" / "starter" / "src" / "app" / "page.tsx").exists()
 
 
@@ -1034,6 +1079,7 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     info_result = runner.invoke(main, ["info", "--scenario", str(scenario_dir)])
     assert info_result.exit_code == 0, info_result.output
     assert "Revision: v10" in info_result.output
+    assert "Parent Revision: None" in info_result.output
     assert f"Scenario YAML: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert "Available Revisions:" in info_result.output
     assert f"  vx: {scenario_dir / 'vx' / 'scenario.yaml'}" in info_result.output
@@ -1358,8 +1404,7 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
         "DOCKER:info",
         (
             "UV:run --project orchestrator raidar matrix "
-            "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
-            "--config .configs/hello-world-smoke-trio-matrix.yaml "
+            "--config matrices/hello-world-smoke-trio.yaml "
             "--experiment-kind benchmark"
         ),
         "ENV::",

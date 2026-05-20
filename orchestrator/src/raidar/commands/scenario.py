@@ -113,6 +113,7 @@ def scenario_validate(scenario: Path) -> None:
     click.echo("Scenario validation passed.")
     click.echo(f"  name: {scenario_def.name}")
     click.echo(f"  scenario_revision: {scenario_def.scenario_revision}")
+    click.echo(f"  parent_revision: {scenario_def.parent_revision}")
     click.echo(f"  starter_root: {scenario_def.starter.root}")
     click.echo(f"  prompt_entry: {scenario_def.prompt.entry}")
     click.echo(f"  required_commands: {len(scenario_def.verification.required_commands)}")
@@ -149,6 +150,7 @@ def scenario_clone_revision(
     click.echo(f"  scenario_root: {result.scenario_root}")
     click.echo(f"  source_revision: {result.source_revision}")
     click.echo(f"  target_revision: {result.target_revision}")
+    click.echo(f"  parent_revision: {result.parent_revision}")
     click.echo(f"  scenario_yaml: {result.target_scenario_yaml}")
 
 
@@ -167,6 +169,7 @@ def inject(scenario: Path, harness: str, starter: Path) -> None:
 def echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
     click.echo(f"Scenario: {scenario_def.name}")
     click.echo(f"Revision: {scenario_def.scenario_revision}")
+    click.echo(f"Parent Revision: {scenario_def.parent_revision}")
     click.echo(f"Description: {scenario_def.description}")
     click.echo(f"Difficulty: {scenario_def.difficulty}")
     click.echo(f"Category: {scenario_def.category}")

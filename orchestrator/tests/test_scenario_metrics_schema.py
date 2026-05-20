@@ -67,6 +67,14 @@ def test_scorer_refs_valid_payload_parses() -> None:
     ]
 
 
+def test_parent_revision_must_differ_from_scenario_revision() -> None:
+    payload = _base_scenario_payload()
+    payload["parent_revision"] = "v001"
+
+    with pytest.raises(ValidationError, match="parent_revision must differ"):
+        ScenarioDefinition.model_validate(payload)
+
+
 @pytest.mark.parametrize("legacy_field", ["metrics", "score_profile"])
 def test_scenario_rejects_removed_top_level_fields(legacy_field: str) -> None:
     payload = _base_scenario_payload()

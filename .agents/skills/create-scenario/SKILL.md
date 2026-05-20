@@ -10,6 +10,7 @@ description: "Create reusable scenario baselines with stable scoring contracts. 
 - **Purpose**: Define the scenario objective before choosing artifacts or scoring.
 - **When**: Run before scenario authoring or scorer selection.
 - Capture the target task, intended agent capability, constraints, non-goals, and expected evidence.
+- Decide whether baseline evidence will come from one AgentSpec or a stored matrix.
 - Separate scenario difficulty from scoring mechanics.
 - Do not encode one-off lessons from unrelated scenarios into the new scenario.
 - Workflow: [references/step-0-clarify-benchmark-intent-workflow.md](references/step-0-clarify-benchmark-intent-workflow.md)
@@ -28,7 +29,8 @@ description: "Create reusable scenario baselines with stable scoring contracts. 
 - **Purpose**: Create a baseline scenario that can be compared with future revisions.
 - **When**: Run after the scoring contract is selected.
 - Use the public scenario creation workflow for new scenario roots.
-- Author prompt, rules, starter, verification, acceptance, visual config, and `scorers[]` consistently.
+- Author prompt, rules, starter, verification, acceptance, visual config, `scorers[]`, and root revision lineage consistently.
+- When the baseline is matrix-backed, author a stored matrix definition under `matrices/`.
 - Keep instructions conceptual and reusable; avoid scenario-specific reward hacking.
 - Workflow: [references/step-2-author-baseline-workflow.md](references/step-2-author-baseline-workflow.md)
 
@@ -38,6 +40,7 @@ description: "Create reusable scenario baselines with stable scoring contracts. 
 - **When**: Run after baseline files are authored and before benchmark execution.
 - Run scenario validation.
 - Check that scorer refs are active executable definitions and scenario overrides reference scorer-owned metrics.
+- Check any stored matrix definition uses `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries[]`.
 - Confirm the baseline can be executed without relying on future revision assumptions.
 - Workflow: [references/step-3-validate-baseline-workflow.md](references/step-3-validate-baseline-workflow.md)
 
@@ -45,7 +48,7 @@ description: "Create reusable scenario baselines with stable scoring contracts. 
 
 - **Purpose**: Produce evidence for the starting benchmark point.
 - **When**: Run after baseline validation passes.
-- Run the target AgentSpec against the baseline before creating any revision.
+- Run the target AgentSpec or stored matrix against the baseline before creating any revision.
 - Record aggregate and run-level results.
 - Do not pre-author future revisions before analysing the baseline evidence.
 - Workflow: [references/step-4-run-baseline-workflow.md](references/step-4-run-baseline-workflow.md)
@@ -54,6 +57,6 @@ description: "Create reusable scenario baselines with stable scoring contracts. 
 
 ### Result Format
 
-- Report selected scorers, scenario files changed, validation status, baseline run evidence, and any limitations.
+- Report selected scorers, scenario files changed, matrix config status when used, validation status, baseline run evidence, and any limitations.
 - Explicitly state whether the scenario is ready for revision work.
 - Do not claim future improvement before revisions are run.

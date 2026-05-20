@@ -12,12 +12,12 @@
 - Use `make scenario-init` only for brand-new scenario roots. If the intent is another revision of an existing scenario, do not create a sibling scenario directory; clone the revision inside the existing root instead.
 - Exclude `scenarios/**/starter/**` from analysis and code-quality checks by default; starter folders are representative delivery-scenario artifacts, not canonical shared product code.
 - Treat `scenarios/` and `experiments/` as build-generated runtime artifacts by default: exclude them from quality checks unless the request explicitly asks to review/analyze them.
-- Matrix configs must define `matrix.experiment` with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`, plus `matrix.agents` entries with `harness`, `provider`, `model`, and optional `reasoning_effort`.
+- Matrix configs live under `matrices/` and must define `matrix.id`, `matrix.scenario`, `matrix.experiment` with `timeout_sec`, `repeats`, `repeat_parallel`, and `retry_void`, plus `matrix.entries` entries with `id`, `scenario_revision`, and nested `agent` fields for `harness`, `provider`, `model`, and optional `reasoning_effort`.
 - Task completion requires `make quality` to pass.
 
 ## Known Matrix Configs
 
-- `.configs/homepage-v001-codex-oauth-matrix.yaml`: Homepage implementation revision `v001` Codex-only benchmark using OAuth/session auth across `gpt-5.5-low`, `gpt-5.5-medium`, `gpt-5.4-mini-low`, and `gpt-5.3-codex-spark-low`.
+- `matrices/homepage-v001-codex-oauth.yaml`: Homepage implementation revision `v001` Codex-only benchmark using OAuth/session auth across `gpt-5.5-low`, `gpt-5.5-medium`, `gpt-5.4-mini-low`, and `gpt-5.3-codex-spark-low`.
 
 ## Smoke Testing
 

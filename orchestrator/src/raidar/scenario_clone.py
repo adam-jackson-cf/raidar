@@ -33,6 +33,7 @@ class ScenarioCloneResult:
     scenario_root: Path
     source_revision: str
     target_revision: str
+    parent_revision: str
     target_scenario_yaml: Path
 
 
@@ -82,6 +83,7 @@ def clone_scenario_revision(
         target_scenario_yaml = target_dir / "scenario.yaml"
         scenario_def = ScenarioDefinition.from_yaml(target_scenario_yaml)
         scenario_def.scenario_revision = resolved_target
+        scenario_def.parent_revision = source_revision
         scenario_def.to_yaml(target_scenario_yaml)
     except Exception:
         shutil.rmtree(target_dir, ignore_errors=True)
@@ -91,6 +93,7 @@ def clone_scenario_revision(
         scenario_root=scenario_root,
         source_revision=source_revision,
         target_revision=resolved_target,
+        parent_revision=source_revision,
         target_scenario_yaml=target_scenario_yaml,
     )
 

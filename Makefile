@@ -42,8 +42,7 @@ ORCHESTRATOR_SMOKE_PROVIDER := openai
 ORCHESTRATOR_SMOKE_MODEL := gpt-5.5
 ORCHESTRATOR_SMOKE_REASONING_EFFORT := low
 ORCHESTRATOR_SMOKE_REPEATS ?= 1
-SMOKE_MATRIX_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
-SMOKE_MATRIX_CONFIG ?= .configs/hello-world-smoke-trio-matrix.yaml
+SMOKE_MATRIX_CONFIG ?= matrices/hello-world-smoke-trio.yaml
 AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
@@ -55,11 +54,6 @@ AGENT_SMOKE_MODEL ?= $(ORCHESTRATOR_SMOKE_MODEL)
 AGENT_SMOKE_EFFECTIVE_HARNESS = $(if $(HARNESS),$(HARNESS),$(AGENT_SMOKE_HARNESS))
 AGENT_SMOKE_EFFECTIVE_PROVIDER = $(if $(PROVIDER),$(PROVIDER),$(AGENT_SMOKE_PROVIDER))
 AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
-
-ifeq ($(firstword $(MAKECMDGOALS)),matrix-run)
-MATRIX_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
-$(foreach goal,$(MATRIX_ARGS),$(eval $(goal):;@:))
-endif
 
 .PHONY: help \
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
@@ -106,10 +100,8 @@ help:
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... PROVIDER=... MODEL=..."
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
-	@echo "  make matrix-run scenarios/homepage-implementation/v001/scenario.yaml all"
-	@echo "                                                        Run a generated matrix for all benchmark model sets"
-	@echo "  make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex"
-	@echo "                                                        Run a generated matrix for one provider family"
+	@echo "  make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml"
+	@echo "                                                        Run a stored matrix definition"
 	@echo "  make experiments-list [EVALUATION_PROFILE=...] [LIMIT=...]"
 	@echo "                                                        List stored experiments and summaries"
 	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
@@ -202,7 +194,7 @@ smoke-dry-run-check:
 		ORCHESTRATOR_SMOKE_REPEATS="2" \
 		RUN_PARALLELISM="2"
 	@$(MAKE) --no-print-directory -n smoke-matrix \
-		SMOKE_MATRIX_CONFIG=".configs/hello-world-smoke-trio-matrix.yaml"
+		SMOKE_MATRIX_CONFIG="matrices/hello-world-smoke-trio.yaml"
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		HARNESS="$(ORCHESTRATOR_SMOKE_HARNESS)" \
 		PROVIDER="$(ORCHESTRATOR_SMOKE_PROVIDER)" \
@@ -226,8 +218,7 @@ orchestrator-smoke: docker-check
 
 smoke-matrix: docker-check
 	$(RAIDAR) matrix \
-		--scenario "$(SMOKE_MATRIX_SCENARIO)" \
-		$(if $(SMOKE_MATRIX_SELECTOR),--selector "$(SMOKE_MATRIX_SELECTOR)",--config "$(SMOKE_MATRIX_CONFIG)") \
+		--config "$(SMOKE_MATRIX_CONFIG)" \
 		--experiment-kind "$(EXPERIMENT_KIND)"
 
 agent-smoke: docker-check
@@ -269,18 +260,13 @@ experiment-run:
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
 matrix-run:
-	@if [ "$(words $(MATRIX_ARGS))" -ne 2 ]; then \
-		echo "Usage: make matrix-run <scenario-yaml> <all|codex|gemini|claude|smoke>"; \
+	@if [ -z "$(CONFIG)" ]; then \
+		echo "Usage: make matrix-run CONFIG=matrices/<matrix>.yaml"; \
 		exit 1; \
 	fi
 	@$(RAIDAR) matrix \
-		--scenario "$(word 1,$(MATRIX_ARGS))" \
-		--selector "$(word 2,$(MATRIX_ARGS))" \
-		--repeats "$(RUN_COUNT)" \
-		--repeat-parallel "$(RUN_PARALLELISM)" \
-		--rerun-unscored "$(RERUN_UNSCORED)" \
-		--experiment-kind "$(EXPERIMENT_KIND)" \
-		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
+		--config "$(CONFIG)" \
+		--experiment-kind "$(EXPERIMENT_KIND)"
 
 experiments-list:
 	@$(RAIDAR) experiments list \

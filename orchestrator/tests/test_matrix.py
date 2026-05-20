@@ -4,14 +4,13 @@ import pytest
 from pydantic import ValidationError
 
 from raidar.matrix import (
-    CODEX_SELECTOR_MODEL_CATALOG,
     AgentSpecInput,
     ExperimentConfig,
     MatrixAgentSpec,
     MatrixConfig,
-    build_selected_matrix_config,
-    generate_matrix_entries,
-    matrix_selector_choices,
+    MatrixEntryInput,
+    matrix_entry_agent_spec,
+    resolve_matrix_jobs,
 )
 
 
@@ -78,170 +77,240 @@ class TestMatrixAgentSpec:
 class TestGenerateMatrixEntries:
     """Test matrix entry generation."""
 
-    def test_generates_all_combinations(self):
-        """Should generate all combinations."""
+    def test_accepts_single_revision_benchmark_entries(self):
+        """Should model multiple AgentSpecs against one scenario revision."""
         config = MatrixConfig(
+            id="sample-benchmark",
+            scenario="scenarios/sample",
             experiment=ExperimentConfig(
                 timeout_sec=300,
                 repeats=3,
                 repeat_parallel=1,
                 retry_void=1,
             ),
-            agents=[
-                AgentSpecInput(
-                    harness="codex-cli",
-                    provider="openai",
-                    model="gpt-5.4",
-                    reasoning_effort="high",
+            entries=[
+                MatrixEntryInput(
+                    id="codex-v001",
+                    scenario_revision="v001",
+                    agent=AgentSpecInput(
+                        harness="codex-cli",
+                        provider="openai",
+                        model="gpt-5.4",
+                        reasoning_effort="high",
+                    ),
                 ),
-                AgentSpecInput(
-                    harness="claude-code",
-                    provider="anthropic",
-                    model="claude-sonnet-4-5",
+                MatrixEntryInput(
+                    id="claude-v001",
+                    scenario_revision="v001",
+                    agent=AgentSpecInput(
+                        harness="claude-code",
+                        provider="anthropic",
+                        model="claude-sonnet-4-5",
+                    ),
                 ),
             ],
         )
-        entries = generate_matrix_entries(config)
 
-        assert len(entries) == 2
+        assert [entry.scenario_revision for entry in config.entries] == ["v001", "v001"]
+        assert matrix_entry_agent_spec(config.entries[0]).model == "gpt-5.4"
 
-    def test_generates_correct_combinations(self):
-        """Should generate correct AgentSpec combinations."""
+    def test_accepts_multi_revision_entries_for_one_agentspec(self):
+        """Should model one AgentSpec across multiple scenario revisions."""
         config = MatrixConfig(
+            id="sample-revision-comparison",
+            scenario="scenarios/sample",
             experiment=ExperimentConfig(
                 timeout_sec=300,
                 repeats=3,
                 repeat_parallel=1,
                 retry_void=1,
             ),
-            agents=[
-                AgentSpecInput(
-                    harness="codex-cli",
-                    provider="openai",
-                    model="gpt-5.4",
-                    reasoning_effort="high",
+            entries=[
+                MatrixEntryInput(
+                    id="codex-v001",
+                    scenario_revision="v001",
+                    agent=AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.4"),
                 ),
-                AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.1"),
+                MatrixEntryInput(
+                    id="codex-v002",
+                    scenario_revision="v002",
+                    agent=AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.4"),
+                ),
             ],
         )
-        entries = generate_matrix_entries(config)
 
-        assert len(entries) == 2
-        models = {(e.provider, e.model) for e in entries}
-        assert ("openai", "gpt-5.4") in models
-        assert ("openai", "gpt-5.1") in models
+        assert [entry.scenario_revision for entry in config.entries] == ["v001", "v002"]
 
     def test_empty_config_generates_empty_list(self):
         """Empty config should raise validation error."""
         try:
             MatrixConfig(
+                id="empty",
+                scenario="scenarios/sample",
                 experiment=ExperimentConfig(
                     timeout_sec=300,
                     repeats=3,
                     repeat_parallel=1,
                     retry_void=1,
                 ),
-                agents=[],
+                entries=[],
             )
         except ValidationError:
             assert True
         else:
             pytest.fail("MatrixConfig should require at least one run")
 
-    def test_large_matrix_generation(self):
-        """Should handle larger matrices."""
-        config = MatrixConfig(
-            experiment=ExperimentConfig(
-                timeout_sec=300,
-                repeats=3,
-                repeat_parallel=1,
-                retry_void=1,
-            ),
-            agents=[
-                AgentSpecInput(
-                    harness="codex-cli",
-                    provider="openai",
-                    model="gpt-5.4",
-                    reasoning_effort="high",
-                ),
-                AgentSpecInput(
-                    harness="claude-code",
-                    provider="anthropic",
-                    model="claude-sonnet-4-5",
-                ),
-                AgentSpecInput(harness="cursor", provider="openai", model="gpt-4o-mini"),
-            ],
+    def test_duplicate_entry_ids_rejected(self):
+        """Matrix entry identifiers must be unique."""
+        entry = MatrixEntryInput(
+            id="duplicate",
+            scenario_revision="v001",
+            agent=AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.4"),
         )
-        entries = generate_matrix_entries(config)
+        with pytest.raises(ValidationError, match="duplicate entry ids"):
+            MatrixConfig(
+                id="duplicates",
+                scenario="scenarios/sample",
+                experiment=ExperimentConfig(
+                    timeout_sec=300,
+                    repeats=3,
+                    repeat_parallel=1,
+                    retry_void=1,
+                ),
+                entries=[entry, entry],
+            )
 
-        assert len(entries) == 3
+    def test_old_agents_shape_is_rejected(self):
+        """Config-level agents are no longer a valid matrix shape."""
+        with pytest.raises(ValidationError):
+            MatrixConfig.model_validate(
+                {
+                    "id": "legacy",
+                    "scenario": "scenarios/sample",
+                    "experiment": {
+                        "timeout_sec": 300,
+                        "repeats": 3,
+                        "repeat_parallel": 1,
+                        "retry_void": 1,
+                    },
+                    "agents": [{"harness": "codex-cli", "provider": "openai", "model": "gpt-5.4"}],
+                }
+            )
 
 
-def test_matrix_selector_choices_are_public_and_stable() -> None:
-    assert matrix_selector_choices() == ("all", "codex", "gemini", "claude")
-
-
-def test_build_selected_matrix_config_for_codex() -> None:
-    config = build_selected_matrix_config(
-        selector="codex",
-        timeout_sec=1800,
-        repeats=5,
-        repeat_parallel=1,
-        retry_void=0,
+def _write_scenario(root, revision: str) -> None:
+    revision_dir = root / revision
+    revision_dir.mkdir(parents=True)
+    (revision_dir / "scenario.yaml").write_text(
+        "\n".join(
+            [
+                "name: sample",
+                f"scenario_revision: {revision}",
+                "parent_revision: null",
+                "description: Sample scenario",
+                "difficulty: easy",
+                "category: smoke",
+                "timeout_sec: 300",
+                "starter:",
+                "  root: starter",
+                "verification:",
+                "  min_quality_score: 0.0",
+                "  gates: []",
+                "  required_commands: []",
+                "acceptance: {}",
+                "scorers:",
+                "  - id: resource-efficiency",
+                "    version: 1",
+                "    weight: 1.0",
+                "prompt:",
+                "  entry: prompt/task.md",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
     )
 
-    assert config.experiment.timeout_sec == 1800
-    assert config.experiment.repeats == 5
-    assert all(spec.harness == "codex-cli" for spec in config.agents)
-    assert [(spec.provider, spec.model, spec.reasoning_effort) for spec in config.agents] == [
-        ("openai", "gpt-5.5", "low"),
-        ("openai", "gpt-5.5", "medium"),
-        ("openai", "gpt-5.5", "high"),
-        ("openai", "gpt-5.5", "xhigh"),
-        ("openai", "gpt-5.2", "low"),
-        ("openai", "gpt-5.2", "medium"),
-        ("openai", "gpt-5.2", "high"),
-        ("openai", "gpt-5.3-codex-spark", "low"),
-        ("openai", "gpt-5.3-codex-spark", "medium"),
-        ("openai", "gpt-5.3-codex-spark", "high"),
-        ("openai", "gpt-5.3-codex-spark", "xhigh"),
-        ("openai", "gpt-5.4", "low"),
-        ("openai", "gpt-5.4", "medium"),
-        ("openai", "gpt-5.4", "high"),
-        ("openai", "gpt-5.4", "xhigh"),
-        ("openai", "gpt-5.4-mini", None),
-        ("openai", "gpt-5.4-mini", "low"),
-    ]
 
-
-def test_codex_selector_matches_model_catalog() -> None:
-    config = build_selected_matrix_config(
-        selector="codex",
-        timeout_sec=1800,
-        repeats=5,
-        repeat_parallel=1,
-        retry_void=0,
+def test_resolve_matrix_jobs_loads_entry_scenarios(tmp_path):
+    scenario_root = tmp_path / "scenarios" / "sample"
+    _write_scenario(scenario_root, "v001")
+    _write_scenario(scenario_root, "v002")
+    config = MatrixConfig(
+        id="sample",
+        scenario=scenario_root,
+        experiment=ExperimentConfig(timeout_sec=300, repeats=3, repeat_parallel=1, retry_void=1),
+        entries=[
+            MatrixEntryInput(
+                id="codex-v001",
+                scenario_revision="v001",
+                agent=AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.4"),
+            ),
+            MatrixEntryInput(
+                id="codex-v002",
+                scenario_revision="v002",
+                agent=AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.4"),
+            ),
+        ],
     )
 
-    expected = [
-        (model, reasoning_effort)
-        for model, reasoning_efforts in CODEX_SELECTOR_MODEL_CATALOG
-        for reasoning_effort in reasoning_efforts
-    ]
-    assert [(spec.model, spec.reasoning_effort) for spec in config.agents] == expected
+    jobs = resolve_matrix_jobs(config, repo_root=tmp_path)
+
+    assert [job.entry_id for job in jobs] == ["codex-v001", "codex-v002"]
+    assert [job.scenario.scenario_revision for job in jobs] == ["v001", "v002"]
 
 
-def test_build_selected_matrix_config_for_all() -> None:
-    config = build_selected_matrix_config(
-        selector="all",
-        timeout_sec=1800,
-        repeats=5,
-        repeat_parallel=1,
-        retry_void=0,
+def test_resolve_matrix_jobs_rejects_missing_revision(tmp_path):
+    scenario_root = tmp_path / "scenarios" / "sample"
+    _write_scenario(scenario_root, "v001")
+    config = MatrixConfig(
+        id="sample",
+        scenario=scenario_root,
+        experiment=ExperimentConfig(timeout_sec=300, repeats=3, repeat_parallel=1, retry_void=1),
+        entries=[
+            MatrixEntryInput(
+                id="codex-v002",
+                scenario_revision="v002",
+                agent=AgentSpecInput(harness="codex-cli", provider="openai", model="gpt-5.4"),
+            )
+        ],
     )
 
-    harnesses = [spec.harness for spec in config.agents]
-    assert harnesses.count("codex-cli") == 17
-    assert harnesses.count("gemini") == 3
-    assert harnesses.count("claude-code") == 5
-    assert len(config.agents) == 25
+    with pytest.raises(FileNotFoundError, match="codex-v002"):
+        resolve_matrix_jobs(config, repo_root=tmp_path)
+
+
+def test_matrix_supports_multiple_entries():
+    """Should handle larger stored matrices."""
+    config = MatrixConfig(
+        id="large",
+        scenario="scenarios/sample",
+        experiment=ExperimentConfig(
+            timeout_sec=300,
+            repeats=3,
+            repeat_parallel=1,
+            retry_void=1,
+        ),
+        entries=[
+            MatrixEntryInput(
+                id="codex-v001",
+                scenario_revision="v001",
+                agent=AgentSpecInput(
+                    harness="codex-cli", provider="openai", model="gpt-5.4", reasoning_effort="high"
+                ),
+            ),
+            MatrixEntryInput(
+                id="claude-v001",
+                scenario_revision="v001",
+                agent=AgentSpecInput(
+                    harness="claude-code", provider="anthropic", model="claude-sonnet-4-5"
+                ),
+            ),
+            MatrixEntryInput(
+                id="cursor-v001",
+                scenario_revision="v001",
+                agent=AgentSpecInput(harness="cursor", provider="openai", model="gpt-4o-mini"),
+            ),
+        ],
+    )
+
+    assert len(config.entries) == 3

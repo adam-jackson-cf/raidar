@@ -162,6 +162,7 @@ class ScenarioInitResult:
     scenario_root: Path
     scenario_name: str
     scenario_revision: str
+    parent_revision: str | None
     revision_dir: Path
     scenario_yaml: Path
     prompt_path: Path

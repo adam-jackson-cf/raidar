@@ -1,0 +1,28 @@
+matrix:
+  id: hello-world-smoke-trio
+  scenario: scenarios/hello-world-smoke
+  experiment:
+    timeout_sec: 1800
+    repeats: 1
+    repeat_parallel: 1
+    retry_void: 0
+  entries:
+    - id: codex-gpt-5-5-low-v001
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
+    - id: gemini-3-flash-preview-v001
+      scenario_revision: v001
+      agent:
+        harness: gemini
+        provider: google
+        model: gemini-3-flash-preview
+    - id: claude-haiku-4-5-v001
+      scenario_revision: v001
+      agent:
+        harness: claude-code
+        provider: anthropic
+        model: claude-haiku-4-5

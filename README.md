@@ -55,7 +55,7 @@ Use the public make surface for smoke runs or structured provider-family compari
 
 ```bash
 make orchestrator-smoke
-make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
+make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml
 ```
 
 If your local Codex login is stored in the OS keyring instead of `~/.codex/auth.json`, Raidar cannot transport that session into Harbor. Switch Codex to file-backed credential storage before using ChatGPT auth with Raidar.
@@ -66,6 +66,7 @@ If your local Codex login is stored in the OS keyring instead of `~/.codex/auth.
 The repository has four primary concerns:
 
 - `orchestrator/`: CLI and runtime pipeline that executes and scores scenarios.
+- `matrices/`: stored matrix definitions that bind scenario revisions to AgentSpecs.
 - `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
 - `experiments/benchmarks/`: canonical artifact root for comparison baselines.
@@ -89,7 +90,7 @@ make codex-auth-setup
 make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml
 make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5 REASONING_EFFORT=low
 make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5 REASONING_EFFORT=low
-make matrix-run scenarios/homepage-implementation/v001/scenario.yaml codex
+make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml
 ```
 
 ## Core Concepts

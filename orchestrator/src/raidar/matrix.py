@@ -1,30 +1,20 @@
-"""Configuration matrix for comparing agent specs."""
+"""Configuration matrix definitions and job resolution."""
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from .agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
-from .agents.adapters.gemini_cli import GeminiCliAdapter
 from .agents.config import AgentSpec, Harness, ModelTarget
-
-MatrixSelector = Literal["all", "codex", "gemini", "claude"]
-ReasoningEffort = Literal["low", "medium", "high", "xhigh"]
-
-CODEX_REASONING_EFFORTS: tuple[ReasoningEffort, ...] = ("low", "medium", "high", "xhigh")
-CODEX_SELECTOR_MODEL_CATALOG: tuple[tuple[str, tuple[ReasoningEffort | None, ...]], ...] = (
-    ("gpt-5.5", CODEX_REASONING_EFFORTS),
-    ("gpt-5.2", ("low", "medium", "high")),
-    ("gpt-5.3-codex-spark", CODEX_REASONING_EFFORTS),
-    ("gpt-5.4", CODEX_REASONING_EFFORTS),
-    ("gpt-5.4-mini", (None, "low")),
-)
+from .application.scenario_catalog import load_scenario
+from .schemas.scenario import ScenarioDefinition
 
 
 class AgentSpecInput(BaseModel):
     """Explicit harness/model pairing for one agent spec."""
+
+    model_config = ConfigDict(extra="forbid")
 
     harness: str = Field(description="Harness identifier (matches Harness enum values)")
     provider: str = Field(description="Upstream model provider")
@@ -36,7 +26,9 @@ class AgentSpecInput(BaseModel):
 
 
 class ExperimentConfig(BaseModel):
-    """Experiment execution settings for every matrix agent spec."""
+    """Experiment execution settings for every matrix entry."""
+
+    model_config = ConfigDict(extra="forbid")
 
     timeout_sec: int = Field(gt=0, description="Scenario timeout in seconds for each experiment")
     repeats: int = Field(
@@ -47,18 +39,41 @@ class ExperimentConfig(BaseModel):
     retry_void: int = Field(ge=0, le=1, description="Retry budget for unscored runs")
 
 
+class MatrixEntryInput(BaseModel):
+    """Single executable matrix entry."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Stable matrix entry identifier")
+    scenario_revision: str = Field(description="Scenario revision directory under matrix.scenario")
+    agent: AgentSpecInput = Field(description="AgentSpec to run for this scenario revision")
+
+
 class MatrixConfig(BaseModel):
     """Configuration for a matrix of experiment runs."""
 
-    agents: list[AgentSpecInput] = Field(
-        min_length=1,
-        description="List of agent specs to execute",
-    )
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Stable matrix identifier")
+    scenario: Path = Field(description="Scenario root directory containing revision folders")
     experiment: ExperimentConfig = Field(description="Experiment execution settings")
+    entries: list[MatrixEntryInput] = Field(
+        min_length=1,
+        description="Executable matrix entries",
+    )
+
+    @model_validator(mode="after")
+    def _validate_entry_ids(self) -> "MatrixConfig":
+        entry_ids = [entry.id for entry in self.entries]
+        if len(entry_ids) != len(set(entry_ids)):
+            raise ValueError("matrix.entries contains duplicate entry ids")
+        return self
 
 
 class MatrixAgentSpec(BaseModel):
     """Single agent spec entry in the configuration matrix."""
+
+    model_config = ConfigDict(extra="forbid")
 
     harness: str
     provider: str
@@ -86,6 +101,16 @@ class MatrixAgentSpec(BaseModel):
         return f"{self.harness}_{model_safe}"
 
 
+@dataclass(frozen=True, slots=True)
+class MatrixJob:
+    """Resolved executable matrix job."""
+
+    entry_id: str
+    scenario_path: Path
+    scenario: ScenarioDefinition
+    agent: MatrixAgentSpec
+
+
 def load_matrix_config(path: Path) -> MatrixConfig:
     """Load matrix configuration from YAML file."""
 
@@ -94,99 +119,43 @@ def load_matrix_config(path: Path) -> MatrixConfig:
     return MatrixConfig.model_validate(data.get("matrix", data))
 
 
-def generate_matrix_entries(config: MatrixConfig) -> list[MatrixAgentSpec]:
-    """Generate all combinations from a matrix configuration."""
+def matrix_entry_agent_spec(entry: MatrixEntryInput) -> MatrixAgentSpec:
+    """Return the executable AgentSpec for a matrix entry."""
 
-    return [
-        MatrixAgentSpec(
-            harness=spec.harness,
-            provider=spec.provider,
-            model=spec.model,
-            reasoning_effort=spec.reasoning_effort,
+    agent = entry.agent
+    return MatrixAgentSpec(
+        harness=agent.harness,
+        provider=agent.provider,
+        model=agent.model,
+        reasoning_effort=agent.reasoning_effort,
+    )
+
+
+def resolve_matrix_jobs(config: MatrixConfig, *, repo_root: Path) -> list[MatrixJob]:
+    """Resolve a matrix config to executable jobs."""
+
+    scenario_root = (
+        config.scenario if config.scenario.is_absolute() else repo_root / config.scenario
+    )
+    if not scenario_root.is_dir():
+        raise FileNotFoundError(f"Matrix scenario root does not exist: {scenario_root}")
+    jobs: list[MatrixJob] = []
+    for entry in config.entries:
+        scenario_path = scenario_root / entry.scenario_revision / "scenario.yaml"
+        if not scenario_path.is_file():
+            raise FileNotFoundError(
+                f"Matrix entry '{entry.id}' scenario revision does not exist: {scenario_path}"
+            )
+        scenario = load_scenario(scenario_path)
+        jobs.append(
+            MatrixJob(
+                entry_id=entry.id,
+                scenario_path=scenario_path,
+                scenario=scenario,
+                agent=matrix_entry_agent_spec(entry),
+            )
         )
-        for spec in config.agents
-    ]
-
-
-def matrix_selector_choices() -> tuple[str, ...]:
-    """Return supported on-the-fly matrix selectors."""
-
-    return ("all", "codex", "gemini", "claude")
-
-
-def _codex_selector_agent_specs() -> list[AgentSpecInput]:
-    return [
-        AgentSpecInput(
-            harness=Harness.CODEX_CLI.value,
-            provider="openai",
-            model=model,
-            reasoning_effort=reasoning_effort,
-        )
-        for model, reasoning_efforts in CODEX_SELECTOR_MODEL_CATALOG
-        for reasoning_effort in reasoning_efforts
-    ]
-
-
-def _gemini_selector_agent_specs() -> list[AgentSpecInput]:
-    return _model_selector_agent_specs(
-        harness=Harness.GEMINI,
-        provider="google",
-        model_names=GeminiCliAdapter.SUPPORTED_MODELS,
-    )
-
-
-def _claude_selector_agent_specs() -> list[AgentSpecInput]:
-    return _model_selector_agent_specs(
-        harness=Harness.CLAUDE_CODE,
-        provider="anthropic",
-        model_names=ClaudeCodeCliAdapter.SUPPORTED_MODELS,
-    )
-
-
-def _model_selector_agent_specs(
-    *,
-    harness: Harness,
-    provider: str,
-    model_names,
-) -> list[AgentSpecInput]:
-    return [
-        AgentSpecInput(harness=harness.value, provider=provider, model=model_name)
-        for model_name in sorted(model_names)
-    ]
-
-
-def _selector_agent_specs(selector: MatrixSelector) -> list[AgentSpecInput]:
-    codex_specs = _codex_selector_agent_specs()
-    gemini_specs = _gemini_selector_agent_specs()
-    claude_specs = _claude_selector_agent_specs()
-    groups: dict[str, list[AgentSpecInput]] = {
-        "codex": codex_specs,
-        "gemini": gemini_specs,
-        "claude": claude_specs,
-        "all": [*codex_specs, *gemini_specs, *claude_specs],
-    }
-    return groups[selector]
-
-
-def build_selected_matrix_config(
-    *,
-    selector: MatrixSelector,
-    timeout_sec: int,
-    repeats: int,
-    repeat_parallel: int,
-    retry_void: int,
-) -> MatrixConfig:
-    """Build a matrix config from a predefined selector."""
-
-    return MatrixConfig(
-        experiment=ExperimentConfig(
-            timeout_sec=timeout_sec,
-            repeats=repeats,
-            repeat_parallel=repeat_parallel,
-            retry_void=retry_void,
-        ),
-        agents=_selector_agent_specs(selector),
-    )
+    return jobs
 
 
 def create_example_matrix() -> str:
@@ -194,17 +163,25 @@ def create_example_matrix() -> str:
 
     return """# Experiment matrix configuration
 matrix:
+  id: example-matrix
+  scenario: scenarios/example-scenario
   experiment:
     timeout_sec: 1800
     repeats: 5
     repeat_parallel: 1
     retry_void: 1
-  agents:
-    - harness: codex-cli
-      provider: openai
-      model: gpt-5.4
-      reasoning_effort: high
-    - harness: claude-code
-      provider: anthropic
-      model: claude-sonnet-4-5
+  entries:
+    - id: codex-gpt-5-4-high-v001
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.4
+        reasoning_effort: high
+    - id: claude-sonnet-4-5-v001
+      scenario_revision: v001
+      agent:
+        harness: claude-code
+        provider: anthropic
+        model: claude-sonnet-4-5
 """

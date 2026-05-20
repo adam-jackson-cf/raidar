@@ -47,13 +47,14 @@ def suite_execution_payload(result: SuiteExecutionResult) -> dict[str, object]:
     }
 
 
-def scenario_init_payload(result: ScenarioInitResult) -> dict[str, str]:
+def scenario_init_payload(result: ScenarioInitResult) -> dict[str, str | None]:
     """Serialize the stable scenario-init JSON payload."""
 
     return {
         "scenario_root": str(result.scenario_root),
         "scenario_name": result.scenario_name,
         "scenario_revision": result.scenario_revision,
+        "parent_revision": result.parent_revision,
         "revision_dir": str(result.revision_dir),
         "scenario_yaml": str(result.scenario_yaml),
         "prompt_path": str(result.prompt_path),
@@ -69,6 +70,7 @@ def scenario_clone_payload(result: ScenarioCloneResult) -> dict[str, str]:
         "scenario_root": str(result.scenario_root),
         "source_revision": result.source_revision,
         "target_revision": result.target_revision,
+        "parent_revision": result.parent_revision,
         "revision_dir": str(result.target_scenario_yaml.parent),
         "scenario_yaml": str(result.target_scenario_yaml),
     }

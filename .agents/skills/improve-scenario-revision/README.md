@@ -8,12 +8,14 @@ Guides one-revision-at-a-time scenario improvement using completed benchmark evi
 
 - Use after a baseline or prior revision has been run.
 - Use to create exactly one next comparable revision.
+- Use when prior evidence came from stored matrix entries and the next revision must preserve that run shape.
 - Do not use to pre-author multiple future revisions.
 
 ## Example prompts
 
 - Analyse the latest scenario run and create the next revision.
 - Improve this scenario revision without changing the scoring contract.
+- Create the next revision and update the comparison matrix entries.
 
 ## References
 

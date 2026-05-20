@@ -11,6 +11,7 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 - **When**: Run before creating or editing the next revision.
 - Inspect the latest completed revision run evidence.
 - Review aggregate results, run-level failures, unscored reasons, and gate outcomes.
+- Preserve the evidence shape: single AgentSpec evidence stays single-agent, matrix evidence stays matrix-backed.
 - Do not create or edit the next revision before evidence has been analysed.
 - Workflow: [references/step-0-load-prior-evidence-workflow.md](references/step-0-load-prior-evidence-workflow.md)
 
@@ -19,6 +20,7 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 - **Purpose**: Ensure the next revision keeps the same benchmark contract.
 - **When**: Run after prior evidence is loaded and before selecting changes.
 - Compare scorer ids, scorer versions, scorer weights, scenario metric overrides, verification, acceptance, and visual config against the baseline.
+- For matrix-backed evidence, compare `matrix.scenario`, `matrix.experiment`, entry AgentSpecs, and per-entry run shape before changing revisions.
 - If any contract element needs to change, stop and start a new baseline instead.
 - Treat prompt, rules, starter guidance, and non-contract implementation guidance as the normal revision surface.
 - Workflow: [references/step-1-confirm-comparability-workflow.md](references/step-1-confirm-comparability-workflow.md)
@@ -38,6 +40,7 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 - **When**: Run after one improvement hypothesis is selected.
 - Clone from the latest accepted revision.
 - Apply only the selected generalizable improvement.
+- Preserve revision lineage with `parent_revision` set to the latest accepted revision.
 - Do not author later revisions in the same pass.
 - Workflow: [references/step-3-create-next-revision-workflow.md](references/step-3-create-next-revision-workflow.md)
 
@@ -45,7 +48,7 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 
 - **Purpose**: Determine whether the revision actually improved under the stable contract.
 - **When**: Run after the candidate revision validates.
-- Validate and run the new revision with the same target AgentSpec and comparable run shape.
+- Validate and run the new revision with the same target AgentSpec or comparable stored matrix run shape.
 - Compare composite, quality, diagnostic, validity, gate stability, resource use, and unscored counts.
 - Classify the result as improved, tied with secondary gains, regressed, or inconclusive.
 - Workflow: [references/step-4-run-and-analyse-revision-workflow.md](references/step-4-run-and-analyse-revision-workflow.md)
@@ -63,6 +66,6 @@ description: "Improve one scenario revision at a time from run evidence. USE WHE
 
 ### Result Format
 
-- Report prior evidence, unchanged scorer contract check, selected hypothesis, files changed, validation status, scorer and metric run evidence, and accept/reject decision.
+- Report prior evidence, unchanged scorer and matrix contract checks, selected hypothesis, files changed, validation status, scorer and metric run evidence, and accept/reject decision.
 - State whether improvement was strict composite improvement, secondary improvement, tie, regression, or inconclusive.
 - State whether another revision should be created next, based only on completed evidence.

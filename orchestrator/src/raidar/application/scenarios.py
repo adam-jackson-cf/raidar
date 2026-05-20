@@ -78,6 +78,7 @@ def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> d
     return {
         "name": layout.scenario_name,
         "scenario_revision": request.scenario_revision,
+        "parent_revision": None,
         "description": f"Scenario definition for {layout.scenario_name}",
         "difficulty": request.difficulty,
         "category": request.category,
@@ -144,6 +145,7 @@ def _scenario_init_result(
         scenario_root=layout.scenario_root,
         scenario_name=layout.scenario_name,
         scenario_revision=request.scenario_revision,
+        parent_revision=None,
         revision_dir=layout.revision_dir,
         scenario_yaml=layout.scenario_yaml,
         prompt_path=layout.prompt_path,
