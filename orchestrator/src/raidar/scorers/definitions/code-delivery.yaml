@@ -1,0 +1,28 @@
+id: code-delivery
+version: 1
+status: active
+category: quality
+description: Scores nonvisual code delivery tasks against functional correctness, acceptance requirements, coverage, artifacts, and verification stability.
+metrics:
+  - id: functional
+    type: core
+    weight: 0.25
+  - id: acceptance
+    type: core
+    weight: 0.20
+  - id: requirements-coverage
+    type: core
+    weight: 0.20
+  - id: test-coverage
+    type: core
+    weight: 0.15
+  - id: artifact-checks
+    type: artifact-checks
+    weight: 0.10
+    config:
+      required_paths:
+        - src/**/*.ts
+      path_match: glob
+  - id: verification-stability
+    type: core
+    weight: 0.10

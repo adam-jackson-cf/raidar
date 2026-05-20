@@ -22,6 +22,7 @@ class ExperimentSummaryInput:
     model: str
     evaluation_profile: str
     metrics: list[str]
+    scorers: list[str]
     repeats: int
     repeat_parallel: int
     runs: list[EvalRun]
@@ -111,25 +112,48 @@ def _partition_runs(runs: list[EvalRun]) -> tuple[list[EvalRun], list[EvalRun], 
 
 
 def _aggregate_metric_outcomes(runs: list[EvalRun]) -> dict[str, dict[str, float | int]]:
-    by_metric: dict[str, dict[str, int]] = {}
+    by_metric: dict[str, dict[str, float | int]] = {}
     for run in runs:
-        for metric in run.scores.metric_results:
-            counts = by_metric.setdefault(metric.metric_id, {"pass_count": 0, "fail_count": 0})
+        for metric in run.scores.metric_scores:
+            counts = by_metric.setdefault(
+                metric.metric_id, {"pass_count": 0, "fail_count": 0, "score_total": 0.0}
+            )
             if metric.passed:
-                counts["pass_count"] += 1
+                counts["pass_count"] = int(counts["pass_count"]) + 1
             else:
-                counts["fail_count"] += 1
+                counts["fail_count"] = int(counts["fail_count"]) + 1
+            counts["score_total"] = float(counts["score_total"]) + metric.score
 
     outcomes: dict[str, dict[str, float | int]] = {}
     for metric_id, counts in sorted(by_metric.items()):
-        sample_size = counts["pass_count"] + counts["fail_count"]
+        sample_size = int(counts["pass_count"]) + int(counts["fail_count"])
         outcomes[metric_id] = {
             "pass_count": counts["pass_count"],
             "fail_count": counts["fail_count"],
             "sample_size": sample_size,
             "pass_rate": round(counts["pass_count"] / max(1, sample_size), 6),
+            "mean_score": round(float(counts["score_total"]) / max(1, sample_size), 6),
         }
     return outcomes
+
+
+def _aggregate_scorer_outcomes(runs: list[EvalRun]) -> dict[str, dict[str, float | int]]:
+    by_scorer: dict[str, dict[str, float | int]] = {}
+    for run in runs:
+        for scorer in run.scores.scorer_results:
+            key = f"{scorer.scorer_id}@{scorer.version}"
+            values = by_scorer.setdefault(key, {"sample_size": 0, "score_total": 0.0})
+            values["sample_size"] = int(values["sample_size"]) + 1
+            values["score_total"] = float(values["score_total"]) + scorer.score
+    return {
+        key: {
+            "sample_size": values["sample_size"],
+            "mean_score": round(
+                float(values["score_total"]) / max(1, int(values["sample_size"])), 6
+            ),
+        }
+        for key, values in sorted(by_scorer.items())
+    }
 
 
 def _aggregate_block(
@@ -139,6 +163,7 @@ def _aggregate_block(
     valid_runs: list[EvalRun],
 ) -> dict[str, object]:
     metric_outcomes = _aggregate_metric_outcomes(scored_runs)
+    scorer_outcomes = _aggregate_scorer_outcomes(scored_runs)
     composite_scores = [run.scores.composite_score for run in scored_runs]
     quality_scores = [run.scores.quality_score for run in scored_runs]
     diagnostic_scores = [run.scores.diagnostic_score for run in scored_runs]
@@ -165,6 +190,7 @@ def _aggregate_block(
         "duration_sec": _stat_summary(durations),
         "uncached_input_tokens": _stat_summary(tokens),
         "metric_outcomes": metric_outcomes,
+        "scorer_outcomes": scorer_outcomes,
     }
 
 
@@ -230,6 +256,7 @@ def _summary_config(
         "model": summary_input.model,
         "evaluation_profile": summary_input.evaluation_profile,
         "metrics": summary_input.metrics,
+        "scorers": summary_input.scorers,
         "repeats": summary_input.repeats,
         "repeat_parallel": summary_input.repeat_parallel,
         "rerun_unscored_limit": summary_input.rerun_unscored_limit,
@@ -339,7 +366,24 @@ def _append_metric_outcome_lines(lines: list[str], metric_outcomes: object) -> N
             f"- {metric_id}: pass_count=`{outcome.get('pass_count')}` "
             f"fail_count=`{outcome.get('fail_count')}` "
             f"sample_size=`{outcome.get('sample_size')}` "
-            f"pass_rate=`{outcome.get('pass_rate')}`"
+            f"pass_rate=`{outcome.get('pass_rate')}` "
+            f"mean_score=`{outcome.get('mean_score')}`"
+        )
+
+
+def _append_scorer_outcome_lines(lines: list[str], scorer_outcomes: object) -> None:
+    if not isinstance(scorer_outcomes, dict):
+        return
+    lines.extend(["", "## scorer_outcomes"])
+    if not scorer_outcomes:
+        lines.append("- scorer_outcomes: `{}`")
+        return
+    for scorer_id, outcome in sorted(scorer_outcomes.items()):
+        if not isinstance(outcome, dict):
+            continue
+        lines.append(
+            f"- {scorer_id}: sample_size=`{outcome.get('sample_size')}` "
+            f"mean_score=`{outcome.get('mean_score')}`"
         )
 
 
@@ -418,6 +462,7 @@ def _experiment_report_lines(experiment_summary: dict[str, object]) -> list[str]
     rerun = experiment_summary.get("rerun", {})
     runs = experiment_summary.get("runs", [])
     metric_outcomes = aggregate.get("metric_outcomes", {}) if isinstance(aggregate, dict) else {}
+    scorer_outcomes = aggregate.get("scorer_outcomes", {}) if isinstance(aggregate, dict) else {}
     sample = experiment_summary.get("sample", {})
     typed_aggregate = aggregate if isinstance(aggregate, dict) else {}
     typed_config = config if isinstance(config, dict) else {}
@@ -426,6 +471,7 @@ def _experiment_report_lines(experiment_summary: dict[str, object]) -> list[str]
     lines = _report_header_lines(experiment_id, typed_config)
     lines.extend(_report_aggregate_lines(typed_aggregate, typed_rerun))
     _append_sample_lines(lines, sample)
+    _append_scorer_outcome_lines(lines, scorer_outcomes)
     _append_metric_outcome_lines(lines, metric_outcomes)
     _append_run_lines(lines, runs)
     return lines

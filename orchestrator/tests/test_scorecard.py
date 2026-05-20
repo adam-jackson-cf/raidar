@@ -8,6 +8,8 @@ from raidar.schemas.scorecard import (
     GateCheck,
     ResourceEfficiencyScore,
     Scorecard,
+    ScorerMetricContribution,
+    ScorerResult,
     VerificationStabilityScore,
     VisualScore,
 )
@@ -125,21 +127,14 @@ class TestVisualScore:
 class TestScorecardComposite:
     """Test Scorecard composite score calculation."""
 
-    def test_composite_with_visual(self):
-        """Composite should use all weights when visual present."""
-        scorecard = Scorecard(
-            functional=FunctionalScore(
-                passed=True, build_succeeded=True, tests_passed=10, tests_total=10
-            ),
-            acceptance=AcceptanceScore(),
-            visual=VisualScore(similarity=1.0),
-            verification_stability=VerificationStabilityScore(),
-        )
-        # All scores are 1.0, so composite should be 1.0
-        assert abs(scorecard.composite_score - 1.0) < 0.001
+    def test_composite_uses_resource_efficiency_without_scorer_results(self):
+        """Composite should use resource efficiency for pre-scorer scorecards."""
+        scorecard = Scorecard(resource_efficiency=ResourceEfficiencyScore(command_count=1))
+        assert scorecard.quality_score == 0.0
+        assert scorecard.composite_score == scorecard.resource_efficiency.score
 
-    def test_composite_without_visual(self):
-        """Composite should redistribute visual weight when visual None."""
+    def test_quality_score_zero_without_quality_scorer_results(self):
+        """Quality score should not fall back to legacy metric weights."""
         scorecard = Scorecard(
             functional=FunctionalScore(
                 passed=True, build_succeeded=True, tests_passed=10, tests_total=10
@@ -148,21 +143,7 @@ class TestScorecardComposite:
             visual=None,
             verification_stability=VerificationStabilityScore(),
         )
-        # All scores are 1.0, so composite should still be 1.0
-        assert abs(scorecard.composite_score - 1.0) < 0.001
-
-    def test_composite_with_mixed_scores(self):
-        """Quality score should weight quality dimensions correctly."""
-        scorecard = Scorecard(
-            functional=FunctionalScore(
-                passed=True, build_succeeded=True, tests_passed=5, tests_total=10
-            ),  # 0.5
-            acceptance=AcceptanceScore(),  # 1.0
-            visual=VisualScore(similarity=0.8),  # 0.8
-            verification_stability=VerificationStabilityScore(),  # 1.0
-        )
-        # 0.5*0.4 + 1.0*0.25 + 0.8*0.2 + 1.0*0.15 = 0.2 + 0.25 + 0.16 + 0.15 = 0.76
-        assert abs(scorecard.quality_score - 0.76) < 0.001
+        assert scorecard.quality_score == 0.0
 
     def test_composite_zero_when_invalid(self):
         """Composite score must be 0 when run validity checks fail."""
@@ -202,39 +183,37 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == scorecard.resource_efficiency.score
 
-    def test_composite_uses_score_profile_weights_when_present(self):
-        """Composite score should follow explicit score-profile weights."""
+    def test_composite_uses_weighted_scorer_results_when_present(self):
+        """Composite score should follow scenario-level scorer weights."""
         scorecard = Scorecard(
-            score_profile={
-                "id": "code-delivery-v1",
-                "weights": {
-                    "functional": 0.5,
-                    "acceptance": 0.25,
-                    "resource-efficiency": 0.25,
-                },
-            },
-            functional=FunctionalScore(
-                passed=True,
-                build_succeeded=True,
-                tests_passed=1,
-                tests_total=2,
-            ),
-            acceptance=AcceptanceScore(),
-            resource_efficiency=ResourceEfficiencyScore(
-                uncached_input_tokens=150000,
-                output_tokens=2000,
-                command_count=10,
-                failed_command_count=0,
-                verification_rounds=1,
-                repeated_verification_failures=0,
-            ),
+            scorer_results=[
+                ScorerResult(
+                    scorer_id="code-delivery",
+                    version=1,
+                    category="quality",
+                    weight=0.8,
+                    score=0.75,
+                    metric_contributions=[
+                        ScorerMetricContribution(
+                            metric_id="functional",
+                            weight=1.0,
+                            score=0.75,
+                            weighted_score=0.75,
+                        )
+                    ],
+                ),
+                ScorerResult(
+                    scorer_id="resource-efficiency",
+                    version=1,
+                    category="efficiency",
+                    weight=0.2,
+                    score=0.5,
+                ),
+            ],
         )
 
-        expected = round(
-            (0.5 * 0.5) + (1.0 * 0.25) + (scorecard.resource_efficiency.score * 0.25),
-            3,
-        )
-        assert scorecard.composite_score == expected
+        assert scorecard.quality_score == 0.75
+        assert scorecard.composite_score == 0.7
 
     def test_composite_zero_when_unscored(self):
         """Composite score must be 0 when run is unscored."""

@@ -1,14 +1,11 @@
-"""Acceptance scoring: deterministic checks and LLM judge."""
+"""Acceptance scoring: deterministic checks."""
 
 import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from litellm import completion
-
-from ..config import settings
-from ..schemas.scenario import AcceptanceConfig, DeterministicCheck, LLMJudgeCriterion
-from ..schemas.scorecard import AcceptanceCheck, AcceptanceScore
+from ..schemas.scenario import AcceptanceConfig, DeterministicCheck
+from ..schemas.scorecard import AcceptanceCheck, AcceptanceScore, MetricScore
 
 
 @dataclass
@@ -165,127 +162,41 @@ def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> Accep
     )
 
 
-def collect_source_code(workspace: Path, max_chars: int | None = None) -> str:
-    """Collect source code for LLM evaluation."""
-    if max_chars is None:
-        max_chars = settings.llm_judge.max_source_chars
-
-    src_dir = workspace / "src"
-    if not src_dir.exists():
-        return "No source directory found"
-
-    collected: list[str] = []
-    total_chars = 0
-
-    for file_path in sorted(src_dir.rglob("*.tsx")) + sorted(src_dir.rglob("*.ts")):
-        if total_chars >= max_chars:
-            break
-
-        content = file_path.read_text()
-        rel_path = file_path.relative_to(workspace)
-        file_block = f"=== {rel_path} ===\n{content}\n"
-
-        if total_chars + len(file_block) > max_chars:
-            remaining = max_chars - total_chars
-            file_block = file_block[:remaining] + "\n... (truncated)"
-
-        collected.append(file_block)
-        total_chars += len(file_block)
-
-    return "\n".join(collected)
-
-
-def run_llm_judge(
-    criterion: LLMJudgeCriterion,
-    source_code: str,
-    rules_content: str,
-    judge_model: str | None = None,
-) -> AcceptanceCheck:
-    """Run LLM judge for a criterion with retry logic.
-
-    Args:
-        criterion: The criterion to evaluate
-        source_code: Collected source code
-        rules_content: Rules file content for context
-        judge_model: Optional model override
-
-    Returns:
-        AcceptanceCheck with result
-    """
-    if judge_model is None:
-        judge_model = settings.llm_judge.model
-
-    prompt = f"""You are evaluating code acceptance against project guidelines.
-
-## Project Rules
-{rules_content}
-
-## Source Code
-{source_code}
-
-## Evaluation Criterion
-{criterion.criterion}
-
-Evaluate whether the code follows this criterion. Respond with:
-1. PASS or FAIL
-2. Brief evidence (1-2 sentences)
-
-Format:
-VERDICT: [PASS/FAIL]
-EVIDENCE: [your evidence]"""
-
-    max_retries = settings.llm_judge.max_retries
-    last_error: Exception | None = None
-
-    for attempt in range(max_retries + 1):
-        try:
-            response = completion(
-                model=judge_model,
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=settings.llm_judge.max_tokens,
-            )
-            result_text = response.choices[0].message.content or ""
-
-            judge_result = parse_judge_response(result_text)
-
-            return AcceptanceCheck(
-                rule=criterion.criterion,
-                type="llm_judge",
-                passed=judge_result.passed,
-                evidence=judge_result.evidence,
-            )
-        except Exception as e:
-            last_error = e
-            if attempt < max_retries:
-                continue
-
-    return AcceptanceCheck(
-        rule=criterion.criterion,
-        type="llm_judge",
-        passed=False,
-        evidence=f"LLM judge error after {max_retries + 1} attempts: {last_error}",
-    )
-
-
 def evaluate_acceptance(
     workspace: Path,
     config: AcceptanceConfig,
-    rules_path: Path | None = None,
-    run_llm_checks: bool = True,
 ) -> AcceptanceScore:
     """Evaluate acceptance against scenario configuration."""
-    checks = _collect_acceptance_checks(workspace, config, rules_path, run_llm_checks)
+    checks = _collect_acceptance_checks(workspace, config)
     return _score_acceptance_checks(checks)
+
+
+def evaluate_llm_as_judge_metric(
+    *,
+    workspace: Path,
+    scenario_dir: Path,
+    scenario: object,
+    metric_id: str,
+    judge_path: str,
+) -> MetricScore:
+    """Evaluate the scorer-level LLM-as-judge metric."""
+
+    from .llm_as_judge import evaluate_llm_as_judge_metric as _evaluate
+
+    return _evaluate(
+        workspace=workspace,
+        scenario_dir=scenario_dir,
+        scenario=scenario,
+        metric_id=metric_id,
+        judge_path=judge_path,
+    )
 
 
 def _collect_acceptance_checks(
     workspace: Path,
     config: AcceptanceConfig,
-    rules_path: Path | None,
-    run_llm_checks: bool,
 ) -> list[AcceptanceCheck]:
     checks = list(_run_deterministic_checks(config.deterministic_checks, workspace))
-    checks.extend(_run_llm_judge_checks(config, workspace, rules_path, run_llm_checks))
     return checks
 
 
@@ -294,29 +205,6 @@ def _run_deterministic_checks(
     workspace: Path,
 ) -> list[AcceptanceCheck]:
     return [run_deterministic_check(check, workspace) for check in deterministic_checks]
-
-
-def _run_llm_judge_checks(
-    config: AcceptanceConfig,
-    workspace: Path,
-    rules_path: Path | None,
-    run_llm_checks: bool,
-) -> list[AcceptanceCheck]:
-    if not run_llm_checks or not config.llm_judge_rubric:
-        return []
-
-    source_code = collect_source_code(workspace)
-    rules_content = _load_rules_content(rules_path)
-    return [
-        run_llm_judge(criterion, source_code, rules_content)
-        for criterion in config.llm_judge_rubric
-    ]
-
-
-def _load_rules_content(rules_path: Path | None) -> str:
-    if not rules_path or not rules_path.exists():
-        return ""
-    return rules_path.read_text()
 
 
 def _score_acceptance_checks(checks: list[AcceptanceCheck]) -> AcceptanceScore:

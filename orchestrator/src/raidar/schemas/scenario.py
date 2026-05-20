@@ -2,10 +2,12 @@
 
 import re
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from raidar.scenario_paths import validate_relative_path
 
 SHELL_WRAPPER_ARGS = {"-c", "-lc", "/c", "/k", "-command", "-encodedcommand"}
 SHELL_WRAPPER_BINARIES = {
@@ -49,6 +51,8 @@ def _validate_argv_command(argv: list[str], *, field_name: str) -> list[str]:
 class VerificationGate(BaseModel):
     """Configuration for a verification gate."""
 
+    model_config = ConfigDict(extra="forbid")
+
     name: str = Field(description="Gate identifier (typecheck, lint, test)")
     command: list[str] = Field(min_length=1, description="Command argv to execute")
     on_failure: Literal["continue", "terminate"] = Field(
@@ -65,6 +69,8 @@ class VerificationGate(BaseModel):
 class StarterConfig(BaseModel):
     """Scenario-local starter configuration."""
 
+    model_config = ConfigDict(extra="forbid")
+
     root: str = Field(
         default="starter",
         description="Relative path from scenario revision directory to starter root",
@@ -73,6 +79,8 @@ class StarterConfig(BaseModel):
 
 class PromptConfig(BaseModel):
     """Prompt artifact configuration."""
+
+    model_config = ConfigDict(extra="forbid")
 
     entry: str = Field(
         description="Primary prompt artifact path relative to scenario revision directory"
@@ -86,6 +94,8 @@ class PromptConfig(BaseModel):
 class DeterministicCheck(BaseModel):
     """Deterministic acceptance check."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["import_present", "file_exists", "no_pattern"] = Field(description="Check type")
     pattern: str = Field(description="Pattern to match")
     description: str = Field(description="Human-readable description")
@@ -93,6 +103,8 @@ class DeterministicCheck(BaseModel):
 
 class QueryRoleTestEvidence(BaseModel):
     """Structured evidence that tests query an element by ARIA role."""
+
+    model_config = ConfigDict(extra="forbid")
 
     type: Literal["query_role"] = "query_role"
     role: str = Field(description="ARIA role asserted by the test")
@@ -115,6 +127,8 @@ class QueryRoleTestEvidence(BaseModel):
 class QueryTextTestEvidence(BaseModel):
     """Structured evidence that tests query text intentionally."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["query_text"] = "query_text"
     pattern: str = Field(description="Regex-compatible text pattern expected in a text query")
     min_count: int = Field(
@@ -133,6 +147,8 @@ TestEvidenceSpec = Annotated[
 class RequirementSpec(BaseModel):
     """Scenario requirement with deterministic presence and optional test evidence checks."""
 
+    model_config = ConfigDict(extra="forbid")
+
     id: str = Field(description="Stable requirement identifier")
     description: str = Field(description="Requirement description")
     check: DeterministicCheck = Field(description="Deterministic check for requirement presence")
@@ -142,26 +158,24 @@ class RequirementSpec(BaseModel):
     )
 
 
-class LLMJudgeCriterion(BaseModel):
-    """LLM judge evaluation criterion."""
-
-    criterion: str = Field(description="Evaluation criterion description")
-    weight: float = Field(ge=0, le=1, description="Weight for this criterion")
-
-
 class AcceptanceConfig(BaseModel):
     """Acceptance checking configuration."""
 
+    model_config = ConfigDict(extra="forbid")
+
     deterministic_checks: list[DeterministicCheck] = Field(default_factory=list)
     requirements: list[RequirementSpec] = Field(default_factory=list)
-    llm_judge_rubric: list[LLMJudgeCriterion] = Field(default_factory=list)
 
 
 class VisualConfig(BaseModel):
     """Visual regression configuration."""
 
+    model_config = ConfigDict(extra="forbid")
+
     class VisualBand(BaseModel):
         """Lower/upper scoring band for one visual component."""
+
+        model_config = ConfigDict(extra="forbid")
 
         lower: float = Field(ge=0, le=1)
         upper: float = Field(ge=0, le=1)
@@ -175,7 +189,7 @@ class VisualConfig(BaseModel):
     class VisualScoringWeights(BaseModel):
         """Relative weights for the Oracle visual scoring formula."""
 
-        model_config = ConfigDict(populate_by_name=True)
+        model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
         global_weight: float = Field(alias="global", gt=0)
         regional: float = Field(gt=0)
@@ -185,7 +199,7 @@ class VisualConfig(BaseModel):
     class VisualScoringBands(BaseModel):
         """Per-component scoring bands for the Oracle visual scoring formula."""
 
-        model_config = ConfigDict(populate_by_name=True)
+        model_config = ConfigDict(populate_by_name=True, extra="forbid")
 
         global_band: "VisualConfig.VisualBand" = Field(alias="global")
         regional: "VisualConfig.VisualBand"
@@ -194,6 +208,8 @@ class VisualConfig(BaseModel):
     class VisualScoringConfig(BaseModel):
         """Continuous visual score configuration."""
 
+        model_config = ConfigDict(extra="forbid")
+
         weights: "VisualConfig.VisualScoringWeights"
         bands: "VisualConfig.VisualScoringBands"
         gamma: float = Field(default=2.0, gt=0)
@@ -201,6 +217,8 @@ class VisualConfig(BaseModel):
 
     class VisualPassPolicy(BaseModel):
         """Hard visual pass/fail and tier thresholds."""
+
+        model_config = ConfigDict(extra="forbid")
 
         fail_if_global_below: float = Field(default=0.9, ge=0, le=1)
         fail_if_worst_region_below: float = Field(default=0.85, ge=0, le=1)
@@ -214,11 +232,15 @@ class VisualConfig(BaseModel):
     class VisualViewport(BaseModel):
         """Viewport used for authored visual captures."""
 
+        model_config = ConfigDict(extra="forbid")
+
         width: int = Field(gt=0)
         height: int = Field(gt=0)
 
     class VisualRegionClip(BaseModel):
         """Viewport clip for one authored visual region."""
+
+        model_config = ConfigDict(extra="forbid")
 
         x: int = Field(ge=0)
         y: int = Field(ge=0)
@@ -227,6 +249,8 @@ class VisualConfig(BaseModel):
 
     class VisualRegion(BaseModel):
         """One authored visual region used for capture and scoring."""
+
+        model_config = ConfigDict(extra="forbid")
 
         name: str = Field(description="Stable authored region name")
         weight: float = Field(default=1.0, gt=0, description="Relative scoring weight")
@@ -262,8 +286,12 @@ class VisualConfig(BaseModel):
 class VerificationConfig(BaseModel):
     """Verification configuration."""
 
+    model_config = ConfigDict(extra="forbid")
+
     class VerificationWorkflowConfig(BaseModel):
         """Workflow requirements applied outside the task prompt."""
+
+        model_config = ConfigDict(extra="forbid")
 
         atomic_commits_required: bool = Field(
             default=False,
@@ -326,11 +354,10 @@ CoreMetricId = Literal[
     "resource-efficiency",
     "test-coverage",
     "requirements-coverage",
-    "llm-judge",
     "visual-regression",
 ]
 
-ScoreProfileMetricId = Literal[
+MetricId = Literal[
     "functional",
     "acceptance",
     "verification-stability",
@@ -338,6 +365,7 @@ ScoreProfileMetricId = Literal[
     "resource-efficiency",
     "test-coverage",
     "requirements-coverage",
+    "plan-quality",
     "visual-regression",
     "artifact-checks",
 ]
@@ -346,12 +374,16 @@ ScoreProfileMetricId = Literal[
 class CoreMetricDefinition(BaseModel):
     """Built-in metric definition."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["core"] = "core"
     id: CoreMetricId = Field(description="Core metric id")
 
 
 class ArtifactCheckMetricConfig(BaseModel):
     """Configuration for artifact checks."""
+
+    model_config = ConfigDict(extra="forbid")
 
     required_paths: list[str] = Field(
         min_length=1,
@@ -363,49 +395,77 @@ class ArtifactCheckMetricConfig(BaseModel):
 class ArtifactCheckMetricDefinition(BaseModel):
     """Metric definition that checks required artifacts exist."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["artifact-checks"] = "artifact-checks"
     id: Literal["artifact-checks"] = "artifact-checks"
     config: ArtifactCheckMetricConfig = Field(description="Artifact check configuration")
 
 
+class LLMAsJudgeMetricConfig(BaseModel):
+    """Configuration for an LLM-as-judge metric."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    judge: str = Field(description="Path to a judge role file relative to scorer definitions")
+
+    @field_validator("judge")
+    @classmethod
+    def _validate_judge_path(cls, value: str) -> str:
+        return validate_relative_path(
+            value,
+            field_name="llm-as-judge.config.judge",
+            root_name="scorer definitions",
+        )
+
+
+class LLMAsJudgeMetricDefinition(BaseModel):
+    """Metric definition that evaluates output with a judge role file."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    type: Literal["llm-as-judge"] = "llm-as-judge"
+    id: Literal["plan-quality"] = "plan-quality"
+    config: LLMAsJudgeMetricConfig = Field(description="LLM judge configuration")
+
+
 MetricDefinition = Annotated[
-    CoreMetricDefinition | ArtifactCheckMetricDefinition,
+    CoreMetricDefinition | ArtifactCheckMetricDefinition | LLMAsJudgeMetricDefinition,
     Field(discriminator="type"),
 ]
 
 
-class ScoreProfileConfig(BaseModel):
-    """Stable scoring contract used to compare scenario revisions."""
+class ScorerMetricDefinition(BaseModel):
+    """Weighted metric entry inside a reusable scorer definition."""
 
-    id: str = Field(
-        default="legacy-resource-efficiency-v1",
-        description="Stable score profile identifier; changing this starts a new baseline",
-    )
-    baseline_lineage: str | None = Field(
-        default=None,
-        description="Optional lineage identifier for comparable benchmark revisions",
-    )
-    weights: dict[ScoreProfileMetricId, float] = Field(
-        default_factory=lambda: {"resource-efficiency": 1.0},
-        description="Composite score weights by metric id",
-    )
+    model_config = ConfigDict(extra="forbid")
 
-    @field_validator("weights")
-    @classmethod
-    def _validate_weights(
-        cls, value: dict[ScoreProfileMetricId, float]
-    ) -> dict[ScoreProfileMetricId, float]:
-        if not value:
-            raise ValueError("score_profile.weights must not be empty")
-        if any(weight < 0 for weight in value.values()):
-            raise ValueError("score_profile.weights must be non-negative")
-        if sum(value.values()) <= 0:
-            raise ValueError("score_profile.weights must include positive total weight")
-        return value
+    id: MetricId = Field(description="Metric identifier")
+    type: Literal["core", "artifact-checks", "llm-as-judge"] = Field(
+        description="Metric implementation type"
+    )
+    weight: float = Field(gt=0, description="Metric weight inside this scorer")
+    config: dict[str, Any] = Field(default_factory=dict)
+
+
+class ScenarioScorerRef(BaseModel):
+    """Scenario reference to a reusable scorer definition."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Scorer identifier")
+    version: int = Field(ge=1, description="Scorer definition version")
+    weight: float = Field(gt=0, description="Scenario-level scorer weight")
+    config: dict[str, dict[str, Any]] = Field(
+        default_factory=dict,
+        description="Scenario-level metric config overrides keyed by metric id",
+    )
 
 
 class ScenarioDefinition(BaseModel):
     """Complete scenario definition matching the YAML format."""
+
+    model_config = ConfigDict(extra="forbid")
 
     name: str = Field(description="Scenario identifier")
     scenario_revision: str = Field(description="Scenario revision identifier (for example v001)")
@@ -419,27 +479,41 @@ class ScenarioDefinition(BaseModel):
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
     acceptance: AcceptanceConfig = Field(default_factory=AcceptanceConfig)
     visual: VisualConfig | None = Field(default=None)
-    metrics: list[MetricDefinition] = Field(
+    scorers: list[ScenarioScorerRef] = Field(
         min_length=1,
-        description="Ordered metric definitions enabled for this scenario",
-    )
-    score_profile: ScoreProfileConfig | None = Field(
-        default=None,
-        description="Optional stable scoring contract; omitted scenarios use legacy scoring",
+        description="Reusable scorer definitions attached to this scenario",
     )
     prompt: PromptConfig = Field(description="Prompt artifact configuration")
 
     def metric_ids(self) -> list[str]:
-        """Return ordered metric ids."""
-        return [metric.id for metric in self.metrics]
+        """Return ordered metric ids derived from attached scorers."""
+        return [metric.id for metric in self.resolved_metrics()]
+
+    def scorer_ids(self) -> list[str]:
+        """Return deterministic scorer references."""
+        return [f"{scorer.id}@{scorer.version}" for scorer in self.scorers]
+
+    def resolved_scorers(self):
+        """Return validated scorer definitions with scenario config merged."""
+        from raidar.scorers.registry import resolve_scorers
+
+        return resolve_scorers(self)
+
+    def resolved_metrics(self) -> list[MetricDefinition]:
+        """Return de-duplicated metric definitions derived from resolved scorers."""
+        from raidar.scorers.registry import resolved_metrics
+
+        return resolved_metrics(self)
 
     @model_validator(mode="after")
-    def _validate_metrics(self) -> "ScenarioDefinition":
+    def _validate_scorers(self) -> "ScenarioDefinition":
+        if len(self.scorer_ids()) != len(set(self.scorer_ids())):
+            raise ValueError("scorers contains duplicate scorer references")
+        self.resolved_scorers()
         metric_ids = self.metric_ids()
         if len(metric_ids) != len(set(metric_ids)):
-            raise ValueError("metrics contains duplicate metric ids")
+            raise ValueError("resolved scorers contain duplicate metric ids")
         self._validate_metric_dependencies(metric_ids)
-        self._validate_score_profile_metrics(metric_ids)
         return self
 
     def _validate_metric_dependencies(self, metric_ids: list[str]) -> None:
@@ -451,19 +525,11 @@ class ScenarioDefinition(BaseModel):
             raise ValueError(
                 "metrics includes requirements-coverage without acceptance.requirements"
             )
-        if "llm-judge" in metric_ids and not self.acceptance.llm_judge_rubric:
-            raise ValueError("metrics includes llm-judge without acceptance.llm_judge_rubric")
         if "visual-regression" in metric_ids and self.visual is None:
-            raise ValueError("metrics includes visual-regression without visual config")
-
-    def _validate_score_profile_metrics(self, metric_ids: list[str]) -> None:
-        if self.score_profile is not None:
-            missing_weighted_metrics = sorted(set(self.score_profile.weights) - set(metric_ids))
-            if missing_weighted_metrics:
-                raise ValueError(
-                    "score_profile.weights references metrics not enabled in metrics: "
-                    + ", ".join(missing_weighted_metrics)
-                )
+            raise ValueError("scorers include visual-regression without visual config")
+        has_quality_scorer = any(scorer.category == "quality" for scorer in self.resolved_scorers())
+        if self.verification.min_quality_score > 0 and not has_quality_scorer:
+            raise ValueError("verification.min_quality_score requires at least one quality scorer")
 
     @classmethod
     def from_yaml(cls, path: Path) -> "ScenarioDefinition":

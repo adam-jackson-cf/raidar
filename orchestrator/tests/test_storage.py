@@ -186,7 +186,7 @@ class TestExportCsv:
     def test_export_to_csv_includes_evaluation_profile_and_metrics(
         self, sample_eval_run: EvalRun, tmp_path: Path
     ):
-        sample_eval_run.scores.metric_results = []
+        sample_eval_run.scores.metric_scores = []
         sample_eval_run.scores.metadata["harbor"] = {
             "phase_timings_sec": {},
             "harness_overhead_sec": 1.23,
@@ -196,7 +196,7 @@ class TestExportCsv:
         export_to_csv([sample_eval_run], output)
         payload = output.read_text(encoding="utf-8")
         assert "evaluation_profile" in payload
-        assert "metric_results" in payload
+        assert "metric_scores" in payload
         assert "harness_overhead_sec" in payload
         assert "orchestration_overhead_excluding_test_sec" in payload
         assert "1.23" in payload

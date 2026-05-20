@@ -37,13 +37,11 @@ def evaluate_all(
     acceptance_config: AcceptanceConfig,
     visual_config: VisualConfig | None,
     gate_events: list[GateEvent],
-    rules_path: Path | None = None,
-    run_llm_checks: bool = True,
 ) -> Scorecard:
     """Run all evaluations and return complete scorecard."""
 
     functional = evaluate_functional(workspace)
-    acceptance = evaluate_acceptance(workspace, acceptance_config, rules_path, run_llm_checks)
+    acceptance = evaluate_acceptance(workspace, acceptance_config)
 
     visual = None
     if visual_config:

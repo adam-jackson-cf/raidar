@@ -77,12 +77,19 @@ def _workspace_runtime_env(
 
 def scenario_evaluation_profile(scenario: ScenarioDefinition) -> str:
     """Derive deterministic evaluation-profile identifier for a scenario."""
-    return "+".join(scenario_metrics(scenario))
+    from raidar.scorers.registry import scorer_evaluation_profile
+
+    return scorer_evaluation_profile(scenario)
 
 
 def scenario_metrics(scenario: ScenarioDefinition) -> list[str]:
     """Return deterministic ordered metric ids for a scenario."""
     return scenario.metric_ids()
+
+
+def scenario_scorers(scenario: ScenarioDefinition) -> list[str]:
+    """Return deterministic scorer ids for a scenario."""
+    return scenario.scorer_ids()
 
 
 def prepare_workspace(

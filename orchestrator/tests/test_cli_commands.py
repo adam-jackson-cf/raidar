@@ -247,9 +247,9 @@ def _minimal_cli_scenario() -> ScenarioDefinition:
             "category": "smoke",
             "timeout_sec": 300,
             "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": []},
+            "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
             "acceptance": {},
-            "metrics": [{"type": "core", "id": "functional"}],
+            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -675,9 +675,9 @@ def test_matrix_dry_run_supports_selector_generation(tmp_path: Path, monkeypatch
             "category": "smoke",
             "timeout_sec": 300,
             "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": []},
+            "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
             "acceptance": {},
-            "metrics": [{"type": "core", "id": "functional"}],
+            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -778,8 +778,10 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
     assert scenario_def.metric_ids() == [
         "functional",
         "acceptance",
+        "requirements-coverage",
+        "test-coverage",
+        "artifact-checks",
         "verification-stability",
-        "execution-validity",
         "resource-efficiency",
     ]
 
@@ -1039,8 +1041,7 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     assert f"  v10: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert (
         "Evaluation Profile: "
-        "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
-        in info_result.output
+        "scorers:code-delivery@1:0.9+resource-efficiency@1:0.1" in info_result.output
     )
 
 

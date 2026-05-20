@@ -1,10 +1,11 @@
-# Creating a New Scenario
+# Creating A New Scenario
 
 Use this guide to create a versioned scenario that runs in the orchestrator for any supported `AgentSpec` (`harness + model`).
 
 ## 1. Create Versioned Scenario Structure
 
 Create:
+
 - `scenarios/<scenario-name>/v001/scenario.yaml`
 - `scenarios/<scenario-name>/v001/prompt/task.md`
 - `scenarios/<scenario-name>/v001/rules/`
@@ -12,7 +13,7 @@ Create:
 
 ## 2. Author `scenario.yaml`
 
-Current schema:
+Current schema shape:
 
 ```yaml
 name: homepage-implementation
@@ -39,19 +40,20 @@ verification:
 acceptance:
   deterministic_checks: []
   requirements: []
-  llm_judge_rubric: []
 
-metrics:
-  - type: core
-    id: functional
-  - type: core
-    id: acceptance
-  - type: core
-    id: verification-stability
-  - type: core
-    id: execution-validity
-  - type: core
-    id: resource-efficiency
+scorers:
+  - id: code-delivery
+    version: 1
+    weight: 0.9
+    config:
+      artifact-checks:
+        required_paths:
+          - src/**/*.ts
+          - src/**/*.tsx
+        path_match: glob
+  - id: resource-efficiency
+    version: 1
+    weight: 0.1
 
 prompt:
   entry: prompt/task.md
@@ -59,68 +61,81 @@ prompt:
 ```
 
 Notes:
+
 - Keep implementation instructions in prompt artifacts, not in YAML prose blocks.
 - Command fields must be argv arrays. Do not use shell wrappers, operators, or `-c`.
 - Rules are single-set only. Do not add strict/minimal variants.
-- `metrics[]` is required and defines the evaluation profile for the scenario.
+- `scorers[]` is required and defines the scenario evaluation profile.
+- Scorer refs must point to active executable definitions in `orchestrator/src/raidar/scorers/definitions/`.
+- Scenario YAML is strict. Removed fields such as top-level `metrics`, top-level `score_profile`, and `acceptance.llm_judge_rubric` fail validation.
 
-## 2.1 Configure Metrics
+## 2.1 Configure Scorers
 
-Core metric IDs:
-- `functional`
-- `acceptance`
-- `verification-stability`
-- `execution-validity`
+Active scorer IDs:
+
+- `design-to-code`
+- `code-delivery`
 - `resource-efficiency`
-- `test-coverage`
-- `requirements-coverage`
-- `llm-judge`
-- `visual-regression`
 
-Non-core metric example (`artifact-checks`):
+Attach one or more scorers and use scorer-level `weight` to express the scenario blend. The homepage scenario uses `design-to-code` for quality and `resource-efficiency` for cost-aware comparison:
 
 ```yaml
-metrics:
-  - type: core
-    id: functional
-  - type: core
-    id: acceptance
-  - type: core
-    id: verification-stability
-  - type: core
-    id: execution-validity
-  - type: core
-    id: resource-efficiency
-  - type: artifact-checks
-    id: artifact-checks
+scorers:
+  - id: design-to-code
+    version: 1
+    weight: 0.9
     config:
-      required_paths:
-        - src/app/page.tsx
-        - src/components/**/*.tsx
-      path_match: glob
+      artifact-checks:
+        required_paths:
+          - src/app/page.tsx
+          - src/components/**/*.tsx
+        path_match: glob
+  - id: resource-efficiency
+    version: 1
+    weight: 0.1
 ```
 
-Metric dependency rules:
-- IDs must be unique.
+Dependency rules:
+
+- Scorer weights must have a positive total.
+- Metric weights inside scorer definitions must have a positive total.
 - `test-coverage` requires `verification.coverage_threshold`.
 - `requirements-coverage` requires non-empty `acceptance.requirements`.
-- `llm-judge` requires non-empty `acceptance.llm_judge_rubric`.
 - `visual-regression` requires a `visual` block.
 - `artifact-checks` requires non-empty `config.required_paths`.
+- `llm-as-judge` is scorer-owned. Scenarios cannot override judge role files.
+- `verification.min_quality_score` requires at least one quality-category scorer. Set it to `0.0` only for efficiency-only smoke scenarios.
 
-The profile shown in run and experiment artifacts is derived from metric order as:
-- `v2:<metric-id>+<metric-id>+...`
+The profile shown in run and experiment artifacts is derived from scorer refs as:
+
+`scorers:<scorer-id>@<version>:<weight>+...`
+
+## 2.2 Judge Role Files
+
+When a scorer includes `llm-as-judge`, the judge role file lives with the scorer definition under `orchestrator/src/raidar/scorers/definitions/`:
+
+```yaml
+- id: plan-quality
+  type: llm-as-judge
+  weight: 0.35
+  config:
+    judge: judges/plan-judge.toml
+```
+
+The judge role file should contain the judge role, responsibilities, rubric, and output contract. Keep those details out of `scenario.yaml`.
+The `judge` path must stay inside scorer definitions; absolute paths and `..` traversal are rejected.
 
 ## 3. Create Rules Files
 
 Populate `scenarios/<scenario>/v001/rules/` with harness-mapped files:
+
 - `AGENTS.md`
 - `CLAUDE.md`
 - `GEMINI.md`
 - `copilot-instructions.md`
 - `user-rules-setting.md`
 
-## 4. Validate and Run
+## 4. Validate And Run
 
 1. Validate the scenario:
 
@@ -142,17 +157,17 @@ make experiment-run \
 ## 5. Revision Pattern
 
 When iterating scenario behavior, create `v002`, `v003`, etc., and evolve:
+
 - prompt artifacts
 - rules
 - starter files
 - scenario config
+- scorer refs and scorer-specific config
 
 Use deterministic revision cloning:
 
 ```bash
-uv run --project orchestrator raidar scenario clone-revision \
-  --path scenarios/<scenario-name> \
-  --from-revision v001
+make scenario-clone-revision SCENARIO_DIR=scenarios/<scenario-name> FROM_REVISION=v001
 ```
 
 This creates `v002` automatically and updates `scenario.yaml` revision metadata in the cloned version.

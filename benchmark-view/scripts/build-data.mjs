@@ -135,9 +135,38 @@ function gateNames(text) {
   return names;
 }
 
-function metricIds(text) {
-  const matches = [...text.matchAll(/^\s*id:\s*(.+)$/gm)].map((match) => match[1].trim());
-  return [...new Set(matches)];
+function scorerRefs(text) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => line.trim() === 'scorers:');
+  if (start === -1) return [];
+  const refs = [];
+  let current = null;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\S/.test(line) && !line.startsWith('-')) break;
+    const idMatch = line.match(/^\s*-\s*id:\s*(.+)$/);
+    if (idMatch) {
+      current = { id: idMatch[1].trim(), version: null, weight: null };
+      refs.push(current);
+      continue;
+    }
+    if (!current) continue;
+    const versionMatch = line.match(/^\s*version:\s*(.+)$/);
+    if (versionMatch) current.version = Number(versionMatch[1].trim()) || null;
+    const weightMatch = line.match(/^\s*weight:\s*(.+)$/);
+    if (weightMatch) current.weight = Number(weightMatch[1].trim()) || null;
+  }
+  return refs;
+}
+
+function scorerIds(text) {
+  return [...new Set(scorerRefs(text).map((ref) => ref.id))];
+}
+
+function scorerEvaluationProfile(text) {
+  return `scorers:${scorerRefs(text)
+    .map((ref) => `${ref.id}@${ref.version ?? 1}:${ref.weight ?? 1}`)
+    .join('+')}`;
 }
 
 function readScenarioRevision(scenario, revision) {
@@ -154,12 +183,13 @@ function readScenarioRevision(scenario, revision) {
     difficulty: firstScalar(yaml, 'difficulty'),
     category: firstScalar(yaml, 'category'),
     timeout_sec: Number(firstScalar(yaml, 'timeout_sec')) || null,
-    evaluation_profile: metricIds(yaml).join('+'),
-    metrics: metricIds(yaml),
+    evaluation_profile: scorerEvaluationProfile(yaml),
+    scorers: scorerIds(yaml),
+    metrics: [],
     quality_gates: gateNames(yaml),
-    deterministic_checks: countBetween(yaml, 'deterministic_checks', ['requirements', 'llm_judge_rubric', 'metrics', 'visual', 'prompt'], /^\s*-\s*type:/),
-    requirements: countBetween(yaml, 'requirements', ['llm_judge_rubric', 'metrics', 'visual', 'prompt'], /^\s*-\s*id:/),
-    llm_judge_criteria: [...yaml.matchAll(/^\s*-\s*criterion:/gm)].length,
+    deterministic_checks: countBetween(yaml, 'deterministic_checks', ['requirements', 'scorers', 'visual', 'prompt'], /^\s*-\s*type:/),
+    requirements: countBetween(yaml, 'requirements', ['scorers', 'visual', 'prompt'], /^\s*-\s*id:/),
+    llm_as_judge_metrics: [...yaml.matchAll(/judge:\s*/gm)].length,
     visual_reference: /reference_image:\s*/.test(yaml),
     prompt_preview: prompt.split('\n').filter(Boolean).slice(0, 5).join(' '),
     files: {
@@ -369,12 +399,14 @@ function scenarioIdentity(meta, config) {
     model: valueOrDefault(config.model, meta.model),
     evaluation_profile: valueOrDefault(config.evaluation_profile, null),
     metrics: valueOrDefault(config.metrics, []),
+    scorers: valueOrDefault(config.scorers, []),
   };
 }
 
 function scoreMetrics(aggregate) {
   return {
     metric_outcomes: aggregate.metric_outcomes ?? {},
+    scorer_outcomes: aggregate.scorer_outcomes ?? {},
     mean_score: statMean(aggregate.composite_score),
     median_score: statMedian(aggregate.composite_score),
     score_stddev: statStddev(aggregate.composite_score),
@@ -441,11 +473,12 @@ function scenarioMetadata(row) {
     scenario: row.scenario,
     revision: row.revision,
     description: null,
+    scorers: row.scorers,
     metrics: row.metrics,
     quality_gates: [],
     deterministic_checks: null,
     requirements: null,
-    llm_judge_criteria: null,
+    llm_as_judge_metrics: null,
     visual_reference: false,
     files: {},
   };

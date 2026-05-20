@@ -28,11 +28,11 @@ class TestEvalSettings:
         assert timeouts.typecheck > 0
         assert timeouts.gate > 0
 
-    def test_llm_judge_defaults(self):
-        """LLM judge should have sensible defaults."""
-        from raidar.config import LLMJudgeSettings
+    def test_llm_as_judge_defaults(self):
+        """LLM-as-judge should have sensible defaults."""
+        from raidar.config import LLMAsJudgeSettings
 
-        judge = LLMJudgeSettings()
+        judge = LLMAsJudgeSettings()
         assert judge.max_tokens > 0
         assert judge.max_source_chars > 0
         assert judge.max_retries >= 0
@@ -44,7 +44,7 @@ class TestEvalSettings:
 
         assert settings.weights is not None
         assert settings.timeouts is not None
-        assert settings.llm_judge is not None
+        assert settings.llm_as_judge is not None
         assert settings.verification_stability is not None
         assert settings.gate is not None
         assert settings.visual is not None
@@ -56,12 +56,12 @@ class TestEnvironmentOverrides:
 
     def test_env_override_llm_model(self, monkeypatch):
         """Environment variable should override LLM model."""
-        monkeypatch.setenv("EVAL_LLM_JUDGE__MODEL", "test/model")
+        monkeypatch.setenv("EVAL_LLM_AS_JUDGE__MODEL", "test/model")
 
         # Need to reimport to pick up env var
-        from raidar.config import LLMJudgeSettings
+        from raidar.config import LLMAsJudgeSettings
 
-        settings = LLMJudgeSettings()
+        settings = LLMAsJudgeSettings()
         assert settings.model == "test/model"
 
     def test_env_override_timeout(self, monkeypatch):

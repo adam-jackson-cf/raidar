@@ -14,7 +14,7 @@ from raidar.schemas.scorecard import (
     EvalConfig,
     EvalRun,
     GateCheck,
-    MetricResult,
+    MetricScore,
     Scorecard,
 )
 
@@ -67,9 +67,7 @@ def _eval_config() -> EvalConfig:
         scenario_name="homepage",
         scenario_revision="v001",
         starter_root="starter",
-        evaluation_profile=(
-            "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
-        ),
+        evaluation_profile="scorers:code-delivery@1:0.98+resource-efficiency@1:0.02",
     )
 
 
@@ -91,7 +89,7 @@ def _scorecard(spec: ExperimentRunSpec) -> Scorecard:
         },
         unscored=spec.unscored,
         unscored_reasons=["provider_rate_limit"] if spec.unscored else [],
-        metric_results=_artifact_check_results(spec),
+        metric_scores=_artifact_check_results(spec),
     )
     scorecard.execution_validity.checks = [
         GateCheck(name="run_completed", passed=spec.run_valid, evidence=None)
@@ -101,12 +99,13 @@ def _scorecard(spec: ExperimentRunSpec) -> Scorecard:
     return scorecard
 
 
-def _artifact_check_results(spec: ExperimentRunSpec) -> list[MetricResult]:
+def _artifact_check_results(spec: ExperimentRunSpec) -> list[MetricScore]:
     if spec.artifact_checks_passed is None:
         return []
     return [
-        MetricResult(
+        MetricScore(
             metric_id="artifact-checks",
+            score=1.0 if spec.artifact_checks_passed else 0.0,
             passed=spec.artifact_checks_passed,
             matched_count=1 if spec.artifact_checks_passed else 0,
             missing_patterns=[] if spec.artifact_checks_passed else ["src/components/**/*.tsx"],
@@ -121,8 +120,9 @@ def _summary_input(spec: SummaryInputSpec) -> ExperimentSummaryInput:
         scenario_revision="v001",
         harness="codex-cli",
         model="codex/gpt-5.4-mini",
-        evaluation_profile="+".join(spec.metrics),
+        evaluation_profile="scorers:code-delivery@1:0.98+resource-efficiency@1:0.02",
         metrics=spec.metrics,
+        scorers=["code-delivery@1", "resource-efficiency@1"],
         repeats=spec.repeats,
         repeat_parallel=spec.repeat_parallel,
         runs=spec.runs,
@@ -179,6 +179,7 @@ def _summary_aggregate_payload() -> dict[str, object]:
                 "fail_count": 0,
                 "sample_size": 1,
                 "pass_rate": 1.0,
+                "mean_score": 1.0,
             }
         },
     }
@@ -189,9 +190,7 @@ def _summary_config_payload() -> dict[str, object]:
         "scenario_name": "homepage",
         "harness": "codex-cli",
         "model": "codex/gpt-5.4-mini",
-        "evaluation_profile": (
-            "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
-        ),
+        "evaluation_profile": "scorers:code-delivery@1:0.98+resource-efficiency@1:0.02",
         "metrics": [
             "functional",
             "acceptance",

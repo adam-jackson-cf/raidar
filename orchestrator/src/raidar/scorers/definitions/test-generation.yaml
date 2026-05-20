@@ -1,0 +1,21 @@
+id: test-generation
+version: 1
+status: proposed
+category: quality
+description: Scores test-generation tasks by coverage lift, meaningful requirement mapping, and production-code guardrails.
+metrics:
+  - id: test-coverage
+    type: core
+    weight: 0.35
+  - id: requirements-coverage
+    type: core
+    weight: 0.25
+  - id: functional
+    type: core
+    weight: 0.20
+  - id: acceptance
+    type: core
+    weight: 0.10
+  - id: verification-stability
+    type: core
+    weight: 0.10

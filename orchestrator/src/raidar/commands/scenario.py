@@ -14,6 +14,7 @@ from raidar.application.scenario_catalog import (
     load_scenario,
     scenario_evaluation_profile,
     scenario_metrics,
+    scenario_scorers,
 )
 from raidar.application.scenarios import clone_scenario_revision as _service_clone_scenario_revision
 from raidar.application.scenarios import init_scenario as _service_init_scenario
@@ -116,6 +117,7 @@ def scenario_validate(scenario: Path) -> None:
     click.echo(f"  prompt_entry: {scenario_def.prompt.entry}")
     click.echo(f"  required_commands: {len(scenario_def.verification.required_commands)}")
     click.echo(f"  gates: {len(scenario_def.verification.gates)}")
+    click.echo(f"  scorers: {len(scenario_def.scorers)}")
     click.echo(f"  metrics: {len(scenario_def.metric_ids())}")
 
 
@@ -170,6 +172,7 @@ def echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
     click.echo(f"Category: {scenario_def.category}")
     click.echo(f"Timeout: {scenario_def.timeout_sec // 60} minutes")
     click.echo(f"Evaluation Profile: {scenario_evaluation_profile(scenario_def)}")
+    click.echo(f"Scorers: {', '.join(scenario_scorers(scenario_def))}")
     click.echo(f"Metrics: {', '.join(scenario_metrics(scenario_def))}")
     if scenario_def.verification.gates:
         gates = [g.name for g in scenario_def.verification.gates]
@@ -210,14 +213,11 @@ def echo_visual_config(task_def: ScenarioDefinition) -> None:
 
 
 def echo_acceptance_config(task_def: ScenarioDefinition) -> None:
-    if not (task_def.acceptance.deterministic_checks or task_def.acceptance.llm_judge_rubric):
+    if not task_def.acceptance.deterministic_checks:
         return
     click.echo()
     click.echo("Acceptance Config:")
-    if task_def.acceptance.deterministic_checks:
-        click.echo(f"  Deterministic checks: {len(task_def.acceptance.deterministic_checks)}")
-    if task_def.acceptance.llm_judge_rubric:
-        click.echo(f"  LLM judge criteria: {len(task_def.acceptance.llm_judge_rubric)}")
+    click.echo(f"  Deterministic checks: {len(task_def.acceptance.deterministic_checks)}")
 
 
 @click.command()

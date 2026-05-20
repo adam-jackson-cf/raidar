@@ -105,40 +105,19 @@ acceptance:
       pattern: src/test/math.test.ts
       description: Unit test file exists
     required_test_evidence: []
-  llm_judge_rubric: []
-metrics:
-- type: core
-  id: functional
-- type: core
-  id: acceptance
-- type: core
-  id: verification-stability
-- type: core
-  id: execution-validity
-- type: core
-  id: resource-efficiency
-- type: core
-  id: test-coverage
-- type: core
-  id: requirements-coverage
-- type: artifact-checks
-  id: artifact-checks
+scorers:
+- id: code-delivery
+  version: 1
+  weight: 0.98
   config:
-    required_paths:
-    - src/lib/math.ts
-    - src/test/math.test.ts
-    path_match: glob
-score_profile:
-  id: code-delivery-utility-v1
-  baseline_lineage: skill-benchmark-coding-test
-  weights:
-    functional: 0.3
-    acceptance: 0.2
-    requirements-coverage: 0.2
-    test-coverage: 0.15
-    artifact-checks: 0.1
-    verification-stability: 0.03
-    resource-efficiency: 0.02
+    artifact-checks:
+      required_paths:
+      - src/lib/math.ts
+      - src/test/math.test.ts
+      path_match: glob
+- id: resource-efficiency
+  version: 1
+  weight: 0.02
 prompt:
   entry: prompt/task.md
   includes: []

@@ -32,16 +32,16 @@ class TimeoutSettings(BaseSettings):
     command_default: int = Field(default=60, description="Default command timeout")
 
 
-class LLMJudgeSettings(BaseSettings):
-    """LLM judge configuration."""
+class LLMAsJudgeSettings(BaseSettings):
+    """LLM-as-judge metric configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="EVAL_LLM_JUDGE__")
+    model_config = SettingsConfigDict(env_prefix="EVAL_LLM_AS_JUDGE__")
 
     model: str = Field(
         default="anthropic/claude-sonnet-4-20250514",
-        description="LLM model for judge evaluations",
+        description="LLM model for llm-as-judge evaluations",
     )
-    max_tokens: int = Field(default=200, description="Max tokens for judge response")
+    max_tokens: int = Field(default=1500, description="Max tokens for judge response")
     max_source_chars: int = Field(
         default=10000,
         description="Max source code characters to send to judge",
@@ -126,7 +126,7 @@ class EvalSettings(BaseSettings):
 
     weights: ScoringWeights = Field(default_factory=ScoringWeights)
     timeouts: TimeoutSettings = Field(default_factory=TimeoutSettings)
-    llm_judge: LLMJudgeSettings = Field(default_factory=LLMJudgeSettings)
+    llm_as_judge: LLMAsJudgeSettings = Field(default_factory=LLMAsJudgeSettings)
     verification_stability: VerificationStabilitySettings = Field(
         default_factory=VerificationStabilitySettings
     )

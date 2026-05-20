@@ -24,6 +24,7 @@ from raidar.application.run_dispatch import (
 from raidar.application.scenario_catalog import (
     scenario_evaluation_profile,
     scenario_metrics,
+    scenario_scorers,
 )
 from raidar.experiment import (
     ExperimentSummaryInput,
@@ -239,6 +240,7 @@ def _persist_experiment_summary(
             model=request.resolved.model,
             evaluation_profile=scenario_evaluation_profile(request.scenario),
             metrics=scenario_metrics(request.scenario),
+            scorers=list(scenario_scorers(request.scenario)),
             repeats=request.resolved.repeats,
             repeat_parallel=max(1, min(request.resolved.repeat_parallel, request.resolved.repeats)),
             runs=request.runs,

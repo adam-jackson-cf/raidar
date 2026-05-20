@@ -809,6 +809,7 @@ function evaluateArtifactChecks(metricSpec) {
   }
   return {
     metric_id: metricSpec?.id || "artifact-checks",
+    score: missingPatterns.length === 0 ? 1 : 0,
     passed: missingPatterns.length === 0,
     matched_count: matchedCount,
     missing_patterns: missingPatterns,
@@ -816,25 +817,96 @@ function evaluateArtifactChecks(metricSpec) {
   };
 }
 
-function evaluateMetricResults(metrics) {
-  const results = [];
+function baseMetricScores({
+  metrics,
+  functional,
+  acceptanceScore,
+  verificationStability,
+  testCoverage,
+  requirementsCoverage,
+  visual,
+}) {
+  const scores = new Map();
+  scores.set("functional", {
+    metric_id: "functional",
+    score: functional.passed ? 1 : 0,
+    passed: functional.passed,
+    matched_count: 0,
+    missing_patterns: [],
+    evidence: `build=${functional.build_succeeded}, tests=${functional.tests_passed}/${functional.tests_total}`,
+  });
+  scores.set("acceptance", {
+    metric_id: "acceptance",
+    score: acceptanceScore,
+    passed: acceptanceScore >= 1,
+    matched_count: 0,
+    missing_patterns: [],
+    evidence: `score=${acceptanceScore}`,
+  });
+  scores.set("verification-stability", {
+    metric_id: "verification-stability",
+    score: verificationStability.score,
+    passed: verificationStability.score > 0,
+    matched_count: 0,
+    missing_patterns: [],
+    evidence: `failures=${verificationStability.total_gate_failures}`,
+  });
+  scores.set("test-coverage", {
+    metric_id: "test-coverage",
+    score:
+      testCoverage.threshold === null
+        ? testCoverage.passed
+          ? 1
+          : 0
+        : testCoverage.measured === null
+          ? 0
+          : Math.min(1, testCoverage.measured / testCoverage.threshold),
+    passed: testCoverage.passed,
+    matched_count: 0,
+    missing_patterns: [],
+    evidence: `threshold=${testCoverage.threshold}, measured=${testCoverage.measured}, source=${testCoverage.source}`,
+  });
+  scores.set("requirements-coverage", {
+    metric_id: "requirements-coverage",
+    score:
+      requirementsCoverage.presence_ratio * 0.5 +
+      requirementsCoverage.mapping_ratio * 0.5,
+    passed:
+      requirementsCoverage.presence_ratio >= 1 &&
+      requirementsCoverage.mapping_ratio >= 1,
+    matched_count: requirementsCoverage.satisfied_requirements,
+    missing_patterns: requirementsCoverage.missing_requirement_ids,
+    evidence: `presence=${requirementsCoverage.presence_ratio}, mapping=${requirementsCoverage.mapping_ratio}`,
+  });
+  scores.set("visual-regression", {
+    metric_id: "visual-regression",
+    score: visual ? visual.score : 0,
+    passed: visual ? visual.passed === true : false,
+    matched_count: 0,
+    missing_patterns: [],
+    evidence: visual
+      ? `similarity=${visual.score}, passed=${visual.passed}`
+      : "Visual threshold not configured.",
+  });
   for (const metricSpec of metrics) {
     if (metricSpec?.type === "core") {
       continue;
     }
     if (metricSpec?.type === "artifact-checks") {
-      results.push(evaluateArtifactChecks(metricSpec));
+      scores.set(metricSpec?.id || "artifact-checks", evaluateArtifactChecks(metricSpec));
       continue;
     }
-    results.push({
+    if (metricSpec?.type === "llm-as-judge") continue;
+    scores.set(metricSpec?.id || "unknown-metric", {
       metric_id: metricSpec?.id || "unknown-metric",
+      score: 0,
       passed: false,
       matched_count: 0,
       missing_patterns: [],
       evidence: `Unsupported metric type '${metricSpec?.type}'`,
     });
   }
-  return results;
+  return metrics.map((metric) => scores.get(metric.id)).filter(Boolean);
 }
 
 function buildPerformanceGateChecks({
@@ -1199,12 +1271,21 @@ function main() {
   };
 
   const stackIntegrity = starterIntegrityCheck(scenarioSpec);
-  const quality = qualityScore({
+  const legacyQuality = qualityScore({
     functional: { score: functional.passed ? 1 : 0 },
     acceptanceScore,
     visual: visual ? { score: visual.score } : null,
     verificationStabilityScore: verificationStability.score,
     weights: scenarioSpec.weights,
+  });
+  const metricScores = baseMetricScores({
+    metrics: metricDefinitions,
+    functional,
+    acceptanceScore,
+    verificationStability,
+    testCoverage,
+    requirementsCoverage,
+    visual,
   });
   const performanceGateChecks = buildPerformanceGateChecks({
     gateHistory,
@@ -1212,7 +1293,7 @@ function main() {
     coverage: testCoverage,
     visual,
     requirements: requirementsCoverage,
-    quality,
+    quality: legacyQuality,
     minQuality: scenarioSpec.verification?.min_quality_score ?? 0,
   });
   const executionValidityChecks = buildExecutionValidityChecks(stackIntegrity);
@@ -1221,7 +1302,6 @@ function main() {
     passed: true,
     evidence: "Validated post-run by orchestrator.",
   });
-  const metricResults = evaluateMetricResults(metricDefinitions);
 
   const scorecard = {
     functional,
@@ -1241,7 +1321,8 @@ function main() {
       checks: performanceGateChecks,
       passed: performanceGateChecks.every((check) => check.passed),
     },
-    metric_results: metricResults,
+    metric_scores: metricScores,
+    scorer_results: [],
     metadata: {
       command_timings_sec: {
         gates: gateHistory.map((event) => ({
@@ -1266,7 +1347,7 @@ function main() {
     path.join(LOG_DIR, "performance-gates.json"),
     scorecard.performance_gates,
   );
-  const rewardValue = scorecard.execution_validity.passed ? quality : 0;
+  const rewardValue = scorecard.execution_validity.passed ? legacyQuality : 0;
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), `${rewardValue}`);
 }
 
@@ -1333,7 +1414,8 @@ try {
       checks: [],
       passed: false,
     },
-    metric_results: [],
+    metric_scores: [],
+    scorer_results: [],
     gate_history: [],
   });
   fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), "0");

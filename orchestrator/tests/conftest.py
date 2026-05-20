@@ -110,7 +110,7 @@ def sample_scorecard() -> Scorecard:
             checks=[
                 AcceptanceCheck(rule="Use React", type="deterministic", passed=True),
                 AcceptanceCheck(rule="No console.log", type="deterministic", passed=True),
-                AcceptanceCheck(rule="Code quality", type="llm_judge", passed=True),
+                AcceptanceCheck(rule="Code quality", type="deterministic", passed=True),
             ]
         ),
         visual=VisualScore(similarity=0.95),

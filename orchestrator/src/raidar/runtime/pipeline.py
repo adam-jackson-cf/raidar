@@ -5,7 +5,7 @@ from __future__ import annotations
 from raidar.runtime.artifact_phase import persist_artifacts_phase
 from raidar.runtime.execution_phase import execute_harbor_phase
 from raidar.runtime.scorecard_phase import synthesize_scorecard_phase
-from raidar.runtime.workspace import scenario_evaluation_profile
+from raidar.runtime.workspace import scenario_evaluation_profile, scenario_scorers
 from raidar.runtime.workspace_phase import prepare_workspace_phase
 from raidar.schemas.scorecard import EvalConfig, EvalRun
 
@@ -27,6 +27,7 @@ def run_task(request):
             scenario_revision=request.scenario.scenario_revision,
             starter_root=request.scenario.starter.root,
             evaluation_profile=scenario_evaluation_profile(request.scenario),
+            scorers=scenario_scorers(request.scenario),
         ),
         duration_sec=execution.duration_sec,
         terminated_early=execution.terminated_early,

@@ -32,7 +32,7 @@ class AcceptanceCheck(BaseModel):
     """Result of a single acceptance check."""
 
     rule: str = Field(description="Rule description")
-    type: str = Field(description="Check type (deterministic or llm_judge)")
+    type: str = Field(description="Check type")
     passed: bool = Field(description="Whether check passed")
     evidence: str | None = Field(default=None, description="Supporting evidence")
 
@@ -195,14 +195,39 @@ class ResourceEfficiencyScore(BaseModel):
         return round(max(0.0, min(1.0, 1.0 - weighted_penalty)), 3)
 
 
-class MetricResult(BaseModel):
-    """Audit result for one configured metric."""
+class MetricScore(BaseModel):
+    """Canonical scalar score for one resolved metric."""
 
     metric_id: str = Field(description="Metric identifier")
-    passed: bool = Field(description="Whether the metric evaluation passed")
-    matched_count: int = Field(default=0, ge=0, description="Matched artifact count")
+    score: float = Field(ge=0, le=1, description="Scalar metric score")
+    passed: bool = Field(description="Whether the metric passed")
+    matched_count: int = Field(default=0, ge=0)
     missing_patterns: list[str] = Field(default_factory=list)
-    evidence: str | None = Field(default=None, description="Supporting evidence")
+    evidence: str | None = Field(default=None)
+    judge_output: dict[str, Any] | None = Field(
+        default=None,
+        description="Structured LLM judge output when the metric is judge-backed",
+    )
+
+
+class ScorerMetricContribution(BaseModel):
+    """One metric's weighted contribution to a scorer score."""
+
+    metric_id: str
+    weight: float
+    score: float
+    weighted_score: float
+
+
+class ScorerResult(BaseModel):
+    """Score produced by one attached scorer."""
+
+    scorer_id: str
+    version: int
+    category: Literal["quality", "efficiency"]
+    weight: float
+    score: float = Field(ge=0, le=1)
+    metric_contributions: list[ScorerMetricContribution] = Field(default_factory=list)
 
 
 class Scorecard(BaseModel):
@@ -219,7 +244,6 @@ class Scorecard(BaseModel):
     termination_reason: str | None = None
     unscored: bool = False
     unscored_reasons: list[str] = Field(default_factory=list)
-    score_profile: dict[str, Any] = Field(default_factory=dict)
     metadata: dict[str, Any] = Field(default_factory=dict)
     functional: FunctionalScore = Field(default_factory=FunctionalScore)
     acceptance: AcceptanceScore = Field(default_factory=AcceptanceScore)
@@ -234,27 +258,16 @@ class Scorecard(BaseModel):
     execution_validity: ExecutionValidityScore = Field(default_factory=ExecutionValidityScore)
     performance_gates: PerformanceGatesScore = Field(default_factory=PerformanceGatesScore)
     resource_efficiency: ResourceEfficiencyScore = Field(default_factory=ResourceEfficiencyScore)
-    metric_results: list[MetricResult] = Field(default_factory=list)
+    metric_scores: list[MetricScore] = Field(default_factory=list)
+    scorer_results: list[ScorerResult] = Field(default_factory=list)
 
     @computed_field
     @property
     def quality_score(self) -> float:
-        weights = settings.weights
-        visual_score = self.visual.score if self.visual else 0.0
-        if self.visual:
-            return (
-                self.functional.score * weights.functional
-                + self.acceptance.score * weights.acceptance
-                + visual_score * weights.visual
-                + self.verification_stability.score * weights.verification_stability
-            )
-        non_visual_total = weights.functional + weights.acceptance + weights.verification_stability
-        return (
-            self.functional.score * (weights.functional / non_visual_total)
-            + self.acceptance.score * (weights.acceptance / non_visual_total)
-            + self.verification_stability.score
-            * (weights.verification_stability / non_visual_total)
-        )
+        quality_results = [result for result in self.scorer_results if result.category == "quality"]
+        if quality_results:
+            return round(_weighted_scorer_average(quality_results), 3)
+        return 0.0
 
     @computed_field
     @property
@@ -263,21 +276,15 @@ class Scorecard(BaseModel):
             return 0.0
         if not self.execution_validity.passed:
             return 0.0
-        weights = self.score_profile.get("weights") or {"resource-efficiency": 1.0}
-        weighted_score = 0.0
-        total_weight = 0.0
-        for metric_id, raw_weight in weights.items():
-            weight = float(raw_weight)
-            if weight <= 0:
-                continue
-            weighted_score += self._score_profile_metric(str(metric_id)) * weight
-            total_weight += weight
-        if total_weight <= 0:
-            return 0.0
-        return round(weighted_score / total_weight, 3)
+        if self.scorer_results:
+            return round(_weighted_scorer_average(self.scorer_results), 3)
+        return round(self.resource_efficiency.score, 3)
 
-    def _score_profile_metric(self, metric_id: str) -> float:
-        """Return the scalar score used by a score-profile metric."""
+    def metric_score(self, metric_id: str) -> float:
+        """Return the scalar score for a metric id."""
+        for metric in self.metric_scores:
+            if metric.metric_id == metric_id:
+                return metric.score
         metric_scores = {
             "functional": self.functional.score,
             "acceptance": self.acceptance.score,
@@ -287,7 +294,6 @@ class Scorecard(BaseModel):
             "test-coverage": self._test_coverage_profile_score(),
             "requirements-coverage": self._requirements_coverage_profile_score(),
             "visual-regression": self.visual.score if self.visual else 0.0,
-            "artifact-checks": self._artifact_checks_profile_score(),
         }
         return metric_scores.get(metric_id, 0.0)
 
@@ -303,15 +309,6 @@ class Scorecard(BaseModel):
             self.requirements_coverage.presence_ratio * 0.5
             + self.requirements_coverage.mapping_ratio * 0.5
         )
-
-    def _artifact_checks_profile_score(self) -> float:
-        artifact_results = [
-            result for result in self.metric_results if result.metric_id == "artifact-checks"
-        ]
-        if not artifact_results:
-            return 0.0
-        passed = sum(1 for result in artifact_results if result.passed)
-        return passed / len(artifact_results)
 
     @computed_field
     @property
@@ -333,6 +330,7 @@ class EvalConfig(BaseModel):
     scenario_revision: str = Field(description="Scenario revision")
     starter_root: str = Field(description="Scenario-local starter root path")
     evaluation_profile: str = Field(description="Metric capability profile identifier")
+    scorers: list[str] = Field(default_factory=list, description="Attached scorer ids")
 
 
 class EvalRun(BaseModel):
@@ -348,4 +346,13 @@ class EvalRun(BaseModel):
     traces: list[TraceEvent] = Field(default_factory=list, description="Execution trace events")
     gate_history: list[GateEvent] = Field(
         default_factory=list, description="Gate execution history"
+    )
+
+
+def _weighted_scorer_average(results: list[ScorerResult]) -> float:
+    total_weight = sum(result.weight for result in results if result.weight > 0)
+    if total_weight <= 0:
+        return 0.0
+    return (
+        sum(result.score * result.weight for result in results if result.weight > 0) / total_weight
     )

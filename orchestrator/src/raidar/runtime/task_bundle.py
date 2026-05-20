@@ -60,7 +60,23 @@ def _load_baseline_scripts(starter_source: Any) -> dict[str, str]:
 
 def _scenario_spec_metrics_block(request: RunRequest) -> list[dict[str, Any]]:
     return [
-        metric.model_dump(mode="json", exclude_none=True) for metric in request.scenario.metrics
+        metric.model_dump(mode="json", exclude_none=True)
+        for metric in request.scenario.resolved_metrics()
+    ]
+
+
+def _scenario_spec_scorers_block(request: RunRequest) -> list[dict[str, Any]]:
+    return [
+        {
+            "id": scorer.id,
+            "version": scorer.version,
+            "status": scorer.status,
+            "category": scorer.category,
+            "description": scorer.description,
+            "weight": scorer.weight,
+            "metrics": [metric.model_dump(mode="json") for metric in scorer.metrics],
+        }
+        for scorer in request.scenario.resolved_scorers()
     ]
 
 
@@ -136,21 +152,11 @@ def _scenario_spec_weights_block() -> dict[str, float]:
     }
 
 
-def _scenario_score_profile_block(request: RunRequest) -> dict[str, Any]:
-    if request.scenario.score_profile is None:
-        return {
-            "id": "legacy-resource-efficiency-v1",
-            "baseline_lineage": None,
-            "weights": {"resource-efficiency": 1.0},
-        }
-    return request.scenario.score_profile.model_dump(mode="json")
-
-
 def _build_verifier_scenario_spec(request: RunRequest, context: WorkspaceContext) -> dict:
     return {
         "scenario_name": request.scenario.name,
         "metrics": _scenario_spec_metrics_block(request),
-        "score_profile": _scenario_score_profile_block(request),
+        "scorers": _scenario_spec_scorers_block(request),
         "verification": _scenario_spec_verification_block(request),
         "acceptance": _scenario_spec_acceptance_block(request),
         "visual": _scenario_spec_visual_block(request),
@@ -325,9 +331,8 @@ def _copy_workspace_into_bundle(
             "diff.png",
         ),
     )
-    if not request.scenario.visual:
-        return
-    for source_reference, relative_target in _visual_reference_assets(request):
+    visual_assets = [] if not request.scenario.visual else _visual_reference_assets(request)
+    for source_reference, relative_target in visual_assets:
         target_reference = app_dir / relative_target
         target_reference.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_reference, target_reference)

@@ -23,12 +23,10 @@ from raidar.runtime.models import (
     RunRequest,
     WorkspaceContext,
 )
-from raidar.runtime.task_bundle import (
-    _scenario_score_profile_block,
-)
 from raidar.runtime.workspace import (
     scenario_evaluation_profile,
     scenario_metrics,
+    scenario_scorers,
 )
 from raidar.runtime.workspace_artifacts import (
     _visual_reference_assets,
@@ -43,7 +41,7 @@ from raidar.schemas.scorecard import (
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
-    MetricResult,
+    MetricScore,
     PerformanceGatesScore,
     RequirementsCoverageScore,
     Scorecard,
@@ -67,8 +65,8 @@ def _parse_gate_history(payload: dict[str, Any]) -> list[GateEvent]:
     return _parse_scorecard_list(payload, "gate_history", GateEvent)
 
 
-def _parse_module_results(payload: dict[str, Any]) -> list[MetricResult]:
-    return _parse_scorecard_list(payload, "metric_results", MetricResult)
+def _parse_metric_scores(payload: dict[str, Any]) -> list[MetricScore]:
+    return _parse_scorecard_list(payload, "metric_scores", MetricScore)
 
 
 def _parse_scorecard_list(
@@ -84,7 +82,7 @@ def _parse_scorecard_list(
 
 def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:
     gate_history = _parse_gate_history(payload)
-    metric_results = _parse_module_results(payload)
+    metric_scores = _parse_metric_scores(payload)
     return EvaluationOutputs(
         functional=FunctionalScore.model_validate(payload.get("functional")),
         acceptance=AcceptanceScore.model_validate(payload.get("acceptance")),
@@ -102,7 +100,7 @@ def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:
         ),
         execution_validity=ExecutionValidityScore.model_validate(payload.get("execution_validity")),
         performance_gates=PerformanceGatesScore.model_validate(payload.get("performance_gates")),
-        metric_results=metric_results,
+        metric_scores=metric_scores,
         gate_history=gate_history,
     )
 
@@ -176,7 +174,7 @@ def build_scenario_revision_meta(
         "scenario_fingerprint": _hash_bytes(seed),
         "evaluation_profile": scenario_evaluation_profile(request.scenario),
         "metrics": scenario_metrics(request.scenario),
-        "score_profile": _scenario_score_profile_block(request),
+        "scorers": scenario_scorers(request.scenario),
     }
 
 

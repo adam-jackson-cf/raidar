@@ -16,7 +16,7 @@ from raidar.schemas.scorecard import (
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
-    MetricResult,
+    MetricScore,
     PerformanceGatesScore,
     RequirementsCoverageScore,
     VerificationStabilityScore,
@@ -64,7 +64,7 @@ class EvaluationOutputs:
     requirements_coverage: RequirementsCoverageScore
     execution_validity: ExecutionValidityScore
     performance_gates: PerformanceGatesScore
-    metric_results: list[MetricResult]
+    metric_scores: list[MetricScore]
     gate_history: list[GateEvent]
 
 

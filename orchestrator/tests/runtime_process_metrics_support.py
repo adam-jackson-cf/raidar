@@ -22,14 +22,13 @@ from raidar.schemas.scenario import (
     DeterministicCheck,
     RequirementSpec,
     ScenarioDefinition,
-    ScoreProfileConfig,
 )
 from raidar.schemas.scorecard import (
     AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
-    MetricResult,
+    MetricScore,
     PerformanceGatesScore,
     VerificationStabilityScore,
 )

@@ -1,9 +1,23 @@
-"""Schema tests for scenario metric configuration."""
+"""Schema tests for scenario scorer configuration."""
 
 import pytest
 from pydantic import ValidationError
 
 from raidar.schemas.scenario import ScenarioDefinition
+from raidar.scorers.registry import load_scorer_definition
+
+
+def _requirement() -> dict:
+    return {
+        "id": "req-marker",
+        "description": "Marker text exists.",
+        "check": {
+            "type": "import_present",
+            "pattern": "Ready",
+            "description": "Marker text exists",
+        },
+        "required_test_evidence": [],
+    }
 
 
 def _base_scenario_payload() -> dict:
@@ -15,90 +29,119 @@ def _base_scenario_payload() -> dict:
         "category": "greenfield-ui",
         "timeout_sec": 1800,
         "starter": {"root": "starter"},
-        "verification": {"gates": [], "required_commands": []},
-        "acceptance": {},
-        "metrics": [
-            {"type": "core", "id": "functional"},
-            {"type": "core", "id": "acceptance"},
-            {"type": "core", "id": "verification-stability"},
-            {"type": "core", "id": "execution-validity"},
-            {"type": "core", "id": "resource-efficiency"},
+        "verification": {
+            "coverage_threshold": 0.8,
+            "gates": [],
+            "required_commands": [],
+        },
+        "acceptance": {"requirements": [_requirement()]},
+        "scorers": [
+            {
+                "id": "code-delivery",
+                "version": 1,
+                "weight": 0.9,
+                "config": {
+                    "artifact-checks": {
+                        "required_paths": ["src/lib/math.ts"],
+                        "path_match": "glob",
+                    }
+                },
+            },
+            {"id": "resource-efficiency", "version": 1, "weight": 0.1},
         ],
         "prompt": {"entry": "prompt/task.md"},
     }
 
 
-def test_metrics_modules_valid_payload_parses() -> None:
+def test_scorer_refs_valid_payload_parses() -> None:
     scenario = ScenarioDefinition.model_validate(_base_scenario_payload())
+    assert scenario.scorer_ids() == ["code-delivery@1", "resource-efficiency@1"]
     assert scenario.metric_ids() == [
         "functional",
         "acceptance",
+        "requirements-coverage",
+        "test-coverage",
+        "artifact-checks",
         "verification-stability",
-        "execution-validity",
         "resource-efficiency",
     ]
 
 
-def test_score_profile_weights_must_reference_enabled_metrics() -> None:
+@pytest.mark.parametrize("legacy_field", ["metrics", "score_profile"])
+def test_scenario_rejects_removed_top_level_fields(legacy_field: str) -> None:
     payload = _base_scenario_payload()
-    payload["score_profile"] = {
-        "id": "code-delivery-v1",
-        "weights": {"requirements-coverage": 0.5, "resource-efficiency": 0.5},
-    }
+    payload[legacy_field] = []
 
-    with pytest.raises(ValidationError, match="score_profile.weights references metrics"):
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         ScenarioDefinition.model_validate(payload)
 
 
-def test_score_profile_accepts_weighted_enabled_metrics() -> None:
+def test_scenario_rejects_removed_llm_judge_rubric_field() -> None:
     payload = _base_scenario_payload()
-    payload["score_profile"] = {
-        "id": "code-delivery-v1",
-        "baseline_lineage": "code-delivery",
-        "weights": {"functional": 0.6, "acceptance": 0.3, "resource-efficiency": 0.1},
-    }
+    payload["acceptance"]["llm_judge_rubric"] = []
+
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_min_quality_score_requires_quality_scorer() -> None:
+    payload = _base_scenario_payload()
+    payload["scorers"] = [{"id": "resource-efficiency", "version": 1, "weight": 1.0}]
+
+    with pytest.raises(ValidationError, match="min_quality_score requires"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_resource_only_scorer_allows_zero_min_quality_score() -> None:
+    payload = _base_scenario_payload()
+    payload["verification"]["min_quality_score"] = 0.0
+    payload["scorers"] = [{"id": "resource-efficiency", "version": 1, "weight": 1.0}]
 
     scenario = ScenarioDefinition.model_validate(payload)
 
-    assert scenario.score_profile is not None
-    assert scenario.score_profile.id == "code-delivery-v1"
-    assert scenario.score_profile.baseline_lineage == "code-delivery"
-    assert scenario.score_profile.weights["functional"] == 0.6
+    assert scenario.scorer_ids() == ["resource-efficiency@1"]
 
 
-def test_metrics_modules_reject_duplicate_ids() -> None:
+def test_scorer_refs_reject_duplicate_refs() -> None:
     payload = _base_scenario_payload()
-    payload["metrics"].append({"type": "core", "id": "functional"})
-    with pytest.raises(ValidationError, match="duplicate metric ids"):
+    payload["scorers"].append({"id": "resource-efficiency", "version": 1, "weight": 0.2})
+    with pytest.raises(ValidationError, match="duplicate scorer references"):
         ScenarioDefinition.model_validate(payload)
 
 
-def test_metrics_modules_reject_unknown_type() -> None:
+def test_scorer_refs_reject_unknown_scorer() -> None:
     payload = _base_scenario_payload()
-    payload["metrics"].append({"type": "unknown", "id": "mystery"})
+    payload["scorers"] = [{"id": "missing-scorer", "version": 1, "weight": 1.0}]
+    with pytest.raises(ValidationError, match="Unknown scorer definition"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_scorer_refs_reject_proposed_scorer() -> None:
+    payload = _base_scenario_payload()
+    payload["scorers"] = [{"id": "plan-to-code", "version": 1, "weight": 1.0}]
+    with pytest.raises(ValidationError, match="is proposed"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_scorer_refs_reject_invalid_weights() -> None:
+    payload = _base_scenario_payload()
+    payload["scorers"][0]["weight"] = 0
     with pytest.raises(ValidationError):
         ScenarioDefinition.model_validate(payload)
 
 
-def test_metrics_visual_regression_requires_visual_config() -> None:
+def test_scorer_metric_dependencies_are_validated() -> None:
     payload = _base_scenario_payload()
-    payload["metrics"].append({"type": "core", "id": "visual-regression"})
-    with pytest.raises(ValidationError, match="visual-regression without visual config"):
-        ScenarioDefinition.model_validate(payload)
-
-
-def test_metrics_test_coverage_requires_verification_threshold() -> None:
-    payload = _base_scenario_payload()
-    payload["metrics"].append({"type": "core", "id": "test-coverage"})
+    payload["verification"].pop("coverage_threshold")
     with pytest.raises(
         ValidationError, match="test-coverage without verification.coverage_threshold"
     ):
         ScenarioDefinition.model_validate(payload)
 
 
-def test_metrics_requirements_coverage_requires_requirement_specs() -> None:
+def test_scorer_requirements_coverage_requires_requirement_specs() -> None:
     payload = _base_scenario_payload()
-    payload["metrics"].append({"type": "core", "id": "requirements-coverage"})
+    payload["acceptance"] = {}
     with pytest.raises(
         ValidationError,
         match="requirements-coverage without acceptance.requirements",
@@ -106,23 +149,31 @@ def test_metrics_requirements_coverage_requires_requirement_specs() -> None:
         ScenarioDefinition.model_validate(payload)
 
 
-def test_metrics_llm_judge_requires_rubric() -> None:
+def test_design_to_code_is_deterministic() -> None:
     payload = _base_scenario_payload()
-    payload["metrics"].append({"type": "core", "id": "llm-judge"})
-    with pytest.raises(ValidationError, match="llm-judge without acceptance.llm_judge_rubric"):
-        ScenarioDefinition.model_validate(payload)
+    payload["verification"]["coverage_threshold"] = 0.8
+    payload["visual"] = _visual_payload()
+    payload["scorers"] = [{"id": "design-to-code", "version": 1, "weight": 1.0}]
+
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert all(metric.type != "llm-as-judge" for metric in scenario.resolved_metrics())
 
 
-def test_metrics_artifact_checks_require_paths() -> None:
+def test_plan_to_code_defines_scorer_owned_plan_quality_judge() -> None:
+    scorer = load_scorer_definition("plan-to-code", 1)
+
+    metric = next(metric for metric in scorer.metrics if metric.id == "plan-quality")
+
+    assert metric.type == "llm-as-judge"
+    assert metric.config["judge"] == "judges/plan-judge.toml"
+
+
+def test_scorer_refs_reject_unknown_metric_config_keys() -> None:
     payload = _base_scenario_payload()
-    payload["metrics"].append(
-        {
-            "type": "artifact-checks",
-            "id": "artifact-checks",
-            "config": {"required_paths": [], "path_match": "glob"},
-        }
-    )
-    with pytest.raises(ValidationError):
+    payload["scorers"][0]["config"] = {"llm-as-judge": {"judge": "judges/reviewer.md"}}
+
+    with pytest.raises(ValidationError, match="metrics not in scorer definition"):
         ScenarioDefinition.model_validate(payload)
 
 
@@ -147,10 +198,10 @@ def test_gate_commands_reject_shell_operators() -> None:
 def test_screenshot_command_rejects_shell_redirection() -> None:
     payload = _base_scenario_payload()
     payload["visual"] = {
-        "reference_image": "reference.png",
+        **_visual_payload(),
         "screenshot_command": ["bun", "run", "capture-screenshot", ">", "out.png"],
     }
-    payload["metrics"].append({"type": "core", "id": "visual-regression"})
+    payload["scorers"] = [{"id": "design-to-code", "version": 1, "weight": 1.0}]
 
     with pytest.raises(ValidationError, match="must not include shell operators"):
         ScenarioDefinition.model_validate(payload)
@@ -166,7 +217,30 @@ def test_setup_actions_reject_shell_wrappers() -> None:
 
 def test_visual_viewport_parses_when_configured() -> None:
     payload = _base_scenario_payload()
-    payload["visual"] = {
+    payload["visual"] = _visual_payload()
+    payload["scorers"] = [{"id": "design-to-code", "version": 1, "weight": 1.0}]
+
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert scenario.visual is not None
+    assert scenario.visual.viewport is not None
+    assert scenario.visual.viewport.width == 1440
+    assert scenario.visual.viewport.height == 1024
+    assert scenario.visual.scoring.weights.global_weight == 0.25
+    assert scenario.visual.pass_policy.minimum_score == 70
+
+
+def test_workflow_atomic_commits_flag_parses() -> None:
+    payload = _base_scenario_payload()
+    payload["verification"]["workflow"] = {"atomic_commits_required": True}
+
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert scenario.verification.workflow.atomic_commits_required is True
+
+
+def _visual_payload() -> dict:
+    return {
         "reference_image": "reference.png",
         "screenshot_command": ["bun", "run", "capture-screenshot"],
         "viewport": {"width": 1440, "height": 1024},
@@ -197,22 +271,3 @@ def test_visual_viewport_parses_when_configured() -> None:
         },
         "regions": [],
     }
-    payload["metrics"].append({"type": "core", "id": "visual-regression"})
-
-    scenario = ScenarioDefinition.model_validate(payload)
-
-    assert scenario.visual is not None
-    assert scenario.visual.viewport is not None
-    assert scenario.visual.viewport.width == 1440
-    assert scenario.visual.viewport.height == 1024
-    assert scenario.visual.scoring.weights.global_weight == 0.25
-    assert scenario.visual.pass_policy.minimum_score == 70
-
-
-def test_workflow_atomic_commits_flag_parses() -> None:
-    payload = _base_scenario_payload()
-    payload["verification"]["workflow"] = {"atomic_commits_required": True}
-
-    scenario = ScenarioDefinition.model_validate(payload)
-
-    assert scenario.verification.workflow.atomic_commits_required is True

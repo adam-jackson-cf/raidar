@@ -29,10 +29,10 @@ The runner injects exactly one rules file based on `SYSTEM_RULES`.
 
 If log format differs, extend `orchestrator/src/raidar/parser/trace_log.py` and add tests so process metrics and trace events are extracted consistently.
 
-Harness integration expectations for metric-driven evaluation:
-- Do not change scenario metric behavior in adapters; metric assignment is scenario-defined via `scenario.yaml -> metrics[]`.
-- Ensure adapter output still allows deterministic verifier execution so `scorecard.metric_results[]` is written.
-- Keep run metadata parity so `evaluation_profile` and metric outputs remain comparable across `AgentSpec`s.
+Harness integration expectations for scorer-driven evaluation:
+- Do not change scenario scoring behavior in adapters; scorer assignment is scenario-defined via `scenario.yaml -> scorers[]`.
+- Ensure adapter output still allows deterministic verifier execution so `scorecard.metric_scores[]` and `scorecard.scorer_results[]` are written.
+- Keep run metadata parity so `evaluation_profile`, scorer outputs, and metric outputs remain comparable across `AgentSpec`s.
 
 ## 5. Validate End-to-End
 
@@ -50,5 +50,6 @@ Check outputs in:
 
 Verify these fields are present and consistent:
 - `config.evaluation_profile` in run and experiment config blocks.
-- `config.metrics` in experiment config.
-- `scores.metric_results[]` in `run.json` and verifier scorecard artifacts.
+- `config.scorers` in experiment config.
+- `scores.metric_scores[]` in `run.json` and verifier scorecard artifacts.
+- `scores.scorer_results[]` in `run.json`.

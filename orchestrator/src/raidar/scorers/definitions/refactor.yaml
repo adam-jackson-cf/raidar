@@ -1,0 +1,21 @@
+id: refactor
+version: 1
+status: proposed
+category: quality
+description: Scores behavior-preserving refactors with structural improvement and verification confidence.
+metrics:
+  - id: functional
+    type: core
+    weight: 0.30
+  - id: test-coverage
+    type: core
+    weight: 0.20
+  - id: acceptance
+    type: core
+    weight: 0.20
+  - id: verification-stability
+    type: core
+    weight: 0.15
+  - id: requirements-coverage
+    type: core
+    weight: 0.15

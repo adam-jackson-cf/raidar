@@ -134,13 +134,6 @@ acceptance:
     required_test_evidence:
     - type: query_role
       role: contentinfo
-  llm_judge_rubric:
-  - criterion: Implementation follows the scenario's section and shared-ui structure
-    weight: 0.4
-  - criterion: Styling uses shared theming tokens and design-system primitives consistently
-    weight: 0.3
-  - criterion: Visual hierarchy and polish align with the authored reference design
-    weight: 0.3
 visual:
   reference_image: ./reference/homepage.png
   screenshot_command:
@@ -206,32 +199,19 @@ visual:
       y: 864
       width: 1440
       height: 160
-metrics:
-- type: core
-  id: functional
-- type: core
-  id: acceptance
-- type: core
-  id: verification-stability
-- type: core
-  id: execution-validity
-- type: core
-  id: resource-efficiency
-- type: core
-  id: test-coverage
-- type: core
-  id: requirements-coverage
-- type: core
-  id: llm-judge
-- type: core
-  id: visual-regression
-- type: artifact-checks
-  id: artifact-checks
+scorers:
+- id: design-to-code
+  version: 1
+  weight: 0.9
   config:
-    required_paths:
-    - src/app/page.tsx
-    - src/components/**/*.tsx
-    path_match: glob
+    artifact-checks:
+      required_paths:
+      - src/app/page.tsx
+      - src/components/**/*.tsx
+      path_match: glob
+- id: resource-efficiency
+  version: 1
+  weight: 0.1
 prompt:
   entry: prompt/task.md
   includes: []

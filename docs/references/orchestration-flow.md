@@ -12,7 +12,7 @@ End-to-end flow for scenario execution, Harbor runtime orchestration, and experi
    - `prompt.entry` and optional `prompt.includes`
    - `verification`
    - `acceptance`
-   - ordered `metrics`
+   - weighted `scorers`
 3. Resolve the starter from the scenario revision directory (`scenario_dir / starter.root`).
 4. Copy the starter into the run workspace and inject one rules file from `scenarios/<scenario>/v###/rules/` for the selected harness.
 
@@ -63,7 +63,7 @@ matrix:
 
 ## 4. Scoring Pipeline
 
-Scenario scoring capability is defined by ordered `scenario.yaml -> metrics[]`.
+Scenario scoring capability is defined by `scenario.yaml -> scorers[]`. Each scorer is resolved from `orchestrator/src/raidar/scorers/definitions/`, scenario config is merged into metric config, and duplicate metrics are executed once.
 
 Core score outputs:
 - `functional`
@@ -75,12 +75,18 @@ Core score outputs:
 - hard gates: `execution_validity`, `performance_gates`
 - ranking metric: `resource_efficiency`
 
-Metric output:
-- `metric_results[]` in verifier scorecards and persisted run scorecards.
-- `artifact-checks` is audit-only unless an experiment contract explicitly makes it gating.
+Canonical metric output:
+- `metric_scores[]` in verifier scorecards and persisted run scorecards.
+- `artifact-checks` and scorer-owned `llm-as-judge` metrics appear alongside core metrics as scalar metric scores when resolved.
+
+Scorer output:
+- `scorer_results[]` includes scorer id, version, category, scenario weight, score, and metric contributions.
+- `quality_score` is computed from quality-category scorer results only.
+- `composite_score` is computed from all scorer results after unscored and execution-validity gating.
+- `minimum_quality_score` performance gating is recomputed from canonical scorer output after orchestrator-owned metrics have run.
 
 Evaluation profile:
-- `evaluation_profile` is derived from ordered metrics as `v2:<metric-id>+...`.
+- `evaluation_profile` is derived from weighted scorers as `scorers:<scorer-id>@<version>:<weight>+...`.
 - Persisted in `run.json` config and experiment config.
 
 `composite_score` is gated: unscored or execution-invalid runs score `0.0`.

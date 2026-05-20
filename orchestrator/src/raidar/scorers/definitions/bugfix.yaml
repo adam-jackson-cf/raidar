@@ -1,0 +1,21 @@
+id: bugfix
+version: 1
+status: proposed
+category: quality
+description: Scores targeted defect fixes with regression coverage, minimal unrelated drift, and clean verification.
+metrics:
+  - id: functional
+    type: core
+    weight: 0.30
+  - id: acceptance
+    type: core
+    weight: 0.25
+  - id: test-coverage
+    type: core
+    weight: 0.20
+  - id: requirements-coverage
+    type: core
+    weight: 0.15
+  - id: verification-stability
+    type: core
+    weight: 0.10

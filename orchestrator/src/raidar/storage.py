@@ -55,11 +55,11 @@ def _variance(values: list[float]) -> float:
 
 
 def _metric_ids(run: EvalRun) -> list[str]:
-    return [module.metric_id for module in run.scores.metric_results]
+    return [module.metric_id for module in run.scores.metric_scores]
 
 
 def _artifact_checks_metric(run: EvalRun):
-    for module in run.scores.metric_results:
+    for module in run.scores.metric_scores:
         if module.metric_id == "artifact-checks":
             return module
     return None
@@ -187,7 +187,7 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "scenario_revision",
         "starter_root",
         "evaluation_profile",
-        "metric_results",
+        "metric_scores",
         "duration_sec",
         "terminated_early",
         "functional_passed",
@@ -260,7 +260,7 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "scenario_revision": run.config.scenario_revision,
         "starter_root": run.config.starter_root,
         "evaluation_profile": run.config.evaluation_profile,
-        "metric_results": json.dumps(_metric_ids(run)),
+        "metric_scores": json.dumps(_metric_ids(run)),
         "duration_sec": run.duration_sec,
         "terminated_early": run.terminated_early,
         "functional_passed": run.scores.functional.passed,
@@ -374,7 +374,7 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
             f"requirements_presence={run.scores.requirements_coverage.presence_ratio:.2f}, "
             f"requirements_mapping={run.scores.requirements_coverage.mapping_ratio:.2f}, "
             f"evaluation_profile={run.config.evaluation_profile}, "
-            f"metric_results={_metric_ids(run)}, "
+            f"metric_scores={_metric_ids(run)}, "
             f"failed_categories={_failed_categories(run)}"
         )
 

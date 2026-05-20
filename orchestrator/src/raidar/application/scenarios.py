@@ -87,6 +87,7 @@ def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> d
         "starter": {"root": request.starter_root},
         "verification": {
             "max_gate_failures": 3,
+            "coverage_threshold": 0.8,
             "min_quality_score": 0.8,
             "required_commands": [
                 ["bun", "run", "typecheck"],
@@ -105,15 +106,22 @@ def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> d
                     "description": "No TODO markers remain in production files",
                 }
             ],
-            "requirements": [],
-            "llm_judge_rubric": [],
+            "requirements": [
+                {
+                    "id": "req-no-todo",
+                    "description": "No TODO markers remain in production files.",
+                    "check": {
+                        "type": "no_pattern",
+                        "pattern": "TODO",
+                        "description": "No TODO markers remain in production files",
+                    },
+                    "required_test_evidence": [],
+                }
+            ],
         },
-        "metrics": [
-            {"type": "core", "id": "functional"},
-            {"type": "core", "id": "acceptance"},
-            {"type": "core", "id": "verification-stability"},
-            {"type": "core", "id": "execution-validity"},
-            {"type": "core", "id": "resource-efficiency"},
+        "scorers": [
+            {"id": "code-delivery", "version": 1, "weight": 0.9},
+            {"id": "resource-efficiency", "version": 1, "weight": 0.1},
         ],
         "prompt": {"entry": request.prompt_entry, "includes": []},
     }
@@ -148,10 +156,17 @@ def validate_scenario(path: Path) -> ScenarioValidationResult:
     """Validate a scenario document and return the typed result."""
 
     scenario_yaml = resolve_scenario_yaml(path)
+    scenario = load_scenario(scenario_yaml)
+    _validate_scenario_files(scenario_yaml.parent, scenario)
     return ScenarioValidationResult(
         scenario_path=scenario_yaml,
-        scenario=load_scenario(scenario_yaml),
+        scenario=scenario,
     )
+
+
+def _validate_scenario_files(scenario_dir: Path, scenario) -> None:
+    del scenario_dir
+    scenario.resolved_metrics()
 
 
 def clone_scenario_revision(request: ScenarioCloneRequest) -> ScenarioCloneResult:

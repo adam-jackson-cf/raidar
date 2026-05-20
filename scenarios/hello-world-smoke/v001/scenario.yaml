@@ -10,6 +10,7 @@ starter:
 
 verification:
   max_gate_failures: 1
+  coverage_threshold: 0.0
   min_quality_score: 0.0
   required_commands:
     - ["bun", "run", "typecheck"]
@@ -23,18 +24,26 @@ acceptance:
     - type: no_pattern
       pattern: Homepage placeholder - implement the design
       description: Starter placeholder text is removed
+  requirements:
+    - id: req-smoke-marker
+      description: Smoke marker text exists in source.
+      check:
+        type: import_present
+        pattern: Harbor smoke test ready
+        description: Smoke marker text exists in source
 
-metrics:
-  - type: core
-    id: functional
-  - type: core
-    id: acceptance
-  - type: core
-    id: verification-stability
-  - type: core
-    id: execution-validity
-  - type: core
-    id: resource-efficiency
+scorers:
+  - id: code-delivery
+    version: 1
+    weight: 0.01
+    config:
+      artifact-checks:
+        required_paths:
+          - src/index.tsx
+        path_match: glob
+  - id: resource-efficiency
+    version: 1
+    weight: 0.99
 
 prompt:
   entry: prompt/task.md

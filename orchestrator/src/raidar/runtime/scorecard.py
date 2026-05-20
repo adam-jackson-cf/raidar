@@ -23,7 +23,11 @@ from raidar.runtime.models import (
     RunLayout,
     ScorecardBuildContext,
 )
-from raidar.runtime.task_bundle import _scenario_score_profile_block
+from raidar.runtime.scoring_outputs import (
+    build_metric_scores,
+    build_scorer_results,
+    canonical_performance_gates,
+)
 from raidar.runtime.verification_metrics import (
     _count_executed_required,
     _observed_verification_attempts,
@@ -332,7 +336,7 @@ def terminated_outputs(reason: str | None) -> EvaluationOutputs:
         requirements_coverage=_terminated_requirements_coverage_score(),
         execution_validity=_terminated_execution_validity_score(failure_reason),
         performance_gates=PerformanceGatesScore(checks=[]),
-        metric_results=[],
+        metric_scores=[],
         gate_history=[],
     )
 
@@ -794,6 +798,17 @@ def _scorecard_from_context(
     layout = context.layout
     execution = context.execution
     outputs = execution.outputs
+    metric_scores = build_metric_scores(
+        context,
+        execution_validity=components.execution_validity,
+        resource_efficiency=components.resource_efficiency,
+    )
+    scorer_results = build_scorer_results(context, metric_scores)
+    performance_gates = canonical_performance_gates(
+        components.performance_gates,
+        quality_score=_quality_score_from_scorers(scorer_results),
+        min_quality_score=request.scenario.verification.min_quality_score,
+    )
     return Scorecard(
         run_id=layout.run_id,
         scenario_name=request.scenario.name,
@@ -806,7 +821,6 @@ def _scorecard_from_context(
         termination_reason=execution.termination_reason,
         unscored=components.unscored,
         unscored_reasons=components.unscored_reasons,
-        score_profile=_scenario_score_profile_block(request),
         functional=outputs.functional,
         acceptance=outputs.acceptance,
         visual=outputs.visual,
@@ -814,8 +828,20 @@ def _scorecard_from_context(
         test_coverage=outputs.test_coverage,
         requirements_coverage=outputs.requirements_coverage,
         execution_validity=components.execution_validity,
-        performance_gates=components.performance_gates,
+        performance_gates=performance_gates,
         resource_efficiency=components.resource_efficiency,
-        metric_results=outputs.metric_results,
+        metric_scores=metric_scores,
+        scorer_results=scorer_results,
         metadata=components.metadata,
+    )
+
+
+def _quality_score_from_scorers(scorer_results) -> float:
+    quality_results = [result for result in scorer_results if result.category == "quality"]
+    total_weight = sum(result.weight for result in quality_results if result.weight > 0)
+    if total_weight <= 0:
+        return 0.0
+    return (
+        sum(result.score * result.weight for result in quality_results if result.weight > 0)
+        / total_weight
     )

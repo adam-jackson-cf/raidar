@@ -5,7 +5,7 @@ Use the homepage scenario as the reference example for how Raidar scenario desig
 ## Why This Scenario Works As A Teaching Example
 
 - The task is easy to understand: implement a SaaS landing page from a reference image.
-- The scenario mixes deterministic requirements, test expectations, and subjective review via `llm-judge`.
+- The scenario mixes deterministic requirements, test expectations, scorer-based quality assessment, visual comparison, and efficiency/ranking signals.
 - It uses a visual baseline, which makes the difference between correctness and quality easier to explain.
 - It is representative of day-to-day delivery work: build UI, satisfy requirements, keep tests green, and avoid fragile behavior.
 
@@ -18,8 +18,7 @@ Use the homepage scenario as the reference example for how Raidar scenario desig
 - `verification.gates` defines the tracked gate history used during scoring and stability analysis.
 - `acceptance.requirements` defines the required product outcomes and the test patterns that should cover them.
 - `acceptance.deterministic_checks` captures simple pass/fail content and structure checks.
-- `acceptance.llm_judge_rubric` captures subjective criteria that are hard to score deterministically.
-- `metrics[]` defines which capability signals are active for comparison and review.
+- `scorers[]` attaches `design-to-code` and `resource-efficiency`, including their scenario-level weights.
 - `visual` defines the reference image, capture command, and similarity threshold for visual review.
 
 ## What Each Layer Teaches
@@ -28,7 +27,8 @@ Use the homepage scenario as the reference example for how Raidar scenario desig
 - The starter teaches what the harness inherits versus what it must create.
 - Verification teaches the difference between "did the workflow pass" and "did it pass consistently."
 - Acceptance teaches the difference between output requirements and toolchain success.
-- Metrics teach which signals matter for comparison, diagnosis, and ranking.
+- Scorers teach which grouped delivery-task judgments matter for comparison, diagnosis, and ranking.
+- Metrics teach how each scorer is measured.
 - Visual config teaches that a scenario can care about appearance, not just code output.
 
 ## Running The Scenario
@@ -65,4 +65,5 @@ Use `make matrix-run` when you want a structured comparison across multiple `Age
 - Start with `make scenario-info` to understand the active contract.
 - Run the scenario and inspect `experiments/.../runs/*/run.json` for one-repeat details.
 - Use `experiment-summary.json` to compare repeats for the same `(scenario, revision, harness, model, evaluation_profile)` identity.
+- Inspect `scores.scorer_results[]` for the quality and efficiency blend, and `scores.metric_scores[]` for individual metric evidence.
 - Use [analyze-results.md](/Users/adamjackson/Projects/raidar/docs/todos/analyze-results.md) for the review procedure and [metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md) when you need metric-by-metric interpretation.

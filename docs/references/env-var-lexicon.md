@@ -95,11 +95,11 @@ These are optional runtime tuning variables consumed by [`orchestrator/src/raida
 - `EVAL_TIMEOUTS__COMMAND_DEFAULT`
   Purpose: override command and verifier timeouts.
 
-- `EVAL_LLM_JUDGE__MODEL`
-- `EVAL_LLM_JUDGE__MAX_TOKENS`
-- `EVAL_LLM_JUDGE__MAX_SOURCE_CHARS`
-- `EVAL_LLM_JUDGE__MAX_RETRIES`
-  Purpose: tune the acceptance LLM judge behavior.
+- `EVAL_LLM_AS_JUDGE__MODEL`
+- `EVAL_LLM_AS_JUDGE__MAX_TOKENS`
+- `EVAL_LLM_AS_JUDGE__MAX_SOURCE_CHARS`
+- `EVAL_LLM_AS_JUDGE__MAX_RETRIES`
+  Purpose: tune the `llm-as-judge` metric behavior.
 
 - `EVAL_WEIGHTS__FUNCTIONAL`
 - `EVAL_WEIGHTS__ACCEPTANCE`

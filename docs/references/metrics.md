@@ -1,23 +1,96 @@
-# Metrics Catalog
+# Scorers And Metrics
 
-Use this table when choosing metrics for a scenario or interpreting experiment artifacts. The source of truth for supported metric ids is the scenario schema, and the source of truth for scoring fields is the scorecard schema.
+Use this reference when choosing scenario scoring or interpreting experiment artifacts. Scorers are the authored scenario contract; metrics are the measured signals inside each scorer.
 
-| Metric | What it measures | When to use it | Requires in `scenario.yaml` | Inspect | Role |
-| --- | --- | --- | --- | --- | --- |
-| `functional` | Whether the run completed the expected build/test workflow successfully. | Use for every scenario where passing the delivery workflow matters. | Include `functional` in `metrics[]`; scenario verification should define the commands the run must satisfy. | `run.json.scores.functional` | Quality signal and performance-gate input. |
-| `acceptance` | Whether the delivered output satisfies deterministic acceptance checks and acceptance-level review criteria. | Use when the scenario has clear outcome requirements beyond build/test success. | `acceptance.deterministic_checks` and/or `acceptance.requirements`; include `acceptance` in `metrics[]`. | `run.json.scores.acceptance.checks[]` and `run.json.scores.acceptance.score` | Quality signal. |
-| `verification-stability` | How noisy or repeat-failure-prone the verification gates were during the run. | Use when you care about reliability, not just eventual success. | Include `verification-stability` in `metrics[]`; define meaningful verification gates. | `run.json.scores.verification_stability` | Quality signal. |
-| `execution-validity` | Whether the run is valid for ranking at all. | Use when comparisons should exclude broken or incomplete runs. | Include `execution-validity` in `metrics[]`. | `run.json.scores.execution_validity.checks[]` and `experiments/*/runs/*/verifier/execution-validity.json` | Ranking gate. |
-| `resource-efficiency` | Token, command, and verification-round efficiency after a valid run completes. | Use when cost and operational efficiency matter for comparisons. | Include `resource-efficiency` in `metrics[]`. | `run.json.scores.resource_efficiency` | Ranking score after execution validity passes. |
-| `test-coverage` | Whether measured test coverage meets the scenario threshold. | Use when test-backed delivery quality matters. | `verification.coverage_threshold`; include `test-coverage` in `metrics[]`. | `run.json.scores.test_coverage` | Diagnostic signal and performance-gate input. |
-| `requirements-coverage` | Whether stated requirements are present and mapped to tests. | Use when you want explicit requirement-to-test accountability. | `acceptance.requirements`; include `requirements-coverage` in `metrics[]`. | `run.json.scores.requirements_coverage` | Diagnostic signal and performance-gate input. |
-| `llm-judge` | Subjective review criteria captured in the acceptance rubric. | Use when code quality or UX qualities cannot be captured with deterministic checks alone. | `acceptance.llm_judge_rubric`; include `llm-judge` in `metrics[]`. | `run.json.scores.acceptance.checks[]` filtered to `type=llm_judge` and the `llm-judge` entry in `experiment-summary.json.aggregate.metric_outcomes` | Acceptance input and diagnostic signal. |
-| `visual-regression` | Similarity to the visual reference and whether the threshold was met. | Use for layout- or design-sensitive scenarios. | `visual.reference_image`, `visual.screenshot_command`, `visual.threshold`; include `visual-regression` in `metrics[]`. | `run.json.scores.visual` and verifier visual diffs | Quality signal and performance-gate input. |
-| `artifact-checks` | Whether required files or paths exist in the run workspace. | Use when you need explicit artifact presence guarantees beyond core scoring. | `metrics[]` entry with `type: artifact-checks` and `config.required_paths`. | `run.json.scores.metric_results[]` and `experiment-summary.json.aggregate.metric_outcomes["artifact-checks"]` | Audit signal unless the scenario contract promotes it to gating. |
+## Terminology
 
-## How To Read Roles
+- A `scorer` is a reusable delivery-task scoring definition under `orchestrator/src/raidar/scorers/definitions/`.
+- A scenario attaches scorers with `scorers[]`, and each attached scorer has a positive scenario-level `weight`.
+- A `metric` is a weighted signal inside a scorer. Metrics are executed once per run even when multiple attached scorers reuse the same metric.
+- Active scorer definitions are executable. Proposed scorer definitions document the catalog direction but scenario validation rejects them until their missing metrics are implemented.
+- Scenario YAML is strict: removed fields such as top-level `metrics`, top-level `score_profile`, and `acceptance.llm_judge_rubric` fail validation.
+- `verification.min_quality_score` requires at least one quality-category scorer. Efficiency-only scenarios must set `min_quality_score: 0.0`.
 
-- `quality_score` is built from functional, acceptance, visual (when configured), and verification stability.
-- Ranking depends on `execution-validity` first and `resource-efficiency` second; invalid runs should not be ranked against valid runs.
-- `test-coverage`, `requirements-coverage`, and `artifact-checks` are best treated as diagnostic or audit signals unless the scenario contract explicitly turns them into gating expectations.
-- `llm-judge` is configured as its own metric id, but its detailed evidence lives inside acceptance checks because it contributes to the acceptance view of run quality.
+## Scenario Example
+
+```yaml
+scorers:
+  - id: design-to-code
+    version: 1
+    weight: 0.9
+    config:
+      artifact-checks:
+        required_paths:
+          - src/app/page.tsx
+          - src/components/**/*.tsx
+        path_match: glob
+
+  - id: resource-efficiency
+    version: 1
+    weight: 0.1
+```
+
+The resulting `evaluation_profile` is scorer-based:
+
+`scorers:design-to-code@1:0.9+resource-efficiency@1:0.1`
+
+## Active Scorers
+
+| Scorer | Category | Use when | Metrics |
+| --- | --- | --- | --- |
+| `design-to-code@1` | `quality` | A scenario asks a harness to implement a design against visual and product evidence. | `visual-regression` 0.34, `acceptance` 0.20, `requirements-coverage` 0.17, `functional` 0.14, `test-coverage` 0.08, `verification-stability` 0.05, `artifact-checks` 0.02 |
+| `code-delivery@1` | `quality` | A nonvisual delivery task should be judged on correctness, requirements, tests, artifacts, and stable verification. | `functional` 0.25, `acceptance` 0.20, `requirements-coverage` 0.20, `test-coverage` 0.15, `artifact-checks` 0.10, `verification-stability` 0.10 |
+| `resource-efficiency@1` | `efficiency` | Cost, token usage, command count, and verification churn should contribute to the final comparison. | `resource-efficiency` 1.00 |
+
+## Proposed Scorers
+
+These definitions exist as catalog entries but are not executable scenario refs yet:
+
+- `plan-to-code@1`
+- `bugfix@1`
+- `refactor@1`
+- `test-generation@1`
+
+## Metric Catalog
+
+| Metric | What it measures | Requires |
+| --- | --- | --- |
+| `functional` | Whether the run completed the expected build/test workflow successfully. | Scenario verification commands or gates that represent the delivery workflow. |
+| `acceptance` | Whether deterministic acceptance checks pass. | `acceptance.deterministic_checks` and/or `acceptance.requirements`. |
+| `verification-stability` | How noisy or repeat-failure-prone verification gates were. | Meaningful `verification.gates`. |
+| `execution-validity` | Whether the run is valid for ranking. | No scenario-specific config; derived from completion, required commands, execution health, and workflow validity. |
+| `resource-efficiency` | Token, command, failure, and verification-round efficiency. | Process and trace metrics from the run. |
+| `test-coverage` | Whether measured test coverage meets the scenario threshold. | `verification.coverage_threshold`. |
+| `requirements-coverage` | Whether stated requirements are present and mapped to tests. | Non-empty `acceptance.requirements`. |
+| `visual-regression` | Similarity to the visual reference and whether the threshold was met. | `visual.reference_image`, `visual.screenshot_command`, and visual scoring config. |
+| `artifact-checks` | Whether required files or path patterns exist in the run workspace. | `artifact-checks.config.required_paths`. |
+| `plan-quality` | Subjective plan-quality review using a scorer-owned judge role file. | `plan-quality.config.judge`, pointing to a judge role file under `orchestrator/src/raidar/scorers/definitions/`. |
+
+## LLM-As-Judge Files
+
+`llm-as-judge` is a metric type. The metric id for the proposed `plan-to-code` scorer is `plan-quality`.
+
+Judge role files are scorer-owned, not scenario-owned. A scorer definition points to one file under `orchestrator/src/raidar/scorers/definitions/`, for example:
+
+```yaml
+- id: plan-quality
+  type: llm-as-judge
+  weight: 0.35
+  config:
+    judge: judges/plan-judge.toml
+```
+
+That file contains the judge role, responsibilities, rubric, and expected output contract. Runtime validation fails if the file is missing.
+Judge file paths must be relative to scorer definitions and cannot use absolute paths or parent traversal. Scenario YAML cannot override judge files.
+
+## Artifact Fields
+
+Run scorecards include:
+
+- `scores.metric_scores[]`: canonical scalar outputs for every resolved metric.
+- `scores.metric_scores[].judge_output`: structured judge details for judge-backed metrics, including findings and rubric coverage.
+- `scores.scorer_results[]`: scorer id, version, category, scenario weight, score, and metric contributions.
+- `scores.quality_score`: weighted output from quality-category scorer results only.
+- `scores.composite_score`: weighted output across all scorer results after unscored and execution-validity gating.
+
+Experiment summaries aggregate both `aggregate.metric_outcomes` and `aggregate.scorer_outcomes`.

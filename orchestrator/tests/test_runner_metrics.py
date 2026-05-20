@@ -25,12 +25,11 @@ GateEvent = process_support.GateEvent
 DeterministicCheck = process_support.DeterministicCheck
 RequirementSpec = process_support.RequirementSpec
 ScenarioDefinition = process_support.ScenarioDefinition
-ScoreProfileConfig = process_support.ScoreProfileConfig
 AcceptanceScore = process_support.AcceptanceScore
 CoverageScore = process_support.CoverageScore
 ExecutionValidityScore = process_support.ExecutionValidityScore
 FunctionalScore = process_support.FunctionalScore
-MetricResult = process_support.MetricResult
+MetricScore = process_support.MetricScore
 PerformanceGatesScore = process_support.PerformanceGatesScore
 VerificationStabilityScore = process_support.VerificationStabilityScore
 RequirementCoverageScore = process_support.RequirementCoverageScore
@@ -133,8 +132,8 @@ def _sample_scenario_doc() -> dict[str, object]:
         "timeout_sec": 1800,
         "starter": {"root": "starter"},
         "verification": _sample_verification_doc(),
-        "acceptance": {},
-        "metrics": _sample_metric_docs(),
+        "acceptance": {"requirements": [_sample_requirement_doc()]},
+        "scorers": _sample_scorer_docs(),
         "visual": _sample_visual_doc(),
         "prompt": {"entry": "prompt/task.md"},
     }
@@ -165,15 +164,34 @@ def _verification_gate_doc(name: str) -> dict[str, object]:
     }
 
 
-def _sample_metric_docs() -> list[dict[str, str]]:
+def _sample_scorer_docs() -> list[dict[str, object]]:
     return [
-        {"type": "core", "id": "functional"},
-        {"type": "core", "id": "acceptance"},
-        {"type": "core", "id": "verification-stability"},
-        {"type": "core", "id": "execution-validity"},
-        {"type": "core", "id": "resource-efficiency"},
-        {"type": "core", "id": "test-coverage"},
+        {
+            "id": "code-delivery",
+            "version": 1,
+            "weight": 0.9,
+            "config": {
+                "artifact-checks": {
+                    "required_paths": ["src/app/page.tsx"],
+                    "path_match": "glob",
+                }
+            },
+        },
+        {"id": "resource-efficiency", "version": 1, "weight": 0.1},
     ]
+
+
+def _sample_requirement_doc() -> dict[str, object]:
+    return {
+        "id": "req-marker",
+        "description": "Marker text exists.",
+        "check": {
+            "type": "import_present",
+            "pattern": "Ready",
+            "description": "Marker text exists",
+        },
+        "required_test_evidence": [],
+    }
 
 
 def _sample_visual_doc() -> dict[str, object]:
@@ -256,7 +274,7 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
         ),
         execution_validity=ExecutionValidityScore(),
         performance_gates=PerformanceGatesScore(),
-        metric_results=[],
+        metric_scores=[],
         gate_history=[],
     )
 
@@ -435,7 +453,7 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
             "category": "greenfield-ui",
             "timeout_sec": 1800,
             "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": []},
+            "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
             "visual": {
                 "reference_image": str(reference_image),
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
@@ -444,7 +462,7 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
                 "regions": [_visual_bundle_region()],
             },
             "acceptance": {},
-            "metrics": _visual_bundle_metrics(),
+            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -501,7 +519,7 @@ def _visual_bundle_metrics() -> list[dict[str, str]]:
 def _assert_verifier_script_contains_contracts(score_script: str) -> None:
     expected_snippets = [
         "scenarioSpec.acceptance?.deterministic_checks",
-        "metric_results",
+        "metric_scores",
         "verification_stability",
         r"const testPattern = /\.(test|spec)\.tsx?$/",
         "NEXT_TELEMETRY_DISABLED",
@@ -639,10 +657,11 @@ def _verifier_gate_history_payload() -> list[dict[str, object]]:
     ]
 
 
-def _verifier_metric_results_payload() -> list[dict[str, object]]:
+def _verifier_metric_scores_payload() -> list[dict[str, object]]:
     return [
         {
             "metric_id": "artifact-checks",
+            "score": 0.0,
             "passed": False,
             "matched_count": 0,
             "missing_patterns": ["src/components/**/*.tsx"],
@@ -651,7 +670,7 @@ def _verifier_metric_results_payload() -> list[dict[str, object]]:
     ]
 
 
-def _verifier_scorecard_payload(*, include_metric_results: bool = True) -> dict[str, object]:
+def _verifier_scorecard_payload(*, include_metric_scores: bool = True) -> dict[str, object]:
     payload: dict[str, object] = {
         "functional": _verifier_functional_payload(),
         "acceptance": _verifier_acceptance_payload(),
@@ -663,8 +682,8 @@ def _verifier_scorecard_payload(*, include_metric_results: bool = True) -> dict[
         "performance_gates": _verifier_performance_payload(),
         "gate_history": _verifier_gate_history_payload(),
     }
-    if include_metric_results:
-        payload["metric_results"] = _verifier_metric_results_payload()
+    if include_metric_scores:
+        payload["metric_scores"] = _verifier_metric_scores_payload()
     return payload
 
 
@@ -768,8 +787,9 @@ def _test_and_coverage_scenario() -> ScenarioDefinition:
             _verification_gate_doc("test:coverage"),
         ],
         "required_commands": [],
+        "min_quality_score": 0.0,
     }
-    scenario_doc["metrics"] = _standard_core_metric_docs()
+    scenario_doc["scorers"] = [{"id": "resource-efficiency", "version": 1, "weight": 1.0}]
     scenario_doc.pop("visual")
     return ScenarioDefinition.model_validate(scenario_doc)
 
@@ -986,7 +1006,11 @@ def _simple_bundle_scenario() -> ScenarioDefinition:
             "name": "hello-world-smoke",
             "description": "test task",
             "difficulty": "easy",
-            "metrics": _standard_core_metric_docs(),
+            "verification": {
+                **scenario_doc["verification"],
+                "min_quality_score": 0.0,
+            },
+            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
         }
     )
     scenario_doc.pop("visual")
@@ -1660,9 +1684,10 @@ def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
     assert outputs.visual.region_evidence_status == "present"
     assert outputs.visual.worst_region_similarity == 0.91
     assert outputs.visual.regional_scores[1]["name"] == "footer"
-    assert outputs.metric_results == [
-        MetricResult(
+    assert outputs.metric_scores == [
+        MetricScore(
             metric_id="artifact-checks",
+            score=0.0,
             passed=False,
             matched_count=0,
             missing_patterns=["src/components/**/*.tsx"],
@@ -1677,12 +1702,12 @@ def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
     verifier_dir = trial_dir / "verifier"
     verifier_dir.mkdir(parents=True, exist_ok=True)
     (verifier_dir / "scorecard.json").write_text(
-        json.dumps(_verifier_scorecard_payload(include_metric_results=False))
+        json.dumps(_verifier_scorecard_payload(include_metric_scores=False))
     )
     outputs, reason = _load_verifier_outputs(trial_dir)
     assert outputs is None
     assert reason is not None
-    assert "scorecard.metric_results must be a list" in reason
+    assert "scorecard.metric_scores must be a list" in reason
 
 
 def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
@@ -1694,8 +1719,7 @@ def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
 def test_scenario_evaluation_profile_uses_ordered_metrics():
     scenario = _sample_scenario()
     assert scenario_evaluation_profile(scenario) == (
-        "functional+acceptance+verification-stability+"
-        "execution-validity+resource-efficiency+test-coverage"
+        "scorers:code-delivery@1:0.9+resource-efficiency@1:0.1"
     )
 
 
@@ -1709,41 +1733,56 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
     assert scenario_spec["metrics"] == [
         {"type": "core", "id": "functional"},
         {"type": "core", "id": "acceptance"},
-        {"type": "core", "id": "verification-stability"},
-        {"type": "core", "id": "execution-validity"},
-        {"type": "core", "id": "resource-efficiency"},
+        {"type": "core", "id": "requirements-coverage"},
         {"type": "core", "id": "test-coverage"},
+        {
+            "type": "artifact-checks",
+            "id": "artifact-checks",
+            "config": {"required_paths": ["src/app/page.tsx"], "path_match": "glob"},
+        },
+        {"type": "core", "id": "verification-stability"},
+        {"type": "core", "id": "resource-efficiency"},
     ]
+    assert scenario_spec["scorers"][0]["id"] == "code-delivery"
     assert scenario_spec["visual"]["viewport"] == {"width": 1440, "height": 1024}
     assert scenario_spec["visual"]["scoring"]["weights"]["global"] == 0.25
     assert scenario_spec["visual"]["pass_policy"]["minimum_score"] == 70
     assert scenario_spec["verification"]["workflow"] == {"atomic_commits_required": False}
-    assert scenario_spec["score_profile"] == {
-        "id": "legacy-resource-efficiency-v1",
-        "baseline_lineage": None,
-        "weights": {"resource-efficiency": 1.0},
-    }
 
 
-def test_build_scorecard_carries_scenario_score_profile(tmp_path: Path):
+def test_build_scorecard_carries_scorer_results(tmp_path: Path):
     score_context = _sample_scorecard_context(
         tmp_path=tmp_path,
         terminated_early=False,
         termination_reason=None,
     )
-    score_context.request.scenario.score_profile = ScoreProfileConfig(
-        id="code-delivery-v1",
-        baseline_lineage="code-delivery",
-        weights={"functional": 0.7, "resource-efficiency": 0.3},
-    )
 
     scorecard = build_scorecard(score_context)
 
-    assert scorecard.score_profile == {
-        "id": "code-delivery-v1",
-        "baseline_lineage": "code-delivery",
-        "weights": {"functional": 0.7, "resource-efficiency": 0.3},
-    }
+    assert [result.scorer_id for result in scorecard.scorer_results] == [
+        "code-delivery",
+        "resource-efficiency",
+    ]
+    assert scorecard.metric_score("resource-efficiency") == scorecard.resource_efficiency.score
+
+
+def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: Path):
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    score_context.request.scenario.verification.min_quality_score = 0.95
+
+    scorecard = build_scorecard(score_context)
+
+    quality_gate = next(
+        check
+        for check in scorecard.performance_gates.checks
+        if check.name == "minimum_quality_score"
+    )
+    assert quality_gate.passed is False
+    assert quality_gate.evidence == "quality=0.900, min=0.950"
 
 
 def test_build_scorecard_fails_execution_validity_without_required_atomic_commit(
@@ -2196,15 +2235,9 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
             "category": "agent-integration",
             "timeout_sec": 300,
             "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": []},
+            "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
             "acceptance": {},
-            "metrics": [
-                {"type": "core", "id": "functional"},
-                {"type": "core", "id": "acceptance"},
-                {"type": "core", "id": "verification-stability"},
-                {"type": "core", "id": "execution-validity"},
-                {"type": "core", "id": "resource-efficiency"},
-            ],
+            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
