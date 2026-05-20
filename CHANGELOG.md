@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.12.1] - 2026-05-20
+
+- refactor: introduce scorer-based metrics
+
 ## [0.12.1] - 2026-05-19
 
 - fix: stabilize agent smoke warm prep
