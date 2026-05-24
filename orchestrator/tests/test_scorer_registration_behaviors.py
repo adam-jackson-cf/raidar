@@ -125,7 +125,10 @@ def test_registered_scorers_collect_expected_evidence(monkeypatch, tmp_path):
         or SimpleNamespace(metric_id=kwargs["metric_id"], score=1.0, passed=True),
     )
     requirements = Requirements().collect_evidence(context)
-    assert requirements.metric_scores[0].metric_id == "requirements-adherence"
+    assert [metric.metric_id for metric in requirements.metric_scores] == [
+        "requirements-coverage",
+        "requirements-adherence",
+    ]
     assert calls[0]["judge_path"] == "judges/requirements-adherence.toml"
 
 

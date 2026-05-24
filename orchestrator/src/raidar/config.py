@@ -4,20 +4,6 @@ from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ScoringWeights(BaseSettings):
-    """Scoring dimension weights (must sum to 1.0)."""
-
-    model_config = SettingsConfigDict(env_prefix="EVAL_WEIGHTS__")
-
-    functional: float = Field(default=0.40, description="Functional tests weight")
-    acceptance: float = Field(default=0.25, description="Acceptance checks weight")
-    visual: float = Field(default=0.20, description="Visual regression weight")
-    verification_stability: float = Field(
-        default=0.15,
-        description="Verification stability weight",
-    )
-
-
 class TimeoutSettings(BaseSettings):
     """Timeout values in seconds for various operations."""
 
@@ -132,7 +118,6 @@ class EvalSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="EVAL_", env_nested_delimiter="__")
 
-    weights: ScoringWeights = Field(default_factory=ScoringWeights)
     timeouts: TimeoutSettings = Field(default_factory=TimeoutSettings)
     llm_as_judge: LLMAsJudgeSettings = Field(default_factory=LLMAsJudgeSettings)
     verification_stability: VerificationStabilitySettings = Field(

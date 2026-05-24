@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from raidar.codex_auth import ResolvedCodexAuth
 from raidar.schemas.scenario import LLMAsJudgeMetricConfig, ScenarioDefinition
-from raidar.scoring import llm_as_judge
+from raidar.scorers import llm_as_judge
 
 JUDGE_RESPONSE = """
 {

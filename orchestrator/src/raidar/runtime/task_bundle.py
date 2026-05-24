@@ -14,7 +14,6 @@ from raidar.agents.config import Harness
 from raidar.agents.harbor_routing import is_task_image_reuse_enabled, task_image_prefix
 from raidar.agents.rules import SYSTEM_RULES
 from raidar.audit.workspace_diff import directory_fingerprint
-from raidar.config import settings
 from raidar.runtime.harbor import validate_public_base_images as _validate_public_base_images
 from raidar.runtime.models import (
     BaselineWorkspaceCacheResult,
@@ -143,15 +142,6 @@ def _scenario_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
     }
 
 
-def _scenario_spec_weights_block() -> dict[str, float]:
-    return {
-        "functional": settings.weights.functional,
-        "acceptance": settings.weights.acceptance,
-        "visual": settings.weights.visual,
-        "verification_stability": settings.weights.verification_stability,
-    }
-
-
 def _build_verifier_scenario_spec(request: RunRequest, context: WorkspaceContext) -> dict:
     return {
         "scenario_name": request.scenario.name,
@@ -160,7 +150,6 @@ def _build_verifier_scenario_spec(request: RunRequest, context: WorkspaceContext
         "verification": _scenario_spec_verification_block(request),
         "acceptance": _scenario_spec_acceptance_block(request),
         "visual": _scenario_spec_visual_block(request),
-        "weights": _scenario_spec_weights_block(),
         "baseline_scripts": _load_baseline_scripts(context.starter_source),
     }
 

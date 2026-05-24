@@ -5,6 +5,7 @@ from __future__ import annotations
 from importlib import import_module
 
 for module in (
+    "raidar.scorers.acceptance",
     "raidar.scorers.code_task",
     "raidar.scorers.resource_efficiency",
     "raidar.scorers.requirements",

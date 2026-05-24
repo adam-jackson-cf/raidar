@@ -575,31 +575,6 @@ function scoreVerificationStability(verificationStability) {
   return Math.max(0, Math.min(1, 1 - basePenalty - repeatPenalty));
 }
 
-function qualityScore({
-  functional,
-  acceptanceScore,
-  visual,
-  verificationStabilityScore,
-  weights,
-}) {
-  if (visual) {
-    return (
-      functional.score * weights.functional +
-      acceptanceScore * weights.acceptance +
-      visual.score * weights.visual +
-      verificationStabilityScore * weights.verification_stability
-    );
-  }
-  const nonVisualTotal =
-    weights.functional + weights.acceptance + weights.verification_stability;
-  return (
-    functional.score * (weights.functional / nonVisualTotal) +
-    acceptanceScore * (weights.acceptance / nonVisualTotal) +
-    verificationStabilityScore *
-      (weights.verification_stability / nonVisualTotal)
-  );
-}
-
 function starterIntegrityCheck(scenarioSpec) {
   const packagePath = path.join(APP_DIR, "package.json");
   if (!fs.existsSync(packagePath)) {
@@ -783,140 +758,12 @@ function checkRequirementMappings(requirements, testSources) {
   };
 }
 
-function evaluateArtifactChecks(metricSpec) {
-  const requiredPaths = metricSpec?.config?.required_paths || [];
-  if (!Array.isArray(requiredPaths) || requiredPaths.length === 0) {
-    return {
-      metric_id: metricSpec?.id || "artifact-checks",
-      passed: false,
-      matched_count: 0,
-      missing_patterns: [],
-      evidence: "artifact-checks metric missing required_paths configuration.",
-    };
-  }
-  const missingPatterns = [];
-  let matchedCount = 0;
-  const evidenceParts = [];
-  for (const pattern of requiredPaths) {
-    const matches = filesMatchingPattern(pattern);
-    matchedCount += matches.length;
-    if (matches.length === 0) {
-      missingPatterns.push(pattern);
-      evidenceParts.push(`${pattern}:0`);
-    } else {
-      evidenceParts.push(`${pattern}:${matches.length}`);
-    }
-  }
-  return {
-    metric_id: metricSpec?.id || "artifact-checks",
-    score: missingPatterns.length === 0 ? 1 : 0,
-    passed: missingPatterns.length === 0,
-    matched_count: matchedCount,
-    missing_patterns: missingPatterns,
-    evidence: `artifact-checks matches (${evidenceParts.join(", ")})`,
-  };
-}
-
-function baseMetricScores({
-  metrics,
-  functional,
-  acceptanceScore,
-  verificationStability,
-  testCoverage,
-  requirementsCoverage,
-  visual,
-}) {
-  const scores = new Map();
-  scores.set("functional", {
-    metric_id: "functional",
-    score: functional.passed ? 1 : 0,
-    passed: functional.passed,
-    matched_count: 0,
-    missing_patterns: [],
-    evidence: `build=${functional.build_succeeded}, tests=${functional.tests_passed}/${functional.tests_total}`,
-  });
-  scores.set("acceptance", {
-    metric_id: "acceptance",
-    score: acceptanceScore,
-    passed: acceptanceScore >= 1,
-    matched_count: 0,
-    missing_patterns: [],
-    evidence: `score=${acceptanceScore}`,
-  });
-  scores.set("verification-stability", {
-    metric_id: "verification-stability",
-    score: verificationStability.score,
-    passed: verificationStability.score > 0,
-    matched_count: 0,
-    missing_patterns: [],
-    evidence: `failures=${verificationStability.total_gate_failures}`,
-  });
-  scores.set("test-coverage", {
-    metric_id: "test-coverage",
-    score:
-      testCoverage.threshold === null
-        ? testCoverage.passed
-          ? 1
-          : 0
-        : testCoverage.measured === null
-          ? 0
-          : Math.min(1, testCoverage.measured / testCoverage.threshold),
-    passed: testCoverage.passed,
-    matched_count: 0,
-    missing_patterns: [],
-    evidence: `threshold=${testCoverage.threshold}, measured=${testCoverage.measured}, source=${testCoverage.source}`,
-  });
-  scores.set("requirements-coverage", {
-    metric_id: "requirements-coverage",
-    score:
-      requirementsCoverage.presence_ratio * 0.5 +
-      requirementsCoverage.mapping_ratio * 0.5,
-    passed:
-      requirementsCoverage.presence_ratio >= 1 &&
-      requirementsCoverage.mapping_ratio >= 1,
-    matched_count: requirementsCoverage.satisfied_requirements,
-    missing_patterns: requirementsCoverage.missing_requirement_ids,
-    evidence: `presence=${requirementsCoverage.presence_ratio}, mapping=${requirementsCoverage.mapping_ratio}`,
-  });
-  scores.set("visual-regression", {
-    metric_id: "visual-regression",
-    score: visual ? visual.score : 0,
-    passed: visual ? visual.passed === true : false,
-    matched_count: 0,
-    missing_patterns: [],
-    evidence: visual
-      ? `similarity=${visual.score}, passed=${visual.passed}`
-      : "Visual threshold not configured.",
-  });
-  for (const metricSpec of metrics) {
-    if (metricSpec?.type === "core") {
-      continue;
-    }
-    if (metricSpec?.type === "artifact-checks") {
-      scores.set(metricSpec?.id || "artifact-checks", evaluateArtifactChecks(metricSpec));
-      continue;
-    }
-    if (metricSpec?.type === "llm-as-judge") continue;
-    scores.set(metricSpec?.id || "unknown-metric", {
-      metric_id: metricSpec?.id || "unknown-metric",
-      score: 0,
-      passed: false,
-      matched_count: 0,
-      missing_patterns: [],
-      evidence: `Unsupported metric type '${metricSpec?.type}'`,
-    });
-  }
-  return metrics.map((metric) => scores.get(metric.id)).filter(Boolean);
-}
-
 function buildPerformanceGateChecks({
   gateHistory,
   functional,
   coverage,
   visual,
   requirements,
-  quality,
-  minQuality,
 }) {
   const checks = [];
   const allGatesPassed = gateHistory.every((event) => event.exit_code === 0);
@@ -973,11 +820,6 @@ function buildPerformanceGateChecks({
       `gaps=${JSON.stringify(requirements.requirement_gap_ids)}, ` +
       `evidence_gaps=${JSON.stringify(requirements.requirement_test_evidence_gaps)}`,
   });
-  checks.push({
-    name: "minimum_quality_score",
-    passed: quality >= minQuality,
-    evidence: `quality=${quality.toFixed(3)}, min=${minQuality.toFixed(3)}`,
-  });
   return checks;
 }
 
@@ -999,9 +841,6 @@ function main() {
   }
   ensureDir(LOG_DIR);
   const scenarioSpec = readJson(scenarioSpecPath, {});
-  const metricDefinitions = Array.isArray(scenarioSpec.metrics)
-    ? scenarioSpec.metrics
-    : [];
   const sourceFiles = collectSourceFiles();
   const deterministicChecks =
     scenarioSpec.acceptance?.deterministic_checks || [];
@@ -1271,30 +1110,12 @@ function main() {
   };
 
   const stackIntegrity = starterIntegrityCheck(scenarioSpec);
-  const legacyQuality = qualityScore({
-    functional: { score: functional.passed ? 1 : 0 },
-    acceptanceScore,
-    visual: visual ? { score: visual.score } : null,
-    verificationStabilityScore: verificationStability.score,
-    weights: scenarioSpec.weights,
-  });
-  const metricScores = baseMetricScores({
-    metrics: metricDefinitions,
-    functional,
-    acceptanceScore,
-    verificationStability,
-    testCoverage,
-    requirementsCoverage,
-    visual,
-  });
   const performanceGateChecks = buildPerformanceGateChecks({
     gateHistory,
     functional,
     coverage: testCoverage,
     visual,
     requirements: requirementsCoverage,
-    quality: legacyQuality,
-    minQuality: scenarioSpec.verification?.min_quality_score ?? 0,
   });
   const executionValidityChecks = buildExecutionValidityChecks(stackIntegrity);
   executionValidityChecks.push({
@@ -1321,7 +1142,7 @@ function main() {
       checks: performanceGateChecks,
       passed: performanceGateChecks.every((check) => check.passed),
     },
-    metric_scores: metricScores,
+    metric_scores: [],
     scorer_results: [],
     metadata: {
       command_timings_sec: {
@@ -1347,8 +1168,7 @@ function main() {
     path.join(LOG_DIR, "performance-gates.json"),
     scorecard.performance_gates,
   );
-  const rewardValue = scorecard.execution_validity.passed ? legacyQuality : 0;
-  fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), `${rewardValue}`);
+  fs.writeFileSync(path.join(LOG_DIR, "reward.txt"), "0");
 }
 
 try {

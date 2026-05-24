@@ -13,8 +13,8 @@ from raidar.codex_auth import OPENAI_API_KEY_ENV, resolve_codex_auth
 from raidar.config import settings
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import MetricScore
+from raidar.scorers.deterministic import parse_judge_response
 from raidar.scorers.paths import resolve_scorer_definition_file
-from raidar.scoring.acceptance import parse_judge_response
 
 SOURCE_PATTERNS = (
     "package.json",
@@ -267,14 +267,14 @@ def _judge_prompt(
 
 
 def _scenario_context(scenario: ScenarioDefinition) -> str:
-    requirements = "\n".join(
+    requirements = [
         f"- {requirement.id}: {requirement.description}"
         for requirement in scenario.acceptance.requirements
-    )
+    ]
     return (
         f"Scenario: {scenario.name}@{scenario.scenario_revision}\n"
         f"Description: {scenario.description}\n"
-        f"Requirements:\n{requirements or '- No explicit requirements configured.'}"
+        f"Requirements:\n{chr(10).join(requirements) or '- No explicit requirements configured.'}"
     )
 
 

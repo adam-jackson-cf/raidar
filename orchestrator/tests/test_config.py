@@ -4,20 +4,6 @@
 class TestEvalSettings:
     """Test configuration loading and defaults."""
 
-    def test_default_weights_sum_to_one(self):
-        """Weights should sum to 1.0."""
-        # Import fresh to get defaults
-        from raidar.config import ScoringWeights
-
-        weights = ScoringWeights()
-        total = (
-            weights.functional
-            + weights.acceptance
-            + weights.visual
-            + weights.verification_stability
-        )
-        assert abs(total - 1.0) < 0.001
-
     def test_default_timeouts_are_reasonable(self):
         """Timeouts should be positive integers."""
         from raidar.config import TimeoutSettings
@@ -44,7 +30,6 @@ class TestEvalSettings:
         """Settings singleton should be importable and have all subsections."""
         from raidar.config import settings
 
-        assert settings.weights is not None
         assert settings.timeouts is not None
         assert settings.llm_as_judge is not None
         assert settings.verification_stability is not None

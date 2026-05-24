@@ -2,7 +2,7 @@ import json
 import subprocess
 from types import SimpleNamespace
 
-from raidar.scoring import llm_as_judge
+from raidar.scorers import llm_as_judge
 
 
 def test_codex_command_response_text_and_output_clipping(monkeypatch):

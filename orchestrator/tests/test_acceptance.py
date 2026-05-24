@@ -1,6 +1,6 @@
 """Tests for acceptance scoring and judge parsing."""
 
-from raidar.scoring.acceptance import (
+from raidar.scorers.deterministic import (
     JudgeResult,
     parse_judge_response,
     validate_safe_regex_pattern,

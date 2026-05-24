@@ -48,7 +48,7 @@ from raidar.schemas.scorecard import (
     Scorecard,
     VerificationStabilityScore,
 )
-from raidar.scoring.acceptance import run_deterministic_check
+from raidar.scorers.deterministic import run_deterministic_check
 
 
 @dataclass(frozen=True, slots=True)

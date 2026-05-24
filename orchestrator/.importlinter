@@ -29,11 +29,11 @@ forbidden_modules =
     raidar.agents
     raidar.cli
 
-[importlinter:contract:scoring-boundary]
-name = Scoring stays independent of runtime, application, agents, and CLI layers
+[importlinter:contract:scorers-boundary]
+name = Scorers stay independent of runtime, application, agents, and CLI layers
 type = forbidden
 source_modules =
-    raidar.scoring
+    raidar.scorers
 forbidden_modules =
     raidar.runtime
     raidar.application
