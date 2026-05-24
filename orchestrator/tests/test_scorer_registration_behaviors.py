@@ -8,19 +8,18 @@ from raidar.schemas.scorecard import (
     VisualScore,
 )
 from raidar.scorers.base import ScorerContext
-from raidar.scorers.scorer_registration import (
-    DesignToCode,
-    Requirements,
-    ResourceEfficiency,
-    _artifact_metric_score,
-    _coverage_metric_score,
-    _functional_metric_score,
-    _missing_required_artifacts,
-    _required_artifact_patterns,
-    _test_coverage_metric_score,
-    _verification_stability_metric_score,
-    _visual_regression_metric_score,
+from raidar.scorers.common import (
+    artifact_metric_score,
+    coverage_metric_score,
+    coverage_output_metric_score,
+    functional_metric_score,
+    missing_required_artifacts,
+    required_artifact_patterns,
+    verification_stability_metric_score,
 )
+from raidar.scorers.design_to_code import DesignToCode, visual_regression_metric_score
+from raidar.scorers.requirements import Requirements
+from raidar.scorers.resource_efficiency import ResourceEfficiency
 
 
 def _outputs(**overrides):
@@ -42,17 +41,17 @@ def _outputs(**overrides):
 def test_core_metric_score_helpers_reflect_output_state(tmp_path):
     outputs = _outputs()
 
-    assert _functional_metric_score(outputs).evidence == "build=True, tests=2/2"
-    assert _verification_stability_metric_score(outputs).passed is True
-    coverage_metric = _test_coverage_metric_score(outputs)
+    assert functional_metric_score(outputs).evidence == "build=True, tests=2/2"
+    assert verification_stability_metric_score(outputs).passed is True
+    coverage_metric = coverage_output_metric_score(outputs)
     assert coverage_metric.score == 0.5
     assert coverage_metric.passed is False
-    assert _coverage_metric_score(CoverageScore(threshold=None, passed=True)) == 1.0
-    assert _coverage_metric_score(CoverageScore(threshold=None, passed=False)) == 0.0
-    assert _coverage_metric_score(CoverageScore(threshold=0.8, measured=None)) == 0.0
+    assert coverage_metric_score(CoverageScore(threshold=None, passed=True)) == 1.0
+    assert coverage_metric_score(CoverageScore(threshold=None, passed=False)) == 0.0
+    assert coverage_metric_score(CoverageScore(threshold=0.8, measured=None)) == 0.0
 
-    assert _visual_regression_metric_score(outputs).score == 0.75
-    no_visual = _visual_regression_metric_score(_outputs(visual=None))
+    assert visual_regression_metric_score(outputs).score == 0.75
+    no_visual = visual_regression_metric_score(_outputs(visual=None))
     assert no_visual.passed is False
     assert no_visual.evidence == "Visual threshold not configured."
 
@@ -75,15 +74,15 @@ def test_artifact_pattern_collection_and_scoring(tmp_path):
         ]
     )
 
-    patterns = _required_artifact_patterns(scenario, "design-to-code")
+    patterns = required_artifact_patterns(scenario, "design-to-code")
 
     assert patterns == ("src/app/page.tsx",)
-    assert _missing_required_artifacts(workspace, patterns) == []
-    metric = _artifact_metric_score(workspace, ("src/app/page.tsx", "missing.txt"))
+    assert missing_required_artifacts(workspace, patterns) == []
+    metric = artifact_metric_score(workspace, ("src/app/page.tsx", "missing.txt"))
     assert metric.score == 0.5
     assert metric.matched_count == 1
     assert metric.missing_patterns == ["missing.txt"]
-    assert _artifact_metric_score(workspace, ()).score == 1.0
+    assert artifact_metric_score(workspace, ()).score == 1.0
 
 
 def test_registered_scorers_collect_expected_evidence(monkeypatch, tmp_path):
@@ -121,7 +120,7 @@ def test_registered_scorers_collect_expected_evidence(monkeypatch, tmp_path):
 
     calls = []
     monkeypatch.setattr(
-        "raidar.scorers.scorer_registration.evaluate_llm_as_judge_metric",
+        "raidar.scorers.requirements.evaluate_llm_as_judge_metric",
         lambda **kwargs: calls.append(kwargs)
         or SimpleNamespace(metric_id=kwargs["metric_id"], score=1.0, passed=True),
     )
