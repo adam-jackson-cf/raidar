@@ -67,3 +67,32 @@ def test_get_commits_since_last_bump_keeps_bodies_and_stops_at_release(
         "feat: change CLI contract\n\nBREAKING CHANGE: old flag removed",
         "fix: repair cache",
     ]
+
+
+def test_update_pyproject_only_rewrites_project_version(
+    bump_version_module,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    pyproject = tmp_path / "pyproject.toml"
+    pyproject.write_text(
+        "\n".join(
+            [
+                "[project]",
+                'name = "sample"',
+                'version = "1.2.3"',
+                "",
+                "[tool.sample]",
+                'version = "9.9.9"',
+                "",
+            ]
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(bump_version_module, "PYPROJECT_PATH", pyproject)
+
+    bump_version_module.update_pyproject("2.0.0")
+
+    assert pyproject.read_text(encoding="utf-8") == (
+        '[project]\nname = "sample"\nversion = "2.0.0"\n\n[tool.sample]\nversion = "9.9.9"\n'
+    )

@@ -5,8 +5,9 @@ from __future__ import annotations
 from collections.abc import Iterable
 from pathlib import Path
 
+from raidar.codex_auth import OPENAI_API_KEY_ENV, ResolvedCodexAuth, resolve_codex_auth
+
 from ..config import AgentSpec
-from .codex_auth import OPENAI_API_KEY_ENV, ResolvedCodexAuth, resolve_codex_auth
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 

@@ -21,11 +21,10 @@ def test_hello_world_smoke_scenario_loads() -> None:
         ["bun", "run", "lint"],
     ]
     assert scenario.verification.gates == []
-    assert scenario.scorer_ids() == ["code-delivery@1", "resource-efficiency@1"]
+    assert scenario.scorer_ids() == ["typescript-code-task@1", "resource-efficiency@1"]
     assert scenario.metric_ids() == [
         "functional",
-        "acceptance",
-        "requirements-coverage",
+        "code-quality",
         "test-coverage",
         "artifact-checks",
         "verification-stability",

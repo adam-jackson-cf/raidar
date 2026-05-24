@@ -12,7 +12,6 @@ dependencies = [
     "aiohttp>=3.13.5",
     "requests>=2.33.0",
     "urllib3>=2.7.0",
-    "litellm==1.84.0",
 ]
 
 [project.optional-dependencies]

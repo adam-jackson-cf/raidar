@@ -35,9 +35,10 @@ BUMP_TYPES = {
 def get_current_version() -> str:
     """Read current version from orchestrator pyproject.toml."""
     content = PYPROJECT_PATH.read_text(encoding="utf-8")
-    match = VERSION_PATTERN.search(content)
+    project_block = _project_table_block(content)
+    match = VERSION_PATTERN.search(project_block)
     if not match:
-        raise ValueError(f"Could not find version in {PYPROJECT_PATH}")
+        raise ValueError(f"Could not find [project].version in {PYPROJECT_PATH}")
     return match.group(1)
 
 
@@ -116,8 +117,31 @@ def calculate_new_version(current: str, bump_type: str) -> str:
 
 def update_pyproject(new_version: str) -> None:
     content = PYPROJECT_PATH.read_text(encoding="utf-8")
-    updated = VERSION_PATTERN.sub(f'version = "{new_version}"', content)
+    start, end = _project_table_span(content)
+    project_block = content[start:end]
+    updated_block, replacements = VERSION_PATTERN.subn(
+        f'version = "{new_version}"',
+        project_block,
+        count=1,
+    )
+    if replacements != 1:
+        raise ValueError(f"Could not update [project].version in {PYPROJECT_PATH}")
+    updated = content[:start] + updated_block + content[end:]
     PYPROJECT_PATH.write_text(updated, encoding="utf-8")
+
+
+def _project_table_block(content: str) -> str:
+    start, end = _project_table_span(content)
+    return content[start:end]
+
+
+def _project_table_span(content: str) -> tuple[int, int]:
+    project_match = re.search(r"(?m)^\[project\]\s*$", content)
+    if project_match is None:
+        raise ValueError(f"Could not find [project] table in {PYPROJECT_PATH}")
+    next_table = re.search(r"(?m)^\[.+\]\s*$", content[project_match.end() :])
+    end = len(content) if next_table is None else project_match.end() + next_table.start()
+    return project_match.end(), end
 
 
 def generate_changelog_entry(version: str, commits: list[dict[str, str]]) -> str:

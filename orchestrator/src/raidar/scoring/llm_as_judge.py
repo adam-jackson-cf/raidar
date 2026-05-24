@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+import os
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Any
 
-from litellm import completion
-
+from raidar.codex_auth import OPENAI_API_KEY_ENV, resolve_codex_auth
 from raidar.config import settings
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import MetricScore
@@ -16,6 +18,10 @@ from raidar.scoring.acceptance import parse_judge_response
 
 SOURCE_PATTERNS = (
     "package.json",
+    "src/lib/**/*.ts",
+    "src/lib/**/*.tsx",
+    "src/test/**/*.ts",
+    "src/test/**/*.tsx",
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.js",
@@ -67,20 +73,110 @@ def evaluate_llm_as_judge_metric(
 
 
 def _call_judge(*, judge_role: str, prompt: str) -> str:
-    response = completion(
-        model=settings.llm_as_judge.model,
-        messages=[
-            {"role": "system", "content": judge_role},
-            {"role": "user", "content": prompt},
-        ],
-        max_tokens=settings.llm_as_judge.max_tokens,
-        temperature=0,
-        num_retries=settings.llm_as_judge.max_retries,
-    )
-    content = response.choices[0].message.content
+    return _call_codex_judge(judge_role=judge_role, prompt=prompt)
+
+
+def _call_codex_judge(*, judge_role: str, prompt: str) -> str:
+    auth = resolve_codex_auth(requested_mode=settings.llm_as_judge.codex_auth_mode)
+    if auth.resolved_mode != "chatgpt" or auth.auth_json_path is None:
+        raise OSError("LLM judge requires Codex ChatGPT auth.")
+
+    instruction = "\n\n".join((judge_role, prompt))
+    with tempfile.TemporaryDirectory(prefix="raidar-codex-judge-") as codex_home:
+        codex_home_path = Path(codex_home)
+        auth_target = codex_home_path / "auth.json"
+        auth_target.write_bytes(auth.auth_json_path.read_bytes())
+        auth_target.chmod(0o600)
+        env = os.environ.copy()
+        env["CODEX_HOME"] = str(codex_home_path)
+        env.pop(OPENAI_API_KEY_ENV, None)
+        completed = subprocess.run(
+            _codex_judge_command(),
+            input=instruction,
+            cwd=Path.cwd(),
+            capture_output=True,
+            text=True,
+            timeout=settings.timeouts.command_default,
+            check=False,
+            env=env,
+        )
+    if completed.returncode != 0:
+        output = _clip_output(f"{completed.stdout}\n{completed.stderr}")
+        raise RuntimeError(f"Codex judge failed with exit {completed.returncode}: {output}")
+    return _codex_response_text(completed.stdout)
+
+
+def _codex_judge_command() -> list[str]:
+    command = [
+        "codex",
+        "exec",
+        "--ignore-user-config",
+        "--ephemeral",
+        "--disable",
+        "plugins",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "--skip-git-repo-check",
+        "--json",
+        "--model",
+        settings.llm_as_judge.model,
+    ]
+    reasoning_effort = settings.llm_as_judge.reasoning_effort.strip()
+    if reasoning_effort:
+        command.extend(["-c", f"model_reasoning_effort={reasoning_effort}"])
+    command.append("-")
+    return command
+
+
+def _codex_response_text(stdout: str) -> str:
+    fallback_lines: list[str] = []
+    for line in stdout.splitlines():
+        try:
+            event = json.loads(line)
+        except json.JSONDecodeError:
+            if line.strip():
+                fallback_lines.append(line)
+            continue
+        text = _codex_event_text(event)
+        if text:
+            fallback_lines.append(text)
+    if fallback_lines:
+        return "\n".join(fallback_lines).strip()
+    return stdout.strip()
+
+
+def _codex_event_text(event: dict[str, Any]) -> str:
+    item = event.get("item")
+    if isinstance(item, dict):
+        if item.get("type") == "agent_message":
+            text = item.get("text")
+            return text if isinstance(text, str) else ""
+        if item.get("type") == "message":
+            return _content_text(item.get("content"))
+    if event.get("type") in {"message", "agent_message"}:
+        return _content_text(event.get("content") or event.get("text"))
+    return ""
+
+
+def _content_text(content: Any) -> str:
     if isinstance(content, str):
         return content
-    return json.dumps(content)
+    if not isinstance(content, list):
+        return ""
+    parts: list[str] = []
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        text = item.get("text") or item.get("content")
+        if isinstance(text, str):
+            parts.append(text)
+    return "\n".join(parts)
+
+
+def _clip_output(output: str, *, max_chars: int = 1000) -> str:
+    clipped = " ".join(output.split())
+    if len(clipped) > max_chars:
+        return clipped[: max_chars - 3] + "..."
+    return clipped
 
 
 def _metric_score_from_response(response: str, *, metric_id: str) -> MetricScore:
@@ -163,7 +259,7 @@ def _judge_prompt(
         for part in (
             _scenario_context(scenario),
             _task_prompt(scenario_dir, scenario),
-            _workspace_sources(workspace),
+            _workspace_sources(workspace, scenario=scenario),
             _output_contract(),
         )
         if part
@@ -189,11 +285,11 @@ def _task_prompt(scenario_dir: Path, scenario: ScenarioDefinition) -> str:
     return f"Task prompt:\n{prompt_path.read_text(encoding='utf-8')}"
 
 
-def _workspace_sources(workspace: Path) -> str:
+def _workspace_sources(workspace: Path, *, scenario: ScenarioDefinition) -> str:
     chunks: list[str] = []
     budget = settings.llm_as_judge.max_source_chars
     used = 0
-    for source_path in _source_paths(workspace):
+    for source_path in _source_paths(workspace, scenario=scenario):
         if used >= budget:
             break
         try:
@@ -207,13 +303,31 @@ def _workspace_sources(workspace: Path) -> str:
     return "Submitted workspace sources:\n\n" + "\n\n".join(chunks)
 
 
-def _source_paths(workspace: Path) -> list[Path]:
+def _source_paths(workspace: Path, *, scenario: ScenarioDefinition) -> list[Path]:
     paths: dict[str, Path] = {}
-    for pattern in SOURCE_PATTERNS:
+    for pattern in (*_scenario_source_patterns(scenario), *SOURCE_PATTERNS):
         for path in workspace.glob(pattern):
             if path.is_file() and "node_modules" not in path.parts:
                 paths[str(path.relative_to(workspace))] = path
-    return [paths[key] for key in sorted(paths)]
+    return list(paths.values())
+
+
+def _scenario_source_patterns(scenario: ScenarioDefinition) -> tuple[str, ...]:
+    patterns: list[str] = []
+    for scorer_ref in scenario.scorers:
+        artifact_config = scorer_ref.config.get("artifact-checks", {})
+        required_paths = artifact_config.get("required_paths", [])
+        if isinstance(required_paths, list):
+            patterns.extend(path for path in required_paths if isinstance(path, str))
+    for requirement in scenario.acceptance.requirements:
+        check = requirement.check
+        if check.type == "file_exists" and _looks_like_workspace_path(check.pattern):
+            patterns.append(check.pattern)
+    return tuple(dict.fromkeys(patterns))
+
+
+def _looks_like_workspace_path(value: str) -> bool:
+    return "/" in value and not value.startswith(("/", "../")) and ".." not in Path(value).parts
 
 
 def _output_contract() -> str:

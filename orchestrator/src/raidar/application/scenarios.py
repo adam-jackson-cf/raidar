@@ -121,7 +121,7 @@ def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> d
             ],
         },
         "scorers": [
-            {"id": "code-delivery", "version": 1, "weight": 0.9},
+            {"id": "typescript-code-task", "version": 1, "weight": 0.9},
             {"id": "resource-efficiency", "version": 1, "weight": 0.1},
         ],
         "prompt": {"entry": request.prompt_entry, "includes": []},

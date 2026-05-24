@@ -37,7 +37,7 @@ def _base_scenario_payload() -> dict:
         "acceptance": {"requirements": [_requirement()]},
         "scorers": [
             {
-                "id": "code-delivery",
+                "id": "typescript-code-task",
                 "version": 1,
                 "weight": 0.9,
                 "config": {
@@ -55,11 +55,10 @@ def _base_scenario_payload() -> dict:
 
 def test_scorer_refs_valid_payload_parses() -> None:
     scenario = ScenarioDefinition.model_validate(_base_scenario_payload())
-    assert scenario.scorer_ids() == ["code-delivery@1", "resource-efficiency@1"]
+    assert scenario.scorer_ids() == ["typescript-code-task@1", "resource-efficiency@1"]
     assert scenario.metric_ids() == [
         "functional",
-        "acceptance",
-        "requirements-coverage",
+        "code-quality",
         "test-coverage",
         "artifact-checks",
         "verification-stability",
@@ -131,6 +130,13 @@ def test_scorer_refs_reject_proposed_scorer() -> None:
         ScenarioDefinition.model_validate(payload)
 
 
+def test_code_task_family_is_not_attachable() -> None:
+    payload = _base_scenario_payload()
+    payload["scorers"] = [{"id": "code-task", "version": 1, "weight": 1.0}]
+    with pytest.raises(ValidationError, match="is proposed"):
+        ScenarioDefinition.model_validate(payload)
+
+
 def test_scorer_refs_reject_invalid_weights() -> None:
     payload = _base_scenario_payload()
     payload["scorers"][0]["weight"] = 0
@@ -147,14 +153,10 @@ def test_scorer_metric_dependencies_are_validated() -> None:
         ScenarioDefinition.model_validate(payload)
 
 
-def test_scorer_requirements_coverage_requires_requirement_specs() -> None:
-    payload = _base_scenario_payload()
-    payload["acceptance"] = {}
-    with pytest.raises(
-        ValidationError,
-        match="requirements-coverage without acceptance.requirements",
-    ):
-        ScenarioDefinition.model_validate(payload)
+def test_design_to_code_does_not_include_legacy_requirements_coverage_metric() -> None:
+    scorer = load_scorer_definition("design-to-code", 1)
+
+    assert "requirements-coverage" not in [metric.id for metric in scorer.metrics]
 
 
 def test_design_to_code_is_deterministic() -> None:
@@ -175,6 +177,28 @@ def test_plan_to_code_defines_scorer_owned_plan_quality_judge() -> None:
 
     assert metric.type == "llm-as-judge"
     assert metric.config["judge"] == "judges/plan-judge.toml"
+
+
+def test_requirements_defines_requirements_adherence_judge() -> None:
+    scorer = load_scorer_definition("requirements", 1)
+
+    metric = next(metric for metric in scorer.metrics if metric.id == "requirements-adherence")
+
+    assert metric.type == "llm-as-judge"
+    assert metric.config["judge"] == "judges/requirements-adherence.toml"
+
+
+def test_python_code_task_extends_code_task_metric_interface() -> None:
+    family = load_scorer_definition("code-task", 1)
+    scorer = load_scorer_definition("python-code-task", 1)
+
+    assert scorer.status == "proposed"
+    assert scorer.extends == family.id
+    assert scorer.runtime == "python"
+    assert [metric.id for metric in scorer.metrics] == [metric.id for metric in family.metrics]
+    assert [metric.weight for metric in scorer.metrics] == [
+        metric.weight for metric in family.metrics
+    ]
 
 
 def test_scorer_refs_reject_unknown_metric_config_keys() -> None:

@@ -1,0 +1,23 @@
+matrix:
+  id: hello-world-smoke-codex-gpt55
+  scenario: scenarios/hello-world-smoke
+  experiment:
+    timeout_sec: 1800
+    repeats: 1
+    repeat_parallel: 1
+    retry_void: 0
+  entries:
+    - id: hello-world-smoke-v001-gpt-5-5-low
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
+    - id: hello-world-smoke-v001-gpt-5-5-medium
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: medium

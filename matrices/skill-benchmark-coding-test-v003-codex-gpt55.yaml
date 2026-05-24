@@ -1,0 +1,51 @@
+matrix:
+  id: skill-benchmark-coding-test-codex-gpt55
+  scenario: scenarios/skill-benchmark-coding-test
+  experiment:
+    timeout_sec: 1800
+    repeats: 1
+    repeat_parallel: 1
+    retry_void: 0
+  entries:
+    - id: skill-benchmark-coding-test-v001-gpt-5-5-low
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
+    - id: skill-benchmark-coding-test-v001-gpt-5-5-medium
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: medium
+    - id: skill-benchmark-coding-test-v002-gpt-5-5-low
+      scenario_revision: v002
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
+    - id: skill-benchmark-coding-test-v002-gpt-5-5-medium
+      scenario_revision: v002
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: medium
+    - id: skill-benchmark-coding-test-v003-gpt-5-5-low
+      scenario_revision: v003
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
+    - id: skill-benchmark-coding-test-v003-gpt-5-5-medium
+      scenario_revision: v003
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: medium

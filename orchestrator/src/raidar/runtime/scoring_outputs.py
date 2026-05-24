@@ -12,7 +12,7 @@ from raidar.schemas.scorecard import (
     ScorerMetricContribution,
     ScorerResult,
 )
-from raidar.scoring.acceptance import evaluate_llm_as_judge_metric
+from raidar.scorers.base import ScorerContext, scorer_class
 
 
 def build_metric_scores(
@@ -21,138 +21,45 @@ def build_metric_scores(
     execution_validity: ExecutionValidityScore,
     resource_efficiency: ResourceEfficiencyScore,
 ) -> list[MetricScore]:
-    outputs = context.execution.outputs
-    metric_scores: dict[str, MetricScore] = {
-        metric.metric_id: metric.model_copy(deep=True) for metric in outputs.metric_scores
-    }
-    core_scores = _core_metric_scores(outputs, execution_validity, resource_efficiency)
+    metric_scores = _scorer_owned_metric_scores(
+        context,
+        execution_validity=execution_validity,
+        resource_efficiency=resource_efficiency,
+    )
     for metric in context.request.scenario.resolved_metrics():
         metric_id = metric.id
-        if metric_id in core_scores:
-            metric_scores[metric_id] = core_scores[metric_id]
-        elif metric.type == "llm-as-judge":
-            metric_scores[metric_id] = evaluate_llm_as_judge_metric(
-                workspace=context.context.workspace,
-                scenario_dir=context.request.scenario_dir,
-                scenario=context.request.scenario,
-                metric_id=metric.id,
-                judge_path=metric.config.judge,
-            )
-        elif metric_id not in metric_scores:
+        if metric_id not in metric_scores:
             metric_scores[metric_id] = MetricScore(
                 metric_id=metric_id,
                 score=0.0,
                 passed=False,
-                evidence="Metric was resolved but no evaluator output was produced.",
+                evidence=f"Selected scorer did not emit metric: {metric_id}",
             )
     return [metric_scores[metric.id] for metric in context.request.scenario.resolved_metrics()]
 
 
-def _core_metric_scores(
-    outputs,
+def _scorer_owned_metric_scores(
+    context: ScorecardBuildContext,
+    *,
     execution_validity: ExecutionValidityScore,
     resource_efficiency: ResourceEfficiencyScore,
 ) -> dict[str, MetricScore]:
-    return {
-        "functional": _functional_metric_score(outputs),
-        "acceptance": _acceptance_metric_score(outputs),
-        "verification-stability": _verification_stability_metric_score(outputs),
-        "execution-validity": _execution_validity_metric_score(execution_validity),
-        "resource-efficiency": _resource_efficiency_metric_score(resource_efficiency),
-        "test-coverage": _test_coverage_metric_score(outputs),
-        "requirements-coverage": _requirements_coverage_metric_score(outputs),
-        "visual-regression": _visual_regression_metric_score(outputs),
-    }
-
-
-def _functional_metric_score(outputs) -> MetricScore:
-    return MetricScore(
-        metric_id="functional",
-        score=outputs.functional.score,
-        passed=outputs.functional.passed,
-        evidence=(
-            f"build={outputs.functional.build_succeeded}, "
-            f"tests={outputs.functional.tests_passed}/{outputs.functional.tests_total}"
-        ),
+    scorer_context = ScorerContext(
+        workspace=context.context.workspace,
+        scenario_dir=context.request.scenario_dir,
+        scenario=context.request.scenario,
+        execution=context.execution,
+        resource_efficiency=resource_efficiency,
+        execution_validity=execution_validity,
     )
-
-
-def _acceptance_metric_score(outputs) -> MetricScore:
-    return MetricScore(
-        metric_id="acceptance",
-        score=outputs.acceptance.score,
-        passed=outputs.acceptance.score >= 1.0,
-        evidence=f"checks={len(outputs.acceptance.checks)}",
-    )
-
-
-def _verification_stability_metric_score(outputs) -> MetricScore:
-    return MetricScore(
-        metric_id="verification-stability",
-        score=outputs.verification_stability.score,
-        passed=outputs.verification_stability.score > 0,
-        evidence=f"failures={outputs.verification_stability.total_gate_failures}",
-    )
-
-
-def _execution_validity_metric_score(score: ExecutionValidityScore) -> MetricScore:
-    return MetricScore(
-        metric_id="execution-validity",
-        score=1.0 if score.passed else 0.0,
-        passed=score.passed,
-        evidence=f"checks={len(score.checks)}",
-    )
-
-
-def _resource_efficiency_metric_score(score: ResourceEfficiencyScore) -> MetricScore:
-    return MetricScore(
-        metric_id="resource-efficiency",
-        score=score.score,
-        passed=True,
-        evidence=(
-            f"uncached_input_tokens={score.uncached_input_tokens}, "
-            f"command_count={score.command_count}"
-        ),
-    )
-
-
-def _test_coverage_metric_score(outputs) -> MetricScore:
-    return MetricScore(
-        metric_id="test-coverage",
-        score=_coverage_metric_score(outputs.test_coverage),
-        passed=outputs.test_coverage.passed,
-        evidence=(
-            f"threshold={outputs.test_coverage.threshold}, "
-            f"measured={outputs.test_coverage.measured}, "
-            f"source={outputs.test_coverage.source}"
-        ),
-    )
-
-
-def _requirements_coverage_metric_score(outputs) -> MetricScore:
-    score = outputs.requirements_coverage
-    return MetricScore(
-        metric_id="requirements-coverage",
-        score=_requirements_metric_score(score),
-        passed=score.presence_ratio >= 1.0 and score.mapping_ratio >= 1.0,
-        evidence=f"presence={score.presence_ratio}, mapping={score.mapping_ratio}",
-    )
-
-
-def _visual_regression_metric_score(outputs) -> MetricScore:
-    if outputs.visual is None:
-        return MetricScore(
-            metric_id="visual-regression",
-            score=0.0,
-            passed=False,
-            evidence="Visual threshold not configured.",
-        )
-    return MetricScore(
-        metric_id="visual-regression",
-        score=outputs.visual.score,
-        passed=outputs.visual.passed,
-        evidence=f"similarity={outputs.visual.score}, passed={outputs.visual.passed}",
-    )
+    metric_scores: dict[str, MetricScore] = {}
+    for scorer_ref in context.request.scenario.scorers:
+        scorer = scorer_class(scorer_ref.id, scorer_ref.version)()
+        evidence = scorer.collect_evidence(scorer_context)
+        for metric_score in evidence.metric_scores:
+            score = MetricScore.model_validate(metric_score)
+            metric_scores[score.metric_id] = score
+    return metric_scores
 
 
 def build_scorer_results(
@@ -210,15 +117,3 @@ def canonical_performance_gates(
         )
     )
     return PerformanceGatesScore(checks=checks)
-
-
-def _coverage_metric_score(score) -> float:
-    if score.threshold is None:
-        return 1.0 if score.passed else 0.0
-    if score.measured is None:
-        return 0.0
-    return min(1.0, score.measured / score.threshold)
-
-
-def _requirements_metric_score(score) -> float:
-    return score.presence_ratio * 0.5 + score.mapping_ratio * 0.5

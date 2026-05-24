@@ -202,7 +202,7 @@ def _sample_policy(metrics: list[str]) -> dict[str, object]:
             "preferred_scored_runs": 5,
         }
     return {
-        "scenario_family": "code-delivery-nonvisual",
+        "scenario_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
     }

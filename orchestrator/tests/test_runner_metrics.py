@@ -1,7 +1,10 @@
 """Tests for execution-validity and resource-efficiency helpers."""
 
+from types import SimpleNamespace
+
 import pytest
 
+from raidar.runtime import scoring_outputs as scoring_outputs_runtime
 from tests import runtime_process_metrics_support as process_support
 from tests import runtime_scorecard_workspace_support as runtime_support
 
@@ -167,7 +170,7 @@ def _verification_gate_doc(name: str) -> dict[str, object]:
 def _sample_scorer_docs() -> list[dict[str, object]]:
     return [
         {
-            "id": "code-delivery",
+            "id": "typescript-code-task",
             "version": 1,
             "weight": 0.9,
             "config": {
@@ -1719,7 +1722,7 @@ def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
 def test_scenario_evaluation_profile_uses_ordered_metrics():
     scenario = _sample_scenario()
     assert scenario_evaluation_profile(scenario) == (
-        "scorers:code-delivery@1:0.9+resource-efficiency@1:0.1"
+        "scorers:typescript-code-task@1:0.9+resource-efficiency@1:0.1"
     )
 
 
@@ -1732,8 +1735,7 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
     scenario_spec = _build_verifier_scenario_spec(score_context.request, score_context.context)
     assert scenario_spec["metrics"] == [
         {"type": "core", "id": "functional"},
-        {"type": "core", "id": "acceptance"},
-        {"type": "core", "id": "requirements-coverage"},
+        {"type": "core", "id": "code-quality"},
         {"type": "core", "id": "test-coverage"},
         {
             "type": "artifact-checks",
@@ -1743,7 +1745,7 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
         {"type": "core", "id": "verification-stability"},
         {"type": "core", "id": "resource-efficiency"},
     ]
-    assert scenario_spec["scorers"][0]["id"] == "code-delivery"
+    assert scenario_spec["scorers"][0]["id"] == "typescript-code-task"
     assert scenario_spec["visual"]["viewport"] == {"width": 1440, "height": 1024}
     assert scenario_spec["visual"]["scoring"]["weights"]["global"] == 0.25
     assert scenario_spec["visual"]["pass_policy"]["minimum_score"] == 70
@@ -1760,10 +1762,39 @@ def test_build_scorecard_carries_scorer_results(tmp_path: Path):
     scorecard = build_scorecard(score_context)
 
     assert [result.scorer_id for result in scorecard.scorer_results] == [
-        "code-delivery",
+        "typescript-code-task",
         "resource-efficiency",
     ]
     assert scorecard.metric_score("resource-efficiency") == scorecard.resource_efficiency.score
+
+
+def test_build_metric_scores_does_not_use_global_metric_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+
+    class EmptyScorer:
+        def collect_evidence(self, _context):
+            return SimpleNamespace(metric_scores=())
+
+    monkeypatch.setattr(
+        scoring_outputs_runtime,
+        "scorer_class",
+        lambda _scorer_id, _version: EmptyScorer,
+    )
+
+    scorecard = build_scorecard(score_context)
+
+    assert scorecard.metric_scores
+    assert all(
+        score.evidence == f"Selected scorer did not emit metric: {score.metric_id}"
+        for score in scorecard.metric_scores
+    )
 
 
 def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: Path):
@@ -1782,7 +1813,7 @@ def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: 
         if check.name == "minimum_quality_score"
     )
     assert quality_gate.passed is False
-    assert quality_gate.evidence == "quality=0.900, min=0.950"
+    assert quality_gate.evidence == "quality=0.425, min=0.950"
 
 
 def test_build_scorecard_fails_execution_validity_without_required_atomic_commit(

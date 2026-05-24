@@ -107,15 +107,18 @@ acceptance:
       description: Unit test file exists
     required_test_evidence: []
 scorers:
-- id: code-delivery
+- id: typescript-code-task
   version: 1
-  weight: 0.98
+  weight: 0.78
   config:
     artifact-checks:
       required_paths:
       - src/lib/math.ts
       - src/test/math.test.ts
       path_match: glob
+- id: requirements
+  version: 1
+  weight: 0.20
 - id: resource-efficiency
   version: 1
   weight: 0.02

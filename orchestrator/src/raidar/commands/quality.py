@@ -26,7 +26,7 @@ TYPECHECK_TARGETS = [
     "tests/test_claude_code_cli_adapter.py",
     "tests/test_gemini_cli_adapter.py",
 ]
-COVERAGE_FAIL_UNDER = "60"
+COVERAGE_FAIL_UNDER = "95"
 
 
 def register(main: click.Group) -> None:

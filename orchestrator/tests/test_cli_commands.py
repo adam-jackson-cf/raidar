@@ -813,8 +813,7 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
     ]
     assert scenario_def.metric_ids() == [
         "functional",
-        "acceptance",
-        "requirements-coverage",
+        "code-quality",
         "test-coverage",
         "artifact-checks",
         "verification-stability",
@@ -1087,7 +1086,7 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
     assert f"  v10: {scenario_dir / 'v10' / 'scenario.yaml'}" in info_result.output
     assert (
         "Evaluation Profile: "
-        "scorers:code-delivery@1:0.9+resource-efficiency@1:0.1" in info_result.output
+        "scorers:typescript-code-task@1:0.9+resource-efficiency@1:0.1" in info_result.output
     )
 
 

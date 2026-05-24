@@ -67,7 +67,7 @@ def _eval_config() -> EvalConfig:
         scenario_name="homepage",
         scenario_revision="v001",
         starter_root="starter",
-        evaluation_profile="scorers:code-delivery@1:0.98+resource-efficiency@1:0.02",
+        evaluation_profile="scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
     )
 
 
@@ -120,9 +120,9 @@ def _summary_input(spec: SummaryInputSpec) -> ExperimentSummaryInput:
         scenario_revision="v001",
         harness="codex-cli",
         model="codex/gpt-5.4-mini",
-        evaluation_profile="scorers:code-delivery@1:0.98+resource-efficiency@1:0.02",
+        evaluation_profile="scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
         metrics=spec.metrics,
-        scorers=["code-delivery@1", "resource-efficiency@1"],
+        scorers=["typescript-code-task@1", "resource-efficiency@1"],
         repeats=spec.repeats,
         repeat_parallel=spec.repeat_parallel,
         runs=spec.runs,
@@ -190,7 +190,7 @@ def _summary_config_payload() -> dict[str, object]:
         "scenario_name": "homepage",
         "harness": "codex-cli",
         "model": "codex/gpt-5.4-mini",
-        "evaluation_profile": "scorers:code-delivery@1:0.98+resource-efficiency@1:0.02",
+        "evaluation_profile": "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
         "metrics": [
             "functional",
             "acceptance",
@@ -246,7 +246,7 @@ def test_create_experiment_summary_aggregates() -> None:
     assert summary["config"]["sample_class"] == "smoke"
     assert summary["config"]["starter_root"] == "starter"
     assert summary["config"]["starter_fingerprint"] is None
-    assert summary["sample"]["scenario_family"] == "code-delivery-nonvisual"
+    assert summary["sample"]["scenario_family"] == "code-task-nonvisual"
     assert summary["sample"]["minimum_scored_runs"] == 3
     assert summary["sample"]["preferred_scored_runs"] == 5
     assert summary["sample"]["sample_adequacy"] == 0.4

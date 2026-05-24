@@ -36,7 +36,9 @@ class TestEvalSettings:
         assert judge.max_tokens > 0
         assert judge.max_source_chars > 0
         assert judge.max_retries >= 0
-        assert "/" in judge.model  # Model should have provider prefix
+        assert judge.model == "gpt-5.5"
+        assert judge.reasoning_effort == "low"
+        assert judge.codex_auth_mode == "chatgpt"
 
     def test_settings_singleton_exports(self):
         """Settings singleton should be importable and have all subsections."""

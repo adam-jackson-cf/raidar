@@ -7,14 +7,14 @@ import subprocess
 import click
 
 from raidar.agents.adapters.base import resolve_cli_executable
-from raidar.agents.adapters.codex_auth import (
+from raidar.agents.adapters.factory import adapter_class_for_harness, resolve_adapter
+from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.agents.rules import SYSTEM_RULES
+from raidar.codex_auth import (
     CODEX_AUTH_MODE_ENV,
     codex_auth_json_path,
     has_file_backed_codex_auth,
 )
-from raidar.agents.adapters.factory import adapter_class_for_harness, resolve_adapter
-from raidar.agents.config import AgentSpec, Harness, ModelTarget
-from raidar.agents.rules import SYSTEM_RULES
 from raidar.commands.shared import HARNESS_CHOICES
 
 

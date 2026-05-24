@@ -389,7 +389,7 @@ def _prepare_workspace_scenario_yaml() -> str:
             "        pattern: src/index.tsx",
             "        description: Source entry exists",
             "scorers:",
-            "  - id: code-delivery",
+            "  - id: typescript-code-task",
             "    version: 1",
             "    weight: 0.01",
             "    config:",

@@ -1,14 +1,11 @@
-"""Reusable scorer definition loading and scenario resolution."""
+"""Code-backed scorer definition registry and scenario resolution."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from functools import cache
-from pathlib import Path
-from typing import Any, Literal
-
-import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from importlib import import_module
+from typing import Any
 
 from raidar.schemas.scenario import (
     ArtifactCheckMetricConfig,
@@ -19,33 +16,10 @@ from raidar.schemas.scenario import (
     MetricDefinition,
     ScorerMetricDefinition,
 )
-from raidar.scorers.paths import resolve_scorer_definition_file, scorer_definitions_dir
+from raidar.scorers.base import ScorerDefinition, ScorerResolutionError, scorer_class
+from raidar.scorers.paths import resolve_scorer_definition_file
 
-
-class ScorerResolutionError(ValueError):
-    """Raised when a scenario references an invalid scorer definition."""
-
-
-class ScorerDefinition(BaseModel):
-    """Reusable scorer definition loaded from package YAML."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    id: str
-    version: int = Field(ge=1)
-    status: Literal["active", "proposed"] = "active"
-    category: Literal["quality", "efficiency"] = "quality"
-    description: str
-    metrics: list[ScorerMetricDefinition] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def _validate_metric_weights(self) -> ScorerDefinition:
-        metric_ids = [metric.id for metric in self.metrics]
-        if len(metric_ids) != len(set(metric_ids)):
-            raise ValueError("scorer definition contains duplicate metric ids")
-        if sum(metric.weight for metric in self.metrics) <= 0:
-            raise ValueError("scorer definition metric weights require positive total")
-        return self
+import_module("raidar.scorers.scorer_registration")
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,26 +39,11 @@ class ResolvedScorer:
         return f"{self.id}@{self.version}"
 
 
-def _definition_dir() -> Path:
-    return scorer_definitions_dir()
-
-
 @cache
 def load_scorer_definition(scorer_id: str, version: int) -> ScorerDefinition:
-    """Load one scorer definition by id/version."""
-    path = _definition_dir() / f"{scorer_id}.yaml"
-    if not path.exists():
-        raise ScorerResolutionError(f"Unknown scorer definition: {scorer_id}@{version}")
-    payload = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
-    if not isinstance(payload, dict):
-        raise ScorerResolutionError(f"Invalid scorer definition content: {path}")
-    definition = ScorerDefinition.model_validate(payload)
-    if definition.version != version:
-        raise ScorerResolutionError(
-            f"Scorer {scorer_id} requested version {version}, "
-            f"but definition version is {definition.version}"
-        )
-    return definition
+    """Load one code-backed scorer definition by id/version."""
+
+    return scorer_class(scorer_id, version).definition()
 
 
 def _deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:

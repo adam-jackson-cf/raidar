@@ -107,7 +107,7 @@ acceptance:
       description: Unit test file exists
     required_test_evidence: []
 scorers:
-- id: code-delivery
+- id: typescript-code-task
   version: 1
   weight: 0.98
   config:

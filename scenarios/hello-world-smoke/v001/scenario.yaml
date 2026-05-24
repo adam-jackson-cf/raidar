@@ -33,7 +33,7 @@ acceptance:
         description: Smoke marker text exists in source
 
 scorers:
-  - id: code-delivery
+  - id: typescript-code-task
     version: 1
     weight: 0.01
     config:

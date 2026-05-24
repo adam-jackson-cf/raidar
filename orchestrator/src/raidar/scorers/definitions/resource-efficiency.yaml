@@ -1,9 +1,0 @@
-id: resource-efficiency
-version: 1
-status: active
-category: efficiency
-description: Scores token, command, failure, and verification-round efficiency after a valid run completes.
-metrics:
-  - id: resource-efficiency
-    type: core
-    weight: 1.0

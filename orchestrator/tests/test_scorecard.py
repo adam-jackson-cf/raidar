@@ -188,7 +188,7 @@ class TestScorecardComposite:
         scorecard = Scorecard(
             scorer_results=[
                 ScorerResult(
-                    scorer_id="code-delivery",
+                    scorer_id="typescript-code-task",
                     version=1,
                     category="quality",
                     weight=0.8,

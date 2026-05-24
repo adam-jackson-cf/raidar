@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from raidar.agents.adapters.codex_auth import CODEX_AUTH_MODE_ENV
 from raidar.agents.adapters.codex_cli import CodexCliAdapter
 from raidar.agents.adapters.factory import resolve_adapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.codex_auth import CODEX_AUTH_MODE_ENV
 
 CODEX_HARBOR_AGENT = "raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent"
 

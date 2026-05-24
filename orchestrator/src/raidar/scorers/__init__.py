@@ -1,5 +1,7 @@
 """Scorer definition registry and resolution helpers."""
 
+from .base import BaseScorer, ScorerContext, ScorerEvidence
+from .code_task import CodeTaskScorer
 from .registry import (
     ResolvedScorer,
     ScorerDefinition,
@@ -12,8 +14,12 @@ from .registry import (
 )
 
 __all__ = [
+    "BaseScorer",
+    "CodeTaskScorer",
     "ResolvedScorer",
+    "ScorerContext",
     "ScorerDefinition",
+    "ScorerEvidence",
     "ScorerResolutionError",
     "load_scorer_definition",
     "resolve_scorers",

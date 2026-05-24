@@ -1,14 +1,15 @@
+import json
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
+from raidar.codex_auth import ResolvedCodexAuth
 from raidar.schemas.scenario import LLMAsJudgeMetricConfig, ScenarioDefinition
 from raidar.scoring import llm_as_judge
 
-
-class _Message:
-    content = """
+JUDGE_RESPONSE = """
 {
   "passed": true,
   "score": 0.82,
@@ -32,14 +33,6 @@ class _Message:
   "residual_risk": []
 }
 """
-
-
-class _Choice:
-    message = _Message()
-
-
-class _Response:
-    choices = [_Choice()]
 
 
 def _scenario() -> ScenarioDefinition:
@@ -89,13 +82,13 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
     (scenario_dir / "prompt" / "task.md").write_text("Build the page.", encoding="utf-8")
     (workspace / "src" / "page.tsx").write_text("export const Ready = true;\n", encoding="utf-8")
 
-    calls: list[dict[str, object]] = []
+    calls: list[dict[str, str]] = []
 
-    def fake_completion(**kwargs):
-        calls.append(kwargs)
-        return _Response()
+    def fake_call_judge(*, judge_role: str, prompt: str) -> str:
+        calls.append({"judge_role": judge_role, "prompt": prompt})
+        return JUDGE_RESPONSE
 
-    monkeypatch.setattr(llm_as_judge, "completion", fake_completion)
+    monkeypatch.setattr(llm_as_judge, "_call_judge", fake_call_judge)
     monkeypatch.setattr(
         llm_as_judge,
         "resolve_scorer_definition_file",
@@ -118,9 +111,59 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
     assert metric.judge_output["verdict"] == "PASS WITH GAPS"
     assert metric.judge_output["findings"][0]["id"] == "PJ1"
     assert metric.judge_output["rubric_coverage"]["outcome_verifiability"] == "gap"
-    assert calls
-    assert calls[0]["messages"][0]["content"] == "You are a delivery reviewer."
-    assert "src/page.tsx" in calls[0]["messages"][1]["content"]
+    assert len(calls) == 1
+    assert calls[0]["judge_role"] == "You are a delivery reviewer."
+    assert "src/page.tsx" in calls[0]["prompt"]
+
+
+def test_call_codex_judge_uses_chatgpt_auth_without_api_key(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    auth_path = tmp_path / "auth.json"
+    auth_path.write_text('{"tokens": {"id_token": "present"}}', encoding="utf-8")
+    calls: list[dict[str, object]] = []
+
+    monkeypatch.setenv("OPENAI_API_KEY", "secret-value")
+    monkeypatch.setattr(llm_as_judge.settings.llm_as_judge, "model", "gpt-5.5")
+    monkeypatch.setattr(llm_as_judge.settings.llm_as_judge, "reasoning_effort", "low")
+    monkeypatch.setattr(llm_as_judge.settings.llm_as_judge, "codex_auth_mode", "chatgpt")
+    monkeypatch.setattr(
+        llm_as_judge,
+        "resolve_codex_auth",
+        lambda *, requested_mode: ResolvedCodexAuth(
+            requested_mode=requested_mode,
+            resolved_mode="chatgpt",
+            auth_json_path=auth_path,
+            source_label="test auth",
+        ),
+    )
+
+    def fake_run(*args, **kwargs):
+        calls.append({"args": args, **kwargs})
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps({"item": {"type": "agent_message", "text": JUDGE_RESPONSE}}) + "\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(llm_as_judge.subprocess, "run", fake_run)
+
+    response = llm_as_judge._call_codex_judge(judge_role="judge", prompt="prompt")
+
+    assert response == JUDGE_RESPONSE.strip()
+    assert len(calls) == 1
+    command = calls[0]["args"][0]
+    assert command[:2] == ["codex", "exec"]
+    assert "--json" in command
+    assert command[command.index("--model") + 1] == "gpt-5.5"
+    assert "-c" in command
+    assert "model_reasoning_effort=low" in command
+    assert command[-1] == "-"
+    assert calls[0]["input"] == "judge\n\nprompt"
+    env = calls[0]["env"]
+    assert "CODEX_HOME" in env
+    assert "OPENAI_API_KEY" not in env
 
 
 def test_evaluate_llm_as_judge_metric_fails_when_judge_file_missing(tmp_path: Path) -> None:

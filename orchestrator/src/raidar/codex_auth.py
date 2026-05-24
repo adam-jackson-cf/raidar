@@ -1,4 +1,4 @@
-"""Codex authentication helpers shared by adapter and CLI setup flows."""
+"""Codex authentication helpers shared across runtime layers."""
 
 from __future__ import annotations
 

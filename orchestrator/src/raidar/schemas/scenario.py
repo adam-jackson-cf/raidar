@@ -349,6 +349,7 @@ class VerificationConfig(BaseModel):
 CoreMetricId = Literal[
     "functional",
     "acceptance",
+    "code-quality",
     "verification-stability",
     "execution-validity",
     "resource-efficiency",
@@ -360,11 +361,13 @@ CoreMetricId = Literal[
 MetricId = Literal[
     "functional",
     "acceptance",
+    "code-quality",
     "verification-stability",
     "execution-validity",
     "resource-efficiency",
     "test-coverage",
     "requirements-coverage",
+    "requirements-adherence",
     "plan-quality",
     "visual-regression",
     "artifact-checks",
@@ -425,7 +428,7 @@ class LLMAsJudgeMetricDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["llm-as-judge"] = "llm-as-judge"
-    id: Literal["plan-quality"] = "plan-quality"
+    id: Literal["plan-quality", "requirements-adherence"]
     config: LLMAsJudgeMetricConfig = Field(description="LLM judge configuration")
 
 

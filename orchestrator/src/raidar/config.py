@@ -38,8 +38,16 @@ class LLMAsJudgeSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="EVAL_LLM_AS_JUDGE__")
 
     model: str = Field(
-        default="anthropic/claude-sonnet-4-20250514",
-        description="LLM model for llm-as-judge evaluations",
+        default="gpt-5.5",
+        description="Codex CLI model for llm-as-judge evaluations",
+    )
+    reasoning_effort: str = Field(
+        default="low",
+        description="Codex CLI model reasoning effort for llm-as-judge evaluations",
+    )
+    codex_auth_mode: str = Field(
+        default="chatgpt",
+        description="Codex auth mode for llm-as-judge evaluations",
     )
     max_tokens: int = Field(default=1500, description="Max tokens for judge response")
     max_source_chars: int = Field(
