@@ -42,7 +42,7 @@ acceptance:
   requirements: []
 
 scorers:
-  - id: code-delivery
+  - id: typescript-code-task
     version: 1
     weight: 0.9
     config:
@@ -66,7 +66,7 @@ Notes:
 - Command fields must be argv arrays. Do not use shell wrappers, operators, or `-c`.
 - Rules are single-set only. Do not add strict/minimal variants.
 - `scorers[]` is required and defines the scenario evaluation profile.
-- Scorer refs must point to active executable definitions in `orchestrator/src/raidar/scorers/definitions/`.
+- Scorer refs must point to active executable definitions registered by code under `orchestrator/src/raidar/scorers/`.
 - Scenario YAML is strict. Removed fields such as top-level `metrics`, top-level `score_profile`, and `acceptance.llm_judge_rubric` fail validation.
 
 ## 2.1 Configure Scorers
@@ -74,7 +74,8 @@ Notes:
 Active scorer IDs:
 
 - `design-to-code`
-- `code-delivery`
+- `typescript-code-task`
+- `requirements`
 - `resource-efficiency`
 
 Attach one or more scorers and use scorer-level `weight` to express the scenario blend. The homepage scenario uses `design-to-code` for quality and `resource-efficiency` for cost-aware comparison:
@@ -112,7 +113,7 @@ The profile shown in run and experiment artifacts is derived from scorer refs as
 
 ## 2.2 Judge Role Files
 
-When a scorer includes `llm-as-judge`, the judge role file lives with the scorer definition under `orchestrator/src/raidar/scorers/definitions/`:
+When a scorer includes `llm-as-judge`, the judge role file lives under `orchestrator/src/raidar/scorers/definitions/` and is referenced by the code-backed scorer definition:
 
 ```yaml
 - id: plan-quality
@@ -149,10 +150,12 @@ make scenario-validate SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml
 make experiment-run \
   SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml \
   HARNESS=codex-cli \
-  MODEL=codex/gpt-5.4-high
+  PROVIDER=openai \
+  MODEL=gpt-5.5 \
+  REASONING_EFFORT=low
 ```
 
-3. When you compare multiple `AgentSpec`s, author the matrix config with top-level `experiment` and `agents` blocks, and set `harness` on each `agents[]` entry.
+3. When you compare multiple `AgentSpec`s, author the matrix config with `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries`; each entry declares `scenario_revision` and a nested `agent` with `harness`, `provider`, `model`, and optional `reasoning_effort`.
 
 ## 5. Revision Pattern
 

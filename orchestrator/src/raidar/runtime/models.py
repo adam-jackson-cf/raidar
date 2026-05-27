@@ -12,7 +12,6 @@ from raidar.agents.config import AgentSpec
 from raidar.schemas.events import GateEvent, TraceEvent
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import (
-    AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
@@ -57,7 +56,6 @@ class EvaluationOutputs:
     """Computed scoring outputs for a run."""
 
     functional: FunctionalScore
-    acceptance: AcceptanceScore
     visual: VisualScore | None
     verification_stability: VerificationStabilityScore
     test_coverage: CoverageScore

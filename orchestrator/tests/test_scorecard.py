@@ -1,8 +1,6 @@
 """Tests for scorecard computed fields."""
 
 from raidar.schemas.scorecard import (
-    AcceptanceCheck,
-    AcceptanceScore,
     ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
@@ -51,42 +49,6 @@ class TestFunctionalScore:
             passed=True,
         )
         assert score.score == 1.0
-
-
-class TestAcceptanceScore:
-    """Test AcceptanceScore computed fields."""
-
-    def test_score_one_when_no_checks(self):
-        """Score should be 1 when no checks configured."""
-        score = AcceptanceScore(checks=[])
-        assert score.score == 1.0
-
-    def test_score_one_when_all_pass(self):
-        """Score should be 1 when all checks pass."""
-        checks = [
-            AcceptanceCheck(rule="Rule 1", type="deterministic", passed=True),
-            AcceptanceCheck(rule="Rule 2", type="deterministic", passed=True),
-        ]
-        score = AcceptanceScore(checks=checks)
-        assert score.score == 1.0
-
-    def test_score_zero_when_all_fail(self):
-        """Score should be 0 when all checks fail."""
-        checks = [
-            AcceptanceCheck(rule="Rule 1", type="deterministic", passed=False),
-            AcceptanceCheck(rule="Rule 2", type="deterministic", passed=False),
-        ]
-        score = AcceptanceScore(checks=checks)
-        assert score.score == 0.0
-
-    def test_score_partial_when_some_fail(self):
-        """Score should be partial when some checks fail."""
-        checks = [
-            AcceptanceCheck(rule="Rule 1", type="deterministic", passed=True),
-            AcceptanceCheck(rule="Rule 2", type="deterministic", passed=False),
-        ]
-        score = AcceptanceScore(checks=checks)
-        assert score.score == 0.5
 
 
 class TestVerificationStabilityScore:
@@ -139,7 +101,6 @@ class TestScorecardComposite:
             functional=FunctionalScore(
                 passed=True, build_succeeded=True, tests_passed=10, tests_total=10
             ),
-            acceptance=AcceptanceScore(),
             visual=None,
             verification_stability=VerificationStabilityScore(),
         )

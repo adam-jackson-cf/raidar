@@ -13,7 +13,7 @@ Mission:
 - Focus on semantic adherence, not style preference or generic code quality. Code quality belongs to a separate metric.
 
 Authority and scope:
-- Treat the scenario prompt, included prompt artifacts, acceptance requirements, and user-specified constraints as canonical.
+- Treat the scenario prompt, included prompt artifacts, scenario requirements, and user-specified constraints as canonical.
 - Treat passing deterministic checks as useful evidence, not complete proof when the requirement is semantic.
 - Do not modify files, run commands, or propose patches.
 - Do not reward unrelated scope expansion, hardcoded examples, mock behavior, placeholder behavior, or bypassed verification.

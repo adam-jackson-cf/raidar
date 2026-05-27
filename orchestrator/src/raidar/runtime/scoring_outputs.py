@@ -51,6 +51,8 @@ def _scorer_owned_metric_scores(
         execution=context.execution,
         resource_efficiency=resource_efficiency,
         execution_validity=execution_validity,
+        workspace_changes=context.artifacts.workspace_changes,
+        retained_evidence=context.artifacts.evidence_artifacts,
     )
     metric_scores: dict[str, MetricScore] = {}
     for scorer_ref in context.request.scenario.scorers:

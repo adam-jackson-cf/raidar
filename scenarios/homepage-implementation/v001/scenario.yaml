@@ -36,8 +36,15 @@ verification:
       command: ["bun", "run", "build"]
       on_failure: continue
 
-acceptance:
-  requirements:
+requirements:
+  items:
+    - id: req-placeholder-removed
+      description: Replaces starter placeholder content.
+      check:
+        type: no_pattern
+        pattern: "Homepage placeholder - implement the design"
+        description: Replaces starter placeholder content
+      required_test_evidence: []
     - id: req-header-nav
       description: Header contains logo and Home/About/Contact navigation.
       check:
@@ -80,37 +87,41 @@ acceptance:
       required_test_evidence:
         - type: query_role
           role: contentinfo
-  deterministic_checks:
-    - type: no_pattern
-      pattern: "Homepage placeholder - implement the design"
-      description: Replaces starter placeholder content
-    - type: import_present
-      pattern: "Get Started"
-      description: Includes hero call-to-action copy
-    - type: import_present
-      pattern: Contact
-      description: Includes contact navigation copy
-    - type: import_present
-      pattern: Everything You Need
-      description: Includes the authored features section heading
-    - type: import_present
-      pattern: Lightning Fast
-      description: Includes the first authored feature card
-    - type: import_present
-      pattern: Secure by Default
-      description: Includes the second authored feature card
-    - type: import_present
-      pattern: Team Collaboration
-      description: Includes the third authored feature card
-    - type: import_present
-      pattern: All rights reserved
-      description: Includes footer copyright copy
-    - type: no_pattern
-      pattern: "style={{"
-      description: Avoids inline styles
-    - type: file_exists
-      pattern: src/components/sections/**/*.tsx
-      description: Uses the expected section component structure
+    - id: req-lightning-feature
+      description: Includes the first authored feature card.
+      check:
+        type: import_present
+        pattern: Lightning Fast
+        description: Includes the first authored feature card
+      required_test_evidence: []
+    - id: req-secure-feature
+      description: Includes the second authored feature card.
+      check:
+        type: import_present
+        pattern: Secure by Default
+        description: Includes the second authored feature card
+      required_test_evidence: []
+    - id: req-collaboration-feature
+      description: Includes the third authored feature card.
+      check:
+        type: import_present
+        pattern: Team Collaboration
+        description: Includes the third authored feature card
+      required_test_evidence: []
+    - id: req-no-inline-styles
+      description: Avoids inline styles.
+      check:
+        type: no_pattern
+        pattern: "style={{"
+        description: Avoids inline styles
+      required_test_evidence: []
+    - id: req-section-component-structure
+      description: Uses the expected section component structure.
+      check:
+        type: file_exists
+        pattern: src/components/sections/**/*.tsx
+        description: Uses the expected section component structure
+      required_test_evidence: []
 visual:
   reference_image: ./reference/homepage.png
   screenshot_command: ["bun", "run", "capture-screenshot"]

@@ -2,7 +2,7 @@
 
 This is the reference list for repo-visible environment variables that affect Raidar orchestrator behavior.
 
-Use [`orchestrator/.env.example`](/Users/adamjackson/Projects/raidar/orchestrator/.env.example) for the common local setup path. This document is the fuller lexicon, including advanced and internally generated variables.
+Use [`orchestrator/.env.example`](/Users/adamjackson/Projects/complete/raidar/orchestrator/.env.example) for the common local setup path. This document is the fuller lexicon, including advanced and internally generated variables.
 
 ## User-Set Variables
 
@@ -57,16 +57,15 @@ Use [`orchestrator/.env.example`](/Users/adamjackson/Projects/raidar/orchestrato
 
 ### Smoke-mode controls
 
-- `HARBOR_SMOKE_FAST`
-  Purpose: enables smoke fast mode. When set to a truthy value (`1`, `true`, `yes`, `on`), Raidar switches supported harnesses to repo-local fast Harbor agents and enables fast-only `PYTHONPATH` wiring.
-  Typical source: set by [`scripts/checks/run-agent-smoke.sh`](/Users/adamjackson/Projects/raidar/scripts/checks/run-agent-smoke.sh) when `--fast` is used.
+- `CODEX_AUTH_MODE`
+  Purpose: selects Codex authentication mode. Valid values are `auto`, `chatgpt`, and `api`.
+  Typical source: set by `make agent-smoke` for Codex smoke runs.
 
-- `HARBOR_SMOKE_FAST_REUSE_IMAGE`
-  Purpose: enables fast image reuse for smoke runs. Only has effect if `HARBOR_SMOKE_FAST` is also enabled.
+- `RAIDAR_TASK_IMAGE_REUSE`
+  Purpose: enables or disables reusable task images for Harbor-backed runs.
 
-- `HARBOR_SMOKE_FAST_IMAGE_PREFIX`
-  Purpose: overrides the Docker image repository prefix used for fast-mode reusable task images.
-  Default: `ts-ui-eval-smoke-fast`
+- `RAIDAR_TASK_IMAGE_PREFIX`
+  Purpose: overrides the Docker image repository prefix used for reusable task images.
 
 ### Google / Vertex AI passthrough
 
@@ -84,7 +83,7 @@ Use [`orchestrator/.env.example`](/Users/adamjackson/Projects/raidar/orchestrato
 
 ### Evaluation tuning overrides
 
-These are optional runtime tuning variables consumed by [`orchestrator/src/raidar/config.py`](/Users/adamjackson/Projects/raidar/orchestrator/src/raidar/config.py). They are not required for normal setup, but they do alter scoring and timeout behavior.
+These are optional runtime tuning variables consumed by [`orchestrator/src/raidar/config.py`](/Users/adamjackson/Projects/complete/raidar/orchestrator/src/raidar/config.py). They are not required for normal setup, but they do alter scoring and timeout behavior.
 
 - `EVAL_TIMEOUTS__BUILD`
 - `EVAL_TIMEOUTS__TYPECHECK`
@@ -96,16 +95,12 @@ These are optional runtime tuning variables consumed by [`orchestrator/src/raida
   Purpose: override command and verifier timeouts.
 
 - `EVAL_LLM_AS_JUDGE__MODEL`
+- `EVAL_LLM_AS_JUDGE__REASONING_EFFORT`
+- `EVAL_LLM_AS_JUDGE__CODEX_AUTH_MODE`
 - `EVAL_LLM_AS_JUDGE__MAX_TOKENS`
 - `EVAL_LLM_AS_JUDGE__MAX_SOURCE_CHARS`
 - `EVAL_LLM_AS_JUDGE__MAX_RETRIES`
   Purpose: tune the `llm-as-judge` metric behavior.
-
-- `EVAL_WEIGHTS__FUNCTIONAL`
-- `EVAL_WEIGHTS__ACCEPTANCE`
-- `EVAL_WEIGHTS__VISUAL`
-- `EVAL_WEIGHTS__VERIFICATION_STABILITY`
-  Purpose: override scoring weights.
 
 - `EVAL_VERIFICATION_STABILITY__MAX_GATE_FAILURES`
 - `EVAL_VERIFICATION_STABILITY__REPEAT_PENALTY`
@@ -140,7 +135,7 @@ These are optional runtime tuning variables consumed by [`orchestrator/src/raida
 
 ## Observed Gaps Closed
 
-The previous [`orchestrator/.env.example`](/Users/adamjackson/Projects/raidar/orchestrator/.env.example) omitted:
+The previous [`orchestrator/.env.example`](/Users/adamjackson/Projects/complete/raidar/orchestrator/.env.example) omitted:
 
 - smoke-mode flags
 - Copilot, Cursor, and Pi credentials / CLI-path overrides

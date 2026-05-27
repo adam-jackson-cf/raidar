@@ -34,7 +34,7 @@ The Scenario Board must select one representative experiment per review identity
 | Scenario family | Example | Minimum scored runs | Preferred scored runs for high confidence |
 | --- | --- | --- | --- |
 | `visual-ui-implementation` | homepage replication | 3 | 5 |
-| `code-delivery-nonvisual` | API feature, bugfix, CLI flow | 3 | 5 |
+| `code-task-nonvisual` | API feature, bugfix, CLI flow | 3 | 5 |
 | `open-ended-judged` | planning, migration strategy, loosely judged tasks | 5 | 7 |
 
 The homepage scenario uses the `visual-ui-implementation` threshold.
@@ -77,8 +77,8 @@ The review surface uses five canonical dimensions plus a separate efficiency anc
 | --- | --- | --- |
 | deterministic acceptance pass rate | authored acceptance checks with `type=deterministic` | 0.45 |
 | functional success rate | `functional.passed` and `functional.build_succeeded` | 0.20 |
-| requirements presence | median `requirements_coverage.presence_ratio` | 0.15 |
-| requirements mapping | median `requirements_coverage.mapping_ratio` | 0.10 |
+| requirements presence | median `requirements-coverage.presence_ratio` | 0.15 |
+| requirements mapping | median `requirements-coverage.mapping_ratio` | 0.10 |
 | LLM-judge pass rate | authored checks with `type=llm_judge` when configured | 0.10 |
 
 Rules:
@@ -114,8 +114,8 @@ Rules:
 | --- | --- | --- |
 | required verification execution rate | required gates/commands actually executed | 0.30 |
 | first-pass verification success rate | pass rate with no prior gate failure in the run | 0.30 |
-| verification stability | median `verification_stability.score` | 0.25 |
-| repeated verification failure penalty | inverse of median `resource_efficiency.repeated_verification_failures` | 0.15 |
+| verification stability | median `verification-stability.score` | 0.25 |
+| repeated verification failure penalty | inverse of median `resource-efficiency.repeated_verification_failures` | 0.15 |
 
 Rules:
 
@@ -166,9 +166,9 @@ The anchor cluster should include:
 
 - median `duration_sec`
 - median `uncached_input_tokens`
-- median `resource_efficiency.command_count`
-- median `resource_efficiency.failed_command_count`
-- median `resource_efficiency.verification_rounds`
+- median `resource-efficiency.command_count`
+- median `resource-efficiency.failed_command_count`
+- median `resource-efficiency.verification_rounds`
 
 The board may display a compact efficiency rank or percentile, but it must not fold efficiency into the five review dimensions.
 

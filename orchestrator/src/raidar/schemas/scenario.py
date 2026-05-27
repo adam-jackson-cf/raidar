@@ -92,7 +92,7 @@ class PromptConfig(BaseModel):
 
 
 class DeterministicCheck(BaseModel):
-    """Deterministic acceptance check."""
+    """Deterministic requirement check."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -158,13 +158,12 @@ class RequirementSpec(BaseModel):
     )
 
 
-class AcceptanceConfig(BaseModel):
-    """Acceptance checking configuration."""
+class RequirementsConfig(BaseModel):
+    """Scenario requirements configuration."""
 
     model_config = ConfigDict(extra="forbid")
 
-    deterministic_checks: list[DeterministicCheck] = Field(default_factory=list)
-    requirements: list[RequirementSpec] = Field(default_factory=list)
+    items: list[RequirementSpec] = Field(default_factory=list)
 
 
 class VisualConfig(BaseModel):
@@ -348,7 +347,6 @@ class VerificationConfig(BaseModel):
 
 CoreMetricId = Literal[
     "functional",
-    "acceptance",
     "code-quality",
     "verification-stability",
     "execution-validity",
@@ -356,11 +354,23 @@ CoreMetricId = Literal[
     "test-coverage",
     "requirements-coverage",
     "visual-regression",
+    "defect-resolution",
+    "regression-protection",
+    "change-containment",
+    "defect-evidence-completeness",
+    "behavior-preservation",
+    "structural-improvement",
+    "public-contract-stability",
+    "planned-scope-coverage",
+    "acceptance-evidence-completeness",
+    "requirement-mapping",
+    "assertion-strength",
+    "coverage-lift",
+    "production-code-guardrail",
 ]
 
 MetricId = Literal[
     "functional",
-    "acceptance",
     "code-quality",
     "verification-stability",
     "execution-validity",
@@ -368,9 +378,22 @@ MetricId = Literal[
     "test-coverage",
     "requirements-coverage",
     "requirements-adherence",
-    "plan-quality",
+    "plan-adherence",
     "visual-regression",
     "artifact-checks",
+    "defect-resolution",
+    "regression-protection",
+    "change-containment",
+    "defect-evidence-completeness",
+    "behavior-preservation",
+    "structural-improvement",
+    "public-contract-stability",
+    "planned-scope-coverage",
+    "acceptance-evidence-completeness",
+    "requirement-mapping",
+    "assertion-strength",
+    "coverage-lift",
+    "production-code-guardrail",
 ]
 
 
@@ -428,7 +451,7 @@ class LLMAsJudgeMetricDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["llm-as-judge"] = "llm-as-judge"
-    id: Literal["plan-quality", "requirements-adherence"]
+    id: Literal["plan-adherence", "requirements-adherence"]
     config: LLMAsJudgeMetricConfig = Field(description="LLM judge configuration")
 
 
@@ -448,6 +471,12 @@ class ScorerMetricDefinition(BaseModel):
         description="Metric implementation type"
     )
     weight: float = Field(gt=0, description="Metric weight inside this scorer")
+    evidence: str = Field(min_length=1, description="Evidence consumed by this metric")
+    score_derivation: str = Field(
+        min_length=1,
+        description="How the metric's 0..1 score is derived",
+    )
+    pass_fail: str = Field(min_length=1, description="What makes the metric pass or fail")
     config: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -484,7 +513,7 @@ class ScenarioDefinition(BaseModel):
     test_scripts: list[str] = Field(default_factory=list)
     starter: StarterConfig = Field(description="Starter configuration")
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
-    acceptance: AcceptanceConfig = Field(default_factory=AcceptanceConfig)
+    requirements: RequirementsConfig = Field(default_factory=RequirementsConfig)
     visual: VisualConfig | None = Field(default=None)
     scorers: list[ScenarioScorerRef] = Field(
         min_length=1,
@@ -530,10 +559,8 @@ class ScenarioDefinition(BaseModel):
             raise ValueError(
                 "metrics includes test-coverage without verification.coverage_threshold"
             )
-        if "requirements-coverage" in metric_ids and not self.acceptance.requirements:
-            raise ValueError(
-                "metrics includes requirements-coverage without acceptance.requirements"
-            )
+        if "requirements-coverage" in metric_ids and not self.requirements.items:
+            raise ValueError("metrics includes requirements-coverage without requirements.items")
         if "visual-regression" in metric_ids and self.visual is None:
             raise ValueError("scorers include visual-regression without visual config")
         has_quality_scorer = any(scorer.category == "quality" for scorer in self.resolved_scorers())

@@ -35,9 +35,12 @@ from raidar.runtime.workspace_artifacts import (
 from raidar.runtime.workspace_cache import (
     _hash_bytes,
 )
+from raidar.sanitization import (
+    sanitize_evidence_payload,
+    sanitize_persisted_text,
+)
 from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
-    AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
@@ -85,7 +88,6 @@ def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:
     metric_scores = _parse_metric_scores(payload)
     return EvaluationOutputs(
         functional=FunctionalScore.model_validate(payload.get("functional")),
-        acceptance=AcceptanceScore.model_validate(payload.get("acceptance")),
         visual=(
             VisualScore.model_validate(payload.get("visual"))
             if payload.get("visual") is not None
@@ -201,8 +203,33 @@ def persist_verifier_artifacts(
         if not source.exists():
             continue
         target = verifier_dir / filename
-        copied[filename] = str(shutil.copy2(source, target))
+        copied[filename] = str(_copy_sanitized_verifier_artifact(source, target))
     return copied
+
+
+def _copy_sanitized_verifier_artifact(source: Path, target: Path) -> Path:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if source.suffix == ".json":
+        try:
+            payload = json.loads(source.read_text(encoding="utf-8"))
+        except json.JSONDecodeError:
+            target.write_text(
+                sanitize_persisted_text(source.read_text(encoding="utf-8"), max_chars=4000),
+                encoding="utf-8",
+            )
+            return target
+        target.write_text(
+            json.dumps(sanitize_evidence_payload(payload, max_chars=4000), indent=2) + "\n",
+            encoding="utf-8",
+        )
+        return target
+    if _is_sanitizable_text_path(source):
+        target.write_text(
+            sanitize_persisted_text(source.read_text(encoding="utf-8"), max_chars=4000),
+            encoding="utf-8",
+        )
+        return target
+    return shutil.copy2(source, target)
 
 
 def persist_canonical_verifier_artifacts(
@@ -210,8 +237,14 @@ def persist_canonical_verifier_artifacts(
 ) -> None:
     """Rewrite canonical verifier artifacts from the synthesized canonical scorecard."""
     layout.verifier_dir.mkdir(parents=True, exist_ok=True)
-    gate_history_payload = [event.model_dump(mode="json") for event in outputs.gate_history]
-    scorecard_payload = scorecard.model_dump(mode="json")
+    gate_history_payload = sanitize_evidence_payload(
+        [event.model_dump(mode="json") for event in outputs.gate_history],
+        max_chars=4000,
+    )
+    scorecard_payload = sanitize_evidence_payload(
+        scorecard.model_dump(mode="json"),
+        max_chars=4000,
+    )
     scorecard_payload["gate_history"] = gate_history_payload
 
     (layout.verifier_dir / "scorecard.json").write_text(
@@ -223,11 +256,25 @@ def persist_canonical_verifier_artifacts(
         encoding="utf-8",
     )
     (layout.verifier_dir / "execution-validity.json").write_text(
-        scorecard.execution_validity.model_dump_json(indent=2) + "\n",
+        json.dumps(
+            sanitize_evidence_payload(
+                scorecard.execution_validity.model_dump(mode="json"),
+                max_chars=4000,
+            ),
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
     (layout.verifier_dir / "performance-gates.json").write_text(
-        scorecard.performance_gates.model_dump_json(indent=2) + "\n",
+        json.dumps(
+            sanitize_evidence_payload(
+                scorecard.performance_gates.model_dump(mode="json"),
+                max_chars=4000,
+            ),
+            indent=2,
+        )
+        + "\n",
         encoding="utf-8",
     )
     reward_value = scorecard.quality_score if scorecard.execution_validity.passed else 0
@@ -367,7 +414,7 @@ def persist_harness_artifacts(
     ):
         src = source / filename
         if src.exists():
-            copied[filename] = str(shutil.copy2(src, harness_dir / filename))
+            copied[filename] = str(_copy_sanitized_harness_artifact(src, harness_dir / filename))
     final_app = harness_dir / "final-app.tar.gz"
     if final_app.exists():
         copied["project.final.tar.gz"] = str(
@@ -377,7 +424,7 @@ def persist_harness_artifacts(
     setup_dir = source / "setup"
     if setup_dir.exists():
         target = harness_dir / "setup"
-        shutil.copytree(setup_dir, target, dirs_exist_ok=True)
+        _copy_sanitized_directory(setup_dir, target)
         copied["setup"] = str(target)
 
     commands_dir = harness_dir / "commands"
@@ -386,7 +433,7 @@ def persist_harness_artifacts(
         if not command_dir.is_dir():
             continue
         target = commands_dir / command_dir.name
-        shutil.copytree(command_dir, target, dirs_exist_ok=True)
+        _copy_sanitized_directory(command_dir, target)
         copied[f"commands/{command_dir.name}"] = str(target)
 
     return copied
@@ -400,11 +447,43 @@ def persist_harbor_artifacts(
     for name in ("command.txt", "harbor-stdout.log", "harbor-stderr.log"):
         candidate = harbor_dir / name
         if candidate.exists():
+            _sanitize_text_file_in_place(candidate)
             copied[name] = str(candidate)
     copied["raw_job_dir"] = str(harbor_result.job_dir)
     if harbor_result.trial_dir:
         copied["raw_trial_dir"] = str(harbor_result.trial_dir)
     return copied
+
+
+def _copy_sanitized_harness_artifact(source: Path, target: Path) -> Path:
+    if _is_sanitizable_text_path(source):
+        return _copy_sanitized_verifier_artifact(source, target)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return shutil.copy2(source, target)
+
+
+def _copy_sanitized_directory(source: Path, target: Path) -> None:
+    target.mkdir(parents=True, exist_ok=True)
+    for item in source.rglob("*"):
+        relative = item.relative_to(source)
+        destination = target / relative
+        if item.is_dir():
+            destination.mkdir(parents=True, exist_ok=True)
+            continue
+        _copy_sanitized_harness_artifact(item, destination)
+
+
+def _sanitize_text_file_in_place(path: Path) -> None:
+    if not _is_sanitizable_text_path(path):
+        return
+    path.write_text(
+        sanitize_persisted_text(path.read_text(encoding="utf-8"), max_chars=4000),
+        encoding="utf-8",
+    )
+
+
+def _is_sanitizable_text_path(path: Path) -> bool:
+    return path.suffix.lower() in {".json", ".txt", ".log", ".sh", ".md"}
 
 
 def write_run_analysis(
@@ -456,4 +535,4 @@ def write_run_analysis(
     lines.append(f"- workspace_changed_files: `{change_meta.get('changed_files')}`")
     lines.append(f"- workspace_diff_artifact: `{change_meta.get('artifact')}`")
     lines.append(f"- workspace_diff_error: `{change_meta.get('error')}`")
-    layout.report_path.write_text("\n".join(lines) + "\n")
+    layout.report_path.write_text(sanitize_persisted_text("\n".join(lines), max_chars=12000) + "\n")

@@ -1,4 +1,4 @@
-"""Tests for acceptance scoring and judge parsing."""
+"""Tests for deterministic requirement helpers and judge parsing."""
 
 from raidar.scorers.deterministic import (
     JudgeResult,

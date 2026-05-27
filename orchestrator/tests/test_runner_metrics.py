@@ -28,7 +28,6 @@ GateEvent = process_support.GateEvent
 DeterministicCheck = process_support.DeterministicCheck
 RequirementSpec = process_support.RequirementSpec
 ScenarioDefinition = process_support.ScenarioDefinition
-AcceptanceScore = process_support.AcceptanceScore
 CoverageScore = process_support.CoverageScore
 ExecutionValidityScore = process_support.ExecutionValidityScore
 FunctionalScore = process_support.FunctionalScore
@@ -135,7 +134,7 @@ def _sample_scenario_doc() -> dict[str, object]:
         "timeout_sec": 1800,
         "starter": {"root": "starter"},
         "verification": _sample_verification_doc(),
-        "acceptance": {"requirements": [_sample_requirement_doc()]},
+        "requirements": {"items": [_sample_requirement_doc()]},
         "scorers": _sample_scorer_docs(),
         "visual": _sample_visual_doc(),
         "prompt": {"entry": "prompt/task.md"},
@@ -257,7 +256,6 @@ def _sample_evaluation_outputs() -> EvaluationOutputs:
             gates_passed=2,
             gates_total=2,
         ),
-        acceptance=AcceptanceScore(),
         visual=None,
         verification_stability=VerificationStabilityScore(
             total_gate_failures=0,
@@ -464,7 +462,7 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
                 "pass_policy": _visual_bundle_pass_policy(),
                 "regions": [_visual_bundle_region()],
             },
-            "acceptance": {},
+            "requirements": {"items": []},
             "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }
@@ -511,7 +509,7 @@ def _visual_bundle_region() -> dict[str, object]:
 def _visual_bundle_metrics() -> list[dict[str, str]]:
     return [
         {"type": "core", "id": "functional"},
-        {"type": "core", "id": "acceptance"},
+        {"type": "core", "id": "requirements-coverage"},
         {"type": "core", "id": "verification-stability"},
         {"type": "core", "id": "execution-validity"},
         {"type": "core", "id": "resource-efficiency"},
@@ -521,7 +519,7 @@ def _visual_bundle_metrics() -> list[dict[str, str]]:
 
 def _assert_verifier_script_contains_contracts(score_script: str) -> None:
     expected_snippets = [
-        "scenarioSpec.acceptance?.deterministic_checks",
+        "scenarioSpec.requirements?.items",
         "metric_scores",
         "verification_stability",
         r"const testPattern = /\.(test|spec)\.tsx?$/",
@@ -548,19 +546,6 @@ def _verifier_functional_payload() -> dict[str, object]:
         "build_succeeded": True,
         "gates_passed": 4,
         "gates_total": 4,
-    }
-
-
-def _verifier_acceptance_payload() -> dict[str, object]:
-    return {
-        "checks": [
-            {
-                "rule": "Placeholder removed",
-                "type": "deterministic",
-                "passed": True,
-                "evidence": "ok",
-            }
-        ]
     }
 
 
@@ -676,7 +661,6 @@ def _verifier_metric_scores_payload() -> list[dict[str, object]]:
 def _verifier_scorecard_payload(*, include_metric_scores: bool = True) -> dict[str, object]:
     payload: dict[str, object] = {
         "functional": _verifier_functional_payload(),
-        "acceptance": _verifier_acceptance_payload(),
         "visual": _verifier_visual_payload(),
         "verification_stability": _verifier_stability_payload(),
         "test_coverage": _verifier_coverage_payload(),
@@ -947,17 +931,17 @@ def _verifier_fixture(tmp_path: Path) -> VerifierRunFixture:
 
 
 def _write_verifier_spec(
-    fixture: VerifierRunFixture, deterministic_checks: list[dict[str, str]]
+    fixture: VerifierRunFixture, requirement_checks: list[dict[str, str]]
 ) -> Path:
     scenario_spec_path = fixture.tests_dir / "scenario-spec.json"
     scenario_spec_path.write_text(
-        json.dumps(_verifier_spec_doc(deterministic_checks), indent=2),
+        json.dumps(_verifier_spec_doc(requirement_checks), indent=2),
         encoding="utf-8",
     )
     return scenario_spec_path
 
 
-def _verifier_spec_doc(deterministic_checks: list[dict[str, str]]) -> dict[str, object]:
+def _verifier_spec_doc(requirement_checks: list[dict[str, str]]) -> dict[str, object]:
     return {
         "metrics": [],
         "verification": {
@@ -967,13 +951,19 @@ def _verifier_spec_doc(deterministic_checks: list[dict[str, str]]) -> dict[str, 
             "gates": [],
             "workflow": {"atomic_commits_required": False},
         },
-        "acceptance": {
-            "deterministic_checks": deterministic_checks,
-            "requirements": [],
+        "requirements": {
+            "items": [
+                {
+                    "id": f"req-{index}",
+                    "description": check["description"],
+                    "check": check,
+                    "required_test_evidence": [],
+                }
+                for index, check in enumerate(requirement_checks, start=1)
+            ],
         },
         "weights": {
             "functional": 0.25,
-            "acceptance": 0.25,
             "visual": 0.25,
             "verification_stability": 0.25,
         },
@@ -1023,7 +1013,7 @@ def _simple_bundle_scenario() -> ScenarioDefinition:
 def _standard_core_metric_docs() -> list[dict[str, str]]:
     return [
         {"type": "core", "id": "functional"},
-        {"type": "core", "id": "acceptance"},
+        {"type": "core", "id": "requirements-coverage"},
         {"type": "core", "id": "verification-stability"},
         {"type": "core", "id": "execution-validity"},
         {"type": "core", "id": "resource-efficiency"},
@@ -1965,7 +1955,7 @@ def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
 
     assert completed.returncode == 0, completed.stderr
     scorecard = _verifier_scorecard(fixture)
-    assert scorecard["acceptance"]["checks"][0]["passed"] is True
+    assert scorecard["requirements_coverage"]["missing_requirement_ids"] == []
 
 
 def test_verifier_rejects_unsafe_no_pattern_regex(tmp_path: Path) -> None:
@@ -1989,9 +1979,7 @@ def test_verifier_rejects_unsafe_no_pattern_regex(tmp_path: Path) -> None:
 
     assert completed.returncode == 0, completed.stderr
     scorecard = _verifier_scorecard(fixture)
-    check = scorecard["acceptance"]["checks"][0]
-    assert check["passed"] is False
-    assert "Unsafe regex pattern" in check["evidence"]
+    assert scorecard["requirements_coverage"]["missing_requirement_ids"] == ["req-1"]
 
 
 def test_verifier_no_pattern_uses_bounded_literal_matching(tmp_path: Path) -> None:
@@ -2020,10 +2008,7 @@ def test_verifier_no_pattern_uses_bounded_literal_matching(tmp_path: Path) -> No
 
     assert completed.returncode == 0, completed.stderr
     scorecard = _verifier_scorecard(fixture)
-    checks = scorecard["acceptance"]["checks"]
-    assert checks[0]["passed"] is True
-    assert checks[1]["passed"] is False
-    assert "bounded literal matching" in checks[1]["evidence"]
+    assert scorecard["requirements_coverage"]["missing_requirement_ids"] == ["req-2"]
 
 
 def test_classify_unscored_reasons_rate_limit():
@@ -2267,7 +2252,7 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
             "timeout_sec": 300,
             "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
-            "acceptance": {},
+            "requirements": {"items": []},
             "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }

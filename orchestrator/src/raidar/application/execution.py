@@ -32,6 +32,7 @@ from raidar.experiment import (
     persist_experiment,
 )
 from raidar.runtime.maintenance import cleanup_stale_harbor_resources
+from raidar.sanitization import sanitize_evidence_payload, sanitize_evidence_text
 from raidar.schemas.scenario import ScenarioDefinition
 
 BENCHMARK_EXPERIMENTS_ROOT_NAME = "benchmarks"
@@ -290,9 +291,11 @@ def _echo_single_run_result(result) -> None:
     print(f"Terminated early: {result.terminated_early}")
     print(f"Unscored result: {bool(result.scores.unscored)}")
     if result.scores.unscored:
-        print(f"Unscored reasons: {list(result.scores.unscored_reasons)}")
+        print(
+            f"Unscored reasons: {sanitize_evidence_payload(list(result.scores.unscored_reasons))}"
+        )
     if result.termination_reason:
-        print(f"Reason: {result.termination_reason}")
+        print(f"Reason: {sanitize_evidence_text(result.termination_reason)}")
 
 
 def _echo_experiment_result(request: SuiteResultRequest) -> None:

@@ -9,6 +9,8 @@ from raidar.agents.config import Harness
 from raidar.application import run_dispatch
 from raidar.application.models import RunCliOptions
 from raidar.runtime.starter_preflight import StarterPreflightError
+from raidar.schemas.events import GateEvent
+from raidar.schemas.scorecard import EvalConfig, EvalRun, MetricScore, Scorecard
 
 
 def _run(run_id: str, *, unscored: bool = False, root: Path | None = None):
@@ -59,6 +61,54 @@ def test_summary_and_persist_eval_run_require_canonical_path(tmp_path):
     missing.scores.metadata["run"] = {}
     with pytest.raises(ClickException, match="Canonical run.json path missing"):
         run_dispatch.summary_result_path(missing)
+
+
+def test_persist_eval_run_redacts_secret_shaped_runtime_evidence(tmp_path):
+    run_json_path = tmp_path / "run" / "run.json"
+    run = EvalRun(
+        id="run",
+        timestamp=datetime.now(UTC).isoformat(),
+        config=EvalConfig(
+            model="model",
+            harness="codex-cli",
+            scenario_name="scenario",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="functional",
+        ),
+        duration_sec=1.0,
+        termination_reason="OPENAI_API_KEY=abcdefghijklmnop",
+        scores=Scorecard(
+            metadata={"run": {"run_json_path": str(run_json_path)}},
+            metric_scores=[
+                MetricScore(
+                    metric_id="functional",
+                    score=1.0,
+                    passed=True,
+                    evidence="Bearer abcdefghijklmnop",
+                    judge_output={"raw": "ANTHROPIC_API_KEY=abcdefghijklmnop"},
+                )
+            ],
+        ),
+        gate_history=[
+            GateEvent(
+                timestamp="2026-01-01T00:00:00+00:00",
+                gate_name="test",
+                command="pytest",
+                exit_code=0,
+                stdout="OPENAI_API_KEY=abcdefghijklmnop",
+                stderr="password=hunter2value",
+            )
+        ],
+    )
+
+    path = run_dispatch.persist_eval_run(run)
+
+    text = path.read_text(encoding="utf-8")
+    assert "abcdefghijklmnop" not in text
+    assert "hunter2value" not in text
+    assert "OPENAI_API_KEY=<redacted>" in text
+    assert "ANTHROPIC_API_KEY=<redacted>" in text
 
 
 def test_prepared_request_builds_execution_dir_and_agent_spec(monkeypatch, tmp_path):

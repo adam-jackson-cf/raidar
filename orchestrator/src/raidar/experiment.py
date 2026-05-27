@@ -9,6 +9,7 @@ from pathlib import Path
 from statistics import fmean, median, pstdev
 
 from .run_metadata import uncached_input_tokens
+from .sanitization import sanitize_evidence_payload, sanitize_persisted_text
 from .schemas.scorecard import EvalRun
 
 
@@ -62,7 +63,7 @@ def _run_pointer(run: EvalRun) -> dict[str, object]:
         "run_id": run.id,
         "timestamp": run.timestamp,
         "unscored": run.scores.unscored,
-        "unscored_reasons": run.scores.unscored_reasons,
+        "unscored_reasons": sanitize_evidence_payload(run.scores.unscored_reasons),
         "run_valid": run.scores.execution_validity.passed,
         "performance_gates_passed": run.scores.performance_gates.passed,
         "composite_score": run.scores.composite_score,
@@ -70,7 +71,7 @@ def _run_pointer(run: EvalRun) -> dict[str, object]:
         "quality_score": run.scores.quality_score,
         "duration_sec": run.duration_sec,
         "terminated_early": run.terminated_early,
-        "termination_reason": run.termination_reason,
+        "termination_reason": sanitize_evidence_payload(run.termination_reason),
         "canonical_run_dir": canonical_run_dir if isinstance(canonical_run_dir, str) else None,
         "run_json_path": run_json_path if isinstance(run_json_path, str) else None,
     }
@@ -486,11 +487,30 @@ def persist_experiment(
     experiment_dir.mkdir(parents=True, exist_ok=True)
 
     experiment_json_path = experiment_dir / "experiment.json"
-    experiment_json_path.write_text(json.dumps(experiment_summary, indent=2))
+    experiment_json_path.write_text(
+        json.dumps(sanitize_evidence_payload(experiment_summary, max_chars=4000), indent=2),
+        encoding="utf-8",
+    )
 
     summary_path = experiment_dir / "experiment-summary.json"
-    summary_path.write_text(json.dumps(_experiment_summary_payload(experiment_summary), indent=2))
+    summary_path.write_text(
+        json.dumps(
+            sanitize_evidence_payload(
+                _experiment_summary_payload(experiment_summary),
+                max_chars=4000,
+            ),
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
 
     report_path = experiment_dir / "report.md"
-    report_path.write_text("\n".join(_experiment_report_lines(experiment_summary)) + "\n")
+    report_path.write_text(
+        sanitize_persisted_text(
+            "\n".join(_experiment_report_lines(experiment_summary)),
+            max_chars=12000,
+        )
+        + "\n",
+        encoding="utf-8",
+    )
     return experiment_json_path, summary_path, report_path

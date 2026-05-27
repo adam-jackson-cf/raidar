@@ -3,7 +3,8 @@
 from datetime import UTC, datetime
 from pathlib import Path
 
-from raidar.schemas.scorecard import EvalConfig, EvalRun, Scorecard
+from raidar.schemas.events import GateEvent, TraceEvent
+from raidar.schemas.scorecard import EvalConfig, EvalRun, MetricScore, Scorecard
 from raidar.storage import (
     aggregate_results,
     export_to_csv,
@@ -40,6 +41,49 @@ class TestSaveAndLoadRun:
         save_run(sample_eval_run, results_dir)
 
         assert results_dir.exists()
+
+    def test_save_run_redacts_secret_shaped_runtime_evidence(
+        self, sample_eval_run: EvalRun, tmp_results_dir: Path
+    ):
+        """Should redact persisted runtime evidence in run.json."""
+        run = sample_eval_run.model_copy(deep=True)
+        run.termination_reason = "OPENAI_API_KEY=abcdefghijklmnop"
+        run.scores.metadata["secret"] = "DB_PASSWORD=abcdefghijklmnop"
+        run.scores.metric_scores = [
+            MetricScore(
+                metric_id="functional",
+                score=1.0,
+                passed=True,
+                evidence="Bearer abcdefghijklmnop",
+                judge_output={"raw": "ANTHROPIC_API_KEY=abcdefghijklmnop"},
+            )
+        ]
+        run.gate_history = [
+            GateEvent(
+                timestamp="2026-01-01T00:00:00+00:00",
+                gate_name="test",
+                command="pytest",
+                exit_code=0,
+                stdout="OPENAI_API_KEY=abcdefghijklmnop",
+                stderr="password=hunter2value",
+            )
+        ]
+        run.traces = [
+            TraceEvent(
+                timestamp="2026-01-01T00:00:00+00:00",
+                event_type="gate_result",
+                data={"stdout": "DB_PASSWORD=abcdefghijklmnop"},
+            )
+        ]
+
+        path = save_run(run, tmp_results_dir)
+
+        text = path.read_text(encoding="utf-8")
+        assert "abcdefghijklmnop" not in text
+        assert "hunter2value" not in text
+        assert "OPENAI_API_KEY=<redacted>" in text
+        assert "ANTHROPIC_API_KEY=<redacted>" in text
+        assert "DB_PASSWORD=<redacted>" in text
 
 
 class TestLoadAllRuns:
@@ -125,7 +169,7 @@ class TestAggregateResults:
                 scenario_revision="v001",
                 starter_root="starter",
                 evaluation_profile=(
-                    "functional+acceptance+verification-stability+"
+                    "functional+requirements-coverage+verification-stability+"
                     "execution-validity+resource-efficiency"
                 ),
             ),
@@ -142,7 +186,7 @@ class TestAggregateResults:
                 scenario_revision="v001",
                 starter_root="starter",
                 evaluation_profile=(
-                    "functional+acceptance+verification-stability+"
+                    "functional+requirements-coverage+verification-stability+"
                     "execution-validity+resource-efficiency"
                 ),
             ),

@@ -102,6 +102,35 @@ def test_typescript_code_task_reports_missing_verifier_evidence(tmp_path: Path) 
     assert scores["artifact-checks"].missing_patterns == ["typescript test files"]
 
 
+def test_typescript_code_task_redacts_secret_shaped_gate_output(tmp_path: Path) -> None:
+    src = tmp_path / "src"
+    tests = tmp_path / "tests"
+    src.mkdir()
+    tests.mkdir()
+    (src / "index.ts").write_text("export const value = 1;\n", encoding="utf-8")
+    (tests / "index.test.ts").write_text("expect(value).toBe(1);\n", encoding="utf-8")
+
+    evidence = TypeScriptCodeTask().collect_evidence(
+        _context(
+            tmp_path,
+            gate_history=[
+                GateEvent(
+                    timestamp="2026-01-01T00:00:00Z",
+                    gate_name="lint",
+                    command="bun run lint",
+                    exit_code=1,
+                    stdout="token=super-secret-value-1234567890",
+                    stderr="Bearer abcdefghijklmnopqrstuvwxyz1234567890",
+                )
+            ],
+        )
+    )
+    scores = {score.metric_id: score for score in evidence.metric_scores}
+
+    assert "super-secret-value" not in str(scores["code-quality"].evidence)
+    assert "abcdefghijklmnopqrstuvwxyz" not in str(scores["code-quality"].evidence)
+
+
 def test_typescript_code_task_enforces_configured_artifact_paths(tmp_path: Path) -> None:
     src = tmp_path / "src"
     src.mkdir()

@@ -2,13 +2,13 @@
 
 from .events import GateEvent, TraceEvent
 from .scenario import ScenarioDefinition, VerificationGate
-from .scorecard import AcceptanceCheck, EvalRun, Scorecard
+from .scorecard import EvalRun, RequirementCheck, Scorecard
 
 __all__ = [
     "ScenarioDefinition",
     "VerificationGate",
     "Scorecard",
-    "AcceptanceCheck",
+    "RequirementCheck",
     "EvalRun",
     "GateEvent",
     "TraceEvent",

@@ -237,7 +237,7 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
                 minimum_worst_region=0.7,
             ),
         ),
-        acceptance=SimpleNamespace(deterministic_checks=[object(), object()]),
+        requirements=SimpleNamespace(items=[object(), object()]),
     )
     monkeypatch.setattr(scenario, "scenario_evaluation_profile", lambda _task: "code-task")
     monkeypatch.setattr(scenario, "scenario_scorers", lambda _task: ["typescript-code-task"])
@@ -245,7 +245,7 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
 
     scenario.echo_scenario_summary(task_def)
     scenario.echo_visual_config(task_def)
-    scenario.echo_acceptance_config(task_def)
+    scenario.echo_requirements_config(task_def)
 
     rules = revision.parent / "rules"
     rules.mkdir()
@@ -260,9 +260,7 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
     scenario.echo_available_revisions(empty_root)
     scenario.echo_rule_variants(tmp_path / "no-rules")
     scenario.echo_visual_config(SimpleNamespace(visual=None))
-    scenario.echo_acceptance_config(
-        SimpleNamespace(acceptance=SimpleNamespace(deterministic_checks=[]))
-    )
+    scenario.echo_requirements_config(SimpleNamespace(requirements=SimpleNamespace(items=[])))
 
 
 def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:

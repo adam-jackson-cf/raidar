@@ -53,30 +53,15 @@ verification:
     on_failure: continue
   workflow:
     atomic_commits_required: false
-acceptance:
-  deterministic_checks:
-  - type: file_exists
-    pattern: src/lib/math.ts
-    description: Creates the math utility module
-  - type: file_exists
-    pattern: src/test/math.test.ts
-    description: Creates deterministic unit tests for the math utility
-  - type: import_present
-    pattern: export function sumEven
-    description: Exports `sumEven` as a named function
-  - type: import_present
-    pattern: Number.isInteger
-    description: Checks integer-ness explicitly before summing
-  - type: import_present
-    pattern: describe
-    description: Uses a Vitest suite for the utility tests
-  - type: import_present
-    pattern: it(
-    description: Uses deterministic Vitest cases
-  - type: no_pattern
-    pattern: TODO
-    description: No TODO markers remain in production or test files
-  requirements:
+requirements:
+  items:
+  - id: req-math-module-created
+    description: Creates the math utility module.
+    check:
+      type: file_exists
+      pattern: src/lib/math.ts
+      description: Creates the math utility module
+    required_test_evidence: []
   - id: req-export-sum-even
     description: '`src/lib/math.ts` exports `sumEven(nums: number[]): number`.'
     check:
@@ -105,6 +90,27 @@ acceptance:
       type: file_exists
       pattern: src/test/math.test.ts
       description: Unit test file exists
+    required_test_evidence: []
+  - id: req-vitest-suite
+    description: Uses a Vitest suite for the utility tests.
+    check:
+      type: import_present
+      pattern: describe
+      description: Uses a Vitest suite for the utility tests
+    required_test_evidence: []
+  - id: req-vitest-cases
+    description: Uses deterministic Vitest cases.
+    check:
+      type: import_present
+      pattern: it(
+      description: Uses deterministic Vitest cases
+    required_test_evidence: []
+  - id: req-no-todo
+    description: No TODO markers remain in production or test files.
+    check:
+      type: no_pattern
+      pattern: TODO
+      description: No TODO markers remain in production or test files
     required_test_evidence: []
 scorers:
 - id: typescript-code-task

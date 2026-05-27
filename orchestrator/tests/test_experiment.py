@@ -20,7 +20,7 @@ from raidar.schemas.scorecard import (
 
 DEFAULT_METRICS = [
     "functional",
-    "acceptance",
+    "requirements-coverage",
     "verification-stability",
     "execution-validity",
     "resource-efficiency",
@@ -193,7 +193,7 @@ def _summary_config_payload() -> dict[str, object]:
         "evaluation_profile": "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
         "metrics": [
             "functional",
-            "acceptance",
+            "requirements-coverage",
             "verification-stability",
             "execution-validity",
             "resource-efficiency",
@@ -238,7 +238,7 @@ def test_create_experiment_summary_aggregates() -> None:
     assert summary["config"]["scenario_revision"] == "v001"
     assert summary["config"]["metrics"] == [
         "functional",
-        "acceptance",
+        "requirements-coverage",
         "verification-stability",
         "execution-validity",
         "resource-efficiency",
@@ -287,7 +287,7 @@ def test_create_experiment_summary_includes_rerun_metadata() -> None:
                 runs=[run_a],
                 metrics=[
                     "functional",
-                    "acceptance",
+                    "requirements-coverage",
                     "verification-stability",
                     "execution-validity",
                     "resource-efficiency",
@@ -315,7 +315,7 @@ def test_create_experiment_summary_marks_visual_review_samples() -> None:
                 runs=[run_a],
                 metrics=[
                     "functional",
-                    "acceptance",
+                    "requirements-coverage",
                     "verification-stability",
                     "execution-validity",
                     "resource-efficiency",
@@ -337,10 +337,18 @@ def test_create_experiment_summary_marks_visual_review_samples() -> None:
 
 def test_persist_experiment_writes_experiment_summary_and_report(tmp_path: Path) -> None:
     summary = _experiment_summary_payload()
+    summary["runs"][0]["unscored_reasons"] = ["OPENAI_API_KEY=abcdefghijklmnop"]
+    summary["runs"][0]["termination_reason"] = "DB_PASSWORD=abcdefghijklmnop"
     experiment_json_path, summary_path, report_path = persist_experiment(tmp_path, summary)
     assert experiment_json_path.exists()
     assert summary_path.exists()
     assert report_path.exists()
-    assert "test-experiment" in experiment_json_path.read_text()
-    assert "run-1" in report_path.read_text()
-    assert "metric_outcomes" in report_path.read_text()
+    experiment_text = experiment_json_path.read_text(encoding="utf-8")
+    summary_text = summary_path.read_text(encoding="utf-8")
+    report_text = report_path.read_text(encoding="utf-8")
+    combined = "\n".join([experiment_text, summary_text, report_text])
+    assert "test-experiment" in experiment_text
+    assert "run-1" in report_text
+    assert "metric_outcomes" in report_text
+    assert "abcdefghijklmnop" not in combined
+    assert "OPENAI_API_KEY=<redacted>" in combined

@@ -34,7 +34,7 @@ def _base_scenario_payload() -> dict:
             "gates": [],
             "required_commands": [],
         },
-        "acceptance": {"requirements": [_requirement()]},
+        "requirements": {"items": [_requirement()]},
         "scorers": [
             {
                 "id": "typescript-code-task",
@@ -85,7 +85,7 @@ def test_scenario_rejects_removed_top_level_fields(legacy_field: str) -> None:
 
 def test_scenario_rejects_removed_llm_judge_rubric_field() -> None:
     payload = _base_scenario_payload()
-    payload["acceptance"]["llm_judge_rubric"] = []
+    payload["requirements"]["llm_judge_rubric"] = []
 
     with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
         ScenarioDefinition.model_validate(payload)
@@ -130,10 +130,24 @@ def test_scorer_refs_reject_proposed_scorer() -> None:
         ScenarioDefinition.model_validate(payload)
 
 
+@pytest.mark.parametrize(
+    "scorer_id",
+    ["python-code-task", "bugfix", "refactor", "plan-to-code", "test-generation"],
+)
+def test_proposed_concrete_scorers_are_loadable_but_not_attachable(scorer_id: str) -> None:
+    scorer = load_scorer_definition(scorer_id, 1)
+    assert scorer.status == "proposed"
+
+    payload = _base_scenario_payload()
+    payload["scorers"] = [{"id": scorer_id, "version": 1, "weight": 1.0}]
+    with pytest.raises(ValidationError, match="is proposed"):
+        ScenarioDefinition.model_validate(payload)
+
+
 def test_code_task_family_is_not_attachable() -> None:
     payload = _base_scenario_payload()
     payload["scorers"] = [{"id": "code-task", "version": 1, "weight": 1.0}]
-    with pytest.raises(ValidationError, match="is proposed"):
+    with pytest.raises(ValidationError, match="Unknown scorer definition"):
         ScenarioDefinition.model_validate(payload)
 
 
@@ -170,10 +184,10 @@ def test_design_to_code_is_deterministic() -> None:
     assert all(metric.type != "llm-as-judge" for metric in scenario.resolved_metrics())
 
 
-def test_plan_to_code_defines_scorer_owned_plan_quality_judge() -> None:
+def test_plan_to_code_defines_scorer_owned_plan_adherence_judge() -> None:
     scorer = load_scorer_definition("plan-to-code", 1)
 
-    metric = next(metric for metric in scorer.metrics if metric.id == "plan-quality")
+    metric = next(metric for metric in scorer.metrics if metric.id == "plan-adherence")
 
     assert metric.type == "llm-as-judge"
     assert metric.config["judge"] == "judges/plan-judge.toml"
@@ -189,16 +203,79 @@ def test_requirements_defines_requirements_adherence_judge() -> None:
 
 
 def test_python_code_task_extends_code_task_metric_interface() -> None:
-    family = load_scorer_definition("code-task", 1)
     scorer = load_scorer_definition("python-code-task", 1)
 
     assert scorer.status == "proposed"
-    assert scorer.extends == family.id
+    assert scorer.extends == "code-task"
     assert scorer.runtime == "python"
-    assert [metric.id for metric in scorer.metrics] == [metric.id for metric in family.metrics]
-    assert [metric.weight for metric in scorer.metrics] == [
-        metric.weight for metric in family.metrics
+    assert [metric.id for metric in scorer.metrics] == [
+        "functional",
+        "code-quality",
+        "test-coverage",
+        "artifact-checks",
+        "verification-stability",
     ]
+    assert all(metric.evidence for metric in scorer.metrics)
+    assert all(metric.score_derivation for metric in scorer.metrics)
+    assert all(metric.pass_fail for metric in scorer.metrics)
+
+
+def test_proposed_scorer_metric_contracts_match_intentplan() -> None:
+    expected = {
+        "bugfix": [
+            ("defect-resolution", 0.30),
+            ("regression-protection", 0.25),
+            ("change-containment", 0.20),
+            ("verification-stability", 0.15),
+            ("defect-evidence-completeness", 0.10),
+        ],
+        "refactor": [
+            ("behavior-preservation", 0.30),
+            ("structural-improvement", 0.25),
+            ("public-contract-stability", 0.15),
+            ("change-containment", 0.15),
+            ("verification-stability", 0.15),
+        ],
+        "plan-to-code": [
+            ("plan-adherence", 0.35),
+            ("planned-scope-coverage", 0.25),
+            ("acceptance-evidence-completeness", 0.20),
+            ("functional", 0.10),
+            ("verification-stability", 0.10),
+        ],
+        "test-generation": [
+            ("requirement-mapping", 0.25),
+            ("assertion-strength", 0.25),
+            ("coverage-lift", 0.25),
+            ("production-code-guardrail", 0.15),
+            ("verification-stability", 0.10),
+        ],
+    }
+
+    for scorer_id, metric_contract in expected.items():
+        scorer = load_scorer_definition(scorer_id, 1)
+
+        assert scorer.status == "proposed"
+        assert [(metric.id, metric.weight) for metric in scorer.metrics] == metric_contract
+
+
+def test_registered_scorer_metrics_define_contract_metadata() -> None:
+    for scorer_id in (
+        "typescript-code-task",
+        "python-code-task",
+        "bugfix",
+        "refactor",
+        "plan-to-code",
+        "test-generation",
+        "requirements",
+        "design-to-code",
+        "resource-efficiency",
+    ):
+        scorer = load_scorer_definition(scorer_id, 1)
+        for metric in scorer.metrics:
+            assert metric.evidence
+            assert metric.score_derivation
+            assert metric.pass_fail
 
 
 def test_scorer_refs_reject_unknown_metric_config_keys() -> None:

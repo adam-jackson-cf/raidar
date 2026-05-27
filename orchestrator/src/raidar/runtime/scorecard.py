@@ -36,13 +36,12 @@ from raidar.runtime.verification_metrics import (
 from raidar.schemas.events import GateEvent, TraceEvent
 from raidar.schemas.scenario import RequirementSpec
 from raidar.schemas.scorecard import (
-    AcceptanceCheck,
-    AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
     PerformanceGatesScore,
+    RequirementCheck,
     RequirementsCoverageScore,
     ResourceEfficiencyScore,
     Scorecard,
@@ -303,7 +302,7 @@ def _requirement_status(
     workspace: Path,
     requirement: RequirementSpec,
     test_sources: list[str],
-) -> tuple[AcceptanceCheck, list[str]]:
+) -> tuple[RequirementCheck, list[str]]:
     requirement_check = run_deterministic_check(requirement.check, workspace)
     missing_evidence = _missing_test_evidence(test_sources, requirement.required_test_evidence)
     return requirement_check, missing_evidence
@@ -326,15 +325,15 @@ def _apply_requirement_mapping_counts(
 
 def terminated_outputs(reason: str | None) -> EvaluationOutputs:
     """Create deterministic zeroed scores for terminated runs."""
-    failure_reason = reason or "Run terminated before scoring."
     return EvaluationOutputs(
         functional=_terminated_functional_score(),
-        acceptance=_terminated_acceptance_score(failure_reason),
         visual=None,
         verification_stability=_terminated_verification_stability_score(),
         test_coverage=_terminated_coverage_score(),
         requirements_coverage=_terminated_requirements_coverage_score(),
-        execution_validity=_terminated_execution_validity_score(failure_reason),
+        execution_validity=_terminated_execution_validity_score(
+            reason or "Run terminated before scoring."
+        ),
         performance_gates=PerformanceGatesScore(checks=[]),
         metric_scores=[],
         gate_history=[],
@@ -349,19 +348,6 @@ def _terminated_functional_score() -> FunctionalScore:
         build_succeeded=False,
         gates_passed=0,
         gates_total=0,
-    )
-
-
-def _terminated_acceptance_score(failure_reason: str) -> AcceptanceScore:
-    return AcceptanceScore(
-        checks=[
-            AcceptanceCheck(
-                rule="Evaluation run completed",
-                type="deterministic",
-                passed=False,
-                evidence=failure_reason,
-            )
-        ]
     )
 
 
@@ -822,7 +808,6 @@ def _scorecard_from_context(
         unscored=components.unscored,
         unscored_reasons=components.unscored_reasons,
         functional=outputs.functional,
-        acceptance=outputs.acceptance,
         visual=outputs.visual,
         verification_stability=outputs.verification_stability,
         test_coverage=outputs.test_coverage,

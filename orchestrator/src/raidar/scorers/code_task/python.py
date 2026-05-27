@@ -6,7 +6,6 @@ import ast
 import json
 import os
 import py_compile
-import re
 import subprocess
 import sys
 import tempfile
@@ -14,9 +13,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.config import settings
+from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import ScorerContext, ScorerEvidence, register_scorer
-from raidar.scorers.code_task.base import CODE_TASK_METRICS, CodeTaskScorer
+from raidar.scorers.code_task.base import CodeTaskScorer
+from raidar.scorers.common import (
+    code_task_artifact_metric_score,
+    required_artifact_patterns,
+    verification_stability_score,
+)
 
 PYTHON_EXCLUDED_DIRS = {
     ".git",
@@ -68,7 +73,7 @@ class PythonCodeTask(CodeTaskScorer):
         "Scores Python code tasks using the code-task metric interface with "
         "Python-specific measurement tools."
     )
-    metrics = CODE_TASK_METRICS
+    metrics = CodeTaskScorer.default_metrics()
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         """Collect deterministic Python evidence for code-task metrics."""
@@ -82,7 +87,7 @@ class PythonCodeTask(CodeTaskScorer):
         ruff = _run_python_module(workspace, "ruff", "check", ".")
         lizard = _run_python_module(workspace, "lizard", ".", "--CCN", "10", "--length", "100")
         quality_findings = _static_quality_findings(files, workspace)
-        required_artifacts = _required_artifact_patterns(context.scenario, self.id)
+        required_artifacts = required_artifact_patterns(context.scenario, self.id)
 
         return ScorerEvidence(
             metric_scores=(
@@ -324,6 +329,7 @@ def _python_code_quality_score(
         passed=score >= 1.0,
         missing_patterns=missing,
         evidence=(
+            f"proxy: static analysis checks compile, lint, complexity, and bounded AST heuristics; "
             f"compile={not compile_failures}, ruff={_command_evidence(ruff)}, "
             f"lizard={_command_evidence(lizard)}, static_findings={len(findings)}"
         ),
@@ -348,7 +354,7 @@ def _python_test_coverage_score(
         score=score,
         passed=run.passed and report is not None and report.passed and measured is not None,
         evidence=(
-            f"coverage_run={_command_evidence(run)}, "
+            f"proxy: coverage is a test adequacy proxy; coverage_run={_command_evidence(run)}, "
             f"coverage_report={_command_evidence(report)}, measured={measured}"
         ),
     )
@@ -360,65 +366,23 @@ def _python_artifact_score(
     workspace: Path,
     required_artifacts: tuple[str, ...],
 ) -> MetricScore:
-    source_files = [path for path in files if not _is_test_file(path, workspace)]
-    missing_required = _missing_required_artifacts(workspace, required_artifacts)
-    missing = []
-    if not source_files:
-        missing.append("python source files")
-    if not tests:
-        missing.append("python test files")
-    missing.extend(missing_required)
-    structure_score = (0.5 if source_files else 0.0) + (0.5 if tests else 0.0)
-    required_score = (
-        1.0
-        if not required_artifacts
-        else (len(required_artifacts) - len(missing_required)) / len(required_artifacts)
-    )
-    score = round(structure_score * required_score, 3)
-    return MetricScore(
-        metric_id="artifact-checks",
-        score=score,
-        passed=score >= 1.0,
-        matched_count=len(source_files) + len(tests),
-        missing_patterns=missing,
-        evidence=f"source_files={len(source_files)}, test_files={len(tests)}",
+    return code_task_artifact_metric_score(
+        language_label="python",
+        files=files,
+        tests=tests,
+        workspace=workspace,
+        required_artifacts=required_artifacts,
+        is_test_file=_is_test_file,
     )
 
 
 def _python_verification_stability_score(score) -> MetricScore:
-    return MetricScore(
-        metric_id="verification-stability",
-        score=score.score,
-        passed=score.score > 0,
-        evidence=f"failures={score.total_gate_failures}",
-    )
-
-
-def _required_artifact_patterns(scenario, scorer_id: str) -> tuple[str, ...]:
-    patterns: list[str] = []
-    for scorer_ref in getattr(scenario, "scorers", ()):
-        if getattr(scorer_ref, "id", None) != scorer_id:
-            continue
-        artifact_config = getattr(scorer_ref, "config", {}).get("artifact-checks", {})
-        required_paths = artifact_config.get("required_paths", [])
-        if isinstance(required_paths, list):
-            patterns.extend(path for path in required_paths if isinstance(path, str))
-    return tuple(dict.fromkeys(patterns))
-
-
-def _missing_required_artifacts(workspace: Path, patterns: tuple[str, ...]) -> list[str]:
-    return [
-        pattern
-        for pattern in patterns
-        if not any(path.is_file() for path in workspace.glob(pattern))
-    ]
+    return verification_stability_score(score)
 
 
 def _command_evidence(outcome: CommandOutcome | None) -> str:
     if outcome is None:
         return "not_run"
     command = " ".join(outcome.command)
-    output = re.sub(r"\s+", " ", outcome.output).strip()
-    if len(output) > 180:
-        output = output[:177] + "..."
+    output = sanitize_evidence_text(outcome.output)
     return f"command={command!r}, exit={outcome.returncode}, output={output!r}"

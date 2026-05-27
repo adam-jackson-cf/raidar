@@ -6,6 +6,11 @@ from datetime import datetime
 from pathlib import Path
 
 from .run_metadata import uncached_input_tokens
+from .sanitization import (
+    sanitize_evidence_payload,
+    sanitize_evidence_text,
+    sanitized_model_dump_json,
+)
 from .schemas.scorecard import EvalRun
 
 
@@ -23,8 +28,8 @@ def save_run(run: EvalRun, results_dir: Path) -> Path:
     output_path = results_dir / "runs" / run.id / "run.json"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    with open(output_path, "w") as f:
-        f.write(run.model_dump_json(indent=2))
+    with open(output_path, "w", encoding="utf-8") as f:
+        f.write(sanitized_model_dump_json(run, indent=2) + "\n")
 
     return output_path
 
@@ -194,7 +199,6 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "build_succeeded",
         "tests_passed",
         "tests_total",
-        "acceptance_score",
         "visual_similarity",
         "verification_stability_score",
         "quality_score",
@@ -267,13 +271,12 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "build_succeeded": run.scores.functional.build_succeeded,
         "tests_passed": run.scores.functional.tests_passed,
         "tests_total": run.scores.functional.tests_total,
-        "acceptance_score": run.scores.acceptance.score,
         "visual_similarity": run.scores.visual.similarity if run.scores.visual else None,
         "verification_stability_score": run.scores.verification_stability.score,
         "quality_score": run.scores.quality_score,
         "diagnostic_score": run.scores.diagnostic_score,
         "unscored": run.scores.unscored,
-        "unscored_reasons": json.dumps(run.scores.unscored_reasons),
+        "unscored_reasons": json.dumps(sanitize_evidence_payload(run.scores.unscored_reasons)),
         "execution_valid": run.scores.execution_validity.passed,
         "performance_gates_passed": run.scores.performance_gates.passed,
         "resource_efficiency_score": run.scores.resource_efficiency.score,
@@ -347,11 +350,11 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
             (
                 "| Harness | Model | Scenario | Unscored | Execution Valid | Perf Gates | "
                 "Composite | Diagnostic | "
-                "Functional | Acceptance | Visual | Verification Stability |"
+                "Functional | Visual | Verification Stability |"
             ),
             (
                 "|---------|-------|------|------|-----------|------------|-----------|------------|"
-                "------------|------------|--------|------------|"
+                "------------|--------|------------|"
             ),
         ]
     )
@@ -364,12 +367,12 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
             f"{run.scores.performance_gates.passed} | "
             f"{run.scores.composite_score:.3f} | "
             f"{run.scores.diagnostic_score:.3f} | {func_status} | "
-            f"{run.scores.acceptance.score:.2f} | {_visual_value(run)} | "
+            f"{_visual_value(run)} | "
             f"{run.scores.verification_stability.score:.2f} |"
         )
         lines.append(
             f"  - run_id={run.id}, resource_efficiency={run.scores.resource_efficiency.score:.3f}, "
-            f"unscored_reasons={run.scores.unscored_reasons}, "
+            f"unscored_reasons={sanitize_evidence_payload(run.scores.unscored_reasons)}, "
             f"test_coverage_passed={run.scores.test_coverage.passed}, "
             f"requirements_presence={run.scores.requirements_coverage.presence_ratio:.2f}, "
             f"requirements_mapping={run.scores.requirements_coverage.mapping_ratio:.2f}, "
@@ -482,8 +485,9 @@ def _append_unscored_runs(lines: list[str], runs: list[EvalRun]) -> None:
         return
     lines.extend(
         (
-            f"- run_id={run.id}, model={run.config.model}, reasons={run.scores.unscored_reasons}, "
-            f"termination_reason={run.termination_reason}"
+            f"- run_id={run.id}, model={run.config.model}, "
+            f"reasons={sanitize_evidence_payload(run.scores.unscored_reasons)}, "
+            f"termination_reason={sanitize_evidence_text(run.termination_reason or '')}"
         )
         for run in unscored
     )

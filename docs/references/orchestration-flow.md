@@ -41,39 +41,49 @@ Inside that root:
 
 ## 3.1 Matrix Config Contract
 
-Use the refactored public matrix schema:
+Use the public matrix schema:
 
 ```yaml
 matrix:
+  id: homepage-codex
+  scenario: scenarios/homepage-implementation
   experiment:
     timeout_sec: 1800
     repeats: 3
     repeat_parallel: 1
     retry_void: 1
-  agents:
-    - harness: codex-cli
-      model: codex/gpt-5.4-high
-    - harness: claude-code
-      model: anthropic/claude-sonnet-4-5
-  scenario_path: scenarios/homepage-implementation/v001/scenario.yaml
-  experiments_path: experiments
+  entries:
+    - id: codex-gpt-5-5-low-v001
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
+    - id: claude-haiku-4-5-v001
+      scenario_revision: v001
+      agent:
+        harness: claude-code
+        provider: anthropic
+        model: claude-haiku-4-5
 ```
 
-`AgentSpec` means `harness + model`. Current implementation internals may still refer to `suite`, `runs`, or `agent` while the rename is in progress, but public docs and authored config examples should use `experiment`, `agents`, and `harness`.
+`AgentSpec` means `harness + model`. Matrix files live under `matrices/`, and `matrix.scenario` points at the scenario root while each entry selects a revision.
 
 ## 4. Scoring Pipeline
 
-Scenario scoring capability is defined by `scenario.yaml -> scorers[]`. Each scorer is resolved from `orchestrator/src/raidar/scorers/definitions/`, scenario config is merged into metric config, and duplicate metrics are executed once.
+Scenario scoring capability is defined by `scenario.yaml -> scorers[]`. Each scorer is resolved from the code-backed registry in `orchestrator/src/raidar/scorers/`, scenario config is merged into metric config, and duplicate metrics are executed once.
 
 Core score outputs:
 - `functional`
 - `acceptance`
-- `visual` (optional)
-- `verification_stability`
-- `test_coverage`
-- `requirements_coverage`
+- `code-quality`
+- `visual-regression` (optional)
+- `verification-stability`
+- `test-coverage`
+- `requirements-coverage`
 - hard gates: `execution_validity`, `performance_gates`
-- ranking metric: `resource_efficiency`
+- ranking metric: `resource-efficiency`
 
 Canonical metric output:
 - `metric_scores[]` in verifier scorecards and persisted run scorecards.

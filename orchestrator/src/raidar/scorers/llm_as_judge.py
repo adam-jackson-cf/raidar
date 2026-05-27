@@ -11,6 +11,7 @@ from typing import Any
 
 from raidar.codex_auth import OPENAI_API_KEY_ENV, resolve_codex_auth
 from raidar.config import settings
+from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.deterministic import parse_judge_response
@@ -41,6 +42,10 @@ def evaluate_llm_as_judge_metric(
     scenario: ScenarioDefinition,
     metric_id: str,
     judge_path: str,
+    execution_outputs: Any | None = None,
+    deterministic_metric_scores: tuple[MetricScore, ...] = (),
+    retained_evidence: dict[str, Any] | None = None,
+    changed_surfaces: list[str] | None = None,
 ) -> MetricScore:
     """Evaluate a run with the scorer-provided judge role file."""
 
@@ -59,7 +64,15 @@ def evaluate_llm_as_judge_metric(
         )
 
     judge_role = resolved_judge_path.read_text(encoding="utf-8")
-    prompt = _judge_prompt(workspace=workspace, scenario_dir=scenario_dir, scenario=scenario)
+    prompt = _judge_prompt(
+        workspace=workspace,
+        scenario_dir=scenario_dir,
+        scenario=scenario,
+        execution_outputs=execution_outputs,
+        deterministic_metric_scores=deterministic_metric_scores,
+        retained_evidence=retained_evidence or {},
+        changed_surfaces=changed_surfaces or [],
+    )
     try:
         response = _call_judge(judge_role=judge_role, prompt=prompt)
     except Exception as exc:
@@ -173,24 +186,25 @@ def _content_text(content: Any) -> str:
 
 
 def _clip_output(output: str, *, max_chars: int = 1000) -> str:
-    clipped = " ".join(output.split())
-    if len(clipped) > max_chars:
-        return clipped[: max_chars - 3] + "..."
-    return clipped
+    return sanitize_evidence_text(output, max_chars=max_chars)
 
 
 def _metric_score_from_response(response: str, *, metric_id: str) -> MetricScore:
     parsed_json = _parse_json_response(response)
     if parsed_json is not None:
-        score = _bounded_score(parsed_json.get("score"))
-        passed = _bool_value(parsed_json.get("passed"), default=score >= 0.8)
-        evidence = _evidence_from_json(parsed_json, fallback=response[:300])
+        sanitized_json = _sanitize_json(parsed_json)
+        score = _bounded_score(sanitized_json.get("score"))
+        passed = _bool_value(sanitized_json.get("passed"), default=score >= 0.8)
+        evidence = _evidence_from_json(
+            sanitized_json,
+            fallback=sanitize_evidence_text(response, max_chars=300),
+        )
         return MetricScore(
             metric_id=metric_id,
             score=score,
             passed=passed,
             evidence=evidence,
-            judge_output=parsed_json,
+            judge_output=sanitized_json,
         )
 
     parsed = parse_judge_response(response)
@@ -198,7 +212,7 @@ def _metric_score_from_response(response: str, *, metric_id: str) -> MetricScore
         metric_id=metric_id,
         score=1.0 if parsed.passed else 0.0,
         passed=parsed.passed,
-        evidence=parsed.evidence,
+        evidence=sanitize_evidence_text(parsed.evidence or ""),
     )
 
 
@@ -253,6 +267,10 @@ def _judge_prompt(
     workspace: Path,
     scenario_dir: Path,
     scenario: ScenarioDefinition,
+    execution_outputs: Any | None = None,
+    deterministic_metric_scores: tuple[MetricScore, ...] = (),
+    retained_evidence: dict[str, Any] | None = None,
+    changed_surfaces: list[str] | None = None,
 ) -> str:
     return "\n\n".join(
         part
@@ -260,6 +278,13 @@ def _judge_prompt(
             _scenario_context(scenario),
             _task_prompt(scenario_dir, scenario),
             _workspace_sources(workspace, scenario=scenario),
+            _structured_judge_inputs(
+                scenario,
+                execution_outputs=execution_outputs,
+                deterministic_metric_scores=deterministic_metric_scores,
+                retained_evidence=retained_evidence or {},
+                changed_surfaces=changed_surfaces or [],
+            ),
             _output_contract(),
         )
         if part
@@ -269,7 +294,7 @@ def _judge_prompt(
 def _scenario_context(scenario: ScenarioDefinition) -> str:
     requirements = [
         f"- {requirement.id}: {requirement.description}"
-        for requirement in scenario.acceptance.requirements
+        for requirement in scenario.requirements.items
     ]
     return (
         f"Scenario: {scenario.name}@{scenario.scenario_revision}\n"
@@ -282,7 +307,8 @@ def _task_prompt(scenario_dir: Path, scenario: ScenarioDefinition) -> str:
     prompt_path = scenario_dir / scenario.prompt.entry
     if not prompt_path.is_file():
         return ""
-    return f"Task prompt:\n{prompt_path.read_text(encoding='utf-8')}"
+    prompt_text = prompt_path.read_text(encoding="utf-8")
+    return f"Task prompt:\n{sanitize_evidence_text(prompt_text, max_chars=4000)}"
 
 
 def _workspace_sources(workspace: Path, *, scenario: ScenarioDefinition) -> str:
@@ -299,7 +325,8 @@ def _workspace_sources(workspace: Path, *, scenario: ScenarioDefinition) -> str:
         remaining = budget - used
         clipped = content[:remaining]
         used += len(clipped)
-        chunks.append(f"File: {source_path.relative_to(workspace)}\n```text\n{clipped}\n```")
+        sanitized = sanitize_evidence_text(clipped, max_chars=remaining)
+        chunks.append(f"File: {source_path.relative_to(workspace)}\n```text\n{sanitized}\n```")
     return "Submitted workspace sources:\n\n" + "\n\n".join(chunks)
 
 
@@ -319,7 +346,7 @@ def _scenario_source_patterns(scenario: ScenarioDefinition) -> tuple[str, ...]:
         required_paths = artifact_config.get("required_paths", [])
         if isinstance(required_paths, list):
             patterns.extend(path for path in required_paths if isinstance(path, str))
-    for requirement in scenario.acceptance.requirements:
+    for requirement in scenario.requirements.items:
         check = requirement.check
         if check.type == "file_exists" and _looks_like_workspace_path(check.pattern):
             patterns.append(check.pattern)
@@ -328,6 +355,53 @@ def _scenario_source_patterns(scenario: ScenarioDefinition) -> tuple[str, ...]:
 
 def _looks_like_workspace_path(value: str) -> bool:
     return "/" in value and not value.startswith(("/", "../")) and ".." not in Path(value).parts
+
+
+def _structured_judge_inputs(
+    scenario: ScenarioDefinition,
+    *,
+    execution_outputs: Any | None,
+    deterministic_metric_scores: tuple[MetricScore, ...],
+    retained_evidence: dict[str, Any],
+    changed_surfaces: list[str],
+) -> str:
+    functional = getattr(execution_outputs, "functional", None)
+    execution_summary = {
+        "functional_passed": getattr(functional, "passed", None),
+        "build_succeeded": getattr(functional, "build_succeeded", None),
+        "tests_passed": getattr(functional, "tests_passed", None),
+        "tests_total": getattr(functional, "tests_total", None),
+    }
+    metric_summaries = [
+        {
+            "metric_id": score.metric_id,
+            "score": score.score,
+            "passed": score.passed,
+            "evidence": score.evidence,
+        }
+        for score in deterministic_metric_scores
+    ]
+    payload = {
+        "scenario_id": f"{scenario.name}@{scenario.scenario_revision}",
+        "requirement_count": len(scenario.requirements.items),
+        "configured_scorers": len(scenario.scorers),
+        "changed_surfaces": changed_surfaces[:50],
+        "execution_outcomes": execution_summary,
+        "retained_evidence": retained_evidence,
+        "deterministic_metric_summaries": metric_summaries,
+    }
+    payload_text = json.dumps(_sanitize_json(payload), sort_keys=True)
+    return f"Structured judge inputs:\n{payload_text}"
+
+
+def _sanitize_json(value: Any) -> Any:
+    if isinstance(value, str):
+        return sanitize_evidence_text(value, max_chars=1000)
+    if isinstance(value, list):
+        return [_sanitize_json(item) for item in value]
+    if isinstance(value, dict):
+        return {str(key): _sanitize_json(entry) for key, entry in value.items()}
+    return value
 
 
 def _output_contract() -> str:

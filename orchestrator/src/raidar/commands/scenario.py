@@ -215,12 +215,12 @@ def echo_visual_config(task_def: ScenarioDefinition) -> None:
     )
 
 
-def echo_acceptance_config(task_def: ScenarioDefinition) -> None:
-    if not task_def.acceptance.deterministic_checks:
+def echo_requirements_config(task_def: ScenarioDefinition) -> None:
+    if not task_def.requirements.items:
         return
     click.echo()
-    click.echo("Acceptance Config:")
-    click.echo(f"  Deterministic checks: {len(task_def.acceptance.deterministic_checks)}")
+    click.echo("Requirements Config:")
+    click.echo(f"  Requirements: {len(task_def.requirements.items)}")
 
 
 @click.command()
@@ -237,4 +237,4 @@ def info(scenario: Path) -> None:
         echo_available_revisions(scenario_input)
     echo_rule_variants(scenario_yaml.parent)
     echo_visual_config(scenario_def)
-    echo_acceptance_config(scenario_def)
+    echo_requirements_config(scenario_def)

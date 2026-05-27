@@ -99,15 +99,8 @@ def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> d
                 {"name": "lint", "command": ["bun", "run", "lint"]},
             ],
         },
-        "acceptance": {
-            "deterministic_checks": [
-                {
-                    "type": "no_pattern",
-                    "pattern": "TODO",
-                    "description": "No TODO markers remain in production files",
-                }
-            ],
-            "requirements": [
+        "requirements": {
+            "items": [
                 {
                     "id": "req-no-todo",
                     "description": "No TODO markers remain in production files.",

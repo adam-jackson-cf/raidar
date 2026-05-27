@@ -16,21 +16,20 @@ verification:
     - ["bun", "run", "typecheck"]
     - ["bun", "run", "lint"]
 
-acceptance:
-  deterministic_checks:
-    - type: import_present
-      pattern: Harbor smoke test ready
-      description: Smoke marker text exists in source
-    - type: no_pattern
-      pattern: Homepage placeholder - implement the design
-      description: Starter placeholder text is removed
-  requirements:
+requirements:
+  items:
     - id: req-smoke-marker
       description: Smoke marker text exists in source.
       check:
         type: import_present
         pattern: Harbor smoke test ready
         description: Smoke marker text exists in source
+    - id: req-placeholder-removed
+      description: Starter placeholder text is removed.
+      check:
+        type: no_pattern
+        pattern: Homepage placeholder - implement the design
+        description: Starter placeholder text is removed
 
 scorers:
   - id: typescript-code-task

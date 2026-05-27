@@ -37,11 +37,12 @@ Harness integration expectations for scorer-driven evaluation:
 ## 5. Validate End-to-End
 
 ```bash
-make harness-validate HARNESS=<harness> MODEL=<provider/model>
+make harness-validate HARNESS=<harness> PROVIDER=<provider> MODEL=<model>
 make experiment-run \
   SCENARIO=scenarios/hello-world-smoke/v001/scenario.yaml \
   HARNESS=<harness> \
-  MODEL=<provider/model>
+  PROVIDER=<provider> \
+  MODEL=<model>
 ```
 
 Check outputs in:
@@ -50,6 +51,5 @@ Check outputs in:
 
 Verify these fields are present and consistent:
 - `config.evaluation_profile` in run and experiment config blocks.
-- `config.scorers` in experiment config.
 - `scores.metric_scores[]` in `run.json` and verifier scorecard artifacts.
 - `scores.scorer_results[]` in `run.json`.

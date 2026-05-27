@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -48,6 +48,8 @@ class ScorerContext:
     execution: Any
     resource_efficiency: Any
     execution_validity: Any
+    workspace_changes: dict[str, Any] = field(default_factory=dict)
+    retained_evidence: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)

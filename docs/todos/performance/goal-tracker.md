@@ -91,7 +91,7 @@ Optimize the repo-root `make agent-smoke` workflow so the full warm-start smoke 
 - CLI orchestration entrypoints: `orchestrator/src/raidar/cli.py`.
 - Experiment execution orchestration: `orchestrator/src/raidar/application/execution.py`, `orchestrator/src/raidar/experiment.py`, `orchestrator/src/raidar/runner.py`, and `orchestrator/src/raidar/runner_pipeline.py`.
 - Codex model validation and reasoning propagation: `orchestrator/src/raidar/agents/adapters/codex_cli.py`.
-- Matrix/default model surfaces: `orchestrator/src/raidar/matrix.py` and `.configs/homepage-v001-codex-oauth-matrix.yaml`.
+- Matrix/default model surfaces: `orchestrator/src/raidar/matrix.py` and `matrices/homepage-v001-codex-oauth.yaml`.
 - Existing relevant tests: `orchestrator/tests/test_cli_commands.py`, `orchestrator/tests/test_codex_cli_adapter.py`, `orchestrator/tests/test_matrix.py`, `orchestrator/tests/test_runner_harbor_env_and_cleanup.py`, and `orchestrator/tests/test_fast_smoke_mode.py`.
 
 # Deferred work and explicitly rejected paths

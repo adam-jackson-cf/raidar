@@ -11,9 +11,13 @@ from typing import Any
 import click
 
 from raidar.application.execution import (
+    BENCHMARK_EXPERIMENTS_ROOT_NAME,
+    RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME,
+    execute_run_command,
+)
+from raidar.application.execution import (
     build_run_cli_options_from_request as _service_build_run_cli_options,
 )
-from raidar.application.execution import execute_run_command
 from raidar.application.execution import (
     experiment_execution_suffix as _service_experiment_execution_suffix,
 )
@@ -38,8 +42,8 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[3]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
 EXPERIMENTS_ROOT = REPO_ROOT / "experiments"
-BENCHMARK_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / "benchmarks"
-RESEARCH_LOOP_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / "research_loops"
+BENCHMARK_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / BENCHMARK_EXPERIMENTS_ROOT_NAME
+RESEARCH_LOOP_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME
 DEFAULT_ARCHIVE_ROOT = Path("/tmp")
 EXPERIMENT_KIND_CHOICES = ["benchmark", "research-loop"]
 HARNESS_CHOICES: list[str] = []

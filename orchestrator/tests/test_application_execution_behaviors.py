@@ -9,6 +9,7 @@ from raidar.application.models import (
     ExperimentRunRequest,
     RunCliOptions,
 )
+from raidar.application.serializers import run_payload
 
 
 def _options(tmp_path: Path, *, repeats: int = 1) -> RunCliOptions:
@@ -45,6 +46,8 @@ def _run(tmp_path: Path, *, unscored: bool = False) -> SimpleNamespace:
             execution_validity=SimpleNamespace(passed=True),
             performance_gates=SimpleNamespace(passed=True),
             composite_score=0.75,
+            diagnostic_score=0.75,
+            quality_score=0.75,
             metadata={
                 "run": {
                     "run_json_path": str(tmp_path / "runs" / "run-1" / "run.json"),
@@ -53,6 +56,23 @@ def _run(tmp_path: Path, *, unscored: bool = False) -> SimpleNamespace:
             },
         ),
     )
+
+
+def test_cli_run_payload_and_echo_redact_secret_shaped_reasons(tmp_path, capsys) -> None:
+    run = _run(tmp_path, unscored=True)
+    run.scores.unscored_reasons = ["OPENAI_API_KEY=abcdefghijklmnop"]
+    run.termination_reason = "Bearer abcdefghijklmnop password=hunter2value"
+
+    payload = run_payload(run)
+    execution._echo_single_run_result(run)
+    output = capsys.readouterr().out
+
+    assert "abcdefghijklmnop" not in str(payload)
+    assert "hunter2value" not in str(payload)
+    assert payload["unscored_reasons"] == ["OPENAI_API_KEY=<redacted>"]
+    assert "abcdefghijklmnop" not in output
+    assert "hunter2value" not in output
+    assert "OPENAI_API_KEY=<redacted>" in output
 
 
 def test_execute_run_command_returns_single_suite_without_forced_summary(

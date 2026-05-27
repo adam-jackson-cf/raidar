@@ -42,7 +42,7 @@ make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yam
 make experiments-list
 ```
 
-Use `make matrix-run` when you want a structured comparison across multiple `AgentSpec`s instead of a single experiment run. Author the matrix config with top-level `experiment` and `agents` blocks, and set `harness` on each `agents[]` entry.
+Use `make matrix-run` when you want a structured comparison across multiple `AgentSpec`s instead of a single experiment run. Author the matrix config with `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries`; each entry declares `scenario_revision` and a nested `agent` with `harness`, `provider`, `model`, and optional `reasoning_effort`.
 
 ## What This Scenario Can Tell You
 
@@ -66,4 +66,4 @@ Use `make matrix-run` when you want a structured comparison across multiple `Age
 - Run the scenario and inspect `experiments/.../runs/*/run.json` for one-repeat details.
 - Use `experiment-summary.json` to compare repeats for the same `(scenario, revision, harness, model, evaluation_profile)` identity.
 - Inspect `scores.scorer_results[]` for the quality and efficiency blend, and `scores.metric_scores[]` for individual metric evidence.
-- Use [analyze-results.md](/Users/adamjackson/Projects/raidar/docs/todos/analyze-results.md) for the review procedure and [metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md) when you need metric-by-metric interpretation.
+- Use [metrics.md](/Users/adamjackson/Projects/complete/raidar/docs/references/metrics.md) when you need metric-by-metric interpretation.

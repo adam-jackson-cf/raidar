@@ -5,9 +5,15 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
+from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import ScorerContext, ScorerEvidence, register_scorer
-from raidar.scorers.code_task.base import CODE_TASK_METRICS, CodeTaskScorer
+from raidar.scorers.code_task.base import CodeTaskScorer
+from raidar.scorers.common import (
+    code_task_artifact_metric_score,
+    required_artifact_patterns,
+    verification_stability_score,
+)
 
 TYPESCRIPT_EXCLUDED_DIRS = {
     ".git",
@@ -30,7 +36,7 @@ class TypeScriptCodeTask(CodeTaskScorer):
         "Scores TypeScript code tasks using the code-task metric interface with "
         "TypeScript-specific measurement tools."
     )
-    metrics = CODE_TASK_METRICS
+    metrics = CodeTaskScorer.default_metrics()
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         """Collect deterministic TypeScript evidence for code-task metrics."""
@@ -42,7 +48,7 @@ class TypeScriptCodeTask(CodeTaskScorer):
         lint_gate = _latest_gate(outputs.gate_history, "lint")
         quality_findings = _static_quality_findings(files, workspace)
 
-        required_artifacts = _required_artifact_patterns(context.scenario, self.id)
+        required_artifacts = required_artifact_patterns(context.scenario, self.id)
         return ScorerEvidence(
             metric_scores=(
                 _typescript_functional_score(files, outputs.functional),
@@ -132,7 +138,10 @@ def _typescript_code_quality_score(
         score=score,
         passed=score >= 1.0,
         missing_patterns=findings[:5],
-        evidence=f"lint={_gate_evidence(lint)}, static_findings={len(findings)}",
+        evidence=(
+            "proxy: static analysis checks lint gate and bounded source heuristics; "
+            f"lint={_gate_evidence(lint)}, static_findings={len(findings)}"
+        ),
     )
 
 
@@ -143,6 +152,7 @@ def _typescript_test_coverage_score(coverage) -> MetricScore:
         score=score,
         passed=coverage.passed,
         evidence=(
+            "proxy: coverage is a test adequacy proxy; "
             f"threshold={coverage.threshold}, measured={coverage.measured}, "
             f"source={coverage.source}"
         ),
@@ -155,58 +165,18 @@ def _typescript_artifact_score(
     workspace: Path,
     required_artifacts: tuple[str, ...],
 ) -> MetricScore:
-    source_files = [path for path in files if not _is_test_file(path, workspace)]
-    missing_required = _missing_required_artifacts(workspace, required_artifacts)
-    missing = []
-    if not source_files:
-        missing.append("typescript source files")
-    if not tests:
-        missing.append("typescript test files")
-    missing.extend(missing_required)
-    structure_score = (0.5 if source_files else 0.0) + (0.5 if tests else 0.0)
-    required_score = (
-        1.0
-        if not required_artifacts
-        else (len(required_artifacts) - len(missing_required)) / len(required_artifacts)
+    return code_task_artifact_metric_score(
+        language_label="typescript",
+        files=files,
+        tests=tests,
+        workspace=workspace,
+        required_artifacts=required_artifacts,
+        is_test_file=_is_test_file,
     )
-    score = round(structure_score * required_score, 3)
-    return MetricScore(
-        metric_id="artifact-checks",
-        score=score,
-        passed=score >= 1.0,
-        matched_count=len(source_files) + len(tests),
-        missing_patterns=missing,
-        evidence=f"source_files={len(source_files)}, test_files={len(tests)}",
-    )
-
-
-def _required_artifact_patterns(scenario, scorer_id: str) -> tuple[str, ...]:
-    patterns: list[str] = []
-    for scorer_ref in getattr(scenario, "scorers", ()):
-        if getattr(scorer_ref, "id", None) != scorer_id:
-            continue
-        artifact_config = getattr(scorer_ref, "config", {}).get("artifact-checks", {})
-        required_paths = artifact_config.get("required_paths", [])
-        if isinstance(required_paths, list):
-            patterns.extend(path for path in required_paths if isinstance(path, str))
-    return tuple(dict.fromkeys(patterns))
-
-
-def _missing_required_artifacts(workspace: Path, patterns: tuple[str, ...]) -> list[str]:
-    return [
-        pattern
-        for pattern in patterns
-        if not any(path.is_file() for path in workspace.glob(pattern))
-    ]
 
 
 def _typescript_verification_stability_score(score) -> MetricScore:
-    return MetricScore(
-        metric_id="verification-stability",
-        score=score.score,
-        passed=score.score > 0,
-        evidence=f"failures={score.total_gate_failures}",
-    )
+    return verification_stability_score(score)
 
 
 def _latest_gate(gate_history, gate_name: str):
@@ -227,7 +197,5 @@ def _coverage_score(coverage) -> float:
 def _gate_evidence(gate) -> str:
     if gate is None:
         return "not_run"
-    output = re.sub(r"\s+", " ", f"{gate.stdout}\n{gate.stderr}").strip()
-    if len(output) > 180:
-        output = output[:177] + "..."
+    output = sanitize_evidence_text(f"{gate.stdout}\n{gate.stderr}")
     return f"command={gate.command!r}, exit={gate.exit_code}, output={output!r}"

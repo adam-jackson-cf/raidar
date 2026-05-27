@@ -14,6 +14,7 @@ from raidar.application.scenario_catalog import load_scenario
 from raidar.runtime.models import RunRequest
 from raidar.runtime.pipeline import run_task
 from raidar.runtime.starter_preflight import StarterPreflightError
+from raidar.sanitization import sanitized_model_dump_json
 
 
 def summary_result_path(run) -> Path:
@@ -27,7 +28,7 @@ def summary_result_path(run) -> Path:
 def persist_eval_run(run) -> Path:
     result_path = summary_result_path(run)
     result_path.parent.mkdir(parents=True, exist_ok=True)
-    result_path.write_text(run.model_dump_json(indent=2), encoding="utf-8")
+    result_path.write_text(sanitized_model_dump_json(run, indent=2) + "\n", encoding="utf-8")
     return result_path
 
 

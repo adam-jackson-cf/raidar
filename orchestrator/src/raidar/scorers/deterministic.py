@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.schemas.scenario import DeterministicCheck
-from raidar.schemas.scorecard import AcceptanceCheck
+from raidar.schemas.scorecard import RequirementCheck
 
 
 @dataclass
@@ -105,8 +105,8 @@ def check_no_pattern(workspace: Path, pattern: str) -> tuple[bool, str]:
     return True, "Pattern not found (good)"
 
 
-def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> AcceptanceCheck:
-    """Run a single deterministic acceptance check."""
+def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> RequirementCheck:
+    """Run a single deterministic requirement check."""
     if check.type == "import_present":
         passed, evidence = check_import_present(workspace, check.pattern)
     elif check.type == "file_exists":
@@ -115,7 +115,7 @@ def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> Accep
         passed, evidence = check_no_pattern(workspace, check.pattern)
     else:
         passed, evidence = False, f"Unknown check type: {check.type}"
-    return AcceptanceCheck(
+    return RequirementCheck(
         rule=check.description,
         type="deterministic",
         passed=passed,
@@ -123,8 +123,8 @@ def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> Accep
     )
 
 
-def score_acceptance_checks(checks: list[AcceptanceCheck]) -> float:
-    """Return the ratio of passing acceptance checks."""
+def score_requirement_checks(checks: list[RequirementCheck]) -> float:
+    """Return the ratio of passing requirement checks."""
     if not checks:
         return 1.0
     return sum(1 for check in checks if check.passed) / len(checks)

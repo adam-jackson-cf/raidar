@@ -33,7 +33,7 @@ EvalRun = support.EvalRun
 Scorecard = support.Scorecard
 
 DEFAULT_EXPERIMENT_PROFILE = (
-    "functional+acceptance+verification-stability+execution-validity+resource-efficiency"
+    "functional+requirements-coverage+verification-stability+execution-validity+resource-efficiency"
 )
 
 
@@ -248,7 +248,7 @@ def _minimal_cli_scenario() -> ScenarioDefinition:
             "timeout_sec": 300,
             "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
-            "acceptance": {},
+            "requirements": {"items": []},
             "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
             "prompt": {"entry": "prompt/task.md"},
         }
@@ -683,7 +683,8 @@ def test_matrix_dry_run_uses_config_scenario_entries(tmp_path: Path) -> None:
                 "  gates: []",
                 "  required_commands: []",
                 "  min_quality_score: 0.0",
-                "acceptance: {}",
+                "requirements:",
+                "  items: []",
                 "scorers:",
                 "  - id: resource-efficiency",
                 "    version: 1",
@@ -1144,7 +1145,7 @@ def _assert_filtered_experiment_text(output: str) -> None:
     assert "homepage-implementation@v001" in output
     assert "hello-world-smoke@v001" not in output
     assert (
-        "evaluation_profile=functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
+        "evaluation_profile=functional+requirements-coverage+verification-stability+execution-validity+resource-efficiency+visual-regression"
         in output
     )
 
@@ -1201,7 +1202,7 @@ def test_experiments_list_filters_and_json_output(tmp_path: Path) -> None:
     assert isinstance(rows, list)
     assert rows[0]["execution_id"] == "20260222-110000Z__homepage-implementation__v001"
     assert rows[0]["evaluation_profile"] == (
-        "functional+acceptance+verification-stability+execution-validity+resource-efficiency+visual-regression"
+        "functional+requirements-coverage+verification-stability+execution-validity+resource-efficiency+visual-regression"
     )
 
 

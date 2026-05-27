@@ -96,8 +96,8 @@ def test_judge_prompt_includes_scenario_prompt_and_bounded_workspace_sources(mon
         scenario_revision="v001",
         description="Description",
         prompt=SimpleNamespace(entry="prompt.md"),
-        acceptance=SimpleNamespace(
-            requirements=[
+        requirements=SimpleNamespace(
+            items=[
                 SimpleNamespace(
                     id="req-1",
                     description="Need source",
@@ -141,7 +141,7 @@ def test_evaluate_llm_as_judge_metric_handles_resolution_call_and_failure(monkey
         scenario_revision="v001",
         description="Description",
         prompt=SimpleNamespace(entry="missing.md"),
-        acceptance=SimpleNamespace(requirements=[]),
+        requirements=SimpleNamespace(items=[]),
         scorers=[],
     )
     monkeypatch.setattr(

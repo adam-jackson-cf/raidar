@@ -96,17 +96,9 @@ def _scenario_spec_verification_block(request: RunRequest) -> dict[str, Any]:
     }
 
 
-def _scenario_spec_acceptance_block(request: RunRequest) -> dict[str, Any]:
+def _scenario_spec_requirements_block(request: RunRequest) -> dict[str, Any]:
     return {
-        "deterministic_checks": [
-            {
-                "type": check.type,
-                "pattern": check.pattern,
-                "description": check.description,
-            }
-            for check in request.scenario.acceptance.deterministic_checks
-        ],
-        "requirements": [
+        "items": [
             {
                 "id": requirement.id,
                 "description": requirement.description,
@@ -120,7 +112,7 @@ def _scenario_spec_acceptance_block(request: RunRequest) -> dict[str, Any]:
                     for evidence in requirement.required_test_evidence
                 ],
             }
-            for requirement in request.scenario.acceptance.requirements
+            for requirement in request.scenario.requirements.items
         ],
     }
 
@@ -148,7 +140,7 @@ def _build_verifier_scenario_spec(request: RunRequest, context: WorkspaceContext
         "metrics": _scenario_spec_metrics_block(request),
         "scorers": _scenario_spec_scorers_block(request),
         "verification": _scenario_spec_verification_block(request),
-        "acceptance": _scenario_spec_acceptance_block(request),
+        "requirements": _scenario_spec_requirements_block(request),
         "visual": _scenario_spec_visual_block(request),
         "baseline_scripts": _load_baseline_scripts(context.starter_source),
     }

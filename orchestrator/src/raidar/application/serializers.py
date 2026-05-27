@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from raidar.application.models import ScenarioInitResult, SuiteExecutionResult
+from raidar.sanitization import sanitize_evidence_payload
 from raidar.scenario_clone import ScenarioCloneResult
 from raidar.schemas.scorecard import EvalRun
 
@@ -17,9 +18,9 @@ def run_payload(run: EvalRun) -> dict[str, object]:
         "run_id": run.id,
         "duration_sec": run.duration_sec,
         "terminated_early": run.terminated_early,
-        "termination_reason": run.termination_reason,
+        "termination_reason": sanitize_evidence_payload(run.termination_reason),
         "unscored": bool(run.scores.unscored),
-        "unscored_reasons": list(run.scores.unscored_reasons),
+        "unscored_reasons": sanitize_evidence_payload(list(run.scores.unscored_reasons)),
         "execution_valid": run.scores.execution_validity.passed,
         "performance_gates_passed": run.scores.performance_gates.passed,
         "composite_score": run.scores.composite_score,

@@ -10,7 +10,6 @@ from raidar.runtime.models import (
 )
 from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
-    AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
@@ -25,7 +24,10 @@ from raidar.schemas.scorecard import (
 )
 
 
-def _outputs(visual: VisualScore | None = None) -> EvaluationOutputs:
+def _outputs(
+    visual: VisualScore | None = None, *, secret_output: bool = False
+) -> EvaluationOutputs:
+    stdout = "Bearer abcdefghijklmnop token=supersecretvalue" if secret_output else "ok"
     return EvaluationOutputs(
         functional=FunctionalScore(
             passed=True,
@@ -35,7 +37,6 @@ def _outputs(visual: VisualScore | None = None) -> EvaluationOutputs:
             gates_passed=1,
             gates_total=1,
         ),
-        acceptance=AcceptanceScore(),
         visual=visual,
         verification_stability=VerificationStabilityScore(),
         test_coverage=CoverageScore(threshold=0.8, measured=0.9, source="summary", passed=True),
@@ -51,10 +52,12 @@ def _outputs(visual: VisualScore | None = None) -> EvaluationOutputs:
             GateEvent(
                 timestamp="2026-01-01T00:00:00+00:00",
                 gate_name="build",
-                command="bun run build",
+                command="bun run build --api-key=abcdef1234567890"
+                if secret_output
+                else "bun run build",
                 exit_code=0,
-                stdout="ok",
-                stderr="",
+                stdout=stdout,
+                stderr="password=hunter2value" if secret_output else "",
             )
         ],
     )
@@ -87,7 +90,6 @@ def test_load_verifier_outputs_reports_missing_invalid_and_valid_scorecards(monk
 
     payload = {
         "functional": _outputs().functional.model_dump(mode="json"),
-        "acceptance": _outputs().acceptance.model_dump(mode="json"),
         "visual": None,
         "verification_stability": _outputs().verification_stability.model_dump(mode="json"),
         "test_coverage": _outputs().test_coverage.model_dump(mode="json"),
@@ -152,6 +154,110 @@ def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
     assert (target / "reward.txt").read_text(encoding="utf-8") == "0"
 
 
+def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
+    trial_dir = tmp_path / "trial"
+    verifier_source = trial_dir / "verifier"
+    verifier_source.mkdir(parents=True)
+    (verifier_source / "scorecard.json").write_text(
+        json.dumps(
+            {
+                "gate_history": [
+                    {
+                        "command": "pytest --token=abcdefghijklmnop",
+                        "stdout": "Bearer abcdefghijklmnop",
+                        "stderr": "password=hunter2value",
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
+    (verifier_source / "gate-history.json").write_text(
+        json.dumps([{"stdout": "api_key=abcdefghijklmnop", "stderr": "ok"}]),
+        encoding="utf-8",
+    )
+    (verifier_source / "test-stdout.txt").write_text(
+        "token=abcdefghijklmnop\nBearer abcdefghijklmnop",
+        encoding="utf-8",
+    )
+
+    target = tmp_path / "canonical" / "verifier"
+    target.mkdir(parents=True)
+    harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
+    artifacts.persist_verifier_artifacts(harbor_result, target)
+
+    copied_text = "\n".join(
+        [
+            (target / "scorecard.json").read_text(encoding="utf-8"),
+            (target / "gate-history.json").read_text(encoding="utf-8"),
+            (target / "test-stdout.txt").read_text(encoding="utf-8"),
+        ]
+    )
+    assert "abcdefghijklmnop" not in copied_text
+    assert "hunter2value" not in copied_text
+    assert "Bear...mnop" in copied_text
+
+    layout = RunLayout(
+        run_id="run",
+        start_time=datetime.now(UTC),
+        run_label="label",
+        root_dir=tmp_path / "run",
+        workspace_dir=tmp_path / "workspace",
+        verifier_dir=target,
+        harness_dir=tmp_path / "harness",
+        harbor_dir=tmp_path / "harbor",
+        run_json_path=tmp_path / "run.json",
+        report_path=tmp_path / "report.md",
+    )
+    scorecard = Scorecard(
+        execution_validity=ExecutionValidityScore(
+            checks=[
+                GateCheck(
+                    name="valid",
+                    passed=False,
+                    evidence="OPENAI_API_KEY=abcdefghijklmnop secret=abcdefghijklmnop",
+                )
+            ]
+        ),
+        performance_gates=PerformanceGatesScore(
+            checks=[
+                GateCheck(
+                    name="perf",
+                    passed=False,
+                    evidence='{"DB_PASSWORD":"abcdefghijklmnop"}',
+                )
+            ]
+        ),
+    )
+    artifacts.persist_canonical_verifier_artifacts(layout, scorecard, _outputs(secret_output=True))
+    artifacts.write_run_analysis(
+        layout,
+        SimpleNamespace(
+            scenario=SimpleNamespace(name="scenario"),
+            config=SimpleNamespace(
+                harness=SimpleNamespace(value="codex-cli"),
+                model=SimpleNamespace(qualified_name="model"),
+            ),
+        ),
+        scorecard,
+        harbor_result,
+    )
+
+    canonical_text = "\n".join(
+        [
+            (target / "scorecard.json").read_text(encoding="utf-8"),
+            (target / "gate-history.json").read_text(encoding="utf-8"),
+            (target / "execution-validity.json").read_text(encoding="utf-8"),
+            (target / "performance-gates.json").read_text(encoding="utf-8"),
+            layout.report_path.read_text(encoding="utf-8"),
+        ]
+    )
+    assert "abcdefghijklmnop" not in canonical_text
+    assert "hunter2value" not in canonical_text
+    assert "OPENAI_API_KEY=<redacted>" in canonical_text
+    assert "DB_PASSWORD" in canonical_text
+
+
 def test_visual_evidence_persistence_and_rebinding(monkeypatch, tmp_path):
     scenario_dir = tmp_path / "scenario"
     reference_dir = scenario_dir / "reference"
@@ -207,12 +313,17 @@ def test_harness_and_harbor_artifact_persistence(tmp_path):
     agent_dir.mkdir(parents=True)
     for name in ("trajectory.json", "codex.txt", "final-app.tar.gz"):
         (agent_dir / name).write_text(name, encoding="utf-8")
+    (agent_dir / "trajectory.json").write_text(
+        json.dumps({"stdout": "ANTHROPIC_API_KEY=abcdefghijklmnop"}),
+        encoding="utf-8",
+    )
+    (agent_dir / "codex.txt").write_text("Bearer abcdefghijklmnop", encoding="utf-8")
     setup_dir = agent_dir / "setup"
     setup_dir.mkdir()
-    (setup_dir / "install.log").write_text("setup", encoding="utf-8")
+    (setup_dir / "install.log").write_text("DB_PASSWORD=abcdefghijklmnop", encoding="utf-8")
     command_dir = agent_dir / "command-001"
     command_dir.mkdir()
-    (command_dir / "stdout.txt").write_text("out", encoding="utf-8")
+    (command_dir / "stdout.txt").write_text("OPENAI_API_KEY=abcdefghijklmnop", encoding="utf-8")
     (agent_dir / "command-file").write_text("skip", encoding="utf-8")
 
     harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
@@ -224,6 +335,17 @@ def test_harness_and_harbor_artifact_persistence(tmp_path):
     assert copied["project.final.tar.gz"].endswith("project.final.tar.gz")
     assert copied["setup"].endswith("setup")
     assert copied["commands/command-001"].endswith("command-001")
+    harness_text = "\n".join(
+        [
+            (harness_dir / "trajectory.json").read_text(encoding="utf-8"),
+            (harness_dir / "codex.txt").read_text(encoding="utf-8"),
+            (harness_dir / "setup" / "install.log").read_text(encoding="utf-8"),
+            (harness_dir / "commands" / "command-001" / "stdout.txt").read_text(encoding="utf-8"),
+        ]
+    )
+    assert "abcdefghijklmnop" not in harness_text
+    assert "ANTHROPIC_API_KEY=<redacted>" in harness_text
+    assert "OPENAI_API_KEY=<redacted>" in harness_text
     assert (
         artifacts.persist_harness_artifacts(
             HarborExecutionResult(False, None, tmp_path / "job", None), harness_dir

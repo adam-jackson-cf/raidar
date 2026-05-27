@@ -17,7 +17,16 @@ class ResourceEfficiency(BaseScorer):
         "Scores token, command, failure, and verification-round efficiency after "
         "a valid run completes."
     )
-    metrics = (metric("resource-efficiency", "core", 1.0),)
+    metrics = (
+        metric(
+            "resource-efficiency",
+            "core",
+            1.0,
+            evidence="Token, command, failure, and verification-round counts.",
+            score_derivation="Uses the normalized resource-efficiency score for the run.",
+            pass_fail="Passes when the run is valid; lower resource use improves ranking.",
+        ),
+    )
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         score = context.resource_efficiency

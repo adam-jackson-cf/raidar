@@ -24,7 +24,6 @@ from raidar.schemas.scenario import (
     ScenarioDefinition,
 )
 from raidar.schemas.scorecard import (
-    AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,

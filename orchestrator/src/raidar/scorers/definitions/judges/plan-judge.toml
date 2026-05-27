@@ -42,10 +42,10 @@ Hard requirements that always need surfacing:
 - It must identify required or likely languages, frameworks, repositories, runtime assumptions, external services, dependency constraints, and environment constraints. If the stack is undecided, the content must say what research or decision gate will choose it before dependent implementation.
 - It must surface obvious design choices that are knowable at planning time, including architecture shape, data model, API contracts, persistence, boundaries, integration approach, security posture, deployment/runtime model, and reuse-versus-bespoke tradeoffs.
 - It must frame material work around user intent, behavior, capability, and outcomes rather than granular line edits or file-change instructions. File paths and technical surfaces may constrain work, but they are not a substitute for stating what must become true.
-- Every material intent must have a credible validation path: automated tests, scenario checks, manual verification, quality gates, observable runtime behavior, artifact inspection, benchmark evidence, or explicit acceptance evidence.
+- Every material intent must have a credible validation path: automated tests, scenario checks, manual verification, quality gates, observable runtime behavior, artifact inspection, benchmark evidence, or explicit requirements evidence.
 - It must define enough sequencing to put discovery, design decisions, dependency checks, and irreversible choices before broad implementation that depends on them.
 - It must name material internal and external dependencies, required inputs, blocked decisions, permissions, service availability, migration constraints, and cross-team or user-provided prerequisites.
-- It must identify material technical, product, security, privacy, operational, and delivery risks, with mitigation, decision gates, or explicit acceptance.
+- It must identify material technical, product, security, privacy, operational, and delivery risks, with mitigation, decision gates, or explicit requirements evidence.
 - It must state how implementation-time decisions, discovered constraints, material deviations, rejected alternatives, unresolved risks, and follow-up work will be surfaced to the user at the conclusion of implementation.
 - It must define what happens when required inputs, tests, dependencies, tools, assumptions, or research steps fail.
 - Quality gates must not be weakened, skipped, bypassed, mocked, or treated as optional unless the user explicitly approves a rescope.
@@ -78,7 +78,7 @@ Implementation planning review rubric:
 - Stack and constraint handling: Are languages, frameworks, dependencies, runtime assumptions, integrations, and environment constraints identified or discoverable before dependent work?
 - Sequencing and dependencies: Does the order of work reduce avoidable rework and prevent implementation before required decisions or inputs?
 - Risk and failure handling: Are material risks, failure modes, blocked inputs, and degraded paths surfaced?
-- Verification strategy: Are tests, checks, benchmarks, manual verification, artifacts, or acceptance evidence appropriate to the objective?
+- Verification strategy: Are tests, checks, benchmarks, manual verification, artifacts, or requirements evidence appropriate to the objective?
 - Implementation-time decision surfacing: Will material decisions, deviations, rejected alternatives, and unresolved risks be reported to the user at the end?
 - Shortcut discipline: Are allowed shortcuts separated from shortcuts that would invalidate the objective?
 

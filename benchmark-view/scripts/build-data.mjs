@@ -25,12 +25,8 @@ function readText(filePath) {
 function sanitizeDashboardValue(value) {
   if (Array.isArray(value)) return value.map(sanitizeDashboardValue);
   if (!value || typeof value !== 'object') {
-    if (
-      typeof value === 'string' &&
-      value.length >= 48 &&
-      /^[A-Za-z0-9+/=_-]+$/.test(value)
-    ) {
-      return '[redacted-high-entropy-value]';
+    if (typeof value === 'string') {
+      return sanitizeDashboardText(value);
     }
     return value;
   }
@@ -38,6 +34,70 @@ function sanitizeDashboardValue(value) {
     Object.entries(value).map(([key, entry]) => [key, sanitizeDashboardValue(entry)]),
   );
 }
+
+function sanitizeDashboardText(value) {
+  if (value.length >= 48 && /^[A-Za-z0-9+/=_-]+$/.test(value)) {
+    return '[redacted-high-entropy-value]';
+  }
+  return value
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/=-]{12,}/gi, 'Bear...cted')
+    .replace(/\b(?:sk|pk|rk|xox[abprs])-[A-Za-z0-9_-]{12,}\b/g, (token) =>
+      `${token.slice(0, 4)}...${token.slice(-4)}`,
+    )
+    .replace(
+      /\b(api[_-]?key|token|secret|password|passwd|pwd)\s*[:=]\s*['"]?[^'"\s,;]+/gi,
+      (_match, key) => `${key}=<redacted>`,
+    )
+    .replace(
+      /(['"]?\b[A-Z0-9_]*(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|PASSWD|PWD)\b['"]?\s*[:=]\s*['"]?)[^'"\s,;}]+/gi,
+      (_match, prefix) => `${prefix}<redacted>`,
+    );
+}
+
+const scorerMetricIds = {
+  'typescript-code-task': [
+    'functional',
+    'code-quality',
+    'test-coverage',
+    'artifact-checks',
+    'verification-stability',
+  ],
+  'python-code-task': [
+    'functional',
+    'code-quality',
+    'test-coverage',
+    'artifact-checks',
+    'verification-stability',
+  ],
+  bugfix: [
+    'defect-resolution',
+    'regression-protection',
+    'change-containment',
+    'verification-stability',
+    'defect-evidence-completeness',
+  ],
+  refactor: [
+    'behavior-preservation',
+    'structural-improvement',
+    'public-contract-stability',
+    'change-containment',
+    'verification-stability',
+  ],
+  'plan-to-code': [
+    'plan-adherence',
+    'planned-scope-coverage',
+    'acceptance-evidence-completeness',
+    'functional',
+    'verification-stability',
+  ],
+  'test-generation': [
+    'requirement-mapping',
+    'assertion-strength',
+    'coverage-lift',
+    'production-code-guardrail',
+    'verification-stability',
+  ],
+};
 
 function pathExists(filePath) {
   return fs.existsSync(filePath);
@@ -163,6 +223,14 @@ function scorerIds(text) {
   return [...new Set(scorerRefs(text).map((ref) => ref.id))];
 }
 
+function metricIdsForScorers(text) {
+  return [
+    ...new Set(
+      scorerIds(text).flatMap((scorerId) => scorerMetricIds[scorerId] || []),
+    ),
+  ];
+}
+
 function scorerEvaluationProfile(text) {
   return `scorers:${scorerRefs(text)
     .map((ref) => `${ref.id}@${ref.version ?? 1}:${ref.weight ?? 1}`)
@@ -185,9 +253,8 @@ function readScenarioRevision(scenario, revision) {
     timeout_sec: Number(firstScalar(yaml, 'timeout_sec')) || null,
     evaluation_profile: scorerEvaluationProfile(yaml),
     scorers: scorerIds(yaml),
-    metrics: [],
+    metrics: metricIdsForScorers(yaml),
     quality_gates: gateNames(yaml),
-    deterministic_checks: countBetween(yaml, 'deterministic_checks', ['requirements', 'scorers', 'visual', 'prompt'], /^\s*-\s*type:/),
     requirements: countBetween(yaml, 'requirements', ['scorers', 'visual', 'prompt'], /^\s*-\s*id:/),
     llm_as_judge_metrics: [...yaml.matchAll(/judge:\s*/gm)].length,
     visual_reference: /reference_image:\s*/.test(yaml),
@@ -240,13 +307,13 @@ function appendChangedLines(state, before, after, dp, maxLines) {
 }
 
 function appendContextLine(state, text) {
-  if (text.trim()) state.lines.push({ type: 'context', text });
+  if (text.trim()) state.lines.push({ type: 'context', text: sanitizeDashboardText(text) });
   state.i += 1;
   state.j += 1;
 }
 
 function appendTypedLine(state, type, text) {
-  state.lines.push({ type, text });
+  state.lines.push({ type, text: sanitizeDashboardText(text) });
   state[type] += 1;
   if (type === 'removed') {
     state.i += 1;
@@ -266,7 +333,7 @@ function classifyRevisionChange(beforeMeta, afterMeta, files) {
   const changes = [
     [beforeMeta?.evaluation_profile !== afterMeta?.evaluation_profile, 'evaluation profile changed'],
     [qualityGateKey(beforeMeta) !== qualityGateKey(afterMeta), 'quality gates changed'],
-    [beforeMeta?.deterministic_checks !== afterMeta?.deterministic_checks, 'deterministic checks changed'],
+    [beforeMeta?.requirements !== afterMeta?.requirements, 'requirements changed'],
     [beforeMeta?.visual_reference !== afterMeta?.visual_reference, 'visual baseline changed'],
     [diffChanged(files.prompt.diff), 'prompt changed'],
     [diffChanged(files.scenario.diff), 'scenario contract changed'],
@@ -301,8 +368,7 @@ function readRunDiagnostic(runsDir, runId) {
   return {
     run_id: runId,
     failing_gates: failingGateNames(gateItems),
-    acceptance_fail_ids: arrayOrEmpty(scorecard?.acceptance?.failed_ids),
-    requirement_missing_ids: arrayOrEmpty(scorecard?.requirements?.missing_ids),
+    requirement_missing_ids: arrayOrEmpty(scorecard?.requirements_coverage?.missing_requirement_ids),
     validity_ok: validity?.valid ?? null,
     workspace_diff_summary: workspaceDiff?.summary ?? null,
     paths: diagnosticPaths(runDir, verifier),
@@ -476,7 +542,6 @@ function scenarioMetadata(row) {
     scorers: row.scorers,
     metrics: row.metrics,
     quality_gates: [],
-    deterministic_checks: null,
     requirements: null,
     llm_as_judge_metrics: null,
     visual_reference: false,

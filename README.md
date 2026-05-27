@@ -95,14 +95,14 @@ make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml
 
 ## Core Concepts
 
-- A `scenario` is the contract: prompt, rules, starter, verification settings, acceptance requirements, attached scorers, and optional visual baseline.
+- A `scenario` is the contract: prompt, rules, starter, verification settings, requirements, attached scorers, and optional visual baseline.
 - A `scorer` is a reusable delivery-task scoring definition made of weighted metrics. Scenario `scorers[]` entries attach one or more scorers and assign scorer-level weights.
-- A `metric` is one measured signal inside a scorer, such as `functional`, `visual-regression`, `artifact-checks`, or `plan-quality`.
+- A `metric` is one measured signal inside a scorer, such as `functional`, `visual-regression`, `artifact-checks`, or `plan-adherence`.
 - A `harness` is the executable/runtime surface previously referred to as an agent.
 - An `AgentSpec` is one harness plus one model.
 - An `experiment` is one `AgentSpec` run against one scenario, usually with repeats.
 - A `benchmark` is a pinned experiment used as a stable comparison anchor across runs, scenario revisions, or decision points.
-- A `matrix config` uses top-level `experiment` and `agents` blocks; each entry in `agents` must declare a `harness` and `model`.
+- A `matrix config` uses `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries`; each entry declares `scenario_revision` and a nested `agent` with `harness`, `provider`, `model`, and optional `reasoning_effort`.
 - A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and harness logs.
 - An `evaluation_profile` is the weighted scorer set derived from `scorers[]`, such as `scorers:design-to-code@1:0.9+resource-efficiency@1:0.1`; use it as part of the identity when comparing experiments.
 
@@ -110,6 +110,6 @@ Canonical artifact paths use `runs/` and `harness/` under each experiment.
 
 ## Go Deeper
 
-- [docs/references/metrics.md](/Users/adamjackson/Projects/raidar/docs/references/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
-- [docs/references/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/raidar/docs/references/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
-- [docs/references/raidar-framework-comparison.md](/Users/adamjackson/Projects/raidar/docs/references/raidar-framework-comparison.md): comparison memo covering RAIDAR's delivery-focused differentiators and how it compares with Inspect AI, Promptfoo, and DeepEval.
+- [docs/references/metrics.md](/Users/adamjackson/Projects/complete/raidar/docs/references/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
+- [docs/references/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/complete/raidar/docs/references/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
+- [docs/references/raidar-framework-comparison.md](/Users/adamjackson/Projects/complete/raidar/docs/references/raidar-framework-comparison.md): comparison memo covering RAIDAR's delivery-focused differentiators and how it compares with Inspect AI, Promptfoo, and DeepEval.

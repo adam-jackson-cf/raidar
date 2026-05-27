@@ -11,7 +11,6 @@ from raidar.schemas.scenario import (
     RequirementSpec,
 )
 from raidar.schemas.scorecard import (
-    AcceptanceScore,
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
@@ -213,9 +212,9 @@ def test_terminated_outputs_zero_scored_surfaces_and_preserve_failure_reason() -
     outputs = scorecard.terminated_outputs("agent stopped")
 
     assert outputs.functional.passed is False
-    assert outputs.acceptance.checks[0].evidence == "agent stopped"
     assert outputs.test_coverage.passed is False
     assert outputs.execution_validity.checks[0].name == "run_completed"
+    assert outputs.execution_validity.checks[0].evidence == "agent stopped"
     assert outputs.requirements_coverage.total_requirements == 0
 
 
@@ -229,7 +228,6 @@ def _outputs(*, gates_passed: int = 1, gates_total: int = 1) -> EvaluationOutput
             gates_passed=gates_passed,
             gates_total=gates_total,
         ),
-        acceptance=AcceptanceScore(),
         visual=None,
         verification_stability=VerificationStabilityScore(),
         test_coverage=CoverageScore(),

@@ -563,12 +563,6 @@ function coverageFromSummary() {
   return { measured: Math.min(...values) / 100, source: summaryPath };
 }
 
-function scoreAcceptance(checks) {
-  if (checks.length === 0) return 1;
-  const passed = checks.filter((check) => check.passed).length;
-  return passed / checks.length;
-}
-
 function scoreVerificationStability(verificationStability) {
   const basePenalty = verificationStability.total_gate_failures / 4;
   const repeatPenalty = verificationStability.repeat_failures * 0.2;
@@ -841,12 +835,6 @@ function main() {
   }
   ensureDir(LOG_DIR);
   const scenarioSpec = readJson(scenarioSpecPath, {});
-  const sourceFiles = collectSourceFiles();
-  const deterministicChecks =
-    scenarioSpec.acceptance?.deterministic_checks || [];
-  const acceptanceChecks = deterministicChecks.map((check) =>
-    runDeterministicCheck(check, sourceFiles),
-  );
   const gateHistory = [];
   let gateFailures = 0;
 
@@ -906,7 +894,7 @@ function main() {
 
   const testSources = collectTestSources();
   const requirementsCoverage = checkRequirementMappings(
-    scenarioSpec.acceptance?.requirements || [],
+    scenarioSpec.requirements?.items || [],
     testSources,
   );
 
@@ -1091,7 +1079,6 @@ function main() {
     };
   }
 
-  const acceptanceScore = scoreAcceptance(acceptanceChecks);
   const failingGateNames = gateHistory
     .filter((event) => event.exit_code !== 0)
     .map((event) => event.gate_name);
@@ -1126,10 +1113,6 @@ function main() {
 
   const scorecard = {
     functional,
-    acceptance: {
-      checks: acceptanceChecks,
-      score: acceptanceScore,
-    },
     visual,
     verification_stability: verificationStability,
     test_coverage: testCoverage,
@@ -1184,17 +1167,6 @@ try {
       build_succeeded: false,
       gates_passed: 0,
       gates_total: 0,
-    },
-    acceptance: {
-      checks: [
-        {
-          rule: "Verifier execution completed",
-          type: "deterministic",
-          passed: false,
-          evidence: message,
-        },
-      ],
-      score: 0,
     },
     visual: null,
     verification_stability: {

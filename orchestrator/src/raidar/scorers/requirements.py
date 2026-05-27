@@ -22,11 +22,21 @@ class Requirements(BaseScorer):
         "deterministic checks cannot fully prove intent."
     )
     metrics = (
-        metric("requirements-coverage", "core", 0.35),
+        metric(
+            "requirements-coverage",
+            "core",
+            0.35,
+            evidence="Deterministic requirement checks configured on the scenario.",
+            score_derivation="Divides passing requirement checks by total requirement checks.",
+            pass_fail="Passes when every deterministic requirement check passes.",
+        ),
         metric(
             "requirements-adherence",
             "llm-as-judge",
             0.65,
+            evidence="Scenario requirements, prompt artifacts, and submitted outputs.",
+            score_derivation="Uses the scorer-owned requirements-adherence judge verdict.",
+            pass_fail="Passes when the judge determines requirements are materially satisfied.",
             config={"judge": "judges/requirements-adherence.toml"},
         ),
     )
@@ -48,8 +58,8 @@ class Requirements(BaseScorer):
 
 
 def _requirements_coverage_score(workspace: Path, scenario) -> MetricScore:
-    acceptance = getattr(scenario, "acceptance", None)
-    requirements = list(getattr(acceptance, "requirements", ()))
+    requirements_config = getattr(scenario, "requirements", None)
+    requirements = list(getattr(requirements_config, "items", ()))
     if not requirements:
         return MetricScore(
             metric_id="requirements-coverage",

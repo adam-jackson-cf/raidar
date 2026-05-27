@@ -5,7 +5,7 @@ This document defines the replacement for the current experiment review outputs.
 ## Scope and Terms
 
 - `harness`: the executable/runtime surface previously called an agent.
-- `AgentSpec`: one harness plus one model, for example `codex-cli + codex/gpt-5.4`.
+- `AgentSpec`: one harness plus one model, for example `codex-cli + gpt-5.5`.
 - `Scenario Board`: the high-level view for one scenario, showing one representative experiment for each `AgentSpec`.
 - `Experiment Review`: the detailed view for one representative experiment, including runs, evidence, and change context.
 - `benchmark`: the pinned comparison `AgentSpec` for the scenario, for example `claude-code + opus`.
@@ -70,7 +70,7 @@ The review surface should derive a small set of stable dimensions plus a separat
 
 | Dimension | Meaning | Current RAIDAR inputs |
 | --- | --- | --- |
-| `Task Fidelity` | Did the implementation satisfy the authored task and hard acceptance bar? | `functional`, `acceptance`, `requirements_coverage`, `llm-judge` |
+| `Task Fidelity` | Did the implementation satisfy the authored task and hard acceptance bar? | `functional`, `acceptance`, `requirements-coverage`, `requirements-adherence` |
 | `Scenario Fidelity` | How closely did the output match the scenario-specific target? | `visual` for UI tasks, equivalent scenario-family evidence for non-visual tasks |
 | `Workflow Discipline` | Did the harness behave cleanly around required verification and iteration? | required verification commands, first-pass verification success, repeat failures, gate history |
 | `Execution Reliability` | Did the run complete cleanly and preserve evaluation validity? | `execution_validity`, termination reason, timeout / early termination signals |

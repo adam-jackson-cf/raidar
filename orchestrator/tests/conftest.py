@@ -8,8 +8,6 @@ import pytest
 
 from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
-    AcceptanceCheck,
-    AcceptanceScore,
     EvalConfig,
     EvalRun,
     FunctionalScore,
@@ -106,13 +104,6 @@ def sample_scorecard() -> Scorecard:
             gates_passed=3,
             gates_total=3,
         ),
-        acceptance=AcceptanceScore(
-            checks=[
-                AcceptanceCheck(rule="Use React", type="deterministic", passed=True),
-                AcceptanceCheck(rule="No console.log", type="deterministic", passed=True),
-                AcceptanceCheck(rule="Code quality", type="deterministic", passed=True),
-            ]
-        ),
         visual=VisualScore(similarity=0.95),
         verification_stability=VerificationStabilityScore(
             total_gate_failures=1,
@@ -135,7 +126,7 @@ def sample_eval_run(sample_scorecard: Scorecard) -> EvalRun:
             scenario_revision="v001",
             starter_root="starter",
             evaluation_profile=(
-                "functional+acceptance+verification-stability+"
+                "functional+requirements-coverage+verification-stability+"
                 "execution-validity+resource-efficiency"
             ),
         ),

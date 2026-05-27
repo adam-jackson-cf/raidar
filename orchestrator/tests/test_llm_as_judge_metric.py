@@ -45,8 +45,8 @@ def _scenario() -> ScenarioDefinition:
             "category": "greenfield-ui",
             "timeout_sec": 1800,
             "starter": {"root": "starter"},
-            "acceptance": {
-                "requirements": [
+            "requirements": {
+                "items": [
                     {
                         "id": "req-copy",
                         "description": "Expected copy is present.",
@@ -99,11 +99,11 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
         workspace=workspace,
         scenario_dir=scenario_dir,
         scenario=_scenario(),
-        metric_id="plan-quality",
+        metric_id="plan-adherence",
         judge_path="judges/reviewer.toml",
     )
 
-    assert metric.metric_id == "plan-quality"
+    assert metric.metric_id == "plan-adherence"
     assert metric.score == 0.82
     assert metric.passed is True
     assert metric.evidence == "Strong plan with one verification gap."
@@ -114,6 +114,61 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
     assert len(calls) == 1
     assert calls[0]["judge_role"] == "You are a delivery reviewer."
     assert "src/page.tsx" in calls[0]["prompt"]
+    assert "Structured judge inputs:" in calls[0]["prompt"]
+    assert "changed_surfaces" in calls[0]["prompt"]
+    assert "execution_outcomes" in calls[0]["prompt"]
+    assert "deterministic_metric_summaries" in calls[0]["prompt"]
+
+
+def test_llm_as_judge_redacts_secret_shaped_prompt_and_response(
+    monkeypatch,
+    tmp_path: Path,
+) -> None:
+    scenario_dir = tmp_path / "scenario"
+    workspace = tmp_path / "workspace"
+    judge_path = tmp_path / "scorer-definitions" / "judges" / "reviewer.toml"
+    judge_path.parent.mkdir(parents=True)
+    (scenario_dir / "prompt").mkdir(parents=True)
+    (workspace / "src").mkdir(parents=True)
+    judge_path.write_text("You are a delivery reviewer.", encoding="utf-8")
+    (scenario_dir / "prompt" / "task.md").write_text(
+        "Use token=super-secret-value-1234567890", encoding="utf-8"
+    )
+    (workspace / "src" / "page.tsx").write_text(
+        "const password = 'hunter2-secret-value';\n", encoding="utf-8"
+    )
+    calls: list[dict[str, str]] = []
+
+    def fake_call_judge(*, judge_role: str, prompt: str) -> str:
+        calls.append({"judge_role": judge_role, "prompt": prompt})
+        return json.dumps(
+            {
+                "passed": True,
+                "score": 1,
+                "evidence": "Bearer abcdefghijklmnopqrstuvwxyz1234567890",
+                "findings": [{"evidence": "api_key=abcdef1234567890"}],
+            }
+        )
+
+    monkeypatch.setattr(llm_as_judge, "_call_judge", fake_call_judge)
+    monkeypatch.setattr(
+        llm_as_judge,
+        "resolve_scorer_definition_file",
+        lambda *args, **kwargs: judge_path,
+    )
+
+    metric = llm_as_judge.evaluate_llm_as_judge_metric(
+        workspace=workspace,
+        scenario_dir=scenario_dir,
+        scenario=_scenario(),
+        metric_id="plan-adherence",
+        judge_path="judges/reviewer.toml",
+    )
+
+    assert "super-secret-value" not in calls[0]["prompt"]
+    assert "hunter2-secret-value" not in calls[0]["prompt"]
+    assert "abcdefghijklmnopqrstuvwxyz" not in str(metric.evidence)
+    assert "abcdef1234567890" not in str(metric.judge_output)
 
 
 def test_call_codex_judge_uses_chatgpt_auth_without_api_key(
@@ -176,11 +231,11 @@ def test_evaluate_llm_as_judge_metric_fails_when_judge_file_missing(tmp_path: Pa
         workspace=workspace,
         scenario_dir=scenario_dir,
         scenario=_scenario(),
-        metric_id="plan-quality",
+        metric_id="plan-adherence",
         judge_path="judges/missing.md",
     )
 
-    assert metric.metric_id == "plan-quality"
+    assert metric.metric_id == "plan-adherence"
     assert metric.score == 0.0
     assert metric.passed is False
     assert metric.missing_patterns == ["judges/missing.md"]
@@ -201,7 +256,7 @@ def test_evaluate_llm_as_judge_metric_rejects_unsafe_judge_paths(
         workspace=workspace,
         scenario_dir=scenario_dir,
         scenario=_scenario(),
-        metric_id="plan-quality",
+        metric_id="plan-adherence",
         judge_path=judge_path,
     )
 

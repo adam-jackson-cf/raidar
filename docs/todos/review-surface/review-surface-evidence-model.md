@@ -88,7 +88,7 @@ These are supporting blocks. They do not replace the screenshot-led strip.
 
 Non-visual scenarios still need a scenario-family evidence model. The detail view must not fall back to generic metric tiles.
 
-For `code-delivery-nonvisual` tasks, the evidence strip should provide:
+For `code-task-nonvisual` tasks, the evidence strip should provide:
 
 - outcome proof: deterministic requirement results and authored acceptance outcomes
 - implementation proof: changed file clusters and code-diff excerpts tied to affected areas

@@ -209,6 +209,18 @@ def test_csv_export_row_contains_process_phase_and_artifact_metrics(tmp_path):
     assert row["visual_similarity"] == 0.9
 
 
+def test_csv_export_redacts_unscored_reason_values(tmp_path):
+    run = _run("run-secret", unscored=True)
+    run.scores.unscored_reasons = ["DB_PASSWORD=abcdefghijklmnop"]
+    output = tmp_path / "runs.csv"
+
+    export_to_csv([run], output)
+
+    payload = output.read_text(encoding="utf-8")
+    assert "abcdefghijklmnop" not in payload
+    assert "DB_PASSWORD=<redacted>" in payload
+
+
 def test_comparison_report_sections_cover_valid_invalid_and_unscored_runs(monkeypatch):
     monkeypatch.setattr(
         "raidar.storage.datetime", type("D", (), {"now": staticmethod(datetime.now)})
@@ -216,6 +228,8 @@ def test_comparison_report_sections_cover_valid_invalid_and_unscored_runs(monkey
     valid = _run("run-a", duration=10)
     invalid = _run("run-b", valid=False, duration=20, visual=False)
     unscored = _run("run-c", unscored=True, duration=30)
+    unscored.scores.unscored_reasons = ["OPENAI_API_KEY=abcdefghijklmnop"]
+    unscored.termination_reason = "Bearer abcdefghijklmnop password=hunter2value"
 
     assert _normalized_lower_better(1, 1, 1) == 1.0
     assert _normalized_lower_better(5, 0, 10) == 0.5
@@ -232,6 +246,9 @@ def test_comparison_report_sections_cover_valid_invalid_and_unscored_runs(monkey
     assert "## Diagnostic Ranking (Invalid Runs)" in report
     assert "## Unscored Runs (Rerun Required)" in report
     assert "run_id=run-c" in report
+    assert "abcdefghijklmnop" not in report
+    assert "hunter2value" not in report
+    assert "OPENAI_API_KEY=<redacted>" in report
     assert generate_comparison_report([]) == "# Experiment Report\n\nNo runs to report."
 
     all_unscored_report = generate_comparison_report([unscored])

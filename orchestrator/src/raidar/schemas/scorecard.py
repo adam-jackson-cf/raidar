@@ -28,27 +28,13 @@ class FunctionalScore(BaseModel):
         return self.tests_passed / self.tests_total
 
 
-class AcceptanceCheck(BaseModel):
-    """Result of a single acceptance check."""
+class RequirementCheck(BaseModel):
+    """Result of a single deterministic requirement check."""
 
     rule: str = Field(description="Rule description")
     type: str = Field(description="Check type")
     passed: bool = Field(description="Whether check passed")
     evidence: str | None = Field(default=None, description="Supporting evidence")
-
-
-class AcceptanceScore(BaseModel):
-    """Acceptance evaluation with auto-computed score."""
-
-    checks: list[AcceptanceCheck] = Field(default_factory=list)
-
-    @computed_field
-    @property
-    def score(self) -> float:
-        if not self.checks:
-            return 1.0
-        passed_count = sum(1 for check in self.checks if check.passed)
-        return passed_count / len(self.checks)
 
 
 class VisualScore(BaseModel):
@@ -246,7 +232,6 @@ class Scorecard(BaseModel):
     unscored_reasons: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
     functional: FunctionalScore = Field(default_factory=FunctionalScore)
-    acceptance: AcceptanceScore = Field(default_factory=AcceptanceScore)
     visual: VisualScore | None = Field(default_factory=VisualScore)
     verification_stability: VerificationStabilityScore = Field(
         default_factory=VerificationStabilityScore
@@ -287,7 +272,6 @@ class Scorecard(BaseModel):
                 return metric.score
         metric_scores = {
             "functional": self.functional.score,
-            "acceptance": self.acceptance.score,
             "verification-stability": self.verification_stability.score,
             "execution-validity": 1.0 if self.execution_validity.passed else 0.0,
             "resource-efficiency": self.resource_efficiency.score,
