@@ -355,15 +355,7 @@ def _command_records_for_harness(
         return _command_records_from_gemini_trajectory(
             trial_dir, include_git_commit=include_git_commit
         )
-    if harness == "cursor":
-        return _command_records_from_harness_stdout(
-            trial_dir, include_git_commit=include_git_commit
-        )
-    if harness == "copilot":
-        return _command_records_from_harness_stdout(
-            trial_dir, include_git_commit=include_git_commit
-        )
-    if harness == "pi":
+    if harness in {"cursor", "copilot", "pi"}:
         return _command_records_from_harness_stdout(
             trial_dir, include_git_commit=include_git_commit
         )

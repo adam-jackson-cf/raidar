@@ -130,7 +130,7 @@ def test_chatgpt_mode_requires_file_backed_auth(
 
 @pytest.mark.parametrize(
     ("model_name", "model_argument", "reasoning_effort"),
-    (
+    [
         ("gpt-5.5", "openai/gpt-5.5", "low"),
         ("gpt-5.5", "openai/gpt-5.5", "medium"),
         ("gpt-5.5", "openai/gpt-5.5", "high"),
@@ -148,7 +148,7 @@ def test_chatgpt_mode_requires_file_backed_auth(
         ("gpt-5.4", "openai/gpt-5.4", "xhigh"),
         ("gpt-5.4-mini", "openai/gpt-5.4-mini", None),
         ("gpt-5.4-mini", "openai/gpt-5.4-mini", "low"),
-    ),
+    ],
 )
 def test_aliases_requested_codex_models(
     monkeypatch: pytest.MonkeyPatch,

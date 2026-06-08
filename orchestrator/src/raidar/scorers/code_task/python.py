@@ -61,7 +61,7 @@ class CommandOutcome:
         return self.returncode == 0
 
 
-@register_scorer(id="python-code-task", version=1)
+@register_scorer(scorer_id="python-code-task", version=1)
 class PythonCodeTask(CodeTaskScorer):
     """Python-specific code-task scorer implementation contract."""
 

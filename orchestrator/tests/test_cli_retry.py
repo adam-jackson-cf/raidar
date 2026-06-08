@@ -3,6 +3,7 @@
 from types import SimpleNamespace
 
 import click
+import pytest
 
 from raidar.application import run_dispatch
 from raidar.commands import shared as cli_shared
@@ -82,14 +83,10 @@ def test_run_with_unscored_reruns_abort_on_starter_preflight_error(monkeypatch):
 
     monkeypatch.setattr(run_dispatch, "_execute_repeat_batch", fail_preflight)
 
-    try:
+    with pytest.raises(click.ClickException, match="Fatal starter preflight error"):
         run_dispatch._run_with_unscored_reruns(
             request=SimpleNamespace(),
             repeats=2,
             repeat_parallel=1,
             rerun_unscored=1,
         )
-    except click.ClickException as exc:
-        assert "Fatal starter preflight error" in str(exc)
-    else:
-        raise AssertionError("Expected fatal starter preflight ClickException.")

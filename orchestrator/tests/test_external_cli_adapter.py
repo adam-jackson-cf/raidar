@@ -17,7 +17,7 @@ def _config(harness: Harness, provider: str, model: str = "model") -> AgentSpec:
 
 @pytest.mark.parametrize(
     ("adapter_class", "harness", "provider", "cli_env", "api_env", "cli_path"),
-    (
+    [
         (CursorCliAdapter, Harness.CURSOR, "openai", "CURSOR_CLI_PATH", "CURSOR_API_KEY", "cursor"),
         (
             CopilotCliAdapter,
@@ -28,7 +28,7 @@ def _config(harness: Harness, provider: str, model: str = "model") -> AgentSpec:
             "copilot",
         ),
         (PiCliAdapter, Harness.PI, "inflection", "PI_CLI_PATH", "PI_API_TOKEN", "pi"),
-    ),
+    ],
 )
 def test_external_cli_adapters_validate_env_path_and_required_secret(
     monkeypatch: pytest.MonkeyPatch,

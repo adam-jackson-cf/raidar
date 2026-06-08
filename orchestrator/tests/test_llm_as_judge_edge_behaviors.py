@@ -2,6 +2,8 @@ import json
 import subprocess
 from types import SimpleNamespace
 
+import pytest
+
 from raidar.scorers import llm_as_judge
 
 
@@ -205,10 +207,8 @@ def test_call_codex_judge_requires_chatgpt_auth_and_returns_response(monkeypatch
         "resolve_codex_auth",
         lambda requested_mode: SimpleNamespace(resolved_mode="api-key", auth_json_path=None),
     )
-    try:
+    with pytest.raises(OSError, match="ChatGPT auth"):
         llm_as_judge._call_codex_judge(judge_role="role", prompt="prompt")
-    except OSError as exc:
-        assert "ChatGPT auth" in str(exc)
 
     monkeypatch.setattr(
         llm_as_judge,
@@ -240,7 +240,5 @@ def test_call_codex_judge_requires_chatgpt_auth_and_returns_response(monkeypatch
             command, 2, stdout="out", stderr="err"
         ),
     )
-    try:
+    with pytest.raises(RuntimeError, match="Codex judge failed with exit 2"):
         llm_as_judge._call_codex_judge(judge_role="role", prompt="prompt")
-    except RuntimeError as exc:
-        assert "Codex judge failed with exit 2" in str(exc)

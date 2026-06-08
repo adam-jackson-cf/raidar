@@ -84,7 +84,12 @@ def test_default_reasoning_effort_is_forwarded_for_supported_models(
 
 @pytest.mark.parametrize(
     "model_name",
-    ("claude-opus-4-6", "claude-sonnet-4-6", "claude-sonnet-4-5", "claude-haiku-4-5"),
+    [
+        "claude-opus-4-6",
+        "claude-sonnet-4-6",
+        "claude-sonnet-4-5",
+        "claude-haiku-4-5",
+    ],
 )
 def test_validate_accepts_requested_models(monkeypatch: pytest.MonkeyPatch, model_name: str):
     monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")

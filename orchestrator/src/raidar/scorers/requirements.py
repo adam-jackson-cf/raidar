@@ -11,7 +11,7 @@ from raidar.scorers.deterministic import run_deterministic_check
 from raidar.scorers.llm_as_judge import evaluate_llm_as_judge_metric
 
 
-@register_scorer(id="requirements", version=1)
+@register_scorer(scorer_id="requirements", version=1)
 class Requirements(BaseScorer):
     """Shared requirements-domain scorer backed by requirement-specific metrics."""
 

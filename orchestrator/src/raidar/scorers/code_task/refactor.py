@@ -14,7 +14,7 @@ from raidar.scorers.common import (
 )
 
 
-@register_scorer(id="refactor", version=1)
+@register_scorer(scorer_id="refactor", version=1)
 class Refactor(BaseScorer):
     """Refactor scorer retained as a proposed code-backed definition."""
 

@@ -15,7 +15,7 @@ from raidar.scorers.common import (
 )
 
 
-@register_scorer(id="design-to-code", version=1)
+@register_scorer(scorer_id="design-to-code", version=1)
 class DesignToCode(BaseScorer):
     """Design-to-code scorer retained as a code-backed definition."""
 

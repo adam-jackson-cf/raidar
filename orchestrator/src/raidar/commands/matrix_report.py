@@ -198,9 +198,15 @@ def run_sequential_matrix_jobs(jobs, run_matrix_job) -> tuple[int, int]:
 
 @click.command()
 @click.option("--results", "-r", type=click.Path(exists=True, path_type=Path), required=True)
-@click.option("--format", "-f", type=click.Choice(["json", "csv", "markdown"]), default="markdown")
+@click.option(
+    "--format",
+    "-f",
+    "output_format",
+    type=click.Choice(["json", "csv", "markdown"]),
+    default="markdown",
+)
 @click.option("--output", "-o", type=click.Path(path_type=Path))
-def report(results: Path, format: str, output: Path | None) -> None:
+def report(results: Path, output_format: str, output: Path | None) -> None:
     """Generate a comparison report from experiment runs."""
     from raidar.storage import (
         aggregate_results,
@@ -217,11 +223,11 @@ def report(results: Path, format: str, output: Path | None) -> None:
         click.echo("No runs found")
         return
 
-    if format == "csv":
+    if output_format == "csv":
         out_path = output or (results / "comparison.csv")
         export_to_csv(runs, out_path)
         click.echo(f"CSV exported to {out_path}")
-    elif format == "markdown":
+    elif output_format == "markdown":
         report_text = generate_comparison_report(runs)
         if output:
             output.write_text(report_text)

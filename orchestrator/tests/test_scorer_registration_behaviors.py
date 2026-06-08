@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from raidar.schemas.scenario import DeterministicCheck
 from raidar.schemas.scorecard import (
     CoverageScore,
@@ -315,27 +317,18 @@ def test_scorer_registry_resolution_and_metric_definition_edges():
     zero_weight = SimpleNamespace(
         scorers=[SimpleNamespace(id="resource-efficiency", version=1, weight=0.0, config={})]
     )
-    try:
+    with pytest.raises(ScorerResolutionError, match="positive total"):
         resolve_scorers(zero_weight)
-    except ScorerResolutionError as exc:
-        assert "positive total" in str(exc)
-    else:  # pragma: no cover - defensive guard for assertion clarity
-        raise AssertionError("zero-weight scorer resolution should fail")
 
     bad_metric = SimpleNamespace(id="custom", type="unsupported", config={})
-    try:
+    with pytest.raises(ScorerResolutionError, match="Unsupported scorer metric type"):
         _metric_definition(bad_metric)
-    except ScorerResolutionError as exc:
-        assert "Unsupported scorer metric type" in str(exc)
-    else:  # pragma: no cover - defensive guard for assertion clarity
-        raise AssertionError("unsupported metric type should fail")
 
 
 def test_removed_generic_and_acceptance_scorers_are_unknown():
     for scorer_id in ("code-task", "acceptance"):
-        try:
+        with pytest.raises(
+            ScorerResolutionError,
+            match=f"Unknown scorer definition: {scorer_id}@1",
+        ):
             load_scorer_definition(scorer_id, 1)
-        except ScorerResolutionError as exc:
-            assert f"Unknown scorer definition: {scorer_id}@1" in str(exc)
-        else:  # pragma: no cover - defensive guard for assertion clarity
-            raise AssertionError(f"{scorer_id}@1 should not be registered")

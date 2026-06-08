@@ -15,7 +15,7 @@ from raidar.scorers.common import (
 )
 
 
-@register_scorer(id="bugfix", version=1)
+@register_scorer(scorer_id="bugfix", version=1)
 class Bugfix(BaseScorer):
     """Bugfix scorer retained as a proposed code-backed definition."""
 

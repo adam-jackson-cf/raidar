@@ -24,7 +24,7 @@ TYPESCRIPT_EXCLUDED_DIRS = {
 }
 
 
-@register_scorer(id="typescript-code-task", version=1)
+@register_scorer(scorer_id="typescript-code-task", version=1)
 class TypeScriptCodeTask(CodeTaskScorer):
     """TypeScript-specific code-task scorer implementation contract."""
 

@@ -7,7 +7,7 @@ from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, regis
 from raidar.scorers.common import metric
 
 
-@register_scorer(id="resource-efficiency", version=1)
+@register_scorer(scorer_id="resource-efficiency", version=1)
 class ResourceEfficiency(BaseScorer):
     """Shared resource-efficiency scorer."""
 

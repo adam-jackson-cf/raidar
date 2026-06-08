@@ -101,14 +101,14 @@ class BaseScorer:
 _SCORER_REGISTRY: dict[tuple[str, int], type[BaseScorer]] = {}
 
 
-def register_scorer(*, id: str, version: int):
+def register_scorer(*, scorer_id: str, version: int):
     """Register a code-backed scorer implementation."""
 
     def decorator(cls: type[BaseScorer]) -> type[BaseScorer]:
-        key = (id, version)
+        key = (scorer_id, version)
         if key in _SCORER_REGISTRY:
-            raise ScorerResolutionError(f"Duplicate scorer registration: {id}@{version}")
-        cls.id = id
+            raise ScorerResolutionError(f"Duplicate scorer registration: {scorer_id}@{version}")
+        cls.id = scorer_id
         cls.version = version
         _SCORER_REGISTRY[key] = cls
         return cls

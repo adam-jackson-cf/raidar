@@ -15,7 +15,7 @@ from raidar.scorers.common import (
 )
 
 
-@register_scorer(id="test-generation", version=1)
+@register_scorer(scorer_id="test-generation", version=1)
 class TestGeneration(BaseScorer):
     """Test-generation scorer retained as a proposed code-backed definition."""
 

@@ -12,7 +12,7 @@ from raidar.scorers.common import metric, valid_changed_file_paths, verification
 from raidar.scorers.llm_as_judge import evaluate_llm_as_judge_metric
 
 
-@register_scorer(id="plan-to-code", version=1)
+@register_scorer(scorer_id="plan-to-code", version=1)
 class PlanToCode(BaseScorer):
     """Plan-to-code scorer retained as a proposed code-backed definition."""
 

@@ -892,12 +892,11 @@ def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, mon
         ],
     )
 
-    try:
+    with pytest.raises(
+        click.ClickException,
+        match="Generated Harbor artifacts must not be committed",
+    ):
         assert_no_generated_artifact_changes(tmp_path)
-    except click.ClickException as exc:
-        assert "Generated Harbor artifacts must not be committed" in str(exc)
-    else:
-        raise AssertionError("Expected generated artifact guard failure.")
 
 
 def _create_starter_files(scenario_dir: Path, revision: str) -> None:

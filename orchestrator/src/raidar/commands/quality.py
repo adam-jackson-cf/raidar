@@ -18,6 +18,7 @@ INTEGRATION_TEST_TARGETS = [
     "tests/test_task_images_and_workspace_phase.py",
 ]
 FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py"
+PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"
 IMPORT_LINTER_CONFIG = ORCHESTRATOR_ROOT / ".importlinter"
 TYPECHECK_TARGETS = [
     "src/raidar/watcher",
@@ -84,7 +85,20 @@ def coverage_env() -> dict[str, str]:
 
 def run_orchestrator_quality_gates() -> None:
     run_or_raise(
-        [python_cmd(), str(FANOUT_CHECK_SCRIPT), "--repo-root", str(REPO_ROOT)],
+        [
+            python_cmd(),
+            str(FANOUT_CHECK_SCRIPT),
+            "--repo-root",
+            str(REPO_ROOT),
+            "--source-root",
+            "orchestrator/src",
+            "--root-package",
+            "raidar",
+        ],
+        REPO_ROOT,
+    )
+    run_or_raise(
+        [python_cmd(), str(PYTHON_QUALITY_CHECK_SCRIPT), "--repo-root", str(REPO_ROOT)],
         REPO_ROOT,
     )
     run_or_raise(["lint-imports", "--config", str(IMPORT_LINTER_CONFIG)], ORCHESTRATOR_ROOT)
