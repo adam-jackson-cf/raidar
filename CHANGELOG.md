@@ -2,6 +2,18 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.13.0] - 2026-06-09
+
+- feat: migrate scorer definitions to coded scorers
+- feat: move matrix execution to stored configs
+- refactor: realize scorer metric contracts
+- refactor: make scorers canonical
+- refactor: organize scorer implementations
+- docs: organize todo references
+- chore: add scorer platform goal
+- chore: strengthen python quality gates
+- chore: ignore generated runtime outputs
+
 ## [0.12.1] - 2026-05-20
 
 - refactor: introduce scorer-based metrics
