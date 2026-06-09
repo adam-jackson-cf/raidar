@@ -55,6 +55,8 @@ benchmark-view/src/data.json
 # Lock files (keep bun.lock for scaffold)
 .enaible/
 .plan/
+.codegraph/
+.codex/
 
 # Infisical local state
 .infisical.json

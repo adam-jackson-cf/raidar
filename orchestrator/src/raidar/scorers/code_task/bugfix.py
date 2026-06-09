@@ -17,9 +17,9 @@ from raidar.scorers.common import (
 
 @register_scorer(scorer_id="bugfix", version=1)
 class Bugfix(BaseScorer):
-    """Bugfix scorer retained as a proposed code-backed definition."""
+    """Bugfix scorer promoted to an active code-backed definition."""
 
-    status = "proposed"
+    status = "active"
     category = "quality"
     description = (
         "Scores targeted defect fixes with regression coverage, minimal unrelated "

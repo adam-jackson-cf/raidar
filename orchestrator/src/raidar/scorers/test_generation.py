@@ -17,9 +17,9 @@ from raidar.scorers.common import (
 
 @register_scorer(scorer_id="test-generation", version=1)
 class TestGeneration(BaseScorer):
-    """Test-generation scorer retained as a proposed code-backed definition."""
+    """Test-generation scorer promoted to an active code-backed definition."""
 
-    status = "proposed"
+    status = "active"
     category = "quality"
     description = (
         "Scores test-generation tasks by coverage lift, meaningful requirement "

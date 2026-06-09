@@ -65,7 +65,7 @@ class CommandOutcome:
 class PythonCodeTask(CodeTaskScorer):
     """Python-specific code-task scorer implementation contract."""
 
-    status = "proposed"
+    status = "active"
     category = "quality"
     extends = "code-task"
     runtime = "python"

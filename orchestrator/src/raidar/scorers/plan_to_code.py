@@ -14,9 +14,9 @@ from raidar.scorers.llm_as_judge import evaluate_llm_as_judge_metric
 
 @register_scorer(scorer_id="plan-to-code", version=1)
 class PlanToCode(BaseScorer):
-    """Plan-to-code scorer retained as a proposed code-backed definition."""
+    """Plan-to-code scorer promoted to an active code-backed definition."""
 
-    status = "proposed"
+    status = "active"
     category = "quality"
     description = (
         "Scores implementation against an approved plan, including plan adherence "
