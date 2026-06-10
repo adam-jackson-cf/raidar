@@ -1,6 +1,7 @@
 import json
 import subprocess
 import time
+from pathlib import Path
 
 import pytest
 
@@ -24,32 +25,29 @@ def test_load_task_image_cache_payload_removes_invalid_files(tmp_path):
     assert task_images._load_task_image_cache_payload(valid) == {"image_name": "img"}
 
 
-def test_stale_task_image_name_returns_only_expired_inactive_images(monkeypatch, tmp_path):
+def test_stale_task_image_names_returns_only_expired_inactive_images(monkeypatch, tmp_path):
     metadata = tmp_path / "image.json"
     metadata.write_text('{"image_name":"old"}', encoding="utf-8")
     old = time.time() - task_images.RAIDAR_DOCKER_CACHE_MAX_AGE_SEC - 10
     fresh = time.time()
     monkeypatch.setattr(task_images, "_cache_last_used_epoch", lambda _path: old)
 
+    assert task_images._stale_task_image_names(
+        metadata, now=time.time(), active_image_name=None
+    ) == ("old",)
     assert (
-        task_images._stale_task_image_name(metadata, now=time.time(), active_image_name=None)
-        == "old"
-    )
-    assert (
-        task_images._stale_task_image_name(metadata, now=time.time(), active_image_name="old")
-        is None
+        task_images._stale_task_image_names(metadata, now=time.time(), active_image_name="old")
+        == ()
     )
 
     monkeypatch.setattr(task_images, "_cache_last_used_epoch", lambda _path: fresh)
     assert (
-        task_images._stale_task_image_name(metadata, now=time.time(), active_image_name=None)
-        is None
+        task_images._stale_task_image_names(metadata, now=time.time(), active_image_name=None) == ()
     )
 
     metadata.write_text('{"image_name":42}', encoding="utf-8")
     assert (
-        task_images._stale_task_image_name(metadata, now=time.time(), active_image_name=None)
-        is None
+        task_images._stale_task_image_names(metadata, now=time.time(), active_image_name=None) == ()
     )
     assert not metadata.exists()
 
@@ -191,6 +189,57 @@ def test_run_task_image_build_handles_timeout_and_missing_docker(monkeypatch):
     monkeypatch.setattr(task_images.subprocess, "run", missing)
     with pytest.raises(RuntimeError, match="Docker CLI not found"):
         task_images._run_task_image_build(["docker"], {}, timeout_sec=5)
+
+
+def test_task_image_build_command_tags_primary_and_reserve_images():
+    image_ref = TaskImageRef("image:tag", "cache", "tag")
+
+    command = task_images._task_image_build_command(
+        image_ref, Path("Dockerfile"), Path("context"), harness="codex-cli"
+    )
+
+    tag_values = [command[index + 1] for index, value in enumerate(command) if value == "--tag"]
+    assert tag_values == ["image:tag", "image:tag-reserve"]
+
+
+def test_task_image_cache_hit_restores_primary_tag_from_validated_reserve(
+    monkeypatch,
+):
+    image_ref = TaskImageRef("image:tag", "cache", "tag")
+    monkeypatch.setattr(task_images, "_repo_cache_identity", lambda: "repo")
+    expected = task_images._expected_task_image_labels(image_ref, "codex-cli")
+    labels_by_image = {"image:tag-reserve": expected}
+
+    monkeypatch.setattr(
+        task_images,
+        "_inspect_docker_image_labels",
+        lambda image_name, _env: labels_by_image.get(image_name),
+    )
+    tag_calls: list[tuple[str, str]] = []
+
+    def fake_tag(source_image: str, target_image: str, _env: dict[str, str]) -> bool:
+        tag_calls.append((source_image, target_image))
+        labels_by_image[target_image] = labels_by_image[source_image]
+        return True
+
+    monkeypatch.setattr(task_images, "_tag_task_image", fake_tag)
+
+    assert task_images._task_image_cache_hit(image_ref, harness="codex-cli", run_env={})
+    assert tag_calls == [("image:tag-reserve", "image:tag")]
+
+
+def test_run_task_image_build_does_not_force_legacy_docker_builder(monkeypatch):
+    captured_env: dict[str, str] = {}
+
+    def fake_run(*_args, **kwargs):
+        captured_env.update(kwargs["env"])
+        return subprocess.CompletedProcess(["docker"], 0, stdout="", stderr="")
+
+    monkeypatch.setattr(task_images.subprocess, "run", fake_run)
+
+    task_images._run_task_image_build(["docker", "build"], {}, timeout_sec=5)
+
+    assert "DOCKER_BUILDKIT" not in captured_env
 
 
 def test_runtime_preflight_writes_logs_and_reports_failures(monkeypatch, tmp_path):

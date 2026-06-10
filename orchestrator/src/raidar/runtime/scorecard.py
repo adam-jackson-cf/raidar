@@ -154,7 +154,7 @@ def evaluate_coverage(
     measured, source = _coverage_from_summary_file(workspace)
     if measured is None:
         measured, source = _coverage_from_gate_history(gate_history)
-    passed = threshold is None or (measured is not None and measured >= threshold)
+    passed = threshold is None or threshold <= 0 or (measured is not None and measured >= threshold)
     return CoverageScore(
         threshold=threshold,
         measured=measured,

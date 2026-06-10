@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from raidar.runtime import scoring_outputs as scoring_outputs_runtime
+from raidar.schemas.scorecard import Scorecard
 from tests import runtime_process_metrics_support as process_support
 from tests import runtime_scorecard_workspace_support as runtime_support
 
@@ -1578,6 +1579,22 @@ def test_evaluate_coverage_parses_gate_output_when_summary_missing(tmp_path: Pat
     assert score.measured == 0.83
     assert score.passed is False
     assert score.source == "gate:coverage"
+
+
+def test_evaluate_coverage_zero_threshold_does_not_require_measurement(tmp_path: Path):
+    score = evaluate_coverage(tmp_path, gate_history=[], threshold=0)
+
+    assert score.threshold == 0
+    assert score.measured is None
+    assert score.passed is True
+
+
+def test_coverage_profile_score_treats_zero_threshold_as_no_minimum():
+    scorecard = Scorecard(
+        test_coverage=CoverageScore(threshold=0, measured=None, passed=True),
+    )
+
+    assert scorecard.metric_score("test-coverage") == 1.0
 
 
 def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):

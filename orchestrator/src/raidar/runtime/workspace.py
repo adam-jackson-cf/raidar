@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import re
 import shutil
 import uuid
 from datetime import UTC, datetime
@@ -32,11 +31,6 @@ def load_scenario(scenario_path: Path) -> ScenarioDefinition:
     with open(scenario_path, encoding="utf-8") as f:
         data = yaml.safe_load(f)
     return ScenarioDefinition.model_validate(data)
-
-
-def _slug_fragment(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug or "unknown"
 
 
 def _harness_value(harness: Harness | Any) -> str:

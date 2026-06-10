@@ -262,6 +262,10 @@ def _load_project_env(repo_root: Path) -> None:
         load_dotenv(env_path, override=False)
 
 
+def cleanup_stale_harbor_before_runs() -> None:
+    _cleanup_stale_harbor_before_runs()
+
+
 def _cleanup_stale_harbor_before_runs() -> None:
     cleanup_stale_harbor_resources(
         include_containers=True,
