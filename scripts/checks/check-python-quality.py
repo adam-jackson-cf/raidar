@@ -91,7 +91,9 @@ def discover_maintained_python_files(repo_root: Path) -> list[Path]:
 def _is_snake_case_name(name: str) -> bool:
     if name == "__init__":
         return True
-    return bool(name) and all(char == "_" or char.islower() or char.isdigit() for char in name)
+    if not name or name[0].isdigit():
+        return False
+    return all(char == "_" or char.islower() or char.isdigit() for char in name)
 
 
 def _root_diagnostics(relpath: str) -> list[Diagnostic]:
