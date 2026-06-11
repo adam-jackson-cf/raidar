@@ -68,6 +68,16 @@ Notes:
 - `scorers[]` is required and defines the scenario evaluation profile.
 - Scorer refs must point to active executable definitions registered by code under `orchestrator/src/raidar/scorers/`.
 - Scenario YAML is strict. Removed fields such as top-level `metrics`, top-level `score_profile`, and `acceptance.llm_judge_rubric` fail validation.
+- Scenarios may declare retained evidence files the agent must write during the run:
+
+```yaml
+evidence:
+  retained_files:
+    - path: evidence/defect-evidence.json
+      description: Reproduction note, regression test paths, and verification evidence.
+```
+
+  Declared files must be JSON objects in the run workspace. After the run, their top-level string and string-list fields are ingested into scorer-visible retained evidence (size-capped; platform keys are protected). Scorers such as `bugfix@1` consume these fields for evidence-completeness metrics. See `scenarios/bugfix-ledger-balance/v001/` for a working example.
 
 ## 2.1 Configure Scorers
 

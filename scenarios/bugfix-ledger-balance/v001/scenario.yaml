@@ -1,0 +1,96 @@
+name: bugfix-ledger-balance
+scenario_revision: v001
+parent_revision: null
+description: Targeted ledger defect fix with reproduction, regression protection, contained changes, and retained defect evidence
+difficulty: easy
+category: bugfix
+timeout_sec: 1800
+dockerfile: ./Dockerfile
+test_scripts: []
+
+starter:
+  root: starter
+
+verification:
+  max_gate_failures: 4
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+    - [bun, run, typecheck]
+    - [bun, run, lint]
+    - [bun, run, test]
+    - [bun, run, "test:coverage"]
+  setup_actions: []
+  gates:
+    - name: typecheck
+      command: [bun, run, typecheck]
+      on_failure: continue
+    - name: lint
+      command: [bun, run, lint]
+      on_failure: continue
+    - name: test
+      command: [bun, run, test]
+      on_failure: continue
+    - name: coverage
+      command: [bun, run, "test:coverage"]
+      on_failure: continue
+  workflow:
+    atomic_commits_required: false
+
+requirements:
+  items:
+    - id: req-repro-test-enabled
+      description: The skipped RAID-1042 reproduction test is re-enabled and no skipped tests remain.
+      check:
+        type: no_pattern
+        pattern: it\.skip
+        description: No skipped tests remain in source or test files
+      required_test_evidence: []
+    - id: req-ledger-module-intact
+      description: The ledger module still exists at its original path.
+      check:
+        type: file_exists
+        pattern: src/lib/ledger.ts
+        description: Ledger module exists
+      required_test_evidence: []
+    - id: req-debit-regression-suite
+      description: A dedicated regression suite protects debit handling.
+      check:
+        type: file_exists
+        pattern: src/test/ledger.regression.test.ts
+        description: Regression test suite exists
+      required_test_evidence: []
+    - id: req-defect-evidence-retained
+      description: Defect evidence is retained as a JSON object in the workspace.
+      check:
+        type: file_exists
+        pattern: evidence/defect-evidence.json
+        description: Defect evidence file exists
+      required_test_evidence: []
+    - id: req-no-todo
+      description: No TODO markers remain in production or test files.
+      check:
+        type: no_pattern
+        pattern: TODO
+        description: No TODO markers remain in production or test files
+      required_test_evidence: []
+
+evidence:
+  retained_files:
+    - path: evidence/defect-evidence.json
+      description: Reproduction note, regression test paths, and verification evidence retained by the agent.
+
+scorers:
+  - id: bugfix
+    version: 1
+    weight: 0.88
+  - id: requirements
+    version: 1
+    weight: 0.10
+  - id: resource-efficiency
+    version: 1
+    weight: 0.02
+
+prompt:
+  entry: prompt/task.md
+  includes: []
