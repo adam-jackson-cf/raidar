@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -15,13 +16,25 @@ from raidar.schemas.scorecard import EvalConfig, EvalRun, MetricScore, Scorecard
 
 def _run(run_id: str, *, unscored: bool = False, root: Path | None = None):
     run_json_path = (root or Path("/tmp")) / run_id / "run.json"
-    return SimpleNamespace(
+    return EvalRun(
         id=run_id,
-        scores=SimpleNamespace(
+        timestamp=datetime.now(UTC).isoformat(),
+        config=EvalConfig(
+            model="openai/gpt-5.5",
+            harness="codex-cli",
+            scenario_name="demo-task",
+            scenario_revision="v001",
+            starter_root="starter",
+            evaluation_profile="functional",
+        ),
+        duration_sec=1.0,
+        scores=Scorecard(
+            run_id=run_id,
+            scenario_name="demo-task",
+            scenario_revision="v001",
             unscored=unscored,
             metadata={"run": {"run_json_path": str(run_json_path)}},
         ),
-        model_dump_json=lambda indent=2: f'{{"id":"{run_id}"}}',
     )
 
 
@@ -56,6 +69,10 @@ def test_summary_and_persist_eval_run_require_canonical_path(tmp_path):
     path = run_dispatch.persist_eval_run(run)
 
     assert path == tmp_path / "run-a" / "run.json"
+    findings_payload = json.loads((tmp_path / "run-a" / "findings.json").read_text("utf-8"))
+    assert findings_payload["run_id"] == "run-a"
+    assert findings_payload["schema_version"] == 1
+    assert isinstance(findings_payload["findings"], list)
 
     missing = _run("missing")
     missing.scores.metadata["run"] = {}

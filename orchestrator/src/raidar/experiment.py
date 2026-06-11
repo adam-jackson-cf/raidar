@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from statistics import fmean, median, pstdev
 
+from .findings import experiment_findings
 from .run_metadata import uncached_input_tokens
 from .sanitization import sanitize_evidence_payload, sanitize_persisted_text
 from .schemas.scorecard import EvalRun
@@ -300,7 +301,7 @@ def create_experiment_summary(summary_input: ExperimentSummaryInput) -> dict[str
 
     context = _summary_context(summary_input)
 
-    return {
+    summary = {
         "experiment_id": context.experiment_id,
         "created_at_utc": context.finished_utc.isoformat(),
         "started_at_utc": context.started_utc.isoformat(),
@@ -316,6 +317,10 @@ def create_experiment_summary(summary_input: ExperimentSummaryInput) -> dict[str
         "sample": _summary_sample(context),
         "rerun": _summary_rerun(summary_input, context),
     }
+    summary["findings"] = [
+        finding.model_dump() for finding in experiment_findings(summary_input.runs, summary)
+    ]
+    return summary
 
 
 def _experiment_summary_payload(experiment: dict[str, object]) -> dict[str, object]:
@@ -328,6 +333,7 @@ def _experiment_summary_payload(experiment: dict[str, object]) -> dict[str, obje
         "aggregate": experiment.get("aggregate"),
         "sample": experiment.get("sample"),
         "rerun": experiment.get("rerun"),
+        "findings": experiment.get("findings", []),
         "run_count": (
             len(experiment.get("runs", [])) if isinstance(experiment.get("runs"), list) else 0
         ),
