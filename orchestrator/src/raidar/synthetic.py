@@ -17,7 +17,7 @@ from pathlib import Path
 from raidar.experiment import ExperimentSummaryInput, create_experiment_summary
 from raidar.findings import run_findings_artifact
 from raidar.sanitization import sanitized_model_dump_json
-from raidar.schemas.events import GateEvent
+from raidar.schemas.events import GateEvent, TraceEvent
 from raidar.schemas.scorecard import (
     EvalConfig,
     EvalRun,
@@ -194,7 +194,7 @@ def _degraded_run(run_id: str, effort: str) -> EvalRun:
             is_repeat=False,
         ),
     ]
-    return _eval_run(run_id, effort, scorecard, duration=540.0, gates=gates)
+    return _eval_run(run_id, effort, scorecard, duration=540.0, gates=gates, fix_succeeded=False)
 
 
 def _scorecard(run_id: str, effort: str, *, duration: float) -> Scorecard:
@@ -233,6 +233,7 @@ def _eval_run(
     *,
     duration: float,
     gates: list[GateEvent] | None = None,
+    fix_succeeded: bool = True,
 ) -> EvalRun:
     return EvalRun(
         id=run_id,
@@ -249,8 +250,80 @@ def _eval_run(
         duration_sec=duration,
         terminated_early=False,
         scores=scorecard,
+        traces=_trace_events(fix_succeeded=fix_succeeded),
         gate_history=gates or [],
     )
+
+
+def _at(offset_sec: float) -> str:
+    return datetime(2026, 1, 1, 0, 0, int(offset_sec), tzinfo=UTC).isoformat()
+
+
+def _command_events(offset_sec: float, command: str, exit_code: int) -> list[TraceEvent]:
+    return [
+        TraceEvent(timestamp=_at(offset_sec), event_type="bash_command", data={"command": command}),
+        TraceEvent(
+            timestamp=_at(offset_sec + 2),
+            event_type="gate_result",
+            data={"status": "completed" if exit_code == 0 else "failed", "exit_code": exit_code},
+        ),
+    ]
+
+
+def _trace_events(*, fix_succeeded: bool) -> list[TraceEvent]:
+    events = [
+        TraceEvent(
+            timestamp=_at(0),
+            event_type="user_prompt",
+            data={"content": "Fix bug RAID-1042 in the ledger utility with minimal changes."},
+        ),
+        TraceEvent(
+            timestamp=_at(4),
+            event_type="assistant_message",
+            data={"content": "Re-enabling the skipped reproduction test to confirm the defect."},
+        ),
+        TraceEvent(
+            timestamp=_at(6),
+            event_type="file_change",
+            data={"file_path": "src/test/ledger.test.ts"},
+        ),
+        *_command_events(8, "bun run test", 1),
+        TraceEvent(
+            timestamp=_at(12),
+            event_type="assistant_message",
+            data={"content": "Reproduced: expected 6500 to be 3500. Fixing debit handling."},
+        ),
+        TraceEvent(
+            timestamp=_at(14),
+            event_type="file_change",
+            data={"file_path": "src/lib/ledger.ts"},
+        ),
+        TraceEvent(
+            timestamp=_at(16),
+            event_type="file_change",
+            data={"file_path": "src/test/ledger.regression.test.ts"},
+        ),
+        *_command_events(18, "bun run test", 0 if fix_succeeded else 1),
+        *_command_events(22, "bun run typecheck", 0),
+        *_command_events(26, "bun run lint", 0 if fix_succeeded else 1),
+        *_command_events(30, "bun run test:coverage", 0 if fix_succeeded else 1),
+    ]
+    if fix_succeeded:
+        events.append(
+            TraceEvent(
+                timestamp=_at(34),
+                event_type="file_change",
+                data={"file_path": "evidence/defect-evidence.json"},
+            )
+        )
+        events.append(
+            TraceEvent(
+                timestamp=_at(36),
+                event_type="assistant_message",
+                data={"content": "All gates pass; defect evidence retained."},
+            )
+        )
+    return events
 
 
 def _passing_metric_scores() -> list[MetricScore]:
