@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
 from typing import Any
 
 from raidar.runtime import artifacts as runtime_artifacts
@@ -22,19 +22,20 @@ _run_homepage_capture_command = workspace_artifacts._run_homepage_capture_comman
 _workspace_changes_from_baseline = workspace_artifacts._workspace_changes_from_baseline
 PersistedArtifacts = models.PersistedArtifacts
 
-
-@dataclass(frozen=True, slots=True)
-class _VisualEvidenceState:
-    evidence_artifacts: dict[str, object]
-    hydrate_error: str | None
-
-
-@dataclass(frozen=True, slots=True)
-class _HydratedVisualEvidenceRequest:
-    request: Any
-    phase: Any
-    execution: Any
-    evidence_artifacts: dict[str, object]
+RESERVED_EVIDENCE_KEYS = frozenset(
+    {
+        "screenshot_command",
+        "homepage_post",
+        "final_workspace_archive",
+        "visual",
+        "errors",
+        "retained_files",
+    }
+)
+MAX_EVIDENCE_FILE_BYTES = 65536
+MAX_EVIDENCE_TEXT_CHARS = 4000
+MAX_EVIDENCE_LIST_ITEMS = 50
+MAX_EVIDENCE_LIST_ITEM_CHARS = 500
 
 
 def persist_artifacts_phase(
@@ -44,10 +45,11 @@ def persist_artifacts_phase(
 ) -> PersistedArtifacts:
     """Artifact persistence phase."""
 
-    visual_state = _persist_visual_evidence(request, phase, execution)
-    evidence_artifacts = visual_state.evidence_artifacts
-    if visual_state.hydrate_error:
-        evidence_artifacts["errors"].append(visual_state.hydrate_error)
+    evidence_artifacts = _initial_evidence_artifacts(phase)
+    hydrated = _hydrate_final_workspace(phase, execution, evidence_artifacts)
+    if hydrated and phase.screenshot_command:
+        _persist_visual_evidence(request, phase, execution, evidence_artifacts)
+    _ingest_retained_evidence(request, phase, evidence_artifacts)
 
     workspace_prune = _prune_workspace_artifacts(phase.layout.workspace_dir)
     workspace_changes = _workspace_changes_from_baseline(
@@ -86,42 +88,38 @@ def _initial_evidence_artifacts(phase: Any) -> dict[str, object]:
     }
 
 
-def _persist_visual_evidence(request: Any, phase: Any, execution: Any) -> _VisualEvidenceState:
-    evidence_artifacts = _initial_evidence_artifacts(phase)
-    if phase.screenshot_command and not execution.terminated_early:
-        return _persist_hydrated_visual_evidence(
-            _HydratedVisualEvidenceRequest(
-                request=request,
-                phase=phase,
-                execution=execution,
-                evidence_artifacts=evidence_artifacts,
-            )
-        )
-    return _VisualEvidenceState(evidence_artifacts=evidence_artifacts, hydrate_error=None)
+def _hydrate_final_workspace(
+    phase: Any, execution: Any, evidence_artifacts: dict[str, object]
+) -> bool:
+    """Hydrate the local run workspace from the final Harbor app archive."""
 
-
-def _persist_hydrated_visual_evidence(
-    request: _HydratedVisualEvidenceRequest,
-) -> _VisualEvidenceState:
+    if execution.terminated_early:
+        return False
     archive_path, hydrate_error = _hydrate_workspace_from_final_app(
-        request.execution.harbor_result,
-        request.phase.context.workspace,
+        execution.harbor_result,
+        phase.context.workspace,
     )
-    if archive_path:
-        request.evidence_artifacts["final_workspace_archive"] = str(archive_path)
-        _capture_homepage_post(request.phase, request.evidence_artifacts)
-        visual_artifacts = _persist_visual_evidence_artifacts(
-            VisualEvidenceRequest(
-                request=request.request,
-                workspace=request.phase.context.workspace,
-                run_root_dir=request.phase.layout.root_dir,
-            )
+    if hydrate_error:
+        _evidence_errors(evidence_artifacts).append(hydrate_error)
+    if archive_path is None:
+        return False
+    evidence_artifacts["final_workspace_archive"] = str(archive_path)
+    return True
+
+
+def _persist_visual_evidence(
+    request: Any, phase: Any, execution: Any, evidence_artifacts: dict[str, object]
+) -> None:
+    _capture_homepage_post(phase, evidence_artifacts)
+    visual_artifacts = _persist_visual_evidence_artifacts(
+        VisualEvidenceRequest(
+            request=request,
+            workspace=phase.context.workspace,
+            run_root_dir=phase.layout.root_dir,
         )
-        request.evidence_artifacts["visual"] = visual_artifacts
-        _rebind_visual_evidence_paths(request.execution.outputs.visual, visual_artifacts)
-    return _VisualEvidenceState(
-        evidence_artifacts=request.evidence_artifacts, hydrate_error=hydrate_error
     )
+    evidence_artifacts["visual"] = visual_artifacts
+    _rebind_visual_evidence_paths(execution.outputs.visual, visual_artifacts)
 
 
 def _capture_homepage_post(phase: Any, evidence_artifacts: dict[str, object]) -> None:
@@ -133,6 +131,74 @@ def _capture_homepage_post(phase: Any, evidence_artifacts: dict[str, object]) ->
     if post_path:
         evidence_artifacts["homepage_post"] = str(post_path)
     if post_error:
-        errors = evidence_artifacts["errors"]
-        if isinstance(errors, list):
-            errors.append(f"homepage-post capture failed: {post_error}")
+        _evidence_errors(evidence_artifacts).append(f"homepage-post capture failed: {post_error}")
+
+
+def _ingest_retained_evidence(
+    request: Any, phase: Any, evidence_artifacts: dict[str, object]
+) -> None:
+    """Ingest scenario-declared retained evidence files into scorer-visible evidence."""
+
+    declared = request.scenario.evidence.retained_files
+    if not declared:
+        return
+    evidence_artifacts["retained_files"] = [
+        _ingest_evidence_file(phase.context.workspace, entry.path, evidence_artifacts)
+        for entry in declared
+    ]
+
+
+def _ingest_evidence_file(
+    workspace: Any, relative_path: str, evidence_artifacts: dict[str, object]
+) -> dict[str, object]:
+    payload, status = _load_evidence_payload(workspace, relative_path)
+    if payload is None:
+        return {"path": relative_path, "status": status, "keys": []}
+    ingested: list[str] = []
+    for key, value in payload.items():
+        if key in RESERVED_EVIDENCE_KEYS or key in evidence_artifacts:
+            continue
+        sanitized = _sanitize_evidence_value(value)
+        if sanitized is None:
+            continue
+        evidence_artifacts[key] = sanitized
+        ingested.append(key)
+    return {"path": relative_path, "status": "ingested", "keys": ingested}
+
+
+def _load_evidence_payload(
+    workspace: Any, relative_path: str
+) -> tuple[dict[str, Any] | None, str]:
+    path = workspace / relative_path
+    if not path.is_file():
+        return None, "missing"
+    if path.stat().st_size > MAX_EVIDENCE_FILE_BYTES:
+        return None, f"oversize: exceeds {MAX_EVIDENCE_FILE_BYTES} bytes"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        return None, f"unreadable: {exc}"
+    if not isinstance(payload, dict):
+        return None, "invalid: top-level JSON value must be an object"
+    return payload, "ingested"
+
+
+def _sanitize_evidence_value(value: Any) -> str | list[str] | None:
+    if isinstance(value, str):
+        text = value.strip()
+        return text[:MAX_EVIDENCE_TEXT_CHARS] if text else None
+    if isinstance(value, list):
+        items = [
+            item.strip()[:MAX_EVIDENCE_LIST_ITEM_CHARS]
+            for item in value[:MAX_EVIDENCE_LIST_ITEMS]
+            if isinstance(item, str) and item.strip()
+        ]
+        return items if items else None
+    return None
+
+
+def _evidence_errors(evidence_artifacts: dict[str, object]) -> list[str]:
+    errors = evidence_artifacts["errors"]
+    if not isinstance(errors, list):
+        raise TypeError("evidence_artifacts errors must be a list")
+    return errors
