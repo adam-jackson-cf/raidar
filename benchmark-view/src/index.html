@@ -136,6 +136,11 @@
       .badge-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: var(--spacing-8); }
       .badge { border: 1px solid var(--app-border); color: var(--app-text-muted); padding: 2px 6px; border-radius: var(--radius-default); font-size: var(--text-caption); }
       .badge.attention { border-color: var(--app-attention); color: var(--app-attention); }
+      .finding-chip { display: inline-block; border: 1px solid var(--app-border); color: var(--app-text-muted); padding: 1px 6px; border-radius: var(--radius-default); font-size: var(--text-caption); line-height: var(--leading-caption); text-transform: uppercase; }
+      .finding-chip.issue { border-color: var(--app-attention); color: var(--app-attention); }
+      .finding-chip.good { border-color: #7fbf7f; color: #7fbf7f; }
+      .finding-chip.note { border-color: var(--app-border); color: var(--app-text-muted); }
+      .finding-row { display: flex; gap: var(--spacing-8); align-items: baseline; flex-wrap: wrap; margin-top: var(--spacing-8); }
       .compact-list { display: grid; gap: var(--spacing-16); }
       .compact-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: var(--spacing-16); align-items: baseline; padding-bottom: var(--spacing-16); border-bottom: 1px solid var(--app-border-soft); }
       .compact-row:last-child { border-bottom: 0; padding-bottom: 0; }
@@ -224,6 +229,7 @@
           <article class="panel" aria-labelledby="deltaTitle"><div class="panel-header"><h2 id="deltaTitle">Revision deltas</h2><p class="note">Adjacent and first-to-last changes.</p></div><div class="panel-body compact-list" id="deltaList"></div></article>
           <article class="panel" aria-labelledby="riskTitle"><div class="panel-header"><h2 id="riskTitle">Failure root causes</h2><p class="note">Failing gate names, affected AgentSpecs, scenario revisions, and run-level evidence.</p></div><div class="panel-body" id="riskList"></div></article>
         </section>
+        <section class="panel" aria-labelledby="findingsTitle"><div class="panel-header"><div><h2 id="findingsTitle">Findings</h2><p class="note" id="findingsNote">Deterministic review findings across experiments and runs.</p></div></div><div class="panel-body compact-list" id="findingsList"></div></section>
         <section class="grid-two">
           <article class="panel" aria-labelledby="coverageTitle"><div class="panel-header"><h2 id="coverageTitle">Signal coverage matrix</h2><p class="note">Shows which diagnostic signals exist in artifacts.</p></div><div class="panel-body" id="coverageMatrix"></div></article>
           <article class="panel" aria-labelledby="attribTitle"><div class="panel-header"><h2 id="attribTitle">Revision improvement attribution</h2><p class="note">Score and reliability movement with comparability guardrails.</p></div><div class="panel-body compact-list" id="attributionList"></div></article>
@@ -444,6 +450,33 @@
         const ordered = [...causes.values()].sort((a, b) => b.count - a.count).slice(0, 8);
         $('riskList').innerHTML = ordered.length ? `<div class="compact-list">${ordered.map((c) => `<div class="compact-row"><div><h3>${esc(c.gate)}</h3><p>Failures ${c.count} · AgentSpecs ${c.specs.size} · Revisions ${c.revs.size}</p><p class="mono">Runs: ${esc(c.runs.join(', '))}</p><span class="evidence-path mono">${esc(c.path)}</span></div><div class="bad">${c.count}</div></div>`).join('')}</div>` : '<div class="empty">No run-level gate failures in the current filters.</div>';
       }
+      const findingChip = (kind) => `<span class="finding-chip ${esc(kind)}">${esc(kind)}</span>`;
+      const findingKindRank = (kind) => ({ issue: 0, good: 1, note: 2 }[kind] ?? 3);
+      function findingItems(rows) {
+        const items = [];
+        for (const row of rows) {
+          for (const finding of (row.experiment_findings || [])) items.push({ row, scope: 'experiment', finding });
+          for (const run of (row.run_diagnostics || [])) for (const finding of (run.findings || [])) items.push({ row, scope: run.run_id, finding });
+        }
+        return items;
+      }
+      function findingLine({ row, scope, finding }) {
+        const evidence = (finding.evidence || [])[0];
+        const evidenceRef = evidence ? `${evidence.source}:${evidence.reference}` : 'no evidence reference';
+        const synthetic = row.synthetic === true ? ' <span class="badge attention">SYNTHETIC FIXTURE</span>' : '';
+        return `<div class="compact-row"><div><div class="finding-row">${findingChip(finding.kind)}<strong>${esc(finding.category)}</strong><span>${esc(finding.title)}</span>${synthetic}</div><p class="mono">${esc(scope)} · ${esc(row.agent_spec)} · ${esc(evidenceRef)}</p>${finding.detail ? `<p>${esc(finding.detail)}</p>` : ''}</div></div>`;
+      }
+      function renderFindings(rows) {
+        const items = findingItems(rows);
+        const counts = { issue: 0, good: 0, note: 0 };
+        for (const { finding } of items) if (finding.kind in counts) counts[finding.kind] += 1;
+        $('findingsNote').textContent = items.length ? `${counts.issue} issues · ${counts.good} good · ${counts.note} notes` : 'Deterministic review findings across experiments and runs.';
+        if (!items.length) { $('findingsList').innerHTML = '<div class="empty">No deterministic findings in the current filters.</div>'; return; }
+        const cap = 40;
+        const visible = items.slice().sort((a, b) => findingKindRank(a.finding.kind) - findingKindRank(b.finding.kind)).slice(0, cap);
+        const overflow = items.length > cap ? `<p class="note">Showing ${cap} of ${items.length} findings. Narrow the filters to inspect the rest.</p>` : '';
+        $('findingsList').innerHTML = visible.map(findingLine).join('') + overflow;
+      }
       function renderCoverage(rows) {
         const defs = [
           ['Composite score', (r) => typeof r.mean_score === 'number'],
@@ -537,13 +570,13 @@
         $('runRows').innerHTML = sorted.map((row) => `<tr data-run-row="${esc(row.run_id)}"><td data-label="Scenario">${esc(row.scenario)}</td><td data-label="Rev" class="mono">${esc(row.revision)}</td><td data-label="AgentSpec">${esc(row.agent_spec)}</td><td class="numeric" data-label="Score">${fmt(row.mean_score)}</td><td class="numeric" data-label="Quality">${fmt(row.quality_score)}</td><td class="numeric" data-label="Gates">${pct(row.performance_pass_rate)}</td><td class="numeric" data-label="Duration">${fmt(row.duration_sec, 1)}s</td><td class="numeric" data-label="Tokens">${compact(row.uncached_input_tokens)}</td><td class="numeric" data-label="Runs">${row.run_count_scored ?? 'n/a'}/${row.run_count_total ?? 'n/a'}</td></tr>`).join('') || '<tr><td colspan="9"><div class="empty">No runs match the current filters.</div></td></tr>';
         const selected = allRows.find((r) => r.run_id === state.selectedRun) || sorted[0];
         const diag = (selected?.run_diagnostics || [])[0];
-        $('runDrawer').innerHTML = selected ? `<h3>${esc(selected.agent_spec)} <span class="mono">${esc(selected.scenario)} ${esc(selected.revision)} · ${esc(selected.run_id)}</span></h3>${diag ? `<p>Failing gates: ${esc((diag.failing_gates || []).join(', ') || 'none')}</p><p>Requirement gaps: ${esc((diag.requirement_missing_ids || []).join(', ') || 'none')}</p><p class="mono">Workspace diff: ${esc(JSON.stringify(diag.workspace_diff_summary || {}))}</p><span class="evidence-path mono">${esc(diag.paths?.scorecard || '')}</span><span class="evidence-path mono">${esc(diag.paths?.gate_history || diag.paths?.performance_gates || '')}</span>` : '<div class="empty">No run diagnostics emitted for this benchmark artifact.</div>'}` : '<div class="empty">No run selected.</div>';
+        $('runDrawer').innerHTML = selected ? `<h3>${esc(selected.agent_spec)} <span class="mono">${esc(selected.scenario)} ${esc(selected.revision)} · ${esc(selected.run_id)}</span></h3>${diag ? `<p>Failing gates: ${esc((diag.failing_gates || []).join(', ') || 'none')}</p><p>Requirement gaps: ${esc((diag.requirement_missing_ids || []).join(', ') || 'none')}</p><p class="mono">Workspace diff: ${esc(JSON.stringify(diag.workspace_diff_summary || {}))}</p>${(diag.findings || []).map((finding) => `<div class="finding-row">${findingChip(finding.kind)}<span>${esc(finding.category)} · ${esc(finding.title)}</span>${selected.synthetic === true ? '<span class="badge attention">SYNTHETIC FIXTURE</span>' : ''}</div>`).join('')}<span class="evidence-path mono">${esc(diag.paths?.scorecard || '')}</span><span class="evidence-path mono">${esc(diag.paths?.gate_history || diag.paths?.performance_gates || '')}</span><span class="evidence-path mono">${esc(diag.findings_path || '')}</span>` : '<div class="empty">No run diagnostics emitted for this benchmark artifact.</div>'}` : '<div class="empty">No run selected.</div>';
       }
 
       function render() {
         renderControls();
         const rows = rowsInView();
-        renderTabs(rows); renderSummary(rows); renderLeaderboard(rows); renderScatter(rows); renderTrajectory(rows); renderDeltas(rows); renderRisks(rows); renderCoverage(rows); renderAttribution(rows); renderStability(rows); renderPlaybook(rows); renderPortfolio(rows); renderDiff(rows); renderMetricBreakdown(rows); renderEvidence(rows); renderRuns(rows);
+        renderTabs(rows); renderSummary(rows); renderLeaderboard(rows); renderScatter(rows); renderTrajectory(rows); renderDeltas(rows); renderRisks(rows); renderFindings(rows); renderCoverage(rows); renderAttribution(rows); renderStability(rows); renderPlaybook(rows); renderPortfolio(rows); renderDiff(rows); renderMetricBreakdown(rows); renderEvidence(rows); renderRuns(rows);
       }
 
       function bindField(name, stateKey) {

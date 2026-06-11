@@ -364,6 +364,7 @@ function readRunDiagnostic(runsDir, runId) {
   const performance = readJson(path.join(verifier, 'performance-gates.json'));
   const validity = readJson(path.join(verifier, 'execution-validity.json'));
   const workspaceDiff = readJson(path.join(runDir, 'workspace-diff.json'));
+  const findingsPayload = readJson(path.join(runDir, 'findings.json'));
   const gateItems = diagnosticGateItems(gateHistory, performance);
   return {
     run_id: runId,
@@ -371,6 +372,8 @@ function readRunDiagnostic(runsDir, runId) {
     requirement_missing_ids: arrayOrEmpty(scorecard?.requirements_coverage?.missing_requirement_ids),
     validity_ok: validity?.valid ?? null,
     workspace_diff_summary: workspaceDiff?.summary ?? null,
+    findings: findingsPayload?.findings ?? [],
+    findings_path: relativeIfExists(path.join(runDir, 'findings.json')),
     paths: diagnosticPaths(runDir, verifier),
   };
 }
@@ -439,11 +442,23 @@ function buildBenchmarkRow(meta, experimentDir) {
     ...sampleMetadata(payload.summary, payload.experiment, config),
     artifact_paths: experimentArtifactPaths(experimentDir, payload),
     run_diagnostics: readRunDiagnostics(experimentDir),
+    experiment_findings: payload.summary?.findings ?? [],
+    synthetic: Boolean(payload.summary?.synthetic),
   };
+  row.findings_summary = findingsSummary(row);
   row.agent_spec = `${row.harness} · ${row.model}`;
   row.latest_group_key = `${row.scenario}:${row.revision}:${row.agent_spec}`;
   row.decision_score = decisionScore(row);
   return row;
+}
+
+function findingsSummary(row) {
+  const counts = { issue: 0, good: 0, note: 0 };
+  const runFindings = row.run_diagnostics.flatMap((diagnostic) => diagnostic.findings ?? []);
+  for (const finding of [...row.experiment_findings, ...runFindings]) {
+    if (finding?.kind in counts) counts[finding.kind] += 1;
+  }
+  return counts;
 }
 
 function readExperimentPayload(experimentDir) {
