@@ -6,9 +6,8 @@ Transform Raidar into a fully realised eval suite with scorers that enable effec
 
 ## Lifecycle Status
 
-- Status: execution in progress.
-- Current phase: Phase 2 (scenario/scorer-backed measurement slice).
-- Do not mark this tracker complete until the implementation definition of done in `goal.md` is satisfied.
+- Status: first implementation pass complete (2026-06-11). Phases 1-4 delivered and validated; Phase 5 backlog recorded below.
+- Definition-of-done check: (1) source docs translated into an implementation sequence — done; (2) high-signal coverage gap improved — `bugfix@1` now has an authorable scenario root plus the platform evidence it needed — done; (3) findings/review surface MVP populated from Raidar artifacts with evidence references — done; (4) workflow measures outcomes and process quality (gates/requirements/scorers plus process findings) — done; (5) public `make ...` remains the interface (new targets only) — done; (6) changes covered by tests/validation — done; (7) `make quality` passes — done; (8) tracker updated — this update.
 
 ## Source Inputs
 
@@ -31,62 +30,37 @@ Outputs:
 
 ### Phase 2: Scenario/scorer-backed measurement slice
 
-Status: pending.
+Status: complete (2026-06-11). Selected family: `bugfix@1`.
 
-Candidate gap families:
+Delivered:
 
-- `bugfix@1`
-- `refactor@1`
-- `test-generation@1`
-- `python-code-task@1`
-- `plan-to-code@1`
-
-Expected outputs:
-
-- Scenario root or revision decision.
-- Scorer/matrix/platform changes as needed.
-- Tests or scenario validation.
+- Platform (2a): final-workspace hydration for all non-terminated runs (previously visual-only, which left non-visual workspace diffs empty and starved `change-containment`), plus scenario-declared retained-evidence ingestion (`evidence.retained_files` in `scenario.yaml`; JSON files from the run workspace are ingested into scorer-visible retained evidence with reserved-key protection and size caps). This makes `defect-evidence-completeness` fully scoreable and is reusable for a future `plan-to-code@1` scenario.
+- Scenario (2b): new root `scenarios/bugfix-ledger-balance/v001` (category `bugfix`, difficulty easy): seeded debit-handling defect in `src/lib/ledger.ts`, parked reproduction test (`it.skip`, so starter preflight passes), defect-linked requirements (`no_pattern it\.skip`, regression-suite and evidence-file existence checks), four gates (typecheck/lint/test/coverage), scorers `bugfix@1` 0.88 + `requirements@1` 0.10 + `resource-efficiency@1` 0.02.
+- Matrix: `matrices/bugfix-ledger-balance-codex-gpt55.yaml` (codex-cli, gpt-5.5 low/medium, repeats 1). Not executed live; running it is a separate cost decision.
+- Validation: `make scenario-validate` passes (3 scorers, 8 metrics); baseline starter passes all four gates locally (install/typecheck/lint/test/coverage at 100%); the solved state was simulated end-to-end in a scratch copy (repro test fails with the bug — `expected 6500 to be 3500` — and all gates pass after the fix); contract tests in `orchestrator/tests/test_bugfix_ledger_scenario.py`.
 
 ### Phase 3: Findings surface MVP
 
-Status: pending.
+Status: complete (2026-06-11).
 
-Expected finding categories:
+Delivered:
 
-- failed gates;
-- missing required commands;
-- missing required artifacts;
-- requirements gaps;
-- deterministic caps on judge-backed scores;
-- resource outliers;
-- completion-claim inconsistencies;
-- workflow/process anomalies;
-- repeat variance.
-
-Expected outputs:
-
-- Raidar-native finding records or projection.
-- Evidence references into Raidar artifacts.
-- Initial UI/report/API surface.
+- `orchestrator/src/raidar/findings.py`: deterministic projection of retained evidence into `issue | good | note` finding records with evidence references. Run-level categories: failed-gate, missing-required-command, requirements-gap, missing-artifact (metric missing patterns and unusable declared evidence files), judge-review, deterministic-cap, completion-claim, performance-gate, workflow-anomaly (repeated verification failures, verification-bypassing git commits), plus good findings (clean-verification, requirements-satisfied, retained-evidence). Experiment-level categories: unscored-run, repeat-variance, resource-outlier (leave-one-out duration statistics), sample-adequacy, rerun-target. Findings are non-authoritative and never change scores.
+- Persistence: per-run `findings.json` written beside `run.json` by `persist_eval_run`; experiment-level `findings` array added to `experiment-summary.json`.
+- benchmark-view surface: restored the worktree-deleted `benchmark-view/` from HEAD and added a Findings panel (Workshop-inspired kind chips, category, title, evidence `source:reference`, kind counts, 40-item cap) plus per-run findings in the run diagnostic drawer; rows carry `findings_summary` counts and a `synthetic` flag rendered as a SYNTHETIC FIXTURE badge.
+- Synthetic fixtures: `make benchmark-fixture-synthetic` (new public target) generates two clearly-labeled benchmark-shaped experiments (`synthetic` markers in ids and payloads) so the review surface can be developed and tested without live runs.
+- Validation: `orchestrator/tests/test_findings.py` (8 behavior tests), `tests/test_synthetic_fixture.py`, findings persistence asserted in `test_run_dispatch_behaviors.py`; `node --check` on the data builder and extracted page module; `make benchmark-view-build` against the synthetic fixtures.
 
 ### Phase 4: Experiment/report iteration path
 
-Status: pending.
+Status: complete (2026-06-11) for the MVP scope.
 
-Expected outputs:
-
-- Matrix/report or benchmark-view path for comparing AgentSpecs, scenario revisions, or interventions.
-- Findings visible enough to support iteration decisions.
+- The dashboard's existing comparison machinery (AgentSpec leaderboard, revision trajectory, deltas, evidence explorer) now coexists with the findings layer: the Findings panel aggregates over the rows in view, so comparing AgentSpecs or revisions surfaces the differentiating findings directly.
+- Validated over HTTP with the synthetic fixtures: two AgentSpecs (gpt-5.5 low vs medium) on `bugfix-ledger-balance@v001` render with findings summaries issue=9/good=9/note=5 vs issue=0/good=9/note=3 — the degraded spec's failed gates, requirements gaps, and missing defect evidence are visible without opening raw artifacts.
 
 ### Phase 5: Follow-on backlog
 
-Status: pending.
-
-Expected outputs:
-
-- Remaining scorer/scenario gaps.
-- Deferred Workshop-inspired UX/platform work.
-- Residual risks and next recommended implementation slices.
+Status: recorded (2026-06-11). See Follow-on Backlog section below.
 
 ## Decision Log
 
@@ -103,6 +77,9 @@ Record material decisions here during execution.
 | 2026-06-11 | Add scenario-declared retained-evidence ingestion (platform) | `bugfix@1` `defect-evidence-completeness` reads `context.retained_evidence` keys (`reproduction_note`, `regression_tests`, …), but the artifact phase only retains visual evidence today; without ingestion the metric can never fully pass. | Small generic platform capability: scenario contract declares evidence files the agent must write; artifact phase ingests them into `evidence_artifacts`. Reusable for the future `plan-to-code@1` scenario. |
 | 2026-06-11 | Findings layer is deterministic orchestrator code, not LLM-generated | Goal prefers deterministic evidence; all target finding categories (failed gates, missing commands/artifacts, requirements gaps, judge caps, resource outliers, completion-claim inconsistencies, repeat variance) are derivable from retained artifacts. | Findings stay non-authoritative review metadata with evidence references; no scorer behavior changes. |
 | 2026-06-11 | Restore `benchmark-view/` from HEAD and build findings surface on it | Working tree contains uncommitted deletions of all tracked `benchmark-view/` files (cause unknown, not made by this execution); public `make benchmark-view-build`/`serve` targets depend on the directory and would fail. | Files recreated from HEAD content, then extended with the findings surface. Flagged to user in case the deletion was intentional. |
+| 2026-06-11 | Hydrate the final workspace for all non-terminated runs | Hydration was visual-only, so non-visual runs diffed an unchanged baseline: empty changed-file evidence starved `change-containment`, regression-test inventory, and the new evidence ingestion. | Platform behavior change recorded under residual risks; covered by artifact-phase tests. |
+| 2026-06-11 | Ship the defect reproduction test as `it.skip` in the starter | Starter preflight executes all `required_commands` against the baseline and aborts on failure, so a hard-failing repro test cannot ship; a parked repro keeps preflight green while `no_pattern it\.skip` plus the test gate force re-enable-and-fix. | Deterministic defect link without preflight breakage; verified by lint/test on the baseline. |
+| 2026-06-11 | Findings persist as per-run `findings.json` plus experiment-summary `findings` | Run-level findings need to live with run evidence for drilldown; experiment-level findings (variance, outliers, unscored, sample) only exist at aggregation time. | benchmark-view consumes both without new orchestrator APIs. |
 
 ## Files Changed During Execution
 
@@ -110,6 +87,23 @@ Record implementation changes here. Do not include goal-asset drafting as implem
 
 | File/path | Change summary | Phase |
 |---|---|---|
+| `orchestrator/src/raidar/schemas/scenario.py` | Added `EvidenceConfig`/`RetainedEvidenceFile` and `ScenarioDefinition.evidence` | 2a |
+| `orchestrator/src/raidar/runtime/artifact_phase.py` | Hydrate final workspace for all non-terminated runs; ingest declared retained-evidence JSON files into scorer-visible evidence | 2a |
+| `orchestrator/tests/test_artifact_phase_behaviors.py` | Rewritten for the new artifact-phase contract incl. ingestion edge cases | 2a |
+| `scenarios/bugfix-ledger-balance/v001/**` | New scenario root: contract, prompt, rules, starter with seeded defect and parked repro test | 2b |
+| `matrices/bugfix-ledger-balance-codex-gpt55.yaml` | Stored matrix config for the new scenario (codex gpt-5.5 low/medium) | 2b |
+| `orchestrator/tests/test_bugfix_ledger_scenario.py` | Scenario contract tests | 2b |
+| `docs/references/new-scenario.md` | Documented `evidence.retained_files` authoring contract | 2a/2b |
+| `orchestrator/src/raidar/findings.py` | New deterministic findings projection (run + experiment level) | 3 |
+| `orchestrator/src/raidar/application/run_dispatch.py` | Persist `findings.json` beside `run.json` | 3 |
+| `orchestrator/src/raidar/experiment.py` | Experiment-level `findings` in experiment summary payloads | 3 |
+| `orchestrator/src/raidar/synthetic.py` | Labeled synthetic benchmark fixture generator | 3 |
+| `orchestrator/tests/test_findings.py`, `test_synthetic_fixture.py`, `test_run_dispatch_behaviors.py` | Findings/fixture behavior coverage | 3 |
+| `benchmark-view/scripts/build-data.mjs` | Ingest run findings.json + experiment findings; rows carry findings_summary and synthetic flag | 3/4 |
+| `benchmark-view/src/index.html` | Findings panel with issue/good/note chips; run drawer findings; SYNTHETIC FIXTURE badge | 3/4 |
+| `Makefile` | New public target `benchmark-fixture-synthetic` | 3 |
+
+Commits: `a2d9e3f` (goal assets), `3bab93f` (retained-evidence ingestion), `2f4efb2` (bugfix scenario), `9c8dd3a` (findings layer), `e908a70` (benchmark-view surface), plus a final formatting/tracker commit.
 
 ## Validation Log
 
@@ -117,6 +111,14 @@ Record validation commands and results here.
 
 | Date | Command | Result | Notes |
 |---|---|---|---|
+| 2026-06-11 | `make scenario-validate SCENARIO=scenarios/bugfix-ledger-balance` | pass | 3 scorers, 8 metrics, 4 gates, 4 required commands |
+| 2026-06-11 | `bun install/typecheck/lint/test/test:coverage` in new starter | pass | Baseline green: 8 passed + 1 skipped repro; coverage 100% |
+| 2026-06-11 | Solved-state simulation in scratch copy | pass | Unskipped repro fails pre-fix (`expected 6500 to be 3500`); all gates pass post-fix |
+| 2026-06-11 | `uv run python -m pytest tests` (orchestrator) | pass | 525 tests after all changes |
+| 2026-06-11 | `make benchmark-fixture-synthetic` + `make benchmark-view-build` | pass | 2 synthetic rows with findings_summary populated |
+| 2026-06-11 | `node --check` on build-data.mjs and extracted page module | pass | Dashboard module parses |
+| 2026-06-11 | HTTP smoke of `make benchmark-view-serve` | pass | page 200; data.json findings summaries issue=9/good=9/note=5 vs issue=0/good=9/note=3 |
+| 2026-06-11 | `make quality` | pass | smoke dry-run check, ruff, pytest + coverage, lizard CC<10 |
 
 ## Rejected or Deferred Alternatives
 
@@ -131,21 +133,21 @@ Record alternatives that are intentionally not pursued.
 
 ## Residual Risks
 
-Update during execution.
-
-- First implementation slice may prove too broad if it combines scenario coverage, scorer changes, matrix reporting, and UI work at once.
-- Findings surface must remain evidence-linked and non-authoritative unless deliberately promoted into scorer/scenario behavior.
-- Workshop UI/component reuse may carry hidden dependency, styling, routing, or data-shape costs.
-- Live benchmark runs may be expensive; use minimal validation, default to GPT 5.5 low reasoning, and prefer synthetic benchmark-shaped fixtures for review-surface development where valid.
-- Subagent use can reduce context load but may create integration drift; orchestrator should keep final architecture, validation, and tracker updates centralized.
+- No live benchmark run has exercised `bugfix-ledger-balance@v001` end-to-end in Harbor yet; the contract is validated by schema checks, baseline gate runs, and a solved-state simulation, but the first real matrix run (GPT 5.5 low) may surface container/runtime issues (for example archive hydration timing or coverage parsing).
+- The all-runs workspace hydration is a behavior change for non-visual scenarios: workspace diffs and scorer file inventories now reflect agent output. This is the intended fix for empty non-visual diffs, but historical run artifacts are not comparable for change-containment-style evidence.
+- The `benchmark-view/` working-tree deletion that predated this execution was unexplained; the directory was restored from HEAD because public make targets depend on it. If the deletion was intentional, the findings surface needs a new home.
+- Findings remain non-authoritative review metadata; if finding frequency is later promoted into scoring, calibration and versioning will be needed.
+- `regression-protection` still uses a filename-keyword proxy; a starter-replay upgrade would make it directly evidential.
+- Real `requirements-adherence` judging on the new scenario needs judge-runtime credentials at scoring time; synthetic fixtures bypass this deliberately.
 
 ## Follow-on Backlog
 
-Update after the first implementation slice.
+Recommended next slices, in priority order:
 
-- Additional scorer-backed scenarios for remaining uncovered active scorer families.
-- Workshop-inspired evidence search and payload retrieval over Raidar artifacts.
-- Durable annotations over runs, scorer results, commands, requirements, and artifacts.
-- Phase tree/timeline over Raidar execution evidence.
-- Finding-to-rerun and finding-to-scenario promotion workflow.
-- Optional Workshop-compatible export adapter for interoperability experiments.
+1. Run `matrices/bugfix-ledger-balance-codex-gpt55.yaml` live (GPT 5.5 low first) to validate the scenario and the evidence-ingestion path end-to-end in Harbor, then review the findings surface against real artifacts.
+2. Remaining uncovered active scorer families, reusing the bugfix authoring pattern: `refactor@1` (behavior-preserving refactor root), `test-generation@1` (coverage-lift root), `python-code-task@1` (Python starter), then `plan-to-code@1` using the retained-evidence mechanism for plan packets (charter backlog items 2-5/8).
+3. Workshop-inspired evidence search and payload retrieval over Raidar artifacts (charter item 15) — the findings layer gives the record shape; search/index is the missing access path.
+4. Durable annotations (manual `issue|good|note` notes reusing the finding visual language, charter item 16) and finding-to-rerun/finding-to-scenario promotion workflow (charter item 18).
+5. Phase tree/timeline over execution evidence (charter item 17) once stable phase timestamps are emitted.
+6. Multi-harness quality matrices and rules/linting intervention revision pairs (charter items 7/10).
+7. Upgrade `regression-protection` from filename proxy to starter-replay evidence if live runs show the proxy is gameable.

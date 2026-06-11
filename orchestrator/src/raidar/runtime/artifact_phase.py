@@ -166,9 +166,7 @@ def _ingest_evidence_file(
     return {"path": relative_path, "status": "ingested", "keys": ingested}
 
 
-def _load_evidence_payload(
-    workspace: Any, relative_path: str
-) -> tuple[dict[str, Any] | None, str]:
+def _load_evidence_payload(workspace: Any, relative_path: str) -> tuple[dict[str, Any] | None, str]:
     path = workspace / relative_path
     if not path.is_file():
         return None, "missing"

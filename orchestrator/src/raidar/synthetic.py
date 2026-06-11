@@ -60,8 +60,7 @@ def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
 
 def _experiment_dir(dest_dir: Path, model_label: str, runs: list[EvalRun]) -> Path:
     dir_name = (
-        f"{SYNTHETIC_MARKER}-00000000-000000Z__{_SCENARIO}__{_REVISION}__{_HARNESS}"
-        f"__{model_label}"
+        f"{SYNTHETIC_MARKER}-00000000-000000Z__{_SCENARIO}__{_REVISION}__{_HARNESS}__{model_label}"
     )
     experiment_dir = dest_dir / dir_name
     summary = _summary_payload(runs)
