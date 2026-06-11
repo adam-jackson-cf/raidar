@@ -291,6 +291,160 @@ The following are high-level backlog proposals only. They should become separate
 - **Why current coverage is insufficient:** Platform captures process signals, but scenario-level reports do not make all process behaviors first-class objectives.
 - **Work type:** Scorer/reporting refinement or platform reporting work, depending on desired output.
 
+
+## Backlog Addendum: Raidar-Native Workshop-Inspired Review UX
+
+This addendum assumes Raidar remains the benchmark mechanism. Workshop should not replace Raidar scenarios, scorers, matrices, or scorecards. The useful adoption path is to copy or adapt Workshop's review framing and selected UI/source-gathering concepts over Raidar-owned artifacts.
+
+Workshop source context for extraction and adaptation:
+
+- `src/mcp/tools.ts`: source-gathering concepts. Relevant tool shapes are `get_current_run`, `get_run_outline`, `query_traces`, `search_run`, `get_span_payload`, `get_span_context`, `annotate`, `show_in_ui`, and `replay_run`. Raidar should adapt the outline/search/payload/annotation concepts, not the Workshop daemon dependency.
+- `src/db/schema.ts`: conceptual data model. Workshop stores `runs`, `spans`, `live_events`, and `annotations`; Raidar can project experiment runs, execution phases, command/gate events, scorer outputs, and reviewer notes into the same review shape.
+- `app/src/api/runs.ts` and `app/src/api/annotations.ts`: thin client API patterns for run-detail and annotation CRUD.
+- `app/src/components/RunList.tsx` and `app/src/components/RunDetail.tsx`: review navigation and run drilldown patterns.
+- `app/src/components/SpanTree.tsx`, `FlameTimeline.tsx`, `ToolCallPill.tsx`, `MessageList.tsx`, and `JsonView.tsx`: timeline/tree/detail components that can be adapted to Raidar phases, commands, gates, scorer payloads, and artifact snippets.
+- `app/src/components/TraceAnnotations.tsx` and `AnnotationChip.tsx`: finding/annotation presentation. These are the strongest candidates to copy or port because their `issue | good | note` framing maps cleanly onto Raidar review findings.
+- `app/src/components/ReplayView.tsx` and `app/src/api/replay.ts`: useful interaction framing for rerun-from-finding, but Raidar should route execution through public `make ...` workflows rather than Workshop replay.
+
+Raidar source-gathering target model:
+
+| Workshop review source | Raidar projection source |
+|---|---|
+| `run` | one Raidar run under an experiment/matrix entry, including `run.json`, AgentSpec, scenario revision, scorecard, and result metadata |
+| `span` | normalized Raidar phase or evidence node: scenario setup, prompt/rules injection, agent execution, command execution, verification gate, scoring, artifact capture, summary generation |
+| `live_event` | command/gate event, process metric update, scorer collection event, optional harness trace event |
+| `payload` | prompt/rules text, command output, verifier output, scorer evidence, requirements mapping, workspace diff, artifact snippet, scorecard rationale |
+| `annotation` | durable reviewer or agent note attached to run, metric, scorer result, requirement, command, artifact, or phase |
+| `replay` | Raidar-native rerun or scorer-only re-evaluation request routed through public `make ...` targets |
+
+### 13. Platform capability: Raidar evidence index and review outline
+
+**Purpose:** Create a single source-gathering layer that projects existing Raidar artifacts into a Workshop-like run outline without changing benchmark semantics.
+
+**Delivery activity measured:** Reviewability, evidence completeness, and causal auditability of benchmark runs.
+
+**Candidate scorers:** No new scorer required initially. This is platform work that supports existing scorers and future process-quality scorers.
+
+**Required evidence:** Artifact manifest, run metadata, scenario revision metadata, AgentSpec, scorecard, metric/scorer results, command records, gate history, workspace diff, retained logs, and paths to retained artifacts.
+
+**Workshop adaptation:** Use the `get_run_outline` shape from `src/mcp/tools.ts` as the interaction model: totals, status, phase/span counts, failure shortlist, annotations, representative payload previews, and evidence-size hints. Use `RunDetail.tsx` as the UX reference for top-level run review.
+
+**Why current coverage is insufficient:** Raidar retains useful evidence, but reviewers must know artifact layout and manually connect scorecard failures to commands, diffs, and logs. A first-class outline would make review repeatable without weakening Raidar's scoring contract.
+
+**Work type:** Platform capability.
+
+### 14. Benchmark-view enhancement: Workshop-style finding surfacing
+
+**Purpose:** Add a findings layer that translates Raidar scorecard, gate, process, and artifact evidence into concrete review items before a user opens raw artifacts.
+
+**Delivery activity measured:** Review effectiveness, failure triage quality, and benchmark explainability.
+
+**Candidate scorers:** Existing scorers feed findings. Future process scorers can consume finding frequency/severity once the layer is stable.
+
+**Required evidence:** Metric outcomes, scorer results, gate failures, missing required commands, missing artifacts, requirements gaps, judge caps caused by deterministic prerequisites, resource outliers, completion-claim inconsistencies, git/commit workflow issues, and repeat variance.
+
+**Workshop adaptation:** Port or adapt the framing from `TraceAnnotations.tsx` and `AnnotationChip.tsx`: compact chips, `issue | good | note` categories, source glyph/label, arrival/highlight affordance, and evidence-linked note text. Findings should be generated from Raidar evidence first; manual annotations can reuse the same visual language.
+
+**Why current coverage is insufficient:** Scores identify pass/fail or numeric quality, but they do not consistently surface the small set of findings a reviewer should inspect. Workshop's review UX is stronger because it makes findings visible at run and span level.
+
+**Work type:** Benchmark-view/UI plus platform-generated finding records.
+
+### 15. Platform capability: Raidar evidence search and payload retrieval
+
+**Purpose:** Provide Workshop-like searchable evidence access over Raidar artifacts so reviewers and agents can answer targeted questions without loading whole run directories.
+
+**Delivery activity measured:** Audit speed, source traceability, and investigation reproducibility.
+
+**Candidate scorers:** No immediate scorer. Future scorer refinement can use stable evidence references rather than filesystem-specific paths.
+
+**Required evidence:** Indexed text and metadata from prompts, rules, command outputs, logs, scorecards, scorer evidence, requirements mappings, diffs, artifact manifests, experiment summaries, and dashboard rows.
+
+**Workshop adaptation:** Mirror the concepts of `query_traces`, `search_run`, `get_span_payload`, and `get_span_context` from `src/mcp/tools.ts`, but expose Raidar concepts: `query_runs`, `search_run_evidence`, `get_evidence_payload`, and `get_evidence_context`. Use `JsonView.tsx`, `MessageList.tsx`, and `ToolCallPill.tsx` as payload-display references where Raidar evidence is command/tool/message-shaped.
+
+**Why current coverage is insufficient:** Raidar artifacts are retained but not uniformly searchable or addressable. Reviewers need stable evidence references to support findings, audits, and future scorer debugging.
+
+**Work type:** Platform/API capability, then UI integration.
+
+### 16. Platform capability: durable annotations over Raidar artifacts
+
+**Purpose:** Let humans or review agents attach durable notes to Raidar runs, metrics, scorer results, commands, requirements, and artifacts without changing scores.
+
+**Delivery activity measured:** Review traceability, human audit workflow, and finding lifecycle management.
+
+**Candidate scorers:** None initially. Annotations are non-scoring review metadata unless explicitly promoted into a scenario/scorer revision.
+
+**Required evidence:** Annotation records with `kind`, `source`, `scope`, `evidence_ref`, `note`, timestamps, and optional links to generated findings.
+
+**Workshop adaptation:** Reuse Workshop's annotation semantics from `src/db/schema.ts`, `src/annotations.ts`, `app/src/api/annotations.ts`, `TraceAnnotations.tsx`, and `AnnotationChip.tsx`. Preserve `issue | good | note` as the first taxonomy because it is simple and maps to Raidar review needs.
+
+**Why current coverage is insufficient:** Raidar can produce benchmark outputs but does not have a first-class review-note layer. That makes it harder to preserve reviewer judgment, scorer caveats, or recurring failure patterns across follow-up work.
+
+**Work type:** Platform data model plus benchmark-view UI.
+
+### 17. Platform/UI capability: Raidar phase tree and timeline
+
+**Purpose:** Adapt Workshop's span tree/timeline review pattern to Raidar execution phases, commands, gates, scoring steps, and artifact capture.
+
+**Delivery activity measured:** Delivery-process explainability and phase-level failure localization.
+
+**Candidate scorers:** Existing process/resource metrics can feed phase summaries. Future orchestration/process scorers can consume phase-level artifacts.
+
+**Required evidence:** Start/end/duration where available, status, command names, gate names, scorer IDs, metric IDs, token/resource summaries, failed command categories, verification rounds, and artifact references.
+
+**Workshop adaptation:** `SpanTree.tsx` is the key component to inspect for collapsible row/detail behavior, per-node status, duration bars, error banners, provider/model badges, payload sections, and inline annotation chips. `FlameTimeline.tsx` is the candidate for visualizing durations if Raidar emits stable phase timestamps. Raidar phases do not need to be token-level spans initially.
+
+**Why current coverage is insufficient:** Existing run summaries show what failed but not always where in the delivery process the failure emerged. A phase tree would make process measurement reviewable before adding deeper tracing.
+
+**Work type:** Benchmark-view/UI plus artifact projection.
+
+### 18. Workflow proposal: finding-to-rerun and finding-to-scenario promotion
+
+**Purpose:** Use findings as the bridge from one observed benchmark failure to a controlled rerun, scorer-only review, scenario revision, or new scenario root.
+
+**Delivery activity measured:** Evaluation maintenance quality and failure-to-benchmark conversion.
+
+**Candidate scorers:** Existing affected scorer(s), depending on finding. No new scorer required for workflow MVP.
+
+**Required evidence:** Finding record, source evidence references, scenario revision, AgentSpec, matrix entry, repeat metadata, scorer IDs, and rerun/revision decision log.
+
+**Workshop adaptation:** Use `ReplayView.tsx`, `app/src/api/replay.ts`, and the `replay_run` concept from `src/mcp/tools.ts` for UX framing only. Raidar execution should remain public `make ...`: rerun matrix entry, rerun scenario/AgentSpec, or rerun scoring over retained artifacts where safe. The Workshop idea to turn observed failures into eval assertions should become Raidar's `finding -> backlog brief -> scenario/revision/scorer/platform proposal` workflow.
+
+**Why current coverage is insufficient:** The charter backlog identifies many gaps, but there is no explicit lifecycle from a concrete failed run to a durable Raidar backlog item or revised benchmark contract.
+
+**Work type:** Workflow/platform capability.
+
+### 19. Spike: Workshop UX extraction feasibility for benchmark-view
+
+**Purpose:** Determine whether to copy selected Workshop UI components wholesale or reimplement them against a Raidar-native review API.
+
+**Delivery activity measured:** Implementation feasibility, maintenance risk, and fidelity of Workshop-style review over Raidar data.
+
+**Candidate scorers:** None. This is a UI/platform spike.
+
+**Required evidence:** Component dependency map, data-shape adapter sketch, styling/dependency inventory, licensing check, minimal prototype against one existing Raidar run artifact set, and decision record.
+
+**Workshop adaptation:** Prioritize extraction candidates in this order: `AnnotationChip.tsx`, `TraceAnnotations.tsx`, `JsonView.tsx`, `ToolCallPill.tsx`, `SpanTree.tsx`, `RunDetail.tsx`. Avoid wholesale daemon/backend adoption until a Raidar adapter proves that run outlines, evidence search, payload retrieval, and annotations work against Raidar artifacts.
+
+**Why current coverage is insufficient:** Pulling the Workshop app wholesale would couple Raidar to a trace debugger's daemon, database, routing, and replay assumptions. A component-level spike tests the attractive part—the review UX—without replacing Raidar's mechanism.
+
+**Work type:** UI/platform spike.
+
+### 20. Optional platform proposal: Workshop-compatible export adapter
+
+**Purpose:** Emit a Workshop-shaped export of Raidar evidence for interoperability experiments while keeping Raidar artifacts authoritative.
+
+**Delivery activity measured:** Tool interoperability and trace-review compatibility.
+
+**Candidate scorers:** None initially.
+
+**Required evidence:** Mapping from Raidar run artifacts to Workshop-like `run`, `span`, `live_event`, `payload`, and `annotation` records; redaction policy; stable IDs; links back to Raidar source artifacts.
+
+**Workshop adaptation:** Use `src/db/schema.ts` and `src/mcp/tools.ts` as schema/interface references. Do not make Workshop's SQLite database the source of truth. Treat export as generated review data that can be rebuilt from Raidar artifacts.
+
+**Why current coverage is insufficient:** A direct Workshop UI reuse path may need Workshop-shaped data. An export adapter gives Raidar a reversible compatibility layer without weakening benchmark reproducibility or scorecard governance.
+
+**Work type:** Optional platform interoperability.
+
 ## Decision Rules
 
 ### Deterministic vs LLM-as-judge vs Hybrid
