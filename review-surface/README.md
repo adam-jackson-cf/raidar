@@ -15,7 +15,7 @@ only data it owns (stored in `data/user-annotations.json`).
 
 | Persona | Objective | Where they land |
 |---|---|---|
-| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, and can I trust the sample? | **Experiments** page: per-scenario AgentSpec comparison (best-first with Δ-vs-best), scenario context chips/description, validity, sample adequacy, unscored warnings, cost/duration, finding counts, and status-bearing run pills. |
+| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, did a revision change help, and can I trust the sample? | **Experiments** page: per-scenario AgentSpec comparison (best-first with Δ-vs-best), scenario context chips/description, validity, sample adequacy, unscored warnings, cost/duration, finding counts, status-bearing run pills, score-vs-duration tradeoff scatter, failure-pattern rollups, and revision movement with scenario contract diffs and comparability warnings. |
 | Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: scorecard breakdown (scorer → weighted metric contributions with pass/fail and evidence), gate status chips, findings as evidence-linked annotations, requirements/metric evidence spans. |
 | Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases) with expand/collapse-all, error cycling, keyboard navigation (↑↓/←→/esc), per-run evidence search with match highlighting, payload drilldown with copy. |
 
@@ -64,6 +64,16 @@ Inside `review-surface/` for development: `npm run dev` (Vite on 5951, proxies
 Synthetic fixtures are always labeled — experiment ids, run ids, and payloads
 carry `synthetic` markers and the UI shows a `SYNTHETIC FIXTURE` badge. They
 must never be read as real benchmark evidence.
+
+## Relationship to the former benchmark-view
+
+The earlier `benchmark-view` dashboard is deprecated and removed. Its
+persona-relevant capabilities live here: revision movement deltas, scenario
+contract diffs with comparability warnings, failure-pattern rollups, and the
+score-vs-duration tradeoff scatter. Its decision-score heuristic, signal
+coverage matrix, improvement playbook, and scenario portfolio census were
+deliberately not carried forward — the deterministic findings layer and the
+comparison tables supersede them.
 
 ## Attribution
 

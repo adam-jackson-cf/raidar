@@ -414,6 +414,23 @@ export function ExperimentsPage() {
 
   return (
     <div className="sb flex flex-1 flex-col gap-5 overflow-auto p-4">
+      {families.length > 1 && (
+        <nav className="flex flex-wrap items-center gap-1.5" aria-label="Scenario families">
+          <span className="text-[10px] uppercase tracking-wider" style={{ color: C.fg0 }}>
+            scenarios
+          </span>
+          {families.map(({ family }) => (
+            <a
+              key={family}
+              href={`#family-${family}`}
+              className="num rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
+              style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
+            >
+              {family}
+            </a>
+          ))}
+        </nav>
+      )}
       {families.map(({ family, revisions, all }) => (
         <FamilySection
           key={family}
@@ -442,7 +459,7 @@ function FamilySection({
   const familyRunIds = new Set(all.flatMap((exp) => exp.run_ids));
   const familyRuns = (runs.data ?? []).filter((run) => familyRunIds.has(run.id));
   return (
-    <div className="flex flex-col gap-3">
+    <div id={`family-${family}`} className="flex scroll-mt-4 flex-col gap-3">
       {revisions.map(([revision, exps]) => (
         <ExperimentGroup key={`${family}:${revision}`} groupKey={`${family}:${revision}`} experiments={exps} />
       ))}

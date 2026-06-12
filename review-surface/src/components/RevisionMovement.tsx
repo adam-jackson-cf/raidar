@@ -220,7 +220,7 @@ export function RevisionMovement({
                 <td className="px-2 py-1">
                   <DeltaCell
                     delta={movement.tokens}
-                    format={(v) => fmtTokens(Math.round(Math.abs(v))) ?? String(v)}
+                    format={(v) => `${v < 0 ? '-' : ''}${fmtTokens(Math.round(Math.abs(v)))}`}
                     higherIsBetter={false}
                   />
                 </td>
