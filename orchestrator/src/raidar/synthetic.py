@@ -28,6 +28,7 @@ from raidar.schemas.scorecard import (
     ScorerResult,
     VerificationStabilityScore,
 )
+from raidar.synthetic_visual import visual_experiment_specs, write_visual_assets
 
 SYNTHETIC_MARKER = "synthetic"
 _SCENARIO = "bugfix-ledger-balance"
@@ -86,6 +87,17 @@ def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
         _experiment_dir(dest_dir, "gpt-5.5-low", skill_v1, _skill_runs("v001", skill_v1, 0.78)),
         _experiment_dir(dest_dir, "gpt-5.5-low", skill_v3, _skill_runs("v003", skill_v3, 0.91)),
     ]
+    for spec in visual_experiment_specs():
+        runs = spec["runs"]
+        experiment_dir = _experiment_dir(
+            dest_dir,
+            str(spec["model_label"]),
+            spec["meta"],  # type: ignore[arg-type]
+            runs,  # type: ignore[arg-type]
+            harness=str(spec["harness"]),
+        )
+        write_visual_assets(experiment_dir, runs)  # type: ignore[arg-type]
+        experiments.append(experiment_dir)
     return experiments
 
 
@@ -110,10 +122,11 @@ def _experiment_dir(
     model_label: str,
     meta: dict[str, object],
     runs: list[EvalRun],
+    harness: str = _HARNESS,
 ) -> Path:
     dir_name = (
         f"{SYNTHETIC_MARKER}-00000000-000000Z__{meta['scenario']}__{meta['revision']}"
-        f"__{_HARNESS}__{model_label}"
+        f"__{harness}__{model_label}"
     )
     experiment_dir = dest_dir / dir_name
     summary = _summary_payload(meta, runs)
@@ -129,7 +142,7 @@ def _summary_payload(meta: dict[str, object], runs: list[EvalRun]) -> dict[str, 
         ExperimentSummaryInput(
             scenario_name=str(meta["scenario"]),
             scenario_revision=str(meta["revision"]),
-            harness=_HARNESS,
+            harness=runs[0].config.harness,
             model=runs[0].config.model,
             evaluation_profile=str(meta["profile"]),
             metrics=list(meta["metric_ids"]),  # type: ignore[arg-type]
