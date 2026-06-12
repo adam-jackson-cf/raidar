@@ -80,6 +80,7 @@ Record material decisions here during execution.
 | 2026-06-11 | Hydrate the final workspace for all non-terminated runs | Hydration was visual-only, so non-visual runs diffed an unchanged baseline: empty changed-file evidence starved `change-containment`, regression-test inventory, and the new evidence ingestion. | Platform behavior change recorded under residual risks; covered by artifact-phase tests. |
 | 2026-06-11 | Ship the defect reproduction test as `it.skip` in the starter | Starter preflight executes all `required_commands` against the baseline and aborts on failure, so a hard-failing repro test cannot ship; a parked repro keeps preflight green while `no_pattern it\.skip` plus the test gate force re-enable-and-fix. | Deterministic defect link without preflight breakage; verified by lint/test on the baseline. |
 | 2026-06-11 | Findings persist as per-run `findings.json` plus experiment-summary `findings` | Run-level findings need to live with run evidence for drilldown; experiment-level findings (variance, outliers, unscored, sample) only exist at aggregation time. | benchmark-view consumes both without new orchestrator APIs. |
+| 2026-06-12 | Workshop-adapted review surface built as `review-surface/` (separate goal) | User requested a fully functional, persona-aware review surface replicating Workshop's findings UX over Raidar data in a new root subdirectory. | Charter items 13/15/16/17 substantially delivered: run outline, span tree, evidence search, payload retrieval, and durable manual annotations over projected Raidar artifacts (MIT-attributed component adaptation; daemon/replay intentionally excluded). Public targets `make review-surface-{data,build,serve}`. |
 
 ## Files Changed During Execution
 
@@ -146,8 +147,8 @@ Recommended next slices, in priority order:
 
 1. Run `matrices/bugfix-ledger-balance-codex-gpt55.yaml` live (GPT 5.5 low first) to validate the scenario and the evidence-ingestion path end-to-end in Harbor, then review the findings surface against real artifacts.
 2. Remaining uncovered active scorer families, reusing the bugfix authoring pattern: `refactor@1` (behavior-preserving refactor root), `test-generation@1` (coverage-lift root), `python-code-task@1` (Python starter), then `plan-to-code@1` using the retained-evidence mechanism for plan packets (charter backlog items 2-5/8).
-3. Workshop-inspired evidence search and payload retrieval over Raidar artifacts (charter item 15) — the findings layer gives the record shape; search/index is the missing access path.
-4. Durable annotations (manual `issue|good|note` notes reusing the finding visual language, charter item 16) and finding-to-rerun/finding-to-scenario promotion workflow (charter item 18).
-5. Phase tree/timeline over execution evidence (charter item 17) once stable phase timestamps are emitted.
+3. ~~Workshop-inspired evidence search and payload retrieval over Raidar artifacts (charter item 15)~~ — delivered 2026-06-12 by the `review-surface/` app (per-run evidence search, payload slicing API).
+4. Durable annotations (charter item 16) — manual `issue|good|note` annotations delivered in `review-surface/` (persisted to `review-surface/data/user-annotations.json`); finding-to-rerun/finding-to-scenario promotion workflow (charter item 18) still open.
+5. ~~Phase tree/timeline over execution evidence (charter item 17)~~ — delivered 2026-06-12: the review-surface span tree projects trace events, gates, scoring, requirements, validity, process, and artifact evidence with duration bars. A related platform bug was fixed en route: `run_task` silently dropped execution trace events (`events=` vs `traces` field), so real runs never persisted traces.
 6. Multi-harness quality matrices and rules/linting intervention revision pairs (charter items 7/10).
 7. Upgrade `regression-protection` from filename proxy to starter-replay evidence if live runs show the proxy is gameable.
