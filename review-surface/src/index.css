@@ -1,0 +1,94 @@
+/* Adapted from Raindrop Workshop (MIT) — app/src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: #000;
+  color: #a0acb2;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Monospace numerals for metric alignment */
+.num {
+  font-variant-numeric: tabular-nums;
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Thin scrollbars */
+.sb::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.sb::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+.sb::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+.sb {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+.pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* Annotation arrival — subtle fade-in + two kind-colored glow pulses. */
+@keyframes annotation-enter {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes annotation-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--annotation-glow, rgba(37, 99, 235, 0.45));
+  }
+  50% {
+    box-shadow: 0 0 0 3px var(--annotation-glow, rgba(37, 99, 235, 0.45));
+  }
+}
+.annotation-arriving {
+  animation:
+    annotation-enter 0.25s ease-out both,
+    annotation-breathe 1.2s ease-in-out 0.25s;
+  animation-iteration-count: 1, 2;
+}
+.annotation-arriving.kind-issue {
+  --annotation-glow: rgba(220, 38, 38, 0.45);
+}
+.annotation-arriving.kind-good {
+  --annotation-glow: rgba(5, 150, 105, 0.45);
+}
+.annotation-arriving.kind-note {
+  --annotation-glow: rgba(37, 99, 235, 0.45);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pulse-dot,
+  .annotation-arriving {
+    animation: none;
+  }
+}

@@ -61,6 +61,7 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
 	benchmark-view-build benchmark-view-serve benchmark-fixture-synthetic run-web \
+	review-surface-data review-surface-build review-surface-serve \
 	quality
 
 define require_var
@@ -112,12 +113,26 @@ help:
 	@echo "  make benchmark-view-build                              Build benchmark dashboard data from experiments/benchmarks"
 	@echo "  make benchmark-view-serve [WEB_PORT=4173]              Serve benchmark dashboard locally"
 	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
+	@echo ""
+	@echo "Review surface:"
+	@echo "  make review-surface-data                               Project experiments/benchmarks into review-surface data"
+	@echo "  make review-surface-build                              Install and build the review-surface app"
+	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
 
 benchmark-view-build:
 	@cd benchmark-view && npm run build-data
 
 benchmark-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
+
+review-surface-data:
+	@node review-surface/scripts/build-review-data.mjs
+
+review-surface-build:
+	@cd review-surface && npm install --no-fund --no-audit && npm run build
+
+review-surface-serve: review-surface-data
+	@cd review-surface && node server.mjs
 
 benchmark-view-serve: benchmark-view-build
 	@cd benchmark-view && \
