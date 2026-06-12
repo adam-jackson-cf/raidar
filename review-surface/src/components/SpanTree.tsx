@@ -205,6 +205,35 @@ export function SpanTree({
 
   const rows = useMemo(() => buildRows(spans, collapsed), [spans, collapsed]);
 
+  function handleKeyDown(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (!['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Escape'].includes(event.key)) return;
+    event.preventDefault();
+    if (event.key === 'Escape') {
+      onSelect(null);
+      return;
+    }
+    const index = rows.findIndex((row) => row.span.id === selectedSpanId);
+    if (event.key === 'ArrowDown') {
+      const next = rows[Math.min(index + 1, rows.length - 1)] ?? rows[0];
+      if (next) onSelect(next.span.id);
+      return;
+    }
+    if (event.key === 'ArrowUp') {
+      const previous = rows[Math.max(index - 1, 0)];
+      if (previous) onSelect(previous.span.id);
+      return;
+    }
+    if (!selectedSpanId) return;
+    const row = rows[index];
+    if (!row) return;
+    if (event.key === 'ArrowRight' && row.hasChildren && collapsed.has(row.span.id)) {
+      toggle(row.span.id);
+    }
+    if (event.key === 'ArrowLeft' && row.hasChildren && !collapsed.has(row.span.id)) {
+      toggle(row.span.id);
+    }
+  }
+
   const annotationsBySpan = useMemo(() => {
     const map = new Map<string, Annotation[]>();
     for (const a of annotations) {
@@ -242,7 +271,13 @@ export function SpanTree({
   }
 
   return (
-    <div className="sb h-full overflow-auto">
+    <div
+      className="sb h-full overflow-auto outline-none"
+      tabIndex={0}
+      role="tree"
+      aria-label="Span tree — arrow keys navigate, escape clears selection"
+      onKeyDown={handleKeyDown}
+    >
       <div
         className="sticky top-0 z-10 flex items-center gap-1.5 px-2 py-1.5"
         style={{ background: C.surface, borderBottom: `1px solid ${C.border}` }}
@@ -280,6 +315,9 @@ export function SpanTree({
         </div>
         <div className="flex-1 text-[9px] font-medium uppercase tracking-wider" style={{ color: C.fg0 }}>
           Timeline
+          <span className="ml-2 normal-case tracking-normal" style={{ color: C.fg0 }}>
+            ↑↓ navigate · ←→ fold · esc clear
+          </span>
         </div>
         <div
           className="pr-3 text-right text-[9px] font-medium uppercase tracking-wider"

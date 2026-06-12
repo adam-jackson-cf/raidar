@@ -44,8 +44,16 @@ export function RunListItem({
             </span>
             {run.synthetic && <Badge label="synthetic" />}
           </div>
-          <div className="num mt-0.5 truncate text-[10px]" style={{ color: C.fg0 }}>
-            {run.id}
+          <div className="num mt-0.5 flex items-center justify-between gap-2 text-[10px]" style={{ color: C.fg0 }}>
+            <span className="truncate">{run.id}</span>
+            {run.started_at > 0 && (
+              <span className="shrink-0" title={new Date(run.started_at).toISOString()}>
+                {new Date(run.started_at).toLocaleDateString(undefined, {
+                  day: '2-digit',
+                  month: 'short',
+                })}
+              </span>
+            )}
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-2">
             <span

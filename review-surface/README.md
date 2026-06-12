@@ -15,9 +15,9 @@ only data it owns (stored in `data/user-annotations.json`).
 
 | Persona | Objective | Where they land |
 |---|---|---|
-| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, and can I trust the sample? | **Experiments** page: per-scenario AgentSpec comparison with composite/quality stats, validity, sample adequacy, cost/duration, and finding counts. |
-| Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: scores, findings as evidence-linked annotations, requirements coverage, scorer/metric evidence spans. |
-| Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases), per-run evidence search, payload drilldown. |
+| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, and can I trust the sample? | **Experiments** page: per-scenario AgentSpec comparison (best-first with Δ-vs-best), scenario context chips/description, validity, sample adequacy, unscored warnings, cost/duration, finding counts, and status-bearing run pills. |
+| Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: scorecard breakdown (scorer → weighted metric contributions with pass/fail and evidence), gate status chips, findings as evidence-linked annotations, requirements/metric evidence spans. |
+| Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases) with expand/collapse-all, error cycling, keyboard navigation (↑↓/←→/esc), per-run evidence search with match highlighting, payload drilldown with copy. |
 
 ## Architecture
 
