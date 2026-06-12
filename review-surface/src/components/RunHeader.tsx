@@ -1,10 +1,17 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/RunDetail.tsx (header)
 import { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { ArrowUpRight, Copy, Check } from 'lucide-react';
 import { Badge } from '@/components/Badge';
 import { C } from '@/utils/colors';
 import { fmtDuration, fmtScore, fmtTokens } from '@/utils/helpers';
 import type { RunRecord } from '@/utils/types';
+
+/** Review id is the experiment directory name under experiments/benchmarks/. */
+function reviewIdFromRun(run: RunRecord): string | null {
+  const match = run.artifact_paths.run_json.match(/experiments\/benchmarks\/([^/]+)\//);
+  return match ? match[1] : null;
+}
 
 function StatusPill({ status }: { status: RunRecord['status'] }) {
   const color = status === 'OK' ? C.green : status === 'ERROR' ? C.red : C.fg1;
@@ -66,6 +73,7 @@ function ArtifactPath({ label, path }: { label: string; path: string }) {
 }
 
 export function RunHeader({ run, children }: { run: RunRecord; children?: React.ReactNode }) {
+  const reviewId = reviewIdFromRun(run);
   return (
     <div
       className="flex flex-col gap-3 rounded-lg p-3"
@@ -87,6 +95,16 @@ export function RunHeader({ run, children }: { run: RunRecord; children?: React.
         <span className="num text-[10px]" style={{ color: C.fg0 }}>
           {run.id}
         </span>
+        {reviewId && (
+          <Link
+            to={`/review/${encodeURIComponent(reviewId)}`}
+            className="ml-auto inline-flex items-center gap-1 text-[10px] transition hover:opacity-80"
+            style={{ color: C.accent }}
+            title="Open the experiment review this run belongs to"
+          >
+            experiment review <ArrowUpRight className="size-3" />
+          </Link>
+        )}
       </div>
 
       <div className="flex flex-wrap gap-x-6 gap-y-2">
