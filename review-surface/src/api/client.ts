@@ -7,6 +7,7 @@ import type {
   RunRecord,
   SearchMatch,
 } from '@/utils/types';
+import type { ReviewResponse } from '@/utils/review-types';
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
@@ -28,6 +29,7 @@ export const api = {
     );
   },
   experiments: () => getJson<ExperimentsResponse>('/api/experiments'),
+  review: () => getJson<ReviewResponse>('/api/review'),
   annotations: (runId: string) =>
     getJson<Annotation[]>(`/api/annotations?run_id=${encodeURIComponent(runId)}`),
   createAnnotation: async (input: {

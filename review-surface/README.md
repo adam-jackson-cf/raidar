@@ -15,7 +15,7 @@ only data it owns (stored in `data/user-annotations.json`).
 
 | Persona | Objective | Where they land |
 |---|---|---|
-| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, did a revision change help, and can I trust the sample? | **Experiments** page: per-scenario AgentSpec comparison (best-first with Δ-vs-best), scenario context chips/description, validity, sample adequacy, unscored warnings, cost/duration, finding counts, status-bearing run pills, score-vs-duration tradeoff scatter, failure-pattern rollups, and revision movement with scenario contract diffs and comparability warnings. |
+| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, did a revision change help, and can I trust the sample? | **Scenario Board**: one representative experiment per AgentSpec, absolute status (`Meets/Below Scenario Bar`), pinned-benchmark deltas, confidence bands, one-line verdicts with strength/weakness, five canonical dimension cells, efficiency anchors, sort/filter, and a two-row compare affordance. Then **Experiment Review**: outcome header, change context, side-by-side evidence proof blocks, diagnosis, radar + delta bars, run consistency, and hypothesis-shaped next-experiment recommendations. |
 | Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: scorecard breakdown (scorer → weighted metric contributions with pass/fail and evidence), gate status chips, findings as evidence-linked annotations, requirements/metric evidence spans. |
 | Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases) with expand/collapse-all, error cycling, keyboard navigation (↑↓/←→/esc), per-run evidence search with match highlighting, payload drilldown with copy. |
 
@@ -27,15 +27,37 @@ experiments/benchmarks/**            Raidar benchmark artifacts (authoritative)
         ▼
 data/runs.json                       run index records
 data/runs/<run_id>.json              { run, spans, annotations } projections
-data/experiments.json                experiment rollups for comparison
+data/experiments.json                experiment rollups (exploratory context)
+data/review.json                     derived review model: scenario boards +
+        │                            experiment reviews (scripts/derive-review.mjs,
+        │                            benchmark pins from review.config.json)
         │  server.mjs (node:http, zero deps)
         ▼
 /api/runs · /api/runs/detail/:id · /api/runs/:id/outline · /api/runs/:id/search
-/api/spans/:id/payload · /api/annotations (CRUD) · /api/experiments
+/api/spans/:id/payload · /api/annotations (CRUD) · /api/experiments · /api/review
         │
         ▼
 React SPA (Vite + Tailwind), components adapted from Workshop's app
 ```
+
+The review model follows the review-surface specs: one representative
+experiment per `(scenario, revision, harness, model)` identity (latest
+completed experiment meeting the scenario-family scored-run minimum), five
+canonical dimensions (`Task Fidelity`, `Scenario Fidelity`, `Workflow
+Discipline`, `Execution Reliability`, `Confidence`) derived from run-level
+evidence with hard overrides, explicit pinned-benchmark deltas (never a silent
+"current best"), confidence-gated verdict language, and at most three
+hypothesis-shaped recommendations per review. Efficiency stays an anchor
+cluster, never a dimension.
+
+Scenario Fidelity follows the scenario family: `visual-ui-implementation`
+scenarios derive it from screenshot similarity, threshold pass rates, and
+regional evidence (rendered as a reference/current/benchmark/diff strip with
+region cards, served from `/artifacts/...`); non-visual scenarios derive it
+from the primary scenario-family scorer (e.g. `bugfix@1` →
+`Defect-Fix Fidelity`), which acts as the evidence-model subtype contract.
+Missing regional or subtype evidence lowers Confidence instead of inventing a
+neutral score.
 
 Projection mapping (Workshop concept → Raidar source):
 

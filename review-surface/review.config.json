@@ -1,0 +1,7 @@
+{
+  "$comment": "Review-surface configuration. benchmarks pins the comparison AgentSpec per scenario; a scenario without a pin renders as 'No benchmark pinned' (never a silent fallback to current best).",
+  "benchmarks": {
+    "bugfix-ledger-balance": { "harness": "codex-cli", "model": "openai/gpt-5.5:medium" },
+    "homepage-hero-replication": { "harness": "claude-code", "model": "anthropic/claude-opus-4.8" }
+  }
+}

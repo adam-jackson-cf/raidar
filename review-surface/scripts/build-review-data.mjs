@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { deriveReview } from './derive-review.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const surfaceRoot = path.resolve(here, '..');
@@ -334,6 +335,97 @@ function findingCounts(annotations, experimentFindings) {
   return counts;
 }
 
+// Resolves a visual artifact path from run.json into a repo-relative path the
+// server can serve via /artifacts/, or null when the file is not available.
+function resolveArtifactPath(value, runDirRel) {
+  if (!value) return null;
+  const text = String(value);
+  const marker = 'experiments/benchmarks/';
+  const markerIndex = text.indexOf(marker);
+  const candidate = markerIndex !== -1
+    ? text.slice(markerIndex)
+    : path.isAbsolute(text)
+      ? null
+      : path.join(runDirRel, text);
+  if (!candidate) return null;
+  return fs.existsSync(path.join(repoRoot, candidate)) ? candidate : null;
+}
+
+function projectVisual(scores, runDirRel) {
+  const visual = scores.visual;
+  if (!visual || (!visual.capture_succeeded && visual.similarity === 0)) return null;
+  return {
+    ...visual,
+    actual_path: resolveArtifactPath(visual.actual_path, runDirRel),
+    reference_path: resolveArtifactPath(visual.reference_path, runDirRel),
+    diff_path: resolveArtifactPath(visual.diff_path, runDirRel),
+    regional_scores: (visual.regional_scores ?? []).map((region) => ({
+      ...region,
+      actual_path: resolveArtifactPath(region.actual_path, runDirRel),
+      reference_path: resolveArtifactPath(region.reference_path, runDirRel),
+      diff_path: resolveArtifactPath(region.diff_path, runDirRel),
+    })),
+  };
+}
+
+// Extracts the per-run inputs the review derivation layer consumes
+// (scripts/derive-review.mjs); everything comes from retained artifacts.
+function reviewInput(run, findingsPayload, runDirRel) {
+  const scores = run.scores ?? {};
+  const findings = findingsPayload?.findings ?? [];
+  const categories = {};
+  for (const finding of findings) {
+    categories[finding.category] = (categories[finding.category] ?? 0) + 1;
+  }
+  const changedFiles = [
+    ...new Set(
+      (run.traces ?? [])
+        .filter((event) => event.event_type === 'file_change')
+        .map((event) => event.data?.file_path)
+        .filter(Boolean),
+    ),
+  ];
+  const resource = scores.resource_efficiency ?? {};
+  return {
+    run_id: run.id,
+    duration_sec: run.duration_sec ?? null,
+    terminated_early: Boolean(run.terminated_early),
+    termination_reason: run.termination_reason ?? null,
+    unscored: Boolean(scores.unscored),
+    valid:
+      scores.execution_validity?.passed !== false &&
+      !(scores.execution_validity?.checks ?? []).some((check) => !check.passed),
+    functional: scores.functional ?? null,
+    visual: projectVisual(scores, runDirRel),
+    requirements:
+      (scores.requirements_coverage?.total_requirements ?? 0) > 0
+        ? scores.requirements_coverage
+        : null,
+    verification_stability: scores.verification_stability ?? null,
+    execution_validity_passed: scores.execution_validity?.passed !== false,
+    performance_gates_passed: scores.performance_gates?.passed !== false,
+    resource: {
+      ...resource,
+      uncached_input_tokens:
+        scores.metadata?.process?.uncached_input_tokens ?? resource.uncached_input_tokens ?? null,
+    },
+    scorer_results: scores.scorer_results ?? [],
+    metric_scores: scores.metric_scores ?? [],
+    changed_files: changedFiles,
+    gate_history: (run.gate_history ?? []).map((gate) => ({
+      gate_name: gate.gate_name,
+      exit_code: gate.exit_code,
+      detail: gate.stderr || gate.stdout || gate.failure_category || null,
+    })),
+    finding_categories: categories,
+    findings: findings.map((finding) => ({
+      kind: finding.kind,
+      category: finding.category,
+      title: finding.title,
+    })),
+  };
+}
+
 function projectRun(experiment, runDir) {
   const run = readJson(path.join(runDir, 'run.json'));
   if (!run) return null;
@@ -426,6 +518,7 @@ function projectRun(experiment, runDir) {
     index: indexRecord,
     detail: { run: indexRecord, spans: builder.spans, annotations },
     experimentFindings,
+    reviewInput: reviewInput(run, findingsPayload, path.relative(repoRoot, runDir)),
   };
 }
 
@@ -634,6 +727,8 @@ function projectExperiment(dirName) {
     agent_spec: `${summary.config?.harness ?? '?'} · ${summary.config?.model ?? '?'}`,
     synthetic: Boolean(summary.synthetic),
     repeats: summary.config?.repeats ?? null,
+    evaluation_profile: summary.config?.evaluation_profile ?? null,
+    starter_fingerprint: summary.config?.starter_fingerprint ?? null,
     scenario_meta: scenarioMeta(summary.config?.scenario_name, summary.config?.scenario_revision),
     aggregate: summary.aggregate ?? {},
     sample: summary.sample ?? {},
@@ -658,10 +753,15 @@ function main() {
 
   const experiments = [];
   const runIndex = [];
+  const inputsByExperiment = new Map();
   for (const dirName of listDirs(benchRoot)) {
     const projected = projectExperiment(dirName);
     if (!projected) continue;
     experiments.push(projected.experiment);
+    inputsByExperiment.set(
+      projected.experiment.dir,
+      projected.runs.map((run) => run.reviewInput),
+    );
     for (const run of projected.runs) {
       runIndex.push(run.index);
       fs.writeFileSync(
@@ -671,16 +771,20 @@ function main() {
     }
   }
   runIndex.sort((a, b) => b.started_at - a.started_at || a.id.localeCompare(b.id));
+  const revisionDiffs = buildRevisionDiffs(experiments);
   fs.writeFileSync(
     path.join(dataRoot, 'runs.json'),
     JSON.stringify({ generated_from: path.relative(repoRoot, benchRoot), runs: runIndex }, null, 2),
   );
   fs.writeFileSync(
     path.join(dataRoot, 'experiments.json'),
-    JSON.stringify({ experiments, revision_diffs: buildRevisionDiffs(experiments) }, null, 2),
+    JSON.stringify({ experiments, revision_diffs: revisionDiffs }, null, 2),
   );
+  const config = readJson(path.join(surfaceRoot, 'review.config.json')) ?? {};
+  const review = deriveReview({ experiments, inputsByExperiment, revisionDiffs, config });
+  fs.writeFileSync(path.join(dataRoot, 'review.json'), JSON.stringify(review, null, 2));
   console.log(
-    `Projected ${runIndex.length} run(s) across ${experiments.length} experiment(s) into ${path.relative(repoRoot, dataRoot)}`,
+    `Projected ${runIndex.length} run(s) across ${experiments.length} experiment(s) into ${path.relative(repoRoot, dataRoot)} (boards: ${review.boards.length})`,
   );
 }
 
