@@ -33,7 +33,6 @@ PROMPT_ENTRY ?=
 DIFFICULTY ?=
 CATEGORY ?=
 TIMEOUT_SEC ?=
-WEB_PORT ?= 4173
 
 # Canonical smoke workflow defaults.
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
@@ -60,7 +59,7 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
-	benchmark-view-build benchmark-view-serve benchmark-fixture-synthetic run-web \
+	benchmark-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve \
 	quality
 
@@ -108,19 +107,11 @@ help:
 	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
 	@echo "                                                        Preview artifact pruning decisions"
 	@echo ""
-	@echo "Benchmark view:"
-	@echo "  make run-web [WEB_PORT=4173]                           Build benchmark dashboard data and serve it locally"
-	@echo "  make benchmark-view-build                              Build benchmark dashboard data from experiments/benchmarks"
-	@echo "  make benchmark-view-serve [WEB_PORT=4173]              Serve benchmark dashboard locally"
-	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
-	@echo ""
 	@echo "Review surface:"
+	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
 	@echo "  make review-surface-data                               Project experiments/benchmarks into review-surface data"
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
-
-benchmark-view-build:
-	@cd benchmark-view && npm run build-data
 
 benchmark-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
@@ -133,18 +124,6 @@ review-surface-build:
 
 review-surface-serve: review-surface-data
 	@cd review-surface && node server.mjs
-
-benchmark-view-serve: benchmark-view-build
-	@cd benchmark-view && \
-		port="$(WEB_PORT)"; \
-		while lsof -nP -iTCP:"$$port" -sTCP:LISTEN >/dev/null 2>&1; do \
-			echo "Port $$port is already in use; trying $$((port + 1))"; \
-			port=$$((port + 1)); \
-		done; \
-		echo "Serving benchmark dashboard on http://localhost:$$port"; \
-		python3 -m http.server "$$port" --directory src
-
-run-web: benchmark-view-serve
 
 env-setup:
 	@$(RAIDAR) env setup

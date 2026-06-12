@@ -72,7 +72,12 @@ def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
         _SKILL_SCENARIO,
         "v003",
         "scorers:typescript-code-task@1:0.78+requirements@1:0.20+resource-efficiency@1:0.02",
-        [*_SKILL_CORE_METRICS, "requirements-coverage", "requirements-adherence", "resource-efficiency"],
+        [
+            *_SKILL_CORE_METRICS,
+            "requirements-coverage",
+            "requirements-adherence",
+            "resource-efficiency",
+        ],
         ["typescript-code-task@1", "requirements@1", "resource-efficiency@1"],
     )
     experiments = [
