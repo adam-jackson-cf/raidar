@@ -404,6 +404,17 @@ function projectRun(experiment, runDir) {
     valid: !(scores.execution_validity?.checks ?? []).some((check) => !check.passed),
     synthetic: Boolean(experiment.synthetic),
     finding_counts: findingCounts(annotations, []),
+    issue_categories: Object.fromEntries(
+      annotations
+        .filter((annotation) => annotation.kind === 'issue')
+        .reduce((map, annotation) => {
+          map.set(annotation.category, (map.get(annotation.category) ?? 0) + 1);
+          return map;
+        }, new Map()),
+    ),
+    failed_gates: builder.spans
+      .filter((span) => span.name.startsWith('gate:') && span.status === 'ERROR')
+      .map((span) => span.name.slice('gate:'.length)),
     artifact_paths: {
       run_json: path.relative(repoRoot, path.join(runDir, 'run.json')),
       findings_json: fs.existsSync(path.join(runDir, 'findings.json'))
@@ -422,6 +433,172 @@ function firstYamlScalar(text, key) {
   const prefix = `${key}:`;
   const line = text.split('\n').find((candidate) => candidate.startsWith(prefix));
   return line ? line.slice(prefix.length).replace(/^['"]|['"]$/g, '').trim() : null;
+}
+
+function readText(filePath) {
+  try {
+    return fs.readFileSync(filePath, 'utf8');
+  } catch {
+    return '';
+  }
+}
+
+// --- Revision diffing (adapted from the deprecated benchmark-view builder) ---
+
+function lineDiff(beforeText, afterText, maxLines = 160) {
+  const before = beforeText.split('\n');
+  const after = afterText.split('\n');
+  const dp = lineDiffTable(before, after);
+  const state = { i: 0, j: 0, added: 0, removed: 0, lines: [] };
+  appendChangedLines(state, before, after, dp, maxLines);
+  appendRemainingLines(state, before, 'removed', maxLines);
+  appendRemainingLines(state, after, 'added', maxLines);
+  return {
+    added: state.added,
+    removed: state.removed,
+    truncated: state.i < before.length || state.j < after.length,
+    lines: state.lines,
+  };
+}
+
+function lineDiffTable(before, after) {
+  const dp = Array.from({ length: before.length + 1 }, () => Array(after.length + 1).fill(0));
+  for (let i = before.length - 1; i >= 0; i -= 1) {
+    for (let j = after.length - 1; j >= 0; j -= 1) {
+      dp[i][j] =
+        before[i] === after[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+    }
+  }
+  return dp;
+}
+
+function appendChangedLines(state, before, after, dp, maxLines) {
+  while (state.i < before.length && state.j < after.length && state.lines.length < maxLines) {
+    if (before[state.i] === after[state.j]) {
+      if (before[state.i].trim()) state.lines.push({ type: 'context', text: before[state.i] });
+      state.i += 1;
+      state.j += 1;
+    } else if (dp[state.i + 1][state.j] >= dp[state.i][state.j + 1]) {
+      state.lines.push({ type: 'removed', text: before[state.i] });
+      state.removed += 1;
+      state.i += 1;
+    } else {
+      state.lines.push({ type: 'added', text: after[state.j] });
+      state.added += 1;
+      state.j += 1;
+    }
+  }
+}
+
+function appendRemainingLines(state, source, type, maxLines) {
+  const cursor = type === 'removed' ? 'i' : 'j';
+  while (state[cursor] < source.length && state.lines.length < maxLines) {
+    state.lines.push({ type, text: source[state[cursor]] });
+    state[type] += 1;
+    state[cursor] += 1;
+  }
+}
+
+function gateNames(text) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => line.trim() === 'gates:');
+  if (start === -1) return [];
+  const names = [];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\S/.test(line) && !line.startsWith('-')) break;
+    const match = line.match(/^\s*-?\s*name:\s*(.+)$/);
+    if (match) names.push(match[1].trim());
+  }
+  return names;
+}
+
+function scorerProfile(text) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => line.trim() === 'scorers:');
+  if (start === -1) return '';
+  const refs = [];
+  let current = null;
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\S/.test(line) && !line.startsWith('-') && !line.startsWith(' ')) break;
+    const idMatch = line.match(/^\s*-\s*id:\s*(.+)$/);
+    if (idMatch) {
+      current = { id: idMatch[1].trim(), weight: null };
+      refs.push(current);
+      continue;
+    }
+    if (!current) continue;
+    const weightMatch = line.match(/^\s*weight:\s*(.+)$/);
+    if (weightMatch) current.weight = weightMatch[1].trim();
+  }
+  return refs.map((ref) => `${ref.id}:${ref.weight ?? '1'}`).join('+');
+}
+
+function requirementCount(text) {
+  return (text.match(/^\s*-\s*id:\s*req-/gm) ?? []).length;
+}
+
+function classifyRevisionChange(beforeYaml, afterYaml, promptDiff, yamlDiff) {
+  const changes = [
+    [scorerProfile(beforeYaml) !== scorerProfile(afterYaml), 'evaluation profile changed'],
+    [gateNames(beforeYaml).join(',') !== gateNames(afterYaml).join(','), 'quality gates changed'],
+    [requirementCount(beforeYaml) !== requirementCount(afterYaml), 'requirements changed'],
+    [promptDiff.added + promptDiff.removed > 0, 'prompt changed'],
+    [yamlDiff.added + yamlDiff.removed > 0, 'scenario contract changed'],
+  ];
+  const flags = changes.filter(([changed]) => changed).map(([, label]) => label);
+  return flags.length ? flags : ['metadata unchanged'];
+}
+
+const NON_COMPARABLE = new Set(['prompt changed', 'scenario contract changed', 'metadata unchanged']);
+
+function buildRevisionDiffs(experiments) {
+  const revisionsByScenario = new Map();
+  for (const experiment of experiments) {
+    if (!experiment.scenario || !experiment.revision) continue;
+    const set = revisionsByScenario.get(experiment.scenario) ?? new Set();
+    set.add(experiment.revision);
+    revisionsByScenario.set(experiment.scenario, set);
+  }
+  const diffs = [];
+  for (const [scenario, revisionSet] of revisionsByScenario) {
+    const revisions = [...revisionSet].sort();
+    for (let index = 1; index < revisions.length; index += 1) {
+      const diff = buildRevisionDiff(scenario, revisions[index - 1], revisions[index]);
+      if (diff) diffs.push(diff);
+    }
+  }
+  return diffs;
+}
+
+function buildRevisionDiff(scenario, fromRevision, toRevision) {
+  const beforeYaml = readText(path.join(scenariosRoot, scenario, fromRevision, 'scenario.yaml'));
+  const afterYaml = readText(path.join(scenariosRoot, scenario, toRevision, 'scenario.yaml'));
+  if (!beforeYaml || !afterYaml) return null;
+  const beforePrompt = readText(path.join(scenariosRoot, scenario, fromRevision, 'prompt', 'task.md'));
+  const afterPrompt = readText(path.join(scenariosRoot, scenario, toRevision, 'prompt', 'task.md'));
+  const yamlDiff = lineDiff(beforeYaml, afterYaml);
+  const promptDiff = lineDiff(beforePrompt, afterPrompt);
+  const summary = classifyRevisionChange(beforeYaml, afterYaml, promptDiff, yamlDiff);
+  return {
+    key: `${scenario}:${fromRevision}:${toRevision}`,
+    scenario,
+    from_revision: fromRevision,
+    to_revision: toRevision,
+    summary,
+    comparable_warnings: summary.filter((flag) => !NON_COMPARABLE.has(flag)),
+    files: {
+      scenario: {
+        path: path.join('scenarios', scenario, toRevision, 'scenario.yaml'),
+        diff: yamlDiff,
+      },
+      prompt: {
+        path: path.join('scenarios', scenario, toRevision, 'prompt', 'task.md'),
+        diff: promptDiff,
+      },
+    },
+  };
 }
 
 function scenarioMeta(scenarioName, revision) {
@@ -500,7 +677,7 @@ function main() {
   );
   fs.writeFileSync(
     path.join(dataRoot, 'experiments.json'),
-    JSON.stringify({ experiments }, null, 2),
+    JSON.stringify({ experiments, revision_diffs: buildRevisionDiffs(experiments) }, null, 2),
   );
   console.log(
     `Projected ${runIndex.length} run(s) across ${experiments.length} experiment(s) into ${path.relative(repoRoot, dataRoot)}`,

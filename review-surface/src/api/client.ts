@@ -1,7 +1,7 @@
 import type {
   Annotation,
   AnnotationKind,
-  ExperimentRecord,
+  ExperimentsResponse,
   RunDetail,
   RunOutline,
   RunRecord,
@@ -27,7 +27,7 @@ export const api = {
       `/api/runs/${encodeURIComponent(runId)}/search?${params}`,
     );
   },
-  experiments: () => getJson<{ experiments: ExperimentRecord[] }>('/api/experiments'),
+  experiments: () => getJson<ExperimentsResponse>('/api/experiments'),
   annotations: (runId: string) =>
     getJson<Annotation[]>(`/api/annotations?run_id=${encodeURIComponent(runId)}`),
   createAnnotation: async (input: {

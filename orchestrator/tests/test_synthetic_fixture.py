@@ -8,7 +8,9 @@ from raidar.synthetic import SYNTHETIC_MARKER, generate_synthetic_benchmark
 def test_synthetic_experiments_are_labeled_and_benchmark_shaped(tmp_path):
     experiment_dirs = generate_synthetic_benchmark(tmp_path)
 
-    assert len(experiment_dirs) == 2
+    assert len(experiment_dirs) == 4
+    revisions = {directory.name.split("__")[2] for directory in experiment_dirs}
+    assert revisions == {"v001", "v003"}
     for experiment_dir in experiment_dirs:
         assert experiment_dir.name.startswith(f"{SYNTHETIC_MARKER}-")
         assert len(experiment_dir.name.split("__")) == 5

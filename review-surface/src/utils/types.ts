@@ -25,6 +25,8 @@ export interface RunRecord {
   valid: boolean;
   synthetic: boolean;
   finding_counts: { issue: number; good: number; note: number };
+  issue_categories: Record<string, number>;
+  failed_gates: string[];
   artifact_paths: { run_json: string; findings_json: string | null };
 }
 
@@ -154,4 +156,29 @@ export interface ExperimentRecord {
   }>;
   created_at_utc: string | null;
   run_ids: string[];
+}
+
+export interface DiffLine {
+  type: 'context' | 'added' | 'removed';
+  text: string;
+}
+
+export interface FileDiff {
+  path: string;
+  diff: { added: number; removed: number; truncated: boolean; lines: DiffLine[] };
+}
+
+export interface RevisionDiff {
+  key: string;
+  scenario: string;
+  from_revision: string;
+  to_revision: string;
+  summary: string[];
+  comparable_warnings: string[];
+  files: { scenario: FileDiff; prompt: FileDiff };
+}
+
+export interface ExperimentsResponse {
+  experiments: ExperimentRecord[];
+  revision_diffs: RevisionDiff[];
 }

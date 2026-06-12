@@ -32,6 +32,14 @@ from raidar.schemas.scorecard import (
 SYNTHETIC_MARKER = "synthetic"
 _SCENARIO = "bugfix-ledger-balance"
 _REVISION = "v001"
+_SKILL_SCENARIO = "skill-benchmark-coding-test"
+_SKILL_CORE_METRICS = [
+    "functional",
+    "code-quality",
+    "test-coverage",
+    "artifact-checks",
+    "verification-stability",
+]
 _HARNESS = "codex-cli"
 _PROFILE = "scorers:bugfix@1:0.88+requirements@1:0.10+resource-efficiency@1:0.02"
 _STARTED = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
@@ -51,19 +59,59 @@ _SCORER_IDS = ["bugfix@1", "requirements@1", "resource-efficiency@1"]
 def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
     """Write labeled synthetic experiments and return their directories."""
 
+    bugfix_low = _experiment_meta(_SCENARIO, _REVISION, _PROFILE, _METRIC_IDS, _SCORER_IDS)
+    bugfix_medium = bugfix_low
+    skill_v1 = _experiment_meta(
+        _SKILL_SCENARIO,
+        "v001",
+        "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
+        [*_SKILL_CORE_METRICS, "resource-efficiency"],
+        ["typescript-code-task@1", "resource-efficiency@1"],
+    )
+    skill_v3 = _experiment_meta(
+        _SKILL_SCENARIO,
+        "v003",
+        "scorers:typescript-code-task@1:0.78+requirements@1:0.20+resource-efficiency@1:0.02",
+        [*_SKILL_CORE_METRICS, "requirements-coverage", "requirements-adherence", "resource-efficiency"],
+        ["typescript-code-task@1", "requirements@1", "resource-efficiency@1"],
+    )
     experiments = [
-        _experiment_dir(dest_dir, "gpt-5.5-low", _mixed_quality_runs("low")),
-        _experiment_dir(dest_dir, "gpt-5.5-medium", _clean_runs("medium")),
+        _experiment_dir(dest_dir, "gpt-5.5-low", bugfix_low, _mixed_quality_runs("low")),
+        _experiment_dir(dest_dir, "gpt-5.5-medium", bugfix_medium, _clean_runs("medium")),
+        _experiment_dir(dest_dir, "gpt-5.5-low", skill_v1, _skill_runs("v001", skill_v1, 0.78)),
+        _experiment_dir(dest_dir, "gpt-5.5-low", skill_v3, _skill_runs("v003", skill_v3, 0.91)),
     ]
     return experiments
 
 
-def _experiment_dir(dest_dir: Path, model_label: str, runs: list[EvalRun]) -> Path:
+def _experiment_meta(
+    scenario: str,
+    revision: str,
+    profile: str,
+    metric_ids: list[str],
+    scorer_ids: list[str],
+) -> dict[str, object]:
+    return {
+        "scenario": scenario,
+        "revision": revision,
+        "profile": profile,
+        "metric_ids": metric_ids,
+        "scorer_ids": scorer_ids,
+    }
+
+
+def _experiment_dir(
+    dest_dir: Path,
+    model_label: str,
+    meta: dict[str, object],
+    runs: list[EvalRun],
+) -> Path:
     dir_name = (
-        f"{SYNTHETIC_MARKER}-00000000-000000Z__{_SCENARIO}__{_REVISION}__{_HARNESS}__{model_label}"
+        f"{SYNTHETIC_MARKER}-00000000-000000Z__{meta['scenario']}__{meta['revision']}"
+        f"__{_HARNESS}__{model_label}"
     )
     experiment_dir = dest_dir / dir_name
-    summary = _summary_payload(runs)
+    summary = _summary_payload(meta, runs)
     _write_runs(experiment_dir, runs)
     (experiment_dir / "experiment-summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
@@ -71,16 +119,16 @@ def _experiment_dir(dest_dir: Path, model_label: str, runs: list[EvalRun]) -> Pa
     return experiment_dir
 
 
-def _summary_payload(runs: list[EvalRun]) -> dict[str, object]:
+def _summary_payload(meta: dict[str, object], runs: list[EvalRun]) -> dict[str, object]:
     summary = create_experiment_summary(
         ExperimentSummaryInput(
-            scenario_name=_SCENARIO,
-            scenario_revision=_REVISION,
+            scenario_name=str(meta["scenario"]),
+            scenario_revision=str(meta["revision"]),
             harness=_HARNESS,
             model=runs[0].config.model,
-            evaluation_profile=_PROFILE,
-            metrics=_METRIC_IDS,
-            scorers=_SCORER_IDS,
+            evaluation_profile=str(meta["profile"]),
+            metrics=list(meta["metric_ids"]),  # type: ignore[arg-type]
+            scorers=list(meta["scorer_ids"]),  # type: ignore[arg-type]
             repeats=len(runs),
             repeat_parallel=1,
             runs=runs,
@@ -119,6 +167,141 @@ def _clean_runs(effort: str) -> list[EvalRun]:
     return [
         _run(f"{SYNTHETIC_MARKER}-med-{index:02d}", effort, duration=150.0 + 12 * index)
         for index in range(1, 4)
+    ]
+
+
+def _skill_runs(revision: str, meta: dict[str, object], quality: float) -> list[EvalRun]:
+    return [
+        _skill_run(
+            f"{SYNTHETIC_MARKER}-skill-{revision}-{index:02d}",
+            revision,
+            meta,
+            quality=round(quality + 0.01 * (index - 2), 3),
+            duration=200.0 - (40.0 if revision == "v003" else 0.0) + 8 * index,
+        )
+        for index in range(1, 4)
+    ]
+
+
+def _skill_run(
+    run_id: str,
+    revision: str,
+    meta: dict[str, object],
+    *,
+    quality: float,
+    duration: float,
+) -> EvalRun:
+    scorecard = Scorecard(
+        run_id=run_id,
+        scenario_name=_SKILL_SCENARIO,
+        scenario_revision=revision,
+        harness=_HARNESS,
+        model=_model("low"),
+        starter_root="starter",
+        duration_sec=duration,
+        functional=FunctionalScore(
+            passed=True,
+            tests_passed=6,
+            tests_total=6,
+            build_succeeded=True,
+            gates_passed=4,
+            gates_total=4,
+        ),
+        requirements_coverage=RequirementsCoverageScore(
+            total_requirements=8,
+            satisfied_requirements=8 if revision == "v003" else 7,
+            missing_requirement_ids=[] if revision == "v003" else ["req-no-todo"],
+        ),
+        metadata={
+            SYNTHETIC_MARKER: True,
+            "run": {"canonical_run_dir": None, "run_json_path": None},
+            "process": {"uncached_input_tokens": 26000 if revision == "v003" else 33000},
+        },
+        metric_scores=[
+            MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
+            for metric_id in list(meta["metric_ids"])  # type: ignore[arg-type]
+        ],
+        scorer_results=_skill_scorer_results(revision, quality),
+    )
+    return EvalRun(
+        id=run_id,
+        timestamp=_STARTED.isoformat(),
+        config=EvalConfig(
+            model=_model("low"),
+            harness=_HARNESS,
+            scenario_name=_SKILL_SCENARIO,
+            scenario_revision=revision,
+            starter_root="starter",
+            evaluation_profile=str(meta["profile"]),
+            scorers=list(meta["scorer_ids"]),  # type: ignore[arg-type]
+        ),
+        duration_sec=duration,
+        terminated_early=False,
+        scores=scorecard,
+        traces=_skill_trace_events(),
+    )
+
+
+def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
+    if revision == "v003":
+        return [
+            ScorerResult(
+                scorer_id="typescript-code-task",
+                version=1,
+                category="quality",
+                weight=0.78,
+                score=quality,
+            ),
+            ScorerResult(
+                scorer_id="requirements", version=1, category="quality", weight=0.20, score=quality
+            ),
+            ScorerResult(
+                scorer_id="resource-efficiency",
+                version=1,
+                category="efficiency",
+                weight=0.02,
+                score=0.88,
+            ),
+        ]
+    return [
+        ScorerResult(
+            scorer_id="typescript-code-task",
+            version=1,
+            category="quality",
+            weight=0.98,
+            score=quality,
+        ),
+        ScorerResult(
+            scorer_id="resource-efficiency",
+            version=1,
+            category="efficiency",
+            weight=0.02,
+            score=0.8,
+        ),
+    ]
+
+
+def _skill_trace_events() -> list[TraceEvent]:
+    return [
+        TraceEvent(
+            timestamp=_at(0),
+            event_type="user_prompt",
+            data={"content": "Build sumEven with minimal churn."},
+        ),
+        TraceEvent(
+            timestamp=_at(4),
+            event_type="file_change",
+            data={"file_path": "src/lib/math.ts"},
+        ),
+        TraceEvent(
+            timestamp=_at(6),
+            event_type="file_change",
+            data={"file_path": "src/test/math.test.ts"},
+        ),
+        *_command_events(8, "bun run typecheck", 0),
+        *_command_events(12, "bun run lint", 0),
+        *_command_events(16, "bun run test", 0),
+        *_command_events(20, "bun run test:coverage", 0),
     ]
 
 

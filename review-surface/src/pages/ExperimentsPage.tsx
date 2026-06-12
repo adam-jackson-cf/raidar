@@ -6,10 +6,13 @@ import { api } from '@/api/client';
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
 import { Badge } from '@/components/Badge';
+import { FailurePatterns } from '@/components/FailurePatterns';
 import { FindingChips } from '@/components/FindingChips';
+import { RevisionMovement } from '@/components/RevisionMovement';
+import { TradeoffScatter } from '@/components/TradeoffScatter';
 import { C } from '@/utils/colors';
 import { fmtPercent, fmtScore, fmtTokens } from '@/utils/helpers';
-import type { AnnotationKind, ExperimentRecord, StatBlock } from '@/utils/types';
+import type { AnnotationKind, ExperimentRecord, RevisionDiff, StatBlock } from '@/utils/types';
 
 function meanStd(stat: StatBlock | undefined): string {
   if (stat?.mean == null) return '—';
@@ -353,16 +356,25 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
 export function ExperimentsPage() {
   const experiments = useQuery({ queryKey: ['experiments'], queryFn: api.experiments });
 
-  const groups = useMemo(() => {
-    const map = new Map<string, ExperimentRecord[]>();
+  const families = useMemo(() => {
+    const map = new Map<string, Map<string, ExperimentRecord[]>>();
     for (const exp of experiments.data?.experiments ?? []) {
-      const key = `${exp.scenario ?? 'unknown'}:${exp.revision ?? 'unknown'}`;
-      const list = map.get(key) ?? [];
+      const family = exp.scenario ?? 'unknown';
+      const revision = exp.revision ?? 'unknown';
+      const revisions = map.get(family) ?? new Map<string, ExperimentRecord[]>();
+      const list = revisions.get(revision) ?? [];
       list.push(exp);
-      map.set(key, list);
+      revisions.set(revision, list);
+      map.set(family, revisions);
     }
-    return [...map.entries()];
+    return [...map.entries()].map(([family, revisions]) => ({
+      family,
+      revisions: [...revisions.entries()].sort(([a], [b]) => a.localeCompare(b)),
+      all: [...revisions.values()].flat(),
+    }));
   }, [experiments.data]);
+
+  const groups = families;
 
   if (experiments.isLoading) {
     return (
@@ -398,11 +410,47 @@ export function ExperimentsPage() {
     );
   }
 
+  const revisionDiffs = experiments.data?.revision_diffs ?? [];
+
   return (
-    <div className="sb flex flex-1 flex-col gap-4 overflow-auto p-4">
-      {groups.map(([key, exps]) => (
-        <ExperimentGroup key={key} groupKey={key} experiments={exps} />
+    <div className="sb flex flex-1 flex-col gap-5 overflow-auto p-4">
+      {families.map(({ family, revisions, all }) => (
+        <FamilySection
+          key={family}
+          family={family}
+          revisions={revisions}
+          all={all}
+          diffs={revisionDiffs.filter((diff) => diff.scenario === family)}
+        />
       ))}
+    </div>
+  );
+}
+
+function FamilySection({
+  family,
+  revisions,
+  all,
+  diffs,
+}: {
+  family: string;
+  revisions: Array<[string, ExperimentRecord[]]>;
+  all: ExperimentRecord[];
+  diffs: RevisionDiff[];
+}) {
+  const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
+  const familyRunIds = new Set(all.flatMap((exp) => exp.run_ids));
+  const familyRuns = (runs.data ?? []).filter((run) => familyRunIds.has(run.id));
+  return (
+    <div className="flex flex-col gap-3">
+      {revisions.map(([revision, exps]) => (
+        <ExperimentGroup key={`${family}:${revision}`} groupKey={`${family}:${revision}`} experiments={exps} />
+      ))}
+      <div className="grid items-start gap-3 xl:grid-cols-2">
+        <TradeoffScatter runs={familyRuns} />
+        <FailurePatterns runs={familyRuns} />
+      </div>
+      <RevisionMovement experiments={all} diffs={diffs} />
     </div>
   );
 }
