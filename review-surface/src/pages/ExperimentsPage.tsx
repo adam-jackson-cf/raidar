@@ -29,6 +29,8 @@ const TD = 'num px-2.5 py-1.5 text-[11px]';
 function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   const metricOutcomes = Object.entries(exp.aggregate.metric_outcomes ?? {});
   const scorerOutcomes = Object.entries(exp.aggregate.scorer_outcomes ?? {});
+  const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
+  const runsById = new Map((runs.data ?? []).map((run) => [run.id, run]));
   return (
     <div className="flex flex-col gap-3 px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.015)' }}>
       {metricOutcomes.length > 0 && (
@@ -135,16 +137,34 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
             Runs
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {exp.run_ids.map((id) => (
-              <Link
-                key={id}
-                to={`/runs/${encodeURIComponent(id)}`}
-                className="num rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
-                style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
-              >
-                {id}
-              </Link>
-            ))}
+            {exp.run_ids.map((id) => {
+              const run = runsById.get(id);
+              const failed = run?.status === 'ERROR';
+              return (
+                <Link
+                  key={id}
+                  to={`/runs/${encodeURIComponent(id)}`}
+                  title={failed ? 'Run failed — open to review findings' : 'Open run review'}
+                  className="num inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
+                  style={{
+                    color: failed ? C.red : C.accent,
+                    border: `1px solid ${failed ? 'rgba(235,20,20,0.35)' : C.selectedBorder}`,
+                  }}
+                >
+                  <span
+                    className="inline-block size-1.5 rounded-full"
+                    style={{ background: failed ? C.red : C.green }}
+                  />
+                  {id}
+                  {run?.composite_score != null && (
+                    <span style={{ color: failed ? C.red : C.fg1 }}>
+                      {fmtScore(run.composite_score)}
+                    </span>
+                  )}
+                  {run && <FindingChips counts={run.finding_counts} />}
+                </Link>
+              );
+            })}
           </div>
         </div>
       )}

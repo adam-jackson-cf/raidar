@@ -101,24 +101,24 @@ export function AnnotationCards({
   spanNameById,
   onJumpToSpan,
   onDelete,
+  flat = false,
 }: {
   annotations: Annotation[];
   spanNameById?: Map<string, string>;
   onJumpToSpan?: (spanId: string) => void;
   onDelete?: (id: string) => void;
+  flat?: boolean;
 }) {
   if (annotations.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-1.5">
-      {annotations.map((a) => (
-        <AnnotationCard
-          key={a.id}
-          annotation={a}
-          spanName={a.span_id ? spanNameById?.get(a.span_id) : null}
-          onJumpToSpan={a.span_id && onJumpToSpan ? () => onJumpToSpan(a.span_id as string) : undefined}
-          onDelete={onDelete ? () => onDelete(a.id) : undefined}
-        />
-      ))}
-    </div>
-  );
+  const cards = annotations.map((a) => (
+    <AnnotationCard
+      key={a.id}
+      annotation={a}
+      spanName={a.span_id ? spanNameById?.get(a.span_id) : null}
+      onJumpToSpan={a.span_id && onJumpToSpan ? () => onJumpToSpan(a.span_id as string) : undefined}
+      onDelete={onDelete ? () => onDelete(a.id) : undefined}
+    />
+  ));
+  if (flat) return <>{cards}</>;
+  return <div className="flex flex-col gap-1.5">{cards}</div>;
 }

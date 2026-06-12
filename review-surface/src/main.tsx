@@ -7,7 +7,8 @@ import '@/index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      retry: 1,
+      retry: (failureCount, error) =>
+        failureCount < 1 && !(error instanceof Error && error.message.includes('404')),
       refetchOnWindowFocus: false,
     },
   },

@@ -1,18 +1,41 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/SpanTree.tsx (SpanDetail)
-import { MessageSquarePlus } from 'lucide-react';
+import { useState } from 'react';
+import { Check, Copy, MessageSquarePlus } from 'lucide-react';
 import { AnnotationCards } from '@/components/AnnotationCards';
 import { JsonView } from '@/components/JsonView';
 import { C, SPAN_TYPE_INFO } from '@/utils/colors';
 import { fmtDuration, tryParseJson } from '@/utils/helpers';
 import type { Annotation, Span } from '@/utils/types';
 
+function CopyPayloadButton({ payload }: { payload: string }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      title="Copy payload"
+      className="rounded p-0.5 transition hover:bg-white/10"
+      style={{ color: copied ? C.green : C.fg0 }}
+      onClick={() => {
+        void navigator.clipboard.writeText(payload).then(() => {
+          setCopied(true);
+          window.setTimeout(() => setCopied(false), 1200);
+        });
+      }}
+    >
+      {copied ? <Check className="size-3" /> : <Copy className="size-3" />}
+    </button>
+  );
+}
+
 function PayloadSection({ title, payload }: { title: string; payload: string }) {
   const parsed = tryParseJson(payload);
   const isStructured = parsed !== undefined && parsed !== null && typeof parsed === 'object';
   return (
     <div>
-      <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-        {title}
+      <div className="mb-1 flex items-center gap-1.5">
+        <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
+          {title}
+        </span>
+        <CopyPayloadButton payload={payload} />
       </div>
       <div
         className="sb max-h-72 overflow-auto rounded p-2"
