@@ -65,7 +65,7 @@ function ArtifactPath({ label, path }: { label: string; path: string }) {
   );
 }
 
-export function RunHeader({ run }: { run: RunRecord }) {
+export function RunHeader({ run, children }: { run: RunRecord; children?: React.ReactNode }) {
   return (
     <div
       className="flex flex-col gap-3 rounded-lg p-3"
@@ -99,6 +99,8 @@ export function RunHeader({ run }: { run: RunRecord }) {
         <Metric label="spans" value={String(run.span_count)} />
         <Metric label="valid" value={run.valid ? 'yes' : 'no'} color={run.valid ? C.green : C.red} />
       </div>
+
+      {children}
 
       {run.unscored_reasons.length > 0 && (
         <div

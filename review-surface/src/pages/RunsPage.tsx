@@ -7,7 +7,9 @@ import { api } from '@/api/client';
 import { AnnotationCards } from '@/components/AnnotationCards';
 import { AnnotationCreateForm } from '@/components/AnnotationCreateForm';
 import { FindingChips } from '@/components/FindingChips';
+import { GateChips } from '@/components/GateChips';
 import { RunHeader } from '@/components/RunHeader';
+import { ScorecardPanel } from '@/components/ScorecardPanel';
 import { RunListItem } from '@/components/RunListItem';
 import { SearchPanel } from '@/components/SearchPanel';
 import { SpanDetail } from '@/components/SpanDetail';
@@ -101,7 +103,15 @@ function RunDetailView({ runId }: { runId: string }) {
 
   return (
     <div className="sb flex h-full flex-col gap-3 overflow-auto p-3">
-      <RunHeader run={data.run} />
+      <RunHeader run={data.run}>
+        <GateChips spans={data.spans} onSelect={(spanId) => selectSpan(spanId)} />
+      </RunHeader>
+
+      <ScorecardPanel
+        spans={data.spans}
+        selectedSpanId={selectedSpanId}
+        onSelect={(spanId) => selectSpan(spanId)}
+      />
 
       <div
         className="flex flex-col gap-2 rounded-lg p-2.5"
