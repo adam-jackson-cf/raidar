@@ -378,11 +378,13 @@ export function EvidenceStrip({
   comparator,
   comparatorLabel,
   subtype,
+  isBenchmark,
 }: {
   evidence: ReviewEvidence;
   comparator: EvidenceSide | null;
   comparatorLabel: string | null;
   subtype: string;
+  isBenchmark?: boolean;
 }) {
   const statusOf = (block: string) => evidence.availability.find((a) => a.block === block)?.status;
   return (
@@ -398,8 +400,10 @@ export function EvidenceStrip({
           </span>
         ))}
         {!comparator && (
-          <span className="text-[10px]" style={{ color: C.orange }}>
-            no benchmark evidence to compare — conclusions stay one-sided
+          <span className="text-[10px]" style={{ color: isBenchmark ? C.fg0 : C.orange }}>
+            {isBenchmark
+              ? 'this is the pinned benchmark — candidates compare against this evidence'
+              : 'no benchmark evidence to compare — conclusions stay one-sided'}
           </span>
         )}
       </div>

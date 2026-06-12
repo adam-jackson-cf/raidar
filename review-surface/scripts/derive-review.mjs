@@ -759,7 +759,37 @@ function buildEvidence(row, inputs, benchRow, benchInputs) {
 
 // --- diagnosis ----------------------------------------------------------------
 
-function diagnosisItems(row, inputs) {
+function efficiencyContrast(row, benchRow) {
+  if (!benchRow || row.benchmark_delta?.is_benchmark) return null;
+  const current = row.efficiency;
+  const bench = benchRow.efficiency;
+  if (
+    current.duration_sec == null ||
+    bench.duration_sec == null ||
+    !current.uncached_input_tokens ||
+    !bench.uncached_input_tokens
+  ) {
+    return null;
+  }
+  const durationRatio = current.duration_sec / bench.duration_sec;
+  const tokenRatio = current.uncached_input_tokens / bench.uncached_input_tokens;
+  const detail = `${current.duration_sec}s vs ${bench.duration_sec}s median duration, ${Math.round(current.uncached_input_tokens / 1000)}k vs ${Math.round(bench.uncached_input_tokens / 1000)}k median uncached tokens`;
+  const item = {
+    dimension: 'Efficiency (anchor)',
+    comparator: 'benchmark efficiency anchors',
+    evidence: [{ label: detail, block: 'Outcome proof' }],
+    confidence: row.confidence.band,
+  };
+  if (durationRatio <= 0.85 && tokenRatio <= 0.85) {
+    return { kind: 'strength', item: { ...item, statement: `Cheaper and faster than the benchmark (${detail}).` } };
+  }
+  if (durationRatio >= 1.3 && tokenRatio >= 1.3) {
+    return { kind: 'weakness', item: { ...item, statement: `Substantially more expensive than the benchmark (${detail}).` } };
+  }
+  return null;
+}
+
+function diagnosisItems(row, inputs, benchRow) {
   const strengths = [];
   const weaknesses = [];
   const scoredDims = Object.entries(row.dimensions).filter(
@@ -787,6 +817,9 @@ function diagnosisItems(row, inputs) {
       });
     }
   }
+  const efficiency = efficiencyContrast(row, benchRow);
+  if (efficiency?.kind === 'strength') strengths.push(efficiency.item);
+  if (efficiency?.kind === 'weakness') weaknesses.push(efficiency.item);
   return { strengths, weaknesses };
 }
 
@@ -1229,7 +1262,7 @@ function buildReview(row, board, inputsByExperiment, experimentsAll, revisionDif
   const benchInputs = benchRow ? (inputsByExperiment.get(benchRow.representative.dir) ?? []) : [];
   const family = row.scenario_family;
   const thresholds = FAMILY_THRESHOLDS[family] ?? FAMILY_THRESHOLDS[DEFAULT_FAMILY];
-  const diagnosis = diagnosisItems(row, inputs);
+  const diagnosis = diagnosisItems(row, inputs, benchRow);
   const isBenchmark = Boolean(row.benchmark_delta?.is_benchmark);
   return {
     ...row,

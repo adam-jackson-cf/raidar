@@ -293,7 +293,9 @@ function ReviewBody({ review, data }: { review: ReviewDetail; data: ReviewRespon
           ))}
         {!modes.some((entry) => entry.enabled) && (
           <span className="text-[10px]" style={{ color: C.fg0 }}>
-            none available — no benchmark pinned and no previous representative
+            {review.benchmark_delta?.is_benchmark
+              ? 'this AgentSpec is the pinned benchmark — select rows on the board to compare candidates against it'
+              : 'none available — no benchmark pinned and no previous representative'}
           </span>
         )}
       </div>
@@ -302,6 +304,7 @@ function ReviewBody({ review, data }: { review: ReviewDetail; data: ReviewRespon
         comparator={comparator ? comparator.evidence.current : null}
         comparatorLabel={comparator ? label : null}
         subtype={review.scenario_fidelity_subtype}
+        isBenchmark={Boolean(review.benchmark_delta?.is_benchmark)}
       />
       <DiagnosisSection
         strengths={review.diagnosis.strengths}
