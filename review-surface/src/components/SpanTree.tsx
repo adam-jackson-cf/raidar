@@ -1,6 +1,6 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/SpanTree.tsx
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleAlert } from 'lucide-react';
 import { AnnotationChip } from '@/components/AnnotationChip';
 import { C, SPAN_TYPE_INFO } from '@/utils/colors';
 import { fmtDuration } from '@/utils/helpers';
@@ -164,6 +164,45 @@ export function SpanTree({
 }) {
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
 
+  const parentById = useMemo(
+    () => new Map(spans.map((s) => [s.id, s.parent_span_id])),
+    [spans],
+  );
+  const sectionIds = useMemo(() => {
+    // spans with children whose parent is a root span (depth 1 sections)
+    const hasChildren = new Set(spans.map((s) => s.parent_span_id).filter(Boolean) as string[]);
+    const rootIds = new Set(
+      spans.filter((s) => !s.parent_span_id || !parentById.has(s.parent_span_id)).map((s) => s.id),
+    );
+    return spans
+      .filter((s) => hasChildren.has(s.id) && s.parent_span_id != null && rootIds.has(s.parent_span_id))
+      .map((s) => s.id);
+  }, [spans, parentById]);
+  const errorSpans = useMemo(
+    () => buildRows(spans, new Set()).filter((row) => row.span.status === 'ERROR').map((r) => r.span.id),
+    [spans],
+  );
+
+  // Selecting a span (deep link, search, finding jump) reveals it.
+  useEffect(() => {
+    if (!selectedSpanId) return;
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      let cursor = parentById.get(selectedSpanId) ?? null;
+      while (cursor) {
+        next.delete(cursor);
+        cursor = parentById.get(cursor) ?? null;
+      }
+      return next;
+    });
+  }, [selectedSpanId, parentById]);
+
+  function nextError() {
+    if (errorSpans.length === 0) return;
+    const current = selectedSpanId ? errorSpans.indexOf(selectedSpanId) : -1;
+    onSelect(errorSpans[(current + 1) % errorSpans.length]);
+  }
+
   const rows = useMemo(() => buildRows(spans, collapsed), [spans, collapsed]);
 
   const annotationsBySpan = useMemo(() => {
@@ -205,11 +244,39 @@ export function SpanTree({
   return (
     <div className="sb h-full overflow-auto">
       <div
-        className="sticky top-0 z-10 flex items-center px-2 py-1.5"
+        className="sticky top-0 z-10 flex items-center gap-1.5 px-2 py-1.5"
         style={{ background: C.surface, borderBottom: `1px solid ${C.border}` }}
       >
-        <div className="text-[9px] font-medium uppercase tracking-wider" style={{ color: C.fg0, width: 280 }}>
+        <div
+          className="flex items-center gap-1.5 text-[9px] font-medium uppercase tracking-wider"
+          style={{ color: C.fg0, width: 280 }}
+        >
           Span
+          <button
+            title="Expand all"
+            className="rounded p-0.5 transition hover:bg-white/10"
+            onClick={() => setCollapsed(new Set())}
+          >
+            <ChevronsUpDown className="size-3" style={{ color: C.fg1 }} />
+          </button>
+          <button
+            title="Collapse to sections"
+            className="rounded p-0.5 transition hover:bg-white/10"
+            onClick={() => setCollapsed(new Set(sectionIds))}
+          >
+            <ChevronsDownUp className="size-3" style={{ color: C.fg1 }} />
+          </button>
+          {errorSpans.length > 0 && (
+            <button
+              title="Cycle through error spans"
+              onClick={nextError}
+              className="num inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] normal-case tracking-normal transition hover:bg-white/10"
+              style={{ color: C.red, background: `${C.red}10`, border: `1px solid ${C.red}38` }}
+            >
+              <CircleAlert className="size-2.5" />
+              {errorSpans.length} error{errorSpans.length === 1 ? '' : 's'} ▸
+            </button>
+          )}
         </div>
         <div className="flex-1 text-[9px] font-medium uppercase tracking-wider" style={{ color: C.fg0 }}>
           Timeline

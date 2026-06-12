@@ -209,6 +209,20 @@ export function RunsPage() {
     );
   }, [runs.data, filter]);
 
+  const grouped = useMemo(() => {
+    const groups = new Map<string, { label: string; runs: typeof filtered }>();
+    for (const run of filtered) {
+      const key = run.experiment_id;
+      const entry = groups.get(key) ?? {
+        label: `${run.scenario}@${run.revision} · ${run.model}`,
+        runs: [],
+      };
+      entry.runs.push(run);
+      groups.set(key, entry);
+    }
+    return [...groups.values()];
+  }, [filtered]);
+
   return (
     <div className="flex min-h-0 flex-1">
       <aside
@@ -233,13 +247,24 @@ export function RunsPage() {
               Failed to load runs.
             </div>
           )}
-          {filtered.map((run) => (
-            <RunListItem
-              key={run.id}
-              run={run}
-              selected={run.id === runId}
-              onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
-            />
+          {grouped.map((group) => (
+            <div key={group.label} className="flex flex-col gap-1">
+              <div
+                className="sticky top-0 z-10 truncate px-1 py-1 text-[9px] font-medium uppercase tracking-wider"
+                style={{ color: C.fg0, background: C.surface }}
+                title={group.label}
+              >
+                {group.label}
+              </div>
+              {group.runs.map((run) => (
+                <RunListItem
+                  key={run.id}
+                  run={run}
+                  selected={run.id === runId}
+                  onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
+                />
+              ))}
+            </div>
           ))}
           {runs.data && filtered.length === 0 && (
             <div className="p-2 text-xs" style={{ color: C.fg0 }}>
