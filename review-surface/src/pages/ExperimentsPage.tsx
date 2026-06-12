@@ -175,12 +175,23 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
 function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experiments: ExperimentRecord[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
+  const sorted = useMemo(
+    () =>
+      [...experiments].sort(
+        (a, b) =>
+          (b.aggregate.composite_score?.mean ?? -1) - (a.aggregate.composite_score?.mean ?? -1),
+      ),
+    [experiments],
+  );
+
   const bestComposite = useMemo(() => {
     const means = experiments
       .map((e) => e.aggregate.composite_score?.mean)
       .filter((m): m is number => m != null);
     return means.length > 0 ? Math.max(...means) : null;
   }, [experiments]);
+
+  const meta = experiments.find((e) => e.scenario_meta)?.scenario_meta ?? null;
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -195,13 +206,39 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
       className="overflow-hidden rounded-lg"
       style={{ background: C.surface, border: `1px solid ${C.border}` }}
     >
-      <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: `1px solid ${C.border}` }}>
-        <span className="num text-sm font-medium" style={{ color: C.fg5 }}>
-          {groupKey}
-        </span>
-        <span className="text-[10px]" style={{ color: C.fg0 }}>
-          {experiments.length} agent spec{experiments.length === 1 ? '' : 's'}
-        </span>
+      <div
+        className="flex flex-col gap-0.5 px-3 py-2"
+        style={{ borderBottom: `1px solid ${C.border}` }}
+      >
+        <div className="flex items-center gap-2">
+          <span className="num text-sm font-medium" style={{ color: C.fg5 }}>
+            {groupKey}
+          </span>
+          {meta?.category && (
+            <span
+              className="rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
+              style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
+            >
+              {meta.category}
+            </span>
+          )}
+          {meta?.difficulty && (
+            <span
+              className="rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
+              style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
+            >
+              {meta.difficulty}
+            </span>
+          )}
+          <span className="text-[10px]" style={{ color: C.fg0 }}>
+            {experiments.length} agent spec{experiments.length === 1 ? '' : 's'}
+          </span>
+        </div>
+        {meta?.description && (
+          <span className="text-[11px]" style={{ color: C.fg1 }}>
+            {meta.description}
+          </span>
+        )}
       </div>
       <div className="sb overflow-x-auto">
         <table className="w-full border-collapse">
@@ -209,6 +246,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
               <th className={TH} style={{ color: C.fg0 }}>Agent spec</th>
               <th className={TH} style={{ color: C.fg0 }}>Composite</th>
+              <th className={TH} style={{ color: C.fg0 }}>Δ best</th>
               <th className={TH} style={{ color: C.fg0 }}>Quality</th>
               <th className={TH} style={{ color: C.fg0 }}>Validity</th>
               <th className={TH} style={{ color: C.fg0 }}>Scored</th>
@@ -219,13 +257,16 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
             </tr>
           </thead>
           <tbody>
-            {experiments.map((exp) => {
+            {sorted.map((exp) => {
               const isOpen = expanded.has(exp.experiment_id);
               const compositeMean = exp.aggregate.composite_score?.mean ?? null;
               const isBest =
                 bestComposite != null && compositeMean != null && compositeMean === bestComposite;
+              const delta =
+                bestComposite != null && compositeMean != null ? compositeMean - bestComposite : null;
               const scored = exp.aggregate.run_count_scored ?? 0;
               const total = exp.aggregate.run_count_total ?? 0;
+              const unscored = exp.aggregate.unscored_count ?? 0;
               return (
                 <Fragment key={exp.experiment_id}>
                   <tr
@@ -253,14 +294,23 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
                     <td className={TD} style={{ color: isBest ? C.accent : C.fg3, fontWeight: isBest ? 600 : 400 }}>
                       {meanStd(exp.aggregate.composite_score)}
                     </td>
+                    <td
+                      className={TD}
+                      style={{ color: delta == null || delta === 0 ? C.fg0 : C.orange }}
+                    >
+                      {delta == null ? '—' : delta === 0 ? 'best' : delta.toFixed(3)}
+                    </td>
                     <td className={TD} style={{ color: C.fg2 }}>
                       {fmtScore(exp.aggregate.quality_score?.mean)}
                     </td>
                     <td className={TD} style={{ color: C.fg2 }}>
                       {fmtPercent(exp.aggregate.validity_rate)}
                     </td>
-                    <td className={TD} style={{ color: C.fg2 }}>
+                    <td className={TD} style={{ color: unscored > 0 ? C.orange : C.fg2 }}>
                       {scored}/{total}
+                      {unscored > 0 && (
+                        <span title={`${unscored} unscored run(s) need rerun`}> · {unscored} unscored</span>
+                      )}
                     </td>
                     <td className={TD} style={{ color: C.fg2 }}>
                       {exp.aggregate.duration_sec?.mean != null
@@ -285,7 +335,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
                   </tr>
                   {isOpen && (
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <td colSpan={9} className="p-0">
+                      <td colSpan={10} className="p-0">
                         <ExperimentExpansion exp={exp} />
                       </td>
                     </tr>

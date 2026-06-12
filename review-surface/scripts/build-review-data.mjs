@@ -12,6 +12,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const surfaceRoot = path.resolve(here, '..');
 const repoRoot = path.resolve(surfaceRoot, '..');
 const benchRoot = path.join(repoRoot, 'experiments', 'benchmarks');
+const scenariosRoot = path.join(repoRoot, 'scenarios');
 const dataRoot = path.join(surfaceRoot, 'data');
 
 const PAYLOAD_CAP = 32000;
@@ -417,6 +418,31 @@ function projectRun(experiment, runDir) {
   };
 }
 
+function firstYamlScalar(text, key) {
+  const prefix = `${key}:`;
+  const line = text.split('\n').find((candidate) => candidate.startsWith(prefix));
+  return line ? line.slice(prefix.length).replace(/^['"]|['"]$/g, '').trim() : null;
+}
+
+function scenarioMeta(scenarioName, revision) {
+  if (!scenarioName || !revision) return null;
+  let text;
+  try {
+    text = fs.readFileSync(
+      path.join(scenariosRoot, scenarioName, revision, 'scenario.yaml'),
+      'utf8',
+    );
+  } catch {
+    return null;
+  }
+  return {
+    description: firstYamlScalar(text, 'description'),
+    difficulty: firstYamlScalar(text, 'difficulty'),
+    category: firstYamlScalar(text, 'category'),
+    timeout_sec: Number(firstYamlScalar(text, 'timeout_sec')) || null,
+  };
+}
+
 function projectExperiment(dirName) {
   const experimentDir = path.join(benchRoot, dirName);
   const summary = readJson(path.join(experimentDir, 'experiment-summary.json'));
@@ -431,6 +457,7 @@ function projectExperiment(dirName) {
     agent_spec: `${summary.config?.harness ?? '?'} · ${summary.config?.model ?? '?'}`,
     synthetic: Boolean(summary.synthetic),
     repeats: summary.config?.repeats ?? null,
+    scenario_meta: scenarioMeta(summary.config?.scenario_name, summary.config?.scenario_revision),
     aggregate: summary.aggregate ?? {},
     sample: summary.sample ?? {},
     rerun: summary.rerun ?? {},

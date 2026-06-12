@@ -120,6 +120,12 @@ export interface ExperimentRecord {
   agent_spec: string;
   synthetic: boolean;
   repeats: number | null;
+  scenario_meta: {
+    description: string | null;
+    difficulty: string | null;
+    category: string | null;
+    timeout_sec: number | null;
+  } | null;
   aggregate: {
     run_count_total?: number;
     run_count_scored?: number;
