@@ -10,7 +10,6 @@ import { fileURLToPath } from 'node:url';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataRoot = path.join(here, 'data');
 const distRoot = path.join(here, 'dist');
-const benchRoot = path.resolve(here, '..', 'experiments', 'benchmarks');
 const userAnnotationsPath = path.join(dataRoot, 'user-annotations.json');
 const port = Number(process.env.REVIEW_SURFACE_PORT || 5950);
 
@@ -213,9 +212,6 @@ async function handleApi(req, res, url) {
   if (req.method === 'GET' && url.pathname === '/api/experiments') {
     return sendJson(res, 200, readJson(path.join(dataRoot, 'experiments.json'), { experiments: [] }));
   }
-  if (req.method === 'GET' && url.pathname === '/api/review') {
-    return sendJson(res, 200, readJson(path.join(dataRoot, 'review.json'), { boards: [], reviews: {} }));
-  }
   if (req.method === 'GET' && parts[1] === 'runs' && parts[2] === 'detail' && parts[3]) {
     const detail = loadRunDetail(parts[3]);
     if (!detail) return sendJson(res, 404, { error: 'run not found' });
@@ -273,28 +269,6 @@ async function handleApi(req, res, url) {
   return sendJson(res, 404, { error: 'unknown endpoint' });
 }
 
-// Serves retained benchmark evidence assets (screenshots, diffs) referenced by
-// the review model. Read-only, restricted to experiments/benchmarks/**.
-function serveArtifact(res, url) {
-  const relative = decodeURIComponent(url.pathname.slice('/artifacts/'.length));
-  if (!relative.startsWith('experiments/benchmarks/')) {
-    res.writeHead(403);
-    return res.end('forbidden');
-  }
-  const resolved = path.normalize(path.join(benchRoot, '..', '..', relative));
-  if (!resolved.startsWith(benchRoot) || !fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
-    res.writeHead(404);
-    return res.end('artifact not found');
-  }
-  const mime = MIME[path.extname(resolved)];
-  if (!mime) {
-    res.writeHead(415);
-    return res.end('unsupported artifact type');
-  }
-  res.writeHead(200, { 'content-type': mime });
-  res.end(fs.readFileSync(resolved));
-}
-
 function serveStatic(res, url) {
   const requested = url.pathname === '/' ? '/index.html' : url.pathname;
   const resolved = path.normalize(path.join(distRoot, requested));
@@ -318,10 +292,6 @@ const server = http.createServer(async (req, res) => {
   try {
     if (url.pathname.startsWith('/api/')) {
       await handleApi(req, res, url);
-      return;
-    }
-    if (url.pathname.startsWith('/artifacts/')) {
-      serveArtifact(res, url);
       return;
     }
     serveStatic(res, url);

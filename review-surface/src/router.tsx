@@ -1,6 +1,5 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
-import { ExperimentReviewPage } from '@/pages/ExperimentReviewPage';
-import { ScenarioBoardPage } from '@/pages/ScenarioBoardPage';
+import { ExperimentsPage } from '@/pages/ExperimentsPage';
 import { RunsPage } from '@/pages/RunsPage';
 import { C } from '@/utils/colors';
 
@@ -22,7 +21,7 @@ function Layout() {
               className="text-xs transition"
               style={({ isActive }) => ({ color: isActive ? C.accent : C.fg1 })}
             >
-              Scenario Boards
+              Experiments
             </NavLink>
             <NavLink
               to="/runs"
@@ -34,7 +33,7 @@ function Layout() {
           </nav>
         </div>
         <span className="mt-0.5 text-[10px]" style={{ color: C.fg0 }}>
-          Which AgentSpec is stronger · Why · How much to trust it · What to try next
+          Compare AgentSpecs · Explain scores · Trace failures
         </span>
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
@@ -49,8 +48,7 @@ export function AppRouter() {
     <BrowserRouter>
       <Routes>
         <Route element={<Layout />}>
-          <Route path="/" element={<ScenarioBoardPage />} />
-          <Route path="/review/:reviewId" element={<ExperimentReviewPage />} />
+          <Route path="/" element={<ExperimentsPage />} />
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/:runId" element={<RunsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

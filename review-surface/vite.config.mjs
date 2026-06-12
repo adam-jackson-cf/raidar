@@ -14,7 +14,6 @@ export default defineConfig({
     port: 5951,
     proxy: {
       '/api': `http://localhost:${process.env.REVIEW_SURFACE_PORT || 5950}`,
-      '/artifacts': `http://localhost:${process.env.REVIEW_SURFACE_PORT || 5950}`,
     },
   },
 });
