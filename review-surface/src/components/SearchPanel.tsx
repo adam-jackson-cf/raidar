@@ -38,9 +38,11 @@ function Snippet({ snippet }: { snippet: string }) {
 export function SearchPanel({
   runId,
   onSelect,
+  frameless = false,
 }: {
   runId: string;
   onSelect: (spanId: string) => void;
+  frameless?: boolean;
 }) {
   const [pattern, setPattern] = useState('');
   const [regex, setRegex] = useState(false);
@@ -60,15 +62,19 @@ export function SearchPanel({
 
   return (
     <div
-      className="flex flex-col gap-2 rounded-lg p-2.5"
-      style={{ background: C.surface, border: `1px solid ${C.border}` }}
+      className={frameless ? 'flex flex-col gap-2 p-2.5' : 'flex flex-col gap-2 rounded-lg p-2.5'}
+      style={
+        frameless
+          ? { borderBottom: `1px solid ${C.border}`, background: C.surface }
+          : { background: C.surface, border: `1px solid ${C.border}` }
+      }
     >
       <form className="flex items-center gap-2" onSubmit={submit}>
         <Search className="size-3.5 shrink-0" style={{ color: C.fg0 }} />
         <input
           value={pattern}
           onChange={(e) => setPattern(e.target.value)}
-          placeholder="Search span payloads…"
+          placeholder="Search this run's evidence — commands, file paths, error text…"
           className="num min-w-0 flex-1 rounded-md px-2 py-1 text-xs outline-none"
           style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
         />

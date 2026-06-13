@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { C } from '@/utils/colors';
 import { fmtDuration, fmtScore } from '@/utils/helpers';
+import { runLabel } from '@/utils/verdict';
 import type { RunRecord } from '@/utils/types';
 
 const SPEC_COLORS = [C.accent, C.cyan, C.purple, C.orange, '#8BC34A', '#F5CE4E'];
@@ -66,14 +67,25 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
             </g>
           );
         })}
+        {[0.25, 0.5, 0.75, 1].map((frac) => {
+          const tx = PAD.left + frac * (WIDTH - PAD.left - PAD.right);
+          return (
+            <g key={frac}>
+              <line x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />
+              <text x={tx} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="8" fill={C.fg0}>
+                {fmtDuration(maxDuration * frac)}
+              </text>
+            </g>
+          );
+        })}
         <text
           x={(WIDTH - PAD.right + PAD.left) / 2}
-          y={HEIGHT - 8}
+          y={HEIGHT - 2}
           textAnchor="middle"
           fontSize="8"
           fill={C.fg0}
         >
-          duration → ({fmtDuration(maxDuration)} max)
+          run time →
         </text>
         {points.map((run) => (
           <circle
@@ -89,7 +101,7 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
             onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
           >
             <title>
-              {`${run.id} · ${run.agent_spec}\ncomposite ${fmtScore(run.composite_score)} · ${fmtDuration(run.duration_ms)} · ${run.status}`}
+              {`${runLabel(run.id)} · ${run.agent_spec}\nscore ${fmtScore(run.composite_score)} in ${fmtDuration(run.duration_ms)}${run.status === 'ERROR' ? ' · run errored' : ''}\n${run.id}`}
             </title>
           </circle>
         ))}

@@ -2,6 +2,7 @@
 import { Crosshair, Trash2 } from 'lucide-react';
 import { AnnotationChip, KIND_STYLES, SOURCE_GLYPH, annotationSourceLabel } from '@/components/AnnotationChip';
 import { C } from '@/utils/colors';
+import { categoryHint, categoryLabel } from '@/utils/verdict';
 import type { Annotation, FindingEvidenceRef } from '@/utils/types';
 
 export function canDeleteAnnotation(annotation: Annotation): boolean {
@@ -52,8 +53,12 @@ export function AnnotationCard({
         <div className="mb-0.5 flex flex-wrap items-center gap-2">
           <AnnotationChip annotation={annotation} showLabel />
           {annotation.category && (
-            <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-              {annotation.category}
+            <span
+              className="text-[10px] font-medium"
+              style={{ color: C.fg2 }}
+              title={`${categoryHint(annotation.category)} (${annotation.category})`}
+            >
+              {categoryLabel(annotation.category)}
             </span>
           )}
           <span className="text-[10px]" style={{ color: C.fg0 }}>

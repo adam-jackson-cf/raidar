@@ -2,8 +2,10 @@
 // parsed from the projected scorer:*/metric:* evidence spans.
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, Crosshair } from 'lucide-react';
+import { ScoreBar } from '@/components/Verdict';
 import { C } from '@/utils/colors';
-import { fmtScore, tryParseJson } from '@/utils/helpers';
+import { fmtPercent, fmtScore, tryParseJson } from '@/utils/helpers';
+import { humanize, scoreTier, scorerName } from '@/utils/verdict';
 import type { Span } from '@/utils/types';
 
 interface MetricRow {
@@ -73,9 +75,7 @@ function parseScorers(spans: Span[]): ScorerBlock[] {
 
 function scoreColor(score: number, passed: boolean | null): string {
   if (passed === false) return C.red;
-  if (score >= 0.9) return C.green;
-  if (score >= 0.6) return C.fg3;
-  return C.orange;
+  return scoreTier(score).color;
 }
 
 export function ScorecardPanel({
@@ -103,24 +103,25 @@ export function ScorecardPanel({
           <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
         )}
         <span className="text-xs font-medium" style={{ color: C.fg3 }}>
-          Scorecard
+          Why it scored this
         </span>
         <span className="flex items-center gap-1.5">
           {scorers.map((scorer) => (
             <span
               key={scorer.scorerId}
-              className="num rounded px-1.5 py-px text-[10px]"
+              title={`${scorer.scorerId} · ${fmtPercent(scorer.weight)} of the composite`}
+              className="rounded px-1.5 py-px text-[10px]"
               style={{ color: C.fg2, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
             >
-              {scorer.scorerId}
-              <span className="ml-1" style={{ color: scoreColor(scorer.score, null) }}>
+              {scorerName(scorer.scorerId)}
+              <span className="num ml-1" style={{ color: scoreColor(scorer.score, null) }}>
                 {fmtScore(scorer.score)}
               </span>
             </span>
           ))}
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          why this run scored what it scored
+          each score area, and the checks behind it — click a check to see its evidence
         </span>
       </button>
 
@@ -133,14 +134,21 @@ export function ScorecardPanel({
               style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${C.border}` }}
             >
               <div className="mb-1.5 flex items-center gap-2">
-                <span className="num text-[11px] font-medium" style={{ color: C.fg4 }}>
-                  {scorer.scorerId}
+                <span className="text-[11px] font-medium" style={{ color: C.fg4 }} title={scorer.scorerId}>
+                  {scorerName(scorer.scorerId)}
                 </span>
-                <span className="num text-[10px]" style={{ color: C.fg0 }}>
-                  weight {scorer.weight} · {scorer.category}
+                <span
+                  className="text-[10px]"
+                  style={{ color: C.fg0 }}
+                  title={`This ${scorer.category} area contributes ${fmtPercent(scorer.weight)} of the composite score`}
+                >
+                  {fmtPercent(scorer.weight)} of composite
                 </span>
-                <span className="num ml-auto text-[11px] font-bold" style={{ color: C.accent }}>
-                  {fmtScore(scorer.score)}
+                <span className="ml-auto inline-flex items-center gap-1.5">
+                  <ScoreBar score={scorer.score} width={48} />
+                  <span className="num text-[11px] font-bold" style={{ color: scoreColor(scorer.score, null) }}>
+                    {fmtScore(scorer.score)}
+                  </span>
                 </span>
               </div>
               <div className="flex flex-col">
@@ -151,7 +159,7 @@ export function ScorecardPanel({
                       key={metric.metricId}
                       disabled={metric.spanId == null}
                       onClick={() => metric.spanId && onSelect(metric.spanId)}
-                      title={metric.evidence || metric.metricId}
+                      title={`${metric.metricId} · ${fmtPercent(metric.weight)} of this area${metric.evidence ? `\n${metric.evidence}` : ''}`}
                       className="group flex items-center gap-2 rounded px-1 py-0.5 text-left transition hover:bg-white/5 disabled:cursor-default"
                       style={{ background: selected ? C.selected : undefined }}
                     >
@@ -161,11 +169,8 @@ export function ScorecardPanel({
                       >
                         {metric.passed === false ? '✗' : metric.passed ? '✓' : '·'}
                       </span>
-                      <span className="num min-w-0 flex-1 truncate text-[10px]" style={{ color: C.fg2 }}>
-                        {metric.metricId}
-                      </span>
-                      <span className="num shrink-0 text-[10px]" style={{ color: C.fg0 }}>
-                        w {metric.weight}
+                      <span className="min-w-0 flex-1 truncate text-[10px]" style={{ color: C.fg2 }}>
+                        {humanize(metric.metricId)}
                       </span>
                       <span
                         className="num shrink-0 text-[10px] font-medium"

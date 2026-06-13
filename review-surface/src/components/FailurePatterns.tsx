@@ -5,10 +5,12 @@ import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { CircleAlert } from 'lucide-react';
 import { C } from '@/utils/colors';
+import { categoryHint, categoryLabel, runLabel } from '@/utils/verdict';
 import type { RunRecord } from '@/utils/types';
 
 interface Pattern {
   label: string;
+  hint: string;
   kind: 'gate' | 'category';
   count: number;
   runs: RunRecord[];
@@ -19,7 +21,13 @@ function buildPatterns(runs: RunRecord[]): Pattern[] {
   for (const run of runs) {
     for (const gate of run.failed_gates) {
       const key = `gate:${gate}`;
-      const entry = byKey.get(key) ?? { label: `gate ${gate} fails`, kind: 'gate' as const, count: 0, runs: [] };
+      const entry = byKey.get(key) ?? {
+        label: `‘${gate}’ gate fails`,
+        hint: `The ${gate} verification gate did not pass`,
+        kind: 'gate' as const,
+        count: 0,
+        runs: [],
+      };
       entry.count += 1;
       if (!entry.runs.includes(run)) entry.runs.push(run);
       byKey.set(key, entry);
@@ -27,7 +35,13 @@ function buildPatterns(runs: RunRecord[]): Pattern[] {
     for (const [category, count] of Object.entries(run.issue_categories)) {
       if (category === 'failed-gate') continue; // covered by the gate rows above
       const key = `cat:${category}`;
-      const entry = byKey.get(key) ?? { label: category, kind: 'category' as const, count: 0, runs: [] };
+      const entry = byKey.get(key) ?? {
+        label: categoryLabel(category),
+        hint: categoryHint(category),
+        kind: 'category' as const,
+        count: 0,
+        runs: [],
+      };
       entry.count += count;
       if (!entry.runs.includes(run)) entry.runs.push(run);
       byKey.set(key, entry);
@@ -67,7 +81,7 @@ export function FailurePatterns({ runs }: { runs: RunRecord[] }) {
             >
               {pattern.count}×
             </span>
-            <span className="text-[11px]" style={{ color: C.fg3 }}>
+            <span className="text-[11px]" style={{ color: C.fg3 }} title={pattern.hint}>
               {pattern.label}
             </span>
             <span className="flex flex-wrap items-center gap-1">
@@ -75,11 +89,11 @@ export function FailurePatterns({ runs }: { runs: RunRecord[] }) {
                 <Link
                   key={run.id}
                   to={`/runs/${encodeURIComponent(run.id)}`}
-                  className="num rounded px-1 py-px text-[10px] transition hover:bg-white/10"
+                  className="rounded px-1 py-px text-[10px] transition hover:bg-white/10"
                   style={{ color: C.accent }}
-                  title={`Open ${run.id} (${run.agent_spec})`}
+                  title={`${run.id} (${run.agent_spec}) — open run review`}
                 >
-                  {run.id}
+                  {runLabel(run.id)}
                 </Link>
               ))}
             </span>

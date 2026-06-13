@@ -10,77 +10,170 @@ import { FailurePatterns } from '@/components/FailurePatterns';
 import { FindingChips } from '@/components/FindingChips';
 import { RevisionMovement } from '@/components/RevisionMovement';
 import { TradeoffScatter } from '@/components/TradeoffScatter';
+import { ScoreBar, ScoreVerdict, TierPill } from '@/components/Verdict';
 import { C } from '@/utils/colors';
 import { fmtPercent, fmtScore, fmtTokens } from '@/utils/helpers';
-import type { AnnotationKind, ExperimentRecord, RevisionDiff, StatBlock } from '@/utils/types';
+import {
+  categoryLabel,
+  humanize,
+  runLabel,
+  sampleTrust,
+  scoreTier,
+  scorerName,
+  spreadTier,
+} from '@/utils/verdict';
+import type { AnnotationKind, ExperimentRecord, RevisionDiff, RunRecord, StatBlock } from '@/utils/types';
 
-function meanStd(stat: StatBlock | undefined): string {
-  if (stat?.mean == null) return '—';
-  const mean = stat.mean.toFixed(3);
-  return stat.stddev != null ? `${mean} ± ${stat.stddev.toFixed(3)}` : mean;
+function statDetail(stat: StatBlock | undefined): string {
+  if (stat?.mean == null) return 'No scored runs';
+  const parts = [`mean ${stat.mean.toFixed(3)}`];
+  if (stat.stddev != null) parts.push(`±${stat.stddev.toFixed(3)}`);
+  if (stat.median != null) parts.push(`median ${stat.median.toFixed(3)}`);
+  if (stat.min != null && stat.max != null) parts.push(`range ${stat.min.toFixed(3)}–${stat.max.toFixed(3)}`);
+  return parts.join(' · ');
 }
 
-function findingCounts(exp: ExperimentRecord): Partial<Record<AnnotationKind, number>> {
+/** Findings across the experiment AND its runs — the table answers "is anything wrong here?", so run-level issues must count. */
+function findingCounts(exp: ExperimentRecord, runsById: Map<string, RunRecord>): Partial<Record<AnnotationKind, number>> {
   const counts: Partial<Record<AnnotationKind, number>> = {};
   for (const f of exp.findings) counts[f.kind] = (counts[f.kind] ?? 0) + 1;
+  for (const id of exp.run_ids) {
+    const run = runsById.get(id);
+    if (!run) continue;
+    for (const kind of ['issue', 'good', 'note'] as const) {
+      counts[kind] = (counts[kind] ?? 0) + run.finding_counts[kind];
+    }
+  }
   return counts;
 }
 
+function issueCount(exp: ExperimentRecord, runsById: Map<string, RunRecord>): number {
+  return findingCounts(exp, runsById).issue ?? 0;
+}
+
 const TH = 'px-2.5 py-1.5 text-left text-[9px] font-medium uppercase tracking-wider';
-const TD = 'num px-2.5 py-1.5 text-[11px]';
+const TD = 'px-2.5 py-2 text-[11px] align-middle';
+
+function RunPill({ run, id }: { run: RunRecord | undefined; id: string }) {
+  const tier = scoreTier(run?.unscored ? null : (run?.composite_score ?? null));
+  const failed = run?.status === 'ERROR';
+  return (
+    <Link
+      to={`/runs/${encodeURIComponent(id)}`}
+      title={`${id}\n${tier.label}${run?.composite_score != null ? ` · composite ${fmtScore(run.composite_score)}` : ''}${failed ? ' · run errored' : ''} — open run review`}
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] transition hover:bg-white/10"
+      style={{ color: failed ? C.red : C.fg3, border: `1px solid ${failed ? 'rgba(235,20,20,0.35)' : C.border}` }}
+    >
+      <span className="inline-block size-1.5 rounded-full" style={{ background: tier.color }} />
+      {runLabel(id)}
+      {run?.composite_score != null && (
+        <span className="num" style={{ color: tier.color }}>
+          {run.composite_score.toFixed(2)}
+        </span>
+      )}
+      {run && <FindingChips counts={run.finding_counts} />}
+    </Link>
+  );
+}
+
+function MetricOutcomeRow({
+  metric,
+  outcome,
+}: {
+  metric: string;
+  outcome: { pass_rate: number; mean_score: number; sample_size: number; pass_count: number; fail_count: number };
+}) {
+  const failing = outcome.pass_rate < 1;
+  return (
+    <div
+      className="flex items-center gap-2 rounded px-1.5 py-1"
+      title={`${metric} · pass rate ${fmtPercent(outcome.pass_rate)} · mean score ${fmtScore(outcome.mean_score)} · ${outcome.sample_size} samples`}
+    >
+      <span className="w-3 shrink-0 text-center text-[10px] font-bold" style={{ color: failing ? C.red : C.green }}>
+        {failing ? '✗' : '✓'}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-[11px]" style={{ color: C.fg3 }}>
+        {humanize(metric)}
+      </span>
+      <ScoreBar score={outcome.mean_score} width={56} color={failing ? C.red : C.green} />
+      <span className="num w-20 shrink-0 text-right text-[10px]" style={{ color: failing ? C.orange : C.fg1 }}>
+        {failing
+          ? `${outcome.pass_count}/${outcome.sample_size} runs pass`
+          : `${outcome.sample_size}/${outcome.sample_size} pass`}
+      </span>
+    </div>
+  );
+}
 
 function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   const metricOutcomes = Object.entries(exp.aggregate.metric_outcomes ?? {});
   const scorerOutcomes = Object.entries(exp.aggregate.scorer_outcomes ?? {});
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const runsById = new Map((runs.data ?? []).map((run) => [run.id, run]));
+  const failing = metricOutcomes.filter(([, o]) => o.pass_rate < 1).sort(([, a], [, b]) => a.pass_rate - b.pass_rate);
+  const passing = metricOutcomes.filter(([, o]) => o.pass_rate >= 1);
   return (
     <div className="flex flex-col gap-3 px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.015)' }}>
-      {metricOutcomes.length > 0 && (
+      {exp.run_ids.length > 0 && (
         <div>
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Metric outcomes
+            Runs — open one to see its full story
           </div>
-          <table className="w-full max-w-xl border-collapse">
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-                <th className={TH} style={{ color: C.fg0 }}>Metric</th>
-                <th className={TH} style={{ color: C.fg0 }}>Pass rate</th>
-                <th className={TH} style={{ color: C.fg0 }}>Mean score</th>
-                <th className={TH} style={{ color: C.fg0 }}>Samples</th>
-              </tr>
-            </thead>
-            <tbody>
-              {metricOutcomes.map(([metric, o]) => (
-                <tr key={metric} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                  <td className={TD} style={{ color: C.fg3 }}>{metric}</td>
-                  <td className={TD} style={{ color: o.pass_rate >= 1 ? C.green : o.pass_rate <= 0 ? C.red : C.fg2 }}>
-                    {fmtPercent(o.pass_rate)}
-                  </td>
-                  <td className={TD} style={{ color: C.fg2 }}>{fmtScore(o.mean_score)}</td>
-                  <td className={TD} style={{ color: C.fg1 }}>{o.sample_size}</td>
-                </tr>
+          <div className="flex flex-wrap gap-1.5">
+            {exp.run_ids.map((id) => (
+              <RunPill key={id} run={runsById.get(id)} id={id} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {metricOutcomes.length > 0 && (
+        <div className="grid gap-3 lg:grid-cols-2">
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: failing.length > 0 ? C.orange : C.fg1 }}>
+              {failing.length > 0 ? `Where points were lost (${failing.length})` : 'Where points were lost'}
+            </div>
+            {failing.length === 0 ? (
+              <span className="text-[11px]" style={{ color: C.fg1 }}>
+                Nothing — every check passed in every scored run.
+              </span>
+            ) : (
+              <div className="flex max-w-md flex-col">
+                {failing.map(([metric, o]) => (
+                  <MetricOutcomeRow key={metric} metric={metric} outcome={o} />
+                ))}
+              </div>
+            )}
+          </div>
+          <div>
+            <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
+              What held up ({passing.length})
+            </div>
+            <div className="flex max-w-md flex-col">
+              {passing.map(([metric, o]) => (
+                <MetricOutcomeRow key={metric} metric={metric} outcome={o} />
               ))}
-            </tbody>
-          </table>
+            </div>
+          </div>
         </div>
       )}
 
       {scorerOutcomes.length > 0 && (
         <div>
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Scorer outcomes
+            Score areas
           </div>
           <div className="flex flex-wrap gap-1.5">
             {scorerOutcomes.map(([scorer, o]) => (
               <span
                 key={scorer}
-                className="num inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px]"
+                title={`${scorer} · mean score ${fmtScore(o.mean_score)} across ${o.sample_size} runs`}
+                className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px]"
                 style={{ color: C.fg2, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
               >
-                {scorer}
-                <span style={{ color: C.accent }}>{fmtScore(o.mean_score)}</span>
-                <span style={{ color: C.fg0 }}>n={o.sample_size}</span>
+                {scorerName(scorer)}
+                <ScoreBar score={o.mean_score} width={40} />
+                <span className="num" style={{ color: scoreTier(o.mean_score).color }}>{fmtScore(o.mean_score)}</span>
               </span>
             ))}
           </div>
@@ -113,8 +206,8 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
                       {style.label}
                     </span>
                     {f.category && (
-                      <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-                        {f.category}
+                      <span className="text-[10px] font-medium" style={{ color: C.fg1 }} title={f.category}>
+                        {categoryLabel(f.category)}
                       </span>
                     )}
                     <span className="text-xs font-medium" style={{ color: C.fg4 }}>
@@ -133,50 +226,72 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
           </div>
         </div>
       )}
-
-      {exp.run_ids.length > 0 && (
-        <div>
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Runs
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {exp.run_ids.map((id) => {
-              const run = runsById.get(id);
-              const failed = run?.status === 'ERROR';
-              return (
-                <Link
-                  key={id}
-                  to={`/runs/${encodeURIComponent(id)}`}
-                  title={failed ? 'Run failed — open to review findings' : 'Open run review'}
-                  className="num inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
-                  style={{
-                    color: failed ? C.red : C.accent,
-                    border: `1px solid ${failed ? 'rgba(235,20,20,0.35)' : C.selectedBorder}`,
-                  }}
-                >
-                  <span
-                    className="inline-block size-1.5 rounded-full"
-                    style={{ background: failed ? C.red : C.green }}
-                  />
-                  {id}
-                  {run?.composite_score != null && (
-                    <span style={{ color: failed ? C.red : C.fg1 }}>
-                      {fmtScore(run.composite_score)}
-                    </span>
-                  )}
-                  {run && <FindingChips counts={run.finding_counts} />}
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-      )}
     </div>
+  );
+}
+
+/** One plain-language sentence answering "who wins this scenario revision, and what should I look at first?" */
+function GroupHeadline({ sorted, runsById }: { sorted: ExperimentRecord[]; runsById: Map<string, RunRecord> }) {
+  const best = sorted[0];
+  const bestMean = best?.aggregate.composite_score?.mean ?? null;
+  if (best == null || bestMean == null) {
+    return (
+      <span className="text-[11px]" style={{ color: C.fg1 }}>
+        No scored runs yet — rerun the benchmark to get a verdict.
+      </span>
+    );
+  }
+  const bestTier = scoreTier(bestMean);
+  const runnerUp = sorted.length > 1 ? sorted[1] : null;
+  const runnerMean = runnerUp?.aggregate.composite_score?.mean ?? null;
+
+  const worstRun = sorted
+    .flatMap((exp) => exp.run_ids.map((id) => runsById.get(id)))
+    .filter((run): run is RunRecord => run != null)
+    .sort((a, b) => (b.finding_counts.issue - a.finding_counts.issue) || ((a.composite_score ?? 1) - (b.composite_score ?? 1)))[0];
+  const hasTrouble = worstRun != null && worstRun.finding_counts.issue > 0;
+
+  return (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs leading-relaxed" style={{ color: C.fg3 }}>
+      <TierPill tier={bestTier} />
+      <span>
+        {sorted.length > 1 ? 'Best delivery: ' : ''}
+        <span style={{ color: C.fg4 }}>{best.agent_spec}</span>
+        {' — '}
+        {bestTier.blurb.toLowerCase()} ({bestMean.toFixed(2)})
+        {runnerUp && runnerMean != null && (
+          <>
+            {'. '}
+            <span style={{ color: C.fg4 }}>{runnerUp.agent_spec}</span>
+            {` trails by ${(bestMean - runnerMean).toFixed(2)}`}
+            {issueCount(runnerUp, runsById) > 0 &&
+              ` with ${issueCount(runnerUp, runsById)} issue${issueCount(runnerUp, runsById) === 1 ? '' : 's'}`}
+          </>
+        )}
+        {'.'}
+      </span>
+      {hasTrouble && (
+        <span>
+          Start with{' '}
+          <Link
+            to={`/runs/${encodeURIComponent(worstRun.id)}`}
+            className="underline decoration-dotted underline-offset-2 transition hover:opacity-80"
+            style={{ color: C.accent }}
+            title={`${worstRun.id} — ${worstRun.finding_counts.issue} issues`}
+          >
+            {runLabel(worstRun.id)}
+          </Link>
+          {worstRun.status === 'ERROR' ? ' (the failing run)' : ' (most issues)'}.
+        </span>
+      )}
+    </span>
   );
 }
 
 function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experiments: ExperimentRecord[] }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
+  const runsById = useMemo(() => new Map((runs.data ?? []).map((run) => [run.id, run])), [runs.data]);
 
   const sorted = useMemo(
     () =>
@@ -187,13 +302,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
     [experiments],
   );
 
-  const bestComposite = useMemo(() => {
-    const means = experiments
-      .map((e) => e.aggregate.composite_score?.mean)
-      .filter((m): m is number => m != null);
-    return means.length > 0 ? Math.max(...means) : null;
-  }, [experiments]);
-
+  const bestComposite = sorted[0]?.aggregate.composite_score?.mean ?? null;
   const meta = experiments.find((e) => e.scenario_meta)?.scenario_meta ?? null;
 
   const toggle = (id: string) =>
@@ -210,11 +319,11 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
       style={{ background: C.surface, border: `1px solid ${C.border}` }}
     >
       <div
-        className="flex flex-col gap-0.5 px-3 py-2"
+        className="flex flex-col gap-1.5 px-3 py-2.5"
         style={{ borderBottom: `1px solid ${C.border}` }}
       >
         <div className="flex items-center gap-2">
-          <span className="num text-sm font-medium" style={{ color: C.fg5 }}>
+          <span className="text-sm font-medium" style={{ color: C.fg5 }}>
             {groupKey}
           </span>
           {meta?.category && (
@@ -242,21 +351,21 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
             {meta.description}
           </span>
         )}
+        <GroupHeadline sorted={sorted} runsById={runsById} />
       </div>
       <div className="sb overflow-x-auto">
         <table className="w-full border-collapse">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
               <th className={TH} style={{ color: C.fg0 }}>Agent spec</th>
-              <th className={TH} style={{ color: C.fg0 }}>Composite</th>
-              <th className={TH} style={{ color: C.fg0 }}>Δ best</th>
-              <th className={TH} style={{ color: C.fg0 }}>Quality</th>
-              <th className={TH} style={{ color: C.fg0 }}>Validity</th>
-              <th className={TH} style={{ color: C.fg0 }}>Scored</th>
-              <th className={TH} style={{ color: C.fg0 }}>Duration (s)</th>
+              <th className={TH} style={{ color: C.fg0 }}>Delivery</th>
+              <th className={TH} style={{ color: C.fg0 }}>Repeatability</th>
+              <th className={TH} style={{ color: C.fg0 }}>Issues</th>
+              <th className={TH} style={{ color: C.fg0 }} title="Can you trust this sample? Based on scored-run counts vs the scenario's minimum and preferred sample sizes.">
+                Confidence
+              </th>
+              <th className={TH} style={{ color: C.fg0 }}>Pace</th>
               <th className={TH} style={{ color: C.fg0 }}>Tokens</th>
-              <th className={TH} style={{ color: C.fg0 }}>Adequacy</th>
-              <th className={TH} style={{ color: C.fg0 }}>Findings</th>
             </tr>
           </thead>
           <tbody>
@@ -270,6 +379,8 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
               const scored = exp.aggregate.run_count_scored ?? 0;
               const total = exp.aggregate.run_count_total ?? 0;
               const unscored = exp.aggregate.unscored_count ?? 0;
+              const trust = sampleTrust(exp.sample, scored, total);
+              const spread = spreadTier(exp.aggregate.composite_score);
               return (
                 <Fragment key={exp.experiment_id}>
                   <tr
@@ -282,63 +393,71 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
                     onClick={() => toggle(exp.experiment_id)}
                   >
                     <td className={TD}>
-                      <span className="flex items-center gap-1.5">
+                      <span className="flex items-center gap-1.5" title={exp.experiment_id}>
                         <ChevronRight
                           className="size-3 shrink-0 transition-transform"
                           style={{ color: C.fg1, transform: isOpen ? 'rotate(90deg)' : '' }}
                         />
-                        <span style={{ color: C.cyan }}>{exp.agent_spec}</span>
-                        {isBest && (
+                        <span className="num" style={{ color: C.cyan }}>{exp.agent_spec}</span>
+                        {isBest && sorted.length > 1 && (
                           <Trophy className="size-3" style={{ color: C.accent }} aria-label="Best composite mean" />
                         )}
                         {exp.synthetic && <Badge label="synthetic" />}
                       </span>
                     </td>
-                    <td className={TD} style={{ color: isBest ? C.accent : C.fg3, fontWeight: isBest ? 600 : 400 }}>
-                      {meanStd(exp.aggregate.composite_score)}
-                    </td>
-                    <td
-                      className={TD}
-                      style={{ color: delta == null || delta === 0 ? C.fg0 : C.orange }}
-                    >
-                      {delta == null ? '—' : delta === 0 ? 'best' : delta.toFixed(3)}
-                    </td>
-                    <td className={TD} style={{ color: C.fg2 }}>
-                      {fmtScore(exp.aggregate.quality_score?.mean)}
-                    </td>
-                    <td className={TD} style={{ color: C.fg2 }}>
-                      {fmtPercent(exp.aggregate.validity_rate)}
-                    </td>
-                    <td className={TD} style={{ color: unscored > 0 ? C.orange : C.fg2 }}>
-                      {scored}/{total}
-                      {unscored > 0 && (
-                        <span title={`${unscored} unscored run(s) need rerun`}> · {unscored} unscored</span>
-                      )}
-                    </td>
-                    <td className={TD} style={{ color: C.fg2 }}>
-                      {exp.aggregate.duration_sec?.mean != null
-                        ? exp.aggregate.duration_sec.mean.toFixed(1)
-                        : '—'}
-                    </td>
-                    <td className={TD} style={{ color: C.fg2 }}>
-                      {fmtTokens(exp.aggregate.uncached_input_tokens?.mean != null
-                        ? Math.round(exp.aggregate.uncached_input_tokens.mean)
-                        : null)}
-                    </td>
-                    <td
-                      className={TD}
-                      style={{ color: exp.sample.minimum_met === false ? C.orange : C.fg2 }}
-                      title={exp.sample.sample_class ?? undefined}
-                    >
-                      {fmtPercent(exp.sample.sample_adequacy)}
+                    <td className={TD}>
+                      <span className="flex items-center gap-2">
+                        <ScoreVerdict
+                          score={compositeMean}
+                          detail={statDetail(exp.aggregate.composite_score)}
+                        />
+                        {delta != null && delta < 0 && (
+                          <span className="num text-[10px]" style={{ color: C.orange }} title="Gap to the best agent spec in this group">
+                            {delta.toFixed(2)} vs best
+                          </span>
+                        )}
+                      </span>
                     </td>
                     <td className={TD}>
-                      <FindingChips counts={findingCounts(exp)} />
+                      {spread ? (
+                        <span title={`${spread.blurb} (±${exp.aggregate.composite_score?.stddev?.toFixed(3)})`} style={{ color: spread.color }}>
+                          {spread.label}
+                        </span>
+                      ) : (
+                        <span style={{ color: C.fg0 }}>—</span>
+                      )}
+                    </td>
+                    <td className={TD} title="Findings across this spec's runs and experiment-level checks">
+                      {Object.values(findingCounts(exp, runsById)).some((n) => n > 0) ? (
+                        <FindingChips counts={findingCounts(exp, runsById)} />
+                      ) : (
+                        <span style={{ color: C.fg0 }}>none</span>
+                      )}
+                    </td>
+                    <td className={TD}>
+                      <span className="flex items-center gap-1.5">
+                        <TierPill tier={trust} />
+                        {unscored > 0 && (
+                          <span className="num text-[10px]" style={{ color: C.orange }} title={`${unscored} unscored run(s) need rerun`}>
+                            {unscored} unscored
+                          </span>
+                        )}
+                      </span>
+                    </td>
+                    <td className={`num ${TD}`} style={{ color: C.fg2 }} title={statDetail(exp.aggregate.duration_sec)}>
+                      {exp.aggregate.duration_sec?.mean != null
+                        ? `${(exp.aggregate.duration_sec.mean / 60).toFixed(1)}m avg`
+                        : '—'}
+                    </td>
+                    <td className={`num ${TD}`} style={{ color: C.fg2 }} title={statDetail(exp.aggregate.uncached_input_tokens)}>
+                      {exp.aggregate.uncached_input_tokens?.mean != null
+                        ? `${fmtTokens(Math.round(exp.aggregate.uncached_input_tokens.mean))} avg`
+                        : '—'}
                     </td>
                   </tr>
                   {isOpen && (
                     <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                      <td colSpan={10} className="p-0">
+                      <td colSpan={7} className="p-0">
                         <ExperimentExpansion exp={exp} />
                       </td>
                     </tr>

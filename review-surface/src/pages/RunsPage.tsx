@@ -156,12 +156,12 @@ function RunDetailView({ runId }: { runId: string }) {
         />
       </div>
 
-      <SearchPanel runId={runId} onSelect={(spanId) => selectSpan(spanId)} />
-
       <div
-        className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-lg lg:flex-row"
+        className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-lg"
         style={{ border: `1px solid ${C.border}` }}
       >
+        <SearchPanel runId={runId} onSelect={(spanId) => selectSpan(spanId)} frameless />
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
         <div
           className="min-h-0 flex-1 lg:basis-[60%]"
           style={{ borderRight: selectedSpan ? `1px solid ${C.border}` : 'none' }}
@@ -185,6 +185,7 @@ function RunDetailView({ runId }: { runId: string }) {
             />
           </div>
         )}
+        </div>
       </div>
     </div>
   );
@@ -210,11 +211,13 @@ export function RunsPage() {
   }, [runs.data, filter]);
 
   const grouped = useMemo(() => {
-    const groups = new Map<string, { label: string; runs: typeof filtered }>();
+    const groups = new Map<string, { scenario: string; spec: string; experimentId: string; runs: typeof filtered }>();
     for (const run of filtered) {
       const key = run.experiment_id;
       const entry = groups.get(key) ?? {
-        label: `${run.scenario}@${run.revision} · ${run.model}`,
+        scenario: `${run.scenario}@${run.revision}`,
+        spec: run.agent_spec,
+        experimentId: run.experiment_id,
         runs: [],
       };
       entry.runs.push(run);
@@ -248,13 +251,18 @@ export function RunsPage() {
             </div>
           )}
           {grouped.map((group) => (
-            <div key={group.label} className="flex flex-col gap-1">
+            <div key={group.experimentId} className="flex flex-col gap-1">
               <div
-                className="sticky top-0 z-10 truncate px-1 py-1 text-[9px] font-medium uppercase tracking-wider"
-                style={{ color: C.fg0, background: C.surface }}
-                title={group.label}
+                className="sticky top-0 z-10 flex flex-col px-1 py-1"
+                style={{ background: C.surface }}
+                title={group.experimentId}
               >
-                {group.label}
+                <span className="truncate text-[10px] font-medium" style={{ color: C.fg2 }}>
+                  {group.scenario}
+                </span>
+                <span className="num truncate text-[9px]" style={{ color: C.cyan }}>
+                  {group.spec}
+                </span>
               </div>
               {group.runs.map((run) => (
                 <RunListItem
