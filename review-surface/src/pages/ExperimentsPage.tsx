@@ -427,12 +427,35 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
                         <span style={{ color: C.fg0 }}>—</span>
                       )}
                     </td>
-                    <td className={TD} title="Findings across this spec's runs and experiment-level checks">
-                      {Object.values(findingCounts(exp, runsById)).some((n) => n > 0) ? (
-                        <FindingChips counts={findingCounts(exp, runsById)} />
-                      ) : (
-                        <span style={{ color: C.fg0 }}>none</span>
-                      )}
+                    <td className={TD}>
+                      {(() => {
+                        const counts = findingCounts(exp, runsById);
+                        const issues = counts.issue ?? 0;
+                        const positives = (counts.good ?? 0) + (counts.note ?? 0);
+                        return (
+                          <span
+                            className="flex items-center gap-1.5"
+                            title={`${issues} issue${issues === 1 ? '' : 's'}, ${counts.good ?? 0} good, ${counts.note ?? 0} note across this spec's runs and experiment checks`}
+                          >
+                            {issues > 0 ? (
+                              <span
+                                className="num inline-flex h-[18px] items-center gap-1 rounded-full px-1.5 text-[10px] font-medium leading-[18px]"
+                                style={{ color: '#f87171', background: 'rgba(220,38,38,0.12)', border: '1px solid rgba(220,38,38,0.35)' }}
+                              >
+                                <span className="font-bold">!</span>
+                                {issues}
+                              </span>
+                            ) : (
+                              <span style={{ color: C.green }}>none</span>
+                            )}
+                            {positives > 0 && (
+                              <span className="text-[10px]" style={{ color: C.fg0 }}>
+                                · {positives} positive
+                              </span>
+                            )}
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className={TD}>
                       <span className="flex items-center gap-1.5">

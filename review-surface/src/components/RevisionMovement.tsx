@@ -22,8 +22,16 @@ function DeltaCell({
   format: (value: number) => string;
   higherIsBetter: boolean;
 }) {
+  const color = deltaColor(delta, higherIsBetter);
+  const improved = delta != null && delta !== 0 && (higherIsBetter ? delta > 0 : delta < 0);
+  const arrow = delta == null || delta === 0 ? '' : delta > 0 ? '↑' : '↓';
   return (
-    <span className="num text-[11px]" style={{ color: deltaColor(delta, higherIsBetter) }}>
+    <span
+      className="num inline-flex items-center gap-1 text-[11px]"
+      style={{ color }}
+      title={delta == null || delta === 0 ? 'No change' : improved ? 'Improved' : 'Regressed'}
+    >
+      {arrow && <span aria-hidden>{arrow}</span>}
       {delta == null ? '—' : `${delta > 0 ? '+' : ''}${format(delta)}`}
     </span>
   );
@@ -77,15 +85,20 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
         <span className="num text-[11px] font-medium" style={{ color: C.fg3 }}>
           {diff.from_revision} <MoveRight className="inline size-3" /> {diff.to_revision} contract changes
         </span>
-        {diff.summary.map((flag) => (
-          <span
-            key={flag}
-            className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
-            style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
-          >
-            {flag}
-          </span>
-        ))}
+        {diff.summary
+          .filter(
+            (flag) =>
+              !diff.comparable_warnings.some((w) => w.toLowerCase() === flag.toLowerCase()),
+          )
+          .map((flag) => (
+            <span
+              key={flag}
+              className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
+              style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
+            >
+              {flag}
+            </span>
+          ))}
         {diff.comparable_warnings.length > 0 && (
           <span
             className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
@@ -184,7 +197,7 @@ export function RevisionMovement({
         <table className="w-full max-w-2xl border-collapse">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {['Agent spec', 'Revisions', 'Δ composite', 'Δ duration (s)', 'Δ tokens'].map((label) => (
+              {['Agent spec', 'Revisions', 'Delivery', 'Run time', 'Tokens'].map((label) => (
                 <th
                   key={label}
                   className="px-2 py-1 text-left text-[9px] font-medium uppercase tracking-wider"
