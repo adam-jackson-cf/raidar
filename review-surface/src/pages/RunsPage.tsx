@@ -1,7 +1,7 @@
 // Adapted from Raindrop Workshop (MIT) — app/src/components/RunDetail.tsx (layout)
 import { useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { api } from '@/api/client';
 import { AnnotationCards } from '@/components/AnnotationCards';
@@ -286,12 +286,20 @@ export function RunsPage() {
         {runId ? (
           <RunDetailView key={runId} runId={runId} />
         ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-1">
+          <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <span className="text-sm" style={{ color: C.fg2 }}>
-              Select a run to review its trace
+              Pick a run to see why it scored what it did
             </span>
-            <span className="text-xs" style={{ color: C.fg0 }}>
-              Pick a run from the sidebar to see scores, spans, and annotations.
+            <span className="max-w-sm text-xs leading-relaxed" style={{ color: C.fg0 }}>
+              Each run opens with a plain-language verdict, the scorecard behind it, the
+              issues Raidar found, and the full execution trace.
+            </span>
+            <span className="max-w-sm text-xs leading-relaxed" style={{ color: C.fg0 }}>
+              Not sure where to start? Compare agent specs on the{' '}
+              <Link to="/" className="underline decoration-dotted underline-offset-2" style={{ color: C.accent }}>
+                Experiments
+              </Link>{' '}
+              page — it points you to the run worth opening first.
             </span>
           </div>
         )}

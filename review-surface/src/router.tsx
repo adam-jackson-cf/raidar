@@ -33,7 +33,7 @@ function Layout() {
           </nav>
         </div>
         <span className="mt-0.5 text-[10px]" style={{ color: C.fg0 }}>
-          Compare AgentSpecs · Explain scores · Trace failures
+          Compare agent specs · Explain scores · Trace failures
         </span>
       </header>
       <div className="flex min-h-0 flex-1 flex-col">
