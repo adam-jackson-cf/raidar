@@ -13,11 +13,28 @@ only data it owns (stored in `data/user-annotations.json`).
 
 ## Personas and objectives
 
+Every surface leads with a plain-language verdict and keeps the granular metrics
+behind progressive disclosure, so each persona starts zoomed-out and drills in.
+
 | Persona | Objective | Where they land |
 |---|---|---|
-| Benchmark reviewer / platform lead | Which AgentSpec delivers this scenario better, did a revision change help, and can I trust the sample? | **Experiments** page: per-scenario AgentSpec comparison (best-first with Δ-vs-best), scenario context chips/description, validity, sample adequacy, unscored warnings, cost/duration, finding counts, status-bearing run pills, score-vs-duration tradeoff scatter, failure-pattern rollups, and revision movement with scenario contract diffs and comparability warnings. |
-| Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: scorecard breakdown (scorer → weighted metric contributions with pass/fail and evidence), gate status chips, findings as evidence-linked annotations, requirements/metric evidence spans. |
-| Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases) with expand/collapse-all, error cycling, keyboard navigation (↑↓/←→/esc), per-run evidence search with match highlighting, payload drilldown with copy. |
+| Benchmark reviewer / platform lead | Which agent spec delivers this scenario better, did a revision change help, and can I trust the sample? | **Experiments** page: a per-revision verdict headline (best delivery, the gap to the runner-up, and the run worth opening first), then a comparison table framed as delivery verdict (Strong/Solid/Shaky/Failing) · repeatability · issues · sample confidence · pace · tokens. Expanding a spec splits metrics into "where points were lost" vs "what held up" with pass-ratio bars, score-area bars, evidence-linked findings, and run pills. Below: score-vs-run-time scatter, failure-pattern rollups, and revision movement with contract diffs and comparability warnings. |
+| Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: a verdict banner (one-sentence outcome, gates, headline score) over a "why it scored this" scorecard — each score area shows its share of the composite with bars, and each check is click-to-evidence. Findings render as plain-language, evidence-linked annotations. Long ids and source artifacts sit behind a "Technical details" disclosure. |
+| Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases) with a duration timeline, expand/collapse-all, error cycling, keyboard navigation (↑↓/←→/esc), per-run evidence search with match highlighting, and payload drilldown with copy. This is the deepest layer, where raw span names map 1:1 to the trace. |
+
+### Semantic verdict layer
+
+Raw scores, sample sizes, and finding categories are translated into one
+consistent good/bad vocabulary in `src/utils/verdict.ts`:
+
+- **Delivery** tiers from the composite score (Strong ≥ 0.9, Solid ≥ 0.75,
+  Shaky ≥ 0.5, Failing below) — a presentation band; Raidar has no canonical
+  composite grade.
+- **Repeatability** maps directly to Raidar's `REPEAT_VARIANCE_STDDEV_THRESHOLD`
+  (0.1): "Volatile" means Raidar would raise a repeat-variance finding.
+- **Confidence** comes from the sample adequacy flags (minimum/preferred met).
+- Finding categories (`failed-gate`, `missing-required-command`, …) render as
+  plain-language labels with the raw category retained in tooltips.
 
 ## Architecture
 

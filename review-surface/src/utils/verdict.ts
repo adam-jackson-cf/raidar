@@ -18,12 +18,20 @@ export function scoreTier(score: number | null | undefined): Tier {
   return { label: 'Failing', color: C.red, blurb: 'Did not deliver' };
 }
 
-/** Spread-of-results verdict from a stat block's stddev. */
+/**
+ * Spread-of-results verdict from a stat block's stddev. The boundary matches
+ * Raidar's REPEAT_VARIANCE_STDDEV_THRESHOLD (0.1) — at or above it Raidar
+ * raises a repeat-variance finding, so "Volatile" here means "Raidar would
+ * flag this for inconsistency".
+ */
+const REPEAT_VARIANCE_STDDEV_THRESHOLD = 0.1;
+
 export function spreadTier(stat: StatBlock | undefined): Tier | null {
   if (stat?.stddev == null || stat.mean == null) return null;
-  if (stat.stddev < 0.02) return { label: 'Consistent', color: C.fg2, blurb: 'Repeats land on the same score' };
-  if (stat.stddev < 0.1) return { label: 'Some spread', color: C.fg2, blurb: 'Repeats vary a little' };
-  return { label: 'Volatile', color: C.orange, blurb: 'Repeats disagree — inspect the outlier runs' };
+  if (stat.stddev < REPEAT_VARIANCE_STDDEV_THRESHOLD) {
+    return { label: 'Consistent', color: C.fg2, blurb: `Repeats stay within ±${REPEAT_VARIANCE_STDDEV_THRESHOLD} — no variance flag` };
+  }
+  return { label: 'Volatile', color: C.orange, blurb: 'Repeats disagree enough for Raidar to flag variance — inspect the outlier runs' };
 }
 
 /** Sample-trust verdict from adequacy flags. */
