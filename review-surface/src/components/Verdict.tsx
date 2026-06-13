@@ -1,8 +1,6 @@
-// Shared verdict renderings: tier pills, score bars, and concise id chips.
-// Every score the surface shows should pass through one of these so the
-// good/bad vocabulary stays consistent.
-import { useState } from 'react';
-import { Copy, Check } from 'lucide-react';
+// Shared verdict renderings: tier pills and score bars. Every score the
+// surface shows should pass through one of these so the good/bad vocabulary
+// stays consistent.
 import { C } from '@/utils/colors';
 import { scoreTier, type Tier } from '@/utils/verdict';
 
@@ -60,37 +58,6 @@ export function ScoreBar({ score, width = 64, color, height = 4 }: { score: numb
         className="block h-full rounded-full"
         style={{ width: `${Math.max(0, Math.min(1, score)) * 100}%`, background: color ?? tier.color }}
       />
-    </span>
-  );
-}
-
-/** Concise conceptual label for a long id: shows the label, keeps the full id in a tooltip with one-click copy. */
-export function IdChip({ id, label, color = C.fg1 }: { id: string; label: string; color?: string }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <span
-      className="group/id num inline-flex items-center gap-1 rounded px-1.5 py-px text-[10px]"
-      style={{ color, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
-      title={id}
-    >
-      {label}
-      <button
-        className="opacity-0 transition group-hover/id:opacity-100"
-        title={`Copy full id: ${id}`}
-        onClick={(e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          void navigator.clipboard.writeText(id);
-          setCopied(true);
-          setTimeout(() => setCopied(false), 1500);
-        }}
-      >
-        {copied ? (
-          <Check className="size-2.5" style={{ color: C.green }} />
-        ) : (
-          <Copy className="size-2.5" style={{ color: C.fg0 }} />
-        )}
-      </button>
     </span>
   );
 }
