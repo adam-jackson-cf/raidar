@@ -1,10 +1,10 @@
 """
 Version bump and changelog generator for Raidar.
 
-Analyzes conventional commits to determine version bump type:
-- feat: -> minor bump (0.1.1 -> 0.2.0)
-- fix: -> patch bump (0.1.1 -> 0.1.2)
-- perf: -> patch bump (0.1.1 -> 0.1.2)
+Bump type:
+- feat: minor bump (0.1.1 -> 0.2.0)
+- fix: patch bump (0.1.1 -> 0.1.2)
+- perf: patch bump (0.1.1 -> 0.1.2)
 - BREAKING CHANGE -> major bump (0.1.1 -> 1.0.0)
 - chore:, docs:, refactor:, test: -> no bump
 """
@@ -12,8 +12,10 @@ Analyzes conventional commits to determine version bump type:
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
+import tempfile
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -21,9 +23,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = REPO_ROOT / "orchestrator" / "pyproject.toml"
 CHANGELOG_PATH = REPO_ROOT / "CHANGELOG.md"
 
-VERSION_PATTERN = re.compile(r'^version\s*=\s*"(\d+\.\d+\.\d+)"', re.MULTILINE)
-COMMIT_TYPE_PATTERN = re.compile(r"^(\w+)(?:\(.+\))?(!)?:\s*(.+)$")
-BREAKING_CHANGE_PATTERN = re.compile(r"(^|\n)BREAKING[ -]CHANGE:", re.IGNORECASE)
+VERSION_PATTERN = re.compile(r'(?m)^version = "([^"]+)"$')
+PROJECT_TABLE_PATTERN = re.compile(
+    r"(?ms)^\[project\]\n(?P<body>.*?)(?=^\[[^\n]+\]\n|\Z)"
+)
+COMMIT_TYPE_PATTERN = re.compile(r"^(\w+)(?:\([^)]*\))?(!)?:")
+BREAKING_CHANGE_PATTERN = re.compile(r"(?im)^BREAKING[ -]CHANGE:")
 
 BUMP_TYPES = {
     "feat": "minor",
@@ -32,18 +37,71 @@ BUMP_TYPES = {
 }
 
 
+def _project_block(content: str) -> re.Match[str]:
+    match = PROJECT_TABLE_PATTERN.search(content)
+    if match is None:
+        raise ValueError(f"Could not find [project] table in {PYPROJECT_PATH}")
+    return match
+
+
+def _atomic_write_text(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(
+        "w",
+        encoding="utf-8",
+        dir=path.parent,
+        delete=False,
+    ) as temp_file:
+        temp_path = Path(temp_file.name)
+        temp_file.write(content)
+        temp_file.flush()
+        os.fsync(temp_file.fileno())
+
+    try:
+        os.replace(temp_path, path)
+    except Exception:
+        temp_path.unlink(missing_ok=True)
+        raise
+
+
+def _atomic_write_many(updates: dict[Path, str]) -> None:
+    temp_paths: dict[Path, Path] = {}
+    try:
+        for path, content in updates.items():
+            path.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.NamedTemporaryFile(
+                "w",
+                encoding="utf-8",
+                dir=path.parent,
+                delete=False,
+            ) as temp_file:
+                temp_path = Path(temp_file.name)
+                temp_file.write(content)
+                temp_file.flush()
+                os.fsync(temp_file.fileno())
+            temp_paths[path] = temp_path
+
+        for path, temp_path in temp_paths.items():
+            os.replace(temp_path, path)
+    finally:
+        for temp_path in temp_paths.values():
+            temp_path.unlink(missing_ok=True)
+
+
 def get_current_version() -> str:
-    """Read current version from orchestrator pyproject.toml."""
+    """Read current version from orchestrator pyproject."""
     content = PYPROJECT_PATH.read_text(encoding="utf-8")
-    project_block = _project_table_block(content)
+    project_block = _project_block(content).group("body")
     match = VERSION_PATTERN.search(project_block)
-    if not match:
+    if match is None:
         raise ValueError(f"Could not find [project].version in {PYPROJECT_PATH}")
     return match.group(1)
 
 
 def parse_version(version: str) -> tuple[int, int, int]:
     parts = version.split(".")
+    if len(parts) != 3:
+        raise ValueError(f"Expected semantic version x.y.z, got: {version}")
     return int(parts[0]), int(parts[1]), int(parts[2])
 
 
@@ -52,7 +110,7 @@ def format_version(major: int, minor: int, patch: int) -> str:
 
 
 def get_commits_since_last_bump() -> list[str]:
-    """Get commit subjects and bodies since the last release commit."""
+    """Get commit subjects and bodies since last version bump commit."""
     result = subprocess.run(
         ["git", "log", "--format=%s%n%b%x1e", "--no-merges", "-100"],
         capture_output=True,
@@ -60,10 +118,8 @@ def get_commits_since_last_bump() -> list[str]:
         cwd=REPO_ROOT,
         check=True,
     )
-    commits = [
-        record.strip() for record in result.stdout.split("\x1e") if record.strip()
-    ]
 
+    commits = [record.strip() for record in result.stdout.split("\x1e") if record.strip()]
     filtered: list[str] = []
     for commit in commits:
         subject = commit.splitlines()[0]
@@ -72,11 +128,12 @@ def get_commits_since_last_bump() -> list[str]:
         ):
             break
         filtered.append(commit)
+
     return filtered
 
 
 def analyze_commits(commits: list[str]) -> tuple[str, list[dict[str, str]]]:
-    """Determine bump type and return categorized commit records."""
+    """Analyze commits to determine bump type and categorize changelog entries."""
     bump_type = "none"
     categorized: list[dict[str, str]] = []
 
@@ -92,7 +149,7 @@ def analyze_commits(commits: list[str]) -> tuple[str, list[dict[str, str]]]:
 
             if match.group(2):
                 bump_type = "major"
-            elif commit_type in BUMP_TYPES:
+            elif bump_type != "major" and commit_type in BUMP_TYPES:
                 candidate = BUMP_TYPES[commit_type]
                 if bump_type == "none":
                     bump_type = candidate
@@ -106,6 +163,7 @@ def analyze_commits(commits: list[str]) -> tuple[str, list[dict[str, str]]]:
 
 def calculate_new_version(current: str, bump_type: str) -> str:
     major, minor, patch = parse_version(current)
+
     if bump_type == "major":
         return format_version(major + 1, 0, 0)
     if bump_type == "minor":
@@ -115,60 +173,55 @@ def calculate_new_version(current: str, bump_type: str) -> str:
     return current
 
 
-def update_pyproject(new_version: str) -> None:
+def render_pyproject_update(new_version: str) -> str:
     content = PYPROJECT_PATH.read_text(encoding="utf-8")
-    start, end = _project_table_span(content)
-    project_block = content[start:end]
+    project_match = _project_block(content)
+    project_block = project_match.group("body")
     updated_block, replacements = VERSION_PATTERN.subn(
-        f'version = "{new_version}"',
-        project_block,
-        count=1,
+        f'version = "{new_version}"', project_block, count=1
     )
     if replacements != 1:
-        raise ValueError(f"Could not update [project].version in {PYPROJECT_PATH}")
-    updated = content[:start] + updated_block + content[end:]
-    PYPROJECT_PATH.write_text(updated, encoding="utf-8")
+        raise ValueError(f"Could not replace exactly one [project].version in {PYPROJECT_PATH}")
+    return content[: project_match.start("body")] + updated_block + content[project_match.end("body") :]
 
 
-def _project_table_block(content: str) -> str:
-    start, end = _project_table_span(content)
-    return content[start:end]
+def update_pyproject(new_version: str) -> None:
+    _atomic_write_text(PYPROJECT_PATH, render_pyproject_update(new_version))
+    print(f"Updated pyproject.toml: {new_version}")
 
 
-def _project_table_span(content: str) -> tuple[int, int]:
-    project_match = re.search(r"(?m)^\[project\]\s*$", content)
-    if project_match is None:
-        raise ValueError(f"Could not find [project] table in {PYPROJECT_PATH}")
-    next_table = re.search(r"(?m)^\[.+\]\s*$", content[project_match.end() :])
-    end = len(content) if next_table is None else project_match.end() + next_table.start()
-    return project_match.end(), end
+def generate_changelog_entry(
+    version: str,
+    commits: list[dict[str, str]],
+    bump_type: str,
+) -> str:
+    date = datetime.now(UTC).strftime("%Y-%m-%d")
+    lines = [f"## {version} - {date}", ""]
 
+    if bump_type == "major":
+        lines.extend(["### Breaking Changes", ""])
 
-def generate_changelog_entry(version: str, commits: list[dict[str, str]]) -> str:
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    lines = [f"## [{version}] - {today}", ""]
-
-    type_order = [
-        "feat",
-        "fix",
-        "perf",
-        "refactor",
-        "docs",
-        "ci",
-        "build",
-        "style",
-        "chore",
-        "test",
-        "other",
-    ]
     by_type: dict[str, list[str]] = {}
-
     for commit in commits:
-        key = commit["type"]
-        by_type.setdefault(key, []).append(commit["raw"])
+        by_type.setdefault(commit["type"], []).append(commit["raw"])
 
+    type_headers = {
+        "feat": "Features",
+        "fix": "Bug Fixes",
+        "perf": "Performance",
+        "docs": "Documentation",
+        "refactor": "Refactoring",
+        "test": "Tests",
+        "chore": "Chores",
+        "other": "Other Changes",
+    }
+
+    type_order = ["feat", "fix", "perf", "docs", "refactor", "test", "chore", "other"]
     for kind in type_order:
-        lines.extend(f"- {raw}" for raw in by_type.get(kind, []))
+        if kind in by_type:
+            lines.extend([f"### {type_headers[kind]}", ""])
+            lines.extend(f"- {raw}" for raw in by_type[kind])
+            lines.append("")
 
     for kind in sorted(set(by_type) - set(type_order)):
         lines.extend(f"- {raw}" for raw in by_type[kind])
@@ -177,50 +230,69 @@ def generate_changelog_entry(version: str, commits: list[dict[str, str]]) -> str
     return "\n".join(lines)
 
 
-def update_changelog(entry: str) -> None:
+def render_changelog_update(entry: str) -> str:
     content = CHANGELOG_PATH.read_text(encoding="utf-8")
-    header_end = content.find("\n## ")
-    if header_end == -1:
-        header_end = content.find("\n\n") + 1
-    updated = content[:header_end] + "\n" + entry + content[header_end:]
-    CHANGELOG_PATH.write_text(updated, encoding="utf-8")
+    section_match = re.search(r"(?m)^## ", content)
+    if section_match is not None:
+        insertion_point = section_match.start()
+        prefix = content[:insertion_point].rstrip()
+        suffix = content[insertion_point:].lstrip("\n")
+        return f"{prefix}\n\n{entry}\n{suffix}"
+
+    title_match = re.search(r"(?m)^# .*(?:\n|$)", content)
+    if title_match is not None:
+        prefix = content[: title_match.end()].rstrip()
+        suffix = content[title_match.end() :].strip()
+        if suffix:
+            return f"{prefix}\n\n{entry}\n{suffix}\n"
+        return f"{prefix}\n\n{entry}"
+
+    stripped = content.strip()
+    if stripped:
+        return f"{stripped}\n\n{entry}"
+    return entry
+
+
+def update_changelog(entry: str) -> None:
+    _atomic_write_text(CHANGELOG_PATH, render_changelog_update(entry))
+    print("Updated CHANGELOG.md")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Bump version and update changelog")
-    parser.add_argument("--dry-run", action="store_true", help="Preview changes only")
+    parser.add_argument("--dry-run", action="store_true", help="Show changes without writing")
     args = parser.parse_args()
 
     current_version = get_current_version()
     commits = get_commits_since_last_bump()
 
     if not commits:
-        print("No new commits since last version bump")
+        print("No commits since last version bump")
         return 0
 
     bump_type, categorized = analyze_commits(commits)
     new_version = calculate_new_version(current_version, bump_type)
+    changelog_version = new_version if bump_type != "none" else current_version
+    entry = generate_changelog_entry(changelog_version, categorized, bump_type)
+
+    print(f"Current version: {current_version}")
+    print(f"Bump type: {bump_type}")
+    print(f"New version: {new_version}")
+    print("\nChangelog entry:")
+    print(entry)
 
     if args.dry_run:
-        print(f"Current version: {current_version}")
-        print(f"Bump type: {bump_type}")
-        print(f"New version: {new_version}")
-        print("Commits:")
-        for commit in categorized:
-            print(f"- {commit['raw']}")
         return 0
 
+    updates = {CHANGELOG_PATH: render_changelog_update(entry)}
     if bump_type != "none":
-        update_pyproject(new_version)
+        updates[PYPROJECT_PATH] = render_pyproject_update(new_version)
 
-    changelog_version = new_version if bump_type != "none" else current_version
-    entry = generate_changelog_entry(changelog_version, categorized)
-    update_changelog(entry)
+    _atomic_write_many(updates)
+    if bump_type != "none":
+        print(f"Updated pyproject.toml: {new_version}")
+    print("Updated CHANGELOG.md")
 
-    print(f"Bump type: {bump_type}")
-    print(f"Version: {current_version} -> {new_version}")
-    print(f"Updated {PYPROJECT_PATH}")
-    print(f"Updated {CHANGELOG_PATH}")
     return 0
 
 

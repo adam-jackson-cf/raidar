@@ -11,6 +11,7 @@ from raidar.scorers.base import ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.code_task.base import CodeTaskScorer
 from raidar.scorers.common import (
     code_task_artifact_metric_score,
+    coverage_ratio_score,
     required_artifact_patterns,
     verification_stability_score,
 )
@@ -146,7 +147,7 @@ def _typescript_code_quality_score(
 
 
 def _typescript_test_coverage_score(coverage) -> MetricScore:
-    score = _coverage_score(coverage)
+    score = coverage_ratio_score(coverage)
     return MetricScore(
         metric_id="test-coverage",
         score=score,
@@ -184,14 +185,6 @@ def _latest_gate(gate_history, gate_name: str):
         if event.gate_name == gate_name:
             return event
     return None
-
-
-def _coverage_score(coverage) -> float:
-    if coverage.threshold is None:
-        return 1.0 if coverage.passed else 0.0
-    if coverage.measured is None:
-        return 0.0
-    return min(1.0, coverage.measured / coverage.threshold)
 
 
 def _gate_evidence(gate) -> str:

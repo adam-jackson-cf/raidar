@@ -166,6 +166,43 @@ class RequirementsConfig(BaseModel):
     items: list[RequirementSpec] = Field(default_factory=list)
 
 
+class RetainedEvidenceFile(BaseModel):
+    """One JSON evidence file the agent must retain in the run workspace."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    path: str = Field(
+        description="Workspace-relative path to a JSON object file written during the run"
+    )
+    description: str = Field(
+        default="",
+        description="What evidence the file is expected to retain",
+    )
+
+    @field_validator("path")
+    @classmethod
+    def _validate_path(cls, value: str) -> str:
+        return validate_relative_path(
+            value,
+            field_name="evidence.retained_files[].path",
+            root_name="run workspace",
+        )
+
+
+class EvidenceConfig(BaseModel):
+    """Scenario-declared retained-evidence contract."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    retained_files: list[RetainedEvidenceFile] = Field(
+        default_factory=list,
+        description=(
+            "JSON evidence files ingested from the final run workspace into scorer-visible "
+            "retained evidence"
+        ),
+    )
+
+
 class VisualConfig(BaseModel):
     """Visual regression configuration."""
 
@@ -514,6 +551,7 @@ class ScenarioDefinition(BaseModel):
     starter: StarterConfig = Field(description="Starter configuration")
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
     requirements: RequirementsConfig = Field(default_factory=RequirementsConfig)
+    evidence: EvidenceConfig = Field(default_factory=EvidenceConfig)
     visual: VisualConfig | None = Field(default=None)
     scorers: list[ScenarioScorerRef] = Field(
         min_length=1,

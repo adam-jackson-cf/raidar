@@ -16,9 +16,9 @@ from raidar.scorers.common import (
 
 @register_scorer(scorer_id="refactor", version=1)
 class Refactor(BaseScorer):
-    """Refactor scorer retained as a proposed code-backed definition."""
+    """Refactor scorer promoted to an active code-backed definition."""
 
-    status = "proposed"
+    status = "active"
     category = "quality"
     description = (
         "Scores behavior-preserving refactors with structural improvement and "

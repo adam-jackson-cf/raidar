@@ -8,6 +8,7 @@ from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     artifact_metric_score,
+    coverage_ratio_score,
     functional_metric_score,
     metric,
     required_artifact_patterns,
@@ -105,7 +106,7 @@ def design_to_code_coverage_metric_score(outputs) -> MetricScore:
     coverage = outputs.test_coverage
     return MetricScore(
         metric_id="test-coverage",
-        score=_design_to_code_coverage_score(coverage),
+        score=coverage_ratio_score(coverage),
         passed=coverage.passed,
         evidence=(
             f"threshold={coverage.threshold}, "
@@ -113,11 +114,3 @@ def design_to_code_coverage_metric_score(outputs) -> MetricScore:
             f"source={coverage.source}"
         ),
     )
-
-
-def _design_to_code_coverage_score(coverage) -> float:
-    if coverage.threshold is None:
-        return 1.0 if coverage.passed else 0.0
-    if coverage.measured is None:
-        return 0.0
-    return min(1.0, coverage.measured / coverage.threshold)

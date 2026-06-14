@@ -283,7 +283,7 @@ class Scorecard(BaseModel):
         return metric_scores.get(metric_id, 0.0)
 
     def _test_coverage_profile_score(self) -> float:
-        if self.test_coverage.threshold is None:
+        if self.test_coverage.threshold is None or self.test_coverage.threshold <= 0:
             return 1.0 if self.test_coverage.passed else 0.0
         if self.test_coverage.measured is None:
             return 0.0

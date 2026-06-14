@@ -33,6 +33,6 @@ def run_task(request):
         terminated_early=execution.terminated_early,
         termination_reason=execution.termination_reason,
         scores=scorecard,
-        events=execution.events,
+        traces=execution.events,
         gate_history=execution.outputs.gate_history,
     )

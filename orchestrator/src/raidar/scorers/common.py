@@ -65,6 +65,16 @@ def verification_stability_score(score) -> MetricScore:
     )
 
 
+def coverage_ratio_score(coverage) -> float:
+    threshold = getattr(coverage, "threshold", None)
+    measured = getattr(coverage, "measured", None)
+    if threshold is None or threshold <= 0:
+        return 1.0 if getattr(coverage, "passed", False) else 0.0
+    if measured is None:
+        return 0.0
+    return min(1.0, measured / threshold)
+
+
 def workspace_files(workspace: Path) -> list[Path]:
     excluded = {
         ".git",

@@ -11,6 +11,7 @@ from click import ClickException
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 from raidar.application.models import RunCliOptions
 from raidar.application.scenario_catalog import load_scenario
+from raidar.findings import run_findings_artifact
 from raidar.runtime.models import RunRequest
 from raidar.runtime.pipeline import run_task
 from raidar.runtime.starter_preflight import StarterPreflightError
@@ -29,7 +30,17 @@ def persist_eval_run(run) -> Path:
     result_path = summary_result_path(run)
     result_path.parent.mkdir(parents=True, exist_ok=True)
     result_path.write_text(sanitized_model_dump_json(run, indent=2) + "\n", encoding="utf-8")
+    persist_run_findings(run, result_path.parent)
     return result_path
+
+
+def persist_run_findings(run, run_dir: Path) -> Path:
+    findings_path = run_dir / "findings.json"
+    findings_path.write_text(
+        sanitized_model_dump_json(run_findings_artifact(run), indent=2) + "\n",
+        encoding="utf-8",
+    )
+    return findings_path
 
 
 def execute_repeat_runs(

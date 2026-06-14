@@ -922,6 +922,7 @@ function main() {
     source: coverageSource,
     passed:
       coverageThreshold === null ||
+      coverageThreshold <= 0 ||
       (coverageMeasured !== null && coverageMeasured >= coverageThreshold),
   };
 

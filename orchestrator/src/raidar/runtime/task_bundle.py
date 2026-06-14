@@ -15,6 +15,7 @@ from raidar.agents.harbor_routing import is_task_image_reuse_enabled, task_image
 from raidar.agents.rules import SYSTEM_RULES
 from raidar.audit.workspace_diff import directory_fingerprint
 from raidar.runtime.harbor import validate_public_base_images as _validate_public_base_images
+from raidar.runtime.identifiers import slug_fragment
 from raidar.runtime.models import (
     BaselineWorkspaceCacheResult,
     RunRequest,
@@ -36,11 +37,6 @@ HARNESS_NPM_PACKAGES: dict[str, str] = {
     "claude-code": "@anthropic-ai/claude-code",
     "gemini": "@google/gemini-cli",
 }
-
-
-def _slug_fragment(value: str) -> str:
-    slug = re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
-    return slug or "unknown"
 
 
 def _load_baseline_scripts(starter_source: Any) -> dict[str, str]:
@@ -176,7 +172,7 @@ def _task_image_reference(request: RunRequest, task_bundle_path: Path) -> TaskIm
     }
     cache_key = _hash_json_payload(payload)
     digest = cache_key[:16]
-    harness_fragment = _slug_fragment(request.config.harness.value)
+    harness_fragment = slug_fragment(request.config.harness.value)
     image_tag = f"task-env-{harness_fragment}-{digest}"
     return TaskImageRef(
         image_name=f"{task_image_prefix()}:{image_tag}",

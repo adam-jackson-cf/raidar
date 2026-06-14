@@ -1,0 +1,775 @@
+"""Synthetic benchmark fixture generation for review-surface development.
+
+Generated experiments are clearly labeled as synthetic: experiment ids and run
+ids carry a ``synthetic`` prefix and every persisted payload sets a
+``synthetic: true`` marker. Synthetic fixtures must never be treated as real
+benchmark evidence; they exist to give the findings/review surface stable,
+realistic-shaped data.
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import sys
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from pathlib import Path
+
+from raidar.experiment import ExperimentSummaryInput, create_experiment_summary
+from raidar.findings import run_findings_artifact
+from raidar.sanitization import sanitized_model_dump_json
+from raidar.schemas.events import GateEvent, TraceEvent
+from raidar.schemas.scorecard import (
+    EvalConfig,
+    EvalRun,
+    FunctionalScore,
+    MetricScore,
+    RequirementsCoverageScore,
+    Scorecard,
+    ScorerMetricContribution,
+    ScorerResult,
+    VerificationStabilityScore,
+)
+
+SYNTHETIC_MARKER = "synthetic"
+_SCENARIO = "bugfix-ledger-balance"
+_REVISION = "v001"
+_SKILL_SCENARIO = "skill-benchmark-coding-test"
+_SKILL_CORE_METRICS = [
+    "functional",
+    "code-quality",
+    "test-coverage",
+    "artifact-checks",
+    "verification-stability",
+]
+_HARNESS = "codex-cli"
+_PROFILE = "scorers:bugfix@1:0.88+requirements@1:0.10+resource-efficiency@1:0.02"
+_STARTED = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
+_METRIC_IDS = [
+    "defect-resolution",
+    "regression-protection",
+    "change-containment",
+    "verification-stability",
+    "defect-evidence-completeness",
+    "requirements-coverage",
+    "requirements-adherence",
+    "resource-efficiency",
+]
+_SCORER_IDS = ["bugfix@1", "requirements@1", "resource-efficiency@1"]
+
+# Which metrics roll up into each scorer — used to build the metric_contributions
+# the review surface renders as the clickable, evidence-linked scorecard checks.
+_BUGFIX_SCORER_METRICS = {
+    "bugfix": [
+        "defect-resolution",
+        "regression-protection",
+        "change-containment",
+        "verification-stability",
+        "defect-evidence-completeness",
+    ],
+    "requirements": ["requirements-coverage", "requirements-adherence"],
+    "resource-efficiency": ["resource-efficiency"],
+}
+_SKILL_SCORER_METRICS = {
+    "typescript-code-task": [*_SKILL_CORE_METRICS],
+    "requirements": ["requirements-coverage", "requirements-adherence"],
+    "resource-efficiency": ["resource-efficiency"],
+}
+
+
+@dataclass(frozen=True)
+class Spec:
+    """An agent spec: the harness/model pairing a scenario is run against."""
+
+    harness: str
+    model: str
+    label: str  # short slug used in the experiment directory name
+
+
+_GPT_LOW = Spec("codex-cli", "openai/gpt-5.5:low", "gpt-5.5-low")
+_GPT_MEDIUM = Spec("codex-cli", "openai/gpt-5.5:medium", "gpt-5.5-medium")
+_GPT_HIGH = Spec("codex-cli", "openai/gpt-5.5:high", "gpt-5.5-high")
+_CLAUDE = Spec("claude-code", "anthropic/claude-sonnet-4.6", "claude-sonnet-4.6")
+
+
+def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
+    """Write labeled synthetic experiments and return their directories."""
+
+    return [*_bugfix_experiments(dest_dir), *_skill_experiments(dest_dir)]
+
+
+def _bugfix_experiments(dest_dir: Path) -> list[Path]:
+    """One scenario revision delivered by three agent specs with distinct means.
+
+    Exercises best-first ordering, the Δ-vs-best comparison framing, and a
+    volatile spec whose degraded run drags its mean below the others.
+    """
+    meta = _experiment_meta(_SCENARIO, _REVISION, _PROFILE, _METRIC_IDS, _SCORER_IDS)
+    return [
+        _experiment_dir(
+            dest_dir, _GPT_MEDIUM, meta, _clean_runs(_GPT_MEDIUM, quality=0.97, count=5)
+        ),
+        _experiment_dir(dest_dir, _GPT_HIGH, meta, _clean_runs(_GPT_HIGH, quality=0.92, count=5)),
+        _experiment_dir(dest_dir, _GPT_LOW, meta, _mixed_quality_runs(_GPT_LOW)),
+    ]
+
+
+def _skill_experiments(dest_dir: Path) -> list[Path]:
+    """Two specs across three revisions, with a leadership crossover at v003.
+
+    Exercises per-revision comparison and revision-movement deltas for each
+    spec as the scenario contract tightens (more requirements weight).
+    """
+    quality = {
+        ("v001", _GPT_LOW): 0.78,
+        ("v001", _CLAUDE): 0.74,
+        ("v002", _GPT_LOW): 0.85,
+        ("v002", _CLAUDE): 0.83,
+        ("v003", _GPT_LOW): 0.91,
+        ("v003", _CLAUDE): 0.95,
+    }
+    dirs: list[Path] = []
+    for revision in ("v001", "v002", "v003"):
+        meta = _skill_meta(revision)
+        for spec in (_GPT_LOW, _CLAUDE):
+            runs = _skill_runs(spec, revision, meta, quality[(revision, spec)])
+            dirs.append(_experiment_dir(dest_dir, spec, meta, runs))
+    return dirs
+
+
+def _skill_meta(revision: str) -> dict[str, object]:
+    if revision == "v001":
+        return _experiment_meta(
+            _SKILL_SCENARIO,
+            "v001",
+            "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
+            [*_SKILL_CORE_METRICS, "resource-efficiency"],
+            ["typescript-code-task@1", "resource-efficiency@1"],
+        )
+    weight = "0.85+requirements@1:0.13" if revision == "v002" else "0.78+requirements@1:0.20"
+    return _experiment_meta(
+        _SKILL_SCENARIO,
+        revision,
+        f"scorers:typescript-code-task@1:{weight}+resource-efficiency@1:0.02",
+        [
+            *_SKILL_CORE_METRICS,
+            "requirements-coverage",
+            "requirements-adherence",
+            "resource-efficiency",
+        ],
+        ["typescript-code-task@1", "requirements@1", "resource-efficiency@1"],
+    )
+
+
+def _str_list(meta: dict[str, object], key: str) -> list[str]:
+    value = meta[key]
+    assert isinstance(value, list)
+    return value
+
+
+def _experiment_meta(
+    scenario: str,
+    revision: str,
+    profile: str,
+    metric_ids: list[str],
+    scorer_ids: list[str],
+) -> dict[str, object]:
+    return {
+        "scenario": scenario,
+        "revision": revision,
+        "profile": profile,
+        "metric_ids": metric_ids,
+        "scorer_ids": scorer_ids,
+    }
+
+
+def _experiment_dir(
+    dest_dir: Path,
+    spec: Spec,
+    meta: dict[str, object],
+    runs: list[EvalRun],
+) -> Path:
+    dir_name = (
+        f"{SYNTHETIC_MARKER}-00000000-000000Z__{meta['scenario']}__{meta['revision']}"
+        f"__{spec.harness}__{spec.label}"
+    )
+    experiment_dir = dest_dir / dir_name
+    # Regeneration is idempotent: clear any prior synthetic payload so renamed
+    # or removed runs never linger as stale projections in the review surface.
+    shutil.rmtree(experiment_dir, ignore_errors=True)
+    summary = _summary_payload(spec, meta, runs)
+    _write_runs(experiment_dir, runs)
+    (experiment_dir / "experiment-summary.json").write_text(
+        json.dumps(summary, indent=2) + "\n", encoding="utf-8"
+    )
+    return experiment_dir
+
+
+def _summary_payload(spec: Spec, meta: dict[str, object], runs: list[EvalRun]) -> dict[str, object]:
+    summary = create_experiment_summary(
+        ExperimentSummaryInput(
+            scenario_name=str(meta["scenario"]),
+            scenario_revision=str(meta["revision"]),
+            harness=spec.harness,
+            model=spec.model,
+            evaluation_profile=str(meta["profile"]),
+            metrics=_str_list(meta, "metric_ids"),
+            scorers=_str_list(meta, "scorer_ids"),
+            repeats=len(runs),
+            repeat_parallel=1,
+            runs=runs,
+            started_at=_STARTED,
+        )
+    )
+    config = summary.get("config")
+    if isinstance(config, dict):
+        config[SYNTHETIC_MARKER] = True
+    summary[SYNTHETIC_MARKER] = True
+    return summary
+
+
+def _write_runs(experiment_dir: Path, runs: list[EvalRun]) -> None:
+    for run in runs:
+        run_dir = experiment_dir / "runs" / run.id
+        run_dir.mkdir(parents=True, exist_ok=True)
+        (run_dir / "run.json").write_text(
+            sanitized_model_dump_json(run, indent=2) + "\n", encoding="utf-8"
+        )
+        (run_dir / "findings.json").write_text(
+            sanitized_model_dump_json(run_findings_artifact(run), indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+
+def _bugfix_run_id(spec: Spec, index: int) -> str:
+    return f"{SYNTHETIC_MARKER}-bugfix-{spec.label}-{index:02d}"
+
+
+def _mixed_quality_runs(spec: Spec) -> list[EvalRun]:
+    """Three clean runs, one degraded run, and one unscored run.
+
+    The unscored run exercises the rerun/unscored path: it is excluded from
+    the composite stats and surfaces as an explicit "needs rerun" state.
+    """
+    healthy = [
+        _run(_bugfix_run_id(spec, index), spec, duration=120.0 + 10 * index, quality=0.97)
+        for index in range(1, 4)
+    ]
+    return [
+        *healthy,
+        _degraded_run(_bugfix_run_id(spec, 4), spec),
+        _unscored_run(_bugfix_run_id(spec, 5), spec),
+    ]
+
+
+def _unscored_run(run_id: str, spec: Spec) -> EvalRun:
+    scorecard = _scorecard(run_id, spec, duration=300.0)
+    scorecard.unscored = True
+    scorecard.unscored_reasons = [
+        "Scoring did not complete: the harness exited before verification finished.",
+        "Re-run this scenario to obtain a score.",
+    ]
+    scorecard.metric_scores = []
+    scorecard.scorer_results = []
+    return _eval_run(run_id, spec, scorecard, duration=300.0, fix_succeeded=False)
+
+
+def _clean_runs(spec: Spec, *, quality: float, count: int) -> list[EvalRun]:
+    efficiency = 0.93 if quality >= 0.95 else 0.85
+    return [
+        _run(
+            _bugfix_run_id(spec, index),
+            spec,
+            duration=150.0 + 12 * index,
+            quality=quality,
+            efficiency=efficiency,
+        )
+        for index in range(1, count + 1)
+    ]
+
+
+def _skill_runs(
+    spec: Spec, revision: str, meta: dict[str, object], quality: float
+) -> list[EvalRun]:
+    return [
+        _skill_run(
+            f"{SYNTHETIC_MARKER}-skill-{revision}-{spec.label}-{index:02d}",
+            spec,
+            revision,
+            meta,
+            quality=round(quality + 0.01 * (index - 2), 3),
+            duration=200.0 - (40.0 if revision == "v003" else 0.0) + 8 * index,
+        )
+        for index in range(1, 4)
+    ]
+
+
+def _skill_run(
+    run_id: str,
+    spec: Spec,
+    revision: str,
+    meta: dict[str, object],
+    *,
+    quality: float,
+    duration: float,
+) -> EvalRun:
+    metric_scores = [
+        MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
+        for metric_id in _str_list(meta, "metric_ids")
+    ]
+    metric_by_id = {m.metric_id: m.score for m in metric_scores}
+    scorecard = Scorecard(
+        run_id=run_id,
+        scenario_name=_SKILL_SCENARIO,
+        scenario_revision=revision,
+        harness=spec.harness,
+        model=spec.model,
+        starter_root="starter",
+        duration_sec=duration,
+        functional=FunctionalScore(
+            passed=True,
+            tests_passed=6,
+            tests_total=6,
+            build_succeeded=True,
+            gates_passed=4,
+            gates_total=4,
+        ),
+        requirements_coverage=_skill_requirements(revision),
+        metadata={
+            SYNTHETIC_MARKER: True,
+            "run": {"canonical_run_dir": None, "run_json_path": None},
+            "process": {"uncached_input_tokens": 26000 if revision == "v003" else 33000},
+        },
+        metric_scores=metric_scores,
+        scorer_results=_skill_scorer_results(revision, quality, metric_by_id),
+    )
+    return EvalRun(
+        id=run_id,
+        timestamp=_STARTED.isoformat(),
+        config=EvalConfig(
+            model=spec.model,
+            harness=spec.harness,
+            scenario_name=_SKILL_SCENARIO,
+            scenario_revision=revision,
+            starter_root="starter",
+            evaluation_profile=str(meta["profile"]),
+            scorers=_str_list(meta, "scorer_ids"),
+        ),
+        duration_sec=duration,
+        terminated_early=False,
+        scores=scorecard,
+        traces=_skill_trace_events(),
+    )
+
+
+def _skill_requirements(revision: str) -> RequirementsCoverageScore:
+    satisfied = {"v001": 6, "v002": 7}.get(revision, 8)
+    missing = {
+        "v001": ["req-no-todo", "req-error-paths"],
+        "v002": ["req-no-todo"],
+    }.get(revision, [])
+    return RequirementsCoverageScore(
+        total_requirements=8,
+        satisfied_requirements=satisfied,
+        missing_requirement_ids=missing,
+    )
+
+
+def _contributions(scorer_key: str, metrics: dict[str, float]) -> list[ScorerMetricContribution]:
+    """Even-weighted metric_contributions for a scorer, scoped to the metrics present."""
+    scorer_metrics = (_BUGFIX_SCORER_METRICS | _SKILL_SCORER_METRICS).get(scorer_key, [])
+    present = [m for m in scorer_metrics if m in metrics]
+    if not present:
+        return []
+    weight = round(1.0 / len(present), 4)
+    return [
+        ScorerMetricContribution(
+            metric_id=metric_id,
+            weight=weight,
+            score=metrics[metric_id],
+            weighted_score=round(weight * metrics[metric_id], 4),
+        )
+        for metric_id in present
+    ]
+
+
+def _skill_scorer_results(
+    revision: str, quality: float, metrics: dict[str, float]
+) -> list[ScorerResult]:
+    if revision == "v001":
+        return [
+            ScorerResult(
+                scorer_id="typescript-code-task",
+                version=1,
+                category="quality",
+                weight=0.98,
+                score=quality,
+                metric_contributions=_contributions("typescript-code-task", metrics),
+            ),
+            ScorerResult(
+                scorer_id="resource-efficiency",
+                version=1,
+                category="efficiency",
+                weight=0.02,
+                score=0.8,
+                metric_contributions=_contributions("resource-efficiency", metrics),
+            ),
+        ]
+    task_weight = 0.85 if revision == "v002" else 0.78
+    req_weight = 0.13 if revision == "v002" else 0.20
+    return [
+        ScorerResult(
+            scorer_id="typescript-code-task",
+            version=1,
+            category="quality",
+            weight=task_weight,
+            score=quality,
+            metric_contributions=_contributions("typescript-code-task", metrics),
+        ),
+        ScorerResult(
+            scorer_id="requirements",
+            version=1,
+            category="quality",
+            weight=req_weight,
+            score=quality,
+            metric_contributions=_contributions("requirements", metrics),
+        ),
+        ScorerResult(
+            scorer_id="resource-efficiency",
+            version=1,
+            category="efficiency",
+            weight=0.02,
+            score=0.88,
+            metric_contributions=_contributions("resource-efficiency", metrics),
+        ),
+    ]
+
+
+def _skill_trace_events() -> list[TraceEvent]:
+    return [
+        TraceEvent(
+            timestamp=_at(0),
+            event_type="user_prompt",
+            data={"content": "Build sumEven with minimal churn."},
+        ),
+        TraceEvent(
+            timestamp=_at(4),
+            event_type="file_change",
+            data={"file_path": "src/lib/math.ts"},
+        ),
+        TraceEvent(
+            timestamp=_at(6),
+            event_type="file_change",
+            data={"file_path": "src/test/math.test.ts"},
+        ),
+        *_command_events(8, "bun run typecheck", 0),
+        *_command_events(12, "bun run lint", 0),
+        *_command_events(16, "bun run test", 0),
+        *_command_events(20, "bun run test:coverage", 0),
+    ]
+
+
+def _run(
+    run_id: str,
+    spec: Spec,
+    *,
+    duration: float,
+    quality: float = 0.97,
+    efficiency: float = 0.93,
+) -> EvalRun:
+    scorecard = _scorecard(run_id, spec, duration=duration)
+    scorecard.metric_scores = _passing_metric_scores()
+    metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
+    scorecard.scorer_results = _scorer_results(quality, efficiency, metrics)
+    scorecard.metadata["evidence"] = {
+        "retained_files": [
+            {
+                "path": "evidence/defect-evidence.json",
+                "status": "ingested",
+                "keys": ["reproduction_note", "regression_tests", "verification_evidence"],
+            }
+        ]
+    }
+    return _eval_run(run_id, spec, scorecard, duration=duration)
+
+
+def _degraded_run(run_id: str, spec: Spec) -> EvalRun:
+    scorecard = _scorecard(run_id, spec, duration=540.0)
+    scorecard.functional = FunctionalScore(
+        passed=False,
+        tests_passed=7,
+        tests_total=9,
+        build_succeeded=True,
+        gates_passed=2,
+        gates_total=4,
+    )
+    scorecard.verification_stability = VerificationStabilityScore(
+        total_gate_failures=3,
+        unique_failure_categories=2,
+        repeat_failures=1,
+    )
+    scorecard.requirements_coverage = RequirementsCoverageScore(
+        total_requirements=5,
+        satisfied_requirements=3,
+        missing_requirement_ids=["req-repro-test-enabled", "req-defect-evidence-retained"],
+    )
+    scorecard.metric_scores = _failing_metric_scores()
+    metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
+    scorecard.scorer_results = _scorer_results(0.46, 0.40, metrics)
+    scorecard.metadata["process"] = {
+        "missing_required_verification_commands": 1,
+        "required_verification_first_pass": {"bun run test:coverage": "missing"},
+    }
+    scorecard.metadata["evidence"] = {
+        "retained_files": [
+            {"path": "evidence/defect-evidence.json", "status": "missing", "keys": []}
+        ]
+    }
+    gates = [
+        GateEvent(
+            timestamp=_STARTED.isoformat(),
+            gate_name="test",
+            command="bun run test",
+            exit_code=1,
+            stdout="",
+            stderr="2 tests failed: debit entries are still added to the balance",
+            failure_category="test",
+        ),
+        GateEvent(
+            timestamp=_STARTED.isoformat(),
+            gate_name="lint",
+            command="bun run lint",
+            exit_code=1,
+            stdout="",
+            stderr="import order violation in src/test/ledger.test.ts",
+            failure_category="lint",
+            is_repeat=False,
+        ),
+    ]
+    return _eval_run(run_id, spec, scorecard, duration=540.0, gates=gates, fix_succeeded=False)
+
+
+def _scorecard(run_id: str, spec: Spec, *, duration: float) -> Scorecard:
+    return Scorecard(
+        run_id=run_id,
+        scenario_name=_SCENARIO,
+        scenario_revision=_REVISION,
+        harness=spec.harness,
+        model=spec.model,
+        starter_root="starter",
+        duration_sec=duration,
+        functional=FunctionalScore(
+            passed=True,
+            tests_passed=12,
+            tests_total=12,
+            build_succeeded=True,
+            gates_passed=4,
+            gates_total=4,
+        ),
+        requirements_coverage=RequirementsCoverageScore(
+            total_requirements=5,
+            satisfied_requirements=5,
+        ),
+        metadata={
+            SYNTHETIC_MARKER: True,
+            "run": {"canonical_run_dir": None, "run_json_path": None},
+            "process": {"uncached_input_tokens": 42000},
+        },
+    )
+
+
+def _eval_run(
+    run_id: str,
+    spec: Spec,
+    scorecard: Scorecard,
+    *,
+    duration: float,
+    gates: list[GateEvent] | None = None,
+    fix_succeeded: bool = True,
+) -> EvalRun:
+    return EvalRun(
+        id=run_id,
+        timestamp=_STARTED.isoformat(),
+        config=EvalConfig(
+            model=spec.model,
+            harness=spec.harness,
+            scenario_name=_SCENARIO,
+            scenario_revision=_REVISION,
+            starter_root="starter",
+            evaluation_profile=_PROFILE,
+            scorers=_SCORER_IDS,
+        ),
+        duration_sec=duration,
+        terminated_early=False,
+        scores=scorecard,
+        traces=_trace_events(fix_succeeded=fix_succeeded),
+        gate_history=gates or [],
+    )
+
+
+def _at(offset_sec: float) -> str:
+    return datetime(2026, 1, 1, 0, 0, int(offset_sec), tzinfo=UTC).isoformat()
+
+
+def _command_events(offset_sec: float, command: str, exit_code: int) -> list[TraceEvent]:
+    return [
+        TraceEvent(timestamp=_at(offset_sec), event_type="bash_command", data={"command": command}),
+        TraceEvent(
+            timestamp=_at(offset_sec + 2),
+            event_type="gate_result",
+            data={"status": "completed" if exit_code == 0 else "failed", "exit_code": exit_code},
+        ),
+    ]
+
+
+def _trace_events(*, fix_succeeded: bool) -> list[TraceEvent]:
+    events = [
+        TraceEvent(
+            timestamp=_at(0),
+            event_type="user_prompt",
+            data={"content": "Fix bug RAID-1042 in the ledger utility with minimal changes."},
+        ),
+        TraceEvent(
+            timestamp=_at(4),
+            event_type="assistant_message",
+            data={"content": "Re-enabling the skipped reproduction test to confirm the defect."},
+        ),
+        TraceEvent(
+            timestamp=_at(6),
+            event_type="file_change",
+            data={"file_path": "src/test/ledger.test.ts"},
+        ),
+        *_command_events(8, "bun run test", 1),
+        TraceEvent(
+            timestamp=_at(12),
+            event_type="assistant_message",
+            data={"content": "Reproduced: expected 6500 to be 3500. Fixing debit handling."},
+        ),
+        TraceEvent(
+            timestamp=_at(14),
+            event_type="file_change",
+            data={"file_path": "src/lib/ledger.ts"},
+        ),
+        TraceEvent(
+            timestamp=_at(16),
+            event_type="file_change",
+            data={"file_path": "src/test/ledger.regression.test.ts"},
+        ),
+        *_command_events(18, "bun run test", 0 if fix_succeeded else 1),
+        *_command_events(22, "bun run typecheck", 0),
+        *_command_events(26, "bun run lint", 0 if fix_succeeded else 1),
+        *_command_events(30, "bun run test:coverage", 0 if fix_succeeded else 1),
+    ]
+    if fix_succeeded:
+        events.append(
+            TraceEvent(
+                timestamp=_at(34),
+                event_type="file_change",
+                data={"file_path": "evidence/defect-evidence.json"},
+            )
+        )
+        events.append(
+            TraceEvent(
+                timestamp=_at(36),
+                event_type="assistant_message",
+                data={"content": "All gates pass; defect evidence retained."},
+            )
+        )
+    return events
+
+
+def _passing_metric_scores() -> list[MetricScore]:
+    return [
+        MetricScore(metric_id="defect-resolution", score=1.0, passed=True),
+        MetricScore(metric_id="regression-protection", score=1.0, passed=True),
+        MetricScore(metric_id="change-containment", score=1.0, passed=True),
+        MetricScore(metric_id="verification-stability", score=1.0, passed=True),
+        MetricScore(metric_id="defect-evidence-completeness", score=1.0, passed=True),
+        MetricScore(metric_id="requirements-coverage", score=1.0, passed=True),
+        MetricScore(
+            metric_id="requirements-adherence",
+            score=0.95,
+            passed=True,
+            judge_output={"verdict": "satisfied"},
+            evidence="judge verdict satisfied with full evidence bundle",
+        ),
+        MetricScore(metric_id="resource-efficiency", score=0.9, passed=True),
+    ]
+
+
+def _failing_metric_scores() -> list[MetricScore]:
+    return [
+        MetricScore(
+            metric_id="defect-resolution",
+            score=0.46,
+            passed=False,
+            evidence="direct: functional execution capped by defect-linked requirement checks",
+        ),
+        MetricScore(
+            metric_id="regression-protection",
+            score=0.5,
+            passed=False,
+            missing_patterns=["behavior-specific regression tests"],
+            evidence="proxy: test file inventory cannot prove failure-before-pass replay",
+        ),
+        MetricScore(metric_id="change-containment", score=0.85, passed=True),
+        MetricScore(metric_id="verification-stability", score=0.4, passed=False),
+        MetricScore(
+            metric_id="defect-evidence-completeness",
+            score=0.5,
+            passed=False,
+            missing_patterns=["reproduction note", "regression test evidence"],
+        ),
+        MetricScore(metric_id="requirements-coverage", score=0.6, passed=False),
+        MetricScore(
+            metric_id="requirements-adherence",
+            score=0.3,
+            passed=False,
+            judge_output={"verdict": "unsatisfied"},
+            evidence="judge verdict unsatisfied: defect evidence missing",
+        ),
+        MetricScore(metric_id="resource-efficiency", score=0.5, passed=False),
+    ]
+
+
+def _scorer_results(
+    quality: float, efficiency: float, metrics: dict[str, float]
+) -> list[ScorerResult]:
+    return [
+        ScorerResult(
+            scorer_id="bugfix",
+            version=1,
+            category="quality",
+            weight=0.88,
+            score=quality,
+            metric_contributions=_contributions("bugfix", metrics),
+        ),
+        ScorerResult(
+            scorer_id="requirements",
+            version=1,
+            category="quality",
+            weight=0.10,
+            score=quality,
+            metric_contributions=_contributions("requirements", metrics),
+        ),
+        ScorerResult(
+            scorer_id="resource-efficiency",
+            version=1,
+            category="efficiency",
+            weight=0.02,
+            score=efficiency,
+            metric_contributions=_contributions("resource-efficiency", metrics),
+        ),
+    ]
+
+
+def main() -> None:
+    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("../experiments/benchmarks")
+    dest.mkdir(parents=True, exist_ok=True)
+    for experiment_dir in generate_synthetic_benchmark(dest):
+        print(f"Wrote synthetic experiment: {experiment_dir}")
+
+
+if __name__ == "__main__":
+    main()

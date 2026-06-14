@@ -127,9 +127,9 @@ def test_scorer_refs_reject_unknown_scorer() -> None:
     "scorer_id",
     ["python-code-task", "bugfix", "refactor", "plan-to-code", "test-generation"],
 )
-def test_implemented_concrete_scorers_are_attachable(scorer_id: str) -> None:
+def test_concrete_scorers_are_active_and_attachable(scorer_id: str) -> None:
     scorer = load_scorer_definition(scorer_id, 1)
-    assert scorer.status == "proposed"
+    assert scorer.status == "active"
 
     payload = _base_scenario_payload()
     payload["scorers"] = [{"id": scorer_id, "version": 1, "weight": 1.0}]
@@ -200,7 +200,7 @@ def test_requirements_defines_requirements_adherence_judge() -> None:
 def test_python_code_task_extends_code_task_metric_interface() -> None:
     scorer = load_scorer_definition("python-code-task", 1)
 
-    assert scorer.status == "proposed"
+    assert scorer.status == "active"
     assert scorer.extends == "code-task"
     assert scorer.runtime == "python"
     assert [metric.id for metric in scorer.metrics] == [
@@ -215,7 +215,7 @@ def test_python_code_task_extends_code_task_metric_interface() -> None:
     assert all(metric.pass_fail for metric in scorer.metrics)
 
 
-def test_proposed_scorer_metric_contracts_match_intentplan() -> None:
+def test_promoted_scorer_metric_contracts_match_intentplan() -> None:
     expected = {
         "bugfix": [
             ("defect-resolution", 0.30),
@@ -250,7 +250,7 @@ def test_proposed_scorer_metric_contracts_match_intentplan() -> None:
     for scorer_id, metric_contract in expected.items():
         scorer = load_scorer_definition(scorer_id, 1)
 
-        assert scorer.status == "proposed"
+        assert scorer.status == "active"
         assert [(metric.id, metric.weight) for metric in scorer.metrics] == metric_contract
 
 

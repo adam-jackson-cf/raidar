@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-from collections.abc import Iterable
 
 from .base import HarnessAdapter
 
@@ -44,7 +43,3 @@ class ExternalCliAdapter(HarnessAdapter):
         if self.CLI_ENV_VAR:
             env[self.CLI_ENV_VAR] = self._resolve_cli()
         return env
-
-    def extra_harbor_args(self) -> Iterable[str]:
-        # Harbor expects the harness binary on PATH. Provide a hint via env var only.
-        return []

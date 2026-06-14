@@ -2,6 +2,64 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.14.0 - 2026-06-14
+
+### Features
+
+- feat(synthetic): add an unscored run to the bugfix-low spec
+- feat(synthetic): populate scorer metric_contributions
+- feat(synthetic): multi-spec, multi-revision fixture at volume
+- feat: plain-language nav copy and Runs landing guidance
+- feat: refine issues triage, revision-movement readability
+- feat: semantic verdict layer and progressive-disclosure review UX
+- feat: link runs back to their experiment review
+- feat: efficiency contrast in diagnosis and benchmark-row messaging
+- feat: replace experiments metric table with scenario board and experiment review
+- feat: add synthetic visual-ui benchmark fixture with screenshot evidence
+- feat: family quick-nav, token delta sign fix, and docs for ported comparisons
+- feat: port benchmark-view's comparison value into review-surface
+- feat: keyboard navigation, run dates, and persona doc updates
+- feat: scale span-tree navigation for debuggers
+- feat: give benchmark reviewers scenario context and ranking deltas
+- feat: add scorecard breakdown and gate chips to run review
+- feat: add persona-aware review-surface app over Raidar benchmark evidence
+- feat: scaffold review-surface data projection and API server
+- feat: surface review findings in benchmark-view with synthetic fixtures
+- feat: project run and experiment evidence into deterministic review findings
+- feat: add bugfix-ledger-balance scenario exercising bugfix scorer
+- feat: ingest scenario-declared retained evidence into scorer context
+- feat: activate concrete scorer definitions
+
+### Bug Fixes
+
+- fix: persist execution trace events on run records
+- fix: improve task image caching and coverage gates
+
+### Documentation
+
+- docs: update runLabel example to current synthetic id format
+- docs: record review-surface delivery against charter backlog items
+- docs: record charter-review execution results and follow-on backlog
+- docs: record charter-review implementation goal and phase-1 plan
+
+### Refactoring
+
+- refactor: ground repeatability tier in Raidar's variance threshold; doc redesign
+- refactor: drop unused IdChip from Verdict
+- refactor: deprecate benchmark-view in favor of review-surface
+- refactor: harden review-surface UX from browser persona testing
+
+### Tests
+
+- test(review-surface): committed Playwright e2e functional suite (S1)
+
+### Chores
+
+- chore(docs): remove superseded review-surface and migration todo specs
+- chore: add charter review goal assets
+
+- revert: roll back scenario-board redesign and visual fixture
+
 ## [0.13.0] - 2026-06-09
 
 - feat: migrate scorer definitions to coded scorers

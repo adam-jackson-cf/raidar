@@ -122,25 +122,27 @@ def _load_task_image_cache_payload(metadata_path: Path) -> dict[str, Any] | None
     return payload
 
 
-def _stale_task_image_name(
+def _stale_task_image_names(
     metadata_path: Path, *, now: float, active_image_name: str | None
-) -> str | None:
+) -> tuple[str, ...]:
     payload = _load_task_image_cache_payload(metadata_path)
-    if payload is None:
-        return None
-    image_name = payload.get("image_name")
-    if not isinstance(image_name, str):
+    image_names: tuple[str, ...] = ()
+    image_name = payload.get("image_name") if payload is not None else None
+    if payload is not None and not isinstance(image_name, str):
         metadata_path.unlink(missing_ok=True)
-        return None
-    if image_name == active_image_name:
-        return None
-    try:
-        last_used = _cache_last_used_epoch(metadata_path)
-    except FileNotFoundError:
-        return None
-    if now - last_used <= RAIDAR_DOCKER_CACHE_MAX_AGE_SEC:
-        return None
-    return image_name
+    elif isinstance(image_name, str) and image_name != active_image_name:
+        try:
+            last_used = _cache_last_used_epoch(metadata_path)
+        except FileNotFoundError:
+            last_used = now
+        if now - last_used > RAIDAR_DOCKER_CACHE_MAX_AGE_SEC:
+            reserve_image_name = payload.get("reserve_image_name") if payload else None
+            image_names = (
+                (image_name, reserve_image_name)
+                if isinstance(reserve_image_name, str)
+                else (image_name,)
+            )
+    return image_names
 
 
 def _managed_task_image(image_name: str, run_env: dict[str, str]) -> bool:
@@ -167,16 +169,17 @@ def _prune_stale_task_images(*, run_env: dict[str, str], active_image_name: str 
     images_root.mkdir(parents=True, exist_ok=True)
     now = time.time()
     for metadata_path in images_root.glob("*.json"):
-        image_name = _stale_task_image_name(
+        image_names = _stale_task_image_names(
             metadata_path,
             now=now,
             active_image_name=active_image_name,
         )
-        if image_name is None:
+        if not image_names:
             continue
         try:
-            if _managed_task_image(image_name, run_env):
-                _remove_task_image(image_name, run_env)
+            for image_name in image_names:
+                if _managed_task_image(image_name, run_env):
+                    _remove_task_image(image_name, run_env)
         except FileNotFoundError:
             return
         metadata_path.unlink(missing_ok=True)
@@ -245,14 +248,48 @@ def _expected_task_image_labels(image_ref: TaskImageRef, harness: str) -> dict[s
     }
 
 
-def _task_image_cache_hit(
-    image_ref: TaskImageRef, *, harness: str, run_env: dict[str, str]
+def _reserve_task_image_name(image_ref: TaskImageRef) -> str:
+    return f"{image_ref.image_name}-reserve"
+
+
+def _task_image_labels_match(
+    image_name: str, image_ref: TaskImageRef, *, harness: str, run_env: dict[str, str]
 ) -> bool:
-    labels = _inspect_docker_image_labels(image_ref.image_name, run_env)
+    labels = _inspect_docker_image_labels(image_name, run_env)
     if labels is None:
         return False
     expected_labels = _expected_task_image_labels(image_ref, harness)
     return all(labels.get(key) == value for key, value in expected_labels.items())
+
+
+def _tag_task_image(source_image: str, target_image: str, run_env: dict[str, str]) -> bool:
+    try:
+        completed = subprocess.run(
+            ["docker", "image", "tag", source_image, target_image],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            env=run_env,
+            check=False,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError("Docker CLI not found.") from exc
+    return completed.returncode == 0
+
+
+def _task_image_cache_hit(
+    image_ref: TaskImageRef, *, harness: str, run_env: dict[str, str]
+) -> bool:
+    if _task_image_labels_match(image_ref.image_name, image_ref, harness=harness, run_env=run_env):
+        return True
+    reserve_image = _reserve_task_image_name(image_ref)
+    if not _task_image_labels_match(reserve_image, image_ref, harness=harness, run_env=run_env):
+        return False
+    if not _tag_task_image(reserve_image, image_ref.image_name, run_env):
+        return False
+    return _task_image_labels_match(
+        image_ref.image_name, image_ref, harness=harness, run_env=run_env
+    )
 
 
 def _task_image_build_command(
@@ -263,6 +300,8 @@ def _task_image_build_command(
         "build",
         "--tag",
         image_ref.image_name,
+        "--tag",
+        _reserve_task_image_name(image_ref),
         "--file",
         str(dockerfile),
     ]
@@ -276,9 +315,6 @@ def _run_task_image_build(
     build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int
 ) -> TaskImageBuildResult:
     build_env = dict(run_env)
-    # Use the classic builder for task images. It has been more reliable than buildx
-    # on local OrbStack storage and still produces a locally-available image.
-    build_env["DOCKER_BUILDKIT"] = "0"
     try:
         completed = subprocess.run(
             build_cmd,
@@ -434,6 +470,7 @@ def _write_task_image_cache_metadata(
             {
                 "cache_key": image_ref.cache_key,
                 "image_name": image_ref.image_name,
+                "reserve_image_name": _reserve_task_image_name(image_ref),
                 "image_tag": image_ref.tag,
                 "harness": harness,
                 "repo_id": _repo_cache_identity(),
