@@ -27,6 +27,7 @@ from raidar.schemas.scorecard import (
     MetricScore,
     RequirementsCoverageScore,
     Scorecard,
+    ScorerMetricContribution,
     ScorerResult,
     VerificationStabilityScore,
 )
@@ -56,6 +57,25 @@ _METRIC_IDS = [
     "resource-efficiency",
 ]
 _SCORER_IDS = ["bugfix@1", "requirements@1", "resource-efficiency@1"]
+
+# Which metrics roll up into each scorer — used to build the metric_contributions
+# the review surface renders as the clickable, evidence-linked scorecard checks.
+_BUGFIX_SCORER_METRICS = {
+    "bugfix": [
+        "defect-resolution",
+        "regression-protection",
+        "change-containment",
+        "verification-stability",
+        "defect-evidence-completeness",
+    ],
+    "requirements": ["requirements-coverage", "requirements-adherence"],
+    "resource-efficiency": ["resource-efficiency"],
+}
+_SKILL_SCORER_METRICS = {
+    "typescript-code-task": [*_SKILL_CORE_METRICS],
+    "requirements": ["requirements-coverage", "requirements-adherence"],
+    "resource-efficiency": ["resource-efficiency"],
+}
 
 
 @dataclass(frozen=True)
@@ -273,6 +293,11 @@ def _skill_run(
     quality: float,
     duration: float,
 ) -> EvalRun:
+    metric_scores = [
+        MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
+        for metric_id in _str_list(meta, "metric_ids")
+    ]
+    metric_by_id = {m.metric_id: m.score for m in metric_scores}
     scorecard = Scorecard(
         run_id=run_id,
         scenario_name=_SKILL_SCENARIO,
@@ -295,11 +320,8 @@ def _skill_run(
             "run": {"canonical_run_dir": None, "run_json_path": None},
             "process": {"uncached_input_tokens": 26000 if revision == "v003" else 33000},
         },
-        metric_scores=[
-            MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
-            for metric_id in _str_list(meta, "metric_ids")
-        ],
-        scorer_results=_skill_scorer_results(revision, quality),
+        metric_scores=metric_scores,
+        scorer_results=_skill_scorer_results(revision, quality, metric_by_id),
     )
     return EvalRun(
         id=run_id,
@@ -333,7 +355,27 @@ def _skill_requirements(revision: str) -> RequirementsCoverageScore:
     )
 
 
-def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
+def _contributions(scorer_key: str, metrics: dict[str, float]) -> list[ScorerMetricContribution]:
+    """Even-weighted metric_contributions for a scorer, scoped to the metrics present."""
+    scorer_metrics = (_BUGFIX_SCORER_METRICS | _SKILL_SCORER_METRICS).get(scorer_key, [])
+    present = [m for m in scorer_metrics if m in metrics]
+    if not present:
+        return []
+    weight = round(1.0 / len(present), 4)
+    return [
+        ScorerMetricContribution(
+            metric_id=metric_id,
+            weight=weight,
+            score=metrics[metric_id],
+            weighted_score=round(weight * metrics[metric_id], 4),
+        )
+        for metric_id in present
+    ]
+
+
+def _skill_scorer_results(
+    revision: str, quality: float, metrics: dict[str, float]
+) -> list[ScorerResult]:
     if revision == "v001":
         return [
             ScorerResult(
@@ -342,6 +384,7 @@ def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
                 category="quality",
                 weight=0.98,
                 score=quality,
+                metric_contributions=_contributions("typescript-code-task", metrics),
             ),
             ScorerResult(
                 scorer_id="resource-efficiency",
@@ -349,6 +392,7 @@ def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
                 category="efficiency",
                 weight=0.02,
                 score=0.8,
+                metric_contributions=_contributions("resource-efficiency", metrics),
             ),
         ]
     task_weight = 0.85 if revision == "v002" else 0.78
@@ -360,6 +404,7 @@ def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
             category="quality",
             weight=task_weight,
             score=quality,
+            metric_contributions=_contributions("typescript-code-task", metrics),
         ),
         ScorerResult(
             scorer_id="requirements",
@@ -367,6 +412,7 @@ def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
             category="quality",
             weight=req_weight,
             score=quality,
+            metric_contributions=_contributions("requirements", metrics),
         ),
         ScorerResult(
             scorer_id="resource-efficiency",
@@ -374,6 +420,7 @@ def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
             category="efficiency",
             weight=0.02,
             score=0.88,
+            metric_contributions=_contributions("resource-efficiency", metrics),
         ),
     ]
 
@@ -412,7 +459,8 @@ def _run(
 ) -> EvalRun:
     scorecard = _scorecard(run_id, spec, duration=duration)
     scorecard.metric_scores = _passing_metric_scores()
-    scorecard.scorer_results = _scorer_results(quality, efficiency)
+    metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
+    scorecard.scorer_results = _scorer_results(quality, efficiency, metrics)
     scorecard.metadata["evidence"] = {
         "retained_files": [
             {
@@ -446,7 +494,8 @@ def _degraded_run(run_id: str, spec: Spec) -> EvalRun:
         missing_requirement_ids=["req-repro-test-enabled", "req-defect-evidence-retained"],
     )
     scorecard.metric_scores = _failing_metric_scores()
-    scorecard.scorer_results = _scorer_results(0.46, 0.40)
+    metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
+    scorecard.scorer_results = _scorer_results(0.46, 0.40, metrics)
     scorecard.metadata["process"] = {
         "missing_required_verification_commands": 1,
         "required_verification_first_pass": {"bun run test:coverage": "missing"},
@@ -663,11 +712,25 @@ def _failing_metric_scores() -> list[MetricScore]:
     ]
 
 
-def _scorer_results(quality: float, efficiency: float) -> list[ScorerResult]:
+def _scorer_results(
+    quality: float, efficiency: float, metrics: dict[str, float]
+) -> list[ScorerResult]:
     return [
-        ScorerResult(scorer_id="bugfix", version=1, category="quality", weight=0.88, score=quality),
         ScorerResult(
-            scorer_id="requirements", version=1, category="quality", weight=0.10, score=quality
+            scorer_id="bugfix",
+            version=1,
+            category="quality",
+            weight=0.88,
+            score=quality,
+            metric_contributions=_contributions("bugfix", metrics),
+        ),
+        ScorerResult(
+            scorer_id="requirements",
+            version=1,
+            category="quality",
+            weight=0.10,
+            score=quality,
+            metric_contributions=_contributions("requirements", metrics),
         ),
         ScorerResult(
             scorer_id="resource-efficiency",
@@ -675,6 +738,7 @@ def _scorer_results(quality: float, efficiency: float) -> list[ScorerResult]:
             category="efficiency",
             weight=0.02,
             score=efficiency,
+            metric_contributions=_contributions("resource-efficiency", metrics),
         ),
     ]
 
