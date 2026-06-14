@@ -87,7 +87,7 @@ export function scorerName(id: string): string {
 
 /**
  * Concise run label: trailing alphanumeric chunk(s) of the id, e.g.
- * "synthetic-low-04" → "Run 04", "r017" → "Run r017". Full id belongs in a tooltip.
+ * "synthetic-bugfix-gpt-5.5-low-04" → "Run 04", "r017" → "Run r017". Full id belongs in a tooltip.
  */
 export function runLabel(id: string): string {
   const tail = id.match(/(\d+)$/);
