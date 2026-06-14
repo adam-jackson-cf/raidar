@@ -60,7 +60,7 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
 	benchmark-fixture-synthetic \
-	review-surface-data review-surface-build review-surface-serve \
+	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	quality
 
 define require_var
@@ -112,6 +112,7 @@ help:
 	@echo "  make review-surface-data                               Project experiments/benchmarks into review-surface data"
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
+	@echo "  make review-surface-test                               Run the review-surface end-to-end functional suite (Playwright)"
 
 benchmark-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
@@ -124,6 +125,10 @@ review-surface-build:
 
 review-surface-serve: review-surface-data
 	@cd review-surface && node server.mjs
+
+review-surface-test: benchmark-fixture-synthetic review-surface-data
+	@cd review-surface && npm install --no-fund --no-audit && npm run build \
+		&& npx playwright install chromium && npm test
 
 env-setup:
 	@$(RAIDAR) env setup

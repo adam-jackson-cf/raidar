@@ -73,10 +73,27 @@ make benchmark-fixture-synthetic   # optional: labeled synthetic demo data
 make review-surface-data           # project experiments/benchmarks into data/
 make review-surface-build          # npm install + typecheck + vite build
 make review-surface-serve          # serve app + API on http://localhost:5950
+make review-surface-test           # end-to-end functional suite (Playwright)
 ```
 
 Inside `review-surface/` for development: `npm run dev` (Vite on 5951, proxies
 `/api` to the server on 5950).
+
+## End-to-end tests
+
+`tests/surface.spec.ts` is a Playwright functional regression net over the
+synthetic fixture, asserting every interaction works: navigation and scenario
+anchors, experiment expand/collapse and run pills, the comparison headline and
+Δ-vs-best framing, the run verdict banner, gate chips, the evidence-linked
+scorecard checks, findings jumps, per-run search (plain + regex + result
+click), the span tree (error cycle, expand/collapse-all, keyboard nav, escape),
+payload copy, annotation create/delete/kind-toggle, the runs sidebar filter and
+selection, the tradeoff scatter, failure patterns, revision-movement diffs, and
+the failing / passing / **unscored** run states — plus a console-error guard.
+
+`make review-surface-test` projects the fixture, builds the app, ensures the
+Chromium browser, and runs the suite via `server.mjs` (Playwright's `webServer`
+reuses an already-running server on 5950).
 
 Synthetic fixtures are always labeled — experiment ids, run ids, and payloads
 carry `synthetic` markers and the UI shows a `SYNTHETIC FIXTURE` badge. They

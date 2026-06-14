@@ -8,7 +8,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
-    "serve": "node server.mjs"
+    "serve": "node server.mjs",
+    "test": "playwright test"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.59.0",
@@ -19,6 +20,7 @@
     "react-router-dom": "^7.1.0"
   },
   "devDependencies": {
+    "@playwright/test": "1.60.0",
     "@types/react": "^18.3.0",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.0",
