@@ -247,11 +247,32 @@ def _bugfix_run_id(spec: Spec, index: int) -> str:
 
 
 def _mixed_quality_runs(spec: Spec) -> list[EvalRun]:
+    """Three clean runs, one degraded run, and one unscored run.
+
+    The unscored run exercises the rerun/unscored path: it is excluded from
+    the composite stats and surfaces as an explicit "needs rerun" state.
+    """
     healthy = [
         _run(_bugfix_run_id(spec, index), spec, duration=120.0 + 10 * index, quality=0.97)
         for index in range(1, 4)
     ]
-    return [*healthy, _degraded_run(_bugfix_run_id(spec, 4), spec)]
+    return [
+        *healthy,
+        _degraded_run(_bugfix_run_id(spec, 4), spec),
+        _unscored_run(_bugfix_run_id(spec, 5), spec),
+    ]
+
+
+def _unscored_run(run_id: str, spec: Spec) -> EvalRun:
+    scorecard = _scorecard(run_id, spec, duration=300.0)
+    scorecard.unscored = True
+    scorecard.unscored_reasons = [
+        "Scoring did not complete: the harness exited before verification finished.",
+        "Re-run this scenario to obtain a score.",
+    ]
+    scorecard.metric_scores = []
+    scorecard.scorer_results = []
+    return _eval_run(run_id, spec, scorecard, duration=300.0, fix_succeeded=False)
 
 
 def _clean_runs(spec: Spec, *, quality: float, count: int) -> list[EvalRun]:

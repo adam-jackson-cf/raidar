@@ -47,17 +47,35 @@ def test_synthetic_fixture_covers_multi_spec_and_multi_revision(tmp_path):
 
 def test_synthetic_runs_persist_run_and_findings_artifacts(tmp_path):
     experiment_dirs = generate_synthetic_benchmark(tmp_path)
-    # The volatile bugfix spec (gpt-5.5-low) carries the degraded run.
+    # The volatile bugfix spec (gpt-5.5-low) carries the degraded and unscored runs.
     low_dir = next(
         d for d in experiment_dirs if d.name.endswith("__gpt-5.5-low") and "bugfix" in d.name
     )
 
     run_dirs = sorted((low_dir / "runs").iterdir())
-    assert len(run_dirs) == 4
-    degraded = json.loads((run_dirs[-1] / "findings.json").read_text("utf-8"))
+    assert len(run_dirs) == 5
+
+    degraded_dir = next(d for d in run_dirs if d.name.endswith("-04"))
+    degraded = json.loads((degraded_dir / "findings.json").read_text("utf-8"))
     categories = {finding["category"] for finding in degraded["findings"]}
     assert "failed-gate" in categories
     assert "missing-required-command" in categories
     assert "requirements-gap" in categories
-    run_payload = json.loads((run_dirs[-1] / "run.json").read_text("utf-8"))
+    run_payload = json.loads((degraded_dir / "run.json").read_text("utf-8"))
     assert run_payload["scores"]["metadata"][SYNTHETIC_MARKER] is True
+
+
+def test_synthetic_fixture_includes_an_unscored_run(tmp_path):
+    experiment_dirs = generate_synthetic_benchmark(tmp_path)
+    low_dir = next(
+        d for d in experiment_dirs if d.name.endswith("__gpt-5.5-low") and "bugfix" in d.name
+    )
+    summary = json.loads((low_dir / "experiment-summary.json").read_text("utf-8"))
+    assert summary["aggregate"]["unscored_count"] == 1
+    assert summary["aggregate"]["run_count_scored"] == 4
+    assert summary["aggregate"]["run_count_total"] == 5
+
+    unscored_dir = next(d for d in sorted((low_dir / "runs").iterdir()) if d.name.endswith("-05"))
+    payload = json.loads((unscored_dir / "run.json").read_text("utf-8"))
+    assert payload["scores"]["unscored"] is True
+    assert payload["scores"]["unscored_reasons"]
