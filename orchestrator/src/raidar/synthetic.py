@@ -10,7 +10,9 @@ realistic-shaped data.
 from __future__ import annotations
 
 import json
+import shutil
 import sys
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -56,22 +58,80 @@ _METRIC_IDS = [
 _SCORER_IDS = ["bugfix@1", "requirements@1", "resource-efficiency@1"]
 
 
+@dataclass(frozen=True)
+class Spec:
+    """An agent spec: the harness/model pairing a scenario is run against."""
+
+    harness: str
+    model: str
+    label: str  # short slug used in the experiment directory name
+
+
+_GPT_LOW = Spec("codex-cli", "openai/gpt-5.5:low", "gpt-5.5-low")
+_GPT_MEDIUM = Spec("codex-cli", "openai/gpt-5.5:medium", "gpt-5.5-medium")
+_GPT_HIGH = Spec("codex-cli", "openai/gpt-5.5:high", "gpt-5.5-high")
+_CLAUDE = Spec("claude-code", "anthropic/claude-sonnet-4.6", "claude-sonnet-4.6")
+
+
 def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
     """Write labeled synthetic experiments and return their directories."""
 
-    bugfix_low = _experiment_meta(_SCENARIO, _REVISION, _PROFILE, _METRIC_IDS, _SCORER_IDS)
-    bugfix_medium = bugfix_low
-    skill_v1 = _experiment_meta(
+    return [*_bugfix_experiments(dest_dir), *_skill_experiments(dest_dir)]
+
+
+def _bugfix_experiments(dest_dir: Path) -> list[Path]:
+    """One scenario revision delivered by three agent specs with distinct means.
+
+    Exercises best-first ordering, the Δ-vs-best comparison framing, and a
+    volatile spec whose degraded run drags its mean below the others.
+    """
+    meta = _experiment_meta(_SCENARIO, _REVISION, _PROFILE, _METRIC_IDS, _SCORER_IDS)
+    return [
+        _experiment_dir(
+            dest_dir, _GPT_MEDIUM, meta, _clean_runs(_GPT_MEDIUM, quality=0.97, count=5)
+        ),
+        _experiment_dir(dest_dir, _GPT_HIGH, meta, _clean_runs(_GPT_HIGH, quality=0.92, count=5)),
+        _experiment_dir(dest_dir, _GPT_LOW, meta, _mixed_quality_runs(_GPT_LOW)),
+    ]
+
+
+def _skill_experiments(dest_dir: Path) -> list[Path]:
+    """Two specs across three revisions, with a leadership crossover at v003.
+
+    Exercises per-revision comparison and revision-movement deltas for each
+    spec as the scenario contract tightens (more requirements weight).
+    """
+    quality = {
+        ("v001", _GPT_LOW): 0.78,
+        ("v001", _CLAUDE): 0.74,
+        ("v002", _GPT_LOW): 0.85,
+        ("v002", _CLAUDE): 0.83,
+        ("v003", _GPT_LOW): 0.91,
+        ("v003", _CLAUDE): 0.95,
+    }
+    dirs: list[Path] = []
+    for revision in ("v001", "v002", "v003"):
+        meta = _skill_meta(revision)
+        for spec in (_GPT_LOW, _CLAUDE):
+            runs = _skill_runs(spec, revision, meta, quality[(revision, spec)])
+            dirs.append(_experiment_dir(dest_dir, spec, meta, runs))
+    return dirs
+
+
+def _skill_meta(revision: str) -> dict[str, object]:
+    if revision == "v001":
+        return _experiment_meta(
+            _SKILL_SCENARIO,
+            "v001",
+            "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
+            [*_SKILL_CORE_METRICS, "resource-efficiency"],
+            ["typescript-code-task@1", "resource-efficiency@1"],
+        )
+    weight = "0.85+requirements@1:0.13" if revision == "v002" else "0.78+requirements@1:0.20"
+    return _experiment_meta(
         _SKILL_SCENARIO,
-        "v001",
-        "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
-        [*_SKILL_CORE_METRICS, "resource-efficiency"],
-        ["typescript-code-task@1", "resource-efficiency@1"],
-    )
-    skill_v3 = _experiment_meta(
-        _SKILL_SCENARIO,
-        "v003",
-        "scorers:typescript-code-task@1:0.78+requirements@1:0.20+resource-efficiency@1:0.02",
+        revision,
+        f"scorers:typescript-code-task@1:{weight}+resource-efficiency@1:0.02",
         [
             *_SKILL_CORE_METRICS,
             "requirements-coverage",
@@ -80,13 +140,12 @@ def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
         ],
         ["typescript-code-task@1", "requirements@1", "resource-efficiency@1"],
     )
-    experiments = [
-        _experiment_dir(dest_dir, "gpt-5.5-low", bugfix_low, _mixed_quality_runs("low")),
-        _experiment_dir(dest_dir, "gpt-5.5-medium", bugfix_medium, _clean_runs("medium")),
-        _experiment_dir(dest_dir, "gpt-5.5-low", skill_v1, _skill_runs("v001", skill_v1, 0.78)),
-        _experiment_dir(dest_dir, "gpt-5.5-low", skill_v3, _skill_runs("v003", skill_v3, 0.91)),
-    ]
-    return experiments
+
+
+def _str_list(meta: dict[str, object], key: str) -> list[str]:
+    value = meta[key]
+    assert isinstance(value, list)
+    return value
 
 
 def _experiment_meta(
@@ -107,16 +166,19 @@ def _experiment_meta(
 
 def _experiment_dir(
     dest_dir: Path,
-    model_label: str,
+    spec: Spec,
     meta: dict[str, object],
     runs: list[EvalRun],
 ) -> Path:
     dir_name = (
         f"{SYNTHETIC_MARKER}-00000000-000000Z__{meta['scenario']}__{meta['revision']}"
-        f"__{_HARNESS}__{model_label}"
+        f"__{spec.harness}__{spec.label}"
     )
     experiment_dir = dest_dir / dir_name
-    summary = _summary_payload(meta, runs)
+    # Regeneration is idempotent: clear any prior synthetic payload so renamed
+    # or removed runs never linger as stale projections in the review surface.
+    shutil.rmtree(experiment_dir, ignore_errors=True)
+    summary = _summary_payload(spec, meta, runs)
     _write_runs(experiment_dir, runs)
     (experiment_dir / "experiment-summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
@@ -124,16 +186,16 @@ def _experiment_dir(
     return experiment_dir
 
 
-def _summary_payload(meta: dict[str, object], runs: list[EvalRun]) -> dict[str, object]:
+def _summary_payload(spec: Spec, meta: dict[str, object], runs: list[EvalRun]) -> dict[str, object]:
     summary = create_experiment_summary(
         ExperimentSummaryInput(
             scenario_name=str(meta["scenario"]),
             scenario_revision=str(meta["revision"]),
-            harness=_HARNESS,
-            model=runs[0].config.model,
+            harness=spec.harness,
+            model=spec.model,
             evaluation_profile=str(meta["profile"]),
-            metrics=list(meta["metric_ids"]),  # type: ignore[arg-type]
-            scorers=list(meta["scorer_ids"]),  # type: ignore[arg-type]
+            metrics=_str_list(meta, "metric_ids"),
+            scorers=_str_list(meta, "scorer_ids"),
             repeats=len(runs),
             repeat_parallel=1,
             runs=runs,
@@ -160,25 +222,39 @@ def _write_runs(experiment_dir: Path, runs: list[EvalRun]) -> None:
         )
 
 
-def _mixed_quality_runs(effort: str) -> list[EvalRun]:
+def _bugfix_run_id(spec: Spec, index: int) -> str:
+    return f"{SYNTHETIC_MARKER}-bugfix-{spec.label}-{index:02d}"
+
+
+def _mixed_quality_runs(spec: Spec) -> list[EvalRun]:
     healthy = [
-        _run(f"{SYNTHETIC_MARKER}-low-{index:02d}", effort, duration=120.0 + 10 * index)
+        _run(_bugfix_run_id(spec, index), spec, duration=120.0 + 10 * index, quality=0.97)
         for index in range(1, 4)
     ]
-    return [*healthy, _degraded_run(f"{SYNTHETIC_MARKER}-low-04", effort)]
+    return [*healthy, _degraded_run(_bugfix_run_id(spec, 4), spec)]
 
 
-def _clean_runs(effort: str) -> list[EvalRun]:
+def _clean_runs(spec: Spec, *, quality: float, count: int) -> list[EvalRun]:
+    efficiency = 0.93 if quality >= 0.95 else 0.85
     return [
-        _run(f"{SYNTHETIC_MARKER}-med-{index:02d}", effort, duration=150.0 + 12 * index)
-        for index in range(1, 4)
+        _run(
+            _bugfix_run_id(spec, index),
+            spec,
+            duration=150.0 + 12 * index,
+            quality=quality,
+            efficiency=efficiency,
+        )
+        for index in range(1, count + 1)
     ]
 
 
-def _skill_runs(revision: str, meta: dict[str, object], quality: float) -> list[EvalRun]:
+def _skill_runs(
+    spec: Spec, revision: str, meta: dict[str, object], quality: float
+) -> list[EvalRun]:
     return [
         _skill_run(
-            f"{SYNTHETIC_MARKER}-skill-{revision}-{index:02d}",
+            f"{SYNTHETIC_MARKER}-skill-{revision}-{spec.label}-{index:02d}",
+            spec,
             revision,
             meta,
             quality=round(quality + 0.01 * (index - 2), 3),
@@ -190,6 +266,7 @@ def _skill_runs(revision: str, meta: dict[str, object], quality: float) -> list[
 
 def _skill_run(
     run_id: str,
+    spec: Spec,
     revision: str,
     meta: dict[str, object],
     *,
@@ -200,8 +277,8 @@ def _skill_run(
         run_id=run_id,
         scenario_name=_SKILL_SCENARIO,
         scenario_revision=revision,
-        harness=_HARNESS,
-        model=_model("low"),
+        harness=spec.harness,
+        model=spec.model,
         starter_root="starter",
         duration_sec=duration,
         functional=FunctionalScore(
@@ -212,11 +289,7 @@ def _skill_run(
             gates_passed=4,
             gates_total=4,
         ),
-        requirements_coverage=RequirementsCoverageScore(
-            total_requirements=8,
-            satisfied_requirements=8 if revision == "v003" else 7,
-            missing_requirement_ids=[] if revision == "v003" else ["req-no-todo"],
-        ),
+        requirements_coverage=_skill_requirements(revision),
         metadata={
             SYNTHETIC_MARKER: True,
             "run": {"canonical_run_dir": None, "run_json_path": None},
@@ -224,7 +297,7 @@ def _skill_run(
         },
         metric_scores=[
             MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
-            for metric_id in list(meta["metric_ids"])  # type: ignore[arg-type]
+            for metric_id in _str_list(meta, "metric_ids")
         ],
         scorer_results=_skill_scorer_results(revision, quality),
     )
@@ -232,13 +305,13 @@ def _skill_run(
         id=run_id,
         timestamp=_STARTED.isoformat(),
         config=EvalConfig(
-            model=_model("low"),
-            harness=_HARNESS,
+            model=spec.model,
+            harness=spec.harness,
             scenario_name=_SKILL_SCENARIO,
             scenario_revision=revision,
             starter_root="starter",
             evaluation_profile=str(meta["profile"]),
-            scorers=list(meta["scorer_ids"]),  # type: ignore[arg-type]
+            scorers=_str_list(meta, "scorer_ids"),
         ),
         duration_sec=duration,
         terminated_early=False,
@@ -247,33 +320,52 @@ def _skill_run(
     )
 
 
+def _skill_requirements(revision: str) -> RequirementsCoverageScore:
+    satisfied = {"v001": 6, "v002": 7}.get(revision, 8)
+    missing = {
+        "v001": ["req-no-todo", "req-error-paths"],
+        "v002": ["req-no-todo"],
+    }.get(revision, [])
+    return RequirementsCoverageScore(
+        total_requirements=8,
+        satisfied_requirements=satisfied,
+        missing_requirement_ids=missing,
+    )
+
+
 def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
-    if revision == "v003":
+    if revision == "v001":
         return [
             ScorerResult(
                 scorer_id="typescript-code-task",
                 version=1,
                 category="quality",
-                weight=0.78,
+                weight=0.98,
                 score=quality,
-            ),
-            ScorerResult(
-                scorer_id="requirements", version=1, category="quality", weight=0.20, score=quality
             ),
             ScorerResult(
                 scorer_id="resource-efficiency",
                 version=1,
                 category="efficiency",
                 weight=0.02,
-                score=0.88,
+                score=0.8,
             ),
         ]
+    task_weight = 0.85 if revision == "v002" else 0.78
+    req_weight = 0.13 if revision == "v002" else 0.20
     return [
         ScorerResult(
             scorer_id="typescript-code-task",
             version=1,
             category="quality",
-            weight=0.98,
+            weight=task_weight,
+            score=quality,
+        ),
+        ScorerResult(
+            scorer_id="requirements",
+            version=1,
+            category="quality",
+            weight=req_weight,
             score=quality,
         ),
         ScorerResult(
@@ -281,7 +373,7 @@ def _skill_scorer_results(revision: str, quality: float) -> list[ScorerResult]:
             version=1,
             category="efficiency",
             weight=0.02,
-            score=0.8,
+            score=0.88,
         ),
     ]
 
@@ -310,14 +402,17 @@ def _skill_trace_events() -> list[TraceEvent]:
     ]
 
 
-def _model(effort: str) -> str:
-    return f"openai/gpt-5.5:{effort}"
-
-
-def _run(run_id: str, effort: str, *, duration: float) -> EvalRun:
-    scorecard = _scorecard(run_id, effort, duration=duration)
+def _run(
+    run_id: str,
+    spec: Spec,
+    *,
+    duration: float,
+    quality: float = 0.97,
+    efficiency: float = 0.93,
+) -> EvalRun:
+    scorecard = _scorecard(run_id, spec, duration=duration)
     scorecard.metric_scores = _passing_metric_scores()
-    scorecard.scorer_results = _scorer_results(0.97, 0.93)
+    scorecard.scorer_results = _scorer_results(quality, efficiency)
     scorecard.metadata["evidence"] = {
         "retained_files": [
             {
@@ -327,11 +422,11 @@ def _run(run_id: str, effort: str, *, duration: float) -> EvalRun:
             }
         ]
     }
-    return _eval_run(run_id, effort, scorecard, duration=duration)
+    return _eval_run(run_id, spec, scorecard, duration=duration)
 
 
-def _degraded_run(run_id: str, effort: str) -> EvalRun:
-    scorecard = _scorecard(run_id, effort, duration=540.0)
+def _degraded_run(run_id: str, spec: Spec) -> EvalRun:
+    scorecard = _scorecard(run_id, spec, duration=540.0)
     scorecard.functional = FunctionalScore(
         passed=False,
         tests_passed=7,
@@ -382,16 +477,16 @@ def _degraded_run(run_id: str, effort: str) -> EvalRun:
             is_repeat=False,
         ),
     ]
-    return _eval_run(run_id, effort, scorecard, duration=540.0, gates=gates, fix_succeeded=False)
+    return _eval_run(run_id, spec, scorecard, duration=540.0, gates=gates, fix_succeeded=False)
 
 
-def _scorecard(run_id: str, effort: str, *, duration: float) -> Scorecard:
+def _scorecard(run_id: str, spec: Spec, *, duration: float) -> Scorecard:
     return Scorecard(
         run_id=run_id,
         scenario_name=_SCENARIO,
         scenario_revision=_REVISION,
-        harness=_HARNESS,
-        model=_model(effort),
+        harness=spec.harness,
+        model=spec.model,
         starter_root="starter",
         duration_sec=duration,
         functional=FunctionalScore(
@@ -416,7 +511,7 @@ def _scorecard(run_id: str, effort: str, *, duration: float) -> Scorecard:
 
 def _eval_run(
     run_id: str,
-    effort: str,
+    spec: Spec,
     scorecard: Scorecard,
     *,
     duration: float,
@@ -427,8 +522,8 @@ def _eval_run(
         id=run_id,
         timestamp=_STARTED.isoformat(),
         config=EvalConfig(
-            model=_model(effort),
-            harness=_HARNESS,
+            model=spec.model,
+            harness=spec.harness,
             scenario_name=_SCENARIO,
             scenario_revision=_REVISION,
             starter_root="starter",
