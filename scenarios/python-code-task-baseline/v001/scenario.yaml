@@ -1,0 +1,61 @@
+name: python-code-task-baseline
+scenario_revision: v001
+parent_revision: null
+description: Baseline Python utility implementation with deterministic tests and artifact checks
+difficulty: medium
+category: greenfield-code
+timeout_sec: 1800
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+    - ["python", "-m", "compileall", "-q", "src", "tests"]
+    - ["python", "-m", "unittest", "discover", "-s", "tests"]
+requirements:
+  items:
+    - id: req-totals-module
+      description: Create `src/ledger_utils/totals.py`.
+      check:
+        type: file_exists
+        pattern: src/ledger_utils/totals.py
+        description: Totals module exists.
+    - id: req-summarize-export
+      description: Export `summarize_transactions(transactions)`.
+      check:
+        type: import_present
+        pattern: summarize_transactions
+        description: summarize_transactions export is present.
+    - id: req-income-expense
+      description: Summary reports income, expenses, and net values.
+      check:
+        type: import_present
+        pattern: net
+        description: Net calculation marker is present.
+    - id: req-tests-created
+      description: Add unit tests for valid, empty, and invalid transaction input.
+      check:
+        type: file_exists
+        pattern: tests/test_totals.py
+        description: Unit test file exists.
+scorers:
+  - id: python-code-task
+    version: 1
+    weight: 0.78
+    config:
+      artifact-checks:
+        required_paths:
+          - src/ledger_utils/totals.py
+          - tests/test_totals.py
+        path_match: glob
+  - id: requirements
+    version: 1
+    weight: 0.20
+  - id: resource-efficiency
+    version: 1
+    weight: 0.02
+prompt:
+  entry: prompt/task.md
+  includes: []

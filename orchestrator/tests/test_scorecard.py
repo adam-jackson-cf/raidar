@@ -89,11 +89,12 @@ class TestVisualScore:
 class TestScorecardComposite:
     """Test Scorecard composite score calculation."""
 
-    def test_composite_uses_resource_efficiency_without_scorer_results(self):
-        """Composite should use resource efficiency for pre-scorer scorecards."""
+    def test_composite_zero_without_quality_scorer_results(self):
+        """Composite should not be lifted by resource efficiency alone."""
         scorecard = Scorecard(resource_efficiency=ResourceEfficiencyScore(command_count=1))
         assert scorecard.quality_score == 0.0
-        assert scorecard.composite_score == scorecard.resource_efficiency.score
+        assert scorecard.resource_efficiency.score > 0.0
+        assert scorecard.composite_score == 0.0
 
     def test_quality_score_zero_without_quality_scorer_results(self):
         """Quality score should not fall back to legacy metric weights."""
@@ -121,8 +122,8 @@ class TestScorecardComposite:
         )
         assert scorecard.composite_score == 0.0
 
-    def test_composite_uses_resource_efficiency_when_valid(self):
-        """Composite score should use resource-efficiency score after run validity."""
+    def test_composite_does_not_use_resource_efficiency_without_quality_when_valid(self):
+        """Composite should still require delivered quality after run validity."""
         scorecard = Scorecard(
             execution_validity=ExecutionValidityScore(
                 checks=[
@@ -142,7 +143,8 @@ class TestScorecardComposite:
                 repeated_verification_failures=0,
             ),
         )
-        assert scorecard.composite_score == scorecard.resource_efficiency.score
+        assert scorecard.resource_efficiency.score > 0.0
+        assert scorecard.composite_score == 0.0
 
     def test_composite_uses_weighted_scorer_results_when_present(self):
         """Composite score should follow scenario-level scorer weights."""
@@ -175,6 +177,38 @@ class TestScorecardComposite:
 
         assert scorecard.quality_score == 0.75
         assert scorecard.composite_score == 0.7
+
+    def test_composite_capped_by_weak_quality_with_high_efficiency(self):
+        """Resource efficiency cannot lift composite above weak delivered quality."""
+        scorecard = Scorecard(
+            scorer_results=[
+                ScorerResult(
+                    scorer_id="python-code-task",
+                    version=1,
+                    category="quality",
+                    weight=0.2,
+                    score=0.25,
+                    metric_contributions=[
+                        ScorerMetricContribution(
+                            metric_id="functional",
+                            weight=1.0,
+                            score=0.25,
+                            weighted_score=0.25,
+                        )
+                    ],
+                ),
+                ScorerResult(
+                    scorer_id="resource-efficiency",
+                    version=1,
+                    category="efficiency",
+                    weight=0.8,
+                    score=1.0,
+                ),
+            ],
+        )
+
+        assert scorecard.quality_score == 0.25
+        assert scorecard.composite_score == 0.25
 
     def test_composite_zero_when_unscored(self):
         """Composite score must be 0 when run is unscored."""

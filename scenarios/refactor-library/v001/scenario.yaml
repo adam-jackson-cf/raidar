@@ -1,0 +1,49 @@
+name: refactor-library
+scenario_revision: v001
+parent_revision: null
+description: Baseline behavior-preserving refactor with public contract stability checks
+difficulty: medium
+category: refactor
+timeout_sec: 1800
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+    - ["python", "-m", "compileall", "-q", "src", "tests"]
+    - ["python", "-m", "unittest", "discover", "-s", "tests"]
+requirements:
+  items:
+    - id: req-public-api-stable
+      description: Preserve `build_report(rows)` as the public entrypoint.
+      check:
+        type: import_present
+        pattern: build_report
+        description: Public build_report API remains present.
+    - id: req-helper-extraction
+      description: Extract at least one focused private helper for report grouping or formatting.
+      check:
+        type: import_present
+        pattern: _group
+        description: Grouping helper marker is present.
+    - id: req-tests-preserved
+      description: Existing behavior tests still pass without changing expected outputs.
+      check:
+        type: file_exists
+        pattern: tests/test_reports.py
+        description: Behavior test file exists.
+scorers:
+  - id: refactor
+    version: 1
+    weight: 0.78
+  - id: requirements
+    version: 1
+    weight: 0.20
+  - id: resource-efficiency
+    version: 1
+    weight: 0.02
+prompt:
+  entry: prompt/task.md
+  includes: []

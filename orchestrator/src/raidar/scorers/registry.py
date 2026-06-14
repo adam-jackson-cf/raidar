@@ -21,6 +21,16 @@ from raidar.scorers.paths import resolve_scorer_definition_file
 
 import_module("raidar.scorers.scorer_registration")
 
+ATTACHABLE_PROPOSED_SCORERS = frozenset(
+    {
+        "python-code-task@1",
+        "bugfix@1",
+        "refactor@1",
+        "plan-to-code@1",
+        "test-generation@1",
+    }
+)
+
 
 @dataclass(frozen=True, slots=True)
 class ResolvedScorer:
@@ -75,7 +85,8 @@ def resolve_scorers(scenario) -> list[ResolvedScorer]:
     resolved: list[ResolvedScorer] = []
     for scorer_ref in scenario.scorers:
         definition = load_scorer_definition(scorer_ref.id, scorer_ref.version)
-        if definition.status != "active":
+        scorer_key = f"{definition.id}@{definition.version}"
+        if definition.status != "active" and scorer_key not in ATTACHABLE_PROPOSED_SCORERS:
             raise ScorerResolutionError(
                 f"Scorer {definition.id}@{definition.version} is {definition.status} "
                 "and cannot be attached to a scenario"

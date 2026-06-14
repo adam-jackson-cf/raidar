@@ -261,9 +261,10 @@ class Scorecard(BaseModel):
             return 0.0
         if not self.execution_validity.passed:
             return 0.0
+        quality_score = self.quality_score
         if self.scorer_results:
-            return round(_weighted_scorer_average(self.scorer_results), 3)
-        return round(self.resource_efficiency.score, 3)
+            return round(min(_weighted_scorer_average(self.scorer_results), quality_score), 3)
+        return quality_score
 
     def metric_score(self, metric_id: str) -> float:
         """Return the scalar score for a metric id."""

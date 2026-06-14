@@ -1,0 +1,55 @@
+name: plan-to-code-baseline
+scenario_revision: v001
+parent_revision: null
+description: Baseline plan-to-code task with retained plan and acceptance evidence
+difficulty: medium
+category: plan-to-code
+timeout_sec: 1800
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+    - ["python", "-m", "compileall", "-q", "src", "tests"]
+    - ["python", "-m", "unittest", "discover", "-s", "tests"]
+requirements:
+  items:
+    - id: req-retained-plan
+      description: Retain an `intentplan.md` with Feature Dashboard and Acceptance Tracker tables.
+      check:
+        type: file_exists
+        pattern: intentplan.md
+        description: Retained plan artifact exists.
+    - id: req-alert-module
+      description: Implement `src/alerts/escalation.py`.
+      check:
+        type: file_exists
+        pattern: src/alerts/escalation.py
+        description: Alert escalation module exists.
+    - id: req-escalation-export
+      description: Export `route_alert(alert)`.
+      check:
+        type: import_present
+        pattern: route_alert
+        description: route_alert export is present.
+    - id: req-acceptance-tests
+      description: Add tests for severity routing and missing owner fallback.
+      check:
+        type: file_exists
+        pattern: tests/test_escalation.py
+        description: Escalation test file exists.
+scorers:
+  - id: plan-to-code
+    version: 1
+    weight: 0.78
+  - id: requirements
+    version: 1
+    weight: 0.20
+  - id: resource-efficiency
+    version: 1
+    weight: 0.02
+prompt:
+  entry: prompt/task.md
+  includes: []

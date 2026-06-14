@@ -123,25 +123,20 @@ def test_scorer_refs_reject_unknown_scorer() -> None:
         ScenarioDefinition.model_validate(payload)
 
 
-def test_scorer_refs_reject_proposed_scorer() -> None:
-    payload = _base_scenario_payload()
-    payload["scorers"] = [{"id": "plan-to-code", "version": 1, "weight": 1.0}]
-    with pytest.raises(ValidationError, match="is proposed"):
-        ScenarioDefinition.model_validate(payload)
-
-
 @pytest.mark.parametrize(
     "scorer_id",
     ["python-code-task", "bugfix", "refactor", "plan-to-code", "test-generation"],
 )
-def test_proposed_concrete_scorers_are_loadable_but_not_attachable(scorer_id: str) -> None:
+def test_implemented_concrete_scorers_are_attachable(scorer_id: str) -> None:
     scorer = load_scorer_definition(scorer_id, 1)
     assert scorer.status == "proposed"
 
     payload = _base_scenario_payload()
     payload["scorers"] = [{"id": scorer_id, "version": 1, "weight": 1.0}]
-    with pytest.raises(ValidationError, match="is proposed"):
-        ScenarioDefinition.model_validate(payload)
+    scenario = ScenarioDefinition.model_validate(payload)
+
+    assert scenario.scorer_ids() == [f"{scorer_id}@1"]
+    assert scenario.metric_ids() == [metric.id for metric in scorer.metrics]
 
 
 def test_code_task_family_is_not_attachable() -> None:

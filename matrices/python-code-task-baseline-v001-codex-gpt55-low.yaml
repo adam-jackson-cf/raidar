@@ -1,0 +1,16 @@
+matrix:
+  id: python-code-task-baseline-v001-codex-gpt55-low
+  scenario: scenarios/python-code-task-baseline
+  experiment:
+    timeout_sec: 1800
+    repeats: 1
+    repeat_parallel: 1
+    retry_void: 0
+  entries:
+    - id: python-code-task-baseline-v001-gpt-5-5-low
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.5
+        reasoning_effort: low
