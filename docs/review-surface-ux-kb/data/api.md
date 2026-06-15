@@ -9,20 +9,21 @@ timestamp: 2026-06-15T00:00:00Z
 
 # API endpoints
 
-`server.mjs` is a zero-dependency `node:http` server. It serves the projection
-files as read-only JSON and the SPA static assets, plus annotation CRUD.
+`server.mjs` is a zero-dependency `node:http` server (binds `127.0.0.1`, port
+`REVIEW_SURFACE_PORT` or `5950`). It serves the projection files as read-only
+JSON and the SPA static assets, plus annotation CRUD.
 
 ## Read endpoints
 
 | Method · Route | Returns |
 |---|---|
-| `GET /api/runs` | `RunRecord[]` index → [Runs list](../pages/runs-index.md), pills |
+| `GET /api/runs` | the `runs` array from `runs.json` (`{ runs: RunRecord[] }`) → [Runs list](../pages/runs-index.md), pills |
 | `GET /api/experiments` | `{ experiments[], revision_diffs[] }` → [Experiments](../pages/experiments.md) |
 | `GET /api/runs/detail/:id` | `{ run, spans, annotations }` → [Run detail](../pages/run-detail.md) |
 | `GET /api/runs/:id/outline` | summary: `span_type_counts`, `tool_calls.by_name[]`, `errors[]`, annotations |
-| `GET /api/runs/:id/search` | `{ matches[], truncated }` over span payloads — params `pattern`, `regex`, `case_sensitive`, `max_matches`, `context_chars` → [Search](../components/search-panel.md) |
+| `GET /api/runs/:id/search` | `{ matches[], truncated }` over span payloads — params `pattern`, `regex`, `case_sensitive`, `max_matches` (default 50, cap 200), `context_chars` (default 80, cap 300). Caps at **10 matches per span-scope** (input/output/attributes); each `snippet` wraps the hit in `<<MATCH>>…<<END>>` markers; invalid regex returns `{ matches: [], error: 'invalid regex' }` → [Search](../components/search-panel.md) |
 | `GET /api/spans/:id/payload` | paginated single-span payload — params `target` (input/output), `max_chars`, `offset` |
-| `GET /api/annotations?run_id=` | merged raidar + user `Annotation[]` |
+| `GET /api/annotations?run_id=` | merged raidar + user `Annotation[]` (400 if `run_id` is missing) |
 
 ## Write endpoints
 
@@ -34,6 +35,14 @@ files as read-only JSON and the SPA static assets, plus annotation CRUD.
 ## Static serving
 
 `/` → `index.html`; `/<path>` → file from `dist/` if present, else SPA fallback
-to `index.html`. The client wrapper is
+to `index.html`. Requests that normalise outside `dist/` are rejected **403**
+(path-traversal guard); if the app hasn't been built, static requests return
+**503** with a "run npm install && npm run build" hint. The client wrapper is
 [`src/api/client.ts`](../../../review-surface/src/api/client.ts). Writes land in
 [owned data](./owned-data.md).
+
+## Verification
+
+Documented against `review-surface/server.mjs` directly (2026-06-15): all
+endpoints, params, annotation fields, and the merge/no-locking behaviour
+confirmed line-by-line.

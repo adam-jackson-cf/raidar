@@ -15,7 +15,7 @@ timestamp: 2026-06-15T00:00:00Z
 
 | File | Shape | Key fields |
 |---|---|---|
-| `data/runs.json` | `RunRecord[]` (index) | `id`, `scenario`, `revision`, `agent_spec`, `experiment_id`, `composite_score`, `status`, `unscored`/`unscored_reasons`, `valid`, `finding_counts`, `issue_categories`, `failed_gates`, `artifact_paths` |
+| `data/runs.json` | `{ runs: RunRecord[] }` (index; `/api/runs` returns `.runs`) | `id`, `scenario`, `revision`, `agent_spec`, `experiment_id`, `composite_score`, `status`, `unscored`/`unscored_reasons`, `valid`, `finding_counts`, `issue_categories`, `failed_gates`, `artifact_paths` |
 | `data/runs/<id>.json` | `{ run, spans, annotations }` | full [`RunDetail`](../pages/run-detail.md) — projected spans + merged annotations |
 | `data/experiments.json` | `{ experiments[], revision_diffs[] }` | per-spec `aggregate`, `sample`, `rerun`, `findings`, `run_ids` + `RevisionDiff[]` |
 

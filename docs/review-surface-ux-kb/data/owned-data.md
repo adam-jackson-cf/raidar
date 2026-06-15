@@ -34,8 +34,9 @@ exception** — the only data the surface creates and owns.
   (`fs.writeFileSync`).
 - **Delete** — `DELETE /api/annotations/:id` filters and re-persists; only
   `user-`prefixed ids are deletable.
-- **Read/merge** — at read time, user annotations are concatenated with the
-  projected Raidar findings for the run.
+- **Read/merge** — at read time, `annotationsForRun(runId)` concatenates the
+  projected Raidar findings (from `runs/<id>.json`) with user annotations
+  filtered to that `run_id`: `[...generated, ...user]`.
 
 ## Caveat
 
