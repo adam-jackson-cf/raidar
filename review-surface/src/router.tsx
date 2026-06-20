@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
+import { Crosshair } from 'lucide-react';
 import { ExperimentsPage } from '@/pages/ExperimentsPage';
 import { RunsPage } from '@/pages/RunsPage';
 import { WireframeExperimentsPage } from '@/pages/WireframeExperimentsPage';
@@ -12,8 +13,9 @@ function Layout() {
         style={{ borderBottom: `1px solid ${C.border}`, background: C.surface }}
       >
         <div className="flex items-baseline gap-5">
-          <span className="text-sm font-semibold tracking-tight" style={{ color: C.fg5 }}>
-            Raidar Review
+          <span className="flex items-center gap-1.5 text-sm font-semibold tracking-tight" style={{ color: C.fg5 }}>
+            <Crosshair className="size-3.5" style={{ color: C.accent }} />
+            Raidar
           </span>
           <nav className="flex items-center gap-3">
             <NavLink
@@ -34,7 +36,7 @@ function Layout() {
           </nav>
         </div>
         <span className="mt-0.5 text-[10px]" style={{ color: C.fg0 }}>
-          Compare agent specs · Explain scores · Trace failures
+          Compare agents · Explain delivery · Trace failures
         </span>
       </header>
       <div className="flex min-h-0 flex-1 flex-col">

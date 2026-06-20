@@ -2,6 +2,9 @@ import { Fragment, useEffect, useMemo, useState, type FocusEvent, type MouseEven
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Eye, EyeOff, Pin, PinOff, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { FailurePatterns } from '@/components/FailurePatterns';
+import { RevisionMovement } from '@/components/RevisionMovement';
+import { TradeoffScatter } from '@/components/TradeoffScatter';
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
 import { api } from '@/api/client';
@@ -990,6 +993,13 @@ export function WireframeExperimentsPage() {
       .filter(({ family }) => !search || family.toLowerCase().includes(search));
   }, [families, selectedFamilies, scenarioFilter]);
 
+  const hasHiddenScenarios = useMemo(() => {
+    if (selectedFamilies.includes('__all_scenarios__') || selectedFamilies.length === 0) {
+      return false;
+    }
+    return selectedFamilies.length < families.length;
+  }, [families.length, selectedFamilies]);
+
   const rankedByFamily = useMemo(() => {
     const map = new Map<string, { winnerId: string; runnerUpId?: string }>();
 
@@ -1093,14 +1103,27 @@ export function WireframeExperimentsPage() {
     });
   };
 
-  return (
+    return (
     <div className="sb flex h-full flex-col gap-3 overflow-auto p-4">
       <div className="rounded-lg border p-3" style={{ borderColor: C.border, background: C.surface }}>
         <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            className="inline-flex size-7 items-center justify-center rounded border border-white/20"
+            onClick={() => {
+              if (hasHiddenScenarios) {
+                setSelectedFamilies(['__all_scenarios__']);
+              }
+            }}
+            aria-label={hasHiddenScenarios ? 'Show all scenario families' : 'All scenario families visible'}
+            title={hasHiddenScenarios ? 'Show all scenario families' : 'All scenario families visible'}
+          >
+            {hasHiddenScenarios ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
+          </button>
           <div className="relative" data-wireframe-menu>
                 <button
                   type="button"
-                  className="min-w-56 rounded-md px-2 py-1 text-left text-xs"
+                  className="min-w-56 h-7 rounded-md px-2 py-1 text-left text-xs"
                   style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
                   onClick={() => setOpenFamilyMenu((open) => !open)}
                 >
@@ -1156,8 +1179,8 @@ export function WireframeExperimentsPage() {
               </div>
             ) : null}
           </div>
-          <input
-            className="min-w-56 rounded-md px-2 py-1 text-xs"
+              <input
+            className="min-w-56 h-7 rounded-md px-2 py-1 text-xs"
             style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
             value={scenarioFilter}
             placeholder="Search scenario family…"
@@ -1169,19 +1192,22 @@ export function WireframeExperimentsPage() {
 
       {filteredFamilies.map(({ family, revisions }) => {
         const hasSynthetic = revisions.some(({ exps }) => exps.some((exp) => exp.synthetic));
-        const revisionIds = revisions.map((revision) => revision.revision);
-        const selected = selectedRevisions[family] ?? [getLatestRevision(revisions)];
-        const selectedSet = new Set(selected);
-        const hasHiddenRevisions = revisionIds.some((revision) => !selectedSet.has(revision));
-        return (
+                const revisionIds = revisions.map((revision) => revision.revision);
+                const selected = selectedRevisions[family] ?? [getLatestRevision(revisions)];
+                const selectedSet = new Set(selected);
+                const hasHiddenRevisions = revisionIds.some((revision) => !selectedSet.has(revision));
+                const allFamilyExps = revisions.flatMap(({ exps }) => exps);
+                const revisionRunIds = new Set(allFamilyExps.flatMap((exp) => exp.run_ids));
+                const familyRuns = (runsQuery.data ?? []).filter((run) => revisionRunIds.has(run.id));
+                const familyDiffs = (query.data?.revision_diffs ?? []).filter((diff) => diff.scenario === family);
+                return (
           <section
             key={family}
             id={`family-${family}`}
             className="rounded-lg border"
             style={{
               borderColor: C.border,
-              background:
-                'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+              background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
             }}
           >
             <div className="px-3 py-2 border-b" style={{ borderColor: C.border }}>
@@ -1206,10 +1232,23 @@ export function WireframeExperimentsPage() {
                 {(revisions[0]?.exps[0]?.scenario_meta?.description || 'Scenario family').slice(0, 180)}
               </div>
               <div className="mt-2 flex items-center gap-2">
+                <button
+                  type="button"
+                  className="inline-flex size-7 items-center justify-center rounded border border-white/20"
+                  onClick={() => {
+                    if (hasHiddenRevisions) {
+                      showAllRevisionsForFamily(family);
+                    }
+                  }}
+                  aria-label={hasHiddenRevisions ? 'Show all revision tables' : 'All revision tables visible'}
+                  title={hasHiddenRevisions ? 'Show all revision tables' : 'All revision tables visible'}
+                >
+                  {hasHiddenRevisions ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
+                </button>
                 <div className="relative" data-wireframe-menu>
                   <button
                     type="button"
-                    className="min-w-60 rounded-md px-2 py-1 text-left text-xs"
+                    className="min-w-60 h-7 rounded-md px-2 py-1 text-left text-xs"
                     style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
                     onClick={() => setOpenRevisionMenu((current) => (current === family ? null : family))}
                   >
@@ -1270,32 +1309,24 @@ export function WireframeExperimentsPage() {
                     </div>
                   ) : null}
                 </div>
-                <button
-                  type="button"
-                  className="inline-flex size-7 items-center justify-center rounded border border-white/20"
-                  onClick={() => {
-                    if (hasHiddenRevisions) {
-                      showAllRevisionsForFamily(family);
-                    }
-                  }}
-                  aria-label={hasHiddenRevisions ? 'Show all revision tables' : 'All revision tables visible'}
-                  title={hasHiddenRevisions ? 'Show all revision tables' : 'All revision tables already visible'}
-                >
-                  {hasHiddenRevisions ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
-                </button>
               </div>
             </div>
-          <div className="space-y-3 px-2 pb-2 pt-3">
-            {revisions
-              .filter(({ revision }) => selectedSet.has(revision))
-              .map(({ revision, exps }) => (
+          <div
+            className="space-y-3 px-2 pb-2 pt-3"
+            style={{
+              background:
+                'repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 6px)',
+            }}
+          >
+              {revisions
+                .filter(({ revision }) => selectedSet.has(revision))
+                .map(({ revision, exps }) => (
                 <div
                   key={`${family}:${revision}`}
                   className="overflow-hidden rounded-md border"
-                  style={{ borderColor: 'rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)' }}
+                  style={{ borderColor: 'rgba(255,255,255,0.12)', background: 'rgba(0,0,0,0.78)' }}
                 >
                   <div className="flex items-center gap-2 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: C.fg2 }}>
-                    Revision {revision}
                     <button
                       type="button"
                       className="inline-flex size-6 items-center justify-center rounded border border-white/20"
@@ -1305,6 +1336,7 @@ export function WireframeExperimentsPage() {
                     >
                       {selectedSet.has(revision) ? <Eye size={12} color={C.fg3} /> : <EyeOff size={12} color={C.red} />}
                     </button>
+                    Revision {revision}
                   </div>
                   <div className="overflow-x-auto">
                     <table className="w-full table-auto border-collapse">
@@ -1320,7 +1352,7 @@ export function WireframeExperimentsPage() {
                           </HeaderInfoCell>
                           <HeaderInfoCell
                             label="Outcome"
-                            className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
                             onOpen={setColumnTooltip}
                             onClose={() => setColumnTooltip(null)}
                           >
@@ -1336,7 +1368,7 @@ export function WireframeExperimentsPage() {
                           </HeaderInfoCell>
                           <HeaderInfoCell
                             label="Trust"
-                            className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
                             onOpen={setColumnTooltip}
                             onClose={() => setColumnTooltip(null)}
                           >
@@ -1344,7 +1376,7 @@ export function WireframeExperimentsPage() {
                           </HeaderInfoCell>
                           <HeaderInfoCell
                             label="Run"
-                            className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
                             onOpen={setColumnTooltip}
                             onClose={() => setColumnTooltip(null)}
                           >
@@ -1397,7 +1429,7 @@ export function WireframeExperimentsPage() {
                                 onClick={() => toggleExpanded(experimentKey)}
                               >
                                 <td className="max-w-52 px-2.5 py-2">
-                                  <div className="flex items-center gap-1 truncate text-xs" style={{ color: C.fg4 }} title={exp.agent_spec}>
+                                  <div className="flex items-center gap-2 truncate text-xs" style={{ color: C.fg4 }} title={exp.agent_spec}>
                                     <ChevronRight
                                       className="size-3 shrink-0 transition-transform"
                                       style={{ color: C.fg1, transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
@@ -1421,7 +1453,7 @@ export function WireframeExperimentsPage() {
                                     ) : null}
                                   </div>
                                 </td>
-                                <td className="w-16 px-2.5 py-2">
+                                <td className="w-20 px-2.5 py-2">
                                   <div className="flex items-center justify-center">
                                     <ScoreRing
                                       id={`${experimentKey}-outcome`}
@@ -1457,7 +1489,7 @@ export function WireframeExperimentsPage() {
                                     />
                                   </div>
                                 </td>
-                                <td className="w-16 px-2.5 py-2">
+                                <td className="w-20 px-2.5 py-2">
                                   <div className="flex items-center justify-center">
                                     <ScoreRing
                                       id={`${experimentKey}-sample-quality`}
@@ -1476,7 +1508,7 @@ export function WireframeExperimentsPage() {
                                     />
                                   </div>
                                 </td>
-                                <td className="w-16 px-2.5 py-2">
+                                <td className="w-20 px-2.5 py-2">
                                   <div className="flex items-center justify-center">
                                     <ScoreRing
                                       id={`${experimentKey}-run`}
@@ -1538,6 +1570,11 @@ export function WireframeExperimentsPage() {
                   </div>
                 </div>
               ))}
+              <div className="grid items-start gap-3 xl:grid-cols-2">
+                <TradeoffScatter runs={familyRuns} />
+                <FailurePatterns runs={familyRuns} />
+              </div>
+              <RevisionMovement experiments={allFamilyExps} diffs={familyDiffs} />
           </div>
         </section>
       );
