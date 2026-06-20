@@ -1256,8 +1256,8 @@ export function WireframeExperimentsPage() {
               className="h-7 min-w-[250px] rounded-md px-2 py-1 text-xs"
               style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
             >
-              <option value="most_recent">scenario with most recent data</option>
-              <option value="revision_improvement">scenario by latest revision improvement (delivery)</option>
+              <option value="most_recent">latest data</option>
+              <option value="revision_improvement">delivery score</option>
             </select>
           </div>
         </div>
