@@ -283,7 +283,12 @@ function serveStatic(res, url) {
     res.writeHead(503, { 'content-type': 'text/plain' });
     return res.end('review-surface app not built; run: cd review-surface && npm install && npm run build');
   }
-  res.writeHead(200, { 'content-type': MIME[path.extname(target)] ?? 'application/octet-stream' });
+  res.writeHead(200, {
+    'content-type': MIME[path.extname(target)] ?? 'application/octet-stream',
+    'cache-control': 'no-cache, no-store, must-revalidate',
+    pragma: 'no-cache',
+    expires: '0',
+  });
   res.end(fs.readFileSync(target));
 }
 

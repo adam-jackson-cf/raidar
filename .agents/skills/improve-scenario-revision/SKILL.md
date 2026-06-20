@@ -1,6 +1,6 @@
 ---
 name: "improve-scenario-revision"
-description: "Improve one scenario revision at a time from run evidence. USE WHEN you need to create the next comparable scenario revision."
+description: "USE WHEN you need to iterate on a scenario revision."
 ---
 
 # Workflow

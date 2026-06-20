@@ -1,6 +1,6 @@
 ---
 name: "python-conventions"
-description: "Guide Python naming, package structure, and code-object choices. USE WHEN writing or refactoring Python code."
+description: "USE WHEN writing or refactoring Python code."
 ---
 
 # Guidance

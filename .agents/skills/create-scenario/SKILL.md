@@ -1,6 +1,6 @@
 ---
 name: "create-scenario"
-description: "Create reusable scenario baselines with stable scoring contracts. USE WHEN you need to author a new benchmark scenario baseline."
+description: "USE WHEN you need to author a new experiment scenario."
 ---
 
 # Workflow

@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router-dom';
 import { ExperimentsPage } from '@/pages/ExperimentsPage';
 import { RunsPage } from '@/pages/RunsPage';
+import { WireframeExperimentsPage } from '@/pages/WireframeExperimentsPage';
 import { C } from '@/utils/colors';
 
 function Layout() {
@@ -51,6 +52,7 @@ export function AppRouter() {
           <Route path="/" element={<ExperimentsPage />} />
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/:runId" element={<RunsPage />} />
+          <Route path="wireframe" element={<WireframeExperimentsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
