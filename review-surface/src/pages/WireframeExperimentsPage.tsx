@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type FocusEvent, type MouseEvent, type ReactNode, type WheelEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Pin, PinOff, Trophy } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, Pin, PinOff, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
@@ -643,6 +643,27 @@ function findingPanelKey(experimentKey: string, kind: FindingKind) {
   return `${experimentKey}:${kind}`;
 }
 
+type RevisionFilterMap = Record<string, string[]>;
+
+function formatFamilyMenuLabel(allSelected: boolean, families: string[]) {
+  if (allSelected) return 'all scenarios';
+  if (families.length === 1) return families[0];
+  if (families.length > 0) return `${families.length} scenarios`;
+  return 'all scenarios';
+}
+
+function formatRevisionMenuLabel(allSelected: boolean, revisions: string[], hasHidden: boolean) {
+  if (allSelected) return 'all revisions';
+  if (revisions.length === 0) return 'no revisions';
+  if (!hasHidden) return `revision ${revisions[0]}`;
+  if (revisions.length === 1) return `revision ${revisions[0]}`;
+  return `${revisions.length} revisions`;
+}
+
+function findMissingRevisionLabel(revisions: string[], selected: string[]) {
+  return revisions.some((revision) => !selected.includes(revision));
+}
+
 function experimentRowKey(exp: ExperimentRecord) {
   return `${exp.experiment_id}|${compactSpec(exp.agent_spec)}|${exp.revision ?? ''}`;
 }
@@ -720,13 +741,16 @@ export function WireframeExperimentsPage() {
   const query = useQuery({ queryKey: ['experiments'], queryFn: api.experiments });
   const runsQuery = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const [scenarioFilter, setScenarioFilter] = useState('');
-  const [selectedFamily, setSelectedFamily] = useState('all scenarios');
+  const [selectedFamilies, setSelectedFamilies] = useState<string[]>(['__all_scenarios__']);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [openFamilyMenu, setOpenFamilyMenu] = useState(false);
+  const [openRevisionMenu, setOpenRevisionMenu] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<HoverPayload | null>(null);
   const [columnTooltip, setColumnTooltip] = useState<HoverPayload | null>(null);
   const [pinnedTooltips, setPinnedTooltips] = useState<HoverPayload[]>([]);
   const [findingPanel, setFindingPanel] = useState<FindingPanelState | null>(null);
   const [pinnedFindingPanels, setPinnedFindingPanels] = useState<FindingPanelState[]>([]);
+  const [selectedRevisions, setSelectedRevisions] = useState<RevisionFilterMap>({});
 
   useEffect(() => {
     if (!findingPanel?.pinned) return;
@@ -865,25 +889,106 @@ export function WireframeExperimentsPage() {
   };
 
   const families = useMemo(() => {
-    const groups = new Map<string, ExperimentRecord[]>();
-    const experiments = query.data?.experiments ?? [];
-    for (const exp of experiments) {
+    const groups = new Map<string, Map<string, ExperimentRecord[]>>();
+    for (const exp of query.data?.experiments ?? []) {
       const family = exp.scenario ?? 'unknown';
-      const list = groups.get(family) ?? [];
+      const revision = exp.revision ?? 'unknown';
+      const revisions = groups.get(family) ?? new Map<string, ExperimentRecord[]>();
+      const list = revisions.get(revision) ?? [];
       list.push(exp);
-      groups.set(family, list);
+      revisions.set(revision, list);
+      groups.set(family, revisions);
     }
-    const familyEntries = [...groups.entries()].sort(([a], [b]) => a.localeCompare(b));
-    return familyEntries.map(([family, exps]) => ({ family, exps: exps.sort((a, b) => (b.revision ?? '').localeCompare(a.revision ?? '')) }));
+    return [...groups.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([family, revisionMap]) => ({
+        family,
+        revisions: [...revisionMap.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([revision, exps]) => ({ revision, exps: exps.sort((a, b) => (b.revision ?? '').localeCompare(a.revision ?? '')) })),
+      }));
   }, [query.data]);
 
-  const familyNames = useMemo(() => ['all scenarios', ...families.map((f) => f.family)], [families]);
+  const getLatestRevision = (revisions: Array<{ revision: string }>) => {
+    if (revisions.length === 0) return 'unknown';
+    const sorted = [...revisions].sort((a, b) => a.revision.localeCompare(b.revision));
+    return sorted.at(-1)?.revision ?? 'unknown';
+  };
+
+  useEffect(() => {
+    setSelectedRevisions((current) => {
+      const next = { ...current };
+      let changed = false;
+
+      for (const { family, revisions } of families) {
+        const revisionIds = revisions.map((revision) => revision.revision);
+        const validCurrent = next[family]?.filter((revision) => revisionIds.includes(revision));
+        if (validCurrent && validCurrent.length > 0) {
+          next[family] = validCurrent;
+        } else {
+          next[family] = [getLatestRevision(revisions)];
+          changed = true;
+        }
+      }
+
+      for (const currentFamily of Object.keys(next)) {
+        if (!families.some((entry) => entry.family === currentFamily)) {
+          delete next[currentFamily];
+          changed = true;
+        }
+      }
+
+      if (!changed && families.every((entry) => next[entry.family] != null)) {
+        return current;
+      }
+
+      return next;
+    });
+  }, [families]);
+
+  const toggleRevisionVisibility = (family: string, revision: string) => {
+    setSelectedRevisions((current) => {
+      const revisions = current[family] ?? [getLatestRevision(families.find((entry) => entry.family === family)?.revisions ?? [])];
+      if (revisions.includes(revision)) {
+        return { ...current, [family]: revisions.filter((entry) => entry !== revision) };
+      }
+      return { ...current, [family]: [...revisions, revision] };
+    });
+  };
+
+  const showAllRevisionsForFamily = (family: string) => {
+    const revisionIds = families.find((entry) => entry.family === family)?.revisions ?? [];
+    setSelectedRevisions((current) => ({ ...current, [family]: revisionIds.map((revision) => revision.revision) }));
+  };
+
+  useEffect(() => {
+    setSelectedFamilies((current) => {
+      const available = families.map((entry) => entry.family);
+      const allToken = '__all_scenarios__';
+      if (current.includes(allToken)) {
+        return [allToken];
+      }
+
+      const next = current.filter((family) => available.includes(family));
+      if (next.length === 0) {
+        return [];
+      }
+      if (next.length === current.length && next.every((family) => current.includes(family))) {
+        return current;
+      }
+      return next;
+    });
+  }, [families]);
+
   const filteredFamilies = useMemo(() => {
     const search = scenarioFilter.trim().toLowerCase();
+    const familySelection = selectedFamilies.includes('__all_scenarios__') || selectedFamilies.length === 0
+      ? null
+      : new Set(selectedFamilies);
     return families
-      .filter(({ family }) => selectedFamily === 'all scenarios' || selectedFamily === family)
+      .filter(({ family }) => (familySelection == null || familySelection.has(family)))
       .filter(({ family }) => !search || family.toLowerCase().includes(search));
-  }, [families, selectedFamily, scenarioFilter]);
+  }, [families, selectedFamilies, scenarioFilter]);
 
   const rankedByFamily = useMemo(() => {
     const map = new Map<string, { winnerId: string; runnerUpId?: string }>();
@@ -905,8 +1010,9 @@ export function WireframeExperimentsPage() {
       return 0;
     };
 
-    for (const { family, exps } of families) {
-      const ranked = exps
+    for (const { family, revisions } of families) {
+      for (const { revision, exps } of revisions) {
+        const ranked = exps
         .map((exp) => {
         const rowKey = experimentRowKey(exp);
         const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
@@ -940,11 +1046,29 @@ export function WireframeExperimentsPage() {
         winnerId: ranked[0].rowKey,
         runnerUpId: ranked[1]?.rowKey,
       });
+      map.set(`${family}::${revision}`, {
+        winnerId: ranked[0].rowKey,
+        runnerUpId: ranked[1]?.rowKey,
+      });
+      }
     }
 
     return map;
   }, [families]);
   const runsById = useMemo(() => new Map((runsQuery.data ?? []).map((run) => [run.id, run])), [runsQuery.data]);
+
+  useEffect(() => {
+    const onPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest('[data-wireframe-menu]')) {
+        setOpenFamilyMenu(false);
+        setOpenRevisionMenu(null);
+      }
+    };
+
+    window.addEventListener('pointerdown', onPointerDown);
+    return () => window.removeEventListener('pointerdown', onPointerDown);
+  }, []);
 
   if (query.isLoading) {
     return <div className="flex h-full items-center justify-center text-xs" style={{ color: C.fg1 }}>Loading experiments…</div>;
@@ -973,19 +1097,65 @@ export function WireframeExperimentsPage() {
     <div className="sb flex h-full flex-col gap-3 overflow-auto p-4">
       <div className="rounded-lg border p-3" style={{ borderColor: C.border, background: C.surface }}>
         <div className="flex flex-wrap gap-2">
-          <select
-            className="rounded-md px-2 py-1 text-xs"
-            style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
-            value={selectedFamily}
-            onChange={(event) => setSelectedFamily(event.target.value)}
-            title="Scenario family scope"
-          >
-            {familyNames.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </select>
+          <div className="relative" data-wireframe-menu>
+                <button
+                  type="button"
+                  className="min-w-56 rounded-md px-2 py-1 text-left text-xs"
+                  style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
+                  onClick={() => setOpenFamilyMenu((open) => !open)}
+                >
+                  {formatFamilyMenuLabel(selectedFamilies.includes('__all_scenarios__'), selectedFamilies.filter((item) => item !== '__all_scenarios__'))}
+                </button>
+                {openFamilyMenu ? (
+              <div className="absolute left-0 top-full z-20 mt-1 min-w-56 rounded-md border border-white/15 bg-black/90 p-2 text-xs" data-wireframe-menu>
+                <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                    <input
+                    type="checkbox"
+                    checked={selectedFamilies.includes('__all_scenarios__')}
+                    onChange={(event) => {
+                      if (event.target.checked) {
+                        setSelectedFamilies(['__all_scenarios__']);
+                      } else {
+                        setSelectedFamilies([]);
+                      }
+                    }}
+                  />
+                  all scenarios
+                </label>
+                {families.map(({ family }) => {
+                  const checked = !selectedFamilies.includes('__all_scenarios__') && selectedFamilies.includes(family);
+                  return (
+                    <label key={family} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                      <input
+                        type="checkbox"
+                        onMouseDown={(event) => event.stopPropagation()}
+                        checked={checked}
+                        onClick={(event) => {
+                          const isSingleSelect = event.ctrlKey || event.metaKey;
+                          const nextChecked = event.currentTarget.checked;
+                          setSelectedFamilies((current) => {
+                            if (nextChecked) {
+                              if (isSingleSelect) {
+                                return [family];
+                              }
+                              const next = [...current.filter((value) => value !== '__all_scenarios__'), family];
+                              return [...new Set(next)];
+                            }
+                            const next = current.filter((value) => value !== family);
+                            if (next.length === 0) {
+                              return ['__all_scenarios__'];
+                            }
+                            return next.includes('__all_scenarios__') ? ['__all_scenarios__'] : next;
+                          });
+                        }}
+                      />
+                      {family}
+                    </label>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
           <input
             className="min-w-56 rounded-md px-2 py-1 text-xs"
             style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
@@ -997,10 +1167,23 @@ export function WireframeExperimentsPage() {
         </div>
       </div>
 
-      {filteredFamilies.map(({ family, exps }) => {
-        const hasSynthetic = exps.some((exp) => exp.synthetic);
+      {filteredFamilies.map(({ family, revisions }) => {
+        const hasSynthetic = revisions.some(({ exps }) => exps.some((exp) => exp.synthetic));
+        const revisionIds = revisions.map((revision) => revision.revision);
+        const selected = selectedRevisions[family] ?? [getLatestRevision(revisions)];
+        const selectedSet = new Set(selected);
+        const hasHiddenRevisions = revisionIds.some((revision) => !selectedSet.has(revision));
         return (
-          <section key={family} className="rounded-lg border" style={{ borderColor: C.border, background: C.surface }}>
+          <section
+            key={family}
+            id={`family-${family}`}
+            className="rounded-lg border"
+            style={{
+              borderColor: C.border,
+              background:
+                'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+            }}
+          >
             <div className="px-3 py-2 border-b" style={{ borderColor: C.border }}>
               <div className="flex items-center gap-2">
                 <div className="text-sm font-medium" style={{ color: C.fg5 }}>
@@ -1019,233 +1202,342 @@ export function WireframeExperimentsPage() {
                   </span>
                 ) : null}
               </div>
-              <div className="text-[11px]" style={{ color: C.fg1 }}>{(exps[0]?.scenario_meta?.description || 'Scenario family').slice(0, 180)}</div>
-            </div>
-          <div className="overflow-x-auto">
-            <table className="w-full table-auto border-collapse">
-              <thead>
-                <tr>
-                  <HeaderInfoCell
-                    label="Agent spec"
-                    className="w-52 px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide"
-                    onOpen={setColumnTooltip}
-                    onClose={() => setColumnTooltip(null)}
+              <div className="text-[11px]" style={{ color: C.fg1 }}>
+                {(revisions[0]?.exps[0]?.scenario_meta?.description || 'Scenario family').slice(0, 180)}
+              </div>
+              <div className="mt-2 flex items-center gap-2">
+                <div className="relative" data-wireframe-menu>
+                  <button
+                    type="button"
+                    className="min-w-60 rounded-md px-2 py-1 text-left text-xs"
+                    style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+                    onClick={() => setOpenRevisionMenu((current) => (current === family ? null : family))}
                   >
-                    Agent spec
-                  </HeaderInfoCell>
-                  <HeaderInfoCell
-                    label="Outcome"
-                    className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
-                    onOpen={setColumnTooltip}
-                    onClose={() => setColumnTooltip(null)}
-                  >
-                    Outcome
-                  </HeaderInfoCell>
-                  <HeaderInfoCell
-                    label="Stability"
-                    className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
-                    onOpen={setColumnTooltip}
-                    onClose={() => setColumnTooltip(null)}
-                  >
-                    Stability
-                  </HeaderInfoCell>
-                  <HeaderInfoCell
-                    label="Trust"
-                    className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
-                    onOpen={setColumnTooltip}
-                    onClose={() => setColumnTooltip(null)}
-                  >
-                    Trust
-                  </HeaderInfoCell>
-                  <HeaderInfoCell
-                    label="Run"
-                    className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
-                    onOpen={setColumnTooltip}
-                    onClose={() => setColumnTooltip(null)}
-                  >
-                    run
-                  </HeaderInfoCell>
-                  <HeaderInfoCell
-                    label="Findings"
-                    className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide"
-                    onOpen={setColumnTooltip}
-                    onClose={() => setColumnTooltip(null)}
-                  >
-                    Findings
-                  </HeaderInfoCell>
-                </tr>
-              </thead>
-              <tbody>
-                {exps.map((exp) => {
-                  const experimentKey = experimentRowKey(exp);
-                  const ranking = rankedByFamily.get(family);
-                  const isWinner = ranking?.winnerId === experimentKey;
-                  const isRunnerUp =
-                    ranking?.runnerUpId === experimentKey && ranking?.winnerId !== ranking?.runnerUpId;
-                  const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
-                  const compact = compactSpec(exp.agent_spec);
-                  const deliveryColor = deliveryRingColor(composite);
-                  const stddev = exp.aggregate.composite_score?.stddev ?? null;
-                  const repeatScore = repeatabilityValue(stddev);
-                  const repeatColor = repeatabilityRingColor(stddev);
-                  const scoredRuns = exp.aggregate.run_count_scored ?? 0;
-                  const totalRuns = exp.aggregate.run_count_total ?? 0;
-                  const confidence = confidenceScore(scoredRuns, totalRuns);
-                  const confidenceColor = confidenceRingColor(exp.sample);
-                  const isExpanded = expandedRows.has(experimentKey);
-                  return (
-                    <Fragment key={experimentKey}>
-                        <tr
-                          className="cursor-pointer border-b transition hover:bg-white/[0.03]"
-                        style={{
-                          borderColor: 'rgba(255,255,255,0.05)',
-                          background: isExpanded ? 'rgba(255,255,255,0.015)' : 'transparent',
-                          borderLeft: isWinner ? `3px solid ${C.orange}` : isRunnerUp ? `3px solid ${C.fg1}` : '3px solid transparent',
-                        }}
-                        onClick={() => toggleExpanded(experimentKey)}
-                      >
-                        <td className="max-w-52 px-2.5 py-2">
-                          <div className="flex items-center gap-1 truncate text-xs" style={{ color: C.fg4 }} title={exp.agent_spec}>
-                            <ChevronRight
-                              className="size-3 shrink-0 transition-transform"
-                              style={{ color: C.fg1, transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                    {formatRevisionMenuLabel(
+                      selectedSet.size === revisionIds.length,
+                      selected,
+                      hasHiddenRevisions,
+                    )}
+                  </button>
+                  {openRevisionMenu === family ? (
+                    <div className="absolute left-0 top-full z-20 mt-1 min-w-60 rounded-md border border-white/15 bg-black/90 p-2 text-xs" data-wireframe-menu>
+                      <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                            <input
+                              type="checkbox"
+                              checked={selectedSet.size === revisionIds.length}
+                              onChange={(event) => {
+                                setSelectedRevisions((current) => {
+                                  const next = { ...current };
+                                  if (event.target.checked) {
+                                    next[family] = revisionIds;
+                                  } else {
+                                    next[family] = [];
+                                  }
+                                  return next;
+                                });
+                              }}
                             />
-                            <span className="truncate">{compact}</span>
-                            {isWinner ? (
-                              <Trophy
-                                className="shrink-0"
-                                size={15}
-                                style={{ color: C.orange }}
-                                aria-label="Top scoring experiment in scenario"
-                              />
-                            ) : null}
-                            {isRunnerUp ? (
-                              <Trophy
-                                className="shrink-0"
-                                size={15}
-                                style={{ color: '#C0C0C0' }}
-                                aria-label="Runner-up experiment in scenario"
-                              />
-                            ) : null}
-                          </div>
-                          <div className="ml-3 truncate text-[10px] text-gray-400" title={exp.agent_spec}>
-                            {exp.revision && `rev ${exp.revision}`}
-                          </div>
-                        </td>
-                        <td className="w-16 px-2.5 py-2">
-                          <div className="flex items-center justify-center">
-                            <ScoreRing
-                              id={`${experimentKey}-outcome`}
-                              score={composite}
-                              title="Outcome score"
-                              ringColor={deliveryColor}
-                              tooltip={[
-                                `mean: ${composite == null ? '—' : composite.toFixed(3)}`,
-                                `runs scored: ${exp.aggregate.run_count_scored ?? 0}/${exp.aggregate.run_count_total ?? 0}`,
-                                statString(exp.aggregate.composite_score),
-                              ]}
-                              hover={setTooltip}
-                              onMove={(next) => setTooltip(next)}
-                              onPin={pinTooltip}
-                            />
-                          </div>
-                        </td>
-                        <td className="w-20 px-2.5 py-2">
-                          <div className="flex items-center justify-center">
-                            <ScoreRing
-                              id={`${experimentKey}-stability`}
-                              score={repeatScore}
-                              title="Stability"
-                              ringColor={repeatColor}
-                              tooltip={[
-                                `stddev: ${exp.aggregate.composite_score?.stddev?.toFixed(3) ?? '—'}`,
-                                `repeat score: ${repeatScore == null ? '—' : repeatScore.toFixed(2)}`,
-                                `scored runs: ${exp.aggregate.run_count_scored ?? 0}`,
-                              ]}
-                              hover={setTooltip}
-                              onMove={(next) => setTooltip(next)}
-                              onPin={pinTooltip}
-                            />
-                          </div>
-                        </td>
-                        <td className="w-16 px-2.5 py-2">
-                          <div className="flex items-center justify-center">
-                            <ScoreRing
-                              id={`${experimentKey}-sample-quality`}
-                              score={confidence}
-                              title="Trust"
-                              ringColor={confidenceColor}
-                              tooltip={[
-                                `preferred met: ${exp.sample.preferred_met ? 'true' : 'false'}`,
-                                `minimum met: ${exp.sample.minimum_met ? 'true' : 'false'}`,
-                                `scored ratio: ${totalRuns > 0 ? `${(confidence * 100).toFixed(0)}%` : '—'}`,
-                                `unscored: ${exp.aggregate.unscored_count ?? 0}`,
-                              ]}
-                              hover={setTooltip}
-                              onMove={(next) => setTooltip(next)}
-                              onPin={pinTooltip}
-                            />
-                          </div>
-                        </td>
-                        <td className="w-16 px-2.5 py-2">
-                          <div className="flex items-center justify-center">
-                            <ScoreRing
-                              id={`${experimentKey}-run`}
-                              score={totalRuns > 0 ? scoredRuns / totalRuns : 0}
-                              title="Run"
-                              ringColor={runCoverageColor(scoredRuns, totalRuns)}
-                              tooltip={[
-                                `valid runs: ${scoredRuns}`,
-                                `total runs: ${totalRuns}`,
-                                `coverage: ${totalRuns > 0 ? `${Math.round((scoredRuns / totalRuns) * 100)}%` : '—'}`,
-                              ]}
-                              hover={setTooltip}
-                              onMove={(next) => setTooltip(next)}
-                              onPin={pinTooltip}
-                            />
-                          </div>
-                        </td>
-                          <td
-                          className="px-2.5 py-2"
-                          onMouseLeave={() => closeFindingPanel(experimentKey)}
-                          style={{ color: C.fg1 }}
-                        >
-                          {(() => {
-                            const clusters = clusterFindings(exp.findings);
+                            all revisions
+                          </label>
+                          {revisionIds.map((revision) => {
+                            const revisionChecked = selectedSet.has(revision);
                             return (
-                              <div className="flex items-center justify-start gap-3">
-                                {clusters.length === 0 && <span className="text-[10px]" style={{ color: C.fg0 }}>No findings</span>}
-                                {clusters.map(({ kind, findings }) => (
-                                  <FindingClusterBadge
-                                    key={`${experimentKey}-${kind}`}
-                                    kind={kind}
-                                    findings={findings}
-                                    onOpen={(event, groupFindings, groupKind) => {
-                                      openFindingPanel(event, experimentKey, groupFindings, groupKind);
-                                    }}
-                                    onClose={() => closeFindingPanel(experimentKey, kind)}
-                                    onPin={(event, groupFindings, groupKind) => {
-                                      openPinnedFindingPanel(event, experimentKey, groupFindings, groupKind);
-                                    }}
-                                  />
-                                ))}
-                              </div>
+                              <label key={`${family}-revision-${revision}`} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                                <input
+                        type="checkbox"
+                        onMouseDown={(event) => event.stopPropagation()}
+                        checked={revisionChecked}
+                        onClick={(event) => {
+                          const isSingleSelect = event.ctrlKey || event.metaKey;
+                          const nextChecked = event.currentTarget.checked;
+                          setSelectedRevisions((current) => {
+                            const currentSelected = current[family] ?? [getLatestRevision(families.find((entry) => entry.family === family)?.revisions ?? [])];
+                            if (nextChecked) {
+                              if (isSingleSelect) {
+                                return { ...current, [family]: [revision] };
+                              }
+                                        return { ...current, [family]: Array.from(new Set([...currentSelected, revision])) };
+                                      }
+                                      const next = currentSelected.filter((value) => value !== revision);
+                                      return { ...current, [family]: next };
+                                    });
+                                  }}
+                                />
+                                revision {revision}
+                              </label>
                             );
-                          })()}
-                        </td>
-                      </tr>
-                      {isExpanded ? (
-                        <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-                          <td colSpan={6} className="p-0">
-                            <WireframeExperimentExpansion exp={exp} />
-                          </td>
+                          })}
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className="inline-flex size-7 items-center justify-center rounded border border-white/20"
+                  onClick={() => {
+                    if (hasHiddenRevisions) {
+                      showAllRevisionsForFamily(family);
+                    }
+                  }}
+                  aria-label={hasHiddenRevisions ? 'Show all revision tables' : 'All revision tables visible'}
+                  title={hasHiddenRevisions ? 'Show all revision tables' : 'All revision tables already visible'}
+                >
+                  {hasHiddenRevisions ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
+                </button>
+              </div>
+            </div>
+          <div className="space-y-3 px-2 pb-2 pt-3">
+            {revisions
+              .filter(({ revision }) => selectedSet.has(revision))
+              .map(({ revision, exps }) => (
+                <div
+                  key={`${family}:${revision}`}
+                  className="overflow-hidden rounded-md border"
+                  style={{ borderColor: 'rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.02)' }}
+                >
+                  <div className="flex items-center gap-2 px-2.5 py-2 text-[11px] font-semibold uppercase tracking-wide" style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: C.fg2 }}>
+                    Revision {revision}
+                    <button
+                      type="button"
+                      className="inline-flex size-6 items-center justify-center rounded border border-white/20"
+                      onClick={() => toggleRevisionVisibility(family, revision)}
+                      title={selectedSet.has(revision) ? 'Hide this revision table' : 'Show this revision table'}
+                      aria-label={selectedSet.has(revision) ? `Hide revision ${revision} table` : `Show revision ${revision} table`}
+                    >
+                      {selectedSet.has(revision) ? <Eye size={12} color={C.fg3} /> : <EyeOff size={12} color={C.red} />}
+                    </button>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full table-auto border-collapse">
+                      <thead>
+                        <tr>
+                          <HeaderInfoCell
+                            label="Agent spec"
+                            className="w-52 px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide"
+                            onOpen={setColumnTooltip}
+                            onClose={() => setColumnTooltip(null)}
+                          >
+                            Agent spec
+                          </HeaderInfoCell>
+                          <HeaderInfoCell
+                            label="Outcome"
+                            className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            onOpen={setColumnTooltip}
+                            onClose={() => setColumnTooltip(null)}
+                          >
+                            Outcome
+                          </HeaderInfoCell>
+                          <HeaderInfoCell
+                            label="Stability"
+                            className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            onOpen={setColumnTooltip}
+                            onClose={() => setColumnTooltip(null)}
+                          >
+                            Stability
+                          </HeaderInfoCell>
+                          <HeaderInfoCell
+                            label="Trust"
+                            className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            onOpen={setColumnTooltip}
+                            onClose={() => setColumnTooltip(null)}
+                          >
+                            Trust
+                          </HeaderInfoCell>
+                          <HeaderInfoCell
+                            label="Run"
+                            className="w-16 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide"
+                            onOpen={setColumnTooltip}
+                            onClose={() => setColumnTooltip(null)}
+                          >
+                            run
+                          </HeaderInfoCell>
+                          <HeaderInfoCell
+                            label="Findings"
+                            className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide"
+                            onOpen={setColumnTooltip}
+                            onClose={() => setColumnTooltip(null)}
+                          >
+                            Findings
+                          </HeaderInfoCell>
                         </tr>
-                      ) : null}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-            </table>
+                      </thead>
+                      <tbody>
+                        {exps.map((exp) => {
+                          const experimentKey = experimentRowKey(exp);
+                          const revisionRanking = rankedByFamily.get(`${family}::${revision}`);
+                          const isWinner = revisionRanking?.winnerId === experimentKey;
+                          const isRunnerUp =
+                            revisionRanking?.runnerUpId === experimentKey && revisionRanking?.winnerId !== revisionRanking?.runnerUpId;
+                          const composite = findabilityScore(
+                            exp.aggregate.composite_score?.mean,
+                            exp.aggregate.quality_score?.mean,
+                          );
+                          const compact = compactSpec(exp.agent_spec);
+                          const deliveryColor = deliveryRingColor(composite);
+                          const stddev = exp.aggregate.composite_score?.stddev ?? null;
+                          const repeatScore = repeatabilityValue(stddev);
+                          const repeatColor = repeatabilityRingColor(stddev);
+                          const scoredRuns = exp.aggregate.run_count_scored ?? 0;
+                          const totalRuns = exp.aggregate.run_count_total ?? 0;
+                          const confidence = confidenceScore(scoredRuns, totalRuns);
+                          const confidenceColor = confidenceRingColor(exp.sample);
+                          const isExpanded = expandedRows.has(experimentKey);
+                          return (
+                            <Fragment key={experimentKey}>
+                              <tr
+                                className="cursor-pointer border-b transition hover:bg-white/[0.03]"
+                                style={{
+                                  borderColor: 'rgba(255,255,255,0.05)',
+                                  background: isExpanded ? 'rgba(255,255,255,0.015)' : 'transparent',
+                                  borderLeft: isWinner
+                                    ? `3px solid ${C.orange}`
+                                    : isRunnerUp
+                                      ? `3px solid ${C.fg1}`
+                                      : '3px solid transparent',
+                                }}
+                                onClick={() => toggleExpanded(experimentKey)}
+                              >
+                                <td className="max-w-52 px-2.5 py-2">
+                                  <div className="flex items-center gap-1 truncate text-xs" style={{ color: C.fg4 }} title={exp.agent_spec}>
+                                    <ChevronRight
+                                      className="size-3 shrink-0 transition-transform"
+                                      style={{ color: C.fg1, transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)' }}
+                                    />
+                                    <span className="truncate">{compact}</span>
+                                    {isWinner ? (
+                                      <Trophy
+                                        className="shrink-0"
+                                        size={15}
+                                        style={{ color: C.orange }}
+                                        aria-label="Top scoring experiment in scenario revision"
+                                      />
+                                    ) : null}
+                                    {isRunnerUp ? (
+                                      <Trophy
+                                        className="shrink-0"
+                                        size={15}
+                                        style={{ color: '#C0C0C0' }}
+                                        aria-label="Runner-up experiment in scenario revision"
+                                      />
+                                    ) : null}
+                                  </div>
+                                </td>
+                                <td className="w-16 px-2.5 py-2">
+                                  <div className="flex items-center justify-center">
+                                    <ScoreRing
+                                      id={`${experimentKey}-outcome`}
+                                      score={composite}
+                                      title="Outcome score"
+                                      ringColor={deliveryColor}
+                                      tooltip={[
+                                        `mean: ${composite == null ? '—' : composite.toFixed(3)}`,
+                                        `runs scored: ${exp.aggregate.run_count_scored ?? 0}/${exp.aggregate.run_count_total ?? 0}`,
+                                        statString(exp.aggregate.composite_score),
+                                      ]}
+                                      hover={setTooltip}
+                                      onMove={(next) => setTooltip(next)}
+                                      onPin={pinTooltip}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="w-20 px-2.5 py-2">
+                                  <div className="flex items-center justify-center">
+                                    <ScoreRing
+                                      id={`${experimentKey}-stability`}
+                                      score={repeatScore}
+                                      title="Stability"
+                                      ringColor={repeatColor}
+                                      tooltip={[
+                                        `stddev: ${exp.aggregate.composite_score?.stddev?.toFixed(3) ?? '—'}`,
+                                        `repeat score: ${repeatScore == null ? '—' : repeatScore.toFixed(2)}`,
+                                        `scored runs: ${exp.aggregate.run_count_scored ?? 0}`,
+                                      ]}
+                                      hover={setTooltip}
+                                      onMove={(next) => setTooltip(next)}
+                                      onPin={pinTooltip}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="w-16 px-2.5 py-2">
+                                  <div className="flex items-center justify-center">
+                                    <ScoreRing
+                                      id={`${experimentKey}-sample-quality`}
+                                      score={confidence}
+                                      title="Trust"
+                                      ringColor={confidenceColor}
+                                      tooltip={[
+                                        `preferred met: ${exp.sample.preferred_met ? 'true' : 'false'}`,
+                                        `minimum met: ${exp.sample.minimum_met ? 'true' : 'false'}`,
+                                        `scored ratio: ${totalRuns > 0 ? `${(confidence * 100).toFixed(0)}%` : '—'}`,
+                                        `unscored: ${exp.aggregate.unscored_count ?? 0}`,
+                                      ]}
+                                      hover={setTooltip}
+                                      onMove={(next) => setTooltip(next)}
+                                      onPin={pinTooltip}
+                                    />
+                                  </div>
+                                </td>
+                                <td className="w-16 px-2.5 py-2">
+                                  <div className="flex items-center justify-center">
+                                    <ScoreRing
+                                      id={`${experimentKey}-run`}
+                                      score={totalRuns > 0 ? scoredRuns / totalRuns : 0}
+                                      title="Run"
+                                      ringColor={runCoverageColor(scoredRuns, totalRuns)}
+                                      tooltip={[
+                                        `valid runs: ${scoredRuns}`,
+                                        `total runs: ${totalRuns}`,
+                                        `coverage: ${totalRuns > 0 ? `${Math.round((scoredRuns / totalRuns) * 100)}%` : '—'}`,
+                                      ]}
+                                      hover={setTooltip}
+                                      onMove={(next) => setTooltip(next)}
+                                      onPin={pinTooltip}
+                                    />
+                                  </div>
+                                </td>
+                                <td
+                                  className="px-2.5 py-2"
+                                  onMouseLeave={() => closeFindingPanel(experimentKey)}
+                                  style={{ color: C.fg1 }}
+                                >
+                                  {(() => {
+                                    const clusters = clusterFindings(exp.findings);
+                                    return (
+                                      <div className="flex items-center justify-start gap-3">
+                                        {clusters.length === 0 && <span className="text-[10px]" style={{ color: C.fg0 }}>No findings</span>}
+                                        {clusters.map(({ kind, findings }) => (
+                                          <FindingClusterBadge
+                                            key={`${experimentKey}-${kind}`}
+                                            kind={kind}
+                                            findings={findings}
+                                            onOpen={(event, groupFindings, groupKind) => {
+                                              openFindingPanel(event, experimentKey, groupFindings, groupKind);
+                                            }}
+                                            onClose={() => closeFindingPanel(experimentKey, kind)}
+                                            onPin={(event, groupFindings, groupKind) => {
+                                              openPinnedFindingPanel(event, experimentKey, groupFindings, groupKind);
+                                            }}
+                                          />
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+                                </td>
+                              </tr>
+                              {isExpanded ? (
+                                <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                                  <td colSpan={6} className="p-0">
+                                    <WireframeExperimentExpansion exp={exp} />
+                                  </td>
+                                </tr>
+                              ) : null}
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ))}
           </div>
         </section>
       );
