@@ -671,6 +671,27 @@ function experimentRowKey(exp: ExperimentRecord) {
   return `${exp.experiment_id}|${compactSpec(exp.agent_spec)}|${exp.revision ?? ''}`;
 }
 
+function revisionSortValue(revision?: string | null) {
+  if (!revision) return 0;
+  const match = revision.match(/\d+/g);
+  if (!match?.length) return 0;
+  return Number(match.join('')) || 0;
+}
+
+function topDeliveryScore(experiments: ExperimentRecord[]) {
+  let best = -1;
+
+  for (const exp of experiments) {
+    const score = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
+    if (score == null) continue;
+    if (score > best) {
+      best = score;
+    }
+  }
+
+  return best;
+}
+
 function isKnownFindingKind(value: string): value is FindingKind {
   return value === 'issue' || value === 'good' || value === 'note';
 }
@@ -754,6 +775,7 @@ export function WireframeExperimentsPage() {
   const [findingPanel, setFindingPanel] = useState<FindingPanelState | null>(null);
   const [pinnedFindingPanels, setPinnedFindingPanels] = useState<FindingPanelState[]>([]);
   const [selectedRevisions, setSelectedRevisions] = useState<RevisionFilterMap>({});
+  const [scenarioSortMode, setScenarioSortMode] = useState<'most_recent' | 'revision_improvement'>('most_recent');
 
   useEffect(() => {
     if (!findingPanel?.pinned) return;
@@ -988,10 +1010,46 @@ export function WireframeExperimentsPage() {
     const familySelection = selectedFamilies.includes('__all_scenarios__') || selectedFamilies.length === 0
       ? null
       : new Set(selectedFamilies);
-    return families
+    const base = families
       .filter(({ family }) => (familySelection == null || familySelection.has(family)))
       .filter(({ family }) => !search || family.toLowerCase().includes(search));
-  }, [families, selectedFamilies, scenarioFilter]);
+
+    return [...base].sort((left, right) => {
+      if (scenarioSortMode === 'most_recent') {
+        const leftStamp = revisionSortValue(left.revisions.at(-1)?.revision);
+        const rightStamp = revisionSortValue(right.revisions.at(-1)?.revision);
+        if (leftStamp !== rightStamp) {
+          return rightStamp - leftStamp;
+        }
+        return left.family.localeCompare(right.family);
+      }
+
+      const leftRevisions = [...left.revisions].sort((a, b) => revisionSortValue(a.revision) - revisionSortValue(b.revision));
+      const rightRevisions = [...right.revisions].sort((a, b) => revisionSortValue(a.revision) - revisionSortValue(b.revision));
+
+      const leftCurrent = leftRevisions.at(-1);
+      const leftPrevious = leftRevisions.length > 1 ? leftRevisions.at(-2) : undefined;
+      const rightCurrent = rightRevisions.at(-1);
+      const rightPrevious = rightRevisions.length > 1 ? rightRevisions.at(-2) : undefined;
+
+      const leftDelivery = topDeliveryScore(leftCurrent?.exps ?? []);
+      const rightDelivery = topDeliveryScore(rightCurrent?.exps ?? []);
+      const leftPreviousBest = leftPrevious ? topDeliveryScore(leftPrevious.exps) : -1;
+      const rightPreviousBest = rightPrevious ? topDeliveryScore(rightPrevious.exps) : -1;
+
+      const leftImprovement = leftDelivery - leftPreviousBest;
+      const rightImprovement = rightDelivery - rightPreviousBest;
+
+      if (leftImprovement !== rightImprovement) {
+        return rightImprovement - leftImprovement;
+      }
+      if (leftDelivery !== rightDelivery) {
+        return rightDelivery - leftDelivery;
+      }
+
+      return left.family.localeCompare(right.family);
+    });
+  }, [families, selectedFamilies, scenarioFilter, scenarioSortMode]);
 
   const hasHiddenScenarios = useMemo(() => {
     if (selectedFamilies.includes('__all_scenarios__') || selectedFamilies.length === 0) {
@@ -1187,6 +1245,21 @@ export function WireframeExperimentsPage() {
             onChange={(event) => setScenarioFilter(event.target.value)}
             aria-label="Scenario family filter"
           />
+          <div className="ml-auto flex items-center gap-2">
+            <label className="text-xs" style={{ color: C.fg2 }} htmlFor="scenario-sort-mode">
+              Sort:
+            </label>
+            <select
+              id="scenario-sort-mode"
+              value={scenarioSortMode}
+              onChange={(event) => setScenarioSortMode(event.target.value as 'most_recent' | 'revision_improvement')}
+              className="h-7 min-w-[250px] rounded-md px-2 py-1 text-xs"
+              style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+            >
+              <option value="most_recent">scenario with most recent data</option>
+              <option value="revision_improvement">scenario by latest revision improvement (delivery)</option>
+            </select>
+          </div>
         </div>
       </div>
 
