@@ -273,7 +273,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
               </button>
             ))}
           </div>
-          <p className="mt-0.5 text-[10px] leading-tight" style={{ color: C.fg0 }}>
+          <p className="mt-0.5 text-[11px]" style={{ color: C.fg0 }}>
             {activeTab === 'runtime'
               ? 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'
               : 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'}
