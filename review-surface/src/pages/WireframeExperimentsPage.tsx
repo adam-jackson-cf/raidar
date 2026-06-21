@@ -1270,7 +1270,10 @@ export function WireframeExperimentsPage() {
                 const selectedSet = new Set(selected);
                 const hasHiddenRevisions = revisionIds.some((revision) => !selectedSet.has(revision));
                 const allFamilyExps = revisions.flatMap(({ exps }) => exps);
-                const revisionRunIds = new Set(allFamilyExps.flatMap((exp) => exp.run_ids));
+                const visibleFamilyExps = revisions
+                  .filter(({ revision }) => selectedSet.has(revision))
+                  .flatMap(({ exps }) => exps);
+                const revisionRunIds = new Set(visibleFamilyExps.flatMap((exp) => exp.run_ids));
                 const familyRuns = (runsQuery.data ?? []).filter((run) => revisionRunIds.has(run.id));
                 const familyDiffs = (query.data?.revision_diffs ?? []).filter((diff) => diff.scenario === family);
                 return (
