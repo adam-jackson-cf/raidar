@@ -260,11 +260,12 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
               <button
                 key={tab}
                 type="button"
+                aria-pressed={activeTab === tab}
                 className="rounded-md px-2 py-1 text-xs font-medium transition hover:bg-white/5"
                 style={{
-                  color: activeTab === tab ? C.fg4 : C.fg1,
-                  background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'transparent',
-                  border: `1px solid ${activeTab === tab ? C.selectedBorder : 'transparent'}`,
+                  color: activeTab === tab ? C.fg4 : C.fg2,
+                  background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.025)',
+                  border: `1px solid ${activeTab === tab ? C.selectedBorder : C.border}`,
                 }}
                 onClick={() => setActiveTab(tab as 'runtime' | 'tokens')}
               >
