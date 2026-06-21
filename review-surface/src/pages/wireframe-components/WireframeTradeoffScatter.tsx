@@ -371,7 +371,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
               <button
                 key={model}
                 type="button"
-                className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs transition hover:bg-white/5"
+                className="num inline-flex items-center gap-1 rounded py-0.5 pl-0 pr-1 text-xs transition hover:bg-white/5"
                 style={{ color: C.fg1 }}
                 onMouseEnter={(event) => openTooltip(payloadAt(event))}
                 onMouseMove={(event) => openTooltip(payloadAt(event))}
@@ -383,11 +383,11 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           );
         }) : (
           <>
-            <span className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs" style={{ color: C.fg1 }}>
+            <span className="num inline-flex items-center gap-1 rounded py-0.5 pl-0 pr-1 text-xs" style={{ color: C.fg1 }}>
               <span className="size-2 rounded-sm" style={{ background: TOKEN_COLORS.input }} />
               input
             </span>
-            <span className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs" style={{ color: C.fg1 }}>
+            <span className="num inline-flex items-center gap-1 rounded py-0.5 pl-0 pr-1 text-xs" style={{ color: C.fg1 }}>
               <span className="size-2 rounded-sm" style={{ background: TOKEN_COLORS.output }} />
               output
             </span>
