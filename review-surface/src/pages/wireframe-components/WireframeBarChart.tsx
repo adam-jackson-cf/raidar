@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { C } from '@/utils/colors';
 import { fmtScore, fmtTokens } from '@/utils/helpers';
-import { runLabel } from '@/utils/verdict';
+import { runLabel, scoreTier } from '@/utils/verdict';
 import type { RunRecord } from '@/utils/types';
 
 const WIDTH = 560;
@@ -63,6 +63,18 @@ export function WireframeBarChart({
       ],
     };
   };
+  const outcomePayload = (run: RunRecord, clientX: number, clientY: number): TooltipPayload => ({
+    id: `outcome:${run.id}`,
+    x: clientX,
+    y: clientY,
+    title: 'Outcome',
+    lines: [
+      `agent spec: ${run.agent_spec}`,
+      `run: ${runLabel(run.id)}`,
+      `outcome: ${fmtScore(run.composite_score)}`,
+      run.id,
+    ],
+  });
 
   return (
     <div className="sb overflow-x-auto">
@@ -91,6 +103,13 @@ export function WireframeBarChart({
           const output = run.total_output_tokens ?? 0;
           const inputY = tokenY(input);
           const outputY = tokenY(output);
+          const outcome = Math.max(0, Math.min(1, run.composite_score ?? 0));
+          const ringSize = 12;
+          const ringStroke = 2;
+          const ringRadius = (ringSize - ringStroke) / 2;
+          const ringCircumference = Math.PI * 2 * ringRadius;
+          const ringDash = outcome * ringCircumference;
+          const ringY = HEIGHT - PAD.bottom + 22;
 
           return (
             <g key={run.id}>
@@ -125,9 +144,28 @@ export function WireframeBarChart({
               <text x={centerX} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="7" fill={C.fg0}>
                 {modelLabel(run.agent_spec)}
               </text>
-              <text x={centerX} y={HEIGHT - PAD.bottom + 21} textAnchor="middle" fontSize="7" fill={C.fg0}>
-                {fmtScore(run.composite_score)}
-              </text>
+              <g
+                role="img"
+                aria-label={`Outcome ${fmtScore(run.composite_score)}`}
+                style={{ cursor: 'default' }}
+                onMouseEnter={(event) => onOpenTooltip(outcomePayload(run, event.clientX, event.clientY))}
+                onMouseMove={(event) => onOpenTooltip(outcomePayload(run, event.clientX, event.clientY))}
+                onMouseLeave={onCloseTooltip}
+              >
+                <circle cx={centerX} cy={ringY} r={ringRadius} strokeWidth={ringStroke} fill="none" stroke="rgba(255,255,255,0.16)" />
+                <circle
+                  cx={centerX}
+                  cy={ringY}
+                  r={ringRadius}
+                  fill="none"
+                  stroke={scoreTier(run.composite_score).color}
+                  strokeWidth={ringStroke}
+                  strokeDasharray={`${ringDash} ${Math.max(0, ringCircumference - ringDash)}`}
+                  strokeDashoffset={ringCircumference * 0.25}
+                  strokeLinecap="round"
+                  transform={`rotate(-90 ${centerX} ${ringY})`}
+                />
+              </g>
             </g>
           );
         })}
