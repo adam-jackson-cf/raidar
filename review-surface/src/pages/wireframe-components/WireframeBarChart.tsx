@@ -42,7 +42,8 @@ export function WireframeBarChart({
   );
   const maxTokenAmount = Math.max(...orderedRuns.flatMap((run) => [run.total_input_tokens ?? 0, run.total_output_tokens ?? 0]), 1) * 1.2;
   const chartWidth = Math.max(WIDTH, PAD.left + PAD.right + orderedRuns.length * TOKEN_GROUP_WIDTH);
-  const tokenGroupX = (index: number) => PAD.left + TOKEN_GROUP_WIDTH * index + TOKEN_GROUP_WIDTH / 2;
+  const plotWidth = chartWidth - PAD.left - PAD.right;
+  const tokenGroupX = (index: number) => PAD.left + (plotWidth / (orderedRuns.length + 1)) * (index + 1);
   const tokenY = (tokens: number) => PAD.top + (1 - tokens / maxTokenAmount) * (HEIGHT - PAD.top - PAD.bottom);
   const tokenPayload = (run: RunRecord, kind: 'input' | 'output', clientX: number, clientY: number): TooltipPayload => {
     const input = run.total_input_tokens ?? 0;
