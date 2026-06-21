@@ -5,8 +5,8 @@ import { runLabel, scoreTier } from '@/utils/verdict';
 import type { RunRecord } from '@/utils/types';
 
 const WIDTH = 560;
-const HEIGHT = 220;
-const PAD = { left: 42, right: 14, top: 16, bottom: 42 };
+const HEIGHT = 236;
+const PAD = { left: 42, right: 14, top: 16, bottom: 58 };
 const TOKEN_COLORS = { input: C.cyan, output: C.orange };
 const TOKEN_GROUP_WIDTH = 92;
 
@@ -94,6 +94,9 @@ export function WireframeBarChart({
           const tx = tokenGroupX(index);
           return <line key={`${run.id}-grid`} x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />;
         })}
+        <text x={(chartWidth - PAD.right + PAD.left) / 2} y={HEIGHT - 4} textAnchor="middle" fontSize="8" fill={C.fg0}>
+          Agent (outcome &gt;)
+        </text>
         {orderedRuns.map((run, index) => {
           const centerX = tokenGroupX(index);
           const baseY = HEIGHT - PAD.bottom;
