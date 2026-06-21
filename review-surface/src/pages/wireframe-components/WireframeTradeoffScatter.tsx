@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Info, SlidersHorizontal } from 'lucide-react';
 import { C } from '@/utils/colors';
-import { fmtDuration, fmtScore } from '@/utils/helpers';
+import { fmtDuration, fmtScore, fmtTokens } from '@/utils/helpers';
 import { runLabel } from '@/utils/verdict';
 import type { RunRecord } from '@/utils/types';
 
@@ -10,6 +10,7 @@ const MODEL_COLORS = [C.accent, C.cyan, C.green, C.orange, C.purple, '#F5CE4E', 
 const WIDTH = 560;
 const HEIGHT = 210;
 const PAD = { left: 42, right: 14, top: 16, bottom: 28 };
+const TOKEN_COLORS = { input: C.cyan, output: C.orange };
 
 type TooltipPayload = {
   id: string;
@@ -135,6 +136,10 @@ function durationTickLabel(ms: number) {
   return `${Math.round(ms)}ms`;
 }
 
+function tokenTickLabel(tokens: number) {
+  return fmtTokens(Math.round(tokens));
+}
+
 function titleCase(value: string) {
   return value
     .split(/[^a-z0-9]+/i)
@@ -169,6 +174,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'runtime' | 'tokens'>('runtime');
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedEfforts, setSelectedEfforts] = useState<string[]>([]);
   const filterRef = useRef<HTMLDivElement | null>(null);
@@ -213,10 +219,13 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
 
   const hasChart = points.length >= 1;
   const maxDuration = (hasChart ? Math.max(...points.map((run) => run.duration_ms)) : 1) * 1.2;
+  const maxTokenAmount = (hasChart ? Math.max(...points.flatMap((run) => [run.total_input_tokens ?? 0, run.total_output_tokens ?? 0])) : 1) * 1.2 || 1;
   const attractorMaxX = WIDTH - PAD.right;
   const xTicks = [0.25, 0.5, 0.75, 1];
   const x = (run: RunRecord) => PAD.left + (run.duration_ms / maxDuration) * (WIDTH - PAD.left - PAD.right);
   const y = (run: RunRecord) => PAD.top + (1 - (run.composite_score ?? 0)) * (HEIGHT - PAD.top - PAD.bottom);
+  const outcomeX = (run: RunRecord) => PAD.left + (run.composite_score ?? 0) * (WIDTH - PAD.left - PAD.right);
+  const tokenY = (tokens: number) => PAD.top + (1 - tokens / maxTokenAmount) * (HEIGHT - PAD.top - PAD.bottom);
   const modelColor = (model: string) => MODEL_COLORS[modelLabels.indexOf(model) % MODEL_COLORS.length];
   const openTooltip = (payload: TooltipPayload) => setTooltip(payload);
   const closeTooltip = () => setTooltip(null);
@@ -237,6 +246,25 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
       ],
     };
   };
+  const tokenPayload = (run: RunRecord, kind: 'input' | 'output', clientX: number, clientY: number): TooltipPayload => {
+    const input = run.total_input_tokens ?? 0;
+    const output = run.total_output_tokens ?? 0;
+    return {
+      id: `token:${kind}:${run.id}`,
+      x: clientX,
+      y: clientY,
+      title: `${kind === 'input' ? 'Input' : 'Output'} tokens`,
+      lines: [
+        `agent spec: ${run.agent_spec}`,
+        `run: ${runLabel(run.id)}`,
+        `outcome: ${fmtScore(run.composite_score)}`,
+        `input: ${fmtTokens(input)}`,
+        `output: ${fmtTokens(output)}`,
+        `total: ${fmtTokens(input + output)}`,
+        run.id,
+      ],
+    };
+  };
   const legendPayload = (model: string, specs: string[], clientX: number, clientY: number): TooltipPayload => ({
     id: `legend:${model}`,
     x: clientX,
@@ -249,11 +277,30 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
     <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div className="flex items-start gap-2">
         <div className="min-w-0">
-          <span className="text-xs font-medium" style={{ color: C.fg3 }}>
-            Outcome vs run time
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {[
+              ['runtime', 'Outcome vs runtime'],
+              ['tokens', 'Tokens by outcome'],
+            ].map(([tab, label]) => (
+              <button
+                key={tab}
+                type="button"
+                className="rounded-md px-2 py-1 text-xs font-medium transition hover:bg-white/5"
+                style={{
+                  color: activeTab === tab ? C.fg4 : C.fg1,
+                  background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'transparent',
+                  border: `1px solid ${activeTab === tab ? C.selectedBorder : 'transparent'}`,
+                }}
+                onClick={() => setActiveTab(tab as 'runtime' | 'tokens')}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <p className="mt-0.5 text-[10px] leading-tight" style={{ color: C.fg0 }}>
-            Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.
+            {activeTab === 'runtime'
+              ? 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'
+              : 'Input and output token bars are positioned by outcome score.'}
           </p>
         </div>
         <div ref={filterRef} className="relative ml-auto shrink-0">
@@ -340,7 +387,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
             No matching runs
           </span>
         ) : null}
-        {modelLabels.map((model) => {
+        {activeTab === 'runtime' ? modelLabels.map((model) => {
           const specs = [...new Set(points.filter((run) => reduxModelLabel(run.agent_spec) === model).map((run) => run.agent_spec))];
           const payloadAt = (event: { clientX: number; clientY: number }) => legendPayload(model, specs, event.clientX, event.clientY);
 
@@ -358,9 +405,21 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
                 {model}
               </button>
           );
-        })}
+        }) : (
+          <>
+            <span className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs" style={{ color: C.fg1 }}>
+              <span className="size-2 rounded-sm" style={{ background: TOKEN_COLORS.input }} />
+              input
+            </span>
+            <span className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs" style={{ color: C.fg1 }}>
+              <span className="size-2 rounded-sm" style={{ background: TOKEN_COLORS.output }} />
+              output
+            </span>
+          </>
+        )}
       </div>
       {hasChart ? (
+        activeTab === 'runtime' ? (
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against run duration">
         <polygon
           points={`${PAD.left},${HEIGHT - PAD.bottom - 4} ${attractorMaxX},${PAD.top} ${PAD.left},${PAD.top}`}
@@ -394,7 +453,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           );
         })}
         <text x={(WIDTH - PAD.right + PAD.left) / 2} y={HEIGHT - 3} textAnchor="middle" fontSize="8" fill={C.fg0}>
-          run time {'>'}
+          runtime {'>'}
         </text>
         {points.map((run) => {
           const model = reduxModelLabel(run.agent_spec);
@@ -420,6 +479,81 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           );
         })}
         </svg>
+        ) : (
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Input and output tokens by outcome score">
+        {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+          const ty = PAD.top + (1 - tick) * (HEIGHT - PAD.top - PAD.bottom);
+          return (
+            <g key={tick}>
+              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={ty} y2={ty} stroke="rgba(255,255,255,0.05)" />
+              <text x={PAD.left - 6} y={ty + 3} textAnchor="end" fontSize="8" fill={C.fg0}>
+                {tokenTickLabel(maxTokenAmount * tick)}
+              </text>
+            </g>
+          );
+        })}
+        {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
+          const tx = PAD.left + tick * (WIDTH - PAD.left - PAD.right);
+          return (
+            <g key={tick}>
+              <line x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />
+              <text x={tx} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="8" fill={C.fg0}>
+                {tick.toFixed(2)}
+              </text>
+            </g>
+          );
+        })}
+        <text x={(WIDTH - PAD.right + PAD.left) / 2} y={HEIGHT - 3} textAnchor="middle" fontSize="8" fill={C.fg0}>
+          outcome {'>'}
+        </text>
+        {points.map((run) => {
+          const centerX = outcomeX(run);
+          const baseY = HEIGHT - PAD.bottom;
+          const barWidth = 4.5;
+          const gap = 1.5;
+          const input = run.total_input_tokens ?? 0;
+          const output = run.total_output_tokens ?? 0;
+          const inputY = tokenY(input);
+          const outputY = tokenY(output);
+
+          return (
+            <g key={run.id}>
+              <rect
+                x={centerX - barWidth - gap / 2}
+                y={inputY}
+                width={barWidth}
+                height={Math.max(baseY - inputY, 1)}
+                rx={1}
+                fill={TOKEN_COLORS.input}
+                fillOpacity={0.84}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={(event) => openTooltip(tokenPayload(run, 'input', event.clientX, event.clientY))}
+                onMouseMove={(event) => openTooltip(tokenPayload(run, 'input', event.clientX, event.clientY))}
+                onMouseLeave={closeTooltip}
+                onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
+              />
+              <rect
+                x={centerX + gap / 2}
+                y={outputY}
+                width={barWidth}
+                height={Math.max(baseY - outputY, 1)}
+                rx={1}
+                fill={TOKEN_COLORS.output}
+                fillOpacity={0.84}
+                style={{ cursor: 'pointer' }}
+                onMouseEnter={(event) => openTooltip(tokenPayload(run, 'output', event.clientX, event.clientY))}
+                onMouseMove={(event) => openTooltip(tokenPayload(run, 'output', event.clientX, event.clientY))}
+                onMouseLeave={closeTooltip}
+                onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
+              />
+              <text x={centerX} y={Math.min(inputY, outputY) - 4} textAnchor="middle" fontSize="7" fill={C.fg0}>
+                {reduxModelLabel(run.agent_spec)}
+              </text>
+            </g>
+          );
+        })}
+        </svg>
+        )
       ) : (
         <div className="flex h-40 items-center justify-center rounded-md border text-xs" style={{ borderColor: C.border, color: C.fg1 }}>
           Select at least one matching run to plot this chart.
