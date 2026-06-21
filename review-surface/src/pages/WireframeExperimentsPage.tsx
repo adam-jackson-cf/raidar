@@ -1412,7 +1412,7 @@ export function WireframeExperimentsPage() {
               </div>
             </div>
           <div
-            className="space-y-3 px-2 pb-2 pt-3"
+            className="space-y-3 px-2 py-2"
             style={{
               background:
                 'repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 6px)',
