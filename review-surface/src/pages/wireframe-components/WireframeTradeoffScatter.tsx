@@ -11,6 +11,7 @@ const WIDTH = 560;
 const HEIGHT = 210;
 const PAD = { left: 42, right: 14, top: 16, bottom: 28 };
 const TOKEN_COLORS = { input: C.cyan, output: C.orange };
+const TOKEN_GROUP_WIDTH = 92;
 
 type TooltipPayload = {
   id: string;
@@ -220,11 +221,12 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   const hasChart = points.length >= 1;
   const maxDuration = (hasChart ? Math.max(...points.map((run) => run.duration_ms)) : 1) * 1.2;
   const maxTokenAmount = (hasChart ? Math.max(...points.flatMap((run) => [run.total_input_tokens ?? 0, run.total_output_tokens ?? 0])) : 1) * 1.2 || 1;
+  const tokenChartWidth = Math.max(WIDTH, PAD.left + PAD.right + points.length * TOKEN_GROUP_WIDTH);
   const attractorMaxX = WIDTH - PAD.right;
   const xTicks = [0.25, 0.5, 0.75, 1];
   const x = (run: RunRecord) => PAD.left + (run.duration_ms / maxDuration) * (WIDTH - PAD.left - PAD.right);
   const y = (run: RunRecord) => PAD.top + (1 - (run.composite_score ?? 0)) * (HEIGHT - PAD.top - PAD.bottom);
-  const outcomeX = (run: RunRecord) => PAD.left + (run.composite_score ?? 0) * (WIDTH - PAD.left - PAD.right);
+  const tokenGroupX = (index: number) => PAD.left + TOKEN_GROUP_WIDTH * index + TOKEN_GROUP_WIDTH / 2;
   const tokenY = (tokens: number) => PAD.top + (1 - tokens / maxTokenAmount) * (HEIGHT - PAD.top - PAD.bottom);
   const modelColor = (model: string) => MODEL_COLORS[modelLabels.indexOf(model) % MODEL_COLORS.length];
   const openTooltip = (payload: TooltipPayload) => setTooltip(payload);
@@ -280,7 +282,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           <div className="flex flex-wrap items-center gap-1.5">
             {[
               ['runtime', 'Outcome vs runtime'],
-              ['tokens', 'Tokens by outcome'],
+              ['tokens', 'Token spend'],
             ].map(([tab, label]) => (
               <button
                 key={tab}
@@ -300,7 +302,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           <p className="mt-0.5 text-[10px] leading-tight" style={{ color: C.fg0 }}>
             {activeTab === 'runtime'
               ? 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'
-              : 'Input and output token bars are positioned by outcome score.'}
+              : 'Input and output token bars show spend for each best outcome run.'}
           </p>
         </div>
         <div ref={filterRef} className="relative ml-auto shrink-0">
@@ -480,37 +482,31 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
         })}
         </svg>
         ) : (
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Input and output tokens by outcome score">
+        <div className="sb overflow-x-auto">
+        <svg viewBox={`0 0 ${tokenChartWidth} ${HEIGHT}`} className="min-w-full" style={{ width: tokenChartWidth }} role="img" aria-label="Input and output token spend by agent spec">
         {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
           const ty = PAD.top + (1 - tick) * (HEIGHT - PAD.top - PAD.bottom);
           return (
             <g key={tick}>
-              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={ty} y2={ty} stroke="rgba(255,255,255,0.05)" />
+              <line x1={PAD.left} x2={tokenChartWidth - PAD.right} y1={ty} y2={ty} stroke="rgba(255,255,255,0.05)" />
               <text x={PAD.left - 6} y={ty + 3} textAnchor="end" fontSize="8" fill={C.fg0}>
                 {tokenTickLabel(maxTokenAmount * tick)}
               </text>
             </g>
           );
         })}
-        {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
-          const tx = PAD.left + tick * (WIDTH - PAD.left - PAD.right);
-          return (
-            <g key={tick}>
-              <line x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />
-              <text x={tx} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="8" fill={C.fg0}>
-                {tick.toFixed(2)}
-              </text>
-            </g>
-          );
+        {points.map((run, index) => {
+          const tx = tokenGroupX(index);
+          return <line key={`${run.id}-grid`} x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />;
         })}
-        <text x={(WIDTH - PAD.right + PAD.left) / 2} y={HEIGHT - 3} textAnchor="middle" fontSize="8" fill={C.fg0}>
-          outcome {'>'}
+        <text x={(tokenChartWidth - PAD.right + PAD.left) / 2} y={HEIGHT - 3} textAnchor="middle" fontSize="8" fill={C.fg0}>
+          agent spec
         </text>
-        {points.map((run) => {
-          const centerX = outcomeX(run);
+        {points.map((run, index) => {
+          const centerX = tokenGroupX(index);
           const baseY = HEIGHT - PAD.bottom;
-          const barWidth = 4.5;
-          const gap = 1.5;
+          const barWidth = 8;
+          const gap = 3;
           const input = run.total_input_tokens ?? 0;
           const output = run.total_output_tokens ?? 0;
           const inputY = tokenY(input);
@@ -547,12 +543,16 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
                 onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
               />
               <text x={centerX} y={Math.min(inputY, outputY) - 4} textAnchor="middle" fontSize="7" fill={C.fg0}>
+                {fmtScore(run.composite_score)}
+              </text>
+              <text x={centerX} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="7" fill={C.fg0}>
                 {reduxModelLabel(run.agent_spec)}
               </text>
             </g>
           );
         })}
         </svg>
+        </div>
         )
       ) : (
         <div className="flex h-40 items-center justify-center rounded-md border text-xs" style={{ borderColor: C.border, color: C.fg1 }}>
