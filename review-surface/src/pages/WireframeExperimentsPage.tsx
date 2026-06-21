@@ -646,6 +646,33 @@ function topDeliveryScore(experiments: ExperimentRecord[]) {
   return best;
 }
 
+function compareExperimentRank(left: number[], right: number[]) {
+  for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
+    const lhs = left[i] ?? 0;
+    const rhs = right[i] ?? 0;
+    if (lhs === rhs) continue;
+    return lhs > rhs ? -1 : 1;
+  }
+  return 0;
+}
+
+function experimentRankKey(exp: ExperimentRecord) {
+  const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
+  const repeatScore = repeatabilityValue(exp.aggregate.composite_score?.stddev ?? null);
+  const scoredRuns = exp.aggregate.run_count_scored ?? 0;
+  const totalRuns = exp.aggregate.run_count_total ?? 0;
+  const sampleScore = confidenceScore(scoredRuns, totalRuns);
+
+  return [
+    composite == null ? -1 : Math.max(0, Math.min(1, composite)),
+    repeatScore == null ? -1 : repeatScore,
+    sampleScore == null ? -1 : sampleScore,
+    scoredRuns,
+    totalRuns,
+    revisionSortValue(exp.revision),
+  ];
+}
+
 function isKnownFindingKind(value: string): value is FindingKind {
   return value === 'issue' || value === 'good' || value === 'note';
 }
@@ -1021,50 +1048,14 @@ export function WireframeExperimentsPage() {
   const rankedByFamily = useMemo(() => {
     const map = new Map<string, { winnerId: string; runnerUpId?: string }>();
 
-    const revisionValue = (revision?: string | null) => {
-      if (!revision) return 0;
-      const match = revision.match(/\d+/g);
-      if (!match?.length) return 0;
-      return Number(match.join('')) || 0;
-    };
-
-    const compareMetrics = (left: number[], right: number[]) => {
-      for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
-        const lhs = left[i] ?? 0;
-        const rhs = right[i] ?? 0;
-        if (lhs === rhs) continue;
-        return lhs > rhs ? -1 : 1;
-      }
-      return 0;
-    };
-
     for (const { family, revisions } of families) {
       for (const { revision, exps } of revisions) {
         const ranked = exps
         .map((exp) => {
         const rowKey = experimentRowKey(exp);
-        const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
-        const repeatScore = repeatabilityValue(exp.aggregate.composite_score?.stddev ?? null);
-        const scoredRuns = exp.aggregate.run_count_scored ?? 0;
-        const totalRuns = exp.aggregate.run_count_total ?? 0;
-        const sampleScore = confidenceScore(scoredRuns, totalRuns);
-
-        const normComposite = composite == null ? -1 : Math.max(0, Math.min(1, composite));
-        const normRepeat = repeatScore == null ? -1 : repeatScore;
-        const normSample = sampleScore == null ? -1 : sampleScore;
-
-        const key = [
-          normComposite,
-          normRepeat,
-          normSample,
-          scoredRuns,
-          totalRuns,
-          revisionValue(exp.revision),
-        ];
-
-        return { rowKey, key };
+        return { rowKey, key: experimentRankKey(exp) };
         })
-        .sort((a, b) => compareMetrics(a.key, b.key));
+        .sort((a, b) => compareExperimentRank(a.key, b.key));
 
       if (ranked.length === 0) {
         continue;
@@ -1447,7 +1438,9 @@ export function WireframeExperimentsPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {exps.map((exp) => {
+                        {[...exps]
+                          .sort((left, right) => compareExperimentRank(experimentRankKey(left), experimentRankKey(right)))
+                          .map((exp) => {
                           const experimentKey = experimentRowKey(exp);
                           const revisionRanking = rankedByFamily.get(`${family}::${revision}`);
                           const isWinner = revisionRanking?.winnerId === experimentKey;

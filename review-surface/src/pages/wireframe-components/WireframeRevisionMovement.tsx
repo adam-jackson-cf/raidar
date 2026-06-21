@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ChevronDown, ChevronRight, MoveRight, TriangleAlert } from 'lucide-react';
+import { ChevronDown, ChevronRight, MoveRight, TriangleAlert, Trophy } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { fmtTokens } from '@/utils/helpers';
 import type { ExperimentRecord, FileDiff, RevisionDiff, StatBlock } from '@/utils/types';
@@ -22,6 +22,7 @@ type MovementRow = {
   outcome: DeltaValue;
   runtime: DeltaValue;
   spend: DeltaValue;
+  rank: number;
 };
 
 function revisionSortValue(revision?: string | null) {
@@ -241,11 +242,28 @@ export function WireframeRevisionMovement({
           outcome: delta(statMean(source.aggregate.composite_score), statMean(target.aggregate.composite_score)),
           runtime: delta(statMean(source.aggregate.duration_sec), statMean(target.aggregate.duration_sec)),
           spend: delta(spendMean(source), spendMean(target)),
+          rank: 0,
         });
       }
     }
 
-    return rows;
+    return rows
+      .sort((left, right) => {
+        const leftOutcome = left.outcome.delta ?? Number.NEGATIVE_INFINITY;
+        const rightOutcome = right.outcome.delta ?? Number.NEGATIVE_INFINITY;
+        if (rightOutcome !== leftOutcome) return rightOutcome - leftOutcome;
+
+        const leftRuntime = left.runtime.delta ?? Number.POSITIVE_INFINITY;
+        const rightRuntime = right.runtime.delta ?? Number.POSITIVE_INFINITY;
+        if (leftRuntime !== rightRuntime) return leftRuntime - rightRuntime;
+
+        const leftSpend = left.spend.delta ?? Number.POSITIVE_INFINITY;
+        const rightSpend = right.spend.delta ?? Number.POSITIVE_INFINITY;
+        if (leftSpend !== rightSpend) return leftSpend - rightSpend;
+
+        return left.agentLabel.localeCompare(right.agentLabel);
+      })
+      .map((row, index) => ({ ...row, rank: index + 1 }));
   }, [allRevisionSelected, experiments, selectedRevisions]);
 
   const visibleDiffs = useMemo(() => {
@@ -283,9 +301,38 @@ export function WireframeRevisionMovement({
           </thead>
           <tbody>
             {movements.map((movement) => (
-              <tr key={movement.key} style={{ borderBottom: '1px solid rgba(255,255,255,0.03)' }}>
-                <td className="num px-2 py-2 text-[11px]" style={{ color: C.cyan }} title={movement.agentSpec}>
-                  {movement.agentLabel}
+              <tr
+                key={movement.key}
+                style={{
+                  borderBottom: '1px solid rgba(255,255,255,0.03)',
+                  borderLeft:
+                    movement.rank === 1
+                      ? `3px solid ${C.orange}`
+                      : movement.rank === 2
+                        ? `3px solid ${C.fg1}`
+                        : '3px solid transparent',
+                }}
+              >
+                <td className="num px-2 py-2 text-[11px]" style={{ color: C.fg4 }} title={movement.agentSpec}>
+                  <span className="inline-flex items-center gap-2">
+                    <span>{movement.agentLabel}</span>
+                    {movement.rank === 1 ? (
+                      <Trophy
+                        className="shrink-0"
+                        size={15}
+                        style={{ color: C.orange }}
+                        aria-label="Highest outcome improvement between compared revisions"
+                      />
+                    ) : null}
+                    {movement.rank === 2 ? (
+                      <Trophy
+                        className="shrink-0"
+                        size={15}
+                        style={{ color: '#C0C0C0' }}
+                        aria-label="Runner-up outcome improvement between compared revisions"
+                      />
+                    ) : null}
+                  </span>
                 </td>
                 <td className="num px-2 py-2 text-[11px]" style={{ color: C.fg2 }}>
                   {movement.from} -&gt; {movement.to}
