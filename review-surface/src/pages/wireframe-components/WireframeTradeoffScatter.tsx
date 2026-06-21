@@ -275,7 +275,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           <p className="mt-0.5 text-[10px] leading-tight" style={{ color: C.fg0 }}>
             {activeTab === 'runtime'
               ? 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'
-              : 'Input and output token bars show spend for each best outcome run.'}
+              : 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'}
           </p>
         </div>
         <div ref={filterRef} className="relative ml-auto shrink-0">
