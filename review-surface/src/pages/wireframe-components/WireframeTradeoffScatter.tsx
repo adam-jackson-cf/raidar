@@ -10,9 +10,8 @@ import type { RunRecord } from '@/utils/types';
 const MODEL_COLORS = [C.accent, C.cyan, C.green, C.orange, C.purple, '#F5CE4E', '#E879F9', '#94A3B8'];
 const WIDTH = 560;
 const HEIGHT = 210;
-const PAD = { left: 42, right: 14, top: 16, bottom: 28 };
+const PAD = { left: 23, right: 14, top: 16, bottom: 28 };
 const TOKEN_COLORS = { input: C.cyan, output: C.orange };
-const HEADER_LEFT_INSET = 58;
 
 type TooltipPayload = {
   id: string;
@@ -252,7 +251,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div className="flex items-start gap-2">
-        <div className="min-w-0" style={{ paddingLeft: HEADER_LEFT_INSET }}>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             {[
               ['runtime', 'Outcome vs runtime'],
@@ -357,7 +356,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           ) : null}
         </div>
       </div>
-      <div className="flex flex-wrap items-center justify-start gap-2" style={{ paddingLeft: HEADER_LEFT_INSET }}>
+      <div className="flex flex-wrap items-center justify-start gap-2">
         {modelLabels.length === 0 ? (
           <span className="text-xs" style={{ color: C.fg0 }}>
             No matching runs
