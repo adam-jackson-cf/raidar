@@ -255,7 +255,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
           <div className="flex flex-wrap items-center gap-1.5">
             {[
               ['runtime', 'Outcome vs runtime'],
-              ['tokens', 'Token spend'],
+              ['tokens', 'Outcome vs spend'],
             ].map(([tab, label]) => (
               <button
                 key={tab}
