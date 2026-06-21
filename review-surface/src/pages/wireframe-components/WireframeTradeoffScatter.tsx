@@ -10,7 +10,7 @@ import type { RunRecord } from '@/utils/types';
 const MODEL_COLORS = [C.accent, C.cyan, C.green, C.orange, C.purple, '#F5CE4E', '#E879F9', '#94A3B8'];
 const WIDTH = 560;
 const HEIGHT = 210;
-const PAD = { left: 23, right: 14, top: 16, bottom: 28 };
+const PAD = { left: 23, right: 23, top: 16, bottom: 28 };
 const TOKEN_COLORS = { input: C.cyan, output: C.orange };
 
 type TooltipPayload = {
