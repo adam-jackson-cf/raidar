@@ -1058,6 +1058,12 @@ export function WireframeExperimentsPage() {
     return selectedFamilies.length < families.length;
   }, [families.length, selectedFamilies]);
 
+  const scenarioFilterSuggestion = useMemo(() => {
+    const queryText = scenarioFilter.trim().toLowerCase();
+    if (!queryText) return null;
+    return families.find(({ family }) => family.toLowerCase().startsWith(queryText) && family.toLowerCase() !== queryText)?.family ?? null;
+  }, [families, scenarioFilter]);
+
   const rankedByFamily = useMemo(() => {
     const map = new Map<string, { winnerId: string; runnerUpId?: string }>();
 
@@ -1237,14 +1243,32 @@ export function WireframeExperimentsPage() {
               </div>
             ) : null}
           </div>
-              <input
-            className="min-w-56 h-7 rounded-md px-2 py-1 text-xs"
-            style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
-            value={scenarioFilter}
-            placeholder="Search scenario family…"
-            onChange={(event) => setScenarioFilter(event.target.value)}
-            aria-label="Scenario family filter"
-          />
+          <div className="relative min-w-56">
+            {scenarioFilterSuggestion ? (
+              <div
+                className="pointer-events-none absolute inset-0 h-7 rounded-md px-2 py-1 text-xs"
+                style={{ border: `1px solid transparent`, color: C.fg0 }}
+                aria-hidden="true"
+              >
+                <span style={{ visibility: 'hidden' }}>{scenarioFilter}</span>
+                <span>{scenarioFilterSuggestion.slice(scenarioFilter.length)}</span>
+              </div>
+            ) : null}
+            <input
+              className="relative h-7 w-full rounded-md px-2 py-1 text-xs"
+              style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
+              value={scenarioFilter}
+              placeholder="Search scenario family…"
+              onChange={(event) => setScenarioFilter(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Tab' && scenarioFilterSuggestion) {
+                  event.preventDefault();
+                  setScenarioFilter(scenarioFilterSuggestion);
+                }
+              }}
+              aria-label="Scenario family filter"
+            />
+          </div>
           <div className="ml-auto flex items-center gap-2">
             <label className="text-xs" style={{ color: C.fg2 }} htmlFor="scenario-sort-mode">
               Sort:
