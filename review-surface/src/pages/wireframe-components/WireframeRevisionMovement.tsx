@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, MoveRight, TriangleAlert } from 'lucide-reac
 import { C } from '@/utils/colors';
 import { fmtTokens } from '@/utils/helpers';
 import type { ExperimentRecord, FileDiff, RevisionDiff, StatBlock } from '@/utils/types';
+import { compactSpec } from './wireframeLabels';
 
 type MovementMetric = 'outcome' | 'runtime' | 'spend';
 
@@ -27,22 +28,6 @@ function revisionSortValue(revision?: string | null) {
   if (!revision) return 0;
   const match = revision.match(/\d+/g);
   return match ? Number(match.join('')) : 0;
-}
-
-function compactAgentSpec(agentSpec: string) {
-  const lower = agentSpec.toLowerCase();
-  const harness = lower.includes('claude-code') ? 'Claude' : lower.includes('codex-cli') ? 'Codex' : agentSpec.split(/[ ·:]/)[0] || 'Agent';
-  const model = lower.includes('sonnet')
-    ? 'Claude-S-4.6'
-    : lower.includes('gpt-5.5')
-      ? 'GPT-5.5'
-      : agentSpec
-          .split(/[/:]/)
-          .at(-1)
-          ?.replace(/^gpt-/, 'GPT-')
-          .replace(/^claude-/, 'Claude-') || 'model';
-  const effort = lower.includes(':low') || lower.includes('-low') ? '-L' : lower.includes(':medium') || lower.includes('-medium') ? '-M' : lower.includes(':high') || lower.includes('-high') ? '-H' : '';
-  return `${harness}-${model}${effort}`.replace(/--+/g, '-');
 }
 
 function statMean(stat?: StatBlock) {
@@ -250,7 +235,7 @@ export function WireframeRevisionMovement({
         rows.push({
           key: `${target.agent_spec}-${previousRevision}-${revision}`,
           agentSpec: target.agent_spec,
-          agentLabel: compactAgentSpec(target.agent_spec),
+          agentLabel: compactSpec(target.agent_spec),
           from: previousRevision,
           to: revision,
           outcome: delta(statMean(source.aggregate.composite_score), statMean(target.aggregate.composite_score)),
