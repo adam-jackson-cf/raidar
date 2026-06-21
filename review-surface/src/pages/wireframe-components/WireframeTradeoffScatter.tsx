@@ -161,7 +161,7 @@ function effortValue(run: RunRecord) {
 }
 
 function effortLabel(value: string) {
-  if (value === 'default') return 'Default';
+  if (value === 'default') return 'None';
   return titleCase(value);
 }
 
@@ -307,7 +307,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
                         className="pointer-events-none absolute right-0 top-4 z-30 hidden w-52 rounded-md border p-2 text-[10px] normal-case leading-snug tracking-normal group-hover:block"
                         style={{ borderColor: C.selectedBorder, background: C.surface, color: C.fg2 }}
                       >
-                        OpenAI effort maps reasoning effort. Anthropic effort maps thinking effort. Default means no explicit effort was captured.
+                        OpenAI effort maps reasoning effort. Anthropic effort maps thinking effort. None means no explicit effort was captured.
                       </span>
                     </span>
                   </div>
