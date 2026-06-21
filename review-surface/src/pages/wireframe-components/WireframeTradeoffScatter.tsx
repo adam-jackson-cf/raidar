@@ -99,12 +99,51 @@ function TooltipContent({ payload }: { payload: TooltipPayload }) {
   );
 }
 
+function runSequence(run: RunRecord) {
+  const match = run.id.match(/(\d+)$/);
+  if (!match) return Number.MAX_SAFE_INTEGER;
+  return Number(match[1]);
+}
+
+function bestRunForEachRevisionSpec(runs: RunRecord[]) {
+  const grouped = new Map<string, RunRecord[]>();
+
+  for (const run of runs) {
+    const key = `${run.revision}|${run.agent_spec}`;
+    const bucket = grouped.get(key) ?? [];
+    bucket.push(run);
+    grouped.set(key, bucket);
+  }
+
+  const selected = [] as RunRecord[];
+  for (const bucket of grouped.values()) {
+    const sorted = [...bucket].sort((left, right) => {
+      const leftOutcome = left.composite_score ?? -1;
+      const rightOutcome = right.composite_score ?? -1;
+      if (leftOutcome !== rightOutcome) return rightOutcome - leftOutcome;
+      const leftCost = (left.total_input_tokens ?? 0) + (left.total_output_tokens ?? 0);
+      const rightCost = (right.total_input_tokens ?? 0) + (right.total_output_tokens ?? 0);
+      if (leftCost !== rightCost) {
+        return leftCost - rightCost;
+      }
+      if (left.duration_ms !== right.duration_ms) return left.duration_ms - right.duration_ms;
+      return runSequence(left) - runSequence(right);
+    });
+    const best = sorted[0];
+    if (best) {
+      selected.push(best);
+    }
+  }
+
+  return selected;
+}
+
 export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
   const [pinnedTooltip, setPinnedTooltip] = useState<TooltipPayload | null>(null);
   const points = useMemo(
-    () => runs.filter((run) => run.composite_score != null && run.duration_ms > 0),
+    () => bestRunForEachRevisionSpec(runs).filter((run) => run.composite_score != null && run.duration_ms > 0),
     [runs],
   );
   const modelLabels = useMemo(() => [...new Set(points.map((run) => reduxModelLabel(run.agent_spec)))], [points]);

@@ -44,9 +44,40 @@ const expectedVisiblePlotCount = async (sectionId) => {
 
     const chartRuns = runs
       .filter((run) => selectedRunIds.has(run.id) && run.composite_score != null && run.duration_ms > 0)
-      .length;
+      .reduce((buckets, run) => {
+        const key = `${run.revision}|${run.agent_spec}`;
+        const existing = buckets.get(key) ?? [];
+        existing.push(run);
+        buckets.set(key, existing);
+        return buckets;
+      }, new Map())
+      .values();
 
-    return { chartRuns, visibleRevisions };
+    let bestRunCount = 0;
+    for (const entries of chartRuns) {
+      const sorted = [...entries].sort((left, right) => {
+        const leftOutcome = left.composite_score ?? -1;
+        const rightOutcome = right.composite_score ?? -1;
+        if (leftOutcome !== rightOutcome) return rightOutcome - leftOutcome;
+
+        const leftCost = (left.total_input_tokens ?? 0) + (left.total_output_tokens ?? 0);
+        const rightCost = (right.total_input_tokens ?? 0) + (right.total_output_tokens ?? 0);
+        if (leftCost !== rightCost) return leftCost - rightCost;
+
+        if (left.duration_ms !== right.duration_ms) return left.duration_ms - right.duration_ms;
+
+        const leftLabel = String(left.id).match(/(\d+)$/)?.[1];
+        const rightLabel = String(right.id).match(/(\d+)$/)?.[1];
+        const leftRun = leftLabel ? Number(leftLabel) : Number.MAX_SAFE_INTEGER;
+        const rightRun = rightLabel ? Number(rightLabel) : Number.MAX_SAFE_INTEGER;
+        return leftRun - rightRun;
+      });
+      if (sorted.length > 0) {
+        bestRunCount += 1;
+      }
+    }
+
+    return { chartRuns: bestRunCount, visibleRevisions };
   }, sectionId);
 };
 
