@@ -4,9 +4,9 @@ import { ChevronRight, Eye, EyeOff, Pin, PinOff, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { FailurePatterns } from '@/components/FailurePatterns';
 import { RevisionMovement } from '@/components/RevisionMovement';
-import { TradeoffScatter } from '@/components/TradeoffScatter';
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
+import { WireframeTradeoffScatter } from './wireframe-components/WireframeTradeoffScatter';
 import { api } from '@/api/client';
 import { C } from '@/utils/colors';
 import { fmtPercent, fmtScore } from '@/utils/helpers';
@@ -1644,7 +1644,7 @@ export function WireframeExperimentsPage() {
                 </div>
               ))}
               <div className="grid items-start gap-3 xl:grid-cols-2">
-                <TradeoffScatter runs={familyRuns} />
+                <WireframeTradeoffScatter runs={familyRuns} />
                 <FailurePatterns runs={familyRuns} />
               </div>
               <RevisionMovement experiments={allFamilyExps} diffs={familyDiffs} />
