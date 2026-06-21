@@ -4,56 +4,41 @@ description: "Use When you need to do any wireframe work."
 ---
 # Guidance
 
-Use this before and during any wireframe iteration so changes stay isolated from existing experiments pages and remain demonstrably reproducible.
+Use this before and during wireframe iteration to keep exploration isolated, reproducible, and intentionally portable.
 
-## Scope and location
+## Rules
 
 - Keep wireframe work in `review-surface/src/pages/WireframeExperimentsPage.tsx` (and any directly related assets used only by that page).
-- Treat the wireframe as a dedicated exploration surface for rapid UI design changes.
-- The purpose is to test interaction and layout hypotheses first, then port validated patterns intentionally when the user gives approval.
+- Treat the wireframe as the dedicated surface for testing interaction and layout hypotheses before any approved migration.
+- Keep wireframe changes independent from live review-surface pages and components.
+- Never edit or refactor existing components while proving a wireframe change.
+- Do not change core-page behavior unless explicitly approved outside a wireframe iteration.
 
-## Non-impact rule
+## Migration path
 
-- Never edit or refactor existing components on the wireframe while still proving a wireframe change.
-- Do not change existing component behavior in core pages unless explicitly approved and requested outside a wireframe iteration.
-- Any migration from existing non wireframe implementation to a new component should be done by:
-  1. first building the equivalent in the wireframe only,
-  2. validating behavior and interaction, and content
-  3. then applying a scoped refresh based on the existing wireframe design theme and mode of behaviour/interaction plus any user specified actions.
-- Keep wireframe changes independent from the live review-surface pages and components.
+For any migration from existing non wireframe implementation to a new component:
 
-## Iteration workflow
+1. Build the equivalent in the wireframe only.
+2. Validate behavior, interaction, and content.
+3. Apply a scoped refresh based on the existing wireframe design theme, mode of behaviour/interaction, and any user specified actions.
 
-- Before changing UI behavior, identify the exact target in the wireframe section and keep edits narrowly scoped.
-- When implementing a design change, include only one atomic UI change batch before returning to review unless a hard dependency requires multiple files.
-- After each approved wireframe update:
-  - Save the edit.
-  - Run a full npm rebuild.
-  - Verify the browser loads with Playwright which installed under the review-surface app using `http://127.0.0.1:5950/wireframe`.
+## Iteration checklist
 
-## Required operational steps
-
-- Always run:
-  - `cd /Users/adamjackson/Projects/complete/raidar`
+- Identify the exact wireframe target before changing UI behavior.
+- Make one atomic UI change batch before returning to review unless a hard dependency requires multiple files.
+- After each approved update, save the edit and run from repo root:
   - `make review-surface-build`
-- Restart the service so you know you are seeing fresh runtime output:
   - `make review-surface-serve`
-- Confirm the endpoint is available at:
-  - `http://127.0.0.1:5950/wireframe`
-
-## Testing/checking for this workflow (mandatory)
-
-- Always run a lightweight runtime load check after each change to catch React lifecycle issues (for example, hook-order regressions like minified React error #310).
-- Use a browser session check and verify the page renders without console errors:
-  - open or refresh `/wireframe` in headless Playwright and confirm the page content appears, not blank.
-  - verify there is no `Error:` output in console.
-- If any console exception appears, stop and fix before reporting completion.
+- Verify fresh runtime output at `http://127.0.0.1:5950/wireframe`.
+- Use Playwright installed under the review-surface app for the browser check.
+- Confirm `/wireframe` renders content, is not blank, and has no console `Error:` output.
+- Stop and fix any console exception before reporting completion.
 
 ## Commit hygiene
 
-- Do one atomic commit after each completed wireframe change set.
-- Commit message should be specific and concise, e.g.:
+- Make one atomic commit after each completed wireframe change set.
+- Keep commit content limited to wireframe files unless an explicit migration was approved.
+- Use a specific, concise message, e.g.:
   - `wireframe: tune scenario and revision dropdown interaction`
   - `wireframe: add overlay navigation for issues container`
-- Keep commit content limited to wireframe files unless an explicit migration was approved.
 - Record what changed, what was validated, and whether rebuild+load check passed.

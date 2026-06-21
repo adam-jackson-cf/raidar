@@ -300,9 +300,50 @@ def _skill_runs(
             meta,
             quality=round(quality + 0.01 * (index - 2), 3),
             duration=200.0 - (40.0 if revision == "v003" else 0.0) + 8 * index,
+            index=index,
         )
         for index in range(1, 4)
     ]
+
+
+def _skill_token_spend(spec: Spec, revision: str, index: int) -> dict[str, int]:
+    """Synthetic token spend with enough variation to exercise chart scaling."""
+
+    base_input = {"v001": 36000, "v002": 31000, "v003": 26000}.get(revision, 30000)
+    run_offset = (index - 2) * 650
+    if spec is _CLAUDE:
+        return {
+            "uncached_input_tokens": base_input + 1200 + run_offset,
+            "output_tokens": 5400 + (index - 2) * 260,
+        }
+    return {
+        "uncached_input_tokens": base_input - 900 + run_offset,
+        "output_tokens": 3900 + (index - 2) * 220,
+    }
+
+
+def _bugfix_token_spend(spec: Spec, run_id: str) -> dict[str, int]:
+    """Synthetic bugfix token spend by model effort and run ordinal."""
+
+    try:
+        index = int(run_id.rsplit("-", 1)[1])
+    except ValueError:
+        index = 1
+
+    if spec is _GPT_HIGH:
+        effort_input = 9000
+        effort_output = 1800
+    elif spec is _GPT_MEDIUM:
+        effort_input = 4500
+        effort_output = 900
+    else:
+        effort_input = 0
+        effort_output = 0
+
+    return {
+        "uncached_input_tokens": 36000 + effort_input + index * 850,
+        "output_tokens": 4200 + effort_output + index * 180,
+    }
 
 
 def _skill_run(
@@ -313,6 +354,7 @@ def _skill_run(
     *,
     quality: float,
     duration: float,
+    index: int,
 ) -> EvalRun:
     metric_scores = [
         MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
@@ -339,7 +381,7 @@ def _skill_run(
         metadata={
             SYNTHETIC_MARKER: True,
             "run": {"canonical_run_dir": None, "run_json_path": None},
-            "process": {"uncached_input_tokens": 26000 if revision == "v003" else 33000},
+            "process": _skill_token_spend(spec, revision, index),
         },
         metric_scores=metric_scores,
         scorer_results=_skill_scorer_results(revision, quality, metric_by_id),
@@ -518,6 +560,7 @@ def _degraded_run(run_id: str, spec: Spec) -> EvalRun:
     metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
     scorecard.scorer_results = _scorer_results(0.46, 0.40, metrics)
     scorecard.metadata["process"] = {
+        **scorecard.metadata.get("process", {}),
         "missing_required_verification_commands": 1,
         "required_verification_first_pass": {"bun run test:coverage": "missing"},
     }
@@ -574,7 +617,7 @@ def _scorecard(run_id: str, spec: Spec, *, duration: float) -> Scorecard:
         metadata={
             SYNTHETIC_MARKER: True,
             "run": {"canonical_run_dir": None, "run_json_path": None},
-            "process": {"uncached_input_tokens": 42000},
+            "process": _bugfix_token_spend(spec, run_id),
         },
     )
 

@@ -56,6 +56,16 @@ function runStatus(scores) {
   return 'OK';
 }
 
+function uncachedInputTokens(scores) {
+  const process = scores.metadata?.process;
+  const processValue = process && typeof process === 'object' ? process.uncached_input_tokens : null;
+  return Number(processValue ?? scores.resource_efficiency?.uncached_input_tokens ?? 0) || 0;
+}
+
+function outputTokens(scores) {
+  return Number(scores.metadata?.process?.output_tokens ?? scores.resource_efficiency?.output_tokens ?? 0) || 0;
+}
+
 class SpanBuilder {
   constructor(runId, startedAtMs) {
     this.runId = runId;
@@ -367,8 +377,8 @@ function projectRun(experiment, runDir) {
     start: agentStart,
     duration: durationMs > 0 ? Math.round(durationMs * 0.7) : null,
     model: run.config?.model,
-    inputTokens: scores.resource_efficiency?.uncached_input_tokens ?? null,
-    outputTokens: scores.resource_efficiency?.output_tokens ?? null,
+    inputTokens: uncachedInputTokens(scores),
+    outputTokens: outputTokens(scores),
   });
   projectTraceEvents(builder, run, agentRootId);
   const lastEventTs = traceEvents.length
@@ -394,8 +404,8 @@ function projectRun(experiment, runDir) {
     duration_ms: durationMs,
     status: runStatus(scores),
     span_count: builder.spans.length,
-    total_input_tokens: scores.resource_efficiency?.uncached_input_tokens ?? 0,
-    total_output_tokens: scores.resource_efficiency?.output_tokens ?? 0,
+    total_input_tokens: uncachedInputTokens(scores),
+    total_output_tokens: outputTokens(scores),
     composite_score: scores.composite_score ?? null,
     quality_score: scores.quality_score ?? null,
     diagnostic_score: scores.diagnostic_score ?? null,
