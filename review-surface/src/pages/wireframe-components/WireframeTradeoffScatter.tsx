@@ -1,6 +1,6 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pin, PinOff } from 'lucide-react';
+import { SlidersHorizontal } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { fmtDuration, fmtScore } from '@/utils/helpers';
 import { runLabel } from '@/utils/verdict';
@@ -21,15 +21,17 @@ type TooltipPayload = {
 
 function reduxModelLabel(agentSpec: string) {
   const text = agentSpec.toLowerCase();
+  const [, model = text] = text.split('·').map((part) => part.trim());
   const gpt = text.match(/gpt[\s-]?([0-9]+(?:\.[0-9]+)?)/);
   if (gpt?.[1]) return `GPT${gpt[1]}`;
-  if (text.includes('sonnet')) return 'Sonnet';
+  const sonnet = model.match(/claude[-_ ]?sonnet[-_ ]?([0-9]+(?:\.[0-9]+)?)/);
+  if (sonnet?.[1]) return `Sonnet ${sonnet[1]}`;
   if (text.includes('opus')) return 'Opus';
   if (text.includes('haiku')) return 'Haiku';
   if (text.includes('claude')) return 'Claude';
 
-  const [, model = agentSpec] = agentSpec.split('·').map((part) => part.trim());
-  return model
+  const [, fallbackModel = agentSpec] = agentSpec.split('·').map((part) => part.trim());
+  return fallbackModel
     .replace(/^openai\s+/i, '')
     .replace(/^anthropic\s+/i, '')
     .replace(/[^a-z0-9.]+/gi, ' ')
@@ -39,7 +41,15 @@ function reduxModelLabel(agentSpec: string) {
     .join(' ');
 }
 
-function OverlayFrame({ payload, pinned, onPin, onClose, children }: { payload: TooltipPayload; pinned: boolean; onPin: () => void; onClose: () => void; children: ReactNode }) {
+function OverlayFrame({
+  payload,
+  showControls = true,
+  children,
+}: {
+  payload: TooltipPayload;
+  showControls?: boolean;
+  children: ReactNode;
+}) {
   return (
     <div
       className="fixed z-30 min-w-60 max-w-72 rounded-md border p-2.5 text-[11px]"
@@ -55,32 +65,13 @@ function OverlayFrame({ payload, pinned, onPin, onClose, children }: { payload: 
         <div className="min-w-0 truncate text-[11px]" style={{ color: C.fg4 }}>
           {payload.title}
         </div>
-        <div className="ml-auto flex items-center gap-1.5">
-          <button
-            type="button"
-            aria-label={pinned ? 'Unpin overlay' : 'Pin overlay'}
-            className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[10px] leading-none"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-              onPin();
-            }}
-            title="[P]"
-          >
-            {pinned ? <Pin size={11} /> : <PinOff size={11} />}
-          </button>
-          <button
-            type="button"
-            aria-label="Close overlay"
-            className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[11px] font-medium leading-none"
-            onClick={(event) => {
-              event.stopPropagation();
-              onClose();
-            }}
-          >
-            x
-          </button>
-        </div>
+        {showControls ? (
+          <div className="ml-auto flex items-center gap-1.5">
+            <button type="button" aria-label="Close overlay" className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[11px] font-medium leading-none">
+              x
+            </button>
+          </div>
+        ) : null}
       </div>
       {children}
     </div>
@@ -138,31 +129,95 @@ function bestRunForEachRevisionSpec(runs: RunRecord[]) {
   return selected;
 }
 
+function durationTickLabel(ms: number) {
+  if (ms >= 60000) return `${Math.round(ms / 60000)}m`;
+  if (ms >= 1000) return `${Math.round(ms / 1000)}s`;
+  return `${Math.round(ms)}ms`;
+}
+
+function titleCase(value: string) {
+  return value
+    .split(/[^a-z0-9]+/i)
+    .filter(Boolean)
+    .map((part) => part[0]?.toUpperCase() + part.slice(1).toLowerCase())
+    .join(' ');
+}
+
+function providerValue(run: RunRecord) {
+  return run.model.includes('/') ? run.model.split('/')[0] : run.harness;
+}
+
+function providerLabel(value: string) {
+  if (value.toLowerCase() === 'openai') return 'OpenAI';
+  if (value.toLowerCase() === 'anthropic') return 'Anthropic';
+  return titleCase(value);
+}
+
+function reasoningValue(run: RunRecord) {
+  const match = run.model.match(/:(low|medium|high)$/i);
+  return match?.[1]?.toLowerCase() ?? 'none';
+}
+
+function reasoningLabel(value: string) {
+  if (value === 'none') return 'None';
+  return titleCase(value);
+}
+
 export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
-  const [pinnedTooltip, setPinnedTooltip] = useState<TooltipPayload | null>(null);
-  const points = useMemo(
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
+  const [selectedReasoning, setSelectedReasoning] = useState<string[]>([]);
+  const filterRef = useRef<HTMLDivElement | null>(null);
+  const allPoints = useMemo(
     () => bestRunForEachRevisionSpec(runs).filter((run) => run.composite_score != null && run.duration_ms > 0),
     [runs],
   );
+  const providerOptions = useMemo(() => [...new Set(allPoints.map(providerValue))], [allPoints]);
+  const reasoningOptions = useMemo(() => [...new Set(allPoints.map(reasoningValue))], [allPoints]);
+
+  useEffect(() => {
+    setSelectedProviders((current) => (current.length === 0 ? providerOptions : current.filter((item) => providerOptions.includes(item))));
+  }, [providerOptions]);
+
+  useEffect(() => {
+    setSelectedReasoning((current) => (current.length === 0 ? reasoningOptions : current.filter((item) => reasoningOptions.includes(item))));
+  }, [reasoningOptions]);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', closeOnOutsideClick);
+    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+  }, [filterOpen]);
+
+  const points = useMemo(
+    () =>
+      allPoints.filter((run) => {
+        const providerSelected = selectedProviders.length === 0 || selectedProviders.includes(providerValue(run));
+        const reasoningSelected = selectedReasoning.length === 0 || selectedReasoning.includes(reasoningValue(run));
+        return providerSelected && reasoningSelected;
+      }),
+    [allPoints, selectedProviders, selectedReasoning],
+  );
   const modelLabels = useMemo(() => [...new Set(points.map((run) => reduxModelLabel(run.agent_spec)))], [points]);
 
-  if (points.length < 2) return null;
+  if (allPoints.length < 2) return null;
 
-  const maxDuration = Math.max(...points.map((run) => run.duration_ms)) * 1.08;
+  const hasChart = points.length >= 2;
+  const maxDuration = (hasChart ? Math.max(...points.map((run) => run.duration_ms)) : 1) * 1.2;
+  const attractorMaxX = WIDTH - PAD.right;
+  const xTicks = [0.25, 0.5, 0.75, 1];
   const x = (run: RunRecord) => PAD.left + (run.duration_ms / maxDuration) * (WIDTH - PAD.left - PAD.right);
   const y = (run: RunRecord) => PAD.top + (1 - (run.composite_score ?? 0)) * (HEIGHT - PAD.top - PAD.bottom);
   const modelColor = (model: string) => MODEL_COLORS[modelLabels.indexOf(model) % MODEL_COLORS.length];
-  const openTooltip = (payload: TooltipPayload) => {
-    if (pinnedTooltip?.id === payload.id) return;
-    setTooltip(payload);
-  };
+  const openTooltip = (payload: TooltipPayload) => setTooltip(payload);
   const closeTooltip = () => setTooltip(null);
-  const pinPayload = (payload: TooltipPayload) => {
-    setTooltip(null);
-    setPinnedTooltip((current) => (current?.id === payload.id ? null : payload));
-  };
   const runPayload = (run: RunRecord, clientX: number, clientY: number): TooltipPayload => {
     const model = reduxModelLabel(run.agent_spec);
     return {
@@ -190,45 +245,119 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
 
   return (
     <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-medium" style={{ color: C.fg3 }}>
-          Outcome vs run time
-        </span>
-        <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
-          {modelLabels.map((model) => {
-            const specs = [...new Set(points.filter((run) => reduxModelLabel(run.agent_spec) === model).map((run) => run.agent_spec))];
-            const payloadAt = (event: { clientX: number; clientY: number }) => legendPayload(model, specs, event.clientX, event.clientY);
+      <div className="flex items-start gap-2">
+        <div className="min-w-0">
+          <span className="text-xs font-medium" style={{ color: C.fg3 }}>
+            Outcome vs run time
+          </span>
+          <p className="mt-0.5 text-[10px] leading-tight" style={{ color: C.fg0 }}>
+            Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.
+          </p>
+        </div>
+        <div ref={filterRef} className="relative ml-auto shrink-0">
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border transition hover:bg-white/5"
+            style={{ borderColor: filterOpen ? C.selectedBorder : C.border, color: filterOpen ? C.fg4 : C.fg2, background: filterOpen ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+            aria-label="Filter chart"
+            title="Filter chart"
+            onClick={() => setFilterOpen((open) => !open)}
+          >
+            <SlidersHorizontal size={14} />
+          </button>
+          {filterOpen ? (
+            <div
+              className="absolute right-0 top-full z-20 mt-1 w-56 rounded-md border p-3 text-xs shadow-xl"
+              style={{ borderColor: C.border, background: C.surface, color: C.fg3 }}
+            >
+              <div className="mb-2 text-xs font-semibold" style={{ color: C.fg4 }}>
+                Filters
+              </div>
+              <div className="space-y-2">
+                <div>
+                  <div className="mb-1 border-b pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: C.border, color: C.fg1 }}>
+                    Provider
+                  </div>
+                  <div className="space-y-1">
+                    {providerOptions.map((provider) => (
+                      <label key={provider} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedProviders.includes(provider)}
+                          onChange={() => {
+                            setSelectedProviders((current) => {
+                              if (!current.includes(provider)) return [...current, provider];
+                              return current.length === 1 ? current : current.filter((item) => item !== provider);
+                            });
+                          }}
+                        />
+                        {providerLabel(provider)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1 border-b pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: C.border, color: C.fg1 }}>
+                    Reasoning
+                  </div>
+                  <div className="space-y-1">
+                    {reasoningOptions.map((reasoning) => (
+                      <label key={reasoning} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedReasoning.includes(reasoning)}
+                          onChange={() => {
+                            setSelectedReasoning((current) => {
+                              if (!current.includes(reasoning)) return [...current, reasoning];
+                              return current.length === 1 ? current : current.filter((item) => item !== reasoning);
+                            });
+                          }}
+                        />
+                        {reasoningLabel(reasoning)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      </div>
+      <div className="flex flex-wrap items-center justify-start gap-2">
+        {modelLabels.length === 0 ? (
+          <span className="text-xs" style={{ color: C.fg0 }}>
+            No matching runs
+          </span>
+        ) : null}
+        {modelLabels.map((model) => {
+          const specs = [...new Set(points.filter((run) => reduxModelLabel(run.agent_spec) === model).map((run) => run.agent_spec))];
+          const payloadAt = (event: { clientX: number; clientY: number }) => legendPayload(model, specs, event.clientX, event.clientY);
 
-            return (
+          return (
               <button
                 key={model}
                 type="button"
-                className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-[10px] transition hover:bg-white/5"
+                className="num inline-flex items-center gap-1 rounded px-1 py-0.5 text-xs transition hover:bg-white/5"
                 style={{ color: C.fg1 }}
                 onMouseEnter={(event) => openTooltip(payloadAt(event))}
                 onMouseMove={(event) => openTooltip(payloadAt(event))}
                 onMouseLeave={closeTooltip}
-                onClick={(event) => {
-                  event.preventDefault();
-                  event.stopPropagation();
-                  pinPayload(payloadAt(event));
-                }}
               >
                 <span className="size-2 rounded-full" style={{ background: modelColor(model) }} />
                 {model}
               </button>
-            );
-          })}
-        </span>
+          );
+        })}
       </div>
-      <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full max-w-2xl" role="img" aria-label="Outcome against run duration">
+      {hasChart ? (
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against run duration">
         <polygon
-          points={`${PAD.left},${PAD.top} ${WIDTH - PAD.right},${PAD.top} ${WIDTH - PAD.right},${PAD.top + 78} ${PAD.left},${HEIGHT - PAD.bottom - 4}`}
+          points={`${PAD.left},${HEIGHT - PAD.bottom - 4} ${attractorMaxX},${PAD.top} ${PAD.left},${PAD.top}`}
           fill="rgba(34,197,94,0.12)"
           stroke="rgba(34,197,94,0.22)"
           strokeWidth="1"
         />
-        <text x={PAD.left + 4} y={PAD.top + 11} fontSize="8" fill={C.green}>
+        <text x={PAD.left + 4} y={PAD.top + 11} fontSize="6" fill={C.green}>
           attractive region
         </text>
         {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
@@ -242,13 +371,13 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
             </g>
           );
         })}
-        {[0.25, 0.5, 0.75, 1].map((frac) => {
+        {xTicks.map((frac) => {
           const tx = PAD.left + frac * (WIDTH - PAD.left - PAD.right);
           return (
             <g key={frac}>
               <line x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />
               <text x={tx} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="8" fill={C.fg0}>
-                {fmtDuration(maxDuration * frac)}
+                {durationTickLabel(maxDuration * frac)}
               </text>
             </g>
           );
@@ -274,24 +403,20 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
               onMouseMove={(event) => openTooltip(runPayload(run, event.clientX, event.clientY))}
               onMouseLeave={closeTooltip}
               onClick={(event) => {
-                if (event.altKey || event.metaKey || event.ctrlKey) {
-                  pinPayload(runPayload(run, event.clientX, event.clientY));
-                  return;
-                }
                 navigate(`/runs/${encodeURIComponent(run.id)}`);
               }}
             />
           );
         })}
-      </svg>
+        </svg>
+      ) : (
+        <div className="flex h-40 items-center justify-center rounded-md border text-xs" style={{ borderColor: C.border, color: C.fg1 }}>
+          Select at least two matching runs to plot this chart.
+        </div>
+      )}
       {tooltip ? (
-        <OverlayFrame payload={tooltip} pinned={false} onPin={() => pinPayload(tooltip)} onClose={closeTooltip}>
+        <OverlayFrame payload={tooltip} showControls={false}>
           <TooltipContent payload={tooltip} />
-        </OverlayFrame>
-      ) : null}
-      {pinnedTooltip ? (
-        <OverlayFrame payload={pinnedTooltip} pinned onPin={() => setPinnedTooltip(null)} onClose={() => setPinnedTooltip(null)}>
-          <TooltipContent payload={pinnedTooltip} />
         </OverlayFrame>
       ) : null}
     </div>
