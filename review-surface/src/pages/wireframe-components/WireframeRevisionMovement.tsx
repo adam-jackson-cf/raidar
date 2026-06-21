@@ -218,7 +218,7 @@ export function WireframeRevisionMovement({
     const revisions = [...new Set(experiments.map((experiment) => experiment.revision).filter(Boolean))].sort(
       (left, right) => revisionSortValue(left) - revisionSortValue(right),
     ) as string[];
-    const selected = allRevisionSelected ? revisions.slice(-1) : selectedRevisions;
+    const selected = allRevisionSelected ? revisions : selectedRevisions;
     const rows: MovementRow[] = [];
 
     for (const revision of selected) {
