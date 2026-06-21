@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { SlidersHorizontal } from 'lucide-react';
+import { Info, SlidersHorizontal } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { fmtDuration, fmtScore } from '@/utils/helpers';
 import { runLabel } from '@/utils/verdict';
@@ -153,13 +153,15 @@ function providerLabel(value: string) {
   return titleCase(value);
 }
 
-function reasoningValue(run: RunRecord) {
-  const match = run.model.match(/:(low|medium|high)$/i);
-  return match?.[1]?.toLowerCase() ?? 'none';
+function effortValue(run: RunRecord) {
+  const source = `${run.model} ${run.agent_spec}`.toLowerCase();
+  const namedEffort = source.match(/(?:reasoning|thinking)[-_\s:]+(low|medium|high)/i);
+  const modelSuffix = run.model.match(/:(low|medium|high)$/i);
+  return (namedEffort?.[1] ?? modelSuffix?.[1] ?? 'default').toLowerCase();
 }
 
-function reasoningLabel(value: string) {
-  if (value === 'none') return 'None';
+function effortLabel(value: string) {
+  if (value === 'default') return 'Default';
   return titleCase(value);
 }
 
@@ -168,22 +170,22 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
-  const [selectedReasoning, setSelectedReasoning] = useState<string[]>([]);
+  const [selectedEfforts, setSelectedEfforts] = useState<string[]>([]);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const allPoints = useMemo(
     () => bestRunForEachRevisionSpec(runs).filter((run) => run.composite_score != null && run.duration_ms > 0),
     [runs],
   );
   const providerOptions = useMemo(() => [...new Set(allPoints.map(providerValue))], [allPoints]);
-  const reasoningOptions = useMemo(() => [...new Set(allPoints.map(reasoningValue))], [allPoints]);
+  const effortOptions = useMemo(() => [...new Set(allPoints.map(effortValue))], [allPoints]);
 
   useEffect(() => {
     setSelectedProviders((current) => (current.length === 0 ? providerOptions : current.filter((item) => providerOptions.includes(item))));
   }, [providerOptions]);
 
   useEffect(() => {
-    setSelectedReasoning((current) => (current.length === 0 ? reasoningOptions : current.filter((item) => reasoningOptions.includes(item))));
-  }, [reasoningOptions]);
+    setSelectedEfforts((current) => (current.length === 0 ? effortOptions : current.filter((item) => effortOptions.includes(item))));
+  }, [effortOptions]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -200,16 +202,16 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
     () =>
       allPoints.filter((run) => {
         const providerSelected = selectedProviders.length === 0 || selectedProviders.includes(providerValue(run));
-        const reasoningSelected = selectedReasoning.length === 0 || selectedReasoning.includes(reasoningValue(run));
-        return providerSelected && reasoningSelected;
+        const effortSelected = selectedEfforts.length === 0 || selectedEfforts.includes(effortValue(run));
+        return providerSelected && effortSelected;
       }),
-    [allPoints, selectedProviders, selectedReasoning],
+    [allPoints, selectedProviders, selectedEfforts],
   );
   const modelLabels = useMemo(() => [...new Set(points.map((run) => reduxModelLabel(run.agent_spec)))], [points]);
 
-  if (allPoints.length < 2) return null;
+  if (allPoints.length < 1) return null;
 
-  const hasChart = points.length >= 2;
+  const hasChart = points.length >= 1;
   const maxDuration = (hasChart ? Math.max(...points.map((run) => run.duration_ms)) : 1) * 1.2;
   const attractorMaxX = WIDTH - PAD.right;
   const xTicks = [0.25, 0.5, 0.75, 1];
@@ -297,23 +299,32 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
                   </div>
                 </div>
                 <div>
-                  <div className="mb-1 border-b pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: C.border, color: C.fg1 }}>
-                    Reasoning
+                  <div className="mb-1 flex items-center gap-1.5 border-b pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: C.border, color: C.fg1 }}>
+                    Effort
+                    <span className="group relative inline-flex" aria-label="Effort explanation">
+                      <Info size={11} />
+                      <span
+                        className="pointer-events-none absolute right-0 top-4 z-30 hidden w-52 rounded-md border p-2 text-[10px] normal-case leading-snug tracking-normal group-hover:block"
+                        style={{ borderColor: C.selectedBorder, background: C.surface, color: C.fg2 }}
+                      >
+                        OpenAI effort maps reasoning effort. Anthropic effort maps thinking effort. Default means no explicit effort was captured.
+                      </span>
+                    </span>
                   </div>
                   <div className="space-y-1">
-                    {reasoningOptions.map((reasoning) => (
-                      <label key={reasoning} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                    {effortOptions.map((effort) => (
+                      <label key={effort} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
                         <input
                           type="checkbox"
-                          checked={selectedReasoning.includes(reasoning)}
+                          checked={selectedEfforts.includes(effort)}
                           onChange={() => {
-                            setSelectedReasoning((current) => {
-                              if (!current.includes(reasoning)) return [...current, reasoning];
-                              return current.length === 1 ? current : current.filter((item) => item !== reasoning);
+                            setSelectedEfforts((current) => {
+                              if (!current.includes(effort)) return [...current, effort];
+                              return current.length === 1 ? current : current.filter((item) => item !== effort);
                             });
                           }}
                         />
-                        {reasoningLabel(reasoning)}
+                        {effortLabel(effort)}
                       </label>
                     ))}
                   </div>
@@ -411,7 +422,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
         </svg>
       ) : (
         <div className="flex h-40 items-center justify-center rounded-md border text-xs" style={{ borderColor: C.border, color: C.fg1 }}>
-          Select at least two matching runs to plot this chart.
+          Select at least one matching run to plot this chart.
         </div>
       )}
       {tooltip ? (
