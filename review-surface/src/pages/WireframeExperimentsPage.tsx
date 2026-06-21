@@ -1169,7 +1169,7 @@ export function WireframeExperimentsPage() {
 
     return (
     <div className="sb flex h-full flex-col gap-3 overflow-auto p-4">
-      <div className="rounded-lg border p-3" style={{ borderColor: C.border, background: C.surface }}>
+      <div className="rounded-lg border p-2" style={{ borderColor: C.border, background: C.surface }}>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -1310,7 +1310,7 @@ export function WireframeExperimentsPage() {
               background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
             }}
           >
-            <div className="px-3 py-2 border-b" style={{ borderColor: C.border }}>
+            <div className="px-2 py-2 border-b" style={{ borderColor: C.border }}>
               <div className="flex items-center gap-2">
                 <div className="text-sm font-medium" style={{ color: C.fg5 }}>
                   {family}
