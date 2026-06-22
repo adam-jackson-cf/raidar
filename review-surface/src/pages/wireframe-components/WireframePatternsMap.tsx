@@ -359,8 +359,8 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
               {criteria.map((criterion) => (
                 <th key={criterion.key} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
-                    className="absolute bottom-9 left-1/2 origin-bottom whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
-                    style={{ color: C.fg3, transform: 'translateX(-50%) rotate(-60deg)' }}
+                    className="absolute bottom-9 origin-bottom whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
+                    style={{ color: C.fg3, left: 'calc(50% + 8px)', transform: 'translateX(-50%) rotate(-60deg)' }}
                     onMouseEnter={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
                       title: criterion.label,
