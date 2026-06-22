@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Patterns · Evidence map</title>
+<style>
+  :root {
+    --bg: #000;
+    --surface: #0a0a0a;
+    --border: rgba(255,255,255,0.06);
+    --green: #60E36D;
+    --red: #EB1414;
+    --orange: #F0AD4E;
+    --cyan: #4FCAE3;
+    --accent: #5B8DEF;
+    --muted: #7d8a90;
+    --bright: #e1e8ec;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--bright);
+    font-family: "SF Mono", "JetBrains Mono", "Roboto Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    line-height: 1.45;
+    padding: 24px;
+  }
+  .panel {
+    max-width: 920px;
+    margin: 0 auto;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .panel-head {
+    padding: 16px 18px 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .panel-head h1 {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .panel-head h1 .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+  }
+  .panel-head p {
+    margin: 6px 0 0;
+    color: var(--muted);
+    font-size: 11px;
+    max-width: 640px;
+  }
+  .meta-row {
+    display: flex;
+    gap: 14px;
+    margin-top: 10px;
+    flex-wrap: wrap;
+    font-size: 10.5px;
+    color: var(--muted);
+  }
+  .meta-row .chip {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    background: #060606;
+  }
+  .meta-row .chip b { color: var(--bright); font-weight: 600; }
+
+  /* Concept lanes */
+  .concepts {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1px;
+    background: var(--border);
+    border-bottom: 1px solid var(--border);
+  }
+  .concept {
+    background: var(--surface);
+    padding: 13px 15px;
+  }
+  .concept .label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+  }
+  .concept .tick { width: 8px; height: 8px; border-radius: 2px; }
+  .c-cost .tick { background: var(--red); box-shadow: 0 0 7px rgba(235,20,20,0.5); }
+  .c-trend .tick { background: var(--orange); box-shadow: 0 0 7px rgba(240,173,78,0.5); }
+  .c-strength .tick { background: var(--green); box-shadow: 0 0 7px rgba(96,227,109,0.5); }
+  .c-cost .count { color: var(--red); }
+  .c-trend .count { color: var(--orange); }
+  .c-strength .count { color: var(--green); }
+  .concept .count { font-size: 20px; font-weight: 700; margin: 8px 0 2px; }
+  .concept .sub { color: var(--muted); font-size: 10.5px; }
+
+  /* Map */
+  .map-wrap { padding: 16px 18px 8px; }
+  .map-title {
+    font-size: 10.5px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--muted);
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+  }
+  .map-title .legend { display: flex; gap: 12px; }
+  .map-title .legend span { display: flex; align-items: center; gap: 5px; }
+  .swatch { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+  .sw-pass { background: var(--green); }
+  .sw-fix { background: var(--cyan); }
+  .sw-fail { background: var(--red); }
+
+  table.map {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10.5px;
+  }
+  table.map th {
+    text-align: center;
+    font-weight: 500;
+    color: var(--muted);
+    padding: 6px 4px;
+    border-bottom: 1px solid var(--border);
+  }
+  table.map th.crit { text-align: left; width: 38%; }
+  table.map .agent-grp {
+    border-left: 1px solid var(--border);
+  }
+  table.map th .agent-name { color: var(--bright); font-weight: 600; font-size: 10px; }
+  table.map th .rev { color: var(--muted); font-weight: 400; font-size: 9.5px; }
+  table.map td {
+    padding: 5px 4px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    text-align: center;
+  }
+  table.map td.crit {
+    text-align: left;
+    color: var(--bright);
+    font-size: 10.5px;
+    white-space: nowrap;
+  }
+  table.map td.crit .tag {
+    color: var(--muted);
+    font-size: 9px;
+    display: block;
+    font-weight: 400;
+  }
+  .cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px; height: 20px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+  }
+  .cell.pass { color: var(--green); background: rgba(96,227,109,0.07); border-color: rgba(96,227,109,0.25); }
+  .cell.fail { color: var(--red); background: rgba(235,20,20,0.08); border-color: rgba(235,20,20,0.3); }
+  .cell.fix  { color: var(--cyan); background: rgba(79,202,227,0.08); border-color: rgba(79,202,227,0.3); }
+  .agent-grp { border-left: 1px solid var(--border); }
+
+  /* Evidence cards */
+  .evidence {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1px;
+    background: var(--border);
+    border-top: 1px solid var(--border);
+    margin-top: 8px;
+  }
+  .ev-card { background: var(--surface); padding: 14px 16px; }
+  .ev-card .hd {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px;
+    font-weight: 600; margin-bottom: 8px;
+  }
+  .ev-card.cost .hd { color: var(--red); }
+  .ev-card.strength .hd { color: var(--green); }
+  .ev-card .crit-name { color: var(--bright); font-size: 12px; font-weight: 600; margin-bottom: 4px; }
+  .ev-card p { margin: 0 0 8px; color: var(--muted); font-size: 11px; line-height: 1.5; }
+  .ev-card p b { color: var(--bright); font-weight: 600; }
+  .ev-card .trail {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 10px; color: var(--muted);
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .ev-card .trail .pip {
+    border: 1px solid var(--border);
+    border-radius: 3px; padding: 2px 6px;
+    font-weight: 600;
+  }
+  .pip.f { color: var(--red); border-color: rgba(235,20,20,0.3); }
+  .pip.x { color: var(--cyan); border-color: rgba(79,202,227,0.3); }
+  .pip.p { color: var(--green); border-color: rgba(96,227,109,0.3); }
+  .arrow { color: var(--muted); }
+  .cost-badge {
+    display: inline-block;
+    background: rgba(235,20,20,0.1);
+    border: 1px solid rgba(235,20,20,0.3);
+    color: var(--red);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 9.5px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .trend-badge {
+    display: inline-block;
+    background: rgba(96,227,109,0.1);
+    border: 1px solid rgba(96,227,109,0.3);
+    color: var(--green);
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 9.5px;
+    font-weight: 600;
+    margin-left: 6px;
+  }
+  .foot {
+    padding: 10px 18px 14px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 10px;
+    display: flex;
+    justify-content: space-between;
+  }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="panel-head">
+    <h1><span class="dot"></span> Patterns · Evidence map</h1>
+    <p>Recurring signals mapped across the runs in view — each criterion linked to the revisions and agents where it fired, so a pattern is traceable to its evidence, not just counted.</p>
+    <div class="meta-row">
+      <span class="chip"><b>skill-benchmark-coding-test</b></span>
+      <span class="chip">revisions <b>v001 · v002 · v003</b></span>
+      <span class="chip">agents <b>2</b></span>
+      <span class="chip">criteria <b>8</b></span>
+      <span class="chip">overall <b style="color:var(--green)">12 pass</b> / <b style="color:var(--red)">6 fail</b></span>
+    </div>
+  </div>
+
+  <div class="concepts">
+    <div class="concept c-cost">
+      <div class="label"><span class="tick"></span> Costing you</div>
+      <div class="count">2</div>
+      <div class="sub">Criteria still failing in v003 — block latest revision on both agents.</div>
+    </div>
+    <div class="concept c-trend">
+      <div class="label"><span class="tick"></span> Trending up</div>
+      <div class="count">3</div>
+      <div class="sub">Failed early, cleared by v003. Recovery direction is consistent.</div>
+    </div>
+    <div class="concept c-strength">
+      <div class="label"><span class="tick"></span> Repeatable strengths</div>
+      <div class="count">3</div>
+      <div class="sub">Pass on every revision where evaluated, across both agents.</div>
+    </div>
+  </div>
+
+  <div class="map-wrap">
+    <div class="map-title">
+      <span>Criterion → revision × agent</span>
+      <span class="legend">
+        <span><i class="swatch sw-pass"></i> pass</span>
+        <span><i class="swatch sw-fix"></i> cleared</span>
+        <span><i class="swatch sw-fail"></i> fail</span>
+      </span>
+    </div>
+    <table class="map">
+      <thead>
+        <tr>
+          <th class="crit">criterion</th>
+          <th class="agent-grp" colspan="3"><span class="agent-name">Claude-Claude-S-4.6</span></th>
+          <th class="agent-grp" colspan="3"><span class="agent-name">Codex-GPT-5.5-L</span></th>
+        </tr>
+        <tr>
+          <th class="crit"></th>
+          <th class="agent-grp"><span class="rev">v001</span></th>
+          <th><span class="rev">v002</span></th>
+          <th><span class="rev">v003</span></th>
+          <th class="agent-grp"><span class="rev">v001</span></th>
+          <th><span class="rev">v002</span></th>
+          <th><span class="rev">v003</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="crit">requirements-adherence<span class="tag">trending up</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fix">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fix">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+        <tr>
+          <td class="crit">requirements-coverage<span class="tag">trending up</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fix">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fix">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+        <tr>
+          <td class="crit">verification-stability<span class="tag">trending up</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fail">✕</span></td>
+          <td><span class="cell fix">✓</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fix">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+        <tr>
+          <td class="crit">code-quality<span class="tag" style="color:var(--red)">costing you</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fail">✕</span></td>
+          <td><span class="cell fail">✕</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+        <tr>
+          <td class="crit">resource-efficiency<span class="tag" style="color:var(--red)">costing you</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td class="agent-grp"><span class="cell fail">✕</span></td>
+          <td><span class="cell fail">✕</span></td>
+          <td><span class="cell fail">✕</span></td>
+        </tr>
+        <tr>
+          <td class="crit">artifact-checks<span class="tag" style="color:var(--green)">repeatable</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+        <tr>
+          <td class="crit">functional<span class="tag" style="color:var(--green)">repeatable</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+        <tr>
+          <td class="crit">test-coverage<span class="tag" style="color:var(--green)">repeatable</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td class="agent-grp"><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+          <td><span class="cell pass">✓</span></td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="evidence">
+      <div class="ev-card cost">
+        <div class="hd"><span class="tick" style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block;"></span> Friction · why it costs<span class="cost-badge">blocks v003</span></div>
+        <div class="crit-name">code-quality — Claude-Claude-S-4.6</div>
+        <p>Fails on <b>all three revisions</b> for this agent while Codex passes clean. Not flaky and not recovering — a persistent gap localized to one agent.</p>
+        <p><b>Cost:</b> holds the latest revision below merge bar despite requirements criteria now green. Every re-run spends budget re-failing the same lint/structure checks instead of advancing.</p>
+        <div class="trail">
+          <span class="pip f">v001 ✕</span><span class="arrow">→</span>
+          <span class="pip f">v002 ✕</span><span class="arrow">→</span>
+          <span class="pip f">v003 ✕</span>
+          <span style="margin-left:auto;">no recovery trend</span>
+        </div>
+      </div>
+
+      <div class="ev-card strength">
+        <div class="hd"><span class="tick" style="width:8px;height:8px;border-radius:2px;background:var(--green);display:inline-block;"></span> Strength · why it holds<span class="trend-badge">stable 6/6</span></div>
+        <div class="crit-name">functional — both agents</div>
+        <p>Passes on <b>6 of 6</b> cells — but the signal is the <b>shape</b>: green across every revision <i>and</i> both agents, with zero dips even while v001 was failing requirements.</p>
+        <p><b>Consistency:</b> independent of revision churn and agent choice, so it is safe to treat as a baseline rather than re-verify each run. Contrast with trending-up criteria, which only just stabilized at v003.</p>
+        <div class="trail">
+          <span class="pip p">Claude 3/3 ✓</span>
+          <span class="pip p">Codex 3/3 ✓</span>
+          <span style="margin-left:auto;">no regressions observed</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="foot">
+    <span>Evidence map · linked to 18 evaluated cells across 3 revisions</span>
+    <span>cleared = failed earlier, green in v003</span>
+  </div>
+</div>
+</body>
+</html>

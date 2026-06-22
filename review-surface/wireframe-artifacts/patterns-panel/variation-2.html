@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patterns — Variation 2 · Trajectory rows</title>
+<style>
+  :root{
+    --bg:#000; --surface:#0a0a0a; --elevated:#111; --border:rgba(255,255,255,.06);
+    --borderL:rgba(255,255,255,.1); --fg0:#5a6a72; --fg1:#7d8a90; --fg2:#a0acb2;
+    --fg3:#c8d5dc; --fg4:#e1e8ec; --fg5:#f2f5f7; --accent:#5B8DEF; --green:#60E36D;
+    --red:#EB1414; --orange:#F0AD4E; --cyan:#4FCAE3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg2);
+    font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:13px;line-height:1.4;padding:28px;}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .panel{max-width:940px;margin:0 auto;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:20px 22px;}
+  h1{font-size:16px;color:var(--fg5);margin:0;font-weight:600;}
+  .sub{color:var(--fg1);font-size:12px;margin:4px 0 2px;}
+  .scope{color:var(--fg0);font-size:11px;margin-bottom:16px;}
+  .scope b{color:var(--fg3);font-weight:600;}
+  .grouphead{display:flex;align-items:center;gap:8px;margin:18px 0 8px;font-size:11px;
+    text-transform:uppercase;letter-spacing:.7px;}
+  .grouphead .ico{width:9px;height:9px;border-radius:50%;}
+  .g-cost .ico{background:var(--red);} .g-up .ico{background:var(--cyan);} .g-rep .ico{background:var(--green);}
+  .g-cost{color:#ff8a8a;} .g-up{color:var(--cyan);} .g-rep{color:var(--green);}
+  .grouphead .note{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--fg0);font-size:10.5px;}
+  .row{display:grid;grid-template-columns:200px 1fr 150px;gap:14px;align-items:center;
+    border:1px solid var(--border);border-radius:7px;padding:11px 13px;margin-bottom:8px;
+    background:var(--elevated);}
+  .crit{font-size:12.5px;color:var(--fg4);font-weight:600;}
+  .ctype{font-size:10.5px;color:var(--fg0);margin-top:2px;}
+  /* trajectory chart */
+  .chart{display:flex;align-items:flex-end;gap:0;height:46px;position:relative;}
+  .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:4px;height:100%;}
+  .bar{width:60%;border-radius:2px 2px 0 0;min-height:3px;}
+  .bar.p{background:linear-gradient(var(--green),rgba(96,227,109,.35));}
+  .bar.f{background:linear-gradient(var(--red),rgba(235,20,20,.35));}
+  .bar.w{background:linear-gradient(var(--orange),rgba(240,173,78,.35));}
+  .rev{font-size:9.5px;color:var(--fg0);}
+  .val{font-size:9.5px;color:var(--fg2);}
+  .read{font-size:11px;color:var(--fg2);}
+  .read .big{font-size:13px;font-weight:700;color:var(--fg5);display:block;margin-bottom:2px;}
+  .read .big.up{color:var(--cyan);} .read .big.rep{color:var(--green);} .read .big.cost{color:#ff8a8a;}
+  .why{grid-column:1 / -1;font-size:11px;color:var(--fg2);border-top:1px dashed var(--border);
+    margin-top:10px;padding-top:9px;}
+  .why b{color:var(--fg4);}
+  .agents{display:inline-flex;gap:4px;align-items:center;margin-left:8px;color:var(--fg0);font-size:10px;}
+  .ad{width:6px;height:6px;border-radius:50%;background:var(--green);}
+  .ad.x{background:var(--red);}
+  .foot{margin-top:18px;font-size:10.5px;color:var(--fg0);border-top:1px solid var(--border);padding-top:10px;}
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>Patterns · Revision trajectory</h1>
+  <div class="sub">Every recurring signal plotted across the visible revisions, so movement and consequence read at a glance.</div>
+  <div class="scope mono">scope <b>skill-benchmark-coding-test</b> · <b>v001 → v003</b> · <b>2 agents</b> · <b>18 runs</b> · diff v001→v002: requirements · rules · prompt changed</div>
+
+  <!-- COSTING YOU -->
+  <div class="grouphead g-cost"><span class="ico"></span>Costing you<span class="note">latest revision still under-performs</span></div>
+  <div class="row">
+    <div>
+      <div class="crit">Resource efficiency</div>
+      <div class="ctype mono">scorer · resource-efficiency@1</div>
+    </div>
+    <div class="chart">
+      <div class="col"><span class="val mono">.80</span><div class="bar w" style="height:55%"></div><span class="rev mono">v001</span></div>
+      <div class="col"><span class="val mono">.88</span><div class="bar w" style="height:64%"></div><span class="rev mono">v002</span></div>
+      <div class="col"><span class="val mono">.88</span><div class="bar w" style="height:64%"></div><span class="rev mono">v003</span></div>
+    </div>
+    <div class="read"><span class="big cost mono">0.88</span>flat · lowest scorer</div>
+    <div class="why"><b>Why it costs you:</b> while every other scorer climbed to 0.95 by v003, resource efficiency stalled at 0.88 across two revisions. It is now the ceiling on the composite — fixing it is the only remaining headroom in this family.</div>
+  </div>
+
+  <!-- TRENDING UP -->
+  <div class="grouphead g-up"><span class="ico"></span>Trending up<span class="note">failed early, cleared and held</span></div>
+  <div class="row">
+    <div>
+      <div class="crit">Functional</div>
+      <div class="ctype mono">scorer · 0/6 → 6/6</div>
+    </div>
+    <div class="chart">
+      <div class="col"><span class="val mono">fail</span><div class="bar f" style="height:18%"></div><span class="rev mono">v001</span></div>
+      <div class="col"><span class="val mono">pass</span><div class="bar p" style="height:78%"></div><span class="rev mono">v002</span></div>
+      <div class="col"><span class="val mono">pass</span><div class="bar p" style="height:95%"></div><span class="rev mono">v003</span></div>
+    </div>
+    <div class="read"><span class="big up mono">+6</span>cleared at v002</div>
+    <div class="why"><b>What moved:</b> failed on all 6 v001 runs (both agents). The v001→v002 diff flipped it to passing and it held through v003. Code quality, artifact checks, test coverage and verification stability moved on the same step — a cluster recovery, not a single fluke.<span class="agents"><span class="ad x"></span><span class="ad"></span> both agents</span></div>
+  </div>
+
+  <!-- REPEATABLE STRENGTHS -->
+  <div class="grouphead g-rep"><span class="ico"></span>Repeatable strengths<span class="note">reproduced across agents</span></div>
+  <div class="row">
+    <div>
+      <div class="crit">Requirements adherence + coverage</div>
+      <div class="ctype mono">scorer · requirements@1</div>
+    </div>
+    <div class="chart">
+      <div class="col"><span class="val mono">n/a</span><div class="bar" style="height:6%;background:var(--fg0)"></div><span class="rev mono">v001</span></div>
+      <div class="col"><span class="val mono">.83</span><div class="bar p" style="height:80%"></div><span class="rev mono">v002</span></div>
+      <div class="col"><span class="val mono">.95</span><div class="bar p" style="height:95%"></div><span class="rev mono">v003</span></div>
+    </div>
+    <div class="read"><span class="big rep mono">12/12</span>σ = 0</div>
+    <div class="why"><b>Why it beats a raw 12 of 12:</b> introduced at v002, it passed on every run of two different agents across two revisions with zero variance. Independent agent agreement is the signal of trust — this one you can build on.<span class="agents"><span class="ad"></span><span class="ad"></span> both agents</span></div>
+  </div>
+
+  <div class="foot mono">Bars show the scorer mean / pass-state per revision. Threshold to surface: pass-or-fail count ≥ ceil(sample/3). Each criterion classified into one dominant state.</div>
+</div>
+</body>
+</html>

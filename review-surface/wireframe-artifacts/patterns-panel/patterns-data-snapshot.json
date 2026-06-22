@@ -1,0 +1,1151 @@
+{
+  "experiments": [
+    {
+      "scenario": "bugfix-ledger-balance",
+      "revision": "v001",
+      "agent_spec": "codex-cli · openai/gpt-5.5:high",
+      "run_ids": [
+        "synthetic-bugfix-gpt-5.5-high-01",
+        "synthetic-bugfix-gpt-5.5-high-02",
+        "synthetic-bugfix-gpt-5.5-high-03",
+        "synthetic-bugfix-gpt-5.5-high-04",
+        "synthetic-bugfix-gpt-5.5-high-05"
+      ],
+      "aggregate": {
+        "run_count_total": 5,
+        "run_count_scored": 5,
+        "composite_score": {
+          "mean": 0.919,
+          "median": 0.919,
+          "stddev": 0,
+          "min": 0.919,
+          "max": 0.919
+        },
+        "duration_sec": {
+          "mean": 186,
+          "median": 186,
+          "stddev": 16.970563,
+          "min": 162,
+          "max": 210
+        },
+        "uncached_input_tokens": {
+          "mean": 47550,
+          "median": 47550,
+          "stddev": 1202.081528,
+          "min": 45850,
+          "max": 49250
+        },
+        "metric_outcomes": {
+          "change-containment": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "defect-evidence-completeness": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "defect-resolution": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "regression-protection": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "requirements-adherence": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "requirements-coverage": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "resource-efficiency": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 0.9
+          },
+          "verification-stability": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          }
+        },
+        "scorer_outcomes": {
+          "bugfix@1": {
+            "sample_size": 5,
+            "mean_score": 0.92
+          },
+          "requirements@1": {
+            "sample_size": 5,
+            "mean_score": 0.92
+          },
+          "resource-efficiency@1": {
+            "sample_size": 5,
+            "mean_score": 0.85
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "review",
+        "achieved_scored_runs": 5,
+        "minimum_met": true,
+        "preferred_met": true,
+        "sample_adequacy": 1
+      },
+      "findings": [
+        {
+          "id": "experiment-finding-001",
+          "kind": "note",
+          "category": "resource-outlier",
+          "title": "Run synthetic-bugfix-gpt-5.5-high-05 duration 210s is an outlier",
+          "detail": "peer mean 180s across 4 scored runs",
+          "evidence": [
+            {
+              "source": "run",
+              "reference": "synthetic-bugfix-gpt-5.5-high-05",
+              "detail": "duration_sec=210.0"
+            }
+          ],
+          "source": "deterministic"
+        }
+      ]
+    },
+    {
+      "scenario": "bugfix-ledger-balance",
+      "revision": "v001",
+      "agent_spec": "codex-cli · openai/gpt-5.5:low",
+      "run_ids": [
+        "synthetic-bugfix-gpt-5.5-low-01",
+        "synthetic-bugfix-gpt-5.5-low-02",
+        "synthetic-bugfix-gpt-5.5-low-03",
+        "synthetic-bugfix-gpt-5.5-low-04",
+        "synthetic-bugfix-gpt-5.5-low-05"
+      ],
+      "aggregate": {
+        "run_count_total": 5,
+        "run_count_scored": 4,
+        "composite_score": {
+          "mean": 0.8415,
+          "median": 0.969,
+          "stddev": 0.220836,
+          "min": 0.459,
+          "max": 0.969
+        },
+        "duration_sec": {
+          "mean": 240,
+          "median": 145,
+          "stddev": 173.349358,
+          "min": 130,
+          "max": 540
+        },
+        "uncached_input_tokens": {
+          "mean": 38125,
+          "median": 38125,
+          "stddev": 950.32889,
+          "min": 36850,
+          "max": 39400
+        },
+        "metric_outcomes": {
+          "change-containment": {
+            "pass_count": 4,
+            "fail_count": 0,
+            "sample_size": 4,
+            "pass_rate": 1,
+            "mean_score": 0.9625
+          },
+          "defect-evidence-completeness": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.875
+          },
+          "defect-resolution": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.865
+          },
+          "regression-protection": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.875
+          },
+          "requirements-adherence": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.7875
+          },
+          "requirements-coverage": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.9
+          },
+          "resource-efficiency": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.8
+          },
+          "verification-stability": {
+            "pass_count": 3,
+            "fail_count": 1,
+            "sample_size": 4,
+            "pass_rate": 0.75,
+            "mean_score": 0.85
+          }
+        },
+        "scorer_outcomes": {
+          "bugfix@1": {
+            "sample_size": 4,
+            "mean_score": 0.8425
+          },
+          "requirements@1": {
+            "sample_size": 4,
+            "mean_score": 0.8425
+          },
+          "resource-efficiency@1": {
+            "sample_size": 4,
+            "mean_score": 0.7975
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "review",
+        "achieved_scored_runs": 4,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.8
+      },
+      "findings": [
+        {
+          "id": "experiment-finding-001",
+          "kind": "issue",
+          "category": "unscored-run",
+          "title": "Run synthetic-bugfix-gpt-5.5-low-05 is unscored",
+          "detail": "Scoring did not complete: the harness exited before verification finished., Re-run this scenario to obtain a score.",
+          "evidence": [
+            {
+              "source": "run",
+              "reference": "synthetic-bugfix-gpt-5.5-low-05",
+              "detail": "Scoring did not complete: the harness exited before verification finished., Re-run this scenario to obtain a score."
+            }
+          ],
+          "source": "deterministic"
+        },
+        {
+          "id": "experiment-finding-002",
+          "kind": "note",
+          "category": "repeat-variance",
+          "title": "High composite-score variance across repeats (stddev=0.221)",
+          "detail": "",
+          "evidence": [
+            {
+              "source": "experiment_aggregate",
+              "reference": "composite_score.stddev",
+              "detail": "0.221"
+            }
+          ],
+          "source": "deterministic"
+        },
+        {
+          "id": "experiment-finding-003",
+          "kind": "note",
+          "category": "resource-outlier",
+          "title": "Run synthetic-bugfix-gpt-5.5-low-04 duration 540s is an outlier",
+          "detail": "peer mean 140s across 3 scored runs",
+          "evidence": [
+            {
+              "source": "run",
+              "reference": "synthetic-bugfix-gpt-5.5-low-04",
+              "detail": "duration_sec=540.0"
+            }
+          ],
+          "source": "deterministic"
+        },
+        {
+          "id": "experiment-finding-004",
+          "kind": "issue",
+          "category": "rerun-target",
+          "title": "Rerun budget exhausted before reaching the scored-run target",
+          "detail": "achieved=4, target=5",
+          "evidence": [
+            {
+              "source": "experiment_rerun",
+              "reference": "target_met",
+              "detail": "false"
+            }
+          ],
+          "source": "deterministic"
+        }
+      ]
+    },
+    {
+      "scenario": "bugfix-ledger-balance",
+      "revision": "v001",
+      "agent_spec": "codex-cli · openai/gpt-5.5:medium",
+      "run_ids": [
+        "synthetic-bugfix-gpt-5.5-medium-01",
+        "synthetic-bugfix-gpt-5.5-medium-02",
+        "synthetic-bugfix-gpt-5.5-medium-03",
+        "synthetic-bugfix-gpt-5.5-medium-04",
+        "synthetic-bugfix-gpt-5.5-medium-05"
+      ],
+      "aggregate": {
+        "run_count_total": 5,
+        "run_count_scored": 5,
+        "composite_score": {
+          "mean": 0.969,
+          "median": 0.969,
+          "stddev": 0,
+          "min": 0.969,
+          "max": 0.969
+        },
+        "duration_sec": {
+          "mean": 186,
+          "median": 186,
+          "stddev": 16.970563,
+          "min": 162,
+          "max": 210
+        },
+        "uncached_input_tokens": {
+          "mean": 43050,
+          "median": 43050,
+          "stddev": 1202.081528,
+          "min": 41350,
+          "max": 44750
+        },
+        "metric_outcomes": {
+          "change-containment": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "defect-evidence-completeness": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "defect-resolution": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "regression-protection": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "requirements-adherence": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "requirements-coverage": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          },
+          "resource-efficiency": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 0.9
+          },
+          "verification-stability": {
+            "pass_count": 5,
+            "fail_count": 0,
+            "sample_size": 5,
+            "pass_rate": 1,
+            "mean_score": 1
+          }
+        },
+        "scorer_outcomes": {
+          "bugfix@1": {
+            "sample_size": 5,
+            "mean_score": 0.97
+          },
+          "requirements@1": {
+            "sample_size": 5,
+            "mean_score": 0.97
+          },
+          "resource-efficiency@1": {
+            "sample_size": 5,
+            "mean_score": 0.93
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "review",
+        "achieved_scored_runs": 5,
+        "minimum_met": true,
+        "preferred_met": true,
+        "sample_adequacy": 1
+      },
+      "findings": [
+        {
+          "id": "experiment-finding-001",
+          "kind": "note",
+          "category": "resource-outlier",
+          "title": "Run synthetic-bugfix-gpt-5.5-medium-05 duration 210s is an outlier",
+          "detail": "peer mean 180s across 4 scored runs",
+          "evidence": [
+            {
+              "source": "run",
+              "reference": "synthetic-bugfix-gpt-5.5-medium-05",
+              "detail": "duration_sec=210.0"
+            }
+          ],
+          "source": "deterministic"
+        }
+      ]
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "revision": "v001",
+      "agent_spec": "claude-code · anthropic/claude-sonnet-4.6",
+      "run_ids": [
+        "synthetic-skill-v001-claude-sonnet-4.6-01",
+        "synthetic-skill-v001-claude-sonnet-4.6-02",
+        "synthetic-skill-v001-claude-sonnet-4.6-03"
+      ],
+      "aggregate": {
+        "run_count_total": 3,
+        "run_count_scored": 3,
+        "composite_score": {
+          "mean": 0.74,
+          "median": 0.74,
+          "stddev": 0.008165,
+          "min": 0.73,
+          "max": 0.75
+        },
+        "duration_sec": {
+          "mean": 216,
+          "median": 216,
+          "stddev": 6.531973,
+          "min": 208,
+          "max": 224
+        },
+        "uncached_input_tokens": {
+          "mean": 37200,
+          "median": 37200,
+          "stddev": 530.722778,
+          "min": 36550,
+          "max": 37850
+        },
+        "metric_outcomes": {
+          "artifact-checks": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.74
+          },
+          "code-quality": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.74
+          },
+          "functional": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.74
+          },
+          "resource-efficiency": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.74
+          },
+          "test-coverage": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.74
+          },
+          "verification-stability": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.74
+          }
+        },
+        "scorer_outcomes": {
+          "resource-efficiency@1": {
+            "sample_size": 3,
+            "mean_score": 0.8
+          },
+          "typescript-code-task@1": {
+            "sample_size": 3,
+            "mean_score": 0.74
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "smoke",
+        "achieved_scored_runs": 3,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.6
+      },
+      "findings": []
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "revision": "v001",
+      "agent_spec": "codex-cli · openai/gpt-5.5:low",
+      "run_ids": [
+        "synthetic-skill-v001-gpt-5.5-low-01",
+        "synthetic-skill-v001-gpt-5.5-low-02",
+        "synthetic-skill-v001-gpt-5.5-low-03"
+      ],
+      "aggregate": {
+        "run_count_total": 3,
+        "run_count_scored": 3,
+        "composite_score": {
+          "mean": 0.78,
+          "median": 0.78,
+          "stddev": 0.008165,
+          "min": 0.77,
+          "max": 0.79
+        },
+        "duration_sec": {
+          "mean": 216,
+          "median": 216,
+          "stddev": 6.531973,
+          "min": 208,
+          "max": 224
+        },
+        "uncached_input_tokens": {
+          "mean": 35100,
+          "median": 35100,
+          "stddev": 530.722778,
+          "min": 34450,
+          "max": 35750
+        },
+        "metric_outcomes": {
+          "artifact-checks": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.78
+          },
+          "code-quality": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.78
+          },
+          "functional": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.78
+          },
+          "resource-efficiency": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.78
+          },
+          "test-coverage": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.78
+          },
+          "verification-stability": {
+            "pass_count": 0,
+            "fail_count": 3,
+            "sample_size": 3,
+            "pass_rate": 0,
+            "mean_score": 0.78
+          }
+        },
+        "scorer_outcomes": {
+          "resource-efficiency@1": {
+            "sample_size": 3,
+            "mean_score": 0.8
+          },
+          "typescript-code-task@1": {
+            "sample_size": 3,
+            "mean_score": 0.78
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "smoke",
+        "achieved_scored_runs": 3,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.6
+      },
+      "findings": []
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "revision": "v002",
+      "agent_spec": "claude-code · anthropic/claude-sonnet-4.6",
+      "run_ids": [
+        "synthetic-skill-v002-claude-sonnet-4.6-01",
+        "synthetic-skill-v002-claude-sonnet-4.6-02",
+        "synthetic-skill-v002-claude-sonnet-4.6-03"
+      ],
+      "aggregate": {
+        "run_count_total": 3,
+        "run_count_scored": 3,
+        "composite_score": {
+          "mean": 0.83,
+          "median": 0.83,
+          "stddev": 0.008165,
+          "min": 0.82,
+          "max": 0.84
+        },
+        "duration_sec": {
+          "mean": 216,
+          "median": 216,
+          "stddev": 6.531973,
+          "min": 208,
+          "max": 224
+        },
+        "uncached_input_tokens": {
+          "mean": 32200,
+          "median": 32200,
+          "stddev": 530.722778,
+          "min": 31550,
+          "max": 32850
+        },
+        "metric_outcomes": {
+          "artifact-checks": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "code-quality": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "functional": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "requirements-adherence": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "requirements-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "resource-efficiency": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "test-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          },
+          "verification-stability": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.83
+          }
+        },
+        "scorer_outcomes": {
+          "requirements@1": {
+            "sample_size": 3,
+            "mean_score": 0.83
+          },
+          "resource-efficiency@1": {
+            "sample_size": 3,
+            "mean_score": 0.88
+          },
+          "typescript-code-task@1": {
+            "sample_size": 3,
+            "mean_score": 0.83
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "smoke",
+        "achieved_scored_runs": 3,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.6
+      },
+      "findings": []
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "revision": "v002",
+      "agent_spec": "codex-cli · openai/gpt-5.5:low",
+      "run_ids": [
+        "synthetic-skill-v002-gpt-5.5-low-01",
+        "synthetic-skill-v002-gpt-5.5-low-02",
+        "synthetic-skill-v002-gpt-5.5-low-03"
+      ],
+      "aggregate": {
+        "run_count_total": 3,
+        "run_count_scored": 3,
+        "composite_score": {
+          "mean": 0.85,
+          "median": 0.85,
+          "stddev": 0.008165,
+          "min": 0.84,
+          "max": 0.86
+        },
+        "duration_sec": {
+          "mean": 216,
+          "median": 216,
+          "stddev": 6.531973,
+          "min": 208,
+          "max": 224
+        },
+        "uncached_input_tokens": {
+          "mean": 30100,
+          "median": 30100,
+          "stddev": 530.722778,
+          "min": 29450,
+          "max": 30750
+        },
+        "metric_outcomes": {
+          "artifact-checks": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "code-quality": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "functional": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "requirements-adherence": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "requirements-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "resource-efficiency": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "test-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          },
+          "verification-stability": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.85
+          }
+        },
+        "scorer_outcomes": {
+          "requirements@1": {
+            "sample_size": 3,
+            "mean_score": 0.85
+          },
+          "resource-efficiency@1": {
+            "sample_size": 3,
+            "mean_score": 0.88
+          },
+          "typescript-code-task@1": {
+            "sample_size": 3,
+            "mean_score": 0.85
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "smoke",
+        "achieved_scored_runs": 3,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.6
+      },
+      "findings": []
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "revision": "v003",
+      "agent_spec": "claude-code · anthropic/claude-sonnet-4.6",
+      "run_ids": [
+        "synthetic-skill-v003-claude-sonnet-4.6-01",
+        "synthetic-skill-v003-claude-sonnet-4.6-02",
+        "synthetic-skill-v003-claude-sonnet-4.6-03"
+      ],
+      "aggregate": {
+        "run_count_total": 3,
+        "run_count_scored": 3,
+        "composite_score": {
+          "mean": 0.948667,
+          "median": 0.949,
+          "stddev": 0.00776,
+          "min": 0.939,
+          "max": 0.958
+        },
+        "duration_sec": {
+          "mean": 176,
+          "median": 176,
+          "stddev": 6.531973,
+          "min": 168,
+          "max": 184
+        },
+        "uncached_input_tokens": {
+          "mean": 27200,
+          "median": 27200,
+          "stddev": 530.722778,
+          "min": 26550,
+          "max": 27850
+        },
+        "metric_outcomes": {
+          "artifact-checks": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "code-quality": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "functional": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "requirements-adherence": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "requirements-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "resource-efficiency": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "test-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          },
+          "verification-stability": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.95
+          }
+        },
+        "scorer_outcomes": {
+          "requirements@1": {
+            "sample_size": 3,
+            "mean_score": 0.95
+          },
+          "resource-efficiency@1": {
+            "sample_size": 3,
+            "mean_score": 0.88
+          },
+          "typescript-code-task@1": {
+            "sample_size": 3,
+            "mean_score": 0.95
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "smoke",
+        "achieved_scored_runs": 3,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.6
+      },
+      "findings": []
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "revision": "v003",
+      "agent_spec": "codex-cli · openai/gpt-5.5:low",
+      "run_ids": [
+        "synthetic-skill-v003-gpt-5.5-low-01",
+        "synthetic-skill-v003-gpt-5.5-low-02",
+        "synthetic-skill-v003-gpt-5.5-low-03"
+      ],
+      "aggregate": {
+        "run_count_total": 3,
+        "run_count_scored": 3,
+        "composite_score": {
+          "mean": 0.909333,
+          "median": 0.909,
+          "stddev": 0.00776,
+          "min": 0.9,
+          "max": 0.919
+        },
+        "duration_sec": {
+          "mean": 176,
+          "median": 176,
+          "stddev": 6.531973,
+          "min": 168,
+          "max": 184
+        },
+        "uncached_input_tokens": {
+          "mean": 25100,
+          "median": 25100,
+          "stddev": 530.722778,
+          "min": 24450,
+          "max": 25750
+        },
+        "metric_outcomes": {
+          "artifact-checks": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "code-quality": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "functional": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "requirements-adherence": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "requirements-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "resource-efficiency": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "test-coverage": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          },
+          "verification-stability": {
+            "pass_count": 3,
+            "fail_count": 0,
+            "sample_size": 3,
+            "pass_rate": 1,
+            "mean_score": 0.91
+          }
+        },
+        "scorer_outcomes": {
+          "requirements@1": {
+            "sample_size": 3,
+            "mean_score": 0.91
+          },
+          "resource-efficiency@1": {
+            "sample_size": 3,
+            "mean_score": 0.88
+          },
+          "typescript-code-task@1": {
+            "sample_size": 3,
+            "mean_score": 0.91
+          }
+        }
+      },
+      "sample": {
+        "scenario_family": "code-task-nonvisual",
+        "minimum_scored_runs": 3,
+        "preferred_scored_runs": 5,
+        "sample_class": "smoke",
+        "achieved_scored_runs": 3,
+        "minimum_met": true,
+        "preferred_met": false,
+        "sample_adequacy": 0.6
+      },
+      "findings": []
+    }
+  ],
+  "revision_diffs": [
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "from_revision": "v001",
+      "to_revision": "v002",
+      "summary": [
+        "requirements changed",
+        "rules changed",
+        "prompt changed"
+      ]
+    },
+    {
+      "scenario": "skill-benchmark-coding-test",
+      "from_revision": "v002",
+      "to_revision": "v003",
+      "summary": [
+        "evaluation profile changed",
+        "rules changed",
+        "prompt changed"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Patterns — Variation 1 · Consequence lanes</title>
+<style>
+  :root{
+    --bg:#000; --surface:#0a0a0a; --elevated:#111; --border:rgba(255,255,255,.06);
+    --borderL:rgba(255,255,255,.1); --fg0:#5a6a72; --fg1:#7d8a90; --fg2:#a0acb2;
+    --fg3:#c8d5dc; --fg4:#e1e8ec; --fg5:#f2f5f7; --accent:#5B8DEF; --green:#60E36D;
+    --red:#EB1414; --orange:#F0AD4E; --cyan:#4FCAE3;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg2);
+    font-family:system-ui,-apple-system,Segoe UI,sans-serif;font-size:13px;line-height:1.45;
+    padding:28px;}
+  .mono{font-family:ui-monospace,"SF Mono",Menlo,monospace;}
+  .panel{max-width:1080px;margin:0 auto;background:var(--surface);border:1px solid var(--border);
+    border-radius:10px;padding:20px 22px;}
+  h1{font-size:16px;color:var(--fg5);margin:0;font-weight:600;letter-spacing:.2px;}
+  .sub{color:var(--fg1);font-size:12px;margin:4px 0 2px;}
+  .scope{color:var(--fg0);font-size:11px;margin-bottom:18px;}
+  .scope b{color:var(--fg3);font-weight:600;}
+  .lanes{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;}
+  .lane{background:var(--elevated);border:1px solid var(--border);border-radius:8px;padding:12px;}
+  .lane-h{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+  .dot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .lane-title{font-size:12.5px;font-weight:600;color:var(--fg4);}
+  .lane-q{font-size:11px;color:var(--fg0);margin:0 0 12px;min-height:28px;}
+  .cost .dot{background:var(--red);box-shadow:0 0 8px rgba(235,20,20,.5);}
+  .up .dot{background:var(--cyan);box-shadow:0 0 8px rgba(79,202,227,.5);}
+  .rep .dot{background:var(--green);box-shadow:0 0 8px rgba(96,227,109,.5);}
+  .cost .lane-title{color:#ff8a8a;} .up .lane-title{color:var(--cyan);} .rep .lane-title{color:var(--green);}
+  .card{border:1px solid var(--border);border-radius:6px;padding:10px 11px;margin-bottom:10px;
+    background:rgba(255,255,255,.012);}
+  .card:last-child{margin-bottom:0;}
+  .crit{font-size:12.5px;color:var(--fg4);font-weight:600;}
+  .ctype{font-size:10.5px;color:var(--fg0);margin-top:1px;}
+  .count{margin:8px 0 6px;font-size:12px;}
+  .count .n{color:var(--fg5);font-weight:700;}
+  .count .of{color:var(--fg1);}
+  .why{font-size:11px;color:var(--fg2);border-left:2px solid var(--borderL);padding-left:8px;margin-top:8px;}
+  .cost .why{border-color:rgba(235,20,20,.4);}
+  .up .why{border-color:rgba(79,202,227,.4);}
+  .rep .why{border-color:rgba(96,227,109,.4);}
+  .why .lead{color:var(--fg4);font-weight:600;}
+  .chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px;}
+  .chip{font-size:10px;padding:2px 6px;border-radius:4px;border:1px solid var(--border);
+    color:var(--fg1);background:rgba(255,255,255,.02);}
+  .chip.bad{color:#ff9a9a;border-color:rgba(235,20,20,.25);}
+  .chip.good{color:var(--green);border-color:rgba(96,227,109,.25);}
+  .chip.flat{color:var(--orange);border-color:rgba(240,173,78,.25);}
+  .traj{display:flex;align-items:center;gap:3px;margin-top:8px;font-size:10px;color:var(--fg1);}
+  .step{display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .pip{width:18px;height:4px;border-radius:2px;background:var(--fg0);}
+  .pip.f{background:var(--red);} .pip.p{background:var(--green);} .pip.w{background:var(--orange);}
+  .arrow{color:var(--fg0);}
+  .agents{display:flex;gap:4px;margin-top:8px;align-items:center;font-size:10px;color:var(--fg0);}
+  .ad{width:7px;height:7px;border-radius:50%;background:var(--green);}
+  .ad.x{background:var(--red);}
+  .foot{margin-top:16px;font-size:10.5px;color:var(--fg0);border-top:1px solid var(--border);padding-top:10px;}
+</style>
+</head>
+<body>
+<div class="panel">
+  <h1>Patterns · Consequence lanes</h1>
+  <div class="sub">What is hurting the result, what changed for the better, and what you can trust as repeatable.</div>
+  <div class="scope mono">scope <b>skill-benchmark-coding-test</b> · revisions <b>v001 → v003</b> · <b>2 agents</b> (claude-sonnet-4.6, gpt-5.5:low) · <b>18 runs</b></div>
+
+  <div class="lanes">
+
+    <!-- COSTING YOU -->
+    <section class="lane cost">
+      <div class="lane-h"><span class="dot"></span><span class="lane-title">Costing you</span></div>
+      <p class="lane-q">Still failing or under-performing in the latest visible revision.</p>
+
+      <div class="card">
+        <div class="crit">Resource efficiency</div>
+        <div class="ctype mono">scorer criteria · resource-efficiency@1</div>
+        <div class="count mono"><span class="n">0.88</span> <span class="of">scorer mean · flat since v002</span></div>
+        <div class="traj">
+          <span class="step"><span class="pip w"></span>.80</span><span class="arrow">›</span>
+          <span class="step"><span class="pip w"></span>.88</span><span class="arrow">›</span>
+          <span class="step"><span class="pip w"></span>.88</span>
+        </div>
+        <div class="why"><span class="lead">Cost:</span> every other dimension reached 0.95 in v003, but this scorer never moved past 0.88 — it is now the single lowest scorer and is capping the composite ceiling ~7 pts below the rest.</div>
+        <div class="chips"><span class="chip flat">no improvement 3 revs</span><span class="chip flat">lowest of 3 scorers</span></div>
+      </div>
+    </section>
+
+    <!-- TRENDING UP -->
+    <section class="lane up">
+      <div class="lane-h"><span class="dot"></span><span class="lane-title">Trending up</span></div>
+      <p class="lane-q">Failed in earlier visible revisions, cleared and held in later ones.</p>
+
+      <div class="card">
+        <div class="crit">Functional · Code quality · Verification</div>
+        <div class="ctype mono">scorer criteria · 5 gates, cleared together</div>
+        <div class="count mono"><span class="n">12</span> <span class="of">of 12 pass</span> · was <span style="color:#ff9a9a">0 of 6</span> at v001</div>
+        <div class="traj">
+          <span class="step"><span class="pip f"></span>v001</span><span class="arrow">›</span>
+          <span class="step"><span class="pip p"></span>v002</span><span class="arrow">›</span>
+          <span class="step"><span class="pip p"></span>v003</span>
+        </div>
+        <div class="why"><span class="lead">What changed:</span> the v001→v002 diff (<span class="mono">requirements · rules · prompt changed</span>) flipped a whole cluster of gates from total failure to total pass — and they stayed passing through v003 on both agents. Composite 0.74 → 0.95.</div>
+        <div class="chips"><span class="chip bad">0/6 at v001</span><span class="chip good">6/6 at v002</span><span class="chip good">6/6 at v003</span></div>
+      </div>
+    </section>
+
+    <!-- REPEATABLE STRENGTHS -->
+    <section class="lane rep">
+      <div class="lane-h"><span class="dot"></span><span class="lane-title">Repeatable strengths</span></div>
+      <p class="lane-q">Passing consistently now, reproduced across multiple agents.</p>
+
+      <div class="card">
+        <div class="crit">Requirements adherence + coverage</div>
+        <div class="ctype mono">scorer criteria · requirements@1</div>
+        <div class="count mono"><span class="n">12</span> <span class="of">of 12 pass · 0 variance</span></div>
+        <div class="agents"><span class="ad"></span><span class="ad"></span> both agents agree · 2 revisions</div>
+        <div class="why"><span class="lead">Why it is more than 12 of 12:</span> two independent agent stacks reproduced this on every run across two revisions with zero stddev. Agreement across agents — not a raw tally — is what makes it safe to rely on.</div>
+        <div class="chips"><span class="chip good">claude 6/6</span><span class="chip good">gpt-5.5 6/6</span><span class="chip good">σ = 0</span></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="foot mono">Threshold: a scorer criterion qualifies when pass/fail count ≥ ceil(sample/3). Each criterion is shown in its one dominant state, never as both friction and strength.</div>
+</div>
+</body>
+</html>
