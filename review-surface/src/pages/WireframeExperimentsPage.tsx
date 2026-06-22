@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState, type FocusEvent, type MouseEven
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRight, Eye, EyeOff, Pin, PinOff, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { WireframePatterns } from './wireframe-components/WireframePatterns';
+import { WireframePatternsMap } from './wireframe-components/WireframePatternsMap';
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
 import { WireframeTradeoffScatter } from './wireframe-components/WireframeTradeoffScatter';
@@ -1624,7 +1624,7 @@ export function WireframeExperimentsPage() {
                   selectedRevisions={selected}
                   allRevisionSelected={selectedSet.size === revisionIds.length}
                 />
-                <WireframePatterns experiments={visibleFamilyExps} runs={familyRuns} />
+                <WireframePatternsMap experiments={visibleFamilyExps} runs={familyRuns} />
               </div>
               <WireframeTradeoffScatter runs={familyRuns} />
           </div>
