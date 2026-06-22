@@ -318,7 +318,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>revisions <span className="num" style={{ color: C.fg4 }}>{revisions.join(' · ') || '—'}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agents <span className="num" style={{ color: C.fg4 }}>{rows.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criteria <span className="num" style={{ color: C.fg4 }}>{criteria.length}</span></span>
-          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>checks <span className="num" style={{ color: C.green }}>{passTotal} pass</span> / <span className="num" style={{ color: C.red }}>{failTotal} fail</span></span>
+          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criterion checks <span className="num" style={{ color: C.green }}>{passTotal} pass</span> / <span className="num" style={{ color: C.red }}>{failTotal} fail</span></span>
         </div>
       </div>
 
