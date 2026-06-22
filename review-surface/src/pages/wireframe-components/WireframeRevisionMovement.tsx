@@ -143,7 +143,7 @@ function DiffBlock({ file }: { file: FileDiff }) {
 
 type DiffPill = { label: string; warning: boolean; tab: string };
 
-function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
+export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('prompt');
   const pillConfig = (flag: string) => {
