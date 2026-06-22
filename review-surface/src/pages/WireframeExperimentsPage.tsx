@@ -1617,7 +1617,7 @@ export function WireframeExperimentsPage() {
                   </div>
                 </div>
               ))}
-              <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+              <div className="grid items-start gap-3 xl:grid-cols-2">
                 <WireframeTradeoffScatter runs={familyRuns} />
                 <WireframeRevisionMovement
                   experiments={allFamilyExps}
