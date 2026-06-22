@@ -83,7 +83,7 @@ function stateColor(state: CriterionState) {
 
 function cellColor(state: CellState) {
   if (state === 'pass') return C.green;
-  if (state === 'cleared') return C.cyan;
+  if (state === 'cleared') return C.orange;
   if (state === 'fail') return C.red;
   return C.fg0;
 }
@@ -351,7 +351,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           <span className="text-xs font-medium" style={{ color: C.fg4 }}>Evidence map</span>
           <span className="flex items-center gap-3 uppercase tracking-wide">
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.green }} />pass</span>
-            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.cyan }} />cleared</span>
+            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.orange }} />cleared</span>
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.red }} />fail</span>
           </span>
         </div>
