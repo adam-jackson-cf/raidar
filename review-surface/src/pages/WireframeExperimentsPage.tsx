@@ -1257,7 +1257,7 @@ export function WireframeExperimentsPage() {
           >
             <div className="px-2 py-2 border-b" style={{ borderColor: C.border }}>
               <div className="flex items-center gap-2">
-                <div className="text-sm font-medium" style={{ color: C.fg5 }}>
+                <div className="text-sm font-medium" style={{ color: '#8FF5D2' }}>
                   {family}
                 </div>
                 {hasSynthetic ? (
