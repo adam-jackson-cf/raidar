@@ -258,7 +258,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
       <div className="border-b px-3 py-3" style={{ borderColor: C.border }}>
         <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
           <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
-          Patterns · Evidence map
+          Patterns
           <span
             className="inline-flex size-4 items-center justify-center rounded-full border"
             style={{ color: C.fg1, borderColor: C.border }}
@@ -302,7 +302,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
 
       <div className="sb overflow-x-auto px-3 pb-3 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide" style={{ color: C.fg1 }}>
-          <span>agent spec → scoring criterion</span>
+          <span>Evidence map</span>
           <span className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.green }} />pass</span>
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.cyan }} />cleared</span>
@@ -316,10 +316,10 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
                 Agent spec
               </th>
               {criteria.map((criterion) => (
-                <th key={criterion.key} className="h-32 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
+                <th key={criterion.key} className="relative h-24 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
-                    className="origin-bottom-left whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
-                    style={{ color: stateColor(criterion.state), transform: 'rotate(-60deg)' }}
+                    className="absolute bottom-3 left-1/2 origin-bottom whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
+                    style={{ color: C.fg3, transform: 'translateX(-50%) rotate(-60deg)' }}
                     onMouseEnter={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
                       title: criterion.label,
