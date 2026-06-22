@@ -181,15 +181,37 @@ function buildMap(experiments: ExperimentRecord[]) {
   return { criteria, rows, revisions, latestRevision };
 }
 
-function SummaryCard({ state, label, count, copy }: { state: CriterionState; label: string; count: number; copy: string }) {
+function SummaryCard({
+  state,
+  label,
+  count,
+  copy,
+  onInfo,
+}: {
+  state: CriterionState;
+  label: string;
+  count: number;
+  copy: string;
+  onInfo: (event: MouseEvent<HTMLElement>, title: string, copy: string) => void;
+}) {
   return (
     <div className="p-3" style={{ borderLeft: `1px solid ${C.border}`, background: C.surface }}>
       <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide" style={{ color: C.fg4 }}>
         <span className="inline-block size-2 rounded-sm" style={{ background: stateColor(state), boxShadow: `0 0 8px ${stateColor(state)}70` }} />
         {label}
+        <button
+          className="inline-flex size-4 items-center justify-center rounded-full border"
+          style={{ color: C.fg1, borderColor: C.border }}
+          onMouseEnter={(event) => onInfo(event, label, copy)}
+          onMouseMove={(event) => onInfo(event, label, copy)}
+          onMouseLeave={() => undefined}
+          type="button"
+          aria-label={`${label} explanation`}
+        >
+          <Info size={10} />
+        </button>
       </div>
       <div className="num mt-2 text-[22px] font-bold" style={{ color: stateColor(state) }}>{count}</div>
-      <div className="mt-1 text-[12px] leading-5" style={{ color: C.fg1 }}>{copy}</div>
     </div>
   );
 }
@@ -233,6 +255,9 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
   const repeatable = criteria.filter((criterion) => criterion.state === 'repeatable');
   const passTotal = criteria.reduce((sum, criterion) => sum + criterion.pass, 0);
   const failTotal = criteria.reduce((sum, criterion) => sum + criterion.fail, 0);
+  const costingCopy = costing.length ? `Still failing in ${latestRevision ?? 'latest'} and likely pulling outcome down.` : `No criteria still fail in ${latestRevision ?? 'latest'}.`;
+  const trendingCopy = trending.length ? `Failed earlier, now cleared in ${latestRevision ?? 'latest'}.` : 'No visible recovery trend above threshold.';
+  const strengthsCopy = repeatable.length ? 'Passes hold across visible agents rather than only one clean run.' : 'No fully repeatable strengths above threshold.';
 
   const openOverlay = (event: MouseEvent<HTMLElement>, overlay: Omit<Overlay, 'x' | 'y'>) => {
     setHovered({ ...overlay, x: event.clientX + 14, y: event.clientY + 14 });
@@ -284,7 +309,10 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           </span>
         </div>
         <div className="mt-1 max-w-3xl text-[13px] leading-5" style={{ color: C.fg1 }}>
-          Recurring signals mapped across visible runs. Agent rows show whether each scoring criterion is still costing, has cleared, or is repeatable.
+          Signals across the whole scenario, this that are costing you, things that have improved (cleared), things that remain strong (pass)
+        </div>
+        <div className="mt-2 text-[11px]" style={{ color: C.fg1 }}>
+          Evidence map · linked to {runs.length} visible runs across {revisions.length} revisions
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: C.fg1 }}>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>revisions <span className="num" style={{ color: C.fg4 }}>{revisions.join(' · ') || '—'}</span></span>
@@ -295,12 +323,30 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
       </div>
 
       <div className="grid border-b lg:grid-cols-3" style={{ borderColor: C.border }}>
-        <SummaryCard state="costing" label="Costing you" count={costing.length} copy={costing.length ? `Still failing in ${latestRevision ?? 'latest'} and likely pulling outcome down.` : `No criteria still fail in ${latestRevision ?? 'latest'}.`} />
-        <SummaryCard state="trending" label="Trending up" count={trending.length} copy={trending.length ? `Failed earlier, now cleared in ${latestRevision ?? 'latest'}.` : 'No visible recovery trend above threshold.'} />
-        <SummaryCard state="repeatable" label="Repeatable strengths" count={repeatable.length} copy={repeatable.length ? 'Passes hold across visible agents rather than only one clean run.' : 'No fully repeatable strengths above threshold.'} />
+        <SummaryCard
+          state="costing"
+          label="Costing you"
+          count={costing.length}
+          copy={costingCopy}
+          onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })}
+        />
+        <SummaryCard
+          state="trending"
+          label="Trending up"
+          count={trending.length}
+          copy={trendingCopy}
+          onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })}
+        />
+        <SummaryCard
+          state="repeatable"
+          label="Strengths"
+          count={repeatable.length}
+          copy={strengthsCopy}
+          onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })}
+        />
       </div>
 
-      <div className="sb overflow-x-auto px-3 pb-3 pt-3">
+      <div className="sb overflow-x-auto px-3 pb-2 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide" style={{ color: C.fg1 }}>
           <span>Evidence map</span>
           <span className="flex items-center gap-3">
@@ -312,13 +358,11 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              <th className="sticky left-0 z-10 w-44 px-2 py-2 text-left font-medium uppercase tracking-wide" style={{ color: C.fg1, background: C.surface }}>
-                Agent spec
-              </th>
+              <th className="sticky left-0 z-10 w-44 px-2 py-1" style={{ background: C.surface }} aria-label="Agent spec" />
               {criteria.map((criterion) => (
-                <th key={criterion.key} className="relative h-24 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
+                <th key={criterion.key} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
-                    className="absolute bottom-3 left-1/2 origin-bottom whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
+                    className="absolute bottom-9 left-1/2 origin-bottom whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
                     style={{ color: C.fg3, transform: 'translateX(-50%) rotate(-60deg)' }}
                     onMouseEnter={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
@@ -410,32 +454,6 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div className="grid border-t lg:grid-cols-2" style={{ borderColor: C.border }}>
-        <div className="p-3" style={{ borderRight: `1px solid ${C.border}` }}>
-          <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: C.red }}>Friction · why it costs</div>
-          <div className="mt-2 text-[13px] font-medium" style={{ color: C.fg4 }}>{costing[0]?.label ?? 'No current costing criterion'}</div>
-          <div className="mt-1 text-[12px] leading-5" style={{ color: C.fg1 }}>
-            {costing[0]
-              ? `Still failing in ${latestRevision ?? 'latest'}; treat as the likely first place outcome is being capped.`
-              : 'No latest-revision criterion currently crosses the costing threshold.'}
-          </div>
-        </div>
-        <div className="p-3">
-          <div className="text-[12px] font-semibold uppercase tracking-wide" style={{ color: C.green }}>Strength · why it holds</div>
-          <div className="mt-2 text-[13px] font-medium" style={{ color: C.fg4 }}>{repeatable[0]?.label ?? trending[0]?.label ?? 'No current repeatable criterion'}</div>
-          <div className="mt-1 text-[12px] leading-5" style={{ color: C.fg1 }}>
-            {(repeatable[0] ?? trending[0])
-              ? 'The useful signal is the shape: the latest state holds across agents, not a single isolated clean run.'
-              : 'No stable strength is visible for the current filter.'}
-          </div>
-        </div>
-      </div>
-
-      <div className="flex justify-between border-t px-3 py-2 text-[11px]" style={{ color: C.fg1, borderColor: C.border }}>
-        <span>Evidence map · linked to {runs.length} visible runs across {revisions.length} revisions</span>
-        <span>cleared = failed earlier, green in {latestRevision ?? 'latest'}</span>
       </div>
 
       {hovered ? <DetailOverlay overlay={hovered} pinned={false} onPin={togglePin} onClose={closeOverlay} /> : null}
