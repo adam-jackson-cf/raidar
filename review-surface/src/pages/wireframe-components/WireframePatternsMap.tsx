@@ -199,7 +199,6 @@ function SummaryCard({
       <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide" style={{ color: C.fg4 }}>
         <span className="inline-block size-2 rounded-sm" style={{ background: stateColor(state), boxShadow: `0 0 8px ${stateColor(state)}70` }} />
         {label}
-        <span className="num text-[16px] font-bold leading-none" style={{ color: stateColor(state) }}>{count}</span>
         <button
           className="inline-flex size-4 items-center justify-center rounded-full border"
           style={{ color: C.fg1, borderColor: C.border }}
@@ -211,6 +210,7 @@ function SummaryCard({
         >
           <Info size={10} />
         </button>
+        <span className="num ml-3 text-[16px] font-bold leading-none" style={{ color: stateColor(state) }}>{count}</span>
       </div>
     </div>
   );
