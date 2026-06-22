@@ -1617,16 +1617,16 @@ export function WireframeExperimentsPage() {
                   </div>
                 </div>
               ))}
-              <div className="grid items-start gap-3 xl:grid-cols-2">
+              <div className="grid items-start gap-3 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
                 <WireframeTradeoffScatter runs={familyRuns} />
-                <FailurePatterns runs={familyRuns} />
+                <WireframeRevisionMovement
+                  experiments={allFamilyExps}
+                  diffs={familyDiffs}
+                  selectedRevisions={selected}
+                  allRevisionSelected={selectedSet.size === revisionIds.length}
+                />
               </div>
-              <WireframeRevisionMovement
-                experiments={allFamilyExps}
-                diffs={familyDiffs}
-                selectedRevisions={selected}
-                allRevisionSelected={selectedSet.size === revisionIds.length}
-              />
+              <FailurePatterns runs={familyRuns} />
           </div>
         </section>
       );
