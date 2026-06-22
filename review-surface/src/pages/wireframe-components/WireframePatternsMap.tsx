@@ -351,11 +351,6 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
       <div className="sb overflow-x-auto px-3 pb-2 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11px]" style={{ color: C.fg1 }}>
           <span className="text-xs font-medium" style={{ color: C.fg4 }}>Evidence map</span>
-          <span className="flex items-center gap-3 uppercase tracking-wide">
-            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.green }} />pass</span>
-            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: RECOVERY_COLOR }} />cleared</span>
-            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.red }} />fail</span>
-          </span>
         </div>
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
