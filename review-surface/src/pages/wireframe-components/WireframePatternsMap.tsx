@@ -308,7 +308,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
             <Info size={10} />
           </span>
         </div>
-        <div className="mt-1 max-w-3xl text-[13px] leading-5" style={{ color: C.fg1 }}>
+        <div className="mt-1 w-full text-[13px] leading-5" style={{ color: C.fg1 }}>
           Signals across the whole scenario, this that are costing you, things that have improved (cleared), things that remain strong (pass)
         </div>
         <div className="mt-2 text-[11px]" style={{ color: C.fg1 }}>
