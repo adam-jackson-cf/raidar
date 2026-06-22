@@ -312,7 +312,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              <th className="sticky left-0 z-10 w-48 px-2 py-2 text-left font-medium uppercase tracking-wide" style={{ color: C.fg1, background: C.surface }}>
+              <th className="sticky left-0 z-10 w-44 px-2 py-2 text-left font-medium uppercase tracking-wide" style={{ color: C.fg1, background: C.surface }}>
                 Agent spec
               </th>
               {criteria.map((criterion) => (
@@ -358,8 +358,10 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           <tbody>
             {rows.map((row) => (
               <tr key={row.spec} style={{ borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
-                <td className="sticky left-0 z-10 px-2 py-2" style={{ background: C.surface, color: C.fg4 }} title={row.spec}>
-                  {row.label}
+                <td className="sticky left-0 z-10 w-44 px-2 py-2 align-middle" style={{ background: C.surface }} title={row.spec}>
+                  <span className="block text-left text-[11px] font-medium leading-none" style={{ color: C.fg3 }}>
+                    {row.label}
+                  </span>
                 </td>
                 {criteria.map((criterion) => {
                   const state = row.cells[criterion.key] ?? 'missing';
