@@ -42,6 +42,8 @@ type Overlay = {
   lines: string[];
 };
 
+const RECOVERY_COLOR = '#B58CFF';
+
 function threshold(sample: number) {
   return Math.max(1, Math.ceil(sample / 3));
 }
@@ -76,14 +78,14 @@ function shortCriterion(metric: string) {
 
 function stateColor(state: CriterionState) {
   if (state === 'costing') return C.red;
-  if (state === 'trending') return C.orange;
+  if (state === 'trending') return RECOVERY_COLOR;
   if (state === 'repeatable') return C.green;
   return C.fg1;
 }
 
 function cellColor(state: CellState) {
   if (state === 'pass') return C.green;
-  if (state === 'cleared') return C.orange;
+  if (state === 'cleared') return RECOVERY_COLOR;
   if (state === 'fail') return C.red;
   return C.fg0;
 }
@@ -351,7 +353,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           <span className="text-xs font-medium" style={{ color: C.fg4 }}>Evidence map</span>
           <span className="flex items-center gap-3 uppercase tracking-wide">
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.green }} />pass</span>
-            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.orange }} />cleared</span>
+            <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: RECOVERY_COLOR }} />cleared</span>
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.red }} />fail</span>
           </span>
         </div>
