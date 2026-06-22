@@ -320,7 +320,8 @@ export function WireframeRevisionMovement({
   return (
     <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div>
-        <div className="text-xs font-medium" style={{ color: C.fg3 }}>
+        <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
+          <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
           Revision movement
         </div>
         <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
