@@ -318,7 +318,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>revisions <span className="num" style={{ color: C.fg4 }}>{revisions.join(' · ') || '—'}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agents <span className="num" style={{ color: C.fg4 }}>{rows.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criteria <span className="num" style={{ color: C.fg4 }}>{criteria.length}</span></span>
-          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>overall <span className="num" style={{ color: C.green }}>{passTotal} pass</span> / <span className="num" style={{ color: C.red }}>{failTotal} fail</span></span>
+          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>checks <span className="num" style={{ color: C.green }}>{passTotal} pass</span> / <span className="num" style={{ color: C.red }}>{failTotal} fail</span></span>
         </div>
       </div>
 
@@ -348,7 +348,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
 
       <div className="sb overflow-x-auto px-3 pb-2 pt-3">
         <div className="mb-2 flex items-center justify-between gap-3 text-[11px] uppercase tracking-wide" style={{ color: C.fg1 }}>
-          <span>Evidence map</span>
+          <span style={{ color: C.fg4 }}>Evidence map</span>
           <span className="flex items-center gap-3">
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.green }} />pass</span>
             <span className="inline-flex items-center gap-1"><i className="size-2 rounded-sm" style={{ background: C.cyan }} />cleared</span>
