@@ -171,7 +171,7 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
           <span
             key={pill.label}
             className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
-            style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
+            style={{ color: C.cyan, background: `${C.cyan}12`, border: `1px solid ${C.cyan}35` }}
           >
             {pill.label}
           </span>
