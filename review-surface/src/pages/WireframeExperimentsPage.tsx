@@ -1618,15 +1618,15 @@ export function WireframeExperimentsPage() {
                 </div>
               ))}
               <div className="grid items-start gap-3 xl:grid-cols-2">
-                <WireframeTradeoffScatter runs={familyRuns} />
                 <WireframeRevisionMovement
                   experiments={allFamilyExps}
                   diffs={familyDiffs}
                   selectedRevisions={selected}
                   allRevisionSelected={selectedSet.size === revisionIds.length}
                 />
+                <WireframePatterns experiments={visibleFamilyExps} runs={familyRuns} />
               </div>
-              <WireframePatterns experiments={visibleFamilyExps} runs={familyRuns} />
+              <WireframeTradeoffScatter runs={familyRuns} />
           </div>
         </section>
       );

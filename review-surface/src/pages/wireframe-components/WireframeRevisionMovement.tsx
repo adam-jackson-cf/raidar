@@ -317,8 +317,6 @@ export function WireframeRevisionMovement({
     return diffs.filter((diff) => pairs.has(`${diff.from_revision}->${diff.to_revision}`));
   }, [diffs, movements]);
 
-  if (movements.length === 0 && visibleDiffs.length === 0) return null;
-
   return (
     <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div>
@@ -329,6 +327,12 @@ export function WireframeRevisionMovement({
           Did the outcome improve, contract diff shows changes
         </div>
       </div>
+
+      {movements.length === 0 && (
+        <div className="rounded-md px-2 py-4 text-[11px]" style={{ color: C.fg1, border: `1px dashed ${C.border}` }}>
+          No previous visible revision to compare.
+        </div>
+      )}
 
       {movements.length > 0 && (
         <table className="w-full max-w-3xl border-collapse">

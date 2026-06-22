@@ -1,5 +1,5 @@
 import { useMemo, useState, type MouseEvent } from 'react';
-import { CircleAlert, CircleCheck, Pin, PinOff, X } from 'lucide-react';
+import { CircleAlert, CircleCheck, Info, Pin, PinOff, X } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { humanize, categoryHint, categoryLabel, runLabel } from '@/utils/verdict';
 import type { ExperimentRecord, RunRecord } from '@/utils/types';
@@ -371,6 +371,7 @@ export function WireframePatterns({ experiments, runs }: { experiments: Experime
   const strengths = patterns.filter((pattern) => pattern.kind === 'strength');
   const [hovered, setHovered] = useState<Overlay | null>(null);
   const [pinned, setPinned] = useState<Overlay[]>([]);
+  const [thresholdTooltip, setThresholdTooltip] = useState<{ x: number; y: number } | null>(null);
 
   const showHover = (event: MouseEvent<HTMLElement>, pattern: Pattern) => {
     setHovered({ id: `hover-${pattern.id}`, pattern, x: event.clientX + 14, y: event.clientY + 14 });
@@ -394,7 +395,19 @@ export function WireframePatterns({ experiments, runs }: { experiments: Experime
   return (
     <div className="relative rounded-lg p-3" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div className="mb-3">
-        <div className="text-[15px] font-medium" style={{ color: C.fg4 }}>Patterns</div>
+        <div className="flex items-center gap-2 text-[15px] font-medium" style={{ color: C.fg4 }}>
+          <span>Patterns</span>
+          <span
+            className="inline-flex size-4 items-center justify-center rounded-full border"
+            style={{ color: C.fg1, borderColor: C.border }}
+            onMouseEnter={(event) => setThresholdTooltip({ x: event.clientX + 14, y: event.clientY + 14 })}
+            onMouseMove={(event) => setThresholdTooltip({ x: event.clientX + 14, y: event.clientY + 14 })}
+            onMouseLeave={() => setThresholdTooltip(null)}
+            aria-label="Pattern threshold explanation"
+          >
+            <Info size={10} />
+          </span>
+        </div>
         <div className="text-[13px] leading-5" style={{ color: C.fg1 }}>
           Recurring signals across visible runs. Criteria appear when they affect at least one third of their sample.
         </div>
@@ -423,6 +436,16 @@ export function WireframePatterns({ experiments, runs }: { experiments: Experime
       {pinned.map((overlay) => (
         <PatternOverlay key={overlay.id} overlay={overlay} pinned onPin={togglePinnedOverlay} onClose={closeOverlay} />
       ))}
+      {thresholdTooltip ? (
+        <div
+          className="pointer-events-none fixed z-40 w-72 rounded-lg border p-2 text-[11px] leading-4 shadow-2xl"
+          style={{ left: thresholdTooltip.x, top: thresholdTooltip.y, color: C.fg3, background: 'rgba(5,5,5,0.96)', borderColor: 'rgba(255,255,255,0.16)' }}
+        >
+          <div className="mb-1 text-[12px] font-medium" style={{ color: C.fg5 }}>Pattern threshold</div>
+          <div>Scorer criteria appear when pass or fail count is at least one third of that criterion's sample.</div>
+          <div className="mt-1">Gate and finding patterns appear when affected runs are at least one third of visible runs.</div>
+        </div>
+      ) : null}
     </div>
   );
 }
