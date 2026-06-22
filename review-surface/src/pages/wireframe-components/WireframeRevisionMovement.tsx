@@ -145,6 +145,17 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState<'prompt' | 'scenario'>('prompt');
   const file = diff.files[tab];
+  const pillConfig = (flag: string) => {
+    const normalized = flag.toLowerCase();
+    if (normalized === 'prompt changed') return { label: 'PROMPT', warning: false };
+    if (normalized === 'rules changed') return { label: 'RULES', warning: false };
+    if (normalized === 'starter changed') return { label: 'STARTER', warning: false };
+    if (normalized === 'quality gates changed') return { label: 'GATES', warning: false };
+    if (normalized === 'requirements changed') return { label: 'REQS', warning: false };
+    if (normalized === 'evaluation profile changed') return { label: 'EVAL', warning: true };
+    return null;
+  };
+  const pills = diff.summary.map(pillConfig).filter(Boolean) as Array<{ label: string; warning: boolean }>;
   return (
     <div className="rounded-md p-2" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <button className="flex w-full flex-wrap items-center gap-2 text-left" onClick={() => setOpen((openNow) => !openNow)}>
@@ -154,27 +165,25 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
           <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
         )}
         <span className="num text-[11px] font-medium" style={{ color: C.fg3 }}>
-          {diff.from_revision} <MoveRight className="inline size-3" /> {diff.to_revision} contract changes
+          {diff.from_revision} <MoveRight className="inline size-3" /> {diff.to_revision}
         </span>
-        {diff.summary
-          .filter((flag) => !diff.comparable_warnings.some((warning) => warning.toLowerCase() === flag.toLowerCase()))
-          .map((flag) => (
-            <span
-              key={flag}
-              className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
-              style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
-            >
-              {flag}
-            </span>
-          ))}
-        {diff.comparable_warnings.length > 0 && (
+        {pills.filter((pill) => !pill.warning).map((pill) => (
+          <span
+            key={pill.label}
+            className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
+            style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
+          >
+            {pill.label}
+          </span>
+        ))}
+        {pills.some((pill) => pill.warning) && (
           <span
             className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
             style={{ color: C.orange, background: `${C.orange}12`, border: `1px solid ${C.orange}35` }}
             title="The evaluation contract itself changed - score movement is not purely the agent's doing."
           >
             <TriangleAlert className="size-2.5" />
-            {diff.comparable_warnings.join(' · ')}
+            EVAL
           </span>
         )}
       </button>

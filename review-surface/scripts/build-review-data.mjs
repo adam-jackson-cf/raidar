@@ -545,23 +545,46 @@ function scorerProfile(text) {
   return refs.map((ref) => `${ref.id}:${ref.weight ?? '1'}`).join('+');
 }
 
-function requirementCount(text) {
-  return (text.match(/^\s*-\s*id:\s*req-/gm) ?? []).length;
+function topLevelSection(text, key) {
+  const lines = text.split('\n');
+  const start = lines.findIndex((line) => line.trim() === `${key}:`);
+  if (start === -1) return '';
+  const section = [lines[start]];
+  for (let index = start + 1; index < lines.length; index += 1) {
+    const line = lines[index];
+    if (/^\S/.test(line) && !line.startsWith('-')) break;
+    section.push(line);
+  }
+  return section.join('\n').trim();
 }
 
-function classifyRevisionChange(beforeYaml, afterYaml, promptDiff, yamlDiff) {
+function rulesDigest(rulesDir) {
+  try {
+    return fs
+      .readdirSync(rulesDir)
+      .filter((name) => fs.statSync(path.join(rulesDir, name)).isFile())
+      .sort()
+      .map((name) => `${name}:${fs.readFileSync(path.join(rulesDir, name), 'utf8')}`)
+      .join('\n---\n');
+  } catch {
+    return '';
+  }
+}
+
+function classifyRevisionChange(beforeYaml, afterYaml, promptDiff, beforeRulesDir, afterRulesDir) {
   const changes = [
     [scorerProfile(beforeYaml) !== scorerProfile(afterYaml), 'evaluation profile changed'],
     [gateNames(beforeYaml).join(',') !== gateNames(afterYaml).join(','), 'quality gates changed'],
-    [requirementCount(beforeYaml) !== requirementCount(afterYaml), 'requirements changed'],
+    [topLevelSection(beforeYaml, 'requirements') !== topLevelSection(afterYaml, 'requirements'), 'requirements changed'],
+    [topLevelSection(beforeYaml, 'starter') !== topLevelSection(afterYaml, 'starter'), 'starter changed'],
+    [rulesDigest(beforeRulesDir) !== rulesDigest(afterRulesDir), 'rules changed'],
     [promptDiff.added + promptDiff.removed > 0, 'prompt changed'],
-    [yamlDiff.added + yamlDiff.removed > 0, 'scenario contract changed'],
   ];
   const flags = changes.filter(([changed]) => changed).map(([, label]) => label);
   return flags.length ? flags : ['metadata unchanged'];
 }
 
-const NON_COMPARABLE = new Set(['prompt changed', 'scenario contract changed', 'metadata unchanged']);
+const COMPARABILITY_WARNINGS = new Set(['evaluation profile changed']);
 
 function buildRevisionDiffs(experiments) {
   const revisionsByScenario = new Map();
@@ -588,16 +611,18 @@ function buildRevisionDiff(scenario, fromRevision, toRevision) {
   if (!beforeYaml || !afterYaml) return null;
   const beforePrompt = readText(path.join(scenariosRoot, scenario, fromRevision, 'prompt', 'task.md'));
   const afterPrompt = readText(path.join(scenariosRoot, scenario, toRevision, 'prompt', 'task.md'));
+  const beforeRulesDir = path.join(scenariosRoot, scenario, fromRevision, 'rules');
+  const afterRulesDir = path.join(scenariosRoot, scenario, toRevision, 'rules');
   const yamlDiff = lineDiff(beforeYaml, afterYaml);
   const promptDiff = lineDiff(beforePrompt, afterPrompt);
-  const summary = classifyRevisionChange(beforeYaml, afterYaml, promptDiff, yamlDiff);
+  const summary = classifyRevisionChange(beforeYaml, afterYaml, promptDiff, beforeRulesDir, afterRulesDir);
   return {
     key: `${scenario}:${fromRevision}:${toRevision}`,
     scenario,
     from_revision: fromRevision,
     to_revision: toRevision,
     summary,
-    comparable_warnings: summary.filter((flag) => !NON_COMPARABLE.has(flag)),
+    comparable_warnings: summary.filter((flag) => COMPARABILITY_WARNINGS.has(flag)),
     files: {
       scenario: {
         path: path.join('scenarios', scenario, toRevision, 'scenario.yaml'),
