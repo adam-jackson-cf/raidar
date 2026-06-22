@@ -175,6 +175,7 @@ export interface RevisionDiff {
   to_revision: string;
   summary: string[];
   comparable_warnings: string[];
+  sections?: Record<string, FileDiff>;
   files: { scenario: FileDiff; prompt: FileDiff };
 }
 

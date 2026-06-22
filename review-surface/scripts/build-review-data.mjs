@@ -571,6 +571,35 @@ function rulesDigest(rulesDir) {
   }
 }
 
+function sectionDiff(pathLabel, beforeText, afterText) {
+  return {
+    path: pathLabel,
+    diff: lineDiff(beforeText, afterText),
+  };
+}
+
+function revisionDiffSections({
+  scenario,
+  fromRevision,
+  toRevision,
+  beforeYaml,
+  afterYaml,
+  beforePrompt,
+  afterPrompt,
+  beforeRulesDir,
+  afterRulesDir,
+}) {
+  const scenarioPath = path.join('scenarios', scenario, toRevision, 'scenario.yaml');
+  return {
+    prompt: sectionDiff(path.join('scenarios', scenario, toRevision, 'prompt', 'task.md'), beforePrompt, afterPrompt),
+    rules: sectionDiff(path.join('scenarios', scenario, toRevision, 'rules'), rulesDigest(beforeRulesDir), rulesDigest(afterRulesDir)),
+    starter: sectionDiff(`${scenarioPath}:starter`, topLevelSection(beforeYaml, 'starter'), topLevelSection(afterYaml, 'starter')),
+    gates: sectionDiff(`${scenarioPath}:verification`, topLevelSection(beforeYaml, 'verification'), topLevelSection(afterYaml, 'verification')),
+    reqs: sectionDiff(`${scenarioPath}:requirements`, topLevelSection(beforeYaml, 'requirements'), topLevelSection(afterYaml, 'requirements')),
+    eval: sectionDiff(`${scenarioPath}:scorers`, scorerProfile(beforeYaml), scorerProfile(afterYaml)),
+  };
+}
+
 function classifyRevisionChange(beforeYaml, afterYaml, promptDiff, beforeRulesDir, afterRulesDir) {
   const changes = [
     [scorerProfile(beforeYaml) !== scorerProfile(afterYaml), 'evaluation profile changed'],
@@ -616,6 +645,17 @@ function buildRevisionDiff(scenario, fromRevision, toRevision) {
   const yamlDiff = lineDiff(beforeYaml, afterYaml);
   const promptDiff = lineDiff(beforePrompt, afterPrompt);
   const summary = classifyRevisionChange(beforeYaml, afterYaml, promptDiff, beforeRulesDir, afterRulesDir);
+  const sections = revisionDiffSections({
+    scenario,
+    fromRevision,
+    toRevision,
+    beforeYaml,
+    afterYaml,
+    beforePrompt,
+    afterPrompt,
+    beforeRulesDir,
+    afterRulesDir,
+  });
   return {
     key: `${scenario}:${fromRevision}:${toRevision}`,
     scenario,
@@ -623,6 +663,7 @@ function buildRevisionDiff(scenario, fromRevision, toRevision) {
     to_revision: toRevision,
     summary,
     comparable_warnings: summary.filter((flag) => COMPARABILITY_WARNINGS.has(flag)),
+    sections,
     files: {
       scenario: {
         path: path.join('scenarios', scenario, toRevision, 'scenario.yaml'),

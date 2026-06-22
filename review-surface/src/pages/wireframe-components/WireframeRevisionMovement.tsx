@@ -141,21 +141,31 @@ function DiffBlock({ file }: { file: FileDiff }) {
   );
 }
 
+type DiffPill = { label: string; warning: boolean; tab: string };
+
 function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'prompt' | 'scenario'>('prompt');
-  const file = diff.files[tab];
+  const [tab, setTab] = useState('prompt');
   const pillConfig = (flag: string) => {
     const normalized = flag.toLowerCase();
-    if (normalized === 'prompt changed') return { label: 'PROMPT', warning: false };
-    if (normalized === 'rules changed') return { label: 'RULES', warning: false };
-    if (normalized === 'starter changed') return { label: 'STARTER', warning: false };
-    if (normalized === 'quality gates changed') return { label: 'GATES', warning: false };
-    if (normalized === 'requirements changed') return { label: 'REQS', warning: false };
-    if (normalized === 'evaluation profile changed') return { label: 'EVAL', warning: true };
+    if (normalized === 'prompt changed') return { label: 'PROMPT', warning: false, tab: 'prompt' };
+    if (normalized === 'rules changed') return { label: 'RULES', warning: false, tab: 'rules' };
+    if (normalized === 'starter changed') return { label: 'STARTER', warning: false, tab: 'starter' };
+    if (normalized === 'quality gates changed') return { label: 'GATES', warning: false, tab: 'gates' };
+    if (normalized === 'requirements changed') return { label: 'REQS', warning: false, tab: 'reqs' };
+    if (normalized === 'evaluation profile changed') return { label: 'EVAL', warning: true, tab: 'eval' };
     return null;
   };
-  const pills = diff.summary.map(pillConfig).filter(Boolean) as Array<{ label: string; warning: boolean }>;
+  const pills = diff.summary.map(pillConfig).filter(Boolean) as DiffPill[];
+  const sections = diff.sections ?? { prompt: diff.files.prompt, scenario: diff.files.scenario };
+  const tabs = pills.filter((pill) => sections[pill.tab]);
+  const activeTab = sections[tab] ? tab : (tabs[0]?.tab ?? 'prompt');
+  const file = sections[activeTab] ?? diff.files.prompt;
+  const openTab = (nextTab: string) => {
+    if (!sections[nextTab]) return;
+    setTab(nextTab);
+    setOpen(true);
+  };
   return (
     <div className="rounded-md p-2" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <button className="flex w-full flex-wrap items-center gap-2 text-left" onClick={() => setOpen((openNow) => !openNow)}>
@@ -170,38 +180,65 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
         {pills.filter((pill) => !pill.warning).map((pill) => (
           <span
             key={pill.label}
+            role="button"
+            tabIndex={0}
             className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
             style={{ color: C.cyan, background: `${C.cyan}12`, border: `1px solid ${C.cyan}35` }}
+            onClick={(event) => {
+              event.stopPropagation();
+              openTab(pill.tab);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                openTab(pill.tab);
+              }
+            }}
           >
             {pill.label}
           </span>
         ))}
-        {pills.some((pill) => pill.warning) && (
+        {pills.filter((pill) => pill.warning).map((pill) => (
           <span
+            key={pill.label}
+            role="button"
+            tabIndex={0}
             className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
             style={{ color: C.orange, background: `${C.orange}12`, border: `1px solid ${C.orange}35` }}
             title="The evaluation contract itself changed - score movement is not purely the agent's doing."
+            onClick={(event) => {
+              event.stopPropagation();
+              openTab(pill.tab);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                openTab(pill.tab);
+              }
+            }}
           >
             <TriangleAlert className="size-2.5" />
-            EVAL
+            {pill.label}
           </span>
-        )}
+        ))}
       </button>
       {open && (
         <div className="mt-2 flex flex-col gap-1.5">
           <div className="flex gap-1">
-            {(['prompt', 'scenario'] as const).map((name) => (
+            {tabs.map((pill) => (
               <button
-                key={name}
-                onClick={() => setTab(name)}
+                key={pill.tab}
+                onClick={() => setTab(pill.tab)}
                 className="rounded px-2 py-0.5 text-[10px]"
                 style={{
-                  color: tab === name ? C.fg5 : C.fg1,
-                  background: tab === name ? 'rgba(255,255,255,0.08)' : 'transparent',
-                  border: `1px solid ${tab === name ? C.borderLight : C.border}`,
+                  color: activeTab === pill.tab ? C.fg5 : C.fg1,
+                  background: activeTab === pill.tab ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  border: `1px solid ${activeTab === pill.tab ? C.borderLight : C.border}`,
                 }}
               >
-                {name} (+{diff.files[name].diff.added} -{diff.files[name].diff.removed})
+                {pill.label.toLowerCase()} (+{sections[pill.tab].diff.added} -{sections[pill.tab].diff.removed})
               </button>
             ))}
           </div>
