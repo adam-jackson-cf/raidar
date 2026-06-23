@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState, type FocusEvent, type MouseEvent, type ReactNode, type WheelEvent } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Eye, EyeOff, Pin, PinOff, Trophy } from 'lucide-react';
+import { ChevronRight, Eye, EyeOff, Info, Pin, PinOff, Trophy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { WireframePatternsMap } from './wireframe-components/WireframePatternsMap';
 import { KIND_STYLES } from '@/components/AnnotationChip';
@@ -1409,6 +1409,28 @@ export function WireframeExperimentsPage() {
                       <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
                         <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
                         Revision movement
+                        <button
+                          type="button"
+                          className="inline-flex size-4 items-center justify-center rounded-full border"
+                          style={{ color: C.fg1, borderColor: C.border }}
+                          aria-label="Revision movement sort explanation"
+                          onMouseEnter={(event) => {
+                            const rect = event.currentTarget.getBoundingClientRect();
+                            setColumnTooltip({
+                              x: rect.left,
+                              y: rect.bottom + 4,
+                              title: 'Outcome sorting',
+                              lines: [
+                                'Default order ranks all visible scenario rows together.',
+                                'Sort priority: highest outcome, lower runtime, lower spend, higher stability, higher trust.',
+                                'Agent and Revision sort modes group first, then apply the same outcome ranking inside each group.',
+                              ],
+                            });
+                          }}
+                          onMouseLeave={() => setColumnTooltip(null)}
+                        >
+                          <Info className="size-3" />
+                        </button>
                       </div>
                       <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
                         Did the outcome improve, contract diff shows changes
