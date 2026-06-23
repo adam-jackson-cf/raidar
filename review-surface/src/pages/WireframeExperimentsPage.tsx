@@ -1245,6 +1245,39 @@ export function WireframeExperimentsPage() {
                 const revisionRunIds = new Set(visibleFamilyExps.flatMap((exp) => exp.run_ids));
                 const familyRuns = (runsQuery.data ?? []).filter((run) => revisionRunIds.has(run.id));
                 const familyDiffs = (query.data?.revision_diffs ?? []).filter((diff) => diff.scenario === family);
+                const visibleRevisionRows = revisions
+                  .filter(({ revision }) => selectedSet.has(revision))
+                  .flatMap(({ revision, exps }) => exps.map((exp) => ({ revision, exp })))
+                  .sort((left, right) => {
+                    const scoreLeft = findabilityScore(left.exp.aggregate.composite_score?.mean, left.exp.aggregate.quality_score?.mean) ?? -1;
+                    const scoreRight = findabilityScore(right.exp.aggregate.composite_score?.mean, right.exp.aggregate.quality_score?.mean) ?? -1;
+                    if (scoreRight !== scoreLeft) return scoreRight - scoreLeft;
+
+                    const runtimeLeft = left.exp.aggregate.duration_sec?.mean ?? Number.POSITIVE_INFINITY;
+                    const runtimeRight = right.exp.aggregate.duration_sec?.mean ?? Number.POSITIVE_INFINITY;
+                    if (runtimeLeft !== runtimeRight) return runtimeLeft - runtimeRight;
+
+                    const spendFor = (exp: ExperimentRecord) => {
+                      const aggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
+                      const input = exp.aggregate.uncached_input_tokens?.mean;
+                      if (input == null) return Number.POSITIVE_INFINITY;
+                      return input + (aggregate.output_tokens?.mean ?? aggregate.uncached_output_tokens?.mean ?? 0);
+                    };
+                    const spendLeft = spendFor(left.exp);
+                    const spendRight = spendFor(right.exp);
+                    if (spendLeft !== spendRight) return spendLeft - spendRight;
+
+                    const stabilityLeft = repeatabilityValue(left.exp.aggregate.composite_score?.stddev ?? null) ?? -1;
+                    const stabilityRight = repeatabilityValue(right.exp.aggregate.composite_score?.stddev ?? null) ?? -1;
+                    if (stabilityRight !== stabilityLeft) return stabilityRight - stabilityLeft;
+
+                    const trustFor = (exp: ExperimentRecord) => confidenceScore(exp.aggregate.run_count_scored ?? 0, exp.aggregate.run_count_total ?? 0);
+                    const trustLeft = trustFor(left.exp);
+                    const trustRight = trustFor(right.exp);
+                    if (trustRight !== trustLeft) return trustRight - trustLeft;
+
+                    return revisionSortValue(left.revision) - revisionSortValue(right.revision);
+                  });
                 return (
           <section
             key={family}
@@ -1377,14 +1410,8 @@ export function WireframeExperimentsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {revisions
-                        .filter(({ revision }) => selectedSet.has(revision))
-                        .flatMap(({ revision, exps }) =>
-                          [...exps]
-                            .sort((left, right) => compareExperimentRank(experimentRankKey(left), experimentRankKey(right)))
-                            .map((exp) => ({ revision, exp })),
-                        )
-                        .map(({ revision, exp }) => {
+                      {visibleRevisionRows
+                        .map(({ revision, exp }, scenarioRankIndex) => {
                           const previousRevision = revisionIds[revisionIds.indexOf(revision) - 1];
                           const previousExp = previousRevision
                             ? revisions.find((entry) => entry.revision === previousRevision)?.exps.find((candidate) => candidate.agent_spec === exp.agent_spec)
@@ -1428,9 +1455,8 @@ export function WireframeExperimentsPage() {
                           );
                           const outcomeMove = movementDelta(previousExp?.aggregate.composite_score?.mean, exp.aggregate.composite_score?.mean);
                           const experimentKey = experimentRowKey(exp);
-                          const revisionRanking = rankedByFamily.get(`${family}::${revision}`);
-                          const isWinner = revisionRanking?.winnerId === experimentKey;
-                          const isRunnerUp = revisionRanking?.runnerUpId === experimentKey && revisionRanking?.winnerId !== revisionRanking?.runnerUpId;
+                          const isWinner = scenarioRankIndex === 0;
+                          const isRunnerUp = scenarioRankIndex === 1;
                           const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
                           const compact = compactSpec(exp.agent_spec);
                           const deliveryColor = deliveryRingColor(composite);
@@ -1459,8 +1485,8 @@ export function WireframeExperimentsPage() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 truncate">
                                         <span className="truncate">{compact}</span>
-                                        {isWinner ? <Trophy className="shrink-0" size={15} style={{ color: C.orange }} aria-label="Top scoring experiment in scenario revision" /> : null}
-                                        {isRunnerUp ? <Trophy className="shrink-0" size={15} style={{ color: '#C0C0C0' }} aria-label="Runner-up experiment in scenario revision" /> : null}
+                                        {isWinner ? <Trophy className="shrink-0" size={15} style={{ color: C.orange }} aria-label="Top scoring experiment in visible scenario rows" /> : null}
+                                        {isRunnerUp ? <Trophy className="shrink-0" size={15} style={{ color: '#C0C0C0' }} aria-label="Runner-up experiment in visible scenario rows" /> : null}
                                       </div>
                                       <div className="num mt-0.5 text-[10px]" style={{ color: C.fg1 }}>revision {revision}</div>
                                     </div>
