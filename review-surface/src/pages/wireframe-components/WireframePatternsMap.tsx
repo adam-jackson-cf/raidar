@@ -474,13 +474,6 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
                     })}
                   >
                     <span>{criterion.shortLabel}</span>
-                    <span
-                      className="inline-flex size-3 items-center justify-center rounded-full border text-[8px] leading-none"
-                      style={{ color: C.fg1, borderColor: C.border }}
-                      aria-hidden="true"
-                    >
-                      ?
-                    </span>
                   </button>
                 </th>
               ))}
