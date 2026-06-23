@@ -320,7 +320,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>visible revisions <span className="num" style={{ color: C.fg4 }}>{revisions.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agents <span className="num" style={{ color: C.fg4 }}>{rows.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criteria <span className="num" style={{ color: C.fg4 }}>{criteria.length}</span></span>
-          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criterion checks <span className="num" style={{ color: C.green }}>{passTotal} pass</span> / <span className="num" style={{ color: C.red }}>{failTotal} fail</span></span>
+          <span className="inline-flex items-center gap-1 rounded border px-2 py-1" style={{ borderColor: C.border }}>checks <span className="num inline-flex items-center" style={{ color: C.green }}>{passTotal} pass</span><span style={{ color: C.fg1 }}>/</span><span className="num inline-flex items-center" style={{ color: C.red }}>{failTotal} fail</span></span>
         </div>
       </div>
 
