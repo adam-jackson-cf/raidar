@@ -429,7 +429,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           What is costing you, what has improved and what remains a strength
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: C.fg1 }}>
-          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>visible revisions <span className="num" style={{ color: C.fg4 }}>{revisions.length}</span></span>
+          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>revisions <span className="num" style={{ color: C.fg4 }}>{revisions.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agents <span className="num" style={{ color: C.fg4 }}>{agentCount}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criteria <span className="num" style={{ color: C.fg4 }}>{criteria.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>runs <span className="num" style={{ color: C.fg4 }}>{runs.length}</span></span>
