@@ -1421,7 +1421,7 @@ export function WireframeExperimentsPage() {
                               y: rect.bottom + 4,
                               title: 'Outcome sorting',
                               lines: [
-                                'Default order ranks all visible scenario rows together.',
+                                'Default order ranks the visible revision rows in this scenario together.',
                                 'Sort priority: highest outcome, lower runtime, lower spend, higher stability, higher trust.',
                                 'Agent and Revision sort modes group first, then apply the same outcome ranking inside each group.',
                               ],
