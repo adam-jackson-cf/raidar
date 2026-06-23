@@ -1368,7 +1368,7 @@ export function WireframeExperimentsPage() {
                     <thead>
                       <tr>
                         <HeaderInfoCell label="Agent spec" className="w-52 px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Agent spec</HeaderInfoCell>
-                        <HeaderInfoCell label="Outcome" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Outcome</HeaderInfoCell>
+                        <HeaderInfoCell label="Outcome" className="w-24 px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Outcome</HeaderInfoCell>
                         <HeaderInfoCell label="Stability" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Stability</HeaderInfoCell>
                         <HeaderInfoCell label="Trust" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Trust</HeaderInfoCell>
                         <HeaderInfoCell label="Run" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>run</HeaderInfoCell>
@@ -1403,6 +1403,19 @@ export function WireframeExperimentsPage() {
                             if (value == null || value === 0) return C.fg1;
                             return (higherIsBetter ? value > 0 : value < 0) ? C.green : C.red;
                           };
+                          const movementArrow = (value: number | null) => {
+                            if (value == null || value === 0) return '→';
+                            return value > 0 ? '↑' : '↓';
+                          };
+                          const MovementValue = ({ value, kind, higherIsBetter }: { value: number | null; kind: 'outcome' | 'runtime' | 'spend'; higherIsBetter: boolean }) => (
+                            <span
+                              className="num inline-flex items-center gap-1 text-[11px] font-semibold"
+                              style={{ color: movementColor(value, higherIsBetter) }}
+                            >
+                              <span className="text-[15px] leading-none" aria-hidden>{movementArrow(value)}</span>
+                              <span>{formatMovement(value, kind)}</span>
+                            </span>
+                          );
                           const currentAggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
                           const previousAggregate = previousExp?.aggregate as (typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } }) | undefined;
                           const outputMean = currentAggregate.output_tokens?.mean ?? currentAggregate.uncached_output_tokens?.mean ?? 0;
@@ -1455,16 +1468,16 @@ export function WireframeExperimentsPage() {
                                   </div>
                                 </td>
                                 <td className="w-24 px-2.5 py-2">
-                                  <div className="flex items-center justify-center gap-2">
+                                  <div className="flex items-center justify-start gap-2">
                                     <ScoreRing id={`${experimentKey}-outcome`} score={composite} title="Outcome score" ringColor={deliveryColor} tooltip={[`mean: ${composite == null ? '—' : composite.toFixed(3)}`, `runs scored: ${exp.aggregate.run_count_scored ?? 0}/${exp.aggregate.run_count_total ?? 0}`, statString(exp.aggregate.composite_score)]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} />
-                                    <span className="num text-[11px] font-semibold" style={{ color: movementColor(outcomeMove, true) }}>{formatMovement(outcomeMove, 'outcome')}</span>
+                                    <MovementValue value={outcomeMove} kind="outcome" higherIsBetter />
                                   </div>
                                 </td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-stability`} score={repeatScore} title="Stability" ringColor={repeatColor} tooltip={[`stddev: ${exp.aggregate.composite_score?.stddev?.toFixed(3) ?? '—'}`, `repeat score: ${repeatScore == null ? '—' : repeatScore.toFixed(2)}`, `scored runs: ${exp.aggregate.run_count_scored ?? 0}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-sample-quality`} score={confidence} title="Trust" ringColor={confidenceColor} tooltip={[`preferred met: ${exp.sample.preferred_met ? 'true' : 'false'}`, `minimum met: ${exp.sample.minimum_met ? 'true' : 'false'}`, `scored ratio: ${totalRuns > 0 ? `${(confidence * 100).toFixed(0)}%` : '—'}`, `unscored: ${exp.aggregate.unscored_count ?? 0}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-run`} score={totalRuns > 0 ? scoredRuns / totalRuns : 0} title="Run" ringColor={runCoverageColor(scoredRuns, totalRuns)} tooltip={[`valid runs: ${scoredRuns}`, `total runs: ${totalRuns}`, `coverage: ${totalRuns > 0 ? `${Math.round((scoredRuns / totalRuns) * 100)}%` : '—'}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
-                                <td className="w-24 px-2.5 py-2 text-center"><span className="num text-[11px] font-semibold" style={{ color: movementColor(runtimeMove, false) }}>{formatMovement(runtimeMove, 'runtime')}</span></td>
-                                <td className="w-24 px-2.5 py-2 text-center"><span className="num text-[11px] font-semibold" style={{ color: movementColor(spendMove, false) }}>{formatMovement(spendMove, 'spend')}</span></td>
+                                <td className="w-24 px-2.5 py-2 text-center"><MovementValue value={runtimeMove} kind="runtime" higherIsBetter={false} /></td>
+                                <td className="w-24 px-2.5 py-2 text-center"><MovementValue value={spendMove} kind="spend" higherIsBetter={false} /></td>
                                 <td className="px-2.5 py-2" onMouseLeave={() => closeFindingPanel(experimentKey)} style={{ color: C.fg1 }}>
                                   {(() => {
                                     const clusters = clusterFindings(exp.findings);
