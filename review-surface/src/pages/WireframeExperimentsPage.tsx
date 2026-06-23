@@ -1421,9 +1421,9 @@ export function WireframeExperimentsPage() {
                         >
                           <Info className="size-3" />
                         </button>
-                      </div>
-                      <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
-                        Did the outcome improve, contract diff shows changes
+                        <span className="text-[11px] font-normal leading-4" style={{ color: C.fg0 }}>
+                          Did the outcome improve, contract diff shows changes
+                        </span>
                       </div>
                       <div className="mt-2 flex items-center gap-2">
                                 <button
