@@ -654,6 +654,57 @@ function topDeliveryScore(experiments: ExperimentRecord[]) {
   return best;
 }
 
+
+function patternDemoOutcome(pass: number, fail: number): MetricOutcome {
+  const sample = pass + fail;
+  return {
+    pass_rate: sample > 0 ? pass / sample : 0,
+    mean_score: sample > 0 ? pass / sample : 0,
+    sample_size: sample,
+    pass_count: pass,
+    fail_count: fail,
+  };
+}
+
+function withPatternDemoData(experiments: ExperimentRecord[]) {
+  const targetFamily = 'skill-benchmark-coding-test';
+  const hasTarget = experiments.some((exp) => exp.synthetic && exp.scenario === targetFamily);
+  if (!hasTarget) return experiments;
+
+  const patternByRevision: Record<string, Record<string, MetricOutcome>> = {
+    v001: {
+      'code-quality': patternDemoOutcome(1, 2),
+      functional: patternDemoOutcome(3, 0),
+      'resource-efficiency': patternDemoOutcome(3, 0),
+    },
+    v002: {
+      'code-quality': patternDemoOutcome(1, 2),
+      functional: patternDemoOutcome(3, 0),
+      'resource-efficiency': patternDemoOutcome(2, 1),
+    },
+    v003: {
+      'code-quality': patternDemoOutcome(3, 0),
+      functional: patternDemoOutcome(3, 0),
+      'resource-efficiency': patternDemoOutcome(1, 2),
+    },
+  };
+
+  return experiments.map((exp) => {
+    const overrides = exp.synthetic && exp.scenario === targetFamily && exp.revision ? patternByRevision[exp.revision] : undefined;
+    if (!overrides) return exp;
+    return {
+      ...exp,
+      aggregate: {
+        ...exp.aggregate,
+        metric_outcomes: {
+          ...(exp.aggregate.metric_outcomes ?? {}),
+          ...overrides,
+        },
+      },
+    };
+  });
+}
+
 function compareExperimentRank(left: number[], right: number[]) {
   for (let i = 0; i < Math.max(left.length, right.length); i += 1) {
     const lhs = left[i] ?? 0;
@@ -903,9 +954,11 @@ export function WireframeExperimentsPage() {
     setPinnedTooltips((current) => current.filter((item) => item.id !== id));
   };
 
+  const experiments = useMemo(() => withPatternDemoData(query.data?.experiments ?? []), [query.data]);
+
   const families = useMemo(() => {
     const groups = new Map<string, Map<string, ExperimentRecord[]>>();
-    for (const exp of query.data?.experiments ?? []) {
+    for (const exp of experiments) {
       const family = exp.scenario ?? 'unknown';
       const revision = exp.revision ?? 'unknown';
       const revisions = groups.get(family) ?? new Map<string, ExperimentRecord[]>();
@@ -922,7 +975,7 @@ export function WireframeExperimentsPage() {
           .sort(([a], [b]) => a.localeCompare(b))
           .map(([revision, exps]) => ({ revision, exps: exps.sort((a, b) => (b.revision ?? '').localeCompare(a.revision ?? '')) })),
       }));
-  }, [query.data]);
+  }, [experiments]);
 
   const getLatestRevision = (revisions: Array<{ revision: string }>) => {
     if (revisions.length === 0) return 'unknown';
@@ -1248,11 +1301,8 @@ export function WireframeExperimentsPage() {
                 const selectedSet = new Set(selected);
                 const hasHiddenRevisions = revisionIds.some((revision) => !selectedSet.has(revision));
                 const allFamilyExps = revisions.flatMap(({ exps }) => exps);
-                const visibleFamilyExps = revisions
-                  .filter(({ revision }) => selectedSet.has(revision))
-                  .flatMap(({ exps }) => exps);
-                const revisionRunIds = new Set(visibleFamilyExps.flatMap((exp) => exp.run_ids));
-                const familyRuns = (runsQuery.data ?? []).filter((run) => revisionRunIds.has(run.id));
+                const allFamilyRunIds = new Set(allFamilyExps.flatMap((exp) => exp.run_ids));
+                const familyRuns = (runsQuery.data ?? []).filter((run) => allFamilyRunIds.has(run.id));
                 const familyDiffs = (query.data?.revision_diffs ?? []).filter((diff) => diff.scenario === family);
                 const revisionSortMode = revisionSortModes[family] ?? 'outcome';
                 const baseRevisionRows = revisions
@@ -1334,74 +1384,6 @@ export function WireframeExperimentsPage() {
               <div className="text-[11px]" style={{ color: C.fg1 }}>
                 {(revisions[0]?.exps[0]?.scenario_meta?.description || 'Scenario family').slice(0, 180)}
               </div>
-              <div className="mt-2 flex items-center gap-2">
-                <button
-              type="button"
-              className="inline-flex size-7 items-center justify-center rounded border border-white/20"
-              onClick={() => {
-                if (hasHiddenRevisions) {
-                  showAllRevisionsForFamily(family);
-                }
-              }}
-              aria-label={hasHiddenRevisions ? 'Show all revision rows' : 'All revision rows visible'}
-              title={hasHiddenRevisions ? 'Show all revision rows' : 'All revision rows visible'}
-                >
-              {hasHiddenRevisions ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
-                </button>
-                <div className="relative" data-wireframe-menu>
-              <button
-                type="button"
-                className="min-w-60 h-7 rounded-md px-2 py-1 text-left text-xs"
-                style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
-                onClick={() => setOpenRevisionMenu((current) => (current === family ? null : family))}
-              >
-                {formatRevisionMenuLabel(
-                  selectedSet.size === revisionIds.length,
-                  selected,
-                  hasHiddenRevisions,
-                )}
-              </button>
-              {openRevisionMenu === family ? (
-                <div className="absolute left-0 top-full z-20 mt-1 min-w-60 rounded-md border border-white/15 bg-black/90 p-2 text-xs" data-wireframe-menu>
-                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
-                    <input
-                      type="checkbox"
-                      checked={selectedSet.size === revisionIds.length}
-                      onChange={(event) => {
-                        setSelectedRevisions((current) => ({ ...current, [family]: event.target.checked ? revisionIds : [] }));
-                      }}
-                    />
-                    all revisions
-                  </label>
-                  {revisionIds.map((revision) => {
-                    const revisionChecked = selectedSet.has(revision);
-                    return (
-                      <label key={`${family}-revision-${revision}`} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
-                        <input
-                          type="checkbox"
-                          onMouseDown={(event) => event.stopPropagation()}
-                          checked={revisionChecked}
-                          onClick={(event) => {
-                            const isSingleSelect = event.ctrlKey || event.metaKey;
-                            const nextChecked = event.currentTarget.checked;
-                            setSelectedRevisions((current) => {
-                              const currentSelected = current[family] ?? [getLatestRevision(families.find((entry) => entry.family === family)?.revisions ?? [])];
-                              if (nextChecked) {
-                                if (isSingleSelect) return { ...current, [family]: [revision] };
-                                return { ...current, [family]: Array.from(new Set([...currentSelected, revision])) };
-                              }
-                              return { ...current, [family]: currentSelected.filter((value) => value !== revision) };
-                            });
-                          }}
-                        />
-                        revision {revision}
-                      </label>
-                    );
-                  })}
-                </div>
-              ) : null}
-                </div>
-              </div>
             </div>
           <div
             className="space-y-3 px-2 py-2"
@@ -1443,6 +1425,75 @@ export function WireframeExperimentsPage() {
                       <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
                         Did the outcome improve, contract diff shows changes
                       </div>
+                      <div className="mt-2 flex items-center gap-2">
+                                <button
+                      type="button"
+                      className="inline-flex size-7 items-center justify-center rounded border border-white/20"
+                      onClick={() => {
+                                if (hasHiddenRevisions) {
+                                  showAllRevisionsForFamily(family);
+                                }
+                      }}
+                      aria-label={hasHiddenRevisions ? 'Show all revision rows' : 'All revision rows visible'}
+                      title={hasHiddenRevisions ? 'Show all revision rows' : 'All revision rows visible'}
+                                >
+                      {hasHiddenRevisions ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
+                                </button>
+                                <div className="relative" data-wireframe-menu>
+                      <button
+                                type="button"
+                                className="min-w-60 h-7 rounded-md px-2 py-1 text-left text-xs"
+                                style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+                                onClick={() => setOpenRevisionMenu((current) => (current === family ? null : family))}
+                      >
+                                {formatRevisionMenuLabel(
+                                  selectedSet.size === revisionIds.length,
+                                  selected,
+                                  hasHiddenRevisions,
+                                )}
+                      </button>
+                      {openRevisionMenu === family ? (
+                                <div className="absolute left-0 top-full z-20 mt-1 min-w-60 rounded-md border border-white/15 bg-black/90 p-2 text-xs" data-wireframe-menu>
+                                  <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedSet.size === revisionIds.length}
+                                      onChange={(event) => {
+                                        setSelectedRevisions((current) => ({ ...current, [family]: event.target.checked ? revisionIds : [] }));
+                                      }}
+                                    />
+                                    all revisions
+                                  </label>
+                                  {revisionIds.map((revision) => {
+                                    const revisionChecked = selectedSet.has(revision);
+                                    return (
+                                      <label key={`${family}-revision-${revision}`} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                                        <input
+                                          type="checkbox"
+                                          onMouseDown={(event) => event.stopPropagation()}
+                                          checked={revisionChecked}
+                                          onClick={(event) => {
+                                            const isSingleSelect = event.ctrlKey || event.metaKey;
+                                            const nextChecked = event.currentTarget.checked;
+                                            setSelectedRevisions((current) => {
+                                              const currentSelected = current[family] ?? [getLatestRevision(families.find((entry) => entry.family === family)?.revisions ?? [])];
+                                              if (nextChecked) {
+                                                if (isSingleSelect) return { ...current, [family]: [revision] };
+                                                return { ...current, [family]: Array.from(new Set([...currentSelected, revision])) };
+                                              }
+                                              return { ...current, [family]: currentSelected.filter((value) => value !== revision) };
+                                            });
+                                          }}
+                                        />
+                                        revision {revision}
+                                      </label>
+                                    );
+                                  })}
+                                </div>
+                      ) : null}
+                                </div>
+                      </div>
+
                     </div>
                     <div className="flex items-center gap-2">
                       <label className="text-xs" style={{ color: C.fg2 }} htmlFor={`revision-sort-mode-${family}`}>
@@ -1597,7 +1648,7 @@ export function WireframeExperimentsPage() {
                   {familyDiffs.filter((diff) => selectedSet.has(diff.to_revision)).map((diff) => <RevisionDiffCard key={diff.key} diff={diff} />)}
                 </div>
               </div>
-              <WireframePatternsMap experiments={visibleFamilyExps} runs={familyRuns} />
+              <WireframePatternsMap experiments={allFamilyExps} runs={familyRuns} />
               <div className="rounded-lg border px-0.5 py-2.5" style={{ background: C.surface, borderColor: C.border }}>
                 <div className="mb-2 ml-2.5 flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
                   <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />

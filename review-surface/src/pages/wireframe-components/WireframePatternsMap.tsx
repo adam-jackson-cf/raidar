@@ -2,7 +2,7 @@ import { useMemo, useState, type MouseEvent } from 'react';
 import { Info, Pin, PinOff, X } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { humanize } from '@/utils/verdict';
-import type { ExperimentRecord, RunRecord } from '@/utils/types';
+import type { ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
 import { compactSpec } from './wireframeLabels';
 
 type MetricOutcome = {
@@ -16,6 +16,28 @@ type MetricOutcome = {
 type CellState = 'pass' | 'fail' | 'cleared' | 'missing';
 type CriterionState = 'costing' | 'trending' | 'repeatable' | 'watchlist';
 
+type AgentPerformance = {
+  spec: string;
+  label: string;
+  outcome: MetricOutcome;
+  composite: number | null;
+  runtime: number | null;
+  spend: number | null;
+  stability: number | null;
+  trust: number;
+};
+
+type Cell = {
+  state: CellState;
+  sample: number;
+  pass: number;
+  fail: number;
+  passRate: number | null;
+  failRate: number | null;
+  threshold: number;
+  topAgents: AgentPerformance[];
+};
+
 type Criterion = {
   key: string;
   label: string;
@@ -24,14 +46,11 @@ type Criterion = {
   pass: number;
   fail: number;
   sample: number;
-  latestFail: number;
-  latestSample: number;
 };
 
-type AgentRow = {
-  spec: string;
-  label: string;
-  cells: Record<string, CellState>;
+type RevisionRow = {
+  revision: string;
+  cells: Record<string, Cell>;
 };
 
 type Overlay = {
@@ -43,6 +62,9 @@ type Overlay = {
 };
 
 const RECOVERY_COLOR = '#B58CFF';
+const MIN_SAMPLE = 3;
+const COSTING_FAIL_RATE = 0.34;
+const STRENGTH_PASS_RATE = 0.8;
 
 function threshold(sample: number) {
   return Math.max(1, Math.ceil(sample / 3));
@@ -76,18 +98,11 @@ function shortCriterion(metric: string) {
   return known[metric] ?? humanize(metric).split(/\s+/).map((part) => part.slice(0, 4)).join(' ');
 }
 
-function stateColor(state: CriterionState) {
-  if (state === 'costing') return C.red;
-  if (state === 'trending') return RECOVERY_COLOR;
-  if (state === 'repeatable') return C.green;
+function stateColor(state: CriterionState | CellState) {
+  if (state === 'costing' || state === 'fail') return C.red;
+  if (state === 'trending' || state === 'cleared') return RECOVERY_COLOR;
+  if (state === 'repeatable' || state === 'pass') return C.green;
   return C.fg1;
-}
-
-function cellColor(state: CellState) {
-  if (state === 'pass') return C.green;
-  if (state === 'cleared') return RECOVERY_COLOR;
-  if (state === 'fail') return C.red;
-  return C.fg0;
 }
 
 function cellSymbol(state: CellState) {
@@ -98,10 +113,84 @@ function cellSymbol(state: CellState) {
 }
 
 function cellTitle(state: CellState) {
-  if (state === 'pass') return 'passes in the latest visible revision';
-  if (state === 'cleared') return 'failed earlier, now passes in the latest visible revision';
-  if (state === 'fail') return 'still failing in the latest visible revision';
-  return 'not evaluated in the latest visible revision';
+  if (state === 'pass') return 'strength: pass rate is at or above 80%';
+  if (state === 'cleared') return 'trending: previously costing, now no longer above the failure threshold';
+  if (state === 'fail') return 'costing: fail rate is at or above one third';
+  return 'insufficient or mixed evidence';
+}
+
+function statMean(stat?: StatBlock | null) {
+  return stat?.mean ?? null;
+}
+
+function repeatabilityValue(stddev: number | null | undefined): number | null {
+  if (stddev == null) return null;
+  return Math.max(0, Math.min(1, 1 - stddev));
+}
+
+function confidenceScore(scored: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.max(0, Math.min(1, scored / total));
+}
+
+function spendFor(exp: ExperimentRecord) {
+  const aggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
+  const input = exp.aggregate.uncached_input_tokens?.mean;
+  if (input == null) return null;
+  return input + (aggregate.output_tokens?.mean ?? aggregate.uncached_output_tokens?.mean ?? 0);
+}
+
+function agentPerformance(exp: ExperimentRecord, outcome: MetricOutcome): AgentPerformance {
+  return {
+    spec: exp.agent_spec,
+    label: compactSpec(exp.agent_spec),
+    outcome,
+    composite: exp.aggregate.quality_score?.mean ?? exp.aggregate.composite_score?.mean ?? null,
+    runtime: statMean(exp.aggregate.duration_sec),
+    spend: spendFor(exp),
+    stability: repeatabilityValue(exp.aggregate.composite_score?.stddev ?? null),
+    trust: confidenceScore(exp.aggregate.run_count_scored ?? 0, exp.aggregate.run_count_total ?? 0),
+  };
+}
+
+function compareAgentPerformance(left: AgentPerformance, right: AgentPerformance) {
+  const scoreLeft = left.composite ?? -1;
+  const scoreRight = right.composite ?? -1;
+  if (scoreRight !== scoreLeft) return scoreRight - scoreLeft;
+
+  const runtimeLeft = left.runtime ?? Number.POSITIVE_INFINITY;
+  const runtimeRight = right.runtime ?? Number.POSITIVE_INFINITY;
+  if (runtimeLeft !== runtimeRight) return runtimeLeft - runtimeRight;
+
+  const spendLeft = left.spend ?? Number.POSITIVE_INFINITY;
+  const spendRight = right.spend ?? Number.POSITIVE_INFINITY;
+  if (spendLeft !== spendRight) return spendLeft - spendRight;
+
+  const stabilityLeft = left.stability ?? -1;
+  const stabilityRight = right.stability ?? -1;
+  if (stabilityRight !== stabilityLeft) return stabilityRight - stabilityLeft;
+
+  if (right.trust !== left.trust) return right.trust - left.trust;
+
+  return left.label.localeCompare(right.label);
+}
+
+function classifyCell(sample: number, pass: number, fail: number, previouslyCosting: boolean): CellState {
+  if (sample < MIN_SAMPLE) return 'missing';
+  const failRate = fail / sample;
+  const passRate = pass / sample;
+  if (failRate >= COSTING_FAIL_RATE) return 'fail';
+  if (previouslyCosting) return 'cleared';
+  if (passRate >= STRENGTH_PASS_RATE) return 'pass';
+  return 'missing';
+}
+
+function criterionStateFromCell(cell: Cell | undefined): CriterionState {
+  if (!cell) return 'watchlist';
+  if (cell.state === 'fail') return 'costing';
+  if (cell.state === 'cleared') return 'trending';
+  if (cell.state === 'pass') return 'repeatable';
+  return 'watchlist';
 }
 
 function buildMap(experiments: ExperimentRecord[]) {
@@ -110,77 +199,79 @@ function buildMap(experiments: ExperimentRecord[]) {
   );
   const latestRevision = revisions[revisions.length - 1] ?? null;
   const metrics = [...new Set(experiments.flatMap((exp) => metricOutcomes(exp).map(([metric]) => metric)))].sort();
-  const specs = [...new Set(experiments.map((exp) => exp.agent_spec))].sort((left, right) => compactSpec(left).localeCompare(compactSpec(right)));
+  const revisionExperiments = new Map(revisions.map((revision) => [revision, experiments.filter((exp) => exp.revision === revision)]));
+
+  const cellsByRevision = new Map<string, Record<string, Cell>>();
+  const priorCostingByMetric = new Map<string, boolean>();
+
+  for (const revision of revisions) {
+    const rowCells: Record<string, Cell> = {};
+    const exps = revisionExperiments.get(revision) ?? [];
+    for (const metric of metrics) {
+      let pass = 0;
+      let fail = 0;
+      let sample = 0;
+      const topAgents: AgentPerformance[] = [];
+      for (const exp of exps) {
+        const outcome = exp.aggregate.metric_outcomes?.[metric] as MetricOutcome | undefined;
+        if (!outcome) continue;
+        pass += outcome.pass_count;
+        fail += outcome.fail_count;
+        sample += outcome.sample_size;
+        topAgents.push(agentPerformance(exp, outcome));
+      }
+      const state = classifyCell(sample, pass, fail, priorCostingByMetric.get(metric) ?? false);
+      rowCells[metric] = {
+        state,
+        sample,
+        pass,
+        fail,
+        passRate: sample > 0 ? pass / sample : null,
+        failRate: sample > 0 ? fail / sample : null,
+        threshold: threshold(sample),
+        topAgents: topAgents.sort(compareAgentPerformance).slice(0, 2),
+      };
+      if (state === 'fail') priorCostingByMetric.set(metric, true);
+    }
+    cellsByRevision.set(revision, rowCells);
+  }
 
   const criteria: Criterion[] = metrics.map((metric) => {
     let pass = 0;
     let fail = 0;
     let sample = 0;
-    let latestFail = 0;
-    let latestSample = 0;
-    for (const exp of experiments) {
-      const outcome = exp.aggregate.metric_outcomes?.[metric] as MetricOutcome | undefined;
-      if (!outcome) continue;
-      pass += outcome.pass_count;
-      fail += outcome.fail_count;
-      sample += outcome.sample_size;
-      if (exp.revision === latestRevision) {
-        latestFail += outcome.fail_count;
-        latestSample += outcome.sample_size;
-      }
+    for (const revision of revisions) {
+      const cell = cellsByRevision.get(revision)?.[metric];
+      pass += cell?.pass ?? 0;
+      fail += cell?.fail ?? 0;
+      sample += cell?.sample ?? 0;
     }
-    const minimum = threshold(sample);
-    const latestMinimum = threshold(latestSample);
-    const hadEarlierFailure = fail - latestFail > 0;
-    const latestClean = latestSample > 0 && latestFail === 0;
-    const latestCosting = latestSample > 0 && latestFail >= latestMinimum;
-    const state: CriterionState = latestCosting
-      ? 'costing'
-      : hadEarlierFailure && latestClean
-        ? 'trending'
-        : sample > 0 && pass >= minimum && fail === 0
-          ? 'repeatable'
-          : sample > 0 && pass >= minimum && latestClean
-            ? 'repeatable'
-            : 'watchlist';
     return {
       key: metric,
       label: humanize(metric),
       shortLabel: shortCriterion(metric),
-      state,
+      state: criterionStateFromCell(latestRevision ? cellsByRevision.get(latestRevision)?.[metric] : undefined),
       pass,
       fail,
       sample,
-      latestFail,
-      latestSample,
     };
   }).sort((left, right) => {
     const stateOrder: Record<CriterionState, number> = { costing: 0, trending: 1, repeatable: 2, watchlist: 3 };
     return stateOrder[left.state] - stateOrder[right.state] || left.label.localeCompare(right.label);
   });
 
-  const rows: AgentRow[] = specs.map((spec) => {
-    const cells: Record<string, CellState> = {};
-    for (const criterion of criteria) {
-      const agentExperiments = experiments
-        .filter((exp) => exp.agent_spec === spec && exp.aggregate.metric_outcomes?.[criterion.key])
-        .sort((left, right) => revisionValue(left.revision) - revisionValue(right.revision));
-      const latest = agentExperiments.find((exp) => exp.revision === latestRevision) ?? agentExperiments[agentExperiments.length - 1];
-      const latestOutcome = latest?.aggregate.metric_outcomes?.[criterion.key] as MetricOutcome | undefined;
-      const earlierFailed = agentExperiments.some((exp) => {
-        if (exp.revision === latest?.revision) return false;
-        const outcome = exp.aggregate.metric_outcomes?.[criterion.key] as MetricOutcome | undefined;
-        return outcome ? outcome.fail_count > 0 : false;
-      });
-      if (!latestOutcome) cells[criterion.key] = 'missing';
-      else if (latestOutcome.fail_count > 0) cells[criterion.key] = 'fail';
-      else if (earlierFailed) cells[criterion.key] = 'cleared';
-      else cells[criterion.key] = 'pass';
-    }
-    return { spec, label: compactSpec(spec), cells };
-  });
+  const rows: RevisionRow[] = revisions.map((revision) => ({ revision, cells: cellsByRevision.get(revision) ?? {} }));
+  const agentCount = new Set(experiments.map((exp) => exp.agent_spec)).size;
+  return { criteria, rows, revisions, latestRevision, agentCount };
+}
 
-  return { criteria, rows, revisions, latestRevision };
+function pct(value: number | null) {
+  return value == null ? '—' : `${Math.round(value * 100)}%`;
+}
+
+function agentLine(label: string, agent: AgentPerformance | undefined) {
+  if (!agent) return `${label}: —`;
+  return `${label}: ${agent.label} · outcome ${agent.composite == null ? '—' : agent.composite.toFixed(3)} · criterion ${agent.outcome.pass_count}/${agent.outcome.sample_size} pass`;
 }
 
 function SummaryCard({
@@ -226,7 +317,7 @@ function DetailOverlay({ overlay, pinned, onPin, onClose }: {
 }) {
   return (
     <div
-      className="fixed z-40 w-80 rounded-lg border p-2 shadow-2xl"
+      className="fixed z-40 w-96 rounded-lg border p-2 shadow-2xl"
       style={{ left: overlay.x, top: overlay.y, color: C.fg3, background: 'rgba(5,5,5,0.96)', borderColor: 'rgba(255,255,255,0.16)' }}
       onClick={(event) => event.stopPropagation()}
     >
@@ -249,7 +340,7 @@ function DetailOverlay({ overlay, pinned, onPin, onClose }: {
 }
 
 export function WireframePatternsMap({ experiments, runs }: { experiments: ExperimentRecord[]; runs: RunRecord[] }) {
-  const { criteria, rows, revisions, latestRevision } = useMemo(() => buildMap(experiments), [experiments]);
+  const { criteria, rows, revisions, latestRevision, agentCount } = useMemo(() => buildMap(experiments), [experiments]);
   const [hovered, setHovered] = useState<Overlay | null>(null);
   const [pinned, setPinned] = useState<Overlay[]>([]);
   const costing = criteria.filter((criterion) => criterion.state === 'costing');
@@ -257,9 +348,9 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
   const repeatable = criteria.filter((criterion) => criterion.state === 'repeatable');
   const passTotal = criteria.reduce((sum, criterion) => sum + criterion.pass, 0);
   const failTotal = criteria.reduce((sum, criterion) => sum + criterion.fail, 0);
-  const costingCopy = costing.length ? `Still failing in ${latestRevision ?? 'latest'} and likely pulling outcome down.` : `No criteria still fail in ${latestRevision ?? 'latest'}.`;
-  const trendingCopy = trending.length ? `Failed earlier, now cleared in ${latestRevision ?? 'latest'}.` : 'No visible recovery trend above threshold.';
-  const strengthsCopy = repeatable.length ? 'Passes hold across visible agents rather than only one clean run.' : 'No fully repeatable strengths above threshold.';
+  const costingCopy = costing.length ? `Latest revision has criteria with fail rate at or above 34%.` : `No criteria are above the failure threshold in ${latestRevision ?? 'latest'}.`;
+  const trendingCopy = trending.length ? 'Previously costing criteria are now below the failure threshold.' : 'No criterion has cleared after previously costing.';
+  const strengthsCopy = repeatable.length ? 'Latest revision criteria pass at or above 80%.' : 'No latest-revision strengths above threshold.';
 
   const openOverlay = (event: MouseEvent<HTMLElement>, overlay: Omit<Overlay, 'x' | 'y'>) => {
     setHovered({ ...overlay, x: event.clientX + 14, y: event.clientY + 14 });
@@ -280,6 +371,17 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
 
   if (criteria.length === 0 || rows.length === 0) return null;
 
+  const cellLines = (revision: string, criterion: Criterion, cell: Cell) => [
+    cellTitle(cell.state),
+    `Revision: ${revision}`,
+    `Sample: ${cell.sample} checks · threshold ${cell.threshold}`,
+    `Pass/fail: ${cell.pass} pass / ${cell.fail} fail`,
+    `Rates: ${pct(cell.passRate)} pass / ${pct(cell.failRate)} fail`,
+    agentLine('Top agent', cell.topAgents[0]),
+    agentLine('Runner-up', cell.topAgents[1]),
+    'Agent ranking uses the revision trophy order: highest outcome, lower runtime, lower spend, higher stability, higher trust.',
+  ];
+
   return (
     <div className="relative overflow-hidden rounded-lg" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
       <div className="border-b px-3 py-2.5" style={{ borderColor: C.border }}>
@@ -293,16 +395,18 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
               id: 'hover-threshold',
               title: 'Pattern threshold',
               lines: [
-                'Criteria use the visible revision sample and appear when their pass or fail count reaches ceil(sample / 3).',
-                'Cells show the latest visible state per agent; cyan means the criterion failed earlier but is now green.',
+                'Each cell aggregates one revision and one scoring criterion across all agent specs and scored runs in the scenario.',
+                'Costing: fail rate >= 34%. Strength: pass rate >= 80%. Trending: previously costing and now below the failure threshold.',
+                'Cells with fewer than 3 checks, or mixed results below threshold, stay muted.',
               ],
             })}
             onMouseMove={(event) => openOverlay(event, {
               id: 'hover-threshold',
               title: 'Pattern threshold',
               lines: [
-                'Criteria use the visible revision sample and appear when their pass or fail count reaches ceil(sample / 3).',
-                'Cells show the latest visible state per agent; cyan means the criterion failed earlier but is now green.',
+                'Each cell aggregates one revision and one scoring criterion across all agent specs and scored runs in the scenario.',
+                'Costing: fail rate >= 34%. Strength: pass rate >= 80%. Trending: previously costing and now below the failure threshold.',
+                'Cells with fewer than 3 checks, or mixed results below threshold, stay muted.',
               ],
             })}
             onMouseLeave={() => setHovered(null)}
@@ -315,7 +419,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: C.fg1 }}>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>visible revisions <span className="num" style={{ color: C.fg4 }}>{revisions.length}</span></span>
-          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agents <span className="num" style={{ color: C.fg4 }}>{rows.length}</span></span>
+          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agents <span className="num" style={{ color: C.fg4 }}>{agentCount}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criteria <span className="num" style={{ color: C.fg4 }}>{criteria.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>runs <span className="num" style={{ color: C.fg4 }}>{runs.length}</span></span>
           <span className="inline-flex items-center gap-1 rounded border px-2 py-1" style={{ borderColor: C.border }}>checks <span className="num inline-flex items-center" style={{ color: C.green }}>{passTotal} pass</span><span style={{ color: C.fg1 }}>/</span><span className="num inline-flex items-center" style={{ color: C.red }}>{failTotal} fail</span></span>
@@ -323,27 +427,9 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
       </div>
 
       <div className="grid border-b lg:grid-cols-3" style={{ borderColor: C.border }}>
-        <SummaryCard
-          state="costing"
-          label="Costing you"
-          count={costing.length}
-          copy={costingCopy}
-          onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })}
-        />
-        <SummaryCard
-          state="trending"
-          label="Trending up"
-          count={trending.length}
-          copy={trendingCopy}
-          onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })}
-        />
-        <SummaryCard
-          state="repeatable"
-          label="Strengths"
-          count={repeatable.length}
-          copy={strengthsCopy}
-          onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })}
-        />
+        <SummaryCard state="costing" label="Costing you" count={costing.length} copy={costingCopy} onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })} />
+        <SummaryCard state="trending" label="Trending up" count={trending.length} copy={trendingCopy} onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })} />
+        <SummaryCard state="repeatable" label="Strengths" count={repeatable.length} copy={strengthsCopy} onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })} />
       </div>
 
       <div className="sb overflow-x-auto px-3 pb-2 pt-3">
@@ -353,7 +439,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              <th className="sticky left-0 z-10 w-44 px-2 py-1" style={{ background: C.surface }} aria-label="Agent spec" />
+              <th className="sticky left-0 z-10 w-32 px-2 py-1" style={{ background: C.surface }} aria-label="Revision" />
               {criteria.map((criterion) => (
                 <th key={criterion.key} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
@@ -363,18 +449,18 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
                       id: `hover-criterion-${criterion.key}`,
                       title: criterion.label,
                       lines: [
-                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks.`,
-                        `Current classification: ${criterion.state}.`,
-                        'Scoring explanation placeholder: criterion rubric detail is not available in the current wireframe data yet.',
+                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
+                        `Latest classification: ${criterion.state}.`,
+                        'Costing uses >=34% fail rate; strength uses >=80% pass rate; trending means previously costing and now below the failure threshold.',
                       ],
                     })}
                     onMouseMove={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
                       title: criterion.label,
                       lines: [
-                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks.`,
-                        `Current classification: ${criterion.state}.`,
-                        'Scoring explanation placeholder: criterion rubric detail is not available in the current wireframe data yet.',
+                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
+                        `Latest classification: ${criterion.state}.`,
+                        'Costing uses >=34% fail rate; strength uses >=80% pass rate; trending means previously costing and now below the failure threshold.',
                       ],
                     })}
                     onMouseLeave={() => setHovered(null)}
@@ -382,9 +468,9 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
                       id: `criterion-${criterion.key}`,
                       title: criterion.label,
                       lines: [
-                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks.`,
-                        `Current classification: ${criterion.state}.`,
-                        'Scoring explanation placeholder: criterion rubric detail is not available in the current wireframe data yet.',
+                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
+                        `Latest classification: ${criterion.state}.`,
+                        'Costing uses >=34% fail rate; strength uses >=80% pass rate; trending means previously costing and now below the failure threshold.',
                       ],
                     })}
                   >
@@ -396,48 +482,37 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.spec} style={{ borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
-                <td className="sticky left-0 z-10 w-44 px-2 py-2 align-middle" style={{ background: C.surface }} title={row.spec}>
-                  <span className="block text-left text-[11px] font-medium leading-none" style={{ color: C.fg3 }}>
-                    {row.label}
+              <tr key={row.revision} style={{ borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
+                <td className="sticky left-0 z-10 w-32 px-2 py-2 align-middle" style={{ background: C.surface }}>
+                  <span className="num block text-left text-[11px] font-medium leading-none" style={{ color: C.fg3 }}>
+                    revision {row.revision}
                   </span>
                 </td>
                 {criteria.map((criterion) => {
-                  const state = row.cells[criterion.key] ?? 'missing';
-                  const color = cellColor(state);
+                  const cell = row.cells[criterion.key];
+                  const state = cell?.state ?? 'missing';
+                  const color = stateColor(state);
                   return (
-                    <td key={`${row.spec}-${criterion.key}`} className="px-1 py-2 text-center">
+                    <td key={`${row.revision}-${criterion.key}`} className="px-1 py-2 text-center">
                       <button
                         className="inline-flex size-7 items-center justify-center rounded border text-[13px] font-bold"
                         style={{ color, borderColor: `${color}55`, background: `${color}14` }}
-                        title={`${row.label} · ${criterion.label} · ${cellTitle(state)}`}
+                        title={`${row.revision} · ${criterion.label} · ${cellTitle(state)}`}
                         onMouseEnter={(event) => openOverlay(event, {
-                          id: `hover-cell-${row.spec}-${criterion.key}`,
-                          title: `${row.label} · ${criterion.label}`,
-                          lines: [
-                            cellTitle(state),
-                            `Latest visible revision: ${latestRevision ?? '—'}.`,
-                            state === 'fail' ? 'Placeholder cost: this criterion is likely holding back outcome until resolved.' : state === 'cleared' ? 'Placeholder trend: earlier failure has cleared in the latest revision.' : 'Placeholder context: stable pass needs rubric detail to explain why it is valuable.',
-                          ],
+                          id: `hover-cell-${row.revision}-${criterion.key}`,
+                          title: `${row.revision} · ${criterion.label}`,
+                          lines: cellLines(row.revision, criterion, cell),
                         })}
                         onMouseMove={(event) => openOverlay(event, {
-                          id: `hover-cell-${row.spec}-${criterion.key}`,
-                          title: `${row.label} · ${criterion.label}`,
-                          lines: [
-                            cellTitle(state),
-                            `Latest visible revision: ${latestRevision ?? '—'}.`,
-                            state === 'fail' ? 'Placeholder cost: this criterion is likely holding back outcome until resolved.' : state === 'cleared' ? 'Placeholder trend: earlier failure has cleared in the latest revision.' : 'Placeholder context: stable pass needs rubric detail to explain why it is valuable.',
-                          ],
+                          id: `hover-cell-${row.revision}-${criterion.key}`,
+                          title: `${row.revision} · ${criterion.label}`,
+                          lines: cellLines(row.revision, criterion, cell),
                         })}
                         onMouseLeave={() => setHovered(null)}
                         onClick={(event) => pinOverlay(event, {
-                          id: `cell-${row.spec}-${criterion.key}`,
-                          title: `${row.label} · ${criterion.label}`,
-                          lines: [
-                            cellTitle(state),
-                            `Latest visible revision: ${latestRevision ?? '—'}.`,
-                            state === 'fail' ? 'Placeholder cost: this criterion is likely holding back outcome until resolved.' : state === 'cleared' ? 'Placeholder trend: earlier failure has cleared in the latest revision.' : 'Placeholder context: stable pass needs rubric detail to explain why it is valuable.',
-                          ],
+                          id: `cell-${row.revision}-${criterion.key}`,
+                          title: `${row.revision} · ${criterion.label}`,
+                          lines: cellLines(row.revision, criterion, cell),
                         })}
                       >
                         {cellSymbol(state)}
