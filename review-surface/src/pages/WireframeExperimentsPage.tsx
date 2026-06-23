@@ -1411,7 +1411,7 @@ export function WireframeExperimentsPage() {
             }}
           >
               <div className="overflow-hidden rounded-lg border" style={{ borderColor: C.border, background: C.surface }}>
-                <div className="border-b px-2.5 py-2" style={{ borderColor: C.border }}>
+                <div className="border-b px-2.5 py-2.5" style={{ borderColor: C.border }}>
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
@@ -1598,7 +1598,7 @@ export function WireframeExperimentsPage() {
                 </div>
               </div>
               <WireframePatternsMap experiments={visibleFamilyExps} runs={familyRuns} />
-              <div className="rounded-lg border p-0.5" style={{ background: C.surface, borderColor: C.border }}>
+              <div className="rounded-lg border px-0.5 py-2.5" style={{ background: C.surface, borderColor: C.border }}>
                 <div className="mb-2 ml-2.5 flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
                   <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
                   Trends
