@@ -167,7 +167,7 @@ function effortLabel(value: string) {
   return titleCase(value);
 }
 
-export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
+export function WireframeTradeoffScatter({ runs, borderless = false }: { runs: RunRecord[]; borderless?: boolean }) {
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -249,7 +249,7 @@ export function WireframeTradeoffScatter({ runs }: { runs: RunRecord[] }) {
   });
 
   return (
-    <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: `1px solid ${C.border}` }}>
+    <div className="flex flex-col gap-2 rounded-lg p-2.5" style={{ background: C.surface, border: borderless ? '0' : `1px solid ${C.border}` }}>
       <div className="flex items-start gap-2">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
