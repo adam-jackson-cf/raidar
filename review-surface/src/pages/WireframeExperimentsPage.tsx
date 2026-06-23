@@ -1653,8 +1653,32 @@ export function WireframeExperimentsPage() {
                 <div className="mb-2 ml-2.5 flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
                   <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
                   Trends
+                  <button
+                    type="button"
+                    className="inline-flex size-4 items-center justify-center rounded-full border"
+                    style={{ color: C.fg1, borderColor: C.border }}
+                    aria-label="Trends explanation"
+                    onMouseEnter={(event) => {
+                      const rect = event.currentTarget.getBoundingClientRect();
+                      setColumnTooltip({
+                        x: rect.left,
+                        y: rect.bottom + 4,
+                        title: 'Trends',
+                        lines: [
+                          'Scenario view across all revisions and agent specs.',
+                          'Charts use the highest outcome run for each agent spec, then cheapest, quickest, earliest run.',
+                        ],
+                      });
+                    }}
+                    onMouseLeave={() => setColumnTooltip(null)}
+                  >
+                    <Info className="size-3" />
+                  </button>
+                  <span className="text-[11px] font-normal leading-4" style={{ color: C.fg0 }}>
+                    Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.
+                  </span>
                 </div>
-                <WireframeTradeoffScatter runs={familyRuns} borderless />
+                <WireframeTradeoffScatter runs={familyRuns} borderless showSubtitle={false} />
               </div>
           </div>
         </section>

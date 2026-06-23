@@ -167,7 +167,7 @@ function effortLabel(value: string) {
   return titleCase(value);
 }
 
-export function WireframeTradeoffScatter({ runs, borderless = false }: { runs: RunRecord[]; borderless?: boolean }) {
+export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitle = true }: { runs: RunRecord[]; borderless?: boolean; showSubtitle?: boolean }) {
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -273,11 +273,11 @@ export function WireframeTradeoffScatter({ runs, borderless = false }: { runs: R
               </button>
             ))}
           </div>
-          <p className="mt-0.5 text-[11px]" style={{ color: C.fg0 }}>
-            {activeTab === 'runtime'
-              ? 'Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.'
-              : 'Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.'}
-          </p>
+          {showSubtitle ? (
+            <p className="mt-0.5 text-[11px]" style={{ color: C.fg0 }}>
+              Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.
+            </p>
+          ) : null}
         </div>
         <div ref={filterRef} className="relative ml-auto shrink-0">
           <button
