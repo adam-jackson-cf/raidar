@@ -98,6 +98,17 @@ function shortCriterion(metric: string) {
   return known[metric] ?? humanize(metric).split(/\s+/).map((part) => part.slice(0, 4)).join(' ');
 }
 
+
+function criterionOverlayLines(criterion: Criterion) {
+  return [
+    `Scorer: metric outcomes`,
+    `Scorer field: aggregate.metric_outcomes["${criterion.key}"]`,
+    `Criterion label: ${criterion.label}`,
+    `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
+    `Latest classification: ${criterion.state}.`,
+  ];
+}
+
 function stateColor(state: CriterionState | CellState) {
   if (state === 'costing' || state === 'fail') return C.red;
   if (state === 'trending' || state === 'cleared') return RECOVERY_COLOR;
@@ -443,38 +454,33 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
               {criteria.map((criterion) => (
                 <th key={criterion.key} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
-                    className="absolute bottom-9 origin-bottom whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
+                    className="absolute bottom-9 origin-bottom inline-flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
                     style={{ color: C.fg3, left: 'calc(50% + 8px)', transform: 'translateX(-50%) rotate(-60deg)' }}
                     onMouseEnter={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
                       title: criterion.label,
-                      lines: [
-                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
-                        `Latest classification: ${criterion.state}.`,
-                        'Costing uses >=34% fail rate; strength uses >=80% pass rate; trending means previously costing and now below the failure threshold.',
-                      ],
+                      lines: criterionOverlayLines(criterion),
                     })}
                     onMouseMove={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
                       title: criterion.label,
-                      lines: [
-                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
-                        `Latest classification: ${criterion.state}.`,
-                        'Costing uses >=34% fail rate; strength uses >=80% pass rate; trending means previously costing and now below the failure threshold.',
-                      ],
+                      lines: criterionOverlayLines(criterion),
                     })}
                     onMouseLeave={() => setHovered(null)}
                     onClick={(event) => pinOverlay(event, {
                       id: `criterion-${criterion.key}`,
                       title: criterion.label,
-                      lines: [
-                        `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
-                        `Latest classification: ${criterion.state}.`,
-                        'Costing uses >=34% fail rate; strength uses >=80% pass rate; trending means previously costing and now below the failure threshold.',
-                      ],
+                      lines: criterionOverlayLines(criterion),
                     })}
                   >
-                    {criterion.shortLabel}
+                    <span>{criterion.shortLabel}</span>
+                    <span
+                      className="inline-flex size-3 items-center justify-center rounded-full border text-[8px] leading-none"
+                      style={{ color: C.fg1, borderColor: C.border }}
+                      aria-hidden="true"
+                    >
+                      ?
+                    </span>
                   </button>
                 </th>
               ))}
