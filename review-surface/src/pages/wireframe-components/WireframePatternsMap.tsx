@@ -310,7 +310,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
             <Info size={10} />
           </span>
         </div>
-        <div className="mt-1 w-full text-[13px] leading-5" style={{ color: C.fg1 }}>
+        <div className="mt-1 w-full text-[11px] leading-4" style={{ color: C.fg0 }}>
           What is costing you, what has improved and what remains a strength
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: C.fg1 }}>
