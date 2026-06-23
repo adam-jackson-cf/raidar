@@ -260,7 +260,7 @@ function buildMap(experiments: ExperimentRecord[]) {
     return stateOrder[left.state] - stateOrder[right.state] || left.label.localeCompare(right.label);
   });
 
-  const rows: RevisionRow[] = revisions.map((revision) => ({ revision, cells: cellsByRevision.get(revision) ?? {} }));
+  const rows: RevisionRow[] = [...revisions].reverse().map((revision) => ({ revision, cells: cellsByRevision.get(revision) ?? {} }));
   const agentCount = new Set(experiments.map((exp) => exp.agent_spec)).size;
   return { criteria, rows, revisions, latestRevision, agentCount };
 }
