@@ -275,8 +275,8 @@ export function WireframeTradeoffScatter({ runs, borderless = false }: { runs: R
           </div>
           <p className="mt-0.5 text-[11px]" style={{ color: C.fg0 }}>
             {activeTab === 'runtime'
-              ? 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'
-              : 'Best run per revision/spec: highest outcome, then cheapest, quickest, earliest run.'}
+              ? 'Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.'
+              : 'Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.'}
           </p>
         </div>
         <div ref={filterRef} className="relative ml-auto shrink-0">
