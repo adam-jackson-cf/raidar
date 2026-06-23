@@ -1371,7 +1371,6 @@ export function WireframeExperimentsPage() {
                         <HeaderInfoCell label="Outcome" className="w-24 px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Outcome</HeaderInfoCell>
                         <HeaderInfoCell label="Stability" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Stability</HeaderInfoCell>
                         <HeaderInfoCell label="Trust" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Trust</HeaderInfoCell>
-                        <HeaderInfoCell label="Run" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>run</HeaderInfoCell>
                         <th className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg0 }}>Runtime</th>
                         <th className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg0 }}>Spend</th>
                         <HeaderInfoCell label="Findings" className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Findings</HeaderInfoCell>
@@ -1475,7 +1474,6 @@ export function WireframeExperimentsPage() {
                                 </td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-stability`} score={repeatScore} title="Stability" ringColor={repeatColor} tooltip={[`stddev: ${exp.aggregate.composite_score?.stddev?.toFixed(3) ?? '—'}`, `repeat score: ${repeatScore == null ? '—' : repeatScore.toFixed(2)}`, `scored runs: ${exp.aggregate.run_count_scored ?? 0}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-sample-quality`} score={confidence} title="Trust" ringColor={confidenceColor} tooltip={[`preferred met: ${exp.sample.preferred_met ? 'true' : 'false'}`, `minimum met: ${exp.sample.minimum_met ? 'true' : 'false'}`, `scored ratio: ${totalRuns > 0 ? `${(confidence * 100).toFixed(0)}%` : '—'}`, `unscored: ${exp.aggregate.unscored_count ?? 0}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
-                                <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-run`} score={totalRuns > 0 ? scoredRuns / totalRuns : 0} title="Run" ringColor={runCoverageColor(scoredRuns, totalRuns)} tooltip={[`valid runs: ${scoredRuns}`, `total runs: ${totalRuns}`, `coverage: ${totalRuns > 0 ? `${Math.round((scoredRuns / totalRuns) * 100)}%` : '—'}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
                                 <td className="w-24 px-2.5 py-2 text-center"><MovementValue value={runtimeMove} kind="runtime" higherIsBetter={false} /></td>
                                 <td className="w-24 px-2.5 py-2 text-center"><MovementValue value={spendMove} kind="spend" higherIsBetter={false} /></td>
                                 <td className="px-2.5 py-2" onMouseLeave={() => closeFindingPanel(experimentKey)} style={{ color: C.fg1 }}>
@@ -1494,7 +1492,7 @@ export function WireframeExperimentsPage() {
                               </tr>
                               {isExpanded ? (
                                 <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-                                  <td colSpan={8} className="p-0"><WireframeExperimentExpansion exp={exp} /></td>
+                                  <td colSpan={7} className="p-0"><WireframeExperimentExpansion exp={exp} /></td>
                                 </tr>
                               ) : null}
                             </Fragment>
