@@ -292,6 +292,14 @@ const COLUMN_HELPERS: Record<string, string[]> = {
     'How confidently the score can be trusted from available evidence.',
     'Derived from scored runs vs total runs and whether sample thresholds are met.',
   ],
+  Runtime: [
+    'Runtime movement for this revision row compared with the previous revision of the same agent.',
+    'Lower runtime is better, so downward movement is green and upward movement is red.',
+  ],
+  Spend: [
+    'Token spend movement for this revision row compared with the previous revision of the same agent.',
+    'Lower spend is better, so downward movement is green and upward movement is red.',
+  ],
   Run: [
     'How much of the recorded run set completed successfully.',
     'Higher fill means stronger signal strength for this experiment.',
@@ -1462,8 +1470,8 @@ export function WireframeExperimentsPage() {
                         <HeaderInfoCell label="Outcome" className="w-24 px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Outcome</HeaderInfoCell>
                         <HeaderInfoCell label="Stability" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Stability</HeaderInfoCell>
                         <HeaderInfoCell label="Trust" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Trust</HeaderInfoCell>
-                        <th className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg0 }}>Runtime</th>
-                        <th className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg0 }}>Spend</th>
+                        <HeaderInfoCell label="Runtime" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Runtime</HeaderInfoCell>
+                        <HeaderInfoCell label="Spend" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Spend</HeaderInfoCell>
                         <HeaderInfoCell label="Findings" className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Findings</HeaderInfoCell>
                       </tr>
                     </thead>
