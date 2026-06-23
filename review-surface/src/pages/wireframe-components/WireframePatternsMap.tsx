@@ -311,7 +311,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           </span>
         </div>
         <div className="mt-1 w-full text-[13px] leading-5" style={{ color: C.fg1 }}>
-          Signals across the whole scenario, this that are costing you, things that have improved (cleared), things that remain strong (pass)
+          What is costing you, what has improved and what remains a strength
         </div>
         <div className="mt-2 text-[11px]" style={{ color: C.fg1 }}>
           Evidence map · linked to {runs.length} visible runs across {revisions.length} revisions
