@@ -757,6 +757,7 @@ export function WireframeExperimentsPage() {
   const [pinnedFindingPanels, setPinnedFindingPanels] = useState<FindingPanelState[]>([]);
   const [selectedRevisions, setSelectedRevisions] = useState<RevisionFilterMap>({});
   const [scenarioSortMode, setScenarioSortMode] = useState<'most_recent' | 'revision_improvement'>('most_recent');
+  const [revisionSortModes, setRevisionSortModes] = useState<Record<string, 'outcome' | 'agent' | 'revision'>>({});
 
   useEffect(() => {
     if (!findingPanel?.pinned) return;
@@ -1245,39 +1246,54 @@ export function WireframeExperimentsPage() {
                 const revisionRunIds = new Set(visibleFamilyExps.flatMap((exp) => exp.run_ids));
                 const familyRuns = (runsQuery.data ?? []).filter((run) => revisionRunIds.has(run.id));
                 const familyDiffs = (query.data?.revision_diffs ?? []).filter((diff) => diff.scenario === family);
-                const visibleRevisionRows = revisions
+                const revisionSortMode = revisionSortModes[family] ?? 'outcome';
+                const baseRevisionRows = revisions
                   .filter(({ revision }) => selectedSet.has(revision))
-                  .flatMap(({ revision, exps }) => exps.map((exp) => ({ revision, exp })))
-                  .sort((left, right) => {
-                    const scoreLeft = findabilityScore(left.exp.aggregate.composite_score?.mean, left.exp.aggregate.quality_score?.mean) ?? -1;
-                    const scoreRight = findabilityScore(right.exp.aggregate.composite_score?.mean, right.exp.aggregate.quality_score?.mean) ?? -1;
-                    if (scoreRight !== scoreLeft) return scoreRight - scoreLeft;
+                  .flatMap(({ revision, exps }) => exps.map((exp) => ({ revision, exp })));
+                const spendFor = (exp: ExperimentRecord) => {
+                  const aggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
+                  const input = exp.aggregate.uncached_input_tokens?.mean;
+                  if (input == null) return Number.POSITIVE_INFINITY;
+                  return input + (aggregate.output_tokens?.mean ?? aggregate.uncached_output_tokens?.mean ?? 0);
+                };
+                const trustFor = (exp: ExperimentRecord) => confidenceScore(exp.aggregate.run_count_scored ?? 0, exp.aggregate.run_count_total ?? 0);
+                const compareRevisionRowOutcome = (left: { revision: string; exp: ExperimentRecord }, right: { revision: string; exp: ExperimentRecord }) => {
+                  const scoreLeft = findabilityScore(left.exp.aggregate.composite_score?.mean, left.exp.aggregate.quality_score?.mean) ?? -1;
+                  const scoreRight = findabilityScore(right.exp.aggregate.composite_score?.mean, right.exp.aggregate.quality_score?.mean) ?? -1;
+                  if (scoreRight !== scoreLeft) return scoreRight - scoreLeft;
 
-                    const runtimeLeft = left.exp.aggregate.duration_sec?.mean ?? Number.POSITIVE_INFINITY;
-                    const runtimeRight = right.exp.aggregate.duration_sec?.mean ?? Number.POSITIVE_INFINITY;
-                    if (runtimeLeft !== runtimeRight) return runtimeLeft - runtimeRight;
+                  const runtimeLeft = left.exp.aggregate.duration_sec?.mean ?? Number.POSITIVE_INFINITY;
+                  const runtimeRight = right.exp.aggregate.duration_sec?.mean ?? Number.POSITIVE_INFINITY;
+                  if (runtimeLeft !== runtimeRight) return runtimeLeft - runtimeRight;
 
-                    const spendFor = (exp: ExperimentRecord) => {
-                      const aggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
-                      const input = exp.aggregate.uncached_input_tokens?.mean;
-                      if (input == null) return Number.POSITIVE_INFINITY;
-                      return input + (aggregate.output_tokens?.mean ?? aggregate.uncached_output_tokens?.mean ?? 0);
-                    };
-                    const spendLeft = spendFor(left.exp);
-                    const spendRight = spendFor(right.exp);
-                    if (spendLeft !== spendRight) return spendLeft - spendRight;
+                  const spendLeft = spendFor(left.exp);
+                  const spendRight = spendFor(right.exp);
+                  if (spendLeft !== spendRight) return spendLeft - spendRight;
 
-                    const stabilityLeft = repeatabilityValue(left.exp.aggregate.composite_score?.stddev ?? null) ?? -1;
-                    const stabilityRight = repeatabilityValue(right.exp.aggregate.composite_score?.stddev ?? null) ?? -1;
-                    if (stabilityRight !== stabilityLeft) return stabilityRight - stabilityLeft;
+                  const stabilityLeft = repeatabilityValue(left.exp.aggregate.composite_score?.stddev ?? null) ?? -1;
+                  const stabilityRight = repeatabilityValue(right.exp.aggregate.composite_score?.stddev ?? null) ?? -1;
+                  if (stabilityRight !== stabilityLeft) return stabilityRight - stabilityLeft;
 
-                    const trustFor = (exp: ExperimentRecord) => confidenceScore(exp.aggregate.run_count_scored ?? 0, exp.aggregate.run_count_total ?? 0);
-                    const trustLeft = trustFor(left.exp);
-                    const trustRight = trustFor(right.exp);
-                    if (trustRight !== trustLeft) return trustRight - trustLeft;
+                  const trustLeft = trustFor(left.exp);
+                  const trustRight = trustFor(right.exp);
+                  if (trustRight !== trustLeft) return trustRight - trustLeft;
 
-                    return revisionSortValue(left.revision) - revisionSortValue(right.revision);
-                  });
+                  return revisionSortValue(left.revision) - revisionSortValue(right.revision);
+                };
+                const scenarioRankedRows = [...baseRevisionRows].sort(compareRevisionRowOutcome);
+                const scenarioWinnerId = scenarioRankedRows[0] ? experimentRowKey(scenarioRankedRows[0].exp) : null;
+                const scenarioRunnerUpId = scenarioRankedRows[1] ? experimentRowKey(scenarioRankedRows[1].exp) : null;
+                const visibleRevisionRows = [...baseRevisionRows].sort((left, right) => {
+                  if (revisionSortMode === 'agent') {
+                    const agentSort = compactSpec(left.exp.agent_spec).localeCompare(compactSpec(right.exp.agent_spec));
+                    if (agentSort !== 0) return agentSort;
+                  }
+                  if (revisionSortMode === 'revision') {
+                    const revisionSort = revisionSortValue(right.revision) - revisionSortValue(left.revision);
+                    if (revisionSort !== 0) return revisionSort;
+                  }
+                  return compareRevisionRowOutcome(left, right);
+                });
                 return (
           <section
             key={family}
@@ -1388,12 +1404,32 @@ export function WireframeExperimentsPage() {
           >
               <div className="overflow-hidden rounded-lg border" style={{ borderColor: C.border, background: C.surface }}>
                 <div className="border-b px-2.5 py-2" style={{ borderColor: C.border }}>
-                  <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
-                    <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
-                    Revision movement
-                  </div>
-                  <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
-                    Did the outcome improve, contract diff shows changes
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
+                        <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
+                        Revision movement
+                      </div>
+                      <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
+                        Did the outcome improve, contract diff shows changes
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs" style={{ color: C.fg2 }} htmlFor={`revision-sort-mode-${family}`}>
+                        Sort:
+                      </label>
+                      <select
+                        id={`revision-sort-mode-${family}`}
+                        value={revisionSortMode}
+                        onChange={(event) => setRevisionSortModes((current) => ({ ...current, [family]: event.target.value as 'outcome' | 'agent' | 'revision' }))}
+                        className="h-7 rounded-md px-2 py-1 text-xs"
+                        style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+                      >
+                        <option value="outcome">Outcome</option>
+                        <option value="agent">Agent</option>
+                        <option value="revision">Revision</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
                 <div className="overflow-x-auto">
@@ -1411,7 +1447,7 @@ export function WireframeExperimentsPage() {
                     </thead>
                     <tbody>
                       {visibleRevisionRows
-                        .map(({ revision, exp }, scenarioRankIndex) => {
+                        .map(({ revision, exp }) => {
                           const previousRevision = revisionIds[revisionIds.indexOf(revision) - 1];
                           const previousExp = previousRevision
                             ? revisions.find((entry) => entry.revision === previousRevision)?.exps.find((candidate) => candidate.agent_spec === exp.agent_spec)
@@ -1455,8 +1491,8 @@ export function WireframeExperimentsPage() {
                           );
                           const outcomeMove = movementDelta(previousExp?.aggregate.composite_score?.mean, exp.aggregate.composite_score?.mean);
                           const experimentKey = experimentRowKey(exp);
-                          const isWinner = scenarioRankIndex === 0;
-                          const isRunnerUp = scenarioRankIndex === 1;
+                          const isWinner = scenarioWinnerId === experimentKey;
+                          const isRunnerUp = scenarioRunnerUpId === experimentKey;
                           const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
                           const compact = compactSpec(exp.agent_spec);
                           const deliveryColor = deliveryRingColor(composite);
