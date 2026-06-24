@@ -24,6 +24,11 @@ export interface RunRecord {
   unscored_reasons: string[];
   valid: boolean;
   synthetic: boolean;
+  metric_scores?: Array<{
+    metric_id: string;
+    score: number;
+    passed: boolean;
+  }>;
   finding_counts: { issue: number; good: number; note: number };
   issue_categories: Record<string, number>;
   failed_gates: string[];

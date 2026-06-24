@@ -413,6 +413,11 @@ function projectRun(experiment, runDir) {
     unscored_reasons: scores.unscored_reasons ?? [],
     valid: !(scores.execution_validity?.checks ?? []).some((check) => !check.passed),
     synthetic: Boolean(experiment.synthetic),
+    metric_scores: (scores.metric_scores ?? []).map((metric) => ({
+      metric_id: metric.metric_id,
+      score: metric.score,
+      passed: Boolean(metric.passed),
+    })),
     finding_counts: findingCounts(annotations, []),
     issue_categories: Object.fromEntries(
       annotations

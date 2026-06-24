@@ -91,6 +91,85 @@ function WireframeMetricOutcomeRow({
   );
 }
 
+function metricCellColor(passed: boolean | null) {
+  if (passed === true) return C.green;
+  if (passed === false) return C.red;
+  return C.fg1;
+}
+
+function metricCellSymbol(passed: boolean | null) {
+  if (passed === true) return '✓';
+  if (passed === false) return '×';
+  return '·';
+}
+
+function WireframeRunCriterionMatrix({
+  runIds,
+  runsById,
+  metricOutcomes,
+}: {
+  runIds: string[];
+  runsById: Map<string, RunRecord>;
+  metricOutcomes: Array<[string, MetricOutcome]>;
+}) {
+  if (runIds.length === 0 || metricOutcomes.length === 0) return null;
+
+  return (
+    <div>
+      <div className="mb-2 text-xs font-medium" style={{ color: C.fg4 }}>
+        Run criteria
+      </div>
+      <div className="sb overflow-x-auto">
+        <table className="min-w-full border-collapse text-[11px]">
+          <thead>
+            <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+              <th className="sticky left-0 z-10 w-32 px-2 py-1" style={{ background: C.surface }} aria-label="Run" />
+              {metricOutcomes.map(([metric]) => (
+                <th key={metric} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
+                  <span
+                    className="absolute bottom-4 inline-flex whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px]"
+                    style={{ color: C.fg3, left: '50%', transform: 'rotate(-60deg)', transformOrigin: 'left bottom' }}
+                  >
+                    {humanize(metric)}
+                  </span>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {runIds.map((id) => {
+              const run = runsById.get(id);
+              const byMetric = new Map((run?.metric_scores ?? []).map((metric) => [metric.metric_id, metric]));
+              return (
+                <tr key={id} style={{ borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
+                  <td className="sticky left-0 z-10 w-32 px-2 py-2 align-middle" style={{ background: C.surface }}>
+                    <WireframeRunPill run={run} id={id} />
+                  </td>
+                  {metricOutcomes.map(([metric]) => {
+                    const score = byMetric.get(metric);
+                    const passed = score ? score.passed : null;
+                    const color = metricCellColor(passed);
+                    return (
+                      <td key={`${id}-${metric}`} className="px-1 py-2 text-center">
+                        <span
+                          className="inline-flex size-7 items-center justify-center rounded border text-[13px] font-bold"
+                          style={{ color, borderColor: `${color}55`, background: `${color}14` }}
+                        >
+                          {metricCellSymbol(passed)}
+                        </span>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const runsById = useMemo(() => new Map((runs.data ?? []).map((run) => [run.id, run])), [runs.data]);
@@ -100,18 +179,7 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
 
   return (
     <div className="flex flex-col gap-3 border-t px-3 py-2.5" style={{ borderColor: 'rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
-      {exp.run_ids.length > 0 && (
-        <div>
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Runs — open one to see its full story
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {exp.run_ids.map((id) => (
-              <WireframeRunPill key={id} run={runsById.get(id)} id={id} />
-            ))}
-          </div>
-        </div>
-      )}
+      <WireframeRunCriterionMatrix runIds={exp.run_ids} runsById={runsById} metricOutcomes={metricOutcomes} />
 
       {metricOutcomes.length > 0 && (
         <div className="grid gap-3 lg:grid-cols-2">
