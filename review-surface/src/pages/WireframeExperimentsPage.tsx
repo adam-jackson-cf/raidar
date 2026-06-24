@@ -153,9 +153,6 @@ function WireframeRunCriterionMatrix({
 
   return (
     <div>
-      <div className="mb-2 text-xs font-medium" style={{ color: C.fg4 }}>
-        Run criteria
-      </div>
       <div className="sb overflow-x-auto">
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
