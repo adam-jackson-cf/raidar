@@ -1559,15 +1559,24 @@ export function WireframeExperimentsPage() {
                             if (value == null || value === 0) return '→';
                             return value > 0 ? '↑' : '↓';
                           };
-                          const MovementValue = ({ value, kind, higherIsBetter }: { value: number | null; kind: 'outcome' | 'runtime' | 'spend'; higherIsBetter: boolean }) => (
-                            <span
-                              className="num inline-flex items-center gap-1 text-[11px] font-semibold"
-                              style={{ color: movementColor(value, higherIsBetter) }}
-                            >
-                              <span className="text-[15px] leading-none" aria-hidden>{movementArrow(value)}</span>
-                              <span>{formatMovement(value, kind)}</span>
-                            </span>
-                          );
+                          const MovementValue = ({ value, kind, higherIsBetter }: { value: number | null; kind: 'outcome' | 'runtime' | 'spend'; higherIsBetter: boolean }) => {
+                            if (value === 0) {
+                              return (
+                                <span className="num inline-flex items-center text-[11px] font-semibold" style={{ color: C.fg1 }}>
+                                  -
+                                </span>
+                              );
+                            }
+                            return (
+                              <span
+                                className="num inline-flex items-center gap-1 text-[11px] font-semibold"
+                                style={{ color: movementColor(value, higherIsBetter) }}
+                              >
+                                <span className="text-[15px] leading-none" aria-hidden>{movementArrow(value)}</span>
+                                <span>{formatMovement(value, kind)}</span>
+                              </span>
+                            );
+                          };
                           const formatRuntimeMean = (seconds?: number | null) => {
                             if (seconds == null) return '—';
                             return `${(seconds / 60).toFixed(1)}m`;
