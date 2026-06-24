@@ -296,9 +296,13 @@ const COLUMN_HELPERS: Record<string, string[]> = {
     'Runtime movement for this revision row compared with the previous revision of the same agent.',
     'Lower runtime is better, so downward movement is green and upward movement is red.',
   ],
-  Spend: [
-    'Token spend movement for this revision row compared with the previous revision of the same agent.',
-    'Lower spend is better, so downward movement is green and upward movement is red.',
+  Input: [
+    'Input token movement for this revision row compared with the previous revision of the same agent.',
+    'Lower input token use is better, so downward movement is green and upward movement is red.',
+  ],
+  Output: [
+    'Output token movement for this revision row compared with the previous revision of the same agent.',
+    'Lower output token use is better, so downward movement is green and upward movement is red.',
   ],
   Run: [
     'How much of the recorded run set completed successfully.',
@@ -1520,7 +1524,8 @@ export function WireframeExperimentsPage() {
                         <HeaderInfoCell label="Stability" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Stability</HeaderInfoCell>
                         <HeaderInfoCell label="Trust" className="w-20 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Trust</HeaderInfoCell>
                         <HeaderInfoCell label="Runtime" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Runtime</HeaderInfoCell>
-                        <HeaderInfoCell label="Spend" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Spend</HeaderInfoCell>
+                        <HeaderInfoCell label="Input" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Input</HeaderInfoCell>
+                        <HeaderInfoCell label="Output" className="w-24 px-2.5 py-1.5 text-center text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Output</HeaderInfoCell>
                         <HeaderInfoCell label="Findings" className="px-2.5 py-1.5 text-left text-[10px] font-medium uppercase tracking-wide" onOpen={setColumnTooltip} onClose={() => setColumnTooltip(null)}>Findings</HeaderInfoCell>
                       </tr>
                     </thead>
@@ -1561,17 +1566,19 @@ export function WireframeExperimentsPage() {
                             if (seconds == null) return '—';
                             return `${(seconds / 60).toFixed(1)}m`;
                           };
+                          const formatTokenMean = (tokens?: number | null) => {
+                            if (tokens == null) return '—';
+                            return Math.round(tokens).toLocaleString();
+                          };
                           const currentAggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
                           const previousAggregate = previousExp?.aggregate as (typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } }) | undefined;
-                          const outputMean = currentAggregate.output_tokens?.mean ?? currentAggregate.uncached_output_tokens?.mean ?? 0;
-                          const previousOutputMean = previousAggregate ? (previousAggregate.output_tokens?.mean ?? previousAggregate.uncached_output_tokens?.mean ?? 0) : null;
+                          const outputMean = currentAggregate.output_tokens?.mean ?? currentAggregate.uncached_output_tokens?.mean ?? null;
+                          const previousOutputMean = previousAggregate ? (previousAggregate.output_tokens?.mean ?? previousAggregate.uncached_output_tokens?.mean ?? null) : null;
                           const inputMean = exp.aggregate.uncached_input_tokens?.mean ?? null;
                           const previousInputMean = previousExp?.aggregate.uncached_input_tokens?.mean ?? null;
                           const runtimeMove = movementDelta(previousExp?.aggregate.duration_sec?.mean, exp.aggregate.duration_sec?.mean);
-                          const spendMove = movementDelta(
-                            previousInputMean == null || previousOutputMean == null ? null : previousInputMean + previousOutputMean,
-                            inputMean == null ? null : inputMean + outputMean,
-                          );
+                          const inputMove = movementDelta(previousInputMean, inputMean);
+                          const outputMove = movementDelta(previousOutputMean, outputMean);
                           const outcomeMove = movementDelta(previousExp?.aggregate.composite_score?.mean, exp.aggregate.composite_score?.mean);
                           const experimentKey = experimentRowKey(exp);
                           const isWinner = scenarioWinnerId === experimentKey;
@@ -1625,7 +1632,18 @@ export function WireframeExperimentsPage() {
                                     <MovementValue value={runtimeMove} kind="runtime" higherIsBetter={false} />
                                   </div>
                                 </td>
-                                <td className="w-24 px-2.5 py-2 text-center"><MovementValue value={spendMove} kind="spend" higherIsBetter={false} /></td>
+                                <td className="w-24 px-2.5 py-2 text-center">
+                                  <div className="num inline-flex items-center justify-center gap-2 text-[11px]">
+                                    <span style={{ color: C.fg3 }}>{formatTokenMean(inputMean)}</span>
+                                    <MovementValue value={inputMove} kind="spend" higherIsBetter={false} />
+                                  </div>
+                                </td>
+                                <td className="w-24 px-2.5 py-2 text-center">
+                                  <div className="num inline-flex items-center justify-center gap-2 text-[11px]">
+                                    <span style={{ color: C.fg3 }}>{formatTokenMean(outputMean)}</span>
+                                    <MovementValue value={outputMove} kind="spend" higherIsBetter={false} />
+                                  </div>
+                                </td>
                                 <td className="px-2.5 py-2" onMouseLeave={() => closeFindingPanel(experimentKey)} style={{ color: C.fg1 }}>
                                   {(() => {
                                     const clusters = clusterFindings(exp.findings);
