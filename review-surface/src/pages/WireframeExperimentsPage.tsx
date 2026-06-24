@@ -375,7 +375,6 @@ function ScoreRing({
       type="button"
       className="inline-flex size-7 items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
       style={{ color: ringColor }}
-      title={title}
       onMouseEnter={(event) => {
         onMove({
           id,
@@ -793,7 +792,6 @@ function FindingClusterBadge({
           onPin(event, findings, kind);
         }
       }}
-      title={title}
     >
       <span className="-rotate-45 transform">{config.symbol}</span>
       <span className="sr-only">{`${title} findings ${findings.length}`}</span>

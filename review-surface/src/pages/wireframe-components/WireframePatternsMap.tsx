@@ -496,7 +496,6 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
                       <button
                         className="inline-flex size-7 items-center justify-center rounded border text-[13px] font-bold"
                         style={{ color, borderColor: `${color}55`, background: `${color}14` }}
-                        title={`${row.revision} · ${criterion.label} · ${cellTitle(state)}`}
                         onMouseEnter={(event) => openOverlay(event, {
                           id: `hover-cell-${row.revision}-${criterion.key}`,
                           title: `${row.revision} · ${criterion.label}`,
