@@ -251,7 +251,13 @@ function WireframeExperimentExpansion({
   const passing = metricOutcomes.filter(([, o]) => o.pass_rate >= 1);
 
   return (
-    <div className="flex flex-col gap-3 border-t px-3 py-2.5" style={{ borderColor: 'rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
+    <div
+      className="flex flex-col gap-3 border-y px-3 py-2.5"
+      style={{
+        borderColor: 'rgba(114, 176, 222, 0.14)',
+        background: 'linear-gradient(180deg, rgba(31, 72, 96, 0.22), rgba(18, 43, 59, 0.18))',
+      }}
+    >
       <WireframeRunCriterionMatrix runIds={exp.run_ids} runsById={runsById} metricOutcomes={metricOutcomes} onHover={onHover} onClose={onClose} onPin={onPin} />
 
       {metricOutcomes.length > 0 && (
