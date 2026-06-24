@@ -1639,20 +1639,20 @@ export function WireframeExperimentsPage() {
                                 </td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-stability`} score={repeatScore} title="Stability" ringColor={repeatColor} tooltip={[`stddev: ${exp.aggregate.composite_score?.stddev?.toFixed(3) ?? '—'}`, `repeat score: ${repeatScore == null ? '—' : repeatScore.toFixed(2)}`, `scored runs: ${exp.aggregate.run_count_scored ?? 0}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
                                 <td className="w-20 px-2.5 py-2"><div className="flex items-center justify-center"><ScoreRing id={`${experimentKey}-sample-quality`} score={confidence} title="Trust" ringColor={confidenceColor} tooltip={[`preferred met: ${exp.sample.preferred_met ? 'true' : 'false'}`, `minimum met: ${exp.sample.minimum_met ? 'true' : 'false'}`, `scored ratio: ${totalRuns > 0 ? `${(confidence * 100).toFixed(0)}%` : '—'}`, `unscored: ${exp.aggregate.unscored_count ?? 0}`]} hover={setTooltip} onMove={(next) => setTooltip(next)} onPin={pinTooltip} /></div></td>
-                                <td className="w-24 px-2.5 py-2 text-center">
-                                  <div className="num inline-flex items-center justify-center gap-2 text-[11px]">
+                                <td className="w-24 px-2.5 py-2">
+                                  <div className="num inline-flex items-center justify-start gap-2 text-[11px]">
                                     <span style={{ color: C.fg3 }}>{formatRuntimeMean(exp.aggregate.duration_sec?.mean)}</span>
                                     <MovementValue value={runtimeMove} kind="runtime" higherIsBetter={false} />
                                   </div>
                                 </td>
-                                <td className="w-24 px-2.5 py-2 text-center">
-                                  <div className="num inline-flex items-center justify-center gap-2 text-[11px]">
+                                <td className="w-24 px-2.5 py-2">
+                                  <div className="num inline-flex items-center justify-start gap-2 text-[11px]">
                                     <span style={{ color: C.fg3 }}>{formatTokenMean(inputMean)}</span>
                                     <MovementValue value={inputMove} kind="spend" higherIsBetter={false} />
                                   </div>
                                 </td>
-                                <td className="w-24 px-2.5 py-2 text-center">
-                                  <div className="num inline-flex items-center justify-center gap-2 text-[11px]">
+                                <td className="w-24 px-2.5 py-2">
+                                  <div className="num inline-flex items-center justify-start gap-2 text-[11px]">
                                     <span style={{ color: C.fg3 }}>{formatTokenMean(outputMean)}</span>
                                     <MovementValue value={outputMove} kind="spend" higherIsBetter={false} />
                                   </div>
