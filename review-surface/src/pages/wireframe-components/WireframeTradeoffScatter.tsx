@@ -180,7 +180,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'runtime' | 'tokens'>('runtime');
+  const [activeTab, setActiveTab] = useState<'runtime' | 'tokens'>('tokens');
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedEfforts, setSelectedEfforts] = useState<string[]>([]);
   const [selectedRevisions, setSelectedRevisions] = useState<string[]>([]);
@@ -273,8 +273,8 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-1.5">
             {[
-              ['runtime', 'Outcome vs runtime'],
               ['tokens', 'Outcome vs spend'],
+              ['runtime', 'Outcome vs runtime'],
             ].map(([tab, label]) => (
               <button
                 key={tab}
