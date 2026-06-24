@@ -103,14 +103,51 @@ function metricCellSymbol(passed: boolean | null) {
   return '·';
 }
 
+function shortCriterion(metric: string) {
+  const known: Record<string, string> = {
+    'requirements-adherence': 'Req adhere',
+    'requirements-coverage': 'Req cover',
+    'verification-stability': 'Verify',
+    'code-quality': 'Code',
+    'resource-efficiency': 'Resource',
+    'artifact-checks': 'Artifacts',
+    functional: 'Functional',
+    'test-coverage': 'Tests',
+    'change-containment': 'Contain',
+    'defect-evidence-completeness': 'Evidence',
+    'defect-resolution': 'Resolve',
+    'regression-protection': 'Regress',
+  };
+  return known[metric] ?? humanize(metric).split(/\s+/).map((part) => part.slice(0, 4)).join(' ');
+}
+
+function criterionOverlay(metric: string, outcome: MetricOutcome): Pick<HoverPayload, 'title' | 'lines'> {
+  return {
+    title: humanize(metric),
+    lines: [
+      'Scorer: metric outcomes',
+      `Scorer field: aggregate.metric_outcomes["${metric}"]`,
+      `Criterion label: ${humanize(metric)}`,
+      `${outcome.pass_count} pass / ${outcome.fail_count} fail from ${outcome.sample_size} scored checks in this agent revision.`,
+      `Mean score: ${fmtScore(outcome.mean_score)}`,
+    ],
+  };
+}
+
 function WireframeRunCriterionMatrix({
   runIds,
   runsById,
   metricOutcomes,
+  onHover,
+  onClose,
+  onPin,
 }: {
   runIds: string[];
   runsById: Map<string, RunRecord>;
   metricOutcomes: Array<[string, MetricOutcome]>;
+  onHover: (payload: HoverPayload | null) => void;
+  onClose: () => void;
+  onPin: (payload: HoverPayload) => void;
 }) {
   if (runIds.length === 0 || metricOutcomes.length === 0) return null;
 
@@ -124,14 +161,43 @@ function WireframeRunCriterionMatrix({
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
               <th className="sticky left-0 z-10 w-32 px-2 py-1" style={{ background: C.surface }} aria-label="Run" />
-              {metricOutcomes.map(([metric]) => (
+              {metricOutcomes.map(([metric, outcome]) => (
                 <th key={metric} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
-                  <span
-                    className="absolute bottom-4 inline-flex whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px]"
+                  <button
+                    type="button"
+                    className="absolute bottom-4 inline-flex whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
                     style={{ color: C.fg3, left: '50%', transform: 'rotate(-60deg)', transformOrigin: 'left bottom' }}
+                    onMouseEnter={(event) => {
+                      const overlay = criterionOverlay(metric, outcome);
+                      onHover({
+                        id: `run-criterion-${metric}`,
+                        x: event.clientX,
+                        y: event.clientY,
+                        ...overlay,
+                      });
+                    }}
+                    onMouseMove={(event) => {
+                      const overlay = criterionOverlay(metric, outcome);
+                      onHover({
+                        id: `run-criterion-${metric}`,
+                        x: event.clientX,
+                        y: event.clientY,
+                        ...overlay,
+                      });
+                    }}
+                    onMouseLeave={onClose}
+                    onClick={(event) => {
+                      const overlay = criterionOverlay(metric, outcome);
+                      onPin({
+                        id: `run-criterion-${metric}`,
+                        x: event.clientX,
+                        y: event.clientY,
+                        ...overlay,
+                      });
+                    }}
                   >
-                    {humanize(metric)}
-                  </span>
+                    {shortCriterion(metric)}
+                  </button>
                 </th>
               ))}
             </tr>
@@ -170,7 +236,17 @@ function WireframeRunCriterionMatrix({
   );
 }
 
-function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
+function WireframeExperimentExpansion({
+  exp,
+  onHover,
+  onClose,
+  onPin,
+}: {
+  exp: ExperimentRecord;
+  onHover: (payload: HoverPayload | null) => void;
+  onClose: () => void;
+  onPin: (payload: HoverPayload) => void;
+}) {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const runsById = useMemo(() => new Map((runs.data ?? []).map((run) => [run.id, run])), [runs.data]);
   const metricOutcomes = Object.entries(exp.aggregate.metric_outcomes ?? {}) as Array<[string, MetricOutcome]>;
@@ -179,7 +255,7 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
 
   return (
     <div className="flex flex-col gap-3 border-t px-3 py-2.5" style={{ borderColor: 'rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
-      <WireframeRunCriterionMatrix runIds={exp.run_ids} runsById={runsById} metricOutcomes={metricOutcomes} />
+      <WireframeRunCriterionMatrix runIds={exp.run_ids} runsById={runsById} metricOutcomes={metricOutcomes} onHover={onHover} onClose={onClose} onPin={onPin} />
 
       {metricOutcomes.length > 0 && (
         <div className="grid gap-3 lg:grid-cols-2">
@@ -1711,7 +1787,14 @@ export function WireframeExperimentsPage() {
                               </tr>
                               {isExpanded ? (
                                 <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-                                  <td colSpan={8} className="p-0"><WireframeExperimentExpansion exp={exp} /></td>
+                                  <td colSpan={8} className="p-0">
+                                    <WireframeExperimentExpansion
+                                      exp={exp}
+                                      onHover={setTooltip}
+                                      onClose={() => setTooltip(null)}
+                                      onPin={pinTooltip}
+                                    />
+                                  </td>
                                 </tr>
                               ) : null}
                             </Fragment>
