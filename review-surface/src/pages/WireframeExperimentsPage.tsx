@@ -11,7 +11,7 @@ import { compactSpec } from './wireframe-components/wireframeLabels';
 import { api } from '@/api/client';
 import { C } from '@/utils/colors';
 import { fmtPercent, fmtScore } from '@/utils/helpers';
-import { humanize, runLabel, scorerName, scoreTier } from '@/utils/verdict';
+import { humanize, runLabel, scoreTier } from '@/utils/verdict';
 import type { ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
 
 type CompositeStat = StatBlock | undefined;
@@ -40,7 +40,6 @@ function WireframeRunPill({ run, id }: { run: RunRecord | undefined; id: string 
   return (
     <Link
       to={`/runs/${encodeURIComponent(id)}`}
-      title={`${runLabel(id)} · score ${run?.composite_score?.toFixed(3) ?? 'unscored'}${run?.status === 'ERROR' ? ' · run failed' : ''}`}
       className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] transition hover:bg-white/10"
       style={{
         color: failed ? C.red : C.fg3,
@@ -58,11 +57,6 @@ function WireframeRunPill({ run, id }: { run: RunRecord | undefined; id: string 
           unscored
         </span>
       )}
-      {run ? (
-        <span className="text-[9px]" style={{ color: C.fg0 }}>
-          i {run.finding_counts.issue} · g {run.finding_counts.good} · n {run.finding_counts.note}
-        </span>
-      ) : null}
     </Link>
   );
 }
@@ -101,7 +95,6 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const runsById = useMemo(() => new Map((runs.data ?? []).map((run) => [run.id, run])), [runs.data]);
   const metricOutcomes = Object.entries(exp.aggregate.metric_outcomes ?? {}) as Array<[string, MetricOutcome]>;
-  const scorerOutcomes = Object.entries(exp.aggregate.scorer_outcomes ?? {});
   const failing = metricOutcomes.filter(([, o]) => o.pass_rate < 1).sort(([, a], [, b]) => a.pass_rate - b.pass_rate);
   const passing = metricOutcomes.filter(([, o]) => o.pass_rate >= 1);
 
@@ -127,7 +120,7 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
               className="mb-1 text-[10px] font-medium uppercase tracking-wide"
               style={{ color: failing.length > 0 ? C.orange : C.fg1 }}
             >
-              {failing.length > 0 ? `Where points were lost (${failing.length})` : 'Where points were lost'}
+              {failing.length > 0 ? `Costing you (${failing.length})` : 'Costing you'}
             </div>
             {failing.length === 0 ? (
               <span className="text-[11px]" style={{ color: C.fg1 }}>
@@ -143,7 +136,7 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
           </div>
           <div>
             <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-              What held up ({passing.length})
+              Strengths ({passing.length})
             </div>
             <div className="flex max-w-md flex-col">
               {passing.map(([metric, o]) => (
@@ -154,20 +147,20 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
         </div>
       )}
 
-      {scorerOutcomes.length > 0 && (
+      {metricOutcomes.length > 0 && (
         <div>
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Score areas
+            Criterion Scores
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {scorerOutcomes.map(([scorer, o]) => (
+            {metricOutcomes.map(([metric, o]) => (
               <span
-                key={scorer}
-                title={`${scorer} · mean score ${fmtScore(o.mean_score)} across ${o.sample_size} runs`}
+                key={metric}
+                title={`${humanize(metric)} · mean score ${fmtScore(o.mean_score)} across ${o.sample_size} samples`}
                 className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px]"
                 style={{ color: C.fg2, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
               >
-                {scorerName(scorer)}
+                {humanize(metric)}
                 <span className="num" style={{ color: scoreTier(o.mean_score).color }}>
                   {fmtScore(o.mean_score)}
                 </span>
