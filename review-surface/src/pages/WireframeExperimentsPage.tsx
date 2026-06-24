@@ -215,29 +215,6 @@ function WireframeExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
         </div>
       )}
 
-      {metricOutcomes.length > 0 && (
-        <div>
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Criterion Scores
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {metricOutcomes.map(([metric, o]) => (
-              <span
-                key={metric}
-                title={`${humanize(metric)} · mean score ${fmtScore(o.mean_score)} across ${o.sample_size} samples`}
-                className="inline-flex items-center gap-1.5 rounded px-1.5 py-0.5 text-[10px]"
-                style={{ color: C.fg2, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
-              >
-                {humanize(metric)}
-                <span className="num" style={{ color: scoreTier(o.mean_score).color }}>
-                  {fmtScore(o.mean_score)}
-                </span>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
       {exp.findings.length > 0 && (
         <div>
           <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
