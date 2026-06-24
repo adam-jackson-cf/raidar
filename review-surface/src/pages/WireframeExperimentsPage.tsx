@@ -1560,7 +1560,7 @@ export function WireframeExperimentsPage() {
                             return value > 0 ? '↑' : '↓';
                           };
                           const MovementValue = ({ value, kind, higherIsBetter }: { value: number | null; kind: 'outcome' | 'runtime' | 'spend'; higherIsBetter: boolean }) => {
-                            if (value === 0) {
+                            if (value == null || value === 0) {
                               return (
                                 <span className="num inline-flex items-center text-[11px] font-semibold" style={{ color: C.fg1 }}>
                                   -
