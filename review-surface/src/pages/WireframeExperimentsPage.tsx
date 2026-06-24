@@ -1310,11 +1310,17 @@ export function WireframeExperimentsPage() {
                 const baseRevisionRows = revisions
                   .filter(({ revision }) => selectedSet.has(revision))
                   .flatMap(({ revision, exps }) => exps.map((exp) => ({ revision, exp })));
+                const outputMeanFor = (exp: ExperimentRecord) => {
+                  const values = exp.run_ids
+                    .map((id) => runsById.get(id)?.total_output_tokens)
+                    .filter((value): value is number => typeof value === 'number');
+                  if (values.length === 0) return null;
+                  return values.reduce((total, value) => total + value, 0) / values.length;
+                };
                 const spendFor = (exp: ExperimentRecord) => {
-                  const aggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
                   const input = exp.aggregate.uncached_input_tokens?.mean;
                   if (input == null) return Number.POSITIVE_INFINITY;
-                  return input + (aggregate.output_tokens?.mean ?? aggregate.uncached_output_tokens?.mean ?? 0);
+                  return input + (outputMeanFor(exp) ?? 0);
                 };
                 const trustFor = (exp: ExperimentRecord) => confidenceScore(exp.aggregate.run_count_scored ?? 0, exp.aggregate.run_count_total ?? 0);
                 const compareRevisionRowOutcome = (left: { revision: string; exp: ExperimentRecord }, right: { revision: string; exp: ExperimentRecord }) => {
@@ -1570,10 +1576,8 @@ export function WireframeExperimentsPage() {
                             if (tokens == null) return '—';
                             return Math.round(tokens).toLocaleString();
                           };
-                          const currentAggregate = exp.aggregate as typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } };
-                          const previousAggregate = previousExp?.aggregate as (typeof exp.aggregate & { output_tokens?: { mean?: number }; uncached_output_tokens?: { mean?: number } }) | undefined;
-                          const outputMean = currentAggregate.output_tokens?.mean ?? currentAggregate.uncached_output_tokens?.mean ?? null;
-                          const previousOutputMean = previousAggregate ? (previousAggregate.output_tokens?.mean ?? previousAggregate.uncached_output_tokens?.mean ?? null) : null;
+                          const outputMean = outputMeanFor(exp);
+                          const previousOutputMean = previousExp ? outputMeanFor(previousExp) : null;
                           const inputMean = exp.aggregate.uncached_input_tokens?.mean ?? null;
                           const previousInputMean = previousExp?.aggregate.uncached_input_tokens?.mean ?? null;
                           const runtimeMove = movementDelta(previousExp?.aggregate.duration_sec?.mean, exp.aggregate.duration_sec?.mean);
@@ -1660,7 +1664,7 @@ export function WireframeExperimentsPage() {
                               </tr>
                               {isExpanded ? (
                                 <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
-                                  <td colSpan={7} className="p-0"><WireframeExperimentExpansion exp={exp} /></td>
+                                  <td colSpan={8} className="p-0"><WireframeExperimentExpansion exp={exp} /></td>
                                 </tr>
                               ) : null}
                             </Fragment>
