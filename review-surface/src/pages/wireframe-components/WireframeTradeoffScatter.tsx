@@ -167,6 +167,15 @@ function effortLabel(value: string) {
   return titleCase(value);
 }
 
+function revisionValue(run: RunRecord) {
+  return run.revision ?? 'unknown';
+}
+
+function revisionLabel(value: string) {
+  if (value === 'unknown') return 'unknown revision';
+  return `revision ${value}`;
+}
+
 export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitle = true }: { runs: RunRecord[]; borderless?: boolean; showSubtitle?: boolean }) {
   const navigate = useNavigate();
   const [tooltip, setTooltip] = useState<TooltipPayload | null>(null);
@@ -174,6 +183,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
   const [activeTab, setActiveTab] = useState<'runtime' | 'tokens'>('runtime');
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedEfforts, setSelectedEfforts] = useState<string[]>([]);
+  const [selectedRevisions, setSelectedRevisions] = useState<string[]>([]);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const allPoints = useMemo(
     () => bestRunForEachRevisionSpec(runs).filter((run) => run.composite_score != null && run.duration_ms > 0),
@@ -181,6 +191,10 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
   );
   const providerOptions = useMemo(() => [...new Set(allPoints.map(providerValue))], [allPoints]);
   const effortOptions = useMemo(() => [...new Set(allPoints.map(effortValue))], [allPoints]);
+  const revisionOptions = useMemo(
+    () => [...new Set(allPoints.map(revisionValue))].sort((left, right) => right.localeCompare(left)),
+    [allPoints],
+  );
 
   useEffect(() => {
     setSelectedProviders((current) => (current.length === 0 ? providerOptions : current.filter((item) => providerOptions.includes(item))));
@@ -189,6 +203,10 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
   useEffect(() => {
     setSelectedEfforts((current) => (current.length === 0 ? effortOptions : current.filter((item) => effortOptions.includes(item))));
   }, [effortOptions]);
+
+  useEffect(() => {
+    setSelectedRevisions((current) => (current.length === 0 ? revisionOptions : current.filter((item) => revisionOptions.includes(item))));
+  }, [revisionOptions]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -206,9 +224,10 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
       allPoints.filter((run) => {
         const providerSelected = selectedProviders.length === 0 || selectedProviders.includes(providerValue(run));
         const effortSelected = selectedEfforts.length === 0 || selectedEfforts.includes(effortValue(run));
-        return providerSelected && effortSelected;
+        const revisionSelected = selectedRevisions.length === 0 || selectedRevisions.includes(revisionValue(run));
+        return providerSelected && effortSelected && revisionSelected;
       }),
-    [allPoints, selectedProviders, selectedEfforts],
+    [allPoints, selectedProviders, selectedEfforts, selectedRevisions],
   );
   const modelLabels = useMemo(() => [...new Set(points.map((run) => reduxModelLabel(run.agent_spec)))], [points]);
 
@@ -348,6 +367,28 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
                           }}
                         />
                         {effortLabel(effort)}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div className="mb-1 border-b pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: C.border, color: C.fg1 }}>
+                    Revision
+                  </div>
+                  <div className="space-y-1">
+                    {revisionOptions.map((revision) => (
+                      <label key={revision} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                        <input
+                          type="checkbox"
+                          checked={selectedRevisions.includes(revision)}
+                          onChange={() => {
+                            setSelectedRevisions((current) => {
+                              if (!current.includes(revision)) return [...current, revision];
+                              return current.length === 1 ? current : current.filter((item) => item !== revision);
+                            });
+                          }}
+                        />
+                        {revisionLabel(revision)}
                       </label>
                     ))}
                   </div>
