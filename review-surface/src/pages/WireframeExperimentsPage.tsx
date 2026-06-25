@@ -134,101 +134,20 @@ function criterionOverlay(metric: string, outcome: MetricOutcome): Pick<HoverPay
   };
 }
 
-function WireframeRunCriterionMatrix({
+function WireframeRunStrip({
   runIds,
   runsById,
-  metricOutcomes,
-  onHover,
-  onClose,
-  onPin,
 }: {
   runIds: string[];
   runsById: Map<string, RunRecord>;
-  metricOutcomes: Array<[string, MetricOutcome]>;
-  onHover: (payload: HoverPayload | null) => void;
-  onClose: () => void;
-  onPin: (payload: HoverPayload) => void;
 }) {
-  if (runIds.length === 0 || metricOutcomes.length === 0) return null;
+  if (runIds.length === 0) return null;
 
   return (
-    <div>
-      <div className="sb overflow-x-auto">
-        <table className="min-w-full border-collapse text-[11px]">
-          <thead>
-            <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              <th className="sticky left-0 z-10 w-32 px-2 py-1" style={{ background: C.surface }} aria-label="Run" />
-              {metricOutcomes.map(([metric, outcome]) => (
-                <th key={metric} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
-                  <button
-                    type="button"
-                    className="absolute bottom-4 inline-flex whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
-                    style={{ color: C.fg3, left: '50%', transform: 'rotate(-60deg)', transformOrigin: 'left bottom' }}
-                    onMouseEnter={(event) => {
-                      const overlay = criterionOverlay(metric, outcome);
-                      onHover({
-                        id: `run-criterion-${metric}`,
-                        x: event.clientX,
-                        y: event.clientY,
-                        ...overlay,
-                      });
-                    }}
-                    onMouseMove={(event) => {
-                      const overlay = criterionOverlay(metric, outcome);
-                      onHover({
-                        id: `run-criterion-${metric}`,
-                        x: event.clientX,
-                        y: event.clientY,
-                        ...overlay,
-                      });
-                    }}
-                    onMouseLeave={onClose}
-                    onClick={(event) => {
-                      const overlay = criterionOverlay(metric, outcome);
-                      onPin({
-                        id: `run-criterion-${metric}`,
-                        x: event.clientX,
-                        y: event.clientY,
-                        ...overlay,
-                      });
-                    }}
-                  >
-                    {shortCriterion(metric)}
-                  </button>
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {runIds.map((id) => {
-              const run = runsById.get(id);
-              const byMetric = new Map((run?.metric_scores ?? []).map((metric) => [metric.metric_id, metric]));
-              return (
-                <tr key={id} style={{ borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
-                  <td className="sticky left-0 z-10 w-32 px-2 py-2 align-middle" style={{ background: C.surface }}>
-                    <WireframeRunPill run={run} id={id} />
-                  </td>
-                  {metricOutcomes.map(([metric]) => {
-                    const score = byMetric.get(metric);
-                    const passed = score ? score.passed : null;
-                    const color = metricCellColor(passed);
-                    return (
-                      <td key={`${id}-${metric}`} className="px-1 py-2 text-center">
-                        <span
-                          className="inline-flex size-7 items-center justify-center rounded border text-[13px] font-bold"
-                          style={{ color, borderColor: `${color}55`, background: `${color}14` }}
-                        >
-                          {metricCellSymbol(passed)}
-                        </span>
-                      </td>
-                    );
-                  })}
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+    <div className="flex flex-wrap items-center gap-2">
+      {runIds.map((id) => (
+        <WireframeRunPill key={id} run={runsById.get(id)} id={id} />
+      ))}
     </div>
   );
 }
@@ -258,7 +177,7 @@ function WireframeExperimentExpansion({
         background: 'linear-gradient(180deg, rgba(31, 72, 96, 0.22), rgba(18, 43, 59, 0.18))',
       }}
     >
-      <WireframeRunCriterionMatrix runIds={exp.run_ids} runsById={runsById} metricOutcomes={metricOutcomes} onHover={onHover} onClose={onClose} onPin={onPin} />
+      <WireframeRunStrip runIds={exp.run_ids} runsById={runsById} />
 
       {metricOutcomes.length > 0 && (
         <div className="grid gap-3 lg:grid-cols-2">
