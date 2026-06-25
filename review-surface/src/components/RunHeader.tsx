@@ -55,7 +55,15 @@ function ArtifactPath({ label, path }: { label: string; path: string }) {
   );
 }
 
-export function RunHeader({ run, children }: { run: RunRecord; children?: React.ReactNode }) {
+export function RunHeader({
+  run,
+  children,
+  actions,
+}: {
+  run: RunRecord;
+  children?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const tier = scoreTier(run.unscored ? null : run.composite_score);
   return (
@@ -76,15 +84,18 @@ export function RunHeader({ run, children }: { run: RunRecord; children?: React.
         </span>
         {run.synthetic && <Badge label="synthetic" />}
         {!run.valid && <Badge label="invalid" color={C.red} title="Run failed validity checks" />}
+        <div className="ml-auto flex items-center gap-2">
+          {actions}
         <Link
           to={`/#family-${encodeURIComponent(run.scenario)}`}
-          className="ml-auto inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
+          className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
           style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
           title={`Open the ${run.scenario} comparison in Experiments`}
         >
           Compare agent specs
           <ArrowUpRight className="size-2.5" />
         </Link>
+        </div>
       </div>
 
       <span className="text-xs leading-relaxed" style={{ color: C.fg3 }}>

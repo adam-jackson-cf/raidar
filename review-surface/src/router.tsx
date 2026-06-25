@@ -3,6 +3,7 @@ import { Crosshair } from 'lucide-react';
 import { ExperimentsPage } from '@/pages/ExperimentsPage';
 import { RunsPage } from '@/pages/RunsPage';
 import { WireframeExperimentsPage } from '@/pages/WireframeExperimentsPage';
+import { WireframeRunsPage } from '@/pages/WireframeRunsPage';
 import { C } from '@/utils/colors';
 
 function Layout() {
@@ -55,6 +56,8 @@ export function AppRouter() {
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/:runId" element={<RunsPage />} />
           <Route path="wireframe" element={<WireframeExperimentsPage />} />
+          <Route path="wireframe/runs" element={<WireframeRunsPage />} />
+          <Route path="wireframe/runs/:runId" element={<WireframeRunsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
