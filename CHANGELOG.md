@@ -2,6 +2,112 @@
 
 All notable changes to this project are documented in this file.
 
+## 0.14.0 - 2026-07-03
+
+### Chores
+
+- chore: capture orchestration and wireframe updates
+
+- wireframe: add runs review surface
+- wireframe: simplify expanded run summary
+- wireframe: tint expanded row panel
+- wireframe: remove run criteria label
+- wireframe: align run criteria headers
+- wireframe: remove redundant criterion score pills
+- wireframe: add run criterion matrix
+- wireframe: clarify expanded row evidence
+- wireframe: left align movement value cells
+- wireframe: remove neutral movement arrows
+- wireframe: simplify neutral movement values
+- wireframe: derive output tokens from runs
+- wireframe: left align token movement headers
+- wireframe: split token spend movement
+- wireframe: show runtime before movement
+- wireframe: remove duplicate native tooltips
+- wireframe: default trends to spend
+- wireframe: add revision chart filter
+- wireframe: inline trends subtitle
+- wireframe: inline section subtitles
+- wireframe: align rotated pattern header anchors
+- wireframe: bottom align pattern headers
+- wireframe: hide pattern header question marks
+- wireframe: clarify patterns agent spec count
+- wireframe: simplify patterns revision count label
+- wireframe: explain pattern criterion sources
+- wireframe: clarify trends scenario scope
+- wireframe: show latest pattern revisions first
+- wireframe: scope revision filter to movement
+- wireframe: normalize section vertical padding
+- wireframe: align trends container padding
+- wireframe: reduce trends container padding
+- wireframe: restore trends container border
+- wireframe: wrap charts in trends section
+- wireframe: align patterns subtitle style
+- wireframe: explain runtime and spend columns
+- wireframe: remove redundant pattern evidence row
+- wireframe: show visible pattern runs
+- wireframe: simplify checks chip
+- wireframe: count visible pattern revisions
+- wireframe: refine patterns subtitle
+- wireframe: clarify revision sort tooltip
+- wireframe: explain revision row sorting
+- wireframe: add revision row sorting
+- wireframe: rank revision rows by scenario
+- wireframe: remove run column from revisions
+- wireframe: add movement arrows to revision rows
+- wireframe: move revision selector to scenario header
+- wireframe: merge revision movement and rows
+- wireframe: center evidence map labels
+- wireframe: remove evidence map legend
+- wireframe: mark scenario titles with mint dot
+- wireframe: distinguish scenario title color
+- wireframe: add recovery color for patterns
+- wireframe: align section title styling
+- wireframe: align cleared pattern color
+- wireframe: title case evidence map label
+- wireframe: label criterion checks
+- wireframe: clarify patterns map labels
+- wireframe: space patterns summary controls
+- wireframe: widen patterns subtitle
+- wireframe: inline patterns summary counts
+- wireframe: simplify patterns map panel
+- wireframe: tune patterns map headers
+- wireframe: align patterns map labels
+- wireframe: add patterns evidence map
+- wireframe: add patterns panel design artifacts
+- wireframe: clarify patterns and reorder family controls
+- wireframe: add recurring patterns panel
+- wireframe: split chart and movement evenly
+- wireframe: align movement beside charts
+- wireframe: link diff pills to tabs
+- wireframe: tint diff pills cyan
+- wireframe: simplify revision diff pills
+- wireframe: show all selected movement pairs
+- wireframe: rank revision movement rows
+- wireframe: reuse agent spec labels
+- wireframe: refresh revision movement table
+- wireframe: match family body vertical padding
+- wireframe: align scenario outer padding
+- wireframe: tighten spend chart padding
+- wireframe: balance spend chart layout
+- wireframe: align chart legend dots
+- wireframe: match chart subtitle typography
+- wireframe: show chart tab button states
+- wireframe: match runtime chart edge padding
+- wireframe: balance runtime plot edges
+- wireframe: tighten runtime chart right edge
+- wireframe: balance runtime chart padding
+- wireframe: correct chart left alignment
+- wireframe: align chart header rows
+- wireframe: label spend chart outcome axis
+- wireframe: align spend chart subtitle
+- wireframe: rename token chart tab
+- wireframe: use outcome rings on token chart
+- wireframe: populate token spend chart data
+- wireframe: extract token bar chart component
+- wireframe: revise token spend chart axis
+- wireframe: add token chart tab
+
 ## 0.14.0 - 2026-06-14
 
 ### Features
