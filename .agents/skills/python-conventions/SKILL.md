@@ -2,10 +2,9 @@
 name: "python-conventions"
 description: "USE WHEN writing or refactoring Python code."
 ---
-
 # Guidance
 
-Complements Ruff and Raidar's Python quality checks; does not replace deterministic gates.
+Complements Python quality checks; does not replace deterministic gates.
 
 ## Names
 
@@ -38,3 +37,4 @@ Complements Ruff and Raidar's Python quality checks; does not replace determinis
 - Honor scenario, runtime, generated-artifact, and caller-provided exclusions end to end.
 - Label proxy evidence explicitly when direct retained evidence is unavailable.
 - Prefer small scorer-owned evidence helpers over shared catch-all utility modules.
+

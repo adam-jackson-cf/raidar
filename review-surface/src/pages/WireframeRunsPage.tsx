@@ -2,21 +2,26 @@ import { useEffect, useMemo, useRef, useState, type ChangeEvent, type RefObject 
 import { ChevronDown, ChevronRight, MessageSquarePlus, Search, SlidersHorizontal, X } from 'lucide-react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
-import { AnnotationCards } from '@/components/AnnotationCards';
 import { GateChips } from '@/components/GateChips';
 import { SearchPanel } from '@/components/SearchPanel';
-import { RunHeader } from '@/components/RunHeader';
-import { ScorecardPanel } from '@/components/ScorecardPanel';
-import { SpanDetail } from '@/components/SpanDetail';
 import { SpanTree } from '@/components/SpanTree';
 import { C } from '@/utils/colors';
 import { api } from '@/api/client';
 import type { Annotation, AnnotationKind, RunRecord, RunDetail as RunDetailData, Span } from '@/utils/types';
-import { KIND_STYLES } from '@/components/AnnotationChip';
+import { WireframeAnnotationCards } from './wireframe-components/WireframeAnnotationCards';
 import { WireframeRunListItem } from './wireframe-components/WireframeRunListItem';
+import { WireframeRunHeader } from './wireframe-components/WireframeRunHeader';
+import { WireframeScorecardPanel } from './wireframe-components/WireframeScorecardPanel';
+import { WireframeSpanDetail } from './wireframe-components/WireframeSpanDetail';
 import { compactSpec } from './wireframe-components/wireframeLabels';
 
 const KIND_ORDER: Record<Annotation['kind'], number> = { issue: 0, note: 1, good: 2 };
+type SyntheticFilterValue = 'synthetic' | 'real';
+
+const SYNTHETIC_FILTER_OPTIONS: Array<{ value: SyntheticFilterValue; label: string }> = [
+  { value: 'synthetic', label: 'synthetic' },
+  { value: 'real', label: 'not synthetic' },
+];
 
 function sortedAnnotations(annotations: Annotation[]): Annotation[] {
   return [...annotations].sort(
@@ -34,6 +39,14 @@ function providerLabel(value: string) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function syntheticFilterValue(run: RunRecord): SyntheticFilterValue {
+  return run.synthetic ? 'synthetic' : 'real';
+}
+
+function runGroupKey(run: RunRecord) {
+  return `${run.scenario}::${run.revision}::${run.agent_spec}`;
+}
+
 function WireframeRunList({
   runs,
   selectedRunId,
@@ -49,7 +62,9 @@ function WireframeRunList({
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedAgentSpecs, setSelectedAgentSpecs] = useState<string[]>([]);
-  const [selectedSynthetic, setSelectedSynthetic] = useState<Array<'synthetic' | 'real'>>(['synthetic', 'real']);
+  const [selectedSynthetic, setSelectedSynthetic] = useState<SyntheticFilterValue[]>(
+    SYNTHETIC_FILTER_OPTIONS.map((option) => option.value),
+  );
   const [collapsedScenarios, setCollapsedScenarios] = useState<Set<string>>(new Set());
   const [collapsedRevisions, setCollapsedRevisions] = useState<Set<string>>(new Set());
   const [collapsedAgentSpecs, setCollapsedAgentSpecs] = useState<Set<string>>(new Set());
@@ -89,7 +104,7 @@ function WireframeRunList({
     return runs.filter((run) => {
       const providerSelected = selectedProviders.length === 0 || selectedProviders.includes(providerValue(run));
       const agentSpecSelected = selectedAgentSpecs.length === 0 || selectedAgentSpecs.includes(run.agent_spec);
-      const syntheticSelected = selectedSynthetic.includes(run.synthetic ? 'synthetic' : 'real');
+      const syntheticSelected = selectedSynthetic.includes(syntheticFilterValue(run));
       if (!providerSelected || !agentSpecSelected || !syntheticSelected) return false;
       return !q || run.scenario.toLowerCase().includes(q);
     });
@@ -101,7 +116,7 @@ function WireframeRunList({
       { scenario: string; revision: string; experimentId: string; agentSpec: string; runs: RunRecord[] }
     >();
     for (const run of filtered) {
-      const key = `${run.scenario}::${run.revision}::${run.agent_spec}`;
+      const key = runGroupKey(run);
       const entry =
         byExperiment.get(key) ?? {
           scenario: run.scenario,
@@ -157,7 +172,7 @@ function WireframeRunList({
 
   return (
     <aside
-      className="flex w-80 shrink-0 flex-col gap-2 border-r p-2"
+      className="flex h-full min-h-0 w-80 shrink-0 flex-col gap-2 border-r p-2"
       style={{ borderColor: C.border, background: C.surface }}
     >
       <div className="flex items-center gap-2 rounded border px-2 py-1" style={{ borderColor: C.border, background: 'rgba(0,0,0,0.35)' }}>
@@ -249,19 +264,15 @@ function WireframeRunList({
                       Synthetic
                     </div>
                     <div className="space-y-1">
-                      {[
-                        ['synthetic', 'synthetic'],
-                        ['real', 'not synthetic'],
-                      ].map(([value, label]) => (
+                      {SYNTHETIC_FILTER_OPTIONS.map(({ value, label }) => (
                         <label key={value} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
                           <input
                             type="checkbox"
-                            checked={selectedSynthetic.includes(value as 'synthetic' | 'real')}
+                            checked={selectedSynthetic.includes(value)}
                             onChange={() => {
                               setSelectedSynthetic((current) => {
-                                const typed = value as 'synthetic' | 'real';
-                                if (!current.includes(typed)) return [...current, typed];
-                                return current.length === 1 ? current : current.filter((item) => item !== typed);
+                                if (!current.includes(value)) return [...current, value];
+                                return current.length === 1 ? current : current.filter((item) => item !== value);
                               });
                             }}
                           />
@@ -460,7 +471,7 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedSpanId = searchParams.get('span');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [findingsOpen, setFindingsOpen] = useState(true);
+  const [findingsOpen, setFindingsOpen] = useState(false);
   const [annotationTarget, setAnnotationTarget] = useState<Span | null | undefined>(undefined);
 
   const detail = useQuery({
@@ -476,11 +487,6 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
   const createMutation = useMutation({
     mutationFn: (input: { kind: AnnotationKind; note: string; span_id: string | null }) =>
       api.createAnnotation({ run_id: runId, span_id: input.span_id, kind: input.kind, note: input.note }),
-    onSuccess: invalidateDetail,
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => api.deleteAnnotation(id),
     onSuccess: invalidateDetail,
   });
 
@@ -514,110 +520,53 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
     ? (data.spans.find((s) => s.id === selectedSpanId) ?? null)
     : null;
   const annotations = sortedAnnotations(data.annotations);
-  const counts = {
-    issue: annotations.filter((a) => a.kind === 'issue').length,
-    good: annotations.filter((a) => a.kind === 'good').length,
-    note: annotations.filter((a) => a.kind === 'note').length,
-  };
   const spanNameById = new Map(data.spans.map((s) => [s.id, s.name]));
 
   return (
     <main className="min-w-0 flex-1 overflow-hidden">
       <div className="sb flex h-full flex-col gap-3 overflow-auto p-3">
-        <RunHeader
+        <WireframeRunHeader
           run={data.run}
-          actions={
-            <button
-              type="button"
-              className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
-              style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
-              onClick={() => setAnnotationTarget(null)}
-            >
-              <MessageSquarePlus className="size-2.5" />
-              Annotate this run
-            </button>
-          }
+          onAnnotateRun={() => setAnnotationTarget(null)}
         >
           <GateChips spans={data.spans} onSelect={(spanId) => selectSpan(spanId)} />
-        </RunHeader>
+        </WireframeRunHeader>
 
-          <ScorecardPanel
+          <WireframeScorecardPanel
             spans={data.spans}
-          selectedSpanId={selectedSpanId}
             onSelect={(spanId) => selectSpan(spanId)}
           />
 
-        <section
-          className="rounded-lg p-2.5"
-          style={{ background: C.surface, border: `1px solid ${C.border}` }}
-        >
-          <button
-            className="mb-2 flex items-center gap-2 text-left"
-            onClick={() => setFindingsOpen((open) => !open)}
+        {annotations.length > 0 && (
+          <section
+            className="rounded-lg p-2.5"
+            style={{ background: C.surface, border: `1px solid ${C.border}` }}
           >
-            {findingsOpen ? (
-              <ChevronDown className="size-3.5" style={{ color: C.fg0 }} />
-            ) : (
-              <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
-            )}
-            <span className="text-xs font-medium" style={{ color: C.fg3 }}>
-              Findings & annotations
-            </span>
-            <span className="text-[10px]" style={{ color: C.fg1 }}>
-              issues first · generated by Raidar from retained evidence
-            </span>
-            <span className="ml-1 text-[10px] num" style={{ color: C.fg0 }}>
-              {counts.issue}/{counts.good}/{counts.note}
-            </span>
-          </button>
-
-          {findingsOpen && (
-            <div className="sb grid max-h-72 gap-1.5 overflow-auto xl:grid-cols-2">
-              <AnnotationCards
-                annotations={annotations}
-                spanNameById={spanNameById}
-                onJumpToSpan={(spanId) => selectSpan(spanId)}
-                onDelete={(id) => {
-                  if (id.startsWith('user-')) deleteMutation.mutate(id);
-                }}
-                flat
-              />
-            </div>
-          )}
-
-            <div className="mt-2 flex flex-wrap gap-2 text-[10px]">
-            {annotations.map((annotation) => {
-              const style = KIND_STYLES[annotation.kind];
-              return (
-                <span
-                  key={annotation.id}
-                  className="rounded-md px-2 py-1"
-                  style={{ color: style.fg, border: `1px solid ${style.border}`, background: style.bg }}
-                  title={
-                    annotation.created_at
-                      ? `${annotation.category} · ${annotation.source} · ${annotation.kind} · ${annotation.note}`
-                      : annotation.note ?? ''
-                  }
-                >
-                  {annotation.kind}: {annotation.category}
-                </span>
-              );
-            })}
-          </div>
-
-          <div className="mt-2 space-y-1 rounded-md p-2" style={{ background: `${C.cyan}08` }}>
-            {data.run.unscored_reasons.length > 0 && (
-              <span className="text-[11px]" style={{ color: C.orange }}>
-                Unscored reasons
+            <button
+              className="mb-2 flex items-center gap-2 text-left"
+              onClick={() => setFindingsOpen((open) => !open)}
+            >
+              {findingsOpen ? (
+                <ChevronDown className="size-3.5" style={{ color: C.fg0 }} />
+              ) : (
+                <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
+              )}
+              <span className="text-xs font-medium" style={{ color: C.fg3 }}>
+                Findings
               </span>
-            )}
-            {data.run.unscored_reasons.map((reason) => (
-              <div key={reason} className="text-[10px]" style={{ color: C.fg3 }}>
-                {reason}
+            </button>
+
+            {findingsOpen && (
+              <div className="sb grid max-h-72 gap-1.5 overflow-auto xl:grid-cols-2">
+                <WireframeAnnotationCards
+                  annotations={annotations}
+                  spanNameById={spanNameById}
+                  onJumpToSpan={(spanId) => selectSpan(spanId)}
+                />
               </div>
-            ))}
-          </div>
-        </section>
+            )}
+          </section>
+        )}
 
         <section
           className="flex min-h-[420px] flex-col overflow-hidden rounded-lg"
@@ -638,7 +587,7 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
             </div>
             {selectedSpan && (
               <div className="min-h-0 lg:basis-[40%]" style={{ background: C.surface }}>
-                <SpanDetail
+                <WireframeSpanDetail
                   span={selectedSpan}
                   annotations={data.annotations}
                   onAnnotate={() => setAnnotationTarget(selectedSpan)}
@@ -677,14 +626,14 @@ export function WireframeRunsPage() {
   };
 
   return (
-    <div className="flex min-h-0 flex-1" style={{ borderTop: `1px solid ${C.border}` }}>
+    <div className="flex h-full min-h-0 flex-1 overflow-hidden" style={{ borderTop: `1px solid ${C.border}` }}>
       <WireframeRunList
         runs={runs.data ?? []}
         isLoading={runs.isLoading}
         selectedRunId={runId}
         onSelectRun={onSelectRun}
       />
-      <main className="min-w-0 flex-1">
+      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
         {runId ? (
           <WireframeRunDetailPanel runId={runId} />
         ) : (

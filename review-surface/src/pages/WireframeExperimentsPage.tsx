@@ -273,11 +273,7 @@ function asNormalizedScore(value: number | null | undefined) {
 }
 
 function deliveryRingColor(score: number | null | undefined): string {
-  const normalized = asNormalizedScore(score);
-  if (normalized == null) return C.fg2;
-  if (normalized >= 0.9) return C.green;
-  if (normalized >= 0.75) return C.orange;
-  return C.red;
+  return scoreTier(score).color;
 }
 
 function repeatabilityValue(stddev: number | null | undefined): number | null {

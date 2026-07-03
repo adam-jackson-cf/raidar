@@ -3,16 +3,9 @@ import { C } from '@/utils/colors';
 import { runLabel, scoreTier } from '@/utils/verdict';
 import type { RunRecord } from '@/utils/types';
 
-function outcomeColor(score: number | null): string {
-  if (score == null) return C.fg1;
-  if (score >= 0.9) return C.green;
-  if (score >= 0.75) return C.orange;
-  return C.red;
-}
-
 function OutcomeRing({ score }: { score: number | null }) {
   const normalized = score == null ? 0 : Math.max(0, Math.min(1, score));
-  const color = outcomeColor(score);
+  const color = scoreTier(score).color;
   return (
     <span
       className="inline-flex size-4 shrink-0 rounded-full"
