@@ -31,8 +31,9 @@ const FACT_HELPERS: Record<string, string[]> = {
     'A higher count usually means a more involved execution path.',
   ],
   diagnostic: [
-    'Secondary diagnostic score retained from scoring output.',
-    'Use as supporting signal rather than the primary outcome.',
+    'Supporting scorer health signal for this run.',
+    'Formed from retained diagnostic scoring output, not from the primary outcome calculation.',
+    'Use it to understand evidence quality or execution health when outcome and trace status disagree.',
   ],
   status: [
     'Execution status for the run trace.',
@@ -208,7 +209,7 @@ function ArtifactPath({ label, path }: { label: string; path: string }) {
       <span className="shrink-0 text-[9px] uppercase tracking-wider" style={{ color: C.fg0 }}>
         {label}
       </span>
-      <code className="num min-w-0 truncate rounded bg-white/5 px-1.5 py-px text-[10px]" style={{ color: C.fg2 }} title={path}>
+      <code className="num min-w-0 truncate rounded px-1.5 py-px text-[10px]" style={{ color: C.fg2, background: C.subtleStrong }} title={path}>
         {path}
       </code>
       <button
@@ -346,8 +347,8 @@ export function WireframeRunHeader({
             left: factTooltip.x,
             top: factTooltip.y,
             color: C.fg3,
-            background: 'rgba(5,5,5,0.96)',
-            borderColor: 'rgba(255,255,255,0.16)',
+            background: C.tooltipBg,
+            borderColor: C.tooltipBorder,
           }}
         >
           <div className="mb-1 text-[11px] font-medium capitalize" style={{ color: C.fg5 }}>
@@ -365,7 +366,7 @@ export function WireframeRunHeader({
             Why this run is unscored
           </span>
           {unscoredReasons.map((reason) => (
-            <div key={reason.id} className="flex flex-col gap-1 rounded border px-2 py-1.5" style={{ borderColor: `${C.orange}24`, background: 'rgba(0,0,0,0.18)' }}>
+            <div key={reason.id} className="flex flex-col gap-1 rounded border px-2 py-1.5" style={{ borderColor: `${C.orange}24`, background: C.subtle }}>
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[11px] font-medium" style={{ color: C.fg5 }}>
                   {reason.label}
@@ -393,7 +394,7 @@ export function WireframeRunHeader({
           Run artifacts
         </button>
         {detailsOpen && (
-          <div className="flex flex-col gap-1.5 rounded-md p-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
+          <div className="flex flex-col gap-1.5 rounded-md p-2" style={{ background: C.subtle }}>
             <ArtifactPath label="run json" path={run.artifact_paths.run_json} />
             {run.artifact_paths.findings_json && <ArtifactPath label="findings json" path={run.artifact_paths.findings_json} />}
           </div>

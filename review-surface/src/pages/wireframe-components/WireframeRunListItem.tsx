@@ -10,7 +10,7 @@ function OutcomeRing({ score }: { score: number | null }) {
     <span
       className="inline-flex size-4 shrink-0 rounded-full"
       style={{
-        background: `conic-gradient(${color} ${normalized * 360}deg, rgba(255,255,255,0.16) 0deg)`,
+        background: `conic-gradient(${color} ${normalized * 360}deg, ${C.ringTrack} 0deg)`,
       }}
       aria-label="Outcome"
     >
@@ -72,16 +72,16 @@ export function WireframeRunListItem({
       title={`${run.id} — ${run.scenario} ${run.revision} — ${tier.label}`}
       className="w-full rounded-md px-2.5 py-2 text-left transition"
       style={{
-        background: selected ? 'rgba(255,255,255,0.03)' : 'transparent',
+        background: selected ? C.selected : 'transparent',
         border: selected ? `1px solid ${C.selectedBorder}` : '1px solid transparent',
       }}
       onMouseEnter={(e) => {
         if (!selected) {
-          e.currentTarget.style.background = 'rgba(255,255,255,0.04)';
+          e.currentTarget.style.background = C.hover;
         }
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = selected ? 'rgba(255,255,255,0.03)' : 'transparent';
+        e.currentTarget.style.background = selected ? C.selected : 'transparent';
       }}
       onClick={onClick}
     >

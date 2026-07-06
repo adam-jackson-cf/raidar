@@ -267,8 +267,8 @@ function PatternRow({ pattern, onHover, onLeave, onPin }: {
   const color = isStrength ? C.green : pattern.source === 'gate' ? C.red : C.orange;
   return (
     <button
-      className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-white/[0.035]"
-      style={{ border: `1px solid ${C.border}`, background: 'rgba(255,255,255,0.015)' }}
+      className="grid w-full grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-2 rounded-md px-2 py-1.5 text-left transition "
+      style={{ border: `1px solid ${C.border}`, background: C.subtle }}
       onMouseEnter={(event) => onHover(event, pattern)}
       onMouseMove={(event) => onHover(event, pattern)}
       onMouseLeave={onLeave}
@@ -299,7 +299,7 @@ function PatternColumn({ title, kind, patterns, empty, onHover, onLeave, onPin }
 }) {
   const color = kind === 'strength' ? C.green : C.orange;
   return (
-    <div className="rounded-md p-2" style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${C.border}` }}>
+    <div className="rounded-md p-2" style={{ background: C.subtle, border: `1px solid ${C.border}` }}>
       <div className="mb-2 flex items-center gap-2">
         {kind === 'strength' ? <CircleCheck className="size-3.5" style={{ color }} /> : <CircleAlert className="size-3.5" style={{ color }} />}
         <span className="text-[12px] font-medium" style={{ color: C.fg4 }}>{title}</span>
@@ -330,16 +330,16 @@ function PatternOverlay({ overlay, pinned, onPin, onClose }: {
   return (
     <div
       className="fixed z-40 w-80 rounded-lg border p-2 shadow-2xl"
-      style={{ left: overlay.x, top: overlay.y, color: C.fg3, background: 'rgba(5,5,5,0.96)', borderColor: 'rgba(255,255,255,0.16)' }}
+      style={{ left: overlay.x, top: overlay.y, color: C.fg3, background: C.tooltipBg, borderColor: C.tooltipBorder }}
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="mb-2 flex items-center justify-between gap-2 border-b border-white/10 pb-1.5">
+      <div className="mb-2 flex items-center justify-between gap-2 border-b pb-1.5">
         <span className="text-[10px] uppercase tracking-wide" style={{ color }}>{pattern.kind}</span>
         <span className="flex items-center gap-1">
-          <button className="inline-flex size-5 items-center justify-center rounded border border-white/10" onClick={() => onPin(overlay)} title={pinned ? 'Unpin overlay' : 'Pin overlay'}>
+          <button className="inline-flex size-5 items-center justify-center rounded border" onClick={() => onPin(overlay)} title={pinned ? 'Unpin overlay' : 'Pin overlay'}>
             {pinned ? <PinOff size={11} color={C.fg2} /> : <Pin size={11} color={C.fg2} />}
           </button>
-          <button className="inline-flex size-5 items-center justify-center rounded border border-white/10" onClick={() => onClose(overlay.id)} title="Close overlay">
+          <button className="inline-flex size-5 items-center justify-center rounded border" onClick={() => onClose(overlay.id)} title="Close overlay">
             <X size={11} color={C.fg2} />
           </button>
         </span>
@@ -347,11 +347,11 @@ function PatternOverlay({ overlay, pinned, onPin, onClose }: {
       <div className="text-[12px] font-medium" style={{ color: C.fg5 }}>{pattern.label}</div>
       <div className="mt-1 text-[11px] leading-relaxed" style={{ color: C.fg2 }}>{pattern.detail}</div>
       <div className="mt-2 grid grid-cols-2 gap-2 text-[10px]">
-        <div className="rounded p-1.5" style={{ background: 'rgba(255,255,255,0.035)' }}>
+        <div className="rounded p-1.5" style={{ background: C.subtleStrong }}>
           <div style={{ color: C.fg0 }}>Coverage</div>
           <div className="num text-[12px]" style={{ color }}>{pattern.count} of {pattern.sample}</div>
         </div>
-        <div className="rounded p-1.5" style={{ background: 'rgba(255,255,255,0.035)' }}>
+        <div className="rounded p-1.5" style={{ background: C.subtleStrong }}>
           <div style={{ color: C.fg0 }}>Source</div>
           <div style={{ color: C.fg3 }}>{sourceLabel(pattern.source)}</div>
         </div>
@@ -439,7 +439,7 @@ export function WireframePatterns({ experiments, runs }: { experiments: Experime
       {thresholdTooltip ? (
         <div
           className="pointer-events-none fixed z-40 w-72 rounded-lg border p-2 text-[11px] leading-4 shadow-2xl"
-          style={{ left: thresholdTooltip.x, top: thresholdTooltip.y, color: C.fg3, background: 'rgba(5,5,5,0.96)', borderColor: 'rgba(255,255,255,0.16)' }}
+          style={{ left: thresholdTooltip.x, top: thresholdTooltip.y, color: C.fg3, background: C.tooltipBg, borderColor: C.tooltipBorder }}
         >
           <div className="mb-1 text-[12px] font-medium" style={{ color: C.fg5 }}>Pattern threshold</div>
           <div>Scorer criteria appear when pass or fail count is at least one third of that criterion's sample.</div>

@@ -7,9 +7,85 @@ html {
   color-scheme: dark;
 }
 
+:root,
+[data-theme='dark'] {
+  --raidar-bg: #000000;
+  --raidar-surface: #0a0a0a;
+  --raidar-elevated: #111111;
+  --raidar-border: rgba(255,255,255,0.06);
+  --raidar-border-light: rgba(255,255,255,0.1);
+  --raidar-fg0: #5a6a72;
+  --raidar-fg1: #7d8a90;
+  --raidar-fg2: #a0acb2;
+  --raidar-fg3: #c8d5dc;
+  --raidar-fg4: #e1e8ec;
+  --raidar-fg5: #f2f5f7;
+  --raidar-selected: rgba(91,141,239,0.08);
+  --raidar-selected-border: rgba(91,141,239,0.2);
+  --raidar-input: rgba(0,0,0,0.45);
+  --raidar-input-soft: rgba(0,0,0,0.35);
+  --raidar-popover: rgba(0,0,0,0.94);
+  --raidar-overlay: rgba(0,0,0,0.35);
+  --raidar-button: #f2f5f7;
+  --raidar-button-fg: #000000;
+  --raidar-subtle: rgba(255,255,255,0.02);
+  --raidar-subtle-strong: rgba(255,255,255,0.05);
+  --raidar-hover: rgba(255,255,255,0.05);
+  --raidar-row-border: rgba(255,255,255,0.03);
+  --raidar-ring-track: rgba(255,255,255,0.16);
+  --raidar-hatch-line: rgba(255,255,255,0.06);
+  --raidar-cyan: #4FCAE3;
+  --raidar-green: #60E36D;
+  --raidar-green-bg: rgba(5,150,105,0.12);
+  --raidar-green-border: rgba(5,150,105,0.35);
+  --raidar-tooltip-bg: rgba(5,5,5,0.96);
+  --raidar-tooltip-border: rgba(255,255,255,0.16);
+  --raidar-trace-error-bg: rgba(235,20,20,0.05);
+  --raidar-scrollbar-thumb: rgba(255,255,255,0.08);
+  --raidar-scrollbar-thumb-hover: rgba(255,255,255,0.16);
+}
+
+[data-theme='light'] {
+  color-scheme: light;
+  --raidar-bg: #f7f8f9;
+  --raidar-surface: #ffffff;
+  --raidar-elevated: #eef1f3;
+  --raidar-border: rgba(0,0,0,0.10);
+  --raidar-border-light: rgba(0,0,0,0.16);
+  --raidar-fg0: #8a969d;
+  --raidar-fg1: #68757d;
+  --raidar-fg2: #53616a;
+  --raidar-fg3: #36434c;
+  --raidar-fg4: #1d2830;
+  --raidar-fg5: #05080a;
+  --raidar-selected: rgba(91,141,239,0.10);
+  --raidar-selected-border: rgba(91,141,239,0.34);
+  --raidar-input: #ffffff;
+  --raidar-input-soft: #eef1f3;
+  --raidar-popover: #ffffff;
+  --raidar-overlay: rgba(17,24,39,0.25);
+  --raidar-button: #eef1f3;
+  --raidar-button-fg: #1d2830;
+  --raidar-subtle: rgba(0,0,0,0.035);
+  --raidar-subtle-strong: rgba(0,0,0,0.06);
+  --raidar-hover: rgba(0,0,0,0.045);
+  --raidar-row-border: rgba(0,0,0,0.06);
+  --raidar-ring-track: rgba(0,0,0,0.14);
+  --raidar-hatch-line: rgba(0,0,0,0.055);
+  --raidar-cyan: #0b7fd3;
+  --raidar-green: #198a34;
+  --raidar-green-bg: rgba(25,138,52,0.10);
+  --raidar-green-border: rgba(25,138,52,0.34);
+  --raidar-tooltip-bg: rgba(255,255,255,0.98);
+  --raidar-tooltip-border: rgba(0,0,0,0.16);
+  --raidar-trace-error-bg: rgba(235,20,20,0.08);
+  --raidar-scrollbar-thumb: rgba(0,0,0,0.18);
+  --raidar-scrollbar-thumb-hover: rgba(0,0,0,0.28);
+}
+
 body {
-  background: #000;
-  color: #a0acb2;
+  background: var(--raidar-bg);
+  color: var(--raidar-fg2);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -26,15 +102,15 @@ body {
   height: 8px;
 }
 .sb::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--raidar-scrollbar-thumb);
   border-radius: 4px;
 }
 .sb::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.16);
+  background: var(--raidar-scrollbar-thumb-hover);
 }
 .sb {
   scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+  scrollbar-color: var(--raidar-scrollbar-thumb) transparent;
 }
 
 @keyframes pulse-dot {

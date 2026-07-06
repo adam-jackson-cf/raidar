@@ -40,7 +40,7 @@ function WireframeRunPill({ run, id }: { run: RunRecord | undefined; id: string 
   return (
     <Link
       to={`/runs/${encodeURIComponent(id)}`}
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] transition hover:bg-white/10"
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] transition "
       style={{
         color: failed ? C.red : C.fg3,
         border: `1px solid ${failed ? 'rgba(235,20,20,0.35)' : C.border}`,
@@ -227,7 +227,7 @@ function WireframeExperimentExpansion({
                   className="rounded-lg px-2.5 py-2"
                   style={{
                     border: `1px solid ${style.border}`,
-                    background: `linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015)), ${style.bg}`,
+                    background: `linear-gradient(180deg, ${C.subtleStrong}, ${C.subtle}), ${style.bg}`,
                   }}
                 >
                   <div className="mb-0.5 flex flex-wrap items-center gap-2">
@@ -404,12 +404,12 @@ function ScoreRing({
   const radius = (size - stroke) / 2;
   const circumference = Math.PI * 2 * radius;
   const dash = value * circumference;
-  const neutral = `rgba(255,255,255,0.16)`;
+  const neutral = C.ringTrack;
 
   return (
     <button
       type="button"
-      className="inline-flex size-7 items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+      className="inline-flex size-7 items-center justify-center rounded-full transition focus-visible:outline-none focus-visible:ring-2 "
       style={{ color: ringColor }}
       onMouseEnter={(event) => {
         onMove({
@@ -522,7 +522,7 @@ function OverlayFrame({
           <button
             type="button"
             aria-label={pinned ? 'Unpin overlay' : 'Pin overlay'}
-            className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[10px] leading-none"
+            className="inline-flex size-5 items-center justify-center rounded border text-[10px] leading-none"
             onClick={(event) => {
               event.preventDefault();
               event.stopPropagation();
@@ -535,7 +535,7 @@ function OverlayFrame({
           <button
             type="button"
             aria-label="Close overlay"
-            className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[11px] font-medium leading-none"
+            className="inline-flex size-5 items-center justify-center rounded border text-[11px] font-medium leading-none"
             onClick={(event) => {
               event.stopPropagation();
               onClose();
@@ -812,7 +812,7 @@ function FindingClusterBadge({
     <button
       type="button"
       aria-label={`${config.label} findings (${findings.length})`}
-      className="relative inline-flex size-4 rotate-45 items-center justify-center rounded-none border text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/40"
+      className="relative inline-flex size-4 rotate-45 items-center justify-center rounded-none border text-[9px] font-bold transition focus-visible:outline-none focus-visible:ring-2 "
       style={{ color: config.color, border: `1px solid ${config.border}`, background: config.bg, opacity: 0.7 }}
       onMouseEnter={(event) => onOpen(event, findings, kind)}
       onMouseMove={(event) => onOpen(event, findings, kind)}
@@ -1209,12 +1209,12 @@ export function WireframeExperimentsPage() {
   };
 
     return (
-    <div className="sb flex h-full flex-col gap-3 overflow-auto p-4">
+    <div className="flex flex-col gap-3 p-4">
       <div className="rounded-lg border p-2" style={{ borderColor: C.border, background: C.surface }}>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            className="inline-flex size-7 items-center justify-center rounded border border-white/20"
+            className="inline-flex size-7 items-center justify-center rounded border"
             onClick={() => {
               if (hasHiddenScenarios) {
                 setSelectedFamilies(['__all_scenarios__']);
@@ -1229,13 +1229,13 @@ export function WireframeExperimentsPage() {
                 <button
                   type="button"
                   className="min-w-56 h-7 rounded-md px-2 py-1 text-left text-xs"
-                  style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
+                  style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
                   onClick={() => setOpenFamilyMenu((open) => !open)}
                 >
                   {formatFamilyMenuLabel(selectedFamilies.includes('__all_scenarios__'), selectedFamilies.filter((item) => item !== '__all_scenarios__'))}
                 </button>
                 {openFamilyMenu ? (
-              <div className="absolute left-0 top-full z-20 mt-1 min-w-56 rounded-md border border-white/15 bg-black/90 p-2 text-xs" data-wireframe-menu>
+              <div className="absolute left-0 top-full z-20 mt-1 min-w-56 rounded-md border  p-2 text-xs" data-wireframe-menu>
                 <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
                     <input
                     type="checkbox"
@@ -1297,7 +1297,7 @@ export function WireframeExperimentsPage() {
             ) : null}
             <input
               className="relative h-7 w-full rounded-md px-2 py-1 text-xs"
-              style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.4)', color: C.fg4 }}
+              style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
               value={scenarioFilter}
               placeholder="Search scenario family…"
               onChange={(event) => setScenarioFilter(event.target.value)}
@@ -1319,7 +1319,7 @@ export function WireframeExperimentsPage() {
               value={scenarioSortMode}
               onChange={(event) => setScenarioSortMode(event.target.value as 'most_recent' | 'revision_improvement')}
               className="h-7 min-w-[250px] rounded-md px-2 py-1 text-xs"
-              style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+              style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
             >
               <option value="most_recent">latest data</option>
               <option value="revision_improvement">delivery score</option>
@@ -1399,7 +1399,7 @@ export function WireframeExperimentsPage() {
             className="rounded-lg border"
             style={{
               borderColor: C.border,
-              background: 'linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.015))',
+              background: `linear-gradient(180deg, ${C.subtleStrong}, ${C.subtle})`,
             }}
           >
             <div className="px-2 py-2 border-b" style={{ borderColor: C.border }}>
@@ -1429,7 +1429,7 @@ export function WireframeExperimentsPage() {
             className="space-y-3 px-2 py-2"
             style={{
               background:
-                'repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0, rgba(255,255,255,0.06) 1px, transparent 1px, transparent 6px)',
+                `repeating-linear-gradient(45deg, ${C.hatchLine} 0, ${C.hatchLine} 1px, transparent 1px, transparent 6px)`,
             }}
           >
               <div className="overflow-hidden rounded-lg border" style={{ borderColor: C.border, background: C.surface }}>
@@ -1468,7 +1468,7 @@ export function WireframeExperimentsPage() {
                       <div className="mt-2 flex items-center gap-2">
                                 <button
                       type="button"
-                      className="inline-flex size-7 items-center justify-center rounded border border-white/20"
+                      className="inline-flex size-7 items-center justify-center rounded border"
                       onClick={() => {
                                 if (hasHiddenRevisions) {
                                   showAllRevisionsForFamily(family);
@@ -1483,7 +1483,7 @@ export function WireframeExperimentsPage() {
                       <button
                                 type="button"
                                 className="min-w-60 h-7 rounded-md px-2 py-1 text-left text-xs"
-                                style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+                                style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
                                 onClick={() => setOpenRevisionMenu((current) => (current === family ? null : family))}
                       >
                                 {formatRevisionMenuLabel(
@@ -1493,7 +1493,7 @@ export function WireframeExperimentsPage() {
                                 )}
                       </button>
                       {openRevisionMenu === family ? (
-                                <div className="absolute left-0 top-full z-20 mt-1 min-w-60 rounded-md border border-white/15 bg-black/90 p-2 text-xs" data-wireframe-menu>
+                                <div className="absolute left-0 top-full z-20 mt-1 min-w-60 rounded-md border  p-2 text-xs" data-wireframe-menu>
                                   <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
                                     <input
                                       type="checkbox"
@@ -1544,7 +1544,7 @@ export function WireframeExperimentsPage() {
                         value={revisionSortMode}
                         onChange={(event) => setRevisionSortModes((current) => ({ ...current, [family]: event.target.value as 'outcome' | 'agent' | 'revision' }))}
                         className="h-7 rounded-md px-2 py-1 text-xs"
-                        style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+                        style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
                       >
                         <option value="outcome">Outcome</option>
                         <option value="agent">Agent</option>
@@ -1642,10 +1642,10 @@ export function WireframeExperimentsPage() {
                           return (
                             <Fragment key={experimentKey}>
                               <tr
-                                className="cursor-pointer border-b transition hover:bg-white/[0.03]"
+                                className="cursor-pointer border-b transition "
                                 style={{
-                                  borderColor: 'rgba(255,255,255,0.05)',
-                                  background: isExpanded ? 'rgba(255,255,255,0.015)' : 'transparent',
+                                  borderColor: C.rowBorder,
+                                  background: isExpanded ? C.subtle : 'transparent',
                                   borderLeft: isWinner ? `3px solid ${C.orange}` : isRunnerUp ? `3px solid ${C.fg1}` : '3px solid transparent',
                                 }}
                                 onClick={() => toggleExpanded(experimentKey)}
@@ -1704,7 +1704,7 @@ export function WireframeExperimentsPage() {
                                 </td>
                               </tr>
                               {isExpanded ? (
-                                <tr className="border-b" style={{ borderColor: 'rgba(255,255,255,0.05)' }}>
+                                <tr className="border-b" style={{ borderColor: C.rowBorder }}>
                                   <td colSpan={8} className="p-0">
                                     <WireframeExperimentExpansion
                                       exp={exp}
@@ -1764,7 +1764,7 @@ export function WireframeExperimentsPage() {
 
       {columnTooltip ? (
         <div
-          className="pointer-events-none fixed z-30 max-w-56 rounded-md border border-white/15 bg-black/90 p-2 text-[10px]"
+          className="pointer-events-none fixed z-30 max-w-56 rounded-md border  p-2 text-[10px]"
           style={{ left: columnTooltip.x, top: columnTooltip.y, color: C.fg3 }}
         >
           <div className="mb-1 text-[11px] font-medium" style={{ color: C.fg5 }}>{columnTooltip.title}</div>
@@ -1790,7 +1790,7 @@ export function WireframeExperimentsPage() {
             <>
               <button
                 type="button"
-                className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[10px] leading-none"
+                className="inline-flex size-5 items-center justify-center rounded border text-[10px] leading-none"
                 onClick={(event) => {
                   event.preventDefault();
                   panel.pinned
@@ -1805,7 +1805,7 @@ export function WireframeExperimentsPage() {
               </button>
               <button
                 type="button"
-                className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[10px] leading-none"
+                className="inline-flex size-5 items-center justify-center rounded border text-[10px] leading-none"
                 onClick={(event) => {
                   event.preventDefault();
                   panel.pinned

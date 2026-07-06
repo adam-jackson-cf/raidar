@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Check, Copy, MessageSquarePlus } from 'lucide-react';
+import { Check, Copy, MessageSquarePlus, X } from 'lucide-react';
 import { AnnotationCards } from '@/components/AnnotationCards';
 import { JsonView } from '@/components/JsonView';
 import { C, SPAN_TYPE_INFO } from '@/utils/colors';
@@ -38,7 +38,7 @@ function PayloadSection({ title, payload }: { title: string; payload: string }) 
       </div>
       <div
         className="sb max-h-72 overflow-auto rounded p-2"
-        style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}
+        style={{ background: C.subtle, border: `1px solid ${C.border}` }}
       >
         {isStructured ? (
           <JsonView data={parsed} />
@@ -59,10 +59,12 @@ export function WireframeSpanDetail({
   span,
   annotations,
   onAnnotate,
+  onClose,
 }: {
   span: Span;
   annotations: Annotation[];
   onAnnotate: () => void;
+  onClose: () => void;
 }) {
   const info = SPAN_TYPE_INFO[span.span_type];
   const isErr = span.status === 'ERROR';
@@ -95,6 +97,15 @@ export function WireframeSpanDetail({
             onClick={onAnnotate}
           >
             <MessageSquarePlus className="size-3" />
+          </button>
+          <button
+            className="inline-flex items-center rounded p-1 transition hover:bg-white/10"
+            style={{ color: C.fg2, border: `1px solid ${C.border}` }}
+            title="Close span details"
+            aria-label="Close span details"
+            onClick={onClose}
+          >
+            <X className="size-3" />
           </button>
         </div>
         <div className="num text-sm font-medium" style={{ color: C.fg4 }}>

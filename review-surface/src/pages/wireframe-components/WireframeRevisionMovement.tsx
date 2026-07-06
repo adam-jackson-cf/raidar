@@ -112,7 +112,7 @@ function DiffBlock({ file }: { file: FileDiff }) {
   return (
     <div
       className="sb max-h-72 overflow-auto rounded p-2"
-      style={{ background: 'rgba(255,255,255,0.02)', border: `1px solid ${C.border}` }}
+      style={{ background: C.subtle, border: `1px solid ${C.border}` }}
     >
       {file.diff.lines.map((line, index) => (
         <div
@@ -183,7 +183,11 @@ export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
             role="button"
             tabIndex={0}
             className="rounded px-1.5 py-px text-[9px] uppercase tracking-wide"
-            style={{ color: C.cyan, background: `${C.cyan}12`, border: `1px solid ${C.cyan}35` }}
+            style={{
+              color: C.cyan,
+              background: `color-mix(in srgb, ${C.cyan} 14%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${C.cyan} 42%, transparent)`,
+            }}
             onClick={(event) => {
               event.stopPropagation();
               openTab(pill.tab);
@@ -205,7 +209,11 @@ export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
             role="button"
             tabIndex={0}
             className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
-            style={{ color: C.orange, background: `${C.orange}12`, border: `1px solid ${C.orange}35` }}
+            style={{
+              color: C.orange,
+              background: `color-mix(in srgb, ${C.orange} 14%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${C.orange} 42%, transparent)`,
+            }}
             title="The evaluation contract itself changed - score movement is not purely the agent's doing."
             onClick={(event) => {
               event.stopPropagation();
@@ -234,7 +242,7 @@ export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
                 className="rounded px-2 py-0.5 text-[10px]"
                 style={{
                   color: activeTab === pill.tab ? C.fg5 : C.fg1,
-                  background: activeTab === pill.tab ? 'rgba(255,255,255,0.08)' : 'transparent',
+                  background: activeTab === pill.tab ? C.selected : 'transparent',
                   border: `1px solid ${activeTab === pill.tab ? C.borderLight : C.border}`,
                 }}
               >
@@ -355,7 +363,7 @@ export function WireframeRevisionMovement({
               <tr
                 key={movement.key}
                 style={{
-                  borderBottom: '1px solid rgba(255,255,255,0.03)',
+                  borderBottom: `1px solid ${C.rowBorder}`,
                   borderLeft:
                     movement.rank === 1
                       ? `3px solid ${C.orange}`

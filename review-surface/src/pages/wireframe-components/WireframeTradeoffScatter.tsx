@@ -69,7 +69,7 @@ function OverlayFrame({
         </div>
         {showControls ? (
           <div className="ml-auto flex items-center gap-1.5">
-            <button type="button" aria-label="Close overlay" className="inline-flex size-5 items-center justify-center rounded border border-white/20 text-[11px] font-medium leading-none">
+            <button type="button" aria-label="Close overlay" className="inline-flex size-5 items-center justify-center rounded border text-[11px] font-medium leading-none">
               x
             </button>
           </div>
@@ -280,10 +280,10 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
                 key={tab}
                 type="button"
                 aria-pressed={activeTab === tab}
-                className="rounded-md px-2 py-1 text-xs font-medium transition hover:bg-white/5"
+                className="rounded-md px-2 py-1 text-xs font-medium transition "
                 style={{
                   color: activeTab === tab ? C.fg4 : C.fg2,
-                  background: activeTab === tab ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.025)',
+                  background: activeTab === tab ? C.selected : C.subtle,
                   border: `1px solid ${activeTab === tab ? C.selectedBorder : C.border}`,
                 }}
                 onClick={() => setActiveTab(tab as 'runtime' | 'tokens')}
@@ -301,8 +301,8 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
         <div ref={filterRef} className="relative ml-auto shrink-0">
           <button
             type="button"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-md border transition hover:bg-white/5"
-            style={{ borderColor: filterOpen ? C.selectedBorder : C.border, color: filterOpen ? C.fg4 : C.fg2, background: filterOpen ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-md border transition "
+            style={{ borderColor: filterOpen ? C.selectedBorder : C.border, color: filterOpen ? C.fg4 : C.fg2, background: filterOpen ? C.hover : 'transparent' }}
             aria-label="Filter chart"
             title="Filter chart"
             onClick={() => setFilterOpen((open) => !open)}
@@ -324,7 +324,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
                   </div>
                   <div className="space-y-1">
                     {providerOptions.map((provider) => (
-                      <label key={provider} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                      <label key={provider} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 " style={{ color: C.fg2 }}>
                         <input
                           type="checkbox"
                           checked={selectedProviders.includes(provider)}
@@ -355,7 +355,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
                   </div>
                   <div className="space-y-1">
                     {effortOptions.map((effort) => (
-                      <label key={effort} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                      <label key={effort} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 " style={{ color: C.fg2 }}>
                         <input
                           type="checkbox"
                           checked={selectedEfforts.includes(effort)}
@@ -377,7 +377,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
                   </div>
                   <div className="space-y-1">
                     {revisionOptions.map((revision) => (
-                      <label key={revision} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 hover:bg-white/5" style={{ color: C.fg2 }}>
+                      <label key={revision} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 " style={{ color: C.fg2 }}>
                         <input
                           type="checkbox"
                           checked={selectedRevisions.includes(revision)}
@@ -412,7 +412,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
               <button
                 key={model}
                 type="button"
-                className="num inline-flex items-center gap-1 rounded py-0.5 pl-0 pr-1 text-xs transition hover:bg-white/5"
+                className="num inline-flex items-center gap-1 rounded py-0.5 pl-0 pr-1 text-xs transition "
                 style={{ color: C.fg1 }}
                 onMouseEnter={(event) => openTooltip(payloadAt(event))}
                 onMouseMove={(event) => openTooltip(payloadAt(event))}
@@ -440,8 +440,8 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
         <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against run duration">
         <polygon
           points={`${PAD.left},${HEIGHT - PAD.bottom - 4} ${attractorMaxX},${PAD.top} ${PAD.left},${PAD.top}`}
-          fill="rgba(34,197,94,0.12)"
-          stroke="rgba(34,197,94,0.22)"
+          fill={C.greenBg}
+          stroke={C.greenBorder}
           strokeWidth="1"
         />
         <text x={PAD.left + 4} y={PAD.top + 11} fontSize="6" fill={C.green}>
@@ -451,7 +451,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
           const ty = PAD.top + (1 - tick) * (HEIGHT - PAD.top - PAD.bottom);
           return (
             <g key={tick}>
-              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={ty} y2={ty} stroke="rgba(255,255,255,0.05)" />
+              <line x1={PAD.left} x2={WIDTH - PAD.right} y1={ty} y2={ty} stroke={C.rowBorder} />
               <text x={PAD.left - 6} y={ty + 3} textAnchor="end" fontSize="8" fill={C.fg0}>
                 {tick.toFixed(2)}
               </text>
@@ -462,7 +462,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
           const tx = PAD.left + frac * (WIDTH - PAD.left - PAD.right);
           return (
             <g key={frac}>
-              <line x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />
+              <line x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke={C.rowBorder} />
               <text x={tx} y={HEIGHT - PAD.bottom + 10} textAnchor="middle" fontSize="8" fill={C.fg0}>
                 {durationTickLabel(maxDuration * frac)}
               </text>
@@ -483,7 +483,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
               r={4.75}
               fill={modelColor(model)}
               fillOpacity={0.86}
-              stroke={run.status === 'ERROR' ? C.red : 'rgba(0,0,0,0.6)'}
+              stroke={run.status === 'ERROR' ? C.red : C.surface}
               strokeWidth={run.status === 'ERROR' ? 2 : 1}
               style={{ cursor: 'pointer' }}
               onMouseEnter={(event) => openTooltip(runPayload(run, event.clientX, event.clientY))}

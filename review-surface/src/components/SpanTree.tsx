@@ -76,8 +76,8 @@ function SpanRow({
       className="flex cursor-pointer items-center"
       style={{
         minHeight: 28,
-        borderBottom: '1px solid rgba(255,255,255,0.03)',
-        background: selected ? C.selected : isErr ? 'rgba(235,20,20,0.05)' : 'transparent',
+        borderBottom: `1px solid ${C.rowBorder}`,
+        background: selected ? C.selected : isErr ? C.traceErrorBg : 'transparent',
         borderLeft: selected
           ? `2px solid ${C.accent}`
           : isErr

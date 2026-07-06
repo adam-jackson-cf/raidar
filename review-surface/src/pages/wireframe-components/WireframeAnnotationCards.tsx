@@ -52,13 +52,13 @@ export function WireframeAnnotationCards({
           key={group.kind}
           className="min-w-0 rounded-lg border px-2.5 py-2"
           style={{
-            borderColor: 'rgba(255,255,255,0.08)',
-            background: 'linear-gradient(180deg, rgba(255,255,255,0.035), rgba(255,255,255,0.015))',
+            borderColor: C.border,
+            background: `linear-gradient(180deg, ${C.subtleStrong}, ${C.subtle})`,
           }}
         >
           <div className="mb-2 flex items-center gap-2">
             <span className="size-2 rounded-sm" style={{ background: group.color }} />
-            <span className="text-[11px] font-medium uppercase tracking-[0.16em]" style={{ color: C.fg2 }}>
+            <span className="text-xs font-medium" style={{ color: C.fg3 }}>
               {group.title}
             </span>
           </div>
@@ -72,7 +72,7 @@ export function WireframeAnnotationCards({
               const spanName = annotation.span_id ? spanNameById.get(annotation.span_id) : null;
               const canJump = Boolean(annotation.span_id);
               return (
-                <div key={annotation.id} className="flex items-start gap-2 text-xs leading-relaxed" style={{ color: C.fg4 }}>
+                <div key={annotation.id} className="group flex items-start gap-2 text-xs leading-relaxed" style={{ color: C.fg4 }}>
                   <span className="num mt-px w-3 shrink-0" style={{ color: group.color }}>
                     {group.icon}
                   </span>
@@ -82,7 +82,7 @@ export function WireframeAnnotationCards({
                       onClick={() => onJumpToSpan(annotation.span_id as string)}
                       title={spanName ? `jump: ${spanName}` : 'jump to span'}
                       aria-label={spanName ? `jump: ${spanName}` : 'jump to span'}
-                      className="mt-px inline-flex shrink-0 items-center rounded p-0.5 transition hover:bg-white/10"
+                      className="mt-px inline-flex shrink-0 items-center rounded p-0.5 opacity-0 transition hover:bg-white/10 focus:opacity-100 group-hover:opacity-100"
                       style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
                     >
                       <Crosshair className="size-2.5" />

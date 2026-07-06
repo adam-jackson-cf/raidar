@@ -6,7 +6,7 @@ export const KIND_STYLES: Record<
   { icon: string; label: string; fg: string; bg: string; border: string }
 > = {
   issue: { icon: '!', label: 'issue', fg: '#f87171', bg: 'rgba(220,38,38,0.12)', border: 'rgba(220,38,38,0.35)' },
-  good: { icon: '✓', label: 'good', fg: '#34d399', bg: 'rgba(5,150,105,0.12)', border: 'rgba(5,150,105,0.35)' },
+  good: { icon: '✓', label: 'good', fg: 'var(--raidar-green)', bg: 'var(--raidar-green-bg)', border: 'var(--raidar-green-border)' },
   note: { icon: '·', label: 'note', fg: '#60a5fa', bg: 'rgba(37,99,235,0.12)', border: 'rgba(37,99,235,0.35)' },
 };
 

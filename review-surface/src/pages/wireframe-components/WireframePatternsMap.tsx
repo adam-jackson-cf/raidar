@@ -329,16 +329,16 @@ function DetailOverlay({ overlay, pinned, onPin, onClose }: {
   return (
     <div
       className="fixed z-40 w-96 rounded-lg border p-2 shadow-2xl"
-      style={{ left: overlay.x, top: overlay.y, color: C.fg3, background: 'rgba(5,5,5,0.96)', borderColor: 'rgba(255,255,255,0.16)' }}
+      style={{ left: overlay.x, top: overlay.y, color: C.fg3, background: C.tooltipBg, borderColor: C.tooltipBorder }}
       onClick={(event) => event.stopPropagation()}
     >
-      <div className="mb-2 flex items-center justify-between border-b border-white/10 pb-1.5">
+      <div className="mb-2 flex items-center justify-between border-b pb-1.5">
         <div className="text-[12px] font-medium" style={{ color: C.fg5 }}>{overlay.title}</div>
         <span className="flex items-center gap-1">
-          <button className="inline-flex size-5 items-center justify-center rounded border border-white/10" onClick={() => onPin(overlay)} title={pinned ? 'Unpin overlay' : 'Pin overlay'}>
+          <button className="inline-flex size-5 items-center justify-center rounded border" onClick={() => onPin(overlay)} title={pinned ? 'Unpin overlay' : 'Pin overlay'}>
             {pinned ? <PinOff size={11} color={C.fg2} /> : <Pin size={11} color={C.fg2} />}
           </button>
-          <button className="inline-flex size-5 items-center justify-center rounded border border-white/10" onClick={() => onClose(overlay.id)} title="Close overlay">
+          <button className="inline-flex size-5 items-center justify-center rounded border" onClick={() => onClose(overlay.id)} title="Close overlay">
             <X size={11} color={C.fg2} />
           </button>
         </span>
@@ -437,16 +437,13 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
         </div>
       </div>
 
-      <div className="grid border-b lg:grid-cols-3" style={{ borderColor: C.border }}>
+      <div className="grid grid-cols-3 border-b" style={{ borderColor: C.border }}>
         <SummaryCard state="costing" label="Costing you" count={costing.length} copy={costingCopy} onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })} />
         <SummaryCard state="trending" label="Trending up" count={trending.length} copy={trendingCopy} onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })} />
         <SummaryCard state="repeatable" label="Strengths" count={repeatable.length} copy={strengthsCopy} onInfo={(event, title, copy) => openOverlay(event, { id: `hover-summary-${title}`, title, lines: [copy] })} />
       </div>
 
       <div className="sb overflow-x-auto px-3 pb-2 pt-3">
-        <div className="mb-2 flex items-center justify-between gap-3 text-[11px]" style={{ color: C.fg1 }}>
-          <span className="text-xs font-medium" style={{ color: C.fg4 }}>Evidence map</span>
-        </div>
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -454,7 +451,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
               {criteria.map((criterion) => (
                 <th key={criterion.key} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
-                    className="absolute bottom-4 inline-flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition hover:bg-white/[0.04]"
+                    className="absolute bottom-4 inline-flex items-center gap-1 whitespace-nowrap rounded px-1 py-0.5 text-left text-[10px] transition "
                     style={{ color: C.fg3, left: '50%', transform: 'rotate(-60deg)', transformOrigin: 'left bottom' }}
                     onMouseEnter={(event) => openOverlay(event, {
                       id: `hover-criterion-${criterion.key}`,
@@ -481,7 +478,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.revision} style={{ borderBottom: '1px solid rgba(255,255,255,0.035)' }}>
+              <tr key={row.revision} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                 <td className="sticky left-0 z-10 w-32 px-2 py-2 align-middle" style={{ background: C.surface }}>
                   <span className="num block text-left text-[11px] font-medium leading-none" style={{ color: C.fg3 }}>
                     revision {row.revision}

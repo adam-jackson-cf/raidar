@@ -84,7 +84,7 @@ export function WireframeBarChart({
           const ty = PAD.top + (1 - tick) * (HEIGHT - PAD.top - PAD.bottom);
           return (
             <g key={tick}>
-              <line x1={PAD.left} x2={chartWidth - PAD.right} y1={ty} y2={ty} stroke="rgba(255,255,255,0.05)" />
+              <line x1={PAD.left} x2={chartWidth - PAD.right} y1={ty} y2={ty} stroke={C.rowBorder} />
               <text x={PAD.left - 6} y={ty + 3} textAnchor="end" fontSize="8" fill={C.fg0}>
                 {tokenTickLabel(maxTokenAmount * tick)}
               </text>
@@ -93,7 +93,7 @@ export function WireframeBarChart({
         })}
         {orderedRuns.map((run, index) => {
           const tx = tokenGroupX(index);
-          return <line key={`${run.id}-grid`} x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke="rgba(255,255,255,0.04)" />;
+          return <line key={`${run.id}-grid`} x1={tx} x2={tx} y1={PAD.top} y2={HEIGHT - PAD.bottom} stroke={C.rowBorder} />;
         })}
         <text x={(chartWidth - PAD.right + PAD.left) / 2} y={HEIGHT - 4} textAnchor="middle" fontSize="8" fill={C.fg0}>
           Agent (outcome &gt;)
@@ -156,7 +156,7 @@ export function WireframeBarChart({
                 onMouseMove={(event) => onOpenTooltip(outcomePayload(run, event.clientX, event.clientY))}
                 onMouseLeave={onCloseTooltip}
               >
-                <circle cx={centerX} cy={ringY} r={ringRadius} strokeWidth={ringStroke} fill="none" stroke="rgba(255,255,255,0.16)" />
+                <circle cx={centerX} cy={ringY} r={ringRadius} strokeWidth={ringStroke} fill="none" stroke={C.ringTrack} />
                 <circle
                   cx={centerX}
                   cy={ringY}

@@ -79,7 +79,7 @@ function ScoreRing({ score }: { score: number }) {
   return (
     <span
       className="inline-flex size-4 shrink-0 rounded-full"
-      style={{ background: `conic-gradient(${color} ${normalized * 360}deg, rgba(255,255,255,0.16) 0deg)` }}
+      style={{ background: `conic-gradient(${color} ${normalized * 360}deg, ${C.ringTrack} 0deg)` }}
       aria-label="Score"
     >
       <span className="m-[3px] flex-1 rounded-full" style={{ background: C.surface }} />
@@ -111,7 +111,7 @@ export function WireframeScorecardPanel({
       {open && (
         <div className="grid gap-2 lg:grid-cols-2 xl:grid-cols-3">
           {scorers.map((scorer) => (
-            <div key={scorer.scorerId} className="rounded-md px-1.5 py-2" style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${C.border}` }}>
+            <div key={scorer.scorerId} className="rounded-md px-1.5 py-2" style={{ background: C.subtle, border: `1px solid ${C.border}` }}>
               <div className="mb-1.5 flex items-center gap-2">
                 <span className="text-[11px] font-medium" style={{ color: C.fg4 }} title={scorer.scorerId}>
                   {scorerName(scorer.scorerId)}

@@ -76,7 +76,7 @@ export function SearchPanel({
           onChange={(e) => setPattern(e.target.value)}
           placeholder="Search this run's evidence — commands, file paths, error text…"
           className="num min-w-0 flex-1 rounded-md px-2 py-1 text-xs outline-none"
-          style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+          style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
         />
         <label className="flex shrink-0 items-center gap-1 text-[10px]" style={{ color: C.fg1 }}>
           <input type="checkbox" checked={regex} onChange={(e) => setRegex(e.target.checked)} />
@@ -85,7 +85,7 @@ export function SearchPanel({
         <button
           type="submit"
           className="shrink-0 rounded-md px-2 py-1 text-[11px] font-medium"
-          style={{ background: C.fg5, color: '#000' }}
+          style={{ background: C.button, color: C.buttonFg, border: `1px solid ${C.borderLight}` }}
         >
           Search
         </button>
@@ -122,7 +122,7 @@ export function SearchPanel({
                   </span>
                   <span
                     className="rounded px-1 text-[9px] uppercase tracking-wide"
-                    style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
+                    style={{ color: C.fg1, background: C.subtleStrong }}
                   >
                     {m.scope}
                   </span>

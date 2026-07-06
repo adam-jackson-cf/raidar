@@ -23,6 +23,11 @@ const SYNTHETIC_FILTER_OPTIONS: Array<{ value: SyntheticFilterValue; label: stri
   { value: 'real', label: 'not synthetic' },
 ];
 
+function truncateScenarioLabel(value: string, maxChars = 18) {
+  if (value.length <= maxChars) return value;
+  return `${value.slice(0, maxChars - 1)}…`;
+}
+
 function sortedAnnotations(annotations: Annotation[]): Annotation[] {
   return [...annotations].sort(
     (a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind] || a.created_at - b.created_at,
@@ -172,10 +177,10 @@ function WireframeRunList({
 
   return (
     <aside
-      className="flex h-full min-h-0 w-80 shrink-0 flex-col gap-2 border-r p-2"
+      className="flex h-full min-h-0 w-64 shrink-0 flex-col gap-2 border-r p-2"
       style={{ borderColor: C.border, background: C.surface }}
     >
-      <div className="flex items-center gap-2 rounded border px-2 py-1" style={{ borderColor: C.border, background: 'rgba(0,0,0,0.35)' }}>
+      <div className="flex items-center gap-2 rounded border px-2 py-1" style={{ borderColor: C.border, background: C.inputSoft }}>
           <Search className="size-3.5 shrink-0" style={{ color: C.fg0 }} />
           <div className="relative min-w-0 flex-1">
             {scenarioSearch && suggestionSuffix ? (
@@ -202,7 +207,7 @@ function WireframeRunList({
             <button
               type="button"
               className="inline-flex size-6 items-center justify-center rounded-md border transition hover:bg-white/5"
-              style={{ borderColor: filterOpen ? C.selectedBorder : C.border, color: filterOpen ? C.fg4 : C.fg2, background: filterOpen ? 'rgba(255,255,255,0.05)' : 'transparent' }}
+              style={{ borderColor: filterOpen ? C.selectedBorder : C.border, color: filterOpen ? C.fg4 : C.fg2, background: filterOpen ? C.subtleStrong : 'transparent' }}
               aria-label="Filter runs"
               title="Filter runs"
               onClick={() => setFilterOpen((open) => !open)}
@@ -212,7 +217,7 @@ function WireframeRunList({
             {filterOpen ? (
               <div
                 className="absolute left-auto right-0 top-full z-30 mt-1 w-64 rounded-md border p-2 text-[10px] shadow-xl"
-                style={{ borderColor: C.selectedBorder, background: 'rgba(0,0,0,0.94)' }}
+                style={{ borderColor: C.selectedBorder, background: C.popover }}
               >
                 <div className="grid gap-2">
                   <div>
@@ -298,7 +303,7 @@ function WireframeRunList({
           </div>
         )}
         {grouped.map((scenario) => (
-          <div key={scenario.scenario} className="flex flex-col gap-2 border-b pb-2 last:border-b-0" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div key={scenario.scenario} className="flex flex-col gap-2 border-b pb-2 last:border-b-0" style={{ borderColor: C.rowBorder }}>
             <div className="flex items-center gap-1.5 px-2 pt-1 text-xs font-semibold" style={{ color: C.fg2 }}>
               <button
                 type="button"
@@ -308,7 +313,9 @@ function WireframeRunList({
               >
                 {collapsedScenarios.has(scenario.scenario) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
               </button>
-              <span className="min-w-0 truncate">{scenario.scenario}</span>
+              <span className="min-w-0 truncate" title={scenario.scenario}>
+                {truncateScenarioLabel(scenario.scenario)}
+              </span>
               {scenario.synthetic ? (
                 <span
                   className="rounded border px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide"
@@ -405,10 +412,10 @@ function WireframeAnnotationModal({
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-end justify-end bg-black/35 p-4">
+    <div className="fixed inset-0 z-40 flex items-end justify-end p-4" style={{ background: C.overlay }}>
       <div
         className="w-full max-w-md rounded-lg border p-3 shadow-2xl"
-        style={{ background: 'rgba(12,12,13,0.98)', borderColor: C.border }}
+        style={{ background: C.surface, borderColor: C.border }}
       >
         <div className="mb-2 flex items-center gap-2">
           <MessageSquarePlus className="size-3.5" style={{ color: C.accent }} />
@@ -440,7 +447,7 @@ function WireframeAnnotationModal({
           }}
           placeholder="What did you notice?"
           className="sb min-h-[88px] w-full resize-y rounded-md px-2 py-1.5 text-xs outline-none"
-          style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
+          style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
         />
         <div className="mt-2 flex items-center justify-end gap-2">
           <button
@@ -456,7 +463,7 @@ function WireframeAnnotationModal({
             onClick={save}
             disabled={pending || note.trim().length === 0}
             className="rounded-md px-2.5 py-1 text-[11px] font-medium disabled:opacity-40"
-            style={{ background: C.fg5, color: '#000', border: `1px solid ${C.fg5}` }}
+            style={{ background: C.button, color: C.buttonFg, border: `1px solid ${C.borderLight}` }}
           >
             {pending ? 'Saving...' : 'Save note'}
           </button>
@@ -523,8 +530,7 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
   const spanNameById = new Map(data.spans.map((s) => [s.id, s.name]));
 
   return (
-    <main className="min-w-0 flex-1 overflow-hidden">
-      <div className="sb flex h-full flex-col gap-3 overflow-auto p-3">
+      <div className="sb flex h-full min-h-0 flex-col gap-3 overflow-y-auto overflow-x-hidden p-3">
         <WireframeRunHeader
           run={data.run}
           onAnnotateRun={() => setAnnotationTarget(null)}
@@ -543,7 +549,7 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
             style={{ background: C.surface, border: `1px solid ${C.border}` }}
           >
             <button
-              className="mb-2 flex items-center gap-2 text-left"
+              className={`${findingsOpen ? 'mb-2' : ''} flex items-center gap-2 text-left`}
               onClick={() => setFindingsOpen((open) => !open)}
             >
               {findingsOpen ? (
@@ -569,7 +575,7 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
         )}
 
         <section
-          className="flex min-h-[420px] flex-col overflow-hidden rounded-lg"
+          className="flex min-h-[420px] flex-1 flex-col overflow-hidden rounded-lg"
           style={{ border: `1px solid ${C.border}` }}
         >
           <SearchPanel runId={runId} onSelect={(spanId) => selectSpan(spanId)} frameless />
@@ -586,11 +592,12 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
               />
             </div>
             {selectedSpan && (
-              <div className="min-h-0 lg:basis-[40%]" style={{ background: C.surface }}>
+              <div className="min-h-0 flex-1 overflow-hidden lg:basis-[40%]" style={{ background: C.surface }}>
                 <WireframeSpanDetail
                   span={selectedSpan}
                   annotations={data.annotations}
                   onAnnotate={() => setAnnotationTarget(selectedSpan)}
+                  onClose={() => selectSpan(null)}
                 />
               </div>
             )}
@@ -611,7 +618,6 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
           />
         ) : null}
       </div>
-    </main>
   );
 }
 
@@ -633,7 +639,7 @@ export function WireframeRunsPage() {
         selectedRunId={runId}
         onSelectRun={onSelectRun}
       />
-      <main className="min-h-0 min-w-0 flex-1 overflow-hidden">
+      <main className="h-full min-h-0 min-w-0 flex-1 overflow-hidden">
         {runId ? (
           <WireframeRunDetailPanel runId={runId} />
         ) : (
