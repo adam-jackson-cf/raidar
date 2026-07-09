@@ -4,6 +4,16 @@
 from tests.harbor_runtime_support import *  # noqa: F403
 
 
+def _request_for_scenario(relative_scenario: str, harness: str = "codex-cli") -> SimpleNamespace:
+    repo_root = Path(__file__).resolve().parents[2]
+    scenario_path = repo_root / relative_scenario
+    return SimpleNamespace(
+        config=SimpleNamespace(harness=SimpleNamespace(value=harness)),
+        scenario=scenario_catalog.load_scenario(scenario_path),
+        scenario_dir=scenario_path.parent,
+    )
+
+
 def test_ensure_task_image_writes_log_and_raises_on_build_failure(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -66,11 +76,13 @@ def test_task_image_reference_is_content_addressed_by_harness(
     (app_dir / "bun.lock").write_text("", encoding="utf-8")
     (tests_dir / "test.sh").write_text("echo first\n", encoding="utf-8")
 
-    request = SimpleNamespace(
-        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+    request = _request_for_scenario(
+        "scenarios/hello-world-smoke/v001/scenario.yaml",
+        harness="codex-cli",
     )
-    other_request = SimpleNamespace(
-        config=SimpleNamespace(harness=SimpleNamespace(value="gemini")),
+    other_request = _request_for_scenario(
+        "scenarios/hello-world-smoke/v001/scenario.yaml",
+        harness="gemini",
     )
 
     image_ref = runner._task_image_reference(request, bundle_path)
@@ -98,8 +110,9 @@ def test_task_image_reference_respects_reuse_disable_switch(
     (bundle_path / "environment" / "Dockerfile").write_text("FROM oven/bun:1\n", encoding="utf-8")
     (app_dir / "package.json").write_text("{}", encoding="utf-8")
 
-    request = SimpleNamespace(
-        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
+    request = _request_for_scenario(
+        "scenarios/hello-world-smoke/v001/scenario.yaml",
+        harness="codex-cli",
     )
 
     assert runner._task_image_reference(request, bundle_path) is not None
@@ -130,12 +143,19 @@ def test_task_image_build_command_uses_classic_docker_build(tmp_path: Path) -> N
 
 
 def test_render_environment_dockerfile_includes_visual_tooling_dependencies() -> None:
-    request = SimpleNamespace(
-        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
-        scenario=SimpleNamespace(visual=object()),
+    environment = runner.resolve_scenario_environment(
+        scenario=scenario_catalog.load_scenario(
+            Path(__file__).resolve().parents[2]
+            / "scenarios/homepage-implementation/v001/scenario.yaml"
+        ),
+        scenario_path=(
+            Path(__file__).resolve().parents[2]
+            / "scenarios/homepage-implementation/v001/scenario.yaml"
+        ),
+        repo_root=Path(__file__).resolve().parents[2],
     )
 
-    dockerfile = runner._render_environment_dockerfile(request)
+    dockerfile = runner._render_environment_dockerfile(environment)
 
     assert "git" in dockerfile
     assert "ripgrep" in dockerfile
@@ -180,7 +200,7 @@ def test_ensure_task_image_returns_immediately_when_image_exists(
     monkeypatch.setattr(
         runner,
         "_ensure_harbor_runtime_preflight",
-        lambda *, image_ref, run_env, log_dir: preflight_calls.append(
+        lambda *, image_ref, run_env, log_dir, **_kwargs: preflight_calls.append(
             f"{image_ref.image_name}:{log_dir.name}"
         ),
     )
@@ -209,7 +229,7 @@ def test_ensure_task_image_rebuilds_when_cached_image_fails_runtime_preflight(
 
     build_calls: list[list[str]] = []
 
-    def fake_build(build_cmd, run_env, *, timeout_sec):
+    def fake_build(build_cmd, run_env, *, timeout_sec, **_kwargs):
         del run_env, timeout_sec
         build_calls.append(build_cmd)
         return runner.TaskImageBuildResult(
@@ -220,7 +240,7 @@ def test_ensure_task_image_rebuilds_when_cached_image_fails_runtime_preflight(
 
     preflight_attempts: list[str] = []
 
-    def fake_runtime_preflight(*, image_ref, run_env, log_dir):
+    def fake_runtime_preflight(*, image_ref, run_env, log_dir, **_kwargs):
         del run_env, log_dir
         preflight_attempts.append(image_ref.image_name)
         if len(preflight_attempts) < 3:
@@ -242,7 +262,7 @@ def test_ensure_task_image_writes_log_and_raises_on_build_timeout(
     fixture = _task_image_fixture(tmp_path, "timeout")
     _patch_task_image_cache(monkeypatch, tmp_path, cache_hit=False)
 
-    def fake_build(build_cmd, run_env, *, timeout_sec):
+    def fake_build(build_cmd, run_env, *, timeout_sec, **_kwargs):
         del run_env
         return runner.TaskImageBuildResult(
             completed_process=subprocess.CompletedProcess(
@@ -321,8 +341,9 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
 
     def fake_collect_process_metrics(*args, **kwargs):
         del args, kwargs
-        raise RuntimeError(
-            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`."
+        raise runner.ProcessMetricsError(
+            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`.",
+            failure_code="missing_token_usage",
         )
 
     monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
@@ -353,9 +374,10 @@ def test_execute_harbor_phase_recovers_timeout_when_verifier_outputs_exist(
     trial_dir.mkdir(parents=True, exist_ok=True)
     harbor_result = runner.HarborExecutionResult(
         terminated_early=True,
-        termination_reason="Timeout expired after 420s before trial result.json was written.",
+        termination_reason="Harbor timed out after 420s before trial result.json was written.",
         job_dir=tmp_path / "jobs" / "orchestrator-run-01",
         trial_dir=trial_dir,
+        failure_code="harbor_timeout",
     )
 
     monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
@@ -399,8 +421,9 @@ def test_execute_harbor_phase_raises_when_usage_missing_without_termination(
 
     def fake_collect_process_metrics(*args, **kwargs):
         del args, kwargs
-        raise RuntimeError(
-            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`."
+        raise runner.ProcessMetricsError(
+            "Missing token usage metrics for harness `gemini` in trial `/tmp/trial`.",
+            failure_code="missing_token_usage",
         )
 
     monkeypatch.setattr(runner, "execute_harbor", lambda _request: harbor_result)
@@ -420,7 +443,10 @@ def test_execute_harbor_preserves_trial_dir_on_timeout(monkeypatch, tmp_path: Pa
     monkeypatch.setattr(
         runner,
         "_run_harbor_process",
-        lambda _request: "Timeout expired after 420s before trial result.json was written.",
+        lambda _request: runner.HarborProcessFailure(
+            "Harbor timed out after 420s before trial result.json was written.",
+            "harbor_timeout",
+        ),
     )
     monkeypatch.setattr(runner, "cleanup_stale_harbor_resources", lambda: None)
 

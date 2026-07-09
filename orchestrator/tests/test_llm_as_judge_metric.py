@@ -44,6 +44,23 @@ def _scenario() -> ScenarioDefinition:
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
+            "environment": {
+                "kind": "stack_preset",
+                "id": "node:20",
+                "workdir": "/app",
+                "requirements": {
+                    "runtimes": {"node": ">=20"},
+                    "package_managers": {"bun": ">=1"},
+                    "tools": {"typescript": ">=5"},
+                    "browsers": {},
+                },
+                "resources": {
+                    "cpus": 2,
+                    "memory_mb": 4096,
+                    "storage_mb": 10240,
+                },
+                "allow_internet": True,
+            },
             "starter": {"root": "starter"},
             "requirements": {
                 "items": [

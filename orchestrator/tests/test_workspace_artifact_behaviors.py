@@ -10,11 +10,21 @@ from raidar.runtime import workspace_artifacts
 from raidar.runtime.models import HarborExecutionResult
 
 
-def _visual_scenario(reference_image: str, regions: list[dict] | None = None):
+def _visual_scenario(
+    reference_image: str,
+    regions: list[dict] | None = None,
+    capture_setup_actions: list[list[str]] | None = None,
+):
     return SimpleNamespace(
         visual=SimpleNamespace(
             reference_image=reference_image,
+            capture_setup_actions=capture_setup_actions or [],
             screenshot_command=["bun", "run", "capture"],
+            artifact_manifest=SimpleNamespace(
+                actual_image="actual-test.png",
+                diff_image="diff-test.png",
+                post_capture_image="post-test.png",
+            ),
             regions=[SimpleNamespace(**region) for region in regions or []],
         )
     )
@@ -32,7 +42,23 @@ def test_visual_reference_assets_and_region_names_are_scenario_local(tmp_path):
     (reference_dir / "page-region-header.png").write_text("header", encoding="utf-8")
     (reference_dir / "page-region-footer.png").write_text("footer", encoding="utf-8")
 
-    scenario = _visual_scenario("reference/page.png")
+    scenario = _visual_scenario(
+        "reference/page.png",
+        regions=[
+            {
+                "name": "footer",
+                "reference_image": "reference/page-region-footer.png",
+                "actual_image": "actual-region-footer.png",
+                "diff_image": "diff-region-footer.png",
+            },
+            {
+                "name": "header",
+                "reference_image": "reference/page-region-header.png",
+                "actual_image": "actual-region-header.png",
+                "diff_image": "diff-region-header.png",
+            },
+        ],
+    )
     request = _request(scenario, scenario_dir)
 
     assert [
@@ -45,7 +71,17 @@ def test_visual_reference_assets_and_region_names_are_scenario_local(tmp_path):
     ]
     assert workspace_artifacts._visual_region_names(request) == ["footer", "header"]
 
-    configured = _visual_scenario("reference/page.png", regions=[{"name": "hero"}])
+    configured = _visual_scenario(
+        "reference/page.png",
+        regions=[
+            {
+                "name": "hero",
+                "reference_image": "reference/page-region-hero.png",
+                "actual_image": "actual-region-hero.png",
+                "diff_image": "diff-region-hero.png",
+            }
+        ],
+    )
     assert workspace_artifacts._visual_region_names(_request(configured, scenario_dir)) == ["hero"]
 
     absolute = _visual_scenario(str((scenario_dir / "reference" / "page.png").resolve()))
@@ -60,36 +96,36 @@ def test_visual_reference_assets_and_region_names_are_scenario_local(tmp_path):
 def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    output_path = tmp_path / "out" / "actual.png"
+    output_path = tmp_path / "out" / "actual-test.png"
+    scenario = _visual_scenario("reference/page.png")
     monkeypatch.setattr(
-        workspace_artifacts, "_ensure_workspace_capture_dependencies", lambda _w: None
+        workspace_artifacts, "_ensure_workspace_capture_dependencies", lambda *_args: None
     )
 
     def successful_run(*_args, **_kwargs):
-        (workspace / "actual.png").write_text("png", encoding="utf-8")
+        (workspace / "actual-test.png").write_text("png", encoding="utf-8")
         return subprocess.CompletedProcess(["capture"], 0, stdout="ok", stderr="")
 
     monkeypatch.setattr(workspace_artifacts.subprocess, "run", successful_run)
     actual, error = workspace_artifacts._run_homepage_capture_command(
-        ["bun", "run", "capture"], workspace, output_path
+        scenario, ["bun", "run", "capture"], workspace, output_path
     )
     assert actual == output_path
     assert error is None
     assert output_path.read_text(encoding="utf-8") == "png"
-    assert not (workspace / "actual.png").exists()
+    assert not (workspace / "actual-test.png").exists()
 
     monkeypatch.setattr(
         workspace_artifacts,
         "_ensure_workspace_capture_dependencies",
-        lambda _w: "dependency failure",
+        lambda *_args: "dependency failure",
     )
-    assert workspace_artifacts._run_homepage_capture_command(["cmd"], workspace, output_path) == (
-        None,
-        "dependency failure",
-    )
+    assert workspace_artifacts._run_homepage_capture_command(
+        scenario, ["cmd"], workspace, output_path
+    ) == (None, "dependency failure")
 
     monkeypatch.setattr(
-        workspace_artifacts, "_ensure_workspace_capture_dependencies", lambda _w: None
+        workspace_artifacts, "_ensure_workspace_capture_dependencies", lambda *_args: None
     )
     monkeypatch.setattr(
         workspace_artifacts.subprocess,
@@ -101,7 +137,7 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     assert (
         "`bun run capture` exited 3: out\nerr"
         in workspace_artifacts._run_homepage_capture_command(
-            ["bun", "run", "capture"], workspace, output_path
+            scenario, ["bun", "run", "capture"], workspace, output_path
         )[1]
     )
 
@@ -112,7 +148,9 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     )
     assert (
         "completed without producing"
-        in workspace_artifacts._run_homepage_capture_command(["capture"], workspace, output_path)[1]
+        in workspace_artifacts._run_homepage_capture_command(
+            scenario, ["capture"], workspace, output_path
+        )[1]
     )
 
     def missing_command(*_args, **_kwargs):
@@ -121,23 +159,22 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     monkeypatch.setattr(workspace_artifacts.subprocess, "run", missing_command)
     assert (
         "missing"
-        in workspace_artifacts._run_homepage_capture_command(["missing"], workspace, output_path)[1]
+        in workspace_artifacts._run_homepage_capture_command(
+            scenario, ["missing"], workspace, output_path
+        )[1]
     )
 
 
 def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypatch, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    assert workspace_artifacts._ensure_workspace_capture_dependencies(workspace) is None
+    no_setup = _visual_scenario("reference/page.png")
+    assert workspace_artifacts._ensure_workspace_capture_dependencies(no_setup, workspace) is None
 
-    (workspace / "package.json").write_text("{}", encoding="utf-8")
-    (workspace / "bun.lock").write_text("", encoding="utf-8")
-    next_package = workspace / "node_modules" / "next" / "package.json"
-    next_package.parent.mkdir(parents=True)
-    next_package.write_text("{}", encoding="utf-8")
-    assert workspace_artifacts._ensure_workspace_capture_dependencies(workspace) is None
-
-    next_package.unlink()
+    setup_scenario = _visual_scenario(
+        "reference/page.png",
+        capture_setup_actions=[["bun", "install", "--frozen-lockfile"]],
+    )
     monkeypatch.setattr(
         workspace_artifacts.subprocess,
         "run",
@@ -145,7 +182,10 @@ def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypa
             ["bun"], 0, stdout="installed", stderr=""
         ),
     )
-    assert workspace_artifacts._ensure_workspace_capture_dependencies(workspace) is None
+    assert (
+        workspace_artifacts._ensure_workspace_capture_dependencies(setup_scenario, workspace)
+        is None
+    )
 
     monkeypatch.setattr(
         workspace_artifacts.subprocess,
@@ -154,16 +194,16 @@ def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypa
             ["bun"], 1, stdout="out", stderr="err"
         ),
     )
-    assert "exited 1: out\nerr" in workspace_artifacts._ensure_workspace_capture_dependencies(
-        workspace
+    assert "exited 1: out\nerr" in (
+        workspace_artifacts._ensure_workspace_capture_dependencies(setup_scenario, workspace)
     )
 
     def timeout(*_args, **_kwargs):
         raise subprocess.TimeoutExpired(["bun"], timeout=1)
 
     monkeypatch.setattr(workspace_artifacts.subprocess, "run", timeout)
-    assert "Failed to install workspace dependencies" in (
-        workspace_artifacts._ensure_workspace_capture_dependencies(workspace)
+    assert "Failed to run visual capture setup" in (
+        workspace_artifacts._ensure_workspace_capture_dependencies(setup_scenario, workspace)
     )
 
 
@@ -204,7 +244,9 @@ def test_hydrate_workspace_reports_missing_trial_archive_and_extract_errors(monk
         job_dir=tmp_path / "job",
         trial_dir=None,
     )
-    assert workspace_artifacts._hydrate_workspace_from_final_app(result, workspace) == (
+    assert workspace_artifacts._hydrate_workspace_from_final_app(
+        result, workspace, harness="codex-cli"
+    ) == (
         None,
         "Harbor trial directory missing; cannot hydrate post-run workspace.",
     )
@@ -213,7 +255,9 @@ def test_hydrate_workspace_reports_missing_trial_archive_and_extract_errors(monk
     result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
     assert (
         "Missing final app archive"
-        in workspace_artifacts._hydrate_workspace_from_final_app(result, workspace)[1]
+        in workspace_artifacts._hydrate_workspace_from_final_app(
+            result, workspace, harness="codex-cli"
+        )[1]
     )
 
     archive = trial_dir / "agent" / "final-app.tar.gz"
@@ -221,11 +265,15 @@ def test_hydrate_workspace_reports_missing_trial_archive_and_extract_errors(monk
     archive.write_text("not a tarball", encoding="utf-8")
     assert (
         "Failed to hydrate workspace"
-        in workspace_artifacts._hydrate_workspace_from_final_app(result, workspace)[1]
+        in workspace_artifacts._hydrate_workspace_from_final_app(
+            result, workspace, harness="codex-cli"
+        )[1]
     )
 
     monkeypatch.setattr(workspace_artifacts, "_safe_extract_tarball", lambda _a, _w: None)
-    assert workspace_artifacts._hydrate_workspace_from_final_app(result, workspace) == (
+    assert workspace_artifacts._hydrate_workspace_from_final_app(
+        result, workspace, harness="codex-cli"
+    ) == (
         archive,
         None,
     )

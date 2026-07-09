@@ -11,6 +11,7 @@ REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 	UV_CACHE_DIR="$(REPO_UV_CACHE_DIR)"
 
 RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
+RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
 # Shared public workflow defaults.
 SCENARIO ?=
@@ -56,7 +57,7 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 
 .PHONY: help \
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
-	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
+	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
 	benchmark-fixture-synthetic \
@@ -98,6 +99,8 @@ help:
 	@echo "  make smoke-matrix                                      Run the default hello-world smoke scenario across the smoke trio matrix"
 	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5]"
 	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
+	@echo "  make runtime-stack-scenario-smoke SCENARIO=... HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5"
+	@echo "                                                        Run cold+warm scenario smoke and validate persisted runtime stack metadata"
 	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... PROVIDER=... MODEL=..."
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
 	@echo "  make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml"
@@ -131,7 +134,7 @@ review-surface-test: benchmark-fixture-synthetic review-surface-data
 		&& npx playwright install chromium && npm test
 
 env-setup:
-	@$(RAIDAR) env setup
+	@$(RAIDAR_DEV) env setup --sync-arg --extra --sync-arg dev
 
 harness-list:
 	@$(RAIDAR) harness list
@@ -245,6 +248,43 @@ agent-smoke: docker-check
 		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 
+runtime-stack-scenario-smoke: docker-check
+	$(call require_var,SCENARIO)
+	$(call require_var,HARNESS)
+	$(call require_var,PROVIDER)
+	$(call require_var,MODEL)
+	@echo "runtime-stack warm-up: $(SCENARIO)"
+	@$(MAKE) --no-print-directory experiment-run \
+		SCENARIO="$(SCENARIO)" \
+		HARNESS="$(HARNESS)" \
+		PROVIDER="$(PROVIDER)" \
+		MODEL="$(MODEL)" \
+		$(if $(REASONING_EFFORT),REASONING_EFFORT="$(REASONING_EFFORT)",) \
+		RUN_COUNT="1" \
+		RUN_PARALLELISM="1" \
+		RERUN_UNSCORED="0" \
+		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
+		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
+	@echo "runtime-stack measured warm run: $(SCENARIO)"
+	@$(MAKE) --no-print-directory experiment-run \
+		SCENARIO="$(SCENARIO)" \
+		HARNESS="$(HARNESS)" \
+		PROVIDER="$(PROVIDER)" \
+		MODEL="$(MODEL)" \
+		$(if $(REASONING_EFFORT),REASONING_EFFORT="$(REASONING_EFFORT)",) \
+		RUN_COUNT="1" \
+		RUN_PARALLELISM="1" \
+		RERUN_UNSCORED="0" \
+		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
+		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
+	@$(REPO_RUNTIME_ENV) python3 scripts/validate-runtime-stack-smoke.py \
+		--scenario "$(SCENARIO)" \
+		--harness "$(HARNESS)" \
+		--provider "$(PROVIDER)" \
+		--model "$(MODEL)" \
+		--experiments-root "$(CURDIR)/experiments" \
+		--experiment-kind "$(EXPERIMENT_KIND)"
+
 experiment-run:
 	$(call require_var,SCENARIO)
 	$(call require_var,HARNESS)
@@ -284,5 +324,5 @@ experiments-prune:
 
 quality:
 	@$(MAKE) --no-print-directory smoke-dry-run-check
-	@$(RAIDAR) quality gates
+	@$(RAIDAR_DEV) quality gates
 	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src

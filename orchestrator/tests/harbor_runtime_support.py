@@ -21,6 +21,7 @@ execution_phase = importlib.import_module("raidar.runtime.execution_phase")
 harbor_cleanup = importlib.import_module("raidar.runtime.harbor_cleanup")
 harbor_env = importlib.import_module("raidar.runtime.harbor_env")
 harbor_execution = importlib.import_module("raidar.runtime.harbor_execution")
+runtime_environments = importlib.import_module("raidar.runtime.environments")
 harbor_preflight = importlib.import_module("raidar.runtime.harbor_preflight")
 harbor_results = importlib.import_module("raidar.runtime.harbor_results")
 pipeline = importlib.import_module("raidar.runtime.pipeline")
@@ -47,6 +48,7 @@ class _RuntimeProxy:
         starter_preflight,
         task_bundle,
         task_images,
+        runtime_environments,
         pipeline,
         workspace,
         workspace_cache,
@@ -230,31 +232,38 @@ def _patch_prepare_workspace_dependencies(
     monkeypatch.setattr(runner, "_maybe_run_cache_maintenance", lambda **_kwargs: None)
     monkeypatch.setattr(
         runner,
-        "_run_starter_preflight_install",
-        lambda workspace, env: state.preflight_calls.append(f"install:{workspace.name}"),
+        "_run_workspace_setup_actions",
+        lambda *, workspace, env, setup_actions, timeout_sec: state.preflight_calls.append(
+            f"setup:{workspace.name}:{timeout_sec}:{len(setup_actions)}"
+        ),
     )
     monkeypatch.setattr(
         runner,
         "_run_starter_preflight_command",
-        lambda workspace, env, command: state.preflight_calls.append(
+        lambda workspace, env, command, **_kwargs: state.preflight_calls.append(
             f"{workspace.name}:{' '.join(command)}"
         ),
     )
     monkeypatch.setattr(
         runner,
         "_inspect_docker_image_labels",
-        lambda image_name, run_env: state.built_images.get(image_name),
+        lambda image_name, run_env, **_kwargs: state.built_images.get(image_name),
     )
     monkeypatch.setattr(
         runner,
         "_ensure_harbor_runtime_preflight",
-        lambda *, image_ref, run_env, log_dir: state.runtime_preflight_calls.append(
+        lambda *, image_ref, run_env, log_dir, **_kwargs: state.runtime_preflight_calls.append(
             image_ref.image_name
         ),
     )
+    monkeypatch.setattr(
+        runner,
+        "_ensure_task_image_capability_preflight",
+        lambda **_kwargs: {"schema_version": "test", "results": {}},
+    )
 
     def fake_run_task_image_build(
-        build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int
+        build_cmd: list[str], run_env: dict[str, str], *, timeout_sec: int, **_kwargs
     ):
         del run_env, timeout_sec
         image_name = build_cmd[build_cmd.index("--tag") + 1]
@@ -279,7 +288,13 @@ def _starter_preflight_request(tmp_path: Path):
     )
     return SimpleNamespace(
         scenario=SimpleNamespace(
-            verification=SimpleNamespace(required_commands=[["bun", "run", "lint"]])
+            verification=SimpleNamespace(
+                setup_actions=[["bun", "install", "--frozen-lockfile"]],
+                required_commands=[["bun", "run", "lint"]],
+                preflight_command_timeout_sec=None,
+                test_discovery_globs=[],
+                skip_test_commands_when_no_tests=False,
+            )
         ),
         config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
         scenario_dir=task_dir,
@@ -289,6 +304,7 @@ def _starter_preflight_request(tmp_path: Path):
 def _starter_preflight_context(tmp_path: Path, name: str):
     workspace = tmp_path / name
     workspace.mkdir(parents=True, exist_ok=True)
+    (workspace / "package.json").write_text("{}", encoding="utf-8")
     return SimpleNamespace(
         workspace=workspace,
         baseline_cache_key="baseline-cache-key",
@@ -303,7 +319,7 @@ def _patch_starter_preflight_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
     )
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
-    monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: True)
+    monkeypatch.setattr(runner, "_workspace_has_tests", lambda *_args: True)
 
 
 def _task_image_fixture(tmp_path: Path, tag_suffix: str = "cachekey") -> TaskImageFixture:
@@ -373,6 +389,23 @@ def _prepare_workspace_scenario_yaml() -> str:
             "difficulty: easy",
             "category: greenfield-ui",
             "timeout_sec: 1800",
+            "environment:",
+            "  kind: stack_preset",
+            "  id: node:20",
+            "  workdir: /app",
+            "  requirements:",
+            "    runtimes:",
+            '      node: ">=20"',
+            "    package_managers:",
+            '      bun: ">=1"',
+            "    tools:",
+            '      typescript: ">=5"',
+            "    browsers: {}",
+            "  resources:",
+            "    cpus: 2",
+            "    memory_mb: 4096",
+            "    storage_mb: 10240",
+            "  allow_internet: true",
             "starter:",
             "  root: starter",
             "verification:",
@@ -433,11 +466,15 @@ def _assert_prepare_workspace_cache_reuse(
     assert phase_two.cache_metadata["image"]["hit"] is True
     assert (phase_one.layout.harbor_dir / "task-image-build.log").exists()
     assert not (phase_two.layout.harbor_dir / "task-image-build.log").exists()
-    assert len(patch_state.preflight_calls) == 2
-    install_name = patch_state.preflight_calls[0].removeprefix("install:")
-    command_name, command_text = patch_state.preflight_calls[1].split(":", 1)
-    assert install_name
-    assert install_name == command_name
+    assert len(patch_state.preflight_calls) == 3
+    baseline_setup = patch_state.preflight_calls[0]
+    preflight_setup = patch_state.preflight_calls[1]
+    command_name, command_text = patch_state.preflight_calls[2].split(":", 1)
+    assert baseline_setup.startswith("setup:workspace:60:")
+    assert preflight_setup.startswith("setup:")
+    preflight_name = preflight_setup.split(":", 3)[1]
+    assert preflight_name
+    assert preflight_name == command_name
     assert command_text == "bun run lint"
     assert phase_one.cache_metadata["image_key"] == phase_two.cache_metadata["image_key"]
     assert phase_one.cache_metadata["image_tag"] == phase_two.cache_metadata["image_tag"]

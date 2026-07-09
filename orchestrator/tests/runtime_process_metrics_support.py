@@ -14,8 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.harness.command_records import _normalized_shell_subcommands
 from raidar.runtime import process_metrics as process_metrics_runtime
-from raidar.runtime.command_records import _normalized_shell_subcommands
 from raidar.runtime.process_metrics import collect_process_metrics
 from raidar.schemas.events import GateEvent
 from raidar.schemas.scenario import (

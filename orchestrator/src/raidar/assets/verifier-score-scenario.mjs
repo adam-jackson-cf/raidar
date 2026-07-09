@@ -7,23 +7,6 @@ const APP_DIR = process.env.RAIDAR_APP_DIR || "/app";
 const LOG_DIR = process.env.RAIDAR_LOG_DIR || "/logs/verifier";
 const VISUAL_CONFIG_PATH = path.join(APP_DIR, ".raidar-visual-config.json");
 const ODIFF_TOLERANCE = "0.03";
-const DEFAULT_VISUAL_REGIONS = [
-  {
-    name: "hero",
-    weight: 0.35,
-    clip: { x: 0, y: 0, width: 1440, height: 320 },
-  },
-  {
-    name: "features",
-    weight: 0.45,
-    clip: { x: 0, y: 320, width: 1440, height: 420 },
-  },
-  {
-    name: "footer",
-    weight: 0.2,
-    clip: { x: 0, y: 740, width: 1440, height: 160 },
-  },
-];
 
 function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
@@ -180,14 +163,17 @@ function visualPassPolicyOutcome({
 }
 
 function resolveVisualRegions(visualSpec) {
-  const configuredRegions =
-    Array.isArray(visualSpec?.regions) && visualSpec.regions.length > 0
-      ? visualSpec.regions
-      : DEFAULT_VISUAL_REGIONS;
+  const configuredRegions = Array.isArray(visualSpec?.regions) ? visualSpec.regions : [];
   const validRegions = configuredRegions.filter(
     (region) =>
       typeof region?.name === "string" &&
       region.name.length > 0 &&
+      typeof region?.reference_image === "string" &&
+      region.reference_image.length > 0 &&
+      typeof region?.actual_image === "string" &&
+      region.actual_image.length > 0 &&
+      typeof region?.diff_image === "string" &&
+      region.diff_image.length > 0 &&
       typeof region?.weight === "number" &&
       region.weight > 0,
   );
@@ -928,16 +914,21 @@ function main() {
 
   let visual = null;
   if (scenarioSpec.visual) {
+    const visualArtifacts = scenarioSpec.visual.artifacts;
+    if (!visualArtifacts) {
+      throw new Error("scenarioSpec.visual.artifacts is required");
+    }
     writeJson(VISUAL_CONFIG_PATH, {
       viewport: scenarioSpec.visual.viewport || null,
       regions: scenarioSpec.visual.regions || [],
       scoring: scenarioSpec.visual.scoring || null,
       pass_policy: scenarioSpec.visual.pass_policy || null,
       reference_image: scenarioSpec.visual.reference_image || null,
+      artifacts: visualArtifacts,
     });
     const screenshot = runCommand(scenarioSpec.visual.screenshot_command || []);
-    const actualPath = path.join(APP_DIR, "actual.png");
-    const diffPath = path.join(APP_DIR, "diff.png");
+    const actualPath = path.join(APP_DIR, visualArtifacts.actual);
+    const diffPath = path.join(APP_DIR, visualArtifacts.diff);
     const referencePath = path.isAbsolute(scenarioSpec.visual.reference_image)
       ? scenarioSpec.visual.reference_image
       : path.join(APP_DIR, scenarioSpec.visual.reference_image);
@@ -970,23 +961,20 @@ function main() {
         globalSimilarity = globalCompare.similarity;
         diffOutput = globalCompare.diff_path;
 
-        const referenceExt = path.extname(referencePath);
-        const referenceStem = path.basename(referencePath, referenceExt);
-        const referenceDir = path.dirname(referencePath);
         let weightedRegionalSum = 0;
 
         for (const region of visualRegions) {
           const actualRegionPath = path.join(
             APP_DIR,
-            `actual-region-${region.name}.png`,
+            region.actual_image,
           );
           const referenceRegionPath = path.join(
-            referenceDir,
-            `${referenceStem}-region-${region.name}${referenceExt}`,
+            APP_DIR,
+            region.reference_image,
           );
           const regionDiffPath = path.join(
             APP_DIR,
-            `diff-region-${region.name}.png`,
+            region.diff_image,
           );
           if (
             !fs.existsSync(actualRegionPath) ||

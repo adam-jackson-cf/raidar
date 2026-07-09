@@ -295,13 +295,47 @@ def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
         starter=SimpleNamespace(root="starter"),
         prompt=SimpleNamespace(entry="prompt.md"),
         verification=SimpleNamespace(required_commands=[1], gates=[1, 2]),
+        environment=SimpleNamespace(
+            id="node:20",
+        ),
         scorers=[1, 2, 3],
         metric_ids=lambda: ["functional"],
     )
     monkeypatch.setattr(
         scenario,
+        "resolve_scenario_environment",
+        lambda **_kwargs: SimpleNamespace(
+            id="node:20",
+            image="raidar/node:20-bun",
+            workdir="/app",
+            dockerfile_path=tmp_path / "environments/node/20-bun/Dockerfile",
+            requirements=SimpleNamespace(
+                model_dump=lambda **_kwargs: {"runtimes": {"node": ">=20"}}
+            ),
+            library=SimpleNamespace(
+                verifier=SimpleNamespace(runner="bun"),
+                capabilities=SimpleNamespace(
+                    model_dump=lambda **_kwargs: {
+                        "runtimes": {"node": ">=20"},
+                        "package_managers": {"bun": ">=1"},
+                        "tools": {"typescript": ">=5"},
+                        "browsers": {},
+                    }
+                ),
+            ),
+        ),
+    )
+    monkeypatch.setattr(
+        scenario,
         "_service_validate_scenario",
-        lambda _path: SimpleNamespace(scenario=validate_scenario),
+        lambda _path: SimpleNamespace(
+            scenario=validate_scenario,
+            scenario_path=scenario_path,
+            environment=SimpleNamespace(
+                id="node:20",
+                image="raidar/node:20-bun",
+            ),
+        ),
     )
     result = runner.invoke(scenario.scenario_validate, ["--scenario", str(scenario_path)])
     assert result.exit_code == 0

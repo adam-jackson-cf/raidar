@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from raidar.harness.definitions import harness_definition
 from raidar.runtime.harbor_results import _load_json_dict
 from raidar.runtime.harness_logs import _as_int, _read_jsonl_dicts
 
@@ -138,12 +139,14 @@ def _usage_tuple_for_harness(trial_dir: Path, harness: str) -> tuple[int, int, i
     trial_usage = _usage_from_trial_result(trial_dir)
     if trial_usage:
         return trial_usage
-    if harness == "codex-cli":
+    definition = harness_definition(harness)
+    parser = definition.usage_policy.parser
+    if parser == "codex-jsonl":
         return _usage_from_codex_log(trial_dir)
-    if harness == "claude-code":
+    if parser == "claude-jsonl":
         return _usage_from_claude_log(trial_dir)
-    if harness == "gemini":
+    if parser == "gemini-trajectory":
         return _usage_from_gemini_trajectory(trial_dir)
-    if harness in {"cursor", "copilot", "pi"}:
+    if not definition.usage_policy.supported:
         return None
-    raise ValueError(f"Unsupported harness for usage extraction: {harness}")
+    raise ValueError(f"Unsupported usage parser for harness {harness}: {parser}")

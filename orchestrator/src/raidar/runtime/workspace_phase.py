@@ -30,6 +30,8 @@ _ensure_task_image = task_images._ensure_task_image
 _harbor_process_timeout = harbor_execution._harbor_process_timeout
 _maybe_run_cache_maintenance = task_images._maybe_run_cache_maintenance
 _resolve_homepage_screenshot_command = workspace_artifacts._resolve_homepage_screenshot_command
+_resolve_contract = task_bundle._resolve_contract
+_task_image_capability_inputs = task_bundle._task_image_capability_inputs
 _task_image_reference = task_bundle._task_image_reference
 cleanup_stale_harbor_resources = harbor_cleanup.cleanup_stale_harbor_resources
 create_harbor_task_bundle = task_bundle.create_harbor_task_bundle
@@ -42,6 +44,7 @@ prepare_run_context = workspace.prepare_run_context
 class _WorkspacePrepStart:
     request: RunRequest
     adapter: Any
+    contract: Any
     layout: RunLayout
     timings: dict[str, float]
     cache_metadata: dict[str, object]
@@ -52,6 +55,7 @@ class _WorkspacePrepStart:
 class _BaselinePrep:
     request: RunRequest
     adapter: Any
+    contract: Any
     layout: RunLayout
     context: WorkspaceContext
     timings: dict[str, float]
@@ -63,6 +67,7 @@ class _BaselinePrep:
 class _BundlePrep:
     request: RunRequest
     adapter: Any
+    contract: Any
     layout: RunLayout
     context: WorkspaceContext
     timings: dict[str, float]
@@ -89,6 +94,7 @@ def _initial_cache_metadata() -> dict[str, object]:
         "image": {"hit": None},
         "image_key": None,
         "image_tag": None,
+        "contract": {"id": None, "hash": None, "cache_payload": None},
     }
 
 
@@ -111,9 +117,11 @@ def _with_cache_entry(
 def _prepare_workspace_start(request: RunRequest) -> _WorkspacePrepStart:
     adapter = resolve_adapter(request.config)
     adapter.validate()
+    contract = _resolve_contract(request)
     return _WorkspacePrepStart(
         request=request,
         adapter=adapter,
+        contract=contract,
         layout=initialize_run(request),
         timings={},
         cache_metadata=_initial_cache_metadata(),
@@ -142,6 +150,7 @@ def _prepare_baseline_context(start: _WorkspacePrepStart) -> _BaselinePrep:
     return _BaselinePrep(
         request=start.request,
         adapter=start.adapter,
+        contract=start.contract,
         layout=start.layout,
         context=context,
         timings=timings,
@@ -183,11 +192,13 @@ def _prepare_harbor_bundle(
         prep.request,
         prep.context,
         bundle_root=prep.layout.harbor_dir / "bundle",
+        contract=prep.contract,
     )
     timings = _with_timing(prep.timings, "create_harbor_task_bundle", phase_started)
     return _BundlePrep(
         request=prep.request,
         adapter=prep.adapter,
+        contract=prep.contract,
         layout=prep.layout,
         context=prep.context,
         timings=timings,
@@ -196,19 +207,29 @@ def _prepare_harbor_bundle(
         screenshot_command=screenshot_command,
         evidence_errors=evidence_errors,
         harbor_task_bundle=harbor_task_bundle,
-        run_env=_build_harbor_run_env(prep.adapter),
+        run_env=_build_harbor_run_env(prep.adapter, prep.contract.runtime_profile),
     )
 
 
 def _prepare_task_image(prep: _BundlePrep) -> _BundlePrep:
     cache_metadata = dict(prep.cache_metadata)
-    image_ref = _task_image_reference(prep.request, prep.harbor_task_bundle)
+    cache_metadata["contract"] = {
+        "id": prep.contract.id,
+        "hash": prep.contract.contract_hash,
+        "cache_payload": prep.contract.cache_payload,
+    }
+    image_ref = _task_image_reference(prep.request, prep.harbor_task_bundle, prep.contract)
+    provided_capabilities, required_capabilities = _task_image_capability_inputs(
+        prep.request,
+        prep.contract,
+    )
     if image_ref:
         cache_metadata["image_key"] = image_ref.cache_key
         cache_metadata["image_tag"] = image_ref.tag
     _maybe_run_cache_maintenance(
         run_env=prep.run_env,
         active_image_name=image_ref.image_name if image_ref else None,
+        runtime_profile=prep.contract.runtime_profile,
     )
 
     phase_started = time.perf_counter()
@@ -222,6 +243,9 @@ def _prepare_task_image(prep: _BundlePrep) -> _BundlePrep:
                 run_env=prep.run_env,
                 log_dir=prep.layout.harbor_dir,
                 task_timeout_sec=prep.request.config.timeout_sec,
+                provided_capabilities=provided_capabilities,
+                required_capabilities=required_capabilities,
+                runtime_profile=prep.contract.runtime_profile,
             )
         )
     timings = _with_timing(prep.timings, "_ensure_task_image", phase_started)
@@ -250,6 +274,7 @@ def _workspace_preparation_result(prep: _BundlePrep) -> WorkspacePreparationPhas
         harbor_request=_harbor_request(prep),
         prep_phase_timings_sec=prep.timings,
         prep_total_sec=prep_total_sec,
+        time_to_experiment_start_sec=prep_total_sec,
         cache_metadata=prep.cache_metadata,
         auth_metadata=prep.adapter.execution_metadata(),
         screenshot_command=tuple(prep.screenshot_command) if prep.screenshot_command else None,

@@ -15,8 +15,9 @@ from pathlib import Path
 from typing import Any
 
 from raidar.agents.config import Harness
-from raidar.agents.rules import SYSTEM_RULES
+from raidar.agents.rules import rule_filename_for_harness
 from raidar.audit.workspace_diff import directory_fingerprint
+from raidar.config import settings
 from raidar.runtime.models import BaselineWorkspaceCacheResult, RunRequest
 from raidar.runtime.wait import wait_for_cache_lock_retry
 from raidar.schemas.scenario import ScenarioDefinition
@@ -95,7 +96,7 @@ def _hash_json_payload(payload: dict[str, Any]) -> str:
 
 
 def _effective_rule_source(request: RunRequest) -> Path | None:
-    injected_rule_name = SYSTEM_RULES.get(request.config.harness)
+    injected_rule_name = rule_filename_for_harness(request.config.harness)
     if not injected_rule_name:
         return None
     candidate = request.scenario_dir / "rules" / injected_rule_name
@@ -290,6 +291,7 @@ def _create_baseline_workspace(
         workspace=request.baseline_workspace_dir,
         env=_workspace_runtime_env(request.baseline_workspace_dir, os.environ.copy()),
         setup_actions=request.scenario.verification.setup_actions,
+        timeout_sec=_baseline_setup_action_timeout(request),
     )
     baseline_fingerprint = directory_fingerprint(request.baseline_workspace_dir)
     _write_baseline_workspace_metadata(request, metadata_path, baseline_fingerprint)
@@ -299,6 +301,13 @@ def _create_baseline_workspace(
         baseline_fingerprint=baseline_fingerprint,
         hit=False,
         status="invalidated" if invalidated else "miss",
+    )
+
+
+def _baseline_setup_action_timeout(request: BaselineWorkspaceRequest) -> int:
+    return (
+        request.scenario.verification.preflight_command_timeout_sec
+        or settings.timeouts.command_default
     )
 
 

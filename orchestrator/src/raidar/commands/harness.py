@@ -9,13 +9,13 @@ import click
 from raidar.agents.adapters.base import resolve_cli_executable
 from raidar.agents.adapters.factory import adapter_class_for_harness, resolve_adapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
-from raidar.agents.rules import SYSTEM_RULES
 from raidar.codex_auth import (
     CODEX_AUTH_MODE_ENV,
     codex_auth_json_path,
     has_file_backed_codex_auth,
 )
 from raidar.commands.shared import HARNESS_CHOICES
+from raidar.harness import harness_definition
 
 
 def register(main: click.Group) -> None:
@@ -33,9 +33,8 @@ def harness_list() -> None:
     click.echo("Supported harnesses:")
     for harness_name in Harness:
         adapter_class = adapter_class_for_harness(harness_name)
-        click.echo(
-            f"  {harness_name.value:12} -> {SYSTEM_RULES.get(harness_name, '(no rule mapping)')}"
-        )
+        rule_filename = harness_definition(harness_name.value).rule_filename or "(no rule mapping)"
+        click.echo(f"  {harness_name.value:12} -> {rule_filename}")
         click.echo(f"  {'':12} models: {adapter_class.supported_model_summary()}")
 
 

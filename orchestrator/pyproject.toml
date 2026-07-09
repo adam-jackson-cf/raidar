@@ -78,6 +78,7 @@ max-complexity = 10
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+addopts = "--ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
 
 [tool.mypy]

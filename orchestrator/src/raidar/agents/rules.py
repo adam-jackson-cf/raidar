@@ -1,30 +1,37 @@
-"""CLI-to-rule-file mapping and rule injection logic.
-
-Borrowed from enaible's install.py SYSTEM_RULES pattern.
-"""
+"""Harness rule-file injection logic."""
 
 import shutil
 from pathlib import Path
 
+from raidar.harness import HarnessDefinitionError, harness_definition
+
 from .config import Harness
 
-# Mapping from harness id to expected rule filename
-SYSTEM_RULES: dict[Harness, str] = {
-    Harness.CLAUDE_CODE: "CLAUDE.md",
-    Harness.CODEX_CLI: "AGENTS.md",
-    Harness.COPILOT: "copilot-instructions.md",
-    Harness.CURSOR: "user-rules-setting.md",
-    Harness.GEMINI: "GEMINI.md",
-    Harness.PI: "AGENTS.md",
-}
+
+def rule_filename_for_harness(harness: Harness | str) -> str | None:
+    """Return the injected rule filename for a harness id, if known."""
+    harness_id = harness.value if isinstance(harness, Harness) else harness
+    try:
+        return harness_definition(harness_id).rule_filename
+    except HarnessDefinitionError:
+        return None
 
 
 def get_rule_filename(harness: Harness) -> str:
     """Get the rule filename for a given harness."""
-    if harness not in SYSTEM_RULES:
-        supported = [candidate.value for candidate in SYSTEM_RULES]
-        raise ValueError(f"Unknown harness '{harness.value}'. Supported: {supported}")
-    return SYSTEM_RULES[harness]
+    filename = rule_filename_for_harness(harness)
+    if filename is None:
+        raise ValueError(f"Unknown harness '{harness.value}'.")
+    return filename
+
+
+def injected_rules_path(workspace_dir: Path, harness: Harness | str) -> Path | None:
+    """Return the injected rules path in a workspace, if present."""
+    injected_rule_name = rule_filename_for_harness(harness)
+    if not injected_rule_name:
+        return None
+    candidate = workspace_dir / injected_rule_name
+    return candidate if candidate.exists() else None
 
 
 def inject_rules(

@@ -4,45 +4,65 @@ description: Minimal end-to-end Harbor orchestration smoke scenario
 difficulty: easy
 category: agent-integration
 timeout_sec: 300
-
+environment:
+  kind: stack_preset
+  id: node:20
+  workdir: /app
+  requirements:
+    runtimes:
+      node: '>=20'
+    package_managers:
+      bun: '>=1'
+    tools:
+      typescript: '>=5'
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
-
 verification:
   max_gate_failures: 1
   coverage_threshold: 0.0
   min_quality_score: 0.0
+  setup_actions:
+  - - bun
+    - install
+    - --frozen-lockfile
   required_commands:
-    - ["bun", "run", "typecheck"]
-    - ["bun", "run", "lint"]
-
+  - - bun
+    - run
+    - typecheck
+  - - bun
+    - run
+    - lint
 requirements:
   items:
-    - id: req-smoke-marker
-      description: Smoke marker text exists in source.
-      check:
-        type: import_present
-        pattern: Harbor smoke test ready
-        description: Smoke marker text exists in source
-    - id: req-placeholder-removed
-      description: Starter placeholder text is removed.
-      check:
-        type: no_pattern
-        pattern: Homepage placeholder - implement the design
-        description: Starter placeholder text is removed
-
+  - id: req-smoke-marker
+    description: Smoke marker text exists in source.
+    check:
+      type: import_present
+      pattern: Harbor smoke test ready
+      description: Smoke marker text exists in source
+  - id: req-placeholder-removed
+    description: Starter placeholder text is removed.
+    check:
+      type: no_pattern
+      pattern: Homepage placeholder - implement the design
+      description: Starter placeholder text is removed
 scorers:
-  - id: typescript-code-task
-    version: 1
-    weight: 0.01
-    config:
-      artifact-checks:
-        required_paths:
-          - src/index.tsx
-        path_match: glob
-  - id: resource-efficiency
-    version: 1
-    weight: 0.99
-
+- id: typescript-code-task
+  version: 1
+  weight: 0.01
+  config:
+    artifact-checks:
+      required_paths:
+      - src/index.tsx
+      path_match: glob
+- id: resource-efficiency
+  version: 1
+  weight: 0.99
 prompt:
   entry: prompt/task.md

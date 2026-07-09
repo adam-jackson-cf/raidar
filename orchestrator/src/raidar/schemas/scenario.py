@@ -8,6 +8,17 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from raidar.scenario_paths import validate_relative_path
+from raidar.schemas.environment import (
+    CapabilityRequirements,
+    EnvironmentConfig,
+    EnvironmentResourcesConfig,
+)
+
+__all__ = [
+    "CapabilityRequirements",
+    "EnvironmentConfig",
+    "EnvironmentResourcesConfig",
+]
 
 SHELL_WRAPPER_ARGS = {"-c", "-lc", "/c", "/k", "-command", "-encodedcommand"}
 SHELL_WRAPPER_BINARIES = {
@@ -289,14 +300,58 @@ class VisualConfig(BaseModel):
         model_config = ConfigDict(extra="forbid")
 
         name: str = Field(description="Stable authored region name")
+        reference_image: str = Field(
+            description="Scenario-relative reference image path for this region"
+        )
+        actual_image: str = Field(
+            description="Workspace-relative actual capture path for this region"
+        )
+        diff_image: str = Field(
+            description="Workspace-relative visual diff output path for this region"
+        )
         weight: float = Field(default=1.0, gt=0, description="Relative scoring weight")
         clip: "VisualConfig.VisualRegionClip" = Field(description="Viewport clip rectangle")
 
+        @field_validator("reference_image", "actual_image", "diff_image")
+        @classmethod
+        def _validate_region_path(cls, value: str) -> str:
+            return validate_relative_path(
+                value,
+                field_name="visual.regions[] image path",
+                root_name="scenario or workspace",
+            )
+
+    class VisualArtifactManifest(BaseModel):
+        """Scenario-owned output paths produced by visual capture/scoring."""
+
+        model_config = ConfigDict(extra="forbid")
+
+        actual_image: str = Field(description="Workspace-relative captured full-page image")
+        diff_image: str = Field(description="Workspace-relative full-page diff output")
+        post_capture_image: str = Field(
+            description="Run-artifact relative screenshot captured after the agent run"
+        )
+
+        @field_validator("actual_image", "diff_image", "post_capture_image")
+        @classmethod
+        def _validate_manifest_path(cls, value: str) -> str:
+            return validate_relative_path(
+                value,
+                field_name="visual.artifact_manifest image path",
+                root_name="visual artifact",
+            )
+
     reference_image: str = Field(description="Path to reference image")
+    capture_setup_actions: list[list[str]] = Field(
+        default_factory=list,
+        description="Workspace setup commands to execute before visual capture",
+    )
     screenshot_command: list[str] = Field(
-        default_factory=lambda: ["bun", "run", "capture-screenshot"],
         min_length=1,
         description="Command argv to capture screenshot",
+    )
+    artifact_manifest: VisualArtifactManifest = Field(
+        description="Scenario-owned visual capture and diff output paths"
     )
     viewport: "VisualConfig.VisualViewport | None" = Field(
         default=None,
@@ -317,6 +372,14 @@ class VisualConfig(BaseModel):
     @classmethod
     def _validate_screenshot_command(cls, value: list[str]) -> list[str]:
         return _validate_argv_command(value, field_name="visual.screenshot_command")
+
+    @field_validator("capture_setup_actions")
+    @classmethod
+    def _validate_capture_setup_actions(cls, value: list[list[str]]) -> list[list[str]]:
+        return [
+            _validate_argv_command(command, field_name="visual.capture_setup_actions[]")
+            for command in value
+        ]
 
 
 class VerificationConfig(BaseModel):
@@ -360,6 +423,19 @@ class VerificationConfig(BaseModel):
         default_factory=list,
         description="Workspace setup commands to execute before verification gates",
     )
+    preflight_command_timeout_sec: int | None = Field(
+        default=None,
+        gt=0,
+        description="Optional timeout for preflight setup and required command checks",
+    )
+    test_discovery_globs: list[str] = Field(
+        default_factory=list,
+        description="Workspace-relative glob patterns used to decide whether test commands exist",
+    )
+    skip_test_commands_when_no_tests: bool = Field(
+        default=False,
+        description="Whether preflight may skip test commands when discovery globs match no files",
+    )
     gates: list[VerificationGate] = Field(default_factory=list)
     workflow: "VerificationConfig.VerificationWorkflowConfig" = Field(
         default_factory=VerificationWorkflowConfig
@@ -379,6 +455,18 @@ class VerificationConfig(BaseModel):
         return [
             _validate_argv_command(command, field_name="verification.setup_actions[]")
             for command in value
+        ]
+
+    @field_validator("test_discovery_globs")
+    @classmethod
+    def _validate_test_discovery_globs(cls, value: list[str]) -> list[str]:
+        return [
+            validate_relative_path(
+                pattern,
+                field_name="verification.test_discovery_globs[]",
+                root_name="workspace",
+            )
+            for pattern in value
         ]
 
 
@@ -546,8 +634,8 @@ class ScenarioDefinition(BaseModel):
     difficulty: Literal["easy", "medium", "hard"] = Field(default="medium")
     category: str = Field(description="Scenario category (greenfield-ui, etc)")
     timeout_sec: int = Field(default=1800, description="Scenario timeout in seconds")
-    dockerfile: str = Field(default="./Dockerfile")
     test_scripts: list[str] = Field(default_factory=list)
+    environment: EnvironmentConfig = Field(description="Scenario execution environment contract")
     starter: StarterConfig = Field(description="Starter configuration")
     verification: VerificationConfig = Field(default_factory=VerificationConfig)
     requirements: RequirementsConfig = Field(default_factory=RequirementsConfig)

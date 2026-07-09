@@ -28,6 +28,23 @@ def _base_scenario_payload() -> dict:
         "difficulty": "medium",
         "category": "greenfield-ui",
         "timeout_sec": 1800,
+        "environment": {
+            "kind": "stack_preset",
+            "id": "node:20",
+            "workdir": "/app",
+            "requirements": {
+                "runtimes": {"node": ">=20"},
+                "package_managers": {"bun": ">=1"},
+                "tools": {"typescript": ">=5"},
+                "browsers": {},
+            },
+            "resources": {
+                "cpus": 2,
+                "memory_mb": 4096,
+                "storage_mb": 10240,
+            },
+            "allow_internet": True,
+        },
         "starter": {"root": "starter"},
         "verification": {
             "coverage_threshold": 0.8,
@@ -202,7 +219,13 @@ def test_python_code_task_extends_code_task_metric_interface() -> None:
 
     assert scorer.status == "active"
     assert scorer.extends == "code-task"
-    assert scorer.runtime == "python"
+    assert scorer.requirements.runtimes == {"python": ">=3.12"}
+    assert scorer.requirements.tools == {
+        "coverage": ">=7",
+        "lizard": ">=1.17",
+        "pytest": ">=9",
+        "ruff": ">=0.14",
+    }
     assert [metric.id for metric in scorer.metrics] == [
         "functional",
         "code-quality",
@@ -311,6 +334,17 @@ def test_screenshot_command_rejects_shell_redirection() -> None:
         ScenarioDefinition.model_validate(payload)
 
 
+def test_visual_requires_explicit_screenshot_command() -> None:
+    payload = _base_scenario_payload()
+    visual = _visual_payload()
+    visual.pop("screenshot_command")
+    payload["visual"] = visual
+    payload["scorers"] = [{"id": "design-to-code", "version": 1, "weight": 1.0}]
+
+    with pytest.raises(ValidationError, match="screenshot_command"):
+        ScenarioDefinition.model_validate(payload)
+
+
 def test_setup_actions_reject_shell_wrappers() -> None:
     payload = _base_scenario_payload()
     payload["verification"]["setup_actions"] = [["bash", "-lc", "git init"]]
@@ -347,6 +381,11 @@ def _visual_payload() -> dict:
     return {
         "reference_image": "reference.png",
         "screenshot_command": ["bun", "run", "capture-screenshot"],
+        "artifact_manifest": {
+            "actual_image": ".raidar/visual/homepage-actual.png",
+            "diff_image": ".raidar/visual/homepage-diff.png",
+            "post_capture_image": "post-run-homepage.png",
+        },
         "viewport": {"width": 1440, "height": 1024},
         "scoring": {
             "weights": {

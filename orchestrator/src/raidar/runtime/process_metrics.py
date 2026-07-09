@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.runtime.command_records import _command_records_for_harness
+from raidar.harness import harness_definition
+from raidar.harness.command_records import _command_records_for_harness
+from raidar.harness.usage_metrics import _usage_tuple_for_harness
 from raidar.runtime.models import CommandRecord, ProcessMetrics
-from raidar.runtime.usage_metrics import _usage_tuple_for_harness
 from raidar.runtime.verification_metrics import (
     _count_executed_required,
     _count_failed_commands,
@@ -39,6 +40,14 @@ class ProcessMetricsBuildInput:
     failure_categories: dict[str, int]
 
 
+class ProcessMetricsError(RuntimeError):
+    """Typed process metrics extraction failure."""
+
+    def __init__(self, message: str, *, failure_code: str) -> None:
+        super().__init__(message)
+        self.failure_code = failure_code
+
+
 def _empty_process_metrics() -> ProcessMetrics:
     return ProcessMetrics(
         uncached_input_tokens=0,
@@ -63,16 +72,30 @@ def collect_process_metrics(
     if not trial_dir:
         return _empty_process_metrics()
 
+    definition = harness_definition(harness)
     usage_tuple = _usage_tuple_for_harness(trial_dir, harness)
     if usage_tuple is None:
-        raise RuntimeError(
-            f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`."
-        )
+        if definition.usage_policy.required:
+            raise ProcessMetricsError(
+                f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`.",
+                failure_code="missing_token_usage",
+            )
+        usage_tuple = (0, 0, 0)
     input_tokens, cached_input_tokens, output_tokens = usage_tuple
 
-    records = _command_records_for_harness(trial_dir, harness)
-    git_commit_records = _command_records_for_harness(trial_dir, harness, include_git_commit=True)
     verification_patterns = _verification_command_strings(scenario)
+    verification_pattern_tuple = tuple(verification_patterns)
+    records = _command_records_for_harness(
+        trial_dir,
+        harness,
+        verification_patterns=verification_pattern_tuple,
+    )
+    git_commit_records = _command_records_for_harness(
+        trial_dir,
+        harness,
+        include_git_commit=True,
+        verification_patterns=verification_pattern_tuple,
+    )
     attempts_by_pattern, failures_by_pattern = _verification_attempts(
         records, verification_patterns
     )

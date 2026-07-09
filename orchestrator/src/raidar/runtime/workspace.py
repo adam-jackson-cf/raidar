@@ -12,16 +12,16 @@ from typing import Any
 import yaml
 
 from raidar.agents.config import Harness
-from raidar.agents.rules import inject_rules
+from raidar.agents.rules import inject_rules, injected_rules_path
 from raidar.runtime.models import (
     RunLayout,
     RunRequest,
     WorkspaceContext,
 )
+from raidar.runtime.profile import default_runtime_profile
 from raidar.runtime.task_bundle import (
     _baseline_workspace_for_request,
     _copy_baseline_workspace,
-    _injected_rules_path,
 )
 from raidar.schemas.scenario import ScenarioDefinition
 
@@ -49,24 +49,33 @@ def _workspace_runtime_env(
     workspace: Path, base_env: dict[str, str] | None = None
 ) -> dict[str, str]:
     env = dict(os.environ if base_env is None else base_env)
-    tmp_dir = workspace / ".tmp"
-    cache_dir = workspace / ".cache"
-    uv_cache_dir = cache_dir / "uv"
-    bun_cache_dir = cache_dir / "bun"
+    profile = default_runtime_profile()
+    runtime_dir = _workspace_runtime_dir(workspace)
+    tmp_dir = runtime_dir / "tmp"
+    cache_dir = runtime_dir / "cache"
     tmp_dir.mkdir(parents=True, exist_ok=True)
-    uv_cache_dir.mkdir(parents=True, exist_ok=True)
-    bun_cache_dir.mkdir(parents=True, exist_ok=True)
-    env.update(
-        {
-            "TMPDIR": str(tmp_dir),
-            "TMP": str(tmp_dir),
-            "TEMP": str(tmp_dir),
-            "XDG_CACHE_HOME": str(cache_dir),
-            "UV_CACHE_DIR": str(uv_cache_dir),
-            "BUN_INSTALL_CACHE_DIR": str(bun_cache_dir),
-        }
-    )
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    template_values = {
+        "workspace": str(workspace),
+        "runtime": str(runtime_dir),
+        "tmp": str(tmp_dir),
+        "cache": str(cache_dir),
+    }
+    for key, template in profile.workspace_env.items():
+        value = template.format(**template_values)
+        env[key] = value
+        path = Path(value)
+        if path.is_absolute():
+            path.mkdir(parents=True, exist_ok=True)
     return env
+
+
+def _workspace_runtime_dir(workspace: Path) -> Path:
+    return workspace.parent / f"{workspace.name}.runtime"
+
+
+def _cleanup_workspace_runtime_env(workspace: Path) -> None:
+    shutil.rmtree(_workspace_runtime_dir(workspace), ignore_errors=True)
 
 
 def scenario_evaluation_profile(scenario: ScenarioDefinition) -> str:
@@ -110,7 +119,7 @@ def prepare_workspace(
         starter_dir,
         target_dir,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("node_modules", ".next", "jobs"),
+        ignore=shutil.ignore_patterns(*default_runtime_profile().copy_excludes),
     )
 
     # Inject rules
@@ -169,7 +178,7 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
 
     workspace_dir = _repeat_workspace_dir(request)
     _copy_baseline_workspace(baseline_workspace_dir, workspace_dir)
-    injected_rules = _injected_rules_path(workspace_dir, request.config.harness)
+    injected_rules = injected_rules_path(workspace_dir, request.config.harness)
     metadata_path = record_starter_metadata(workspace_dir, starter_source)
 
     return WorkspaceContext(

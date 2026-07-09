@@ -1,0 +1,19 @@
+id: python:3.12
+version: 1
+image: raidar/python:3.12-code
+build:
+  dockerfile: environments/python/3.12/Dockerfile
+verifier:
+  runner: python@1
+capabilities:
+  runtimes:
+    python: ">=3.12"
+  package_managers:
+    pip: ">=24"
+  tools:
+    git: ">=2"
+    pytest: ">=9"
+    coverage: ">=7"
+    ruff: ">=0.14"
+    lizard: ">=1.17"
+  browsers: {}

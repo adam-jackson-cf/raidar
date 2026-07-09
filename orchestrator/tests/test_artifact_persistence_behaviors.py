@@ -266,11 +266,26 @@ def test_visual_evidence_persistence_and_rebinding(monkeypatch, tmp_path):
         (reference_dir / name).write_text(name, encoding="utf-8")
     workspace = tmp_path / "workspace"
     workspace.mkdir()
-    for name in ("actual.png", "diff.png", "actual-region-hero.png", "diff-region-hero.png"):
+    for name in ("capture-main.png", "compare-main.png", "capture-hero.png", "compare-hero.png"):
         (workspace / name).write_text(name, encoding="utf-8")
 
     scenario = SimpleNamespace(
-        visual=SimpleNamespace(reference_image="reference/page.png", regions=[]),
+        visual=SimpleNamespace(
+            reference_image="reference/page.png",
+            artifact_manifest=SimpleNamespace(
+                actual_image="capture-main.png",
+                diff_image="compare-main.png",
+                post_capture_image="post-main.png",
+            ),
+            regions=[
+                SimpleNamespace(
+                    name="hero",
+                    reference_image="reference/page-region-hero.png",
+                    actual_image="capture-hero.png",
+                    diff_image="compare-hero.png",
+                )
+            ],
+        ),
     )
     run_request = SimpleNamespace(scenario=scenario, scenario_dir=scenario_dir)
     request = artifacts.VisualEvidenceRequest(
@@ -281,16 +296,16 @@ def test_visual_evidence_persistence_and_rebinding(monkeypatch, tmp_path):
 
     evidence = artifacts._persist_visual_evidence_artifacts(request)
 
-    assert evidence["actual"].endswith("visual/actual.png")
+    assert evidence["actual"].endswith("visual/capture-main.png")
     assert evidence["reference"].endswith("visual/page.png")
-    assert evidence["diff"].endswith("visual/diff.png")
+    assert evidence["diff"].endswith("visual/compare-main.png")
     assert evidence["regions"][0]["name"] == "hero"
 
     visual = VisualScore(regional_scores=[{"name": "hero"}, {"name": "missing"}])
     visual.regional_scores.append("ignored")
     artifacts._rebind_visual_evidence_paths(visual, evidence)
     assert visual.actual_path == evidence["actual"]
-    assert visual.regional_scores[0]["actual_path"].endswith("actual-region-hero.png")
+    assert visual.regional_scores[0]["actual_path"].endswith("capture-hero.png")
     assert "actual_path" not in visual.regional_scores[1]
     artifacts._rebind_visual_evidence_paths(None, evidence)
 
@@ -329,7 +344,7 @@ def test_harness_and_harbor_artifact_persistence(tmp_path):
     harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
     harness_dir = tmp_path / "harness"
     harness_dir.mkdir()
-    copied = artifacts.persist_harness_artifacts(harbor_result, harness_dir)
+    copied = artifacts.persist_harness_artifacts(harbor_result, harness_dir, harness="codex-cli")
 
     assert copied["trajectory.json"].endswith("trajectory.json")
     assert copied["project.final.tar.gz"].endswith("project.final.tar.gz")
@@ -348,13 +363,17 @@ def test_harness_and_harbor_artifact_persistence(tmp_path):
     assert "OPENAI_API_KEY=<redacted>" in harness_text
     assert (
         artifacts.persist_harness_artifacts(
-            HarborExecutionResult(False, None, tmp_path / "job", None), harness_dir
+            HarborExecutionResult(False, None, tmp_path / "job", None),
+            harness_dir,
+            harness="codex-cli",
         )
         == {}
     )
     assert (
         artifacts.persist_harness_artifacts(
-            HarborExecutionResult(False, None, tmp_path / "job", tmp_path / "missing"), harness_dir
+            HarborExecutionResult(False, None, tmp_path / "job", tmp_path / "missing"),
+            harness_dir,
+            harness="codex-cli",
         )
         == {}
     )

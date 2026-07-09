@@ -25,7 +25,11 @@ def test_execute_harbor_retries_once_on_registry_rate_limit(monkeypatch, tmp_pat
         assert process_request.workspace == request.workspace
         assert process_request.run_harbor_dir == request.run_harbor_dir
         attempts.append(1)
-        return "Harbor exited with code 1" if len(attempts) == 1 else None
+        return (
+            runner.HarborProcessFailure("Harbor exited with code 1", "harbor_cli_failure")
+            if len(attempts) == 1
+            else None
+        )
 
     sleeps: list[int] = []
 
@@ -67,7 +71,7 @@ def test_execute_harbor_does_not_retry_non_rate_limit(monkeypatch, tmp_path) -> 
         assert process_request.workspace == request.workspace
         assert process_request.run_harbor_dir == request.run_harbor_dir
         attempts.append(1)
-        return "Harbor exited with code 1"
+        return runner.HarborProcessFailure("Harbor exited with code 1", "harbor_cli_failure")
 
     sleeps: list[int] = []
 
@@ -79,5 +83,6 @@ def test_execute_harbor_does_not_retry_non_rate_limit(monkeypatch, tmp_path) -> 
 
     assert result.terminated_early is True
     assert result.termination_reason == "Harbor exited with code 1"
+    assert result.failure_code == "harbor_cli_failure"
     assert len(attempts) == 1
     assert sleeps == []

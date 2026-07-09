@@ -4,8 +4,24 @@ description: Concise lint-stable TypeScript utility benchmark with verification 
 difficulty: medium
 category: greenfield-code
 timeout_sec: 1800
-dockerfile: ./Dockerfile
 test_scripts: []
+environment:
+  kind: stack_preset
+  id: node:20
+  workdir: /app
+  requirements:
+    runtimes:
+      node: '>=20'
+    package_managers:
+      bun: '>=1'
+    tools:
+      typescript: '>=5'
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
 verification:
@@ -25,7 +41,20 @@ verification:
   - - bun
     - run
     - test:coverage
-  setup_actions: []
+  setup_actions:
+  - - bun
+    - install
+    - --frozen-lockfile
+  test_discovery_globs:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/*.test.js'
+  - '**/*.test.jsx'
+  - '**/*.spec.js'
+  - '**/*.spec.jsx'
+  skip_test_commands_when_no_tests: true
   gates:
   - name: typecheck
     command:
@@ -124,7 +153,7 @@ scorers:
       path_match: glob
 - id: requirements
   version: 1
-  weight: 0.20
+  weight: 0.2
 - id: resource-efficiency
   version: 1
   weight: 0.02

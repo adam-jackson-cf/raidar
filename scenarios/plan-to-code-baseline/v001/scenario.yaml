@@ -5,6 +5,21 @@ description: Baseline plan-to-code task with retained plan and acceptance eviden
 difficulty: medium
 category: plan-to-code
 timeout_sec: 1800
+environment:
+  kind: stack_preset
+  id: python:3.12
+  workdir: /app
+  requirements:
+    runtimes:
+      python: '>=3.12'
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
 verification:
@@ -12,44 +27,55 @@ verification:
   coverage_threshold: 0.8
   min_quality_score: 0.85
   required_commands:
-    - ["python", "-m", "compileall", "-q", "src", "tests"]
-    - ["python", "-m", "unittest", "discover", "-s", "tests"]
+  - - python
+    - -m
+    - compileall
+    - -q
+    - src
+    - tests
+  - - python
+    - -m
+    - unittest
+    - discover
+    - -s
+    - tests
 requirements:
   items:
-    - id: req-retained-plan
-      description: Retain an `intentplan.md` with Feature Dashboard and Acceptance Tracker tables.
-      check:
-        type: file_exists
-        pattern: intentplan.md
-        description: Retained plan artifact exists.
-    - id: req-alert-module
-      description: Implement `src/alerts/escalation.py`.
-      check:
-        type: file_exists
-        pattern: src/alerts/escalation.py
-        description: Alert escalation module exists.
-    - id: req-escalation-export
-      description: Export `route_alert(alert)`.
-      check:
-        type: import_present
-        pattern: route_alert
-        description: route_alert export is present.
-    - id: req-acceptance-tests
-      description: Add tests for severity routing and missing owner fallback.
-      check:
-        type: file_exists
-        pattern: tests/test_escalation.py
-        description: Escalation test file exists.
+  - id: req-retained-plan
+    description: Retain an `intentplan.md` with Feature Dashboard and Acceptance Tracker
+      tables.
+    check:
+      type: file_exists
+      pattern: intentplan.md
+      description: Retained plan artifact exists.
+  - id: req-alert-module
+    description: Implement `src/alerts/escalation.py`.
+    check:
+      type: file_exists
+      pattern: src/alerts/escalation.py
+      description: Alert escalation module exists.
+  - id: req-escalation-export
+    description: Export `route_alert(alert)`.
+    check:
+      type: import_present
+      pattern: route_alert
+      description: route_alert export is present.
+  - id: req-acceptance-tests
+    description: Add tests for severity routing and missing owner fallback.
+    check:
+      type: file_exists
+      pattern: tests/test_escalation.py
+      description: Escalation test file exists.
 scorers:
-  - id: plan-to-code
-    version: 1
-    weight: 0.78
-  - id: requirements
-    version: 1
-    weight: 0.20
-  - id: resource-efficiency
-    version: 1
-    weight: 0.02
+- id: plan-to-code
+  version: 1
+  weight: 0.78
+- id: requirements
+  version: 1
+  weight: 0.2
+- id: resource-efficiency
+  version: 1
+  weight: 0.02
 prompt:
   entry: prompt/task.md
   includes: []

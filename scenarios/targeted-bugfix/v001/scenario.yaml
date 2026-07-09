@@ -1,10 +1,26 @@
 name: targeted-bugfix
 scenario_revision: v001
 parent_revision: null
-description: Baseline targeted defect fix with regression evidence and containment checks
+description: Baseline targeted defect fix with regression evidence and containment
+  checks
 difficulty: medium
 category: bugfix
 timeout_sec: 1800
+environment:
+  kind: stack_preset
+  id: python:3.12
+  workdir: /app
+  requirements:
+    runtimes:
+      python: '>=3.12'
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
 verification:
@@ -12,38 +28,48 @@ verification:
   coverage_threshold: 0.8
   min_quality_score: 0.85
   required_commands:
-    - ["python", "-m", "compileall", "-q", "src", "tests"]
-    - ["python", "-m", "unittest", "discover", "-s", "tests"]
+  - - python
+    - -m
+    - compileall
+    - -q
+    - src
+    - tests
+  - - python
+    - -m
+    - unittest
+    - discover
+    - -s
+    - tests
 requirements:
   items:
-    - id: req-fix-zone-rate
-      description: Zone 3 expedited shipments use the configured surcharge.
-      check:
-        type: import_present
-        pattern: zone == 3
-        description: Zone 3 expedited branch is present.
-    - id: req-regression-test
-      description: Regression tests cover the reported zone 3 expedited defect.
-      check:
-        type: import_present
-        pattern: zone 3
-        description: Zone 3 regression evidence is present.
-    - id: req-no-api-change
-      description: Preserve the `shipping_quote(weight_kg, zone, expedited=False)` API.
-      check:
-        type: import_present
-        pattern: shipping_quote
-        description: Public shipping_quote API remains present.
+  - id: req-fix-zone-rate
+    description: Zone 3 expedited shipments use the configured surcharge.
+    check:
+      type: import_present
+      pattern: zone == 3
+      description: Zone 3 expedited branch is present.
+  - id: req-regression-test
+    description: Regression tests cover the reported zone 3 expedited defect.
+    check:
+      type: import_present
+      pattern: zone 3
+      description: Zone 3 regression evidence is present.
+  - id: req-no-api-change
+    description: Preserve the `shipping_quote(weight_kg, zone, expedited=False)` API.
+    check:
+      type: import_present
+      pattern: shipping_quote
+      description: Public shipping_quote API remains present.
 scorers:
-  - id: bugfix
-    version: 1
-    weight: 0.78
-  - id: requirements
-    version: 1
-    weight: 0.20
-  - id: resource-efficiency
-    version: 1
-    weight: 0.02
+- id: bugfix
+  version: 1
+  weight: 0.78
+- id: requirements
+  version: 1
+  weight: 0.2
+- id: resource-efficiency
+  version: 1
+  weight: 0.02
 prompt:
   entry: prompt/task.md
   includes: []

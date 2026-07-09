@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import shlex
 
-from raidar.runtime.command_records import (
+from raidar.harness.command_records import (
     _git_commit_uses_verification_bypass,
     _is_git_commit_command,
 )

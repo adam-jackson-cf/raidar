@@ -12,7 +12,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.config import settings
+from raidar.runtime.environments import ResolvedEnvironment, resolve_scenario_environment
 from raidar.runtime.models import RunRequest, WorkspaceContext
+from raidar.runtime.profile import default_runtime_profile
 from raidar.runtime.workspace_cache import (
     RAIDAR_CACHE_VERSION,
     _cache_key_lock,
@@ -38,34 +40,81 @@ class StarterPreflightError(RuntimeError):
     """Fatal starter setup error that unscored and aborts an entire experiment."""
 
 
-def _command_timeout(command: list[str]) -> int:
-    command_text = " ".join(command)
-    if "typecheck" in command_text:
-        return settings.timeouts.typecheck
-    if "test:coverage" in command_text or " test" in command_text:
-        return settings.timeouts.test
-    if "build" in command_text:
-        return settings.timeouts.build
-    return settings.timeouts.command_default
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[4]
 
 
-def _workspace_has_tests(workspace: Path) -> bool:
-    src_root = workspace / "src"
-    if not src_root.exists():
-        return False
-    for pattern in ("**/*.test.ts", "**/*.test.tsx", "**/*.spec.ts", "**/*.spec.tsx"):
-        if any(src_root.glob(pattern)):
+def _resolved_environment(request: RunRequest) -> ResolvedEnvironment:
+    return resolve_scenario_environment(
+        scenario=request.scenario,
+        scenario_path=request.scenario_dir / "scenario.yaml",
+        repo_root=_repo_root(),
+    )
+
+
+def _preflight_command_timeout(request: RunRequest) -> int:
+    return (
+        request.scenario.verification.preflight_command_timeout_sec
+        or settings.timeouts.command_default
+    )
+
+
+def _workspace_has_tests(workspace: Path, test_discovery_globs: list[str]) -> bool:
+    ignored_dirs = set(default_runtime_profile().copy_excludes) | {
+        ".git",
+        ".turbo",
+        "coverage",
+        "dist",
+        "build",
+    }
+    for pattern in test_discovery_globs:
+        for path in workspace.glob(pattern):
+            if not path.is_file():
+                continue
+            relative_parts = path.relative_to(workspace).parts[:-1]
+            if any(part in ignored_dirs for part in relative_parts):
+                continue
             return True
     return False
 
 
+def _is_test_command(command: list[str]) -> bool:
+    command_text = " ".join(command)
+    if "test:coverage" in command_text or command_text.endswith(" test"):
+        return True
+    if len(command) >= 3 and command[:3] == ["python", "-m", "unittest"]:
+        return True
+    if len(command) >= 3 and command[:3] == ["python", "-m", "pytest"]:
+        return True
+    return bool(command and Path(command[0]).name == "pytest")
+
+
+def _should_skip_preflight_command(
+    command: list[str],
+    *,
+    has_tests: bool,
+    skip_test_commands_when_no_tests: bool,
+) -> bool:
+    return skip_test_commands_when_no_tests and not has_tests and _is_test_command(command)
+
+
 def _preflight_cache_key(request: RunRequest, context: WorkspaceContext) -> str:
+    environment = _resolved_environment(request)
     payload = {
         "cache_version": RAIDAR_CACHE_VERSION,
         "baseline_cache_key": context.baseline_cache_key,
         "harness": request.config.harness.value,
         "starter_fingerprint": context.starter_source.fingerprint,
+        "environment": environment.cache_payload(),
+        "setup_actions": getattr(request.scenario.verification, "setup_actions", []),
         "required_commands": request.scenario.verification.required_commands,
+        "preflight_command_timeout_sec": (
+            request.scenario.verification.preflight_command_timeout_sec
+        ),
+        "test_discovery_globs": request.scenario.verification.test_discovery_globs,
+        "skip_test_commands_when_no_tests": (
+            request.scenario.verification.skip_test_commands_when_no_tests
+        ),
     }
     return _hash_json_payload(payload)
 
@@ -81,44 +130,23 @@ def _copy_preflight_workspace(source_workspace: Path, preflight_workspace: Path)
         source_workspace,
         preflight_workspace,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns("node_modules", ".next", ".cache", ".tmp", "jobs"),
+        ignore=shutil.ignore_patterns(*default_runtime_profile().copy_excludes),
     )
-
-
-def _run_starter_preflight_install(workspace: Path, env: dict[str, str]) -> None:
-    install = subprocess.run(
-        ["bun", "install", "--frozen-lockfile"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-        timeout=settings.timeouts.build,
-        env=env,
-    )
-    if install.returncode == 0:
-        return
-    output = (install.stdout + "\n" + install.stderr).strip()[:8000]
-    raise StarterPreflightError(
-        "Starter preflight failed: `bun install --frozen-lockfile` exited "
-        f"{install.returncode}\n{output}"
-    )
-
-
-def _should_skip_preflight_command(command: list[str], has_tests: bool) -> bool:
-    if has_tests:
-        return False
-    command_text = " ".join(command)
-    return "test:coverage" in command_text or command_text.endswith(" test")
 
 
 def _run_starter_preflight_command(
-    workspace: Path, env: dict[str, str], command: list[str]
+    workspace: Path,
+    env: dict[str, str],
+    command: list[str],
+    *,
+    timeout_sec: int,
 ) -> None:
     completed = subprocess.run(
         command,
         cwd=workspace,
         capture_output=True,
         text=True,
-        timeout=_command_timeout(command),
+        timeout=timeout_sec,
         env=env,
     )
     if completed.returncode == 0:
@@ -135,6 +163,7 @@ def _run_workspace_setup_actions(
     workspace: Path,
     env: dict[str, str],
     setup_actions: list[list[str]],
+    timeout_sec: int,
 ) -> None:
     for command in setup_actions:
         completed = subprocess.run(
@@ -142,7 +171,7 @@ def _run_workspace_setup_actions(
             cwd=workspace,
             capture_output=True,
             text=True,
-            timeout=_command_timeout(command),
+            timeout=timeout_sec,
             env=env,
         )
         if completed.returncode == 0:
@@ -175,7 +204,10 @@ def _write_starter_preflight_cache(request: StarterPreflightCacheWrite) -> None:
 
 def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> bool | None:
     """Validate starter baseline commands once per effective prep input set."""
-    from raidar.runtime.workspace import _workspace_runtime_env
+    from raidar.runtime.workspace import (
+        _cleanup_workspace_runtime_env,
+        _workspace_runtime_env,
+    )
 
     required_commands = request.scenario.verification.required_commands
     setup_actions = getattr(request.scenario.verification, "setup_actions", [])
@@ -195,15 +227,36 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
         _copy_preflight_workspace(source_workspace, preflight_workspace)
         try:
             env = _workspace_runtime_env(preflight_workspace, os.environ.copy())
-            _run_starter_preflight_install(preflight_workspace, env)
+            timeout_sec = _preflight_command_timeout(request)
+            _run_workspace_setup_actions(
+                workspace=preflight_workspace,
+                env=env,
+                setup_actions=setup_actions,
+                timeout_sec=timeout_sec,
+            )
 
-            has_tests = _workspace_has_tests(preflight_workspace)
+            has_tests = _workspace_has_tests(
+                preflight_workspace,
+                request.scenario.verification.test_discovery_globs,
+            )
             for command in required_commands:
-                if _should_skip_preflight_command(command, has_tests):
+                if _should_skip_preflight_command(
+                    command,
+                    has_tests=has_tests,
+                    skip_test_commands_when_no_tests=(
+                        request.scenario.verification.skip_test_commands_when_no_tests
+                    ),
+                ):
                     continue
-                _run_starter_preflight_command(preflight_workspace, env, command)
+                _run_starter_preflight_command(
+                    preflight_workspace,
+                    env,
+                    command,
+                    timeout_sec=timeout_sec,
+                )
         finally:
             shutil.rmtree(preflight_workspace, ignore_errors=True)
+            _cleanup_workspace_runtime_env(preflight_workspace)
 
         _write_starter_preflight_cache(
             StarterPreflightCacheWrite(

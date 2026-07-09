@@ -75,7 +75,15 @@ def test_typescript_code_task_collects_metric_scores(
                     exit_code=0,
                     stdout="Checked files.",
                     stderr="",
-                )
+                ),
+                GateEvent(
+                    timestamp="2026-01-01T00:00:01Z",
+                    gate_name="coverage",
+                    command="bun run test:coverage",
+                    exit_code=0,
+                    stdout="All files | 90 | 88 | 85 | 84",
+                    stderr="",
+                ),
             ],
         )
     )

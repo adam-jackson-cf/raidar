@@ -23,6 +23,8 @@ from raidar.schemas.scorecard import (
 )
 from raidar.starter import StarterSource
 
+RuntimeFailureCode = str
+
 
 @dataclass(frozen=True, slots=True)
 class RunRequest:
@@ -74,6 +76,7 @@ class HarborExecutionResult:
     termination_reason: str | None
     job_dir: Path
     trial_dir: Path | None
+    failure_code: RuntimeFailureCode | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -174,6 +177,7 @@ class WorkspacePreparationPhaseResult:
     harbor_request: HarborExecutionRequest
     prep_phase_timings_sec: dict[str, float]
     prep_total_sec: float
+    time_to_experiment_start_sec: float
     cache_metadata: dict[str, Any]
     auth_metadata: dict[str, Any]
     screenshot_command: tuple[str, ...] | None
@@ -193,8 +197,10 @@ class ExecutionPhaseResult:
     duration_sec: float
     prep_phase_timings_sec: dict[str, float]
     prep_total_sec: float
+    time_to_experiment_start_sec: float
     cache_metadata: dict[str, Any]
     auth_metadata: dict[str, Any]
+    failure_code: RuntimeFailureCode | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -202,7 +208,7 @@ class PersistedArtifacts:
     """Persisted artifact metadata used for score synthesis."""
 
     starter_meta: dict
-    scenario_revision_meta: dict[str, str | None]
+    scenario_revision_meta: dict[str, Any]
     verifier_artifacts: dict[str, str]
     harness_artifacts: dict[str, str]
     harbor_artifacts: dict[str, str]

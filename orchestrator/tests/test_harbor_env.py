@@ -123,7 +123,9 @@ def _patch_prepare_workspace_dependencies(
     monkeypatch.setattr(
         runner,
         "_run_starter_preflight_install",
-        lambda workspace, env: state.preflight_calls.append(f"install:{workspace.name}"),
+        lambda workspace, env, environment: state.preflight_calls.append(
+            f"install:{workspace.name}"
+        ),
     )
     monkeypatch.setattr(
         runner,
@@ -265,6 +267,23 @@ def _prepare_workspace_scenario_yaml() -> str:
             "difficulty: easy",
             "category: greenfield-ui",
             "timeout_sec: 1800",
+            "environment:",
+            "  kind: stack_preset",
+            "  id: node:20",
+            "  workdir: /app",
+            "  requirements:",
+            "    runtimes:",
+            '      node: ">=20"',
+            "    package_managers:",
+            '      bun: ">=1"',
+            "    tools:",
+            '      typescript: ">=5"',
+            "    browsers: {}",
+            "  resources:",
+            "    cpus: 2",
+            "    memory_mb: 4096",
+            "    storage_mb: 10240",
+            "  allow_internet: true",
             "starter:",
             "  root: starter",
             "verification:",

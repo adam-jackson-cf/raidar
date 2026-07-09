@@ -19,6 +19,7 @@ from raidar.schemas.scorecard import (
     RequirementsCoverageScore,
     VerificationStabilityScore,
 )
+from raidar.scorers.code_task import typescript_evidence
 
 
 def test_coverage_uses_lowest_summary_metric_and_ignores_invalid_sources(tmp_path) -> None:
@@ -39,20 +40,29 @@ def test_coverage_uses_lowest_summary_metric_and_ignores_invalid_sources(tmp_pat
         encoding="utf-8",
     )
 
-    result = scorecard.evaluate_coverage(workspace, [], threshold=0.9)
+    result = typescript_evidence.evaluate_typescript_coverage(workspace, [], threshold=0.9)
 
     assert result.measured == 0.91
     assert result.source == str(summary)
     assert result.passed is True
 
     summary.write_text("{not-json", encoding="utf-8")
-    assert scorecard.evaluate_coverage(workspace, [], threshold=None).measured is None
+    assert (
+        typescript_evidence.evaluate_typescript_coverage(workspace, [], threshold=None).measured
+        is None
+    )
 
     summary.write_text(json.dumps({"total": []}), encoding="utf-8")
-    assert scorecard.evaluate_coverage(workspace, [], threshold=None).measured is None
+    assert (
+        typescript_evidence.evaluate_typescript_coverage(workspace, [], threshold=None).measured
+        is None
+    )
 
     summary.write_text(json.dumps({"total": {"lines": {}}}), encoding="utf-8")
-    assert scorecard.evaluate_coverage(workspace, [], threshold=0.1).passed is False
+    assert (
+        typescript_evidence.evaluate_typescript_coverage(workspace, [], threshold=0.1).passed
+        is False
+    )
 
 
 def test_coverage_falls_back_to_gate_history_table_and_named_metrics(tmp_path) -> None:
@@ -75,13 +85,15 @@ def test_coverage_falls_back_to_gate_history_table_and_named_metrics(tmp_path) -
         ),
     ]
 
-    result = scorecard.evaluate_coverage(tmp_path, gate_history, threshold=0.91)
+    result = typescript_evidence.evaluate_typescript_coverage(
+        tmp_path, gate_history, threshold=0.91
+    )
 
     assert result.measured == 0.9
     assert result.source == "gate:coverage"
     assert result.passed is False
-    assert scorecard._parse_coverage_percent("no coverage here") is None
-    assert scorecard._coverage_from_gate_history(
+    assert typescript_evidence.parse_istanbul_coverage_percent("no coverage here") is None
+    assert typescript_evidence.coverage_from_gate_history(
         [
             GateEvent(
                 timestamp="2026-01-01T00:00:02Z",
@@ -134,7 +146,9 @@ def test_requirements_count_satisfied_and_missing_test_evidence(tmp_path) -> Non
         required_test_evidence=[QueryRoleTestEvidence(role="button", min_count=2)],
     )
 
-    result = scorecard.evaluate_requirements(workspace, [present, missing_evidence])
+    result = typescript_evidence.evaluate_typescript_requirements(
+        workspace, [present, missing_evidence]
+    )
 
     assert result.total_requirements == 2
     assert result.satisfied_requirements == 2
@@ -175,37 +189,42 @@ def test_requirements_report_missing_presence_checks_and_unknown_evidence(tmp_pa
         [unknown_evidence, no_role],
     )
 
-    result = scorecard.evaluate_requirements(workspace, [missing, with_evidence_gap])
+    result = typescript_evidence.evaluate_typescript_requirements(
+        workspace, [missing, with_evidence_gap]
+    )
 
     assert result.satisfied_requirements == 1
     assert result.missing_requirement_ids == ["R3"]
     assert result.requirement_gap_ids == ["R4"]
     assert result.requirement_test_evidence_gaps == {"R4": ["unknown", "query_role: x1"]}
     assert (
-        scorecard._test_evidence_label(
+        typescript_evidence.test_evidence_label(
             {"type": "query_role", "role": "heading", "level": 2, "name": "Settings"}
         )
         == "query_role:heading,level=2,name=Settings x1"
     )
-    assert scorecard._test_evidence_label({"type": "query_text", "pattern": "Save"}) == (
+    assert typescript_evidence.test_evidence_label({"type": "query_text", "pattern": "Save"}) == (
         "query_text:Save x1"
     )
     assert (
-        scorecard._count_role_query_matches(
+        typescript_evidence.count_role_query_matches(
             ["screen.getByRole('heading', { level: 1, name: /Settings/ });"],
             {"role": "heading", "level": 2, "name": "Settings"},
         )
         == 0
     )
     assert (
-        scorecard._count_role_query_matches(
+        typescript_evidence.count_role_query_matches(
             ["screen.getByRole('heading', { level: 2, name: /Profile/ });"],
             {"role": "heading", "level": 2, "name": "Settings"},
         )
         == 0
     )
-    assert scorecard._count_text_query_matches(["no queries"], {"pattern": "Save"}) == 0
-    assert scorecard._count_text_query_matches(["screen.getByText(/Save/);"], {"pattern": ""}) == 0
+    assert typescript_evidence.count_text_query_matches(["no queries"], {"pattern": "Save"}) == 0
+    assert (
+        typescript_evidence.count_text_query_matches(["screen.getByText(/Save/);"], {"pattern": ""})
+        == 0
+    )
 
 
 def test_terminated_outputs_zero_scored_surfaces_and_preserve_failure_reason() -> None:

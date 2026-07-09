@@ -16,18 +16,18 @@ That makes RAIDAR closer to an opinionated delivery-evaluation system than to a 
 
 ### Delivery-first evaluation unit
 
-RAIDAR is centered on an explicit **scenario contract** for delivery work rather than on a single prompt, test case, or benchmark item. This gives it a stronger fit for tasks that resemble implementation, refactoring, verification, and review work in a real repository.
+RAIDAR is centered on an explicit **scenario contract** for delivery work rather than on a single prompt, test case, or benchmark item. The contract includes the prompt, starter, rules, runtime stack requirements, verification workflow, requirements, and attached scorers. This gives it a stronger fit for tasks that resemble implementation, refactoring, verification, and review work in a real repository.
 
 ### `AgentSpec = harness + model`
 
-RAIDAR makes the **harness/runtime** part of the experimental unit, not just the model. That is the clearest differentiator surfaced by the comparison work. The core question is not only "which model is better?" but "which harness + model pair performs best for this kind of delivery task?"
+RAIDAR makes the **harness** part of the experimental unit, not just the model. The runtime stack is resolved from the scenario contract and validated as concrete image inventory. The core question is not only "which model is better?" but "which harness + model pair performs best for this kind of delivery task?"
 
 ### Decision-grade evidence for delivery
 
 RAIDAR appears more opinionated about the evidence needed to make delivery decisions. The emphasis is on outcomes such as:
 
 - functional correctness
-- acceptance and verification quality
+- requirements and verification quality
 - execution validity
 - efficiency
 - repeat stability
@@ -41,7 +41,7 @@ RAIDAR is designed to support decisions about what to improve next:
 
 - prompt design
 - rules
-- starter scaffolding (project context, linting, tools etc)
+- starter scaffolding and runtime stack requirements
 - scenario design
 - harness choice
 - model choice
@@ -63,7 +63,7 @@ The weights below come from the RAIDAR-specific comparison work and intentionall
 | Dimension | Weight | RAIDAR | Inspect AI | Promptfoo | DeepEval |
 | --- | ---: | ---: | ---: | ---: | ---: |
 | Scenario/task contract authoring flexibility | 14 | 5 | 4 | 3 | 2 |
-| Harness/runtime as experimental variable | 16 | 5 | 5 | 3 | 1 |
+| Harness as experimental variable | 16 | 5 | 5 | 3 | 1 |
 | Model abstraction and multi-model execution | 8 | 5 | 5 | 5 | 2 |
 | Matrix/repeats/sweep support | 12 | 5 | 5 | 4 | 2 |
 | Custom metrics/scorers/evaluator composition | 12 | 5 | 5 | 5 | 5 |
@@ -82,7 +82,7 @@ RAIDAR scores highest when the matrix reflects its own purpose. That is expected
 The most important rows are:
 
 - **Scenario/task contract authoring flexibility**
-- **Harness/runtime as experimental variable**
+- **Harness as experimental variable**
 - **Matrix/repeats/sweep support**
 - **Fit for real project delivery tasks**
 

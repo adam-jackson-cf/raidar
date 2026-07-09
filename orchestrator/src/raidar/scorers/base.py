@@ -7,7 +7,7 @@ from typing import Any, ClassVar, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from raidar.schemas.scenario import ScorerMetricDefinition
+from raidar.schemas.scenario import CapabilityRequirements, ScorerMetricDefinition
 
 
 class ScorerResolutionError(ValueError):
@@ -26,7 +26,7 @@ class ScorerDefinition(BaseModel):
     description: str
     metrics: list[ScorerMetricDefinition] = Field(min_length=1)
     extends: str | None = None
-    runtime: str | None = None
+    requirements: CapabilityRequirements = Field(default_factory=CapabilityRequirements)
 
     @model_validator(mode="after")
     def _validate_metric_weights(self) -> ScorerDefinition:
@@ -70,7 +70,7 @@ class BaseScorer:
     description: ClassVar[str]
     metrics: ClassVar[tuple[ScorerMetricDefinition, ...]]
     extends: ClassVar[str | None] = None
-    runtime: ClassVar[str | None] = None
+    requirements: ClassVar[CapabilityRequirements] = CapabilityRequirements()
 
     @classmethod
     def definition(cls) -> ScorerDefinition:
@@ -84,7 +84,7 @@ class BaseScorer:
             description=cls.description,
             metrics=list(cls.metrics),
             extends=cls.extends,
-            runtime=cls.runtime,
+            requirements=cls.requirements,
         )
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:

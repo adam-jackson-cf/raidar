@@ -5,17 +5,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from raidar.runtime.command_records import _normalize_command
+from raidar.harness import HarnessDefinitionError, harness_definition
+from raidar.harness.command_records import _normalize_command
 from raidar.runtime.harness_logs import _extract_item_completed, _read_jsonl_dicts
 from raidar.schemas.events import TraceEvent
 
 
 def _harness_emits_structured_trace_events(harness: str) -> bool:
-    if harness == "codex-cli":
-        return True
-    if harness in {"claude-code", "gemini", "cursor", "copilot", "pi"}:
-        return False
-    raise ValueError(f"Unsupported harness for trace event extraction: {harness}")
+    try:
+        return harness_definition(harness).emits_structured_trace_events
+    except HarnessDefinitionError as exc:
+        raise ValueError(f"Unsupported harness: {harness}") from exc
 
 
 def _events_from_command(timestamp: str, item: dict) -> list[TraceEvent]:
@@ -84,8 +84,9 @@ def collect_trace_events(
     if not _harness_emits_structured_trace_events(harness):
         return []
 
+    event_stream = harness_definition(harness).event_stream_pointer
     events: list[TraceEvent] = []
-    for entry in _read_jsonl_dicts(trial_dir / "agent" / "codex.txt"):
+    for entry in _read_jsonl_dicts(trial_dir / "agent" / event_stream):
         timestamp = str(entry.get("timestamp") or datetime.now(UTC).isoformat())
         item = _extract_item_completed(entry)
         if not item:

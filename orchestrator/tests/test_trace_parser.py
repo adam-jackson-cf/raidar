@@ -3,7 +3,7 @@
 import json
 from pathlib import Path
 
-from raidar.parser.trace_log import (
+from raidar.harness.trace_log import (
     parse_claude_trace,
     parse_copilot_trace,
     parse_cursor_trace,

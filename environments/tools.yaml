@@ -1,0 +1,39 @@
+version: 1
+tools:
+  runtimes:
+    python:
+      probe: [python, --version]
+    node:
+      probe: [node, --version]
+  package_managers:
+    bun:
+      probe: [bun, --version]
+    pip:
+      probe: [python, -m, pip, --version]
+  tools:
+    git:
+      probe: [git, --version]
+    pytest:
+      probe: [python, -m, pytest, --version]
+    coverage:
+      probe: [python, -m, coverage, --version]
+    ruff:
+      probe: [python, -m, ruff, --version]
+    lizard:
+      probe: [python, -m, lizard, --version]
+    typescript:
+      probe: [bunx, tsc, --version]
+    playwright:
+      probe: [bunx, playwright, --version]
+    odiff:
+      probe: [bunx, odiff-bin, --version]
+  browsers:
+    chromium:
+      probe:
+        - sh
+        - -lc
+        - >-
+          bunx playwright --version >/dev/null &&
+          find /root/.cache/ms-playwright /ms-playwright
+          -maxdepth 3 -iname '*chromium*' -print -quit 2>/dev/null | grep -q .
+      installed_value: installed

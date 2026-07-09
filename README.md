@@ -66,6 +66,7 @@ If your local Codex login is stored in the OS keyring instead of `~/.codex/auth.
 The repository has four primary concerns:
 
 - `orchestrator/`: CLI and runtime pipeline that executes and scores scenarios.
+- `environments/`: Docker-backed runtime stack presets and capability inventories used by scenarios.
 - `matrices/`: stored matrix definitions that bind scenario revisions to AgentSpecs.
 - `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
@@ -95,21 +96,27 @@ make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml
 
 ## Core Concepts
 
-- A `scenario` is the contract: prompt, rules, starter, verification settings, requirements, attached scorers, and optional visual baseline.
+- A `scenario` is the contract: prompt, rules, starter, runtime stack selection, verification settings, requirements, attached scorers, and optional visual baseline.
+- A `runtime stack` is the Docker execution environment selected by `environment.id`, such as `node:20` or `python:3.12`.
+- A `capability` is concrete image inventory: runtimes, package managers, tools, and browsers. Capabilities describe what is available, not what the scenario or scorer does with it.
 - A `scorer` is a reusable delivery-task scoring definition made of weighted metrics. Scenario `scorers[]` entries attach one or more scorers and assign scorer-level weights.
 - A `metric` is one measured signal inside a scorer, such as `functional`, `visual-regression`, `artifact-checks`, or `plan-adherence`.
-- A `harness` is the executable/runtime surface previously referred to as an agent.
+- A `harness` is the CLI execution surface used to run the model in Harbor.
 - An `AgentSpec` is one harness plus one model.
 - An `experiment` is one `AgentSpec` run against one scenario, usually with repeats.
 - A `benchmark` is a pinned experiment used as a stable comparison anchor across runs, scenario revisions, or decision points.
 - A `matrix config` uses `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries`; each entry declares `scenario_revision` and a nested `agent` with `harness`, `provider`, `model`, and optional `reasoning_effort`.
 - A `run artifact` is the evidence bundle for one repeat, centered on `run.json` plus verifier outputs and harness logs.
+- An `effective run contract` is the resolved runtime stack, verifier runner, harness requirements, scenario requirements, and scorer requirements used for task-image validation and cache identity.
 - An `evaluation_profile` is the weighted scorer set derived from `scorers[]`, such as `scorers:design-to-code@1:0.9+resource-efficiency@1:0.1`; use it as part of the identity when comparing experiments.
 
 Canonical artifact paths use `runs/` and `harness/` under each experiment.
 
 ## Go Deeper
 
-- [docs/references/metrics.md](/Users/adamjackson/Projects/complete/raidar/docs/references/metrics.md): what each metric measures, when to use it, and where to inspect evidence.
-- [docs/references/homepage-scenario-walkthrough.md](/Users/adamjackson/Projects/complete/raidar/docs/references/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
-- [docs/references/raidar-framework-comparison.md](/Users/adamjackson/Projects/complete/raidar/docs/references/raidar-framework-comparison.md): comparison memo covering RAIDAR's delivery-focused differentiators and how it compares with Inspect AI, Promptfoo, and DeepEval.
+- [docs/references/new-scenario.md](docs/references/new-scenario.md): how to author scenario YAML, choose runtime stacks, attach scorers, and validate a scenario.
+- [docs/references/orchestration-flow.md](docs/references/orchestration-flow.md): how scenario resolution, runtime stack validation, Harbor execution, scoring, and artifacts fit together.
+- [docs/references/metrics.md](docs/references/metrics.md): what each scorer and metric measures, when to use it, and where to inspect evidence.
+- [docs/references/new-harness.md](docs/references/new-harness.md): how to add a harness while keeping rules, artifacts, trace parsing, and runtime requirements comparable.
+- [docs/references/homepage-scenario-walkthrough.md](docs/references/homepage-scenario-walkthrough.md): a high-level teaching walkthrough of the homepage scenario and eval design flow.
+- [docs/references/raidar-framework-comparison.md](docs/references/raidar-framework-comparison.md): comparison memo covering RAIDAR's delivery-focused differentiators and how it compares with Inspect AI, Promptfoo, and DeepEval.

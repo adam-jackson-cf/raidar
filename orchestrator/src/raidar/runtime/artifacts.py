@@ -10,25 +10,26 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from raidar.harness import harness_definition
 from raidar.runtime.harbor_results import (
     _verifier_scorecard_path,
 )
-from raidar.runtime.harness_logs import (
-    _harness_event_stream_pointer,
-)
 from raidar.runtime.models import (
     EvaluationOutputs,
+    GateEvent,
     HarborExecutionResult,
     RunLayout,
     RunRequest,
     WorkspaceContext,
 )
+from raidar.runtime.verifier_runners import verifier_output_manifest
 from raidar.runtime.workspace import (
     scenario_evaluation_profile,
     scenario_metrics,
     scenario_scorers,
 )
 from raidar.runtime.workspace_artifacts import (
+    _visual_artifact_manifest,
     _visual_reference_assets,
     _visual_region_names,
 )
@@ -39,7 +40,6 @@ from raidar.sanitization import (
     sanitize_evidence_payload,
     sanitize_persisted_text,
 )
-from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
     CoverageScore,
     ExecutionValidityScore,
@@ -153,9 +153,7 @@ def build_starter_meta(request: RunRequest, context: WorkspaceContext) -> dict:
     }
 
 
-def build_scenario_revision_meta(
-    request: RunRequest, context: WorkspaceContext
-) -> dict[str, str | None]:
+def build_scenario_revision_meta(request: RunRequest, context: WorkspaceContext) -> dict[str, Any]:
     """Build deterministic scenario/starter fingerprint metadata."""
     scenario_path = request.scenario_dir / "scenario.yaml"
     scenario_yaml_hash = _hash_bytes(scenario_path.read_bytes()) if scenario_path.exists() else None
@@ -177,6 +175,14 @@ def build_scenario_revision_meta(
         "evaluation_profile": scenario_evaluation_profile(request.scenario),
         "metrics": scenario_metrics(request.scenario),
         "scorers": scenario_scorers(request.scenario),
+        "environment": request.scenario.environment.model_dump(mode="json"),
+        "scorer_requirements": [
+            {
+                "scorer": scorer.ref,
+                "requirements": scorer.requirements.model_dump(mode="json"),
+            }
+            for scorer in request.scenario.resolved_scorers()
+        ],
     }
 
 
@@ -191,14 +197,7 @@ def persist_verifier_artifacts(
         return {}
 
     copied: dict[str, str] = {}
-    for filename in (
-        "scorecard.json",
-        "gate-history.json",
-        "execution-validity.json",
-        "performance-gates.json",
-        "reward.txt",
-        "test-stdout.txt",
-    ):
+    for filename in verifier_output_manifest():
         source = source_dir / filename
         if not source.exists():
             continue
@@ -313,16 +312,17 @@ def _persist_main_visual_artifacts(
     request: VisualEvidenceRequest, visual_dir: Path
 ) -> dict[str, str | None]:
     run_request = request.request
+    visual_artifacts = _visual_artifact_manifest(run_request.scenario)
     main_reference_name = Path(run_request.scenario.visual.reference_image).name
     artifacts = {
         "actual": _copy_optional_visual_asset(
-            request.workspace / "actual.png",
-            visual_dir / "actual.png",
+            request.workspace / visual_artifacts["actual"],
+            visual_dir / visual_artifacts["actual"],
         ),
         "reference": None,
         "diff": _copy_optional_visual_asset(
-            request.workspace / "diff.png",
-            visual_dir / "diff.png",
+            request.workspace / visual_artifacts["diff"],
+            visual_dir / visual_artifacts["diff"],
         ),
     }
     for source_reference, relative_target in _visual_reference_assets(run_request):
@@ -336,9 +336,8 @@ def _persist_region_visual_artifacts(
     request: VisualEvidenceRequest, visual_dir: Path
 ) -> list[dict[str, str | None]]:
     run_request = request.request
-    reference_image = Path(run_request.scenario.visual.reference_image)
     return [
-        _persist_region_visual_artifact(request, visual_dir, reference_image, region_name)
+        _persist_region_visual_artifact(request, visual_dir, region_name)
         for region_name in _visual_region_names(run_request)
     ]
 
@@ -346,23 +345,27 @@ def _persist_region_visual_artifacts(
 def _persist_region_visual_artifact(
     request: VisualEvidenceRequest,
     visual_dir: Path,
-    reference_image: Path,
     region_name: str,
 ) -> dict[str, str | None]:
-    reference_name = f"{reference_image.stem}-region-{region_name}{reference_image.suffix}"
+    region = next(
+        item for item in request.request.scenario.visual.regions if item.name == region_name
+    )
+    actual_name = region.actual_image
+    diff_name = region.diff_image
+    reference_name = region.reference_image
     return {
         "name": region_name,
         "actual": _copy_optional_visual_asset(
-            request.workspace / f"actual-region-{region_name}.png",
-            visual_dir / f"actual-region-{region_name}.png",
+            request.workspace / actual_name,
+            visual_dir / actual_name,
         ),
         "reference": _copy_optional_visual_asset(
-            request.request.scenario_dir / reference_image.parent / reference_name,
-            visual_dir / reference_name,
+            request.request.scenario_dir / reference_name,
+            visual_dir / Path(reference_name).name,
         ),
         "diff": _copy_optional_visual_asset(
-            request.workspace / f"diff-region-{region_name}.png",
-            visual_dir / f"diff-region-{region_name}.png",
+            request.workspace / diff_name,
+            visual_dir / diff_name,
         ),
     }
 
@@ -393,7 +396,7 @@ def _rebind_visual_evidence_paths(
 
 
 def persist_harness_artifacts(
-    harbor_result: HarborExecutionResult, harness_dir: Path
+    harbor_result: HarborExecutionResult, harness_dir: Path, *, harness: str
 ) -> dict[str, str]:
     """Persist Harbor harness transcripts and command history."""
     if not harbor_result.trial_dir:
@@ -403,19 +406,12 @@ def persist_harness_artifacts(
         return {}
 
     copied: dict[str, str] = {}
-    for filename in (
-        "trajectory.json",
-        "codex.txt",
-        "claude-code.txt",
-        "gemini-cli.txt",
-        "gemini-cli.trajectory.json",
-        "install.sh",
-        "final-app.tar.gz",
-    ):
+    for filename in harness_definition(harness).artifact_files:
         src = source / filename
         if src.exists():
             copied[filename] = str(_copy_sanitized_harness_artifact(src, harness_dir / filename))
-    final_app = harness_dir / "final-app.tar.gz"
+    final_archive = harness_definition(harness).final_workspace_archive
+    final_app = harness_dir / final_archive
     if final_app.exists():
         copied["project.final.tar.gz"] = str(
             shutil.copy2(final_app, harness_dir / "project.final.tar.gz")
@@ -486,6 +482,11 @@ def _is_sanitizable_text_path(path: Path) -> bool:
     return path.suffix.lower() in {".json", ".txt", ".log", ".sh", ".md"}
 
 
+def _harness_event_stream_pointer(harness_dir: Path, harness: str) -> str:
+    del harness_dir
+    return harness_definition(harness).event_stream_pointer
+
+
 def write_run_analysis(
     layout: RunLayout,
     request: RunRequest,
@@ -526,7 +527,7 @@ def write_run_analysis(
     ]
     event_stream = _harness_event_stream_pointer(layout.harness_dir, request.config.harness.value)
     lines.append(f"- harness_event_stream: `{event_stream}`")
-    lines.append(f"- homepage_post_screenshot: `{evidence_meta.get('homepage_post')}`")
+    lines.append(f"- post_run_visual_capture: `{evidence_meta.get('post_capture')}`")
     lines.append(f"- final_workspace_archive: `{evidence_meta.get('final_workspace_archive')}`")
     lines.append(f"- evidence_errors: `{evidence_meta.get('errors')}`")
     lines.append(f"- workspace_pruned_dirs: `{prune_meta.get('removed')}`")
