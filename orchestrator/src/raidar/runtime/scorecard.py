@@ -11,7 +11,6 @@ from raidar.config import settings
 from raidar.runtime.harbor_results import (
     _harbor_phase_timings,
     _load_json_dict,
-    _verifier_scorecard_path,
 )
 from raidar.runtime.models import (
     EvaluationOutputs,
@@ -405,18 +404,19 @@ def _scorecard_harbor_metadata(
 def _scorecard_verifier_metadata(
     execution: ExecutionPhaseResult, artifacts: PersistedArtifacts
 ) -> dict[str, Any]:
-    verifier_scorecard_path = _verifier_scorecard_path(execution.harbor_result.trial_dir)
-    verifier_payload = _load_json_dict(verifier_scorecard_path) if verifier_scorecard_path else {}
-    verifier_metadata = verifier_payload.get("metadata")
-    command_timings = (
-        verifier_metadata.get("command_timings_sec")
-        if isinstance(verifier_metadata, dict)
+    evidence_path = (
+        execution.harbor_result.trial_dir / "verifier" / "evidence.json"
+        if execution.harbor_result.trial_dir
         else None
     )
+    evidence_payload = _load_json_dict(evidence_path) if evidence_path else {}
+    evidence_metadata = evidence_payload.get("metadata")
     return {
-        "scorecard": str(verifier_scorecard_path) if verifier_scorecard_path else None,
+        "evidence": str(evidence_path) if evidence_path else None,
         "artifacts": artifacts.verifier_artifacts,
-        "command_timings_sec": command_timings,
+        "action_count": (
+            evidence_metadata.get("action_count") if isinstance(evidence_metadata, dict) else None
+        ),
     }
 
 

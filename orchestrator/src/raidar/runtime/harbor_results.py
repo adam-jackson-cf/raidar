@@ -146,9 +146,3 @@ def _harbor_phase_timings(trial_dir: Path | None) -> dict[str, float]:
         "verifier_sec": _phase_duration(payload, "verifier"),
     }
     return {key: value for key, value in timings.items() if value is not None}
-
-
-def _verifier_scorecard_path(trial_dir: Path | None) -> Path | None:
-    if not trial_dir:
-        return None
-    return trial_dir / "verifier" / "scorecard.json"

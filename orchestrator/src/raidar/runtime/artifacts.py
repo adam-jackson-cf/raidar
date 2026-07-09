@@ -5,15 +5,11 @@ from __future__ import annotations
 import json
 import shutil
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from pydantic import ValidationError
-
 from raidar.harness import harness_definition
-from raidar.runtime.harbor_results import (
-    _verifier_scorecard_path,
-)
 from raidar.runtime.models import (
     EvaluationOutputs,
     GateEvent,
@@ -22,7 +18,6 @@ from raidar.runtime.models import (
     RunRequest,
     WorkspaceContext,
 )
-from raidar.runtime.verifier_runners import verifier_output_manifest
 from raidar.runtime.workspace import (
     scenario_evaluation_profile,
     scenario_metrics,
@@ -44,7 +39,6 @@ from raidar.schemas.scorecard import (
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
-    MetricScore,
     PerformanceGatesScore,
     RequirementsCoverageScore,
     Scorecard,
@@ -53,6 +47,7 @@ from raidar.schemas.scorecard import (
 )
 
 SCORING_SCHEMA_VERSION = "2.0.0"
+EVIDENCE_OUTPUT_MANIFEST = ("action-logs", "evidence.json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,69 +59,80 @@ class VisualEvidenceRequest:
     run_root_dir: Path
 
 
-def _parse_gate_history(payload: dict[str, Any]) -> list[GateEvent]:
-    return _parse_scorecard_list(payload, "gate_history", GateEvent)
+def _load_evidence_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | None, str | None]:
+    evidence_path = _evidence_json_path(trial_dir)
+    if not evidence_path:
+        return None, "Harbor trial directory not found."
+    if not evidence_path.exists():
+        return None, f"Evidence output missing: {evidence_path}"
+    try:
+        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return None, f"Invalid evidence JSON: {exc.msg}"
+    if not isinstance(payload, dict):
+        return None, "Invalid evidence content: expected object root."
+    return _outputs_from_evidence(payload), None
 
 
-def _parse_metric_scores(payload: dict[str, Any]) -> list[MetricScore]:
-    return _parse_scorecard_list(payload, "metric_scores", MetricScore)
+def _evidence_json_path(trial_dir: Path | None) -> Path | None:
+    if trial_dir is None:
+        return None
+    return trial_dir / "verifier" / "evidence.json"
 
 
-def _parse_scorecard_list(
-    payload: dict[str, Any],
-    field_name: str,
-    model_type,
-):
-    items = payload.get(field_name)
-    if not isinstance(items, list):
-        raise ValueError(f"scorecard.{field_name} must be a list")
-    return [model_type.model_validate(item) for item in items]
-
-
-def _parse_verifier_scorecard(payload: dict[str, Any]) -> EvaluationOutputs:
-    gate_history = _parse_gate_history(payload)
-    metric_scores = _parse_metric_scores(payload)
+def _outputs_from_evidence(payload: dict[str, Any]) -> EvaluationOutputs:
+    gate_history = _gate_history_from_evidence(payload.get("actions"))
+    command_count = len(gate_history)
+    passed_count = sum(1 for event in gate_history if event.exit_code == 0)
+    failed_count = command_count - passed_count
     return EvaluationOutputs(
-        functional=FunctionalScore.model_validate(payload.get("functional")),
-        visual=(
-            VisualScore.model_validate(payload.get("visual"))
-            if payload.get("visual") is not None
-            else None
+        functional=FunctionalScore(
+            passed=failed_count == 0,
+            tests_passed=passed_count,
+            tests_total=command_count,
+            build_succeeded=failed_count == 0,
+            gates_passed=passed_count,
+            gates_total=command_count,
         ),
-        verification_stability=VerificationStabilityScore.model_validate(
-            payload.get("verification_stability")
-        ),
-        test_coverage=CoverageScore.model_validate(payload.get("test_coverage")),
-        requirements_coverage=RequirementsCoverageScore.model_validate(
-            payload.get("requirements_coverage")
-        ),
-        execution_validity=ExecutionValidityScore.model_validate(payload.get("execution_validity")),
-        performance_gates=PerformanceGatesScore.model_validate(payload.get("performance_gates")),
-        metric_scores=metric_scores,
+        visual=None,
+        verification_stability=VerificationStabilityScore(total_gate_failures=failed_count),
+        test_coverage=CoverageScore(threshold=None, measured=None, source=None, passed=True),
+        requirements_coverage=RequirementsCoverageScore(),
+        execution_validity=ExecutionValidityScore(checks=[]),
+        performance_gates=PerformanceGatesScore(checks=[]),
+        metric_scores=[],
         gate_history=gate_history,
     )
 
 
-def _load_verifier_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | None, str | None]:
-    scorecard_path = _verifier_scorecard_path(trial_dir)
-    if not scorecard_path:
-        return None, "Harbor trial directory not found."
-    if not scorecard_path.exists():
-        return None, f"Verifier scorecard missing: {scorecard_path}"
+def _gate_history_from_evidence(actions: Any) -> list[GateEvent]:
+    if not isinstance(actions, list):
+        return []
+    events = []
+    timestamp = datetime(1970, 1, 1, tzinfo=UTC).isoformat()
+    for action in actions:
+        if not isinstance(action, dict) or action.get("kind") != "command":
+            continue
+        result = action.get("result")
+        if not isinstance(result, dict):
+            continue
+        events.append(
+            GateEvent(
+                timestamp=timestamp,
+                gate_name=str(action.get("id") or "command"),
+                command=_command_text(result.get("command")),
+                exit_code=int(result.get("exit_code") or 0),
+                stdout=str(result.get("stdout") or ""),
+                stderr=str(result.get("stderr") or ""),
+            )
+        )
+    return events
 
-    try:
-        payload = json.loads(scorecard_path.read_text())
-    except json.JSONDecodeError as exc:
-        return None, f"Invalid verifier scorecard JSON: {exc.msg}"
-    if not isinstance(payload, dict):
-        return None, "Invalid verifier scorecard content: expected object root."
 
-    try:
-        outputs = _parse_verifier_scorecard(payload)
-    except (ValidationError, ValueError) as exc:
-        return None, f"Invalid verifier scorecard content: {exc}"
-
-    return outputs, None
+def _command_text(command: Any) -> str:
+    if isinstance(command, list):
+        return " ".join(str(part) for part in command)
+    return str(command or "")
 
 
 def build_starter_meta(request: RunRequest, context: WorkspaceContext) -> dict:
@@ -197,13 +203,25 @@ def persist_verifier_artifacts(
         return {}
 
     copied: dict[str, str] = {}
-    for filename in verifier_output_manifest():
+    for filename in EVIDENCE_OUTPUT_MANIFEST:
         source = source_dir / filename
         if not source.exists():
             continue
         target = verifier_dir / filename
-        copied[filename] = str(_copy_sanitized_verifier_artifact(source, target))
+        if source.is_dir():
+            copied[filename] = str(_copy_sanitized_verifier_artifact_dir(source, target))
+        else:
+            copied[filename] = str(_copy_sanitized_verifier_artifact(source, target))
     return copied
+
+
+def _copy_sanitized_verifier_artifact_dir(source: Path, target: Path) -> Path:
+    if target.exists():
+        shutil.rmtree(target)
+    for child in sorted(path for path in source.rglob("*") if path.is_file()):
+        relative = child.relative_to(source)
+        _copy_sanitized_verifier_artifact(child, target / relative)
+    return target
 
 
 def _copy_sanitized_verifier_artifact(source: Path, target: Path) -> Path:

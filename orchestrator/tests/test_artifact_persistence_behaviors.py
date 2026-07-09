@@ -63,62 +63,92 @@ def _outputs(
     )
 
 
-def test_load_verifier_outputs_reports_missing_invalid_and_valid_scorecards(monkeypatch, tmp_path):
-    monkeypatch.setattr(artifacts, "_verifier_scorecard_path", lambda trial: None)
-    assert artifacts._load_verifier_outputs(tmp_path) == (
+def test_load_evidence_outputs_reports_missing_invalid_and_valid_evidence(tmp_path):
+    assert artifacts._load_evidence_outputs(None) == (
         None,
         "Harbor trial directory not found.",
     )
 
-    scorecard_path = tmp_path / "scorecard.json"
-    monkeypatch.setattr(artifacts, "_verifier_scorecard_path", lambda trial: scorecard_path)
-    assert "Verifier scorecard missing" in artifacts._load_verifier_outputs(tmp_path)[1]
+    verifier_dir = tmp_path / "verifier"
+    verifier_dir.mkdir()
+    evidence_path = verifier_dir / "evidence.json"
+    assert "Evidence output missing" in artifacts._load_evidence_outputs(tmp_path)[1]
 
-    scorecard_path.write_text("{", encoding="utf-8")
+    evidence_path.write_text("{", encoding="utf-8")
     assert (
-        artifacts._load_verifier_outputs(tmp_path)[1]
-        == "Invalid verifier scorecard JSON: Expecting property name enclosed in double quotes"
+        artifacts._load_evidence_outputs(tmp_path)[1]
+        == "Invalid evidence JSON: Expecting property name enclosed in double quotes"
     )
 
-    scorecard_path.write_text("[]", encoding="utf-8")
-    assert artifacts._load_verifier_outputs(tmp_path)[1] == (
-        "Invalid verifier scorecard content: expected object root."
+    evidence_path.write_text("[]", encoding="utf-8")
+    assert artifacts._load_evidence_outputs(tmp_path)[1] == (
+        "Invalid evidence content: expected object root."
     )
-
-    scorecard_path.write_text('{"gate_history":[]}', encoding="utf-8")
-    assert "Invalid verifier scorecard content" in artifacts._load_verifier_outputs(tmp_path)[1]
 
     payload = {
-        "functional": _outputs().functional.model_dump(mode="json"),
-        "visual": None,
-        "verification_stability": _outputs().verification_stability.model_dump(mode="json"),
-        "test_coverage": _outputs().test_coverage.model_dump(mode="json"),
-        "requirements_coverage": _outputs().requirements_coverage.model_dump(mode="json"),
-        "execution_validity": _outputs().execution_validity.model_dump(mode="json"),
-        "performance_gates": _outputs().performance_gates.model_dump(mode="json"),
-        "metric_scores": [metric.model_dump(mode="json") for metric in _outputs().metric_scores],
-        "gate_history": [event.model_dump(mode="json") for event in _outputs().gate_history],
+        "actions": [
+            "ignored",
+            {"id": "coverage.summary", "kind": "read_json", "result": {"content": {}}},
+            {"id": "bad-command", "kind": "command"},
+            {
+                "id": "design-to-code.build",
+                "kind": "command",
+                "status": "ok",
+                "result": {
+                    "command": ["bun", "run", "build"],
+                    "exit_code": 0,
+                    "stdout": "ok",
+                    "stderr": "",
+                },
+            },
+            {
+                "id": "design-to-code.lint",
+                "kind": "command",
+                "status": "error",
+                "result": {
+                    "command": "bun run lint",
+                    "exit_code": 1,
+                    "stdout": "",
+                    "stderr": "lint failed",
+                },
+            },
+            {
+                "id": "design-to-code.typecheck",
+                "kind": "command",
+                "result": {"command": None, "stdout": None, "stderr": None},
+            },
+        ]
     }
-    scorecard_path.write_text(json.dumps(payload), encoding="utf-8")
-    loaded, error = artifacts._load_verifier_outputs(tmp_path)
+    evidence_path.write_text(json.dumps(payload), encoding="utf-8")
+    loaded, error = artifacts._load_evidence_outputs(tmp_path)
     assert error is None
-    assert loaded.functional.passed is True
-    assert loaded.visual is None
+    assert loaded.functional.passed is False
+    assert loaded.functional.tests_passed == 2
+    assert loaded.functional.tests_total == 3
+    assert loaded.verification_stability.total_gate_failures == 1
+    assert loaded.gate_history[0].gate_name == "design-to-code.build"
+    assert loaded.gate_history[1].command == "bun run lint"
+    assert loaded.gate_history[1].exit_code == 1
+    assert loaded.gate_history[2].command == ""
 
 
 def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
     trial_dir = tmp_path / "trial"
     verifier_source = trial_dir / "verifier"
     verifier_source.mkdir(parents=True)
-    for name in ("scorecard.json", "reward.txt", "test-stdout.txt"):
-        (verifier_source / name).write_text(name, encoding="utf-8")
+    (verifier_source / "evidence.json").write_text('{"actions":[]}', encoding="utf-8")
+    (verifier_source / "action-logs").mkdir()
+    (verifier_source / "action-logs" / "001-build.json").write_text(
+        '{"status":"ok"}',
+        encoding="utf-8",
+    )
 
     harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
     target = tmp_path / "canonical" / "verifier"
     target.mkdir(parents=True)
 
     copied = artifacts.persist_verifier_artifacts(harbor_result, target)
-    assert set(copied) == {"scorecard.json", "reward.txt", "test-stdout.txt"}
+    assert set(copied) == {"evidence.json", "action-logs"}
     assert (
         artifacts.persist_verifier_artifacts(
             HarborExecutionResult(False, None, tmp_path / "job", None), target
@@ -154,30 +184,67 @@ def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
     assert (target / "reward.txt").read_text(encoding="utf-8") == "0"
 
 
+def test_build_scenario_revision_meta_uses_canonical_scenario_seed(tmp_path):
+    scenario_dir = tmp_path / "scenario"
+    scenario_dir.mkdir()
+    (scenario_dir / "scenario.yaml").write_text("name: demo\n", encoding="utf-8")
+    request = SimpleNamespace(
+        scenario_dir=scenario_dir,
+        scenario=SimpleNamespace(
+            name="demo",
+            scenario_revision="v001",
+            starter=SimpleNamespace(root="starter"),
+            scorers=[SimpleNamespace(id="design-to-code", version=1, weight=1.0)],
+            metric_ids=lambda: ["visual-regression"],
+            scorer_ids=lambda: ["design-to-code@1"],
+            environment=SimpleNamespace(model_dump=lambda **_kwargs: {"id": "node"}),
+            resolved_scorers=lambda: [
+                SimpleNamespace(
+                    ref="design-to-code@1",
+                    requirements=SimpleNamespace(model_dump=lambda **_kwargs: {}),
+                )
+            ],
+            model_dump=lambda **_kwargs: {"name": "demo", "scenario_revision": "v001"},
+        ),
+    )
+    context = SimpleNamespace(starter_source=SimpleNamespace(fingerprint="starter-hash"))
+
+    meta = artifacts.build_scenario_revision_meta(request, context)
+
+    assert meta["scoring_schema_version"] == artifacts.SCORING_SCHEMA_VERSION
+    assert meta["scenario_yaml_hash"]
+    assert meta["scenario_fingerprint"]
+    assert meta["evaluation_profile"] == "scorers:design-to-code@1:1"
+    assert meta["metrics"] == ["visual-regression"]
+    assert meta["scorer_requirements"] == [{"scorer": "design-to-code@1", "requirements": {}}]
+
+
 def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
     trial_dir = tmp_path / "trial"
     verifier_source = trial_dir / "verifier"
     verifier_source.mkdir(parents=True)
-    (verifier_source / "scorecard.json").write_text(
+    (verifier_source / "evidence.json").write_text(
         json.dumps(
             {
-                "gate_history": [
+                "actions": [
                     {
-                        "command": "pytest --token=abcdefghijklmnop",
-                        "stdout": "Bearer abcdefghijklmnop",
-                        "stderr": "password=hunter2value",
+                        "id": "python-code-task.pytest",
+                        "kind": "command",
+                        "status": "ok",
+                        "result": {
+                            "command": "pytest --token=abcdefghijklmnop",
+                            "stdout": "Bearer abcdefghijklmnop",
+                            "stderr": "password=hunter2value",
+                        },
                     }
                 ]
             }
         ),
         encoding="utf-8",
     )
-    (verifier_source / "gate-history.json").write_text(
-        json.dumps([{"stdout": "api_key=abcdefghijklmnop", "stderr": "ok"}]),
-        encoding="utf-8",
-    )
-    (verifier_source / "test-stdout.txt").write_text(
-        "token=abcdefghijklmnop\nBearer abcdefghijklmnop",
+    (verifier_source / "action-logs").mkdir()
+    (verifier_source / "action-logs" / "001-pytest.json").write_text(
+        json.dumps({"stdout": "api_key=abcdefghijklmnop", "stderr": "ok"}),
         encoding="utf-8",
     )
 
@@ -188,9 +255,8 @@ def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
 
     copied_text = "\n".join(
         [
-            (target / "scorecard.json").read_text(encoding="utf-8"),
-            (target / "gate-history.json").read_text(encoding="utf-8"),
-            (target / "test-stdout.txt").read_text(encoding="utf-8"),
+            (target / "evidence.json").read_text(encoding="utf-8"),
+            (target / "action-logs" / "001-pytest.json").read_text(encoding="utf-8"),
         ]
     )
     assert "abcdefghijklmnop" not in copied_text

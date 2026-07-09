@@ -8,6 +8,11 @@ from typing import Any, ClassVar, Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from raidar.schemas.scenario import CapabilityRequirements, ScorerMetricDefinition
+from raidar.scorers.verification import (
+    VerificationEvidence,
+    VerificationPlan,
+    VerificationPlanContext,
+)
 
 
 class ScorerResolutionError(ValueError):
@@ -48,6 +53,7 @@ class ScorerContext:
     execution: Any
     resource_efficiency: Any
     execution_validity: Any
+    verification_evidence: VerificationEvidence = field(default_factory=VerificationEvidence)
     workspace_changes: dict[str, Any] = field(default_factory=dict)
     retained_evidence: dict[str, Any] = field(default_factory=dict)
 
@@ -71,6 +77,12 @@ class BaseScorer:
     metrics: ClassVar[tuple[ScorerMetricDefinition, ...]]
     extends: ClassVar[str | None] = None
     requirements: ClassVar[CapabilityRequirements] = CapabilityRequirements()
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Return scorer-owned raw-evidence actions for this run."""
+
+        del context
+        return VerificationPlan(owner=self.id, actions=())
 
     @classmethod
     def definition(cls) -> ScorerDefinition:

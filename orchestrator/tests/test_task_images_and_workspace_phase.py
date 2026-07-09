@@ -387,18 +387,18 @@ def test_execute_harbor_phase_recovers_timeout_when_verifier_outputs_exist(
         lambda *args, **kwargs: runner._empty_process_metrics(),
     )
     monkeypatch.setattr(runner, "collect_trace_events", lambda *args, **kwargs: [])
-    verifier_outputs = runner.terminated_outputs(None)
+    evidence_outputs = runner.terminated_outputs(None)
     monkeypatch.setattr(
         runner,
-        "_load_verifier_outputs",
-        lambda _trial_dir: (verifier_outputs, None),
+        "_load_evidence_outputs",
+        lambda _trial_dir: (evidence_outputs, None),
     )
 
     result = execution_phase.execute_harbor_phase(request, phase)
 
     assert result.terminated_early is False
     assert result.termination_reason is None
-    assert result.outputs == verifier_outputs
+    assert result.outputs == evidence_outputs
 
 
 def test_execute_harbor_phase_raises_when_usage_missing_without_termination(

@@ -19,11 +19,7 @@ from raidar.runtime.models import (
     TaskImageRef,
     WorkspaceContext,
 )
-from raidar.runtime.workspace_artifacts import (
-    _runtime_copy_excludes,
-    _visual_artifact_manifest,
-    _visual_reference_assets,
-)
+from raidar.runtime.workspace_artifacts import _runtime_copy_excludes, _visual_reference_assets
 from raidar.runtime.workspace_cache import (
     RAIDAR_CACHE_VERSION,
     BaselineWorkspaceRequest,
@@ -34,121 +30,7 @@ from raidar.runtime.workspace_cache import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
-
-
-def _load_baseline_scripts(starter_source: Any) -> dict[str, str]:
-    package_path = starter_source.path / "package.json"
-    if not package_path.exists():
-        return {}
-    try:
-        payload = json.loads(package_path.read_text())
-    except json.JSONDecodeError:
-        return {}
-    scripts = payload.get("scripts")
-    if not isinstance(scripts, dict):
-        return {}
-    return {str(key): str(value) for key, value in scripts.items()}
-
-
-def _scenario_spec_metrics_block(request: RunRequest) -> list[dict[str, Any]]:
-    return [
-        metric.model_dump(mode="json", exclude_none=True)
-        for metric in request.scenario.resolved_metrics()
-    ]
-
-
-def _scenario_spec_scorers_block(request: RunRequest) -> list[dict[str, Any]]:
-    return [
-        {
-            "id": scorer.id,
-            "version": scorer.version,
-            "status": scorer.status,
-            "category": scorer.category,
-            "description": scorer.description,
-            "weight": scorer.weight,
-            "extends": scorer.extends,
-            "requirements": scorer.requirements.model_dump(mode="json"),
-            "metrics": [metric.model_dump(mode="json") for metric in scorer.metrics],
-        }
-        for scorer in request.scenario.resolved_scorers()
-    ]
-
-
-def _scenario_spec_verification_block(request: RunRequest) -> dict[str, Any]:
-    return {
-        "max_gate_failures": request.scenario.verification.max_gate_failures,
-        "coverage_threshold": request.scenario.verification.coverage_threshold,
-        "min_quality_score": request.scenario.verification.min_quality_score,
-        "workflow": request.scenario.verification.workflow.model_dump(mode="json"),
-        "gates": [
-            {
-                "name": gate.name,
-                "command": gate.command,
-                "on_failure": gate.on_failure,
-            }
-            for gate in request.scenario.verification.gates
-        ],
-    }
-
-
-def _scenario_spec_requirements_block(request: RunRequest) -> dict[str, Any]:
-    return {
-        "items": [
-            {
-                "id": requirement.id,
-                "description": requirement.description,
-                "check": {
-                    "type": requirement.check.type,
-                    "pattern": requirement.check.pattern,
-                    "description": requirement.check.description,
-                },
-                "required_test_evidence": [
-                    evidence.model_dump(mode="json")
-                    for evidence in requirement.required_test_evidence
-                ],
-            }
-            for requirement in request.scenario.requirements.items
-        ],
-    }
-
-
-def _scenario_spec_visual_block(request: RunRequest) -> dict[str, Any] | None:
-    if request.scenario.visual is None:
-        return None
-    return {
-        "reference_image": request.scenario.visual.reference_image,
-        "screenshot_command": request.scenario.visual.screenshot_command,
-        "artifacts": _visual_artifact_manifest(request.scenario),
-        "viewport": (
-            request.scenario.visual.viewport.model_dump(mode="json")
-            if request.scenario.visual.viewport is not None
-            else None
-        ),
-        "scoring": request.scenario.visual.scoring.model_dump(mode="json", by_alias=True),
-        "pass_policy": request.scenario.visual.pass_policy.model_dump(mode="json"),
-        "regions": [region.model_dump(mode="json") for region in request.scenario.visual.regions],
-    }
-
-
-def _scenario_spec_environment_block(environment: ResolvedEnvironment) -> dict[str, Any]:
-    return environment.report_payload()
-
-
-def _build_verifier_scenario_spec(
-    request: RunRequest,
-    context: WorkspaceContext,
-    environment: ResolvedEnvironment,
-) -> dict:
-    return {
-        "scenario_name": request.scenario.name,
-        "environment": _scenario_spec_environment_block(environment),
-        "metrics": _scenario_spec_metrics_block(request),
-        "scorers": _scenario_spec_scorers_block(request),
-        "verification": _scenario_spec_verification_block(request),
-        "requirements": _scenario_spec_requirements_block(request),
-        "visual": _scenario_spec_visual_block(request),
-        "baseline_scripts": _load_baseline_scripts(context.starter_source),
-    }
+EVIDENCE_RUNNER_ASSET = Path(__file__).parent.parent / "assets" / "evidence_runner.py"
 
 
 def _resolve_contract(request: RunRequest):
@@ -360,22 +242,23 @@ def _render_environment_dockerfile(
 
 def _write_verifier_artifacts(
     request: RunRequest,
-    context: WorkspaceContext,
     tests_dir: Path,
-    environment: ResolvedEnvironment,
     contract: EffectiveRunContract,
 ) -> None:
-    (tests_dir / "scenario-spec.json").write_text(
-        json.dumps(_build_verifier_scenario_spec(request, context, environment), indent=2)
+    del request
+    verification_plan = contract.verification_plan.payload()
+    verification_plan["workspace"] = "/app"
+    verification_plan["output_dir"] = "/logs/verifier"
+    (tests_dir / "verification-plan.json").write_text(
+        json.dumps(verification_plan, indent=2) + "\n",
+        encoding="utf-8",
     )
-    runner = contract.verifier_runner
-    scorer_path = tests_dir / runner.bundle_filename
-    scorer_path.write_text(runner.asset_path.read_text(encoding="utf-8"))
-    verifier_command = runner.render_command()
+    evidence_runner_path = tests_dir / "evidence-runner.py"
+    evidence_runner_path.write_text(EVIDENCE_RUNNER_ASSET.read_text(encoding="utf-8"))
+    evidence_runner_path.chmod(0o755)
     final_workspace_archive = (
         contract.harness.final_workspace_archive if contract.harness else "final-app.tar.gz"
     )
-    scorer_path.chmod(0o755)
     test_script = tests_dir / "test.sh"
     test_script.write_text(
         f"""#!/usr/bin/env bash
@@ -385,13 +268,12 @@ SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
 mkdir -p /logs/verifier /logs/agent
 if [[ ! -d /app ]]; then
   echo "Missing /app workspace" >&2
-  echo "0" > /logs/verifier/reward.txt
   exit 1
 fi
 
-if ! {verifier_command}; then
-  echo "0" > /logs/verifier/reward.txt
-fi
+python "$SCRIPT_DIR/evidence-runner.py" \
+  "$SCRIPT_DIR/verification-plan.json" \
+  --output-dir /logs/verifier
 
 tar \
   --exclude='./node_modules' \
@@ -429,7 +311,7 @@ def create_harbor_task_bundle(
     _validate_public_base_images(dockerfile)
     dockerfile_path = environment_dir / "Dockerfile"
     dockerfile_path.write_text(dockerfile)
-    _write_verifier_artifacts(request, context, tests_dir, environment, contract)
+    _write_verifier_artifacts(request, tests_dir, contract)
     image_ref = _task_image_reference(request, bundle_dir, contract)
     (bundle_dir / "task.toml").write_text(
         _render_task_toml(request, image_ref.image_name if image_ref else None, environment)

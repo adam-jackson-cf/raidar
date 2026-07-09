@@ -13,7 +13,6 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from raidar.runtime.harbor import validate_public_base_images
-from raidar.runtime.verifier_runners import VerifierRunnerError, verifier_runner_definition
 from raidar.scenario_paths import resolve_relative_file
 from raidar.schemas.environment import (
     CapabilityRequirements,
@@ -43,25 +42,6 @@ class EnvironmentBuildMetadata(BaseModel):
         return value
 
 
-class EnvironmentVerifierMetadata(BaseModel):
-    """Library-owned verifier runner metadata."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    runner: str
-
-    @field_validator("runner")
-    @classmethod
-    def _validate_runner(cls, value: str) -> str:
-        if "@" not in value:
-            raise ValueError("verifier.runner must be a versioned runner id")
-        try:
-            verifier_runner_definition(value)
-        except VerifierRunnerError as exc:
-            raise ValueError(str(exc)) from exc
-        return value
-
-
 class EnvironmentLibraryEntry(BaseModel):
     """Repo-local environment metadata entry."""
 
@@ -71,7 +51,6 @@ class EnvironmentLibraryEntry(BaseModel):
     version: int = Field(ge=1)
     image: str
     build: EnvironmentBuildMetadata
-    verifier: EnvironmentVerifierMetadata
     capabilities: CapabilityRequirements = Field(default_factory=CapabilityRequirements)
 
 
@@ -85,7 +64,6 @@ class ResolvedEnvironment:
     metadata_path: Path
     dockerfile_fingerprint: str
     metadata_fingerprint: str
-    verifier_requirements: CapabilityRequirements
 
     @property
     def id(self) -> str:
@@ -123,8 +101,6 @@ class ResolvedEnvironment:
             "resources": self.resources.model_dump(mode="json"),
             "requirements": self.requirements.model_dump(mode="json"),
             "capabilities": self.library.capabilities.model_dump(mode="json"),
-            "verifier": self.library.verifier.model_dump(mode="json"),
-            "verifier_requirements": self.verifier_requirements.model_dump(mode="json"),
             "dockerfile": str(self.dockerfile_path),
             "metadata": str(self.metadata_path),
             "dockerfile_fingerprint": self.dockerfile_fingerprint,
@@ -143,8 +119,6 @@ class ResolvedEnvironment:
             "metadata": str(self.metadata_path),
             "requirements": self.requirements.model_dump(mode="json"),
             "capabilities": self.library.capabilities.model_dump(mode="json"),
-            "verifier": self.library.verifier.model_dump(mode="json"),
-            "verifier_requirements": self.verifier_requirements.model_dump(mode="json"),
         }
 
 
@@ -171,17 +145,11 @@ def resolve_scenario_environment(
         raise EnvironmentResolutionError(
             f"Unsupported environment kind {scenario.environment.kind!r}"
         )
-    verifier_requirements = verifier_runner_requirements(library.verifier.runner)
     requirement_errors = [
         *_capability_requirement_errors(
             owner="scenario environment",
             provided=library.capabilities,
             required=scenario.environment.requirements,
-        ),
-        *_capability_requirement_errors(
-            owner=f"verifier runner {library.verifier.runner}",
-            provided=library.capabilities,
-            required=verifier_requirements,
         ),
     ]
     for scorer in scenario.resolved_scorers():
@@ -204,7 +172,6 @@ def resolve_scenario_environment(
         metadata_path=metadata_path,
         dockerfile_fingerprint=_file_fingerprint(dockerfile_path),
         metadata_fingerprint=_file_fingerprint(metadata_path),
-        verifier_requirements=verifier_requirements,
     )
 
 
@@ -251,14 +218,14 @@ def scorer_requirements_payload(scenario) -> list[dict[str, Any]]:
 def combined_capability_requirements(
     *, scenario, environment: ResolvedEnvironment
 ) -> CapabilityRequirements:
-    """Return scenario, scorer, and verifier runner inventory requirements."""
+    """Return scenario and scorer inventory requirements."""
 
     combined = CapabilityRequirements.model_validate(
         environment.requirements.model_dump(mode="json")
     )
     for scorer in scenario.resolved_scorers():
         combined = merge_capability_requirements(combined, scorer.requirements)
-    return merge_capability_requirements(combined, environment.verifier_requirements)
+    return combined
 
 
 def merge_capability_requirements(
@@ -273,15 +240,6 @@ def merge_capability_requirements(
         tools=_merge_requirement_map(left.tools, right.tools),
         browsers=_merge_requirement_map(left.browsers, right.browsers),
     )
-
-
-def verifier_runner_requirements(runner: str) -> CapabilityRequirements:
-    """Return inventory requirements implied by a verifier runner."""
-
-    try:
-        return verifier_runner_definition(runner).required_capabilities
-    except VerifierRunnerError as exc:
-        raise EnvironmentResolutionError(str(exc)) from exc
 
 
 def _environment_library_entry_by_id(
@@ -304,7 +262,7 @@ def _custom_environment_entry(
     scenario_path: Path,
     repo_root: Path,
 ) -> tuple[EnvironmentLibraryEntry, Path, Path]:
-    if config.image is None or config.build is None or config.verifier is None:
+    if config.image is None or config.build is None:
         raise EnvironmentResolutionError("custom_docker environment metadata is incomplete")
     dockerfile_path = resolve_relative_file(
         repo_root,
@@ -325,7 +283,6 @@ def _custom_environment_entry(
                 "version": 1,
                 "image": config.image,
                 "build": config.build.model_dump(mode="json"),
-                "verifier": config.verifier.model_dump(mode="json"),
                 "capabilities": config.capabilities.model_dump(mode="json"),
             }
         )

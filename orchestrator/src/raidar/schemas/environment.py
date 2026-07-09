@@ -44,21 +44,6 @@ class EnvironmentBuildConfig(BaseModel):
         return value
 
 
-class EnvironmentVerifierConfig(BaseModel):
-    """Verifier runner selected by a custom environment."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    runner: str = Field(description="Versioned verifier runner id")
-
-    @field_validator("runner")
-    @classmethod
-    def _validate_runner(cls, value: str) -> str:
-        if "@" not in value:
-            raise ValueError("environment.verifier.runner must be a versioned runner id")
-        return value
-
-
 class EnvironmentConfig(BaseModel):
     """Scenario-owned execution environment contract."""
 
@@ -74,10 +59,6 @@ class EnvironmentConfig(BaseModel):
         default=None,
         description="Custom Docker build metadata for custom_docker environments",
     )
-    verifier: EnvironmentVerifierConfig | None = Field(
-        default=None,
-        description="Verifier runner metadata for custom_docker environments",
-    )
     capabilities: CapabilityRequirements = Field(
         default_factory=CapabilityRequirements,
         description="Dependency inventory provided by a custom image",
@@ -90,17 +71,13 @@ class EnvironmentConfig(BaseModel):
     @model_validator(mode="after")
     def _validate_kind_fields(self) -> EnvironmentConfig:
         if self.kind == "stack_preset":
-            if self.image is not None or self.build is not None or self.verifier is not None:
-                raise ValueError(
-                    "stack_preset environments must not declare image, build, or verifier"
-                )
+            if self.image is not None or self.build is not None:
+                raise ValueError("stack_preset environments must not declare image or build")
             if self.capabilities != CapabilityRequirements():
                 raise ValueError("stack_preset environments must not declare capabilities")
             return self
-        if self.image is None or self.build is None or self.verifier is None:
-            raise ValueError(
-                "custom_docker environments require image, build.dockerfile, and verifier.runner"
-            )
+        if self.image is None or self.build is None:
+            raise ValueError("custom_docker environments require image and build.dockerfile")
         if self.capabilities == CapabilityRequirements():
             raise ValueError("custom_docker environments require provided capabilities")
         return self

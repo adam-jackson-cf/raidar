@@ -17,7 +17,7 @@ from raidar.runtime import (
 )
 
 _empty_process_metrics = process_metrics._empty_process_metrics
-_load_verifier_outputs = runtime_artifacts._load_verifier_outputs
+_load_evidence_outputs = runtime_artifacts._load_evidence_outputs
 collect_process_metrics = process_metrics.collect_process_metrics
 ProcessMetricsError = process_metrics.ProcessMetricsError
 collect_trace_events = trace_events.collect_trace_events
@@ -32,25 +32,25 @@ def _resolve_harbor_outputs(
     termination_reason: str | None,
     failure_code: str | None,
 ) -> tuple[Any, bool, str | None]:
-    verifier_outputs = None
-    verifier_reason = None
+    evidence_outputs = None
+    evidence_reason = None
     if harbor_result.trial_dir is not None:
-        verifier_outputs, verifier_reason = _load_verifier_outputs(harbor_result.trial_dir)
+        evidence_outputs, evidence_reason = _load_evidence_outputs(harbor_result.trial_dir)
 
     recovered_from_timeout = (
-        terminated_early and verifier_outputs is not None and failure_code == "harbor_timeout"
+        terminated_early and evidence_outputs is not None and failure_code == "harbor_timeout"
     )
     if recovered_from_timeout:
-        return verifier_outputs, False, None
-    if not terminated_early and verifier_outputs is None:
-        return None, True, verifier_reason
+        return evidence_outputs, False, None
+    if not terminated_early and evidence_outputs is None:
+        return None, True, evidence_reason
     if terminated_early:
         return terminated_outputs(termination_reason), True, termination_reason
-    return verifier_outputs, False, None
+    return evidence_outputs, False, None
 
 
 def execute_harbor_phase(request: Any, phase: Any) -> ExecutionPhaseResult:
-    """Harbor execution phase with verifier output loading."""
+    """Harbor execution phase with evidence output loading."""
 
     harbor_result = execute_harbor(phase.harbor_request)
     terminated_early = harbor_result.terminated_early
@@ -79,7 +79,7 @@ def execute_harbor_phase(request: Any, phase: Any) -> ExecutionPhaseResult:
         failure_code,
     )
     if outputs is None:
-        outputs = terminated_outputs("Verifier outputs unavailable.")
+        outputs = terminated_outputs("Evidence outputs unavailable.")
 
     duration_sec = (datetime.now(UTC) - phase.layout.start_time).total_seconds()
     return ExecutionPhaseResult(

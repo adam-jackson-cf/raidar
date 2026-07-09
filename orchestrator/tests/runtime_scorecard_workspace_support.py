@@ -12,7 +12,7 @@ from raidar.runtime import task_bundle as task_bundle_runtime
 from raidar.runtime import workspace as workspace_runtime
 from raidar.runtime import workspace_artifacts as workspace_artifacts_runtime
 from raidar.runtime import workspace_cache as workspace_cache_runtime
-from raidar.runtime.artifacts import _load_verifier_outputs
+from raidar.runtime.artifacts import _load_evidence_outputs
 from raidar.runtime.environments import resolve_scenario_environment
 from raidar.runtime.models import (
     EvaluationOutputs,
@@ -29,7 +29,6 @@ from raidar.runtime.scorecard import (
     build_scorecard,
 )
 from raidar.runtime.task_bundle import (
-    _build_verifier_scenario_spec,
     _task_image_reference,
     create_harbor_task_bundle,
 )

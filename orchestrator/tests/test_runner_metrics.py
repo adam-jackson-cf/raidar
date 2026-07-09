@@ -5,7 +5,6 @@ from types import SimpleNamespace
 import pytest
 
 from raidar.runtime import scoring_outputs as scoring_outputs_runtime
-from raidar.runtime.verifier_runners import verifier_runner_definition
 from raidar.schemas.scorecard import Scorecard
 from raidar.scorers.code_task.typescript_evidence import (
     evaluate_typescript_coverage,
@@ -49,7 +48,7 @@ workspace_runtime = runtime_support.workspace_runtime
 workspace_artifacts_runtime = runtime_support.workspace_artifacts_runtime
 workspace_cache_runtime = runtime_support.workspace_cache_runtime
 runtime_environments = runtime_support.runtime_environments
-_load_verifier_outputs = runtime_support._load_verifier_outputs
+_load_evidence_outputs = runtime_support._load_evidence_outputs
 EvaluationOutputs = runtime_support.EvaluationOutputs
 ExecutionPhaseResult = runtime_support.ExecutionPhaseResult
 HarborExecutionResult = runtime_support.HarborExecutionResult
@@ -61,7 +60,6 @@ WorkspaceContext = runtime_support.WorkspaceContext
 BaselineWorkspaceRequest = runtime_support.BaselineWorkspaceRequest
 _classify_unscored_reasons = runtime_support._classify_unscored_reasons
 build_scorecard = runtime_support.build_scorecard
-_build_verifier_scenario_spec = runtime_support._build_verifier_scenario_spec
 _task_image_reference = runtime_support._task_image_reference
 _ensure_baseline_workspace = runtime_support._ensure_baseline_workspace
 _prune_workspace_artifacts = runtime_support._prune_workspace_artifacts
@@ -108,13 +106,6 @@ class BaselineWorkspaceFixture:
     scenario_dir: Path
     starter_dir: Path
     baseline_workspace_dir: Path
-
-
-@dataclass(frozen=True)
-class VerifierRunFixture:
-    app_dir: Path
-    logs_dir: Path
-    tests_dir: Path
 
 
 @dataclass(frozen=True)
@@ -517,7 +508,12 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
             "timeout_sec": 1800,
             "environment": _web_environment_doc(),
             "starter": {"root": "starter"},
-            "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
+            "verification": {
+                "gates": [],
+                "required_commands": [],
+                "coverage_threshold": 0.8,
+                "min_quality_score": 0.0,
+            },
             "visual": {
                 "reference_image": str(reference_image),
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
@@ -531,7 +527,10 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
                 "regions": [_visual_bundle_region()],
             },
             "requirements": {"items": []},
-            "scorers": [{"id": "resource-efficiency", "version": 1, "weight": 1.0}],
+            "scorers": [
+                {"id": "design-to-code", "version": 1, "weight": 0.9},
+                {"id": "resource-efficiency", "version": 1, "weight": 0.1},
+            ],
             "prompt": {"entry": "prompt/task.md"},
         }
     )
@@ -586,27 +585,6 @@ def _visual_bundle_metrics() -> list[dict[str, str]]:
         {"type": "core", "id": "resource-efficiency"},
         {"type": "core", "id": "visual-regression"},
     ]
-
-
-def _assert_verifier_script_contains_contracts(score_script: str) -> None:
-    expected_snippets = [
-        "scenarioSpec.requirements?.items",
-        "metric_scores",
-        "verification_stability",
-        r"const testPattern = /\.(test|spec)\.tsx?$/",
-        "NEXT_TELEMETRY_DISABLED",
-        "command_timings_sec",
-        "hasWorkspaceTestFiles()",
-        "No test files found, exiting with code 1",
-        r"/(\d+)\s+passed/gi",
-        r"/(\d+)\s+failed/gi",
-        r"/([0-9]+(?:\.[0-9]+)?)\s*%/",
-        "required_test_evidence",
-        "countRoleQueryMatches",
-        "missingTestEvidence",
-    ]
-    for snippet in expected_snippets:
-        assert snippet in score_script
 
 
 def _verifier_functional_payload() -> dict[str, object]:
@@ -729,23 +707,7 @@ def _verifier_metric_scores_payload() -> list[dict[str, object]]:
     ]
 
 
-def _verifier_scorecard_payload(*, include_metric_scores: bool = True) -> dict[str, object]:
-    payload: dict[str, object] = {
-        "functional": _verifier_functional_payload(),
-        "visual": _verifier_visual_payload(),
-        "verification_stability": _verifier_stability_payload(),
-        "test_coverage": _verifier_coverage_payload(),
-        "requirements_coverage": _verifier_requirements_payload(),
-        "execution_validity": _verifier_execution_validity_payload(),
-        "performance_gates": _verifier_performance_payload(),
-        "gate_history": _verifier_gate_history_payload(),
-    }
-    if include_metric_scores:
-        payload["metric_scores"] = _verifier_metric_scores_payload()
-    return payload
-
-
-def _stale_verifier_scorecard_payload() -> dict[str, object]:
+def _stale_canonical_scorecard_payload() -> dict[str, object]:
     return {
         "execution_validity": {
             "checks": [
@@ -959,7 +921,7 @@ def _score_context_with_gate_history(score_context, gate_history: list[GateEvent
     )
 
 
-def _score_context_with_verifier_timings(score_context, trial_dir: Path):
+def _score_context_with_evidence_metadata(score_context, trial_dir: Path):
     return replace(
         score_context,
         execution=replace(
@@ -969,7 +931,7 @@ def _score_context_with_verifier_timings(score_context, trial_dir: Path):
     )
 
 
-def _write_verifier_timing_artifacts(trial_dir: Path, raw_timings) -> None:
+def _write_evidence_metadata_artifacts(trial_dir: Path, action_count: int) -> None:
     verifier_dir = trial_dir / "verifier"
     verifier_dir.mkdir(parents=True, exist_ok=True)
     (trial_dir / "result.json").write_text(
@@ -981,89 +943,10 @@ def _write_verifier_timing_artifacts(trial_dir: Path, raw_timings) -> None:
         ),
         encoding="utf-8",
     )
-    (verifier_dir / "scorecard.json").write_text(
-        json.dumps({"metadata": {"command_timings_sec": raw_timings}}),
+    (verifier_dir / "evidence.json").write_text(
+        json.dumps({"metadata": {"action_count": action_count}, "actions": []}),
         encoding="utf-8",
     )
-
-
-def _verifier_fixture(tmp_path: Path) -> VerifierRunFixture:
-    fixture = VerifierRunFixture(
-        app_dir=tmp_path / "app",
-        logs_dir=tmp_path / "logs",
-        tests_dir=tmp_path / "tests",
-    )
-    fixture.logs_dir.mkdir(parents=True, exist_ok=True)
-    fixture.tests_dir.mkdir(parents=True, exist_ok=True)
-    fixture.app_dir.mkdir(parents=True, exist_ok=True)
-    (fixture.app_dir / "package.json").write_text("{}", encoding="utf-8")
-    (fixture.app_dir / "bun.lock").write_text("", encoding="utf-8")
-    return fixture
-
-
-def _write_verifier_spec(
-    fixture: VerifierRunFixture, requirement_checks: list[dict[str, str]]
-) -> Path:
-    scenario_spec_path = fixture.tests_dir / "scenario-spec.json"
-    scenario_spec_path.write_text(
-        json.dumps(_verifier_spec_doc(requirement_checks), indent=2),
-        encoding="utf-8",
-    )
-    return scenario_spec_path
-
-
-def _verifier_spec_doc(requirement_checks: list[dict[str, str]]) -> dict[str, object]:
-    return {
-        "metrics": [],
-        "verification": {
-            "max_gate_failures": 3,
-            "coverage_threshold": None,
-            "min_quality_score": 0,
-            "gates": [],
-            "workflow": {"atomic_commits_required": False},
-        },
-        "requirements": {
-            "items": [
-                {
-                    "id": f"req-{index}",
-                    "description": check["description"],
-                    "check": check,
-                    "required_test_evidence": [],
-                }
-                for index, check in enumerate(requirement_checks, start=1)
-            ],
-        },
-        "weights": {
-            "functional": 0.25,
-            "visual": 0.25,
-            "verification_stability": 0.25,
-        },
-        "baseline_scripts": {},
-    }
-
-
-def _run_verifier_script(fixture: VerifierRunFixture, scenario_spec_path: Path):
-    score_script = fixture.tests_dir / "score-scenario.mjs"
-    score_script.write_text(
-        verifier_runner_definition("bun@1").asset_path.read_text(encoding="utf-8"),
-        encoding="utf-8",
-    )
-    return subprocess.run(
-        ["bun", str(score_script), str(scenario_spec_path)],
-        cwd=fixture.tests_dir,
-        env={
-            **runner.os.environ,
-            "RAIDAR_APP_DIR": str(fixture.app_dir),
-            "RAIDAR_LOG_DIR": str(fixture.logs_dir),
-        },
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def _verifier_scorecard(fixture: VerifierRunFixture) -> dict[str, object]:
-    return json.loads((fixture.logs_dir / "scorecard.json").read_text(encoding="utf-8"))
 
 
 def _simple_bundle_scenario() -> ScenarioDefinition:
@@ -1776,53 +1659,42 @@ def test_evaluate_typescript_requirements_matches_role_queries_and_counts(tmp_pa
     assert result.requirement_test_evidence_gaps == {}
 
 
-def test_load_verifier_outputs_parses_scorecard(tmp_path: Path):
+def test_load_evidence_outputs_builds_gate_history(tmp_path: Path):
     trial_dir = tmp_path / "trial"
     verifier_dir = trial_dir / "verifier"
     verifier_dir.mkdir(parents=True, exist_ok=True)
-    scorecard_path = verifier_dir / "scorecard.json"
-    scorecard_path.write_text(json.dumps(_verifier_scorecard_payload()))
+    (verifier_dir / "evidence.json").write_text(
+        json.dumps(
+            {
+                "actions": [
+                    {
+                        "id": "design-to-code.build",
+                        "kind": "command",
+                        "status": "ok",
+                        "result": {
+                            "command": ["bun", "run", "build"],
+                            "exit_code": 0,
+                            "stdout": "ok",
+                            "stderr": "",
+                        },
+                    }
+                ]
+            }
+        ),
+        encoding="utf-8",
+    )
 
-    outputs, reason = _load_verifier_outputs(trial_dir)
+    outputs, reason = _load_evidence_outputs(trial_dir)
 
     assert reason is None
     assert outputs is not None
     assert outputs.functional.passed is True
-    assert outputs.visual is not None
-    assert outputs.visual.passed is True
-    assert outputs.visual.fidelity_tier == "passed"
-    assert outputs.visual.policy_score == 91.0
-    assert outputs.visual.region_evidence_status == "present"
-    assert outputs.visual.worst_region_similarity == 0.91
-    assert outputs.visual.regional_scores[1]["name"] == "footer"
-    assert outputs.metric_scores == [
-        MetricScore(
-            metric_id="artifact-checks",
-            score=0.0,
-            passed=False,
-            matched_count=0,
-            missing_patterns=["src/components/**/*.tsx"],
-            evidence="artifact-checks matches (src/components/**/*.tsx:0)",
-        )
-    ]
     assert len(outputs.gate_history) == 1
+    assert outputs.gate_history[0].command == "bun run build"
 
 
-def test_load_verifier_outputs_requires_modules_field(tmp_path: Path):
-    trial_dir = tmp_path / "trial"
-    verifier_dir = trial_dir / "verifier"
-    verifier_dir.mkdir(parents=True, exist_ok=True)
-    (verifier_dir / "scorecard.json").write_text(
-        json.dumps(_verifier_scorecard_payload(include_metric_scores=False))
-    )
-    outputs, reason = _load_verifier_outputs(trial_dir)
-    assert outputs is None
-    assert reason is not None
-    assert "scorecard.metric_scores must be a list" in reason
-
-
-def test_load_verifier_outputs_missing_scorecard(tmp_path: Path):
-    outputs, reason = _load_verifier_outputs(tmp_path / "missing")
+def test_load_evidence_outputs_missing_evidence(tmp_path: Path):
+    outputs, reason = _load_evidence_outputs(tmp_path / "missing")
     assert outputs is None
     assert reason is not None
 
@@ -1832,39 +1704,6 @@ def test_scenario_evaluation_profile_uses_ordered_metrics():
     assert scenario_evaluation_profile(scenario) == (
         "scorers:typescript-code-task@1:0.9+resource-efficiency@1:0.1"
     )
-
-
-def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
-    score_context = _sample_scorecard_context(
-        tmp_path=tmp_path,
-        terminated_early=False,
-        termination_reason=None,
-    )
-    environment = runner.resolve_scenario_environment(
-        scenario=score_context.request.scenario,
-        scenario_path=score_context.request.scenario_dir / "scenario.yaml",
-        repo_root=Path(__file__).resolve().parents[2],
-    )
-    scenario_spec = _build_verifier_scenario_spec(
-        score_context.request, score_context.context, environment
-    )
-    assert scenario_spec["metrics"] == [
-        {"type": "core", "id": "functional"},
-        {"type": "core", "id": "code-quality"},
-        {"type": "core", "id": "test-coverage"},
-        {
-            "type": "artifact-checks",
-            "id": "artifact-checks",
-            "config": {"required_paths": ["src/app/page.tsx"], "path_match": "glob"},
-        },
-        {"type": "core", "id": "verification-stability"},
-        {"type": "core", "id": "resource-efficiency"},
-    ]
-    assert scenario_spec["scorers"][0]["id"] == "typescript-code-task"
-    assert scenario_spec["visual"]["viewport"] == {"width": 1440, "height": 1024}
-    assert scenario_spec["visual"]["scoring"]["weights"]["global"] == 0.25
-    assert scenario_spec["visual"]["pass_policy"]["minimum_score"] == 70
-    assert scenario_spec["verification"]["workflow"] == {"atomic_commits_required": False}
 
 
 def test_build_scorecard_carries_scorer_results(tmp_path: Path):
@@ -1910,6 +1749,83 @@ def test_build_metric_scores_does_not_use_global_metric_fallback(
         score.evidence == f"Selected scorer did not emit metric: {score.metric_id}"
         for score in scorecard.metric_scores
     )
+
+
+def test_build_metric_scores_passes_verification_evidence_to_scorers(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    score_context = _sample_scorecard_context(
+        tmp_path=tmp_path,
+        terminated_early=False,
+        termination_reason=None,
+    )
+    evidence_path = tmp_path / "verifier" / "evidence.json"
+    evidence_path.parent.mkdir(parents=True, exist_ok=True)
+    evidence_path.write_text(
+        json.dumps(
+            {
+                "actions": [
+                    {
+                        "id": "design-to-code.build",
+                        "kind": "command",
+                        "required": True,
+                        "status": "ok",
+                        "result": {"exit_code": 0},
+                    },
+                    {
+                        "id": "design-to-code.coverage",
+                        "kind": "command",
+                        "required": False,
+                        "status": "error",
+                        "error": {"type": "RuntimeError", "message": "coverage unavailable"},
+                    },
+                ],
+                "artifacts": [{"path": "coverage/coverage-summary.json"}],
+            }
+        ),
+        encoding="utf-8",
+    )
+    score_context = replace(
+        score_context,
+        artifacts=replace(
+            score_context.artifacts,
+            verifier_artifacts={"evidence.json": str(evidence_path)},
+        ),
+    )
+    observed_contexts = []
+
+    class ObservingScorer:
+        def collect_evidence(self, scorer_context):
+            observed_contexts.append(scorer_context)
+            return SimpleNamespace(metric_scores=())
+
+    monkeypatch.setattr(
+        scoring_outputs_runtime,
+        "scorer_class",
+        lambda _scorer_id, _version: ObservingScorer,
+    )
+
+    scoring_outputs_runtime.build_metric_scores(
+        score_context,
+        execution_validity=ExecutionValidityScore(),
+        resource_efficiency=scorecard_runtime.build_resource_efficiency_score(
+            score_context.execution.process_metrics
+        ),
+    )
+
+    evidence = observed_contexts[0].verification_evidence
+    assert evidence.actions["design-to-code.build"]["result"] == {"exit_code": 0}
+    assert evidence.artifacts == {
+        "coverage/coverage-summary.json": "coverage/coverage-summary.json"
+    }
+    assert evidence.errors == [
+        {
+            "action_id": "design-to-code.coverage",
+            "required": False,
+            "error": {"type": "RuntimeError", "message": "coverage unavailable"},
+        }
+    ]
 
 
 def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: Path):
@@ -2032,13 +1948,8 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
         termination_reason=None,
     )
     trial_dir = tmp_path / "jobs" / "orchestrator-run-1234" / "trial-01"
-    raw_timings = {
-        "functional_build": 11.423,
-        "functional_test": 0.357,
-        "gates": [{"gate_name": "lint", "command": "bun run lint", "duration_sec": 1.234}],
-    }
-    _write_verifier_timing_artifacts(trial_dir, raw_timings)
-    score_context = _score_context_with_verifier_timings(score_context, trial_dir)
+    _write_evidence_metadata_artifacts(trial_dir, 2)
+    score_context = _score_context_with_evidence_metadata(score_context, trial_dir)
 
     scorecard = build_scorecard(score_context)
     harbor_meta = scorecard.metadata["harbor"]
@@ -2062,94 +1973,7 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
     assert harbor_meta["cache"]["image_key"] == "image-key"
     assert harbor_meta["cache"]["image_tag"] == "task-env-codex-cli-image-key"
     assert harbor_meta["auth"]["auth_mode"] == "chatgpt"
-    assert scorecard.metadata["verifier"]["command_timings_sec"] == raw_timings
-
-
-def test_verifier_file_exists_glob_matches_direct_and_nested_section_files(
-    tmp_path: Path,
-) -> None:
-    fixture = _verifier_fixture(tmp_path)
-    (fixture.app_dir / "src" / "components" / "sections").mkdir(parents=True, exist_ok=True)
-    (fixture.app_dir / "src" / "components" / "sections" / "Hero.tsx").write_text(
-        "export function Hero() { return null; }\n",
-        encoding="utf-8",
-    )
-    (fixture.app_dir / "src" / "components" / "sections" / "nested").mkdir(
-        parents=True, exist_ok=True
-    )
-    (fixture.app_dir / "src" / "components" / "sections" / "nested" / "Footer.tsx").write_text(
-        "export function Footer() { return null; }\n",
-        encoding="utf-8",
-    )
-    scenario_spec_path = _write_verifier_spec(
-        fixture,
-        [
-            {
-                "type": "file_exists",
-                "pattern": "src/components/sections/**/*.tsx",
-                "description": "direct or nested section component exists",
-            }
-        ],
-    )
-
-    completed = _run_verifier_script(fixture, scenario_spec_path)
-
-    assert completed.returncode == 0, completed.stderr
-    scorecard = _verifier_scorecard(fixture)
-    assert scorecard["requirements_coverage"]["missing_requirement_ids"] == []
-
-
-def test_verifier_rejects_unsafe_no_pattern_regex(tmp_path: Path) -> None:
-    fixture = _verifier_fixture(tmp_path)
-    (fixture.app_dir / "src").mkdir(parents=True, exist_ok=True)
-    (fixture.app_dir / "src" / "App.tsx").write_text(
-        "export const value = 'aaaa';\n", encoding="utf-8"
-    )
-    scenario_spec_path = _write_verifier_spec(
-        fixture,
-        [
-            {
-                "type": "no_pattern",
-                "pattern": "(a+)+$",
-                "description": "unsafe regex is rejected",
-            }
-        ],
-    )
-
-    completed = _run_verifier_script(fixture, scenario_spec_path)
-
-    assert completed.returncode == 0, completed.stderr
-    scorecard = _verifier_scorecard(fixture)
-    assert scorecard["requirements_coverage"]["missing_requirement_ids"] == ["req-1"]
-
-
-def test_verifier_no_pattern_uses_bounded_literal_matching(tmp_path: Path) -> None:
-    fixture = _verifier_fixture(tmp_path)
-    (fixture.app_dir / "src").mkdir(parents=True, exist_ok=True)
-    (fixture.app_dir / "src" / "App.tsx").write_text(
-        "export const value = 'ok';\n", encoding="utf-8"
-    )
-    scenario_spec_path = _write_verifier_spec(
-        fixture,
-        [
-            {
-                "type": "no_pattern",
-                "pattern": r"console\.log\(",
-                "description": "literal console logging is absent",
-            },
-            {
-                "type": "no_pattern",
-                "pattern": r"console\.(log|warn)\(",
-                "description": "regex alternation is rejected",
-            },
-        ],
-    )
-
-    completed = _run_verifier_script(fixture, scenario_spec_path)
-
-    assert completed.returncode == 0, completed.stderr
-    scorecard = _verifier_scorecard(fixture)
-    assert scorecard["requirements_coverage"]["missing_requirement_ids"] == ["req-2"]
+    assert scorecard.metadata["verifier"]["action_count"] == 2
 
 
 def test_classify_unscored_reasons_rate_limit():
@@ -2205,7 +2029,7 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
     assert scorecard.metadata["run"]["unscored_reasons"] == scorecard.unscored_reasons
 
 
-def test_persist_canonical_verifier_artifacts_overwrites_stale_trial_scorecard(tmp_path: Path):
+def test_persist_canonical_verifier_artifacts_overwrites_stale_canonical_outputs(tmp_path: Path):
     context = _sample_scorecard_context(
         tmp_path,
         terminated_early=True,
@@ -2216,7 +2040,7 @@ def test_persist_canonical_verifier_artifacts_overwrites_stale_trial_scorecard(t
     verifier_dir = context.layout.verifier_dir
     verifier_dir.mkdir(parents=True, exist_ok=True)
     (verifier_dir / "scorecard.json").write_text(
-        json.dumps(_stale_verifier_scorecard_payload()),
+        json.dumps(_stale_canonical_scorecard_payload()),
         encoding="utf-8",
     )
     (verifier_dir / "execution-validity.json").write_text(
@@ -2288,23 +2112,20 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     )
     copied_reference = bundle / "environment" / "app" / reference_rel
     copied_region_reference = bundle / "environment" / "app" / "references" / "hero-region-nav.png"
-    scenario_spec = json.loads(
-        (bundle / "tests" / "scenario-spec.json").read_text(encoding="utf-8")
+    verification_plan = json.loads(
+        (bundle / "tests" / "verification-plan.json").read_text(encoding="utf-8")
     )
+    visual_actions = [
+        action for action in verification_plan["actions"] if action["kind"] == "visual_diff"
+    ]
 
     assert copied_reference.exists()
     assert copied_reference.read_bytes() == b"png-binary"
     assert copied_region_reference.exists()
     assert copied_region_reference.read_bytes() == b"region-binary"
-    assert (bundle / "tests" / "scenario-spec.json").exists()
-    assert scenario_spec["visual"]["regions"] == [_visual_bundle_region()]
-    assert (
-        (bundle / "tests" / "score-scenario.mjs")
-        .read_text(encoding="utf-8")
-        .startswith("#!/usr/bin/env bun")
-    )
-    score_script = (bundle / "tests" / "score-scenario.mjs").read_text(encoding="utf-8")
-    _assert_verifier_script_contains_contracts(score_script)
+    assert (bundle / "tests" / "evidence-runner.py").exists()
+    assert visual_actions[0]["config"]["regions"] == [_visual_bundle_region()]
+    assert visual_actions[0]["config"]["reference"] == reference_rel.as_posix()
 
 
 def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Path):

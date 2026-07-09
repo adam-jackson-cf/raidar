@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from raidar.schemas.scorecard import VerificationStabilityScore
 from raidar.scorers.base import ScorerContext
 from raidar.scorers.code_task import PythonCodeTask
+from raidar.scorers.verification import VerificationEvidence
 
 
 def _context(workspace: Path) -> ScorerContext:
@@ -20,7 +21,49 @@ def _context(workspace: Path) -> ScorerContext:
         ),
         resource_efficiency=SimpleNamespace(),
         execution_validity=SimpleNamespace(),
+        verification_evidence=VerificationEvidence(
+            actions={
+                "python-code-task.pytest": _command_action(
+                    ["python", "-m", "pytest", "-q"], 0, "1 passed"
+                ),
+                "python-code-task.coverage.run": _command_action(
+                    ["python", "-m", "coverage", "run", "-m", "pytest", "-q"],
+                    0,
+                    "1 passed",
+                ),
+                "python-code-task.coverage.json": _command_action(
+                    ["python", "-m", "coverage", "json", "-o", ".raidar/coverage.json"],
+                    0,
+                    "Wrote JSON report",
+                ),
+                "python-code-task.coverage.report": {
+                    "result": {"content": {"totals": {"percent_covered": 100}}},
+                    "status": "ok",
+                },
+                "python-code-task.ruff": _command_action(
+                    ["python", "-m", "ruff", "check", "."], 0, "All checks passed"
+                ),
+                "python-code-task.lizard": _command_action(
+                    ["python", "-m", "lizard", ".", "--CCN", "10", "--length", "100"],
+                    0,
+                    "",
+                ),
+            }
+        ),
     )
+
+
+def _command_action(command: list[str], exit_code: int, stdout: str) -> dict:
+    return {
+        "kind": "command",
+        "status": "ok",
+        "result": {
+            "command": command,
+            "exit_code": exit_code,
+            "stdout": stdout,
+            "stderr": "",
+        },
+    }
 
 
 def _scores_by_id(workspace: Path):

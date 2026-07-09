@@ -3,16 +3,11 @@
 from __future__ import annotations
 
 import ast
-import json
-import os
 import py_compile
-import subprocess
-import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
-from raidar.config import settings
 from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scenario import CapabilityRequirements
 from raidar.schemas.scorecard import MetricScore
@@ -26,6 +21,13 @@ from raidar.scorers.common import (
     code_task_artifact_metric_score,
     required_artifact_patterns,
     verification_stability_score,
+)
+from raidar.scorers.verification import (
+    VerificationPlan,
+    VerificationPlanContext,
+    command,
+    glob,
+    read_json,
 )
 
 PYTHON_EXCLUDED_DIRS = {
@@ -88,6 +90,41 @@ class PythonCodeTask(CodeTaskScorer):
         },
     )
 
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare Python raw evidence actions for the runtime evidence runner."""
+
+        del context
+        return VerificationPlan(
+            owner=self.id,
+            actions=(
+                command("compile", ["python", "-m", "compileall", "-q", "."]),
+                command("pytest", ["python", "-m", "pytest", "-q"]),
+                command(
+                    "coverage.run",
+                    ["python", "-m", "coverage", "run", "-m", "pytest", "-q"],
+                    required=False,
+                ),
+                command(
+                    "coverage.json",
+                    ["python", "-m", "coverage", "json", "-o", ".raidar/coverage.json"],
+                    required=False,
+                    depends_on=("coverage.run",),
+                ),
+                read_json(
+                    "coverage.report",
+                    ".raidar/coverage.json",
+                    required=False,
+                    depends_on=("coverage.json",),
+                ),
+                command("ruff", ["python", "-m", "ruff", "check", "."]),
+                command(
+                    "lizard",
+                    ["python", "-m", "lizard", ".", "--CCN", "10", "--length", "100"],
+                ),
+                glob("python.sources", "**/*.py"),
+            ),
+        )
+
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         """Collect deterministic Python evidence for code-task metrics."""
 
@@ -95,10 +132,10 @@ class PythonCodeTask(CodeTaskScorer):
         files = _python_files(workspace)
         tests = [path for path in files if _is_test_file(path, workspace)]
         compile_failures = _compile_failures(files, workspace)
-        pytest = _run_pytest(workspace, tests)
-        coverage = _run_coverage(workspace, tests)
-        ruff = _run_python_module(workspace, "ruff", "check", ".")
-        lizard = _run_python_module(workspace, "lizard", ".", "--CCN", "10", "--length", "100")
+        pytest = _command_outcome_from_evidence(context.verification_evidence.actions, ".pytest")
+        coverage = _coverage_from_evidence(context.verification_evidence.actions, tests)
+        ruff = _command_outcome_from_evidence(context.verification_evidence.actions, ".ruff")
+        lizard = _command_outcome_from_evidence(context.verification_evidence.actions, ".lizard")
         quality_findings = _static_quality_findings(files, workspace)
         required_artifacts = required_artifact_patterns(context.scenario, self.id)
 
@@ -148,48 +185,26 @@ def _compile_failures(files: list[Path], workspace: Path) -> list[str]:
     return failures
 
 
-def _run_pytest(workspace: Path, tests: list[Path]) -> CommandOutcome | None:
-    if not tests:
-        return None
-    return _run_command(
-        workspace,
-        (sys.executable, "-m", "pytest", "-q"),
-        timeout=settings.timeouts.test,
-    )
-
-
-def _run_coverage(
-    workspace: Path,
+def _coverage_from_evidence(
+    actions: dict[str, dict[str, Any]],
     tests: list[Path],
 ) -> tuple[CommandOutcome, CommandOutcome | None, float | None] | None:
     if not tests:
         return None
-    with tempfile.TemporaryDirectory(prefix="raidar-python-coverage-") as temp_dir:
-        coverage_json = Path(temp_dir) / "coverage.json"
-        env = {"COVERAGE_FILE": str(Path(temp_dir) / ".coverage")}
-        run = _run_command(
-            workspace,
-            (sys.executable, "-m", "coverage", "run", "-m", "pytest", "-q"),
-            timeout=settings.timeouts.test,
-            extra_env=env,
-        )
-        if not run.passed:
-            return run, None, None
-        report = _run_command(
-            workspace,
-            (sys.executable, "-m", "coverage", "json", "-o", str(coverage_json)),
-            timeout=settings.timeouts.command_default,
-            extra_env=env,
-        )
-        if not report.passed:
-            return run, report, None
-        return run, report, _coverage_percent(coverage_json)
+    run = _command_outcome_from_evidence(actions, ".coverage.run")
+    report = _command_outcome_from_evidence(actions, ".coverage.json")
+    if run is None:
+        return None
+    if not run.passed:
+        return run, None, None
+    return run, report, _coverage_percent_from_action(actions)
 
 
-def _coverage_percent(path: Path) -> float | None:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (FileNotFoundError, json.JSONDecodeError):
+def _coverage_percent_from_action(actions: dict[str, dict[str, Any]]) -> float | None:
+    action = _action_by_suffix(actions, ".coverage.report")
+    result = action.get("result") if action else None
+    payload = result.get("content") if isinstance(result, dict) else None
+    if not isinstance(payload, dict):
         return None
     totals = payload.get("totals")
     if not isinstance(totals, dict):
@@ -200,47 +215,29 @@ def _coverage_percent(path: Path) -> float | None:
     return max(0.0, min(1.0, float(value) / 100.0))
 
 
-def _run_python_module(workspace: Path, module: str, *args: str) -> CommandOutcome:
-    return _run_command(
-        workspace,
-        (sys.executable, "-m", module, *args),
-        timeout=settings.timeouts.command_default,
-    )
-
-
-def _run_command(
-    workspace: Path,
-    command: tuple[str, ...],
-    *,
-    timeout: int,
-    extra_env: dict[str, str] | None = None,
-) -> CommandOutcome:
-    env = os.environ.copy()
-    if extra_env:
-        env.update(extra_env)
-    try:
-        result = subprocess.run(
-            list(command),
-            cwd=workspace,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
-            check=False,
-            env=env,
-        )
-    except subprocess.TimeoutExpired as exc:
-        return CommandOutcome(
-            command=command,
-            returncode=-1,
-            stdout=exc.stdout or "",
-            stderr="Command timed out",
-        )
+def _command_outcome_from_evidence(
+    actions: dict[str, dict[str, Any]], suffix: str
+) -> CommandOutcome | None:
+    action = _action_by_suffix(actions, suffix)
+    result = action.get("result") if action else None
+    if not isinstance(result, dict):
+        return None
+    command = result.get("command")
     return CommandOutcome(
-        command=command,
-        returncode=result.returncode,
-        stdout=result.stdout,
-        stderr=result.stderr,
+        command=(
+            tuple(str(part) for part in command) if isinstance(command, list) else (str(command),)
+        ),
+        returncode=int(result.get("exit_code") or 0),
+        stdout=str(result.get("stdout") or ""),
+        stderr=str(result.get("stderr") or ""),
     )
+
+
+def _action_by_suffix(actions: dict[str, dict[str, Any]], suffix: str) -> dict[str, Any] | None:
+    for action_id, action in actions.items():
+        if action_id.endswith(suffix):
+            return action
+    return None
 
 
 def _static_quality_findings(files: list[Path], workspace: Path) -> list[str]:
@@ -320,14 +317,14 @@ def _python_functional_score(
 
 def _python_code_quality_score(
     compile_failures: list[str],
-    ruff: CommandOutcome,
-    lizard: CommandOutcome,
+    ruff: CommandOutcome | None,
+    lizard: CommandOutcome | None,
     findings: list[str],
 ) -> MetricScore:
     checks = [
         not compile_failures,
-        ruff.passed,
-        lizard.passed,
+        ruff is not None and ruff.passed,
+        lizard is not None and lizard.passed,
         not findings,
     ]
     score = sum(1 for check in checks if check) / len(checks)

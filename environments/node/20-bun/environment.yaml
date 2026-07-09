@@ -3,8 +3,6 @@ version: 1
 image: raidar/node:20-bun
 build:
   dockerfile: environments/node/20-bun/Dockerfile
-verifier:
-  runner: bun@1
 capabilities:
   runtimes:
     node: ">=20"

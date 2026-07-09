@@ -16,6 +16,14 @@ from raidar.scorers.common import (
     required_artifact_patterns,
     verification_stability_score,
 )
+from raidar.scorers.verification import (
+    VerificationPlan,
+    VerificationPlanContext,
+    command,
+    glob,
+    read_json,
+    visual_diff,
+)
 
 TYPESCRIPT_EXCLUDED_DIRS = {
     ".git",
@@ -38,6 +46,40 @@ class TypeScriptCodeTask(CodeTaskScorer):
         "TypeScript-specific measurement tools."
     )
     metrics = CodeTaskScorer.default_metrics()
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare TypeScript raw evidence actions for the runtime evidence runner."""
+
+        actions = [
+            command("typecheck", ["bun", "run", "typecheck"], required=False),
+            command("lint", ["bun", "run", "lint"], required=False),
+            command("coverage", ["bun", "run", "test:coverage"], required=False),
+            command("build", ["bun", "run", "build"]),
+            read_json(
+                "coverage.summary",
+                "coverage/coverage-summary.json",
+                required=False,
+                depends_on=("coverage",),
+            ),
+            glob("typescript.sources", "**/*.{ts,tsx}"),
+        ]
+        if context.scenario.visual is not None:
+            visual = context.scenario.visual
+            actions.extend(
+                [
+                    command("capture", visual.screenshot_command, required=False),
+                    visual_diff(
+                        "visual.homepage",
+                        reference=visual.reference_image,
+                        actual=visual.artifact_manifest.actual_image,
+                        diff=visual.artifact_manifest.diff_image,
+                        regions=[region.model_dump(mode="json") for region in visual.regions],
+                        required=False,
+                        depends_on=("capture",),
+                    ),
+                ]
+            )
+        return VerificationPlan(owner=self.id, actions=tuple(actions))
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         """Collect deterministic TypeScript evidence for code-task metrics."""

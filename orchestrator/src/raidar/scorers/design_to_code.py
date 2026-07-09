@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
@@ -13,6 +14,14 @@ from raidar.scorers.common import (
     metric,
     required_artifact_patterns,
     verification_stability_metric_score,
+)
+from raidar.scorers.verification import (
+    VerificationPlan,
+    VerificationPlanContext,
+    command,
+    glob,
+    read_json,
+    visual_diff,
 )
 
 
@@ -70,14 +79,59 @@ class DesignToCode(BaseScorer):
         ),
     )
 
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare design-to-code raw evidence actions for this resolved scorer."""
+
+        actions = [
+            command("typecheck", ["bun", "run", "typecheck"], required=False),
+            command("lint", ["bun", "run", "lint"], required=False),
+            command("coverage", ["bun", "run", "test:coverage"], required=False),
+            command("build", ["bun", "run", "build"]),
+            read_json(
+                "coverage.summary",
+                "coverage/coverage-summary.json",
+                required=False,
+                depends_on=("coverage",),
+            ),
+        ]
+        if context.scenario.visual is not None:
+            visual = context.scenario.visual
+            artifacts = _visual_artifact_paths(visual)
+            actions.extend(
+                [
+                    command("capture", visual.screenshot_command, required=False),
+                    visual_diff(
+                        "visual.homepage",
+                        reference=visual.reference_image,
+                        actual=artifacts["actual"],
+                        diff=artifacts["diff"],
+                        regions=[region.model_dump(mode="json") for region in visual.regions],
+                        required=False,
+                        depends_on=("capture",),
+                    ),
+                ]
+            )
+        for resolved_metric in context.resolved_scorer.metrics:
+            if resolved_metric.id == "artifact-checks":
+                for index, required_path in enumerate(
+                    resolved_metric.config.get("required_paths", [])
+                ):
+                    actions.append(
+                        glob(
+                            f"artifacts.required.{index}",
+                            str(required_path),
+                            required=False,
+                        )
+                    )
+        return VerificationPlan(owner=self.id, actions=tuple(actions))
+
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
-        outputs = context.execution.outputs
         return ScorerEvidence(
             metric_scores=(
-                visual_regression_metric_score(outputs),
-                functional_metric_score(outputs),
-                design_to_code_coverage_metric_score(outputs),
-                verification_stability_metric_score(outputs),
+                visual_regression_metric_score(context),
+                design_functional_metric_score(context),
+                design_to_code_coverage_metric_score(context),
+                design_verification_stability_metric_score(context),
                 artifact_metric_score(
                     Path(context.workspace),
                     required_artifact_patterns(context.scenario, self.id),
@@ -86,31 +140,322 @@ class DesignToCode(BaseScorer):
         )
 
 
-def visual_regression_metric_score(outputs) -> MetricScore:
-    if outputs.visual is None:
+def visual_regression_metric_score(context: ScorerContext) -> MetricScore:
+    if not hasattr(context, "scenario") and hasattr(context, "visual"):
+        if context.visual is None:
+            return _missing_visual_metric()
+        return MetricScore(
+            metric_id="visual-regression",
+            score=context.visual.score,
+            passed=bool(context.visual.passed),
+            evidence=f"similarity={context.visual.score}, passed={context.visual.passed}",
+        )
+    visual = getattr(context.scenario, "visual", None)
+    if visual is None:
+        outputs = getattr(getattr(context, "execution", None), "outputs", None)
+        if outputs is not None and getattr(outputs, "visual", None) is not None:
+            return visual_regression_metric_score(outputs)
+        return _missing_visual_metric()
+    verification_evidence = getattr(context, "verification_evidence", None)
+    action = _action_by_suffix(getattr(verification_evidence, "actions", {}), ".visual.homepage")
+    result = action.get("result") if action else None
+    if not isinstance(result, dict):
         return MetricScore(
             metric_id="visual-regression",
             score=0.0,
             passed=False,
-            evidence="Visual threshold not configured.",
+            evidence="Visual comparison evidence missing.",
         )
+    visual_score = _visual_score_from_result(result, visual)
     return MetricScore(
         metric_id="visual-regression",
-        score=outputs.visual.score,
-        passed=bool(outputs.visual.passed),
-        evidence=f"similarity={outputs.visual.score}, passed={outputs.visual.passed}",
-    )
-
-
-def design_to_code_coverage_metric_score(outputs) -> MetricScore:
-    coverage = outputs.test_coverage
-    return MetricScore(
-        metric_id="test-coverage",
-        score=coverage_ratio_score(coverage),
-        passed=coverage.passed,
+        score=visual_score["similarity"],
+        passed=bool(visual_score["passed"]),
         evidence=(
-            f"threshold={coverage.threshold}, "
-            f"measured={coverage.measured}, "
-            f"source={coverage.source}"
+            f"global={visual_score['global_similarity']}, "
+            f"worst_region={visual_score['worst_region_similarity']}, "
+            f"policy_score={visual_score['policy_score']}, "
+            f"tier={visual_score['fidelity_tier']}"
         ),
     )
+
+
+def design_functional_metric_score(context: ScorerContext) -> MetricScore:
+    verification_evidence = getattr(context, "verification_evidence", None)
+    if verification_evidence is None:
+        return functional_metric_score(context.execution.outputs)
+    build = _action_by_suffix(verification_evidence.actions, ".build")
+    commands = _design_command_actions(verification_evidence.actions)
+    passed_commands = sum(1 for action in commands if _command_passed(action))
+    total_commands = len(commands)
+    build_ok = _command_passed(build)
+    passed = build_ok and passed_commands == total_commands and total_commands > 0
+    return MetricScore(
+        metric_id="functional",
+        score=1.0 if passed else 0.0,
+        passed=passed,
+        evidence=f"build={build_ok}, commands={passed_commands}/{total_commands}",
+    )
+
+
+def _design_command_actions(actions: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    return [
+        action
+        for action_id, action in actions.items()
+        if action_id.startswith("design-to-code.") and action.get("kind") == "command"
+    ]
+
+
+def _command_passed(action: dict[str, Any] | None) -> bool:
+    return _action_exit_code(action) == 0
+
+
+def design_to_code_coverage_metric_score(context: ScorerContext) -> MetricScore:
+    if not hasattr(context, "scenario") and hasattr(context, "test_coverage"):
+        coverage = context.test_coverage
+        return MetricScore(
+            metric_id="test-coverage",
+            score=coverage_ratio_score(coverage),
+            passed=coverage.passed,
+            evidence=(
+                f"threshold={coverage.threshold}, measured={coverage.measured}, "
+                f"source={coverage.source}"
+            ),
+        )
+    verification_evidence = getattr(context, "verification_evidence", None)
+    if verification_evidence is None:
+        return design_to_code_coverage_metric_score(context.execution.outputs)
+    threshold = context.scenario.verification.coverage_threshold
+    coverage = _coverage_from_evidence(verification_evidence.actions)
+    passed = threshold is None or threshold <= 0 or (coverage is not None and coverage >= threshold)
+    score = (
+        1.0
+        if threshold is None or threshold <= 0
+        else (0.0 if coverage is None else min(1.0, coverage / threshold))
+    )
+    return MetricScore(
+        metric_id="test-coverage",
+        score=round(score, 3),
+        passed=passed,
+        evidence=f"threshold={threshold}, measured={coverage}, source=evidence",
+    )
+
+
+def design_verification_stability_metric_score(context: ScorerContext) -> MetricScore:
+    verification_evidence = getattr(context, "verification_evidence", None)
+    if verification_evidence is None:
+        return verification_stability_metric_score(context.execution.outputs)
+    failures = sum(
+        1
+        for action_id, action in verification_evidence.actions.items()
+        if action_id.startswith("design-to-code.")
+        and action.get("kind") == "command"
+        and _action_exit_code(action) not in (None, 0)
+    )
+    score = max(0.0, 1.0 - (failures / max(1, len(context.verification_evidence.actions))))
+    return MetricScore(
+        metric_id="verification-stability",
+        score=round(score, 3),
+        passed=failures == 0,
+        evidence=f"failures={failures}",
+    )
+
+
+def _action_by_suffix(actions: dict[str, dict[str, Any]], suffix: str) -> dict[str, Any] | None:
+    for action_id, action in actions.items():
+        if action_id.endswith(suffix):
+            return action
+    return None
+
+
+def _missing_visual_metric() -> MetricScore:
+    return MetricScore(
+        metric_id="visual-regression",
+        score=0.0,
+        passed=False,
+        evidence="Visual threshold not configured.",
+    )
+
+
+def _visual_artifact_paths(visual: Any) -> dict[str, str]:
+    artifact_manifest = getattr(visual, "artifact_manifest", None)
+    if artifact_manifest is not None:
+        return {
+            "actual": artifact_manifest.actual_image,
+            "diff": artifact_manifest.diff_image,
+        }
+    artifacts = getattr(visual, "artifacts", {})
+    if isinstance(artifacts, dict):
+        return {
+            "actual": str(artifacts.get("actual") or "artifacts/actual.png"),
+            "diff": str(artifacts.get("diff") or "artifacts/diff.png"),
+        }
+    return {"actual": "artifacts/actual.png", "diff": "artifacts/diff.png"}
+
+
+def _action_exit_code(action: dict[str, Any] | None) -> int | None:
+    result = action.get("result") if isinstance(action, dict) else None
+    if not isinstance(result, dict):
+        return None
+    value = result.get("exit_code")
+    return int(value) if isinstance(value, int | float) else None
+
+
+def _coverage_from_evidence(actions: dict[str, dict[str, Any]]) -> float | None:
+    action = _action_by_suffix(actions, ".coverage.summary")
+    result = action.get("result") if action else None
+    content = result.get("content") if isinstance(result, dict) else None
+    totals = _coverage_totals(content)
+    if not isinstance(totals, dict):
+        return None
+    return _coverage_pct_from_totals(totals)
+
+
+def _coverage_totals(content: Any) -> dict[str, Any] | None:
+    if not isinstance(content, dict):
+        return None
+    total = content.get("total")
+    return total if isinstance(total, dict) else content.get("totals")
+
+
+def _coverage_pct_from_totals(totals: dict[str, Any]) -> float | None:
+    for key in ("lines", "statements"):
+        value = _nested_pct(totals.get(key))
+        if value is not None:
+            return value
+    return _pct_number(totals.get("percent_covered"))
+
+
+def _nested_pct(value: Any) -> float | None:
+    if isinstance(value, dict):
+        return _pct_number(value.get("pct"))
+    return None
+
+
+def _pct_number(value: Any) -> float | None:
+    if isinstance(value, int | float):
+        return max(0.0, min(1.0, float(value) / 100.0))
+    return None
+
+
+def _visual_score_from_result(result: dict[str, Any], visual: Any) -> dict[str, Any]:
+    global_compare = result.get("global") if isinstance(result.get("global"), dict) else {}
+    global_similarity = _float_or_zero(global_compare.get("similarity"))
+    region_scores = _visual_region_scores(
+        result.get("regions"), visual.scoring.region_pass_threshold
+    )
+    expected_region_count = int(result.get("expected_region_count") or 0)
+    if region_scores:
+        regional_similarity = sum(
+            score["normalized_weight"] * score["similarity"] for score in region_scores
+        )
+        worst_region_similarity = min(score["similarity"] for score in region_scores)
+    else:
+        regional_similarity = global_similarity
+        worst_region_similarity = global_similarity
+    passing_regions = sum(1 for score in region_scores if score["decent_pass"])
+    region_pass_rate = (
+        1.0 if expected_region_count == 0 else passing_regions / expected_region_count
+    )
+    policy_score = _visual_policy_score(
+        global_similarity=global_similarity,
+        regional_similarity=regional_similarity,
+        worst_region_similarity=worst_region_similarity,
+        region_pass_rate=region_pass_rate,
+        scoring=visual.scoring,
+    )
+    passed, tier = _visual_policy_outcome(
+        global_similarity=global_similarity,
+        worst_region_similarity=worst_region_similarity,
+        region_pass_rate=region_pass_rate,
+        policy_score=policy_score,
+        pass_policy=visual.pass_policy,
+    )
+    return {
+        "similarity": round(max(0.0, min(1.0, policy_score / 100.0)), 3),
+        "global_similarity": round(global_similarity, 3),
+        "regional_similarity": round(regional_similarity, 3),
+        "worst_region_similarity": round(worst_region_similarity, 3),
+        "region_decent_pass_rate": round(region_pass_rate, 3),
+        "policy_score": round(policy_score, 3),
+        "passed": passed,
+        "fidelity_tier": tier,
+        "regional_scores": region_scores,
+    }
+
+
+def _visual_region_scores(regions: Any, threshold: float) -> list[dict[str, Any]]:
+    if not isinstance(regions, list):
+        return []
+    scores = []
+    for region in regions:
+        if not isinstance(region, dict) or not isinstance(region.get("comparison"), dict):
+            continue
+        similarity = _float_or_zero(region["comparison"].get("similarity"))
+        scores.append(
+            {
+                "name": str(region.get("name", "")),
+                "weight": _float_or_zero(region.get("weight")),
+                "normalized_weight": _float_or_zero(region.get("normalized_weight")),
+                "similarity": similarity,
+                "decent_pass": similarity >= threshold,
+            }
+        )
+    return scores
+
+
+def _visual_policy_score(
+    *,
+    global_similarity: float,
+    regional_similarity: float,
+    worst_region_similarity: float,
+    region_pass_rate: float,
+    scoring: Any,
+) -> float:
+    gamma = scoring.gamma
+    return 100.0 * (
+        _scoring_component(global_similarity, scoring.bands.global_band, gamma)
+        * scoring.weights.global_weight
+        + _scoring_component(regional_similarity, scoring.bands.regional, gamma)
+        * scoring.weights.regional
+        + _scoring_component(worst_region_similarity, scoring.bands.worst_region, gamma)
+        * scoring.weights.worst_region
+        + max(0.0, min(1.0, region_pass_rate)) * scoring.weights.region_pass_rate
+    )
+
+
+def _scoring_component(value: float, band: Any, gamma: float) -> float:
+    normalized = (value - band.lower) / max(1e-9, band.upper - band.lower)
+    return max(0.0, min(1.0, normalized)) ** gamma
+
+
+def _visual_policy_outcome(
+    *,
+    global_similarity: float,
+    worst_region_similarity: float,
+    region_pass_rate: float,
+    policy_score: float,
+    pass_policy: Any,
+) -> tuple[bool, str]:
+    if (
+        global_similarity < pass_policy.fail_if_global_below
+        or worst_region_similarity < pass_policy.fail_if_worst_region_below
+    ):
+        return False, "failed"
+    passed = (
+        policy_score >= pass_policy.minimum_score
+        and region_pass_rate >= pass_policy.minimum_region_pass_rate
+        and worst_region_similarity >= pass_policy.minimum_worst_region
+    )
+    if not passed:
+        return False, "failed"
+    high_fidelity = (
+        policy_score >= pass_policy.high_fidelity_score
+        and global_similarity >= pass_policy.high_fidelity_global
+        and worst_region_similarity >= pass_policy.high_fidelity_worst_region
+    )
+    return True, "high_fidelity" if high_fidelity else "passed"
+
+
+def _float_or_zero(value: Any) -> float:
+    return float(value) if isinstance(value, int | float) else 0.0

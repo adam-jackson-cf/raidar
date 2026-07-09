@@ -18,8 +18,14 @@ from raidar.runtime.environments import (
 )
 from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
 from raidar.runtime.tool_catalog import tool_catalog_payload
-from raidar.runtime.verifier_runners import VerifierRunnerDefinition, verifier_runner_definition
 from raidar.schemas.environment import CapabilityRequirements
+from raidar.scorers.base import scorer_class
+from raidar.scorers.verification import (
+    EVIDENCE_RUNNER_CONTRACT_VERSION,
+    NormalizedVerificationPlan,
+    VerificationPlanContext,
+    normalize_verification_plans,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +33,7 @@ class EffectiveRunContract:
     """One resolved contract consumed by runtime phases."""
 
     environment: ResolvedEnvironment
-    verifier_runner: VerifierRunnerDefinition
+    verification_plan: NormalizedVerificationPlan
     harness: HarnessDefinition | None
     runtime_profile: RuntimeProfile
     provided_capabilities: CapabilityRequirements
@@ -56,7 +62,11 @@ def resolve_effective_run_contract(
         scenario_path=scenario_path,
         repo_root=repo_root,
     )
-    verifier = verifier_runner_definition(environment.library.verifier.runner)
+    verification_plan = _resolve_verification_plan(
+        scenario=scenario,
+        scenario_path=scenario_path,
+        environment=environment,
+    )
     harness = harness_definition(harness_id) if harness_id else None
     required = combined_capability_requirements(scenario=scenario, environment=environment)
     if harness is not None:
@@ -64,7 +74,9 @@ def resolve_effective_run_contract(
     payload = {
         "schema_version": "1",
         "environment": environment.cache_payload(),
-        "verifier_runner": verifier.cache_payload(),
+        "evidence_runner_contract": EVIDENCE_RUNNER_CONTRACT_VERSION,
+        "verification_plan": verification_plan.payload(),
+        "verification_plan_hash": verification_plan.hash(),
         "harness": harness.cache_payload() if harness else None,
         "runtime_profile": profile.cache_payload(),
         "tool_catalog": tool_catalog_payload(),
@@ -75,7 +87,7 @@ def resolve_effective_run_contract(
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
     return EffectiveRunContract(
         environment=environment,
-        verifier_runner=verifier,
+        verification_plan=verification_plan,
         harness=harness,
         runtime_profile=profile,
         provided_capabilities=environment.library.capabilities,
@@ -83,3 +95,26 @@ def resolve_effective_run_contract(
         cache_payload=payload,
         contract_hash=hashlib.sha256(encoded).hexdigest(),
     )
+
+
+def _resolve_verification_plan(
+    *,
+    scenario,
+    scenario_path: Path,
+    environment: ResolvedEnvironment,
+) -> NormalizedVerificationPlan:
+    plans = []
+    scenario_dir = scenario_path.parent
+    for resolved_scorer in scenario.resolved_scorers():
+        scorer = scorer_class(resolved_scorer.id, resolved_scorer.version)()
+        plans.append(
+            scorer.verification_plan(
+                VerificationPlanContext(
+                    scenario=scenario,
+                    resolved_scorer=resolved_scorer,
+                    scenario_dir=scenario_dir,
+                    environment_capabilities=environment.library.capabilities,
+                )
+            )
+        )
+    return normalize_verification_plans(tuple(plans))

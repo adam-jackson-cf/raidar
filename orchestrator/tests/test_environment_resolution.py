@@ -26,11 +26,6 @@ from raidar.runtime.tool_catalog import (
     probe_command,
     tool_catalog_payload,
 )
-from raidar.runtime.verifier_runners import (
-    VerifierRunnerError,
-    verifier_output_manifest,
-    verifier_runner_definition,
-)
 from raidar.schemas.scenario import ScenarioDefinition
 
 
@@ -48,8 +43,6 @@ version: 1
 image: raidar/test:latest
 build:
   dockerfile: environments/{relative_dir}/Dockerfile
-verifier:
-  runner: python@1
 capabilities:
   runtimes:
     python: ">=3.12"
@@ -79,7 +72,6 @@ def test_resolve_python_scenario_environment_from_library() -> None:
 
     assert environment.id == "python:3.12"
     assert environment.config.kind == "stack_preset"
-    assert environment.library.verifier.runner == "python@1"
     assert environment.library.capabilities.runtimes["python"] == ">=3.12"
     assert environment.library.capabilities.tools["ruff"] == ">=0.14"
     assert environment.dockerfile_path == _repo_root() / "environments/python/3.12/Dockerfile"
@@ -112,7 +104,6 @@ def test_environment_resolution_supports_custom_docker() -> None:
         "id": "local-python",
         "image": "raidar/local-python:latest",
         "build": {"dockerfile": "environments/python/3.12/Dockerfile"},
-        "verifier": {"runner": "python@1"},
         "capabilities": {
             "runtimes": {"python": ">=3.12"},
             "package_managers": {"pip": ">=24", "uv": ">=0.8"},
@@ -144,7 +135,6 @@ def test_environment_resolution_supports_custom_docker() -> None:
 
     assert environment.id == "local-python"
     assert environment.config.kind == "custom_docker"
-    assert environment.library.verifier.runner == "python@1"
     assert environment.dockerfile_path == _repo_root() / "environments/python/3.12/Dockerfile"
 
 
@@ -210,8 +200,6 @@ version: 1
 image: raidar/python:3.12-code
 build:
   dockerfile: environments/python/3.12/Dockerfile
-verifier:
-  runner: python@1
 capabilities:
   runtimes:
     python: ">=3.12"
@@ -253,7 +241,7 @@ def test_resolved_scorer_preserves_inventory_requirements() -> None:
     }
 
 
-def test_combined_capability_requirements_include_scenario_scorer_and_verifier() -> None:
+def test_combined_capability_requirements_include_scenario_and_scorer() -> None:
     scenario_path = _repo_root() / "scenarios/python-code-task-baseline/v001/scenario.yaml"
     scenario = load_scenario(scenario_path)
     environment = resolve_scenario_environment(
@@ -333,21 +321,6 @@ def test_tool_catalog_rejects_malformed_catalogs(
 def test_tool_catalog_rejects_missing_catalog(tmp_path: Path) -> None:
     with pytest.raises(ToolCatalogError, match="Tool catalog not found"):
         _load_tool_catalog(tmp_path / "missing.yaml")
-
-
-def test_verifier_runner_registry_renders_commands_and_outputs() -> None:
-    python_runner = verifier_runner_definition("python@1")
-    bun_runner = verifier_runner_definition("bun@1")
-
-    assert (
-        python_runner.render_command("ROOT")
-        == 'python "$ROOT/score-scenario.py" "$ROOT/scenario-spec.json"'
-    )
-    assert bun_runner.required_capabilities.package_managers == {"bun": ">=1"}
-    assert "scorecard.json" in verifier_output_manifest()
-
-    with pytest.raises(VerifierRunnerError, match="Unknown verifier runner"):
-        verifier_runner_definition("missing@1")
 
 
 def test_harness_registry_defines_install_and_usage_contracts(

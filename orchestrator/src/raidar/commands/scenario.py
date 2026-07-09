@@ -202,7 +202,6 @@ def echo_environment_config(scenario_yaml: Path, scenario_def: ScenarioDefinitio
     click.echo(f"  Image: {environment.image}")
     click.echo(f"  Workdir: {environment.workdir}")
     click.echo(f"  Dockerfile: {environment.dockerfile_path}")
-    click.echo(f"  Verifier: {environment.library.verifier.runner}")
     requirements = environment.requirements.model_dump(mode="json")
     capabilities = environment.library.capabilities.model_dump(mode="json")
     click.echo(f"  Requirements: {json.dumps(requirements, sort_keys=True)}")
