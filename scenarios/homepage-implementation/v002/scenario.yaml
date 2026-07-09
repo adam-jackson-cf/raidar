@@ -1,11 +1,32 @@
 name: homepage-implementation
 scenario_revision: v002
-description: Iterate the homepage benchmark against the provided reference design with compact, verification-first execution
+description: Iterate the homepage benchmark against the provided reference design
+  with compact, verification-first execution
 difficulty: medium
 category: greenfield-ui
 timeout_sec: 1800
-dockerfile: ./Dockerfile
 test_scripts: []
+environment:
+  kind: stack_preset
+  id: node:20
+  workdir: /app
+  requirements:
+    runtimes:
+      node: '>=20'
+    package_managers:
+      bun: '>=1'
+    tools:
+      git: '>=2'
+      typescript: '>=5'
+      playwright: '>=1'
+      odiff: '>=0'
+    browsers:
+      chromium: installed
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
 verification:
@@ -32,6 +53,19 @@ verification:
     - config
     - core.hooksPath
     - .githooks
+  - - bun
+    - install
+    - --frozen-lockfile
+  test_discovery_globs:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/*.test.js'
+  - '**/*.test.jsx'
+  - '**/*.spec.js'
+  - '**/*.spec.jsx'
+  skip_test_commands_when_no_tests: true
   gates:
   - name: typecheck
     command:
@@ -147,10 +181,18 @@ requirements:
     required_test_evidence: []
 visual:
   reference_image: ./reference/homepage.png
+  capture_setup_actions:
+  - - bun
+    - install
+    - --frozen-lockfile
   screenshot_command:
   - bun
   - run
   - capture-screenshot
+  artifact_manifest:
+    actual_image: actual.png
+    diff_image: diff.png
+    post_capture_image: homepage-post.png
   viewport:
     width: 1440
     height: 1024
@@ -183,6 +225,9 @@ visual:
     high_fidelity_worst_region: 0.92
   regions:
   - name: header
+    reference_image: ./reference/homepage-region-header.png
+    actual_image: actual-region-header.png
+    diff_image: diff-region-header.png
     weight: 0.35
     clip:
       x: 0
@@ -190,6 +235,9 @@ visual:
       width: 1440
       height: 96
   - name: hero
+    reference_image: ./reference/homepage-region-hero.png
+    actual_image: actual-region-hero.png
+    diff_image: diff-region-hero.png
     weight: 0.45
     clip:
       x: 0
@@ -197,6 +245,9 @@ visual:
       width: 1440
       height: 344
   - name: features
+    reference_image: ./reference/homepage-region-features.png
+    actual_image: actual-region-features.png
+    diff_image: diff-region-features.png
     weight: 0.35
     clip:
       x: 0
@@ -204,6 +255,9 @@ visual:
       width: 1440
       height: 424
   - name: footer
+    reference_image: ./reference/homepage-region-footer.png
+    actual_image: actual-region-footer.png
+    diff_image: diff-region-footer.png
     weight: 0.2
     clip:
       x: 0

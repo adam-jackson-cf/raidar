@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from raidar.runtime import command_records
+from raidar.harness import command_records
 from raidar.runtime.models import CommandRecord
 
 
@@ -40,9 +40,14 @@ def test_git_command_parsing_handles_env_options_and_bypass_modes():
     assert command_records._git_commit_uses_verification_bypass("git commit -n -m x") is True
     assert command_records._should_record_command("git commit -m x", include_git_commit=True)
     assert not command_records._should_record_command("git commit -m x", include_git_commit=False)
+    assert command_records._should_record_command(
+        "pytest -q",
+        include_git_commit=False,
+        verification_patterns=("pytest",),
+    )
 
 
-def test_shell_normalization_handles_empty_heredoc_bad_quotes_and_aliases():
+def test_shell_normalization_handles_empty_heredoc_bad_quotes_and_wrappers():
     assert command_records._normalize_command("   ") == ""
     assert command_records._normalized_joined_command([]) is None
     assert command_records._split_token_by_shell_separators("bun&&npm;pnpm||yarn") == [
@@ -62,9 +67,8 @@ def test_shell_normalization_handles_empty_heredoc_bad_quotes_and_aliases():
         "bun run 'unterminated"
     ]
     assert command_records._unwrap_shell_wrapper("sh -lc 'npm run lint'") == "npm run lint"
-    assert command_records._normalize_verification_alias("pnpm build") == "bun run build"
-    assert command_records._normalize_verification_alias("npx ultracite lint") == "bun run lint"
-    assert command_records._normalize_verification_alias("tsc --noEmit") == "bun run typecheck"
+    assert command_records._normalized_shell_subcommands("pnpm build") == ["pnpm build"]
+    assert command_records._normalized_shell_subcommands("tsc --noEmit") == ["tsc --noEmit"]
 
 
 def test_codex_command_records_extracts_outputs_failures_and_git_commits(monkeypatch):
@@ -91,12 +95,16 @@ def test_codex_command_records_extracts_outputs_failures_and_git_commits(monkeyp
     ]
     monkeypatch.setattr(command_records, "_extract_item_completed", lambda entry: entry["item"])
 
-    records = command_records._command_records(entries, include_git_commit=True)
+    records = command_records._command_records(
+        entries,
+        include_git_commit=True,
+        verification_patterns=("bun run test", "npm run build"),
+    )
 
     assert records == [
         CommandRecord(command="bun run test", failed=True, output="combined", exit_code=2),
         CommandRecord(command="git commit -m ok", failed=True, output="combined", exit_code=2),
-        CommandRecord(command="bun run build", failed=False, output="out\nerr", exit_code=None),
+        CommandRecord(command="npm run build", failed=False, output="out\nerr", exit_code=None),
     ]
 
 
@@ -109,13 +117,40 @@ def test_command_records_route_supported_harnesses_and_reject_unknown(monkeypatc
     (agent / "command-001" / "stdout.txt").write_text("$ bun run build\n", encoding="utf-8")
     (agent / "gemini-cli.txt").write_text("ran `bun run lint` successfully\n", encoding="utf-8")
 
-    monkeypatch.setattr(command_records, "_read_jsonl_dicts", lambda _path: [])
-    assert command_records._command_records_for_harness(trial, "codex-cli") == []
+    monkeypatch.setattr(
+        command_records,
+        "_read_jsonl_dicts",
+        lambda _path: [
+            {
+                "type": "item.completed",
+                "item": {
+                    "type": "command_execution",
+                    "command": "node scripts/format.js",
+                    "status": "completed",
+                    "exit_code": 0,
+                },
+            }
+        ],
+    )
     assert [
-        record.command for record in command_records._command_records_for_harness(trial, "cursor")
+        record.command
+        for record in command_records._command_records_for_harness(trial, "codex-cli")
+    ] == ["node scripts/format.js"]
+    assert [
+        record.command
+        for record in command_records._command_records_for_harness(
+            trial,
+            "cursor",
+            verification_patterns=("bun run build",),
+        )
     ] == ["bun run build"]
     assert [
-        record.command for record in command_records._command_records_for_harness(trial, "gemini")
+        record.command
+        for record in command_records._command_records_for_harness(
+            trial,
+            "gemini",
+            verification_patterns=("bun run build", "bun run lint"),
+        )
     ] == [
         "bun run build",
         "bun run lint",
@@ -162,7 +197,10 @@ def test_claude_stdout_records_tool_use_failures_and_ignores_invalid_shapes(tmp_
         encoding="utf-8",
     )
 
-    records = command_records._command_records_from_claude_stdout_file(stdout)
+    records = command_records._command_records_from_claude_stdout_file(
+        stdout,
+        verification_patterns=("bun run lint", "bun run typecheck"),
+    )
 
     assert [(record.command, record.failed) for record in records] == [
         ("bun run lint", True),
@@ -180,7 +218,9 @@ def test_stdout_line_and_gemini_trajectory_command_extraction(tmp_path):
     assert command_records._command_records_from_line("") == []
     assert command_records._command_records_from_line("I will run `bun run build`") == []
     assert command_records._command_records_from_line("no command here") == []
-    assert command_records._command_records_from_line("$ git commit -m ok") == []
+    assert command_records._command_records_from_line("$ git commit -m ok")[0].command == (
+        "git commit -m ok"
+    )
     assert (
         command_records._command_records_from_line("$ git commit -m ok", include_git_commit=True)[
             0
@@ -188,16 +228,7 @@ def test_stdout_line_and_gemini_trajectory_command_extraction(tmp_path):
         == "git commit -m ok"
     )
     assert command_records._quoted_command_records("ran `echo hi`") == []
-    assert (
-        command_records._keyword_command_records("verified with lint and test coverage")[0].command
-        == "bun run lint"
-    )
-    assert (
-        command_records._keyword_command_records(
-            "verified with git commit", include_git_commit=True
-        )[-1].command
-        == "git commit"
-    )
+    assert command_records._command_records_from_line("verified with lint and test coverage") == []
 
     agent = tmp_path / "trial" / "agent"
     agent.mkdir(parents=True)
@@ -226,7 +257,10 @@ def test_stdout_line_and_gemini_trajectory_command_extraction(tmp_path):
         encoding="utf-8",
     )
 
-    records = command_records._command_records_from_gemini_trajectory(tmp_path / "trial")
+    records = command_records._command_records_from_gemini_trajectory(
+        tmp_path / "trial",
+        verification_patterns=("bun run test",),
+    )
 
     assert records == [CommandRecord(command="bun run test", failed=True, output="bun run test")]
     (agent / "gemini-cli.trajectory.json").write_text('{"messages":{}}', encoding="utf-8")

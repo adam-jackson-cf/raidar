@@ -26,11 +26,12 @@ def _phase(tmp_path, *, screenshot_command=("capture",), evidence_errors=("pre",
 
 def _request(retained_files=()):
     return SimpleNamespace(
+        config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
         scenario=SimpleNamespace(
             evidence=SimpleNamespace(
                 retained_files=[SimpleNamespace(path=path) for path in retained_files]
             )
-        )
+        ),
     )
 
 
@@ -56,7 +57,7 @@ def test_hydration_skipped_for_terminated_runs(monkeypatch, tmp_path):
     )
     evidence = artifact_phase._initial_evidence_artifacts(phase)
 
-    assert artifact_phase._hydrate_final_workspace(phase, execution, evidence) is False
+    assert artifact_phase._hydrate_final_workspace(_request(), phase, execution, evidence) is False
     assert evidence["final_workspace_archive"] is None
 
 
@@ -67,11 +68,11 @@ def test_hydration_records_archive_for_non_visual_runs(monkeypatch, tmp_path):
     monkeypatch.setattr(
         artifact_phase,
         "_hydrate_workspace_from_final_app",
-        lambda harbor_result, workspace: (archive, None),
+        lambda harbor_result, workspace, *, harness: (archive, None),
     )
     evidence = artifact_phase._initial_evidence_artifacts(phase)
 
-    assert artifact_phase._hydrate_final_workspace(phase, execution, evidence) is True
+    assert artifact_phase._hydrate_final_workspace(_request(), phase, execution, evidence) is True
     assert evidence["final_workspace_archive"] == str(archive)
 
 
@@ -81,11 +82,11 @@ def test_hydration_failure_appends_error_and_skips_archive(monkeypatch, tmp_path
     monkeypatch.setattr(
         artifact_phase,
         "_hydrate_workspace_from_final_app",
-        lambda harbor_result, workspace: (None, "hydrate failed"),
+        lambda harbor_result, workspace, *, harness: (None, "hydrate failed"),
     )
     evidence = artifact_phase._initial_evidence_artifacts(phase)
 
-    assert artifact_phase._hydrate_final_workspace(phase, execution, evidence) is False
+    assert artifact_phase._hydrate_final_workspace(_request(), phase, execution, evidence) is False
     assert evidence["errors"][-1] == "hydrate failed"
     assert evidence["final_workspace_archive"] is None
 
@@ -103,25 +104,36 @@ def test_visual_evidence_records_capture_artifacts_and_rebinds(monkeypatch, tmp_
     monkeypatch.setattr(
         artifact_phase,
         "_run_homepage_capture_command",
-        lambda command, workspace, output: (output, "capture stderr"),
+        lambda scenario, command, workspace, output: (output, "capture stderr"),
     )
     monkeypatch.setattr(
         artifact_phase,
         "_persist_visual_evidence_artifacts",
-        lambda request: {"actual": "actual.png", "regions": []},
+        lambda request: {"actual": "visual-output.png", "regions": []},
     )
     monkeypatch.setattr(
         artifact_phase,
         "_rebind_visual_evidence_paths",
         lambda score, evidence_paths: calls.append(f"{score is visual}:{evidence_paths['actual']}"),
     )
+    request = SimpleNamespace(
+        scenario=SimpleNamespace(
+            visual=SimpleNamespace(
+                artifact_manifest=SimpleNamespace(
+                    actual_image="capture-output.png",
+                    diff_image="diff-output.png",
+                    post_capture_image="post-output.png",
+                )
+            )
+        )
+    )
 
-    artifact_phase._persist_visual_evidence(SimpleNamespace(), phase, execution, evidence)
+    artifact_phase._persist_visual_evidence(request, phase, execution, evidence)
 
-    assert evidence["homepage_post"].endswith("homepage-post.png")
-    assert evidence["errors"][-1].startswith("homepage-post capture failed")
-    assert evidence["visual"] == {"actual": "actual.png", "regions": []}
-    assert calls == ["True:actual.png"]
+    assert evidence["post_capture"].endswith("post-output.png")
+    assert evidence["errors"][-1].startswith("post-run visual capture failed")
+    assert evidence["visual"] == {"actual": "visual-output.png", "regions": []}
+    assert calls == ["True:visual-output.png"]
 
 
 def test_retained_evidence_ingests_declared_json_fields(tmp_path):
@@ -216,7 +228,7 @@ def test_persist_artifacts_phase_assembles_all_artifact_sections(monkeypatch, tm
     monkeypatch.setattr(
         artifact_phase,
         "_hydrate_workspace_from_final_app",
-        lambda harbor_result, workspace: (None, "hydrate error"),
+        lambda harbor_result, workspace, *, harness: (None, "hydrate error"),
     )
     monkeypatch.setattr(
         artifact_phase, "_prune_workspace_artifacts", lambda _workspace: {"removed": []}

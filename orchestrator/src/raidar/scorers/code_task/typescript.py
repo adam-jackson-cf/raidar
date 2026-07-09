@@ -9,6 +9,7 @@ from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.code_task.base import CodeTaskScorer
+from raidar.scorers.code_task.typescript_evidence import evaluate_typescript_coverage
 from raidar.scorers.common import (
     code_task_artifact_metric_score,
     coverage_ratio_score,
@@ -32,7 +33,6 @@ class TypeScriptCodeTask(CodeTaskScorer):
     status = "active"
     category = "quality"
     extends = "code-task"
-    runtime = "typescript"
     description = (
         "Scores TypeScript code tasks using the code-task metric interface with "
         "TypeScript-specific measurement tools."
@@ -54,7 +54,13 @@ class TypeScriptCodeTask(CodeTaskScorer):
             metric_scores=(
                 _typescript_functional_score(files, outputs.functional),
                 _typescript_code_quality_score(lint_gate, quality_findings),
-                _typescript_test_coverage_score(outputs.test_coverage),
+                _typescript_test_coverage_score(
+                    evaluate_typescript_coverage(
+                        workspace,
+                        outputs.gate_history,
+                        outputs.test_coverage.threshold,
+                    )
+                ),
                 _typescript_artifact_score(files, tests, workspace, required_artifacts),
                 _typescript_verification_stability_score(outputs.verification_stability),
             ),

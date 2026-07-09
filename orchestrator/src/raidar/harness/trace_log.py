@@ -6,6 +6,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
+from raidar.harness import HarnessDefinitionError, harness_definition
+
 from ..schemas.events import TraceEvent
 
 ROLE_KEYS = ("role", "speaker", "source", "event", "type")
@@ -282,8 +284,8 @@ def parse_pi_trace(trace_dir: Path) -> list[TraceEvent]:
 
 
 TRACE_PARSERS = {
-    "codex-cli": parse_codex_trace,
-    "claude-code": parse_claude_trace,
+    "codex-jsonl": parse_codex_trace,
+    "claude": parse_claude_trace,
     "gemini": parse_gemini_trace,
     "cursor": parse_cursor_trace,
     "copilot": parse_copilot_trace,
@@ -292,14 +294,22 @@ TRACE_PARSERS = {
 
 
 def parse_trace(harness: str, trace_dir: Path) -> list[TraceEvent]:
-    parser = TRACE_PARSERS.get(harness)
+    try:
+        parser_id = harness_definition(harness).trace_parser
+    except HarnessDefinitionError:
+        return []
+    parser = TRACE_PARSERS.get(parser_id or "")
     if parser is None:
         return []
     return parser(trace_dir)
 
 
 def parser_supports_structured_traces(harness: str) -> bool:
-    return harness in TRACE_PARSERS and harness != "codex-cli"
+    try:
+        definition = harness_definition(harness)
+    except HarnessDefinitionError:
+        return False
+    return bool(definition.trace_parser) and not definition.emits_structured_trace_events
 
 
 TraceFormat = Literal["json", "jsonl"]

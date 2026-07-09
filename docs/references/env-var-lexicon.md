@@ -2,7 +2,7 @@
 
 This is the reference list for repo-visible environment variables that affect Raidar orchestrator behavior.
 
-Use [`orchestrator/.env.example`](/Users/adamjackson/Projects/complete/raidar/orchestrator/.env.example) for the common local setup path. This document is the fuller lexicon, including advanced and internally generated variables.
+Use [`orchestrator/.env.example`](../../orchestrator/.env.example) for the common local setup path. This document is the fuller lexicon, including advanced and internally generated variables.
 
 ## User-Set Variables
 
@@ -83,7 +83,7 @@ Use [`orchestrator/.env.example`](/Users/adamjackson/Projects/complete/raidar/or
 
 ### Evaluation tuning overrides
 
-These are optional runtime tuning variables consumed by [`orchestrator/src/raidar/config.py`](/Users/adamjackson/Projects/complete/raidar/orchestrator/src/raidar/config.py). They are not required for normal setup, but they do alter scoring and timeout behavior.
+These are optional runtime tuning variables consumed by [`orchestrator/src/raidar/config.py`](../../orchestrator/src/raidar/config.py). They are not required for normal setup, but they do alter scoring and timeout behavior.
 
 - `EVAL_TIMEOUTS__BUILD`
 - `EVAL_TIMEOUTS__TYPECHECK`
@@ -133,13 +133,11 @@ These are optional runtime tuning variables consumed by [`orchestrator/src/raida
   Examples: `AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY`, `AGENTIC_EVAL_SECRET_FILE_GEMINI_API_KEY`
   Notes: these are not intended for manual `.env` authoring.
 
-## Observed Gaps Closed
-
-The previous [`orchestrator/.env.example`](/Users/adamjackson/Projects/complete/raidar/orchestrator/.env.example) omitted:
+## Coverage
 
 - smoke-mode flags
 - Copilot, Cursor, and Pi credentials / CLI-path overrides
 - `CLAUDE_CODE_OAUTH_TOKEN`
 - `GOOGLE_API_KEY`
 - Google / Vertex AI passthrough variables
-- any pointer to the `EVAL_*` tuning surface
+- `EVAL_*` tuning surface variables

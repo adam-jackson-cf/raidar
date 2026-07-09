@@ -14,8 +14,13 @@ from pathlib import Path
 
 from raidar.config import settings
 from raidar.sanitization import sanitize_evidence_text
+from raidar.schemas.scenario import CapabilityRequirements
 from raidar.schemas.scorecard import MetricScore
-from raidar.scorers.base import ScorerContext, ScorerEvidence, register_scorer
+from raidar.scorers.base import (
+    ScorerContext,
+    ScorerEvidence,
+    register_scorer,
+)
 from raidar.scorers.code_task.base import CodeTaskScorer
 from raidar.scorers.common import (
     code_task_artifact_metric_score,
@@ -68,12 +73,20 @@ class PythonCodeTask(CodeTaskScorer):
     status = "active"
     category = "quality"
     extends = "code-task"
-    runtime = "python"
     description = (
         "Scores Python code tasks using the code-task metric interface with "
         "Python-specific measurement tools."
     )
     metrics = CodeTaskScorer.default_metrics()
+    requirements = CapabilityRequirements(
+        runtimes={"python": ">=3.12"},
+        tools={
+            "ruff": ">=0.14",
+            "pytest": ">=9",
+            "coverage": ">=7",
+            "lizard": ">=1.17",
+        },
+    )
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         """Collect deterministic Python evidence for code-task metrics."""

@@ -22,6 +22,7 @@ from raidar.application.scenarios import scenario_revision_paths as _service_sce
 from raidar.application.scenarios import validate_scenario as _service_validate_scenario
 from raidar.application.serializers import scenario_clone_payload, scenario_init_payload
 from raidar.commands.shared import HARNESS_CHOICES, REPO_ROOT, resolve_scenario_yaml
+from raidar.runtime.environments import EnvironmentResolutionError, resolve_scenario_environment
 from raidar.schemas.scenario import ScenarioDefinition
 
 
@@ -107,9 +108,14 @@ def scenario_validate(scenario: Path) -> None:
     """Validate a scenario document and report key configuration fields."""
     try:
         result = _service_validate_scenario(scenario)
-    except FileNotFoundError as exc:
+    except (FileNotFoundError, EnvironmentResolutionError) as exc:
         raise click.ClickException(str(exc)) from exc
     scenario_def = result.scenario
+    environment = resolve_scenario_environment(
+        scenario=scenario_def,
+        scenario_path=result.scenario_path,
+        repo_root=REPO_ROOT,
+    )
     click.echo("Scenario validation passed.")
     click.echo(f"  name: {scenario_def.name}")
     click.echo(f"  scenario_revision: {scenario_def.scenario_revision}")
@@ -120,6 +126,8 @@ def scenario_validate(scenario: Path) -> None:
     click.echo(f"  gates: {len(scenario_def.verification.gates)}")
     click.echo(f"  scorers: {len(scenario_def.scorers)}")
     click.echo(f"  metrics: {len(scenario_def.metric_ids())}")
+    click.echo(f"  environment: {environment.id}")
+    click.echo(f"  image: {environment.image}")
 
 
 @scenario.command("clone-revision")
@@ -182,6 +190,25 @@ def echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
         click.echo(f"Quality Gates: {', '.join(gates)}")
 
 
+def echo_environment_config(scenario_yaml: Path, scenario_def: ScenarioDefinition) -> None:
+    environment = resolve_scenario_environment(
+        scenario=scenario_def,
+        scenario_path=scenario_yaml,
+        repo_root=REPO_ROOT,
+    )
+    click.echo()
+    click.echo("Environment:")
+    click.echo(f"  ID: {environment.id}")
+    click.echo(f"  Image: {environment.image}")
+    click.echo(f"  Workdir: {environment.workdir}")
+    click.echo(f"  Dockerfile: {environment.dockerfile_path}")
+    click.echo(f"  Verifier: {environment.library.verifier.runner}")
+    requirements = environment.requirements.model_dump(mode="json")
+    capabilities = environment.library.capabilities.model_dump(mode="json")
+    click.echo(f"  Requirements: {json.dumps(requirements, sort_keys=True)}")
+    click.echo(f"  Capabilities: {json.dumps(capabilities, sort_keys=True)}")
+
+
 def echo_available_revisions(scenario_root: Path) -> None:
     revision_paths = scenario_revision_paths(scenario_root)
     if not revision_paths:
@@ -233,6 +260,7 @@ def info(scenario: Path) -> None:
 
     echo_scenario_summary(scenario_def)
     click.echo(f"Scenario YAML: {scenario_yaml}")
+    echo_environment_config(scenario_yaml, scenario_def)
     if scenario_input.is_dir() and not (scenario_input / "scenario.yaml").is_file():
         echo_available_revisions(scenario_input)
     echo_rule_variants(scenario_yaml.parent)

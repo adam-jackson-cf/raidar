@@ -20,11 +20,7 @@ DEFAULT_EXCLUDED_DIRS: tuple[str, ...] = (
     "jobs",
     "harbor-task",
 )
-DEFAULT_EXCLUDED_FILES: tuple[str, ...] = (
-    ".DS_Store",
-    "actual.png",
-    "diff.png",
-)
+DEFAULT_EXCLUDED_FILES: tuple[str, ...] = (".DS_Store",)
 
 
 @dataclass(frozen=True, slots=True)

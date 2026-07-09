@@ -7,6 +7,9 @@ import pytest
 
 from raidar.runtime import task_images
 from raidar.runtime.models import TaskImageRef
+from raidar.runtime.profile import RuntimeProfile
+from raidar.runtime.tool_catalog import ToolCatalogError
+from raidar.schemas.environment import CapabilityRequirements
 
 
 def test_load_task_image_cache_payload_removes_invalid_files(tmp_path):
@@ -28,31 +31,53 @@ def test_load_task_image_cache_payload_removes_invalid_files(tmp_path):
 def test_stale_task_image_names_returns_only_expired_inactive_images(monkeypatch, tmp_path):
     metadata = tmp_path / "image.json"
     metadata.write_text('{"image_name":"old"}', encoding="utf-8")
-    old = time.time() - task_images.RAIDAR_DOCKER_CACHE_MAX_AGE_SEC - 10
+    runtime_profile = RuntimeProfile(docker_cache_max_age_sec=30)
+    old = time.time() - runtime_profile.docker_cache_max_age_sec - 10
     fresh = time.time()
     monkeypatch.setattr(task_images, "_cache_last_used_epoch", lambda _path: old)
 
     assert task_images._stale_task_image_names(
-        metadata, now=time.time(), active_image_name=None
+        metadata,
+        now=time.time(),
+        active_image_name=None,
+        runtime_profile=runtime_profile,
     ) == ("old",)
     assert (
-        task_images._stale_task_image_names(metadata, now=time.time(), active_image_name="old")
+        task_images._stale_task_image_names(
+            metadata,
+            now=time.time(),
+            active_image_name="old",
+            runtime_profile=runtime_profile,
+        )
         == ()
     )
 
     monkeypatch.setattr(task_images, "_cache_last_used_epoch", lambda _path: fresh)
     assert (
-        task_images._stale_task_image_names(metadata, now=time.time(), active_image_name=None) == ()
+        task_images._stale_task_image_names(
+            metadata,
+            now=time.time(),
+            active_image_name=None,
+            runtime_profile=runtime_profile,
+        )
+        == ()
     )
 
     metadata.write_text('{"image_name":42}', encoding="utf-8")
     assert (
-        task_images._stale_task_image_names(metadata, now=time.time(), active_image_name=None) == ()
+        task_images._stale_task_image_names(
+            metadata,
+            now=time.time(),
+            active_image_name=None,
+            runtime_profile=runtime_profile,
+        )
+        == ()
     )
     assert not metadata.exists()
 
 
 def test_prune_prep_cache_removes_expired_and_oversized_entries(monkeypatch, tmp_path):
+    runtime_profile = RuntimeProfile(prep_cache_max_age_sec=30, prep_cache_max_bytes=10)
     baselines_root = tmp_path / "prep" / "baselines"
     preflight_root = tmp_path / "prep" / "preflight"
     old_entry = baselines_root / "old"
@@ -69,19 +94,18 @@ def test_prune_prep_cache_removes_expired_and_oversized_entries(monkeypatch, tmp
 
     now = 10_000.0
     mtimes = {
-        old_entry: now - task_images.RAIDAR_PREP_CACHE_MAX_AGE_SEC - 1,
+        old_entry: now - runtime_profile.prep_cache_max_age_sec - 1,
         large_old: now - 20,
         large_new: now - 10,
-        old_preflight: now - task_images.RAIDAR_PREP_CACHE_MAX_AGE_SEC - 1,
+        old_preflight: now - runtime_profile.prep_cache_max_age_sec - 1,
         fresh_preflight: now,
     }
     monkeypatch.setattr(task_images, "_prep_cache_root", lambda: tmp_path / "prep")
     monkeypatch.setattr(task_images, "_cache_last_used_epoch", lambda path: mtimes[path])
     monkeypatch.setattr(task_images, "_directory_size_bytes", lambda _path: 10)
-    monkeypatch.setattr(task_images, "RAIDAR_PREP_CACHE_MAX_BYTES", 10)
     monkeypatch.setattr(task_images.time, "time", lambda: now)
 
-    task_images._prune_prep_cache_entries()
+    task_images._prune_prep_cache_entries(runtime_profile=runtime_profile)
 
     assert not old_entry.exists()
     assert not large_old.exists()
@@ -91,6 +115,7 @@ def test_prune_prep_cache_removes_expired_and_oversized_entries(monkeypatch, tmp
 
 
 def test_prune_stale_task_images_removes_only_managed_expired_images(monkeypatch, tmp_path):
+    runtime_profile = RuntimeProfile(docker_cache_max_age_sec=30)
     images_root = tmp_path / "images"
     images_root.mkdir()
     (images_root / "old.json").write_text('{"image_name":"old"}', encoding="utf-8")
@@ -99,14 +124,24 @@ def test_prune_stale_task_images_removes_only_managed_expired_images(monkeypatch
     monkeypatch.setattr(task_images, "_raidar_cache_root", lambda: tmp_path)
     monkeypatch.setattr(task_images, "_cache_last_used_epoch", lambda _path: 0)
     monkeypatch.setattr(
-        task_images.time, "time", lambda: task_images.RAIDAR_DOCKER_CACHE_MAX_AGE_SEC + 1
+        task_images.time, "time", lambda: runtime_profile.docker_cache_max_age_sec + 1
     )
-    monkeypatch.setattr(task_images, "_managed_task_image", lambda image, _env: image == "old")
     monkeypatch.setattr(
-        task_images, "_remove_task_image", lambda image, _env: removed.append(image)
+        task_images,
+        "_managed_task_image",
+        lambda image, _env, **_kwargs: image == "old",
+    )
+    monkeypatch.setattr(
+        task_images,
+        "_remove_task_image",
+        lambda image, _env, **_kwargs: removed.append(image),
     )
 
-    task_images._prune_stale_task_images(run_env={}, active_image_name="active")
+    task_images._prune_stale_task_images(
+        run_env={},
+        active_image_name="active",
+        runtime_profile=runtime_profile,
+    )
 
     assert removed == ["old"]
     assert not (images_root / "old.json").exists()
@@ -144,7 +179,7 @@ def test_docker_label_inspection_and_cache_hit(monkeypatch):
     image_ref = TaskImageRef("image:tag", "cache", "tag")
     expected = task_images._expected_task_image_labels(image_ref, "codex-cli")
     monkeypatch.setattr(task_images, "_repo_cache_identity", lambda: "repo")
-    expected[task_images.RAIDAR_DOCKER_LABEL_REPO] = "repo"
+    expected[RuntimeProfile().docker_labels["repo"]] = "repo"
 
     monkeypatch.setattr(
         task_images.subprocess,
@@ -213,11 +248,11 @@ def test_task_image_cache_hit_restores_primary_tag_from_validated_reserve(
     monkeypatch.setattr(
         task_images,
         "_inspect_docker_image_labels",
-        lambda image_name, _env: labels_by_image.get(image_name),
+        lambda image_name, _env, **_kwargs: labels_by_image.get(image_name),
     )
     tag_calls: list[tuple[str, str]] = []
 
-    def fake_tag(source_image: str, target_image: str, _env: dict[str, str]) -> bool:
+    def fake_tag(source_image: str, target_image: str, _env: dict[str, str], **_kwargs) -> bool:
         tag_calls.append((source_image, target_image))
         labels_by_image[target_image] = labels_by_image[source_image]
         return True
@@ -279,6 +314,98 @@ def test_runtime_preflight_writes_logs_and_reports_failures(monkeypatch, tmp_pat
         task_images._run_runtime_preflight_command(request)
 
 
+def test_capability_preflight_uses_catalog_and_rejects_unknown_tools(monkeypatch, tmp_path):
+    image_ref = TaskImageRef("image:tag", "cache", "tag")
+    commands: list[tuple[str, list[str]]] = []
+
+    def fake_probe(**kwargs):
+        commands.append((kwargs["name"], kwargs["command"]))
+        return "20" if kwargs["name"] == "node" else "1"
+
+    monkeypatch.setattr(task_images, "_run_capability_probe", fake_probe)
+
+    result = task_images._ensure_task_image_capability_preflight(
+        image_ref=image_ref,
+        run_env={},
+        log_dir=tmp_path,
+        provided_capabilities=CapabilityRequirements(runtimes={"node": ">=20"}),
+        required_capabilities=CapabilityRequirements(package_managers={"bun": ">=1"}),
+    )
+
+    assert result["results"]["runtimes"]["node"] == "20"
+    assert ("node", ["node", "--version"]) in commands
+    assert ("bun", ["bun", "--version"]) in commands
+
+    with pytest.raises(ToolCatalogError, match="tools.unknown-tool"):
+        task_images._ensure_task_image_capability_preflight(
+            image_ref=image_ref,
+            run_env={},
+            log_dir=tmp_path,
+            provided_capabilities=CapabilityRequirements(),
+            required_capabilities=CapabilityRequirements(tools={"unknown-tool": ">=1"}),
+        )
+
+
+def test_cached_task_image_reuses_stored_probe_metadata(monkeypatch, tmp_path):
+    image_ref = TaskImageRef("image:tag", "cache", "tag")
+    metadata_path = tmp_path / "image-cache.json"
+    provided = CapabilityRequirements(runtimes={"node": ">=20"})
+    required = CapabilityRequirements(package_managers={"bun": ">=1"})
+    probe_payload = {
+        "schema_version": task_images.TASK_IMAGE_PROBE_SCHEMA_VERSION,
+        "results": {
+            "runtimes": {"node": "20"},
+            "package_managers": {"bun": "1"},
+            "tools": {},
+            "browsers": {},
+        },
+    }
+    metadata_path.write_text(
+        json.dumps(
+            {
+                "cache_key": image_ref.cache_key,
+                "image_name": image_ref.image_name,
+                "harness": "codex-cli",
+                "repo_id": task_images._repo_cache_identity(),
+                "probe_schema_version": task_images.TASK_IMAGE_PROBE_SCHEMA_VERSION,
+                "tool_catalog": task_images.tool_catalog_payload(),
+                "provided_capabilities": provided.model_dump(mode="json"),
+                "required_capabilities": required.model_dump(mode="json"),
+                "probe_results": probe_payload,
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        task_images,
+        "_task_image_cache_metadata_path",
+        lambda _cache_key: metadata_path,
+    )
+    monkeypatch.setattr(task_images, "_task_image_cache_hit", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        task_images,
+        "_ensure_harbor_runtime_preflight",
+        lambda **_kwargs: pytest.fail("runtime preflight should use stored metadata"),
+    )
+    monkeypatch.setattr(
+        task_images,
+        "_ensure_task_image_capability_preflight",
+        lambda **_kwargs: pytest.fail("capability preflight should use stored metadata"),
+    )
+
+    assert (
+        task_images._cached_task_image_is_ready(
+            image_ref=image_ref,
+            harness="codex-cli",
+            run_env={},
+            log_dir=tmp_path,
+            provided_capabilities=provided,
+            required_capabilities=required,
+        )
+        == probe_payload
+    )
+
+
 def test_task_image_ready_paths_write_hit_metadata_and_build_on_miss(monkeypatch, tmp_path):
     fixture = TaskImageRef("image:tag", "cache", "tag")
     request = task_images.TaskImageEnsureRequest(
@@ -320,7 +447,7 @@ def test_build_and_verify_task_image_requires_dockerfile(monkeypatch, tmp_path):
     monkeypatch.setattr(
         task_images,
         "_run_task_image_build",
-        lambda cmd, _env, timeout_sec: build_calls.append(cmd)
+        lambda cmd, _env, timeout_sec, **_kwargs: build_calls.append(cmd)
         or task_images.TaskImageBuildResult(
             completed_process=subprocess.CompletedProcess(cmd, 0, stdout="ok", stderr="")
         ),

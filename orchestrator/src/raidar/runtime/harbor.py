@@ -45,6 +45,8 @@ def image_registry_host(image: str) -> str | None:
     first_segment = image.split("/", 1)[0].strip().lower()
     if not first_segment or first_segment == "scratch":
         return None
+    if "/" not in image:
+        return None
     if "." in first_segment or ":" in first_segment or first_segment == "localhost":
         return first_segment
     return None

@@ -1,0 +1,19 @@
+id: node:20
+version: 1
+image: raidar/node:20-bun
+build:
+  dockerfile: environments/node/20-bun/Dockerfile
+verifier:
+  runner: bun@1
+capabilities:
+  runtimes:
+    node: ">=20"
+  package_managers:
+    bun: ">=1"
+  tools:
+    git: ">=2"
+    odiff: ">=0"
+    playwright: ">=1"
+    typescript: ">=5"
+  browsers:
+    chromium: installed

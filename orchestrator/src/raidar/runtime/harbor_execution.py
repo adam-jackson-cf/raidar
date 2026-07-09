@@ -33,6 +33,14 @@ class HarborProcessRequest:
     job_dir: Path
 
 
+@dataclass(frozen=True, slots=True)
+class HarborProcessFailure:
+    """Typed Harbor process failure."""
+
+    reason: str
+    code: str
+
+
 def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
     """Execute Harbor against a local scenario bundle."""
     request.jobs_dir.mkdir(parents=True, exist_ok=True)
@@ -44,16 +52,18 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
     if execution_error is not None:
         return _terminated_harbor_result(
             job_dir=job_dir,
-            reason=execution_error,
+            reason=execution_error.reason,
+            failure_code=execution_error.code,
             trial_dir=_select_trial_dir(job_dir),
         )
 
     trial_dir = _select_trial_dir(job_dir)
-    failure_reason = detect_trial_failure(trial_dir) if trial_dir else None
-    if failure_reason:
+    trial_failure = detect_trial_failure(trial_dir) if trial_dir else None
+    if trial_failure:
         return _terminated_harbor_result(
             job_dir=job_dir,
-            reason=failure_reason,
+            reason=trial_failure.reason,
+            failure_code=trial_failure.code,
             trial_dir=trial_dir,
         )
 
@@ -82,7 +92,7 @@ def _harbor_process_request(
     )
 
 
-def _run_harbor_with_retries(request: HarborProcessRequest) -> str | None:
+def _run_harbor_with_retries(request: HarborProcessRequest) -> HarborProcessFailure | None:
     for attempt in range(1, HARBOR_RATE_LIMIT_MAX_ATTEMPTS + 1):
         execution_error = _run_harbor_process(request)
         if execution_error is None:
@@ -99,11 +109,11 @@ def _run_harbor_with_retries(request: HarborProcessRequest) -> str | None:
 
 
 def _should_retry_harbor_rate_limit(
-    *, attempt: int, execution_error: str, run_harbor_dir: Path
+    *, attempt: int, execution_error: HarborProcessFailure, run_harbor_dir: Path
 ) -> bool:
     return (
         attempt < HARBOR_RATE_LIMIT_MAX_ATTEMPTS
-        and execution_error.startswith("Harbor exited with code")
+        and execution_error.code == "harbor_cli_failure"
         and _is_registry_rate_limited(run_harbor_dir)
     )
 
@@ -117,6 +127,7 @@ def _terminated_harbor_result(
     *,
     job_dir: Path,
     reason: str,
+    failure_code: str,
     trial_dir: Path | None,
 ) -> HarborExecutionResult:
     return HarborExecutionResult(
@@ -124,10 +135,11 @@ def _terminated_harbor_result(
         termination_reason=reason,
         job_dir=job_dir,
         trial_dir=trial_dir,
+        failure_code=failure_code,
     )
 
 
-def _run_harbor_process(request: HarborProcessRequest) -> str | None:
+def _run_harbor_process(request: HarborProcessRequest) -> HarborProcessFailure | None:
     request.run_harbor_dir.mkdir(parents=True, exist_ok=True)
     command_path = request.run_harbor_dir / "command.txt"
     stdout_path = request.run_harbor_dir / "harbor-stdout.log"
@@ -138,7 +150,7 @@ def _run_harbor_process(request: HarborProcessRequest) -> str | None:
     if preflight_reason:
         stdout_path.write_text("")
         stderr_path.write_text(preflight_reason + "\n")
-        return preflight_reason
+        return HarborProcessFailure(preflight_reason, "compose_version_unsupported")
 
     try:
         process = subprocess.Popen(
@@ -151,7 +163,7 @@ def _run_harbor_process(request: HarborProcessRequest) -> str | None:
             start_new_session=True,
         )
     except FileNotFoundError:
-        return "Harbor not installed"
+        return HarborProcessFailure("Harbor not installed", "harness_unavailable")
 
     timed_out = False
     try:
@@ -165,9 +177,15 @@ def _run_harbor_process(request: HarborProcessRequest) -> str | None:
     stderr_path.write_text(_redact_sensitive_text(stderr or ""))
 
     if timed_out:
-        return _timeout_reason(timeout_sec=request.timeout_sec, job_dir=request.job_dir)
+        return HarborProcessFailure(
+            _timeout_reason(timeout_sec=request.timeout_sec, job_dir=request.job_dir),
+            "harbor_timeout",
+        )
     if process.returncode != 0:
-        return f"Harbor exited with code {process.returncode}"
+        return HarborProcessFailure(
+            f"Harbor exited with code {process.returncode}",
+            "harbor_cli_failure",
+        )
     return None
 
 
@@ -191,14 +209,14 @@ def _terminate_process_group(process: subprocess.Popen[str]) -> None:
 
 def _timeout_reason(*, timeout_sec: int, job_dir: Path) -> str:
     if not job_dir.exists():
-        return f"Timeout expired after {timeout_sec}s before Harbor created a job directory."
+        return f"Harbor timed out after {timeout_sec}s before creating a job directory."
     trial_dir = _select_trial_dir(job_dir)
     if not trial_dir:
-        return f"Timeout expired after {timeout_sec}s before Harbor created a trial directory."
+        return f"Harbor timed out after {timeout_sec}s before creating a trial directory."
     result_json = trial_dir / "result.json"
     if not result_json.exists():
-        return f"Timeout expired after {timeout_sec}s before trial result.json was written."
-    return f"Timeout expired after {timeout_sec}s."
+        return f"Harbor timed out after {timeout_sec}s before trial result.json was written."
+    return f"Harbor timed out after {timeout_sec}s."
 
 
 def _select_trial_dir(job_dir: Path) -> Path | None:

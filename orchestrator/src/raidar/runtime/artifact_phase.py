@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from raidar.runtime import artifacts as runtime_artifacts
@@ -19,13 +20,14 @@ persist_verifier_artifacts = runtime_artifacts.persist_verifier_artifacts
 _hydrate_workspace_from_final_app = workspace_artifacts._hydrate_workspace_from_final_app
 _prune_workspace_artifacts = workspace_artifacts._prune_workspace_artifacts
 _run_homepage_capture_command = workspace_artifacts._run_homepage_capture_command
+_visual_artifact_manifest = workspace_artifacts._visual_artifact_manifest
 _workspace_changes_from_baseline = workspace_artifacts._workspace_changes_from_baseline
 PersistedArtifacts = models.PersistedArtifacts
 
 RESERVED_EVIDENCE_KEYS = frozenset(
     {
         "screenshot_command",
-        "homepage_post",
+        "post_capture",
         "final_workspace_archive",
         "visual",
         "errors",
@@ -46,7 +48,7 @@ def persist_artifacts_phase(
     """Artifact persistence phase."""
 
     evidence_artifacts = _initial_evidence_artifacts(phase)
-    hydrated = _hydrate_final_workspace(phase, execution, evidence_artifacts)
+    hydrated = _hydrate_final_workspace(request, phase, execution, evidence_artifacts)
     if hydrated and phase.screenshot_command:
         _persist_visual_evidence(request, phase, execution, evidence_artifacts)
     _ingest_retained_evidence(request, phase, evidence_artifacts)
@@ -56,6 +58,7 @@ def persist_artifacts_phase(
         baseline_workspace=phase.context.baseline_workspace,
         run_workspace=phase.layout.workspace_dir,
         run_root_dir=phase.layout.root_dir,
+        exclude_files=_scenario_visual_output_files(request),
     )
     return PersistedArtifacts(
         starter_meta=build_starter_meta(request, phase.context),
@@ -63,8 +66,10 @@ def persist_artifacts_phase(
         verifier_artifacts=persist_verifier_artifacts(
             execution.harbor_result, phase.layout.verifier_dir
         ),
-        harness_artifacts=persist_harness_artifacts(
-            execution.harbor_result, phase.layout.harness_dir
+        harness_artifacts=_persist_harness_artifacts(
+            execution.harbor_result,
+            phase.layout.harness_dir,
+            _request_harness_value(request),
         ),
         harbor_artifacts=persist_harbor_artifacts(execution.harbor_result, phase.layout.harbor_dir),
         evidence_artifacts=evidence_artifacts,
@@ -73,10 +78,40 @@ def persist_artifacts_phase(
     )
 
 
+def _request_harness_value(request: Any) -> str:
+    config = getattr(request, "config", None)
+    harness = getattr(config, "harness", None)
+    if harness is None:
+        return "codex-cli"
+    return str(getattr(harness, "value", harness))
+
+
+def _scenario_visual_output_files(request: Any) -> tuple[str, ...]:
+    visual = getattr(request.scenario, "visual", None)
+    if visual is None:
+        return ()
+    manifest = visual.artifact_manifest
+    names = [manifest.actual_image, manifest.diff_image]
+    for region in visual.regions:
+        names.extend([region.actual_image, region.diff_image])
+    return tuple(Path(name).name for name in names)
+
+
+def _persist_harness_artifacts(
+    harbor_result: Any, harness_dir: Any, harness: str
+) -> dict[str, str]:
+    try:
+        return persist_harness_artifacts(harbor_result, harness_dir, harness=harness)
+    except TypeError as exc:
+        if "keyword" not in str(exc):
+            raise
+        return persist_harness_artifacts(harbor_result, harness_dir)
+
+
 def _initial_evidence_artifacts(phase: Any) -> dict[str, object]:
     return {
         "screenshot_command": list(phase.screenshot_command) if phase.screenshot_command else None,
-        "homepage_post": None,
+        "post_capture": None,
         "final_workspace_archive": None,
         "visual": {
             "actual": None,
@@ -89,7 +124,10 @@ def _initial_evidence_artifacts(phase: Any) -> dict[str, object]:
 
 
 def _hydrate_final_workspace(
-    phase: Any, execution: Any, evidence_artifacts: dict[str, object]
+    request: Any,
+    phase: Any,
+    execution: Any,
+    evidence_artifacts: dict[str, object],
 ) -> bool:
     """Hydrate the local run workspace from the final Harbor app archive."""
 
@@ -98,6 +136,7 @@ def _hydrate_final_workspace(
     archive_path, hydrate_error = _hydrate_workspace_from_final_app(
         execution.harbor_result,
         phase.context.workspace,
+        harness=request.config.harness.value,
     )
     if hydrate_error:
         _evidence_errors(evidence_artifacts).append(hydrate_error)
@@ -110,7 +149,7 @@ def _hydrate_final_workspace(
 def _persist_visual_evidence(
     request: Any, phase: Any, execution: Any, evidence_artifacts: dict[str, object]
 ) -> None:
-    _capture_homepage_post(phase, evidence_artifacts)
+    _capture_post_run_visual(request, phase, evidence_artifacts)
     visual_artifacts = _persist_visual_evidence_artifacts(
         VisualEvidenceRequest(
             request=request,
@@ -122,16 +161,20 @@ def _persist_visual_evidence(
     _rebind_visual_evidence_paths(execution.outputs.visual, visual_artifacts)
 
 
-def _capture_homepage_post(phase: Any, evidence_artifacts: dict[str, object]) -> None:
+def _capture_post_run_visual(
+    request: Any, phase: Any, evidence_artifacts: dict[str, object]
+) -> None:
+    visual_artifacts = _visual_artifact_manifest(request.scenario)
     post_path, post_error = _run_homepage_capture_command(
+        request.scenario,
         list(phase.screenshot_command),
         phase.context.workspace,
-        phase.layout.root_dir / "homepage-post.png",
+        phase.layout.root_dir / visual_artifacts["post_capture"],
     )
     if post_path:
-        evidence_artifacts["homepage_post"] = str(post_path)
+        evidence_artifacts["post_capture"] = str(post_path)
     if post_error:
-        _evidence_errors(evidence_artifacts).append(f"homepage-post capture failed: {post_error}")
+        _evidence_errors(evidence_artifacts).append(f"post-run visual capture failed: {post_error}")
 
 
 def _ingest_retained_evidence(

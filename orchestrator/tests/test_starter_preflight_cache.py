@@ -4,11 +4,31 @@
 from tests.harbor_runtime_support import *  # noqa: F403
 
 
+def _preflight_environment(
+    *,
+    runtimes: dict[str, str] | None = None,
+    package_managers: dict[str, str] | None = None,
+):
+    return SimpleNamespace(
+        cache_payload=lambda: {
+            "id": "test-env",
+            "capabilities": {"package_managers": package_managers or {"bun": ">=1"}},
+        },
+        library=SimpleNamespace(
+            capabilities=SimpleNamespace(
+                runtimes=runtimes or {"node": ">=20"},
+                package_managers=package_managers or {"bun": ">=1"},
+            )
+        ),
+    )
+
+
 def test_ensure_starter_preflight_skips_test_command_without_tests(monkeypatch, tmp_path) -> None:
     workspace = tmp_path / "workspace"
     task_dir = tmp_path / "scenario"
     workspace.mkdir(parents=True, exist_ok=True)
     task_dir.mkdir(parents=True, exist_ok=True)
+    (workspace / "package.json").write_text("{}", encoding="utf-8")
     (task_dir / "scenario.yaml").write_text(
         "name: sample\nscenario_revision: v001\n", encoding="utf-8"
     )
@@ -17,7 +37,11 @@ def test_ensure_starter_preflight_skips_test_command_without_tests(monkeypatch, 
         scenario=SimpleNamespace(
             name="sample-task",
             verification=SimpleNamespace(
-                required_commands=[["bun", "run", "test"], ["bun", "run", "lint"]]
+                setup_actions=[],
+                required_commands=[["bun", "run", "test"], ["bun", "run", "lint"]],
+                preflight_command_timeout_sec=None,
+                test_discovery_globs=["src/**/*.test.ts"],
+                skip_test_commands_when_no_tests=True,
             ),
         ),
         config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
@@ -41,13 +65,22 @@ def test_ensure_starter_preflight_skips_test_command_without_tests(monkeypatch, 
         "_preflight_cache_file",
         lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
     )
+    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
-    monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: False)
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
     runner.ensure_starter_preflight(request, context)
 
-    assert calls == [["bun", "install", "--frozen-lockfile"], ["bun", "run", "lint"]]
+    assert calls == [["bun", "run", "lint"]]
+
+
+def test_workspace_test_discovery_ignores_dependency_tests(tmp_path: Path) -> None:
+    workspace = tmp_path / "workspace"
+    dependency_tests = workspace / "node_modules" / "pkg" / "src" / "index.test.ts"
+    dependency_tests.parent.mkdir(parents=True)
+    dependency_tests.write_text("test('dependency', () => {})\n", encoding="utf-8")
+
+    assert not runner._workspace_has_tests(workspace, ["**/*.test.ts"])
 
 
 def test_ensure_starter_preflight_reuses_repo_local_cache_across_invocations(
@@ -65,6 +98,7 @@ def test_ensure_starter_preflight_reuses_repo_local_cache_across_invocations(
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     _patch_starter_preflight_cache(monkeypatch, tmp_path)
+    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
     first_hit = runner.ensure_starter_preflight(request, context_one)
@@ -88,17 +122,19 @@ def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     _patch_starter_preflight_cache(monkeypatch, tmp_path)
+    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
     runner.ensure_starter_preflight(request, context)
 
     assert envs
-    preflight_workspace = Path(envs[0]["TMPDIR"]).parent
+    runtime_dir = Path(envs[0]["TMPDIR"]).parent
+    preflight_workspace = runtime_dir.with_name(runtime_dir.name.removesuffix(".runtime"))
     assert preflight_workspace != context.workspace
     assert preflight_workspace.parent == tmp_path / "preflight"
 
-    expected_tmp = preflight_workspace / ".tmp"
-    expected_cache = preflight_workspace / ".cache"
+    expected_tmp = runtime_dir / "tmp"
+    expected_cache = runtime_dir / "cache"
     expected_uv_cache = expected_cache / "uv"
     expected_bun_cache = expected_cache / "bun"
 
@@ -111,6 +147,7 @@ def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
         assert env["BUN_INSTALL_CACHE_DIR"] == str(expected_bun_cache)
 
     assert not preflight_workspace.exists()
+    assert not runtime_dir.exists()
 
 
 def test_ensure_starter_preflight_runs_against_baseline_workspace(
@@ -124,7 +161,13 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
 
     request = SimpleNamespace(
         scenario=SimpleNamespace(
-            verification=SimpleNamespace(required_commands=[["bun", "run", "lint"]])
+            verification=SimpleNamespace(
+                setup_actions=[["bun", "install", "--frozen-lockfile"]],
+                required_commands=[["bun", "run", "lint"]],
+                preflight_command_timeout_sec=None,
+                test_discovery_globs=[],
+                skip_test_commands_when_no_tests=False,
+            )
         ),
         config=SimpleNamespace(harness=SimpleNamespace(value="codex-cli")),
         scenario_dir=task_dir,
@@ -143,14 +186,14 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
 
     called_workspaces: list[Path] = []
 
-    def fake_install(workspace: Path, env: dict[str, str]) -> None:
-        del env
-        called_workspaces.append(workspace)
-        (workspace / "node_modules").mkdir()
-        (workspace / "node_modules" / "installed.txt").write_text("ok", encoding="utf-8")
-
-    def fake_command(workspace: Path, env: dict[str, str], command: list[str]) -> None:
-        del env, command
+    def fake_command(
+        workspace: Path,
+        env: dict[str, str],
+        command: list[str],
+        *,
+        timeout_sec: int,
+    ) -> None:
+        del env, command, timeout_sec
         called_workspaces.append(workspace)
         (workspace / "command-ran.txt").write_text("ok", encoding="utf-8")
 
@@ -159,15 +202,13 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
         "_preflight_cache_file",
         lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
     )
+    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
-    monkeypatch.setattr(runner, "_workspace_has_tests", lambda _workspace: True)
-    monkeypatch.setattr(runner, "_run_starter_preflight_install", fake_install)
     monkeypatch.setattr(runner, "_run_starter_preflight_command", fake_command)
 
     runner.ensure_starter_preflight(request, context)
 
-    assert len(called_workspaces) == 2
-    assert called_workspaces[0] == called_workspaces[1]
+    assert len(called_workspaces) == 1
     preflight_workspace = called_workspaces[0]
     assert preflight_workspace != baseline_workspace
     assert preflight_workspace != run_workspace
@@ -175,6 +216,33 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
     assert not preflight_workspace.exists()
     assert not (baseline_workspace / "node_modules").exists()
     assert not (baseline_workspace / "command-ran.txt").exists()
+
+
+def test_preflight_does_not_infer_installs_from_environment(monkeypatch, tmp_path: Path) -> None:
+    request = _starter_preflight_request(tmp_path)
+    request.scenario.verification.setup_actions = []
+    context = _starter_preflight_context(tmp_path, "workspace")
+    calls: list[list[str]] = []
+
+    def fake_run(command, **kwargs):
+        del kwargs
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
+
+    _patch_starter_preflight_cache(monkeypatch, tmp_path)
+    monkeypatch.setattr(
+        runner,
+        "_resolved_environment",
+        lambda _request: _preflight_environment(
+            runtimes={"python": ">=3.12"},
+            package_managers={"pip": ">=24"},
+        ),
+    )
+    monkeypatch.setattr(runner.subprocess, "run", fake_run)
+
+    runner.ensure_starter_preflight(request, context)
+
+    assert calls == [["bun", "run", "lint"]]
 
 
 def test_cache_key_lock_reclaims_dead_owner_immediately(tmp_path: Path, monkeypatch) -> None:

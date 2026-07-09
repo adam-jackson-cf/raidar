@@ -13,7 +13,7 @@ Create:
 
 ## 2. Author `scenario.yaml`
 
-Current schema shape:
+Schema shape:
 
 ```yaml
 name: homepage-implementation
@@ -23,13 +23,40 @@ difficulty: medium
 category: greenfield-ui
 timeout_sec: 1800
 
+environment:
+  kind: stack_preset
+  id: node:20
+  workdir: /app
+  requirements:
+    runtimes:
+      node: ">=20"
+    package_managers:
+      bun: ">=1"
+    tools:
+      git: ">=2"
+      typescript: ">=5"
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
+
 starter:
   root: starter
 
 verification:
   max_gate_failures: 3
+  setup_actions:
+    - ["bun", "install", "--frozen-lockfile"]
   required_commands:
     - ["bun", "run", "typecheck"]
+  test_discovery_globs:
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
+    - "**/*.spec.ts"
+    - "**/*.spec.tsx"
+  skip_test_commands_when_no_tests: true
   gates:
     - name: typecheck
       command: ["bun", "run", "typecheck"]
@@ -37,19 +64,27 @@ verification:
   coverage_threshold: 0.8
   min_quality_score: 0.8
 
-acceptance:
-  deterministic_checks: []
-  requirements: []
+requirements:
+  items:
+    - id: hero-copy
+      description: Hero section includes the required product message.
+      check:
+        type: import_present
+        pattern: "Build faster"
+        description: Required hero copy is present.
+      required_test_evidence:
+        - type: query_text
+          pattern: "Build faster"
 
 scorers:
-  - id: typescript-code-task
+  - id: design-to-code
     version: 1
     weight: 0.9
     config:
       artifact-checks:
         required_paths:
-          - src/**/*.ts
-          - src/**/*.tsx
+          - src/app/page.tsx
+          - src/components/**/*.tsx
         path_match: glob
   - id: resource-efficiency
     version: 1
@@ -65,9 +100,10 @@ Notes:
 - Keep implementation instructions in prompt artifacts, not in YAML prose blocks.
 - Command fields must be argv arrays. Do not use shell wrappers, operators, or `-c`.
 - Rules are single-set only. Do not add strict/minimal variants.
+- `environment.requirements` lists concrete inventory the scenario expects to use. It does not describe behavior.
 - `scorers[]` is required and defines the scenario evaluation profile.
 - Scorer refs must point to active executable definitions registered by code under `orchestrator/src/raidar/scorers/`.
-- Scenario YAML is strict. Removed fields such as top-level `metrics`, top-level `score_profile`, and `acceptance.llm_judge_rubric` fail validation.
+- Scenario YAML is strict. Unsupported top-level fields fail validation.
 - Scenarios may declare retained evidence files the agent must write during the run:
 
 ```yaml
@@ -79,12 +115,45 @@ evidence:
 
   Declared files must be JSON objects in the run workspace. After the run, their top-level string and string-list fields are ingested into scorer-visible retained evidence (size-capped; platform keys are protected). Scorers such as `bugfix@1` consume these fields for evidence-completeness metrics. See `scenarios/bugfix-ledger-balance/v001/` for a working example.
 
-## 2.1 Configure Scorers
+## 2.1 Choose Runtime Stack
+
+Use `environment.kind: stack_preset` when the scenario can run on a repository-provided stack. The preset owns the Docker image, Dockerfile, verifier runner, and provided capability inventory. The scenario owns its working directory, resources, network policy, and required capability inventory.
+
+Available presets:
+
+| Preset | Use when | Provides |
+| --- | --- | --- |
+| `node:20` | Node, Bun, TypeScript, Playwright, or visual-diff scenarios. | Node 20, Bun, Git, TypeScript, Playwright, odiff, Chromium. |
+| `python:3.12` | Python implementation, bugfix, refactor, or test-generation scenarios. | Python 3.12, pip, Git, pytest, coverage, ruff, lizard. |
+
+Capability categories:
+
+- `runtimes`: language/runtime executables, such as `node` or `python`.
+- `package_managers`: package installers and lockfile-aware managers, such as `bun` or `pip`.
+- `tools`: concrete command-line tools, such as `git`, `typescript`, `pytest`, `coverage`, `ruff`, `lizard`, `playwright`, or `odiff`.
+- `browsers`: browser engines needed by visual or browser-driven workflows, such as `chromium`.
+
+Use `custom_docker` only when a preset does not fit. A custom environment must declare `image`, `build.dockerfile`, `verifier.runner`, and the complete provided `capabilities` inventory so the same validation can run against it.
+
+## 2.2 Configure Verification
+
+`verification.setup_actions` runs before preflight checks and gates. Put project setup there when the starter cannot already run the required workflow, for example package installation or repository-local configuration.
+
+`verification.required_commands` describes commands the selected `AgentSpec` is expected to satisfy during the run. `verification.gates` are the commands Raidar executes and records for scoring. Both use argv arrays.
+
+`verification.test_discovery_globs` and `skip_test_commands_when_no_tests` let starter preflight handle templates that intentionally begin without tests. This affects preflight only; gates still run after the harness completes.
+
+## 2.3 Configure Scorers
 
 Active scorer IDs:
 
 - `design-to-code`
 - `typescript-code-task`
+- `python-code-task`
+- `bugfix`
+- `refactor`
+- `test-generation`
+- `plan-to-code`
 - `requirements`
 - `resource-efficiency`
 
@@ -110,8 +179,9 @@ Dependency rules:
 
 - Scorer weights must have a positive total.
 - Metric weights inside scorer definitions must have a positive total.
+- Scorer-declared capability requirements must be satisfiable by the selected runtime stack.
 - `test-coverage` requires `verification.coverage_threshold`.
-- `requirements-coverage` requires non-empty `acceptance.requirements`.
+- `requirements-coverage` requires non-empty `requirements.items`.
 - `visual-regression` requires a `visual` block.
 - `artifact-checks` requires non-empty `config.required_paths`.
 - `llm-as-judge` is scorer-owned. Scenarios cannot override judge role files.
@@ -121,7 +191,7 @@ The profile shown in run and experiment artifacts is derived from scorer refs as
 
 `scorers:<scorer-id>@<version>:<weight>+...`
 
-## 2.2 Judge Role Files
+## 2.4 Judge Role Files
 
 When a scorer includes `llm-as-judge`, the judge role file lives under `orchestrator/src/raidar/scorers/definitions/` and is referenced by the code-backed scorer definition:
 
@@ -133,7 +203,7 @@ When a scorer includes `llm-as-judge`, the judge role file lives under `orchestr
     judge: judges/plan-judge.toml
 ```
 
-The judge role file should contain the judge role, responsibilities, rubric, and output contract. Keep those details out of `scenario.yaml`.
+The judge role file contains the judge role, responsibilities, rubric, and output contract. Keep those details out of `scenario.yaml`.
 The `judge` path must stay inside scorer definitions; absolute paths and `..` traversal are rejected.
 
 ## 3. Create Rules Files
@@ -154,7 +224,18 @@ Populate `scenarios/<scenario>/v001/rules/` with harness-mapped files:
 make scenario-validate SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml
 ```
 
-2. Run a smoke experiment:
+2. Run a runtime-stack smoke when changing environment requirements or stack presets:
+
+```bash
+make runtime-stack-scenario-smoke \
+  SCENARIO=scenarios/<scenario-name>/v001/scenario.yaml \
+  HARNESS=codex-cli \
+  PROVIDER=openai \
+  MODEL=gpt-5.5 \
+  REASONING_EFFORT=low
+```
+
+3. Run a smoke experiment:
 
 ```bash
 make experiment-run \
@@ -165,7 +246,7 @@ make experiment-run \
   REASONING_EFFORT=low
 ```
 
-3. When you compare multiple `AgentSpec`s, author the matrix config with `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries`; each entry declares `scenario_revision` and a nested `agent` with `harness`, `provider`, `model`, and optional `reasoning_effort`.
+4. When you compare multiple `AgentSpec`s, author the matrix config with `matrix.id`, `matrix.scenario`, `matrix.experiment`, and `matrix.entries`; each entry declares `scenario_revision` and a nested `agent` with `harness`, `provider`, `model`, and optional `reasoning_effort`.
 
 ## 5. Revision Pattern
 
@@ -185,4 +266,4 @@ make scenario-clone-revision SCENARIO_DIR=scenarios/<scenario-name> FROM_REVISIO
 
 This creates `v002` automatically and updates `scenario.yaml` revision metadata in the cloned version.
 
-Do not mutate old revisions once they have been used for benchmark comparisons.
+Do not mutate benchmarked revisions once they have been used for comparisons.

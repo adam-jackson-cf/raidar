@@ -5,7 +5,12 @@ from types import SimpleNamespace
 import pytest
 
 from raidar.runtime import scoring_outputs as scoring_outputs_runtime
+from raidar.runtime.verifier_runners import verifier_runner_definition
 from raidar.schemas.scorecard import Scorecard
+from raidar.scorers.code_task.typescript_evidence import (
+    evaluate_typescript_coverage,
+    evaluate_typescript_requirements,
+)
 from tests import runtime_process_metrics_support as process_support
 from tests import runtime_scorecard_workspace_support as runtime_support
 
@@ -43,6 +48,7 @@ task_bundle_runtime = runtime_support.task_bundle_runtime
 workspace_runtime = runtime_support.workspace_runtime
 workspace_artifacts_runtime = runtime_support.workspace_artifacts_runtime
 workspace_cache_runtime = runtime_support.workspace_cache_runtime
+runtime_environments = runtime_support.runtime_environments
 _load_verifier_outputs = runtime_support._load_verifier_outputs
 EvaluationOutputs = runtime_support.EvaluationOutputs
 ExecutionPhaseResult = runtime_support.ExecutionPhaseResult
@@ -55,11 +61,8 @@ WorkspaceContext = runtime_support.WorkspaceContext
 BaselineWorkspaceRequest = runtime_support.BaselineWorkspaceRequest
 _classify_unscored_reasons = runtime_support._classify_unscored_reasons
 build_scorecard = runtime_support.build_scorecard
-evaluate_coverage = runtime_support.evaluate_coverage
-evaluate_requirements = runtime_support.evaluate_requirements
 _build_verifier_scenario_spec = runtime_support._build_verifier_scenario_spec
 _task_image_reference = runtime_support._task_image_reference
-_verifier_scorer_script = runtime_support._verifier_scorer_script
 _ensure_baseline_workspace = runtime_support._ensure_baseline_workspace
 _prune_workspace_artifacts = runtime_support._prune_workspace_artifacts
 _resolve_homepage_screenshot_command = runtime_support._resolve_homepage_screenshot_command
@@ -78,6 +81,7 @@ class _RuntimeProxy:
         scorecard_runtime,
         task_bundle_runtime,
         process_metrics_runtime,
+        runtime_environments,
     )
 
     def __getattr__(self, name: str):
@@ -133,12 +137,58 @@ def _sample_scenario_doc() -> dict[str, object]:
         "difficulty": "medium",
         "category": "greenfield-ui",
         "timeout_sec": 1800,
+        "environment": _web_environment_doc(),
         "starter": {"root": "starter"},
         "verification": _sample_verification_doc(),
         "requirements": {"items": [_sample_requirement_doc()]},
         "scorers": _sample_scorer_docs(),
         "visual": _sample_visual_doc(),
         "prompt": {"entry": "prompt/task.md"},
+    }
+
+
+def _web_environment_doc() -> dict[str, object]:
+    return {
+        "kind": "stack_preset",
+        "id": "node:20",
+        "workdir": "/app",
+        "requirements": {
+            "runtimes": {"node": ">=20"},
+            "package_managers": {"bun": ">=1"},
+            "tools": {
+                "git": ">=2",
+                "typescript": ">=5",
+                "playwright": ">=1",
+                "odiff": ">=0",
+            },
+            "browsers": {"chromium": "installed"},
+        },
+        "resources": {
+            "cpus": 2,
+            "memory_mb": 4096,
+            "storage_mb": 10240,
+        },
+        "allow_internet": True,
+    }
+
+
+def _typescript_environment_doc() -> dict[str, object]:
+    return {
+        "kind": "stack_preset",
+        "id": "node:20",
+        "workdir": "/app",
+        "requirements": {
+            "runtimes": {"node": ">=20"},
+            "package_managers": {"bun": ">=1"},
+            "tools": {"typescript": ">=5"},
+            "browsers": {},
+        },
+        "resources": {
+            "cpus": 2,
+            "memory_mb": 4096,
+            "storage_mb": 10240,
+        },
+        "allow_internet": True,
     }
 
 
@@ -201,6 +251,11 @@ def _sample_visual_doc() -> dict[str, object]:
     return {
         "reference_image": "./reference/homepage.png",
         "screenshot_command": ["bun", "run", "capture-screenshot"],
+        "artifact_manifest": {
+            "actual_image": ".raidar/visual/homepage-actual.png",
+            "diff_image": ".raidar/visual/homepage-diff.png",
+            "post_capture_image": "post-run-homepage.png",
+        },
         "viewport": {"width": 1440, "height": 1024},
         "scoring": _sample_visual_scoring_doc(),
         "pass_policy": _sample_visual_pass_policy_doc(),
@@ -312,6 +367,7 @@ def _sample_execution_phase(
     *,
     terminated_early: bool,
     termination_reason: str | None,
+    failure_code: str | None = None,
 ) -> ExecutionPhaseResult:
     return ExecutionPhaseResult(
         harbor_result=HarborExecutionResult(
@@ -319,6 +375,7 @@ def _sample_execution_phase(
             termination_reason=termination_reason,
             job_dir=tmp_path / "jobs" / "orchestrator-run-1234",
             trial_dir=None,
+            failure_code=failure_code,
         ),
         terminated_early=terminated_early,
         termination_reason=termination_reason,
@@ -328,6 +385,7 @@ def _sample_execution_phase(
         duration_sec=12.5,
         prep_phase_timings_sec={"prepare_run_context": 0.123},
         prep_total_sec=0.456,
+        time_to_experiment_start_sec=0.789,
         cache_metadata={
             "baseline": {
                 "hit": True,
@@ -344,6 +402,7 @@ def _sample_execution_phase(
             "image_tag": "task-env-codex-cli-image-key",
         },
         auth_metadata={"auth_mode": "chatgpt", "auth_mode_requested": "auto"},
+        failure_code=failure_code,
     )
 
 
@@ -373,6 +432,7 @@ def _sample_scorecard_context(
     *,
     terminated_early: bool,
     termination_reason: str | None,
+    failure_code: str | None = None,
 ) -> ScorecardBuildContext:
     scenario_dir = tmp_path / "scenario"
     workspace_dir = tmp_path / "workspace"
@@ -397,6 +457,7 @@ def _sample_scorecard_context(
             workspace_dir,
             terminated_early=terminated_early,
             termination_reason=termination_reason,
+            failure_code=failure_code,
         ),
     )
 
@@ -454,11 +515,17 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
             "difficulty": "medium",
             "category": "greenfield-ui",
             "timeout_sec": 1800,
+            "environment": _web_environment_doc(),
             "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
             "visual": {
                 "reference_image": str(reference_image),
                 "screenshot_command": ["bun", "run", "capture-screenshot"],
+                "artifact_manifest": {
+                    "actual_image": ".raidar/visual/homepage-actual.png",
+                    "diff_image": ".raidar/visual/homepage-diff.png",
+                    "post_capture_image": "post-run-homepage.png",
+                },
                 "scoring": _visual_bundle_scoring(),
                 "pass_policy": _visual_bundle_pass_policy(),
                 "regions": [_visual_bundle_region()],
@@ -502,6 +569,9 @@ def _visual_bundle_pass_policy() -> dict[str, object]:
 def _visual_bundle_region() -> dict[str, object]:
     return {
         "name": "nav",
+        "reference_image": "references/hero-region-nav.png",
+        "actual_image": ".raidar/visual/homepage-nav-actual.png",
+        "diff_image": ".raidar/visual/homepage-nav-diff.png",
         "weight": 1.0,
         "clip": {"x": 0, "y": 0, "width": 1200, "height": 120},
     }
@@ -974,7 +1044,10 @@ def _verifier_spec_doc(requirement_checks: list[dict[str, str]]) -> dict[str, ob
 
 def _run_verifier_script(fixture: VerifierRunFixture, scenario_spec_path: Path):
     score_script = fixture.tests_dir / "score-scenario.mjs"
-    score_script.write_text(runner._verifier_scorer_script(), encoding="utf-8")
+    score_script.write_text(
+        verifier_runner_definition("bun@1").asset_path.read_text(encoding="utf-8"),
+        encoding="utf-8",
+    )
     return subprocess.run(
         ["bun", str(score_script), str(scenario_spec_path)],
         cwd=fixture.tests_dir,
@@ -1132,15 +1205,21 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
         return target_dir, None
 
     def fake_run_setup_actions(
-        *, workspace: Path, env: dict[str, str], setup_actions: list[list[str]]
+        *,
+        workspace: Path,
+        env: dict[str, str],
+        setup_actions: list[list[str]],
+        timeout_sec: int,
     ) -> None:
+        runtime_dir = baseline_workspace_dir.parent / f"{baseline_workspace_dir.name}.runtime"
+        assert timeout_sec == 60
         assert workspace == baseline_workspace_dir
-        assert env["TMPDIR"] == str(baseline_workspace_dir / ".tmp")
-        assert env["TMP"] == str(baseline_workspace_dir / ".tmp")
-        assert env["TEMP"] == str(baseline_workspace_dir / ".tmp")
-        assert env["XDG_CACHE_HOME"] == str(baseline_workspace_dir / ".cache")
-        assert env["UV_CACHE_DIR"] == str(baseline_workspace_dir / ".cache" / "uv")
-        assert env["BUN_INSTALL_CACHE_DIR"] == str(baseline_workspace_dir / ".cache" / "bun")
+        assert env["TMPDIR"] == str(runtime_dir / "tmp")
+        assert env["TMP"] == str(runtime_dir / "tmp")
+        assert env["TEMP"] == str(runtime_dir / "tmp")
+        assert env["XDG_CACHE_HOME"] == str(runtime_dir / "cache")
+        assert env["UV_CACHE_DIR"] == str(runtime_dir / "cache" / "uv")
+        assert env["BUN_INSTALL_CACHE_DIR"] == str(runtime_dir / "cache" / "bun")
         setup_calls.extend(setup_actions)
 
     monkeypatch.setattr("raidar.runtime.workspace.prepare_workspace", fake_prepare_workspace)
@@ -1155,9 +1234,10 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
         ["git", "init"],
         ["git", "config", "core.hooksPath", ".githooks"],
     ]
-    assert (baseline_workspace_dir / ".tmp").is_dir()
-    assert (baseline_workspace_dir / ".cache" / "uv").is_dir()
-    assert (baseline_workspace_dir / ".cache" / "bun").is_dir()
+    runtime_dir = baseline_workspace_dir.parent / f"{baseline_workspace_dir.name}.runtime"
+    assert (runtime_dir / "tmp").is_dir()
+    assert (runtime_dir / "cache" / "uv").is_dir()
+    assert (runtime_dir / "cache" / "bun").is_dir()
 
 
 def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
@@ -1184,9 +1264,14 @@ def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
         return target_dir, None
 
     def fake_run_setup_actions(
-        *, workspace: Path, env: dict[str, str], setup_actions: list[list[str]]
+        *,
+        workspace: Path,
+        env: dict[str, str],
+        setup_actions: list[list[str]],
+        timeout_sec: int,
     ) -> None:
         del env, setup_actions
+        assert timeout_sec == 60
         nonlocal setup_calls
         setup_calls += 1
         assert workspace == baseline_workspace_dir
@@ -1278,6 +1363,23 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
     assert metrics.executed_required_verification_commands == 2
 
 
+def test_collect_process_metrics_counts_unmatched_actual_commands(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    _write_codex_log(
+        trial_dir,
+        [
+            _codex_command_entry("node scripts/format.js"),
+            _codex_usage_entry(10, 0, 5),
+        ],
+    )
+
+    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
+
+    assert metrics.command_count == 1
+    assert metrics.executed_required_verification_commands == 0
+    assert metrics.missing_required_verification_commands == 3
+
+
 def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_path: Path):
     trial_dir = tmp_path / "trial"
     harness_dir = trial_dir / "agent"
@@ -1290,10 +1392,9 @@ def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_
     (command_dir / "stdout.txt").write_text(
         "\n".join(
             [
-                "I will run the type-checking command to ensure there are no TypeScript errors.",
-                "I have completed the smoke-task implementation. I updated `src/app/page.tsx` "
-                "with the text `Harbor smoke test ready`, and verified by running the project's "
-                "type-checking, linting, and build commands, all of which passed.",
+                "$ bun run typecheck",
+                "$ bun run lint",
+                "$ bun run build",
             ]
         )
     )
@@ -1342,18 +1443,18 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
     assert metrics.required_verification_first_pass["bun run build"] == "missing"
 
 
-def test_normalized_shell_subcommands_splits_and_normalizes_aliases() -> None:
+def test_normalized_shell_subcommands_splits_and_preserves_commands() -> None:
     commands = _normalized_shell_subcommands(
         "bash -lc 'bunx tsc --noEmit && npm run lint; bun run build'"
     )
 
-    assert commands == ["bun run typecheck", "bun run lint", "bun run build"]
+    assert commands == ["bunx tsc --noEmit", "npm run lint", "bun run build"]
 
 
 def test_normalized_shell_subcommands_handles_unparseable_command() -> None:
     commands = _normalized_shell_subcommands("bunx tsc --noEmit '")
 
-    assert commands == ["bun run typecheck"]
+    assert commands == ["bunx tsc --noEmit '"]
 
 
 def test_normalized_shell_subcommands_returns_empty_for_blank() -> None:
@@ -1385,7 +1486,7 @@ def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
     command_dir.mkdir(parents=True, exist_ok=True)
     (command_dir / "stdout.txt").write_text(
         "I have updated `src/app/page.tsx` with the requested text and verified "
-        "the implementation with a successful build and typecheck."
+        "the implementation with `bun run build` and `bun run typecheck`."
     )
 
     metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
@@ -1404,7 +1505,7 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
     command_dir.mkdir(parents=True, exist_ok=True)
     _write_claude_jsonl(
         command_dir / "stdout.txt",
-        ["bunx tsc --noEmit", "npm run lint"],
+        ["bun run typecheck", "bun run lint"],
         {"input_tokens": 70, "cache_read_input_tokens": 20, "output_tokens": 9},
     )
 
@@ -1538,7 +1639,7 @@ def test_collect_process_metrics_detects_git_commit_bypass_commands(tmp_path: Pa
     ]
 
 
-def test_evaluate_coverage_reads_summary_file(tmp_path: Path):
+def test_evaluate_typescript_coverage_reads_summary_file(tmp_path: Path):
     workspace = tmp_path / "workspace"
     coverage_dir = workspace / "coverage"
     coverage_dir.mkdir(parents=True, exist_ok=True)
@@ -1554,13 +1655,13 @@ def test_evaluate_coverage_reads_summary_file(tmp_path: Path):
             }
         )
     )
-    score = evaluate_coverage(workspace, gate_history=[], threshold=0.8)
+    score = evaluate_typescript_coverage(workspace, gate_history=[], threshold=0.8)
     assert score.measured == 0.8
     assert score.passed is True
     assert score.source is not None
 
 
-def test_evaluate_coverage_parses_gate_output_when_summary_missing(tmp_path: Path):
+def test_evaluate_typescript_coverage_parses_gate_output_when_summary_missing(tmp_path: Path):
     workspace = tmp_path / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
     gate_history = [
@@ -1575,14 +1676,14 @@ def test_evaluate_coverage_parses_gate_output_when_summary_missing(tmp_path: Pat
             is_repeat=False,
         )
     ]
-    score = evaluate_coverage(workspace, gate_history=gate_history, threshold=0.84)
+    score = evaluate_typescript_coverage(workspace, gate_history=gate_history, threshold=0.84)
     assert score.measured == 0.83
     assert score.passed is False
     assert score.source == "gate:coverage"
 
 
-def test_evaluate_coverage_zero_threshold_does_not_require_measurement(tmp_path: Path):
-    score = evaluate_coverage(tmp_path, gate_history=[], threshold=0)
+def test_evaluate_typescript_coverage_zero_threshold_does_not_require_measurement(tmp_path: Path):
+    score = evaluate_typescript_coverage(tmp_path, gate_history=[], threshold=0)
 
     assert score.threshold == 0
     assert score.measured is None
@@ -1597,7 +1698,7 @@ def test_coverage_profile_score_treats_zero_threshold_as_no_minimum():
     assert scorecard.metric_score("test-coverage") == 1.0
 
 
-def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):
+def test_evaluate_typescript_requirements_flags_requirement_gaps(tmp_path: Path):
     workspace = tmp_path / "workspace"
     src_app = workspace / "src" / "app"
     src_app.mkdir(parents=True, exist_ok=True)
@@ -1622,7 +1723,7 @@ def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):
         )
     ]
 
-    result = evaluate_requirements(workspace, requirements)
+    result = evaluate_typescript_requirements(workspace, requirements)
     assert result.total_requirements == 1
     assert result.satisfied_requirements == 1
     assert result.mapped_requirements == 0
@@ -1633,7 +1734,7 @@ def test_evaluate_requirements_flags_requirement_gaps(tmp_path: Path):
     }
 
 
-def test_evaluate_requirements_matches_role_queries_and_counts(tmp_path: Path):
+def test_evaluate_typescript_requirements_matches_role_queries_and_counts(tmp_path: Path):
     workspace = tmp_path / "workspace"
     src_app = workspace / "src" / "app"
     src_app.mkdir(parents=True, exist_ok=True)
@@ -1666,7 +1767,7 @@ def test_evaluate_requirements_matches_role_queries_and_counts(tmp_path: Path):
         )
     ]
 
-    result = evaluate_requirements(workspace, requirements)
+    result = evaluate_typescript_requirements(workspace, requirements)
     assert result.total_requirements == 1
     assert result.satisfied_requirements == 1
     assert result.mapped_requirements == 1
@@ -1739,7 +1840,14 @@ def test_build_verifier_scenario_spec_includes_metrics(tmp_path: Path):
         terminated_early=False,
         termination_reason=None,
     )
-    scenario_spec = _build_verifier_scenario_spec(score_context.request, score_context.context)
+    environment = runner.resolve_scenario_environment(
+        scenario=score_context.request.scenario,
+        scenario_path=score_context.request.scenario_dir / "scenario.yaml",
+        repo_root=Path(__file__).resolve().parents[2],
+    )
+    scenario_spec = _build_verifier_scenario_spec(
+        score_context.request, score_context.context, environment
+    )
     assert scenario_spec["metrics"] == [
         {"type": "core", "id": "functional"},
         {"type": "core", "id": "code-quality"},
@@ -1809,6 +1917,21 @@ def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: 
         tmp_path=tmp_path,
         terminated_early=False,
         termination_reason=None,
+    )
+    coverage_dir = score_context.context.workspace / "coverage"
+    coverage_dir.mkdir(parents=True, exist_ok=True)
+    (coverage_dir / "coverage-summary.json").write_text(
+        json.dumps(
+            {
+                "total": {
+                    "lines": {"pct": 90},
+                    "statements": {"pct": 90},
+                    "functions": {"pct": 90},
+                    "branches": {"pct": 90},
+                }
+            }
+        ),
+        encoding="utf-8",
     )
     score_context.request.scenario.verification.min_quality_score = 0.95
 
@@ -1922,6 +2045,7 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
 
     assert harbor_meta["prep_phase_timings_sec"] == {"prepare_run_context": 0.123}
     assert harbor_meta["prep_total_sec"] == 0.456
+    assert harbor_meta["time_to_experiment_start_sec"] == 0.789
     assert harbor_meta["orchestration_overhead_excluding_test_sec"] == 2.5
     assert harbor_meta["harness_overhead_sec"] == 2.5
     assert harbor_meta["cache"]["baseline"]["hit"] is True
@@ -2032,6 +2156,7 @@ def test_classify_unscored_reasons_rate_limit():
     reasons = _classify_unscored_reasons(
         terminated_early=True,
         termination_reason="Codex turn failed: Rate limit reached for gpt-5.2-codex.",
+        failure_code="provider_rate_limit",
     )
     assert "provider_rate_limit" in reasons
 
@@ -2040,6 +2165,7 @@ def test_classify_unscored_reasons_timeout():
     reasons = _classify_unscored_reasons(
         terminated_early=True,
         termination_reason="Timeout expired after 420s before trial result.json was written.",
+        failure_code="harbor_timeout",
     )
     assert reasons == ["harbor_timeout"]
 
@@ -2050,6 +2176,7 @@ def test_classify_unscored_reasons_compose_version_unsupported():
         termination_reason=(
             "Unsupported docker compose version 2.39.2. Require >= 2.40.1 for Harbor runs."
         ),
+        failure_code="compose_version_unsupported",
     )
     assert reasons == ["compose_version_unsupported"]
 
@@ -2067,6 +2194,7 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
         tmp_path,
         terminated_early=True,
         termination_reason="Codex turn failed: Rate limit reached for provider/model",
+        failure_code="provider_rate_limit",
     )
 
     scorecard = build_scorecard(context)
@@ -2267,6 +2395,7 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
             "difficulty": "easy",
             "category": "agent-integration",
             "timeout_sec": 300,
+            "environment": _typescript_environment_doc(),
             "starter": {"root": "starter"},
             "verification": {"gates": [], "required_commands": [], "min_quality_score": 0.0},
             "requirements": {"items": []},
@@ -2279,45 +2408,48 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
     assert command is None
 
 
-def test_ensure_workspace_capture_dependencies_installs_when_next_missing(
+def test_ensure_workspace_capture_dependencies_runs_visual_setup_actions(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir(parents=True, exist_ok=True)
-    (workspace / "package.json").write_text('{"name":"app"}\n')
-    (workspace / "bun.lock").write_text("lockfileVersion = 1\n")
 
     calls: list[tuple[list[str], Path]] = []
 
     def fake_run(command, **kwargs):
         calls.append((command, Path(kwargs["cwd"])))
-        (workspace / "node_modules" / "next").mkdir(parents=True, exist_ok=True)
-        (workspace / "node_modules" / "next" / "package.json").write_text("{}\n")
         return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
 
     monkeypatch.setattr(subprocess, "run", fake_run)
 
-    error = runner._ensure_workspace_capture_dependencies(workspace)
+    task = SimpleNamespace(
+        visual=SimpleNamespace(capture_setup_actions=[["bun", "install", "--frozen-lockfile"]])
+    )
+    error = runner._ensure_workspace_capture_dependencies(
+        task,
+        workspace,
+    )
 
     assert error is None
     assert calls == [(["bun", "install", "--frozen-lockfile"], workspace)]
 
 
-def test_ensure_workspace_capture_dependencies_skips_when_next_present(
+def test_ensure_workspace_capture_dependencies_skips_without_visual_setup_actions(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     workspace = tmp_path / "workspace"
-    (workspace / "node_modules" / "next").mkdir(parents=True, exist_ok=True)
-    (workspace / "node_modules" / "next" / "package.json").write_text("{}\n")
-    (workspace / "package.json").write_text('{"name":"app"}\n')
-    (workspace / "bun.lock").write_text("lockfileVersion = 1\n")
+    workspace.mkdir(parents=True, exist_ok=True)
 
     def fail_run(*args, **kwargs):
         raise AssertionError("subprocess.run should not be called")
 
     monkeypatch.setattr(subprocess, "run", fail_run)
 
-    error = runner._ensure_workspace_capture_dependencies(workspace)
+    task = SimpleNamespace(visual=SimpleNamespace(capture_setup_actions=[]))
+    error = runner._ensure_workspace_capture_dependencies(
+        task,
+        workspace,
+    )
 
     assert error is None
 

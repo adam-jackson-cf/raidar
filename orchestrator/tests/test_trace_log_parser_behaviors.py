@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from raidar.parser import trace_log
+from raidar.harness import trace_log
 
 
 def test_json_record_readers_skip_invalid_and_accept_lists_events_and_objects(tmp_path):

@@ -6,12 +6,14 @@ from __future__ import annotations
 
 from raidar.audit.workspace_diff import directory_fingerprint
 from raidar.runtime import artifacts as artifacts_runtime
+from raidar.runtime import environments as runtime_environments
 from raidar.runtime import scorecard as scorecard_runtime
 from raidar.runtime import task_bundle as task_bundle_runtime
 from raidar.runtime import workspace as workspace_runtime
 from raidar.runtime import workspace_artifacts as workspace_artifacts_runtime
 from raidar.runtime import workspace_cache as workspace_cache_runtime
 from raidar.runtime.artifacts import _load_verifier_outputs
+from raidar.runtime.environments import resolve_scenario_environment
 from raidar.runtime.models import (
     EvaluationOutputs,
     ExecutionPhaseResult,
@@ -25,13 +27,10 @@ from raidar.runtime.models import (
 from raidar.runtime.scorecard import (
     _classify_unscored_reasons,
     build_scorecard,
-    evaluate_coverage,
-    evaluate_requirements,
 )
 from raidar.runtime.task_bundle import (
     _build_verifier_scenario_spec,
     _task_image_reference,
-    _verifier_scorer_script,
     create_harbor_task_bundle,
 )
 from raidar.runtime.workspace import (

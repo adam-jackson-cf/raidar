@@ -25,8 +25,10 @@ def test_harbor_result_parsing_detects_rate_limits_failures_and_timings(tmp_path
         json.dumps({"exception_info": {"exception_message": "failed with sk-test-secret"}}),
         encoding="utf-8",
     )
-    assert harbor_results.detect_trial_failure(trial) == (
-        "Harbor trial exception: failed with sk-test-secret"
+    failure = harbor_results.detect_trial_failure(trial)
+    assert failure == harbor_results.TrialFailure(
+        reason="Harbor trial exception: failed with sk-test-secret",
+        code="harbor_trial_exception",
     )
 
     (trial / "result.json").write_text("{}", encoding="utf-8")
@@ -36,7 +38,10 @@ def test_harbor_result_parsing_detects_rate_limits_failures_and_timings(tmp_path
         '{"type":"turn.failed","error":{"message":"bad token"}}\n',
         encoding="utf-8",
     )
-    assert harbor_results.detect_trial_failure(trial) == "Codex turn failed: bad token"
+    assert harbor_results.detect_trial_failure(trial) == harbor_results.TrialFailure(
+        reason="Codex turn failed: bad token",
+        code="provider_or_harness_turn_failure",
+    )
     assert harbor_results._codex_turn_failure_message('{"type":"turn.failed","error":{}}') is None
     assert harbor_results._codex_turn_failure_message("raw failure") == "raw failure"
 
@@ -82,7 +87,11 @@ def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_pat
 
     def fake_run_process(_request):
         calls["count"] += 1
-        return "Harbor exited with code 1" if calls["count"] == 1 else None
+        return (
+            harbor_execution.HarborProcessFailure("Harbor exited with code 1", "harbor_cli_failure")
+            if calls["count"] == 1
+            else None
+        )
 
     monkeypatch.setattr(harbor_execution, "_run_harbor_process", fake_run_process)
     monkeypatch.setattr(harbor_execution, "_is_registry_rate_limited", lambda _dir: True)
@@ -99,7 +108,12 @@ def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_pat
 
     assert (
         harbor_execution._should_retry_harbor_rate_limit(
-            attempt=2, execution_error="Harbor exited with code 1", run_harbor_dir=tmp_path
+            attempt=2,
+            execution_error=harbor_execution.HarborProcessFailure(
+                "Harbor exited with code 1",
+                "harbor_cli_failure",
+            ),
+            run_harbor_dir=tmp_path,
         )
         is False
     )
@@ -107,12 +121,12 @@ def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_pat
     assert harbor_execution._harbor_process_timeout(1000) == 1250
 
     assert harbor_execution._timeout_reason(timeout_sec=5, job_dir=tmp_path / "missing").endswith(
-        "before Harbor created a job directory."
+        "before creating a job directory."
     )
     job = tmp_path / "job"
     job.mkdir()
     assert harbor_execution._timeout_reason(timeout_sec=5, job_dir=job).endswith(
-        "before Harbor created a trial directory."
+        "before creating a trial directory."
     )
     trial = job / "trial"
     trial.mkdir()
@@ -121,7 +135,7 @@ def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_pat
     )
     (trial / "result.json").write_text("{}", encoding="utf-8")
     assert (
-        harbor_execution._timeout_reason(timeout_sec=5, job_dir=job) == "Timeout expired after 5s."
+        harbor_execution._timeout_reason(timeout_sec=5, job_dir=job) == "Harbor timed out after 5s."
     )
 
 
@@ -155,7 +169,11 @@ def test_run_harbor_process_writes_redacted_logs_for_success_failure_and_timeout
     monkeypatch.setattr(
         harbor_execution.subprocess, "Popen", lambda *_args, **_kwargs: _FailingProcess()
     )
-    assert harbor_execution._run_harbor_process(request) == "Harbor exited with code 7"
+    failure = harbor_execution._run_harbor_process(request)
+    assert failure == harbor_execution.HarborProcessFailure(
+        "Harbor exited with code 7",
+        "harbor_cli_failure",
+    )
 
     class _TimeoutProcess(_Process):
         returncode = 0
@@ -171,14 +189,20 @@ def test_run_harbor_process_writes_redacted_logs_for_success_failure_and_timeout
         harbor_execution.subprocess, "Popen", lambda *_args, **_kwargs: _TimeoutProcess()
     )
     monkeypatch.setattr(harbor_execution, "_terminate_process_group", lambda _process: None)
-    assert "Timeout expired after 5s" in harbor_execution._run_harbor_process(request)
+    failure = harbor_execution._run_harbor_process(request)
+    assert failure is not None
+    assert failure.code == "harbor_timeout"
+    assert "Harbor timed out after 5s" in failure.reason
 
     monkeypatch.setattr(
         harbor_execution,
         "_docker_compose_preflight_reason",
         lambda _env: "compose unavailable",
     )
-    assert harbor_execution._run_harbor_process(request) == "compose unavailable"
+    assert harbor_execution._run_harbor_process(request) == harbor_execution.HarborProcessFailure(
+        "compose unavailable",
+        "compose_version_unsupported",
+    )
 
     monkeypatch.setattr(harbor_execution, "_docker_compose_preflight_reason", lambda _env: None)
 
@@ -186,7 +210,10 @@ def test_run_harbor_process_writes_redacted_logs_for_success_failure_and_timeout
         raise FileNotFoundError()
 
     monkeypatch.setattr(harbor_execution.subprocess, "Popen", missing)
-    assert harbor_execution._run_harbor_process(request) == "Harbor not installed"
+    assert harbor_execution._run_harbor_process(request) == harbor_execution.HarborProcessFailure(
+        "Harbor not installed",
+        "harness_unavailable",
+    )
 
 
 def test_terminate_process_group_handles_running_exited_and_missing_processes(monkeypatch):
@@ -242,10 +269,15 @@ def test_execute_harbor_selects_trials_and_reports_execution_or_trial_failures(
         timeout_sec=5,
         run_env={},
     )
-    monkeypatch.setattr(harbor_execution, "_run_harbor_with_retries", lambda _request: "bad")
+    monkeypatch.setattr(
+        harbor_execution,
+        "_run_harbor_with_retries",
+        lambda _request: harbor_execution.HarborProcessFailure("bad", "harbor_cli_failure"),
+    )
     result = harbor_execution.execute_harbor(request)
     assert result.terminated_early is True
     assert result.termination_reason == "bad"
+    assert result.failure_code == "harbor_cli_failure"
 
     job_dir = request.jobs_dir / "orchestrator-run"
     (job_dir / "trial-a").mkdir(parents=True)
@@ -253,10 +285,15 @@ def test_execute_harbor_selects_trials_and_reports_execution_or_trial_failures(
     assert harbor_execution._select_trial_dir(job_dir).name == "trial-b"
 
     monkeypatch.setattr(harbor_execution, "_run_harbor_with_retries", lambda _request: None)
-    monkeypatch.setattr(harbor_execution, "detect_trial_failure", lambda _trial: "trial failed")
+    monkeypatch.setattr(
+        harbor_execution,
+        "detect_trial_failure",
+        lambda _trial: harbor_results.TrialFailure("trial failed", "harbor_trial_exception"),
+    )
     result = harbor_execution.execute_harbor(request)
     assert result.terminated_early is True
     assert result.trial_dir.name == "trial-b"
+    assert result.failure_code == "harbor_trial_exception"
 
     monkeypatch.setattr(harbor_execution, "detect_trial_failure", lambda _trial: None)
     result = harbor_execution.execute_harbor(request)

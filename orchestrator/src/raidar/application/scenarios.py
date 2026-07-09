@@ -8,7 +8,6 @@ from typing import Any
 
 import yaml
 
-from raidar.agents.rules import SYSTEM_RULES
 from raidar.application.models import (
     ScenarioCloneRequest,
     ScenarioInitRequest,
@@ -16,8 +15,12 @@ from raidar.application.models import (
     ScenarioValidationResult,
 )
 from raidar.application.scenario_catalog import load_scenario
+from raidar.harness import harness_rule_filenames
+from raidar.runtime.environments import resolve_scenario_environment
 from raidar.scenario_clone import ScenarioCloneResult
 from raidar.scenario_clone import clone_scenario_revision as clone_revision
+
+REPO_ROOT = Path(__file__).resolve().parents[4]
 
 SCENARIO_PROMPT_TEXT = (
     "Implement the requested feature in the starter application.\n\n"
@@ -83,13 +86,30 @@ def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> d
         "difficulty": request.difficulty,
         "category": request.category,
         "timeout_sec": request.timeout_sec,
-        "dockerfile": "./Dockerfile",
         "test_scripts": [],
+        "environment": {
+            "kind": "stack_preset",
+            "id": "node:20",
+            "workdir": "/app",
+            "requirements": {
+                "runtimes": {"node": ">=20"},
+                "package_managers": {"bun": ">=1"},
+                "tools": {"typescript": ">=5"},
+                "browsers": {},
+            },
+            "resources": {
+                "cpus": 2,
+                "memory_mb": 4096,
+                "storage_mb": 10240,
+            },
+            "allow_internet": True,
+        },
         "starter": {"root": request.starter_root},
         "verification": {
             "max_gate_failures": 3,
             "coverage_threshold": 0.8,
             "min_quality_score": 0.8,
+            "setup_actions": [["bun", "install", "--frozen-lockfile"]],
             "required_commands": [
                 ["bun", "run", "typecheck"],
                 ["bun", "run", "lint"],
@@ -127,7 +147,7 @@ def _write_scenario_prompt(layout: ScenarioInitLayout) -> None:
 
 
 def _write_scenario_rules(layout: ScenarioInitLayout) -> None:
-    for filename in sorted(set(SYSTEM_RULES.values())):
+    for filename in harness_rule_filenames():
         (layout.rules_dir / filename).write_text(SCENARIO_RULE_TEXT + "\n", encoding="utf-8")
 
 
@@ -153,6 +173,11 @@ def validate_scenario(path: Path) -> ScenarioValidationResult:
     scenario_yaml = resolve_scenario_yaml(path)
     scenario = load_scenario(scenario_yaml)
     _validate_scenario_files(scenario_yaml.parent, scenario)
+    resolve_scenario_environment(
+        scenario=scenario,
+        scenario_path=scenario_yaml,
+        repo_root=REPO_ROOT,
+    )
     return ScenarioValidationResult(
         scenario_path=scenario_yaml,
         scenario=scenario,

@@ -8,13 +8,12 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
+from raidar.harness.definitions import HarnessDefinitionError, harness_definition
 from raidar.runtime.harbor_results import _load_json_dict
 from raidar.runtime.harness_logs import _as_int, _extract_item_completed, _read_jsonl_dicts
 from raidar.runtime.models import CommandRecord
 
 BACKTICK_COMMAND_PATTERN = re.compile(r"`([^`\n]+)`")
-
-SHELL_COMMAND_PREFIX_PATTERN = re.compile(r"^(?:bun|npm|npx|pnpm|yarn|biome|tsc|next|vitest)\b")
 
 COMMAND_INTENT_PATTERN = re.compile(r"\b(i will|i'll|i am going to|i'm going to|i plan to)\b")
 
@@ -35,14 +34,6 @@ COMMAND_EXECUTION_HINTS = (
 
 VERIFIED_WITH_PATTERN = re.compile(r"\bverif(?:y|ied|ying)\b.*\bwith\b")
 
-KEYWORD_COMMAND_PATTERNS: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("bun run typecheck", ("type-check", "typecheck", "type checking", "tsc")),
-    ("bun run lint", ("lint", "linting")),
-    ("bun run test:coverage", ("test:coverage", "coverage")),
-    ("bun run test", ("run test", "test command", "testing", "tests")),
-    ("bun run build", ("build", "compil", "next build")),
-)
-
 _HEREDOC_PATTERN = re.compile(r"<<-?\s*['\"]?([A-Za-z_][A-Za-z0-9_]*)['\"]?")
 
 
@@ -55,6 +46,7 @@ class ClaudeToolUseAppendRequest:
     records: list[CommandRecord]
     record_idx_by_tool_use_id: dict[str, int]
     include_git_commit: bool = False
+    verification_patterns: tuple[str, ...] = ()
 
 
 def _normalize_command(command: str) -> str:
@@ -148,10 +140,25 @@ def _git_commit_uses_verification_bypass(command: str) -> bool:
     return "--no-verify" in tokens or "-n" in tokens
 
 
-def _should_record_command(command: str, *, include_git_commit: bool) -> bool:
-    if _looks_like_shell_command(command):
+def _should_record_command(
+    command: str,
+    *,
+    include_git_commit: bool,
+    verification_patterns: tuple[str, ...] = (),
+    include_unmatched: bool = False,
+) -> bool:
+    if include_unmatched and command:
+        return True
+    if _matches_verification_pattern(command, verification_patterns):
         return True
     return include_git_commit and _is_git_commit_command(command)
+
+
+def _matches_verification_pattern(command: str, verification_patterns: tuple[str, ...]) -> bool:
+    return any(
+        command == pattern or command.startswith(f"{pattern} ")
+        for pattern in sorted(verification_patterns, key=len, reverse=True)
+    )
 
 
 def _is_shell_separator(token: str) -> bool:
@@ -161,7 +168,7 @@ def _is_shell_separator(token: str) -> bool:
 def _normalized_joined_command(tokens: list[str]) -> str | None:
     if not tokens:
         return None
-    return _normalize_verification_alias(shlex.join(tokens).strip())
+    return shlex.join(tokens).strip()
 
 
 def _split_token_by_shell_separators(token: str) -> list[str]:
@@ -255,7 +262,7 @@ def _normalized_shell_subcommands(command: str) -> list[str]:
         try:
             tokens = shlex.split(segment)
         except ValueError:
-            subcommands.append(_normalize_verification_alias(segment))
+            subcommands.append(segment)
             continue
         if not tokens:
             continue
@@ -278,21 +285,6 @@ def _unwrap_shell_wrapper(command: str) -> str:
     return command
 
 
-def _normalize_verification_alias(command: str) -> str:
-    lowered = command.lower().strip()
-    if lowered in {"bun run typecheck", "npm run typecheck", "pnpm typecheck", "yarn typecheck"}:
-        return "bun run typecheck"
-    if lowered in {"bun run lint", "npm run lint", "pnpm lint", "yarn lint"}:
-        return "bun run lint"
-    if lowered in {"bun run build", "npm run build", "pnpm build", "yarn build"}:
-        return "bun run build"
-    if "tsc --noemit" in lowered:
-        return "bun run typecheck"
-    if "ultracite lint" in lowered or lowered.startswith("eslint "):
-        return "bun run lint"
-    return command
-
-
 def _command_failed(item: dict) -> bool:
     status = item.get("status")
     exit_code = int(item.get("exit_code", 0) or 0)
@@ -309,7 +301,10 @@ def _command_output(item: dict) -> str:
 
 
 def _command_records(
-    entries: list[dict], *, include_git_commit: bool = False
+    entries: list[dict],
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     records: list[CommandRecord] = []
     for entry in entries:
@@ -321,7 +316,12 @@ def _command_records(
         output = _command_output(item)
         commands = _normalized_shell_subcommands(str(item.get("command", "")))
         for command in commands:
-            if not _should_record_command(command, include_git_commit=include_git_commit):
+            if not _should_record_command(
+                command,
+                include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
+                include_unmatched=True,
+            ):
                 continue
             records.append(
                 CommandRecord(
@@ -335,31 +335,50 @@ def _command_records(
 
 
 def _command_records_for_harness(
-    trial_dir: Path, harness: str, *, include_git_commit: bool = False
+    trial_dir: Path,
+    harness: str,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
-    if harness == "codex-cli":
+    try:
+        definition = harness_definition(harness)
+    except HarnessDefinitionError as exc:
+        raise ValueError(f"Unsupported harness: {harness}") from exc
+    parser = definition.command_parser
+    if parser == "codex-jsonl":
         return _command_records(
             _read_jsonl_dicts(trial_dir / "agent" / "codex.txt"),
             include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
         )
-    if harness == "claude-code":
-        return _command_records_from_claude_stdout(trial_dir, include_git_commit=include_git_commit)
-    if harness == "gemini":
+    if parser == "claude-stdout":
+        return _command_records_from_claude_stdout(
+            trial_dir,
+            include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
+        )
+    if parser == "gemini":
         stdout_records = _command_records_from_harness_stdout(
             trial_dir,
-            additional_stdout_files=("gemini-cli.txt",),
+            additional_stdout_files=definition.additional_stdout_files,
             include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
         )
         if stdout_records:
             return stdout_records
         return _command_records_from_gemini_trajectory(
-            trial_dir, include_git_commit=include_git_commit
+            trial_dir,
+            include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
         )
-    if harness in {"cursor", "copilot", "pi"}:
+    if parser == "command-stdout":
         return _command_records_from_harness_stdout(
-            trial_dir, include_git_commit=include_git_commit
+            trial_dir,
+            include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
         )
-    raise ValueError(f"Unsupported harness for command extraction: {harness}")
+    raise ValueError(f"Unsupported command parser for harness {harness}: {parser}")
 
 
 def _command_records_from_harness_stdout(
@@ -367,6 +386,7 @@ def _command_records_from_harness_stdout(
     *,
     additional_stdout_files: tuple[str, ...] = (),
     include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     harness_dir = trial_dir / "agent"
     if not harness_dir.exists():
@@ -378,13 +398,20 @@ def _command_records_from_harness_stdout(
         if not stdout_path.exists():
             continue
         records.extend(
-            _command_records_from_stdout(stdout_path, include_git_commit=include_git_commit)
+            _command_records_from_stdout(
+                stdout_path,
+                include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
+            )
         )
     return records
 
 
 def _command_records_from_claude_stdout(
-    trial_dir: Path, *, include_git_commit: bool = False
+    trial_dir: Path,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     agent_dir = trial_dir / "agent"
     if not agent_dir.exists():
@@ -397,14 +424,19 @@ def _command_records_from_claude_stdout(
             continue
         records.extend(
             _command_records_from_claude_stdout_file(
-                stdout_path, include_git_commit=include_git_commit
+                stdout_path,
+                include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
             )
         )
     return records
 
 
 def _command_records_from_claude_stdout_file(
-    stdout_path: Path, *, include_git_commit: bool = False
+    stdout_path: Path,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     try:
         lines = stdout_path.read_text(errors="ignore").splitlines()
@@ -420,7 +452,11 @@ def _command_records_from_claude_stdout_file(
         payload = _line_as_json_dict(stripped)
         if payload is None:
             records.extend(
-                _command_records_from_line(stripped, include_git_commit=include_git_commit)
+                _command_records_from_line(
+                    stripped,
+                    include_git_commit=include_git_commit,
+                    verification_patterns=verification_patterns,
+                )
             )
             continue
         _append_claude_tool_use_records(
@@ -430,6 +466,7 @@ def _command_records_from_claude_stdout_file(
                 records=records,
                 record_idx_by_tool_use_id=record_idx_by_tool_use_id,
                 include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
             )
         )
         _mark_claude_failed_tool_records(
@@ -447,6 +484,8 @@ def _append_claude_tool_use_records(request: ClaudeToolUseAppendRequest) -> None
             if not _should_record_command(
                 normalized,
                 include_git_commit=request.include_git_commit,
+                verification_patterns=request.verification_patterns,
+                include_unmatched=True,
             ):
                 continue
             matched_indexes.append(len(request.records))
@@ -541,7 +580,10 @@ def _claude_failed_tool_result_ids(payload: dict) -> list[str]:
 
 
 def _command_records_from_stdout(
-    stdout_path: Path, *, include_git_commit: bool = False
+    stdout_path: Path,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     try:
         lines = stdout_path.read_text(errors="ignore").splitlines()
@@ -549,12 +591,21 @@ def _command_records_from_stdout(
         return []
     records: list[CommandRecord] = []
     for line in lines:
-        records.extend(_command_records_from_line(line, include_git_commit=include_git_commit))
+        records.extend(
+            _command_records_from_line(
+                line,
+                include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
+            )
+        )
     return records
 
 
 def _command_records_from_line(
-    line: str, *, include_git_commit: bool = False
+    line: str,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     stripped = line.strip()
     if not stripped:
@@ -564,36 +615,56 @@ def _command_records_from_line(
             stripped[2:],
             output=stripped,
             include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
         )
     if _line_is_command_intent(stripped):
         return []
     if not _line_reports_command_execution(stripped):
         return []
-    quoted_records = _quoted_command_records(stripped, include_git_commit=include_git_commit)
-    if quoted_records:
-        return quoted_records
-    return _keyword_command_records(stripped, include_git_commit=include_git_commit)
+    return _quoted_command_records(
+        stripped,
+        include_git_commit=include_git_commit,
+        verification_patterns=verification_patterns,
+    )
 
 
 def _prompt_command_record(
-    command_text: str, *, output: str, include_git_commit: bool = False
+    command_text: str,
+    *,
+    output: str,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     commands = _normalized_shell_subcommands(command_text)
     return [
         CommandRecord(command=command, failed=False, output=output)
         for command in commands
-        if _should_record_command(command, include_git_commit=include_git_commit)
+        if _should_record_command(
+            command,
+            include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
+            include_unmatched=True,
+        )
     ]
 
 
-def _quoted_command_records(line: str, *, include_git_commit: bool = False) -> list[CommandRecord]:
+def _quoted_command_records(
+    line: str,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
+) -> list[CommandRecord]:
     commands: list[str] = []
     for match in BACKTICK_COMMAND_PATTERN.findall(line):
         commands.extend(_normalized_shell_subcommands(match))
     commands = [
         command
         for command in commands
-        if _should_record_command(command, include_git_commit=include_git_commit)
+        if _should_record_command(
+            command,
+            include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
+        )
     ]
     if not commands:
         return []
@@ -602,7 +673,10 @@ def _quoted_command_records(line: str, *, include_git_commit: bool = False) -> l
 
 
 def _command_records_from_gemini_trajectory(
-    trial_dir: Path, *, include_git_commit: bool = False
+    trial_dir: Path,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     payload = _load_json_dict(trial_dir / "agent" / "gemini-cli.trajectory.json")
     messages = payload.get("messages")
@@ -611,13 +685,20 @@ def _command_records_from_gemini_trajectory(
     records: list[CommandRecord] = []
     for message in messages:
         records.extend(
-            _command_records_from_gemini_message(message, include_git_commit=include_git_commit)
+            _command_records_from_gemini_message(
+                message,
+                include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
+            )
         )
     return records
 
 
 def _command_records_from_gemini_message(
-    message: dict, *, include_git_commit: bool = False
+    message: dict,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     if not isinstance(message, dict):
         return []
@@ -627,13 +708,20 @@ def _command_records_from_gemini_message(
     records: list[CommandRecord] = []
     for tool_call in tool_calls:
         records.extend(
-            _command_records_from_gemini_tool_call(tool_call, include_git_commit=include_git_commit)
+            _command_records_from_gemini_tool_call(
+                tool_call,
+                include_git_commit=include_git_commit,
+                verification_patterns=verification_patterns,
+            )
         )
     return records
 
 
 def _command_records_from_gemini_tool_call(
-    tool_call: dict, *, include_git_commit: bool = False
+    tool_call: dict,
+    *,
+    include_git_commit: bool = False,
+    verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
     if not isinstance(tool_call, dict):
         return []
@@ -654,27 +742,13 @@ def _command_records_from_gemini_tool_call(
             output=command_text,
         )
         for command in commands
-        if _should_record_command(command, include_git_commit=include_git_commit)
+        if _should_record_command(
+            command,
+            include_git_commit=include_git_commit,
+            verification_patterns=verification_patterns,
+            include_unmatched=True,
+        )
     ]
-
-
-def _keyword_command_records(line: str, *, include_git_commit: bool = False) -> list[CommandRecord]:
-    lowered = f" {line.lower()} "
-    commands: list[str] = []
-    for command, keywords in KEYWORD_COMMAND_PATTERNS:
-        if any(keyword in lowered for keyword in keywords):
-            commands.append(command)
-    if include_git_commit and " git " in lowered and " commit " in lowered:
-        commands.append("git commit")
-    deduped = list(dict.fromkeys(commands))
-    if not deduped:
-        return []
-    failed = _line_reports_command_failure(line)
-    return [CommandRecord(command=command, failed=failed, output=line) for command in deduped]
-
-
-def _looks_like_shell_command(command: str) -> bool:
-    return bool(command and SHELL_COMMAND_PREFIX_PATTERN.match(command))
 
 
 def _line_is_command_intent(line: str) -> bool:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import cache
 from importlib import import_module
 from typing import Any
@@ -10,13 +10,18 @@ from typing import Any
 from raidar.schemas.scenario import (
     ArtifactCheckMetricConfig,
     ArtifactCheckMetricDefinition,
+    CapabilityRequirements,
     CoreMetricDefinition,
     LLMAsJudgeMetricConfig,
     LLMAsJudgeMetricDefinition,
     MetricDefinition,
     ScorerMetricDefinition,
 )
-from raidar.scorers.base import ScorerDefinition, ScorerResolutionError, scorer_class
+from raidar.scorers.base import (
+    ScorerDefinition,
+    ScorerResolutionError,
+    scorer_class,
+)
 from raidar.scorers.paths import resolve_scorer_definition_file
 
 import_module("raidar.scorers.scorer_registration")
@@ -33,6 +38,8 @@ class ResolvedScorer:
     description: str
     weight: float
     metrics: tuple[ScorerMetricDefinition, ...]
+    extends: str | None = None
+    requirements: CapabilityRequirements = field(default_factory=CapabilityRequirements)
 
     @property
     def ref(self) -> str:
@@ -99,6 +106,8 @@ def resolve_scorers(scenario) -> list[ResolvedScorer]:
                 description=definition.description,
                 weight=scorer_ref.weight,
                 metrics=metrics,
+                extends=definition.extends,
+                requirements=definition.requirements,
             )
         )
     if sum(scorer.weight for scorer in resolved) <= 0:

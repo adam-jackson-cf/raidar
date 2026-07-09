@@ -4,10 +4,29 @@ description: Implement homepage matching provided reference design
 difficulty: medium
 category: greenfield-ui
 timeout_sec: 1800
-
+environment:
+  kind: stack_preset
+  id: node:20
+  workdir: /app
+  requirements:
+    runtimes:
+      node: '>=20'
+    package_managers:
+      bun: '>=1'
+    tools:
+      git: '>=2'
+      typescript: '>=5'
+      playwright: '>=1'
+      odiff: '>=0'
+    browsers:
+      chromium: installed
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
-
 verification:
   max_gate_failures: 3
   coverage_threshold: 1.0
@@ -15,116 +34,163 @@ verification:
   workflow:
     atomic_commits_required: true
   setup_actions:
-    - ["git", "init"]
-    - ["git", "config", "core.hooksPath", ".githooks"]
+  - - git
+    - init
+  - - git
+    - config
+    - core.hooksPath
+    - .githooks
+  - - bun
+    - install
+    - --frozen-lockfile
+  test_discovery_globs:
+  - '**/*.test.ts'
+  - '**/*.test.tsx'
+  - '**/*.spec.ts'
+  - '**/*.spec.tsx'
+  - '**/*.test.js'
+  - '**/*.test.jsx'
+  - '**/*.spec.js'
+  - '**/*.spec.jsx'
+  skip_test_commands_when_no_tests: true
   required_commands:
-    - ["bun", "run", "typecheck"]
-    - ["bun", "run", "lint"]
-    - ["bun", "run", "test:coverage"]
-    - ["bun", "run", "build"]
+  - - bun
+    - run
+    - typecheck
+  - - bun
+    - run
+    - lint
+  - - bun
+    - run
+    - test:coverage
+  - - bun
+    - run
+    - build
   gates:
-    - name: typecheck
-      command: ["bun", "run", "typecheck"]
-      on_failure: continue
-    - name: lint
-      command: ["bun", "run", "lint"]
-      on_failure: continue
-    - name: coverage
-      command: ["bun", "run", "test:coverage"]
-      on_failure: continue
-    - name: build
-      command: ["bun", "run", "build"]
-      on_failure: continue
-
+  - name: typecheck
+    command:
+    - bun
+    - run
+    - typecheck
+    on_failure: continue
+  - name: lint
+    command:
+    - bun
+    - run
+    - lint
+    on_failure: continue
+  - name: coverage
+    command:
+    - bun
+    - run
+    - test:coverage
+    on_failure: continue
+  - name: build
+    command:
+    - bun
+    - run
+    - build
+    on_failure: continue
 requirements:
   items:
-    - id: req-placeholder-removed
-      description: Replaces starter placeholder content.
-      check:
-        type: no_pattern
-        pattern: "Homepage placeholder - implement the design"
-        description: Replaces starter placeholder content
-      required_test_evidence: []
-    - id: req-header-nav
-      description: Header contains logo and Home/About/Contact navigation.
-      check:
-        type: import_present
-        pattern: Contact
-        description: Header navigation includes Contact entry
-      required_test_evidence:
-        - type: query_role
-          role: navigation
-        - type: query_role
-          role: link
-          min_count: 3
-    - id: req-hero-cta
-      description: Hero section includes headline, supporting text, and CTA.
-      check:
-        type: import_present
-        pattern: Get Started
-        description: Hero call-to-action copy exists
-      required_test_evidence:
-        - type: query_role
-          role: heading
-        - type: query_role
-          role: button
-    - id: req-features-grid
-      description: Features section renders three feature cards.
-      check:
-        type: import_present
-        pattern: Everything You Need
-        description: Features section heading exists
-      required_test_evidence:
-        - type: query_role
-          role: article
-          min_count: 3
-    - id: req-footer
-      description: Footer contains copyright text.
-      check:
-        type: import_present
-        pattern: All rights reserved
-        description: Footer copyright copy exists
-      required_test_evidence:
-        - type: query_role
-          role: contentinfo
-    - id: req-lightning-feature
-      description: Includes the first authored feature card.
-      check:
-        type: import_present
-        pattern: Lightning Fast
-        description: Includes the first authored feature card
-      required_test_evidence: []
-    - id: req-secure-feature
-      description: Includes the second authored feature card.
-      check:
-        type: import_present
-        pattern: Secure by Default
-        description: Includes the second authored feature card
-      required_test_evidence: []
-    - id: req-collaboration-feature
-      description: Includes the third authored feature card.
-      check:
-        type: import_present
-        pattern: Team Collaboration
-        description: Includes the third authored feature card
-      required_test_evidence: []
-    - id: req-no-inline-styles
-      description: Avoids inline styles.
-      check:
-        type: no_pattern
-        pattern: "style={{"
-        description: Avoids inline styles
-      required_test_evidence: []
-    - id: req-section-component-structure
-      description: Uses the expected section component structure.
-      check:
-        type: file_exists
-        pattern: src/components/sections/**/*.tsx
-        description: Uses the expected section component structure
-      required_test_evidence: []
+  - id: req-placeholder-removed
+    description: Replaces starter placeholder content.
+    check:
+      type: no_pattern
+      pattern: Homepage placeholder - implement the design
+      description: Replaces starter placeholder content
+    required_test_evidence: []
+  - id: req-header-nav
+    description: Header contains logo and Home/About/Contact navigation.
+    check:
+      type: import_present
+      pattern: Contact
+      description: Header navigation includes Contact entry
+    required_test_evidence:
+    - type: query_role
+      role: navigation
+    - type: query_role
+      role: link
+      min_count: 3
+  - id: req-hero-cta
+    description: Hero section includes headline, supporting text, and CTA.
+    check:
+      type: import_present
+      pattern: Get Started
+      description: Hero call-to-action copy exists
+    required_test_evidence:
+    - type: query_role
+      role: heading
+    - type: query_role
+      role: button
+  - id: req-features-grid
+    description: Features section renders three feature cards.
+    check:
+      type: import_present
+      pattern: Everything You Need
+      description: Features section heading exists
+    required_test_evidence:
+    - type: query_role
+      role: article
+      min_count: 3
+  - id: req-footer
+    description: Footer contains copyright text.
+    check:
+      type: import_present
+      pattern: All rights reserved
+      description: Footer copyright copy exists
+    required_test_evidence:
+    - type: query_role
+      role: contentinfo
+  - id: req-lightning-feature
+    description: Includes the first authored feature card.
+    check:
+      type: import_present
+      pattern: Lightning Fast
+      description: Includes the first authored feature card
+    required_test_evidence: []
+  - id: req-secure-feature
+    description: Includes the second authored feature card.
+    check:
+      type: import_present
+      pattern: Secure by Default
+      description: Includes the second authored feature card
+    required_test_evidence: []
+  - id: req-collaboration-feature
+    description: Includes the third authored feature card.
+    check:
+      type: import_present
+      pattern: Team Collaboration
+      description: Includes the third authored feature card
+    required_test_evidence: []
+  - id: req-no-inline-styles
+    description: Avoids inline styles.
+    check:
+      type: no_pattern
+      pattern: style={{
+      description: Avoids inline styles
+    required_test_evidence: []
+  - id: req-section-component-structure
+    description: Uses the expected section component structure.
+    check:
+      type: file_exists
+      pattern: src/components/sections/**/*.tsx
+      description: Uses the expected section component structure
+    required_test_evidence: []
 visual:
   reference_image: ./reference/homepage.png
-  screenshot_command: ["bun", "run", "capture-screenshot"]
+  capture_setup_actions:
+  - - bun
+    - install
+    - --frozen-lockfile
+  screenshot_command:
+  - bun
+  - run
+  - capture-screenshot
+  artifact_manifest:
+    actual_image: actual.png
+    diff_image: diff.png
+    post_capture_image: homepage-post.png
   viewport:
     width: 1440
     height: 1024
@@ -156,48 +222,58 @@ visual:
     high_fidelity_global: 0.95
     high_fidelity_worst_region: 0.92
   regions:
-    - name: header
-      weight: 0.35
-      clip:
-        x: 0
-        y: 0
-        width: 1440
-        height: 96
-    - name: hero
-      weight: 0.45
-      clip:
-        x: 0
-        y: 96
-        width: 1440
-        height: 344
-    - name: features
-      weight: 0.35
-      clip:
-        x: 0
-        y: 440
-        width: 1440
-        height: 424
-    - name: footer
-      weight: 0.2
-      clip:
-        x: 0
-        y: 864
-        width: 1440
-        height: 160
-
+  - name: header
+    reference_image: ./reference/homepage-region-header.png
+    actual_image: actual-region-header.png
+    diff_image: diff-region-header.png
+    weight: 0.35
+    clip:
+      x: 0
+      y: 0
+      width: 1440
+      height: 96
+  - name: hero
+    reference_image: ./reference/homepage-region-hero.png
+    actual_image: actual-region-hero.png
+    diff_image: diff-region-hero.png
+    weight: 0.45
+    clip:
+      x: 0
+      y: 96
+      width: 1440
+      height: 344
+  - name: features
+    reference_image: ./reference/homepage-region-features.png
+    actual_image: actual-region-features.png
+    diff_image: diff-region-features.png
+    weight: 0.35
+    clip:
+      x: 0
+      y: 440
+      width: 1440
+      height: 424
+  - name: footer
+    reference_image: ./reference/homepage-region-footer.png
+    actual_image: actual-region-footer.png
+    diff_image: diff-region-footer.png
+    weight: 0.2
+    clip:
+      x: 0
+      y: 864
+      width: 1440
+      height: 160
 scorers:
-  - id: design-to-code
-    version: 1
-    weight: 0.9
-    config:
-      artifact-checks:
-        required_paths:
-          - src/app/page.tsx
-          - src/components/**/*.tsx
-        path_match: glob
-  - id: resource-efficiency
-    version: 1
-    weight: 0.1
-
+- id: design-to-code
+  version: 1
+  weight: 0.9
+  config:
+    artifact-checks:
+      required_paths:
+      - src/app/page.tsx
+      - src/components/**/*.tsx
+      path_match: glob
+- id: resource-efficiency
+  version: 1
+  weight: 0.1
 prompt:
   entry: prompt/task.md

@@ -8,6 +8,8 @@ import uuid
 from pathlib import Path
 from typing import Any
 
+from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
+
 INLINE_SECRET_PATTERN = re.compile(
     r"\b("
     r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
@@ -37,7 +39,11 @@ SECRET_ENV_KEYS: tuple[str, ...] = (
 SECRET_FILE_ENV_PREFIX = "AGENTIC_EVAL_SECRET_FILE_"
 
 
-def _build_harbor_run_env(adapter: Any) -> dict[str, str]:
+def _build_harbor_run_env(
+    adapter: Any,
+    runtime_profile: RuntimeProfile | None = None,
+) -> dict[str, str]:
+    profile = runtime_profile or default_runtime_profile()
     run_env = os.environ.copy()
     run_env.update(adapter.runtime_env())
     for key in adapter.excluded_run_env_keys():
@@ -45,8 +51,7 @@ def _build_harbor_run_env(adapter: Any) -> dict[str, str]:
     if adapter.harbor_harness_import_path():
         _inject_secret_file_env(run_env)
         _inject_local_secret_file_env(run_env, adapter.local_secret_files())
-    # Workaround for docker compose v2.39.x bake hang in non-interactive runs.
-    run_env["COMPOSE_BAKE"] = "false"
+    run_env.update(profile.compatibility_env)
     return run_env
 
 

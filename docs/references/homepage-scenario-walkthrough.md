@@ -12,21 +12,23 @@ Use the homepage scenario as the reference example for how Raidar scenario desig
 ## Scenario Anatomy
 
 - `prompt/task.md` defines the user-facing job: implement the page, run the required verification commands, cover every requirement with tests, and only report completion after those commands succeed.
+- `environment` selects the `node:20` runtime stack and declares the concrete inventory needed for the scenario workflow.
 - `starter/` defines the baseline workspace the harness starts from.
 - `rules/` defines local coding guidance for the scenario. These rules should support the scenario contract rather than redefine conflicting gates.
+- `verification.setup_actions` prepares the starter workspace before preflight and gate execution.
 - `verification.required_commands` defines the commands the run is expected to satisfy before completion.
 - `verification.gates` defines the tracked gate history used during scoring and stability analysis.
-- `acceptance.requirements` defines the required product outcomes and the test patterns that should cover them.
-- `acceptance.deterministic_checks` captures simple pass/fail content and structure checks.
+- `requirements.items` defines the required product outcomes, deterministic checks, and test evidence expectations.
 - `scorers[]` attaches `design-to-code` and `resource-efficiency`, including their scenario-level weights.
 - `visual` defines the reference image, capture command, and similarity threshold for visual review.
 
 ## What Each Layer Teaches
 
 - The prompt teaches task framing.
+- The runtime stack teaches what concrete tools the scenario depends on.
 - The starter teaches what the harness inherits versus what it must create.
 - Verification teaches the difference between "did the workflow pass" and "did it pass consistently."
-- Acceptance teaches the difference between output requirements and toolchain success.
+- Requirements teach the difference between output obligations and toolchain success.
 - Scorers teach which grouped delivery-task judgments matter for comparison, diagnosis, and ranking.
 - Metrics teach how each scorer is measured.
 - Visual config teaches that a scenario can care about appearance, not just code output.
@@ -66,4 +68,4 @@ Use `make matrix-run` when you want a structured comparison across multiple `Age
 - Run the scenario and inspect `experiments/.../runs/*/run.json` for one-repeat details.
 - Use `experiment-summary.json` to compare repeats for the same `(scenario, revision, harness, model, evaluation_profile)` identity.
 - Inspect `scores.scorer_results[]` for the quality and efficiency blend, and `scores.metric_scores[]` for individual metric evidence.
-- Use [metrics.md](/Users/adamjackson/Projects/complete/raidar/docs/references/metrics.md) when you need metric-by-metric interpretation.
+- Use [metrics.md](metrics.md) when you need metric-by-metric interpretation.

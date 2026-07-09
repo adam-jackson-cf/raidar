@@ -6,21 +6,15 @@ import json
 from pathlib import Path
 from typing import Any
 
+from raidar.harness import HarnessDefinitionError, harness_definition
+
 
 def _harness_event_stream_pointer(harness_dir: Path, harness: str) -> Path:
-    if harness == "codex-cli":
-        return harness_dir / "codex.txt"
-    if harness == "claude-code":
-        return harness_dir / "commands"
-    if harness == "gemini":
-        return harness_dir / "commands"
-    if harness == "cursor":
-        return harness_dir / "commands"
-    if harness == "copilot":
-        return harness_dir / "commands"
-    if harness == "pi":
-        return harness_dir / "commands"
-    raise ValueError(f"Unsupported harness for artifact summary: {harness}")
+    try:
+        pointer = harness_definition(harness).event_stream_pointer
+    except HarnessDefinitionError as exc:
+        raise ValueError(f"Unsupported harness: {harness}") from exc
+    return harness_dir / pointer
 
 
 def _read_jsonl_dicts(path: Path) -> list[dict]:

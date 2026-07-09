@@ -19,6 +19,7 @@ from raidar.runtime import (
 _empty_process_metrics = process_metrics._empty_process_metrics
 _load_verifier_outputs = runtime_artifacts._load_verifier_outputs
 collect_process_metrics = process_metrics.collect_process_metrics
+ProcessMetricsError = process_metrics.ProcessMetricsError
 collect_trace_events = trace_events.collect_trace_events
 execute_harbor = harbor_execution.execute_harbor
 terminated_outputs = scorecard.terminated_outputs
@@ -29,6 +30,7 @@ def _resolve_harbor_outputs(
     harbor_result: Any,
     terminated_early: bool,
     termination_reason: str | None,
+    failure_code: str | None,
 ) -> tuple[Any, bool, str | None]:
     verifier_outputs = None
     verifier_reason = None
@@ -36,10 +38,7 @@ def _resolve_harbor_outputs(
         verifier_outputs, verifier_reason = _load_verifier_outputs(harbor_result.trial_dir)
 
     recovered_from_timeout = (
-        terminated_early
-        and verifier_outputs is not None
-        and termination_reason is not None
-        and "timeout expired" in termination_reason.lower()
+        terminated_early and verifier_outputs is not None and failure_code == "harbor_timeout"
     )
     if recovered_from_timeout:
         return verifier_outputs, False, None
@@ -56,15 +55,15 @@ def execute_harbor_phase(request: Any, phase: Any) -> ExecutionPhaseResult:
     harbor_result = execute_harbor(phase.harbor_request)
     terminated_early = harbor_result.terminated_early
     termination_reason = harbor_result.termination_reason
+    failure_code = harbor_result.failure_code
     try:
         runtime_metrics = collect_process_metrics(
             request.scenario,
             harbor_result.trial_dir,
             harness=request.config.harness.value,
         )
-    except RuntimeError as exc:
-        message = str(exc)
-        if terminated_early and "Missing token usage metrics" in message:
+    except ProcessMetricsError as exc:
+        if terminated_early and exc.failure_code == "missing_token_usage":
             runtime_metrics = _empty_process_metrics()
         else:
             raise
@@ -77,6 +76,7 @@ def execute_harbor_phase(request: Any, phase: Any) -> ExecutionPhaseResult:
         harbor_result,
         terminated_early,
         termination_reason,
+        failure_code,
     )
     if outputs is None:
         outputs = terminated_outputs("Verifier outputs unavailable.")
@@ -86,12 +86,18 @@ def execute_harbor_phase(request: Any, phase: Any) -> ExecutionPhaseResult:
         harbor_result=harbor_result,
         terminated_early=terminated_early,
         termination_reason=termination_reason,
+        failure_code=failure_code if terminated_early else None,
         process_metrics=runtime_metrics,
         events=events,
         outputs=outputs,
         duration_sec=duration_sec,
         prep_phase_timings_sec=getattr(phase, "prep_phase_timings_sec", {}),
         prep_total_sec=getattr(phase, "prep_total_sec", 0.0),
+        time_to_experiment_start_sec=getattr(
+            phase,
+            "time_to_experiment_start_sec",
+            getattr(phase, "prep_total_sec", 0.0),
+        ),
         cache_metadata=getattr(phase, "cache_metadata", {}),
         auth_metadata=getattr(phase, "auth_metadata", {}),
     )

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-import re
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -33,21 +31,18 @@ from raidar.runtime.verification_metrics import (
     _observed_verification_attempts,
     _verification_command_strings,
 )
-from raidar.schemas.events import GateEvent, TraceEvent
-from raidar.schemas.scenario import RequirementSpec
+from raidar.schemas.events import TraceEvent
 from raidar.schemas.scorecard import (
     CoverageScore,
     ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
     PerformanceGatesScore,
-    RequirementCheck,
     RequirementsCoverageScore,
     ResourceEfficiencyScore,
     Scorecard,
     VerificationStabilityScore,
 )
-from raidar.scorers.deterministic import run_deterministic_check
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,242 +80,6 @@ class ExecutionValidityInput:
     workspace_path: Path
     atomic_commits_required: bool
     verification_patterns: list[str]
-
-
-def _coverage_from_summary_file(workspace: Path) -> tuple[float | None, str | None]:
-    summary_path = workspace / "coverage" / "coverage-summary.json"
-    if not summary_path.exists():
-        return None, None
-    try:
-        payload = json.loads(summary_path.read_text())
-    except json.JSONDecodeError:
-        return None, None
-    total = payload.get("total")
-    if not isinstance(total, dict):
-        return None, None
-    values: list[float] = []
-    for key in ("lines", "statements", "functions", "branches"):
-        metric = total.get(key)
-        if not isinstance(metric, dict):
-            continue
-        pct = metric.get("pct")
-        if isinstance(pct, (int, float)):
-            values.append(float(pct))
-    if not values:
-        return None, None
-    return min(values) / 100.0, str(summary_path)
-
-
-def _parse_coverage_percent(output: str) -> float | None:
-    values: list[float] = []
-    for pattern in (
-        r"Lines\s*:\s*([0-9]+(?:\.[0-9]+)?)%",
-        r"Statements\s*:\s*([0-9]+(?:\.[0-9]+)?)%",
-        r"Functions\s*:\s*([0-9]+(?:\.[0-9]+)?)%",
-        r"Branches\s*:\s*([0-9]+(?:\.[0-9]+)?)%",
-    ):
-        values.extend(float(match) for match in re.findall(pattern, output, re.IGNORECASE))
-    table_match = re.search(
-        (
-            r"All files\s*\|\s*([0-9]+(?:\.[0-9]+)?)\s*\|\s*([0-9]+(?:\.[0-9]+)?)\s*\|\s*"
-            r"([0-9]+(?:\.[0-9]+)?)\s*\|\s*([0-9]+(?:\.[0-9]+)?)"
-        ),
-        output,
-    )
-    if table_match:
-        values.extend(float(value) for value in table_match.groups())
-    if not values:
-        return None
-    return min(values) / 100.0
-
-
-def _coverage_from_gate_history(gate_history: list[GateEvent]) -> tuple[float | None, str | None]:
-    for event in reversed(gate_history):
-        gate_hint = f"{event.gate_name} {event.command}".lower()
-        if "coverage" not in gate_hint:
-            continue
-        parsed = _parse_coverage_percent(f"{event.stdout}\n{event.stderr}")
-        if parsed is not None:
-            return parsed, f"gate:{event.gate_name}"
-    return None, None
-
-
-def evaluate_coverage(
-    workspace: Path,
-    gate_history: list[GateEvent],
-    threshold: float | None,
-) -> CoverageScore:
-    """Evaluate whether measured test coverage meets the configured threshold."""
-    measured, source = _coverage_from_summary_file(workspace)
-    if measured is None:
-        measured, source = _coverage_from_gate_history(gate_history)
-    passed = threshold is None or threshold <= 0 or (measured is not None and measured >= threshold)
-    return CoverageScore(
-        threshold=threshold,
-        measured=measured,
-        source=source,
-        passed=passed,
-    )
-
-
-def _test_file_paths(workspace: Path) -> list[Path]:
-    patterns = (
-        "**/*.test.ts",
-        "**/*.test.tsx",
-        "**/*.spec.ts",
-        "**/*.spec.tsx",
-    )
-    test_paths: list[Path] = []
-    for pattern in patterns:
-        test_paths.extend((workspace / "src").glob(pattern))
-    return test_paths
-
-
-def _test_evidence_label(evidence: dict[str, Any]) -> str:
-    evidence_type = str(evidence.get("type", "unknown"))
-    if evidence_type == "query_role":
-        role = str(evidence.get("role", "unknown"))
-        min_count = int(evidence.get("min_count", 1) or 1)
-        parts = [role]
-        if evidence.get("level") is not None:
-            parts.append(f"level={evidence['level']}")
-        if evidence.get("name"):
-            parts.append(f"name={evidence['name']}")
-        return f"query_role:{','.join(parts)} x{min_count}"
-    if evidence_type == "query_text":
-        pattern = str(evidence.get("pattern", "unknown"))
-        min_count = int(evidence.get("min_count", 1) or 1)
-        return f"query_text:{pattern} x{min_count}"
-    return evidence_type
-
-
-def _count_role_query_matches(test_sources: list[str], evidence: dict[str, Any]) -> int:
-    role = re.escape(str(evidence.get("role", "")))
-    if not role:
-        return 0
-    query_pattern = re.compile(
-        r"(?:screen\.)?(?:get|find|query)(?:All)?ByRole\s*\(\s*(['\"])"
-        + role
-        + r"\1(?P<options>\s*,\s*\{[\s\S]*?\})?",
-        re.MULTILINE,
-    )
-    level = evidence.get("level")
-    name = evidence.get("name")
-    count = 0
-    for source in test_sources:
-        for match in query_pattern.finditer(source):
-            options = match.group("options") or ""
-            if level is not None and not re.search(rf"level\s*:\s*{int(level)}\b", options):
-                continue
-            if name is not None and not re.search(re.escape(str(name)), options, re.IGNORECASE):
-                continue
-            count += 1
-    return count
-
-
-def _count_text_query_matches(test_sources: list[str], evidence: dict[str, Any]) -> int:
-    pattern = str(evidence.get("pattern", ""))
-    if not pattern:
-        return 0
-    count = 0
-    query_pattern = re.compile(r"(?:screen\.)?(?:get|find|query)(?:All)?ByText\s*\(", re.MULTILINE)
-    for source in test_sources:
-        if not query_pattern.search(source):
-            continue
-        count += len(re.findall(pattern, source, re.MULTILINE | re.IGNORECASE))
-    return count
-
-
-def _missing_test_evidence(
-    test_sources: list[str],
-    required_test_evidence: list[Any],
-) -> list[str]:
-    missing: list[str] = []
-    for evidence in required_test_evidence:
-        payload = evidence.model_dump(mode="json") if hasattr(evidence, "model_dump") else evidence
-        evidence_type = payload.get("type")
-        min_count = int(payload.get("min_count", 1) or 1)
-        if evidence_type == "query_role":
-            matched = _count_role_query_matches(test_sources, payload)
-        elif evidence_type == "query_text":
-            matched = _count_text_query_matches(test_sources, payload)
-        else:
-            matched = 0
-        if matched < min_count:
-            missing.append(_test_evidence_label(payload))
-    return missing
-
-
-def evaluate_requirements(
-    workspace: Path,
-    requirements: list[RequirementSpec],
-) -> RequirementsCoverageScore:
-    """Evaluate requirement implementation and optional requirement-to-test mapping."""
-    if not requirements:
-        return RequirementsCoverageScore()
-
-    test_sources = [path.read_text(errors="ignore") for path in _test_file_paths(workspace)]
-    missing_ids: list[str] = []
-    gap_ids: list[str] = []
-    evidence_gaps: dict[str, list[str]] = {}
-    satisfied = 0
-    mapped = 0
-    mapped_satisfied = 0
-
-    for requirement in requirements:
-        requirement_check, missing_patterns = _requirement_status(
-            workspace, requirement, test_sources
-        )
-        if requirement_check.passed:
-            satisfied += 1
-        else:
-            missing_ids.append(requirement.id)
-
-        mapped_for_requirement = not missing_patterns
-        mapped, mapped_satisfied = _apply_requirement_mapping_counts(
-            mapped=mapped,
-            mapped_satisfied=mapped_satisfied,
-            mapped_for_requirement=mapped_for_requirement,
-            requirement_passed=requirement_check.passed,
-        )
-        if missing_patterns:
-            gap_ids.append(requirement.id)
-            evidence_gaps[requirement.id] = missing_patterns
-
-    return RequirementsCoverageScore(
-        total_requirements=len(requirements),
-        satisfied_requirements=satisfied,
-        mapped_requirements=mapped,
-        mapped_satisfied_requirements=mapped_satisfied,
-        missing_requirement_ids=missing_ids,
-        requirement_gap_ids=gap_ids,
-        requirement_test_evidence_gaps=evidence_gaps,
-    )
-
-
-def _requirement_status(
-    workspace: Path,
-    requirement: RequirementSpec,
-    test_sources: list[str],
-) -> tuple[RequirementCheck, list[str]]:
-    requirement_check = run_deterministic_check(requirement.check, workspace)
-    missing_evidence = _missing_test_evidence(test_sources, requirement.required_test_evidence)
-    return requirement_check, missing_evidence
-
-
-def _apply_requirement_mapping_counts(
-    *,
-    mapped: int,
-    mapped_satisfied: int,
-    mapped_for_requirement: bool,
-    requirement_passed: bool,
-) -> tuple[int, int]:
-    if not mapped_for_requirement:
-        return mapped, mapped_satisfied
-    mapped += 1
-    if requirement_passed:
-        mapped_satisfied += 1
-    return mapped, mapped_satisfied
 
 
 def terminated_outputs(reason: str | None) -> EvaluationOutputs:
@@ -586,33 +345,18 @@ def build_resource_efficiency_score(metrics: ProcessMetrics) -> ResourceEfficien
     )
 
 
-def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
-    return any(pattern in text for pattern in patterns)
-
-
-def _classify_unscored_reasons(terminated_early: bool, termination_reason: str | None) -> list[str]:
+def _classify_unscored_reasons(
+    terminated_early: bool,
+    termination_reason: str | None,
+    failure_code: str | None = None,
+) -> list[str]:
     """Classify harness/provider issues that unscore a run and require a rerun."""
-    if not terminated_early and not termination_reason:
+    del termination_reason
+    if not terminated_early:
         return []
-
-    reason = (termination_reason or "").lower()
-    rules: list[tuple[str, tuple[str, ...]]] = [
-        ("harbor_timeout", ("timeout expired",)),
-        ("compose_version_unsupported", ("unsupported docker compose version",)),
-        ("provider_rate_limit", ("rate limit",)),
-        ("provider_stream_disconnect", ("stream disconnected before completion",)),
-        ("harness_unavailable", ("harbor not installed",)),
-        ("harbor_cli_failure", ("harbor exited with code",)),
-        ("harbor_trial_exception", ("harbor trial exception",)),
-    ]
-    reasons: list[str] = []
-    for code, patterns in rules:
-        if _contains_any(reason, patterns):
-            reasons.append(code)
-    if "codex turn failed" in reason and not reasons:
-        reasons.append("provider_or_harness_turn_failure")
-
-    return list(dict.fromkeys(reasons))
+    if failure_code:
+        return [failure_code]
+    return ["runtime_terminated"]
 
 
 def _scorecard_run_metadata(
@@ -648,6 +392,7 @@ def _scorecard_harbor_metadata(
         "trial_dir": trial_dir,
         "prep_phase_timings_sec": execution.prep_phase_timings_sec,
         "prep_total_sec": execution.prep_total_sec,
+        "time_to_experiment_start_sec": execution.time_to_experiment_start_sec,
         "phase_timings_sec": harbor_timings,
         "harness_overhead_sec": orchestration_overhead_excluding_test_sec,
         "orchestration_overhead_excluding_test_sec": orchestration_overhead_excluding_test_sec,
@@ -733,6 +478,7 @@ def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     unscored_reasons = _classify_unscored_reasons(
         execution.terminated_early,
         execution.termination_reason,
+        execution.failure_code,
     )
     unscored = len(unscored_reasons) > 0
     metadata = _scorecard_metadata(_scorecard_metadata_input(context, unscored, unscored_reasons))

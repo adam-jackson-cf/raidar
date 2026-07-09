@@ -5,6 +5,21 @@ description: Baseline test-generation task with production-code guardrail
 difficulty: medium
 category: test-generation
 timeout_sec: 1800
+environment:
+  kind: stack_preset
+  id: python:3.12
+  workdir: /app
+  requirements:
+    runtimes:
+      python: '>=3.12'
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
 starter:
   root: starter
 verification:
@@ -12,44 +27,55 @@ verification:
   coverage_threshold: 0.8
   min_quality_score: 0.85
   required_commands:
-    - ["python", "-m", "compileall", "-q", "src", "tests"]
-    - ["python", "-m", "unittest", "discover", "-s", "tests"]
+  - - python
+    - -m
+    - compileall
+    - -q
+    - src
+    - tests
+  - - python
+    - -m
+    - unittest
+    - discover
+    - -s
+    - tests
 requirements:
   items:
-    - id: req-discount-tests
-      description: Add focused tests for percentage, fixed, and invalid discounts.
-      check:
-        type: file_exists
-        pattern: tests/test_discounts.py
-        description: Discount test file exists.
-    - id: req-percentage-case
-      description: Tests cover percentage discounts.
-      check:
-        type: import_present
-        pattern: percentage
-        description: Percentage discount test marker is present.
-    - id: req-invalid-case
-      description: Tests cover invalid discount input.
-      check:
-        type: import_present
-        pattern: assertRaises
-        description: Invalid input assertion marker is present.
-    - id: req-production-unchanged
-      description: Do not change production pricing implementation for this test-only task.
-      check:
-        type: import_present
-        pattern: apply_discount
-        description: Production apply_discount implementation remains present.
+  - id: req-discount-tests
+    description: Add focused tests for percentage, fixed, and invalid discounts.
+    check:
+      type: file_exists
+      pattern: tests/test_discounts.py
+      description: Discount test file exists.
+  - id: req-percentage-case
+    description: Tests cover percentage discounts.
+    check:
+      type: import_present
+      pattern: percentage
+      description: Percentage discount test marker is present.
+  - id: req-invalid-case
+    description: Tests cover invalid discount input.
+    check:
+      type: import_present
+      pattern: assertRaises
+      description: Invalid input assertion marker is present.
+  - id: req-production-unchanged
+    description: Do not change production pricing implementation for this test-only
+      task.
+    check:
+      type: import_present
+      pattern: apply_discount
+      description: Production apply_discount implementation remains present.
 scorers:
-  - id: test-generation
-    version: 1
-    weight: 0.78
-  - id: requirements
-    version: 1
-    weight: 0.20
-  - id: resource-efficiency
-    version: 1
-    weight: 0.02
+- id: test-generation
+  version: 1
+  weight: 0.78
+- id: requirements
+  version: 1
+  weight: 0.2
+- id: resource-efficiency
+  version: 1
+  weight: 0.02
 prompt:
   entry: prompt/task.md
   includes: []

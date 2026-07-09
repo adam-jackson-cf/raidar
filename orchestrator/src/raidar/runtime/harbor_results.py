@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
@@ -13,6 +14,14 @@ REGISTRY_RATE_LIMIT_PATTERN = re.compile(
     r"(?:toomanyrequests|too many requests|pull rate limit|rate limit exceeded|429)",
     re.IGNORECASE,
 )
+
+
+@dataclass(frozen=True, slots=True)
+class TrialFailure:
+    """Typed terminal failure extracted from Harbor trial artifacts."""
+
+    reason: str
+    code: str
 
 
 def _is_registry_rate_limited(run_harbor_dir: Path) -> bool:
@@ -26,14 +35,14 @@ def _is_registry_rate_limited(run_harbor_dir: Path) -> bool:
     return False
 
 
-def detect_trial_failure(trial_dir: Path | None) -> str | None:
+def detect_trial_failure(trial_dir: Path | None) -> TrialFailure | None:
     """Extract a terminal failure reason from Harbor trial artifacts."""
     if not trial_dir:
         return None
-    return _trial_exception_reason(trial_dir) or _codex_turn_failure_reason(trial_dir)
+    return _trial_exception_failure(trial_dir) or _codex_turn_failure(trial_dir)
 
 
-def _trial_exception_reason(trial_dir: Path) -> str | None:
+def _trial_exception_failure(trial_dir: Path) -> TrialFailure | None:
     result_data = _load_json_dict(trial_dir / "result.json")
     exception_info = result_data.get("exception_info")
     if not isinstance(exception_info, dict):
@@ -44,10 +53,13 @@ def _trial_exception_reason(trial_dir: Path) -> str | None:
     message = message.strip()
     if not message:
         return None
-    return f"Harbor trial exception: {_redact_sensitive_text(message)}"
+    return TrialFailure(
+        reason=f"Harbor trial exception: {_redact_sensitive_text(message)}",
+        code="harbor_trial_exception",
+    )
 
 
-def _codex_turn_failure_reason(trial_dir: Path) -> str | None:
+def _codex_turn_failure(trial_dir: Path) -> TrialFailure | None:
     codex_log = trial_dir / "agent" / "codex.txt"
     if not codex_log.exists():
         return None
@@ -55,8 +67,18 @@ def _codex_turn_failure_reason(trial_dir: Path) -> str | None:
         if '"type":"turn.failed"' not in line:
             continue
         message = _codex_turn_failure_message(line)
-        return f"Codex turn failed: {message}" if message else "Codex turn failed."
+        reason = f"Codex turn failed: {message}" if message else "Codex turn failed."
+        return TrialFailure(reason=reason, code=_codex_turn_failure_code(message))
     return None
+
+
+def _codex_turn_failure_code(message: str | None) -> str:
+    normalized = (message or "").lower()
+    if "rate limit" in normalized or "429" in normalized:
+        return "provider_rate_limit"
+    if "stream disconnected before completion" in normalized:
+        return "provider_stream_disconnect"
+    return "provider_or_harness_turn_failure"
 
 
 def _codex_turn_failure_message(line: str) -> str | None:
