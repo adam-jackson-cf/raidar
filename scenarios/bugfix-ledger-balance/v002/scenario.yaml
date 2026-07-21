@@ -69,6 +69,7 @@ verification:
     - --frozen-lockfile
   test_discovery_globs: []
   skip_test_commands_when_no_tests: false
+  skip_test_commands_in_starter_preflight: true
   gates:
   - name: typecheck
     command:

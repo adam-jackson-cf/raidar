@@ -51,15 +51,7 @@ SMOKE_MATRIX_CONFIG_gemini := matrices/hello-world-smoke-gemini.yaml
 SMOKE_MATRIX_CONFIG_claude := matrices/hello-world-smoke-claude.yaml
 SMOKE_MATRIX_SELECTORS := codex gemini claude
 SCENARIO_AGENT_MATRIX_CONFIGS := \
-	matrices/bugfix-ledger-balance-codex-gpt55-terra-low.yaml \
-	matrices/hello-world-smoke-codex-gpt55-terra-low.yaml \
-	matrices/homepage-implementation-codex-gpt55-terra-low.yaml \
-	matrices/plan-to-code-baseline-codex-gpt55-terra-low.yaml \
-	matrices/python-code-task-baseline-codex-gpt55-terra-low.yaml \
-	matrices/refactor-library-codex-gpt55-terra-low.yaml \
-	matrices/skill-benchmark-coding-test-codex-gpt55-terra-low.yaml \
-	matrices/targeted-bugfix-codex-gpt55-terra-low.yaml \
-	matrices/test-generation-baseline-codex-gpt55-terra-low.yaml
+	matrices/skill-benchmark-coding-test-codex-gpt55-terra-low.yaml
 ifneq ($(strip $(SMOKE_MATRIX_SELECTOR)),)
 ifeq ($(filter $(SMOKE_MATRIX_SELECTOR),$(SMOKE_MATRIX_SELECTORS)),)
 $(error Unknown SMOKE_MATRIX_SELECTOR '$(SMOKE_MATRIX_SELECTOR)'; expected one of: $(SMOKE_MATRIX_SELECTORS))

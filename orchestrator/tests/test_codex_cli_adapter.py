@@ -175,7 +175,7 @@ def test_prepare_workspace_creates_codex_trace_dir(tmp_path: Path) -> None:
     assert (tmp_path / ".codex").exists()
 
 
-@pytest.mark.parametrize("model_name", ("gpt-5.6-terra", "gpt-5.6-luna"))
+@pytest.mark.parametrize("model_name", ["gpt-5.6-terra", "gpt-5.6-luna"])
 def test_gpt_5_6_models_reject_non_low_reasoning(
     monkeypatch: pytest.MonkeyPatch, model_name: str
 ) -> None:

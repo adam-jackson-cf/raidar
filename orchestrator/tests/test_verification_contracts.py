@@ -14,8 +14,6 @@ from raidar.scorers.code_task.bugfix import Bugfix, BugfixV2
 from raidar.scorers.code_task.refactor import Refactor, RefactorV2
 from raidar.scorers.code_task.typescript import TypeScriptCodeTask
 from raidar.scorers.design_to_code import DesignToCode
-from raidar.scorers.plan_to_code import PlanToCode, PlanToCodeV2
-from raidar.scorers.test_generation import TestGeneration, TestGenerationV2
 from raidar.scorers.evidence_contract import (
     CommandEvidenceResult,
     EvidenceActionResult,
@@ -25,6 +23,8 @@ from raidar.scorers.evidence_contract import (
     PublicContractSnapshotEvidenceResult,
     StructuralSnapshotEvidenceResult,
 )
+from raidar.scorers.plan_to_code import PlanToCode, PlanToCodeV2
+from raidar.scorers.test_generation import TestGeneration, TestGenerationV2
 from raidar.scorers.verification import (
     EvidenceDependency,
     EvidencePlanAction,
@@ -38,9 +38,9 @@ from raidar.scorers.verification import (
     command,
     glob,
     normalize_verification_plans,
+    public_contract_snapshot,
     read_file,
     read_json,
-    public_contract_snapshot,
     structural_snapshot,
     visual_diff,
 )

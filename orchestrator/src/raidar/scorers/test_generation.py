@@ -342,31 +342,6 @@ def _paired_coverage_lift_metric_score(
     )
 
 
-def _production_code_guardrail_metric_score(
-    workspace: Path,
-    workspace_changes: dict | None,
-) -> MetricScore:
-    changed_files = (
-        workspace_changes.get("changed_files") if isinstance(workspace_changes, dict) else None
-    )
-    has_direct_evidence = (
-        isinstance(changed_files, list)
-        and all(isinstance(path, str) and path for path in changed_files)
-        and workspace_changes.get("error") in (None, "")
-    )
-    if not has_direct_evidence:
-        return MetricScore(
-            metric_id="test-generation-production-code-guardrail-v2",
-            score=0.0,
-            passed=False,
-            missing_patterns=["changed-file evidence"],
-            evidence="changed-file evidence is required to establish protected production integrity",
-        )
-    return _test_generation_v2_metric_score(
-        production_code_guardrail_metric_score(workspace, workspace_changes)
-    )
-
-
 def _paired_coverage_from_evidence(evidence) -> tuple[str, float] | None:
     artifacts = (
         ("test-generation.coverage.python", json_action_content(evidence, "coverage.python")),

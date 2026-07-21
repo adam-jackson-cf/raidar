@@ -448,6 +448,10 @@ class VerificationConfig(BaseModel):
         default=False,
         description="Whether preflight may skip test commands when discovery globs match no files",
     )
+    skip_test_commands_in_starter_preflight: bool = Field(
+        default=False,
+        description="Whether preflight skips test commands even when the starter contains tests",
+    )
     gates: list[VerificationGate] = Field(default_factory=list)
     workflow: "VerificationConfig.VerificationWorkflowConfig" = Field(
         default_factory=VerificationWorkflowConfig

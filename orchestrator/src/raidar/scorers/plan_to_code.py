@@ -272,7 +272,7 @@ def _planned_scope_coverage_score(plan_packet: dict[str, Any]) -> MetricScore:
     if feature_count:
         score = passed_features / feature_count
         return MetricScore(
-            metric_id="plan-to-code-planned-scope-coverage-v2",
+            metric_id="planned-scope-coverage",
             score=round(score, 3),
             passed=score >= 1.0,
             evidence=(
@@ -281,7 +281,7 @@ def _planned_scope_coverage_score(plan_packet: dict[str, Any]) -> MetricScore:
             ),
         )
     return MetricScore(
-        metric_id="plan-to-code-planned-scope-coverage-v2",
+        metric_id="planned-scope-coverage",
         score=0.0,
         passed=False,
         missing_patterns=["retained plan packet feature evidence"],
@@ -298,7 +298,7 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
     if acceptance_count:
         score = passed_acceptance / acceptance_count
         return MetricScore(
-            metric_id="plan-to-code-acceptance-evidence-completeness-v2",
+            metric_id="acceptance-evidence-completeness",
             score=round(score, 3),
             passed=score >= 1.0,
             evidence=(
@@ -307,7 +307,7 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
             ),
         )
     return MetricScore(
-        metric_id="plan-to-code-acceptance-evidence-completeness-v2",
+        metric_id="acceptance-evidence-completeness",
         score=0.0,
         passed=False,
         missing_patterns=["retained acceptance tracker evidence"],
@@ -494,17 +494,25 @@ def _authoritative_table_rows(text: str, heading: str) -> list[dict[str, str]]:
         return []
     headers = _split_markdown_row(lines[0])
     separator = _split_markdown_row(lines[1])
-    if (
-        not headers
-        or len(headers) != len(separator)
-        or any(not header for header in headers)
-        or any(not re.fullmatch(r":?-{3,}:?", cell) for cell in separator)
-    ):
+    if not _is_table_header(headers, separator):
         return []
     data_rows = [_split_markdown_row(line) for line in lines[2:]]
-    if not data_rows or any(len(row) != len(headers) for row in data_rows):
+    if not _has_complete_table_rows(data_rows, headers):
         return []
     return [dict(zip(headers, row, strict=True)) for row in data_rows]
+
+
+def _is_table_header(headers: list[str], separator: list[str]) -> bool:
+    return (
+        bool(headers)
+        and len(headers) == len(separator)
+        and all(headers)
+        and all(re.fullmatch(r":?-{3,}:?", cell) for cell in separator)
+    )
+
+
+def _has_complete_table_rows(rows: list[list[str]], headers: list[str]) -> bool:
+    return bool(rows) and all(len(row) == len(headers) for row in rows)
 
 
 def _split_markdown_row(row: str) -> list[str]:

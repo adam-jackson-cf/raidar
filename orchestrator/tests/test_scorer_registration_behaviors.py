@@ -1,16 +1,15 @@
 import json
-
 from types import SimpleNamespace
 
 import pytest
 
-from raidar.schemas.scenario import DeterministicCheck
-from raidar.schemas.scorecard import (
-    ResourceEfficiencyScore,
-)
 from raidar.runtime.scoring_outputs import (
     _load_baseline_verification_evidence,
     _load_verification_evidence,
+)
+from raidar.schemas.scenario import DeterministicCheck
+from raidar.schemas.scorecard import (
+    ResourceEfficiencyScore,
 )
 from raidar.scorers.base import ScorerContext
 from raidar.scorers.common import (
@@ -770,7 +769,7 @@ def test_removed_generic_and_acceptance_scorers_are_unknown():
 
 @pytest.mark.parametrize(
     ("scorer_id", "historical_metric_ids", "successor_metric_ids"),
-    (
+    [
         (
             "bugfix",
             {
@@ -839,7 +838,7 @@ def test_removed_generic_and_acceptance_scorers_are_unknown():
                 "plan-to-code-verification-stability-v2",
             },
         ),
-    ),
+    ],
 )
 def test_task_conditioned_scorer_versions_have_disjoint_composable_metrics(
     scorer_id, historical_metric_ids, successor_metric_ids

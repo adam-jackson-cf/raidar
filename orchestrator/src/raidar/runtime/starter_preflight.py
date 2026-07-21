@@ -75,9 +75,11 @@ def _is_test_command(command: list[str]) -> bool:
     command_text = " ".join(command)
     if "test:coverage" in command_text or command_text.endswith(" test"):
         return True
-    if len(command) >= 3 and command[:3] == ["python", "-m", "unittest"]:
-        return True
-    if len(command) >= 3 and command[:3] == ["python", "-m", "pytest"]:
+    if len(command) >= 3 and command[:3] in (
+        ["bun", "run", "test"],
+        ["python", "-m", "unittest"],
+        ["python", "-m", "pytest"],
+    ):
         return True
     return bool(command and Path(command[0]).name == "pytest")
 
@@ -87,8 +89,12 @@ def _should_skip_preflight_command(
     *,
     has_tests: bool,
     skip_test_commands_when_no_tests: bool,
+    skip_test_commands_in_starter_preflight: bool,
 ) -> bool:
-    return skip_test_commands_when_no_tests and not has_tests and _is_test_command(command)
+    return _is_test_command(command) and (
+        skip_test_commands_in_starter_preflight
+        or (skip_test_commands_when_no_tests and not has_tests)
+    )
 
 
 def _preflight_cache_key(
@@ -110,6 +116,11 @@ def _preflight_cache_key(
         "test_discovery_globs": request.scenario.verification.test_discovery_globs,
         "skip_test_commands_when_no_tests": (
             request.scenario.verification.skip_test_commands_when_no_tests
+        ),
+        "skip_test_commands_in_starter_preflight": getattr(
+            request.scenario.verification,
+            "skip_test_commands_in_starter_preflight",
+            False,
         ),
     }
     return _hash_json_payload(payload)
@@ -260,6 +271,11 @@ def ensure_starter_preflight(
                     has_tests=has_tests,
                     skip_test_commands_when_no_tests=(
                         request.scenario.verification.skip_test_commands_when_no_tests
+                    ),
+                    skip_test_commands_in_starter_preflight=getattr(
+                        request.scenario.verification,
+                        "skip_test_commands_in_starter_preflight",
+                        False,
                     ),
                 ):
                     continue

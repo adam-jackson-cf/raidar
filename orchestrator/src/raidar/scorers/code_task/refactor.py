@@ -140,7 +140,10 @@ class RefactorV2(BaseScorer):
             "core",
             0.30,
             evidence="Paired starter and submitted behavior verification outcomes.",
-            score_derivation="Uses paired starter and submitted behavior verification outcomes; missing paired evidence fails closed.",
+            score_derivation=(
+                "Uses paired starter and submitted behavior verification outcomes; "
+                "missing paired evidence fails closed."
+            ),
             pass_fail="Passes when paired behavior verification outcomes pass.",
         ),
         metric(
@@ -148,7 +151,10 @@ class RefactorV2(BaseScorer):
             "core",
             0.25,
             evidence="Paired starter and submitted structural verification outcomes.",
-            score_derivation="Uses paired starter and submitted structural verification outcomes; missing paired evidence fails closed.",
+            score_derivation=(
+                "Uses paired starter and submitted structural verification outcomes; "
+                "missing paired evidence fails closed."
+            ),
             pass_fail="Passes when paired structural verification outcomes pass.",
         ),
         metric(
@@ -156,15 +162,23 @@ class RefactorV2(BaseScorer):
             "core",
             0.15,
             evidence="Paired starter and submitted public-contract verification outcomes.",
-            score_derivation="Uses paired starter and submitted public-contract verification outcomes; missing paired evidence fails closed.",
+            score_derivation=(
+                "Uses paired starter and submitted public-contract verification outcomes; "
+                "missing paired evidence fails closed."
+            ),
             pass_fail="Passes when paired public-contract verification outcomes pass.",
         ),
         metric(
             "refactor-change-containment-v2",
             "core",
             0.15,
-            evidence="Changed files, production/test diff ratio, expected paths, and generated artifact exclusions.",
-            score_derivation="Scores focused refactor scope with penalties for unrelated behavior-bearing edits.",
+            evidence=(
+                "Changed files, production/test diff ratio, expected paths, and "
+                "generated artifact exclusions."
+            ),
+            score_derivation=(
+                "Scores focused refactor scope with penalties for unrelated behavior-bearing edits."
+            ),
             pass_fail="Passes when refactor changes stay within declared surfaces.",
         ),
         metric(
@@ -337,35 +351,45 @@ def _metric_paths_from_scenario(context: ScorerContext, metric_id: str) -> list[
     return None
 
 
+def _paired_snapshot_results(
+    baseline_evidence,
+    final_evidence,
+    *,
+    metric_id: str,
+    paths: list[str] | None,
+    result_type,
+    snapshot_label: str,
+) -> tuple[object | None, object | None, list[str]]:
+    missing_patterns: list[str] = []
+    if paths is None:
+        missing_patterns.append(f"scenario-declared {snapshot_label} snapshot paths")
+    baseline_action = baseline_evidence.action(metric_id)
+    final_action = final_evidence.action(metric_id)
+    baseline = baseline_action.result if baseline_action is not None else None
+    final = final_action.result if final_action is not None else None
+    for role, result in (("baseline", baseline), ("final", final)):
+        if not isinstance(result, result_type):
+            missing_patterns.append(f"{role} {metric_id} result")
+        elif paths is not None and tuple(file.path for file in result.files) != tuple(paths):
+            missing_patterns.append(f"{role} {metric_id} selected paths")
+    return baseline, final, missing_patterns
+
+
 def _v2_structural_improvement_score(
     baseline_evidence, final_evidence, paths: list[str] | None
 ) -> MetricScore:
-    missing_patterns: list[str] = []
-    if paths is None:
-        missing_patterns.append("scenario-declared structural snapshot paths")
-    baseline_action = baseline_evidence.action("refactor-structural-improvement-v2")
-    final_action = final_evidence.action("refactor-structural-improvement-v2")
-    baseline = baseline_action.result if baseline_action is not None else None
-    final = final_action.result if final_action is not None else None
-    if not isinstance(baseline, StructuralSnapshotEvidenceResult):
-        missing_patterns.append("baseline refactor-structural-improvement-v2 result")
-    if not isinstance(final, StructuralSnapshotEvidenceResult):
-        missing_patterns.append("final refactor-structural-improvement-v2 result")
-    if (
-        paths is not None
-        and isinstance(baseline, StructuralSnapshotEvidenceResult)
-        and tuple(file.path for file in baseline.files) != tuple(paths)
-    ):
-        missing_patterns.append("baseline refactor-structural-improvement-v2 selected paths")
-    if (
-        paths is not None
-        and isinstance(final, StructuralSnapshotEvidenceResult)
-        and tuple(file.path for file in final.files) != tuple(paths)
-    ):
-        missing_patterns.append("final refactor-structural-improvement-v2 selected paths")
+    metric_id = "refactor-structural-improvement-v2"
+    baseline, final, missing_patterns = _paired_snapshot_results(
+        baseline_evidence,
+        final_evidence,
+        metric_id=metric_id,
+        paths=paths,
+        result_type=StructuralSnapshotEvidenceResult,
+        snapshot_label="structural",
+    )
     if missing_patterns:
         return MetricScore(
-            metric_id="refactor-structural-improvement-v2",
+            metric_id=metric_id,
             score=0.0,
             passed=False,
             missing_patterns=missing_patterns,
@@ -378,7 +402,7 @@ def _v2_structural_improvement_score(
     improved = baseline_code_lines > 0 and final_code_lines < baseline_code_lines
     score = (baseline_code_lines - final_code_lines) / baseline_code_lines if improved else 0.0
     return MetricScore(
-        metric_id="refactor-structural-improvement-v2",
+        metric_id=metric_id,
         score=round(score, 3),
         passed=improved,
         evidence=(
@@ -392,37 +416,24 @@ def _v2_structural_improvement_score(
 def _v2_public_contract_stability_score(
     baseline_evidence, final_evidence, paths: list[str] | None
 ) -> MetricScore:
-    missing_patterns: list[str] = []
-    if paths is None:
-        missing_patterns.append("scenario-declared public-contract snapshot paths")
-    baseline_action = baseline_evidence.action("refactor-public-contract-stability-v2")
-    final_action = final_evidence.action("refactor-public-contract-stability-v2")
-    baseline = baseline_action.result if baseline_action is not None else None
-    final = final_action.result if final_action is not None else None
-    if not isinstance(baseline, PublicContractSnapshotEvidenceResult):
-        missing_patterns.append("baseline refactor-public-contract-stability-v2 result")
-    if not isinstance(final, PublicContractSnapshotEvidenceResult):
-        missing_patterns.append("final refactor-public-contract-stability-v2 result")
-    if (
-        paths is not None
-        and isinstance(baseline, PublicContractSnapshotEvidenceResult)
-        and tuple(file.path for file in baseline.files) != tuple(paths)
-    ):
-        missing_patterns.append("baseline refactor-public-contract-stability-v2 selected paths")
-    if (
-        paths is not None
-        and isinstance(final, PublicContractSnapshotEvidenceResult)
-        and tuple(file.path for file in final.files) != tuple(paths)
-    ):
-        missing_patterns.append("final refactor-public-contract-stability-v2 selected paths")
+    metric_id = "refactor-public-contract-stability-v2"
+    baseline, final, missing_patterns = _paired_snapshot_results(
+        baseline_evidence,
+        final_evidence,
+        metric_id=metric_id,
+        paths=paths,
+        result_type=PublicContractSnapshotEvidenceResult,
+        snapshot_label="public-contract",
+    )
     if missing_patterns:
         return MetricScore(
-            metric_id="refactor-public-contract-stability-v2",
+            metric_id=metric_id,
             score=0.0,
             passed=False,
             missing_patterns=missing_patterns,
             evidence="missing: paired public-contract snapshot results are required",
         )
+    assert paths is not None
     assert isinstance(baseline, PublicContractSnapshotEvidenceResult)
     assert isinstance(final, PublicContractSnapshotEvidenceResult)
     baseline_declarations = {file.path: file.declarations for file in baseline.files}
@@ -432,7 +443,7 @@ def _v2_public_contract_stability_score(
     ]
     passed = not drifted_paths
     return MetricScore(
-        metric_id="refactor-public-contract-stability-v2",
+        metric_id=metric_id,
         score=1.0 if passed else 0.0,
         passed=passed,
         evidence=(

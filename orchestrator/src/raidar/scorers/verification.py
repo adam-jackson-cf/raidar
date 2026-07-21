@@ -7,21 +7,12 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, SkipValidation, model_validator
 
 from raidar.scenario_paths import validate_relative_path
-from raidar.schemas.environment import CapabilityRequirements
 from raidar.schemas.scenario import _validate_argv_command
-
-if TYPE_CHECKING:
-    from raidar.scorers.evidence_contract import (
-        EvidenceActionResult,
-        EvidenceArtifactResult,
-        EvidenceOutput,
-        EvidenceRunnerMetadata,
-    )
 
 ACTION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
 EVIDENCE_SCHEMA_VERSION = "1"
@@ -366,7 +357,7 @@ class VerificationPlanContext:
     scenario: Any
     resolved_scorer: Any
     scenario_dir: Path
-    environment_capabilities: CapabilityRequirements
+    environment_capabilities: Any
     visual_comparison: VisualComparisonToolPolicy
 
 
@@ -377,12 +368,12 @@ class OwnerEvidence:
     owner: str
     evidence: VerificationEvidence
 
-    def action(self, local_id: str) -> EvidenceActionResult | None:
+    def action(self, local_id: str) -> Any | None:
         """Return one action through the owner's normalized alias."""
 
         return self.evidence.action(self.owner, local_id)
 
-    def actions(self, *, kind: str | None = None) -> tuple[EvidenceActionResult, ...]:
+    def actions(self, *, kind: str | None = None) -> tuple[Any, ...]:
         """Return all actions declared by this owner."""
 
         prefix = f"{self.owner}."
@@ -402,13 +393,13 @@ class OwnerEvidence:
 class VerificationEvidence:
     """Strict raw evidence returned by the bundled evidence runner."""
 
-    actions: dict[str, EvidenceActionResult] = field(default_factory=dict)
+    actions: dict[str, Any] = field(default_factory=dict)
     aliases: dict[str, str] = field(default_factory=dict)
-    artifacts: tuple[EvidenceArtifactResult, ...] = ()
-    metadata: EvidenceRunnerMetadata | None = None
+    artifacts: tuple[Any, ...] = ()
+    metadata: Any | None = None
 
     @classmethod
-    def from_output(cls, output: EvidenceOutput) -> VerificationEvidence:
+    def from_output(cls, output: Any) -> VerificationEvidence:
         """Build indexed evidence from one validated runner output."""
 
         actions = {action.id: action for action in output.actions}
@@ -430,7 +421,7 @@ class VerificationEvidence:
 
         return OwnerEvidence(owner=owner, evidence=self)
 
-    def action(self, owner: str, local_id: str) -> EvidenceActionResult | None:
+    def action(self, owner: str, local_id: str) -> Any | None:
         """Resolve an owner-local action through the persisted alias map."""
 
         canonical = self.aliases.get(f"{owner}.{local_id}")

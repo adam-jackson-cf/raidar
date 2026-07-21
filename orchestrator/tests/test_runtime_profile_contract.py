@@ -241,3 +241,14 @@ def test_visual_comparison_policy_changes_effective_contract_identity(tmp_path: 
     assert custom_contract.visual_comparison is policy
     assert custom_contract.cache_payload["visual_comparison"] == policy.cache_payload()
     assert custom_contract.contract_hash != default_contract.contract_hash
+
+
+def test_effective_contract_uses_versioned_scorer_plan_owner_for_dependencies() -> None:
+    scenario_path = _repo_root() / "scenarios/targeted-bugfix/v002/scenario.yaml"
+    contract = resolve_effective_run_contract(
+        scenario=load_scenario(scenario_path),
+        scenario_path=scenario_path,
+        repo_root=_repo_root(),
+    )
+
+    assert any(owner.startswith("bugfix-v2.") for owner in contract.verification_plan.aliases)

@@ -6,8 +6,8 @@ without applying scorecard policy or metric scoring.
 
 from __future__ import annotations
 
-import ast
 import argparse
+import ast
 import fnmatch
 import glob as globlib
 import hashlib
@@ -595,15 +595,12 @@ def _public_declarations(path: Path, data: bytes) -> list[str]:
     text = data.decode("utf-8", errors="replace")
     if path.suffix == ".py":
         return _python_public_declarations(path, text)
-    declarations: list[str] = []
     pattern = re.compile(
         r"^\s*export\s+(?:default\s+)?(?:async\s+)?"
         r"(class|function|interface|type|const|let|var)\s+([A-Za-z_$][\w$]*)",
         re.MULTILINE,
     )
-    for match in pattern.finditer(text):
-        declarations.append(f"{match.group(1)} {match.group(2)}")
-    return declarations
+    return [f"{match.group(1)} {match.group(2)}" for match in pattern.finditer(text)]
 
 
 def _python_public_declarations(path: Path, text: str) -> list[str]:
@@ -611,22 +608,40 @@ def _python_public_declarations(path: Path, text: str) -> list[str]:
         module = ast.parse(text, filename=path.as_posix())
     except SyntaxError as exc:
         raise ValueError(f"cannot parse selected Python file: {path.name}") from exc
-    declarations: list[str] = []
-    for node in module.body:
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith(
-            "_"
-        ):
-            prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
-            declaration = f"{prefix} {node.name}({ast.unparse(node.args)})"
-            if node.returns is not None:
-                declaration += f" -> {ast.unparse(node.returns)}"
-            declarations.append(declaration)
-        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
-            bases = ", ".join(ast.unparse(base) for base in node.bases)
-            declarations.append(f"class {node.name}" + (f"({bases})" if bases else ""))
-        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
-            declarations.extend(_public_assignment_names(node))
-    return declarations
+    return [
+        declaration
+        for node in module.body
+        for declaration in _python_public_declarations_for_node(node)
+    ]
+
+
+def _python_public_declarations_for_node(node: ast.AST) -> list[str]:
+    if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        return _public_function_declaration(node)
+    if isinstance(node, ast.ClassDef):
+        return _public_class_declaration(node)
+    if isinstance(node, (ast.Assign, ast.AnnAssign)):
+        return _public_assignment_names(node)
+    return []
+
+
+def _public_function_declaration(
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
+) -> list[str]:
+    if node.name.startswith("_"):
+        return []
+    prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+    declaration = f"{prefix} {node.name}({ast.unparse(node.args)})"
+    if node.returns is not None:
+        declaration += f" -> {ast.unparse(node.returns)}"
+    return [declaration]
+
+
+def _public_class_declaration(node: ast.ClassDef) -> list[str]:
+    if node.name.startswith("_"):
+        return []
+    bases = ", ".join(ast.unparse(base) for base in node.bases)
+    return [f"class {node.name}" + (f"({bases})" if bases else "")]
 
 
 def _public_assignment_names(node: ast.Assign | ast.AnnAssign) -> list[str]:
@@ -919,6 +934,17 @@ def _archive_dir_files(path: Path, workspace: Path, policy: RunnerPolicy) -> lis
     ]
 
 
+_ACTION_EXECUTORS = {
+    "command": _run_command,
+    "read_file": _run_read_file,
+    "read_json": _run_read_json,
+    "structural_snapshot": _run_structural_snapshot,
+    "public_contract_snapshot": _run_public_contract_snapshot,
+    "glob": _run_glob,
+    "visual_diff": _run_visual_diff,
+}
+
+
 def _execute_action(
     action: dict[str, Any],
     workspace: Path,
@@ -926,23 +952,13 @@ def _execute_action(
     policy: RunnerPolicy,
 ) -> dict[str, Any]:
     kind = action["kind"]
-    if kind == "command":
-        return _run_command(action, workspace, policy)
-    if kind == "read_file":
-        return _run_read_file(action, workspace, policy)
-    if kind == "read_json":
-        return _run_read_json(action, workspace, policy)
-    if kind == "structural_snapshot":
-        return _run_structural_snapshot(action, workspace, policy)
-    if kind == "public_contract_snapshot":
-        return _run_public_contract_snapshot(action, workspace, policy)
-    if kind == "glob":
-        return _run_glob(action, workspace, policy)
-    if kind == "visual_diff":
-        return _run_visual_diff(action, workspace, policy)
     if kind == "archive":
         return _run_archive(action, workspace, output_dir, policy)
-    raise ValueError(f"unsupported evidence action kind: {kind}")
+    try:
+        executor = _ACTION_EXECUTORS[kind]
+    except KeyError as exc:
+        raise ValueError(f"unsupported evidence action kind: {kind}") from exc
+    return executor(action, workspace, policy)
 
 
 def _action_config(action: dict[str, Any]) -> dict[str, Any]:

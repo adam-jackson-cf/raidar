@@ -1903,7 +1903,7 @@ def test_scenario_agent_matrix_dry_run_is_side_effect_free() -> None:
     )
 
     assert result.returncode == 0, result.stderr
-    assert "bugfix-ledger-balance-codex-gpt55-terra-low.yaml" in result.stdout
-    assert "test-generation-baseline-codex-gpt55-terra-low.yaml" in result.stdout
+    assert "skill-benchmark-coding-test-codex-gpt55-terra-low.yaml" in result.stdout
+    assert "bugfix-ledger-balance-codex-gpt55-terra-low.yaml" not in result.stdout
     assert "validate-scenario-agent-matrix.py" in result.stdout
     assert "No fresh experiment summary" not in result.stderr

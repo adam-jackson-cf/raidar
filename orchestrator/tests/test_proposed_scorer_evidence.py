@@ -422,6 +422,39 @@ def test_bugfix_collects_concept_specific_proxy_evidence(tmp_path: Path) -> None
     assert not scores["change-containment"].passed
 
 
+def test_plan_to_code_scores_retained_plan_evidence(monkeypatch, tmp_path: Path) -> None:
+    workspace = _workspace(tmp_path)
+    (workspace / "intentplan.md").write_text(
+        "## Feature Dashboard\n\n"
+        "| Feature | Status | Evidence |\n"
+        "| --- | --- | --- |\n"
+        "| F1 | passed | src/app.py |\n\n"
+        "## Acceptance Tracker\n\n"
+        "| Acceptance | Status | Evidence |\n"
+        "| --- | --- | --- |\n"
+        "| A1 | passed | tests/test_app.py |\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        "raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric",
+        lambda **_kwargs: MetricScore(
+            metric_id="plan-adherence",
+            score=1.0,
+            passed=True,
+            evidence="judge passed",
+        ),
+    )
+
+    scores = {
+        score.metric_id: score
+        for score in PlanToCode().collect_evidence(_context(workspace)).metric_scores
+    }
+
+    assert scores["plan-adherence"].passed
+    assert scores["planned-scope-coverage"].passed
+    assert scores["acceptance-evidence-completeness"].passed
+
+
 def test_bugfix_defect_resolution_requires_a_paired_failure_and_success(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     final_only = {

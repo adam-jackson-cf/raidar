@@ -387,11 +387,18 @@ def _sample_execution_phase(
     )
 
 
-def _sample_persisted_artifacts() -> PersistedArtifacts:
+def _sample_persisted_artifacts(
+    *, baseline_evidence_path: Path | None = None
+) -> PersistedArtifacts:
+    runner_evidence_artifacts = (
+        {"baseline/evidence.json": str(baseline_evidence_path)}
+        if baseline_evidence_path is not None
+        else {}
+    )
     return PersistedArtifacts(
         starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
         scenario_revision_meta={"scenario_yaml_hash": "abc"},
-        runner_evidence_artifacts={},
+        runner_evidence_artifacts=runner_evidence_artifacts,
         harness_artifacts={"log": "harness/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
         evidence_artifacts={"homepage_post": None, "errors": []},
@@ -425,6 +432,25 @@ def _sample_scorecard_context(
     (scenario_dir / "prompt").mkdir(parents=True, exist_ok=True)
     (scenario_dir / "prompt" / "task.md").write_text("Build homepage\n")
 
+    baseline_evidence_path = results_dir / "baseline-evidence.json"
+    baseline_evidence_path.write_text(
+        json.dumps(
+            {
+                "schema_version": "1",
+                "runner_contract": "python-evidence-runner@2",
+                "aliases": {},
+                "actions": [],
+                "artifacts": [],
+                "metadata": {
+                    "action_count": 0,
+                    "error_count": 0,
+                    "required_error_count": 0,
+                    "workspace": workspace_dir.as_posix(),
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
     return ScorecardBuildContext(
         request=_sample_run_request(scenario_dir, results_dir),
         layout=_sample_run_layout(results_dir),
@@ -432,7 +458,7 @@ def _sample_scorecard_context(
             workspace_dir,
             scenario_name="homepage-implementation",
         ),
-        artifacts=_sample_persisted_artifacts(),
+        artifacts=_sample_persisted_artifacts(baseline_evidence_path=baseline_evidence_path),
         execution=_sample_execution_phase(
             tmp_path,
             workspace_dir,
@@ -926,7 +952,10 @@ def _score_context_with_evidence_metadata(score_context, trial_dir: Path):
         score_context,
         artifacts=replace(
             score_context.artifacts,
-            runner_evidence_artifacts={"evidence.json": str(evidence_path)},
+            runner_evidence_artifacts={
+                **score_context.artifacts.runner_evidence_artifacts,
+                "evidence.json": str(evidence_path),
+            },
         ),
         execution=replace(
             score_context.execution,
@@ -1936,7 +1965,10 @@ def test_build_metric_scores_passes_verification_evidence_to_scorers(
         score_context,
         artifacts=replace(
             score_context.artifacts,
-            runner_evidence_artifacts={"evidence.json": str(evidence_path)},
+            runner_evidence_artifacts={
+                **score_context.artifacts.runner_evidence_artifacts,
+                "evidence.json": str(evidence_path),
+            },
         ),
     )
     observed_contexts = []

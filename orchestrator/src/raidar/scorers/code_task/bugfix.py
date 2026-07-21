@@ -421,6 +421,23 @@ def _direct_defect_resolution_score(
         for local_id, starter_failed, final_succeeded in paired_outcomes
         if starter_failed and final_succeeded
     ]
+    missing = _direct_defect_resolution_missing(paired_outcomes, resolved_ids)
+    return MetricScore(
+        metric_id="defect-resolution-v2",
+        score=1.0 if resolved_ids else 0.0,
+        passed=bool(resolved_ids),
+        matched_count=len(resolved_ids),
+        missing_patterns=missing,
+        evidence=(
+            "paired baseline/final command outcomes: "
+            f"paired_commands={len(paired_outcomes)}, resolved_commands={len(resolved_ids)}"
+        ),
+    )
+
+
+def _direct_defect_resolution_missing(
+    paired_outcomes: tuple[tuple[str, bool, bool], ...], resolved_ids: list[str]
+) -> list[str]:
     starter_failure = any(starter_failed for _, starter_failed, _ in paired_outcomes)
     final_success = any(final_succeeded for _, _, final_succeeded in paired_outcomes)
     missing = []
@@ -432,18 +449,7 @@ def _direct_defect_resolution_score(
         missing.append("matching final command success")
     if starter_failure and final_success and not resolved_ids:
         missing.append("paired starter command failure and matching final command success")
-    score = 1.0 if resolved_ids else 0.0
-    return MetricScore(
-        metric_id="defect-resolution-v2",
-        score=score,
-        passed=bool(resolved_ids),
-        matched_count=len(resolved_ids),
-        missing_patterns=missing,
-        evidence=(
-            "paired baseline/final command outcomes: "
-            f"paired_commands={len(paired_outcomes)}, resolved_commands={len(resolved_ids)}"
-        ),
-    )
+    return missing
 
 
 def _direct_regression_protection_score(

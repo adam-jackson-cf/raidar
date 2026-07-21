@@ -51,7 +51,18 @@ def test_source_snapshots_are_typed_and_stable(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     (workspace / "module.py").write_text(
-        """# comment\nPUBLIC_VALUE = 1\n\ndef public_api(value: int) -> str:\n    return str(value)\n\ndef _private() -> None:\n    pass\n\nclass PublicType:\n    pass\n""",
+        """# comment
+PUBLIC_VALUE = 1
+
+def public_api(value: int) -> str:
+    return str(value)
+
+def _private() -> None:
+    pass
+
+class PublicType:
+    pass
+""",
         encoding="utf-8",
     )
     plan_path = _plan(

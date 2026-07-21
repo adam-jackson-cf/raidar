@@ -159,7 +159,7 @@ def _resolve_verification_plan(
             )
         )
     dependencies = {
-        resolved_scorer.id: resolved_scorer.evidence_dependencies
-        for resolved_scorer in scenario.resolved_scorers()
+        plan.owner: resolved_scorer.evidence_dependencies
+        for plan, resolved_scorer in zip(plans, scenario.resolved_scorers(), strict=True)
     }
     return normalize_verification_plans(tuple(plans), dependencies)

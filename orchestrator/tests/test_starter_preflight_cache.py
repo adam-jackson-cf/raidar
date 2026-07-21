@@ -73,6 +73,19 @@ def test_ensure_starter_preflight_skips_test_command_without_tests(monkeypatch, 
     assert calls == [["bun", "run", "lint"]]
 
 
+def test_starter_preflight_skips_expected_failing_test_commands() -> None:
+    for command in (
+        ["python", "-m", "unittest", "discover", "-s", "tests"],
+        ["bun", "run", "test", "--", "src/test/ledger.test.ts"],
+    ):
+        assert runner._should_skip_preflight_command(
+            command,
+            has_tests=True,
+            skip_test_commands_when_no_tests=False,
+            skip_test_commands_in_starter_preflight=True,
+        )
+
+
 def test_workspace_test_discovery_ignores_dependency_tests(tmp_path: Path) -> None:
     workspace = tmp_path / "workspace"
     dependency_tests = workspace / "node_modules" / "pkg" / "src" / "index.test.ts"
