@@ -13,6 +13,7 @@ MATRIX_SUFFIX = "-codex-gpt55-terra-low.yaml"
 EXPECTED_AGENTS = (
     ("codex-cli", "openai", "gpt-5.5", "low"),
     ("codex-cli", "openai", "gpt-5.6-terra", "low"),
+    ("codex-cli", "openai", "gpt-5.6-luna", "low"),
 )
 
 
@@ -36,7 +37,10 @@ def test_every_active_benchmark_scenario_revision_has_a_warm_two_agent_matrix() 
             repo_root=REPO_ROOT,
             experiment_kind="benchmark",
         )
-        assert tuple(job.scenario.scenario_revision for job in jobs[::2]) == revisions
+        assert (
+            tuple(job.scenario.scenario_revision for job in jobs[:: len(EXPECTED_AGENTS)])
+            == revisions
+        )
         assert len(jobs) == len(revisions) * len(EXPECTED_AGENTS)
 
         for offset in range(0, len(jobs), len(EXPECTED_AGENTS)):

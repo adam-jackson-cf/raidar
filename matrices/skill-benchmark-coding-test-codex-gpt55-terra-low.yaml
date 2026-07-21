@@ -21,6 +21,13 @@ matrix:
         provider: openai
         model: gpt-5.6-terra
         reasoning_effort: low
+    - id: v001-gpt-5-6-luna-low
+      scenario_revision: v001
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.6-luna
+        reasoning_effort: low
     - id: v002-gpt-5-5-low
       scenario_revision: v002
       agent:
@@ -35,6 +42,13 @@ matrix:
         provider: openai
         model: gpt-5.6-terra
         reasoning_effort: low
+    - id: v002-gpt-5-6-luna-low
+      scenario_revision: v002
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.6-luna
+        reasoning_effort: low
     - id: v003-gpt-5-5-low
       scenario_revision: v003
       agent:
@@ -48,4 +62,11 @@ matrix:
         harness: codex-cli
         provider: openai
         model: gpt-5.6-terra
+        reasoning_effort: low
+    - id: v003-gpt-5-6-luna-low
+      scenario_revision: v003
+      agent:
+        harness: codex-cli
+        provider: openai
+        model: gpt-5.6-luna
         reasoning_effort: low

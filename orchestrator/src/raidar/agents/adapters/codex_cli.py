@@ -25,6 +25,10 @@ class CodexCliAdapter(HarborCliAdapter):
             display_label="GPT-5.6 Terra",
             reasoning_levels=("low",),
         ),
+        "gpt-5.6-luna": SupportedModelProfile(
+            display_label="GPT-5.6 Luna",
+            reasoning_levels=("low",),
+        ),
         "gpt-5.5": SupportedModelProfile(
             display_label="GPT-5.5",
             reasoning_levels=("low", "medium", "high", "xhigh"),

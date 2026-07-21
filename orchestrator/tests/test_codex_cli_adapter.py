@@ -136,6 +136,7 @@ def test_chatgpt_mode_requires_file_backed_auth(
         ("gpt-5.5", "openai/gpt-5.5", "high"),
         ("gpt-5.5", "openai/gpt-5.5", "xhigh"),
         ("gpt-5.6-terra", "openai/gpt-5.6-terra", "low"),
+        ("gpt-5.6-luna", "openai/gpt-5.6-luna", "low"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "low"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "medium"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "high"),
@@ -174,10 +175,13 @@ def test_prepare_workspace_creates_codex_trace_dir(tmp_path: Path) -> None:
     assert (tmp_path / ".codex").exists()
 
 
-def test_gpt_5_6_terra_rejects_non_low_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("model_name", ("gpt-5.6-terra", "gpt-5.6-luna"))
+def test_gpt_5_6_models_reject_non_low_reasoning(
+    monkeypatch: pytest.MonkeyPatch, model_name: str
+) -> None:
     monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    adapter = CodexCliAdapter(_config("gpt-5.6-terra", reasoning_effort="medium"))
+    adapter = CodexCliAdapter(_config(model_name, reasoning_effort="medium"))
 
     with pytest.raises(ValueError, match="only supports reasoning levels: low"):
         adapter.validate()
