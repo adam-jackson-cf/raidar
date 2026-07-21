@@ -13,6 +13,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from raidar.runtime.harbor import validate_public_base_images
+from raidar.runtime.profile import RuntimeProfile
 from raidar.scenario_paths import resolve_relative_file
 from raidar.schemas.environment import (
     CapabilityRequirements,
@@ -30,7 +31,7 @@ class EnvironmentResolutionError(ValueError):
 class EnvironmentBuildMetadata(BaseModel):
     """Library-owned Docker build metadata."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     dockerfile: str
 
@@ -45,13 +46,54 @@ class EnvironmentBuildMetadata(BaseModel):
 class EnvironmentLibraryEntry(BaseModel):
     """Repo-local environment metadata entry."""
 
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", frozen=True)
 
     id: str
     version: int = Field(ge=1)
     image: str
     build: EnvironmentBuildMetadata
     capabilities: CapabilityRequirements = Field(default_factory=CapabilityRequirements)
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedEnvironmentLibraryEntry:
+    """One fingerprinted entry discovered in a configured registry root."""
+
+    library: EnvironmentLibraryEntry
+    registry_root: Path
+    metadata_path: Path
+    dockerfile_path: Path
+    metadata_fingerprint: str
+    dockerfile_fingerprint: str
+
+    def cache_payload(self) -> dict[str, Any]:
+        return {
+            "id": self.library.id,
+            "version": self.library.version,
+            "image": self.library.image,
+            "registry_root": str(self.registry_root),
+            "metadata": str(self.metadata_path),
+            "dockerfile": str(self.dockerfile_path),
+            "metadata_fingerprint": self.metadata_fingerprint,
+            "dockerfile_fingerprint": self.dockerfile_fingerprint,
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedEnvironmentRegistry:
+    """Ordered environment roots and their immutable discovered entries."""
+
+    roots: tuple[Path, ...]
+    entries: tuple[ResolvedEnvironmentLibraryEntry, ...]
+
+    def index(self) -> dict[str, ResolvedEnvironmentLibraryEntry]:
+        return {entry.library.id: entry for entry in self.entries}
+
+    def cache_payload(self) -> dict[str, Any]:
+        return {
+            "roots": [str(root) for root in self.roots],
+            "entries": [entry.cache_payload() for entry in self.entries],
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -127,19 +169,25 @@ def resolve_scenario_environment(
     scenario,
     scenario_path: Path,
     repo_root: Path,
+    registry: ResolvedEnvironmentRegistry,
+    docker_registry_allowlist: tuple[str, ...],
 ) -> ResolvedEnvironment:
-    """Resolve the scenario-owned environment against the repo-local library."""
+    """Resolve the scenario-owned environment against a resolved library."""
 
     if scenario.environment.kind == "stack_preset":
-        library, metadata_path, dockerfile_path = _environment_library_entry_by_id(
-            repo_root,
+        resolved_entry = _environment_library_entry_by_id(
+            registry,
             scenario.environment.id,
         )
+        library = resolved_entry.library
+        metadata_path = resolved_entry.metadata_path
+        dockerfile_path = resolved_entry.dockerfile_path
     elif scenario.environment.kind == "custom_docker":
         library, metadata_path, dockerfile_path = _custom_environment_entry(
             scenario.environment,
             scenario_path=scenario_path,
             repo_root=repo_root,
+            docker_registry_allowlist=docker_registry_allowlist,
         )
     else:
         raise EnvironmentResolutionError(
@@ -175,31 +223,72 @@ def resolve_scenario_environment(
     )
 
 
-def environment_library_index(
+def resolve_environment_registry(
+    *,
     repo_root: Path,
-) -> dict[str, tuple[EnvironmentLibraryEntry, Path, Path]]:
-    """Return environment library entries keyed by id."""
+    runtime_profile: RuntimeProfile,
+) -> ResolvedEnvironmentRegistry:
+    """Discover and fingerprint every configured environment registry entry."""
 
-    environments_root = repo_root / "environments"
-    if not environments_root.is_dir():
-        raise EnvironmentResolutionError(f"Environment library not found: {environments_root}")
-
-    index: dict[str, tuple[EnvironmentLibraryEntry, Path, Path]] = {}
-    for metadata_path in sorted(environments_root.glob("**/environment.yaml")):
-        library = _load_environment_library_entry(metadata_path)
-        dockerfile_path = resolve_relative_file(
-            repo_root,
-            library.build.dockerfile,
-            field_name=f"{metadata_path}:build.dockerfile",
-            root_name="repository",
-        )
-        if library.id in index:
-            existing = index[library.id][1]
-            raise EnvironmentResolutionError(
-                f"Duplicate environment id {library.id!r}: {existing} and {metadata_path}"
+    resolved_repo_root = repo_root.resolve()
+    roots = tuple(
+        _resolve_environment_registry_root(resolved_repo_root, configured_root)
+        for configured_root in runtime_profile.environment_registry_roots
+    )
+    if len(roots) != len(set(roots)):
+        raise EnvironmentResolutionError("Environment registry roots resolve to duplicate paths")
+    entries: list[ResolvedEnvironmentLibraryEntry] = []
+    seen: dict[str, Path] = {}
+    for registry_root in roots:
+        if not registry_root.is_dir():
+            raise EnvironmentResolutionError(f"Environment library not found: {registry_root}")
+        for metadata_path in sorted(registry_root.glob("**/environment.yaml")):
+            library = _load_environment_library_entry(metadata_path)
+            dockerfile_path = resolve_relative_file(
+                metadata_path.parent,
+                library.build.dockerfile,
+                field_name=f"{metadata_path}:build.dockerfile",
+                root_name="environment library entry",
             )
-        index[library.id] = (library, metadata_path, dockerfile_path)
-    return index
+            try:
+                validate_public_base_images(
+                    dockerfile_path.read_text(encoding="utf-8"),
+                    allowed_registry_hosts=runtime_profile.docker_registry_allowlist,
+                )
+            except ValueError as exc:
+                raise EnvironmentResolutionError(
+                    f"Invalid environment Dockerfile {dockerfile_path}: {exc}"
+                ) from exc
+            if library.id in seen:
+                raise EnvironmentResolutionError(
+                    f"Duplicate environment id {library.id!r}: {seen[library.id]} and "
+                    f"{metadata_path}"
+                )
+            seen[library.id] = metadata_path
+            entries.append(
+                ResolvedEnvironmentLibraryEntry(
+                    library=library,
+                    registry_root=registry_root,
+                    metadata_path=metadata_path,
+                    dockerfile_path=dockerfile_path,
+                    metadata_fingerprint=_file_fingerprint(metadata_path),
+                    dockerfile_fingerprint=_file_fingerprint(dockerfile_path),
+                )
+            )
+    return ResolvedEnvironmentRegistry(roots=roots, entries=tuple(entries))
+
+
+def environment_library_index(
+    registry: ResolvedEnvironmentRegistry,
+) -> dict[str, ResolvedEnvironmentLibraryEntry]:
+    """Return resolved environment registry entries keyed by id."""
+
+    return registry.index()
+
+
+def _resolve_environment_registry_root(repo_root: Path, configured_root: str) -> Path:
+    path = Path(configured_root).expanduser()
+    return path.resolve() if path.is_absolute() else (repo_root / path).resolve()
 
 
 def scorer_requirements_payload(scenario) -> list[dict[str, Any]]:
@@ -243,10 +332,10 @@ def merge_capability_requirements(
 
 
 def _environment_library_entry_by_id(
-    repo_root: Path,
+    registry: ResolvedEnvironmentRegistry,
     environment_id: str,
-) -> tuple[EnvironmentLibraryEntry, Path, Path]:
-    index = environment_library_index(repo_root)
+) -> ResolvedEnvironmentLibraryEntry:
+    index = environment_library_index(registry)
     try:
         return index[environment_id]
     except KeyError as exc:
@@ -261,6 +350,7 @@ def _custom_environment_entry(
     *,
     scenario_path: Path,
     repo_root: Path,
+    docker_registry_allowlist: tuple[str, ...],
 ) -> tuple[EnvironmentLibraryEntry, Path, Path]:
     if config.image is None or config.build is None:
         raise EnvironmentResolutionError("custom_docker environment metadata is incomplete")
@@ -271,7 +361,10 @@ def _custom_environment_entry(
         root_name="repository",
     )
     try:
-        validate_public_base_images(dockerfile_path.read_text(encoding="utf-8"))
+        validate_public_base_images(
+            dockerfile_path.read_text(encoding="utf-8"),
+            allowed_registry_hosts=docker_registry_allowlist,
+        )
     except ValueError as exc:
         raise EnvironmentResolutionError(
             f"Invalid custom_docker environment {config.id!r}: {exc}"

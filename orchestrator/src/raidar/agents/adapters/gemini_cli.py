@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 
@@ -20,7 +18,6 @@ class GeminiCliAdapter(HarborCliAdapter):
     CLI_ENV_VAR = "GEMINI_CLI_PATH"
     DEFAULT_BINARY = "gemini"
     WORKSPACE_SESSION_DIR = ".gemini"
-    GEMINI_API_ENV = "GEMINI_API_KEY"
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
         "gemini-3.1-pro-preview": SupportedModelProfile(
             display_label="Gemini 3.1 Pro Preview",
@@ -32,7 +29,3 @@ class GeminiCliAdapter(HarborCliAdapter):
             display_label="Gemini 3 Flash Preview",
         ),
     }
-
-    def _validate_credentials(self) -> None:
-        if not os.environ.get(self.GEMINI_API_ENV):
-            raise OSError("Gemini Harbor runs require an API key. Set GEMINI_API_KEY.")

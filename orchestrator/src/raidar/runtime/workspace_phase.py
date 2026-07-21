@@ -9,31 +9,24 @@ from typing import Any
 
 from raidar.agents.adapters.factory import resolve_adapter
 from raidar.runtime import (
-    harbor_cleanup,
     harbor_env,
     harbor_execution,
     models,
     starter_preflight,
     task_bundle,
-    task_images,
     workspace,
     workspace_artifacts,
+    workspace_task_image,
 )
 
-TaskImageEnsureRequest = task_images.TaskImageEnsureRequest
 RunLayout = models.RunLayout
 RunRequest = models.RunRequest
 WorkspaceContext = models.WorkspaceContext
 WorkspacePreparationPhaseResult = models.WorkspacePreparationPhaseResult
 _build_harbor_run_env = harbor_env._build_harbor_run_env
-_ensure_task_image = task_images._ensure_task_image
 _harbor_process_timeout = harbor_execution._harbor_process_timeout
-_maybe_run_cache_maintenance = task_images._maybe_run_cache_maintenance
 _resolve_homepage_screenshot_command = workspace_artifacts._resolve_homepage_screenshot_command
 _resolve_contract = task_bundle._resolve_contract
-_task_image_capability_inputs = task_bundle._task_image_capability_inputs
-_task_image_reference = task_bundle._task_image_reference
-cleanup_stale_harbor_resources = harbor_cleanup.cleanup_stale_harbor_resources
 create_harbor_task_bundle = task_bundle.create_harbor_task_bundle
 ensure_starter_preflight = starter_preflight.ensure_starter_preflight
 initialize_run = workspace.initialize_run
@@ -131,7 +124,7 @@ def _prepare_workspace_start(request: RunRequest) -> _WorkspacePrepStart:
 
 def _prepare_baseline_context(start: _WorkspacePrepStart) -> _BaselinePrep:
     phase_started = time.perf_counter()
-    context = prepare_run_context(start.request)
+    context = prepare_run_context(start.request, start.contract)
     timings = _with_timing(start.timings, "prepare_run_context", phase_started)
     cache_metadata = _with_cache_entry(
         start.cache_metadata,
@@ -161,15 +154,8 @@ def _prepare_baseline_context(start: _WorkspacePrepStart) -> _BaselinePrep:
 
 def _prepare_preflight(prep: _BaselinePrep) -> _BaselinePrep:
     phase_started = time.perf_counter()
-    cleanup_stale_harbor_resources(
-        include_containers=True,
-        include_build_processes=True,
-    )
-    timings = _with_timing(prep.timings, "cleanup_stale_harbor_resources", phase_started)
-
-    phase_started = time.perf_counter()
-    preflight_hit = ensure_starter_preflight(prep.request, prep.context)
-    timings = _with_timing(timings, "ensure_starter_preflight", phase_started)
+    preflight_hit = ensure_starter_preflight(prep.request, prep.context, prep.contract)
+    timings = _with_timing(prep.timings, "ensure_starter_preflight", phase_started)
     cache_metadata = _with_cache_entry(prep.cache_metadata, "preflight", {"hit": preflight_hit})
     return replace(prep, timings=timings, cache_metadata=cache_metadata)
 
@@ -212,45 +198,20 @@ def _prepare_harbor_bundle(
 
 
 def _prepare_task_image(prep: _BundlePrep) -> _BundlePrep:
-    cache_metadata = dict(prep.cache_metadata)
-    cache_metadata["contract"] = {
-        "id": prep.contract.id,
-        "hash": prep.contract.contract_hash,
-        "cache_payload": prep.contract.cache_payload,
-    }
-    image_ref = _task_image_reference(prep.request, prep.harbor_task_bundle, prep.contract)
-    provided_capabilities, required_capabilities = _task_image_capability_inputs(
-        prep.request,
-        prep.contract,
-    )
-    if image_ref:
-        cache_metadata["image_key"] = image_ref.cache_key
-        cache_metadata["image_tag"] = image_ref.tag
-    _maybe_run_cache_maintenance(
+    result = workspace_task_image.prepare_task_image(
+        request=prep.request,
+        contract=prep.contract,
+        task_bundle_path=prep.harbor_task_bundle,
         run_env=prep.run_env,
-        active_image_name=image_ref.image_name if image_ref else None,
-        runtime_profile=prep.contract.runtime_profile,
+        harbor_dir=prep.layout.harbor_dir,
+        cache_metadata=prep.cache_metadata,
+        timings=prep.timings,
     )
-
-    phase_started = time.perf_counter()
-    image_hit = None
-    if image_ref:
-        image_hit = _ensure_task_image(
-            TaskImageEnsureRequest(
-                task_bundle_path=prep.harbor_task_bundle,
-                image_ref=image_ref,
-                harness=prep.request.config.harness.value,
-                run_env=prep.run_env,
-                log_dir=prep.layout.harbor_dir,
-                task_timeout_sec=prep.request.config.timeout_sec,
-                provided_capabilities=provided_capabilities,
-                required_capabilities=required_capabilities,
-                runtime_profile=prep.contract.runtime_profile,
-            )
-        )
-    timings = _with_timing(prep.timings, "_ensure_task_image", phase_started)
-    cache_metadata["image"] = {"hit": image_hit}
-    return replace(prep, timings=timings, cache_metadata=cache_metadata)
+    return replace(
+        prep,
+        timings=result.timings,
+        cache_metadata=result.cache_metadata,
+    )
 
 
 def _harbor_request(prep: _BundlePrep) -> models.HarborExecutionRequest:
@@ -263,6 +224,7 @@ def _harbor_request(prep: _BundlePrep) -> models.HarborExecutionRequest:
         run_id=prep.layout.run_id,
         timeout_sec=_harbor_process_timeout(prep.request.config.timeout_sec),
         run_env=prep.run_env,
+        runtime_profile=prep.contract.runtime_profile,
     )
 
 
@@ -279,6 +241,7 @@ def _workspace_preparation_result(prep: _BundlePrep) -> WorkspacePreparationPhas
         auth_metadata=prep.adapter.execution_metadata(),
         screenshot_command=tuple(prep.screenshot_command) if prep.screenshot_command else None,
         evidence_errors=tuple(prep.evidence_errors),
+        effective_contract=prep.contract,
     )
 
 

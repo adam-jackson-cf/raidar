@@ -9,20 +9,6 @@ DOCKERFILE_FROM_PATTERN = re.compile(
     r"^\s*FROM(?:\s+--platform=[^\s]+)?\s+([^\s]+)",
     re.IGNORECASE | re.MULTILINE,
 )
-PUBLIC_REGISTRY_HOSTS: set[str] = {
-    "docker.io",
-    "index.docker.io",
-    "registry-1.docker.io",
-    "ghcr.io",
-    "quay.io",
-    "mcr.microsoft.com",
-    "public.ecr.aws",
-    "gcr.io",
-    "us.gcr.io",
-    "eu.gcr.io",
-    "asia.gcr.io",
-    "registry.k8s.io",
-}
 
 
 def parse_docker_compose_version(raw: str) -> tuple[int, int, int] | None:
@@ -52,14 +38,19 @@ def image_registry_host(image: str) -> str | None:
     return None
 
 
-def validate_public_base_images(dockerfile_content: str) -> None:
+def validate_public_base_images(
+    dockerfile_content: str,
+    *,
+    allowed_registry_hosts: tuple[str, ...],
+) -> None:
+    allowed_hosts = frozenset(allowed_registry_hosts)
     for image in dockerfile_from_images(dockerfile_content):
         if image.startswith("$"):
             raise ValueError(
                 f"Dockerfile FROM image must be explicit, found unresolved variable: {image}."
             )
         host = image_registry_host(image)
-        if host and host not in PUBLIC_REGISTRY_HOSTS:
+        if host and host not in allowed_hosts:
             raise ValueError(
                 f"Dockerfile uses private or unsupported registry host '{host}' in FROM '{image}'. "
                 "Only public registries are allowed."

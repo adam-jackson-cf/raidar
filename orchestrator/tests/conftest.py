@@ -10,10 +10,10 @@ from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
     EvalConfig,
     EvalRun,
-    FunctionalScore,
+    MetricScore,
     Scorecard,
-    VerificationStabilityScore,
-    VisualScore,
+    ScorerMetricContribution,
+    ScorerResult,
 )
 
 
@@ -96,20 +96,40 @@ def sample_scorecard() -> Scorecard:
                 "fingerprint": "abc123",
             }
         },
-        functional=FunctionalScore(
-            passed=True,
-            tests_passed=8,
-            tests_total=10,
-            build_succeeded=True,
-            gates_passed=3,
-            gates_total=3,
-        ),
-        visual=VisualScore(similarity=0.95),
-        verification_stability=VerificationStabilityScore(
-            total_gate_failures=1,
-            unique_failure_categories=1,
-            repeat_failures=0,
-        ),
+        metric_scores=[
+            MetricScore(metric_id="functional", score=0.8, passed=True),
+            MetricScore(metric_id="visual-regression", score=0.95, passed=True),
+            MetricScore(metric_id="verification-stability", score=0.75, passed=True),
+        ],
+        scorer_results=[
+            ScorerResult(
+                scorer_id="typescript-code-task",
+                version=1,
+                category="quality",
+                weight=1.0,
+                score=0.825,
+                metric_contributions=[
+                    ScorerMetricContribution(
+                        metric_id="functional",
+                        weight=0.5,
+                        score=0.8,
+                        weighted_score=0.4,
+                    ),
+                    ScorerMetricContribution(
+                        metric_id="visual-regression",
+                        weight=0.25,
+                        score=0.95,
+                        weighted_score=0.2375,
+                    ),
+                    ScorerMetricContribution(
+                        metric_id="verification-stability",
+                        weight=0.25,
+                        score=0.75,
+                        weighted_score=0.1875,
+                    ),
+                ],
+            )
+        ],
     )
 
 

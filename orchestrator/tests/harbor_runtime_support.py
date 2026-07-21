@@ -15,6 +15,8 @@ datetime_module = importlib.import_module("datetime")
 UTC = datetime_module.UTC
 datetime = datetime_module.datetime
 agents_config = importlib.import_module("raidar.agents.config")
+adapter_base = importlib.import_module("raidar.agents.adapters.base")
+harness_definitions = importlib.import_module("raidar.harness.definitions")
 scenario_catalog = importlib.import_module("raidar.application.scenario_catalog")
 artifacts_runtime = importlib.import_module("raidar.runtime.artifacts")
 execution_phase = importlib.import_module("raidar.runtime.execution_phase")
@@ -27,11 +29,13 @@ harbor_results = importlib.import_module("raidar.runtime.harbor_results")
 pipeline = importlib.import_module("raidar.runtime.pipeline")
 starter_preflight = importlib.import_module("raidar.runtime.starter_preflight")
 task_bundle = importlib.import_module("raidar.runtime.task_bundle")
+task_bundle_images = importlib.import_module("raidar.runtime.task_bundle_images")
 task_images = importlib.import_module("raidar.runtime.task_images")
 wait = importlib.import_module("raidar.runtime.wait")
 workspace = importlib.import_module("raidar.runtime.workspace")
 workspace_cache = importlib.import_module("raidar.runtime.workspace_cache")
 workspace_phase = importlib.import_module("raidar.runtime.workspace_phase")
+runtime_profile_module = importlib.import_module("raidar.runtime.profile")
 runtime_models = importlib.import_module("raidar.runtime.models")
 process_metrics_runtime = importlib.import_module("raidar.runtime.process_metrics")
 scorecard_runtime = importlib.import_module("raidar.runtime.scorecard")
@@ -47,6 +51,7 @@ class _RuntimeProxy:
         harbor_results,
         starter_preflight,
         task_bundle,
+        task_bundle_images,
         task_images,
         runtime_environments,
         pipeline,
@@ -79,19 +84,30 @@ class _RuntimeProxy:
 
 
 runner = _RuntimeProxy()
+RuntimeProfile = runtime_profile_module.RuntimeProfile
+RUNTIME_PROFILE = RuntimeProfile()
+EFFECTIVE_CONTRACT = SimpleNamespace(
+    contract_hash="effective-contract-hash",
+    cache_payload={"runtime_profile": RUNTIME_PROFILE.cache_payload()},
+    runtime_profile=RUNTIME_PROFILE,
+)
 
 
 class _AdapterStub:
     def __init__(
         self,
         *,
+        harness_id: str = "cursor",
+        credentials: tuple[object, ...] = (),
         import_path: str | None = None,
-        excluded_keys: set[str] | None = None,
-        local_secret_files: dict[str, Path] | None = None,
     ) -> None:
+        self._definition = harness_definitions.harness_definition(harness_id)
+        self._credentials = credentials
         self._import_path = import_path
-        self._excluded_keys = excluded_keys or set()
-        self._local_secret_files = local_secret_files or {}
+
+    @property
+    def definition(self):
+        return self._definition
 
     def runtime_env(self) -> dict[str, str]:
         return {"ADAPTER_FLAG": "1", "COMPOSE_BAKE": "1"}
@@ -99,11 +115,8 @@ class _AdapterStub:
     def harbor_harness_import_path(self) -> str | None:
         return self._import_path
 
-    def excluded_run_env_keys(self) -> set[str]:
-        return self._excluded_keys
-
-    def local_secret_files(self) -> dict[str, Path]:
-        return self._local_secret_files
+    def resolved_credentials(self) -> tuple[object, ...]:
+        return self._credentials
 
 
 @pytest.fixture
@@ -114,77 +127,9 @@ def repo_tmp_agentic_eval_home(monkeypatch, tmp_path: Path) -> Path:
     return fake_home
 
 
-def test_build_harbor_run_env_preserves_standard_harness_secrets(monkeypatch) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-
-    env = runner._build_harbor_run_env(_AdapterStub())
-
-    assert env["ADAPTER_FLAG"] == "1"
-    assert env["COMPOSE_BAKE"] == "false"
-    assert env["OPENAI_API_KEY"] == "test-openai-key"
-    assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" not in env
-    assert "DOCKER_CONFIG" not in env
-
-
-def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(
-    monkeypatch,
-    repo_tmp_agentic_eval_home: Path,
-) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-
-    env = runner._build_harbor_run_env(
-        _AdapterStub(import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent")
-    )
-
-    assert env["ADAPTER_FLAG"] == "1"
-    assert env["COMPOSE_BAKE"] == "false"
-    assert "OPENAI_API_KEY" not in env
-    assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" in env
-    secret_file = runner.Path(env["AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY"])
-    assert secret_file.exists()
-    assert secret_file.is_relative_to(repo_tmp_agentic_eval_home)
-    assert secret_file.read_text(encoding="utf-8") == "test-openai-key"
-    assert "DOCKER_CONFIG" not in env
-
-
-def test_build_harbor_run_env_uses_local_secret_files_for_custom_harnesses(
-    repo_tmp_agentic_eval_home: Path,
-    tmp_path: Path,
-) -> None:
-    auth_json_path = tmp_path / "auth.json"
-    auth_json_path.write_text('{"access_token":"token"}', encoding="utf-8")
-
-    env = runner._build_harbor_run_env(
-        _AdapterStub(
-            import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
-            local_secret_files={"CODEX_AUTH_JSON": auth_json_path},
-        )
-    )
-
-    assert env["ADAPTER_FLAG"] == "1"
-    secret_file = runner.Path(env["AGENTIC_EVAL_SECRET_FILE_CODEX_AUTH_JSON"])
-    assert secret_file.exists()
-    assert secret_file.is_relative_to(repo_tmp_agentic_eval_home)
-    assert secret_file.read_text(encoding="utf-8") == '{"access_token":"token"}'
-
-
-def test_build_harbor_run_env_excludes_adapter_blocked_env_keys(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
-
-    env = runner._build_harbor_run_env(
-        _AdapterStub(
-            import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
-            excluded_keys={"OPENAI_API_KEY"},
-        )
-    )
-
-    assert "OPENAI_API_KEY" not in env
-    assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" not in env
-
-
 class _ExecAdapterStub:
+    config = SimpleNamespace(harness=SimpleNamespace(value="codex-cli"))
+
     def build_harbor_command(self, *, task_path: Path, job_name: str, jobs_dir: Path) -> list[str]:
         del task_path, job_name, jobs_dir
         return ["harbor", "run"]
@@ -198,14 +143,15 @@ class _ExecAdapterStub:
     def runtime_env(self) -> dict[str, str]:
         return {}
 
+    @property
+    def definition(self):
+        return harness_definitions.harness_definition("codex-cli")
+
+    def resolved_credentials(self) -> tuple[object, ...]:
+        return ()
+
     def harbor_harness_import_path(self) -> str | None:
         return None
-
-    def excluded_run_env_keys(self) -> set[str]:
-        return set()
-
-    def local_secret_files(self) -> dict[str, Path]:
-        return {}
 
     def execution_metadata(self) -> dict[str, str]:
         return {}
@@ -319,7 +265,7 @@ def _patch_starter_preflight_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
         lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
     )
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
-    monkeypatch.setattr(runner, "_workspace_has_tests", lambda *_args: True)
+    monkeypatch.setattr(runner, "_workspace_has_tests", lambda *_args, **_kwargs: True)
 
 
 def _task_image_fixture(tmp_path: Path, tag_suffix: str = "cachekey") -> TaskImageFixture:
@@ -359,6 +305,7 @@ def _ensure_task_image_request(fixture: TaskImageFixture, tmp_path: Path):
         run_env={},
         log_dir=tmp_path / "logs",
         task_timeout_sec=300,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
 
@@ -384,10 +331,19 @@ def _prepare_workspace_scenario_yaml() -> str:
     return "\n".join(
         [
             "name: hello-world-smoke",
+            "display_name: Hello World Smoke",
             "scenario_revision: v001",
             "description: smoke task",
             "difficulty: easy",
-            "category: greenfield-ui",
+            "task_kind: feature_implementation",
+            "delivery_mode: direct_implementation",
+            "workspace_state: existing",
+            "starting_conditions: []",
+            "languages: [TypeScript]",
+            "evaluation_role: benchmark",
+            "catalog_status: active",
+            "family_id: null",
+            "variant_axes: {}",
             "timeout_sec: 1800",
             "environment:",
             "  kind: stack_preset",

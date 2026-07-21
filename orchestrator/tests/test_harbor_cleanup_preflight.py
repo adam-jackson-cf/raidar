@@ -43,7 +43,7 @@ def test_cleanup_stale_harbor_build_processes_only_kills_orphans(
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     monkeypatch.setattr(runner.os, "kill", fake_kill)
 
-    runner.cleanup_stale_harbor_build_processes()
+    runner.cleanup_stale_harbor_build_processes(RUNTIME_PROFILE)
 
     assert killed == [
         (1001, signal.SIGTERM),
@@ -88,7 +88,7 @@ def test_cleanup_stale_harbor_build_processes_kills_orphan_harbor_run_trees(
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     monkeypatch.setattr(runner.os, "kill", fake_kill)
 
-    runner.cleanup_stale_harbor_build_processes()
+    runner.cleanup_stale_harbor_build_processes(RUNTIME_PROFILE)
 
     assert killed == [
         (2001, signal.SIGTERM),
@@ -112,7 +112,7 @@ def test_cleanup_stale_harbor_build_processes_ignores_ps_permission_error(
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
     monkeypatch.setattr(runner.os, "kill", fake_kill)
 
-    runner.cleanup_stale_harbor_build_processes()
+    runner.cleanup_stale_harbor_build_processes(RUNTIME_PROFILE)
 
     assert killed == []
 
@@ -136,7 +136,7 @@ def test_docker_compose_preflight_reason_flags_old_versions(monkeypatch) -> None
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    reason = runner._docker_compose_preflight_reason({})
+    reason = runner._docker_compose_preflight_reason({}, RUNTIME_PROFILE)
 
     assert reason == "Unsupported docker compose version 2.39.2. Require >= 2.40.1 for Harbor runs."
 
@@ -153,7 +153,7 @@ def test_docker_compose_preflight_reason_allows_supported_versions(monkeypatch) 
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    assert runner._docker_compose_preflight_reason({}) is None
+    assert runner._docker_compose_preflight_reason({}, RUNTIME_PROFILE) is None
 
 
 def test_ensure_harbor_runtime_preflight_runs_git_check(monkeypatch, tmp_path: Path) -> None:
@@ -175,6 +175,7 @@ def test_ensure_harbor_runtime_preflight_runs_git_check(monkeypatch, tmp_path: P
         image_ref=image_ref,
         run_env={"PATH": os.environ.get("PATH", "")},
         log_dir=tmp_path,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     assert calls[0] == ["docker", "run", "--rm", image_ref.image_name, "git", "--version"]
@@ -218,6 +219,7 @@ def test_ensure_harbor_runtime_preflight_raises_when_git_missing(
             image_ref=image_ref,
             run_env={},
             log_dir=tmp_path,
+            runtime_profile=RUNTIME_PROFILE,
         )
 
 
@@ -241,6 +243,7 @@ def test_ensure_harbor_runtime_preflight_runs_isolation_probe(monkeypatch, tmp_p
         image_ref=image_ref,
         run_env={},
         log_dir=tmp_path,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     assert commands[0] == [
@@ -284,8 +287,14 @@ def test_redact_sensitive_text_masks_inline_env_and_json_values() -> None:
 
 def test_validate_public_base_images_rejects_private_registry() -> None:
     with pytest.raises(ValueError, match="private or unsupported registry host"):
-        runner._validate_public_base_images("FROM registry.company.com/platform/base:1\n")
+        runner._validate_public_base_images(
+            "FROM registry.company.com/platform/base:1\n",
+            allowed_registry_hosts=RUNTIME_PROFILE.docker_registry_allowlist,
+        )
 
 
 def test_validate_public_base_images_accepts_public_images() -> None:
-    runner._validate_public_base_images("FROM oven/bun:1\nFROM ghcr.io/acme/tooling:latest\n")
+    runner._validate_public_base_images(
+        "FROM oven/bun:1\nFROM ghcr.io/acme/tooling:latest\n",
+        allowed_registry_hosts=RUNTIME_PROFILE.docker_registry_allowlist,
+    )

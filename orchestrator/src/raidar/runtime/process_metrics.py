@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from raidar.harness import harness_definition
-from raidar.harness.command_records import _command_records_for_harness
-from raidar.harness.usage_metrics import _usage_tuple_for_harness
+from raidar.harness.command_records import _command_records_from_manifest
+from raidar.harness.result_manifest import HarborResultManifest
+from raidar.harness.usage_metrics import _usage_tuple_from_manifest
 from raidar.runtime.models import CommandRecord, ProcessMetrics
 from raidar.runtime.verification_metrics import (
     _count_executed_required,
@@ -64,20 +63,19 @@ def _empty_process_metrics() -> ProcessMetrics:
 
 def collect_process_metrics(
     scenario: ScenarioDefinition,
-    trial_dir: Path | None,
-    *,
-    harness: str,
+    manifest: HarborResultManifest | None,
 ) -> ProcessMetrics:
     """Collect resource-efficiency metrics from harness execution logs."""
-    if not trial_dir:
+    if manifest is None:
         return _empty_process_metrics()
 
-    definition = harness_definition(harness)
-    usage_tuple = _usage_tuple_for_harness(trial_dir, harness)
+    definition = manifest.definition
+    usage_tuple = _usage_tuple_from_manifest(manifest)
     if usage_tuple is None:
         if definition.usage_policy.required:
             raise ProcessMetricsError(
-                f"Missing token usage metrics for harness `{harness}` in trial `{trial_dir}`.",
+                f"Missing token usage metrics for harness `{definition.id}` in trial "
+                f"`{manifest.trial_dir}`.",
                 failure_code="missing_token_usage",
             )
         usage_tuple = (0, 0, 0)
@@ -85,14 +83,12 @@ def collect_process_metrics(
 
     verification_patterns = _verification_command_strings(scenario)
     verification_pattern_tuple = tuple(verification_patterns)
-    records = _command_records_for_harness(
-        trial_dir,
-        harness,
+    records = _command_records_from_manifest(
+        manifest,
         verification_patterns=verification_pattern_tuple,
     )
-    git_commit_records = _command_records_for_harness(
-        trial_dir,
-        harness,
+    git_commit_records = _command_records_from_manifest(
+        manifest,
         include_git_commit=True,
         verification_patterns=verification_pattern_tuple,
     )

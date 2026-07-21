@@ -11,10 +11,8 @@ from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
     EvalConfig,
     EvalRun,
-    FunctionalScore,
     GateCheck,
     MetricScore,
-    RequirementsCoverageScore,
     Scorecard,
 )
 
@@ -110,12 +108,15 @@ def test_missing_required_commands_and_requirements_gaps_are_issues():
                 },
             }
         },
-        requirements_coverage=RequirementsCoverageScore(
-            total_requirements=5,
-            satisfied_requirements=3,
-            missing_requirement_ids=["req-a", "req-b"],
-            requirement_test_evidence_gaps={"req-c": ["query_role:button"]},
-        ),
+        metric_scores=[
+            MetricScore(
+                metric_id="requirements-coverage",
+                score=0.6,
+                passed=False,
+                matched_count=3,
+                missing_patterns=["req-a", "req-b"],
+            )
+        ],
     )
 
     grouped = _by_category(run_findings(_run("run-b", scorecard)))
@@ -124,9 +125,8 @@ def test_missing_required_commands_and_requirements_gaps_are_issues():
     assert missing_command.kind == "issue"
     assert missing_command.evidence[0].reference == "bun run test"
     requirement_findings = grouped["requirements-gap"]
-    assert len(requirement_findings) == 2
-    assert any("2 requirement(s) not satisfied" in item.title for item in requirement_findings)
-    assert any("missing required test evidence" in item.title for item in requirement_findings)
+    assert len(requirement_findings) == 1
+    assert "2 requirement(s) not satisfied" in requirement_findings[0].title
 
 
 def test_retained_evidence_records_project_to_good_and_issue_findings():
@@ -198,18 +198,16 @@ def test_validity_workflow_and_strength_findings():
                 "git_commit_verification_bypass_commands": ["git commit --no-verify"],
             }
         },
-        functional=FunctionalScore(
-            passed=True,
-            tests_passed=9,
-            tests_total=9,
-            build_succeeded=True,
-            gates_passed=4,
-            gates_total=4,
-        ),
-        requirements_coverage=RequirementsCoverageScore(
-            total_requirements=5,
-            satisfied_requirements=5,
-        ),
+        metric_scores=[
+            MetricScore(metric_id="functional", score=1.0, passed=True),
+            MetricScore(metric_id="verification-stability", score=1.0, passed=True),
+            MetricScore(
+                metric_id="requirements-coverage",
+                score=1.0,
+                passed=True,
+                matched_count=5,
+            ),
+        ],
     )
     scorecard.execution_validity.checks = [
         GateCheck(name="completion_claim_integrity", passed=False, evidence="claimed early"),

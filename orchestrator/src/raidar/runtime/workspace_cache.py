@@ -19,6 +19,7 @@ from raidar.agents.rules import rule_filename_for_harness
 from raidar.audit.workspace_diff import directory_fingerprint
 from raidar.config import settings
 from raidar.runtime.models import BaselineWorkspaceCacheResult, RunRequest
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.wait import wait_for_cache_lock_retry
 from raidar.schemas.scenario import ScenarioDefinition
 
@@ -47,6 +48,7 @@ class BaselineWorkspaceRequest:
     baseline_cache_key: str
     scenario_dir: Path
     harness: Harness
+    runtime_profile: RuntimeProfile
 
 
 def _repo_root() -> Path:
@@ -110,13 +112,19 @@ def _injected_rules_hash(request: RunRequest) -> str | None:
     return _hash_bytes(rule_source.read_bytes())
 
 
-def _baseline_cache_key(request: RunRequest, starter_fingerprint: str) -> str:
+def _baseline_cache_key(
+    request: RunRequest,
+    starter_fingerprint: str,
+    *,
+    runtime_profile: RuntimeProfile,
+) -> str:
     payload = {
         "cache_version": RAIDAR_CACHE_VERSION,
         "starter_fingerprint": starter_fingerprint,
         "harness": request.config.harness.value,
         "injected_rules_hash": _injected_rules_hash(request),
         "setup_actions": getattr(request.scenario.verification, "setup_actions", []),
+        "runtime_profile": runtime_profile.cache_payload(),
     }
     return _hash_json_payload(payload)
 
@@ -286,10 +294,15 @@ def _create_baseline_workspace(
         target_dir=request.baseline_workspace_dir,
         scenario_dir=request.scenario_dir,
         harness=request.harness,
+        runtime_profile=request.runtime_profile,
     )
     _run_workspace_setup_actions(
         workspace=request.baseline_workspace_dir,
-        env=_workspace_runtime_env(request.baseline_workspace_dir, os.environ.copy()),
+        env=_workspace_runtime_env(
+            request.baseline_workspace_dir,
+            request.runtime_profile,
+            os.environ.copy(),
+        ),
         setup_actions=request.scenario.verification.setup_actions,
         timeout_sec=_baseline_setup_action_timeout(request),
     )

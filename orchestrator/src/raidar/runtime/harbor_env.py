@@ -8,78 +8,90 @@ import uuid
 from pathlib import Path
 from typing import Any
 
-from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
-
-INLINE_SECRET_PATTERN = re.compile(
-    r"\b("
-    r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
-    r"GEMINI_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
-    r"GOOGLE_APPLICATION_CREDENTIALS"
-    r")=([^\s\"']+)"
+from raidar.harness import (
+    SECRET_FILE_ENV_PREFIX,
+    CredentialTransport,
+    registered_harness_definitions,
 )
-
-JSON_SECRET_PATTERN = re.compile(
-    r'"('
-    r"OPENAI_API_KEY|ANTHROPIC_API_KEY|CLAUDE_CODE_API_KEY|CLAUDE_CODE_OAUTH_TOKEN|"
-    r"GEMINI_API_KEY|COPILOT_API_KEY|CURSOR_API_KEY|PI_API_KEY|"
-    r"GOOGLE_APPLICATION_CREDENTIALS"
-    r')"\s*:\s*"([^"]+)"'
-)
-
-KEY_LIKE_TOKEN_PATTERN = re.compile(r"\bsk-[A-Za-z0-9_-]{16,}\b")
-
-SECRET_ENV_KEYS: tuple[str, ...] = (
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY",
-    "CLAUDE_CODE_API_KEY",
-    "CLAUDE_CODE_OAUTH_TOKEN",
-    "GEMINI_API_KEY",
-)
-
-SECRET_FILE_ENV_PREFIX = "AGENTIC_EVAL_SECRET_FILE_"
+from raidar.runtime.profile import RuntimeProfile
 
 
 def _build_harbor_run_env(
     adapter: Any,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> dict[str, str]:
-    profile = runtime_profile or default_runtime_profile()
     run_env = os.environ.copy()
     run_env.update(adapter.runtime_env())
-    for key in adapter.excluded_run_env_keys():
-        run_env.pop(key, None)
-    if adapter.harbor_harness_import_path():
-        _inject_secret_file_env(run_env)
-        _inject_local_secret_file_env(run_env, adapter.local_secret_files())
-    run_env.update(profile.compatibility_env)
+    _transport_credentials(
+        run_env,
+        adapter.definition.credentials,
+        adapter.resolved_credentials(),
+        secret_dir=runtime_profile.secret_transport_dir,
+    )
+    run_env.update(runtime_profile.compatibility_env)
     return run_env
 
 
 def _redact_sensitive_text(value: str) -> str:
-    redacted = INLINE_SECRET_PATTERN.sub(r"\1=[REDACTED]", value)
-    redacted = JSON_SECRET_PATTERN.sub(r'"\1":"[REDACTED]"', redacted)
-    return KEY_LIKE_TOKEN_PATTERN.sub("[REDACTED]", redacted)
+    assignment_names, value_patterns = _credential_redaction_contract()
+    if assignment_names:
+        names = "|".join(re.escape(name) for name in assignment_names)
+        inline_pattern = re.compile(rf"\b({names})=([^\s\"']+)")
+        json_pattern = re.compile(rf'"({names})"\s*:\s*"([^"]+)"')
+        value = inline_pattern.sub(r"\1=[REDACTED]", value)
+        value = json_pattern.sub(r'"\1":"[REDACTED]"', value)
+    for pattern in value_patterns:
+        value = re.sub(pattern, "[REDACTED]", value)
+    return value
 
 
-def _inject_secret_file_env(run_env: dict[str, str]) -> None:
-    for key in SECRET_ENV_KEYS:
-        secret_value = run_env.pop(key, "")
-        if not secret_value:
+def _credential_redaction_contract() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    assignment_names: set[str] = set()
+    value_patterns: set[str] = set()
+    for definition in registered_harness_definitions():
+        for credential in definition.credentials:
+            assignment_names.update(credential.redaction.assignment_names)
+            value_patterns.update(credential.redaction.value_patterns)
+    return tuple(sorted(assignment_names, key=lambda name: (-len(name), name))), tuple(
+        sorted(value_patterns)
+    )
+
+
+def _transport_credentials(
+    run_env: dict[str, str],
+    credential_specs: tuple[Any, ...],
+    resolved_credentials: tuple[Any, ...],
+    *,
+    secret_dir: Path,
+) -> None:
+    for spec in credential_specs:
+        for accepted_name in spec.accepted_names:
+            run_env.pop(accepted_name, None)
+    for resolved in resolved_credentials:
+        spec = resolved.spec
+        if spec.transport is CredentialTransport.ENVIRONMENT:
+            value = str(resolved.value)
+            export_names = spec.export_names or (spec.transport_name,)
+            for export_name in export_names:
+                run_env[export_name] = value
             continue
-        run_env[f"{SECRET_FILE_ENV_PREFIX}{key}"] = str(
-            _write_harbor_secret_file(secret_name=key, secret_value=secret_value)
-        )
+
+        if isinstance(resolved.value, Path):
+            secret_path = _write_harbor_secret_file_from_path(
+                secret_name=spec.transport_name,
+                source_path=resolved.value,
+                secret_dir=secret_dir,
+            )
+        else:
+            secret_path = _write_harbor_secret_file(
+                secret_name=spec.transport_name,
+                secret_value=resolved.value,
+                secret_dir=secret_dir,
+            )
+        run_env[f"{SECRET_FILE_ENV_PREFIX}{spec.transport_name}"] = str(secret_path)
 
 
-def _inject_local_secret_file_env(run_env: dict[str, str], secret_files: dict[str, Path]) -> None:
-    for key, source_path in secret_files.items():
-        run_env[f"{SECRET_FILE_ENV_PREFIX}{key}"] = str(
-            _write_harbor_secret_file_from_path(secret_name=key, source_path=source_path)
-        )
-
-
-def _write_harbor_secret_file(*, secret_name: str, secret_value: str) -> Path:
-    secret_dir = Path.home() / ".agentic-eval" / "secrets"
+def _write_harbor_secret_file(*, secret_name: str, secret_value: str, secret_dir: Path) -> Path:
     secret_dir.mkdir(parents=True, exist_ok=True)
     secret_path = secret_dir / f"{secret_name.lower()}-{uuid.uuid4().hex}"
     secret_path.write_text(secret_value, encoding="utf-8")
@@ -87,8 +99,9 @@ def _write_harbor_secret_file(*, secret_name: str, secret_value: str) -> Path:
     return secret_path
 
 
-def _write_harbor_secret_file_from_path(*, secret_name: str, source_path: Path) -> Path:
-    secret_dir = Path.home() / ".agentic-eval" / "secrets"
+def _write_harbor_secret_file_from_path(
+    *, secret_name: str, source_path: Path, secret_dir: Path
+) -> Path:
     secret_dir.mkdir(parents=True, exist_ok=True)
     secret_path = secret_dir / f"{secret_name.lower()}-{uuid.uuid4().hex}"
     secret_path.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8")

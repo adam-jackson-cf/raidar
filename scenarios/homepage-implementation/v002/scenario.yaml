@@ -1,9 +1,19 @@
 name: homepage-implementation
 scenario_revision: v002
+parent_revision: v001
 description: Iterate the homepage benchmark against the provided reference design
   with compact, verification-first execution
+display_name: Homepage reference implementation
+task_kind: design_implementation
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions: []
+languages:
+- typescript
+evaluation_role: benchmark
+catalog_status: calibration
+variant_axes: {}
 difficulty: medium
-category: greenfield-ui
 timeout_sec: 1800
 test_scripts: []
 environment:

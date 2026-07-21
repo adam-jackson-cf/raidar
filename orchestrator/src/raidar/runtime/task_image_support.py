@@ -7,7 +7,7 @@ from raidar.runtime.environments import (
     normalize_probe_version,
 )
 from raidar.runtime.models import TaskImageBuildResult, TaskImageRef
-from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.tool_catalog import (
     installed_probe_value,
     probe_command,
@@ -38,7 +38,6 @@ __all__ = [
     "_repo_cache_identity",
     "_task_image_cache_metadata_path",
     "capability_spec_satisfies",
-    "default_runtime_profile",
     "installed_probe_value",
     "merge_capability_requirements",
     "normalize_probe_version",

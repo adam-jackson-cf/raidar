@@ -8,8 +8,19 @@ from typing import Any
 
 from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
-from raidar.scorers.common import metric, valid_changed_file_paths, verification_stability_score
+from raidar.scorers.common import (
+    functional_score_from_evidence,
+    metric,
+    valid_changed_file_paths,
+    verification_stability_from_evidence,
+)
 from raidar.scorers.llm_as_judge import evaluate_llm_as_judge_metric
+from raidar.scorers.verification import (
+    EvidenceDependency,
+    VerificationPlan,
+    VerificationPlanContext,
+    scenario_command_plan,
+)
 
 
 @register_scorer(scorer_id="plan-to-code", version=1)
@@ -85,24 +96,22 @@ class PlanToCode(BaseScorer):
             pass_fail="Passes when verification stability is greater than zero.",
         ),
     )
+    evidence_dependencies = (EvidenceDependency(kind="command"),)
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare scenario verification commands owned by this scorer."""
+
+        return scenario_command_plan(self.id, context)
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
-        outputs = context.execution.outputs
+        evidence = context.verification_evidence.for_owner(self.id)
+        functional = functional_score_from_evidence(evidence)
         plan_packet = _retained_plan_packet(context)
         deterministic_scores = (
             _planned_scope_coverage_score(plan_packet),
             _acceptance_evidence_completeness_score(plan_packet),
-            MetricScore(
-                metric_id="functional",
-                score=outputs.functional.score,
-                passed=outputs.functional.passed,
-                evidence=(
-                    "direct: functional execution summary, "
-                    f"build={outputs.functional.build_succeeded}, "
-                    f"tests={outputs.functional.tests_passed}/{outputs.functional.tests_total}"
-                ),
-            ),
-            verification_stability_score(outputs.verification_stability),
+            functional,
+            verification_stability_from_evidence(evidence),
         )
         plan_adherence = evaluate_llm_as_judge_metric(
             workspace=context.workspace,
@@ -110,15 +119,15 @@ class PlanToCode(BaseScorer):
             scenario=context.scenario,
             metric_id="plan-adherence",
             judge_path="judges/plan-judge.toml",
-            execution_outputs=outputs,
             deterministic_metric_scores=deterministic_scores,
             retained_evidence=plan_packet,
             changed_surfaces=_changed_surfaces(context.workspace_changes),
+            executor=getattr(context, "judge_executor", None),
         )
-        if not outputs.functional.passed:
+        if not functional.passed:
             plan_adherence = plan_adherence.model_copy(
                 update={
-                    "score": min(plan_adherence.score, outputs.functional.score),
+                    "score": min(plan_adherence.score, functional.score),
                     "passed": False,
                     "evidence": (
                         f"{plan_adherence.evidence}; deterministic functional execution failed"

@@ -9,19 +9,20 @@ from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     artifact_metric_score,
-    coverage_ratio_score,
-    functional_metric_score,
+    functional_score_from_evidence,
+    json_action_content,
     metric,
     required_artifact_patterns,
-    verification_stability_metric_score,
+    verification_stability_from_evidence,
 )
+from raidar.scorers.evidence_contract import VisualDiffEvidenceResult
 from raidar.scorers.verification import (
+    EvidenceDependency,
     VerificationPlan,
     VerificationPlanContext,
     command,
     glob,
     read_json,
-    visual_diff,
 )
 
 
@@ -78,6 +79,10 @@ class DesignToCode(BaseScorer):
             config={"required_paths": ["src/app/page.tsx"], "path_match": "glob"},
         ),
     )
+    evidence_dependencies = (
+        EvidenceDependency(kind="command", minimum=4),
+        EvidenceDependency(kind="read_json"),
+    )
 
     def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
         """Declare design-to-code raw evidence actions for this resolved scorer."""
@@ -100,12 +105,21 @@ class DesignToCode(BaseScorer):
             actions.extend(
                 [
                     command("capture", visual.screenshot_command, required=False),
-                    visual_diff(
+                    context.visual_comparison.action(
                         "visual.homepage",
                         reference=visual.reference_image,
                         actual=artifacts["actual"],
                         diff=artifacts["diff"],
-                        regions=[region.model_dump(mode="json") for region in visual.regions],
+                        regions=[
+                            {
+                                "name": region.name,
+                                "reference_image": region.reference_image,
+                                "actual_image": region.actual_image,
+                                "diff_image": region.diff_image,
+                                "weight": region.weight,
+                            }
+                            for region in visual.regions
+                        ],
                         required=False,
                         depends_on=("capture",),
                     ),
@@ -126,12 +140,13 @@ class DesignToCode(BaseScorer):
         return VerificationPlan(owner=self.id, actions=tuple(actions))
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
+        evidence = context.verification_evidence.for_owner(self.id)
         return ScorerEvidence(
             metric_scores=(
-                visual_regression_metric_score(context),
-                design_functional_metric_score(context),
-                design_to_code_coverage_metric_score(context),
-                design_verification_stability_metric_score(context),
+                visual_regression_metric_score(context, evidence),
+                functional_score_from_evidence(evidence),
+                design_to_code_coverage_metric_score(context, evidence),
+                verification_stability_from_evidence(evidence),
                 artifact_metric_score(
                     Path(context.workspace),
                     required_artifact_patterns(context.scenario, self.id),
@@ -140,33 +155,21 @@ class DesignToCode(BaseScorer):
         )
 
 
-def visual_regression_metric_score(context: ScorerContext) -> MetricScore:
-    if not hasattr(context, "scenario") and hasattr(context, "visual"):
-        if context.visual is None:
-            return _missing_visual_metric()
-        return MetricScore(
-            metric_id="visual-regression",
-            score=context.visual.score,
-            passed=bool(context.visual.passed),
-            evidence=f"similarity={context.visual.score}, passed={context.visual.passed}",
-        )
+def visual_regression_metric_score(context: ScorerContext, evidence) -> MetricScore:
     visual = getattr(context.scenario, "visual", None)
     if visual is None:
-        outputs = getattr(getattr(context, "execution", None), "outputs", None)
-        if outputs is not None and getattr(outputs, "visual", None) is not None:
-            return visual_regression_metric_score(outputs)
         return _missing_visual_metric()
-    verification_evidence = getattr(context, "verification_evidence", None)
-    action = _action_by_suffix(getattr(verification_evidence, "actions", {}), ".visual.homepage")
-    result = action.get("result") if action else None
-    if not isinstance(result, dict):
+    action = evidence.action("visual.homepage")
+    if action is None or not isinstance(action.result, VisualDiffEvidenceResult):
         return MetricScore(
             metric_id="visual-regression",
             score=0.0,
             passed=False,
             evidence="Visual comparison evidence missing.",
         )
-    visual_score = _visual_score_from_result(result, visual)
+    visual_score = _visual_score_from_result(
+        action.result.model_dump(mode="json", by_alias=True), visual
+    )
     return MetricScore(
         metric_id="visual-regression",
         score=visual_score["similarity"],
@@ -180,53 +183,9 @@ def visual_regression_metric_score(context: ScorerContext) -> MetricScore:
     )
 
 
-def design_functional_metric_score(context: ScorerContext) -> MetricScore:
-    verification_evidence = getattr(context, "verification_evidence", None)
-    if verification_evidence is None:
-        return functional_metric_score(context.execution.outputs)
-    build = _action_by_suffix(verification_evidence.actions, ".build")
-    commands = _design_command_actions(verification_evidence.actions)
-    passed_commands = sum(1 for action in commands if _command_passed(action))
-    total_commands = len(commands)
-    build_ok = _command_passed(build)
-    passed = build_ok and passed_commands == total_commands and total_commands > 0
-    return MetricScore(
-        metric_id="functional",
-        score=1.0 if passed else 0.0,
-        passed=passed,
-        evidence=f"build={build_ok}, commands={passed_commands}/{total_commands}",
-    )
-
-
-def _design_command_actions(actions: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
-    return [
-        action
-        for action_id, action in actions.items()
-        if action_id.startswith("design-to-code.") and action.get("kind") == "command"
-    ]
-
-
-def _command_passed(action: dict[str, Any] | None) -> bool:
-    return _action_exit_code(action) == 0
-
-
-def design_to_code_coverage_metric_score(context: ScorerContext) -> MetricScore:
-    if not hasattr(context, "scenario") and hasattr(context, "test_coverage"):
-        coverage = context.test_coverage
-        return MetricScore(
-            metric_id="test-coverage",
-            score=coverage_ratio_score(coverage),
-            passed=coverage.passed,
-            evidence=(
-                f"threshold={coverage.threshold}, measured={coverage.measured}, "
-                f"source={coverage.source}"
-            ),
-        )
-    verification_evidence = getattr(context, "verification_evidence", None)
-    if verification_evidence is None:
-        return design_to_code_coverage_metric_score(context.execution.outputs)
+def design_to_code_coverage_metric_score(context: ScorerContext, evidence) -> MetricScore:
     threshold = context.scenario.verification.coverage_threshold
-    coverage = _coverage_from_evidence(verification_evidence.actions)
+    coverage = _coverage_from_evidence(json_action_content(evidence, "coverage.summary"))
     passed = threshold is None or threshold <= 0 or (coverage is not None and coverage >= threshold)
     score = (
         1.0
@@ -239,33 +198,6 @@ def design_to_code_coverage_metric_score(context: ScorerContext) -> MetricScore:
         passed=passed,
         evidence=f"threshold={threshold}, measured={coverage}, source=evidence",
     )
-
-
-def design_verification_stability_metric_score(context: ScorerContext) -> MetricScore:
-    verification_evidence = getattr(context, "verification_evidence", None)
-    if verification_evidence is None:
-        return verification_stability_metric_score(context.execution.outputs)
-    failures = sum(
-        1
-        for action_id, action in verification_evidence.actions.items()
-        if action_id.startswith("design-to-code.")
-        and action.get("kind") == "command"
-        and _action_exit_code(action) not in (None, 0)
-    )
-    score = max(0.0, 1.0 - (failures / max(1, len(context.verification_evidence.actions))))
-    return MetricScore(
-        metric_id="verification-stability",
-        score=round(score, 3),
-        passed=failures == 0,
-        evidence=f"failures={failures}",
-    )
-
-
-def _action_by_suffix(actions: dict[str, dict[str, Any]], suffix: str) -> dict[str, Any] | None:
-    for action_id, action in actions.items():
-        if action_id.endswith(suffix):
-            return action
-    return None
 
 
 def _missing_visual_metric() -> MetricScore:
@@ -293,18 +225,7 @@ def _visual_artifact_paths(visual: Any) -> dict[str, str]:
     return {"actual": "artifacts/actual.png", "diff": "artifacts/diff.png"}
 
 
-def _action_exit_code(action: dict[str, Any] | None) -> int | None:
-    result = action.get("result") if isinstance(action, dict) else None
-    if not isinstance(result, dict):
-        return None
-    value = result.get("exit_code")
-    return int(value) if isinstance(value, int | float) else None
-
-
-def _coverage_from_evidence(actions: dict[str, dict[str, Any]]) -> float | None:
-    action = _action_by_suffix(actions, ".coverage.summary")
-    result = action.get("result") if action else None
-    content = result.get("content") if isinstance(result, dict) else None
+def _coverage_from_evidence(content: Any) -> float | None:
     totals = _coverage_totals(content)
     if not isinstance(totals, dict):
         return None

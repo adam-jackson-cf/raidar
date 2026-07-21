@@ -9,21 +9,29 @@ import click
 
 from raidar.agents.config import Harness
 from raidar.agents.rules import inject_rules
-from raidar.application.models import ScenarioCloneRequest, ScenarioInitRequest
+from raidar.application.models import (
+    CATALOG_STATUS_CHOICES,
+    DELIVERY_MODE_CHOICES,
+    DIFFICULTY_CHOICES,
+    EVALUATION_ROLE_CHOICES,
+    SCENARIO_TEMPLATE_CHOICES,
+    STARTING_CONDITION_CHOICES,
+    TASK_KIND_CHOICES,
+    WORKSPACE_STATE_CHOICES,
+    ScenarioCloneRequest,
+    ScenarioDefinition,
+    ScenarioInitRequest,
+)
 from raidar.application.scenario_catalog import (
     load_scenario,
-    scenario_evaluation_profile,
-    scenario_metrics,
-    scenario_scorers,
 )
 from raidar.application.scenarios import clone_scenario_revision as _service_clone_scenario_revision
 from raidar.application.scenarios import init_scenario as _service_init_scenario
 from raidar.application.scenarios import scenario_revision_paths as _service_scenario_revision_paths
-from raidar.application.scenarios import validate_scenario as _service_validate_scenario
 from raidar.application.serializers import scenario_clone_payload, scenario_init_payload
-from raidar.commands.shared import HARNESS_CHOICES, REPO_ROOT, resolve_scenario_yaml
-from raidar.runtime.environments import EnvironmentResolutionError, resolve_scenario_environment
-from raidar.schemas.scenario import ScenarioDefinition
+from raidar.commands.scenario_inspection import info
+from raidar.commands.scenario_validation import scenario_validate
+from raidar.commands.shared import HARNESS_CHOICES, REPO_ROOT
 
 
 def register(main: click.Group) -> None:
@@ -37,23 +45,63 @@ def scenario() -> None:
     """Scenario lifecycle commands."""
 
 
+scenario.add_command(scenario_validate)
+
+
 def scenario_revision_paths(scenario_root: Path) -> list[Path]:
     return _service_scenario_revision_paths(scenario_root)
 
 
-def list_scenarios_with_revisions(scenarios_root: Path) -> list[tuple[str, tuple[str, ...]]]:
+def _parse_variant_axes(
+    _ctx: click.Context, _param: click.Parameter, values: tuple[str, ...]
+) -> dict[str, str]:
+    axes: dict[str, str] = {}
+    for value in values:
+        key, separator, axis_value = value.partition("=")
+        if not separator or not key.strip() or not axis_value.strip():
+            raise click.BadParameter("must use KEY=VALUE")
+        if key in axes:
+            raise click.BadParameter(f"duplicate variant axis: {key}")
+        axes[key] = axis_value
+    return axes
+
+
+def _format_scenario_taxonomy(scenario_def) -> str:
+    starting_conditions = ", ".join(scenario_def.starting_conditions) or "none"
+    languages = ", ".join(scenario_def.languages)
+    variant_axes = (
+        ", ".join(f"{key}={value}" for key, value in sorted(scenario_def.variant_axes.items()))
+        or "none"
+    )
+    return (
+        f"display_name: {scenario_def.display_name} | "
+        f"task_kind: {scenario_def.task_kind} | "
+        f"delivery_mode: {scenario_def.delivery_mode} | "
+        f"workspace_state: {scenario_def.workspace_state} | "
+        f"starting_conditions: {starting_conditions} | "
+        f"languages: {languages} | "
+        f"evaluation_role: {scenario_def.evaluation_role} | "
+        f"catalog_status: {scenario_def.catalog_status} | "
+        f"family_id: {scenario_def.family_id or 'none'} | "
+        f"variant_axes: {variant_axes}"
+    )
+
+
+def list_scenarios_with_revisions(
+    scenarios_root: Path,
+) -> list[tuple[ScenarioDefinition, tuple[str, ...]]]:
     if not scenarios_root.exists():
         return []
 
-    scenarios: list[tuple[str, tuple[str, ...]]] = []
+    scenarios: list[tuple[ScenarioDefinition, tuple[str, ...]]] = []
     for scenario_root in sorted(path for path in scenarios_root.iterdir() if path.is_dir()):
         revision_paths = scenario_revision_paths(scenario_root)
         if not revision_paths:
             continue
         scenario_def = load_scenario(revision_paths[-1])
         revisions = tuple(path.parent.name for path in revision_paths)
-        scenarios.append((scenario_def.name, revisions))
-    return sorted(scenarios, key=lambda entry: entry[0])
+        scenarios.append((scenario_def, revisions))
+    return sorted(scenarios, key=lambda entry: entry[0].name)
 
 
 @scenario.command("list")
@@ -65,19 +113,59 @@ def list_scenarios_with_revisions(scenarios_root: Path) -> list[tuple[str, tuple
 )
 def scenario_list(scenarios_root: Path) -> None:
     """List available scenarios and their revisions."""
-    for scenario_id, revisions in list_scenarios_with_revisions(scenarios_root.resolve()):
-        click.echo(f"{scenario_id} | revisions: {', '.join(revisions)}")
+    for scenario_def, revisions in list_scenarios_with_revisions(scenarios_root.resolve()):
+        click.echo(
+            f"{scenario_def.name} | {_format_scenario_taxonomy(scenario_def)} | "
+            f"revisions: {', '.join(revisions)}"
+        )
 
 
 @scenario.command("init")
 @click.option("--path", "-p", type=click.Path(path_type=Path), required=True)
 @click.option("--name", type=str)
+@click.option("--display-name", type=str, required=True)
 @click.option("--scenario-revision", type=str, default="v001")
 @click.option("--starter-root", type=str, default="starter")
 @click.option("--prompt-entry", type=str, default="prompt/task.md")
-@click.option("--difficulty", type=click.Choice(["easy", "medium", "hard"]), default="medium")
-@click.option("--category", type=str, default="greenfield-ui")
+@click.option("--difficulty", type=click.Choice(DIFFICULTY_CHOICES), default="medium")
+@click.option(
+    "--task-kind",
+    type=click.Choice(TASK_KIND_CHOICES),
+    required=True,
+)
+@click.option(
+    "--delivery-mode",
+    type=click.Choice(DELIVERY_MODE_CHOICES),
+    required=True,
+)
+@click.option("--workspace-state", type=click.Choice(WORKSPACE_STATE_CHOICES), required=True)
+@click.option(
+    "--starting-condition",
+    "starting_conditions",
+    type=click.Choice(STARTING_CONDITION_CHOICES),
+    multiple=True,
+)
+@click.option("--language", "languages", type=str, multiple=True, required=True)
+@click.option("--evaluation-role", type=click.Choice(EVALUATION_ROLE_CHOICES), required=True)
+@click.option(
+    "--catalog-status",
+    type=click.Choice(CATALOG_STATUS_CHOICES),
+    required=True,
+)
+@click.option("--family-id", type=str)
+@click.option(
+    "--variant-axis",
+    "variant_axes",
+    type=str,
+    multiple=True,
+    callback=_parse_variant_axes,
+)
 @click.option("--timeout", type=int, default=1800)
+@click.option(
+    "--template",
+    type=click.Choice(SCENARIO_TEMPLATE_CHOICES),
+    required=True,
+)
 @click.option("--json", "as_json", is_flag=True)
 def scenario_init(**options) -> None:
     """Create a new versioned scenario descriptor with prompt artifacts and rules."""
@@ -86,48 +174,30 @@ def scenario_init(**options) -> None:
             ScenarioInitRequest(
                 path=options["path"],
                 name=options["name"],
+                display_name=options["display_name"],
                 scenario_revision=options["scenario_revision"],
                 starter_root=options["starter_root"],
                 prompt_entry=options["prompt_entry"],
                 difficulty=options["difficulty"],
-                category=options["category"],
+                task_kind=options["task_kind"],
+                delivery_mode=options["delivery_mode"],
+                workspace_state=options["workspace_state"],
+                starting_conditions=list(options["starting_conditions"]),
+                languages=list(options["languages"]),
+                evaluation_role=options["evaluation_role"],
+                catalog_status=options["catalog_status"],
                 timeout_sec=options["timeout"],
+                template=options["template"],
+                family_id=options["family_id"],
+                variant_axes=options["variant_axes"],
             )
         )
-    except FileExistsError as exc:
+    except (FileExistsError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     if options["as_json"]:
         click.echo(json.dumps(scenario_init_payload(result), indent=2))
         return
     click.echo(f"Created scenario at {result.scenario_yaml}")
-
-
-@scenario.command("validate")
-@click.option("--scenario", "-s", type=click.Path(exists=True, path_type=Path), required=True)
-def scenario_validate(scenario: Path) -> None:
-    """Validate a scenario document and report key configuration fields."""
-    try:
-        result = _service_validate_scenario(scenario)
-    except (FileNotFoundError, EnvironmentResolutionError) as exc:
-        raise click.ClickException(str(exc)) from exc
-    scenario_def = result.scenario
-    environment = resolve_scenario_environment(
-        scenario=scenario_def,
-        scenario_path=result.scenario_path,
-        repo_root=REPO_ROOT,
-    )
-    click.echo("Scenario validation passed.")
-    click.echo(f"  name: {scenario_def.name}")
-    click.echo(f"  scenario_revision: {scenario_def.scenario_revision}")
-    click.echo(f"  parent_revision: {scenario_def.parent_revision}")
-    click.echo(f"  starter_root: {scenario_def.starter.root}")
-    click.echo(f"  prompt_entry: {scenario_def.prompt.entry}")
-    click.echo(f"  required_commands: {len(scenario_def.verification.required_commands)}")
-    click.echo(f"  gates: {len(scenario_def.verification.gates)}")
-    click.echo(f"  scorers: {len(scenario_def.scorers)}")
-    click.echo(f"  metrics: {len(scenario_def.metric_ids())}")
-    click.echo(f"  environment: {environment.id}")
-    click.echo(f"  image: {environment.image}")
 
 
 @scenario.command("clone-revision")
@@ -172,96 +242,3 @@ def inject(scenario: Path, harness: str, starter: Path) -> None:
     rules_dir = scenario / "rules"
     result = inject_rules(rules_dir, starter, Harness(harness))
     click.echo(f"Injected: {result}")
-
-
-def echo_scenario_summary(scenario_def: ScenarioDefinition) -> None:
-    click.echo(f"Scenario: {scenario_def.name}")
-    click.echo(f"Revision: {scenario_def.scenario_revision}")
-    click.echo(f"Parent Revision: {scenario_def.parent_revision}")
-    click.echo(f"Description: {scenario_def.description}")
-    click.echo(f"Difficulty: {scenario_def.difficulty}")
-    click.echo(f"Category: {scenario_def.category}")
-    click.echo(f"Timeout: {scenario_def.timeout_sec // 60} minutes")
-    click.echo(f"Evaluation Profile: {scenario_evaluation_profile(scenario_def)}")
-    click.echo(f"Scorers: {', '.join(scenario_scorers(scenario_def))}")
-    click.echo(f"Metrics: {', '.join(scenario_metrics(scenario_def))}")
-    if scenario_def.verification.gates:
-        gates = [g.name for g in scenario_def.verification.gates]
-        click.echo(f"Quality Gates: {', '.join(gates)}")
-
-
-def echo_environment_config(scenario_yaml: Path, scenario_def: ScenarioDefinition) -> None:
-    environment = resolve_scenario_environment(
-        scenario=scenario_def,
-        scenario_path=scenario_yaml,
-        repo_root=REPO_ROOT,
-    )
-    click.echo()
-    click.echo("Environment:")
-    click.echo(f"  ID: {environment.id}")
-    click.echo(f"  Image: {environment.image}")
-    click.echo(f"  Workdir: {environment.workdir}")
-    click.echo(f"  Dockerfile: {environment.dockerfile_path}")
-    requirements = environment.requirements.model_dump(mode="json")
-    capabilities = environment.library.capabilities.model_dump(mode="json")
-    click.echo(f"  Requirements: {json.dumps(requirements, sort_keys=True)}")
-    click.echo(f"  Capabilities: {json.dumps(capabilities, sort_keys=True)}")
-
-
-def echo_available_revisions(scenario_root: Path) -> None:
-    revision_paths = scenario_revision_paths(scenario_root)
-    if not revision_paths:
-        return
-    click.echo("Available Revisions:")
-    for scenario_yaml in revision_paths:
-        click.echo(f"  {scenario_yaml.parent.name}: {scenario_yaml.resolve()}")
-
-
-def echo_rule_variants(scenario_dir: Path) -> None:
-    rules_dir = scenario_dir / "rules"
-    if not rules_dir.exists():
-        return
-    click.echo()
-    click.echo("Rules:")
-    files = sorted(f.name for f in rules_dir.iterdir() if f.is_file())
-    click.echo(f"  files: {', '.join(files) if files else '(none)'}")
-
-
-def echo_visual_config(task_def: ScenarioDefinition) -> None:
-    if not task_def.visual:
-        return
-    click.echo()
-    click.echo("Visual Config:")
-    click.echo(f"  Reference: {task_def.visual.reference_image}")
-    click.echo(
-        "  Visual Pass Policy: "
-        f"score>={task_def.visual.pass_policy.minimum_score}, "
-        f"global>={task_def.visual.pass_policy.fail_if_global_below}, "
-        f"worst_region>={task_def.visual.pass_policy.minimum_worst_region}"
-    )
-
-
-def echo_requirements_config(task_def: ScenarioDefinition) -> None:
-    if not task_def.requirements.items:
-        return
-    click.echo()
-    click.echo("Requirements Config:")
-    click.echo(f"  Requirements: {len(task_def.requirements.items)}")
-
-
-@click.command()
-@click.option("--scenario", "-s", type=click.Path(exists=True, path_type=Path), required=True)
-def info(scenario: Path) -> None:
-    """Show scenario information and details."""
-    scenario_input = scenario.resolve()
-    scenario_yaml = resolve_scenario_yaml(scenario_input)
-    scenario_def = load_scenario(scenario_yaml)
-
-    echo_scenario_summary(scenario_def)
-    click.echo(f"Scenario YAML: {scenario_yaml}")
-    echo_environment_config(scenario_yaml, scenario_def)
-    if scenario_input.is_dir() and not (scenario_input / "scenario.yaml").is_file():
-        echo_available_revisions(scenario_input)
-    echo_rule_variants(scenario_yaml.parent)
-    echo_visual_config(scenario_def)
-    echo_requirements_config(scenario_def)

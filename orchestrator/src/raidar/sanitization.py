@@ -59,7 +59,7 @@ def sanitized_model_dump_json(value: Any, *, indent: int = 2, max_chars: int = 4
     """Serialize a model-like value after recursively sanitizing evidence strings."""
 
     if hasattr(value, "model_dump"):
-        payload = value.model_dump(mode="json")
+        payload = value.model_dump(mode="json", exclude_computed_fields=True)
     elif hasattr(value, "model_dump_json"):
         payload = json.loads(value.model_dump_json(indent=indent))
     else:

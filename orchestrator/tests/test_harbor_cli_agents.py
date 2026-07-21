@@ -110,18 +110,23 @@ def test_secret_export_prefix_and_claude_settings_are_empty_without_inputs(harbo
 
 
 @pytest.mark.asyncio
-async def test_claude_secret_paths_accepts_legacy_claude_key_env(
+async def test_claude_secret_mount_uses_definition_exports(
     harbor_cli_agents, monkeypatch, tmp_path: Path
 ):
     key_path = tmp_path / "claude-code-key"
     key_path.write_text("legacy-secret", encoding="utf-8")
-    monkeypatch.setenv("AGENTIC_EVAL_SECRET_FILE_CLAUDE_CODE_API_KEY", str(key_path))
-    monkeypatch.delenv("AGENTIC_EVAL_SECRET_FILE_ANTHROPIC_API_KEY", raising=False)
+    monkeypatch.setenv("AGENTIC_EVAL_SECRET_FILE_ANTHROPIC_API_KEY", str(key_path))
     environment = _Environment()
 
-    paths = await harbor_cli_agents._claude_secret_paths(environment)
+    mounted, exports = await harbor_cli_agents._materialize_secret_credentials(
+        environment,
+        "claude-code",
+    )
 
-    assert paths == {
+    assert mounted == {
+        "claude-api-key": "/tmp/agentic-eval-secrets/anthropic_api_key",
+    }
+    assert exports == {
         "ANTHROPIC_API_KEY": "/tmp/agentic-eval-secrets/anthropic_api_key",
         "CLAUDE_CODE_API_KEY": "/tmp/agentic-eval-secrets/anthropic_api_key",
     }

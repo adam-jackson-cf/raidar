@@ -4,14 +4,23 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from raidar.schemas.scorecard import CoverageScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     assertion_strength_metric_score,
     coverage_lift_metric_score,
+    json_action_content,
     metric,
     production_code_guardrail_metric_score,
     requirement_mapping_metric_score,
-    verification_stability_score,
+    verification_stability_from_evidence,
+)
+from raidar.scorers.verification import (
+    EvidenceDependency,
+    VerificationPlan,
+    VerificationPlanContext,
+    read_json,
+    scenario_command_plan,
 )
 
 
@@ -98,16 +107,68 @@ class TestGeneration(BaseScorer):
             pass_fail="Passes when verification stability is greater than zero.",
         ),
     )
+    evidence_dependencies = (
+        EvidenceDependency(kind="command"),
+        EvidenceDependency(kind="read_json", minimum=2),
+    )
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare verification commands and common coverage report inputs."""
+
+        base = scenario_command_plan(self.id, context)
+        return VerificationPlan(
+            owner=self.id,
+            actions=(
+                *base.actions,
+                read_json("coverage.python", ".raidar/coverage.json", required=False),
+                read_json(
+                    "coverage.typescript",
+                    "coverage/coverage-summary.json",
+                    required=False,
+                ),
+            ),
+        )
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         workspace = Path(context.workspace)
-        outputs = context.execution.outputs
+        evidence = context.verification_evidence.for_owner(self.id)
         return ScorerEvidence(
             metric_scores=(
                 requirement_mapping_metric_score(workspace, context.scenario),
                 assertion_strength_metric_score(workspace),
-                coverage_lift_metric_score(outputs),
+                coverage_lift_metric_score(_coverage_from_evidence(evidence, context.scenario)),
                 production_code_guardrail_metric_score(workspace, context.workspace_changes),
-                verification_stability_score(outputs.verification_stability),
+                verification_stability_from_evidence(evidence),
             )
         )
+
+
+def _coverage_from_evidence(evidence, scenario) -> CoverageScore:
+    measured = _coverage_value(json_action_content(evidence, "coverage.python"))
+    source = "test-generation.coverage.python"
+    if measured is None:
+        measured = _coverage_value(json_action_content(evidence, "coverage.typescript"))
+        source = "test-generation.coverage.typescript"
+    threshold = scenario.verification.coverage_threshold
+    passed = threshold is None or threshold <= 0 or (measured is not None and measured >= threshold)
+    return CoverageScore(
+        threshold=threshold,
+        measured=measured,
+        source=source if measured is not None else None,
+        passed=passed,
+    )
+
+
+def _coverage_value(content) -> float | None:
+    if not isinstance(content, dict):
+        return None
+    totals = content.get("totals")
+    value = totals.get("percent_covered") if isinstance(totals, dict) else None
+    if isinstance(value, int | float) and not isinstance(value, bool):
+        return max(0.0, min(1.0, float(value) / 100.0))
+    total = content.get("total")
+    lines = total.get("lines") if isinstance(total, dict) else None
+    pct = lines.get("pct") if isinstance(lines, dict) else None
+    if isinstance(pct, int | float) and not isinstance(pct, bool):
+        return max(0.0, min(1.0, float(pct) / 100.0))
+    return None

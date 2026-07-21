@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -53,12 +54,12 @@ def _iter_files(
     files: list[Path] = []
     excluded_dirs = set(exclude_dirs)
     excluded_files = set(exclude_files)
-    for path in root.rglob("*"):
-        rel = path.relative_to(root)
-        if any(segment in excluded_dirs for segment in rel.parts):
-            continue
-        if path.is_file() and path.name not in excluded_files:
-            files.append(path)
+    for current_root, directory_names, file_names in os.walk(root, topdown=True):
+        directory_names[:] = sorted(name for name in directory_names if name not in excluded_dirs)
+        current_path = Path(current_root)
+        files.extend(
+            current_path / name for name in sorted(file_names) if name not in excluded_files
+        )
     files.sort(key=lambda item: str(item.relative_to(root)))
     return files
 

@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from raidar.application.models import (
     ExecutionDispatchRequest,
     ExperimentDispatchSettings,
+    ExperimentKind,
     ExperimentRunRequest,
     ExperimentSummaryPersistenceRequest,
     RunCliOptions,
@@ -22,6 +23,7 @@ from raidar.application.run_dispatch import (
     summary_result_path,
 )
 from raidar.application.scenario_catalog import (
+    load_scenario,
     scenario_evaluation_profile,
     scenario_metrics,
     scenario_scorers,
@@ -31,18 +33,21 @@ from raidar.experiment import (
     create_experiment_summary,
     persist_experiment,
 )
+from raidar.review_scenario_projection import scenario_review_contract
 from raidar.runtime.maintenance import cleanup_stale_harbor_resources
+from raidar.runtime.profile import default_runtime_profile
 from raidar.sanitization import sanitize_evidence_payload, sanitize_evidence_text
 from raidar.schemas.scenario import ScenarioDefinition
 
 BENCHMARK_EXPERIMENTS_ROOT_NAME = "benchmarks"
+OPERATIONAL_SMOKE_EXPERIMENTS_ROOT_NAME = "operational_smoke"
 RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME = "research_loops"
 
 
 def resolve_experiments_root(
     *,
     experiments_root: Path | None,
-    experiment_kind: str | None,
+    experiment_kind: ExperimentKind,
     repo_root: Path,
 ) -> Path:
     """Resolve the canonical experiment root for one command."""
@@ -50,9 +55,13 @@ def resolve_experiments_root(
     if experiments_root is not None:
         return experiments_root.resolve()
     root = repo_root / "experiments"
+    if experiment_kind == "benchmark":
+        return root / BENCHMARK_EXPERIMENTS_ROOT_NAME
+    if experiment_kind == "operational-smoke":
+        return root / OPERATIONAL_SMOKE_EXPERIMENTS_ROOT_NAME
     if experiment_kind == "research-loop":
         return root / RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME
-    return root / BENCHMARK_EXPERIMENTS_ROOT_NAME
+    raise ValueError(f"Unknown experiment kind: {experiment_kind!r}")
 
 
 def experiment_execution_suffix(options: RunCliOptions) -> str:
@@ -76,6 +85,7 @@ def build_run_cli_options_from_request(request: RunCliOptionsBuildRequest) -> Ru
         timeout=request.timeout,
         repeats=request.repeats,
         repeat_parallel=request.repeat_parallel,
+        experiment_kind=request.experiment_kind,
         rerun_unscored=request.rerun_unscored,
         experiments_root=resolve_experiments_root(
             experiments_root=request.experiments_root,
@@ -92,9 +102,10 @@ def execute_run_command(
 
     _load_project_env(repo_root)
     resolved = request.options.resolved()
+    scenario_def = load_scenario(resolved.scenario)
+    _validate_scenario_experiment_kind(scenario_def, resolved.experiment_kind)
     if request.cleanup_before_runs:
         _cleanup_stale_harbor_before_runs()
-
     scenario_def, started_at, execution_dir, run_request = prepared_run_request(
         resolved,
         execution_suffix=request.execution_suffix,
@@ -120,6 +131,24 @@ def execute_run_command(
             execution_dir=execution_dir,
         ),
     )
+
+
+def _validate_scenario_experiment_kind(
+    scenario: ScenarioDefinition, experiment_kind: ExperimentKind
+) -> None:
+    role = scenario.evaluation_role
+    status = scenario.catalog_status
+    is_permitted = (
+        (experiment_kind == "benchmark" and role == "benchmark" and status == "active")
+        or (experiment_kind == "operational-smoke" and role == "operational")
+        or (experiment_kind == "research-loop" and role != "operational")
+    )
+    if not is_permitted:
+        raise ValueError(
+            "Scenario "
+            f"evaluation_role={role!r} catalog_status={status!r} "
+            f"is incompatible with experiment_kind={experiment_kind!r}"
+        )
 
 
 def _execute_dispatch_runs(resolved: RunCliOptions, run_request) -> tuple[list, int, int]:
@@ -238,7 +267,8 @@ def _persist_experiment_summary(
             scenario_name=request.scenario.name,
             scenario_revision=request.scenario.scenario_revision,
             harness=request.resolved.harness,
-            model=request.resolved.model,
+            model=f"{request.resolved.provider}/{request.resolved.model}",
+            reasoning_effort=request.resolved.reasoning_effort,
             evaluation_profile=scenario_evaluation_profile(request.scenario),
             metrics=scenario_metrics(request.scenario),
             scorers=list(scenario_scorers(request.scenario)),
@@ -246,12 +276,16 @@ def _persist_experiment_summary(
             repeat_parallel=max(1, min(request.resolved.repeat_parallel, request.resolved.repeats)),
             runs=request.runs,
             started_at=request.started_at,
+            review=scenario_review_contract(
+                request.scenario,
+                scenario_dir=request.resolved.scenario.parent,
+            ),
             rerun_unscored_limit=request.resolved.rerun_unscored,
             reruns_used=request.retries_used,
             unresolved_unscored_count=request.unresolved_unscored,
         )
     )
-    return persist_experiment(request.execution_dir, summary)
+    return persist_experiment(request.execution_dir, summary, runs=request.runs)
 
 
 def _load_project_env(repo_root: Path) -> None:
@@ -270,6 +304,7 @@ def _cleanup_stale_harbor_before_runs() -> None:
     cleanup_stale_harbor_resources(
         include_containers=True,
         include_build_processes=True,
+        runtime_profile=default_runtime_profile(),
     )
 
 

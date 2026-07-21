@@ -3,9 +3,13 @@ import subprocess
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+from raidar.harness import HarborResultManifest
 from raidar.runtime import harbor_execution, harbor_results, maintenance, pipeline
 from raidar.runtime.models import HarborExecutionRequest
+from raidar.runtime.profile import RuntimeProfile
 from raidar.schemas.scorecard import Scorecard
+
+RUNTIME_PROFILE = RuntimeProfile()
 
 
 def test_harbor_result_parsing_detects_rate_limits_failures_and_timings(tmp_path):
@@ -18,14 +22,28 @@ def test_harbor_result_parsing_detects_rate_limits_failures_and_timings(tmp_path
 
     trial = tmp_path / "trial"
     trial.mkdir()
+    manifest = HarborResultManifest.for_trial(trial, "codex-cli")
     assert harbor_results.detect_trial_failure(None) is None
-    assert harbor_results.detect_trial_failure(trial) is None
+    assert harbor_results.detect_trial_failure(manifest) is None
+    assert (
+        harbor_results._codex_turn_failure(HarborResultManifest.for_trial(trial, "claude-code"))
+        is None
+    )
+
+    (trial / "result.json").write_text(
+        json.dumps({"exception_info": {"exception_message": 42}}), encoding="utf-8"
+    )
+    assert harbor_results.detect_trial_failure(manifest) is None
+    (trial / "result.json").write_text(
+        json.dumps({"exception_info": {"exception_message": " "}}), encoding="utf-8"
+    )
+    assert harbor_results.detect_trial_failure(manifest) is None
 
     (trial / "result.json").write_text(
         json.dumps({"exception_info": {"exception_message": "failed with sk-test-secret"}}),
         encoding="utf-8",
     )
-    failure = harbor_results.detect_trial_failure(trial)
+    failure = harbor_results.detect_trial_failure(manifest)
     assert failure == harbor_results.TrialFailure(
         reason="Harbor trial exception: failed with sk-test-secret",
         code="harbor_trial_exception",
@@ -35,15 +53,23 @@ def test_harbor_result_parsing_detects_rate_limits_failures_and_timings(tmp_path
     agent = trial / "agent"
     agent.mkdir()
     (agent / "codex.txt").write_text(
-        '{"type":"turn.failed","error":{"message":"bad token"}}\n',
+        '{"type":"turn.failed","error":{"message":"bad token"}}\n{"type":"note"}\n',
         encoding="utf-8",
     )
-    assert harbor_results.detect_trial_failure(trial) == harbor_results.TrialFailure(
+    assert harbor_results.detect_trial_failure(manifest) == harbor_results.TrialFailure(
         reason="Codex turn failed: bad token",
         code="provider_or_harness_turn_failure",
     )
     assert harbor_results._codex_turn_failure_message('{"type":"turn.failed","error":{}}') is None
     assert harbor_results._codex_turn_failure_message("raw failure") == "raw failure"
+    assert harbor_results._codex_turn_failure_code("429 rate limit") == "provider_rate_limit"
+    assert (
+        harbor_results._codex_turn_failure_code("stream disconnected before completion")
+        == "provider_stream_disconnect"
+    )
+    (agent / "codex.txt").write_text('{"type":"note"}\n', encoding="utf-8")
+    assert harbor_results._codex_turn_failure(manifest) is None
+    assert harbor_results._harbor_phase_timings(manifest) == {}
 
     result_payload = {
         "started_at": "2026-01-01T00:00:00Z",
@@ -60,16 +86,46 @@ def test_harbor_result_parsing_detects_rate_limits_failures_and_timings(tmp_path
         },
     }
     (trial / "result.json").write_text(json.dumps(result_payload), encoding="utf-8")
-    assert harbor_results._harbor_phase_timings(trial) == {
+    assert harbor_results._harbor_phase_timings(manifest) == {
         "trial_total_sec": 3.0,
         "environment_setup_sec": 1.0,
-        "verifier_sec": 0.0,
+        "runner_evidence_sec": 0.0,
     }
     assert harbor_results._harbor_phase_timings(None) == {}
+    assert (
+        harbor_results._orchestration_overhead_excluding_agent_and_test_sec(
+            12.5,
+            {
+                "trial_total_sec": 10.0,
+                "harness_execution_sec": 6.0,
+                "runner_evidence_sec": 1.0,
+            },
+        )
+        == 5.5
+    )
+    assert (
+        harbor_results._orchestration_overhead_excluding_agent_and_test_sec(
+            12.5, {"trial_total_sec": 10.0, "harness_execution_sec": 6.0}
+        )
+        is None
+    )
+    assert (
+        harbor_results._orchestration_overhead_excluding_agent_and_test_sec(
+            5.0,
+            {
+                "trial_total_sec": 5.0,
+                "harness_execution_sec": 5.0,
+                "runner_evidence_sec": 1.0,
+            },
+        )
+        is None
+    )
     assert harbor_results._parse_iso8601_timestamp("not-a-date") is None
     assert harbor_results._load_json_dict(trial / "missing.json") == {}
     (trial / "bad.json").write_text("[]", encoding="utf-8")
     assert harbor_results._load_json_dict(trial / "bad.json") == {}
+    (trial / "malformed.json").write_text("{", encoding="utf-8")
+    assert harbor_results._load_json_dict(trial / "malformed.json") == {}
 
 
 def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_path):
@@ -80,6 +136,7 @@ def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_pat
         run_env={},
         run_harbor_dir=tmp_path / "harbor",
         job_dir=tmp_path / "job",
+        runtime_profile=RUNTIME_PROFILE,
     )
     calls = {"count": 0}
     cleanup_calls: list[str] = []
@@ -96,7 +153,9 @@ def test_harbor_process_request_retry_and_timeout_behaviour(monkeypatch, tmp_pat
     monkeypatch.setattr(harbor_execution, "_run_harbor_process", fake_run_process)
     monkeypatch.setattr(harbor_execution, "_is_registry_rate_limited", lambda _dir: True)
     monkeypatch.setattr(
-        harbor_execution, "cleanup_stale_harbor_resources", lambda: cleanup_calls.append("cleanup")
+        harbor_execution,
+        "cleanup_stale_harbor_resources",
+        lambda **_kwargs: cleanup_calls.append("cleanup"),
     )
     monkeypatch.setattr(
         harbor_execution, "wait_for_harbor_rate_limit_retry", lambda: wait_calls.append("wait")
@@ -149,8 +208,13 @@ def test_run_harbor_process_writes_redacted_logs_for_success_failure_and_timeout
         run_env={},
         run_harbor_dir=tmp_path / "harbor",
         job_dir=tmp_path / "job",
+        runtime_profile=RUNTIME_PROFILE,
     )
-    monkeypatch.setattr(harbor_execution, "_docker_compose_preflight_reason", lambda _env: None)
+    monkeypatch.setattr(
+        harbor_execution,
+        "_docker_compose_preflight_reason",
+        lambda _env, _runtime_profile: None,
+    )
 
     class _Process:
         pid = 123
@@ -197,14 +261,18 @@ def test_run_harbor_process_writes_redacted_logs_for_success_failure_and_timeout
     monkeypatch.setattr(
         harbor_execution,
         "_docker_compose_preflight_reason",
-        lambda _env: "compose unavailable",
+        lambda _env, _runtime_profile: "compose unavailable",
     )
     assert harbor_execution._run_harbor_process(request) == harbor_execution.HarborProcessFailure(
         "compose unavailable",
         "compose_version_unsupported",
     )
 
-    monkeypatch.setattr(harbor_execution, "_docker_compose_preflight_reason", lambda _env: None)
+    monkeypatch.setattr(
+        harbor_execution,
+        "_docker_compose_preflight_reason",
+        lambda _env, _runtime_profile: None,
+    )
 
     def missing(*_args, **_kwargs):
         raise FileNotFoundError()
@@ -256,6 +324,8 @@ def test_execute_harbor_selects_trials_and_reports_execution_or_trial_failures(
     monkeypatch, tmp_path
 ):
     class _Adapter:
+        config = SimpleNamespace(harness=SimpleNamespace(value="codex-cli"))
+
         def build_harbor_command(self, *, task_path, job_name, jobs_dir):
             return ["harbor", str(task_path), job_name, str(jobs_dir)]
 
@@ -268,6 +338,7 @@ def test_execute_harbor_selects_trials_and_reports_execution_or_trial_failures(
         run_id="run",
         timeout_sec=5,
         run_env={},
+        runtime_profile=RUNTIME_PROFILE,
     )
     monkeypatch.setattr(
         harbor_execution,
@@ -317,7 +388,7 @@ def test_pipeline_and_maintenance_delegate_to_runtime_phases(monkeypatch, tmp_pa
     )
     request = SimpleNamespace(
         config=SimpleNamespace(
-            model=SimpleNamespace(qualified_name="openai/gpt"),
+            model=SimpleNamespace(qualified_name="openai/gpt", reasoning_effort=None),
             harness=SimpleNamespace(value="codex-cli"),
         ),
         scenario=SimpleNamespace(
@@ -349,11 +420,13 @@ def test_pipeline_and_maintenance_delegate_to_runtime_phases(monkeypatch, tmp_pa
     )
     monkeypatch.setattr(
         "raidar.runtime.harbor_preflight._docker_compose_preflight_reason",
-        lambda env: preflight_calls.append(env) or "reason",
+        lambda env, _runtime_profile: preflight_calls.append(env) or "reason",
     )
     maintenance.cleanup_stale_harbor_resources(
-        include_containers=False, include_build_processes=True
+        include_containers=False,
+        include_build_processes=True,
+        runtime_profile=RUNTIME_PROFILE,
     )
     assert cleanup_calls == [(False, True)]
-    assert maintenance.docker_compose_preflight_reason({"A": "1"}) == "reason"
+    assert maintenance.docker_compose_preflight_reason({"A": "1"}, RUNTIME_PROFILE) == "reason"
     assert preflight_calls == [{"A": "1"}]

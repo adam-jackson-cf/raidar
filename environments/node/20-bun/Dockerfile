@@ -27,6 +27,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   libxkbcommon0 \
   libxrandr2 \
   libxcb1 \
+  python3 \
+  python-is-python3 \
   ripgrep \
   tar \
   && rm -rf /var/lib/apt/lists/*

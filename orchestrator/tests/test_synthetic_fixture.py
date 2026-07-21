@@ -2,7 +2,16 @@
 
 import json
 
-from raidar.synthetic import SYNTHETIC_MARKER, generate_synthetic_benchmark
+import pytest
+from pydantic import ValidationError
+
+from raidar.runtime.scoring_outputs import RegisteredScorerEvidenceAdapter
+from raidar.schemas.review import ExperimentReviewProjection
+from raidar.schemas.scorecard import EvalRun, Scorecard
+from raidar.synthetic import (
+    SYNTHETIC_MARKER,
+    generate_synthetic_benchmark,
+)
 
 
 def test_synthetic_experiments_are_labeled_and_benchmark_shaped(tmp_path):
@@ -79,3 +88,64 @@ def test_synthetic_fixture_includes_an_unscored_run(tmp_path):
     payload = json.loads((unscored_dir / "run.json").read_text("utf-8"))
     assert payload["scores"]["unscored"] is True
     assert payload["scores"]["unscored_reasons"]
+
+
+def test_synthetic_artifacts_round_trip_through_current_schemas(tmp_path):
+    experiment_dirs = generate_synthetic_benchmark(tmp_path)
+
+    for experiment_dir in experiment_dirs:
+        projection_path = experiment_dir / "review-projection.json"
+        projection = ExperimentReviewProjection.model_validate_json(
+            projection_path.read_text("utf-8")
+        )
+        assert (
+            ExperimentReviewProjection.model_validate_json(projection.model_dump_json())
+            == projection
+        )
+        resolved_weights = {
+            (scorer.id, scorer.version): scorer.weight
+            for scorer in projection.experiment.comparable_config.scorers
+        }
+        for run_dir in sorted((experiment_dir / "runs").iterdir()):
+            run_payload = json.loads((run_dir / "run.json").read_text("utf-8"))
+            assert {
+                "functional",
+                "visual",
+                "verification_stability",
+                "test_coverage",
+                "requirements_coverage",
+            }.isdisjoint(run_payload["scores"])
+            run = EvalRun.model_validate(run_payload)
+            assert (
+                EvalRun.model_validate_json(run.model_dump_json(exclude_computed_fields=True))
+                == run
+            )
+            assert {
+                (result.scorer_id, result.version): result.weight
+                for result in run.scores.scorer_results
+            } == resolved_weights
+
+
+def test_synthetic_metrics_flow_through_registered_scorers(tmp_path, monkeypatch):
+    calls: list[tuple[str, int]] = []
+    original = RegisteredScorerEvidenceAdapter.collect_evidence
+
+    def recording_collect(self, scorer_ref, context):
+        calls.append((scorer_ref.id, scorer_ref.version))
+        return original(self, scorer_ref, context)
+
+    monkeypatch.setattr(RegisteredScorerEvidenceAdapter, "collect_evidence", recording_collect)
+
+    generate_synthetic_benchmark(tmp_path)
+
+    assert {scorer_id for scorer_id, _ in calls} == {
+        "bugfix",
+        "requirements",
+        "resource-efficiency",
+        "typescript-code-task",
+    }
+
+
+def test_scorecard_rejects_removed_legacy_constructor_fields():
+    with pytest.raises(ValidationError, match="Extra inputs are not permitted"):
+        Scorecard(functional={"passed": True})

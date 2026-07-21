@@ -1,5 +1,6 @@
 import json
 import subprocess
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -13,8 +14,12 @@ def test_codex_command_response_text_and_output_clipping(monkeypatch):
         "llm_as_judge",
         SimpleNamespace(model="gpt-5.5", reasoning_effort="low"),
     )
+    command = llm_as_judge._codex_judge_command(
+        image_name="raidar-task-env:judge-reserve",
+        auth_path=Path("/tmp/auth.json"),
+    )
     assert (
-        llm_as_judge._codex_judge_command()[-3:]
+        command[-3:]
         == [
             "gpt-5.5",
             "-c",
@@ -27,7 +32,11 @@ def test_codex_command_response_text_and_output_clipping(monkeypatch):
         "llm_as_judge",
         SimpleNamespace(model="gpt-5.5", reasoning_effort=""),
     )
-    assert "-c" not in llm_as_judge._codex_judge_command()
+    command = llm_as_judge._codex_judge_command(
+        image_name="raidar-task-env:judge-reserve",
+        auth_path=Path("/tmp/auth.json"),
+    )
+    assert "-c" not in command
 
     stdout = "\n".join(
         [
@@ -48,38 +57,39 @@ def test_codex_command_response_text_and_output_clipping(monkeypatch):
     assert llm_as_judge._clip_output("x" * 10, max_chars=5) == "xx..."
 
 
-def test_metric_score_from_json_and_fallback_responses():
+def test_metric_score_requires_strict_structured_json():
+    output = {
+        "passed": True,
+        "score": 0.9,
+        "verdict": "PASS",
+        "evidence": "All rubric areas are supported.",
+        "findings": [],
+        "rubric_coverage": {"intent": "pass"},
+        "residual_risk": [],
+    }
     json_score = llm_as_judge._metric_score_from_response(
-        '{"score":1.2,"passed":"false","findings":["a"]}',
+        json.dumps(output),
         metric_id="requirements-adherence",
     )
-    assert json_score.score == 1.0
-    assert json_score.passed is False
-    assert json_score.evidence == "1 judge finding(s)."
+    assert json_score.score == 0.9
+    assert json_score.passed is True
+    assert json_score.evidence == "All rubric areas are supported."
 
     fenced = llm_as_judge._metric_score_from_response(
-        '```json\n{"score":"0.75","summary":"ok"}\n```',
+        f"```json\n{json.dumps(output)}\n```",
         metric_id="requirements-adherence",
     )
-    assert fenced.score == 0.75
-    assert fenced.passed is False
-    assert fenced.evidence == "ok"
+    assert fenced.score == 0.9
+    assert fenced.passed is True
+    assert llm_as_judge._parse_json_response(f"```\njson\n{json.dumps(output)}\n```") == output
 
     assert llm_as_judge._parse_json_response("[]") is None
-    assert llm_as_judge._bounded_score("bad") == 0.0
-    assert llm_as_judge._bounded_score("-1") == 0.0
-    assert llm_as_judge._bool_value("true", default=False) is True
-    assert llm_as_judge._bool_value("false", default=True) is False
-    assert llm_as_judge._bool_value("unknown", default=True) is True
-    assert llm_as_judge._evidence_from_json({"verdict": "ship"}, fallback="fallback") == "ship"
-    assert llm_as_judge._evidence_from_json({}, fallback="fallback") == "fallback"
-
-    fallback = llm_as_judge._metric_score_from_response(
-        "VERDICT: PASS\nEVIDENCE: enough",
-        metric_id="requirements-adherence",
-    )
-    assert fallback.score == 1.0
-    assert fallback.passed is True
+    for invalid in ("VERDICT: PASS", '{"score": 0.9}', '{"score": 2}'):
+        with pytest.raises(llm_as_judge.JudgeEvaluationError):
+            llm_as_judge._metric_score_from_response(
+                invalid,
+                metric_id="requirements-adherence",
+            )
 
 
 def test_judge_prompt_includes_scenario_prompt_and_bounded_workspace_sources(monkeypatch, tmp_path):
@@ -97,6 +107,7 @@ def test_judge_prompt_includes_scenario_prompt_and_bounded_workspace_sources(mon
         name="scenario",
         scenario_revision="v001",
         description="Description",
+        languages=["typescript"],
         prompt=SimpleNamespace(entry="prompt.md"),
         requirements=SimpleNamespace(
             items=[
@@ -132,6 +143,12 @@ def test_judge_prompt_includes_scenario_prompt_and_bounded_workspace_sources(mon
     assert "Task prompt:\nBuild the app" in prompt
     assert "File: src/app.ts" in prompt
     assert "node_modules" not in prompt
+    monkeypatch.setattr(
+        llm_as_judge.settings,
+        "llm_as_judge",
+        SimpleNamespace(max_source_chars=1000),
+    )
+    assert "binary.ts" not in llm_as_judge._workspace_sources(workspace, scenario=scenario)
     assert llm_as_judge._task_prompt(tmp_path / "missing", scenario) == ""
     assert llm_as_judge._looks_like_workspace_path("src/app.ts") is True
     assert llm_as_judge._looks_like_workspace_path("../app.ts") is False
@@ -142,6 +159,7 @@ def test_evaluate_llm_as_judge_metric_handles_resolution_call_and_failure(monkey
         name="scenario",
         scenario_revision="v001",
         description="Description",
+        languages=["typescript"],
         prompt=SimpleNamespace(entry="missing.md"),
         requirements=SimpleNamespace(items=[]),
         scorers=[],
@@ -151,37 +169,52 @@ def test_evaluate_llm_as_judge_metric_handles_resolution_call_and_failure(monkey
         "resolve_scorer_definition_file",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("missing judge")),
     )
-    missing = llm_as_judge.evaluate_llm_as_judge_metric(
-        workspace=tmp_path,
-        scenario_dir=tmp_path,
-        scenario=scenario,
-        metric_id="requirements-adherence",
-        judge_path="missing.toml",
-    )
-    assert missing.passed is False
-    assert missing.missing_patterns == ["missing.toml"]
+    with pytest.raises(llm_as_judge.JudgeEvaluationError, match="Judge definition unavailable"):
+        llm_as_judge.evaluate_llm_as_judge_metric(
+            workspace=tmp_path,
+            scenario_dir=tmp_path,
+            scenario=scenario,
+            metric_id="requirements-adherence",
+            judge_path="missing.toml",
+        )
 
     judge_file = tmp_path / "judge.toml"
     judge_file.write_text("judge role", encoding="utf-8")
     monkeypatch.setattr(
         llm_as_judge, "resolve_scorer_definition_file", lambda *_args, **_kwargs: judge_file
     )
-    monkeypatch.setattr(
-        llm_as_judge,
-        "_call_judge",
-        lambda **_kwargs: (_ for _ in ()).throw(RuntimeError("judge failed")),
-    )
-    failed = llm_as_judge.evaluate_llm_as_judge_metric(
-        workspace=tmp_path,
-        scenario_dir=tmp_path,
-        scenario=scenario,
-        metric_id="requirements-adherence",
-        judge_path="judge.toml",
-    )
-    assert failed.evidence == "LLM judge failed: RuntimeError: judge failed"
+    with pytest.raises(llm_as_judge.JudgeEvaluationError, match="explicit judge executor"):
+        llm_as_judge.evaluate_llm_as_judge_metric(
+            workspace=tmp_path,
+            scenario_dir=tmp_path,
+            scenario=scenario,
+            metric_id="requirements-adherence",
+            judge_path="judge.toml",
+        )
 
-    monkeypatch.setattr(
-        llm_as_judge, "_call_judge", lambda **_kwargs: '{"score":0.9,"passed":true}'
+    def failed_executor(_role, _prompt):
+        raise RuntimeError("judge failed")
+
+    with pytest.raises(llm_as_judge.JudgeEvaluationError, match="Judge execution failed"):
+        llm_as_judge.evaluate_llm_as_judge_metric(
+            workspace=tmp_path,
+            scenario_dir=tmp_path,
+            scenario=scenario,
+            metric_id="requirements-adherence",
+            judge_path="judge.toml",
+            executor=failed_executor,
+        )
+
+    response = json.dumps(
+        {
+            "passed": True,
+            "score": 0.9,
+            "verdict": "PASS",
+            "evidence": "Supported.",
+            "findings": [],
+            "rubric_coverage": {},
+            "residual_risk": [],
+        }
     )
     scored = llm_as_judge.evaluate_llm_as_judge_metric(
         workspace=tmp_path,
@@ -189,6 +222,7 @@ def test_evaluate_llm_as_judge_metric_handles_resolution_call_and_failure(monkey
         scenario=scenario,
         metric_id="requirements-adherence",
         judge_path="judge.toml",
+        executor=lambda _role, _prompt: response,
     )
     assert scored.score == 0.9
     assert scored.passed is True
@@ -208,7 +242,11 @@ def test_call_codex_judge_requires_chatgpt_auth_and_returns_response(monkeypatch
         lambda requested_mode: SimpleNamespace(resolved_mode="api-key", auth_json_path=None),
     )
     with pytest.raises(OSError, match="ChatGPT auth"):
-        llm_as_judge._call_codex_judge(judge_role="role", prompt="prompt")
+        llm_as_judge._call_codex_judge(
+            image_name="raidar-task-env:judge-reserve",
+            judge_role="role",
+            prompt="prompt",
+        )
 
     monkeypatch.setattr(
         llm_as_judge,
@@ -220,7 +258,6 @@ def test_call_codex_judge_requires_chatgpt_auth_and_returns_response(monkeypatch
     def fake_run(command, **kwargs):
         captured["command"] = command
         captured["input"] = kwargs["input"]
-        captured["env"] = kwargs["env"]
         return subprocess.CompletedProcess(
             command,
             0,
@@ -229,9 +266,16 @@ def test_call_codex_judge_requires_chatgpt_auth_and_returns_response(monkeypatch
         )
 
     monkeypatch.setattr(llm_as_judge.subprocess, "run", fake_run)
-    assert llm_as_judge._call_codex_judge(judge_role="role", prompt="prompt") == "ok"
+    assert (
+        llm_as_judge._call_codex_judge(
+            image_name="raidar-task-env:judge-reserve",
+            judge_role="role",
+            prompt="prompt",
+        )
+        == "ok"
+    )
     assert captured["input"] == "role\n\nprompt"
-    assert "OPENAI_API_KEY" not in captured["env"]
+    assert captured["command"][:4] == ["docker", "run", "--rm", "-i"]
 
     monkeypatch.setattr(
         llm_as_judge.subprocess,
@@ -241,4 +285,29 @@ def test_call_codex_judge_requires_chatgpt_auth_and_returns_response(monkeypatch
         ),
     )
     with pytest.raises(RuntimeError, match="Codex judge failed with exit 2"):
-        llm_as_judge._call_codex_judge(judge_role="role", prompt="prompt")
+        llm_as_judge._call_codex_judge(
+            image_name="raidar-task-env:judge-reserve",
+            judge_role="role",
+            prompt="prompt",
+        )
+
+
+def test_codex_judge_executor_requires_and_binds_prepared_image(monkeypatch):
+    with pytest.raises(llm_as_judge.JudgeEvaluationError, match="image is unavailable"):
+        llm_as_judge.codex_judge_executor(" ")
+
+    calls = []
+    monkeypatch.setattr(
+        llm_as_judge,
+        "_call_codex_judge",
+        lambda **kwargs: calls.append(kwargs) or "structured response",
+    )
+    executor = llm_as_judge.codex_judge_executor("raidar-task-env:judge-reserve")
+    assert executor("role", "prompt") == "structured response"
+    assert calls == [
+        {
+            "image_name": "raidar-task-env:judge-reserve",
+            "judge_role": "role",
+            "prompt": "prompt",
+        }
+    ]

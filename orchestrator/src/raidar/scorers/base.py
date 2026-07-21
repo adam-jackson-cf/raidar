@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any, ClassVar, Literal
 
@@ -9,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from raidar.schemas.scenario import CapabilityRequirements, ScorerMetricDefinition
 from raidar.scorers.verification import (
+    EvidenceDependency,
     VerificationEvidence,
     VerificationPlan,
     VerificationPlanContext,
@@ -17,6 +19,9 @@ from raidar.scorers.verification import (
 
 class ScorerResolutionError(ValueError):
     """Raised when a scenario references an invalid scorer definition."""
+
+
+JudgeExecutor = Callable[[str, str], str]
 
 
 class ScorerDefinition(BaseModel):
@@ -32,6 +37,7 @@ class ScorerDefinition(BaseModel):
     metrics: list[ScorerMetricDefinition] = Field(min_length=1)
     extends: str | None = None
     requirements: CapabilityRequirements = Field(default_factory=CapabilityRequirements)
+    evidence_dependencies: list[EvidenceDependency] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_metric_weights(self) -> ScorerDefinition:
@@ -56,6 +62,7 @@ class ScorerContext:
     verification_evidence: VerificationEvidence = field(default_factory=VerificationEvidence)
     workspace_changes: dict[str, Any] = field(default_factory=dict)
     retained_evidence: dict[str, Any] = field(default_factory=dict)
+    judge_executor: JudgeExecutor | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,6 +84,7 @@ class BaseScorer:
     metrics: ClassVar[tuple[ScorerMetricDefinition, ...]]
     extends: ClassVar[str | None] = None
     requirements: ClassVar[CapabilityRequirements] = CapabilityRequirements()
+    evidence_dependencies: ClassVar[tuple[EvidenceDependency, ...]] = ()
 
     def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
         """Return scorer-owned raw-evidence actions for this run."""
@@ -97,15 +105,11 @@ class BaseScorer:
             metrics=list(cls.metrics),
             extends=cls.extends,
             requirements=cls.requirements,
+            evidence_dependencies=list(cls.evidence_dependencies),
         )
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
-        """Collect scorer-owned evidence before scoring.
-
-        Concrete scorer implementations own the runtime/tool-specific evidence
-        collection. The initial migration keeps existing scorecard metrics wired
-        through the canonical scorecard phase, so default evidence is empty.
-        """
+        """Collect scorer-owned evidence before scoring."""
 
         return ScorerEvidence()
 

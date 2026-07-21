@@ -65,11 +65,10 @@ def test_ensure_starter_preflight_skips_test_command_without_tests(monkeypatch, 
         "_preflight_cache_file",
         lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
     )
-    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    runner.ensure_starter_preflight(request, context)
+    runner.ensure_starter_preflight(request, context, EFFECTIVE_CONTRACT)
 
     assert calls == [["bun", "run", "lint"]]
 
@@ -80,7 +79,11 @@ def test_workspace_test_discovery_ignores_dependency_tests(tmp_path: Path) -> No
     dependency_tests.parent.mkdir(parents=True)
     dependency_tests.write_text("test('dependency', () => {})\n", encoding="utf-8")
 
-    assert not runner._workspace_has_tests(workspace, ["**/*.test.ts"])
+    assert not runner._workspace_has_tests(
+        workspace,
+        ["**/*.test.ts"],
+        runtime_profile=RUNTIME_PROFILE,
+    )
 
 
 def test_ensure_starter_preflight_reuses_repo_local_cache_across_invocations(
@@ -98,11 +101,10 @@ def test_ensure_starter_preflight_reuses_repo_local_cache_across_invocations(
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     _patch_starter_preflight_cache(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    first_hit = runner.ensure_starter_preflight(request, context_one)
-    second_hit = runner.ensure_starter_preflight(request, context_two)
+    first_hit = runner.ensure_starter_preflight(request, context_one, EFFECTIVE_CONTRACT)
+    second_hit = runner.ensure_starter_preflight(request, context_two, EFFECTIVE_CONTRACT)
 
     assert first_hit is False
     assert second_hit is True
@@ -122,10 +124,9 @@ def test_ensure_starter_preflight_uses_workspace_local_runtime_env(
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     _patch_starter_preflight_cache(monkeypatch, tmp_path)
-    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    runner.ensure_starter_preflight(request, context)
+    runner.ensure_starter_preflight(request, context, EFFECTIVE_CONTRACT)
 
     assert envs
     runtime_dir = Path(envs[0]["TMPDIR"]).parent
@@ -202,11 +203,10 @@ def test_ensure_starter_preflight_runs_against_baseline_workspace(
         "_preflight_cache_file",
         lambda cache_key: tmp_path / "preflight" / f"{cache_key}.ok.json",
     )
-    monkeypatch.setattr(runner, "_resolved_environment", lambda _request: _preflight_environment())
     monkeypatch.setattr(runner, "_cache_lock_root", lambda: tmp_path / "locks")
     monkeypatch.setattr(runner, "_run_starter_preflight_command", fake_command)
 
-    runner.ensure_starter_preflight(request, context)
+    runner.ensure_starter_preflight(request, context, EFFECTIVE_CONTRACT)
 
     assert len(called_workspaces) == 1
     preflight_workspace = called_workspaces[0]
@@ -230,17 +230,9 @@ def test_preflight_does_not_infer_installs_from_environment(monkeypatch, tmp_pat
         return subprocess.CompletedProcess(command, 0, stdout="ok", stderr="")
 
     _patch_starter_preflight_cache(monkeypatch, tmp_path)
-    monkeypatch.setattr(
-        runner,
-        "_resolved_environment",
-        lambda _request: _preflight_environment(
-            runtimes={"python": ">=3.12"},
-            package_managers={"pip": ">=24"},
-        ),
-    )
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
 
-    runner.ensure_starter_preflight(request, context)
+    runner.ensure_starter_preflight(request, context, EFFECTIVE_CONTRACT)
 
     assert calls == [["bun", "run", "lint"]]
 

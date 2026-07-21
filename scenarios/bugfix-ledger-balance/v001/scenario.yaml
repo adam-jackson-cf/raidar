@@ -4,7 +4,17 @@ parent_revision: null
 description: Targeted ledger defect fix with reproduction, regression protection,
   contained changes, and retained defect evidence
 difficulty: easy
-category: bugfix
+display_name: TypeScript ledger defect repair
+task_kind: defect_repair
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions:
+- known_defect
+languages:
+- TypeScript
+evaluation_role: benchmark
+catalog_status: active
+variant_axes: {}
 timeout_sec: 1800
 test_scripts: []
 environment:

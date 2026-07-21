@@ -9,6 +9,34 @@ from pathlib import Path
 from raidar.schemas.scenario import DeterministicCheck
 from raidar.schemas.scorecard import RequirementCheck
 
+_LANGUAGE_SOURCE_GLOBS: dict[str, tuple[str, ...]] = {
+    "javascript": ("*.js", "*.jsx", "*.mjs", "*.cjs"),
+    "python": ("*.py",),
+    "typescript": ("*.ts", "*.tsx", "*.mts", "*.cts"),
+}
+
+
+def source_file_paths(workspace: Path, languages: tuple[str, ...]) -> tuple[Path, ...]:
+    """Return source files for the scenario's declared implementation languages."""
+
+    src_dir = workspace / "src"
+    if not src_dir.exists():
+        return ()
+    source_globs = {
+        source_glob
+        for language in languages
+        for source_glob in _LANGUAGE_SOURCE_GLOBS.get(language.lower(), ())
+    }
+    return tuple(
+        sorted(
+            {
+                source_file
+                for source_glob in source_globs
+                for source_file in src_dir.rglob(source_glob)
+            }
+        )
+    )
+
 
 @dataclass
 class JudgeResult:
@@ -41,12 +69,18 @@ def parse_judge_response(response: str) -> JudgeResult:
     )
 
 
-def check_import_present(workspace: Path, pattern: str) -> tuple[bool, str]:
-    """Check if an import pattern is present in source files."""
-    src_dir = workspace / "src"
-    if not src_dir.exists():
-        return False, "src directory not found"
-    for source_file in (*src_dir.rglob("*.ts"), *src_dir.rglob("*.tsx")):
+def check_import_present(
+    workspace: Path,
+    pattern: str,
+    *,
+    languages: tuple[str, ...],
+) -> tuple[bool, str]:
+    """Check if an import pattern is present in scenario-language source files."""
+
+    source_files = source_file_paths(workspace, languages)
+    if not source_files:
+        return False, f"No source files found for languages: {', '.join(languages)}"
+    for source_file in source_files:
         content = source_file.read_text(encoding="utf-8", errors="ignore")
         if pattern in content:
             return True, f"Found in {source_file.relative_to(workspace)}"
@@ -88,31 +122,43 @@ def validate_safe_regex_pattern(pattern: str) -> tuple[bool, str]:
     return True, "Pattern passed regex safety validation"
 
 
-def check_no_pattern(workspace: Path, pattern: str) -> tuple[bool, str]:
-    """Check that a pattern does not appear in source files."""
-    src_dir = workspace / "src"
-    if not src_dir.exists():
-        return True, "src directory not found (pattern check passes)"
+def check_no_pattern(
+    workspace: Path,
+    pattern: str,
+    *,
+    languages: tuple[str, ...],
+) -> tuple[bool, str]:
+    """Check that a pattern does not appear in scenario-language source files."""
+
+    source_files = source_file_paths(workspace, languages)
+    if not source_files:
+        return True, f"No source files found for languages: {', '.join(languages)}"
 
     safe, reason = validate_safe_regex_pattern(pattern)
     if not safe:
         return False, f"Unsafe regex pattern '{pattern}': {reason}"
     regex = re.compile(pattern)
-    for source_file in (*src_dir.rglob("*.ts"), *src_dir.rglob("*.tsx")):
+    for source_file in source_files:
         content = source_file.read_text(encoding="utf-8", errors="ignore")
         if regex.search(content):
             return False, f"Pattern found in {source_file.relative_to(workspace)}"
     return True, "Pattern not found (good)"
 
 
-def run_deterministic_check(check: DeterministicCheck, workspace: Path) -> RequirementCheck:
-    """Run a single deterministic requirement check."""
+def run_deterministic_check(
+    check: DeterministicCheck,
+    workspace: Path,
+    *,
+    languages: tuple[str, ...],
+) -> RequirementCheck:
+    """Run one deterministic requirement check against declared source languages."""
+
     if check.type == "import_present":
-        passed, evidence = check_import_present(workspace, check.pattern)
+        passed, evidence = check_import_present(workspace, check.pattern, languages=languages)
     elif check.type == "file_exists":
         passed, evidence = check_file_exists(workspace, check.pattern)
     elif check.type == "no_pattern":
-        passed, evidence = check_no_pattern(workspace, check.pattern)
+        passed, evidence = check_no_pattern(workspace, check.pattern, languages=languages)
     else:
         passed, evidence = False, f"Unknown check type: {check.type}"
     return RequirementCheck(

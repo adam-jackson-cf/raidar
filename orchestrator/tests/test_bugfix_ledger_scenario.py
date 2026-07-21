@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from raidar.schemas.scenario import ScenarioDefinition
+from raidar.application.scenario_catalog import load_scenario
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCENARIO_DIR = REPO_ROOT / "scenarios" / "bugfix-ledger-balance" / "v001"
@@ -10,11 +10,11 @@ SCENARIO_PATH = SCENARIO_DIR / "scenario.yaml"
 
 
 def test_bugfix_ledger_scenario_loads() -> None:
-    scenario = ScenarioDefinition.from_yaml(SCENARIO_PATH)
+    scenario = load_scenario(SCENARIO_PATH)
 
     assert scenario.name == "bugfix-ledger-balance"
     assert scenario.scenario_revision == "v001"
-    assert scenario.category == "bugfix"
+    assert scenario.task_kind == "defect_repair"
     assert scenario.scorer_ids() == ["bugfix@1", "requirements@1", "resource-efficiency@1"]
     assert scenario.metric_ids() == [
         "defect-resolution",
@@ -36,7 +36,7 @@ def test_bugfix_ledger_scenario_loads() -> None:
 
 
 def test_bugfix_ledger_scenario_declares_defect_evidence_contract() -> None:
-    scenario = ScenarioDefinition.from_yaml(SCENARIO_PATH)
+    scenario = load_scenario(SCENARIO_PATH)
 
     assert [entry.path for entry in scenario.evidence.retained_files] == [
         "evidence/defect-evidence.json"

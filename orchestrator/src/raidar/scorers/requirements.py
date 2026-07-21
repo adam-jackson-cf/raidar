@@ -52,6 +52,7 @@ class Requirements(BaseScorer):
                     scenario=context.scenario,
                     metric_id=judge_metric.id,
                     judge_path=judge_metric.config["judge"],
+                    executor=getattr(context, "judge_executor", None),
                 ),
             )
         )
@@ -67,7 +68,14 @@ def _requirements_coverage_score(workspace: Path, scenario) -> MetricScore:
             passed=True,
             evidence="requirements=0",
         )
-    checks = [run_deterministic_check(requirement.check, workspace) for requirement in requirements]
+    checks = [
+        run_deterministic_check(
+            requirement.check,
+            workspace,
+            languages=tuple(scenario.languages),
+        )
+        for requirement in requirements
+    ]
     passed_count = sum(1 for check in checks if check.passed)
     score = passed_count / len(checks)
     return MetricScore(

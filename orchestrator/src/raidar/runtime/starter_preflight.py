@@ -12,9 +12,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.config import settings
-from raidar.runtime.environments import ResolvedEnvironment, resolve_scenario_environment
+from raidar.runtime.execution_contract import EffectiveRunContract
 from raidar.runtime.models import RunRequest, WorkspaceContext
-from raidar.runtime.profile import default_runtime_profile
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.workspace_cache import (
     RAIDAR_CACHE_VERSION,
     _cache_key_lock,
@@ -40,18 +40,6 @@ class StarterPreflightError(RuntimeError):
     """Fatal starter setup error that unscored and aborts an entire experiment."""
 
 
-def _repo_root() -> Path:
-    return Path(__file__).resolve().parents[4]
-
-
-def _resolved_environment(request: RunRequest) -> ResolvedEnvironment:
-    return resolve_scenario_environment(
-        scenario=request.scenario,
-        scenario_path=request.scenario_dir / "scenario.yaml",
-        repo_root=_repo_root(),
-    )
-
-
 def _preflight_command_timeout(request: RunRequest) -> int:
     return (
         request.scenario.verification.preflight_command_timeout_sec
@@ -59,8 +47,13 @@ def _preflight_command_timeout(request: RunRequest) -> int:
     )
 
 
-def _workspace_has_tests(workspace: Path, test_discovery_globs: list[str]) -> bool:
-    ignored_dirs = set(default_runtime_profile().copy_excludes) | {
+def _workspace_has_tests(
+    workspace: Path,
+    test_discovery_globs: list[str],
+    *,
+    runtime_profile: RuntimeProfile,
+) -> bool:
+    ignored_dirs = set(runtime_profile.copy_excludes) | {
         ".git",
         ".turbo",
         "coverage",
@@ -98,14 +91,17 @@ def _should_skip_preflight_command(
     return skip_test_commands_when_no_tests and not has_tests and _is_test_command(command)
 
 
-def _preflight_cache_key(request: RunRequest, context: WorkspaceContext) -> str:
-    environment = _resolved_environment(request)
+def _preflight_cache_key(
+    request: RunRequest,
+    context: WorkspaceContext,
+    contract: EffectiveRunContract,
+) -> str:
     payload = {
         "cache_version": RAIDAR_CACHE_VERSION,
         "baseline_cache_key": context.baseline_cache_key,
         "harness": request.config.harness.value,
         "starter_fingerprint": context.starter_source.fingerprint,
-        "environment": environment.cache_payload(),
+        "effective_run_contract_hash": contract.contract_hash,
         "setup_actions": getattr(request.scenario.verification, "setup_actions", []),
         "required_commands": request.scenario.verification.required_commands,
         "preflight_command_timeout_sec": (
@@ -123,14 +119,19 @@ def _preflight_scratch_workspace(cache_file: Path) -> Path:
     return cache_file.with_name(f"{cache_file.name}.workspace")
 
 
-def _copy_preflight_workspace(source_workspace: Path, preflight_workspace: Path) -> None:
+def _copy_preflight_workspace(
+    source_workspace: Path,
+    preflight_workspace: Path,
+    *,
+    runtime_profile: RuntimeProfile,
+) -> None:
     if preflight_workspace.exists():
         shutil.rmtree(preflight_workspace)
     shutil.copytree(
         source_workspace,
         preflight_workspace,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(*default_runtime_profile().copy_excludes),
+        ignore=shutil.ignore_patterns(*runtime_profile.copy_excludes),
     )
 
 
@@ -202,7 +203,11 @@ def _write_starter_preflight_cache(request: StarterPreflightCacheWrite) -> None:
     )
 
 
-def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> bool | None:
+def ensure_starter_preflight(
+    request: RunRequest,
+    context: WorkspaceContext,
+    contract: EffectiveRunContract,
+) -> bool | None:
     """Validate starter baseline commands once per effective prep input set."""
     from raidar.runtime.workspace import (
         _cleanup_workspace_runtime_env,
@@ -216,7 +221,8 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
 
     source_workspace = getattr(context, "baseline_workspace", context.workspace)
 
-    cache_key = _preflight_cache_key(request, context)
+    runtime_profile = contract.runtime_profile
+    cache_key = _preflight_cache_key(request, context, contract)
     cache_file = _preflight_cache_file(cache_key)
     with _cache_key_lock(f"preflight-{cache_key}"):
         if cache_file.exists():
@@ -224,9 +230,17 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
             return True
 
         preflight_workspace = _preflight_scratch_workspace(cache_file)
-        _copy_preflight_workspace(source_workspace, preflight_workspace)
+        _copy_preflight_workspace(
+            source_workspace,
+            preflight_workspace,
+            runtime_profile=runtime_profile,
+        )
         try:
-            env = _workspace_runtime_env(preflight_workspace, os.environ.copy())
+            env = _workspace_runtime_env(
+                preflight_workspace,
+                runtime_profile,
+                os.environ.copy(),
+            )
             timeout_sec = _preflight_command_timeout(request)
             _run_workspace_setup_actions(
                 workspace=preflight_workspace,
@@ -238,6 +252,7 @@ def ensure_starter_preflight(request: RunRequest, context: WorkspaceContext) -> 
             has_tests = _workspace_has_tests(
                 preflight_workspace,
                 request.scenario.verification.test_discovery_globs,
+                runtime_profile=runtime_profile,
             )
             for command in required_commands:
                 if _should_skip_preflight_command(

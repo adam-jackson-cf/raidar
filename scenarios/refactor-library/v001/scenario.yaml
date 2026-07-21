@@ -4,7 +4,17 @@ parent_revision: null
 description: Baseline behavior-preserving refactor with public contract stability
   checks
 difficulty: medium
-category: refactor
+display_name: Python reporting-library refactor
+task_kind: refactoring
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions:
+- legacy_structure
+languages:
+- Python
+evaluation_role: benchmark
+catalog_status: quarantined
+variant_axes: {}
 timeout_sec: 1800
 environment:
   kind: stack_preset

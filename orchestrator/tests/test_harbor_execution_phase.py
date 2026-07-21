@@ -14,6 +14,7 @@ def test_execute_harbor_retries_once_on_registry_rate_limit(monkeypatch, tmp_pat
         run_id="abc12345",
         timeout_sec=60,
         run_env={},
+        runtime_profile=RUNTIME_PROFILE,
     )
     request.workspace.mkdir(parents=True, exist_ok=True)
     request.run_harbor_dir.mkdir(parents=True, exist_ok=True)
@@ -35,7 +36,11 @@ def test_execute_harbor_retries_once_on_registry_rate_limit(monkeypatch, tmp_pat
 
     monkeypatch.setattr(runner, "_run_harbor_process", fake_run_harbor_process)
     monkeypatch.setattr(runner, "_is_registry_rate_limited", lambda _: True)
-    monkeypatch.setattr(runner, "cleanup_stale_harbor_resources", lambda: None)
+    monkeypatch.setattr(
+        runner,
+        "cleanup_stale_harbor_resources",
+        lambda **_kwargs: None,
+    )
     monkeypatch.setattr(
         runner,
         "wait_for_harbor_rate_limit_retry",
@@ -60,6 +65,7 @@ def test_execute_harbor_does_not_retry_non_rate_limit(monkeypatch, tmp_path) -> 
         run_id="abc12345",
         timeout_sec=60,
         run_env={},
+        runtime_profile=RUNTIME_PROFILE,
     )
     request.workspace.mkdir(parents=True, exist_ok=True)
     request.run_harbor_dir.mkdir(parents=True, exist_ok=True)

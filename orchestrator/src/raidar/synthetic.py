@@ -18,19 +18,18 @@ from pathlib import Path
 
 from raidar.experiment import ExperimentSummaryInput, create_experiment_summary
 from raidar.findings import run_findings_artifact
+from raidar.review_projection import persist_experiment_review_projection
+from raidar.review_scenario_projection import scenario_review_contract
 from raidar.sanitization import sanitized_model_dump_json
 from raidar.schemas.events import GateEvent, TraceEvent
+from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import (
     EvalConfig,
     EvalRun,
-    FunctionalScore,
-    MetricScore,
-    RequirementsCoverageScore,
     Scorecard,
-    ScorerMetricContribution,
-    ScorerResult,
-    VerificationStabilityScore,
 )
+from raidar.scorers.registry import scenario_scorers, scorer_evaluation_profile
+from raidar.synthetic_scorer_inputs import SyntheticEvidence, build_synthetic_scorecard
 
 SYNTHETIC_MARKER = "synthetic"
 _SCENARIO = "bugfix-ledger-balance"
@@ -44,38 +43,7 @@ _SKILL_CORE_METRICS = [
     "verification-stability",
 ]
 _HARNESS = "codex-cli"
-_PROFILE = "scorers:bugfix@1:0.88+requirements@1:0.10+resource-efficiency@1:0.02"
 _STARTED = datetime(2026, 1, 1, 0, 0, 0, tzinfo=UTC)
-_METRIC_IDS = [
-    "defect-resolution",
-    "regression-protection",
-    "change-containment",
-    "verification-stability",
-    "defect-evidence-completeness",
-    "requirements-coverage",
-    "requirements-adherence",
-    "resource-efficiency",
-]
-_SCORER_IDS = ["bugfix@1", "requirements@1", "resource-efficiency@1"]
-
-# Which metrics roll up into each scorer — used to build the metric_contributions
-# the review surface renders as the clickable, evidence-linked scorecard checks.
-_BUGFIX_SCORER_METRICS = {
-    "bugfix": [
-        "defect-resolution",
-        "regression-protection",
-        "change-containment",
-        "verification-stability",
-        "defect-evidence-completeness",
-    ],
-    "requirements": ["requirements-coverage", "requirements-adherence"],
-    "resource-efficiency": ["resource-efficiency"],
-}
-_SKILL_SCORER_METRICS = {
-    "typescript-code-task": [*_SKILL_CORE_METRICS],
-    "requirements": ["requirements-coverage", "requirements-adherence"],
-    "resource-efficiency": ["resource-efficiency"],
-}
 
 
 @dataclass(frozen=True)
@@ -85,12 +53,110 @@ class Spec:
     harness: str
     model: str
     label: str  # short slug used in the experiment directory name
+    reasoning_effort: str | None = None
 
 
-_GPT_LOW = Spec("codex-cli", "openai/gpt-5.5:low", "gpt-5.5-low")
-_GPT_MEDIUM = Spec("codex-cli", "openai/gpt-5.5:medium", "gpt-5.5-medium")
-_GPT_HIGH = Spec("codex-cli", "openai/gpt-5.5:high", "gpt-5.5-high")
+_GPT_LOW = Spec("codex-cli", "openai/gpt-5.5", "gpt-5.5-low", "low")
+_GPT_MEDIUM = Spec("codex-cli", "openai/gpt-5.5", "gpt-5.5-medium", "medium")
+_GPT_HIGH = Spec("codex-cli", "openai/gpt-5.5", "gpt-5.5-high", "high")
 _CLAUDE = Spec("claude-code", "anthropic/claude-sonnet-4.6", "claude-sonnet-4.6")
+
+
+def _fixture_scenario(
+    name: str,
+    revision: str,
+    scorer_weights: list[tuple[str, float]],
+    *,
+    display_name: str,
+    task_kind: str,
+    workspace_state: str,
+    starting_conditions: list[str],
+    parent_revision: str | None = None,
+) -> ScenarioDefinition:
+    requirements = [
+        {
+            "id": f"req-{index}",
+            "description": f"Synthetic requirement {index}",
+            "check": {
+                "type": "file_exists",
+                "pattern": f"synthetic/{index}.txt",
+                "description": f"Synthetic evidence {index}",
+            },
+        }
+        for index in range(1, 9)
+    ]
+    return ScenarioDefinition.model_validate(
+        {
+            "name": name,
+            "display_name": display_name,
+            "scenario_revision": revision,
+            "parent_revision": parent_revision,
+            "description": f"Typed synthetic fixture for {name} {revision}",
+            "difficulty": "medium",
+            "task_kind": task_kind,
+            "delivery_mode": "direct_implementation",
+            "workspace_state": workspace_state,
+            "starting_conditions": starting_conditions,
+            "languages": ["TypeScript"],
+            "evaluation_role": "benchmark",
+            "catalog_status": "calibration",
+            "family_id": None,
+            "variant_axes": {},
+            "timeout_sec": 300,
+            "environment": {"kind": "stack_preset", "id": "node:20"},
+            "starter": {"root": "starter"},
+            "verification": {
+                "coverage_threshold": 0.8,
+                "min_quality_score": 0.0,
+                "required_commands": [["synthetic", "verify"]],
+            },
+            "requirements": {"items": requirements},
+            "scorers": [
+                {"id": scorer_id, "version": 1, "weight": weight}
+                for scorer_id, weight in scorer_weights
+            ],
+            "prompt": {"entry": "prompt/task.md"},
+        }
+    )
+
+
+_BUGFIX_SCENARIO = _fixture_scenario(
+    _SCENARIO,
+    _REVISION,
+    [("bugfix", 0.88), ("requirements", 0.10), ("resource-efficiency", 0.02)],
+    display_name="Ledger Balance Defect Repair",
+    task_kind="defect_repair",
+    workspace_state="existing",
+    starting_conditions=["known_defect"],
+)
+
+
+def _skill_scenario(revision: str) -> ScenarioDefinition:
+    if revision == "v001":
+        weights = [("typescript-code-task", 0.98), ("resource-efficiency", 0.02)]
+    elif revision == "v002":
+        weights = [
+            ("typescript-code-task", 0.85),
+            ("requirements", 0.13),
+            ("resource-efficiency", 0.02),
+        ]
+    else:
+        weights = [
+            ("typescript-code-task", 0.78),
+            ("requirements", 0.20),
+            ("resource-efficiency", 0.02),
+        ]
+    parent = None if revision == "v001" else f"v{int(revision[1:]) - 1:03d}"
+    return _fixture_scenario(
+        _SKILL_SCENARIO,
+        revision,
+        weights,
+        display_name="Skill Benchmark Coding Test",
+        task_kind="feature_implementation",
+        workspace_state="existing",
+        starting_conditions=[],
+        parent_revision=parent,
+    )
 
 
 def generate_synthetic_benchmark(dest_dir: Path) -> list[Path]:
@@ -105,7 +171,7 @@ def _bugfix_experiments(dest_dir: Path) -> list[Path]:
     Exercises best-first ordering, the Δ-vs-best comparison framing, and a
     volatile spec whose degraded run drags its mean below the others.
     """
-    meta = _experiment_meta(_SCENARIO, _REVISION, _PROFILE, _METRIC_IDS, _SCORER_IDS)
+    meta = _experiment_meta(_BUGFIX_SCENARIO)
     return [
         _experiment_dir(
             dest_dir, _GPT_MEDIUM, meta, _clean_runs(_GPT_MEDIUM, quality=0.97, count=5)
@@ -139,27 +205,7 @@ def _skill_experiments(dest_dir: Path) -> list[Path]:
 
 
 def _skill_meta(revision: str) -> dict[str, object]:
-    if revision == "v001":
-        return _experiment_meta(
-            _SKILL_SCENARIO,
-            "v001",
-            "scorers:typescript-code-task@1:0.98+resource-efficiency@1:0.02",
-            [*_SKILL_CORE_METRICS, "resource-efficiency"],
-            ["typescript-code-task@1", "resource-efficiency@1"],
-        )
-    weight = "0.85+requirements@1:0.13" if revision == "v002" else "0.78+requirements@1:0.20"
-    return _experiment_meta(
-        _SKILL_SCENARIO,
-        revision,
-        f"scorers:typescript-code-task@1:{weight}+resource-efficiency@1:0.02",
-        [
-            *_SKILL_CORE_METRICS,
-            "requirements-coverage",
-            "requirements-adherence",
-            "resource-efficiency",
-        ],
-        ["typescript-code-task@1", "requirements@1", "resource-efficiency@1"],
-    )
+    return _experiment_meta(_skill_scenario(revision))
 
 
 def _str_list(meta: dict[str, object], key: str) -> list[str]:
@@ -168,19 +214,14 @@ def _str_list(meta: dict[str, object], key: str) -> list[str]:
     return value
 
 
-def _experiment_meta(
-    scenario: str,
-    revision: str,
-    profile: str,
-    metric_ids: list[str],
-    scorer_ids: list[str],
-) -> dict[str, object]:
+def _experiment_meta(scenario: ScenarioDefinition) -> dict[str, object]:
     return {
-        "scenario": scenario,
-        "revision": revision,
-        "profile": profile,
-        "metric_ids": metric_ids,
-        "scorer_ids": scorer_ids,
+        "scenario": scenario.name,
+        "revision": scenario.scenario_revision,
+        "profile": scorer_evaluation_profile(scenario),
+        "metric_ids": scenario.metric_ids(),
+        "scorer_ids": scenario_scorers(scenario),
+        "scenario_definition": scenario,
     }
 
 
@@ -203,16 +244,25 @@ def _experiment_dir(
     (experiment_dir / "experiment-summary.json").write_text(
         json.dumps(summary, indent=2) + "\n", encoding="utf-8"
     )
+    persist_experiment_review_projection(experiment_dir, summary, runs)
     return experiment_dir
 
 
 def _summary_payload(spec: Spec, meta: dict[str, object], runs: list[EvalRun]) -> dict[str, object]:
+    scenario = meta["scenario_definition"]
+    assert isinstance(scenario, ScenarioDefinition)
+    previous = (
+        _skill_scenario(scenario.parent_revision)
+        if scenario.name == _SKILL_SCENARIO and scenario.parent_revision
+        else None
+    )
     summary = create_experiment_summary(
         ExperimentSummaryInput(
             scenario_name=str(meta["scenario"]),
             scenario_revision=str(meta["revision"]),
             harness=spec.harness,
             model=spec.model,
+            reasoning_effort=spec.reasoning_effort,
             evaluation_profile=str(meta["profile"]),
             metrics=_str_list(meta, "metric_ids"),
             scorers=_str_list(meta, "scorer_ids"),
@@ -220,6 +270,10 @@ def _summary_payload(spec: Spec, meta: dict[str, object], runs: list[EvalRun]) -
             repeat_parallel=1,
             runs=runs,
             started_at=_STARTED,
+            review=scenario_review_contract(
+                scenario,
+                previous_scenario=previous,
+            ),
         )
     )
     config = summary.get("config")
@@ -264,14 +318,20 @@ def _mixed_quality_runs(spec: Spec) -> list[EvalRun]:
 
 
 def _unscored_run(run_id: str, spec: Spec) -> EvalRun:
-    scorecard = _scorecard(run_id, spec, duration=300.0)
-    scorecard.unscored = True
-    scorecard.unscored_reasons = [
+    reasons = [
         "Scoring did not complete: the harness exited before verification finished.",
         "Re-run this scenario to obtain a score.",
     ]
-    scorecard.metric_scores = []
-    scorecard.scorer_results = []
+    scorecard = build_synthetic_scorecard(
+        run_id,
+        spec,
+        _BUGFIX_SCENARIO,
+        duration=300.0,
+        evidence=SyntheticEvidence(default_score=0.0),
+        process=_bugfix_token_spend(spec, run_id),
+        unscored=True,
+        unscored_reasons=reasons,
+    )
     return _eval_run(run_id, spec, scorecard, duration=300.0, fix_succeeded=False)
 
 
@@ -356,41 +416,32 @@ def _skill_run(
     duration: float,
     index: int,
 ) -> EvalRun:
-    metric_scores = [
-        MetricScore(metric_id=metric_id, score=quality, passed=quality >= 0.8)
-        for metric_id in _str_list(meta, "metric_ids")
-    ]
-    metric_by_id = {m.metric_id: m.score for m in metric_scores}
-    scorecard = Scorecard(
-        run_id=run_id,
-        scenario_name=_SKILL_SCENARIO,
-        scenario_revision=revision,
-        harness=spec.harness,
-        model=spec.model,
-        starter_root="starter",
-        duration_sec=duration,
-        functional=FunctionalScore(
-            passed=True,
-            tests_passed=6,
-            tests_total=6,
-            build_succeeded=True,
-            gates_passed=4,
-            gates_total=4,
+    scenario = meta["scenario_definition"]
+    assert isinstance(scenario, ScenarioDefinition)
+    requirement_score, matched_count, missing = _skill_requirements(revision)
+    process = _skill_token_spend(spec, revision, index)
+    scorecard = build_synthetic_scorecard(
+        run_id,
+        spec,
+        scenario,
+        duration=duration,
+        evidence=SyntheticEvidence(
+            default_score=quality,
+            metric_overrides={
+                "requirements-coverage": requirement_score,
+                "resource-efficiency": 0.88,
+            },
+            matched_counts={"requirements-coverage": matched_count},
+            missing_patterns={"requirements-coverage": missing},
         ),
-        requirements_coverage=_skill_requirements(revision),
-        metadata={
-            SYNTHETIC_MARKER: True,
-            "run": {"canonical_run_dir": None, "run_json_path": None},
-            "process": _skill_token_spend(spec, revision, index),
-        },
-        metric_scores=metric_scores,
-        scorer_results=_skill_scorer_results(revision, quality, metric_by_id),
+        process=process,
     )
     return EvalRun(
         id=run_id,
         timestamp=_STARTED.isoformat(),
         config=EvalConfig(
             model=spec.model,
+            reasoning_effort=spec.reasoning_effort,
             harness=spec.harness,
             scenario_name=_SKILL_SCENARIO,
             scenario_revision=revision,
@@ -405,87 +456,13 @@ def _skill_run(
     )
 
 
-def _skill_requirements(revision: str) -> RequirementsCoverageScore:
+def _skill_requirements(revision: str) -> tuple[float, int, list[str]]:
     satisfied = {"v001": 6, "v002": 7}.get(revision, 8)
     missing = {
         "v001": ["req-no-todo", "req-error-paths"],
         "v002": ["req-no-todo"],
     }.get(revision, [])
-    return RequirementsCoverageScore(
-        total_requirements=8,
-        satisfied_requirements=satisfied,
-        missing_requirement_ids=missing,
-    )
-
-
-def _contributions(scorer_key: str, metrics: dict[str, float]) -> list[ScorerMetricContribution]:
-    """Even-weighted metric_contributions for a scorer, scoped to the metrics present."""
-    scorer_metrics = (_BUGFIX_SCORER_METRICS | _SKILL_SCORER_METRICS).get(scorer_key, [])
-    present = [m for m in scorer_metrics if m in metrics]
-    if not present:
-        return []
-    weight = round(1.0 / len(present), 4)
-    return [
-        ScorerMetricContribution(
-            metric_id=metric_id,
-            weight=weight,
-            score=metrics[metric_id],
-            weighted_score=round(weight * metrics[metric_id], 4),
-        )
-        for metric_id in present
-    ]
-
-
-def _skill_scorer_results(
-    revision: str, quality: float, metrics: dict[str, float]
-) -> list[ScorerResult]:
-    if revision == "v001":
-        return [
-            ScorerResult(
-                scorer_id="typescript-code-task",
-                version=1,
-                category="quality",
-                weight=0.98,
-                score=quality,
-                metric_contributions=_contributions("typescript-code-task", metrics),
-            ),
-            ScorerResult(
-                scorer_id="resource-efficiency",
-                version=1,
-                category="efficiency",
-                weight=0.02,
-                score=0.8,
-                metric_contributions=_contributions("resource-efficiency", metrics),
-            ),
-        ]
-    task_weight = 0.85 if revision == "v002" else 0.78
-    req_weight = 0.13 if revision == "v002" else 0.20
-    return [
-        ScorerResult(
-            scorer_id="typescript-code-task",
-            version=1,
-            category="quality",
-            weight=task_weight,
-            score=quality,
-            metric_contributions=_contributions("typescript-code-task", metrics),
-        ),
-        ScorerResult(
-            scorer_id="requirements",
-            version=1,
-            category="quality",
-            weight=req_weight,
-            score=quality,
-            metric_contributions=_contributions("requirements", metrics),
-        ),
-        ScorerResult(
-            scorer_id="resource-efficiency",
-            version=1,
-            category="efficiency",
-            weight=0.02,
-            score=0.88,
-            metric_contributions=_contributions("resource-efficiency", metrics),
-        ),
-    ]
+    return satisfied / 8, satisfied, missing
 
 
 def _skill_trace_events() -> list[TraceEvent]:
@@ -520,10 +497,25 @@ def _run(
     quality: float = 0.97,
     efficiency: float = 0.93,
 ) -> EvalRun:
-    scorecard = _scorecard(run_id, spec, duration=duration)
-    scorecard.metric_scores = _passing_metric_scores()
-    metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
-    scorecard.scorer_results = _scorer_results(quality, efficiency, metrics)
+    scorecard = build_synthetic_scorecard(
+        run_id,
+        spec,
+        _BUGFIX_SCENARIO,
+        duration=duration,
+        evidence=SyntheticEvidence(
+            default_score=quality,
+            metric_overrides={
+                "requirements-adherence": 0.95,
+                "resource-efficiency": efficiency,
+            },
+            matched_counts={"requirements-coverage": 5},
+            judge_outputs={"requirements-adherence": {"verdict": "satisfied"}},
+            evidence={
+                "requirements-adherence": "judge verdict satisfied with full evidence bundle"
+            },
+        ),
+        process=_bugfix_token_spend(spec, run_id),
+    )
     scorecard.metadata["evidence"] = {
         "retained_files": [
             {
@@ -537,33 +529,23 @@ def _run(
 
 
 def _degraded_run(run_id: str, spec: Spec) -> EvalRun:
-    scorecard = _scorecard(run_id, spec, duration=540.0)
-    scorecard.functional = FunctionalScore(
-        passed=False,
-        tests_passed=7,
-        tests_total=9,
-        build_succeeded=True,
-        gates_passed=2,
-        gates_total=4,
-    )
-    scorecard.verification_stability = VerificationStabilityScore(
-        total_gate_failures=3,
-        unique_failure_categories=2,
-        repeat_failures=1,
-    )
-    scorecard.requirements_coverage = RequirementsCoverageScore(
-        total_requirements=5,
-        satisfied_requirements=3,
-        missing_requirement_ids=["req-repro-test-enabled", "req-defect-evidence-retained"],
-    )
-    scorecard.metric_scores = _failing_metric_scores()
-    metrics = {m.metric_id: m.score for m in scorecard.metric_scores}
-    scorecard.scorer_results = _scorer_results(0.46, 0.40, metrics)
-    scorecard.metadata["process"] = {
-        **scorecard.metadata.get("process", {}),
+    process = {
+        **_bugfix_token_spend(spec, run_id),
+        "command_count": 7,
+        "failed_command_count": 3,
+        "verification_rounds": 3,
+        "repeated_verification_failures": 1,
         "missing_required_verification_commands": 1,
         "required_verification_first_pass": {"bun run test:coverage": "missing"},
     }
+    scorecard = build_synthetic_scorecard(
+        run_id,
+        spec,
+        _BUGFIX_SCENARIO,
+        duration=540.0,
+        evidence=_failing_evidence(),
+        process=process,
+    )
     scorecard.metadata["evidence"] = {
         "retained_files": [
             {"path": "evidence/defect-evidence.json", "status": "missing", "keys": []}
@@ -593,35 +575,6 @@ def _degraded_run(run_id: str, spec: Spec) -> EvalRun:
     return _eval_run(run_id, spec, scorecard, duration=540.0, gates=gates, fix_succeeded=False)
 
 
-def _scorecard(run_id: str, spec: Spec, *, duration: float) -> Scorecard:
-    return Scorecard(
-        run_id=run_id,
-        scenario_name=_SCENARIO,
-        scenario_revision=_REVISION,
-        harness=spec.harness,
-        model=spec.model,
-        starter_root="starter",
-        duration_sec=duration,
-        functional=FunctionalScore(
-            passed=True,
-            tests_passed=12,
-            tests_total=12,
-            build_succeeded=True,
-            gates_passed=4,
-            gates_total=4,
-        ),
-        requirements_coverage=RequirementsCoverageScore(
-            total_requirements=5,
-            satisfied_requirements=5,
-        ),
-        metadata={
-            SYNTHETIC_MARKER: True,
-            "run": {"canonical_run_dir": None, "run_json_path": None},
-            "process": _bugfix_token_spend(spec, run_id),
-        },
-    )
-
-
 def _eval_run(
     run_id: str,
     spec: Spec,
@@ -636,12 +589,13 @@ def _eval_run(
         timestamp=_STARTED.isoformat(),
         config=EvalConfig(
             model=spec.model,
+            reasoning_effort=spec.reasoning_effort,
             harness=spec.harness,
             scenario_name=_SCENARIO,
             scenario_revision=_REVISION,
             starter_root="starter",
-            evaluation_profile=_PROFILE,
-            scorers=_SCORER_IDS,
+            evaluation_profile=scorer_evaluation_profile(_BUGFIX_SCENARIO),
+            scorers=scenario_scorers(_BUGFIX_SCENARIO),
         ),
         duration_sec=duration,
         terminated_early=False,
@@ -722,89 +676,42 @@ def _trace_events(*, fix_succeeded: bool) -> list[TraceEvent]:
     return events
 
 
-def _passing_metric_scores() -> list[MetricScore]:
-    return [
-        MetricScore(metric_id="defect-resolution", score=1.0, passed=True),
-        MetricScore(metric_id="regression-protection", score=1.0, passed=True),
-        MetricScore(metric_id="change-containment", score=1.0, passed=True),
-        MetricScore(metric_id="verification-stability", score=1.0, passed=True),
-        MetricScore(metric_id="defect-evidence-completeness", score=1.0, passed=True),
-        MetricScore(metric_id="requirements-coverage", score=1.0, passed=True),
-        MetricScore(
-            metric_id="requirements-adherence",
-            score=0.95,
-            passed=True,
-            judge_output={"verdict": "satisfied"},
-            evidence="judge verdict satisfied with full evidence bundle",
-        ),
-        MetricScore(metric_id="resource-efficiency", score=0.9, passed=True),
-    ]
-
-
-def _failing_metric_scores() -> list[MetricScore]:
-    return [
-        MetricScore(
-            metric_id="defect-resolution",
-            score=0.46,
-            passed=False,
-            evidence="direct: functional execution capped by defect-linked requirement checks",
-        ),
-        MetricScore(
-            metric_id="regression-protection",
-            score=0.5,
-            passed=False,
-            missing_patterns=["behavior-specific regression tests"],
-            evidence="proxy: test file inventory cannot prove failure-before-pass replay",
-        ),
-        MetricScore(metric_id="change-containment", score=0.85, passed=True),
-        MetricScore(metric_id="verification-stability", score=0.4, passed=False),
-        MetricScore(
-            metric_id="defect-evidence-completeness",
-            score=0.5,
-            passed=False,
-            missing_patterns=["reproduction note", "regression test evidence"],
-        ),
-        MetricScore(metric_id="requirements-coverage", score=0.6, passed=False),
-        MetricScore(
-            metric_id="requirements-adherence",
-            score=0.3,
-            passed=False,
-            judge_output={"verdict": "unsatisfied"},
-            evidence="judge verdict unsatisfied: defect evidence missing",
-        ),
-        MetricScore(metric_id="resource-efficiency", score=0.5, passed=False),
-    ]
-
-
-def _scorer_results(
-    quality: float, efficiency: float, metrics: dict[str, float]
-) -> list[ScorerResult]:
-    return [
-        ScorerResult(
-            scorer_id="bugfix",
-            version=1,
-            category="quality",
-            weight=0.88,
-            score=quality,
-            metric_contributions=_contributions("bugfix", metrics),
-        ),
-        ScorerResult(
-            scorer_id="requirements",
-            version=1,
-            category="quality",
-            weight=0.10,
-            score=quality,
-            metric_contributions=_contributions("requirements", metrics),
-        ),
-        ScorerResult(
-            scorer_id="resource-efficiency",
-            version=1,
-            category="efficiency",
-            weight=0.02,
-            score=efficiency,
-            metric_contributions=_contributions("resource-efficiency", metrics),
-        ),
-    ]
+def _failing_evidence() -> SyntheticEvidence:
+    return SyntheticEvidence(
+        default_score=0.46,
+        metric_overrides={
+            "defect-resolution": 0.46,
+            "regression-protection": 0.5,
+            "change-containment": 0.85,
+            "verification-stability": 0.4,
+            "defect-evidence-completeness": 0.5,
+            "requirements-coverage": 0.6,
+            "requirements-adherence": 0.3,
+            "resource-efficiency": 0.5,
+        },
+        matched_counts={"requirements-coverage": 3},
+        missing_patterns={
+            "regression-protection": ["behavior-specific regression tests"],
+            "defect-evidence-completeness": [
+                "reproduction note",
+                "regression test evidence",
+            ],
+            "requirements-coverage": [
+                "req-repro-test-enabled",
+                "req-defect-evidence-retained",
+            ],
+        },
+        evidence={
+            "defect-resolution": (
+                "direct: functional execution capped by defect-linked requirement checks"
+            ),
+            "regression-protection": (
+                "proxy: test file inventory cannot prove failure-before-pass replay"
+            ),
+            "requirements-adherence": "judge verdict unsatisfied: defect evidence missing",
+        },
+        judge_outputs={"requirements-adherence": {"verdict": "unsatisfied"}},
+    )
 
 
 def main() -> None:

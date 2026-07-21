@@ -8,9 +8,17 @@ from __future__ import annotations
 
 import os
 import shutil
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
+
+from raidar.harness.definitions import (
+    CredentialSourceType,
+    CredentialSpec,
+    HarnessDefinition,
+    harness_definition,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
     from ..config import AgentSpec
@@ -31,6 +39,48 @@ def resolve_cli_executable(
             f"{harness_label} CLI not found. Set {cli_env_var} or add '{default_binary}' to PATH."
         )
     return candidate
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedCredential:
+    """One available credential paired with its owning harness contract."""
+
+    spec: CredentialSpec
+    source_name: str
+    value: str | Path
+
+
+def _missing_required_names(
+    credentials: tuple[CredentialSpec, ...],
+    resolved_ids: set[str],
+) -> tuple[str, ...]:
+    missing: list[str] = []
+    for credential in credentials:
+        if (
+            credential.required
+            and credential.requirement_group is None
+            and credential.id not in resolved_ids
+        ):
+            missing.extend(credential.accepted_names)
+    return tuple(dict.fromkeys(missing))
+
+
+def _missing_required_group(
+    credentials: tuple[CredentialSpec, ...],
+    resolved_ids: set[str],
+) -> tuple[str, tuple[str, ...]] | None:
+    grouped: dict[str, list[CredentialSpec]] = {}
+    for credential in credentials:
+        if credential.required and credential.requirement_group is not None:
+            grouped.setdefault(credential.requirement_group, []).append(credential)
+    for group, alternatives in sorted(grouped.items()):
+        if any(credential.id in resolved_ids for credential in alternatives):
+            continue
+        names = tuple(
+            dict.fromkeys(name for credential in alternatives for name in credential.accepted_names)
+        )
+        return group, names
+    return None
 
 
 class HarnessAdapter:
@@ -62,13 +112,73 @@ class HarnessAdapter:
         """Extra environment variables required for the harness runtime."""
         return {}
 
-    def excluded_run_env_keys(self) -> set[str]:
-        """Environment keys that should not be forwarded into Harbor runs."""
-        return set()
+    @property
+    def definition(self) -> HarnessDefinition:
+        """Return the canonical definition for this adapter's harness."""
 
-    def local_secret_files(self) -> dict[str, Path]:
-        """Local file artifacts that should be copied into Harbor as secret files."""
+        return harness_definition(self.config.harness.value)
+
+    def credential_environment_sources(self) -> dict[str, str]:
+        """Return available environment-backed sources declared by the harness."""
+
+        names = {
+            name
+            for credential in self.definition.credentials
+            if credential.source_type is CredentialSourceType.ENVIRONMENT
+            for name in credential.accepted_names
+        }
+        return {name: value for name in names if (value := os.environ.get(name))}
+
+    def credential_file_sources(self) -> dict[str, Path]:
+        """Return available file-backed sources declared by the harness."""
+
         return {}
+
+    def resolved_credentials(self) -> tuple[ResolvedCredential, ...]:
+        """Resolve declared credential alternatives without duplicating policy."""
+
+        environment_sources = self.credential_environment_sources()
+        file_sources = self.credential_file_sources()
+        resolved: list[ResolvedCredential] = []
+        for credential in self.definition.credentials:
+            sources: Mapping[str, str | Path]
+            if credential.source_type is CredentialSourceType.ENVIRONMENT:
+                sources = environment_sources
+            else:
+                sources = file_sources
+            source_name = next(
+                (name for name in credential.accepted_names if name in sources),
+                None,
+            )
+            if source_name is not None:
+                resolved.append(
+                    ResolvedCredential(
+                        spec=credential,
+                        source_name=source_name,
+                        value=sources[source_name],
+                    )
+                )
+        return tuple(resolved)
+
+    def _validate_credentials(self) -> None:
+        """Validate required credential groups from the harness definition."""
+
+        resolved_ids = {credential.spec.id for credential in self.resolved_credentials()}
+        missing_names = _missing_required_names(self.definition.credentials, resolved_ids)
+        if missing_names:
+            raise OSError(
+                f"{self.config.harness.value} runs require credentials; "
+                f"set: {', '.join(missing_names)}."
+            )
+
+        missing_group = _missing_required_group(self.definition.credentials, resolved_ids)
+        if missing_group is None:
+            return
+        group, names = missing_group
+        raise OSError(
+            f"{self.config.harness.value} runs require credentials for {group}; "
+            f"set one of: {', '.join(names)}."
+        )
 
     def execution_metadata(self) -> dict[str, Any]:
         """Adapter metadata that should be surfaced in validation and run artifacts."""
@@ -134,6 +244,9 @@ class HarnessAdapter:
 
         cmd.extend(
             [
+                "--quiet",
+                "--no-delete",
+                "--no-export-traces",
                 "--n-concurrent",
                 "1",
                 "-m",

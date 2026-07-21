@@ -39,10 +39,18 @@ def _scenario() -> ScenarioDefinition:
     return ScenarioDefinition.model_validate(
         {
             "name": "judge-scenario",
+            "display_name": "Judge Scenario",
             "scenario_revision": "v001",
             "description": "Judge a delivery output",
             "difficulty": "medium",
-            "category": "greenfield-ui",
+            "task_kind": "design_implementation",
+            "delivery_mode": "direct_implementation",
+            "workspace_state": "new",
+            "starting_conditions": [],
+            "languages": ["TypeScript"],
+            "evaluation_role": "benchmark",
+            "catalog_status": "active",
+            "variant_axes": {},
             "timeout_sec": 1800,
             "environment": {
                 "kind": "stack_preset",
@@ -98,14 +106,16 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
     )
     (scenario_dir / "prompt" / "task.md").write_text("Build the page.", encoding="utf-8")
     (workspace / "src" / "page.tsx").write_text("export const Ready = true;\n", encoding="utf-8")
+    (workspace / "src" / "ignored.py").write_text(
+        "SECRET_PYTHON_SURFACE = True\n", encoding="utf-8"
+    )
 
     calls: list[dict[str, str]] = []
 
-    def fake_call_judge(*, judge_role: str, prompt: str) -> str:
+    def fake_call_judge(judge_role: str, prompt: str) -> str:
         calls.append({"judge_role": judge_role, "prompt": prompt})
         return JUDGE_RESPONSE
 
-    monkeypatch.setattr(llm_as_judge, "_call_judge", fake_call_judge)
     monkeypatch.setattr(
         llm_as_judge,
         "resolve_scorer_definition_file",
@@ -118,6 +128,7 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
         scenario=_scenario(),
         metric_id="plan-adherence",
         judge_path="judges/reviewer.toml",
+        executor=fake_call_judge,
     )
 
     assert metric.metric_id == "plan-adherence"
@@ -131,9 +142,11 @@ def test_evaluate_llm_as_judge_metric_uses_judge_role_file(
     assert len(calls) == 1
     assert calls[0]["judge_role"] == "You are a delivery reviewer."
     assert "src/page.tsx" in calls[0]["prompt"]
+    assert "src/ignored.py" not in calls[0]["prompt"]
     assert "Structured judge inputs:" in calls[0]["prompt"]
     assert "changed_surfaces" in calls[0]["prompt"]
-    assert "execution_outcomes" in calls[0]["prompt"]
+    assert "execution_outcomes" not in calls[0]["prompt"]
+    assert "deterministic_metric_summaries" in calls[0]["prompt"]
     assert "deterministic_metric_summaries" in calls[0]["prompt"]
 
 
@@ -156,18 +169,20 @@ def test_llm_as_judge_redacts_secret_shaped_prompt_and_response(
     )
     calls: list[dict[str, str]] = []
 
-    def fake_call_judge(*, judge_role: str, prompt: str) -> str:
+    def fake_call_judge(judge_role: str, prompt: str) -> str:
         calls.append({"judge_role": judge_role, "prompt": prompt})
         return json.dumps(
             {
                 "passed": True,
                 "score": 1,
+                "verdict": "PASS",
                 "evidence": "Bearer abcdefghijklmnopqrstuvwxyz1234567890",
                 "findings": [{"evidence": "api_key=abcdef1234567890"}],
+                "rubric_coverage": {},
+                "residual_risk": [],
             }
         )
 
-    monkeypatch.setattr(llm_as_judge, "_call_judge", fake_call_judge)
     monkeypatch.setattr(
         llm_as_judge,
         "resolve_scorer_definition_file",
@@ -180,6 +195,7 @@ def test_llm_as_judge_redacts_secret_shaped_prompt_and_response(
         scenario=_scenario(),
         metric_id="plan-adherence",
         judge_path="judges/reviewer.toml",
+        executor=fake_call_judge,
     )
 
     assert "super-secret-value" not in calls[0]["prompt"]
@@ -221,21 +237,25 @@ def test_call_codex_judge_uses_chatgpt_auth_without_api_key(
 
     monkeypatch.setattr(llm_as_judge.subprocess, "run", fake_run)
 
-    response = llm_as_judge._call_codex_judge(judge_role="judge", prompt="prompt")
+    response = llm_as_judge._call_codex_judge(
+        image_name="raidar-task-env:judge-reserve",
+        judge_role="judge",
+        prompt="prompt",
+    )
 
     assert response == JUDGE_RESPONSE.strip()
     assert len(calls) == 1
     command = calls[0]["args"][0]
-    assert command[:2] == ["codex", "exec"]
+    assert command[:4] == ["docker", "run", "--rm", "-i"]
+    assert "raidar-task-env:judge-reserve" in command
+    assert command[command.index("raidar-task-env:judge-reserve") + 1 :][:2] == ["codex", "exec"]
     assert "--json" in command
     assert command[command.index("--model") + 1] == "gpt-5.5"
     assert "-c" in command
     assert "model_reasoning_effort=low" in command
     assert command[-1] == "-"
     assert calls[0]["input"] == "judge\n\nprompt"
-    env = calls[0]["env"]
-    assert "CODEX_HOME" in env
-    assert "OPENAI_API_KEY" not in env
+    assert "OPENAI_API_KEY" not in command
 
 
 def test_evaluate_llm_as_judge_metric_fails_when_judge_file_missing(tmp_path: Path) -> None:
@@ -244,19 +264,14 @@ def test_evaluate_llm_as_judge_metric_fails_when_judge_file_missing(tmp_path: Pa
     scenario_dir.mkdir()
     workspace.mkdir()
 
-    metric = llm_as_judge.evaluate_llm_as_judge_metric(
-        workspace=workspace,
-        scenario_dir=scenario_dir,
-        scenario=_scenario(),
-        metric_id="plan-adherence",
-        judge_path="judges/missing.md",
-    )
-
-    assert metric.metric_id == "plan-adherence"
-    assert metric.score == 0.0
-    assert metric.passed is False
-    assert metric.missing_patterns == ["judges/missing.md"]
-    assert metric.judge_output is None
+    with pytest.raises(llm_as_judge.JudgeEvaluationError, match="Judge definition unavailable"):
+        llm_as_judge.evaluate_llm_as_judge_metric(
+            workspace=workspace,
+            scenario_dir=scenario_dir,
+            scenario=_scenario(),
+            metric_id="plan-adherence",
+            judge_path="judges/missing.md",
+        )
 
 
 @pytest.mark.parametrize("judge_path", ["../outside.md", "/tmp/outside.md"])
@@ -269,18 +284,28 @@ def test_evaluate_llm_as_judge_metric_rejects_unsafe_judge_paths(
     scenario_dir.mkdir()
     workspace.mkdir()
 
-    metric = llm_as_judge.evaluate_llm_as_judge_metric(
-        workspace=workspace,
-        scenario_dir=scenario_dir,
-        scenario=_scenario(),
-        metric_id="plan-adherence",
-        judge_path=judge_path,
-    )
+    with pytest.raises(llm_as_judge.JudgeEvaluationError, match="Judge definition unavailable"):
+        llm_as_judge.evaluate_llm_as_judge_metric(
+            workspace=workspace,
+            scenario_dir=scenario_dir,
+            scenario=_scenario(),
+            metric_id="plan-adherence",
+            judge_path=judge_path,
+        )
 
-    assert metric.score == 0.0
-    assert metric.passed is False
-    assert metric.missing_patterns == [judge_path]
-    assert "scorer definitions" in metric.evidence or "parent traversal" in metric.evidence
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        "VERDICT: PASS",
+        '{"passed": true, "score": 1}',
+        '{"passed": true, "score": 1, "verdict": "PASS", "evidence": "ok", '
+        '"findings": [], "rubric_coverage": {}, "residual_risk": [], "extra": true}',
+    ],
+)
+def test_metric_score_from_response_rejects_non_contract_output(response: str) -> None:
+    with pytest.raises(llm_as_judge.JudgeEvaluationError):
+        llm_as_judge._metric_score_from_response(response, metric_id="requirements-adherence")
 
 
 @pytest.mark.parametrize("judge_path", ["../outside.toml", "/tmp/outside.toml"])

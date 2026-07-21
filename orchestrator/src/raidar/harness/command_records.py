@@ -8,7 +8,7 @@ import shlex
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.harness.definitions import HarnessDefinitionError, harness_definition
+from raidar.harness.result_manifest import HarborArtifactRole, HarborResultManifest
 from raidar.runtime.harbor_results import _load_json_dict
 from raidar.runtime.harness_logs import _as_int, _extract_item_completed, _read_jsonl_dicts
 from raidar.runtime.models import CommandRecord
@@ -334,66 +334,59 @@ def _command_records(
     return records
 
 
-def _command_records_for_harness(
-    trial_dir: Path,
-    harness: str,
+def _command_records_from_manifest(
+    manifest: HarborResultManifest,
     *,
     include_git_commit: bool = False,
     verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
-    try:
-        definition = harness_definition(harness)
-    except HarnessDefinitionError as exc:
-        raise ValueError(f"Unsupported harness: {harness}") from exc
+    definition = manifest.definition
     parser = definition.command_parser
     if parser == "codex-jsonl":
         return _command_records(
-            _read_jsonl_dicts(trial_dir / "agent" / "codex.txt"),
+            _read_jsonl_dicts(manifest.harness_artifact("codex.txt")),
             include_git_commit=include_git_commit,
             verification_patterns=verification_patterns,
         )
     if parser == "claude-stdout":
         return _command_records_from_claude_stdout(
-            trial_dir,
+            manifest,
             include_git_commit=include_git_commit,
             verification_patterns=verification_patterns,
         )
     if parser == "gemini":
         stdout_records = _command_records_from_harness_stdout(
-            trial_dir,
-            additional_stdout_files=definition.additional_stdout_files,
+            manifest,
             include_git_commit=include_git_commit,
             verification_patterns=verification_patterns,
         )
         if stdout_records:
             return stdout_records
         return _command_records_from_gemini_trajectory(
-            trial_dir,
+            manifest,
             include_git_commit=include_git_commit,
             verification_patterns=verification_patterns,
         )
     if parser == "command-stdout":
         return _command_records_from_harness_stdout(
-            trial_dir,
+            manifest,
             include_git_commit=include_git_commit,
             verification_patterns=verification_patterns,
         )
-    raise ValueError(f"Unsupported command parser for harness {harness}: {parser}")
+    raise ValueError(f"Unsupported command parser for harness {definition.id}: {parser}")
 
 
 def _command_records_from_harness_stdout(
-    trial_dir: Path,
+    manifest: HarborResultManifest,
     *,
-    additional_stdout_files: tuple[str, ...] = (),
     include_git_commit: bool = False,
     verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
-    harness_dir = trial_dir / "agent"
+    harness_dir = manifest.path(HarborArtifactRole.HARNESS_OUTPUT_ROOT)
     if not harness_dir.exists():
         return []
     records: list[CommandRecord] = []
-    stdout_paths: list[Path] = sorted(harness_dir.glob("command-*/stdout.txt"))
-    stdout_paths.extend(harness_dir / name for name in additional_stdout_files)
+    stdout_paths = [*manifest.command_stdout_paths(), *manifest.additional_stdout_paths()]
     for stdout_path in stdout_paths:
         if not stdout_path.exists():
             continue
@@ -408,17 +401,16 @@ def _command_records_from_harness_stdout(
 
 
 def _command_records_from_claude_stdout(
-    trial_dir: Path,
+    manifest: HarborResultManifest,
     *,
     include_git_commit: bool = False,
     verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
-    agent_dir = trial_dir / "agent"
+    agent_dir = manifest.path(HarborArtifactRole.HARNESS_OUTPUT_ROOT)
     if not agent_dir.exists():
         return []
     records: list[CommandRecord] = []
-    stdout_paths: list[Path] = sorted(agent_dir.glob("command-*/stdout.txt"))
-    stdout_paths.append(agent_dir / "claude-code.txt")
+    stdout_paths = [*manifest.command_stdout_paths(), manifest.harness_artifact("claude-code.txt")]
     for stdout_path in stdout_paths:
         if not stdout_path.exists():
             continue
@@ -673,12 +665,12 @@ def _quoted_command_records(
 
 
 def _command_records_from_gemini_trajectory(
-    trial_dir: Path,
+    manifest: HarborResultManifest,
     *,
     include_git_commit: bool = False,
     verification_patterns: tuple[str, ...] = (),
 ) -> list[CommandRecord]:
-    payload = _load_json_dict(trial_dir / "agent" / "gemini-cli.trajectory.json")
+    payload = _load_json_dict(manifest.harness_artifact("gemini-cli.trajectory.json"))
     messages = payload.get("messages")
     if not isinstance(messages, list):
         return []

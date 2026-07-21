@@ -8,6 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from .application.scenario_catalog import load_scenario, save_scenario
 from .schemas.scenario import ScenarioDefinition
 
 REVISION_PATTERN = re.compile(r"^v(\d+)$")
@@ -81,10 +82,13 @@ def clone_scenario_revision(
 
     try:
         target_scenario_yaml = target_dir / "scenario.yaml"
-        scenario_def = ScenarioDefinition.from_yaml(target_scenario_yaml)
-        scenario_def.scenario_revision = resolved_target
-        scenario_def.parent_revision = source_revision
-        scenario_def.to_yaml(target_scenario_yaml)
+        scenario_payload = load_scenario(target_scenario_yaml).model_dump(mode="python")
+        scenario_payload.update(
+            scenario_revision=resolved_target,
+            parent_revision=source_revision,
+        )
+        scenario_def = ScenarioDefinition.model_validate(scenario_payload)
+        save_scenario(target_scenario_yaml, scenario_def)
     except Exception:
         shutil.rmtree(target_dir, ignore_errors=True)
         raise

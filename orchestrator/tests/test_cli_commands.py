@@ -2,6 +2,7 @@
 
 import pytest
 
+from raidar.application.scenario_catalog import load_scenario
 from tests import cli_commands_support as support
 
 json = support.json
@@ -83,9 +84,13 @@ def _assert_smoke_dry_run_output(output: str) -> None:
     assert "uv run --project orchestrator raidar run \\" in output
     assert "uv run --project orchestrator raidar matrix \\" in output
     assert '--config "matrices/hello-world-smoke-trio.yaml" \\' in output
+    assert '--config "matrices/hello-world-smoke-codex-gpt55.yaml" \\' in output
+    assert '--config "matrices/hello-world-smoke-gemini.yaml" \\' in output
+    assert '--config "matrices/hello-world-smoke-claude.yaml" \\' in output
     assert '--repeats "2" \\' in output
     assert '--repeat-parallel "2" \\' in output
     assert "uv run --project orchestrator raidar experiment run \\" in output
+    assert '--experiment-kind "operational-smoke"' in output
 
 
 def _init_scenario_revision(
@@ -102,6 +107,22 @@ def _init_scenario_revision(
             name,
             "--scenario-revision",
             revision,
+            "--display-name",
+            name,
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
         ],
     )
     assert result.exit_code == 0, result.output
@@ -241,10 +262,18 @@ def _minimal_cli_scenario() -> ScenarioDefinition:
     return ScenarioDefinition.model_validate(
         {
             "name": "hello-world-smoke",
+            "display_name": "Hello World Smoke",
             "scenario_revision": "v001",
             "description": "Smoke scenario",
             "difficulty": "easy",
-            "category": "smoke",
+            "task_kind": "feature_implementation",
+            "delivery_mode": "direct_implementation",
+            "workspace_state": "existing",
+            "starting_conditions": [],
+            "languages": ["TypeScript"],
+            "evaluation_role": "benchmark",
+            "catalog_status": "active",
+            "variant_axes": {},
             "timeout_sec": 300,
             "environment": {
                 "kind": "stack_preset",
@@ -290,6 +319,7 @@ def _minimal_eval_run() -> EvalRun:
 
 
 def _dispatch_execute_run_command(options: RunCliOptions, repo_root: Path) -> None:
+    options.scenario.write_text(_minimal_cli_scenario().model_dump_json() + "\n", encoding="utf-8")
     execution.execute_run_command(
         ExecutionDispatchRequest(
             options=options,
@@ -444,10 +474,15 @@ def test_scenario_list_returns_scenario_ids_with_revisions(tmp_path: Path) -> No
     result = runner.invoke(main, ["scenario", "list", "--scenarios-root", str(scenarios_root)])
 
     assert result.exit_code == 0, result.output
-    assert result.output.strip().splitlines() == [
-        "alpha-task | revisions: v001, v002",
-        "beta-task | revisions: v001",
-    ]
+    lines = result.output.strip().splitlines()
+    assert len(lines) == 2
+    assert lines[0].endswith("revisions: v001, v002")
+    assert lines[1].endswith("revisions: v001")
+    for line in lines:
+        assert "display_name:" in line
+        assert "task_kind: feature_implementation" in line
+        assert "evaluation_role: benchmark" in line
+        assert "catalog_status: active" in line
 
 
 def test_generated_artifact_paths_filters_prefixes() -> None:
@@ -538,7 +573,7 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
     monkeypatch.setattr("raidar.commands.env_harbor.cleanup_stale_harbor_before_runs", lambda: None)
     monkeypatch.setattr(
         "raidar.commands.env_harbor.docker_compose_preflight_reason",
-        lambda env: None,
+        lambda env, runtime_profile: None,
     )
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
@@ -688,11 +723,19 @@ def test_matrix_dry_run_uses_config_scenario_entries(tmp_path: Path) -> None:
         "\n".join(
             [
                 "name: hello-world-smoke",
+                "display_name: Hello World Smoke",
                 "scenario_revision: v001",
                 "parent_revision: null",
                 "description: Smoke scenario",
                 "difficulty: easy",
-                "category: smoke",
+                "task_kind: feature_implementation",
+                "delivery_mode: direct_implementation",
+                "workspace_state: existing",
+                "starting_conditions: []",
+                "languages: [TypeScript]",
+                "evaluation_role: operational",
+                "catalog_status: active",
+                "variant_axes: {}",
                 "timeout_sec: 300",
                 "environment:",
                 "  kind: stack_preset",
@@ -761,6 +804,8 @@ def test_matrix_dry_run_uses_config_scenario_entries(tmp_path: Path) -> None:
             "matrix",
             "--config",
             str(config_path),
+            "--experiment-kind",
+            "operational-smoke",
             "--dry-run",
         ],
     )
@@ -825,14 +870,37 @@ def test_scenario_init_creates_schema_valid_scenario_and_rules(tmp_path: Path) -
 
     result = runner.invoke(
         main,
-        ["scenario", "init", "--path", str(task_dir), "--name", "sample-task"],
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(task_dir),
+            "--name",
+            "sample-task",
+            "--display-name",
+            "sample-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+        ],
     )
 
     assert result.exit_code == 0, result.output
     scenario_yaml = task_dir / "v001" / "scenario.yaml"
     assert scenario_yaml.exists()
 
-    scenario_def = ScenarioDefinition.from_yaml(scenario_yaml)
+    scenario_def = load_scenario(scenario_yaml)
     assert scenario_def.name == "sample-task"
     assert scenario_def.scenario_revision == "v001"
     assert scenario_def.parent_revision is None
@@ -884,6 +952,22 @@ def test_scenario_init_json_emits_machine_readable_payload(tmp_path: Path) -> No
             str(task_dir),
             "--name",
             "json-task",
+            "--display-name",
+            "json-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
             "--json",
         ],
     )
@@ -893,9 +977,82 @@ def test_scenario_init_json_emits_machine_readable_payload(tmp_path: Path) -> No
     assert payload["scenario_name"] == "json-task"
     assert payload["scenario_revision"] == "v001"
     assert payload["parent_revision"] is None
+    assert payload["template"] == "typescript-bun"
     assert Path(payload["scenario_yaml"]).is_file()
     assert Path(payload["prompt_path"]).is_file()
     assert Path(payload["rules_dir"]).is_dir()
+
+
+def test_scenario_init_requires_an_explicit_template(tmp_path: Path) -> None:
+    result = CliRunner().invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(tmp_path / "scenario"),
+            "--name",
+            "scenario",
+            "--display-name",
+            "scenario",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+        ],
+    )
+
+    assert result.exit_code != 0
+    assert "Missing option '--template'" in result.output
+
+
+def test_scenario_init_builds_python_template_from_typed_contract(tmp_path: Path) -> None:
+    scenario_root = tmp_path / "scenarios" / "python-task"
+    result = CliRunner().invoke(
+        main,
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(scenario_root),
+            "--name",
+            "python-task",
+            "--display-name",
+            "python-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "python",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "python-pytest",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    scenario = load_scenario(scenario_root / "v001" / "scenario.yaml")
+    assert scenario.environment.id == "python:3.12"
+    assert scenario.scorer_ids() == ["python-code-task@1", "resource-efficiency@1"]
+    assert scenario.verification.required_commands == [
+        ["python", "-m", "pytest"],
+        ["python", "-m", "ruff", "check", "."],
+    ]
+    assert [gate.name for gate in scenario.verification.gates] == ["test", "lint"]
 
 
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
@@ -953,7 +1110,30 @@ def test_scenario_clone_revision_auto_increments(tmp_path: Path) -> None:
 
     init_result = runner.invoke(
         main,
-        ["scenario", "init", "--path", str(scenario_dir), "--name", "sample-task"],
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(scenario_dir),
+            "--name",
+            "sample-task",
+            "--display-name",
+            "sample-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+        ],
     )
     assert init_result.exit_code == 0, init_result.output
 
@@ -968,7 +1148,7 @@ def test_scenario_clone_revision_auto_increments(tmp_path: Path) -> None:
     assert "parent_revision: v001" in clone_result.output
 
     cloned_scenario_yaml = scenario_dir / "v002" / "scenario.yaml"
-    cloned_scenario = ScenarioDefinition.from_yaml(cloned_scenario_yaml)
+    cloned_scenario = load_scenario(cloned_scenario_yaml)
     assert cloned_scenario.scenario_revision == "v002"
     assert cloned_scenario.parent_revision == "v001"
     assert (scenario_dir / "v002" / "starter" / "src" / "app" / "page.tsx").exists()
@@ -980,7 +1160,30 @@ def test_scenario_clone_revision_succeeds_without_starter_manifest(tmp_path: Pat
 
     init_result = runner.invoke(
         main,
-        ["scenario", "init", "--path", str(scenario_dir), "--name", "sample-task"],
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(scenario_dir),
+            "--name",
+            "sample-task",
+            "--display-name",
+            "sample-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+        ],
     )
     assert init_result.exit_code == 0, init_result.output
 
@@ -1007,7 +1210,30 @@ def test_scenario_clone_revision_skips_ignored_generated_artifacts_in_git_repo(
 
     init_result = runner.invoke(
         main,
-        ["scenario", "init", "--path", str(scenario_dir), "--name", "sample-task"],
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(scenario_dir),
+            "--name",
+            "sample-task",
+            "--display-name",
+            "sample-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+        ],
     )
     assert init_result.exit_code == 0, init_result.output
 
@@ -1049,7 +1275,30 @@ def test_scenario_clone_revision_json_emits_machine_readable_payload(tmp_path: P
 
     init_result = runner.invoke(
         main,
-        ["scenario", "init", "--path", str(scenario_dir), "--name", "json-clone-task"],
+        [
+            "scenario",
+            "init",
+            "--path",
+            str(scenario_dir),
+            "--name",
+            "json-clone-task",
+            "--display-name",
+            "json-clone-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+        ],
     )
     assert init_result.exit_code == 0, init_result.output
 
@@ -1086,8 +1335,24 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
             str(scenario_dir),
             "--name",
             "sample-task",
+            "--display-name",
+            "sample-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
             "--scenario-revision",
             "v2",
+            "--template",
+            "typescript-bun",
         ],
     )
     assert init_revision_two.exit_code == 0, init_revision_two.output
@@ -1101,8 +1366,24 @@ def test_info_selects_latest_scenario_revision_numerically(tmp_path: Path) -> No
             str(scenario_dir),
             "--name",
             "sample-task",
+            "--display-name",
+            "sample-task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
             "--scenario-revision",
             "v10",
+            "--template",
+            "typescript-bun",
         ],
     )
     assert init_v10.exit_code == 0, init_v10.output
@@ -1419,7 +1700,7 @@ def test_orchestrator_smoke_make_target_supports_repeat_overrides(tmp_path: Path
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
             "--harness codex-cli --provider openai --model gpt-5.5 --reasoning-effort low "
             "--repeats 2 --repeat-parallel 2 --rerun-unscored 0 "
-            "--experiment-kind benchmark"
+            "--experiment-kind operational-smoke"
         ),
         "ENV::",
     ]
@@ -1439,10 +1720,54 @@ def test_smoke_matrix_make_target_uses_default_smoke_scenario(tmp_path: Path) ->
         (
             "UV:run --project orchestrator raidar matrix "
             "--config matrices/hello-world-smoke-trio.yaml "
-            "--experiment-kind benchmark"
+            "--experiment-kind operational-smoke"
         ),
         "ENV::",
     ]
+
+
+@pytest.mark.parametrize(
+    ("selector", "config"),
+    [
+        ("codex", "matrices/hello-world-smoke-codex-gpt55.yaml"),
+        ("gemini", "matrices/hello-world-smoke-gemini.yaml"),
+        ("claude", "matrices/hello-world-smoke-claude.yaml"),
+    ],
+)
+def test_smoke_matrix_selector_resolves_distinct_config(
+    tmp_path: Path, selector: str, config: str
+) -> None:
+    fake_env = _fake_command_env(tmp_path)
+
+    result = _run_with_fake_commands(
+        fake_env,
+        ["make", "smoke-matrix", f"SMOKE_MATRIX_SELECTOR={selector}"],
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert fake_env.make_log.read_text(encoding="utf-8").splitlines() == [
+        "DOCKER:info",
+        (
+            "UV:run --project orchestrator raidar matrix "
+            f"--config {config} --experiment-kind operational-smoke"
+        ),
+        "ENV::",
+    ]
+
+
+def test_smoke_matrix_selector_rejects_unknown_value() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    result = subprocess.run(
+        ["make", "-n", "smoke-matrix", "SMOKE_MATRIX_SELECTOR=invalid"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Unknown SMOKE_MATRIX_SELECTOR 'invalid'" in result.stderr
 
 
 def test_agent_smoke_make_target_uses_canonical_routing(tmp_path: Path) -> None:
@@ -1467,7 +1792,7 @@ def test_agent_smoke_make_target_uses_canonical_routing(tmp_path: Path) -> None:
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
             "--harness gemini --provider google --model gemini-3-flash-preview "
             "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
-            "--experiment-kind benchmark"
+            "--experiment-kind operational-smoke"
         ),
         "ENV::",
     ]
@@ -1496,7 +1821,7 @@ def test_agent_smoke_make_target_defaults_codex_to_chatgpt_auth(tmp_path: Path) 
             "--scenario scenarios/hello-world-smoke/v001/scenario.yaml "
             "--harness codex-cli --provider openai --model gpt-5.4-mini --reasoning-effort low "
             "--repeats 1 --repeat-parallel 1 --rerun-unscored 0 "
-            "--experiment-kind benchmark"
+            "--experiment-kind operational-smoke"
         ),
         "ENV:::chatgpt",
     ]
@@ -1564,3 +1889,21 @@ def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
 
     assert result.returncode == 0, result.stderr
     _assert_smoke_dry_run_output(result.stdout)
+
+
+def test_scenario_agent_matrix_dry_run_is_side_effect_free() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+
+    result = subprocess.run(
+        ["make", "-n", "scenario-agent-matrix"],
+        cwd=repo_root,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "bugfix-ledger-balance-codex-gpt55-terra-low.yaml" in result.stdout
+    assert "test-generation-baseline-codex-gpt55-terra-low.yaml" in result.stdout
+    assert "validate-scenario-agent-matrix.py" in result.stdout
+    assert "No fresh experiment summary" not in result.stderr

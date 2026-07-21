@@ -200,7 +200,11 @@ def evaluate_typescript_requirements(
     mapped_satisfied = 0
 
     for requirement in requirements:
-        requirement_check = run_deterministic_check(requirement.check, workspace)
+        requirement_check = run_deterministic_check(
+            requirement.check,
+            workspace,
+            languages=("typescript",),
+        )
         missing_evidence = missing_typescript_test_evidence(
             test_sources, requirement.required_test_evidence
         )

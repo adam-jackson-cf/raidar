@@ -71,8 +71,8 @@ test.describe('run detail — failing run', () => {
   });
 
   test('verdict banner, gates and compare-specs link', async ({ page }) => {
-    await expect(page.getByText('Failing').first()).toBeVisible();
-    await expect(page.getByText(/Did not deliver/)).toBeVisible();
+    await expect(page.getByText('Shaky').first()).toBeVisible();
+    await expect(page.getByText(/Delivered with significant gaps/)).toBeVisible();
     const gate = page.locator('button[title*="evidence"]').first();
     await expect(gate).toBeVisible();
     await gate.click();
@@ -182,7 +182,7 @@ test.describe('span tree', () => {
   });
 
   test('payload copy button is present on a selected span', async ({ page }) => {
-    await page.locator('[data-span-row]').first().click();
+    await page.locator('[data-span-row]', { hasText: 'user prompt' }).click();
     await expect(page.locator('button[title="Copy payload"]').first()).toBeVisible();
   });
 });
@@ -244,7 +244,10 @@ test.describe('runs sidebar', () => {
 test.describe('comparison visualisations', () => {
   test('scatter point opens a run', async ({ page }) => {
     await openExperiments(page);
-    const point = page.locator('svg circle').first();
+    const point = page
+      .getByRole('img', { name: 'Composite score against run duration' })
+      .locator('circle')
+      .first();
     await expect(point).toBeVisible();
     await point.click();
     await expect(page).toHaveURL(/\/runs\/.+/);

@@ -11,6 +11,7 @@ from statistics import fmean, median, pstdev
 from .findings import experiment_findings
 from .run_metadata import uncached_input_tokens
 from .sanitization import sanitize_evidence_payload, sanitize_persisted_text
+from .schemas.review import ScenarioReviewContract
 from .schemas.scorecard import EvalRun
 
 
@@ -29,6 +30,8 @@ class ExperimentSummaryInput:
     repeat_parallel: int
     runs: list[EvalRun]
     started_at: datetime
+    reasoning_effort: str | None = None
+    review: ScenarioReviewContract | None = None
     rerun_unscored_limit: int = 0
     reruns_used: int = 0
     unresolved_unscored_count: int = 0
@@ -96,14 +99,17 @@ def _experiment_id(
     model: str,
     repeats: int,
     started_utc: datetime,
+    reasoning_effort: str | None = None,
 ) -> str:
-    return (
+    identity = (
         f"{started_utc.strftime('%Y%m%d-%H%M%SZ')}__"
         f"{scenario_name.lower().replace(' ', '-')}__"
         f"{harness}__"
         f"{model.replace('/', '-')}"
-        f"__x{repeats}"
     )
+    if reasoning_effort:
+        identity = f"{identity}__{reasoning_effort}"
+    return f"{identity}__x{repeats}"
 
 
 def _partition_runs(runs: list[EvalRun]) -> tuple[list[EvalRun], list[EvalRun], list[EvalRun]]:
@@ -219,6 +225,7 @@ def _summary_context(summary_input: ExperimentSummaryInput) -> _ExperimentSummar
         summary_input.model,
         summary_input.repeats,
         started_utc,
+        summary_input.reasoning_effort,
     )
     unscored_runs, scored_runs, valid_runs = _partition_runs(summary_input.runs)
     run_pointers = [_run_pointer(run) for run in summary_input.runs]
@@ -256,6 +263,7 @@ def _summary_config(
         "scenario_revision": summary_input.scenario_revision,
         "harness": summary_input.harness,
         "model": summary_input.model,
+        "reasoning_effort": summary_input.reasoning_effort,
         "evaluation_profile": summary_input.evaluation_profile,
         "metrics": summary_input.metrics,
         "scorers": summary_input.scorers,
@@ -266,6 +274,7 @@ def _summary_config(
         "starter_root": context.starter_root,
         "starter_fingerprint": context.starter_fingerprint,
         "sample_class": context.sample_class,
+        "review": (summary_input.review.model_dump(mode="json") if summary_input.review else None),
     }
 
 
@@ -485,7 +494,10 @@ def _experiment_report_lines(experiment_summary: dict[str, object]) -> list[str]
 
 
 def persist_experiment(
-    results_dir: Path, experiment_summary: dict[str, object]
+    results_dir: Path,
+    experiment_summary: dict[str, object],
+    *,
+    runs: list[EvalRun] | None = None,
 ) -> tuple[Path, Path, Path]:
     """Write experiment artifacts and return the three canonical output paths."""
 
@@ -519,4 +531,10 @@ def persist_experiment(
         + "\n",
         encoding="utf-8",
     )
+    config = experiment_summary.get("config")
+    review = config.get("review") if isinstance(config, dict) else None
+    if runs is not None and review is not None:
+        from .review_projection import persist_experiment_review_projection
+
+        persist_experiment_review_projection(experiment_dir, experiment_summary, runs)
     return experiment_json_path, summary_path, report_path

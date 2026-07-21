@@ -23,6 +23,7 @@ from raidar.scorers.base import (
     scorer_class,
 )
 from raidar.scorers.paths import resolve_scorer_definition_file
+from raidar.scorers.verification import EvidenceDependency
 
 import_module("raidar.scorers.scorer_registration")
 
@@ -40,6 +41,7 @@ class ResolvedScorer:
     metrics: tuple[ScorerMetricDefinition, ...]
     extends: str | None = None
     requirements: CapabilityRequirements = field(default_factory=CapabilityRequirements)
+    evidence_dependencies: tuple[EvidenceDependency, ...] = ()
 
     @property
     def ref(self) -> str:
@@ -108,6 +110,7 @@ def resolve_scorers(scenario) -> list[ResolvedScorer]:
                 metrics=metrics,
                 extends=definition.extends,
                 requirements=definition.requirements,
+                evidence_dependencies=tuple(definition.evidence_dependencies),
             )
         )
     if sum(scorer.weight for scorer in resolved) <= 0:
@@ -132,12 +135,20 @@ def _metric_definition(metric: ScorerMetricDefinition) -> MetricDefinition:
 
 
 def resolved_metrics(scenario) -> list[MetricDefinition]:
-    """Return first-seen de-duplicated metric definitions for a scenario."""
-    by_id: dict[str, MetricDefinition] = {}
+    """Return metric definitions with exactly one owning scorer."""
+
+    metrics: list[MetricDefinition] = []
+    owners: dict[str, str] = {}
     for scorer in resolve_scorers(scenario):
         for metric in scorer.metrics:
-            by_id.setdefault(metric.id, _metric_definition(metric))
-    return list(by_id.values())
+            owner = owners.get(metric.id)
+            if owner is not None:
+                raise ScorerResolutionError(
+                    f"Metric {metric.id!r} is owned by both {owner} and {scorer.ref}"
+                )
+            owners[metric.id] = scorer.ref
+            metrics.append(_metric_definition(metric))
+    return metrics
 
 
 def scorer_evaluation_profile(scenario) -> str:

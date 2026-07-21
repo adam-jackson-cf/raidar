@@ -69,11 +69,28 @@ class VisualSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="EVAL_VISUAL__")
 
+    comparison_executable: str = Field(
+        default="bunx",
+        min_length=1,
+        description="Executable used for visual comparisons",
+    )
+    comparison_arguments_template: tuple[str, ...] = Field(
+        default=(
+            "odiff",
+            "{reference}",
+            "{actual}",
+            "{diff}",
+            "--threshold",
+            "{threshold}",
+        ),
+        description="Visual comparison arguments with evidence placeholders",
+    )
     odiff_threshold: float = Field(
         default=0.03,
+        ge=0,
+        le=1,
         description="Anti-aliasing tolerance for odiff (lower is stricter)",
     )
-    similarity_threshold: float = Field(default=0.95, description="Default similarity threshold")
 
 
 class ResourceEfficiencySettings(BaseSettings):

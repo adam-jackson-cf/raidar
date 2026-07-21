@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 const PORT = Number(process.env.REVIEW_SURFACE_PORT || 5950);
 const BASE = `http://localhost:${PORT}`;
+const CHROMIUM_EXECUTABLE_PATH = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 // End-to-end functional regression net for the review surface. Runs against the
 // built SPA + API served by server.mjs over the projected synthetic fixture.
@@ -17,6 +18,9 @@ export default defineConfig({
     baseURL: BASE,
     headless: true,
     trace: 'retain-on-failure',
+    launchOptions: CHROMIUM_EXECUTABLE_PATH
+      ? { executablePath: CHROMIUM_EXECUTABLE_PATH }
+      : undefined,
   },
   webServer: {
     command: 'node server.mjs',

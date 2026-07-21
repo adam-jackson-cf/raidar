@@ -3,10 +3,10 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from pathlib import Path
 
 from raidar.harness import HarnessDefinitionError, harness_definition
 from raidar.harness.command_records import _normalize_command
+from raidar.harness.result_manifest import HarborArtifactRole, HarborResultManifest
 from raidar.runtime.harness_logs import _extract_item_completed, _read_jsonl_dicts
 from raidar.schemas.events import TraceEvent
 
@@ -74,19 +74,17 @@ def _events_from_item(timestamp: str, item: dict) -> list[TraceEvent]:
 
 
 def collect_trace_events(
-    trial_dir: Path | None,
-    *,
-    harness: str,
+    manifest: HarborResultManifest | None,
 ) -> list[TraceEvent]:
     """Project harness logs into normalized trace events."""
-    if not trial_dir:
+    if manifest is None:
         return []
+    harness = manifest.definition.id
     if not _harness_emits_structured_trace_events(harness):
         return []
 
-    event_stream = harness_definition(harness).event_stream_pointer
     events: list[TraceEvent] = []
-    for entry in _read_jsonl_dicts(trial_dir / "agent" / event_stream):
+    for entry in _read_jsonl_dicts(manifest.path(HarborArtifactRole.HARNESS_EVENT_STREAM)):
         timestamp = str(entry.get("timestamp") or datetime.now(UTC).isoformat())
         item = _extract_item_completed(entry)
         if not item:

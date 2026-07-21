@@ -11,6 +11,8 @@ from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.tool_catalog import ToolCatalogError
 from raidar.schemas.environment import CapabilityRequirements
 
+RUNTIME_PROFILE = RuntimeProfile()
+
 
 def test_load_task_image_cache_payload_removes_invalid_files(tmp_path):
     invalid_json = tmp_path / "invalid.json"
@@ -155,10 +157,16 @@ def test_cache_maintenance_respects_marker_and_swallows_lock_errors(monkeypatch,
     monkeypatch.setattr(task_images.time, "time", lambda: marker.stat().st_mtime + 1)
     prune_calls: list[str] = []
     monkeypatch.setattr(
-        task_images, "_prune_prep_cache_entries", lambda: prune_calls.append("prep")
+        task_images,
+        "_prune_prep_cache_entries",
+        lambda **_kwargs: prune_calls.append("prep"),
     )
 
-    task_images._maybe_run_cache_maintenance(run_env={}, active_image_name=None)
+    task_images._maybe_run_cache_maintenance(
+        run_env={},
+        active_image_name=None,
+        runtime_profile=RUNTIME_PROFILE,
+    )
     assert prune_calls == []
 
     marker.unlink()
@@ -171,15 +179,23 @@ def test_cache_maintenance_respects_marker_and_swallows_lock_errors(monkeypatch,
             return False
 
     monkeypatch.setattr(task_images, "_cache_key_lock", lambda *_args, **_kwargs: _FailingLock())
-    task_images._maybe_run_cache_maintenance(run_env={}, active_image_name=None)
+    task_images._maybe_run_cache_maintenance(
+        run_env={},
+        active_image_name=None,
+        runtime_profile=RUNTIME_PROFILE,
+    )
     assert prune_calls == []
 
 
 def test_docker_label_inspection_and_cache_hit(monkeypatch):
     image_ref = TaskImageRef("image:tag", "cache", "tag")
-    expected = task_images._expected_task_image_labels(image_ref, "codex-cli")
+    expected = task_images._expected_task_image_labels(
+        image_ref,
+        "codex-cli",
+        runtime_profile=RUNTIME_PROFILE,
+    )
     monkeypatch.setattr(task_images, "_repo_cache_identity", lambda: "repo")
-    expected[RuntimeProfile().docker_labels["repo"]] = "repo"
+    expected[RUNTIME_PROFILE.docker_labels.repo] = "repo"
 
     monkeypatch.setattr(
         task_images.subprocess,
@@ -188,23 +204,53 @@ def test_docker_label_inspection_and_cache_hit(monkeypatch):
             ["docker"], 0, stdout=json.dumps(expected), stderr=""
         ),
     )
-    assert task_images._inspect_docker_image_labels("image:tag", {}) == expected
-    assert task_images._task_image_cache_hit(image_ref, harness="codex-cli", run_env={}) is True
-    assert task_images._managed_task_image("image:tag", {}) is True
+    assert (
+        task_images._inspect_docker_image_labels(
+            "image:tag",
+            {},
+            runtime_profile=RUNTIME_PROFILE,
+        )
+        == expected
+    )
+    assert (
+        task_images._task_image_cache_hit(
+            image_ref,
+            harness="codex-cli",
+            run_env={},
+            runtime_profile=RUNTIME_PROFILE,
+        )
+        is True
+    )
+    assert task_images._managed_task_image(
+        "image:tag",
+        {},
+        runtime_profile=RUNTIME_PROFILE,
+    )
 
     monkeypatch.setattr(
         task_images.subprocess,
         "run",
         lambda *_args, **_kwargs: subprocess.CompletedProcess(["docker"], 1, stdout="", stderr=""),
     )
-    assert task_images._inspect_docker_image_labels("missing", {}) is None
+    assert (
+        task_images._inspect_docker_image_labels(
+            "missing",
+            {},
+            runtime_profile=RUNTIME_PROFILE,
+        )
+        is None
+    )
 
     def missing_docker(*_args, **_kwargs):
         raise FileNotFoundError()
 
     monkeypatch.setattr(task_images.subprocess, "run", missing_docker)
     with pytest.raises(RuntimeError, match="Docker CLI not found"):
-        task_images._inspect_docker_image_labels("image:tag", {})
+        task_images._inspect_docker_image_labels(
+            "image:tag",
+            {},
+            runtime_profile=RUNTIME_PROFILE,
+        )
 
 
 def test_run_task_image_build_handles_timeout_and_missing_docker(monkeypatch):
@@ -212,7 +258,12 @@ def test_run_task_image_build_handles_timeout_and_missing_docker(monkeypatch):
         raise subprocess.TimeoutExpired(["docker"], timeout=5, output=b"out", stderr=b"err")
 
     monkeypatch.setattr(task_images.subprocess, "run", timeout)
-    build = task_images._run_task_image_build(["docker", "build"], {}, timeout_sec=5)
+    build = task_images._run_task_image_build(
+        ["docker", "build"],
+        {},
+        timeout_sec=5,
+        runtime_profile=RUNTIME_PROFILE,
+    )
     assert build.timed_out is True
     assert build.completed_process.returncode == 124
     assert build.completed_process.stdout == "out"
@@ -223,14 +274,23 @@ def test_run_task_image_build_handles_timeout_and_missing_docker(monkeypatch):
 
     monkeypatch.setattr(task_images.subprocess, "run", missing)
     with pytest.raises(RuntimeError, match="Docker CLI not found"):
-        task_images._run_task_image_build(["docker"], {}, timeout_sec=5)
+        task_images._run_task_image_build(
+            ["docker"],
+            {},
+            timeout_sec=5,
+            runtime_profile=RUNTIME_PROFILE,
+        )
 
 
 def test_task_image_build_command_tags_primary_and_reserve_images():
     image_ref = TaskImageRef("image:tag", "cache", "tag")
 
     command = task_images._task_image_build_command(
-        image_ref, Path("Dockerfile"), Path("context"), harness="codex-cli"
+        image_ref,
+        Path("Dockerfile"),
+        Path("context"),
+        harness="codex-cli",
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     tag_values = [command[index + 1] for index, value in enumerate(command) if value == "--tag"]
@@ -242,7 +302,11 @@ def test_task_image_cache_hit_restores_primary_tag_from_validated_reserve(
 ):
     image_ref = TaskImageRef("image:tag", "cache", "tag")
     monkeypatch.setattr(task_images, "_repo_cache_identity", lambda: "repo")
-    expected = task_images._expected_task_image_labels(image_ref, "codex-cli")
+    expected = task_images._expected_task_image_labels(
+        image_ref,
+        "codex-cli",
+        runtime_profile=RUNTIME_PROFILE,
+    )
     labels_by_image = {"image:tag-reserve": expected}
 
     monkeypatch.setattr(
@@ -259,7 +323,12 @@ def test_task_image_cache_hit_restores_primary_tag_from_validated_reserve(
 
     monkeypatch.setattr(task_images, "_tag_task_image", fake_tag)
 
-    assert task_images._task_image_cache_hit(image_ref, harness="codex-cli", run_env={})
+    assert task_images._task_image_cache_hit(
+        image_ref,
+        harness="codex-cli",
+        run_env={},
+        runtime_profile=RUNTIME_PROFILE,
+    )
     assert tag_calls == [("image:tag-reserve", "image:tag")]
 
 
@@ -272,7 +341,12 @@ def test_run_task_image_build_does_not_force_legacy_docker_builder(monkeypatch):
 
     monkeypatch.setattr(task_images.subprocess, "run", fake_run)
 
-    task_images._run_task_image_build(["docker", "build"], {}, timeout_sec=5)
+    task_images._run_task_image_build(
+        ["docker", "build"],
+        {},
+        timeout_sec=5,
+        runtime_profile=RUNTIME_PROFILE,
+    )
 
     assert "DOCKER_BUILDKIT" not in captured_env
 
@@ -283,6 +357,7 @@ def test_runtime_preflight_writes_logs_and_reports_failures(monkeypatch, tmp_pat
         run_env={"A": "1"},
         command=["git", "--version"],
         log_path=tmp_path / "logs" / "preflight.log",
+        runtime_profile=RUNTIME_PROFILE,
         docker_args=["--network", "none"],
     )
     monkeypatch.setattr(
@@ -330,6 +405,7 @@ def test_capability_preflight_uses_catalog_and_rejects_unknown_tools(monkeypatch
         log_dir=tmp_path,
         provided_capabilities=CapabilityRequirements(runtimes={"node": ">=20"}),
         required_capabilities=CapabilityRequirements(package_managers={"bun": ">=1"}),
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     assert result["results"]["runtimes"]["node"] == "20"
@@ -343,6 +419,7 @@ def test_capability_preflight_uses_catalog_and_rejects_unknown_tools(monkeypatch
             log_dir=tmp_path,
             provided_capabilities=CapabilityRequirements(),
             required_capabilities=CapabilityRequirements(tools={"unknown-tool": ">=1"}),
+            runtime_profile=RUNTIME_PROFILE,
         )
 
 
@@ -401,6 +478,7 @@ def test_cached_task_image_reuses_stored_probe_metadata(monkeypatch, tmp_path):
             log_dir=tmp_path,
             provided_capabilities=provided,
             required_capabilities=required,
+            runtime_profile=RUNTIME_PROFILE,
         )
         == probe_payload
     )
@@ -415,6 +493,7 @@ def test_task_image_ready_paths_write_hit_metadata_and_build_on_miss(monkeypatch
         run_env={},
         log_dir=tmp_path / "logs",
         task_timeout_sec=10,
+        runtime_profile=RUNTIME_PROFILE,
     )
     metadata_path = tmp_path / "metadata" / "cache.json"
     monkeypatch.setattr(task_images, "_task_image_cache_metadata_path", lambda _key: metadata_path)
@@ -435,6 +514,7 @@ def test_build_and_verify_task_image_requires_dockerfile(monkeypatch, tmp_path):
         run_env={},
         log_dir=tmp_path / "logs",
         task_timeout_sec=10,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     with pytest.raises(FileNotFoundError, match="missing Dockerfile"):

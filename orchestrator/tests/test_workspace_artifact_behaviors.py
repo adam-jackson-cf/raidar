@@ -2,12 +2,31 @@ import errno
 import io
 import subprocess
 import tarfile
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
 
+from raidar.audit.workspace_diff import directory_hashes
 from raidar.runtime import workspace_artifacts
 from raidar.runtime.models import HarborExecutionResult
+from raidar.runtime.profile import RuntimeProfile
+
+RUNTIME_PROFILE = RuntimeProfile()
+
+
+def test_directory_hashes_prune_excluded_directories_before_descent(tmp_path, monkeypatch):
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.py").write_text("value = 1\n")
+    (tmp_path / "node_modules").mkdir()
+    (tmp_path / "node_modules" / "ignored.js").write_text("ignored\n")
+
+    def fail_if_rglob_is_used(*_args, **_kwargs):
+        raise AssertionError("excluded directory traversal must be pruned by os.walk")
+
+    monkeypatch.setattr(Path, "rglob", fail_if_rglob_is_used)
+
+    assert set(directory_hashes(tmp_path)) == {"src/app.py"}
 
 
 def _visual_scenario(
@@ -99,7 +118,9 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     output_path = tmp_path / "out" / "actual-test.png"
     scenario = _visual_scenario("reference/page.png")
     monkeypatch.setattr(
-        workspace_artifacts, "_ensure_workspace_capture_dependencies", lambda *_args: None
+        workspace_artifacts,
+        "_ensure_workspace_capture_dependencies",
+        lambda *_args, **_kwargs: None,
     )
 
     def successful_run(*_args, **_kwargs):
@@ -108,7 +129,11 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
 
     monkeypatch.setattr(workspace_artifacts.subprocess, "run", successful_run)
     actual, error = workspace_artifacts._run_homepage_capture_command(
-        scenario, ["bun", "run", "capture"], workspace, output_path
+        scenario,
+        ["bun", "run", "capture"],
+        workspace,
+        output_path,
+        runtime_profile=RUNTIME_PROFILE,
     )
     assert actual == output_path
     assert error is None
@@ -118,14 +143,20 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     monkeypatch.setattr(
         workspace_artifacts,
         "_ensure_workspace_capture_dependencies",
-        lambda *_args: "dependency failure",
+        lambda *_args, **_kwargs: "dependency failure",
     )
     assert workspace_artifacts._run_homepage_capture_command(
-        scenario, ["cmd"], workspace, output_path
+        scenario,
+        ["cmd"],
+        workspace,
+        output_path,
+        runtime_profile=RUNTIME_PROFILE,
     ) == (None, "dependency failure")
 
     monkeypatch.setattr(
-        workspace_artifacts, "_ensure_workspace_capture_dependencies", lambda *_args: None
+        workspace_artifacts,
+        "_ensure_workspace_capture_dependencies",
+        lambda *_args, **_kwargs: None,
     )
     monkeypatch.setattr(
         workspace_artifacts.subprocess,
@@ -137,7 +168,11 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     assert (
         "`bun run capture` exited 3: out\nerr"
         in workspace_artifacts._run_homepage_capture_command(
-            scenario, ["bun", "run", "capture"], workspace, output_path
+            scenario,
+            ["bun", "run", "capture"],
+            workspace,
+            output_path,
+            runtime_profile=RUNTIME_PROFILE,
         )[1]
     )
 
@@ -149,7 +184,11 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     assert (
         "completed without producing"
         in workspace_artifacts._run_homepage_capture_command(
-            scenario, ["capture"], workspace, output_path
+            scenario,
+            ["capture"],
+            workspace,
+            output_path,
+            runtime_profile=RUNTIME_PROFILE,
         )[1]
     )
 
@@ -160,7 +199,11 @@ def test_homepage_capture_command_success_and_failure_modes(monkeypatch, tmp_pat
     assert (
         "missing"
         in workspace_artifacts._run_homepage_capture_command(
-            scenario, ["missing"], workspace, output_path
+            scenario,
+            ["missing"],
+            workspace,
+            output_path,
+            runtime_profile=RUNTIME_PROFILE,
         )[1]
     )
 
@@ -169,7 +212,14 @@ def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypa
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     no_setup = _visual_scenario("reference/page.png")
-    assert workspace_artifacts._ensure_workspace_capture_dependencies(no_setup, workspace) is None
+    assert (
+        workspace_artifacts._ensure_workspace_capture_dependencies(
+            no_setup,
+            workspace,
+            runtime_profile=RUNTIME_PROFILE,
+        )
+        is None
+    )
 
     setup_scenario = _visual_scenario(
         "reference/page.png",
@@ -183,7 +233,11 @@ def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypa
         ),
     )
     assert (
-        workspace_artifacts._ensure_workspace_capture_dependencies(setup_scenario, workspace)
+        workspace_artifacts._ensure_workspace_capture_dependencies(
+            setup_scenario,
+            workspace,
+            runtime_profile=RUNTIME_PROFILE,
+        )
         is None
     )
 
@@ -195,7 +249,11 @@ def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypa
         ),
     )
     assert "exited 1: out\nerr" in (
-        workspace_artifacts._ensure_workspace_capture_dependencies(setup_scenario, workspace)
+        workspace_artifacts._ensure_workspace_capture_dependencies(
+            setup_scenario,
+            workspace,
+            runtime_profile=RUNTIME_PROFILE,
+        )
     )
 
     def timeout(*_args, **_kwargs):
@@ -203,7 +261,11 @@ def test_capture_dependency_install_is_conditional_and_reports_failures(monkeypa
 
     monkeypatch.setattr(workspace_artifacts.subprocess, "run", timeout)
     assert "Failed to run visual capture setup" in (
-        workspace_artifacts._ensure_workspace_capture_dependencies(setup_scenario, workspace)
+        workspace_artifacts._ensure_workspace_capture_dependencies(
+            setup_scenario,
+            workspace,
+            runtime_profile=RUNTIME_PROFILE,
+        )
     )
 
 
@@ -298,7 +360,7 @@ def test_remove_tree_retries_transient_errors_and_prune_reports_bytes(monkeypatc
     monkeypatch.setattr(workspace_artifacts.shutil, "rmtree", flaky_rmtree)
     monkeypatch.setattr(workspace_artifacts, "wait_for_remove_tree_retry", lambda _delay: None)
 
-    result = workspace_artifacts._prune_workspace_artifacts(workspace)
+    result = workspace_artifacts._prune_workspace_artifacts(workspace, RUNTIME_PROFILE)
 
     assert result == {"removed": ["node_modules"], "reclaimed_bytes": 4}
     assert calls["count"] == 2

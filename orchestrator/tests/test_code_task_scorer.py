@@ -3,10 +3,16 @@
 from pathlib import Path
 from types import SimpleNamespace
 
-from raidar.schemas.scorecard import VerificationStabilityScore
 from raidar.scorers.base import ScorerContext
 from raidar.scorers.code_task import PythonCodeTask
-from raidar.scorers.verification import VerificationEvidence
+from raidar.scorers.evidence_contract import (
+    CommandEvidenceResult,
+    EvidenceActionResult,
+    JsonEvidenceResult,
+)
+from raidar.scorers.verification import (
+    VerificationEvidence,
+)
 
 
 def _context(workspace: Path) -> ScorerContext:
@@ -14,11 +20,7 @@ def _context(workspace: Path) -> ScorerContext:
         workspace=workspace,
         scenario_dir=workspace,
         scenario=SimpleNamespace(),
-        execution=SimpleNamespace(
-            outputs=SimpleNamespace(
-                verification_stability=VerificationStabilityScore(),
-            )
-        ),
+        execution=SimpleNamespace(),
         resource_efficiency=SimpleNamespace(),
         execution_validity=SimpleNamespace(),
         verification_evidence=VerificationEvidence(
@@ -36,10 +38,20 @@ def _context(workspace: Path) -> ScorerContext:
                     0,
                     "Wrote JSON report",
                 ),
-                "python-code-task.coverage.report": {
-                    "result": {"content": {"totals": {"percent_covered": 100}}},
-                    "status": "ok",
-                },
+                "python-code-task.coverage.report": EvidenceActionResult(
+                    id="python-code-task.coverage.report",
+                    kind="read_json",
+                    required=False,
+                    status="ok",
+                    duration_sec=0.1,
+                    result=JsonEvidenceResult(
+                        bytes=10,
+                        content={"totals": {"percent_covered": 100}},
+                        path=".raidar/coverage.json",
+                        sha256="0" * 64,
+                        truncated=False,
+                    ),
+                ),
                 "python-code-task.ruff": _command_action(
                     ["python", "-m", "ruff", "check", "."], 0, "All checks passed"
                 ),
@@ -48,22 +60,49 @@ def _context(workspace: Path) -> ScorerContext:
                     0,
                     "",
                 ),
-            }
+            },
+            aliases={
+                f"python-code-task.{local_id}": f"python-code-task.{local_id}"
+                for local_id in (
+                    "pytest",
+                    "coverage.run",
+                    "coverage.json",
+                    "coverage.report",
+                    "ruff",
+                    "lizard",
+                )
+            },
         ),
     )
 
 
-def _command_action(command: list[str], exit_code: int, stdout: str) -> dict:
-    return {
-        "kind": "command",
-        "status": "ok",
-        "result": {
-            "command": command,
-            "exit_code": exit_code,
-            "stdout": stdout,
-            "stderr": "",
-        },
-    }
+def _command_action(command: list[str], exit_code: int, stdout: str) -> EvidenceActionResult:
+    action_id = {
+        "pytest": "python-code-task.pytest",
+        "coverage": (
+            "python-code-task.coverage.json"
+            if "json" in command
+            else "python-code-task.coverage.run"
+        ),
+        "ruff": "python-code-task.ruff",
+        "lizard": "python-code-task.lizard",
+    }[next(name for name in ("pytest", "coverage", "ruff", "lizard") if name in command)]
+    return EvidenceActionResult(
+        id=action_id,
+        kind="command",
+        required=not action_id.startswith("python-code-task.coverage"),
+        status="ok",
+        duration_sec=0.1,
+        result=CommandEvidenceResult(
+            command=command,
+            cwd=".",
+            duration_sec=0.1,
+            exit_code=exit_code,
+            stdout=stdout,
+            stderr="",
+            timed_out=False,
+        ),
+    )
 
 
 def _scores_by_id(workspace: Path):

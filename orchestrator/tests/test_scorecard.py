@@ -4,6 +4,7 @@ from raidar.schemas.scorecard import (
     ExecutionValidityScore,
     FunctionalScore,
     GateCheck,
+    MetricScore,
     ResourceEfficiencyScore,
     Scorecard,
     ScorerMetricContribution,
@@ -97,14 +98,13 @@ class TestScorecardComposite:
         assert scorecard.composite_score == 0.0
 
     def test_quality_score_zero_without_quality_scorer_results(self):
-        """Quality score should not fall back to legacy metric weights."""
+        """Canonical metric projections must not bypass scorer ownership."""
         scorecard = Scorecard(
-            functional=FunctionalScore(
-                passed=True, build_succeeded=True, tests_passed=10, tests_total=10
-            ),
-            visual=None,
-            verification_stability=VerificationStabilityScore(),
+            metric_scores=[
+                MetricScore(metric_id="functional", score=1.0, passed=True),
+            ],
         )
+        assert scorecard.functional.score == 1.0
         assert scorecard.quality_score == 0.0
 
     def test_composite_zero_when_invalid(self):

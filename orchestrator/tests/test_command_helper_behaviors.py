@@ -5,7 +5,14 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from raidar.commands import matrix_report, quality, scenario, shared
+from raidar.commands import (
+    matrix_report,
+    quality,
+    scenario,
+    scenario_inspection,
+    scenario_validation,
+    shared,
+)
 
 
 def test_shared_command_helpers_raise_and_parse_json(monkeypatch, tmp_path) -> None:
@@ -176,7 +183,12 @@ def test_matrix_command_executes_non_dry_run_and_job_options(monkeypatch, tmp_pa
     calls: dict[str, object] = {}
 
     monkeypatch.setattr(matrix_report, "matrix_config_from_options", lambda _options: config)
-    monkeypatch.setattr("raidar.matrix.resolve_matrix_jobs", lambda _config, repo_root: [job])
+
+    def resolve_jobs(_config, *, repo_root, experiment_kind):
+        calls["resolve"] = (repo_root, experiment_kind)
+        return [job]
+
+    monkeypatch.setattr("raidar.matrix.resolve_matrix_jobs", resolve_jobs)
     monkeypatch.setattr(
         matrix_report,
         "cleanup_stale_harbor_before_runs",
@@ -205,6 +217,7 @@ def test_matrix_command_executes_non_dry_run_and_job_options(monkeypatch, tmp_pa
     assert result.exit_code == 0, result.output
     options, settings = calls["run"]
     assert calls["cleanup"] is True
+    assert calls["resolve"] == (matrix_report.REPO_ROOT, "benchmark")
     assert options.scenario == job.scenario_path
     assert settings["execution_suffix"] == "codex-cli__openai-gpt-5.5"
     assert "Matrix completed: 1 experiments succeeded, 0 failed." in result.output
@@ -218,7 +231,9 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
     revision.write_text("name: demo", encoding="utf-8")
     monkeypatch.setattr(scenario, "scenario_revision_paths", lambda _root: [revision])
     monkeypatch.setattr(scenario, "load_scenario", lambda _path: SimpleNamespace(name="Demo"))
-    assert scenario.list_scenarios_with_revisions(scenario_root) == [("Demo", ("v001",))]
+    listed = scenario.list_scenarios_with_revisions(scenario_root)
+    assert listed[0][0].name == "Demo"
+    assert listed[0][1] == ("v001",)
 
     task_def = SimpleNamespace(
         name="Demo",
@@ -226,7 +241,16 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
         parent_revision=None,
         description="A task",
         difficulty="easy",
-        category="code",
+        display_name="Demo task",
+        task_kind="feature_implementation",
+        delivery_mode="direct_implementation",
+        workspace_state="new",
+        starting_conditions=[],
+        languages=["typescript"],
+        evaluation_role="benchmark",
+        catalog_status="active",
+        family_id=None,
+        variant_axes={},
         timeout_sec=600,
         verification=SimpleNamespace(gates=[SimpleNamespace(name="build")]),
         visual=SimpleNamespace(
@@ -239,28 +263,34 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
         ),
         requirements=SimpleNamespace(items=[object(), object()]),
     )
-    monkeypatch.setattr(scenario, "scenario_evaluation_profile", lambda _task: "code-task")
-    monkeypatch.setattr(scenario, "scenario_scorers", lambda _task: ["typescript-code-task"])
-    monkeypatch.setattr(scenario, "scenario_metrics", lambda _task: ["functional"])
+    monkeypatch.setattr(
+        scenario_inspection, "scenario_evaluation_profile", lambda _task: "code-task"
+    )
+    monkeypatch.setattr(
+        scenario_inspection, "scenario_scorers", lambda _task: ["typescript-code-task"]
+    )
+    monkeypatch.setattr(scenario_inspection, "scenario_metrics", lambda _task: ["functional"])
 
-    scenario.echo_scenario_summary(task_def)
-    scenario.echo_visual_config(task_def)
-    scenario.echo_requirements_config(task_def)
+    scenario_inspection.echo_scenario_summary(task_def)
+    scenario_inspection.echo_visual_config(task_def)
+    scenario_inspection.echo_requirements_config(task_def)
 
     rules = revision.parent / "rules"
     rules.mkdir()
     (rules / "codex.md").write_text("rules", encoding="utf-8")
-    scenario.echo_rule_variants(revision.parent)
-    scenario.echo_available_revisions(scenario_root / "demo")
+    scenario_inspection.echo_rule_variants(revision.parent)
+    scenario_inspection.echo_available_revisions(scenario_root / "demo")
 
     empty_root = scenario_root / "empty"
     empty_root.mkdir()
     monkeypatch.setattr(scenario, "scenario_revision_paths", lambda _root: [])
     assert scenario.list_scenarios_with_revisions(scenario_root) == []
-    scenario.echo_available_revisions(empty_root)
-    scenario.echo_rule_variants(tmp_path / "no-rules")
-    scenario.echo_visual_config(SimpleNamespace(visual=None))
-    scenario.echo_requirements_config(SimpleNamespace(requirements=SimpleNamespace(items=[])))
+    scenario_inspection.echo_available_revisions(empty_root)
+    scenario_inspection.echo_rule_variants(tmp_path / "no-rules")
+    scenario_inspection.echo_visual_config(SimpleNamespace(visual=None))
+    scenario_inspection.echo_requirements_config(
+        SimpleNamespace(requirements=SimpleNamespace(items=[]))
+    )
 
 
 def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
@@ -275,7 +305,30 @@ def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
     monkeypatch.setattr(
         scenario, "scenario_init_payload", lambda _result: {"scenario_yaml": "created"}
     )
-    result = runner.invoke(scenario.scenario_init, ["--path", str(tmp_path / "created"), "--json"])
+    result = runner.invoke(
+        scenario.scenario_init,
+        [
+            "--path",
+            str(tmp_path / "created"),
+            "--display-name",
+            "Created task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+            "--json",
+        ],
+    )
     assert result.exit_code == 0
     assert '"scenario_yaml": "created"' in result.output
 
@@ -284,7 +337,29 @@ def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
         "_service_init_scenario",
         lambda _request: (_ for _ in ()).throw(FileExistsError("exists")),
     )
-    result = runner.invoke(scenario.scenario_init, ["--path", str(tmp_path / "created")])
+    result = runner.invoke(
+        scenario.scenario_init,
+        [
+            "--path",
+            str(tmp_path / "created"),
+            "--display-name",
+            "Created task",
+            "--task-kind",
+            "feature_implementation",
+            "--delivery-mode",
+            "direct_implementation",
+            "--workspace-state",
+            "new",
+            "--language",
+            "typescript",
+            "--evaluation-role",
+            "benchmark",
+            "--catalog-status",
+            "active",
+            "--template",
+            "typescript-bun",
+        ],
+    )
     assert result.exit_code != 0
     assert "exists" in result.output
 
@@ -302,7 +377,7 @@ def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
         metric_ids=lambda: ["functional"],
     )
     monkeypatch.setattr(
-        scenario,
+        scenario_validation,
         "resolve_scenario_environment",
         lambda **_kwargs: SimpleNamespace(
             id="node:20",
@@ -326,8 +401,8 @@ def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
         ),
     )
     monkeypatch.setattr(
-        scenario,
-        "_service_validate_scenario",
+        scenario_validation,
+        "validate_scenario",
         lambda _path: SimpleNamespace(
             scenario=validate_scenario,
             scenario_path=scenario_path,
@@ -337,16 +412,20 @@ def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
             ),
         ),
     )
-    result = runner.invoke(scenario.scenario_validate, ["--scenario", str(scenario_path)])
+    result = runner.invoke(
+        scenario_validation.scenario_validate, ["--scenario", str(scenario_path)]
+    )
     assert result.exit_code == 0
     assert "Scenario validation passed." in result.output
 
     monkeypatch.setattr(
-        scenario,
-        "_service_validate_scenario",
+        scenario_validation,
+        "validate_scenario",
         lambda _path: (_ for _ in ()).throw(FileNotFoundError("missing")),
     )
-    result = runner.invoke(scenario.scenario_validate, ["--scenario", str(scenario_path)])
+    result = runner.invoke(
+        scenario_validation.scenario_validate, ["--scenario", str(scenario_path)]
+    )
     assert result.exit_code != 0
     assert "missing" in result.output
 

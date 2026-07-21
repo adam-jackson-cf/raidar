@@ -3,12 +3,14 @@
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
+from raidar.schemas.scenario import DeterministicCheck
 from raidar.schemas.scorecard import (
     CoverageScore,
     FunctionalScore,
     MetricScore,
     RequirementsCoverageScore,
-    VerificationStabilityScore,
 )
 from raidar.scorers.base import ScorerContext
 from raidar.scorers.code_task.bugfix import Bugfix
@@ -18,8 +20,21 @@ from raidar.scorers.common import (
     coverage_lift_metric_score,
     requirement_mapping_metric_score,
 )
+from raidar.scorers.evidence_contract import (
+    ArchiveEvidenceResult,
+    CommandEvidenceResult,
+    EvidenceActionError,
+    EvidenceActionResult,
+    EvidenceArtifactResult,
+    EvidenceOutput,
+    EvidenceRunnerMetadata,
+    JsonEvidenceResult,
+)
 from raidar.scorers.plan_to_code import PlanToCode
 from raidar.scorers.test_generation import TestGeneration
+from raidar.scorers.verification import (
+    VerificationEvidence,
+)
 
 
 def _context(
@@ -31,25 +46,79 @@ def _context(
     workspace_changes: dict | None = None,
     retained_evidence: dict | None = None,
 ) -> ScorerContext:
+    requirement_items = []
+    if isinstance(requirements, RequirementsCoverageScore) and requirements.total_requirements:
+        requirement_items = [
+            SimpleNamespace(
+                id="req-defect",
+                description="Defect behavior",
+                check=DeterministicCheck(
+                    type="file_exists",
+                    pattern="src/app.py",
+                    description="Source file exists",
+                ),
+            )
+        ]
+    command_result = EvidenceActionResult(
+        id="bugfix.required.0",
+        kind="command",
+        required=True,
+        status="ok",
+        duration_sec=0.1,
+        result=CommandEvidenceResult(
+            command=["python", "-m", "pytest"],
+            cwd=".",
+            duration_sec=0.1,
+            exit_code=0 if functional is None or functional.passed else 1,
+            stdout="passed",
+            stderr="",
+            timed_out=False,
+        ),
+    )
+    coverage_value = coverage.measured if coverage is not None else 0.8
+    coverage_result = EvidenceActionResult(
+        id="test-generation.coverage.python",
+        kind="read_json",
+        required=False,
+        status="ok",
+        duration_sec=0.1,
+        result=JsonEvidenceResult(
+            bytes=10,
+            content={"totals": {"percent_covered": coverage_value * 100}},
+            path=".raidar/coverage.json",
+            sha256="0" * 64,
+            truncated=False,
+        ),
+    )
+    actions = {
+        command_result.id: command_result,
+        coverage_result.id: coverage_result,
+    }
+    aliases = {
+        f"{owner}.required.0": command_result.id
+        for owner in ("bugfix", "refactor", "test-generation", "plan-to-code")
+    }
+    aliases.update(
+        {
+            "test-generation.coverage.python": coverage_result.id,
+            "test-generation.coverage.typescript": coverage_result.id,
+        }
+    )
     return ScorerContext(
         workspace=workspace,
         scenario_dir=workspace,
-        scenario=SimpleNamespace(requirements=SimpleNamespace(items=[]), scorers=[]),
-        execution=SimpleNamespace(
-            outputs=SimpleNamespace(
-                functional=functional
-                or FunctionalScore(
-                    passed=True, tests_passed=2, tests_total=2, build_succeeded=True
-                ),
-                verification_stability=VerificationStabilityScore(),
-                test_coverage=coverage or CoverageScore(threshold=0.8, measured=0.8, passed=True),
-                requirements_coverage=requirements or RequirementsCoverageScore(),
-            )
+        scenario=SimpleNamespace(
+            languages=["python"],
+            requirements=SimpleNamespace(items=requirement_items),
+            scorers=[],
+            verification=SimpleNamespace(coverage_threshold=0.8),
         ),
+        execution=SimpleNamespace(),
         resource_efficiency=SimpleNamespace(),
         execution_validity=SimpleNamespace(),
         workspace_changes=workspace_changes or {},
         retained_evidence=retained_evidence or {},
+        verification_evidence=VerificationEvidence(actions=actions, aliases=aliases),
     )
 
 
@@ -66,6 +135,133 @@ def _workspace(tmp_path: Path) -> Path:
         encoding="utf-8",
     )
     return tmp_path
+
+
+def _command_action(action_id: str = "owner.required.0") -> EvidenceActionResult:
+    return EvidenceActionResult(
+        id=action_id,
+        kind="command",
+        required=True,
+        status="ok",
+        duration_sec=0.1,
+        result=CommandEvidenceResult(
+            command=["python", "-m", "pytest"],
+            cwd=".",
+            duration_sec=0.1,
+            exit_code=0,
+            stdout="passed",
+            stderr="",
+            timed_out=False,
+        ),
+    )
+
+
+def _evidence_output(**overrides) -> EvidenceOutput:
+    payload = {
+        "schema_version": "1",
+        "runner_contract": "python-evidence-runner@2",
+        "aliases": {"owner.required.0": "owner.required.0"},
+        "actions": [_command_action()],
+        "artifacts": [],
+        "metadata": EvidenceRunnerMetadata(
+            action_count=1,
+            error_count=0,
+            required_error_count=0,
+            workspace="/workspace",
+        ),
+    }
+    payload.update(overrides)
+    return EvidenceOutput.model_validate(payload)
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {"status": "ok", "result": None},
+        {
+            "status": "ok",
+            "result": _command_action().result,
+            "error": EvidenceActionError(type="failure", message="bad"),
+        },
+        {"status": "error", "result": None, "error": None},
+        {
+            "status": "error",
+            "result": _command_action().result,
+            "error": EvidenceActionError(type="failure", message="bad"),
+        },
+        {"status": "ok", "result": {"not": "a command"}},
+    ],
+)
+def test_evidence_action_status_and_result_contracts(payload: dict) -> None:
+    with pytest.raises(ValueError, match="evidence action"):
+        EvidenceActionResult(
+            id="owner.required.0",
+            kind="command",
+            required=True,
+            duration_sec=0.1,
+            **payload,
+        )
+
+
+def test_evidence_output_rejects_inconsistent_identity_graphs() -> None:
+    action = _command_action()
+    failed = EvidenceActionResult(
+        id="owner.failed.0",
+        kind="command",
+        required=True,
+        status="error",
+        duration_sec=0.1,
+        error=EvidenceActionError(type="failure", message="bad"),
+    )
+    archive = EvidenceActionResult(
+        id="owner.archive.0",
+        kind="archive",
+        required=False,
+        status="ok",
+        duration_sec=0.1,
+        result=ArchiveEvidenceResult(archive="out.tar", archived=[], exists=True),
+    )
+
+    invalid_payloads = [
+        {
+            "actions": [action, action],
+            "metadata": EvidenceRunnerMetadata(
+                action_count=2, error_count=0, required_error_count=0, workspace="/workspace"
+            ),
+        },
+        {"aliases": {"alias": "missing"}},
+        {
+            "metadata": EvidenceRunnerMetadata(
+                action_count=2, error_count=0, required_error_count=0, workspace="/workspace"
+            )
+        },
+        {
+            "actions": [failed],
+            "aliases": {},
+            "metadata": EvidenceRunnerMetadata(
+                action_count=1, error_count=0, required_error_count=1, workspace="/workspace"
+            ),
+        },
+        {
+            "actions": [failed],
+            "aliases": {},
+            "metadata": EvidenceRunnerMetadata(
+                action_count=1, error_count=1, required_error_count=0, workspace="/workspace"
+            ),
+        },
+        {"artifacts": [EvidenceArtifactResult(action_id=action.id, path="out.tar", exists=True)]},
+        {
+            "actions": [archive],
+            "aliases": {},
+            "artifacts": [
+                EvidenceArtifactResult(action_id=archive.id, path="a.tar", exists=True),
+                EvidenceArtifactResult(action_id=archive.id, path="b.tar", exists=True),
+            ],
+        },
+    ]
+    for overrides in invalid_payloads:
+        with pytest.raises(ValueError, match="evidence output"):
+            _evidence_output(**overrides)
 
 
 def test_bugfix_collects_concept_specific_proxy_evidence(tmp_path: Path) -> None:
@@ -194,6 +390,7 @@ def test_test_generation_collects_guardrail_and_assertion_evidence(tmp_path: Pat
             ]
         ),
         scorers=[],
+        verification=SimpleNamespace(coverage_threshold=0.8),
     )
     context = _context(_workspace(tmp_path))
     context = ScorerContext(
@@ -208,6 +405,7 @@ def test_test_generation_collects_guardrail_and_assertion_evidence(tmp_path: Pat
             "changed_file_count": 1,
             "error": None,
         },
+        verification_evidence=context.verification_evidence,
     )
     scores = {
         score.metric_id: score for score in TestGeneration().collect_evidence(context).metric_scores
@@ -308,7 +506,13 @@ def test_plan_to_code_scores_retained_plan_packet(monkeypatch, tmp_path: Path) -
         assert kwargs["retained_evidence"]["feature_count"] == 2
         assert kwargs["changed_surfaces"] == ["src/app.py", "tests/test_app.py"]
         assert kwargs["deterministic_metric_scores"]
-        assert kwargs["execution_outputs"].functional.passed is True
+        functional = next(
+            score
+            for score in kwargs["deterministic_metric_scores"]
+            if score.metric_id == "functional"
+        )
+        assert functional.passed is True
+        assert "execution_outputs" not in kwargs
         return MetricScore(
             metric_id="plan-adherence",
             score=1.0,
@@ -415,9 +619,7 @@ def test_plan_to_code_rejects_status_only_retained_plan_packet(monkeypatch, tmp_
 
 
 def test_coverage_lift_caps_no_baseline_proxy_at_point_eight() -> None:
-    score = coverage_lift_metric_score(
-        SimpleNamespace(test_coverage=SimpleNamespace(threshold=0.8, measured=1.0, passed=True))
-    )
+    score = coverage_lift_metric_score(SimpleNamespace(threshold=0.8, measured=1.0, passed=True))
 
     assert score.score == 0.8
     assert not score.passed
@@ -426,7 +628,7 @@ def test_coverage_lift_caps_no_baseline_proxy_at_point_eight() -> None:
 
 def test_coverage_lift_handles_malformed_coverage_values() -> None:
     score = coverage_lift_metric_score(
-        SimpleNamespace(test_coverage=SimpleNamespace(threshold="0.8", measured="1.0", passed=True))
+        SimpleNamespace(threshold="0.8", measured="1.0", passed=True)
     )
 
     assert score.score == 0.0

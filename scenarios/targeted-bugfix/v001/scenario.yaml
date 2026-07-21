@@ -4,7 +4,17 @@ parent_revision: null
 description: Baseline targeted defect fix with regression evidence and containment
   checks
 difficulty: medium
-category: bugfix
+display_name: Python shipping defect repair
+task_kind: defect_repair
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions:
+- known_defect
+languages:
+- Python
+evaluation_role: benchmark
+catalog_status: quarantined
+variant_axes: {}
 timeout_sec: 1800
 environment:
   kind: stack_preset

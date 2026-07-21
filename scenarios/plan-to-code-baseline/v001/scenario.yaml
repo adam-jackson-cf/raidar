@@ -2,8 +2,17 @@ name: plan-to-code-baseline
 scenario_revision: v001
 parent_revision: null
 description: Baseline plan-to-code task with retained plan and acceptance evidence
+display_name: Planned alert-escalation implementation
+task_kind: feature_implementation
+delivery_mode: plan_driven
+workspace_state: existing
+starting_conditions: []
+languages:
+- Python
+evaluation_role: benchmark
+catalog_status: quarantined
+variant_axes: {}
 difficulty: medium
-category: plan-to-code
 timeout_sec: 1800
 environment:
   kind: stack_preset

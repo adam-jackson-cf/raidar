@@ -4,30 +4,22 @@ import pytest
 
 from raidar.schemas.scenario import DeterministicCheck
 from raidar.schemas.scorecard import (
-    CoverageScore,
-    FunctionalScore,
     ResourceEfficiencyScore,
-    VerificationStabilityScore,
-    VisualScore,
 )
 from raidar.scorers.base import ScorerContext
 from raidar.scorers.common import (
     artifact_metric_score,
     code_task_artifact_metric_score,
-    functional_metric_score,
+    functional_score_from_evidence,
     missing_required_artifacts,
     required_artifact_patterns,
-    verification_stability_metric_score,
+    verification_stability_from_evidence,
 )
 from raidar.scorers.design_to_code import (
     DesignToCode,
-    _action_exit_code,
     _pct_number,
     _visual_artifact_paths,
     _visual_score_from_result,
-    design_functional_metric_score,
-    design_to_code_coverage_metric_score,
-    design_verification_stability_metric_score,
     visual_regression_metric_score,
 )
 from raidar.scorers.deterministic import (
@@ -38,6 +30,16 @@ from raidar.scorers.deterministic import (
     run_deterministic_check,
     score_requirement_checks,
     validate_safe_regex_pattern,
+)
+from raidar.scorers.evidence_contract import (
+    CommandEvidenceResult,
+    EvidenceActionError,
+    EvidenceActionResult,
+    JsonEvidenceResult,
+    VisualComparisonEvidence,
+    VisualDiffEvidenceResult,
+    VisualPathEvidence,
+    VisualRegionEvidence,
 )
 from raidar.scorers.registry import (
     ScorerResolutionError,
@@ -51,22 +53,6 @@ from raidar.scorers.registry import (
 from raidar.scorers.requirements import Requirements
 from raidar.scorers.resource_efficiency import ResourceEfficiency
 from raidar.scorers.verification import VerificationEvidence
-
-
-def _outputs(**overrides):
-    values = {
-        "functional": FunctionalScore(
-            passed=True,
-            tests_passed=2,
-            tests_total=2,
-            build_succeeded=True,
-        ),
-        "verification_stability": VerificationStabilityScore(total_gate_failures=1),
-        "test_coverage": CoverageScore(threshold=0.8, measured=0.4, source="summary", passed=False),
-        "visual": VisualScore(similarity=0.75, passed=True),
-    }
-    values.update(overrides)
-    return SimpleNamespace(**values)
 
 
 def _visual_scoring_config() -> SimpleNamespace:
@@ -125,10 +111,10 @@ def _design_context(tmp_path, actions, *, visual=None, coverage_threshold=0.8):
         workspace=workspace,
         scenario_dir=tmp_path / "scenario",
         scenario=scenario,
-        execution=SimpleNamespace(outputs=_outputs()),
+        execution=SimpleNamespace(),
         resource_efficiency=SimpleNamespace(),
         execution_validity=SimpleNamespace(),
-        verification_evidence=VerificationEvidence(actions=actions),
+        verification_evidence=_typed_evidence(actions),
     )
 
 
@@ -136,35 +122,117 @@ def _command_action(exit_code):
     return {"kind": "command", "result": {"exit_code": exit_code}}
 
 
+def _typed_evidence(actions: dict) -> VerificationEvidence:
+    typed = {action_id: _typed_action(action_id, raw) for action_id, raw in actions.items()}
+    return VerificationEvidence(
+        actions=typed,
+        aliases={action_id: action_id for action_id in typed},
+    )
+
+
+def _typed_action(action_id: str, raw: dict) -> EvidenceActionResult:
+    kind = raw["kind"]
+    result = raw.get("result")
+    if not isinstance(result, dict) or not result:
+        return EvidenceActionResult(
+            id=action_id,
+            kind=kind,
+            required=action_id.endswith(".build"),
+            status="error",
+            duration_sec=0.1,
+            error=EvidenceActionError(message="missing result", type="MissingEvidence"),
+        )
+    if kind == "command":
+        command_result = CommandEvidenceResult(
+            command=["bun", "run", action_id.rsplit(".", 1)[-1]],
+            cwd=".",
+            duration_sec=0.1,
+            exit_code=int(result.get("exit_code", 0)),
+            stdout=str(result.get("stdout", "")),
+            stderr=str(result.get("stderr", "")),
+            timed_out=False,
+        )
+        typed_result = command_result
+    elif kind == "read_json":
+        typed_result = JsonEvidenceResult(
+            bytes=10,
+            content=result.get("content", {}),
+            path="coverage/coverage-summary.json",
+            sha256="0" * 64,
+            truncated=False,
+        )
+    else:
+        typed_result = _typed_visual_result(result)
+    return EvidenceActionResult(
+        id=action_id,
+        kind=kind,
+        required=action_id.endswith(".build"),
+        status="ok",
+        duration_sec=0.1,
+        result=typed_result,
+    )
+
+
+def _typed_visual_result(result: dict) -> VisualDiffEvidenceResult:
+    def comparison(payload: object, diff_path: str):
+        if not isinstance(payload, dict):
+            return None
+        return VisualComparisonEvidence(
+            command=["custom-visual-tool"],
+            exit_code=0,
+            similarity=float(payload.get("similarity", 0)),
+            raw_output="",
+            diff_path=diff_path,
+        )
+
+    regions = []
+    for raw_region in result.get("regions", []):
+        if not isinstance(raw_region, dict):
+            continue
+        name = str(raw_region.get("name", ""))
+        regions.append(
+            VisualRegionEvidence(
+                name=name,
+                weight=float(raw_region.get("weight", 1)),
+                normalized_weight=float(raw_region.get("normalized_weight", 1)),
+                actual=VisualPathEvidence(exists=True, path=f"{name}-actual.png"),
+                reference=VisualPathEvidence(exists=True, path=f"{name}-reference.png"),
+                diff=VisualPathEvidence(exists=True, path=f"{name}-diff.png"),
+                comparison=comparison(raw_region.get("comparison"), f"{name}-diff.png"),
+            )
+        )
+    return VisualDiffEvidenceResult.model_validate(
+        {
+            "actual": {"exists": True, "path": "actual.png"},
+            "reference": {"exists": True, "path": "reference.png"},
+            "diff": {"exists": True, "path": "diff.png"},
+            "threshold": 0.03,
+            "capture_succeeded": True,
+            "global": (
+                comparison(result.get("global"), "diff.png").model_dump(mode="json")
+                if comparison(result.get("global"), "diff.png")
+                else None
+            ),
+            "regions": [region.model_dump(mode="json") for region in regions],
+            "expected_region_count": int(result.get("expected_region_count", 0)),
+            "available_region_count": len(regions),
+        }
+    )
+
+
 def test_core_metric_score_helpers_reflect_output_state(tmp_path):
-    outputs = _outputs()
+    context = _design_context(
+        tmp_path,
+        {
+            "design-to-code.build": _command_action(0),
+            "design-to-code.lint": _command_action(1),
+        },
+    )
+    evidence = context.verification_evidence.for_owner("design-to-code")
 
-    assert functional_metric_score(outputs).evidence == "build=True, tests=2/2"
-    assert verification_stability_metric_score(outputs).passed is True
-    coverage_metric = design_to_code_coverage_metric_score(outputs)
-    assert coverage_metric.score == 0.5
-    assert coverage_metric.passed is False
-    assert (
-        design_to_code_coverage_metric_score(
-            _outputs(test_coverage=CoverageScore(threshold=None, passed=True))
-        ).score
-        == 1.0
-    )
-    assert (
-        design_to_code_coverage_metric_score(
-            _outputs(test_coverage=CoverageScore(threshold=None, passed=False))
-        ).score
-        == 0.0
-    )
-    assert (
-        design_to_code_coverage_metric_score(
-            _outputs(test_coverage=CoverageScore(threshold=0.8, measured=None))
-        ).score
-        == 0.0
-    )
-
-    assert visual_regression_metric_score(outputs).score == 0.75
-    no_visual = visual_regression_metric_score(_outputs(visual=None))
+    assert functional_score_from_evidence(evidence).passed is True
+    assert verification_stability_from_evidence(evidence).passed is False
+    no_visual = DesignToCode().collect_evidence(context).metric_scores[0]
     assert no_visual.passed is False
     assert no_visual.evidence == "Visual threshold not configured."
 
@@ -174,6 +242,9 @@ def test_artifact_pattern_collection_and_scoring(tmp_path):
     (workspace / "src" / "app").mkdir(parents=True)
     (workspace / "src" / "app" / "page.tsx").write_text("page", encoding="utf-8")
     scenario = SimpleNamespace(
+        visual=None,
+        verification=SimpleNamespace(coverage_threshold=None),
+        requirements=SimpleNamespace(items=[]),
         scorers=[
             SimpleNamespace(
                 id="design-to-code",
@@ -184,7 +255,7 @@ def test_artifact_pattern_collection_and_scoring(tmp_path):
                 },
             ),
             SimpleNamespace(id="other", config={"artifact-checks": {"required_paths": ["x"]}}),
-        ]
+        ],
     )
 
     patterns = required_artifact_patterns(scenario, "design-to-code")
@@ -214,20 +285,25 @@ def test_registered_scorers_collect_expected_evidence(monkeypatch, tmp_path):
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     scenario = SimpleNamespace(
+        visual=None,
+        verification=SimpleNamespace(coverage_threshold=None),
+        requirements=SimpleNamespace(items=[]),
         scorers=[
             SimpleNamespace(
                 id="design-to-code",
                 config={"artifact-checks": {"required_paths": []}},
             )
-        ]
+        ],
     )
-    execution = SimpleNamespace(outputs=_outputs())
+    execution = SimpleNamespace()
     context = SimpleNamespace(
         workspace=workspace,
         scenario_dir=tmp_path / "scenario",
         scenario=scenario,
         execution=execution,
         resource_efficiency=ResourceEfficiencyScore(uncached_input_tokens=10, command_count=2),
+        verification_evidence=VerificationEvidence(),
+        workspace_changes={},
     )
 
     resource = ResourceEfficiency().collect_evidence(context)
@@ -327,7 +403,9 @@ def test_design_to_code_visual_policy_fails_low_global_and_missing_regions(tmp_p
         visual=_visual_config(),
     )
 
-    visual_metric = visual_regression_metric_score(context)
+    visual_metric = visual_regression_metric_score(
+        context, context.verification_evidence.for_owner("design-to-code")
+    )
 
     assert visual_metric.passed is False
     assert visual_metric.score < 0.8
@@ -345,8 +423,12 @@ def test_design_to_code_handles_missing_visual_evidence_and_fallback_paths(tmp_p
         visual=visual,
     )
 
-    visual_metric = visual_regression_metric_score(context)
-    coverage_metric = design_to_code_coverage_metric_score(context)
+    metrics = {
+        metric.metric_id: metric
+        for metric in DesignToCode().collect_evidence(context).metric_scores
+    }
+    visual_metric = metrics["visual-regression"]
+    coverage_metric = metrics["test-coverage"]
     score = _visual_score_from_result({"global": {"similarity": 0.93}}, visual)
 
     assert visual_metric.evidence == "Visual comparison evidence missing."
@@ -368,13 +450,6 @@ def test_design_to_code_handles_missing_visual_evidence_and_fallback_paths(tmp_p
             )
         )
     ) == {"actual": "screens/actual.png", "diff": "screens/diff.png"}
-    fallback_metric = visual_regression_metric_score(
-        SimpleNamespace(
-            scenario=SimpleNamespace(visual=None), execution=SimpleNamespace(outputs=_outputs())
-        )
-    )
-    assert fallback_metric.score == 0.75
-    assert _action_exit_code({"result": "not-a-dict"}) is None
     assert _pct_number("nope") is None
 
 
@@ -390,12 +465,16 @@ def test_design_to_code_evidence_helpers_handle_failures_and_coverage_shapes(tmp
     }
     context = _design_context(tmp_path, actions, visual=None, coverage_threshold=0.8)
 
-    functional = design_functional_metric_score(context)
-    coverage = design_to_code_coverage_metric_score(context)
-    stability = design_verification_stability_metric_score(context)
+    scores = {
+        metric.metric_id: metric
+        for metric in DesignToCode().collect_evidence(context).metric_scores
+    }
+    functional = scores["functional"]
+    coverage = scores["test-coverage"]
+    stability = scores["verification-stability"]
 
-    assert functional.passed is False
-    assert functional.evidence == "build=True, commands=2/3"
+    assert functional.passed is True
+    assert functional.evidence == "owner=design-to-code, required_commands=1/1"
     assert coverage.score == 0.8
     assert coverage.passed is False
     assert stability.score < 1.0
@@ -407,41 +486,57 @@ def test_design_to_code_evidence_helpers_handle_failures_and_coverage_shapes(tmp
         visual=None,
         coverage_threshold=0.0,
     )
-    assert design_to_code_coverage_metric_score(missing_coverage_context).score == 1.0
-    assert design_verification_stability_metric_score(missing_coverage_context).passed is True
+    missing_scores = {
+        metric.metric_id: metric
+        for metric in DesignToCode().collect_evidence(missing_coverage_context).metric_scores
+    }
+    assert missing_scores["test-coverage"].score == 1.0
+    assert missing_scores["verification-stability"].passed is False
 
 
 def test_scorer_context_type_import_is_available():
     assert ScorerContext is not None
 
 
-def test_deterministic_helpers_cover_pass_fail_and_safety_paths(tmp_path):
+def test_deterministic_helpers_cover_pass_fail_and_language_selection(tmp_path):
     src = tmp_path / "src"
     src.mkdir()
     (src / "page.tsx").write_text("import Ready from './ready';\nconst token = 'bad';\n")
+    (src / "worker.py").write_text("from ledger import Ready\nlegacy_token = 'bad'\n")
 
     assert parse_judge_response("VERDICT: PASS\nEVIDENCE: ok").passed is True
     assert parse_judge_response("FAIL: missing requirement").passed is False
     assert parse_judge_response("unclear").evidence.startswith("Could not parse response")
 
-    assert check_import_present(tmp_path, "Ready")[0] is True
-    assert check_import_present(tmp_path / "missing", "Ready")[1] == "src directory not found"
+    assert check_import_present(tmp_path, "Ready", languages=("typescript",))[0] is True
+    assert check_import_present(tmp_path, "from ledger", languages=("typescript",))[0] is False
+    assert check_import_present(tmp_path, "from ledger", languages=("python",))[0] is True
+    assert (
+        check_import_present(
+            tmp_path / "missing",
+            "Ready",
+            languages=("typescript",),
+        )[1]
+        == "No source files found for languages: typescript"
+    )
     assert check_file_exists(tmp_path, "src/*.tsx")[0] is True
     assert check_file_exists(tmp_path, "src/*.ts")[0] is False
     assert validate_safe_regex_pattern("(a+)+$")[0] is False
     assert validate_safe_regex_pattern("(a|aa)+$")[0] is False
     assert validate_safe_regex_pattern("a" * 513)[0] is False
-    assert check_no_pattern(tmp_path, "token")[0] is False
-    assert check_no_pattern(tmp_path, "absent")[0] is True
-    assert check_no_pattern(tmp_path, "(a+)+$")[0] is False
-    assert check_no_pattern(tmp_path / "missing", "token")[0] is True
+    assert check_no_pattern(tmp_path, "token", languages=("typescript",))[0] is False
+    assert check_no_pattern(tmp_path, "legacy_token", languages=("typescript",))[0] is True
+    assert check_no_pattern(tmp_path, "legacy_token", languages=("python",))[0] is False
+    assert check_no_pattern(tmp_path, "absent", languages=("typescript",))[0] is True
+    assert check_no_pattern(tmp_path, "(a+)+$", languages=("typescript",))[0] is False
+    assert check_no_pattern(tmp_path / "missing", "token", languages=("typescript",))[0] is True
 
     check = DeterministicCheck(
         type="file_exists",
         pattern="src/page.tsx",
         description="page exists",
     )
-    result = run_deterministic_check(check, tmp_path)
+    result = run_deterministic_check(check, tmp_path, languages=("typescript",))
     assert result.passed is True
     assert score_requirement_checks([result]) == 1.0
     assert score_requirement_checks([]) == 1.0
@@ -451,21 +546,38 @@ def test_deterministic_helpers_cover_pass_fail_and_safety_paths(tmp_path):
         pattern="absent",
         description="absent token stays absent",
     )
-    assert run_deterministic_check(no_pattern, tmp_path).passed is True
+    assert (
+        run_deterministic_check(
+            no_pattern,
+            tmp_path,
+            languages=("typescript",),
+        ).passed
+        is True
+    )
     unknown = DeterministicCheck.model_construct(
         type="unknown",
         pattern="anything",
         description="unknown checks fail closed",
     )
-    assert run_deterministic_check(unknown, tmp_path).evidence == "Unknown check type: unknown"
+    assert (
+        run_deterministic_check(
+            unknown,
+            tmp_path,
+            languages=("typescript",),
+        ).evidence
+        == "Unknown check type: unknown"
+    )
 
 
 def test_requirements_coverage_scores_empty_and_missing_requirements(tmp_path):
     empty_context = SimpleNamespace(
         workspace=tmp_path,
         scenario_dir=tmp_path,
-        scenario=SimpleNamespace(requirements=SimpleNamespace(items=[])),
-        execution=SimpleNamespace(outputs=_outputs()),
+        scenario=SimpleNamespace(
+            languages=["typescript"],
+            requirements=SimpleNamespace(items=[]),
+        ),
+        execution=SimpleNamespace(),
         resource_efficiency=SimpleNamespace(),
         execution_validity=SimpleNamespace(),
     )
@@ -488,6 +600,7 @@ def test_requirements_coverage_scores_empty_and_missing_requirements(tmp_path):
             **{
                 **empty_context.__dict__,
                 "scenario": SimpleNamespace(
+                    languages=["typescript"],
                     requirements=SimpleNamespace(
                         items=[
                             SimpleNamespace(
@@ -499,7 +612,7 @@ def test_requirements_coverage_scores_empty_and_missing_requirements(tmp_path):
                                 ),
                             )
                         ]
-                    )
+                    ),
                 ),
             }
         )

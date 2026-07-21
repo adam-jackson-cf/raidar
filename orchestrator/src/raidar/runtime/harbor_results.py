@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from raidar.harness import HarborArtifactRole, HarborResultManifest
 from raidar.runtime.harbor_env import _redact_sensitive_text
 
 REGISTRY_RATE_LIMIT_PATTERN = re.compile(
@@ -35,15 +36,15 @@ def _is_registry_rate_limited(run_harbor_dir: Path) -> bool:
     return False
 
 
-def detect_trial_failure(trial_dir: Path | None) -> TrialFailure | None:
+def detect_trial_failure(manifest: HarborResultManifest | None) -> TrialFailure | None:
     """Extract a terminal failure reason from Harbor trial artifacts."""
-    if not trial_dir:
+    if manifest is None:
         return None
-    return _trial_exception_failure(trial_dir) or _codex_turn_failure(trial_dir)
+    return _trial_exception_failure(manifest) or _codex_turn_failure(manifest)
 
 
-def _trial_exception_failure(trial_dir: Path) -> TrialFailure | None:
-    result_data = _load_json_dict(trial_dir / "result.json")
+def _trial_exception_failure(manifest: HarborResultManifest) -> TrialFailure | None:
+    result_data = _load_json_dict(manifest.path(HarborArtifactRole.TRIAL_RESULT))
     exception_info = result_data.get("exception_info")
     if not isinstance(exception_info, dict):
         return None
@@ -59,8 +60,10 @@ def _trial_exception_failure(trial_dir: Path) -> TrialFailure | None:
     )
 
 
-def _codex_turn_failure(trial_dir: Path) -> TrialFailure | None:
-    codex_log = trial_dir / "agent" / "codex.txt"
+def _codex_turn_failure(manifest: HarborResultManifest) -> TrialFailure | None:
+    if manifest.definition.id != "codex-cli":
+        return None
+    codex_log = manifest.harness_artifact("codex.txt")
     if not codex_log.exists():
         return None
     for line in reversed(codex_log.read_text(errors="ignore").splitlines()):
@@ -131,10 +134,10 @@ def _phase_duration(payload: dict, phase_key: str) -> float | None:
     return _duration_seconds(phase_data.get("started_at"), phase_data.get("finished_at"))
 
 
-def _harbor_phase_timings(trial_dir: Path | None) -> dict[str, float]:
-    if not trial_dir:
+def _harbor_phase_timings(manifest: HarborResultManifest | None) -> dict[str, float]:
+    if manifest is None:
         return {}
-    payload = _load_json_dict(trial_dir / "result.json")
+    payload = _load_json_dict(manifest.path(HarborArtifactRole.TRIAL_RESULT))
     if not payload:
         return {}
 
@@ -143,6 +146,30 @@ def _harbor_phase_timings(trial_dir: Path | None) -> dict[str, float]:
         "environment_setup_sec": _phase_duration(payload, "environment_setup"),
         "harness_setup_sec": _phase_duration(payload, "agent_setup"),
         "harness_execution_sec": _phase_duration(payload, "agent_execution"),
-        "verifier_sec": _phase_duration(payload, "verifier"),
+        "runner_evidence_sec": _phase_duration(payload, "verifier"),
     }
     return {key: value for key, value in timings.items() if value is not None}
+
+
+def _orchestration_overhead_excluding_agent_and_test_sec(
+    execution_duration_sec: float,
+    timings: dict[str, float],
+) -> float | None:
+    """Return full execution time spent outside agent and verifier execution."""
+
+    required = (
+        "trial_total_sec",
+        "harness_execution_sec",
+        "runner_evidence_sec",
+    )
+    if any(key not in timings for key in required):
+        return None
+    trial_total_sec = timings["trial_total_sec"]
+    excluded_execution_sec = timings["harness_execution_sec"] + timings["runner_evidence_sec"]
+    rounding_tolerance_sec = 0.002
+    if (
+        excluded_execution_sec - trial_total_sec > rounding_tolerance_sec
+        or excluded_execution_sec - execution_duration_sec > rounding_tolerance_sec
+    ):
+        return None
+    return round(max(0.0, execution_duration_sec - excluded_execution_sec), 3)

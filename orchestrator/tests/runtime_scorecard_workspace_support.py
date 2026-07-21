@@ -9,6 +9,7 @@ from raidar.runtime import artifacts as artifacts_runtime
 from raidar.runtime import environments as runtime_environments
 from raidar.runtime import scorecard as scorecard_runtime
 from raidar.runtime import task_bundle as task_bundle_runtime
+from raidar.runtime import task_bundle_images as task_bundle_images_runtime
 from raidar.runtime import workspace as workspace_runtime
 from raidar.runtime import workspace_artifacts as workspace_artifacts_runtime
 from raidar.runtime import workspace_cache as workspace_cache_runtime
@@ -28,10 +29,8 @@ from raidar.runtime.scorecard import (
     _classify_unscored_reasons,
     build_scorecard,
 )
-from raidar.runtime.task_bundle import (
-    _task_image_reference,
-    create_harbor_task_bundle,
-)
+from raidar.runtime.task_bundle import create_harbor_task_bundle
+from raidar.runtime.task_bundle_images import task_image_reference
 from raidar.runtime.workspace import (
     scenario_evaluation_profile,
 )

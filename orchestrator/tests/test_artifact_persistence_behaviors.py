@@ -2,6 +2,7 @@ import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 
+from raidar.harness import HarborResultManifest
 from raidar.runtime import artifacts
 from raidar.runtime.models import (
     EvaluationOutputs,
@@ -10,44 +11,23 @@ from raidar.runtime.models import (
 )
 from raidar.schemas.events import GateEvent
 from raidar.schemas.scorecard import (
-    CoverageScore,
     ExecutionValidityScore,
-    FunctionalScore,
     GateCheck,
-    MetricScore,
     PerformanceGatesScore,
-    RequirementsCoverageScore,
     Scorecard,
     ScorerResult,
-    VerificationStabilityScore,
-    VisualScore,
 )
 
 
-def _outputs(
-    visual: VisualScore | None = None, *, secret_output: bool = False
-) -> EvaluationOutputs:
+def _outputs(*, secret_output: bool = False) -> EvaluationOutputs:
     stdout = "Bearer abcdefghijklmnop token=supersecretvalue" if secret_output else "ok"
     return EvaluationOutputs(
-        functional=FunctionalScore(
-            passed=True,
-            tests_passed=1,
-            tests_total=1,
-            build_succeeded=True,
-            gates_passed=1,
-            gates_total=1,
-        ),
-        visual=visual,
-        verification_stability=VerificationStabilityScore(),
-        test_coverage=CoverageScore(threshold=0.8, measured=0.9, source="summary", passed=True),
-        requirements_coverage=RequirementsCoverageScore(),
         execution_validity=ExecutionValidityScore(
             checks=[GateCheck(name="valid", passed=True, evidence="ok")]
         ),
         performance_gates=PerformanceGatesScore(
             checks=[GateCheck(name="perf", passed=True, evidence="ok")]
         ),
-        metric_scores=[MetricScore(metric_id="functional", score=1.0, passed=True)],
         gate_history=[
             GateEvent(
                 timestamp="2026-01-01T00:00:00+00:00",
@@ -71,68 +51,74 @@ def test_load_evidence_outputs_reports_missing_invalid_and_valid_evidence(tmp_pa
 
     verifier_dir = tmp_path / "verifier"
     verifier_dir.mkdir()
+    manifest = HarborResultManifest.for_trial(tmp_path, "codex-cli")
     evidence_path = verifier_dir / "evidence.json"
-    assert "Evidence output missing" in artifacts._load_evidence_outputs(tmp_path)[1]
+    assert "Evidence output missing" in artifacts._load_evidence_outputs(manifest)[1]
 
     evidence_path.write_text("{", encoding="utf-8")
-    assert (
-        artifacts._load_evidence_outputs(tmp_path)[1]
-        == "Invalid evidence JSON: Expecting property name enclosed in double quotes"
-    )
+    assert "Invalid current-version evidence" in artifacts._load_evidence_outputs(manifest)[1]
 
     evidence_path.write_text("[]", encoding="utf-8")
-    assert artifacts._load_evidence_outputs(tmp_path)[1] == (
-        "Invalid evidence content: expected object root."
-    )
+    assert "Invalid current-version evidence" in artifacts._load_evidence_outputs(manifest)[1]
 
     payload = {
+        "schema_version": "1",
+        "runner_contract": "python-evidence-runner@2",
+        "aliases": {
+            "design-to-code.build": "design-to-code.build",
+            "design-to-code.lint": "design-to-code.lint",
+        },
         "actions": [
-            "ignored",
-            {"id": "coverage.summary", "kind": "read_json", "result": {"content": {}}},
-            {"id": "bad-command", "kind": "command"},
             {
                 "id": "design-to-code.build",
                 "kind": "command",
+                "required": True,
                 "status": "ok",
+                "duration_sec": 0.1,
                 "result": {
                     "command": ["bun", "run", "build"],
+                    "cwd": ".",
+                    "duration_sec": 0.1,
                     "exit_code": 0,
                     "stdout": "ok",
                     "stderr": "",
+                    "timed_out": False,
                 },
             },
             {
                 "id": "design-to-code.lint",
                 "kind": "command",
-                "status": "error",
+                "required": False,
+                "status": "ok",
+                "duration_sec": 0.1,
                 "result": {
-                    "command": "bun run lint",
+                    "command": ["bun", "run", "lint"],
+                    "cwd": ".",
+                    "duration_sec": 0.1,
                     "exit_code": 1,
                     "stdout": "",
                     "stderr": "lint failed",
+                    "timed_out": False,
                 },
             },
-            {
-                "id": "design-to-code.typecheck",
-                "kind": "command",
-                "result": {"command": None, "stdout": None, "stderr": None},
-            },
-        ]
+        ],
+        "artifacts": [],
+        "metadata": {
+            "action_count": 2,
+            "error_count": 0,
+            "required_error_count": 0,
+            "workspace": "/app",
+        },
     }
     evidence_path.write_text(json.dumps(payload), encoding="utf-8")
-    loaded, error = artifacts._load_evidence_outputs(tmp_path)
+    loaded, error = artifacts._load_evidence_outputs(manifest)
     assert error is None
-    assert loaded.functional.passed is False
-    assert loaded.functional.tests_passed == 2
-    assert loaded.functional.tests_total == 3
-    assert loaded.verification_stability.total_gate_failures == 1
     assert loaded.gate_history[0].gate_name == "design-to-code.build"
     assert loaded.gate_history[1].command == "bun run lint"
     assert loaded.gate_history[1].exit_code == 1
-    assert loaded.gate_history[2].command == ""
 
 
-def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
+def test_persist_runner_evidence_and_scoring_artifacts(tmp_path):
     trial_dir = tmp_path / "trial"
     verifier_source = trial_dir / "verifier"
     verifier_source.mkdir(parents=True)
@@ -143,21 +129,18 @@ def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
         encoding="utf-8",
     )
 
-    harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
-    target = tmp_path / "canonical" / "verifier"
-    target.mkdir(parents=True)
+    manifest = HarborResultManifest.for_trial(trial_dir, "codex-cli")
+    runner_evidence_target = tmp_path / "canonical" / "runner-evidence"
+    runner_evidence_target.mkdir(parents=True)
+    scoring_target = tmp_path / "canonical" / "scoring"
 
-    copied = artifacts.persist_verifier_artifacts(harbor_result, target)
+    copied = artifacts.persist_runner_evidence_artifacts(manifest, runner_evidence_target)
     assert set(copied) == {"evidence.json", "action-logs"}
+    assert artifacts.persist_runner_evidence_artifacts(None, runner_evidence_target) == {}
     assert (
-        artifacts.persist_verifier_artifacts(
-            HarborExecutionResult(False, None, tmp_path / "job", None), target
-        )
-        == {}
-    )
-    assert (
-        artifacts.persist_verifier_artifacts(
-            HarborExecutionResult(False, None, tmp_path / "job", tmp_path / "missing"), target
+        artifacts.persist_runner_evidence_artifacts(
+            HarborResultManifest.for_trial(tmp_path / "missing", "codex-cli"),
+            runner_evidence_target,
         )
         == {}
     )
@@ -168,7 +151,8 @@ def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
         run_label="label",
         root_dir=tmp_path / "run",
         workspace_dir=tmp_path / "workspace",
-        verifier_dir=target,
+        runner_evidence_dir=runner_evidence_target,
+        scoring_dir=scoring_target,
         harness_dir=tmp_path / "harness",
         harbor_dir=tmp_path / "harbor",
         run_json_path=tmp_path / "run.json",
@@ -178,10 +162,20 @@ def test_persist_verifier_and_canonical_verifier_artifacts(tmp_path):
         execution_validity=ExecutionValidityScore(checks=[GateCheck(name="valid", passed=False)]),
         performance_gates=PerformanceGatesScore(checks=[GateCheck(name="perf", passed=True)]),
     )
-    artifacts.persist_canonical_verifier_artifacts(layout, scorecard, _outputs())
+    artifacts.persist_scorecard_artifacts(layout, scorecard, _outputs())
 
-    assert "gate_history" in (target / "scorecard.json").read_text(encoding="utf-8")
-    assert (target / "reward.txt").read_text(encoding="utf-8") == "0"
+    scorecard_payload = json.loads((scoring_target / "scorecard.json").read_text(encoding="utf-8"))
+    assert "gate_history" in scorecard_payload
+    assert {
+        "functional",
+        "visual",
+        "verification_stability",
+        "test_coverage",
+        "requirements_coverage",
+    }.isdisjoint(scorecard_payload)
+    assert "metric_scores" in scorecard_payload
+    assert "scorer_results" in scorecard_payload
+    assert (scoring_target / "reward.txt").read_text(encoding="utf-8") == "0"
 
 
 def test_build_scenario_revision_meta_uses_canonical_scenario_seed(tmp_path):
@@ -219,7 +213,7 @@ def test_build_scenario_revision_meta_uses_canonical_scenario_seed(tmp_path):
     assert meta["scorer_requirements"] == [{"scorer": "design-to-code@1", "requirements": {}}]
 
 
-def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
+def test_runner_evidence_artifacts_redact_secret_shaped_output(tmp_path):
     trial_dir = tmp_path / "trial"
     verifier_source = trial_dir / "verifier"
     verifier_source.mkdir(parents=True)
@@ -248,10 +242,14 @@ def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
         encoding="utf-8",
     )
 
-    target = tmp_path / "canonical" / "verifier"
+    target = tmp_path / "canonical" / "runner-evidence"
     target.mkdir(parents=True)
+    scoring_target = tmp_path / "canonical" / "scoring"
     harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
-    artifacts.persist_verifier_artifacts(harbor_result, target)
+    artifacts.persist_runner_evidence_artifacts(
+        HarborResultManifest.for_trial(trial_dir, "codex-cli"),
+        target,
+    )
 
     copied_text = "\n".join(
         [
@@ -269,7 +267,8 @@ def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
         run_label="label",
         root_dir=tmp_path / "run",
         workspace_dir=tmp_path / "workspace",
-        verifier_dir=target,
+        runner_evidence_dir=target,
+        scoring_dir=scoring_target,
         harness_dir=tmp_path / "harness",
         harbor_dir=tmp_path / "harbor",
         run_json_path=tmp_path / "run.json",
@@ -295,7 +294,7 @@ def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
             ]
         ),
     )
-    artifacts.persist_canonical_verifier_artifacts(layout, scorecard, _outputs(secret_output=True))
+    artifacts.persist_scorecard_artifacts(layout, scorecard, _outputs(secret_output=True))
     artifacts.write_run_analysis(
         layout,
         SimpleNamespace(
@@ -311,10 +310,10 @@ def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
 
     canonical_text = "\n".join(
         [
-            (target / "scorecard.json").read_text(encoding="utf-8"),
-            (target / "gate-history.json").read_text(encoding="utf-8"),
-            (target / "execution-validity.json").read_text(encoding="utf-8"),
-            (target / "performance-gates.json").read_text(encoding="utf-8"),
+            (scoring_target / "scorecard.json").read_text(encoding="utf-8"),
+            (scoring_target / "gate-history.json").read_text(encoding="utf-8"),
+            (scoring_target / "execution-validity.json").read_text(encoding="utf-8"),
+            (scoring_target / "performance-gates.json").read_text(encoding="utf-8"),
             layout.report_path.read_text(encoding="utf-8"),
         ]
     )
@@ -324,7 +323,7 @@ def test_verifier_artifacts_redact_secret_shaped_output(tmp_path):
     assert "DB_PASSWORD" in canonical_text
 
 
-def test_visual_evidence_persistence_and_rebinding(monkeypatch, tmp_path):
+def test_visual_evidence_persistence(tmp_path):
     scenario_dir = tmp_path / "scenario"
     reference_dir = scenario_dir / "reference"
     reference_dir.mkdir(parents=True)
@@ -367,14 +366,6 @@ def test_visual_evidence_persistence_and_rebinding(monkeypatch, tmp_path):
     assert evidence["diff"].endswith("visual/compare-main.png")
     assert evidence["regions"][0]["name"] == "hero"
 
-    visual = VisualScore(regional_scores=[{"name": "hero"}, {"name": "missing"}])
-    visual.regional_scores.append("ignored")
-    artifacts._rebind_visual_evidence_paths(visual, evidence)
-    assert visual.actual_path == evidence["actual"]
-    assert visual.regional_scores[0]["actual_path"].endswith("capture-hero.png")
-    assert "actual_path" not in visual.regional_scores[1]
-    artifacts._rebind_visual_evidence_paths(None, evidence)
-
     no_visual_request = artifacts.VisualEvidenceRequest(
         request=SimpleNamespace(scenario=SimpleNamespace(visual=None)),
         workspace=workspace,
@@ -410,7 +401,10 @@ def test_harness_and_harbor_artifact_persistence(tmp_path):
     harbor_result = HarborExecutionResult(False, None, tmp_path / "job", trial_dir)
     harness_dir = tmp_path / "harness"
     harness_dir.mkdir()
-    copied = artifacts.persist_harness_artifacts(harbor_result, harness_dir, harness="codex-cli")
+    copied = artifacts.persist_harness_artifacts(
+        HarborResultManifest.for_trial(trial_dir, "codex-cli"),
+        harness_dir,
+    )
 
     assert copied["trajectory.json"].endswith("trajectory.json")
     assert copied["project.final.tar.gz"].endswith("project.final.tar.gz")
@@ -427,19 +421,11 @@ def test_harness_and_harbor_artifact_persistence(tmp_path):
     assert "abcdefghijklmnop" not in harness_text
     assert "ANTHROPIC_API_KEY=<redacted>" in harness_text
     assert "OPENAI_API_KEY=<redacted>" in harness_text
+    assert artifacts.persist_harness_artifacts(None, harness_dir) == {}
     assert (
         artifacts.persist_harness_artifacts(
-            HarborExecutionResult(False, None, tmp_path / "job", None),
+            HarborResultManifest.for_trial(tmp_path / "missing", "codex-cli"),
             harness_dir,
-            harness="codex-cli",
-        )
-        == {}
-    )
-    assert (
-        artifacts.persist_harness_artifacts(
-            HarborExecutionResult(False, None, tmp_path / "job", tmp_path / "missing"),
-            harness_dir,
-            harness="codex-cli",
         )
         == {}
     )
@@ -460,7 +446,8 @@ def test_write_run_analysis_records_score_and_artifact_pointers(monkeypatch, tmp
         run_label="label",
         root_dir=tmp_path / "run",
         workspace_dir=tmp_path / "workspace",
-        verifier_dir=tmp_path / "verifier",
+        runner_evidence_dir=tmp_path / "runner-evidence",
+        scoring_dir=tmp_path / "scoring",
         harness_dir=tmp_path / "harness",
         harbor_dir=tmp_path / "harbor",
         run_json_path=tmp_path / "run.json",

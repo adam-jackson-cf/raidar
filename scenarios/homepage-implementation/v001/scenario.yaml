@@ -1,8 +1,17 @@
 name: homepage-implementation
 scenario_revision: v001
 description: Implement homepage matching provided reference design
+display_name: Homepage reference implementation
+task_kind: design_implementation
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions: []
+languages:
+- typescript
+evaluation_role: benchmark
+catalog_status: calibration
+variant_axes: {}
 difficulty: medium
-category: greenfield-ui
 timeout_sec: 1800
 environment:
   kind: stack_preset

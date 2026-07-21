@@ -61,20 +61,22 @@ def test_run_with_unscored_reruns_skips_rerun_when_budget_zero(monkeypatch):
 
 
 def test_cleanup_stale_harbor_before_runs_invokes_full_cleanup(monkeypatch):
-    called: dict[str, bool] = {}
+    called: dict[str, object] = {}
 
-    def fake_cleanup(*, include_containers: bool, include_build_processes: bool) -> None:
+    def fake_cleanup(
+        *, include_containers: bool, include_build_processes: bool, runtime_profile
+    ) -> None:
         called["include_containers"] = include_containers
         called["include_build_processes"] = include_build_processes
+        called["runtime_profile"] = runtime_profile
 
     monkeypatch.setattr(cli_shared, "cleanup_stale_harbor_resources", fake_cleanup)
 
     cli_shared.cleanup_stale_harbor_before_runs()
 
-    assert called == {
-        "include_containers": True,
-        "include_build_processes": True,
-    }
+    assert called["include_containers"] is True
+    assert called["include_build_processes"] is True
+    assert called["runtime_profile"] == cli_shared.default_runtime_profile()
 
 
 def test_run_with_unscored_reruns_abort_on_starter_preflight_error(monkeypatch):

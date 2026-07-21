@@ -34,6 +34,7 @@ def run_task(request):
         timestamp=prepared.layout.start_time.isoformat(),
         config=EvalConfig(
             model=request.config.model.qualified_name,
+            reasoning_effort=request.config.model.reasoning_effort,
             harness=request.config.harness.value,
             scenario_name=request.scenario.name,
             scenario_revision=request.scenario.scenario_revision,

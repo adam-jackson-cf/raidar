@@ -3,8 +3,17 @@ scenario_revision: v001
 parent_revision: null
 description: Baseline Python utility implementation with deterministic tests and artifact
   checks
+display_name: Python utility implementation
+task_kind: feature_implementation
+delivery_mode: direct_implementation
+workspace_state: new
+starting_conditions: []
+languages:
+- python
+evaluation_role: benchmark
+catalog_status: calibration
+variant_axes: {}
 difficulty: medium
-category: greenfield-code
 timeout_sec: 1800
 environment:
   kind: stack_preset

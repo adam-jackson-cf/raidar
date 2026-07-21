@@ -70,9 +70,6 @@ class HarborCliAdapter(HarnessAdapter):
                 f"{allowed_rendered}. Received '{reasoning_effort}'."
             )
 
-    def _validate_credentials(self) -> None:
-        """Validate harness-specific credentials after model/CLI validation."""
-
     def harbor_harness(self) -> str:
         return self.HARBOR_HARNESS_NAME
 

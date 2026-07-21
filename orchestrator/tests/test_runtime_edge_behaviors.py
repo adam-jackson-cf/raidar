@@ -3,6 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from raidar.harness import HarborResultManifest
 from raidar.run_metadata import uncached_input_tokens
 from raidar.runtime import trace_events
 from raidar.schemas.scenario import VerificationGate
@@ -53,7 +54,9 @@ def test_trace_events_project_commands_files_and_messages(monkeypatch, tmp_path)
     monkeypatch.setattr(trace_events, "_read_jsonl_dicts", lambda _path: entries)
     monkeypatch.setattr(trace_events, "_extract_item_completed", lambda entry: entry["item"])
 
-    events = trace_events.collect_trace_events(tmp_path, harness="codex-cli")
+    events = trace_events.collect_trace_events(
+        HarborResultManifest.for_trial(tmp_path, "codex-cli")
+    )
 
     assert [(event.event_type, event.data) for event in events] == [
         ("bash_command", {"command": "bun run build"}),
@@ -61,8 +64,10 @@ def test_trace_events_project_commands_files_and_messages(monkeypatch, tmp_path)
         ("file_change", {"file_path": "src/app.ts"}),
         ("assistant_message", {"content": "done"}),
     ]
-    assert trace_events.collect_trace_events(None, harness="codex-cli") == []
-    assert trace_events.collect_trace_events(tmp_path, harness="gemini") == []
+    assert trace_events.collect_trace_events(None) == []
+    assert (
+        trace_events.collect_trace_events(HarborResultManifest.for_trial(tmp_path, "gemini")) == []
+    )
 
 
 def test_gate_watcher_records_success_failures_repeats_and_termination(monkeypatch, tmp_path):

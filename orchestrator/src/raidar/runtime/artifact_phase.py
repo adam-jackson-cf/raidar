@@ -6,17 +6,18 @@ import json
 from pathlib import Path
 from typing import Any
 
+from raidar.harness import HarborResultManifest
 from raidar.runtime import artifacts as runtime_artifacts
 from raidar.runtime import models, workspace_artifacts
+from raidar.runtime.profile import EvidenceLimits
 
 VisualEvidenceRequest = runtime_artifacts.VisualEvidenceRequest
 _persist_visual_evidence_artifacts = runtime_artifacts._persist_visual_evidence_artifacts
-_rebind_visual_evidence_paths = runtime_artifacts._rebind_visual_evidence_paths
 build_scenario_revision_meta = runtime_artifacts.build_scenario_revision_meta
 build_starter_meta = runtime_artifacts.build_starter_meta
 persist_harbor_artifacts = runtime_artifacts.persist_harbor_artifacts
 persist_harness_artifacts = runtime_artifacts.persist_harness_artifacts
-persist_verifier_artifacts = runtime_artifacts.persist_verifier_artifacts
+persist_runner_evidence_artifacts = runtime_artifacts.persist_runner_evidence_artifacts
 _hydrate_workspace_from_final_app = workspace_artifacts._hydrate_workspace_from_final_app
 _prune_workspace_artifacts = workspace_artifacts._prune_workspace_artifacts
 _run_homepage_capture_command = workspace_artifacts._run_homepage_capture_command
@@ -34,10 +35,6 @@ RESERVED_EVIDENCE_KEYS = frozenset(
         "retained_files",
     }
 )
-MAX_EVIDENCE_FILE_BYTES = 65536
-MAX_EVIDENCE_TEXT_CHARS = 4000
-MAX_EVIDENCE_LIST_ITEMS = 50
-MAX_EVIDENCE_LIST_ITEM_CHARS = 500
 
 
 def persist_artifacts_phase(
@@ -51,25 +48,35 @@ def persist_artifacts_phase(
     hydrated = _hydrate_final_workspace(request, phase, execution, evidence_artifacts)
     if hydrated and phase.screenshot_command:
         _persist_visual_evidence(request, phase, execution, evidence_artifacts)
-    _ingest_retained_evidence(request, phase, evidence_artifacts)
+    runtime_profile = phase.effective_contract.runtime_profile
+    _ingest_retained_evidence(
+        request,
+        phase,
+        evidence_artifacts,
+        limits=runtime_profile.evidence_limits,
+    )
 
-    workspace_prune = _prune_workspace_artifacts(phase.layout.workspace_dir)
+    workspace_prune = _prune_workspace_artifacts(
+        phase.layout.workspace_dir,
+        runtime_profile,
+    )
     workspace_changes = _workspace_changes_from_baseline(
         baseline_workspace=phase.context.baseline_workspace,
         run_workspace=phase.layout.workspace_dir,
         run_root_dir=phase.layout.root_dir,
         exclude_files=_scenario_visual_output_files(request),
     )
+    result_manifest = _result_manifest(execution.harbor_result, _request_harness_value(request))
     return PersistedArtifacts(
         starter_meta=build_starter_meta(request, phase.context),
         scenario_revision_meta=build_scenario_revision_meta(request, phase.context),
-        verifier_artifacts=persist_verifier_artifacts(
-            execution.harbor_result, phase.layout.verifier_dir
+        runner_evidence_artifacts=persist_runner_evidence_artifacts(
+            result_manifest,
+            phase.layout.runner_evidence_dir,
         ),
-        harness_artifacts=_persist_harness_artifacts(
-            execution.harbor_result,
+        harness_artifacts=persist_harness_artifacts(
+            result_manifest,
             phase.layout.harness_dir,
-            _request_harness_value(request),
         ),
         harbor_artifacts=persist_harbor_artifacts(execution.harbor_result, phase.layout.harbor_dir),
         evidence_artifacts=evidence_artifacts,
@@ -97,15 +104,10 @@ def _scenario_visual_output_files(request: Any) -> tuple[str, ...]:
     return tuple(Path(name).name for name in names)
 
 
-def _persist_harness_artifacts(
-    harbor_result: Any, harness_dir: Any, harness: str
-) -> dict[str, str]:
-    try:
-        return persist_harness_artifacts(harbor_result, harness_dir, harness=harness)
-    except TypeError as exc:
-        if "keyword" not in str(exc):
-            raise
-        return persist_harness_artifacts(harbor_result, harness_dir)
+def _result_manifest(harbor_result: Any, harness: str) -> HarborResultManifest | None:
+    if harbor_result.trial_dir is None:
+        return None
+    return HarborResultManifest.for_trial(harbor_result.trial_dir, harness)
 
 
 def _initial_evidence_artifacts(phase: Any) -> dict[str, object]:
@@ -158,7 +160,6 @@ def _persist_visual_evidence(
         )
     )
     evidence_artifacts["visual"] = visual_artifacts
-    _rebind_visual_evidence_paths(execution.outputs.visual, visual_artifacts)
 
 
 def _capture_post_run_visual(
@@ -170,6 +171,7 @@ def _capture_post_run_visual(
         list(phase.screenshot_command),
         phase.context.workspace,
         phase.layout.root_dir / visual_artifacts["post_capture"],
+        runtime_profile=phase.effective_contract.runtime_profile,
     )
     if post_path:
         evidence_artifacts["post_capture"] = str(post_path)
@@ -178,7 +180,11 @@ def _capture_post_run_visual(
 
 
 def _ingest_retained_evidence(
-    request: Any, phase: Any, evidence_artifacts: dict[str, object]
+    request: Any,
+    phase: Any,
+    evidence_artifacts: dict[str, object],
+    *,
+    limits: EvidenceLimits,
 ) -> None:
     """Ingest scenario-declared retained evidence files into scorer-visible evidence."""
 
@@ -186,22 +192,31 @@ def _ingest_retained_evidence(
     if not declared:
         return
     evidence_artifacts["retained_files"] = [
-        _ingest_evidence_file(phase.context.workspace, entry.path, evidence_artifacts)
+        _ingest_evidence_file(
+            phase.context.workspace,
+            entry.path,
+            evidence_artifacts,
+            limits=limits,
+        )
         for entry in declared
     ]
 
 
 def _ingest_evidence_file(
-    workspace: Any, relative_path: str, evidence_artifacts: dict[str, object]
+    workspace: Any,
+    relative_path: str,
+    evidence_artifacts: dict[str, object],
+    *,
+    limits: EvidenceLimits,
 ) -> dict[str, object]:
-    payload, status = _load_evidence_payload(workspace, relative_path)
+    payload, status = _load_evidence_payload(workspace, relative_path, limits=limits)
     if payload is None:
         return {"path": relative_path, "status": status, "keys": []}
     ingested: list[str] = []
     for key, value in payload.items():
         if key in RESERVED_EVIDENCE_KEYS or key in evidence_artifacts:
             continue
-        sanitized = _sanitize_evidence_value(value)
+        sanitized = _sanitize_evidence_value(value, limits=limits)
         if sanitized is None:
             continue
         evidence_artifacts[key] = sanitized
@@ -209,12 +224,14 @@ def _ingest_evidence_file(
     return {"path": relative_path, "status": "ingested", "keys": ingested}
 
 
-def _load_evidence_payload(workspace: Any, relative_path: str) -> tuple[dict[str, Any] | None, str]:
+def _load_evidence_payload(
+    workspace: Any, relative_path: str, *, limits: EvidenceLimits
+) -> tuple[dict[str, Any] | None, str]:
     path = workspace / relative_path
     if not path.is_file():
         return None, "missing"
-    if path.stat().st_size > MAX_EVIDENCE_FILE_BYTES:
-        return None, f"oversize: exceeds {MAX_EVIDENCE_FILE_BYTES} bytes"
+    if path.stat().st_size > limits.file_bytes:
+        return None, f"oversize: exceeds {limits.file_bytes} bytes"
     try:
         payload = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -224,14 +241,14 @@ def _load_evidence_payload(workspace: Any, relative_path: str) -> tuple[dict[str
     return payload, "ingested"
 
 
-def _sanitize_evidence_value(value: Any) -> str | list[str] | None:
+def _sanitize_evidence_value(value: Any, *, limits: EvidenceLimits) -> str | list[str] | None:
     if isinstance(value, str):
         text = value.strip()
-        return text[:MAX_EVIDENCE_TEXT_CHARS] if text else None
+        return text[: limits.text_chars] if text else None
     if isinstance(value, list):
         items = [
-            item.strip()[:MAX_EVIDENCE_LIST_ITEM_CHARS]
-            for item in value[:MAX_EVIDENCE_LIST_ITEMS]
+            item.strip()[: limits.list_item_chars]
+            for item in value[: limits.list_items]
             if isinstance(item, str) and item.strip()
         ]
         return items if items else None

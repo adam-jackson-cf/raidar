@@ -9,6 +9,13 @@ from typing import Any
 
 from raidar.schemas.scenario import ScorerMetricDefinition
 from raidar.schemas.scorecard import MetricScore
+from raidar.scorers.evidence_contract import (
+    CommandEvidenceResult,
+    JsonEvidenceResult,
+)
+from raidar.scorers.verification import (
+    OwnerEvidence,
+)
 
 SOURCE_ROOTS = ("src", "app", "lib", "package")
 TEST_NAME_PATTERNS = (
@@ -40,28 +47,54 @@ def metric(
     )
 
 
-def functional_metric_score(outputs) -> MetricScore:
+def functional_score_from_evidence(
+    evidence: OwnerEvidence,
+    *,
+    metric_id: str = "functional",
+) -> MetricScore:
+    """Score owner-declared required commands without cross-scorer inference."""
+
+    commands = [action for action in evidence.actions(kind="command") if action.required]
+    passed = sum(
+        1
+        for action in commands
+        if isinstance(action.result, CommandEvidenceResult) and action.result.exit_code == 0
+    )
+    total = len(commands)
+    score = passed / total if total else 0.0
     return MetricScore(
-        metric_id="functional",
-        score=outputs.functional.score,
-        passed=outputs.functional.passed,
-        evidence=(
-            f"build={outputs.functional.build_succeeded}, "
-            f"tests={outputs.functional.tests_passed}/{outputs.functional.tests_total}"
-        ),
+        metric_id=metric_id,
+        score=round(score, 3),
+        passed=total > 0 and passed == total,
+        evidence=f"owner={evidence.owner}, required_commands={passed}/{total}",
     )
 
 
-def verification_stability_metric_score(outputs) -> MetricScore:
-    return verification_stability_score(outputs.verification_stability)
+def verification_stability_from_evidence(evidence: OwnerEvidence) -> MetricScore:
+    """Score failures across commands explicitly declared by the owner."""
 
-
-def verification_stability_score(score) -> MetricScore:
+    commands = evidence.actions(kind="command")
+    failures = sum(
+        1
+        for action in commands
+        if not isinstance(action.result, CommandEvidenceResult) or action.result.exit_code != 0
+    )
+    total = len(commands)
+    score = 0.0 if total == 0 else max(0.0, 1.0 - (failures / total))
     return MetricScore(
         metric_id="verification-stability",
-        score=score.score,
-        passed=score.score > 0,
-        evidence=f"failures={score.total_gate_failures}",
+        score=round(score, 3),
+        passed=total > 0 and failures == 0,
+        evidence=f"owner={evidence.owner}, failures={failures}/{total}",
+    )
+
+
+def json_action_content(evidence: OwnerEvidence, local_id: str) -> Any | None:
+    """Return typed JSON content for one owner-local action."""
+
+    action = evidence.action(local_id)
+    return (
+        action.result.content if action and isinstance(action.result, JsonEvidenceResult) else None
     )
 
 
@@ -260,8 +293,7 @@ def assertion_strength_metric_score(workspace: Path) -> MetricScore:
     )
 
 
-def coverage_lift_metric_score(outputs: Any) -> MetricScore:
-    coverage = getattr(outputs, "test_coverage", None)
+def coverage_lift_metric_score(coverage: Any) -> MetricScore:
     threshold = _numeric_or_none(getattr(coverage, "threshold", None))
     measured = _numeric_or_none(getattr(coverage, "measured", None))
     passed = bool(getattr(coverage, "passed", False))

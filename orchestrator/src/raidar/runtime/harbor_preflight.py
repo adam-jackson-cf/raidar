@@ -10,7 +10,7 @@ from raidar.runtime.harbor import (
 from raidar.runtime.harbor import (
     parse_docker_compose_version as _parse_docker_compose_version,
 )
-from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
+from raidar.runtime.profile import RuntimeProfile
 
 
 def _version_tuple(version: str) -> tuple[int, int, int]:
@@ -43,10 +43,9 @@ def _read_docker_compose_version(run_env: dict[str, str]) -> tuple[int, int, int
 
 def _docker_compose_preflight_reason(
     run_env: dict[str, str],
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> str | None:
-    profile = runtime_profile or default_runtime_profile()
-    minimum_version = _version_tuple(profile.compose_minimum_version)
+    minimum_version = _version_tuple(runtime_profile.compose_minimum_version)
     version = _read_docker_compose_version(run_env)
     if version is None:
         return None

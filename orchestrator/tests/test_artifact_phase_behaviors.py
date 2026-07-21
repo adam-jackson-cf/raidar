@@ -2,6 +2,9 @@ import json
 from types import SimpleNamespace
 
 from raidar.runtime import artifact_phase
+from raidar.runtime.profile import EvidenceLimits, RuntimeProfile
+
+LIMITS = EvidenceLimits(file_bytes=65536, text_chars=4000, list_items=50, list_item_chars=500)
 
 
 def _phase(tmp_path, *, screenshot_command=("capture",), evidence_errors=("pre",)):
@@ -16,11 +19,13 @@ def _phase(tmp_path, *, screenshot_command=("capture",), evidence_errors=("pre",
         layout=SimpleNamespace(
             workspace_dir=workspace,
             root_dir=root,
-            verifier_dir=root / "verifier",
+            runner_evidence_dir=root / "runner-evidence",
+            scoring_dir=root / "scoring",
             harness_dir=root / "harness",
             harbor_dir=root / "harbor",
         ),
         context=SimpleNamespace(workspace=workspace, baseline_workspace=baseline),
+        effective_contract=SimpleNamespace(runtime_profile=RuntimeProfile(evidence_limits=LIMITS)),
     )
 
 
@@ -91,30 +96,22 @@ def test_hydration_failure_appends_error_and_skips_archive(monkeypatch, tmp_path
     assert evidence["final_workspace_archive"] is None
 
 
-def test_visual_evidence_records_capture_artifacts_and_rebinds(monkeypatch, tmp_path):
+def test_visual_evidence_records_capture_artifacts(monkeypatch, tmp_path):
     phase = _phase(tmp_path)
-    visual = SimpleNamespace(actual_path=None)
-    execution = SimpleNamespace(
-        harbor_result=SimpleNamespace(),
-        outputs=SimpleNamespace(visual=visual),
-    )
+    execution = SimpleNamespace(harbor_result=SimpleNamespace())
     evidence = artifact_phase._initial_evidence_artifacts(phase)
-    calls: list[str] = []
-
     monkeypatch.setattr(
         artifact_phase,
         "_run_homepage_capture_command",
-        lambda scenario, command, workspace, output: (output, "capture stderr"),
+        lambda scenario, command, workspace, output, *, runtime_profile: (
+            output,
+            "capture stderr",
+        ),
     )
     monkeypatch.setattr(
         artifact_phase,
         "_persist_visual_evidence_artifacts",
         lambda request: {"actual": "visual-output.png", "regions": []},
-    )
-    monkeypatch.setattr(
-        artifact_phase,
-        "_rebind_visual_evidence_paths",
-        lambda score, evidence_paths: calls.append(f"{score is visual}:{evidence_paths['actual']}"),
     )
     request = SimpleNamespace(
         scenario=SimpleNamespace(
@@ -133,7 +130,6 @@ def test_visual_evidence_records_capture_artifacts_and_rebinds(monkeypatch, tmp_
     assert evidence["post_capture"].endswith("post-output.png")
     assert evidence["errors"][-1].startswith("post-run visual capture failed")
     assert evidence["visual"] == {"actual": "visual-output.png", "regions": []}
-    assert calls == ["True:visual-output.png"]
 
 
 def test_retained_evidence_ingests_declared_json_fields(tmp_path):
@@ -154,7 +150,10 @@ def test_retained_evidence_ingests_declared_json_fields(tmp_path):
     evidence = artifact_phase._initial_evidence_artifacts(phase)
 
     artifact_phase._ingest_retained_evidence(
-        _request(retained_files=("evidence/defect-evidence.json",)), phase, evidence
+        _request(retained_files=("evidence/defect-evidence.json",)),
+        phase,
+        evidence,
+        limits=LIMITS,
     )
 
     assert evidence["reproduction_note"] == "bug reproduced via failing sumLedger test"
@@ -173,7 +172,7 @@ def test_retained_evidence_ingests_declared_json_fields(tmp_path):
 def test_retained_evidence_records_missing_oversize_and_invalid_files(tmp_path):
     phase = _phase(tmp_path)
     oversize = phase.context.workspace / "oversize.json"
-    oversize.write_text("x" * (artifact_phase.MAX_EVIDENCE_FILE_BYTES + 1), encoding="utf-8")
+    oversize.write_text("x" * (LIMITS.file_bytes + 1), encoding="utf-8")
     non_object = phase.context.workspace / "list.json"
     non_object.write_text("[1, 2]", encoding="utf-8")
     malformed = phase.context.workspace / "broken.json"
@@ -184,6 +183,7 @@ def test_retained_evidence_records_missing_oversize_and_invalid_files(tmp_path):
         _request(retained_files=("absent.json", "oversize.json", "list.json", "broken.json")),
         phase,
         evidence,
+        limits=LIMITS,
     )
 
     statuses = {record["path"]: record["status"] for record in evidence["retained_files"]}
@@ -198,29 +198,32 @@ def test_retained_evidence_noop_without_declared_files(tmp_path):
     phase = _phase(tmp_path)
     evidence = artifact_phase._initial_evidence_artifacts(phase)
 
-    artifact_phase._ingest_retained_evidence(_request(), phase, evidence)
+    artifact_phase._ingest_retained_evidence(_request(), phase, evidence, limits=LIMITS)
 
     assert "retained_files" not in evidence
 
 
 def test_sanitize_evidence_value_truncates_and_rejects_non_text():
-    long_text = "a" * (artifact_phase.MAX_EVIDENCE_TEXT_CHARS + 10)
-    assert artifact_phase._sanitize_evidence_value(long_text) == (
-        "a" * artifact_phase.MAX_EVIDENCE_TEXT_CHARS
+    long_text = "a" * (LIMITS.text_chars + 10)
+    assert artifact_phase._sanitize_evidence_value(long_text, limits=LIMITS) == (
+        "a" * LIMITS.text_chars
     )
-    assert artifact_phase._sanitize_evidence_value("   ") is None
-    assert artifact_phase._sanitize_evidence_value(42) is None
-    assert artifact_phase._sanitize_evidence_value({"k": "v"}) is None
-    oversized_list = ["item"] * (artifact_phase.MAX_EVIDENCE_LIST_ITEMS + 5)
-    assert len(artifact_phase._sanitize_evidence_value(oversized_list)) == (
-        artifact_phase.MAX_EVIDENCE_LIST_ITEMS
+    assert artifact_phase._sanitize_evidence_value("   ", limits=LIMITS) is None
+    assert artifact_phase._sanitize_evidence_value(42, limits=LIMITS) is None
+    assert artifact_phase._sanitize_evidence_value({"k": "v"}, limits=LIMITS) is None
+    oversized_list = ["item"] * (LIMITS.list_items + 5)
+    assert len(artifact_phase._sanitize_evidence_value(oversized_list, limits=LIMITS)) == (
+        LIMITS.list_items
     )
 
 
 def test_persist_artifacts_phase_assembles_all_artifact_sections(monkeypatch, tmp_path):
     phase = _phase(tmp_path, screenshot_command=None)
     request = _request(retained_files=("evidence/defect-evidence.json",))
-    execution = SimpleNamespace(harbor_result=SimpleNamespace(), terminated_early=False)
+    execution = SimpleNamespace(
+        harbor_result=SimpleNamespace(trial_dir=None),
+        terminated_early=False,
+    )
     evidence_file = phase.context.workspace / "evidence" / "defect-evidence.json"
     evidence_file.parent.mkdir(parents=True)
     evidence_file.write_text(json.dumps({"reproduction_note": "note"}), encoding="utf-8")
@@ -231,7 +234,9 @@ def test_persist_artifacts_phase_assembles_all_artifact_sections(monkeypatch, tm
         lambda harbor_result, workspace, *, harness: (None, "hydrate error"),
     )
     monkeypatch.setattr(
-        artifact_phase, "_prune_workspace_artifacts", lambda _workspace: {"removed": []}
+        artifact_phase,
+        "_prune_workspace_artifacts",
+        lambda _workspace, _profile: {"removed": []},
     )
     monkeypatch.setattr(
         artifact_phase,
@@ -244,7 +249,11 @@ def test_persist_artifacts_phase_assembles_all_artifact_sections(monkeypatch, tm
         "build_scenario_revision_meta",
         lambda *_args: {"scenario": "meta"},
     )
-    monkeypatch.setattr(artifact_phase, "persist_verifier_artifacts", lambda *_args: {"v": "1"})
+    monkeypatch.setattr(
+        artifact_phase,
+        "persist_runner_evidence_artifacts",
+        lambda *_args: {"v": "1"},
+    )
     monkeypatch.setattr(artifact_phase, "persist_harness_artifacts", lambda *_args: {"h": "1"})
     monkeypatch.setattr(artifact_phase, "persist_harbor_artifacts", lambda *_args: {"r": "1"})
 
@@ -254,4 +263,4 @@ def test_persist_artifacts_phase_assembles_all_artifact_sections(monkeypatch, tm
     assert persisted.evidence_artifacts["reproduction_note"] == "note"
     assert persisted.starter_meta == {"starter": "meta"}
     assert persisted.scenario_revision_meta == {"scenario": "meta"}
-    assert persisted.verifier_artifacts == {"v": "1"}
+    assert persisted.runner_evidence_artifacts == {"v": "1"}

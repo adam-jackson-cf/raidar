@@ -6,32 +6,30 @@ import os
 import signal
 import subprocess
 
-from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
+from raidar.runtime.profile import CleanupPolicy, RuntimeProfile
 
 
 def cleanup_stale_harbor_resources(
     *,
     include_containers: bool = True,
     include_build_processes: bool = False,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> None:
     """Remove stale Harbor containers and/or orphaned build processes."""
-    runtime_profile = runtime_profile or default_runtime_profile()
     if include_containers:
         cleanup_stale_harbor_containers(runtime_profile=runtime_profile)
     if include_build_processes:
         cleanup_stale_harbor_build_processes(runtime_profile=runtime_profile)
 
 
-def cleanup_stale_harbor_containers(runtime_profile: RuntimeProfile | None = None) -> None:
+def cleanup_stale_harbor_containers(runtime_profile: RuntimeProfile) -> None:
     """Remove stale Harbor scenario-run containers that can block future runs."""
-    runtime_profile = runtime_profile or default_runtime_profile()
     try:
         listing = subprocess.run(
             ["docker", "ps", "-a", "--format", "{{.ID}}\t{{.Names}}\t{{.Status}}"],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=runtime_profile.docker_inspect_timeout_sec,
             check=False,
         )
     except FileNotFoundError:
@@ -57,7 +55,7 @@ def cleanup_stale_harbor_containers(runtime_profile: RuntimeProfile | None = Non
             ["docker", "rm", "-f", container_id],
             capture_output=True,
             text=True,
-            timeout=60,
+            timeout=runtime_profile.docker_command_timeout_sec,
             check=False,
         )
 
@@ -72,19 +70,19 @@ def _parse_container_listing_line(line: str) -> tuple[str, str, str] | None:
     return parts[0], parts[1], parts[2]
 
 
-def _cleanup_policy(runtime_profile: RuntimeProfile | None = None) -> dict:
-    return (runtime_profile or default_runtime_profile()).cleanup
+def _cleanup_policy(runtime_profile: RuntimeProfile) -> CleanupPolicy:
+    return runtime_profile.cleanup
 
 
 def _is_stale_harbor_container(
     *,
     name: str,
     status: str,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
     policy = _cleanup_policy(runtime_profile)
-    prefixes = tuple(str(item) for item in policy.get("container_name_prefixes", ()))
-    suffix = str(policy.get("container_name_suffix", ""))
+    prefixes = policy.container_name_prefixes
+    suffix = policy.container_name_suffix
     if not suffix or not prefixes:
         return False
     if not (name.endswith(suffix) and name.startswith(prefixes)):
@@ -93,9 +91,8 @@ def _is_stale_harbor_container(
     return not status.startswith("Up ")
 
 
-def cleanup_stale_harbor_build_processes(runtime_profile: RuntimeProfile | None = None) -> None:
+def cleanup_stale_harbor_build_processes(runtime_profile: RuntimeProfile) -> None:
     """Kill orphaned Harbor docker-compose/buildx build processes."""
-    runtime_profile = runtime_profile or default_runtime_profile()
     parsed = _collect_harbor_process_candidates(runtime_profile=runtime_profile)
     if parsed is None:
         return
@@ -116,15 +113,14 @@ def cleanup_stale_harbor_build_processes(runtime_profile: RuntimeProfile | None 
 
 
 def _collect_harbor_process_candidates(
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> tuple[dict[int, int], list[int], list[int]] | None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     try:
         listing = subprocess.run(
             ["ps", "-ax", "-o", "pid=,ppid=,command="],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=runtime_profile.docker_inspect_timeout_sec,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -187,21 +183,19 @@ def _parse_process_listing_line(line: str) -> tuple[int, int, str] | None:
 def _is_harbor_build_command(
     command: str,
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
-    groups = _cleanup_policy(runtime_profile).get("build_command_marker_groups", ())
-    return any(all(str(marker) in command for marker in group) for group in groups)
+    groups = _cleanup_policy(runtime_profile).build_command_marker_groups
+    return any(all(marker in command for marker in group) for group in groups)
 
 
 def _is_orphan_harbor_run_command(
     *,
     command: str,
     ppid: int,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
-    markers = tuple(
-        str(item) for item in _cleanup_policy(runtime_profile).get("run_command_markers", ())
-    )
+    markers = _cleanup_policy(runtime_profile).run_command_markers
     return ppid <= 1 and bool(markers) and all(marker in command for marker in markers)
 
 

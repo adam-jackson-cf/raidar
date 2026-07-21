@@ -7,7 +7,7 @@ import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from .agents.config import AgentSpec, Harness, ModelTarget
-from .application.scenario_catalog import load_scenario
+from .application.scenario_catalog import load_scenario, validate_scenario_experiment_kind
 from .schemas.scenario import ScenarioDefinition
 
 
@@ -131,8 +131,13 @@ def matrix_entry_agent_spec(entry: MatrixEntryInput) -> MatrixAgentSpec:
     )
 
 
-def resolve_matrix_jobs(config: MatrixConfig, *, repo_root: Path) -> list[MatrixJob]:
-    """Resolve a matrix config to executable jobs."""
+def resolve_matrix_jobs(
+    config: MatrixConfig,
+    *,
+    repo_root: Path,
+    experiment_kind: str = "benchmark",
+) -> list[MatrixJob]:
+    """Resolve a matrix config to executable jobs for an experiment kind."""
 
     scenario_root = (
         config.scenario if config.scenario.is_absolute() else repo_root / config.scenario
@@ -147,6 +152,16 @@ def resolve_matrix_jobs(config: MatrixConfig, *, repo_root: Path) -> list[Matrix
                 f"Matrix entry '{entry.id}' scenario revision does not exist: {scenario_path}"
             )
         scenario = load_scenario(scenario_path)
+        try:
+            validate_scenario_experiment_kind(
+                scenario,
+                experiment_kind=experiment_kind,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                f"Matrix entry '{entry.id}' scenario {scenario.name!r} cannot run as "
+                f"{experiment_kind!r}: {exc}"
+            ) from exc
         jobs.append(
             MatrixJob(
                 entry_id=entry.id,

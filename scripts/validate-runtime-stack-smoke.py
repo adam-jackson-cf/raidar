@@ -21,7 +21,9 @@ def _scenario_identity(path: Path) -> tuple[str, str]:
 
 
 def _yaml_scalar(text: str, key: str) -> str | None:
-    match = re.search(rf"^{re.escape(key)}:\s*['\"]?([^'\"\n]+)['\"]?\s*$", text, re.MULTILINE)
+    match = re.search(
+        rf"^{re.escape(key)}:\s*['\"]?([^'\"\n]+)['\"]?\s*$", text, re.MULTILINE
+    )
     return match.group(1).strip() if match else None
 
 
@@ -39,7 +41,9 @@ def _load_json(path: Path) -> dict[str, Any] | None:
     return payload if isinstance(payload, dict) else None
 
 
-def _matching_runs(root: Path, *, scenario_name: str, revision: str, harness: str, model: str):
+def _matching_runs(
+    root: Path, *, scenario_name: str, revision: str, harness: str, model: str
+):
     expected_model = model if "/" in model else None
     for path in root.glob("**/run.json"):
         payload = _load_json(path)
@@ -82,13 +86,29 @@ def _validate_run(path: Path, payload: dict[str, Any]) -> None:
     if not isinstance(cache, dict):
         raise SystemExit(f"Cache metadata missing: {path}")
     contract = cache.get("contract")
-    if not isinstance(contract, dict) or not contract.get("id") or not contract.get("hash"):
+    if (
+        not isinstance(contract, dict)
+        or not contract.get("id")
+        or not contract.get("hash")
+    ):
         raise SystemExit(f"EffectiveRunContract metadata missing: {path}")
     timing = harbor.get("time_to_experiment_start_sec")
     if not isinstance(timing, int | float):
         raise SystemExit(f"time_to_experiment_start_sec missing: {path}")
     if timing >= 10.0:
         raise SystemExit(f"time_to_experiment_start_sec {timing} >= 10.0: {path}")
+    orchestration_overhead = harbor.get(
+        "orchestration_overhead_excluding_agent_and_test_sec"
+    )
+    if not isinstance(orchestration_overhead, int | float):
+        raise SystemExit(
+            f"orchestration_overhead_excluding_agent_and_test_sec missing: {path}"
+        )
+    if orchestration_overhead >= 10.0:
+        raise SystemExit(
+            "orchestration_overhead_excluding_agent_and_test_sec "
+            f"{orchestration_overhead} >= 10.0: {path}"
+        )
 
     image_key = cache.get("image_key")
     image = cache.get("image")
@@ -102,7 +122,9 @@ def _validate_run(path: Path, payload: dict[str, Any]) -> None:
         "runtime-stack-smoke-ok "
         f"run_id={run_id} run_json={path} experiment_dir={experiment_dir} "
         f"contract_id={contract.get('id')} image_hit={image_hit} "
-        f"time_to_experiment_start_sec={timing}"
+        f"time_to_experiment_start_sec={timing} "
+        "orchestration_overhead_excluding_agent_and_test_sec="
+        f"{orchestration_overhead}"
     )
 
 

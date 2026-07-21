@@ -6,7 +6,6 @@ import ast
 import py_compile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scenario import CapabilityRequirements
@@ -20,9 +19,12 @@ from raidar.scorers.code_task.base import CodeTaskScorer
 from raidar.scorers.common import (
     code_task_artifact_metric_score,
     required_artifact_patterns,
-    verification_stability_score,
+    verification_stability_from_evidence,
 )
+from raidar.scorers.evidence_contract import CommandEvidenceResult, JsonEvidenceResult
 from raidar.scorers.verification import (
+    EvidenceDependency,
+    OwnerEvidence,
     VerificationPlan,
     VerificationPlanContext,
     command,
@@ -89,6 +91,11 @@ class PythonCodeTask(CodeTaskScorer):
             "lizard": ">=1.17",
         },
     )
+    evidence_dependencies = (
+        EvidenceDependency(kind="command", minimum=5),
+        EvidenceDependency(kind="read_json"),
+        EvidenceDependency(kind="glob"),
+    )
 
     def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
         """Declare Python raw evidence actions for the runtime evidence runner."""
@@ -129,13 +136,14 @@ class PythonCodeTask(CodeTaskScorer):
         """Collect deterministic Python evidence for code-task metrics."""
 
         workspace = Path(context.workspace)
+        evidence = context.verification_evidence.for_owner(self.id)
         files = _python_files(workspace)
         tests = [path for path in files if _is_test_file(path, workspace)]
         compile_failures = _compile_failures(files, workspace)
-        pytest = _command_outcome_from_evidence(context.verification_evidence.actions, ".pytest")
-        coverage = _coverage_from_evidence(context.verification_evidence.actions, tests)
-        ruff = _command_outcome_from_evidence(context.verification_evidence.actions, ".ruff")
-        lizard = _command_outcome_from_evidence(context.verification_evidence.actions, ".lizard")
+        pytest = _command_outcome_from_evidence(evidence, "pytest")
+        coverage = _coverage_from_evidence(evidence, tests)
+        ruff = _command_outcome_from_evidence(evidence, "ruff")
+        lizard = _command_outcome_from_evidence(evidence, "lizard")
         quality_findings = _static_quality_findings(files, workspace)
         required_artifacts = required_artifact_patterns(context.scenario, self.id)
 
@@ -145,9 +153,7 @@ class PythonCodeTask(CodeTaskScorer):
                 _python_code_quality_score(compile_failures, ruff, lizard, quality_findings),
                 _python_test_coverage_score(coverage),
                 _python_artifact_score(files, tests, workspace, required_artifacts),
-                _python_verification_stability_score(
-                    context.execution.outputs.verification_stability
-                ),
+                verification_stability_from_evidence(evidence),
             ),
             metadata={
                 "source_files": len(files),
@@ -186,24 +192,25 @@ def _compile_failures(files: list[Path], workspace: Path) -> list[str]:
 
 
 def _coverage_from_evidence(
-    actions: dict[str, dict[str, Any]],
+    evidence: OwnerEvidence,
     tests: list[Path],
 ) -> tuple[CommandOutcome, CommandOutcome | None, float | None] | None:
     if not tests:
         return None
-    run = _command_outcome_from_evidence(actions, ".coverage.run")
-    report = _command_outcome_from_evidence(actions, ".coverage.json")
+    run = _command_outcome_from_evidence(evidence, "coverage.run")
+    report = _command_outcome_from_evidence(evidence, "coverage.json")
     if run is None:
         return None
     if not run.passed:
         return run, None, None
-    return run, report, _coverage_percent_from_action(actions)
+    return run, report, _coverage_percent_from_action(evidence)
 
 
-def _coverage_percent_from_action(actions: dict[str, dict[str, Any]]) -> float | None:
-    action = _action_by_suffix(actions, ".coverage.report")
-    result = action.get("result") if action else None
-    payload = result.get("content") if isinstance(result, dict) else None
+def _coverage_percent_from_action(evidence: OwnerEvidence) -> float | None:
+    action = evidence.action("coverage.report")
+    payload = (
+        action.result.content if action and isinstance(action.result, JsonEvidenceResult) else None
+    )
     if not isinstance(payload, dict):
         return None
     totals = payload.get("totals")
@@ -215,29 +222,17 @@ def _coverage_percent_from_action(actions: dict[str, dict[str, Any]]) -> float |
     return max(0.0, min(1.0, float(value) / 100.0))
 
 
-def _command_outcome_from_evidence(
-    actions: dict[str, dict[str, Any]], suffix: str
-) -> CommandOutcome | None:
-    action = _action_by_suffix(actions, suffix)
-    result = action.get("result") if action else None
-    if not isinstance(result, dict):
+def _command_outcome_from_evidence(evidence: OwnerEvidence, local_id: str) -> CommandOutcome | None:
+    action = evidence.action(local_id)
+    result = action.result if action else None
+    if not isinstance(result, CommandEvidenceResult):
         return None
-    command = result.get("command")
     return CommandOutcome(
-        command=(
-            tuple(str(part) for part in command) if isinstance(command, list) else (str(command),)
-        ),
-        returncode=int(result.get("exit_code") or 0),
-        stdout=str(result.get("stdout") or ""),
-        stderr=str(result.get("stderr") or ""),
+        command=tuple(result.command),
+        returncode=result.exit_code,
+        stdout=result.stdout,
+        stderr=result.stderr,
     )
-
-
-def _action_by_suffix(actions: dict[str, dict[str, Any]], suffix: str) -> dict[str, Any] | None:
-    for action_id, action in actions.items():
-        if action_id.endswith(suffix):
-            return action
-    return None
 
 
 def _static_quality_findings(files: list[Path], workspace: Path) -> list[str]:
@@ -384,10 +379,6 @@ def _python_artifact_score(
         required_artifacts=required_artifacts,
         is_test_file=_is_test_file,
     )
-
-
-def _python_verification_stability_score(score) -> MetricScore:
-    return verification_stability_score(score)
 
 
 def _command_evidence(outcome: CommandOutcome | None) -> str:

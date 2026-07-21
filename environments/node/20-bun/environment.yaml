@@ -2,10 +2,11 @@ id: node:20
 version: 1
 image: raidar/node:20-bun
 build:
-  dockerfile: environments/node/20-bun/Dockerfile
+  dockerfile: Dockerfile
 capabilities:
   runtimes:
     node: ">=20"
+    python: ">=3.11"
   package_managers:
     bun: ">=1"
   tools:

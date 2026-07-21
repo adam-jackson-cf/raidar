@@ -9,11 +9,13 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+from raidar.harness import HarborArtifactRole, HarborResultManifest
 from raidar.runtime.harbor_cleanup import cleanup_stale_harbor_resources
 from raidar.runtime.harbor_env import _redact_sensitive_text
 from raidar.runtime.harbor_preflight import _docker_compose_preflight_reason
 from raidar.runtime.harbor_results import _is_registry_rate_limited, detect_trial_failure
 from raidar.runtime.models import HarborExecutionRequest, HarborExecutionResult
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.wait import wait_for_harbor_rate_limit_retry
 
 HARBOR_TIMEOUT_BUFFER_SEC = 120
@@ -31,6 +33,7 @@ class HarborProcessRequest:
     run_env: dict[str, str]
     run_harbor_dir: Path
     job_dir: Path
+    runtime_profile: RuntimeProfile
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,7 +61,12 @@ def execute_harbor(request: HarborExecutionRequest) -> HarborExecutionResult:
         )
 
     trial_dir = _select_trial_dir(job_dir)
-    trial_failure = detect_trial_failure(trial_dir) if trial_dir else None
+    manifest = (
+        HarborResultManifest.for_trial(trial_dir, request.adapter.config.harness.value)
+        if trial_dir is not None
+        else None
+    )
+    trial_failure = detect_trial_failure(manifest)
     if trial_failure:
         return _terminated_harbor_result(
             job_dir=job_dir,
@@ -89,6 +97,7 @@ def _harbor_process_request(
         run_env=request.run_env,
         run_harbor_dir=request.run_harbor_dir,
         job_dir=job_dir,
+        runtime_profile=request.runtime_profile,
     )
 
 
@@ -103,7 +112,7 @@ def _run_harbor_with_retries(request: HarborProcessRequest) -> HarborProcessFail
             run_harbor_dir=request.run_harbor_dir,
         ):
             return execution_error
-        cleanup_stale_harbor_resources()
+        cleanup_stale_harbor_resources(runtime_profile=request.runtime_profile)
         wait_for_harbor_rate_limit_retry()
     return execution_error
 
@@ -119,7 +128,7 @@ def _should_retry_harbor_rate_limit(
 
 
 def _harbor_process_timeout(task_timeout_sec: int) -> int:
-    """Allow Harbor build + verifier overhead beyond harness task timeout."""
+    """Allow Harbor build plus runner-evidence overhead beyond the harness timeout."""
     return max(task_timeout_sec + HARBOR_TIMEOUT_BUFFER_SEC, int(task_timeout_sec * 1.25))
 
 
@@ -146,7 +155,10 @@ def _run_harbor_process(request: HarborProcessRequest) -> HarborProcessFailure |
     stderr_path = request.run_harbor_dir / "harbor-stderr.log"
     command_path.write_text(" ".join(shlex.quote(part) for part in request.harbor_cmd) + "\n")
 
-    preflight_reason = _docker_compose_preflight_reason(request.run_env)
+    preflight_reason = _docker_compose_preflight_reason(
+        request.run_env,
+        request.runtime_profile,
+    )
     if preflight_reason:
         stdout_path.write_text("")
         stderr_path.write_text(preflight_reason + "\n")
@@ -213,7 +225,10 @@ def _timeout_reason(*, timeout_sec: int, job_dir: Path) -> str:
     trial_dir = _select_trial_dir(job_dir)
     if not trial_dir:
         return f"Harbor timed out after {timeout_sec}s before creating a trial directory."
-    result_json = trial_dir / "result.json"
+    result_json = HarborResultManifest.unbound_path(
+        trial_dir,
+        HarborArtifactRole.TRIAL_RESULT,
+    )
     if not result_json.exists():
         return f"Harbor timed out after {timeout_sec}s before trial result.json was written."
     return f"Harbor timed out after {timeout_sec}s."
@@ -224,6 +239,7 @@ def _select_trial_dir(job_dir: Path) -> Path | None:
         return None
     trial_dirs = sorted([candidate for candidate in job_dir.iterdir() if candidate.is_dir()])
     with_agent = next(
-        (candidate for candidate in trial_dirs if (candidate / "agent").exists()), None
+        (candidate for candidate in trial_dirs if HarborResultManifest.looks_like_trial(candidate)),
+        None,
     )
     return with_agent or (trial_dirs[0] if trial_dirs else None)

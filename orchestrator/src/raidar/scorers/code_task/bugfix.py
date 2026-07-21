@@ -8,10 +8,18 @@ from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     change_containment_metric_score,
+    functional_score_from_evidence,
     metric,
     source_and_test_files,
     valid_changed_file_paths,
-    verification_stability_score,
+    verification_stability_from_evidence,
+)
+from raidar.scorers.requirements import _requirements_coverage_score
+from raidar.scorers.verification import (
+    EvidenceDependency,
+    VerificationPlan,
+    VerificationPlanContext,
+    scenario_command_plan,
 )
 
 
@@ -89,22 +97,32 @@ class Bugfix(BaseScorer):
             pass_fail="Passes when defect, regression, and verification evidence are all present.",
         ),
     )
+    evidence_dependencies = (EvidenceDependency(kind="command"),)
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare scenario verification commands owned by this scorer."""
+
+        return scenario_command_plan(self.id, context)
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         workspace = Path(context.workspace)
-        outputs = context.execution.outputs
+        evidence = context.verification_evidence.for_owner(self.id)
+        functional = functional_score_from_evidence(evidence)
+        stability = verification_stability_from_evidence(evidence)
+        requirements = _requirements_coverage_score(workspace, context.scenario)
         sources, tests = source_and_test_files(workspace)
         return ScorerEvidence(
             metric_scores=(
-                _defect_resolution_score(outputs),
+                _defect_resolution_score(functional, requirements),
                 _regression_protection_score(tests),
                 change_containment_metric_score(
                     workspace=workspace,
                     workspace_changes=context.workspace_changes,
                 ),
-                verification_stability_score(outputs.verification_stability),
+                stability,
                 _defect_evidence_completeness_score(
-                    outputs=outputs,
+                    functional=functional,
+                    stability=stability,
                     retained_evidence=context.retained_evidence,
                     workspace_changes=context.workspace_changes,
                 ),
@@ -113,11 +131,8 @@ class Bugfix(BaseScorer):
         )
 
 
-def _defect_resolution_score(outputs) -> MetricScore:
-    functional = outputs.functional
-    checks = getattr(outputs, "requirements_coverage", None)
-    requirement_total = _numeric_requirement_value(checks, "total_requirements")
-    satisfied_total = _numeric_requirement_value(checks, "satisfied_requirements")
+def _defect_resolution_score(functional: MetricScore, requirements: MetricScore) -> MetricScore:
+    requirement_total = requirements.matched_count + len(requirements.missing_patterns)
     if requirement_total <= 0:
         return MetricScore(
             metric_id="defect-resolution",
@@ -128,7 +143,7 @@ def _defect_resolution_score(outputs) -> MetricScore:
                 f"direct: missing defect-linked requirement checks; functional={functional.score}"
             ),
         )
-    requirement_score = min(1.0, satisfied_total / requirement_total)
+    requirement_score = requirements.score
     score = round(min(functional.score, requirement_score), 3)
     return MetricScore(
         metric_id="defect-resolution",
@@ -139,13 +154,6 @@ def _defect_resolution_score(outputs) -> MetricScore:
             f"functional={functional.score}, requirement_ratio={requirement_score}"
         ),
     )
-
-
-def _numeric_requirement_value(checks, field_name: str) -> float:
-    value = getattr(checks, field_name, 0)
-    if isinstance(value, bool):
-        return 0.0
-    return float(value) if isinstance(value, int | float) else 0.0
 
 
 def _regression_protection_score(tests: list[Path]) -> MetricScore:
@@ -169,7 +177,8 @@ def _regression_protection_score(tests: list[Path]) -> MetricScore:
 
 def _defect_evidence_completeness_score(
     *,
-    outputs,
+    functional: MetricScore,
+    stability: MetricScore,
     retained_evidence: dict,
     workspace_changes: dict,
 ) -> MetricScore:
@@ -179,8 +188,8 @@ def _defect_evidence_completeness_score(
     regression_present = _has_collection_evidence(
         retained_evidence, ("regression_tests", "test_evidence", "passing_tests")
     )
-    verification_present = bool(getattr(outputs.functional, "passed", False)) and (
-        getattr(outputs.verification_stability, "score", 0.0) > 0
+    verification_present = functional.passed and (
+        stability.score > 0
         or _has_text_evidence(retained_evidence, ("verification_evidence", "verification"))
     )
     changed_file_present = bool(valid_changed_file_paths(workspace_changes))

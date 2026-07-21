@@ -3,36 +3,38 @@
 from __future__ import annotations
 
 import json
-import os
 import subprocess
-import tempfile
 from pathlib import Path
 from typing import Any
 
-from raidar.codex_auth import OPENAI_API_KEY_ENV, resolve_codex_auth
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from raidar.codex_auth import resolve_codex_auth
 from raidar.config import settings
 from raidar.sanitization import sanitize_evidence_text
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import MetricScore
-from raidar.scorers.deterministic import parse_judge_response
+from raidar.scorers.base import JudgeExecutor
+from raidar.scorers.deterministic import source_file_paths
 from raidar.scorers.paths import resolve_scorer_definition_file
 
-SOURCE_PATTERNS = (
-    "package.json",
-    "src/lib/**/*.ts",
-    "src/lib/**/*.tsx",
-    "src/test/**/*.ts",
-    "src/test/**/*.tsx",
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "src/**/*.js",
-    "src/**/*.jsx",
-    "src/**/*.css",
-    "app/**/*.ts",
-    "app/**/*.tsx",
-    "components/**/*.ts",
-    "components/**/*.tsx",
-)
+
+class JudgeEvaluationError(RuntimeError):
+    """Raised when a judge metric cannot produce valid structured analysis."""
+
+
+class JudgeMetricOutput(BaseModel):
+    """Strict structured output required from every judge-backed metric."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    passed: bool
+    score: float = Field(ge=0, le=1)
+    verdict: str = Field(min_length=1)
+    evidence: str = Field(min_length=1)
+    findings: list[dict[str, Any]]
+    rubric_coverage: dict[str, Any]
+    residual_risk: list[Any]
 
 
 def evaluate_llm_as_judge_metric(
@@ -42,10 +44,10 @@ def evaluate_llm_as_judge_metric(
     scenario: ScenarioDefinition,
     metric_id: str,
     judge_path: str,
-    execution_outputs: Any | None = None,
     deterministic_metric_scores: tuple[MetricScore, ...] = (),
     retained_evidence: dict[str, Any] | None = None,
     changed_surfaces: list[str] | None = None,
+    executor: JudgeExecutor | None = None,
 ) -> MetricScore:
     """Evaluate a run with the scorer-provided judge role file."""
 
@@ -55,72 +57,74 @@ def evaluate_llm_as_judge_metric(
             field_name="llm-as-judge.config.judge",
         )
     except (FileNotFoundError, ValueError) as exc:
-        return MetricScore(
-            metric_id=metric_id,
-            score=0.0,
-            passed=False,
-            missing_patterns=[judge_path],
-            evidence=str(exc),
-        )
+        raise JudgeEvaluationError(f"Judge definition unavailable: {exc}") from exc
+    if executor is None:
+        raise JudgeEvaluationError("Judge-backed metric requires an explicit judge executor")
 
     judge_role = resolved_judge_path.read_text(encoding="utf-8")
     prompt = _judge_prompt(
         workspace=workspace,
         scenario_dir=scenario_dir,
         scenario=scenario,
-        execution_outputs=execution_outputs,
         deterministic_metric_scores=deterministic_metric_scores,
         retained_evidence=retained_evidence or {},
         changed_surfaces=changed_surfaces or [],
     )
     try:
-        response = _call_judge(judge_role=judge_role, prompt=prompt)
+        response = executor(judge_role, prompt)
     except Exception as exc:
-        return MetricScore(
-            metric_id=metric_id,
-            score=0.0,
-            passed=False,
-            evidence=f"LLM judge failed: {type(exc).__name__}: {exc}",
-        )
+        raise JudgeEvaluationError(f"Judge execution failed: {type(exc).__name__}: {exc}") from exc
     return _metric_score_from_response(response, metric_id=metric_id)
 
 
-def _call_judge(*, judge_role: str, prompt: str) -> str:
-    return _call_codex_judge(judge_role=judge_role, prompt=prompt)
+def codex_judge_executor(image_name: str) -> JudgeExecutor:
+    """Bind judge execution to the prepared task image for network parity."""
+
+    if not image_name.strip():
+        raise JudgeEvaluationError("Prepared task image is unavailable for judge execution")
+
+    def execute(judge_role: str, prompt: str) -> str:
+        return _call_codex_judge(
+            image_name=image_name,
+            judge_role=judge_role,
+            prompt=prompt,
+        )
+
+    return execute
 
 
-def _call_codex_judge(*, judge_role: str, prompt: str) -> str:
+def _call_codex_judge(*, image_name: str, judge_role: str, prompt: str) -> str:
     auth = resolve_codex_auth(requested_mode=settings.llm_as_judge.codex_auth_mode)
     if auth.resolved_mode != "chatgpt" or auth.auth_json_path is None:
         raise OSError("LLM judge requires Codex ChatGPT auth.")
 
     instruction = "\n\n".join((judge_role, prompt))
-    with tempfile.TemporaryDirectory(prefix="raidar-codex-judge-") as codex_home:
-        codex_home_path = Path(codex_home)
-        auth_target = codex_home_path / "auth.json"
-        auth_target.write_bytes(auth.auth_json_path.read_bytes())
-        auth_target.chmod(0o600)
-        env = os.environ.copy()
-        env["CODEX_HOME"] = str(codex_home_path)
-        env.pop(OPENAI_API_KEY_ENV, None)
-        completed = subprocess.run(
-            _codex_judge_command(),
-            input=instruction,
-            cwd=Path.cwd(),
-            capture_output=True,
-            text=True,
-            timeout=settings.timeouts.command_default,
-            check=False,
-            env=env,
-        )
+    completed = subprocess.run(
+        _codex_judge_command(image_name=image_name, auth_path=auth.auth_json_path),
+        input=instruction,
+        cwd=Path.cwd(),
+        capture_output=True,
+        text=True,
+        timeout=settings.timeouts.command_default,
+        check=False,
+    )
     if completed.returncode != 0:
         output = _clip_output(f"{completed.stdout}\n{completed.stderr}")
         raise RuntimeError(f"Codex judge failed with exit {completed.returncode}: {output}")
     return _codex_response_text(completed.stdout)
 
 
-def _codex_judge_command() -> list[str]:
+def _codex_judge_command(*, image_name: str, auth_path: Path) -> list[str]:
     command = [
+        "docker",
+        "run",
+        "--rm",
+        "-i",
+        "--volume",
+        f"{auth_path}:/tmp/codex-home/auth.json:ro",
+        "--env",
+        "CODEX_HOME=/tmp/codex-home",
+        image_name,
         "codex",
         "exec",
         "--ignore-user-config",
@@ -191,28 +195,20 @@ def _clip_output(output: str, *, max_chars: int = 1000) -> str:
 
 def _metric_score_from_response(response: str, *, metric_id: str) -> MetricScore:
     parsed_json = _parse_json_response(response)
-    if parsed_json is not None:
-        sanitized_json = _sanitize_json(parsed_json)
-        score = _bounded_score(sanitized_json.get("score"))
-        passed = _bool_value(sanitized_json.get("passed"), default=score >= 0.8)
-        evidence = _evidence_from_json(
-            sanitized_json,
-            fallback=sanitize_evidence_text(response, max_chars=300),
-        )
-        return MetricScore(
-            metric_id=metric_id,
-            score=score,
-            passed=passed,
-            evidence=evidence,
-            judge_output=sanitized_json,
-        )
-
-    parsed = parse_judge_response(response)
+    if parsed_json is None:
+        raise JudgeEvaluationError("Judge response was not a JSON object")
+    sanitized_json = _sanitize_json(parsed_json)
+    try:
+        output = JudgeMetricOutput.model_validate(sanitized_json)
+    except ValidationError as exc:
+        raise JudgeEvaluationError(f"Judge response violated the output contract: {exc}") from exc
+    output_payload = output.model_dump(mode="json")
     return MetricScore(
         metric_id=metric_id,
-        score=1.0 if parsed.passed else 0.0,
-        passed=parsed.passed,
-        evidence=sanitize_evidence_text(parsed.evidence or ""),
+        score=round(output.score, 3),
+        passed=output.passed,
+        evidence=output.evidence,
+        judge_output=output_payload,
     )
 
 
@@ -231,43 +227,11 @@ def _parse_json_response(response: str) -> dict[str, Any] | None:
     return parsed if isinstance(parsed, dict) else None
 
 
-def _bounded_score(value: Any) -> float:
-    try:
-        numeric = float(value)
-    except (TypeError, ValueError):
-        return 0.0
-    return round(max(0.0, min(1.0, numeric)), 3)
-
-
-def _bool_value(value: Any, *, default: bool) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized == "true":
-            return True
-        if normalized == "false":
-            return False
-    return default
-
-
-def _evidence_from_json(parsed_json: dict[str, Any], *, fallback: str) -> str:
-    for key in ("evidence", "summary", "verdict"):
-        value = parsed_json.get(key)
-        if isinstance(value, str) and value.strip():
-            return value
-    findings = parsed_json.get("findings")
-    if isinstance(findings, list) and findings:
-        return f"{len(findings)} judge finding(s)."
-    return fallback
-
-
 def _judge_prompt(
     *,
     workspace: Path,
     scenario_dir: Path,
     scenario: ScenarioDefinition,
-    execution_outputs: Any | None = None,
     deterministic_metric_scores: tuple[MetricScore, ...] = (),
     retained_evidence: dict[str, Any] | None = None,
     changed_surfaces: list[str] | None = None,
@@ -280,7 +244,6 @@ def _judge_prompt(
             _workspace_sources(workspace, scenario=scenario),
             _structured_judge_inputs(
                 scenario,
-                execution_outputs=execution_outputs,
                 deterministic_metric_scores=deterministic_metric_scores,
                 retained_evidence=retained_evidence or {},
                 changed_surfaces=changed_surfaces or [],
@@ -331,12 +294,15 @@ def _workspace_sources(workspace: Path, *, scenario: ScenarioDefinition) -> str:
 
 
 def _source_paths(workspace: Path, *, scenario: ScenarioDefinition) -> list[Path]:
-    paths: dict[str, Path] = {}
-    for pattern in (*_scenario_source_patterns(scenario), *SOURCE_PATTERNS):
+    paths = {
+        str(path.relative_to(workspace)): path
+        for path in source_file_paths(workspace, tuple(scenario.languages))
+    }
+    for pattern in _scenario_source_patterns(scenario):
         for path in workspace.glob(pattern):
             if path.is_file() and "node_modules" not in path.parts:
                 paths[str(path.relative_to(workspace))] = path
-    return list(paths.values())
+    return [paths[key] for key in sorted(paths)]
 
 
 def _scenario_source_patterns(scenario: ScenarioDefinition) -> tuple[str, ...]:
@@ -360,18 +326,10 @@ def _looks_like_workspace_path(value: str) -> bool:
 def _structured_judge_inputs(
     scenario: ScenarioDefinition,
     *,
-    execution_outputs: Any | None,
     deterministic_metric_scores: tuple[MetricScore, ...],
     retained_evidence: dict[str, Any],
     changed_surfaces: list[str],
 ) -> str:
-    functional = getattr(execution_outputs, "functional", None)
-    execution_summary = {
-        "functional_passed": getattr(functional, "passed", None),
-        "build_succeeded": getattr(functional, "build_succeeded", None),
-        "tests_passed": getattr(functional, "tests_passed", None),
-        "tests_total": getattr(functional, "tests_total", None),
-    }
     metric_summaries = [
         {
             "metric_id": score.metric_id,
@@ -386,7 +344,6 @@ def _structured_judge_inputs(
         "requirement_count": len(scenario.requirements.items),
         "configured_scorers": len(scenario.scorers),
         "changed_surfaces": changed_surfaces[:50],
-        "execution_outcomes": execution_summary,
         "retained_evidence": retained_evidence,
         "deterministic_metric_summaries": metric_summaries,
     }

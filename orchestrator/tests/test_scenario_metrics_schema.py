@@ -23,10 +23,18 @@ def _requirement() -> dict:
 def _base_scenario_payload() -> dict:
     return {
         "name": "schema-scenario",
+        "display_name": "Schema Scenario",
         "scenario_revision": "v001",
         "description": "schema test scenario",
         "difficulty": "medium",
-        "category": "greenfield-ui",
+        "task_kind": "feature_implementation",
+        "delivery_mode": "direct_implementation",
+        "workspace_state": "new",
+        "starting_conditions": [],
+        "languages": ["TypeScript"],
+        "evaluation_role": "benchmark",
+        "catalog_status": "active",
+        "variant_axes": {},
         "timeout_sec": 1800,
         "environment": {
             "kind": "stack_preset",
@@ -130,6 +138,14 @@ def test_scorer_refs_reject_duplicate_refs() -> None:
     payload = _base_scenario_payload()
     payload["scorers"].append({"id": "resource-efficiency", "version": 1, "weight": 0.2})
     with pytest.raises(ValidationError, match="duplicate scorer references"):
+        ScenarioDefinition.model_validate(payload)
+
+
+def test_scorer_refs_reject_duplicate_metric_ownership() -> None:
+    payload = _base_scenario_payload()
+    payload["scorers"].append({"id": "python-code-task", "version": 1, "weight": 0.2})
+
+    with pytest.raises(ValidationError, match="Metric 'functional' is owned by both"):
         ScenarioDefinition.model_validate(payload)
 
 

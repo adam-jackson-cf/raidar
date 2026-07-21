@@ -9,28 +9,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-import yaml
-
 from raidar.agents.config import Harness
 from raidar.agents.rules import inject_rules, injected_rules_path
+from raidar.runtime.execution_contract import EffectiveRunContract
 from raidar.runtime.models import (
     RunLayout,
     RunRequest,
     WorkspaceContext,
 )
-from raidar.runtime.profile import default_runtime_profile
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.task_bundle import (
     _baseline_workspace_for_request,
     _copy_baseline_workspace,
 )
 from raidar.schemas.scenario import ScenarioDefinition
-
-
-def load_scenario(scenario_path: Path) -> ScenarioDefinition:
-    """Load scenario definition from YAML file."""
-    with open(scenario_path, encoding="utf-8") as f:
-        data = yaml.safe_load(f)
-    return ScenarioDefinition.model_validate(data)
 
 
 def _harness_value(harness: Harness | Any) -> str:
@@ -46,10 +38,11 @@ def _repeat_workspace_dir(request: RunRequest) -> Path:
 
 
 def _workspace_runtime_env(
-    workspace: Path, base_env: dict[str, str] | None = None
+    workspace: Path,
+    runtime_profile: RuntimeProfile,
+    base_env: dict[str, str] | None = None,
 ) -> dict[str, str]:
     env = dict(os.environ if base_env is None else base_env)
-    profile = default_runtime_profile()
     runtime_dir = _workspace_runtime_dir(workspace)
     tmp_dir = runtime_dir / "tmp"
     cache_dir = runtime_dir / "cache"
@@ -61,7 +54,7 @@ def _workspace_runtime_env(
         "tmp": str(tmp_dir),
         "cache": str(cache_dir),
     }
-    for key, template in profile.workspace_env.items():
+    for key, template in runtime_profile.workspace_env.items():
         value = template.format(**template_values)
         env[key] = value
         path = Path(value)
@@ -101,6 +94,7 @@ def prepare_workspace(
     target_dir: Path,
     scenario_dir: Path,
     harness: Harness,
+    runtime_profile: RuntimeProfile,
 ) -> tuple[Path, Path | None]:
     """Prepare workspace by copying the starter and injecting rules.
 
@@ -119,7 +113,7 @@ def prepare_workspace(
         starter_dir,
         target_dir,
         dirs_exist_ok=True,
-        ignore=shutil.ignore_patterns(*default_runtime_profile().copy_excludes),
+        ignore=shutil.ignore_patterns(*runtime_profile.copy_excludes),
     )
 
     # Inject rules
@@ -142,10 +136,11 @@ def initialize_run(request: RunRequest) -> RunLayout:
     if root_dir.exists():
         shutil.rmtree(root_dir)
     workspace_dir = root_dir / "workspace"
-    verifier_dir = root_dir / "verifier"
+    runner_evidence_dir = root_dir / "runner-evidence"
+    scoring_dir = root_dir / "scoring"
     harness_dir = root_dir / "harness"
     harbor_dir = root_dir / "harbor"
-    for path in (workspace_dir, verifier_dir, harness_dir, harbor_dir):
+    for path in (workspace_dir, runner_evidence_dir, scoring_dir, harness_dir, harbor_dir):
         path.mkdir(parents=True, exist_ok=True)
     return RunLayout(
         run_id=run_id,
@@ -153,7 +148,8 @@ def initialize_run(request: RunRequest) -> RunLayout:
         run_label=run_label,
         root_dir=root_dir,
         workspace_dir=workspace_dir,
-        verifier_dir=verifier_dir,
+        runner_evidence_dir=runner_evidence_dir,
+        scoring_dir=scoring_dir,
         harness_dir=harness_dir,
         harbor_dir=harbor_dir,
         run_json_path=root_dir / "run.json",
@@ -161,7 +157,10 @@ def initialize_run(request: RunRequest) -> RunLayout:
     )
 
 
-def prepare_run_context(request: RunRequest) -> WorkspaceContext:
+def prepare_run_context(
+    request: RunRequest,
+    contract: EffectiveRunContract,
+) -> WorkspaceContext:
     """Resolve starter source, workspace, and metadata."""
     from raidar.starter import record_starter_metadata, resolve_starter_source
 
@@ -173,11 +172,17 @@ def prepare_run_context(request: RunRequest) -> WorkspaceContext:
     )
 
     baseline_cache_key, baseline_workspace_dir, baseline_cache = _baseline_workspace_for_request(
-        request, starter_source
+        request,
+        starter_source,
+        runtime_profile=contract.runtime_profile,
     )
 
     workspace_dir = _repeat_workspace_dir(request)
-    _copy_baseline_workspace(baseline_workspace_dir, workspace_dir)
+    _copy_baseline_workspace(
+        baseline_workspace_dir,
+        workspace_dir,
+        runtime_profile=contract.runtime_profile,
+    )
     injected_rules = injected_rules_path(workspace_dir, request.config.harness)
     metadata_path = record_starter_metadata(workspace_dir, starter_source)
 

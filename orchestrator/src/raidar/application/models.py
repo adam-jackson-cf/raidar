@@ -2,15 +2,34 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Literal
+from typing import Literal, get_args
 
-from raidar.schemas.scenario import ScenarioDefinition
+from raidar.schemas.scenario import (
+    CatalogStatus,
+    DeliveryMode,
+    EvaluationRole,
+    ScenarioDefinition,
+    StartingCondition,
+    TaskKind,
+    WorkspaceState,
+)
 from raidar.schemas.scorecard import EvalRun
 
-ExperimentKind = Literal["benchmark", "research-loop"]
+ExperimentKind = Literal["benchmark", "operational-smoke", "research-loop"]
+ScenarioTemplateId = Literal["python-pytest", "typescript-bun"]
+Difficulty = Literal["easy", "medium", "hard"]
+
+DIFFICULTY_CHOICES = get_args(Difficulty)
+TASK_KIND_CHOICES = get_args(TaskKind)
+DELIVERY_MODE_CHOICES = get_args(DeliveryMode)
+WORKSPACE_STATE_CHOICES = get_args(WorkspaceState)
+STARTING_CONDITION_CHOICES = get_args(StartingCondition)
+EVALUATION_ROLE_CHOICES = get_args(EvaluationRole)
+CATALOG_STATUS_CHOICES = get_args(CatalogStatus)
+SCENARIO_TEMPLATE_CHOICES = get_args(ScenarioTemplateId)
 
 
 @dataclass(frozen=True, slots=True)
@@ -27,7 +46,7 @@ class RunCliOptionsBuildRequest:
     repeat_parallel: int
     rerun_unscored: int
     experiments_root: Path | None
-    experiment_kind: str | None
+    experiment_kind: ExperimentKind
     repo_root: Path
 
 
@@ -81,6 +100,7 @@ class RunCliOptions:
     repeats: int
     repeat_parallel: int
     rerun_unscored: int
+    experiment_kind: ExperimentKind = "benchmark"
     experiments_root: Path = Path(".")
     reasoning_effort: str | None = None
 
@@ -95,6 +115,7 @@ class RunCliOptions:
             repeats=self.repeats,
             repeat_parallel=self.repeat_parallel,
             rerun_unscored=min(self.rerun_unscored, 1),
+            experiment_kind=self.experiment_kind,
             experiments_root=self.experiments_root.resolve(),
         )
 
@@ -147,12 +168,22 @@ class ScenarioInitRequest:
 
     path: Path
     name: str | None
+    display_name: str
     scenario_revision: str
     starter_root: str
     prompt_entry: str
-    difficulty: Literal["easy", "medium", "hard"]
-    category: str
+    difficulty: Difficulty
+    task_kind: TaskKind
+    delivery_mode: DeliveryMode
+    workspace_state: WorkspaceState
+    starting_conditions: list[StartingCondition]
+    languages: list[str]
+    evaluation_role: EvaluationRole
+    catalog_status: CatalogStatus
     timeout_sec: int
+    template: ScenarioTemplateId
+    family_id: str | None = None
+    variant_axes: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +192,7 @@ class ScenarioInitResult:
 
     scenario_root: Path
     scenario_name: str
+    display_name: str
     scenario_revision: str
     parent_revision: str | None
     revision_dir: Path
@@ -168,6 +200,16 @@ class ScenarioInitResult:
     prompt_path: Path
     rules_dir: Path
     starter_root: str
+    template: ScenarioTemplateId
+    task_kind: TaskKind
+    delivery_mode: DeliveryMode
+    workspace_state: WorkspaceState
+    starting_conditions: list[StartingCondition]
+    languages: list[str]
+    evaluation_role: EvaluationRole
+    catalog_status: CatalogStatus
+    family_id: str | None
+    variant_axes: dict[str, str]
 
 
 @dataclass(frozen=True, slots=True)

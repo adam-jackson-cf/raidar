@@ -1,8 +1,17 @@
 name: hello-world-smoke
 scenario_revision: v001
 description: Minimal end-to-end Harbor orchestration smoke scenario
+display_name: Harbor orchestration smoke
+task_kind: feature_implementation
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions: []
+languages:
+- TypeScript
+evaluation_role: operational
+catalog_status: active
+variant_axes: {}
 difficulty: easy
-category: agent-integration
 timeout_sec: 300
 environment:
   kind: stack_preset

@@ -45,8 +45,12 @@ def matrix(**options) -> None:
 
     matrix_config = matrix_config_from_options(options)
     try:
-        jobs = resolve_matrix_jobs(matrix_config, repo_root=REPO_ROOT)
-    except FileNotFoundError as exc:
+        jobs = resolve_matrix_jobs(
+            matrix_config,
+            repo_root=REPO_ROOT,
+            experiment_kind=options["experiment_kind"],
+        )
+    except (FileNotFoundError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     experiment_config = matrix_config.experiment
     echo_matrix_settings(matrix_config, jobs)
@@ -71,6 +75,8 @@ def matrix(**options) -> None:
         parallel=options["parallel"],
     )
     click.echo(f"Matrix completed: {successes} experiments succeeded, {failures} failed.")
+    if failures:
+        raise click.ClickException(f"Matrix failed: {failures} experiment(s) did not complete")
 
 
 def matrix_config_from_options(options: dict[str, object]):

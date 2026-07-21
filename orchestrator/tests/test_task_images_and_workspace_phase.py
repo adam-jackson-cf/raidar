@@ -14,6 +14,13 @@ def _request_for_scenario(relative_scenario: str, harness: str = "codex-cli") ->
     )
 
 
+def _task_contract(harness: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        cache_payload={"harness": harness},
+        contract_hash=f"contract-{harness}",
+    )
+
+
 def test_ensure_task_image_writes_log_and_raises_on_build_failure(
     monkeypatch, tmp_path: Path
 ) -> None:
@@ -52,6 +59,7 @@ def test_ensure_task_image_writes_log_and_raises_on_build_failure(
                 run_env={},
                 log_dir=tmp_path / "logs",
                 task_timeout_sec=300,
+                runtime_profile=RUNTIME_PROFILE,
             )
         )
 
@@ -85,8 +93,8 @@ def test_task_image_reference_is_content_addressed_by_harness(
         harness="gemini",
     )
 
-    image_ref = runner._task_image_reference(request, bundle_path)
-    other_ref = runner._task_image_reference(other_request, bundle_path)
+    image_ref = runner.task_image_reference(request, bundle_path, _task_contract("codex-cli"))
+    other_ref = runner.task_image_reference(other_request, bundle_path, _task_contract("gemini"))
 
     assert image_ref is not None
     assert image_ref.image_name.startswith("custom-task-env:task-env-codex-cli-")
@@ -95,7 +103,11 @@ def test_task_image_reference_is_content_addressed_by_harness(
     assert image_ref.cache_key != other_ref.cache_key
 
     (tests_dir / "test.sh").write_text("echo second\n", encoding="utf-8")
-    changed_tests_ref = runner._task_image_reference(request, bundle_path)
+    changed_tests_ref = runner.task_image_reference(
+        request,
+        bundle_path,
+        _task_contract("codex-cli"),
+    )
 
     assert changed_tests_ref is not None
     assert changed_tests_ref.cache_key != image_ref.cache_key
@@ -115,11 +127,13 @@ def test_task_image_reference_respects_reuse_disable_switch(
         harness="codex-cli",
     )
 
-    assert runner._task_image_reference(request, bundle_path) is not None
+    assert (
+        runner.task_image_reference(request, bundle_path, _task_contract("codex-cli")) is not None
+    )
 
     monkeypatch.setenv("RAIDAR_TASK_IMAGE_REUSE", "0")
 
-    assert runner._task_image_reference(request, bundle_path) is None
+    assert runner.task_image_reference(request, bundle_path, _task_contract("codex-cli")) is None
 
 
 def test_task_image_build_command_uses_classic_docker_build(tmp_path: Path) -> None:
@@ -136,6 +150,7 @@ def test_task_image_build_command_uses_classic_docker_build(tmp_path: Path) -> N
         dockerfile,
         tmp_path,
         harness="codex-cli",
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     assert command[:2] == ["docker", "build"]
@@ -143,16 +158,17 @@ def test_task_image_build_command_uses_classic_docker_build(tmp_path: Path) -> N
 
 
 def test_render_environment_dockerfile_includes_visual_tooling_dependencies() -> None:
+    repo_root = Path(__file__).resolve().parents[2]
+    scenario_path = repo_root / "scenarios/homepage-implementation/v001/scenario.yaml"
     environment = runner.resolve_scenario_environment(
-        scenario=scenario_catalog.load_scenario(
-            Path(__file__).resolve().parents[2]
-            / "scenarios/homepage-implementation/v001/scenario.yaml"
+        scenario=scenario_catalog.load_scenario(scenario_path),
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+        registry=runner.resolve_environment_registry(
+            repo_root=repo_root,
+            runtime_profile=RUNTIME_PROFILE,
         ),
-        scenario_path=(
-            Path(__file__).resolve().parents[2]
-            / "scenarios/homepage-implementation/v001/scenario.yaml"
-        ),
-        repo_root=Path(__file__).resolve().parents[2],
+        docker_registry_allowlist=RUNTIME_PROFILE.docker_registry_allowlist,
     )
 
     dockerfile = runner._render_environment_dockerfile(environment)
@@ -213,6 +229,7 @@ def test_ensure_task_image_returns_immediately_when_image_exists(
             run_env={},
             log_dir=tmp_path / "logs",
             task_timeout_sec=300,
+            runtime_profile=RUNTIME_PROFILE,
         )
     )
 
@@ -359,7 +376,7 @@ def test_execute_harbor_phase_uses_empty_metrics_when_terminated_and_usage_missi
     assert result.process_metrics.command_count == 0
 
 
-def test_execute_harbor_phase_recovers_timeout_when_verifier_outputs_exist(
+def test_execute_harbor_phase_recovers_timeout_when_runner_evidence_exists(
     monkeypatch, tmp_path: Path
 ) -> None:
     request = SimpleNamespace(
@@ -462,6 +479,7 @@ def test_execute_harbor_preserves_trial_dir_on_timeout(monkeypatch, tmp_path: Pa
         run_id="run-01",
         timeout_sec=420,
         run_env={},
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     result = runner.execute_harbor(request)

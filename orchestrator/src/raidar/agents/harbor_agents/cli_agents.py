@@ -12,7 +12,11 @@ from harbor.agents.base import BaseAgent
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
-SECRET_FILE_ENV_PREFIX = "AGENTIC_EVAL_SECRET_FILE_"
+from raidar.harness import (
+    SECRET_FILE_ENV_PREFIX,
+    CredentialTransport,
+    harness_definition,
+)
 
 
 def _model_name(model_name: str | None) -> str:
@@ -78,6 +82,33 @@ async def _upload_secret_file(
             tmp_path.unlink(missing_ok=True)
 
 
+async def _materialize_secret_credentials(
+    environment: BaseEnvironment,
+    harness: str,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """Mount definition-declared secret files and return paths plus exports."""
+
+    mounted_paths: dict[str, str] = {}
+    export_paths: dict[str, str] = {}
+    for credential in harness_definition(harness).credentials:
+        if credential.transport is not CredentialTransport.SECRET_FILE:
+            continue
+        secret_value = _secret_from_file_env(credential.transport_name)
+        if not secret_value:
+            continue
+        if credential.mount_path is None:  # guarded by CredentialSpec validation
+            raise RuntimeError(f"Credential {credential.id!r} has no secret mount path")
+        await _upload_secret_file(
+            environment,
+            secret_value=secret_value,
+            target_path=credential.mount_path,
+        )
+        mounted_paths[credential.id] = credential.mount_path
+        for export_name in credential.export_names:
+            export_paths[export_name] = credential.mount_path
+    return mounted_paths, export_paths
+
+
 def _secret_export_prefix(secret_paths: dict[str, str]) -> str:
     if not secret_paths:
         return ""
@@ -93,24 +124,6 @@ def _secret_from_file_env(secret_name: str) -> str | None:
     if not secret_path.exists():
         return None
     return secret_path.read_text(encoding="utf-8").rstrip("\n")
-
-
-async def _claude_secret_paths(environment: BaseEnvironment) -> dict[str, str]:
-    secret_paths: dict[str, str] = {}
-    anthropic_key = _secret_from_file_env("ANTHROPIC_API_KEY")
-    if not anthropic_key:
-        anthropic_key = _secret_from_file_env("CLAUDE_CODE_API_KEY")
-    if anthropic_key:
-        path = "/tmp/agentic-eval-secrets/anthropic_api_key"
-        await _upload_secret_file(environment, secret_value=anthropic_key, target_path=path)
-        secret_paths["ANTHROPIC_API_KEY"] = path
-        secret_paths["CLAUDE_CODE_API_KEY"] = path
-    oauth_token = _secret_from_file_env("CLAUDE_CODE_OAUTH_TOKEN")
-    if oauth_token:
-        path = "/tmp/agentic-eval-secrets/claude_code_oauth_token"
-        await _upload_secret_file(environment, secret_value=oauth_token, target_path=path)
-        secret_paths["CLAUDE_CODE_OAUTH_TOKEN"] = path
-    return secret_paths
 
 
 def _claude_base_env() -> dict[str, str]:
@@ -181,16 +194,10 @@ class GeminiCliHarborAgent(CliHarborAgentBase):
             value = os.environ.get(key)
             if value:
                 env[key] = value
-        secret_paths: dict[str, str] = {}
-        gemini_key = _secret_from_file_env("GEMINI_API_KEY")
-        if gemini_key:
-            path = "/tmp/agentic-eval-secrets/gemini_api_key"
-            await _upload_secret_file(
-                environment,
-                secret_value=gemini_key,
-                target_path=path,
-            )
-            secret_paths["GEMINI_API_KEY"] = path
+        _mounted_paths, secret_paths = await _materialize_secret_credentials(
+            environment,
+            "gemini",
+        )
 
         secret_prefix = _secret_export_prefix(secret_paths)
         await self._exec_agent_command(
@@ -242,7 +249,10 @@ class ClaudeCodeCliHarborAgent(CliHarborAgentBase):
     ) -> None:
         escaped_instruction = self._quote_instruction(instruction)
         env = _claude_base_env()
-        secret_paths = await _claude_secret_paths(environment)
+        _mounted_paths, secret_paths = await _materialize_secret_credentials(
+            environment,
+            "claude-code",
+        )
         _configure_claude_model_env(env, self.model_name)
         settings_flag = _claude_settings_flag(
             effort=self._effort,
@@ -298,44 +308,40 @@ class CodexCliHarborAgent(CliHarborAgentBase):
         env = {
             "CODEX_HOME": "/logs/agent/codex-home",
         }
-        auth_json = _secret_from_file_env("CODEX_AUTH_JSON")
-        openai_key = _secret_from_file_env("OPENAI_API_KEY") or ""
+        mounted_paths, _export_paths = await _materialize_secret_credentials(
+            environment,
+            "codex-cli",
+        )
+        auth_json_path = mounted_paths.get("codex-auth-json")
+        openai_key_path = mounted_paths.get("openai-api-key")
         reasoning_flag = ""
         if self._reasoning_effort:
             reasoning_flag = f"-c model_reasoning_effort={shlex.quote(self._reasoning_effort)} "
 
-        if auth_json:
-            await _upload_secret_file(
-                environment,
-                secret_value=auth_json,
-                target_path="/tmp/agentic-eval-secrets/codex_auth_json",
-            )
+        if auth_json_path:
             await environment.exec(
                 command=(
                     'mkdir -p /tmp/codex-secrets "$CODEX_HOME" && '
-                    "cp /tmp/agentic-eval-secrets/codex_auth_json /tmp/codex-secrets/auth.json && "
+                    f"cp {shlex.quote(auth_json_path)} /tmp/codex-secrets/auth.json && "
                     "chmod 600 /tmp/codex-secrets/auth.json && "
                     'ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"'
                 ),
                 env=env,
             )
-        else:
-            await _upload_secret_file(
-                environment,
-                secret_value=openai_key,
-                target_path="/tmp/agentic-eval-secrets/openai_api_key",
-            )
+        elif openai_key_path:
             await environment.exec(
                 command=(
                     'mkdir -p /tmp/codex-secrets "$CODEX_HOME" && '
                     'printf \'{\\n  "OPENAI_API_KEY": "%s"\\n}\\n\' '
-                    '"$(cat /tmp/agentic-eval-secrets/openai_api_key)" '
+                    f'"$(cat {shlex.quote(openai_key_path)})" '
                     "> /tmp/codex-secrets/auth.json && "
                     "chmod 600 /tmp/codex-secrets/auth.json && "
                     'ln -sf /tmp/codex-secrets/auth.json "$CODEX_HOME/auth.json"'
                 ),
                 env=env,
             )
+        else:
+            raise RuntimeError("Codex credential contract resolved no mounted credential")
         await self._exec_agent_command(
             environment,
             context,

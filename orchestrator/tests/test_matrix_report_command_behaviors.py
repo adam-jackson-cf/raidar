@@ -148,21 +148,58 @@ def test_matrix_command_dry_run_and_resolution_error(monkeypatch, tmp_path):
         id="matrix",
         experiment=SimpleNamespace(timeout_sec=1, repeats=1, repeat_parallel=1, retry_void=False),
     )
+    resolution_kinds: list[str] = []
+
+    def resolve_jobs(_config, *, repo_root, experiment_kind):
+        assert repo_root == matrix_report.REPO_ROOT
+        resolution_kinds.append(experiment_kind)
+        return [_job()]
+
     monkeypatch.setattr(matrix_report, "matrix_config_from_options", lambda _options: config)
-    monkeypatch.setattr("raidar.matrix.resolve_matrix_jobs", lambda _config, repo_root: [_job()])
+    monkeypatch.setattr("raidar.matrix.resolve_matrix_jobs", resolve_jobs)
 
     result = CliRunner().invoke(matrix_report.matrix, ["--config", str(config_path), "--dry-run"])
 
     assert result.exit_code == 0
     assert "[dry-run]" in result.output
 
-    monkeypatch.setattr(
-        "raidar.matrix.resolve_matrix_jobs",
-        lambda _config, repo_root: (_ for _ in ()).throw(FileNotFoundError("missing scenario")),
-    )
+    def fail_resolution(_config, *, repo_root, experiment_kind):
+        assert repo_root == matrix_report.REPO_ROOT
+        resolution_kinds.append(experiment_kind)
+        raise FileNotFoundError("missing scenario")
+
+    monkeypatch.setattr("raidar.matrix.resolve_matrix_jobs", fail_resolution)
     result = CliRunner().invoke(matrix_report.matrix, ["--config", str(config_path)])
     assert result.exit_code != 0
     assert "missing scenario" in result.output
+    assert resolution_kinds == ["benchmark", "benchmark"]
+
+
+def test_matrix_command_fails_when_any_experiment_does_not_complete(monkeypatch, tmp_path):
+    config_path = tmp_path / "matrix.yaml"
+    config_path.write_text("matrix: {}", encoding="utf-8")
+    config = SimpleNamespace(
+        id="matrix",
+        experiment=SimpleNamespace(timeout_sec=1, repeats=1, repeat_parallel=1, retry_void=False),
+    )
+    resolution_kinds: list[str] = []
+
+    def resolve_jobs(_config, *, repo_root, experiment_kind):
+        assert repo_root == matrix_report.REPO_ROOT
+        resolution_kinds.append(experiment_kind)
+        return [_job()]
+
+    monkeypatch.setattr(matrix_report, "matrix_config_from_options", lambda _options: config)
+    monkeypatch.setattr("raidar.matrix.resolve_matrix_jobs", resolve_jobs)
+    monkeypatch.setattr(matrix_report, "cleanup_stale_harbor_before_runs", lambda: None)
+    monkeypatch.setattr(matrix_report, "resolve_experiments_root", lambda **_kwargs: tmp_path)
+    monkeypatch.setattr(matrix_report, "run_matrix_jobs", lambda *_args, **_kwargs: (0, 1))
+
+    result = CliRunner().invoke(matrix_report.matrix, ["--config", str(config_path)])
+
+    assert result.exit_code != 0
+    assert resolution_kinds == ["benchmark"]
+    assert "Matrix failed: 1 experiment(s) did not complete" in result.output
 
 
 def test_report_command_outputs_csv_markdown_json_and_empty(monkeypatch, tmp_path):

@@ -9,7 +9,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.harness import harness_definition
+from pydantic import ValidationError
+
+from raidar.harness import HarborArtifactRole, HarborResultManifest, harness_definition
 from raidar.runtime.models import (
     EvaluationOutputs,
     GateEvent,
@@ -35,19 +37,11 @@ from raidar.sanitization import (
     sanitize_evidence_payload,
     sanitize_persisted_text,
 )
-from raidar.schemas.scorecard import (
-    CoverageScore,
-    ExecutionValidityScore,
-    FunctionalScore,
-    PerformanceGatesScore,
-    RequirementsCoverageScore,
-    Scorecard,
-    VerificationStabilityScore,
-    VisualScore,
-)
+from raidar.schemas.scorecard import ExecutionValidityScore, PerformanceGatesScore, Scorecard
+from raidar.scorers.evidence_contract import CommandEvidenceResult, EvidenceOutput
 
 SCORING_SCHEMA_VERSION = "2.0.0"
-EVIDENCE_OUTPUT_MANIFEST = ("action-logs", "evidence.json")
+RUNNER_EVIDENCE_ARTIFACTS = ("action-logs", "evidence.json")
 
 
 @dataclass(frozen=True, slots=True)
@@ -59,71 +53,45 @@ class VisualEvidenceRequest:
     run_root_dir: Path
 
 
-def _load_evidence_outputs(trial_dir: Path | None) -> tuple[EvaluationOutputs | None, str | None]:
-    evidence_path = _evidence_json_path(trial_dir)
-    if not evidence_path:
+def _load_evidence_outputs(
+    manifest: HarborResultManifest | None,
+) -> tuple[EvaluationOutputs | None, str | None]:
+    if manifest is None:
         return None, "Harbor trial directory not found."
+    evidence_path = manifest.path(HarborArtifactRole.RUNNER_EVIDENCE)
     if not evidence_path.exists():
         return None, f"Evidence output missing: {evidence_path}"
     try:
-        payload = json.loads(evidence_path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as exc:
-        return None, f"Invalid evidence JSON: {exc.msg}"
-    if not isinstance(payload, dict):
-        return None, "Invalid evidence content: expected object root."
+        payload = EvidenceOutput.model_validate_json(evidence_path.read_text(encoding="utf-8"))
+    except (OSError, ValidationError) as exc:
+        return None, f"Invalid current-version evidence: {exc}"
     return _outputs_from_evidence(payload), None
 
 
-def _evidence_json_path(trial_dir: Path | None) -> Path | None:
-    if trial_dir is None:
-        return None
-    return trial_dir / "verifier" / "evidence.json"
-
-
-def _outputs_from_evidence(payload: dict[str, Any]) -> EvaluationOutputs:
-    gate_history = _gate_history_from_evidence(payload.get("actions"))
-    command_count = len(gate_history)
-    passed_count = sum(1 for event in gate_history if event.exit_code == 0)
-    failed_count = command_count - passed_count
+def _outputs_from_evidence(payload: EvidenceOutput) -> EvaluationOutputs:
+    gate_history = _gate_history_from_evidence(payload)
     return EvaluationOutputs(
-        functional=FunctionalScore(
-            passed=failed_count == 0,
-            tests_passed=passed_count,
-            tests_total=command_count,
-            build_succeeded=failed_count == 0,
-            gates_passed=passed_count,
-            gates_total=command_count,
-        ),
-        visual=None,
-        verification_stability=VerificationStabilityScore(total_gate_failures=failed_count),
-        test_coverage=CoverageScore(threshold=None, measured=None, source=None, passed=True),
-        requirements_coverage=RequirementsCoverageScore(),
         execution_validity=ExecutionValidityScore(checks=[]),
         performance_gates=PerformanceGatesScore(checks=[]),
-        metric_scores=[],
         gate_history=gate_history,
     )
 
 
-def _gate_history_from_evidence(actions: Any) -> list[GateEvent]:
-    if not isinstance(actions, list):
-        return []
+def _gate_history_from_evidence(evidence: EvidenceOutput) -> list[GateEvent]:
     events = []
     timestamp = datetime(1970, 1, 1, tzinfo=UTC).isoformat()
-    for action in actions:
-        if not isinstance(action, dict) or action.get("kind") != "command":
+    for action in evidence.actions:
+        if action.kind != "command" or not isinstance(action.result, CommandEvidenceResult):
             continue
-        result = action.get("result")
-        if not isinstance(result, dict):
-            continue
+        result = action.result
         events.append(
             GateEvent(
                 timestamp=timestamp,
-                gate_name=str(action.get("id") or "command"),
-                command=_command_text(result.get("command")),
-                exit_code=int(result.get("exit_code") or 0),
-                stdout=str(result.get("stdout") or ""),
-                stderr=str(result.get("stderr") or ""),
+                gate_name=action.id,
+                command=_command_text(result.command),
+                exit_code=result.exit_code,
+                stdout=result.stdout,
+                stderr=result.stderr,
             )
         )
     return events
@@ -192,39 +160,39 @@ def build_scenario_revision_meta(request: RunRequest, context: WorkspaceContext)
     }
 
 
-def persist_verifier_artifacts(
-    harbor_result: HarborExecutionResult, verifier_dir: Path
+def persist_runner_evidence_artifacts(
+    manifest: HarborResultManifest | None, runner_evidence_dir: Path
 ) -> dict[str, str]:
-    """Persist verifier outputs for run and scenario audits."""
-    if not harbor_result.trial_dir:
+    """Persist raw evidence-runner outputs for run and scenario audits."""
+    if manifest is None:
         return {}
-    source_dir = harbor_result.trial_dir / "verifier"
+    source_dir = manifest.path(HarborArtifactRole.RUNNER_EVIDENCE_ROOT)
     if not source_dir.exists():
         return {}
 
     copied: dict[str, str] = {}
-    for filename in EVIDENCE_OUTPUT_MANIFEST:
-        source = source_dir / filename
+    for filename in RUNNER_EVIDENCE_ARTIFACTS:
+        source = manifest.runner_evidence_artifact(filename)
         if not source.exists():
             continue
-        target = verifier_dir / filename
+        target = runner_evidence_dir / filename
         if source.is_dir():
-            copied[filename] = str(_copy_sanitized_verifier_artifact_dir(source, target))
+            copied[filename] = str(_copy_sanitized_runner_evidence_dir(source, target))
         else:
-            copied[filename] = str(_copy_sanitized_verifier_artifact(source, target))
+            copied[filename] = str(_copy_sanitized_runner_evidence(source, target))
     return copied
 
 
-def _copy_sanitized_verifier_artifact_dir(source: Path, target: Path) -> Path:
+def _copy_sanitized_runner_evidence_dir(source: Path, target: Path) -> Path:
     if target.exists():
         shutil.rmtree(target)
     for child in sorted(path for path in source.rglob("*") if path.is_file()):
         relative = child.relative_to(source)
-        _copy_sanitized_verifier_artifact(child, target / relative)
+        _copy_sanitized_runner_evidence(child, target / relative)
     return target
 
 
-def _copy_sanitized_verifier_artifact(source: Path, target: Path) -> Path:
+def _copy_sanitized_runner_evidence(source: Path, target: Path) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.suffix == ".json":
         try:
@@ -249,30 +217,39 @@ def _copy_sanitized_verifier_artifact(source: Path, target: Path) -> Path:
     return shutil.copy2(source, target)
 
 
-def persist_canonical_verifier_artifacts(
+def persist_scorecard_artifacts(
     layout: RunLayout, scorecard: Scorecard, outputs: EvaluationOutputs
 ) -> None:
-    """Rewrite canonical verifier artifacts from the synthesized canonical scorecard."""
-    layout.verifier_dir.mkdir(parents=True, exist_ok=True)
+    """Persist canonical scoring artifacts from the synthesized scorecard."""
+    layout.scoring_dir.mkdir(parents=True, exist_ok=True)
     gate_history_payload = sanitize_evidence_payload(
         [event.model_dump(mode="json") for event in outputs.gate_history],
         max_chars=4000,
     )
     scorecard_payload = sanitize_evidence_payload(
-        scorecard.model_dump(mode="json"),
+        scorecard.model_dump(
+            mode="json",
+            exclude={
+                "functional",
+                "visual",
+                "verification_stability",
+                "test_coverage",
+                "requirements_coverage",
+            },
+        ),
         max_chars=4000,
     )
     scorecard_payload["gate_history"] = gate_history_payload
 
-    (layout.verifier_dir / "scorecard.json").write_text(
+    (layout.scoring_dir / "scorecard.json").write_text(
         json.dumps(scorecard_payload, indent=2) + "\n",
         encoding="utf-8",
     )
-    (layout.verifier_dir / "gate-history.json").write_text(
+    (layout.scoring_dir / "gate-history.json").write_text(
         json.dumps(gate_history_payload, indent=2) + "\n",
         encoding="utf-8",
     )
-    (layout.verifier_dir / "execution-validity.json").write_text(
+    (layout.scoring_dir / "execution-validity.json").write_text(
         json.dumps(
             sanitize_evidence_payload(
                 scorecard.execution_validity.model_dump(mode="json"),
@@ -283,7 +260,7 @@ def persist_canonical_verifier_artifacts(
         + "\n",
         encoding="utf-8",
     )
-    (layout.verifier_dir / "performance-gates.json").write_text(
+    (layout.scoring_dir / "performance-gates.json").write_text(
         json.dumps(
             sanitize_evidence_payload(
                 scorecard.performance_gates.model_dump(mode="json"),
@@ -295,7 +272,7 @@ def persist_canonical_verifier_artifacts(
         encoding="utf-8",
     )
     reward_value = scorecard.quality_score if scorecard.execution_validity.passed else 0
-    (layout.verifier_dir / "reward.txt").write_text(f"{reward_value}", encoding="utf-8")
+    (layout.scoring_dir / "reward.txt").write_text(f"{reward_value}", encoding="utf-8")
 
 
 def _copy_optional_visual_asset(source: Path, target: Path) -> str | None:
@@ -388,54 +365,29 @@ def _persist_region_visual_artifact(
     }
 
 
-def _rebind_visual_evidence_paths(
-    scorecard_visual: VisualScore | None, evidence: dict[str, Any]
-) -> None:
-    """Replace transient /app visual paths with canonical run artifact paths."""
-    if scorecard_visual is None:
-        return
-
-    scorecard_visual.actual_path = evidence.get("actual")
-    scorecard_visual.reference_path = evidence.get("reference")
-    scorecard_visual.diff_path = evidence.get("diff")
-
-    regional_paths = {
-        entry.get("name"): entry for entry in evidence.get("regions", []) if isinstance(entry, dict)
-    }
-    for region in scorecard_visual.regional_scores:
-        if not isinstance(region, dict):
-            continue
-        region_paths = regional_paths.get(region.get("name"))
-        if region_paths is None:
-            continue
-        region["actual_path"] = region_paths.get("actual")
-        region["reference_path"] = region_paths.get("reference")
-        region["diff_path"] = region_paths.get("diff")
-
-
 def persist_harness_artifacts(
-    harbor_result: HarborExecutionResult, harness_dir: Path, *, harness: str
+    manifest: HarborResultManifest | None, harness_dir: Path
 ) -> dict[str, str]:
     """Persist Harbor harness transcripts and command history."""
-    if not harbor_result.trial_dir:
+    if manifest is None:
         return {}
-    source = harbor_result.trial_dir / "agent"
+    source = manifest.path(HarborArtifactRole.HARNESS_OUTPUT_ROOT)
     if not source.exists():
         return {}
 
     copied: dict[str, str] = {}
-    for filename in harness_definition(harness).artifact_files:
-        src = source / filename
+    for filename in manifest.definition.artifact_files:
+        src = manifest.harness_artifact(filename)
         if src.exists():
             copied[filename] = str(_copy_sanitized_harness_artifact(src, harness_dir / filename))
-    final_archive = harness_definition(harness).final_workspace_archive
+    final_archive = manifest.definition.final_workspace_archive
     final_app = harness_dir / final_archive
     if final_app.exists():
         copied["project.final.tar.gz"] = str(
             shutil.copy2(final_app, harness_dir / "project.final.tar.gz")
         )
 
-    setup_dir = source / "setup"
+    setup_dir = manifest.setup_dir
     if setup_dir.exists():
         target = harness_dir / "setup"
         _copy_sanitized_directory(setup_dir, target)
@@ -443,9 +395,7 @@ def persist_harness_artifacts(
 
     commands_dir = harness_dir / "commands"
     commands_dir.mkdir(parents=True, exist_ok=True)
-    for command_dir in sorted(source.glob("command-*")):
-        if not command_dir.is_dir():
-            continue
+    for command_dir in manifest.command_dirs():
         target = commands_dir / command_dir.name
         _copy_sanitized_directory(command_dir, target)
         copied[f"commands/{command_dir.name}"] = str(target)
@@ -471,7 +421,7 @@ def persist_harbor_artifacts(
 
 def _copy_sanitized_harness_artifact(source: Path, target: Path) -> Path:
     if _is_sanitizable_text_path(source):
-        return _copy_sanitized_verifier_artifact(source, target)
+        return _copy_sanitized_runner_evidence(source, target)
     target.parent.mkdir(parents=True, exist_ok=True)
     return shutil.copy2(source, target)
 
@@ -540,7 +490,7 @@ def write_run_analysis(
         f"- run_json_path: `{layout.run_json_path}`",
         "",
         "## Key Artifacts",
-        f"- verifier_scorecard: `{layout.verifier_dir / 'scorecard.json'}`",
+        f"- scorecard: `{layout.scoring_dir / 'scorecard.json'}`",
         f"- harness_trajectory: `{layout.harness_dir / 'trajectory.json'}`",
     ]
     event_stream = _harness_event_stream_pointer(layout.harness_dir, request.config.harness.value)

@@ -4,6 +4,7 @@ import subprocess
 import pytest
 
 from raidar.runtime import harbor_preflight, harness_logs, scorecard_phase
+from raidar.runtime.profile import RuntimeProfile
 
 
 def test_harness_event_stream_pointer_maps_supported_harnesses(tmp_path) -> None:
@@ -59,7 +60,10 @@ def test_docker_compose_preflight_reports_only_detected_unsupported_versions(mon
 
     monkeypatch.setattr(harbor_preflight.subprocess, "run", fake_run)
 
-    reason = harbor_preflight._docker_compose_preflight_reason({"PATH": "/bin"})
+    reason = harbor_preflight._docker_compose_preflight_reason(
+        {"PATH": "/bin"},
+        RuntimeProfile(),
+    )
 
     assert "Unsupported docker compose version 2.39.0" in reason
     assert calls == [["docker", "compose", "version", "--short"], ["docker", "compose", "version"]]
@@ -69,10 +73,10 @@ def test_docker_compose_preflight_reports_only_detected_unsupported_versions(mon
         "run",
         lambda *_args, **_kwargs: (_ for _ in ()).throw(subprocess.TimeoutExpired("docker", 15)),
     )
-    assert harbor_preflight._docker_compose_preflight_reason({}) is None
+    assert harbor_preflight._docker_compose_preflight_reason({}, RuntimeProfile()) is None
 
 
-def test_scorecard_phase_persists_verifier_artifacts_and_analysis(monkeypatch) -> None:
+def test_scorecard_phase_persists_scoring_artifacts_and_analysis(monkeypatch) -> None:
     calls: list[tuple[str, object]] = []
     scorecard = object()
     phase = type("Phase", (), {"layout": object(), "context": object()})()
@@ -86,7 +90,7 @@ def test_scorecard_phase_persists_verifier_artifacts_and_analysis(monkeypatch) -
     )
     monkeypatch.setattr(
         scorecard_phase,
-        "persist_canonical_verifier_artifacts",
+        "persist_scorecard_artifacts",
         lambda layout, built_scorecard, outputs: calls.append(
             ("persist", (layout, built_scorecard, outputs))
         ),

@@ -1,18 +1,39 @@
 """Focused Harbor runtime tests."""
 
+from dataclasses import replace
+
 # ruff: noqa: F403, F405
 from tests.harbor_runtime_support import *  # noqa: F403
 
 
-def test_build_harbor_run_env_preserves_standard_harness_secrets(monkeypatch) -> None:
-    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+def _resolved(harness: str, credential_id: str, source_name: str, value):
+    spec = next(
+        credential
+        for credential in harness_definitions.harness_definition(harness).credentials
+        if credential.id == credential_id
+    )
+    return adapter_base.ResolvedCredential(spec=spec, source_name=source_name, value=value)
 
-    env = runner._build_harbor_run_env(_AdapterStub())
+
+def test_build_harbor_run_env_exports_definition_declared_environment_secret(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("CURSOR_API_KEY", "test-cursor-key")
+
+    env = runner._build_harbor_run_env(
+        _AdapterStub(
+            harness_id="cursor",
+            credentials=(
+                _resolved("cursor", "cursor-api-key", "CURSOR_API_KEY", "test-cursor-key"),
+            ),
+        ),
+        RUNTIME_PROFILE,
+    )
 
     assert env["ADAPTER_FLAG"] == "1"
     assert env["COMPOSE_BAKE"] == "false"
-    assert env["OPENAI_API_KEY"] == "test-openai-key"
-    assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" not in env
+    assert env["CURSOR_API_KEY"] == "test-cursor-key"
+    assert "AGENTIC_EVAL_SECRET_FILE_CURSOR_API_KEY" not in env
     assert "DOCKER_CONFIG" not in env
 
 
@@ -23,7 +44,22 @@ def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
     env = runner._build_harbor_run_env(
-        _AdapterStub(import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent")
+        _AdapterStub(
+            harness_id="codex-cli",
+            credentials=(
+                _resolved(
+                    "codex-cli",
+                    "openai-api-key",
+                    "OPENAI_API_KEY",
+                    "test-openai-key",
+                ),
+            ),
+            import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
+        ),
+        replace(
+            RUNTIME_PROFILE,
+            secret_transport_dir=repo_tmp_agentic_eval_home / "secrets",
+        ),
     )
 
     assert env["ADAPTER_FLAG"] == "1"
@@ -37,7 +73,7 @@ def test_build_harbor_run_env_uses_secret_files_for_custom_harnesses(
     assert "DOCKER_CONFIG" not in env
 
 
-def test_build_harbor_run_env_uses_local_secret_files_for_custom_harnesses(
+def test_build_harbor_run_env_transports_file_backed_credentials(
     repo_tmp_agentic_eval_home: Path,
     tmp_path: Path,
 ) -> None:
@@ -46,9 +82,21 @@ def test_build_harbor_run_env_uses_local_secret_files_for_custom_harnesses(
 
     env = runner._build_harbor_run_env(
         _AdapterStub(
+            harness_id="codex-cli",
+            credentials=(
+                _resolved(
+                    "codex-cli",
+                    "codex-auth-json",
+                    "CODEX_AUTH_JSON",
+                    auth_json_path,
+                ),
+            ),
             import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
-            local_secret_files={"CODEX_AUTH_JSON": auth_json_path},
-        )
+        ),
+        replace(
+            RUNTIME_PROFILE,
+            secret_transport_dir=repo_tmp_agentic_eval_home / "secrets",
+        ),
     )
 
     assert env["ADAPTER_FLAG"] == "1"
@@ -58,23 +106,41 @@ def test_build_harbor_run_env_uses_local_secret_files_for_custom_harnesses(
     assert secret_file.read_text(encoding="utf-8") == '{"access_token":"token"}'
 
 
-def test_build_harbor_run_env_excludes_adapter_blocked_env_keys(
+def test_build_harbor_run_env_removes_unselected_declared_credentials(
     monkeypatch,
+    repo_tmp_agentic_eval_home: Path,
 ) -> None:
     monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
 
+    auth_path = repo_tmp_agentic_eval_home / "auth.json"
+    auth_path.write_text("{}", encoding="utf-8")
     env = runner._build_harbor_run_env(
         _AdapterStub(
+            harness_id="codex-cli",
             import_path="raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent",
-            excluded_keys={"OPENAI_API_KEY"},
-        )
+            credentials=(
+                _resolved(
+                    "codex-cli",
+                    "codex-auth-json",
+                    "CODEX_AUTH_JSON",
+                    auth_path,
+                ),
+            ),
+        ),
+        replace(
+            RUNTIME_PROFILE,
+            secret_transport_dir=repo_tmp_agentic_eval_home / "secrets",
+        ),
     )
 
     assert "OPENAI_API_KEY" not in env
     assert "AGENTIC_EVAL_SECRET_FILE_OPENAI_API_KEY" not in env
+    assert "AGENTIC_EVAL_SECRET_FILE_CODEX_AUTH_JSON" in env
 
 
 class _ExecAdapterStub:
+    config = SimpleNamespace(harness=SimpleNamespace(value="codex-cli"))
+
     def build_harbor_command(self, *, task_path: Path, job_name: str, jobs_dir: Path) -> list[str]:
         del task_path, job_name, jobs_dir
         return ["harbor", "run"]
@@ -88,14 +154,15 @@ class _ExecAdapterStub:
     def runtime_env(self) -> dict[str, str]:
         return {}
 
+    @property
+    def definition(self):
+        return harness_definitions.harness_definition("codex-cli")
+
+    def resolved_credentials(self) -> tuple[object, ...]:
+        return ()
+
     def harbor_harness_import_path(self) -> str | None:
         return None
-
-    def excluded_run_env_keys(self) -> set[str]:
-        return set()
-
-    def local_secret_files(self) -> dict[str, Path]:
-        return {}
 
     def execution_metadata(self) -> dict[str, str]:
         return {}
@@ -237,6 +304,7 @@ def _ensure_task_image_request(fixture: TaskImageFixture, tmp_path: Path):
         run_env={},
         log_dir=tmp_path / "logs",
         task_timeout_sec=300,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
 
@@ -262,10 +330,19 @@ def _prepare_workspace_scenario_yaml() -> str:
     return "\n".join(
         [
             "name: hello-world-smoke",
+            "display_name: Hello World Smoke",
             "scenario_revision: v001",
             "description: smoke task",
             "difficulty: easy",
-            "category: greenfield-ui",
+            "task_kind: feature_implementation",
+            "delivery_mode: direct_implementation",
+            "workspace_state: existing",
+            "starting_conditions: []",
+            "languages: [TypeScript]",
+            "evaluation_role: benchmark",
+            "catalog_status: active",
+            "family_id: null",
+            "variant_axes: {}",
             "timeout_sec: 1800",
             "environment:",
             "  kind: stack_preset",

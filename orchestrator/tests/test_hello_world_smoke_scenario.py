@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from raidar.schemas.scenario import ScenarioDefinition
+from raidar.application.scenario_catalog import load_scenario
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCENARIO_DIR = REPO_ROOT / "scenarios" / "hello-world-smoke" / "v001"
@@ -10,7 +10,7 @@ SCENARIO_PATH = SCENARIO_DIR / "scenario.yaml"
 
 
 def test_hello_world_smoke_scenario_loads() -> None:
-    scenario = ScenarioDefinition.from_yaml(SCENARIO_PATH)
+    scenario = load_scenario(SCENARIO_PATH)
 
     assert scenario.name == "hello-world-smoke"
     assert scenario.scenario_revision == "v001"

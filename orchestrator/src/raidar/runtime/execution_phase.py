@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Any
 
+from raidar.harness import HarborResultManifest
 from raidar.runtime import (
     artifacts as runtime_artifacts,
 )
@@ -27,15 +28,15 @@ ExecutionPhaseResult = models.ExecutionPhaseResult
 
 
 def _resolve_harbor_outputs(
-    harbor_result: Any,
+    result_manifest: HarborResultManifest | None,
     terminated_early: bool,
     termination_reason: str | None,
     failure_code: str | None,
 ) -> tuple[Any, bool, str | None]:
     evidence_outputs = None
     evidence_reason = None
-    if harbor_result.trial_dir is not None:
-        evidence_outputs, evidence_reason = _load_evidence_outputs(harbor_result.trial_dir)
+    if result_manifest is not None:
+        evidence_outputs, evidence_reason = _load_evidence_outputs(result_manifest)
 
     recovered_from_timeout = (
         terminated_early and evidence_outputs is not None and failure_code == "harbor_timeout"
@@ -56,24 +57,28 @@ def execute_harbor_phase(request: Any, phase: Any) -> ExecutionPhaseResult:
     terminated_early = harbor_result.terminated_early
     termination_reason = harbor_result.termination_reason
     failure_code = harbor_result.failure_code
+    result_manifest = (
+        HarborResultManifest.for_trial(
+            harbor_result.trial_dir,
+            request.config.harness.value,
+        )
+        if harbor_result.trial_dir is not None
+        else None
+    )
     try:
         runtime_metrics = collect_process_metrics(
             request.scenario,
-            harbor_result.trial_dir,
-            harness=request.config.harness.value,
+            result_manifest,
         )
     except ProcessMetricsError as exc:
         if terminated_early and exc.failure_code == "missing_token_usage":
             runtime_metrics = _empty_process_metrics()
         else:
             raise
-    events = collect_trace_events(
-        harbor_result.trial_dir,
-        harness=request.config.harness.value,
-    )
+    events = collect_trace_events(result_manifest)
 
     outputs, terminated_early, termination_reason = _resolve_harbor_outputs(
-        harbor_result,
+        result_manifest,
         terminated_early,
         termination_reason,
         failure_code,

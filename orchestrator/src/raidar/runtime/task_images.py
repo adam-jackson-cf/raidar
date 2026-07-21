@@ -26,7 +26,6 @@ from raidar.runtime.task_image_support import (
     _repo_cache_identity,
     _task_image_cache_metadata_path,
     capability_spec_satisfies,
-    default_runtime_profile,
     installed_probe_value,
     merge_capability_requirements,
     normalize_probe_version,
@@ -43,8 +42,8 @@ class RuntimePreflightRequest:
     run_env: dict[str, str]
     command: list[str]
     log_path: Path
+    runtime_profile: RuntimeProfile
     docker_args: list[str] | None = None
-    runtime_profile: RuntimeProfile = field(default_factory=default_runtime_profile)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,17 +56,16 @@ class TaskImageEnsureRequest:
     run_env: dict[str, str]
     log_dir: Path
     task_timeout_sec: int
+    runtime_profile: RuntimeProfile
     provided_capabilities: CapabilityRequirements = field(default_factory=CapabilityRequirements)
     required_capabilities: CapabilityRequirements = field(default_factory=CapabilityRequirements)
-    runtime_profile: RuntimeProfile = field(default_factory=default_runtime_profile)
 
 
 def _cache_last_used_epoch(path: Path) -> float:
     return path.stat().st_mtime
 
 
-def _prune_prep_cache_entries(runtime_profile: RuntimeProfile | None = None) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
+def _prune_prep_cache_entries(runtime_profile: RuntimeProfile) -> None:
     baselines_root = _prep_cache_root() / "baselines"
     preflight_root = _prep_cache_root() / "preflight"
     baselines_root.mkdir(parents=True, exist_ok=True)
@@ -79,9 +77,8 @@ def _prune_prep_cache_entries(runtime_profile: RuntimeProfile | None = None) -> 
 
 
 def _prune_baseline_cache_entries(
-    baselines_root: Path, now: float, *, runtime_profile: RuntimeProfile | None = None
+    baselines_root: Path, now: float, *, runtime_profile: RuntimeProfile
 ) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     baseline_entries = [path for path in baselines_root.iterdir() if path.is_dir()]
     total_bytes = 0
     retained: list[tuple[float, int, Path]] = []
@@ -102,9 +99,8 @@ def _prune_baseline_cache_entries(
 
 
 def _prune_preflight_cache_entries(
-    preflight_root: Path, now: float, *, runtime_profile: RuntimeProfile | None = None
+    preflight_root: Path, now: float, *, runtime_profile: RuntimeProfile
 ) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     for cache_file in preflight_root.glob("*.ok.json"):
         try:
             last_used = _cache_last_used_epoch(cache_file)
@@ -131,9 +127,8 @@ def _stale_task_image_names(
     *,
     now: float,
     active_image_name: str | None,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> tuple[str, ...]:
-    runtime_profile = runtime_profile or default_runtime_profile()
     payload = _load_task_image_cache_payload(metadata_path)
     image_name = _cached_task_image_name(payload)
     if payload is not None and image_name is None:
@@ -177,14 +172,17 @@ def _managed_task_image(
     image_name: str,
     run_env: dict[str, str],
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
-    runtime_profile = runtime_profile or default_runtime_profile()
-    labels = _inspect_docker_image_labels(image_name, run_env)
+    labels = _inspect_docker_image_labels(
+        image_name,
+        run_env,
+        runtime_profile=runtime_profile,
+    )
     profile_labels = runtime_profile.docker_labels
     return labels is not None and (
-        labels.get(profile_labels["managed"]) == "true"
-        and labels.get(profile_labels["repo"]) == _repo_cache_identity()
+        labels.get(profile_labels.managed) == "true"
+        and labels.get(profile_labels.repo) == _repo_cache_identity()
     )
 
 
@@ -192,9 +190,8 @@ def _remove_task_image(
     image_name: str,
     run_env: dict[str, str],
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     subprocess.run(
         ["docker", "image", "rm", "-f", image_name],
         capture_output=True,
@@ -209,9 +206,8 @@ def _prune_stale_task_images(
     *,
     run_env: dict[str, str],
     active_image_name: str | None,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     images_root = _raidar_cache_root() / "images"
     images_root.mkdir(parents=True, exist_ok=True)
     now = time.time()
@@ -241,9 +237,8 @@ def _maybe_run_cache_maintenance(
     *,
     run_env: dict[str, str],
     active_image_name: str | None,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     marker_path = _maintenance_marker_path()
     marker_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -278,9 +273,8 @@ def _inspect_docker_image_labels(
     image_name: str,
     run_env: dict[str, str],
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> dict[str, str] | None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     try:
         probe = subprocess.run(
             [
@@ -311,15 +305,14 @@ def _expected_task_image_labels(
     image_ref: TaskImageRef,
     harness: str,
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> dict[str, str]:
-    runtime_profile = runtime_profile or default_runtime_profile()
     profile_labels = runtime_profile.docker_labels
     return {
-        profile_labels["managed"]: "true",
-        profile_labels["key"]: image_ref.cache_key,
-        profile_labels["harness"]: harness,
-        profile_labels["repo"]: _repo_cache_identity(),
+        profile_labels.managed: "true",
+        profile_labels.key: image_ref.cache_key,
+        profile_labels.harness: harness,
+        profile_labels.repo: _repo_cache_identity(),
     }
 
 
@@ -333,7 +326,7 @@ def _task_image_labels_match(
     *,
     harness: str,
     run_env: dict[str, str],
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
     labels = _inspect_docker_image_labels(image_name, run_env, runtime_profile=runtime_profile)
     if labels is None:
@@ -351,9 +344,8 @@ def _tag_task_image(
     target_image: str,
     run_env: dict[str, str],
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
-    runtime_profile = runtime_profile or default_runtime_profile()
     try:
         completed = subprocess.run(
             ["docker", "image", "tag", source_image, target_image],
@@ -373,9 +365,8 @@ def _task_image_cache_hit(
     *,
     harness: str,
     run_env: dict[str, str],
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> bool:
-    runtime_profile = runtime_profile or default_runtime_profile()
     if _task_image_labels_match(
         image_ref.image_name,
         image_ref,
@@ -415,7 +406,7 @@ def _task_image_build_command(
     context_dir: Path,
     *,
     harness: str,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> list[str]:
     command = [
         "docker",
@@ -442,7 +433,7 @@ def _run_task_image_build(
     run_env: dict[str, str],
     *,
     timeout_sec: int,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> TaskImageBuildResult:
     del runtime_profile
     build_env = dict(run_env)
@@ -476,10 +467,9 @@ def _run_task_image_build(
 def _task_image_build_timeout(
     task_timeout_sec: int,
     *,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> int:
     """Bound pre-Harbor image builds to the scenario budget."""
-    runtime_profile = runtime_profile or default_runtime_profile()
     return max(runtime_profile.task_image_build_min_timeout_sec, task_timeout_sec)
 
 
@@ -521,9 +511,8 @@ def _ensure_harbor_runtime_preflight(
     image_ref: TaskImageRef,
     run_env: dict[str, str],
     log_dir: Path,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     _run_runtime_preflight_command(
         RuntimePreflightRequest(
             image_name=image_ref.image_name,
@@ -569,9 +558,8 @@ def _run_capability_probe(
     command: list[str],
     run_env: dict[str, str],
     log_dir: Path,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> str:
-    runtime_profile = runtime_profile or default_runtime_profile()
     docker_cmd = ["docker", "run", "--rm", image_name, *command]
     try:
         completed = subprocess.run(
@@ -609,9 +597,8 @@ def _ensure_task_image_capability_preflight(
     log_dir: Path,
     provided_capabilities: CapabilityRequirements,
     required_capabilities: CapabilityRequirements,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> dict[str, Any]:
-    runtime_profile = runtime_profile or default_runtime_profile()
     expected = merge_capability_requirements(provided_capabilities, required_capabilities)
     probe_results: dict[str, dict[str, str]] = {
         "runtimes": {},
@@ -675,9 +662,8 @@ def _cached_task_image_is_ready(
     log_dir: Path,
     provided_capabilities: CapabilityRequirements,
     required_capabilities: CapabilityRequirements,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> dict[str, Any] | None:
-    runtime_profile = runtime_profile or default_runtime_profile()
     if not _task_image_cache_hit(
         image_ref,
         harness=harness,

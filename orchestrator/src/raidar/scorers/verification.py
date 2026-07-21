@@ -7,20 +7,190 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Literal
+
+from pydantic import BaseModel, ConfigDict, Field, SkipValidation, model_validator
 
 from raidar.scenario_paths import validate_relative_path
 from raidar.schemas.environment import CapabilityRequirements
 from raidar.schemas.scenario import _validate_argv_command
 
+if TYPE_CHECKING:
+    from raidar.scorers.evidence_contract import (
+        EvidenceActionResult,
+        EvidenceArtifactResult,
+        EvidenceOutput,
+        EvidenceRunnerMetadata,
+    )
+
 ACTION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
-EVIDENCE_RUNNER_CONTRACT_VERSION = "python-evidence-runner@1"
-PATH_ACTION_KINDS = {"read_file", "read_json", "archive"}
+EVIDENCE_SCHEMA_VERSION = "1"
+EVIDENCE_RUNNER_CONTRACT_VERSION = "python-evidence-runner@2"
 ACTION_KINDS = {"archive", "command", "glob", "read_file", "read_json", "visual_diff"}
+DEFAULT_SCORER_COMMAND_TIMEOUT_SEC = 60
 
 
 class VerificationPlanError(ValueError):
     """Raised when scorer-owned verification plans are invalid."""
+
+
+class VerificationEvidenceError(ValueError):
+    """Raised when current-version evidence violates its contract."""
+
+
+class EvidenceDependency(BaseModel):
+    """Typed evidence dependency declared by a scorer definition."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    kind: Literal["archive", "command", "glob", "read_file", "read_json", "visual_diff"]
+    minimum: int = Field(default=1, ge=1)
+
+
+class ArchiveActionConfig(BaseModel):
+    """Resolved archive action configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    path: str
+    output: str
+
+
+class CommandActionConfig(BaseModel):
+    """Resolved command action configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    argv: list[str] = Field(min_length=1)
+    cwd: str | None = None
+
+
+class GlobActionConfig(BaseModel):
+    """Resolved glob action configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    pattern: str
+
+
+class ReadActionConfig(BaseModel):
+    """Resolved bounded-read action configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    path: str
+    max_bytes: int | None = Field(default=None, gt=0)
+
+
+class VisualRegionActionConfig(BaseModel):
+    """Resolved visual-region comparison configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    name: str
+    reference_image: str
+    actual_image: str
+    diff_image: str
+    weight: float = Field(gt=0)
+
+
+class VisualDiffActionConfig(BaseModel):
+    """Resolved visual comparison configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    reference: str
+    actual: str
+    diff: str
+    argv_template: list[str] = Field(min_length=1)
+    threshold: float = Field(ge=0, le=1)
+    regions: list[VisualRegionActionConfig]
+
+
+EvidenceActionConfig = (
+    ArchiveActionConfig
+    | CommandActionConfig
+    | GlobActionConfig
+    | ReadActionConfig
+    | VisualDiffActionConfig
+)
+
+
+class EvidencePlanAction(BaseModel):
+    """Strict serialized runner action."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    id: str
+    kind: Literal["archive", "command", "glob", "read_file", "read_json", "visual_diff"]
+    timeout_sec: int | None
+    required: bool
+    depends_on: list[str]
+    config: SkipValidation[EvidenceActionConfig]
+
+    @model_validator(mode="after")
+    def _validate_config_shape(self) -> EvidencePlanAction:
+        expected = {
+            "archive": ArchiveActionConfig,
+            "command": CommandActionConfig,
+            "glob": GlobActionConfig,
+            "read_file": ReadActionConfig,
+            "read_json": ReadActionConfig,
+            "visual_diff": VisualDiffActionConfig,
+        }[self.kind]
+        try:
+            validated_config = expected.model_validate(self.config)
+        except ValueError as exc:
+            raise ValueError(f"evidence action {self.id} has invalid {self.kind} config") from exc
+        if self.kind in {"command", "visual_diff"} and self.timeout_sec is None:
+            raise ValueError(f"evidence action {self.id} timeout_sec is required")
+        object.__setattr__(self, "config", validated_config)
+        return self
+
+
+class EvidenceRunnerLimits(BaseModel):
+    """Resolved bounded-I/O limits consumed by the evidence runner."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    file_bytes: int = Field(gt=0)
+    text_chars: int = Field(gt=0)
+    list_items: int = Field(gt=0)
+    list_item_chars: int = Field(gt=0)
+
+
+class EvidencePlanInput(BaseModel):
+    """Strict current-version input accepted by the bundled runner."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    schema_version: Literal["1"]
+    runner_contract: Literal["python-evidence-runner@2"]
+    workspace: str
+    output_dir: str
+    actions: list[EvidencePlanAction]
+    aliases: dict[str, str]
+    limits: EvidenceRunnerLimits
+    archive_excludes: list[str]
+
+    @model_validator(mode="after")
+    def _validate_action_graph(self) -> EvidencePlanInput:
+        action_ids = [action.id for action in self.actions]
+        if len(action_ids) != len(set(action_ids)):
+            raise ValueError("evidence plan action ids must be unique")
+        unknown_aliases = sorted(set(self.aliases.values()) - set(action_ids))
+        if unknown_aliases:
+            raise ValueError(
+                "evidence plan aliases reference unknown actions: " + ", ".join(unknown_aliases)
+            )
+        for action in self.actions:
+            unknown_dependencies = sorted(set(action.depends_on) - set(action_ids))
+            if unknown_dependencies:
+                raise ValueError(
+                    f"evidence action {action.id} has unknown dependencies: "
+                    + ", ".join(unknown_dependencies)
+                )
+        return self
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,6 +203,102 @@ class VerificationAction:
     required: bool = True
     depends_on: tuple[str, ...] = ()
     config: dict[str, Any] = field(default_factory=dict)
+
+
+def _validate_visual_comparison_command(
+    executable: object,
+    arguments_template: object,
+) -> None:
+    if not isinstance(executable, str) or not executable:
+        raise TypeError("visual comparison executable must be a non-empty string")
+    if not isinstance(arguments_template, tuple) or not all(
+        isinstance(argument, str) and argument for argument in arguments_template
+    ):
+        raise TypeError("visual comparison arguments_template must be a tuple of non-empty strings")
+
+
+def _validate_visual_comparison_placeholders(arguments_template: tuple[str, ...]) -> None:
+    required_placeholders = {"{reference}", "{actual}", "{diff}", "{threshold}"}
+    missing = required_placeholders - set(arguments_template)
+    if missing:
+        raise ValueError(
+            "visual comparison arguments_template is missing placeholders: "
+            + ", ".join(sorted(missing))
+        )
+
+
+def _validate_visual_comparison_threshold(threshold: object) -> None:
+    if (
+        not isinstance(threshold, int | float)
+        or isinstance(threshold, bool)
+        or not 0 <= float(threshold) <= 1
+    ):
+        raise ValueError("visual comparison threshold must be between zero and one")
+
+
+def _validate_visual_comparison_timeout(timeout_sec: object) -> None:
+    if not isinstance(timeout_sec, int) or isinstance(timeout_sec, bool):
+        raise TypeError("visual comparison timeout_sec must be an integer")
+    if timeout_sec <= 0:
+        raise ValueError("visual comparison timeout_sec must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class VisualComparisonToolPolicy:
+    """Resolved visual comparison command and execution policy."""
+
+    executable: str
+    arguments_template: tuple[str, ...]
+    threshold: float
+    timeout_sec: int
+
+    def __post_init__(self) -> None:
+        _validate_visual_comparison_command(self.executable, self.arguments_template)
+        _validate_visual_comparison_placeholders(self.arguments_template)
+        _validate_visual_comparison_threshold(self.threshold)
+        _validate_visual_comparison_timeout(self.timeout_sec)
+
+    @property
+    def argv_template(self) -> tuple[str, ...]:
+        """Return the complete command template consumed by the evidence runner."""
+
+        return (self.executable, *self.arguments_template)
+
+    def cache_payload(self) -> dict[str, Any]:
+        """Return the stable policy payload included in effective contract identity."""
+
+        return {
+            "executable": self.executable,
+            "arguments_template": list(self.arguments_template),
+            "threshold": self.threshold,
+            "timeout_sec": self.timeout_sec,
+        }
+
+    def action(
+        self,
+        action_id: str,
+        *,
+        reference: str,
+        actual: str,
+        diff: str,
+        regions: list[dict[str, Any]] | tuple[dict[str, Any], ...] = (),
+        required: bool = True,
+        depends_on: tuple[str, ...] = (),
+    ) -> VerificationAction:
+        """Construct a visual action governed by this resolved policy."""
+
+        return visual_diff(
+            action_id,
+            reference=reference,
+            actual=actual,
+            diff=diff,
+            argv_template=self.argv_template,
+            threshold=self.threshold,
+            timeout_sec=self.timeout_sec,
+            regions=regions,
+            required=required,
+            depends_on=depends_on,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,15 +317,74 @@ class VerificationPlanContext:
     resolved_scorer: Any
     scenario_dir: Path
     environment_capabilities: CapabilityRequirements
+    visual_comparison: VisualComparisonToolPolicy
+
+
+@dataclass(frozen=True, slots=True)
+class OwnerEvidence:
+    """Owner-local view over normalized evidence aliases."""
+
+    owner: str
+    evidence: VerificationEvidence
+
+    def action(self, local_id: str) -> EvidenceActionResult | None:
+        """Return one action through the owner's normalized alias."""
+
+        return self.evidence.action(self.owner, local_id)
+
+    def actions(self, *, kind: str | None = None) -> tuple[EvidenceActionResult, ...]:
+        """Return all actions declared by this owner."""
+
+        prefix = f"{self.owner}."
+        canonical_ids = {
+            canonical
+            for alias, canonical in self.evidence.aliases.items()
+            if alias.startswith(prefix)
+        }
+        return tuple(
+            action
+            for action_id, action in self.evidence.actions.items()
+            if action_id in canonical_ids and (kind is None or action.kind == kind)
+        )
 
 
 @dataclass(frozen=True, slots=True)
 class VerificationEvidence:
-    """Raw evidence returned by the bundled evidence runner."""
+    """Strict raw evidence returned by the bundled evidence runner."""
 
-    actions: dict[str, dict[str, Any]] = field(default_factory=dict)
-    artifacts: dict[str, str] = field(default_factory=dict)
-    errors: list[dict[str, Any]] = field(default_factory=list)
+    actions: dict[str, EvidenceActionResult] = field(default_factory=dict)
+    aliases: dict[str, str] = field(default_factory=dict)
+    artifacts: tuple[EvidenceArtifactResult, ...] = ()
+    metadata: EvidenceRunnerMetadata | None = None
+
+    @classmethod
+    def from_output(cls, output: EvidenceOutput) -> VerificationEvidence:
+        """Build indexed evidence from one validated runner output."""
+
+        actions = {action.id: action for action in output.actions}
+        unknown_aliases = sorted(set(output.aliases.values()) - set(actions))
+        if unknown_aliases:
+            raise VerificationEvidenceError(
+                "verification evidence aliases reference unknown actions: "
+                + ", ".join(unknown_aliases)
+            )
+        return cls(
+            actions=actions,
+            aliases=dict(output.aliases),
+            artifacts=tuple(output.artifacts),
+            metadata=output.metadata,
+        )
+
+    def for_owner(self, owner: str) -> OwnerEvidence:
+        """Return an owner-local evidence accessor."""
+
+        return OwnerEvidence(owner=owner, evidence=self)
+
+    def action(self, owner: str, local_id: str) -> EvidenceActionResult | None:
+        """Resolve an owner-local action through the persisted alias map."""
+
+        canonical = self.aliases.get(f"{owner}.{local_id}")
+        return self.actions.get(canonical) if canonical else None
 
 
 @dataclass(frozen=True, slots=True)
@@ -73,7 +398,7 @@ class NormalizedVerificationPlan:
         """Return stable JSON-compatible runner input."""
 
         return {
-            "schema_version": "1",
+            "schema_version": EVIDENCE_SCHEMA_VERSION,
             "runner_contract": EVIDENCE_RUNNER_CONTRACT_VERSION,
             "actions": [_action_payload(action) for action in self.actions],
             "aliases": dict(sorted(self.aliases.items())),
@@ -90,7 +415,7 @@ def command(
     action_id: str,
     argv: list[str] | tuple[str, ...],
     *,
-    timeout_sec: int | None = None,
+    timeout_sec: int | None = DEFAULT_SCORER_COMMAND_TIMEOUT_SEC,
     required: bool = True,
     depends_on: tuple[str, ...] = (),
 ) -> VerificationAction:
@@ -104,6 +429,27 @@ def command(
         depends_on=depends_on,
         config={"argv": list(argv)},
     )
+
+
+def scenario_command_plan(owner: str, context: VerificationPlanContext) -> VerificationPlan:
+    """Declare scenario-owned verification commands for one scorer."""
+
+    verification = context.scenario.verification
+    timeout_sec = verification.preflight_command_timeout_sec or DEFAULT_SCORER_COMMAND_TIMEOUT_SEC
+    commands = [(f"gate.{gate.name}", list(gate.command)) for gate in verification.gates]
+    commands.extend(
+        (f"required.{index}", list(argv))
+        for index, argv in enumerate(verification.required_commands)
+    )
+    deduplicated: list[VerificationAction] = []
+    seen: set[tuple[str, ...]] = set()
+    for action_id, argv in commands:
+        key = tuple(argv)
+        if key in seen:
+            continue
+        seen.add(key)
+        deduplicated.append(command(action_id, argv, timeout_sec=timeout_sec))
+    return VerificationPlan(owner=owner, actions=tuple(deduplicated))
 
 
 def read_file(
@@ -174,6 +520,9 @@ def visual_diff(
     reference: str,
     actual: str,
     diff: str,
+    argv_template: list[str] | tuple[str, ...],
+    threshold: float,
+    timeout_sec: int,
     regions: list[dict[str, Any]] | tuple[dict[str, Any], ...] = (),
     required: bool = True,
     depends_on: tuple[str, ...] = (),
@@ -183,12 +532,15 @@ def visual_diff(
     return VerificationAction(
         id=action_id,
         kind="visual_diff",
+        timeout_sec=timeout_sec,
         required=required,
         depends_on=depends_on,
         config={
             "reference": reference,
             "actual": actual,
             "diff": diff,
+            "argv_template": list(argv_template),
+            "threshold": threshold,
             "regions": list(regions),
         },
     )
@@ -198,6 +550,7 @@ def archive(
     action_id: str,
     path: str,
     *,
+    output: str | None = None,
     required: bool = True,
     depends_on: tuple[str, ...] = (),
 ) -> VerificationAction:
@@ -208,13 +561,28 @@ def archive(
         kind="archive",
         required=required,
         depends_on=depends_on,
-        config={"path": path},
+        config={"path": path, "output": output or f"{action_id}.tar.gz"},
     )
 
 
-def normalize_verification_plans(plans: tuple[VerificationPlan, ...]) -> NormalizedVerificationPlan:
+def normalize_verification_plans(
+    plans: tuple[VerificationPlan, ...],
+    dependencies: dict[str, tuple[EvidenceDependency, ...]] | None = None,
+) -> NormalizedVerificationPlan:
     """Namespace, validate, de-duplicate, and topologically order scorer plans."""
 
+    namespaced = _namespace_verification_plans(plans)
+    _validate_evidence_dependencies(plans, dependencies or {})
+    canonical_actions, aliases = _deduplicate_namespaced_actions(namespaced)
+    return NormalizedVerificationPlan(
+        actions=_topological_order(canonical_actions),
+        aliases=aliases,
+    )
+
+
+def _namespace_verification_plans(
+    plans: tuple[VerificationPlan, ...],
+) -> tuple[tuple[str, VerificationAction], ...]:
     namespaced: list[tuple[str, VerificationAction]] = []
     owner_local_ids: set[str] = set()
     for plan in plans:
@@ -231,22 +599,55 @@ def normalize_verification_plans(plans: tuple[VerificationPlan, ...]) -> Normali
                 )
             owner_local_ids.add(owner_local)
             namespaced.append((owner_local, _namespace_action(plan.owner, action)))
+    return tuple(namespaced)
 
+
+def _deduplicate_namespaced_actions(
+    namespaced: tuple[tuple[str, VerificationAction], ...],
+) -> tuple[tuple[VerificationAction, ...], dict[str, str]]:
     aliases: dict[str, str] = {}
     actions_by_key: dict[str, VerificationAction] = {}
     canonical_by_id: dict[str, VerificationAction] = {}
-    for owner_local, action in namespaced:
-        key = _dedupe_key(action)
+    namespaced_by_id = {action.id: owner_local for owner_local, action in namespaced}
+    for action in _topological_order(tuple(action for _, action in namespaced)):
+        owner_local = namespaced_by_id[action.id]
+        candidate = VerificationAction(
+            id=action.id,
+            kind=action.kind,
+            timeout_sec=action.timeout_sec,
+            required=action.required,
+            depends_on=tuple(aliases[dependency] for dependency in action.depends_on),
+            config=dict(action.config),
+        )
+        key = _dedupe_key(candidate)
         canonical = actions_by_key.get(key)
         if canonical is None:
-            actions_by_key[key] = action
-            canonical_by_id[action.id] = action
-            aliases[owner_local] = action.id
+            actions_by_key[key] = candidate
+            canonical_by_id[candidate.id] = candidate
+            aliases[owner_local] = candidate.id
         else:
             aliases[owner_local] = canonical.id
+    return tuple(canonical_by_id.values()), aliases
 
-    ordered = _topological_order(tuple(canonical_by_id.values()))
-    return NormalizedVerificationPlan(actions=ordered, aliases=aliases)
+
+def _validate_evidence_dependencies(
+    plans: tuple[VerificationPlan, ...],
+    dependencies: dict[str, tuple[EvidenceDependency, ...]],
+) -> None:
+    actions_by_owner = {plan.owner: plan.actions for plan in plans}
+    missing: list[str] = []
+    for owner, required_dependencies in dependencies.items():
+        owner_actions = actions_by_owner.get(owner, ())
+        for dependency in required_dependencies:
+            available = sum(1 for action in owner_actions if action.kind == dependency.kind)
+            if available < dependency.minimum:
+                missing.append(
+                    f"{owner}:{dependency.kind} requires {dependency.minimum}, found {available}"
+                )
+    if missing:
+        raise VerificationPlanError(
+            "unsatisfied scorer evidence dependencies: " + "; ".join(missing)
+        )
 
 
 def _namespace_action(owner: str, action: VerificationAction) -> VerificationAction:
@@ -272,21 +673,152 @@ def _validate_action(action: VerificationAction) -> None:
 
 
 def _validate_action_config(action: VerificationAction) -> None:
-    if action.kind == "command":
-        argv = action.config.get("argv")
-        if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
-            raise VerificationPlanError(f"verification action {action.id} command argv is required")
-        try:
-            _validate_argv_command(argv, field_name=f"verification action {action.id}.argv")
-        except ValueError as exc:
-            raise VerificationPlanError(str(exc)) from exc
-    if action.kind in PATH_ACTION_KINDS:
-        _validate_config_path(action, "path")
-    if action.kind == "glob":
-        _validate_config_path(action, "pattern")
-    if action.kind == "visual_diff":
-        for key in ("reference", "actual", "diff"):
-            _validate_config_path(action, key)
+    required, optional = {
+        "archive": ({"path", "output"}, set()),
+        "command": ({"argv"}, {"cwd"}),
+        "glob": ({"pattern"}, set()),
+        "read_file": ({"path"}, {"max_bytes"}),
+        "read_json": ({"path"}, {"max_bytes"}),
+        "visual_diff": (
+            {"reference", "actual", "diff", "argv_template", "threshold", "regions"},
+            set(),
+        ),
+    }[action.kind]
+    actual = set(action.config)
+    if not required.issubset(actual) or not actual.issubset(required | optional):
+        raise VerificationPlanError(
+            f"verification action {action.id} config keys mismatch: "
+            f"required={sorted(required)}, actual={sorted(actual)}"
+        )
+    validators = {
+        "archive": _validate_archive_config,
+        "command": _validate_command_config,
+        "glob": _validate_glob_config,
+        "read_file": _validate_read_config,
+        "read_json": _validate_read_config,
+        "visual_diff": _validate_visual_config,
+    }
+    validators[action.kind](action)
+
+
+def _validate_archive_config(action: VerificationAction) -> None:
+    _validate_config_path(action, "path")
+    _validate_config_path(action, "output")
+
+
+def _validate_glob_config(action: VerificationAction) -> None:
+    _validate_config_path(action, "pattern")
+
+
+def _validate_read_config(action: VerificationAction) -> None:
+    _validate_config_path(action, "path")
+    max_bytes = action.config.get("max_bytes")
+    if max_bytes is not None and (
+        not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes <= 0
+    ):
+        raise VerificationPlanError(
+            f"verification action {action.id} max_bytes must be a positive integer"
+        )
+
+
+def _validate_command_config(action: VerificationAction) -> None:
+    if action.timeout_sec is None:
+        raise VerificationPlanError(
+            f"verification action {action.id} command timeout_sec is required"
+        )
+    argv = action.config.get("argv")
+    if not isinstance(argv, list) or not all(isinstance(item, str) for item in argv):
+        raise VerificationPlanError(f"verification action {action.id} command argv is required")
+    try:
+        _validate_argv_command(argv, field_name=f"verification action {action.id}.argv")
+    except ValueError as exc:
+        raise VerificationPlanError(str(exc)) from exc
+
+
+def _validate_visual_config(action: VerificationAction) -> None:
+    for key in ("reference", "actual", "diff"):
+        _validate_config_path(action, key)
+    _validate_visual_argv_template(action)
+    _validate_visual_threshold(action)
+    if action.timeout_sec is None:
+        raise VerificationPlanError(
+            f"verification action {action.id} visual timeout_sec is required"
+        )
+    _validate_visual_regions(action)
+
+
+def _validate_visual_argv_template(action: VerificationAction) -> None:
+    argv_template = action.config.get("argv_template")
+    if not isinstance(argv_template, list) or not all(
+        isinstance(item, str) for item in argv_template
+    ):
+        raise VerificationPlanError(
+            f"verification action {action.id} visual argv_template is required"
+        )
+    required_placeholders = {"{reference}", "{actual}", "{diff}", "{threshold}"}
+    if not required_placeholders.issubset(argv_template):
+        raise VerificationPlanError(
+            f"verification action {action.id} visual argv_template must contain "
+            "reference, actual, diff, and threshold placeholders"
+        )
+
+
+def _validate_visual_threshold(action: VerificationAction) -> None:
+    threshold = action.config.get("threshold")
+    if not isinstance(threshold, int | float) or isinstance(threshold, bool):
+        raise VerificationPlanError(f"verification action {action.id} visual threshold is required")
+    if not 0 <= float(threshold) <= 1:
+        raise VerificationPlanError(
+            f"verification action {action.id} visual threshold must be between zero and one"
+        )
+
+
+def _validate_visual_regions(action: VerificationAction) -> None:
+    regions = action.config.get("regions")
+    if not isinstance(regions, list):
+        raise VerificationPlanError(
+            f"verification action {action.id} visual regions must be a list"
+        )
+    for region in regions:
+        _validate_visual_region(action, region)
+
+
+def _validate_visual_region(action: VerificationAction, region: Any) -> None:
+    expected = {"name", "reference_image", "actual_image", "diff_image", "weight"}
+    if not isinstance(region, dict) or set(region) != expected:
+        raise VerificationPlanError(
+            f"verification action {action.id} visual region must define "
+            + ", ".join(sorted(expected))
+        )
+    if not isinstance(region["name"], str) or not region["name"]:
+        raise VerificationPlanError(
+            f"verification action {action.id} visual region name is required"
+        )
+    weight = region["weight"]
+    if not isinstance(weight, int | float) or isinstance(weight, bool) or weight <= 0:
+        raise VerificationPlanError(
+            f"verification action {action.id} visual region weight must be positive"
+        )
+    for key in ("reference_image", "actual_image", "diff_image"):
+        _validate_visual_region_path(action, region, key)
+
+
+def _validate_visual_region_path(
+    action: VerificationAction, region: dict[str, Any], key: str
+) -> None:
+    value = region[key]
+    if not isinstance(value, str):
+        raise VerificationPlanError(
+            f"verification action {action.id} visual region {key} is required"
+        )
+    try:
+        validate_relative_path(
+            value,
+            field_name=f"verification action {action.id}.config.regions[].{key}",
+            root_name="workspace",
+        )
+    except ValueError as exc:
+        raise VerificationPlanError(str(exc)) from exc
 
 
 def _validate_config_path(action: VerificationAction, key: str) -> None:

@@ -7,10 +7,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.config import settings
+from raidar.harness import HarborResultManifest
 from raidar.runtime.harbor_results import (
     _harbor_phase_timings,
     _load_json_dict,
+    _orchestration_overhead_excluding_agent_and_test_sec,
 )
 from raidar.runtime.models import (
     EvaluationOutputs,
@@ -22,7 +23,7 @@ from raidar.runtime.models import (
 )
 from raidar.runtime.scoring_outputs import (
     build_metric_scores,
-    build_scorer_results,
+    build_scorer_results_for_scenario,
     canonical_performance_gates,
 )
 from raidar.runtime.verification_metrics import (
@@ -31,16 +32,14 @@ from raidar.runtime.verification_metrics import (
     _verification_command_strings,
 )
 from raidar.schemas.events import TraceEvent
+from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import (
-    CoverageScore,
     ExecutionValidityScore,
-    FunctionalScore,
     GateCheck,
+    MetricScore,
     PerformanceGatesScore,
-    RequirementsCoverageScore,
     ResourceEfficiencyScore,
     Scorecard,
-    VerificationStabilityScore,
 )
 
 
@@ -51,6 +50,7 @@ class ScorecardMetadataInput:
     layout: RunLayout
     execution: ExecutionPhaseResult
     artifacts: PersistedArtifacts
+    harness: str
     unscored: bool
     unscored_reasons: list[str]
 
@@ -64,6 +64,26 @@ class ScorecardComponents:
     resource_efficiency: ResourceEfficiencyScore
     unscored: bool
     unscored_reasons: list[str]
+    metadata: dict[str, Any]
+
+
+@dataclass(frozen=True, slots=True)
+class CanonicalScorecardInput:
+    """Typed inputs shared by real and synthetic canonical scorecard assembly."""
+
+    scenario: ScenarioDefinition
+    run_id: str
+    harness: str
+    model: str
+    duration_sec: float
+    terminated_early: bool
+    termination_reason: str | None
+    unscored: bool
+    unscored_reasons: list[str]
+    execution_validity: ExecutionValidityScore
+    performance_gates: PerformanceGatesScore
+    resource_efficiency: ResourceEfficiencyScore
+    metric_scores: list[MetricScore]
     metadata: dict[str, Any]
 
 
@@ -82,57 +102,13 @@ class ExecutionValidityInput:
 
 
 def terminated_outputs(reason: str | None) -> EvaluationOutputs:
-    """Create deterministic zeroed scores for terminated runs."""
+    """Create deterministic execution-only outputs for terminated runs."""
     return EvaluationOutputs(
-        functional=_terminated_functional_score(),
-        visual=None,
-        verification_stability=_terminated_verification_stability_score(),
-        test_coverage=_terminated_coverage_score(),
-        requirements_coverage=_terminated_requirements_coverage_score(),
         execution_validity=_terminated_execution_validity_score(
             reason or "Run terminated before scoring."
         ),
         performance_gates=PerformanceGatesScore(checks=[]),
-        metric_scores=[],
         gate_history=[],
-    )
-
-
-def _terminated_functional_score() -> FunctionalScore:
-    return FunctionalScore(
-        passed=False,
-        tests_passed=0,
-        tests_total=0,
-        build_succeeded=False,
-        gates_passed=0,
-        gates_total=0,
-    )
-
-
-def _terminated_verification_stability_score() -> VerificationStabilityScore:
-    return VerificationStabilityScore(
-        total_gate_failures=settings.verification_stability.max_gate_failures,
-        unique_failure_categories=0,
-        repeat_failures=0,
-    )
-
-
-def _terminated_coverage_score() -> CoverageScore:
-    return CoverageScore(
-        threshold=None,
-        measured=None,
-        source=None,
-        passed=False,
-    )
-
-
-def _terminated_requirements_coverage_score() -> RequirementsCoverageScore:
-    return RequirementsCoverageScore(
-        total_requirements=0,
-        satisfied_requirements=0,
-        mapped_requirements=0,
-        missing_requirement_ids=[],
-        requirement_gap_ids=[],
     )
 
 
@@ -146,10 +122,6 @@ def _terminated_execution_validity_score(failure_reason: str) -> ExecutionValidi
             )
         ]
     )
-
-
-def _all_gates_passed(outputs: EvaluationOutputs) -> bool:
-    return outputs.functional.gates_total == outputs.functional.gates_passed
 
 
 def _completion_claim_consistent(
@@ -237,7 +209,8 @@ def build_execution_validity_score(
         check.model_copy(deep=True) for check in validity_input.outputs.execution_validity.checks
     ]
     _upsert_gate_check(checks, _run_completed_check(validity_input))
-    _upsert_gate_check(checks, _required_verification_check(validity_input))
+    required_verification = _required_verification_check(validity_input)
+    _upsert_gate_check(checks, required_verification)
     _upsert_gate_check(checks, _commit_bypass_check(validity_input.process_metrics))
 
     commit_count, commit_evidence = _git_commit_count(validity_input.workspace_path)
@@ -248,7 +221,7 @@ def build_execution_validity_score(
         checks,
         _completion_claim_consistent(
             validity_input.events,
-            _all_gates_passed(validity_input.outputs),
+            required_verification.passed,
             atomic_commits_required=validity_input.atomic_commits_required,
             atomic_commits_present=atomic_commits_present,
         ),
@@ -372,14 +345,14 @@ def _scorecard_run_metadata(
 
 
 def _scorecard_harbor_metadata(
-    execution: ExecutionPhaseResult, artifacts: PersistedArtifacts
+    execution: ExecutionPhaseResult,
+    artifacts: PersistedArtifacts,
+    harness: str,
 ) -> dict[str, Any]:
-    harbor_timings = _harbor_phase_timings(execution.harbor_result.trial_dir)
-    trial_total_sec = harbor_timings.get("trial_total_sec")
-    orchestration_overhead_excluding_test_sec = (
-        round(max(0.0, execution.duration_sec - trial_total_sec), 3)
-        if trial_total_sec is not None
-        else None
+    manifest = _result_manifest(execution, harness)
+    harbor_timings = _harbor_phase_timings(manifest)
+    orchestration_overhead_sec = _orchestration_overhead_excluding_agent_and_test_sec(
+        execution.duration_sec, harbor_timings
     )
     trial_dir = (
         str(execution.harbor_result.trial_dir) if execution.harbor_result.trial_dir else None
@@ -393,27 +366,23 @@ def _scorecard_harbor_metadata(
         "prep_total_sec": execution.prep_total_sec,
         "time_to_experiment_start_sec": execution.time_to_experiment_start_sec,
         "phase_timings_sec": harbor_timings,
-        "harness_overhead_sec": orchestration_overhead_excluding_test_sec,
-        "orchestration_overhead_excluding_test_sec": orchestration_overhead_excluding_test_sec,
+        "orchestration_overhead_excluding_agent_and_test_sec": orchestration_overhead_sec,
         "cache": execution.cache_metadata,
         "auth": execution.auth_metadata,
         "artifacts": artifacts.harbor_artifacts,
     }
 
 
-def _scorecard_verifier_metadata(
-    execution: ExecutionPhaseResult, artifacts: PersistedArtifacts
+def _scorecard_runner_evidence_metadata(
+    artifacts: PersistedArtifacts,
 ) -> dict[str, Any]:
-    evidence_path = (
-        execution.harbor_result.trial_dir / "verifier" / "evidence.json"
-        if execution.harbor_result.trial_dir
-        else None
-    )
+    evidence_path_value = artifacts.runner_evidence_artifacts.get("evidence.json")
+    evidence_path = Path(evidence_path_value) if evidence_path_value else None
     evidence_payload = _load_json_dict(evidence_path) if evidence_path else {}
     evidence_metadata = evidence_payload.get("metadata")
     return {
         "evidence": str(evidence_path) if evidence_path else None,
-        "artifacts": artifacts.verifier_artifacts,
+        "artifacts": artifacts.runner_evidence_artifacts,
         "action_count": (
             evidence_metadata.get("action_count") if isinstance(evidence_metadata, dict) else None
         ),
@@ -455,9 +424,13 @@ def _scorecard_metadata(request: ScorecardMetadataInput) -> dict[str, Any]:
         ),
         "starter": request.artifacts.starter_meta,
         "scenario": request.artifacts.scenario_revision_meta,
-        "harbor": _scorecard_harbor_metadata(request.execution, request.artifacts),
+        "harbor": _scorecard_harbor_metadata(
+            request.execution,
+            request.artifacts,
+            request.harness,
+        ),
         "harness": {"artifacts": request.artifacts.harness_artifacts},
-        "verifier": _scorecard_verifier_metadata(request.execution, request.artifacts),
+        "runner_evidence": _scorecard_runner_evidence_metadata(request.artifacts),
         "process": _scorecard_process_metadata(request.execution.process_metrics),
         "evidence": request.artifacts.evidence_artifacts,
         "workspace": {
@@ -467,13 +440,22 @@ def _scorecard_metadata(request: ScorecardMetadataInput) -> dict[str, Any]:
     }
 
 
+def _result_manifest(
+    execution: ExecutionPhaseResult,
+    harness: str,
+) -> HarborResultManifest | None:
+    trial_dir = execution.harbor_result.trial_dir
+    if trial_dir is None:
+        return None
+    return HarborResultManifest.for_trial(trial_dir, harness)
+
+
 def build_scorecard(context: ScorecardBuildContext) -> Scorecard:
     """Create scorecard with populated metrics and metadata."""
 
     execution = context.execution
-    outputs = execution.outputs
     execution_validity = build_execution_validity_score(_execution_validity_input(context))
-    performance_gates = build_performance_gates_score(outputs=outputs)
+    performance_gates = build_performance_gates_score(outputs=execution.outputs)
     resource_efficiency = build_resource_efficiency_score(execution.process_metrics)
     unscored_reasons = _classify_unscored_reasons(
         execution.terminated_early,
@@ -517,6 +499,7 @@ def _scorecard_metadata_input(
         layout=context.layout,
         execution=context.execution,
         artifacts=context.artifacts,
+        harness=context.request.config.harness.value,
         unscored=unscored,
         unscored_reasons=unscored_reasons,
     )
@@ -529,41 +512,58 @@ def _scorecard_from_context(
     request = context.request
     layout = context.layout
     execution = context.execution
-    outputs = execution.outputs
     metric_scores = build_metric_scores(
         context,
         execution_validity=components.execution_validity,
         resource_efficiency=components.resource_efficiency,
     )
-    scorer_results = build_scorer_results(context, metric_scores)
+    return assemble_scorecard(
+        CanonicalScorecardInput(
+            scenario=request.scenario,
+            run_id=layout.run_id,
+            harness=request.config.harness.value,
+            model=request.config.model.qualified_name,
+            duration_sec=execution.duration_sec,
+            terminated_early=execution.terminated_early,
+            termination_reason=execution.termination_reason,
+            unscored=components.unscored,
+            unscored_reasons=components.unscored_reasons,
+            execution_validity=components.execution_validity,
+            performance_gates=components.performance_gates,
+            resource_efficiency=components.resource_efficiency,
+            metric_scores=metric_scores,
+            metadata=components.metadata,
+        )
+    )
+
+
+def assemble_scorecard(request: CanonicalScorecardInput) -> Scorecard:
+    """Assemble a scorecard using canonical resolved-scorer weighting."""
+
+    scorer_results = build_scorer_results_for_scenario(request.scenario, request.metric_scores)
     performance_gates = canonical_performance_gates(
-        components.performance_gates,
+        request.performance_gates,
         quality_score=_quality_score_from_scorers(scorer_results),
         min_quality_score=request.scenario.verification.min_quality_score,
     )
     return Scorecard(
-        run_id=layout.run_id,
+        run_id=request.run_id,
         scenario_name=request.scenario.name,
         scenario_revision=request.scenario.scenario_revision,
-        harness=request.config.harness.value,
-        model=request.config.model.qualified_name,
+        harness=request.harness,
+        model=request.model,
         starter_root=request.scenario.starter.root,
-        duration_sec=execution.duration_sec,
-        terminated_early=execution.terminated_early,
-        termination_reason=execution.termination_reason,
-        unscored=components.unscored,
-        unscored_reasons=components.unscored_reasons,
-        functional=outputs.functional,
-        visual=outputs.visual,
-        verification_stability=outputs.verification_stability,
-        test_coverage=outputs.test_coverage,
-        requirements_coverage=outputs.requirements_coverage,
-        execution_validity=components.execution_validity,
+        duration_sec=request.duration_sec,
+        terminated_early=request.terminated_early,
+        termination_reason=request.termination_reason,
+        unscored=request.unscored,
+        unscored_reasons=request.unscored_reasons,
+        execution_validity=request.execution_validity,
         performance_gates=performance_gates,
-        resource_efficiency=components.resource_efficiency,
-        metric_scores=metric_scores,
+        resource_efficiency=request.resource_efficiency,
+        metric_scores=request.metric_scores,
         scorer_results=scorer_results,
-        metadata=components.metadata,
+        metadata=request.metadata,
     )
 
 

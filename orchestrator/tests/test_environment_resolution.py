@@ -17,8 +17,10 @@ from raidar.runtime.environments import (
     combined_capability_requirements,
     environment_library_index,
     normalize_probe_version,
+    resolve_environment_registry,
     resolve_scenario_environment,
 )
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.tool_catalog import (
     ToolCatalogError,
     _load_tool_catalog,
@@ -33,8 +35,32 @@ def _repo_root() -> Path:
     return Path(__file__).resolve().parents[2]
 
 
-def _write_environment_metadata(root: Path, relative_dir: str, *, environment_id: str) -> None:
-    environment_dir = root / "environments" / relative_dir
+def _runtime_profile(*, registry_roots: tuple[str, ...] = ("environments",)) -> RuntimeProfile:
+    return RuntimeProfile(environment_registry_roots=registry_roots)
+
+
+def _resolve_environment(scenario, scenario_path: Path, repo_root: Path):
+    runtime_profile = _runtime_profile()
+    return resolve_scenario_environment(
+        scenario=scenario,
+        scenario_path=scenario_path,
+        repo_root=repo_root,
+        registry=resolve_environment_registry(
+            repo_root=repo_root,
+            runtime_profile=runtime_profile,
+        ),
+        docker_registry_allowlist=runtime_profile.docker_registry_allowlist,
+    )
+
+
+def _write_environment_metadata(
+    root: Path,
+    relative_dir: str,
+    *,
+    environment_id: str,
+    registry_root: str = "environments",
+) -> None:
+    environment_dir = root / registry_root / relative_dir
     environment_dir.mkdir(parents=True)
     (environment_dir / "Dockerfile").write_text("FROM scratch\n", encoding="utf-8")
     (environment_dir / "environment.yaml").write_text(
@@ -42,7 +68,7 @@ def _write_environment_metadata(root: Path, relative_dir: str, *, environment_id
 version: 1
 image: raidar/test:latest
 build:
-  dockerfile: environments/{relative_dir}/Dockerfile
+  dockerfile: Dockerfile
 capabilities:
   runtimes:
     python: ">=3.12"
@@ -64,17 +90,23 @@ def test_resolve_python_scenario_environment_from_library() -> None:
     scenario_path = _repo_root() / "scenarios/python-code-task-baseline/v001/scenario.yaml"
     scenario = load_scenario(scenario_path)
 
-    environment = resolve_scenario_environment(
-        scenario=scenario,
-        scenario_path=scenario_path,
-        repo_root=_repo_root(),
-    )
+    environment = _resolve_environment(scenario, scenario_path, _repo_root())
 
     assert environment.id == "python:3.12"
     assert environment.config.kind == "stack_preset"
     assert environment.library.capabilities.runtimes["python"] == ">=3.12"
     assert environment.library.capabilities.tools["ruff"] == ">=0.14"
     assert environment.dockerfile_path == _repo_root() / "environments/python/3.12/Dockerfile"
+
+
+def test_node_environment_provides_the_generic_evidence_runner() -> None:
+    scenario_path = _repo_root() / "scenarios/hello-world-smoke/v001/scenario.yaml"
+    scenario = load_scenario(scenario_path)
+
+    environment = _resolve_environment(scenario, scenario_path, _repo_root())
+
+    assert environment.library.capabilities.runtimes["python"] == ">=3.11"
+    assert "python-is-python3" in environment.dockerfile_path.read_text(encoding="utf-8")
 
 
 def test_environment_config_requires_custom_docker_metadata() -> None:
@@ -127,11 +159,7 @@ def test_environment_resolution_supports_custom_docker() -> None:
     }
     scenario = ScenarioDefinition.model_validate(payload)
 
-    environment = resolve_scenario_environment(
-        scenario=scenario,
-        scenario_path=scenario_path,
-        repo_root=_repo_root(),
-    )
+    environment = _resolve_environment(scenario, scenario_path, _repo_root())
 
     assert environment.id == "local-python"
     assert environment.config.kind == "custom_docker"
@@ -156,16 +184,12 @@ def test_environment_resolution_rejects_missing_scorer_inventory() -> None:
     scenario = ScenarioDefinition.model_validate(payload)
 
     with pytest.raises(EnvironmentResolutionError, match="scorer python-code-task@1"):
-        resolve_scenario_environment(
-            scenario=scenario,
-            scenario_path=scenario_path,
-            repo_root=_repo_root(),
-        )
+        _resolve_environment(scenario, scenario_path, _repo_root())
 
 
 def test_environment_library_rejects_missing_root(tmp_path: Path) -> None:
     with pytest.raises(EnvironmentResolutionError, match="Environment library not found"):
-        environment_library_index(tmp_path)
+        resolve_environment_registry(repo_root=tmp_path, runtime_profile=_runtime_profile())
 
 
 def test_environment_library_rejects_duplicate_ids(tmp_path: Path) -> None:
@@ -173,7 +197,68 @@ def test_environment_library_rejects_duplicate_ids(tmp_path: Path) -> None:
     _write_environment_metadata(tmp_path, "python/b", environment_id="python:3.12")
 
     with pytest.raises(EnvironmentResolutionError, match="Duplicate environment id"):
-        environment_library_index(tmp_path)
+        resolve_environment_registry(repo_root=tmp_path, runtime_profile=_runtime_profile())
+
+
+def test_environment_registry_preserves_root_order_and_fingerprints_entries(
+    tmp_path: Path,
+) -> None:
+    _write_environment_metadata(
+        tmp_path,
+        "python/a",
+        environment_id="python:a",
+        registry_root="registry-a",
+    )
+    _write_environment_metadata(
+        tmp_path,
+        "python/b",
+        environment_id="python:b",
+        registry_root="registry-b",
+    )
+    runtime_profile = _runtime_profile(registry_roots=("registry-b", "registry-a"))
+
+    registry = resolve_environment_registry(
+        repo_root=tmp_path,
+        runtime_profile=runtime_profile,
+    )
+
+    assert registry.roots == (tmp_path / "registry-b", tmp_path / "registry-a")
+    assert tuple(environment_library_index(registry)) == ("python:b", "python:a")
+    payload = registry.cache_payload()
+    assert [entry["id"] for entry in payload["entries"]] == ["python:b", "python:a"]
+    assert all(len(entry["metadata_fingerprint"]) == 64 for entry in payload["entries"])
+    assert all(len(entry["dockerfile_fingerprint"]) == 64 for entry in payload["entries"])
+
+
+def test_environment_registry_rejects_duplicate_ids_across_roots(tmp_path: Path) -> None:
+    _write_environment_metadata(
+        tmp_path,
+        "python/a",
+        environment_id="python:duplicate",
+        registry_root="registry-a",
+    )
+    _write_environment_metadata(
+        tmp_path,
+        "python/b",
+        environment_id="python:duplicate",
+        registry_root="registry-b",
+    )
+
+    with pytest.raises(EnvironmentResolutionError, match="Duplicate environment id"):
+        resolve_environment_registry(
+            repo_root=tmp_path,
+            runtime_profile=_runtime_profile(registry_roots=("registry-a", "registry-b")),
+        )
+
+
+def test_environment_registry_rejects_roots_that_resolve_to_same_path(tmp_path: Path) -> None:
+    (tmp_path / "environments").mkdir()
+
+    with pytest.raises(EnvironmentResolutionError, match="duplicate paths"):
+        resolve_environment_registry(
+            repo_root=tmp_path,
+            runtime_profile=_runtime_profile(registry_roots=("environments", "./environments")),
+        )
 
 
 def test_environment_library_rejects_invalid_metadata_mapping(tmp_path: Path) -> None:
@@ -183,7 +268,7 @@ def test_environment_library_rejects_invalid_metadata_mapping(tmp_path: Path) ->
     (environment_dir / "environment.yaml").write_text("- not-a-mapping\n", encoding="utf-8")
 
     with pytest.raises(EnvironmentResolutionError, match="metadata must be a mapping"):
-        environment_library_index(tmp_path)
+        resolve_environment_registry(repo_root=tmp_path, runtime_profile=_runtime_profile())
 
 
 def test_environment_resolution_rejects_incompatible_tool_version(tmp_path: Path) -> None:
@@ -199,7 +284,7 @@ def test_environment_resolution_rejects_incompatible_tool_version(tmp_path: Path
 version: 1
 image: raidar/python:3.12-code
 build:
-  dockerfile: environments/python/3.12/Dockerfile
+  dockerfile: Dockerfile
 capabilities:
   runtimes:
     python: ">=3.12"
@@ -218,11 +303,7 @@ capabilities:
     scenario = load_scenario(scenario_path)
 
     with pytest.raises(EnvironmentResolutionError, match="tools.pytest >=9"):
-        resolve_scenario_environment(
-            scenario=scenario,
-            scenario_path=scenario_path,
-            repo_root=tmp_path,
-        )
+        _resolve_environment(scenario, scenario_path, tmp_path)
 
 
 def test_resolved_scorer_preserves_inventory_requirements() -> None:
@@ -244,11 +325,7 @@ def test_resolved_scorer_preserves_inventory_requirements() -> None:
 def test_combined_capability_requirements_include_scenario_and_scorer() -> None:
     scenario_path = _repo_root() / "scenarios/python-code-task-baseline/v001/scenario.yaml"
     scenario = load_scenario(scenario_path)
-    environment = resolve_scenario_environment(
-        scenario=scenario,
-        scenario_path=scenario_path,
-        repo_root=_repo_root(),
-    )
+    environment = _resolve_environment(scenario, scenario_path, _repo_root())
 
     combined = combined_capability_requirements(scenario=scenario, environment=environment)
 

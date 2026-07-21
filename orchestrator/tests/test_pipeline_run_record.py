@@ -34,7 +34,10 @@ def test_run_task_persists_execution_trace_events(monkeypatch):
     )
     request = SimpleNamespace(
         config=SimpleNamespace(
-            model=SimpleNamespace(qualified_name="openai/gpt-5.5"),
+            model=SimpleNamespace(
+                qualified_name="openai/gpt-5.5",
+                reasoning_effort="low",
+            ),
             harness=SimpleNamespace(value="codex-cli"),
         ),
         scenario=SimpleNamespace(

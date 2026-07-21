@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from collections.abc import Iterable
 
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
@@ -17,9 +16,6 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
     CLI_ENV_VAR = "CLAUDE_CODE_CLI_PATH"
     DEFAULT_BINARY = "claude"
     WORKSPACE_SESSION_DIR = ".claude"
-    API_KEY_ENV = "CLAUDE_CODE_API_KEY"
-    ANTHROPIC_API_ENV = "ANTHROPIC_API_KEY"
-    OAUTH_TOKEN_ENV = "CLAUDE_CODE_OAUTH_TOKEN"
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
         "claude-opus-4-7": SupportedModelProfile(
             display_label="Claude Opus 4.7",
@@ -43,17 +39,6 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
             display_label="Claude Haiku 4.5",
         ),
     }
-
-    def _validate_credentials(self) -> None:
-        if not (
-            os.environ.get(self.ANTHROPIC_API_ENV)
-            or os.environ.get(self.API_KEY_ENV)
-            or os.environ.get(self.OAUTH_TOKEN_ENV)
-        ):
-            raise OSError(
-                "Claude Code Harbor runs require credentials. "
-                "Set ANTHROPIC_API_KEY, CLAUDE_CODE_API_KEY, or CLAUDE_CODE_OAUTH_TOKEN."
-            )
 
     def extra_harbor_args(self) -> Iterable[str]:
         model_profile = self.SUPPORTED_MODELS[self.config.model.name]

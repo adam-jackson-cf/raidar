@@ -165,40 +165,22 @@ def _missing_required_command_findings(run: EvalRun) -> list[Finding]:
 
 
 def _requirements_gap_findings(run: EvalRun) -> list[Finding]:
-    coverage = run.scores.requirements_coverage
+    coverage = run.scores.metric_result("requirements-coverage")
     findings = []
-    if coverage.missing_requirement_ids:
+    if coverage is not None and coverage.missing_patterns:
         findings.append(
             _finding(
                 "issue",
                 "requirements-gap",
-                f"{len(coverage.missing_requirement_ids)} requirement(s) not satisfied",
-                ", ".join(coverage.missing_requirement_ids),
+                f"{len(coverage.missing_patterns)} requirement(s) not satisfied",
+                ", ".join(coverage.missing_patterns),
                 [
                     FindingEvidence(
-                        source="requirements_coverage",
+                        source="metric_scores",
                         reference=requirement_id,
                         detail="deterministic check failed",
                     )
-                    for requirement_id in coverage.missing_requirement_ids
-                ],
-            )
-        )
-    gaps = coverage.requirement_test_evidence_gaps
-    if gaps:
-        findings.append(
-            _finding(
-                "issue",
-                "requirements-gap",
-                f"{len(gaps)} requirement(s) missing required test evidence",
-                ", ".join(sorted(gaps)),
-                [
-                    FindingEvidence(
-                        source="requirements_coverage",
-                        reference=requirement_id,
-                        detail="; ".join(str(item) for item in items[:3]),
-                    )
-                    for requirement_id, items in sorted(gaps.items())
+                    for requirement_id in coverage.missing_patterns
                 ],
             )
         )
@@ -369,7 +351,9 @@ def _process_findings(run: EvalRun) -> list[Finding]:
 def _strength_findings(run: EvalRun) -> list[Finding]:
     findings = []
     scores = run.scores
-    if scores.functional.passed and scores.verification_stability.total_gate_failures == 0:
+    functional = scores.metric_result("functional")
+    stability = scores.metric_result("verification-stability")
+    if functional is not None and functional.passed and stability is not None and stability.passed:
         findings.append(
             _finding(
                 "good",
@@ -378,28 +362,26 @@ def _strength_findings(run: EvalRun) -> list[Finding]:
                 "",
                 [
                     FindingEvidence(
-                        source="verification_stability",
-                        reference="total_gate_failures",
-                        detail="0",
+                        source="metric_scores",
+                        reference="verification-stability",
+                        detail=f"score={stability.score}",
                     )
                 ],
             )
         )
-    coverage = scores.requirements_coverage
-    if coverage.total_requirements > 0 and coverage.satisfied_requirements == (
-        coverage.total_requirements
-    ):
+    coverage = scores.metric_result("requirements-coverage")
+    if coverage is not None and coverage.passed:
         findings.append(
             _finding(
                 "good",
                 "requirements-satisfied",
-                f"All {coverage.total_requirements} requirements satisfied",
+                "All deterministic requirements satisfied",
                 "",
                 [
                     FindingEvidence(
-                        source="requirements_coverage",
-                        reference="satisfied_requirements",
-                        detail=str(coverage.satisfied_requirements),
+                        source="metric_scores",
+                        reference="requirements-coverage",
+                        detail=f"score={coverage.score}",
                     )
                 ],
             )

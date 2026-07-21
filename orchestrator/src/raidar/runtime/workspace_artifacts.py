@@ -14,18 +14,12 @@ from typing import Any
 
 from raidar.audit.workspace_diff import diff_directories
 from raidar.config import settings
-from raidar.harness import harness_definition
+from raidar.harness import HarborArtifactRole, HarborResultManifest
 from raidar.runtime.models import HarborExecutionResult, RunRequest
-from raidar.runtime.profile import RuntimeProfile, default_runtime_profile
+from raidar.runtime.profile import RuntimeProfile
 from raidar.runtime.wait import wait_for_remove_tree_retry
 from raidar.runtime.workspace_cache import _directory_size_bytes
 from raidar.schemas.scenario import ScenarioDefinition
-
-WORKSPACE_PRUNE_DIRS: tuple[str, ...] = default_runtime_profile().prune_dirs
-
-
-def _runtime_copy_excludes() -> tuple[str, ...]:
-    return default_runtime_profile().copy_excludes
 
 
 def _visual_artifact_manifest(task: ScenarioDefinition) -> dict[str, str]:
@@ -78,13 +72,22 @@ def _visual_region_names(request: RunRequest) -> list[str]:
 
 
 def _run_homepage_capture_command(
-    task: ScenarioDefinition, command: list[str], workspace: Path, output_path: Path
+    task: ScenarioDefinition,
+    command: list[str],
+    workspace: Path,
+    output_path: Path,
+    *,
+    runtime_profile: RuntimeProfile,
 ) -> tuple[Path | None, str | None]:
     artifacts = _visual_artifact_manifest(task)
     actual_path = workspace / artifacts["actual"]
     actual_path.unlink(missing_ok=True)
 
-    install_error = _ensure_workspace_capture_dependencies(task, workspace)
+    install_error = _ensure_workspace_capture_dependencies(
+        task,
+        workspace,
+        runtime_profile=runtime_profile,
+    )
     if install_error:
         return None, install_error
 
@@ -115,13 +118,18 @@ def _run_homepage_capture_command(
     return output_path, None
 
 
-def _ensure_workspace_capture_dependencies(task: ScenarioDefinition, workspace: Path) -> str | None:
+def _ensure_workspace_capture_dependencies(
+    task: ScenarioDefinition,
+    workspace: Path,
+    *,
+    runtime_profile: RuntimeProfile,
+) -> str | None:
     from raidar.runtime.workspace import _workspace_runtime_env
 
     if task.visual is None or not task.visual.capture_setup_actions:
         return None
 
-    env = _workspace_runtime_env(workspace)
+    env = _workspace_runtime_env(workspace, runtime_profile)
     for setup_command in task.visual.capture_setup_actions:
         setup_error = _run_workspace_capture_setup_command(workspace, setup_command, env)
         if setup_error:
@@ -186,9 +194,8 @@ def _hydrate_workspace_from_final_app(
 ) -> tuple[Path | None, str | None]:
     if not harbor_result.trial_dir:
         return None, "Harbor trial directory missing; cannot hydrate post-run workspace."
-    archive_path = (
-        harbor_result.trial_dir / "agent" / harness_definition(harness).final_workspace_archive
-    )
+    manifest = HarborResultManifest.for_trial(harbor_result.trial_dir, harness)
+    archive_path = manifest.path(HarborArtifactRole.FINAL_WORKSPACE_ARCHIVE)
     if not archive_path.exists():
         return None, f"Missing final app archive: {archive_path}"
     try:
@@ -218,12 +225,11 @@ def _remove_tree_with_retries(path: Path, *, attempts: int = 3, delay_sec: float
 
 def _prune_workspace_artifacts(
     workspace: Path,
-    runtime_profile: RuntimeProfile | None = None,
+    runtime_profile: RuntimeProfile,
 ) -> dict[str, Any]:
-    profile = runtime_profile or default_runtime_profile()
     removed: list[str] = []
     reclaimed_bytes = 0
-    for dirname in profile.prune_dirs:
+    for dirname in runtime_profile.prune_dirs:
         candidate = workspace / dirname
         if not candidate.exists():
             continue

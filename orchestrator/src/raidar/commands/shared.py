@@ -12,6 +12,7 @@ import click
 
 from raidar.application.execution import (
     BENCHMARK_EXPERIMENTS_ROOT_NAME,
+    OPERATIONAL_SMOKE_EXPERIMENTS_ROOT_NAME,
     RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME,
     execute_run_command,
 )
@@ -37,15 +38,17 @@ from raidar.application.serializers import (
     suite_execution_payload as _service_suite_execution_payload,
 )
 from raidar.runtime.maintenance import cleanup_stale_harbor_resources
+from raidar.runtime.profile import default_runtime_profile
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[3]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
 EXPERIMENTS_ROOT = REPO_ROOT / "experiments"
 BENCHMARK_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / BENCHMARK_EXPERIMENTS_ROOT_NAME
+OPERATIONAL_SMOKE_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / OPERATIONAL_SMOKE_EXPERIMENTS_ROOT_NAME
 RESEARCH_LOOP_EXPERIMENTS_ROOT = EXPERIMENTS_ROOT / RESEARCH_LOOP_EXPERIMENTS_ROOT_NAME
 DEFAULT_ARCHIVE_ROOT = Path("/tmp")
-EXPERIMENT_KIND_CHOICES = ["benchmark", "research-loop"]
+EXPERIMENT_KIND_CHOICES = ["benchmark", "operational-smoke", "research-loop"]
 HARNESS_CHOICES: list[str] = []
 
 
@@ -57,6 +60,7 @@ def cleanup_stale_harbor_before_runs() -> None:
     cleanup_stale_harbor_resources(
         include_containers=True,
         include_build_processes=True,
+        runtime_profile=default_runtime_profile(),
     )
 
 
@@ -67,7 +71,7 @@ def experiment_execution_suffix(options: RunCliOptions) -> str:
 def resolve_experiments_root(
     *,
     experiments_root: Path | None,
-    experiment_kind: str | None,
+    experiment_kind: str,
 ) -> Path:
     return _service_resolve_experiments_root(
         experiments_root=experiments_root,
@@ -93,7 +97,7 @@ def build_run_options_from_mapping(options: dict[str, object]) -> RunCliOptions:
             repeat_parallel=options["repeat_parallel"],
             rerun_unscored=options["rerun_unscored"],
             experiments_root=options.get("experiments_root"),
-            experiment_kind=options.get("experiment_kind"),
+            experiment_kind=options["experiment_kind"],
             repo_root=REPO_ROOT,
         )
     )

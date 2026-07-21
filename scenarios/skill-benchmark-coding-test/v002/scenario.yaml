@@ -1,8 +1,18 @@
 name: skill-benchmark-coding-test
 scenario_revision: v002
+parent_revision: v001
 description: Lint-stable TypeScript utility benchmark with explicit verification guidance
+display_name: TypeScript utility implementation
+task_kind: feature_implementation
+delivery_mode: direct_implementation
+workspace_state: new
+starting_conditions: []
+languages:
+- typescript
+evaluation_role: benchmark
+catalog_status: active
+variant_axes: {}
 difficulty: medium
-category: greenfield-code
 timeout_sec: 1800
 test_scripts: []
 environment:

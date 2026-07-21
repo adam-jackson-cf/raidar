@@ -1,5 +1,6 @@
 """Tests for run storage and aggregation."""
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -23,6 +24,18 @@ class TestSaveAndLoadRun:
 
         assert path.exists()
         assert path.suffix == ".json"
+
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        legacy_fields = {
+            "functional",
+            "visual",
+            "verification_stability",
+            "test_coverage",
+            "requirements_coverage",
+        }
+        assert legacy_fields.isdisjoint(payload["scores"])
+        assert "metric_scores" in payload["scores"]
+        assert "scorer_results" in payload["scores"]
 
     def test_load_run_returns_same_data(self, sample_eval_run: EvalRun, tmp_results_dir: Path):
         """Should load same data that was saved."""
@@ -233,15 +246,13 @@ class TestExportCsv:
         sample_eval_run.scores.metric_scores = []
         sample_eval_run.scores.metadata["harbor"] = {
             "phase_timings_sec": {},
-            "harness_overhead_sec": 1.23,
-            "orchestration_overhead_excluding_test_sec": 1.23,
+            "orchestration_overhead_excluding_agent_and_test_sec": 1.23,
         }
         output = tmp_path / "runs.csv"
         export_to_csv([sample_eval_run], output)
         payload = output.read_text(encoding="utf-8")
         assert "evaluation_profile" in payload
         assert "metric_scores" in payload
-        assert "harness_overhead_sec" in payload
-        assert "orchestration_overhead_excluding_test_sec" in payload
+        assert "orchestration_overhead_excluding_agent_and_test_sec" in payload
         assert "1.23" in payload
         assert sample_eval_run.config.evaluation_profile in payload

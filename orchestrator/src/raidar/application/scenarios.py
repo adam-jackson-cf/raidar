@@ -4,21 +4,36 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
-
-import yaml
 
 from raidar.application.models import (
     ScenarioCloneRequest,
     ScenarioInitRequest,
     ScenarioInitResult,
+    ScenarioTemplateId,
     ScenarioValidationResult,
 )
-from raidar.application.scenario_catalog import load_scenario
+from raidar.application.scenario_catalog import load_scenario, save_scenario
 from raidar.harness import harness_rule_filenames
-from raidar.runtime.environments import resolve_scenario_environment
+from raidar.runtime.environments import resolve_environment_registry, resolve_scenario_environment
+from raidar.runtime.profile import default_runtime_profile
 from raidar.scenario_clone import ScenarioCloneResult
 from raidar.scenario_clone import clone_scenario_revision as clone_revision
+from raidar.schemas.environment import (
+    CapabilityRequirements,
+    EnvironmentConfig,
+    EnvironmentResourcesConfig,
+)
+from raidar.schemas.scenario import (
+    DeterministicCheck,
+    PromptConfig,
+    RequirementsConfig,
+    RequirementSpec,
+    ScenarioDefinition,
+    ScenarioScorerRef,
+    StarterConfig,
+    VerificationConfig,
+    VerificationGate,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[4]
 
@@ -42,13 +57,60 @@ class ScenarioInitLayout:
     rules_dir: Path
 
 
+@dataclass(frozen=True, slots=True)
+class ScenarioTemplate:
+    """Explicit environment, command, and scorer choices for a new scenario."""
+
+    id: ScenarioTemplateId
+    environment_id: str
+    requirements: CapabilityRequirements
+    setup_actions: tuple[tuple[str, ...], ...]
+    verification_gates: tuple[tuple[str, tuple[str, ...]], ...]
+    scorer_id: str
+
+
+SCENARIO_TEMPLATES: dict[ScenarioTemplateId, ScenarioTemplate] = {
+    "typescript-bun": ScenarioTemplate(
+        id="typescript-bun",
+        environment_id="node:20",
+        requirements=CapabilityRequirements(
+            runtimes={"node": ">=20"},
+            package_managers={"bun": ">=1"},
+            tools={"typescript": ">=5"},
+        ),
+        setup_actions=(("bun", "install", "--frozen-lockfile"),),
+        verification_gates=(
+            ("typecheck", ("bun", "run", "typecheck")),
+            ("lint", ("bun", "run", "lint")),
+        ),
+        scorer_id="typescript-code-task",
+    ),
+    "python-pytest": ScenarioTemplate(
+        id="python-pytest",
+        environment_id="python:3.12",
+        requirements=CapabilityRequirements(
+            runtimes={"python": ">=3.12"},
+            package_managers={"pip": ">=24"},
+            tools={"coverage": ">=7", "pytest": ">=9", "ruff": ">=0.14"},
+        ),
+        setup_actions=(("python", "-m", "pip", "install", "-e", "."),),
+        verification_gates=(
+            ("test", ("python", "-m", "pytest")),
+            ("lint", ("python", "-m", "ruff", "check", ".")),
+        ),
+        scorer_id="python-code-task",
+    ),
+}
+
+
 def init_scenario(request: ScenarioInitRequest) -> ScenarioInitResult:
     """Create a new versioned scenario descriptor with prompt artifacts and rules."""
 
     layout = _scenario_init_layout(request)
     _ensure_new_scenario(layout)
     _create_scenario_init_dirs(layout)
-    write_scenario_document(layout.scenario_yaml, _scenario_doc(request, layout))
+    scenario = _build_scenario_definition(request, layout)
+    save_scenario(layout.scenario_yaml, scenario)
     _write_scenario_prompt(layout)
     _write_scenario_rules(layout)
     return _scenario_init_result(request, layout)
@@ -77,68 +139,68 @@ def _create_scenario_init_dirs(layout: ScenarioInitLayout) -> None:
     (layout.revision_dir / "prompt").mkdir(parents=True, exist_ok=True)
 
 
-def _scenario_doc(request: ScenarioInitRequest, layout: ScenarioInitLayout) -> dict[str, Any]:
-    return {
-        "name": layout.scenario_name,
-        "scenario_revision": request.scenario_revision,
-        "parent_revision": None,
-        "description": f"Scenario definition for {layout.scenario_name}",
-        "difficulty": request.difficulty,
-        "category": request.category,
-        "timeout_sec": request.timeout_sec,
-        "test_scripts": [],
-        "environment": {
-            "kind": "stack_preset",
-            "id": "node:20",
-            "workdir": "/app",
-            "requirements": {
-                "runtimes": {"node": ">=20"},
-                "package_managers": {"bun": ">=1"},
-                "tools": {"typescript": ">=5"},
-                "browsers": {},
-            },
-            "resources": {
-                "cpus": 2,
-                "memory_mb": 4096,
-                "storage_mb": 10240,
-            },
-            "allow_internet": True,
-        },
-        "starter": {"root": request.starter_root},
-        "verification": {
-            "max_gate_failures": 3,
-            "coverage_threshold": 0.8,
-            "min_quality_score": 0.8,
-            "setup_actions": [["bun", "install", "--frozen-lockfile"]],
-            "required_commands": [
-                ["bun", "run", "typecheck"],
-                ["bun", "run", "lint"],
-            ],
-            "gates": [
-                {"name": "typecheck", "command": ["bun", "run", "typecheck"]},
-                {"name": "lint", "command": ["bun", "run", "lint"]},
-            ],
-        },
-        "requirements": {
-            "items": [
-                {
-                    "id": "req-no-todo",
-                    "description": "No TODO markers remain in production files.",
-                    "check": {
-                        "type": "no_pattern",
-                        "pattern": "TODO",
-                        "description": "No TODO markers remain in production files",
-                    },
-                    "required_test_evidence": [],
-                }
-            ],
-        },
-        "scorers": [
-            {"id": "typescript-code-task", "version": 1, "weight": 0.9},
-            {"id": "resource-efficiency", "version": 1, "weight": 0.1},
+def _build_scenario_definition(
+    request: ScenarioInitRequest, layout: ScenarioInitLayout
+) -> ScenarioDefinition:
+    template = SCENARIO_TEMPLATES[request.template]
+    gates = [
+        VerificationGate(name=name, command=list(command))
+        for name, command in template.verification_gates
+    ]
+    commands = [gate.command for gate in gates]
+    return ScenarioDefinition(
+        name=layout.scenario_name,
+        display_name=request.display_name,
+        scenario_revision=request.scenario_revision,
+        parent_revision=None,
+        description=f"Scenario definition for {layout.scenario_name}",
+        difficulty=request.difficulty,
+        task_kind=request.task_kind,
+        delivery_mode=request.delivery_mode,
+        workspace_state=request.workspace_state,
+        starting_conditions=list(request.starting_conditions),
+        languages=list(request.languages),
+        evaluation_role=request.evaluation_role,
+        catalog_status=request.catalog_status,
+        family_id=request.family_id,
+        variant_axes=dict(request.variant_axes),
+        timeout_sec=request.timeout_sec,
+        environment=EnvironmentConfig(
+            kind="stack_preset",
+            id=template.environment_id,
+            workdir="/app",
+            requirements=template.requirements.model_copy(deep=True),
+            resources=EnvironmentResourcesConfig(),
+            allow_internet=True,
+        ),
+        starter=StarterConfig(root=request.starter_root),
+        verification=VerificationConfig(
+            max_gate_failures=3,
+            coverage_threshold=0.8,
+            min_quality_score=0.8,
+            setup_actions=[list(command) for command in template.setup_actions],
+            required_commands=commands,
+            gates=gates,
+        ),
+        requirements=RequirementsConfig(
+            items=[
+                RequirementSpec(
+                    id="req-no-todo",
+                    description="No TODO markers remain in production files.",
+                    check=DeterministicCheck(
+                        type="no_pattern",
+                        pattern="TODO",
+                        description="No TODO markers remain in production files",
+                    ),
+                )
+            ]
+        ),
+        scorers=[
+            ScenarioScorerRef(id=template.scorer_id, version=1, weight=0.9),
+            ScenarioScorerRef(id="resource-efficiency", version=1, weight=0.1),
         ],
-        "prompt": {"entry": request.prompt_entry, "includes": []},
-    }
+        prompt=PromptConfig(entry=request.prompt_entry),
+    )
 
 
 def _write_scenario_prompt(layout: ScenarioInitLayout) -> None:
@@ -157,6 +219,7 @@ def _scenario_init_result(
     return ScenarioInitResult(
         scenario_root=layout.scenario_root,
         scenario_name=layout.scenario_name,
+        display_name=request.display_name,
         scenario_revision=request.scenario_revision,
         parent_revision=None,
         revision_dir=layout.revision_dir,
@@ -164,6 +227,16 @@ def _scenario_init_result(
         prompt_path=layout.prompt_path,
         rules_dir=layout.rules_dir,
         starter_root=request.starter_root,
+        template=request.template,
+        task_kind=request.task_kind,
+        delivery_mode=request.delivery_mode,
+        workspace_state=request.workspace_state,
+        starting_conditions=list(request.starting_conditions),
+        languages=list(request.languages),
+        evaluation_role=request.evaluation_role,
+        catalog_status=request.catalog_status,
+        family_id=request.family_id,
+        variant_axes=dict(request.variant_axes),
     )
 
 
@@ -173,10 +246,16 @@ def validate_scenario(path: Path) -> ScenarioValidationResult:
     scenario_yaml = resolve_scenario_yaml(path)
     scenario = load_scenario(scenario_yaml)
     _validate_scenario_files(scenario_yaml.parent, scenario)
+    runtime_profile = default_runtime_profile()
     resolve_scenario_environment(
         scenario=scenario,
         scenario_path=scenario_yaml,
         repo_root=REPO_ROOT,
+        registry=resolve_environment_registry(
+            repo_root=REPO_ROOT,
+            runtime_profile=runtime_profile,
+        ),
+        docker_registry_allowlist=runtime_profile.docker_registry_allowlist,
     )
     return ScenarioValidationResult(
         scenario_path=scenario_yaml,
@@ -229,21 +308,3 @@ def scenario_revision_paths(scenario_root: Path) -> list[Path]:
     if not scenario_root.is_dir():
         return []
     return sorted(scenario_root.glob("v*/scenario.yaml"), key=scenario_revision_sort_key)
-
-
-def load_scenario_document(path: Path) -> dict[str, Any]:
-    """Load a scenario YAML document as a mapping."""
-
-    with path.open(encoding="utf-8") as handle:
-        payload = yaml.safe_load(handle) or {}
-    if not isinstance(payload, dict):
-        raise ValueError(f"Scenario document must be a mapping: {path}")
-    return payload
-
-
-def write_scenario_document(path: Path, payload: dict[str, Any]) -> None:
-    """Write a scenario YAML mapping with stable key order."""
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", encoding="utf-8") as handle:
-        yaml.safe_dump(payload, handle, sort_keys=False)

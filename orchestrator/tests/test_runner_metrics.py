@@ -5,13 +5,17 @@ from types import SimpleNamespace
 import pytest
 
 from raidar.runtime import scoring_outputs as scoring_outputs_runtime
+from raidar.runtime.profile import RuntimeProfile
 from raidar.schemas.scorecard import Scorecard
 from raidar.scorers.code_task.typescript_evidence import (
     evaluate_typescript_coverage,
     evaluate_typescript_requirements,
 )
+from raidar.scorers.evidence_contract import CommandEvidenceResult
 from tests import runtime_process_metrics_support as process_support
 from tests import runtime_scorecard_workspace_support as runtime_support
+
+RUNTIME_PROFILE = RuntimeProfile()
 
 errno = process_support.errno
 json = process_support.json
@@ -29,6 +33,7 @@ ModelTarget = process_support.ModelTarget
 process_metrics_runtime = process_support.process_metrics_runtime
 _normalized_shell_subcommands = process_support._normalized_shell_subcommands
 collect_process_metrics = process_support.collect_process_metrics
+HarborResultManifest = process_support.HarborResultManifest
 GateEvent = process_support.GateEvent
 DeterministicCheck = process_support.DeterministicCheck
 RequirementSpec = process_support.RequirementSpec
@@ -44,6 +49,7 @@ directory_fingerprint = runtime_support.directory_fingerprint
 artifacts_runtime = runtime_support.artifacts_runtime
 scorecard_runtime = runtime_support.scorecard_runtime
 task_bundle_runtime = runtime_support.task_bundle_runtime
+task_bundle_images_runtime = runtime_support.task_bundle_images_runtime
 workspace_runtime = runtime_support.workspace_runtime
 workspace_artifacts_runtime = runtime_support.workspace_artifacts_runtime
 workspace_cache_runtime = runtime_support.workspace_cache_runtime
@@ -60,7 +66,7 @@ WorkspaceContext = runtime_support.WorkspaceContext
 BaselineWorkspaceRequest = runtime_support.BaselineWorkspaceRequest
 _classify_unscored_reasons = runtime_support._classify_unscored_reasons
 build_scorecard = runtime_support.build_scorecard
-_task_image_reference = runtime_support._task_image_reference
+task_image_reference = runtime_support.task_image_reference
 _ensure_baseline_workspace = runtime_support._ensure_baseline_workspace
 _prune_workspace_artifacts = runtime_support._prune_workspace_artifacts
 _resolve_homepage_screenshot_command = runtime_support._resolve_homepage_screenshot_command
@@ -78,6 +84,7 @@ class _RuntimeProxy:
         artifacts_runtime,
         scorecard_runtime,
         task_bundle_runtime,
+        task_bundle_images_runtime,
         process_metrics_runtime,
         runtime_environments,
     )
@@ -123,10 +130,18 @@ def _sample_scenario() -> ScenarioDefinition:
 def _sample_scenario_doc() -> dict[str, object]:
     return {
         "name": "homepage-implementation",
+        "display_name": "Homepage Implementation",
         "scenario_revision": "v001",
         "description": "test task",
         "difficulty": "medium",
-        "category": "greenfield-ui",
+        "task_kind": "design_implementation",
+        "delivery_mode": "direct_implementation",
+        "workspace_state": "new",
+        "starting_conditions": [],
+        "languages": ["TypeScript"],
+        "evaluation_role": "benchmark",
+        "catalog_status": "active",
+        "variant_axes": {},
         "timeout_sec": 1800,
         "environment": _web_environment_doc(),
         "starter": {"root": "starter"},
@@ -295,34 +310,8 @@ def _sample_agent_config() -> AgentSpec:
 
 def _sample_evaluation_outputs() -> EvaluationOutputs:
     return EvaluationOutputs(
-        functional=FunctionalScore(
-            passed=True,
-            tests_passed=2,
-            tests_total=2,
-            build_succeeded=True,
-            gates_passed=2,
-            gates_total=2,
-        ),
-        visual=None,
-        verification_stability=VerificationStabilityScore(
-            total_gate_failures=0,
-            unique_failure_categories=0,
-            repeat_failures=0,
-        ),
-        test_coverage=CoverageScore(
-            threshold=0.8,
-            measured=0.9,
-            source="coverage-summary",
-            passed=True,
-        ),
-        requirements_coverage=RequirementCoverageScore(
-            total_requirements=1,
-            satisfied_requirements=1,
-            mapped_requirements=1,
-        ),
         execution_validity=ExecutionValidityScore(),
         performance_gates=PerformanceGatesScore(),
-        metric_scores=[],
         gate_history=[],
     )
 
@@ -344,7 +333,8 @@ def _sample_run_layout(results_dir: Path) -> RunLayout:
         run_label="run-01",
         root_dir=results_dir / "runs" / "run-1234",
         workspace_dir=results_dir / "runs" / "run-1234" / "workspace",
-        verifier_dir=results_dir / "runs" / "run-1234" / "verifier",
+        runner_evidence_dir=results_dir / "runs" / "run-1234" / "runner-evidence",
+        scoring_dir=results_dir / "runs" / "run-1234" / "scoring",
         harness_dir=results_dir / "runs" / "run-1234" / "harness",
         harbor_dir=results_dir / "runs" / "run-1234" / "harbor",
         run_json_path=results_dir / "runs" / "run-1234" / "run.json",
@@ -370,7 +360,7 @@ def _sample_execution_phase(
         ),
         terminated_early=terminated_early,
         termination_reason=termination_reason,
-        process_metrics=collect_process_metrics(_sample_scenario(), None, harness="codex-cli"),
+        process_metrics=collect_process_metrics(_sample_scenario(), None),
         events=[],
         outputs=_sample_evaluation_outputs(),
         duration_sec=12.5,
@@ -401,7 +391,7 @@ def _sample_persisted_artifacts() -> PersistedArtifacts:
     return PersistedArtifacts(
         starter_meta={"scenario": "homepage-implementation", "scenario_revision": "v001"},
         scenario_revision_meta={"scenario_yaml_hash": "abc"},
-        verifier_artifacts={"scorecard": "verifier/scorecard.json"},
+        runner_evidence_artifacts={},
         harness_artifacts={"log": "harness/codex.txt"},
         harbor_artifacts={"command": "harbor/command.txt"},
         evidence_artifacts={"homepage_post": None, "errors": []},
@@ -501,10 +491,18 @@ def _visual_bundle_scenario(reference_image: Path | str) -> ScenarioDefinition:
     return ScenarioDefinition.model_validate(
         {
             "name": "homepage-implementation",
+            "display_name": "Homepage Implementation",
             "scenario_revision": "v001",
             "description": "test task",
             "difficulty": "medium",
-            "category": "greenfield-ui",
+            "task_kind": "design_implementation",
+            "delivery_mode": "direct_implementation",
+            "workspace_state": "new",
+            "starting_conditions": [],
+            "languages": ["TypeScript"],
+            "evaluation_role": "benchmark",
+            "catalog_status": "active",
+            "variant_axes": {},
             "timeout_sec": 1800,
             "environment": _web_environment_doc(),
             "starter": {"root": "starter"},
@@ -745,6 +743,7 @@ def _baseline_workspace_request(fixture: BaselineWorkspaceFixture):
         baseline_cache_key="cache-key",
         scenario_dir=fixture.scenario_dir,
         harness="codex-cli",
+        runtime_profile=RUNTIME_PROFILE,
     )
 
 
@@ -922,8 +921,13 @@ def _score_context_with_gate_history(score_context, gate_history: list[GateEvent
 
 
 def _score_context_with_evidence_metadata(score_context, trial_dir: Path):
+    evidence_path = trial_dir / "verifier" / "evidence.json"
     return replace(
         score_context,
+        artifacts=replace(
+            score_context.artifacts,
+            runner_evidence_artifacts={"evidence.json": str(evidence_path)},
+        ),
         execution=replace(
             score_context.execution,
             harbor_result=replace(score_context.execution.harbor_result, trial_dir=trial_dir),
@@ -939,12 +943,63 @@ def _write_evidence_metadata_artifacts(trial_dir: Path, action_count: int) -> No
             {
                 "started_at": "2026-05-13T00:00:00",
                 "finished_at": "2026-05-13T00:00:10",
+                "environment_setup": {
+                    "started_at": "2026-05-13T00:00:00",
+                    "finished_at": "2026-05-13T00:00:01",
+                },
+                "agent_setup": {
+                    "started_at": "2026-05-13T00:00:01",
+                    "finished_at": "2026-05-13T00:00:02",
+                },
+                "agent_execution": {
+                    "started_at": "2026-05-13T00:00:02",
+                    "finished_at": "2026-05-13T00:00:08",
+                },
+                "verifier": {
+                    "started_at": "2026-05-13T00:00:08",
+                    "finished_at": "2026-05-13T00:00:09",
+                },
             }
         ),
         encoding="utf-8",
     )
+    actions = [
+        {
+            "id": f"test.action-{index}",
+            "kind": "command",
+            "required": True,
+            "status": "ok",
+            "duration_sec": 0.1,
+            "result": {
+                "command": ["true"],
+                "cwd": ".",
+                "duration_sec": 0.1,
+                "exit_code": 0,
+                "stdout": "",
+                "stderr": "",
+                "timed_out": False,
+            },
+        }
+        for index in range(action_count)
+    ]
     (verifier_dir / "evidence.json").write_text(
-        json.dumps({"metadata": {"action_count": action_count}, "actions": []}),
+        json.dumps(
+            {
+                "schema_version": "1",
+                "runner_contract": "python-evidence-runner@2",
+                "aliases": {
+                    f"test.action-{index}": f"test.action-{index}" for index in range(action_count)
+                },
+                "actions": actions,
+                "artifacts": [],
+                "metadata": {
+                    "action_count": action_count,
+                    "error_count": 0,
+                    "required_error_count": 0,
+                    "workspace": "/app",
+                },
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -1002,6 +1057,7 @@ def _create_bundle(fixture: HarborBundleFixture, harness: Harness = Harness.CODE
         request,
         context,
         bundle_root=fixture.results_dir / "runs" / "run-01" / "harbor" / "bundle",
+        contract=task_bundle_runtime._resolve_contract(request),
     )
 
 
@@ -1039,9 +1095,14 @@ def test_ensure_baseline_workspace_initializes_once_in_parallel(
     _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
-        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+        starter_dir: Path,
+        target_dir: Path,
+        scenario_dir: Path,
+        harness: str,
+        *,
+        runtime_profile: RuntimeProfile,
     ) -> tuple[Path, Path | None]:
-        del starter_dir, scenario_dir, harness
+        del starter_dir, scenario_dir, harness, runtime_profile
         nonlocal call_count
         with call_lock:
             call_count += 1
@@ -1081,9 +1142,14 @@ def test_ensure_baseline_workspace_runs_setup_actions_once(
     _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
-        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+        starter_dir: Path,
+        target_dir: Path,
+        scenario_dir: Path,
+        harness: str,
+        *,
+        runtime_profile: RuntimeProfile,
     ) -> tuple[Path, Path | None]:
-        del starter_dir, scenario_dir, harness
+        del starter_dir, scenario_dir, harness, runtime_profile
         target_dir.mkdir(parents=True, exist_ok=True)
         return target_dir, None
 
@@ -1137,9 +1203,14 @@ def test_ensure_baseline_workspace_rebuilds_incomplete_cache_entry(
     _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
-        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+        starter_dir: Path,
+        target_dir: Path,
+        scenario_dir: Path,
+        harness: str,
+        *,
+        runtime_profile: RuntimeProfile,
     ) -> tuple[Path, Path | None]:
-        del starter_dir, scenario_dir, harness
+        del starter_dir, scenario_dir, harness, runtime_profile
         nonlocal prepare_calls
         prepare_calls += 1
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -1189,9 +1260,14 @@ def test_ensure_baseline_workspace_rebuilds_fingerprint_mismatch_cache_entry(
     _patch_baseline_cache_lock(monkeypatch, tmp_path)
 
     def fake_prepare_workspace(
-        starter_dir: Path, target_dir: Path, scenario_dir: Path, harness: str
+        starter_dir: Path,
+        target_dir: Path,
+        scenario_dir: Path,
+        harness: str,
+        *,
+        runtime_profile: RuntimeProfile,
     ) -> tuple[Path, Path | None]:
-        del starter_dir, scenario_dir, harness
+        del starter_dir, scenario_dir, harness, runtime_profile
         nonlocal prepare_calls
         prepare_calls += 1
         target_dir.mkdir(parents=True, exist_ok=True)
@@ -1224,7 +1300,9 @@ def test_collect_process_metrics_extracts_usage_and_failures(tmp_path: Path):
         ],
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "codex-cli")
+    )
 
     _assert_codex_usage_and_failure_metrics(metrics)
 
@@ -1240,7 +1318,10 @@ def test_collect_process_metrics_distinguishes_test_and_coverage(tmp_path: Path)
         ],
     )
 
-    metrics = collect_process_metrics(_test_and_coverage_scenario(), trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(
+        _test_and_coverage_scenario(),
+        HarborResultManifest.for_trial(trial_dir, "codex-cli"),
+    )
 
     assert metrics.required_verification_commands == 2
     assert metrics.executed_required_verification_commands == 2
@@ -1256,7 +1337,9 @@ def test_collect_process_metrics_counts_unmatched_actual_commands(tmp_path: Path
         ],
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "codex-cli")
+    )
 
     assert metrics.command_count == 1
     assert metrics.executed_required_verification_commands == 0
@@ -1282,7 +1365,9 @@ def test_collect_process_metrics_extracts_gemini_commands_from_agent_stdout(tmp_
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "gemini")
+    )
 
     assert metrics.command_count == 3
     assert metrics.failed_command_count == 0
@@ -1316,7 +1401,9 @@ def test_collect_process_metrics_extracts_gemini_trajectory_shell_commands(tmp_p
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "gemini")
+    )
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -1372,7 +1459,9 @@ def test_collect_process_metrics_extracts_verify_with_phrasing(tmp_path: Path):
         "the implementation with `bun run build` and `bun run typecheck`."
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "gemini")
+    )
 
     assert metrics.command_count == 2
     assert metrics.required_verification_commands == 3
@@ -1392,7 +1481,9 @@ def test_collect_process_metrics_extracts_claude_structured_bash_commands(tmp_pa
         {"input_tokens": 70, "cache_read_input_tokens": 20, "output_tokens": 9},
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "claude-code")
+    )
 
     assert metrics.failed_command_count == 0
     _assert_claude_required_verification(metrics)
@@ -1408,7 +1499,9 @@ def test_collect_process_metrics_extracts_claude_bash_from_top_level_log(tmp_pat
         {"input_tokens": 50, "cache_read_input_tokens": 0, "output_tokens": 7},
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "claude-code")
+    )
 
     _assert_claude_required_verification(metrics)
 
@@ -1448,7 +1541,9 @@ def test_collect_process_metrics_extracts_claude_result_usage(tmp_path: Path):
         )
     )
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="claude-code")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "claude-code")
+    )
 
     assert metrics.uncached_input_tokens == 600
     assert metrics.output_tokens == 111
@@ -1470,7 +1565,9 @@ def test_collect_process_metrics_extracts_gemini_usage_from_trajectory(tmp_path:
     )
     (harness_dir / "gemini-cli.txt").write_text("$ bun run typecheck\n")
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "gemini")
+    )
 
     assert metrics.uncached_input_tokens == 170
     assert metrics.output_tokens == 22
@@ -1483,7 +1580,21 @@ def test_collect_process_metrics_raises_when_usage_missing(tmp_path: Path):
     (harness_dir / "gemini-cli.trajectory.json").write_text(json.dumps({"messages": []}))
 
     with pytest.raises(RuntimeError, match="Missing token usage metrics"):
-        collect_process_metrics(_sample_scenario(), trial_dir, harness="gemini")
+        collect_process_metrics(
+            _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "gemini")
+        )
+
+
+def test_collect_process_metrics_defaults_optional_usage_to_zero(tmp_path: Path):
+    trial_dir = tmp_path / "trial"
+    (trial_dir / "agent").mkdir(parents=True)
+
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "cursor")
+    )
+
+    assert metrics.uncached_input_tokens == 0
+    assert metrics.output_tokens == 0
 
 
 def test_collect_process_metrics_detects_git_commit_bypass_commands(tmp_path: Path):
@@ -1515,7 +1626,9 @@ def test_collect_process_metrics_detects_git_commit_bypass_commands(tmp_path: Pa
     ]
     codex_log.write_text("\n".join(json.dumps(entry) for entry in entries), encoding="utf-8")
 
-    metrics = collect_process_metrics(_sample_scenario(), trial_dir, harness="codex-cli")
+    metrics = collect_process_metrics(
+        _sample_scenario(), HarborResultManifest.for_trial(trial_dir, "codex-cli")
+    )
 
     assert metrics.git_commit_verification_bypass_commands == [
         "git commit --no-verify -m 'feat: bypass hooks'"
@@ -1575,7 +1688,7 @@ def test_evaluate_typescript_coverage_zero_threshold_does_not_require_measuremen
 
 def test_coverage_profile_score_treats_zero_threshold_as_no_minimum():
     scorecard = Scorecard(
-        test_coverage=CoverageScore(threshold=0, measured=None, passed=True),
+        metric_scores=[MetricScore(metric_id="test-coverage", score=1.0, passed=True)],
     )
 
     assert scorecard.metric_score("test-coverage") == 1.0
@@ -1666,35 +1779,51 @@ def test_load_evidence_outputs_builds_gate_history(tmp_path: Path):
     (verifier_dir / "evidence.json").write_text(
         json.dumps(
             {
+                "schema_version": "1",
+                "runner_contract": "python-evidence-runner@2",
+                "aliases": {"design-to-code.build": "design-to-code.build"},
                 "actions": [
                     {
                         "id": "design-to-code.build",
                         "kind": "command",
+                        "required": True,
                         "status": "ok",
+                        "duration_sec": 0.1,
                         "result": {
                             "command": ["bun", "run", "build"],
+                            "cwd": ".",
+                            "duration_sec": 0.1,
                             "exit_code": 0,
                             "stdout": "ok",
                             "stderr": "",
+                            "timed_out": False,
                         },
                     }
-                ]
+                ],
+                "artifacts": [],
+                "metadata": {
+                    "action_count": 1,
+                    "error_count": 0,
+                    "required_error_count": 0,
+                    "workspace": "/app",
+                },
             }
         ),
         encoding="utf-8",
     )
 
-    outputs, reason = _load_evidence_outputs(trial_dir)
+    outputs, reason = _load_evidence_outputs(HarborResultManifest.for_trial(trial_dir, "codex-cli"))
 
     assert reason is None
     assert outputs is not None
-    assert outputs.functional.passed is True
     assert len(outputs.gate_history) == 1
     assert outputs.gate_history[0].command == "bun run build"
 
 
 def test_load_evidence_outputs_missing_evidence(tmp_path: Path):
-    outputs, reason = _load_evidence_outputs(tmp_path / "missing")
+    outputs, reason = _load_evidence_outputs(
+        HarborResultManifest.for_trial(tmp_path / "missing", "codex-cli")
+    )
     assert outputs is None
     assert reason is not None
 
@@ -1742,13 +1871,8 @@ def test_build_metric_scores_does_not_use_global_metric_fallback(
         lambda _scorer_id, _version: EmptyScorer,
     )
 
-    scorecard = build_scorecard(score_context)
-
-    assert scorecard.metric_scores
-    assert all(
-        score.evidence == f"Selected scorer did not emit metric: {score.metric_id}"
-        for score in scorecard.metric_scores
-    )
+    with pytest.raises(ValueError, match="Scorers did not emit all resolved metrics"):
+        build_scorecard(score_context)
 
 
 def test_build_metric_scores_passes_verification_evidence_to_scorers(
@@ -1765,23 +1889,45 @@ def test_build_metric_scores_passes_verification_evidence_to_scorers(
     evidence_path.write_text(
         json.dumps(
             {
+                "schema_version": "1",
+                "runner_contract": "python-evidence-runner@2",
+                "aliases": {
+                    "design-to-code.build": "design-to-code.build",
+                    "design-to-code.coverage": "design-to-code.coverage",
+                },
                 "actions": [
                     {
                         "id": "design-to-code.build",
                         "kind": "command",
                         "required": True,
                         "status": "ok",
-                        "result": {"exit_code": 0},
+                        "duration_sec": 0.1,
+                        "result": {
+                            "command": ["bun", "run", "build"],
+                            "cwd": ".",
+                            "duration_sec": 0.1,
+                            "exit_code": 0,
+                            "stdout": "ok",
+                            "stderr": "",
+                            "timed_out": False,
+                        },
                     },
                     {
                         "id": "design-to-code.coverage",
                         "kind": "command",
                         "required": False,
                         "status": "error",
+                        "duration_sec": 0.1,
                         "error": {"type": "RuntimeError", "message": "coverage unavailable"},
                     },
                 ],
-                "artifacts": [{"path": "coverage/coverage-summary.json"}],
+                "artifacts": [],
+                "metadata": {
+                    "action_count": 2,
+                    "error_count": 1,
+                    "required_error_count": 0,
+                    "workspace": "/app",
+                },
             }
         ),
         encoding="utf-8",
@@ -1790,20 +1936,36 @@ def test_build_metric_scores_passes_verification_evidence_to_scorers(
         score_context,
         artifacts=replace(
             score_context.artifacts,
-            verifier_artifacts={"evidence.json": str(evidence_path)},
+            runner_evidence_artifacts={"evidence.json": str(evidence_path)},
         ),
     )
     observed_contexts = []
 
-    class ObservingScorer:
-        def collect_evidence(self, scorer_context):
-            observed_contexts.append(scorer_context)
-            return SimpleNamespace(metric_scores=())
+    resolved_metrics_by_scorer = {
+        (scorer_ref.id, scorer_ref.version): tuple(
+            MetricScore(metric_id=metric.id, score=1.0, passed=True) for metric in resolved.metrics
+        )
+        for scorer_ref, resolved in zip(
+            score_context.request.scenario.scorers,
+            score_context.request.scenario.resolved_scorers(),
+            strict=True,
+        )
+    }
+
+    def observing_scorer_class(scorer_id, version):
+        class ObservingScorer:
+            def collect_evidence(self, scorer_context):
+                observed_contexts.append(scorer_context)
+                return SimpleNamespace(
+                    metric_scores=resolved_metrics_by_scorer[(scorer_id, version)]
+                )
+
+        return ObservingScorer
 
     monkeypatch.setattr(
         scoring_outputs_runtime,
         "scorer_class",
-        lambda _scorer_id, _version: ObservingScorer,
+        observing_scorer_class,
     )
 
     scoring_outputs_runtime.build_metric_scores(
@@ -1815,17 +1977,15 @@ def test_build_metric_scores_passes_verification_evidence_to_scorers(
     )
 
     evidence = observed_contexts[0].verification_evidence
-    assert evidence.actions["design-to-code.build"]["result"] == {"exit_code": 0}
-    assert evidence.artifacts == {
-        "coverage/coverage-summary.json": "coverage/coverage-summary.json"
-    }
-    assert evidence.errors == [
-        {
-            "action_id": "design-to-code.coverage",
-            "required": False,
-            "error": {"type": "RuntimeError", "message": "coverage unavailable"},
-        }
-    ]
+    build = evidence.for_owner("design-to-code").action("build")
+    assert build is not None
+    assert isinstance(build.result, CommandEvidenceResult)
+    assert build.result.exit_code == 0
+    assert evidence.artifacts == ()
+    coverage = evidence.for_owner("design-to-code").action("coverage")
+    assert coverage is not None
+    assert coverage.error is not None
+    assert coverage.error.type == "RuntimeError"
 
 
 def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: Path):
@@ -1859,7 +2019,7 @@ def test_build_scorecard_recomputes_minimum_quality_gate_from_scorers(tmp_path: 
         if check.name == "minimum_quality_score"
     )
     assert quality_gate.passed is False
-    assert quality_gate.evidence == "quality=0.425, min=0.950"
+    assert quality_gate.evidence == "quality=0.125, min=0.950"
 
 
 def test_build_scorecard_fails_execution_validity_without_required_atomic_commit(
@@ -1957,8 +2117,7 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
     assert harbor_meta["prep_phase_timings_sec"] == {"prepare_run_context": 0.123}
     assert harbor_meta["prep_total_sec"] == 0.456
     assert harbor_meta["time_to_experiment_start_sec"] == 0.789
-    assert harbor_meta["orchestration_overhead_excluding_test_sec"] == 2.5
-    assert harbor_meta["harness_overhead_sec"] == 2.5
+    assert harbor_meta["orchestration_overhead_excluding_agent_and_test_sec"] == 5.5
     assert harbor_meta["cache"]["baseline"]["hit"] is True
     assert harbor_meta["cache"]["baseline"]["status"] == "hit"
     assert harbor_meta["cache"]["baseline"]["cache_key"] == "baseline-cache-key"
@@ -1973,7 +2132,7 @@ def test_build_scorecard_records_prep_timings_and_cache_metadata(tmp_path: Path)
     assert harbor_meta["cache"]["image_key"] == "image-key"
     assert harbor_meta["cache"]["image_tag"] == "task-env-codex-cli-image-key"
     assert harbor_meta["auth"]["auth_mode"] == "chatgpt"
-    assert scorecard.metadata["verifier"]["action_count"] == 2
+    assert scorecard.metadata["runner_evidence"]["action_count"] == 2
 
 
 def test_classify_unscored_reasons_rate_limit():
@@ -2029,7 +2188,7 @@ def test_build_scorecard_marks_rate_limited_run_void(tmp_path: Path):
     assert scorecard.metadata["run"]["unscored_reasons"] == scorecard.unscored_reasons
 
 
-def test_persist_canonical_verifier_artifacts_overwrites_stale_canonical_outputs(tmp_path: Path):
+def test_persist_scorecard_artifacts_overwrites_stale_outputs(tmp_path: Path):
     context = _sample_scorecard_context(
         tmp_path,
         terminated_early=True,
@@ -2037,37 +2196,35 @@ def test_persist_canonical_verifier_artifacts_overwrites_stale_canonical_outputs
             "Codex turn failed: Quota exceeded. Check your plan and billing details."
         ),
     )
-    verifier_dir = context.layout.verifier_dir
-    verifier_dir.mkdir(parents=True, exist_ok=True)
-    (verifier_dir / "scorecard.json").write_text(
+    scoring_dir = context.layout.scoring_dir
+    scoring_dir.mkdir(parents=True, exist_ok=True)
+    (scoring_dir / "scorecard.json").write_text(
         json.dumps(_stale_canonical_scorecard_payload()),
         encoding="utf-8",
     )
-    (verifier_dir / "execution-validity.json").write_text(
+    (scoring_dir / "execution-validity.json").write_text(
         json.dumps({"checks": [{"name": "run_completed", "passed": True}], "passed": True}),
         encoding="utf-8",
     )
-    (verifier_dir / "performance-gates.json").write_text(
+    (scoring_dir / "performance-gates.json").write_text(
         json.dumps({"checks": [], "passed": True}),
         encoding="utf-8",
     )
-    (verifier_dir / "gate-history.json").write_text(
+    (scoring_dir / "gate-history.json").write_text(
         json.dumps([{"gate_name": "lint"}]), encoding="utf-8"
     )
-    (verifier_dir / "reward.txt").write_text("1", encoding="utf-8")
+    (scoring_dir / "reward.txt").write_text("1", encoding="utf-8")
 
     scorecard = build_scorecard(context)
 
-    runner.persist_canonical_verifier_artifacts(
-        context.layout, scorecard, context.execution.outputs
-    )
+    runner.persist_scorecard_artifacts(context.layout, scorecard, context.execution.outputs)
 
-    persisted_scorecard = json.loads((verifier_dir / "scorecard.json").read_text(encoding="utf-8"))
+    persisted_scorecard = json.loads((scoring_dir / "scorecard.json").read_text(encoding="utf-8"))
     persisted_execution = json.loads(
-        (verifier_dir / "execution-validity.json").read_text(encoding="utf-8")
+        (scoring_dir / "execution-validity.json").read_text(encoding="utf-8")
     )
     persisted_gate_history = json.loads(
-        (verifier_dir / "gate-history.json").read_text(encoding="utf-8")
+        (scoring_dir / "gate-history.json").read_text(encoding="utf-8")
     )
 
     run_completed_check = next(
@@ -2078,7 +2235,7 @@ def test_persist_canonical_verifier_artifacts_overwrites_stale_canonical_outputs
     assert persisted_scorecard["execution_validity"]["passed"] is False
     assert persisted_scorecard["unscored"] is True
     assert persisted_gate_history == []
-    assert float((verifier_dir / "reward.txt").read_text(encoding="utf-8")) == 0.0
+    assert float((scoring_dir / "reward.txt").read_text(encoding="utf-8")) == 0.0
 
 
 def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Path):
@@ -2109,6 +2266,7 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
         request,
         context,
         bundle_root=results_dir / "runs" / "run-01" / "harbor" / "bundle",
+        contract=task_bundle_runtime._resolve_contract(request),
     )
     copied_reference = bundle / "environment" / "app" / reference_rel
     copied_region_reference = bundle / "environment" / "app" / "references" / "hero-region-nav.png"
@@ -2124,7 +2282,11 @@ def test_create_harbor_task_bundle_copies_relative_visual_reference(tmp_path: Pa
     assert copied_region_reference.exists()
     assert copied_region_reference.read_bytes() == b"region-binary"
     assert (bundle / "tests" / "evidence-runner.py").exists()
-    assert visual_actions[0]["config"]["regions"] == [_visual_bundle_region()]
+    test_script = (bundle / "tests" / "test.sh").read_text(encoding="utf-8")
+    assert "printf '0\\n' > /logs/verifier/reward.txt" in test_script
+    expected_region = _visual_bundle_region()
+    expected_region.pop("clip")
+    assert visual_actions[0]["config"]["regions"] == [expected_region]
     assert visual_actions[0]["config"]["reference"] == reference_rel.as_posix()
 
 
@@ -2133,12 +2295,15 @@ def test_create_harbor_task_bundle_sets_task_image_and_cli_install(tmp_path: Pat
     bundle = _create_bundle(fixture)
     task_toml = (bundle / "task.toml").read_text()
     dockerfile = (bundle / "environment" / "Dockerfile").read_text()
+    compose = (bundle / "environment" / "docker-compose.yaml").read_text()
 
     assert 'docker_image = "raidar-task-env:task-env-codex-cli-' in task_toml
     assert "git \\" in dockerfile
     assert "@openai/codex" in dockerfile
     assert "@anthropic-ai/claude-code" not in dockerfile
     assert "@google/gemini-cli" not in dockerfile
+    assert 'command: ["sleep", "infinity"]' in compose
+    assert "stop_grace_period: 0s" in compose
 
 
 def test_create_harbor_task_bundle_uses_injected_rules_filename_in_instruction(tmp_path: Path):
@@ -2154,6 +2319,7 @@ def test_create_harbor_task_bundle_uses_injected_rules_filename_in_instruction(t
         request,
         context,
         bundle_root=fixture.results_dir / "runs" / "run-01" / "harbor" / "bundle",
+        contract=task_bundle_runtime._resolve_contract(request),
     )
 
     instruction = (bundle / "instruction.md").read_text(encoding="utf-8")
@@ -2175,10 +2341,15 @@ def test_create_harbor_task_bundle_omits_redundant_codex_rules_reference(tmp_pat
         request,
         context,
         bundle_root=fixture.results_dir / "runs" / "run-01" / "harbor" / "bundle",
+        contract=task_bundle_runtime._resolve_contract(request),
     )
 
     instruction = (bundle / "instruction.md").read_text(encoding="utf-8")
-    image_ref = runner._task_image_reference(request, bundle)
+    image_ref = runner.task_image_reference(
+        request,
+        bundle,
+        task_bundle_runtime._resolve_contract(request),
+    )
     task_toml = (bundle / "task.toml").read_text(encoding="utf-8")
 
     assert "You are working in `/app`." in instruction
@@ -2211,10 +2382,18 @@ def test_resolve_homepage_screenshot_command_returns_none_when_visual_missing(
     scenario = ScenarioDefinition.model_validate(
         {
             "name": "hello-world-smoke",
+            "display_name": "Hello World Smoke",
             "scenario_revision": "v001",
             "description": "task",
             "difficulty": "easy",
-            "category": "agent-integration",
+            "task_kind": "feature_implementation",
+            "delivery_mode": "direct_implementation",
+            "workspace_state": "existing",
+            "starting_conditions": [],
+            "languages": ["TypeScript"],
+            "evaluation_role": "operational",
+            "catalog_status": "active",
+            "variant_axes": {},
             "timeout_sec": 300,
             "environment": _typescript_environment_doc(),
             "starter": {"root": "starter"},
@@ -2249,6 +2428,7 @@ def test_ensure_workspace_capture_dependencies_runs_visual_setup_actions(
     error = runner._ensure_workspace_capture_dependencies(
         task,
         workspace,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     assert error is None
@@ -2270,6 +2450,7 @@ def test_ensure_workspace_capture_dependencies_skips_without_visual_setup_action
     error = runner._ensure_workspace_capture_dependencies(
         task,
         workspace,
+        runtime_profile=RUNTIME_PROFILE,
     )
 
     assert error is None
@@ -2284,7 +2465,7 @@ def test_prune_workspace_artifacts_removes_transient_directories(tmp_path: Path)
     (workspace / "src").mkdir(parents=True, exist_ok=True)
     (workspace / "src" / "app.tsx").write_text("export const App = () => null;\n")
 
-    prune = _prune_workspace_artifacts(workspace)
+    prune = _prune_workspace_artifacts(workspace, RUNTIME_PROFILE)
 
     assert "node_modules" in prune["removed"]
     assert ".next" in prune["removed"]
@@ -2313,7 +2494,7 @@ def test_prune_workspace_artifacts_retries_transient_enotempty(
 
     monkeypatch.setattr(runner.shutil, "rmtree", flaky_rmtree)
 
-    prune = _prune_workspace_artifacts(workspace)
+    prune = _prune_workspace_artifacts(workspace, RUNTIME_PROFILE)
 
     assert prune["removed"] == ["node_modules"]
     assert len(calls) == 2

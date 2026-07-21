@@ -11,13 +11,9 @@ from raidar.schemas.scenario import (
     RequirementSpec,
 )
 from raidar.schemas.scorecard import (
-    CoverageScore,
     ExecutionValidityScore,
-    FunctionalScore,
     GateCheck,
     PerformanceGatesScore,
-    RequirementsCoverageScore,
-    VerificationStabilityScore,
 )
 from raidar.scorers.code_task import typescript_evidence
 
@@ -230,30 +226,16 @@ def test_requirements_report_missing_presence_checks_and_unknown_evidence(tmp_pa
 def test_terminated_outputs_zero_scored_surfaces_and_preserve_failure_reason() -> None:
     outputs = scorecard.terminated_outputs("agent stopped")
 
-    assert outputs.functional.passed is False
-    assert outputs.test_coverage.passed is False
     assert outputs.execution_validity.checks[0].name == "run_completed"
     assert outputs.execution_validity.checks[0].evidence == "agent stopped"
-    assert outputs.requirements_coverage.total_requirements == 0
+    assert outputs.gate_history == []
 
 
 def _outputs(*, gates_passed: int = 1, gates_total: int = 1) -> EvaluationOutputs:
+    del gates_passed, gates_total
     return EvaluationOutputs(
-        functional=FunctionalScore(
-            passed=gates_passed == gates_total,
-            tests_passed=1,
-            tests_total=1,
-            build_succeeded=True,
-            gates_passed=gates_passed,
-            gates_total=gates_total,
-        ),
-        visual=None,
-        verification_stability=VerificationStabilityScore(),
-        test_coverage=CoverageScore(),
-        requirements_coverage=RequirementsCoverageScore(),
         execution_validity=ExecutionValidityScore(checks=[GateCheck(name="stale", passed=True)]),
         performance_gates=PerformanceGatesScore(),
-        metric_scores=[],
         gate_history=[],
     )
 
@@ -295,7 +277,10 @@ def test_execution_validity_flags_premature_completion_claims_and_commit_bypass(
             outputs=_outputs(gates_passed=0, gates_total=1),
             terminated_early=False,
             termination_reason=None,
-            process_metrics=_metrics(bypass_commands=["git commit --no-verify"]),
+            process_metrics=_metrics(
+                bypass_commands=["git commit --no-verify"],
+                executed_required_verification_commands=0,
+            ),
             events=events,
             workspace_path=tmp_path,
             atomic_commits_required=True,

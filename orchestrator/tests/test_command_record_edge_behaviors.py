@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from raidar.harness import command_records
+from raidar.harness import HarborResultManifest, command_records
 from raidar.runtime.models import CommandRecord
 
 
@@ -134,30 +134,35 @@ def test_command_records_route_supported_harnesses_and_reject_unknown(monkeypatc
     )
     assert [
         record.command
-        for record in command_records._command_records_for_harness(trial, "codex-cli")
+        for record in command_records._command_records_from_manifest(
+            HarborResultManifest.for_trial(trial, "codex-cli")
+        )
     ] == ["node scripts/format.js"]
     assert [
         record.command
-        for record in command_records._command_records_for_harness(
-            trial,
-            "cursor",
+        for record in command_records._command_records_from_manifest(
+            HarborResultManifest.for_trial(trial, "cursor"),
             verification_patterns=("bun run build",),
         )
     ] == ["bun run build"]
     assert [
         record.command
-        for record in command_records._command_records_for_harness(
-            trial,
-            "gemini",
+        for record in command_records._command_records_from_manifest(
+            HarborResultManifest.for_trial(trial, "gemini"),
             verification_patterns=("bun run build", "bun run lint"),
         )
     ] == [
         "bun run build",
         "bun run lint",
     ]
-    assert command_records._command_records_from_harness_stdout(tmp_path / "missing") == []
-    with pytest.raises(ValueError, match="Unsupported harness"):
-        command_records._command_records_for_harness(trial, "unknown")
+    assert (
+        command_records._command_records_from_harness_stdout(
+            HarborResultManifest.for_trial(tmp_path / "missing", "cursor")
+        )
+        == []
+    )
+    with pytest.raises(ValueError, match="Unknown harness"):
+        HarborResultManifest.for_trial(trial, "unknown")
 
 
 def test_claude_stdout_records_tool_use_failures_and_ignores_invalid_shapes(tmp_path):
@@ -258,10 +263,15 @@ def test_stdout_line_and_gemini_trajectory_command_extraction(tmp_path):
     )
 
     records = command_records._command_records_from_gemini_trajectory(
-        tmp_path / "trial",
+        HarborResultManifest.for_trial(tmp_path / "trial", "gemini"),
         verification_patterns=("bun run test",),
     )
 
     assert records == [CommandRecord(command="bun run test", failed=True, output="bun run test")]
     (agent / "gemini-cli.trajectory.json").write_text('{"messages":{}}', encoding="utf-8")
-    assert command_records._command_records_from_gemini_trajectory(tmp_path / "trial") == []
+    assert (
+        command_records._command_records_from_gemini_trajectory(
+            HarborResultManifest.for_trial(tmp_path / "trial", "gemini")
+        )
+        == []
+    )

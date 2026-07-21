@@ -6,23 +6,25 @@ import re
 from pathlib import Path
 
 from raidar.sanitization import sanitize_evidence_text
-from raidar.schemas.scorecard import MetricScore
+from raidar.schemas.scorecard import CoverageScore, MetricScore
 from raidar.scorers.base import ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.code_task.base import CodeTaskScorer
-from raidar.scorers.code_task.typescript_evidence import evaluate_typescript_coverage
 from raidar.scorers.common import (
     code_task_artifact_metric_score,
     coverage_ratio_score,
+    functional_score_from_evidence,
+    json_action_content,
     required_artifact_patterns,
-    verification_stability_score,
+    verification_stability_from_evidence,
 )
+from raidar.scorers.evidence_contract import CommandEvidenceResult
 from raidar.scorers.verification import (
+    EvidenceDependency,
     VerificationPlan,
     VerificationPlanContext,
     command,
     glob,
     read_json,
-    visual_diff,
 )
 
 TYPESCRIPT_EXCLUDED_DIRS = {
@@ -46,6 +48,11 @@ class TypeScriptCodeTask(CodeTaskScorer):
         "TypeScript-specific measurement tools."
     )
     metrics = CodeTaskScorer.default_metrics()
+    evidence_dependencies = (
+        EvidenceDependency(kind="command", minimum=4),
+        EvidenceDependency(kind="read_json"),
+        EvidenceDependency(kind="glob"),
+    )
 
     def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
         """Declare TypeScript raw evidence actions for the runtime evidence runner."""
@@ -68,12 +75,21 @@ class TypeScriptCodeTask(CodeTaskScorer):
             actions.extend(
                 [
                     command("capture", visual.screenshot_command, required=False),
-                    visual_diff(
+                    context.visual_comparison.action(
                         "visual.homepage",
                         reference=visual.reference_image,
                         actual=visual.artifact_manifest.actual_image,
                         diff=visual.artifact_manifest.diff_image,
-                        regions=[region.model_dump(mode="json") for region in visual.regions],
+                        regions=[
+                            {
+                                "name": region.name,
+                                "reference_image": region.reference_image,
+                                "actual_image": region.actual_image,
+                                "diff_image": region.diff_image,
+                                "weight": region.weight,
+                            }
+                            for region in visual.regions
+                        ],
                         required=False,
                         depends_on=("capture",),
                     ),
@@ -85,26 +101,23 @@ class TypeScriptCodeTask(CodeTaskScorer):
         """Collect deterministic TypeScript evidence for code-task metrics."""
 
         workspace = Path(context.workspace)
+        evidence = context.verification_evidence.for_owner(self.id)
         files = _typescript_files(workspace)
         tests = [path for path in files if _is_test_file(path, workspace)]
-        outputs = context.execution.outputs
-        lint_gate = _latest_gate(outputs.gate_history, "lint")
+        lint_result = _command_result(evidence.action("lint"))
         quality_findings = _static_quality_findings(files, workspace)
+        functional = functional_score_from_evidence(evidence)
 
         required_artifacts = required_artifact_patterns(context.scenario, self.id)
         return ScorerEvidence(
             metric_scores=(
-                _typescript_functional_score(files, outputs.functional),
-                _typescript_code_quality_score(lint_gate, quality_findings),
+                _typescript_functional_score(files, functional),
+                _typescript_code_quality_score(lint_result, quality_findings),
                 _typescript_test_coverage_score(
-                    evaluate_typescript_coverage(
-                        workspace,
-                        outputs.gate_history,
-                        outputs.test_coverage.threshold,
-                    )
+                    _typescript_coverage(evidence, context.scenario.verification.coverage_threshold)
                 ),
                 _typescript_artifact_score(files, tests, workspace, required_artifacts),
-                _typescript_verification_stability_score(outputs.verification_stability),
+                verification_stability_from_evidence(evidence),
             ),
             metadata={
                 "source_files": len(files),
@@ -158,7 +171,7 @@ def _static_quality_findings(files: list[Path], workspace: Path) -> list[str]:
 
 def _typescript_functional_score(
     files: list[Path],
-    functional,
+    functional: MetricScore,
 ) -> MetricScore:
     source_present = bool(files)
     score = functional.score if source_present else 0.0
@@ -167,11 +180,7 @@ def _typescript_functional_score(
         score=score,
         passed=source_present and functional.passed,
         missing_patterns=[] if source_present else ["*.ts", "*.tsx"],
-        evidence=(
-            f"typescript_files={len(files)}, build={functional.build_succeeded}, "
-            f"tests={functional.tests_passed}/{functional.tests_total}, "
-            f"gates={functional.gates_passed}/{functional.gates_total}"
-        ),
+        evidence=(f"typescript_files={len(files)}, {functional.evidence}"),
     )
 
 
@@ -224,19 +233,44 @@ def _typescript_artifact_score(
     )
 
 
-def _typescript_verification_stability_score(score) -> MetricScore:
-    return verification_stability_score(score)
-
-
-def _latest_gate(gate_history, gate_name: str):
-    for event in reversed(gate_history):
-        if event.gate_name == gate_name:
-            return event
-    return None
-
-
-def _gate_evidence(gate) -> str:
-    if gate is None:
+def _gate_evidence(result: CommandEvidenceResult | None) -> str:
+    if result is None:
         return "not_run"
-    output = sanitize_evidence_text(f"{gate.stdout}\n{gate.stderr}")
-    return f"command={gate.command!r}, exit={gate.exit_code}, output={output!r}"
+    output = sanitize_evidence_text(f"{result.stdout}\n{result.stderr}")
+    return f"command={result.command!r}, exit={result.exit_code}, output={output!r}"
+
+
+def _command_result(action) -> CommandEvidenceResult | None:
+    return action.result if action and isinstance(action.result, CommandEvidenceResult) else None
+
+
+def _coverage_fraction(total: dict, key: str) -> float | None:
+    metric = total.get(key)
+    if not isinstance(metric, dict):
+        return None
+    percentage = metric.get("pct")
+    if isinstance(percentage, bool) or not isinstance(percentage, int | float):
+        return None
+    return float(percentage) / 100.0
+
+
+def _typescript_coverage(evidence, threshold: float | None) -> CoverageScore:
+    content = json_action_content(evidence, "coverage.summary")
+    total = content.get("total") if isinstance(content, dict) else None
+    values = (
+        [
+            fraction
+            for key in ("lines", "statements", "functions", "branches")
+            if (fraction := _coverage_fraction(total, key)) is not None
+        ]
+        if isinstance(total, dict)
+        else []
+    )
+    measured = min(values) if values else None
+    passed = threshold is None or threshold <= 0 or (measured is not None and measured >= threshold)
+    return CoverageScore(
+        threshold=threshold,
+        measured=measured,
+        source="typescript-code-task.coverage.summary" if measured is not None else None,
+        passed=passed,
+    )

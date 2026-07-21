@@ -1,10 +1,8 @@
 """Pydantic models for authored scenario definitions."""
 
 import re
-from pathlib import Path
 from typing import Annotated, Any, Literal
 
-import yaml
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from raidar.scenario_paths import validate_relative_path
@@ -21,6 +19,20 @@ __all__ = [
 ]
 
 SHELL_WRAPPER_ARGS = {"-c", "-lc", "/c", "/k", "-command", "-encodedcommand"}
+TaskKind = Literal[
+    "feature_implementation",
+    "design_implementation",
+    "defect_repair",
+    "refactoring",
+    "test_authoring",
+]
+DeliveryMode = Literal["direct_implementation", "plan_driven", "plan_and_implement"]
+WorkspaceState = Literal["new", "existing"]
+StartingCondition = Literal["known_defect", "legacy_structure"]
+EvaluationRole = Literal["benchmark", "operational"]
+CatalogStatus = Literal["active", "calibration", "quarantined", "retired"]
+
+
 SHELL_WRAPPER_BINARIES = {
     "bash",
     "sh",
@@ -625,6 +637,7 @@ class ScenarioDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(description="Scenario identifier")
+    display_name: str = Field(min_length=1, description="Human-readable scenario name")
     scenario_revision: str = Field(description="Scenario revision identifier (for example v001)")
     parent_revision: str | None = Field(
         default=None,
@@ -632,7 +645,28 @@ class ScenarioDefinition(BaseModel):
     )
     description: str = Field(description="Scenario description")
     difficulty: Literal["easy", "medium", "hard"] = Field(default="medium")
-    category: str = Field(description="Scenario category (greenfield-ui, etc)")
+    task_kind: TaskKind = Field(description="Primary work requested from the agent")
+    delivery_mode: DeliveryMode = Field(description="How work is delivered to the agent")
+    workspace_state: WorkspaceState = Field(description="Whether the workspace is new or existing")
+    starting_conditions: list[StartingCondition] = Field(
+        default_factory=list,
+        description="Known conditions present when the task begins",
+    )
+    languages: list[str] = Field(
+        min_length=1,
+        description="Programming languages materially involved in the task",
+    )
+    evaluation_role: EvaluationRole = Field(description="Scenario evaluation purpose")
+    catalog_status: CatalogStatus = Field(description="Scenario catalogue lifecycle status")
+    family_id: str | None = Field(
+        default=None,
+        min_length=1,
+        description="Optional identifier grouping related scenario variants",
+    )
+    variant_axes: dict[str, str] = Field(
+        default_factory=dict,
+        description="Named dimensions distinguishing this scenario variant",
+    )
     timeout_sec: int = Field(default=1800, description="Scenario timeout in seconds")
     test_scripts: list[str] = Field(default_factory=list)
     environment: EnvironmentConfig = Field(description="Scenario execution environment contract")
@@ -646,6 +680,38 @@ class ScenarioDefinition(BaseModel):
         description="Reusable scorer definitions attached to this scenario",
     )
     prompt: PromptConfig = Field(description="Prompt artifact configuration")
+
+    @field_validator("display_name", "family_id")
+    @classmethod
+    def _validate_taxonomy_text(cls, value: str | None) -> str | None:
+        if value is not None and not value.strip():
+            raise ValueError("taxonomy text values must not be blank")
+        return value
+
+    @field_validator("languages")
+    @classmethod
+    def _validate_languages(cls, languages: list[str]) -> list[str]:
+        if any(not language.strip() for language in languages):
+            raise ValueError("languages must not contain blank values")
+        if len(languages) != len(set(languages)):
+            raise ValueError("languages must not contain duplicates")
+        return languages
+
+    @field_validator("starting_conditions")
+    @classmethod
+    def _validate_starting_conditions(
+        cls, starting_conditions: list[StartingCondition]
+    ) -> list[StartingCondition]:
+        if len(starting_conditions) != len(set(starting_conditions)):
+            raise ValueError("starting_conditions must not contain duplicates")
+        return starting_conditions
+
+    @field_validator("variant_axes")
+    @classmethod
+    def _validate_variant_axes(cls, variant_axes: dict[str, str]) -> dict[str, str]:
+        if any(not key.strip() or not value.strip() for key, value in variant_axes.items()):
+            raise ValueError("variant_axes keys and values must not be blank")
+        return variant_axes
 
     def metric_ids(self) -> list[str]:
         """Return ordered metric ids derived from attached scorers."""
@@ -666,6 +732,33 @@ class ScenarioDefinition(BaseModel):
         from raidar.scorers.registry import resolved_metrics
 
         return resolved_metrics(self)
+
+    @model_validator(mode="after")
+    def _validate_taxonomy_consistency(self) -> "ScenarioDefinition":
+        conditions = set(self.starting_conditions)
+        self._validate_defect_repair_conditions(conditions)
+        self._validate_existing_workspace_conditions(conditions)
+        self._validate_new_workspace_conditions(conditions)
+        self._validate_family_variant_coupling()
+        return self
+
+    def _validate_defect_repair_conditions(self, conditions: set[StartingCondition]) -> None:
+        if self.task_kind == "defect_repair" and "known_defect" not in conditions:
+            raise ValueError("defect_repair requires starting_conditions to include known_defect")
+        if "known_defect" in conditions and self.task_kind != "defect_repair":
+            raise ValueError("known_defect requires task_kind to be defect_repair")
+
+    def _validate_existing_workspace_conditions(self, conditions: set[StartingCondition]) -> None:
+        if "legacy_structure" in conditions and self.workspace_state != "existing":
+            raise ValueError("legacy_structure requires workspace_state to be existing")
+
+    def _validate_new_workspace_conditions(self, conditions: set[StartingCondition]) -> None:
+        if self.workspace_state == "new" and conditions:
+            raise ValueError("new workspace_state must not declare starting_conditions")
+
+    def _validate_family_variant_coupling(self) -> None:
+        if self.variant_axes and self.family_id is None:
+            raise ValueError("variant_axes requires family_id")
 
     @model_validator(mode="after")
     def _validate_scorers(self) -> "ScenarioDefinition":
@@ -692,15 +785,3 @@ class ScenarioDefinition(BaseModel):
         has_quality_scorer = any(scorer.category == "quality" for scorer in self.resolved_scorers())
         if self.verification.min_quality_score > 0 and not has_quality_scorer:
             raise ValueError("verification.min_quality_score requires at least one quality scorer")
-
-    @classmethod
-    def from_yaml(cls, path: Path) -> "ScenarioDefinition":
-        """Load scenario definition from a YAML file."""
-        with path.open(encoding="utf-8") as handle:
-            data = yaml.safe_load(handle)
-        return cls.model_validate(data)
-
-    def to_yaml(self, path: Path) -> None:
-        """Save scenario definition to a YAML file."""
-        with path.open("w", encoding="utf-8") as handle:
-            yaml.dump(self.model_dump(exclude_none=True), handle, sort_keys=False)

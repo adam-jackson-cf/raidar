@@ -7,16 +7,12 @@ from raidar.schemas.scorecard import (
     EvalConfig,
     EvalRun,
     ExecutionValidityScore,
-    FunctionalScore,
     GateCheck,
     MetricScore,
     PerformanceGatesScore,
-    RequirementsCoverageScore,
     ResourceEfficiencyScore,
     Scorecard,
     ScorerResult,
-    VerificationStabilityScore,
-    VisualScore,
 )
 from raidar.storage import (
     _csv_row,
@@ -73,30 +69,11 @@ def _run(
                     "environment_setup_sec": 1.0,
                     "harness_setup_sec": 1.5,
                     "harness_execution_sec": 2.0,
-                    "verifier_sec": 0.5,
+                    "runner_evidence_sec": 0.5,
                 },
-                "harness_overhead_sec": 0.4,
-                "orchestration_overhead_excluding_test_sec": 0.2,
+                "orchestration_overhead_excluding_agent_and_test_sec": 2.5,
             },
         },
-        functional=FunctionalScore(
-            passed=valid,
-            tests_passed=2,
-            tests_total=2,
-            build_succeeded=valid,
-        ),
-        visual=VisualScore(similarity=0.9) if visual else None,
-        verification_stability=VerificationStabilityScore(
-            total_gate_failures=0 if valid else 1,
-            repeat_failures=0,
-        ),
-        requirements_coverage=RequirementsCoverageScore(
-            total_requirements=2,
-            satisfied_requirements=1 if valid else 0,
-            mapped_requirements=1,
-            requirement_gap_ids=["req"] if not valid else [],
-            requirement_test_evidence_gaps={"req": ["test"]} if not valid else {},
-        ),
         execution_validity=ExecutionValidityScore(checks=[GateCheck(name="valid", passed=valid)]),
         performance_gates=PerformanceGatesScore(checks=[GateCheck(name="perf", passed=perf)]),
         resource_efficiency=ResourceEfficiencyScore(
@@ -106,6 +83,22 @@ def _run(
         metric_scores=[
             MetricScore(metric_id="artifact-checks", score=1.0, passed=True),
             MetricScore(metric_id="functional", score=1.0 if valid else 0.0, passed=valid),
+            MetricScore(
+                metric_id="verification-stability",
+                score=1.0 if valid else 0.5,
+                passed=valid,
+            ),
+            MetricScore(
+                metric_id="requirements-coverage",
+                score=0.5 if valid else 0.0,
+                passed=False,
+                missing_patterns=[] if valid else ["req"],
+            ),
+            *(
+                [MetricScore(metric_id="visual-regression", score=0.9, passed=True)]
+                if visual
+                else []
+            ),
         ],
         scorer_results=[
             ScorerResult(
@@ -196,9 +189,15 @@ def test_csv_export_row_contains_process_phase_and_artifact_metrics(tmp_path):
     assert rows[0]["artifact_checks_passed"] == "True"
     assert rows[0]["trial_total_sec"] == "5.0"
     row = _csv_row(run)
-    assert json.loads(row["metric_scores"]) == ["artifact-checks", "functional"]
+    assert json.loads(row["metric_scores"]) == [
+        "artifact-checks",
+        "functional",
+        "verification-stability",
+        "requirements-coverage",
+        "visual-regression",
+    ]
     assert json.loads(row["failed_command_categories"]) == {"test": 1}
-    assert _phase_timings(run)["verifier_sec"] == 0.5
+    assert _phase_timings(run)["runner_evidence_sec"] == 0.5
 
     no_meta = _run("run-no-meta")
     no_meta.scores.metadata["process"] = "bad"
@@ -206,7 +205,7 @@ def test_csv_export_row_contains_process_phase_and_artifact_metrics(tmp_path):
     no_meta.scores.metric_scores = []
     row = _csv_row(no_meta)
     assert row["artifact_checks_passed"] is None
-    assert row["visual_similarity"] == 0.9
+    assert row["visual_similarity"] is None
 
 
 def test_csv_export_redacts_unscored_reason_values(tmp_path):

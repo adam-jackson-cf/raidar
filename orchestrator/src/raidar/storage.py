@@ -195,10 +195,8 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "metric_scores",
         "duration_sec",
         "terminated_early",
+        "functional_score",
         "functional_passed",
-        "build_succeeded",
-        "tests_passed",
-        "tests_total",
         "visual_similarity",
         "verification_stability_score",
         "quality_score",
@@ -208,28 +206,24 @@ def export_to_csv(runs: list[EvalRun], output_path: Path) -> None:
         "execution_valid",
         "performance_gates_passed",
         "resource_efficiency_score",
-        "gate_failures",
-        "repeat_failures",
+        "repeated_verification_failures",
         "failed_command_categories",
         "process_failed_command_count",
         "first_pass_verification_successes",
         "first_pass_verification_failures",
         "missing_required_verification_commands",
-        "test_coverage_threshold",
-        "test_coverage_measured",
+        "test_coverage_score",
         "test_coverage_passed",
-        "requirements_presence_ratio",
-        "requirements_mapping_ratio",
-        "requirement_test_evidence_gap_count",
-        "requirement_test_evidence_gaps",
+        "requirements_coverage_score",
+        "requirements_coverage_passed",
+        "requirements_missing_patterns",
         "composite_score",
         "trial_total_sec",
         "environment_setup_sec",
         "harness_setup_sec",
         "harness_execution_sec",
-        "verifier_sec",
-        "harness_overhead_sec",
-        "orchestration_overhead_excluding_test_sec",
+        "runner_evidence_sec",
+        "orchestration_overhead_excluding_agent_and_test_sec",
         "artifact_checks_passed",
         "artifact_checks_missing_patterns",
     ]
@@ -250,11 +244,25 @@ def _phase_timings(run: EvalRun) -> dict:
     return _dict_meta(harbor_meta.get("phase_timings_sec", {}))
 
 
+def _metric_attribute(metric: object | None, attribute: str) -> object | None:
+    return getattr(metric, attribute) if metric is not None else None
+
+
+def _metric_patterns(metric: object | None) -> str | None:
+    patterns = _metric_attribute(metric, "missing_patterns")
+    return json.dumps(patterns) if patterns is not None else None
+
+
 def _csv_row(run: EvalRun) -> dict[str, object]:
     process_meta = _dict_meta(run.scores.metadata.get("process", {}))
     harbor_meta = _dict_meta(run.scores.metadata.get("harbor", {}))
     phase_timings = _phase_timings(run)
     artifact_checks = _artifact_checks_metric(run)
+    functional = run.scores.metric_result("functional")
+    visual = run.scores.metric_result("visual-regression")
+    stability = run.scores.metric_result("verification-stability")
+    test_coverage = run.scores.metric_result("test-coverage")
+    requirements = run.scores.metric_result("requirements-coverage")
     return {
         "run_id": run.id,
         "timestamp": run.timestamp,
@@ -267,12 +275,10 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "metric_scores": json.dumps(_metric_ids(run)),
         "duration_sec": run.duration_sec,
         "terminated_early": run.terminated_early,
-        "functional_passed": run.scores.functional.passed,
-        "build_succeeded": run.scores.functional.build_succeeded,
-        "tests_passed": run.scores.functional.tests_passed,
-        "tests_total": run.scores.functional.tests_total,
-        "visual_similarity": run.scores.visual.similarity if run.scores.visual else None,
-        "verification_stability_score": run.scores.verification_stability.score,
+        "functional_score": _metric_attribute(functional, "score"),
+        "functional_passed": _metric_attribute(functional, "passed"),
+        "visual_similarity": _metric_attribute(visual, "score"),
+        "verification_stability_score": _metric_attribute(stability, "score"),
         "quality_score": run.scores.quality_score,
         "diagnostic_score": run.scores.diagnostic_score,
         "unscored": run.scores.unscored,
@@ -280,8 +286,7 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "execution_valid": run.scores.execution_validity.passed,
         "performance_gates_passed": run.scores.performance_gates.passed,
         "resource_efficiency_score": run.scores.resource_efficiency.score,
-        "gate_failures": run.scores.verification_stability.total_gate_failures,
-        "repeat_failures": run.scores.verification_stability.repeat_failures,
+        "repeated_verification_failures": process_meta.get("repeated_verification_failures"),
         "failed_command_categories": json.dumps(
             process_meta.get("failed_command_categories", {}),
             sort_keys=True,
@@ -292,32 +297,22 @@ def _csv_row(run: EvalRun) -> dict[str, object]:
         "missing_required_verification_commands": process_meta.get(
             "missing_required_verification_commands"
         ),
-        "test_coverage_threshold": run.scores.test_coverage.threshold,
-        "test_coverage_measured": run.scores.test_coverage.measured,
-        "test_coverage_passed": run.scores.test_coverage.passed,
-        "requirements_presence_ratio": run.scores.requirements_coverage.presence_ratio,
-        "requirements_mapping_ratio": run.scores.requirements_coverage.mapping_ratio,
-        "requirement_test_evidence_gap_count": len(
-            run.scores.requirements_coverage.requirement_test_evidence_gaps
-        ),
-        "requirement_test_evidence_gaps": json.dumps(
-            run.scores.requirements_coverage.requirement_test_evidence_gaps,
-            sort_keys=True,
-        ),
+        "test_coverage_score": _metric_attribute(test_coverage, "score"),
+        "test_coverage_passed": _metric_attribute(test_coverage, "passed"),
+        "requirements_coverage_score": _metric_attribute(requirements, "score"),
+        "requirements_coverage_passed": _metric_attribute(requirements, "passed"),
+        "requirements_missing_patterns": _metric_patterns(requirements),
         "composite_score": run.scores.composite_score,
         "trial_total_sec": phase_timings.get("trial_total_sec"),
         "environment_setup_sec": phase_timings.get("environment_setup_sec"),
         "harness_setup_sec": phase_timings.get("harness_setup_sec"),
         "harness_execution_sec": phase_timings.get("harness_execution_sec"),
-        "verifier_sec": phase_timings.get("verifier_sec"),
-        "harness_overhead_sec": harbor_meta.get("harness_overhead_sec"),
-        "orchestration_overhead_excluding_test_sec": harbor_meta.get(
-            "orchestration_overhead_excluding_test_sec"
+        "runner_evidence_sec": phase_timings.get("runner_evidence_sec"),
+        "orchestration_overhead_excluding_agent_and_test_sec": harbor_meta.get(
+            "orchestration_overhead_excluding_agent_and_test_sec"
         ),
-        "artifact_checks_passed": artifact_checks.passed if artifact_checks is not None else None,
-        "artifact_checks_missing_patterns": (
-            json.dumps(artifact_checks.missing_patterns) if artifact_checks is not None else None
-        ),
+        "artifact_checks_passed": _metric_attribute(artifact_checks, "passed"),
+        "artifact_checks_missing_patterns": _metric_patterns(artifact_checks),
     }
 
 
@@ -330,9 +325,10 @@ def _ranked_runs(runs: list[EvalRun]) -> list[EvalRun]:
 
 
 def _visual_value(run: EvalRun) -> str:
-    if not run.scores.visual:
+    visual = run.scores.metric_result("visual-regression")
+    if visual is None:
         return "N/A"
-    return f"{run.scores.visual.similarity:.2f}"
+    return f"{visual.score:.2f}"
 
 
 def _failed_categories(run: EvalRun) -> dict:
@@ -359,7 +355,11 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
         ]
     )
     for run in _ranked_runs(runs):
-        func_status = "PASS" if run.scores.functional.passed else "FAIL"
+        functional = run.scores.metric_result("functional")
+        stability = run.scores.metric_result("verification-stability")
+        coverage = run.scores.metric_result("test-coverage")
+        requirements = run.scores.metric_result("requirements-coverage")
+        func_status = "PASS" if functional is not None and functional.passed else "FAIL"
         scenario_ref = f"{run.config.scenario_name}@{run.config.scenario_revision}"
         lines.append(
             f"| {run.config.harness} | {run.config.model} | {scenario_ref} | "
@@ -368,14 +368,13 @@ def _append_summary_table(lines: list[str], runs: list[EvalRun]) -> None:
             f"{run.scores.composite_score:.3f} | "
             f"{run.scores.diagnostic_score:.3f} | {func_status} | "
             f"{_visual_value(run)} | "
-            f"{run.scores.verification_stability.score:.2f} |"
+            f"{stability.score if stability else 0.0:.2f} |"
         )
         lines.append(
             f"  - run_id={run.id}, resource_efficiency={run.scores.resource_efficiency.score:.3f}, "
             f"unscored_reasons={sanitize_evidence_payload(run.scores.unscored_reasons)}, "
-            f"test_coverage_passed={run.scores.test_coverage.passed}, "
-            f"requirements_presence={run.scores.requirements_coverage.presence_ratio:.2f}, "
-            f"requirements_mapping={run.scores.requirements_coverage.mapping_ratio:.2f}, "
+            f"test_coverage_passed={coverage.passed if coverage else None}, "
+            f"requirements_score={requirements.score if requirements else None}, "
             f"evaluation_profile={run.config.evaluation_profile}, "
             f"metric_scores={_metric_ids(run)}, "
             f"failed_categories={_failed_categories(run)}"
@@ -470,11 +469,15 @@ def _append_invalid_diagnostics(lines: list[str], runs: list[EvalRun]) -> None:
         (
             f"- run_id={run.id}, model={run.config.model}, "
             f"diagnostic={run.scores.diagnostic_score:.3f}, "
-            f"gaps={run.scores.requirements_coverage.requirement_gap_ids}, "
-            f"evidence_gaps={run.scores.requirements_coverage.requirement_test_evidence_gaps}"
+            f"gaps={_requirements_gaps(run)}"
         )
         for run in ranked
     )
+
+
+def _requirements_gaps(run: EvalRun) -> list[str]:
+    requirements = run.scores.metric_result("requirements-coverage")
+    return requirements.missing_patterns if requirements else []
 
 
 def _append_unscored_runs(lines: list[str], runs: list[EvalRun]) -> None:

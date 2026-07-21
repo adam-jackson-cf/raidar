@@ -16,6 +16,7 @@ from raidar.runtime.maintenance import (
     cleanup_stale_harbor_resources,
     docker_compose_preflight_reason,
 )
+from raidar.runtime.profile import default_runtime_profile
 
 
 def register(main: click.Group) -> None:
@@ -41,9 +42,11 @@ def harbor() -> None:
 )
 def harbor_cleanup(include_containers: bool, include_build_processes: bool) -> None:
     """Cleanup stale Harbor processes and containers."""
+    runtime_profile = default_runtime_profile()
     cleanup_stale_harbor_resources(
         include_containers=include_containers,
         include_build_processes=include_build_processes,
+        runtime_profile=runtime_profile,
     )
     click.echo("Harbor cleanup completed.")
 
@@ -68,7 +71,10 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
     """Setup local toolchain and run Harbor preflight checks."""
     cleanup_stale_harbor_before_runs()
 
-    reason = docker_compose_preflight_reason(dict(os.environ))
+    reason = docker_compose_preflight_reason(
+        dict(os.environ),
+        default_runtime_profile(),
+    )
     if reason:
         raise click.ClickException(reason)
 

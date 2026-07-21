@@ -47,7 +47,7 @@ def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
-    with pytest.raises(OSError, match="require an API key"):
+    with pytest.raises(OSError, match="require credentials; set: GEMINI_API_KEY"):
         adapter.validate()
 
 

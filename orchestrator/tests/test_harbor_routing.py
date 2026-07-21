@@ -30,6 +30,9 @@ def test_harbor_routing_uses_harness_import_path(monkeypatch) -> None:
     assert "--agent-import-path" in command
     assert "-a" not in command
     assert "raidar.agents.harbor_agents.cli_agents:GeminiCliHarborAgent" in command
+    assert "--quiet" in command
+    assert "--no-delete" in command
+    assert "--no-export-traces" in command
 
 
 def test_harbor_routing_runtime_env_includes_pythonpath(monkeypatch) -> None:

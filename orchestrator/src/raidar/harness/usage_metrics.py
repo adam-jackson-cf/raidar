@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from pathlib import Path
-
-from raidar.harness.definitions import harness_definition
+from raidar.harness.result_manifest import HarborArtifactRole, HarborResultManifest
 from raidar.runtime.harbor_results import _load_json_dict
 from raidar.runtime.harness_logs import _as_int, _read_jsonl_dicts
 
@@ -37,14 +35,14 @@ def _extract_codex_usage(entry: dict) -> tuple[int, int, int] | None:
     return _usage_tuple_from_payload(entry.get("usage"))
 
 
-def _usage_from_codex_log(trial_dir: Path) -> tuple[int, int, int] | None:
-    entries = _read_jsonl_dicts(trial_dir / "agent" / "codex.txt")
+def _usage_from_codex_log(manifest: HarborResultManifest) -> tuple[int, int, int] | None:
+    entries = _read_jsonl_dicts(manifest.harness_artifact("codex.txt"))
     usages = [_extract_codex_usage(entry) for entry in entries]
     return next((usage for usage in reversed(usages) if usage), None)
 
 
-def _usage_from_trial_result(trial_dir: Path) -> tuple[int, int, int] | None:
-    payload = _load_json_dict(trial_dir / "result.json")
+def _usage_from_trial_result(manifest: HarborResultManifest) -> tuple[int, int, int] | None:
+    payload = _load_json_dict(manifest.path(HarborArtifactRole.TRIAL_RESULT))
     agent_result = payload.get("agent_result")
     if not isinstance(agent_result, dict):
         return None
@@ -82,12 +80,13 @@ def _record_claude_usage(
     return result_usage
 
 
-def _usage_from_claude_log(trial_dir: Path) -> tuple[int, int, int] | None:
+def _usage_from_claude_log(manifest: HarborResultManifest) -> tuple[int, int, int] | None:
     result_usage: tuple[int, int, int] | None = None
     message_usage_by_id: dict[str, tuple[int, int, int]] = {}
-    agent_dir = trial_dir / "agent"
-    candidate_paths = sorted(agent_dir.glob("command-*/stdout.txt"))
-    candidate_paths.append(agent_dir / "claude-code.txt")
+    candidate_paths = [
+        *manifest.command_stdout_paths(),
+        manifest.harness_artifact("claude-code.txt"),
+    ]
     for path in candidate_paths:
         for entry in _read_jsonl_dicts(path):
             result_usage = _record_claude_usage(
@@ -106,8 +105,10 @@ def _usage_from_claude_log(trial_dir: Path) -> tuple[int, int, int] | None:
     return input_tokens, cached_tokens, output_tokens
 
 
-def _usage_from_gemini_trajectory(trial_dir: Path) -> tuple[int, int, int] | None:
-    payload = _load_json_dict(trial_dir / "agent" / "gemini-cli.trajectory.json")
+def _usage_from_gemini_trajectory(
+    manifest: HarborResultManifest,
+) -> tuple[int, int, int] | None:
+    payload = _load_json_dict(manifest.harness_artifact("gemini-cli.trajectory.json"))
     messages = payload.get("messages")
     if not isinstance(messages, list):
         return None
@@ -135,18 +136,20 @@ def _usage_from_gemini_trajectory(trial_dir: Path) -> tuple[int, int, int] | Non
     return input_tokens, cached_tokens, output_tokens
 
 
-def _usage_tuple_for_harness(trial_dir: Path, harness: str) -> tuple[int, int, int] | None:
-    trial_usage = _usage_from_trial_result(trial_dir)
+def _usage_tuple_from_manifest(
+    manifest: HarborResultManifest,
+) -> tuple[int, int, int] | None:
+    trial_usage = _usage_from_trial_result(manifest)
     if trial_usage:
         return trial_usage
-    definition = harness_definition(harness)
+    definition = manifest.definition
     parser = definition.usage_policy.parser
     if parser == "codex-jsonl":
-        return _usage_from_codex_log(trial_dir)
+        return _usage_from_codex_log(manifest)
     if parser == "claude-jsonl":
-        return _usage_from_claude_log(trial_dir)
+        return _usage_from_claude_log(manifest)
     if parser == "gemini-trajectory":
-        return _usage_from_gemini_trajectory(trial_dir)
+        return _usage_from_gemini_trajectory(manifest)
     if not definition.usage_policy.supported:
         return None
-    raise ValueError(f"Unsupported usage parser for harness {harness}: {parser}")
+    raise ValueError(f"Unsupported usage parser for harness {definition.id}: {parser}")

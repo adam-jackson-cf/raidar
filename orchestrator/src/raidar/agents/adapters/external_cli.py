@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import os
-
 from .base import HarnessAdapter
 
 
@@ -12,7 +10,6 @@ class ExternalCliAdapter(HarnessAdapter):
 
     CLI_ENV_VAR: str = ""
     DEFAULT_BINARY: str = ""
-    REQUIRED_ENV_VARS: tuple[str, ...] = ()
     ALLOWED_PROVIDERS: tuple[str, ...] | None = None
 
     @classmethod
@@ -26,11 +23,7 @@ class ExternalCliAdapter(HarnessAdapter):
     # ------------------------------------------------------------------
     def validate(self) -> None:  # noqa: D401
         self._resolve_cli()
-        for env_var in self.REQUIRED_ENV_VARS:
-            if not os.environ.get(env_var):
-                raise OSError(
-                    f"Environment variable {env_var} must be set for {self.config.harness.value}."
-                )
+        self._validate_credentials()
         if self.ALLOWED_PROVIDERS and self.config.model.provider not in self.ALLOWED_PROVIDERS:
             allowed = ", ".join(self.ALLOWED_PROVIDERS)
             raise ValueError(

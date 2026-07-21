@@ -34,6 +34,8 @@ PROMPT_ENTRY ?=
 DIFFICULTY ?=
 CATEGORY ?=
 TIMEOUT_SEC ?=
+TEMPLATE ?=
+SCENARIO_AGENT_MATRIX_STARTED_AFTER ?=
 
 # Canonical smoke workflow defaults.
 ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
@@ -43,6 +45,29 @@ ORCHESTRATOR_SMOKE_MODEL := gpt-5.5
 ORCHESTRATOR_SMOKE_REASONING_EFFORT := low
 ORCHESTRATOR_SMOKE_REPEATS ?= 1
 SMOKE_MATRIX_CONFIG ?= matrices/hello-world-smoke-trio.yaml
+SMOKE_MATRIX_SELECTOR ?=
+SMOKE_MATRIX_CONFIG_codex := matrices/hello-world-smoke-codex-gpt55.yaml
+SMOKE_MATRIX_CONFIG_gemini := matrices/hello-world-smoke-gemini.yaml
+SMOKE_MATRIX_CONFIG_claude := matrices/hello-world-smoke-claude.yaml
+SMOKE_MATRIX_SELECTORS := codex gemini claude
+SCENARIO_AGENT_MATRIX_CONFIGS := \
+	matrices/bugfix-ledger-balance-codex-gpt55-terra-low.yaml \
+	matrices/hello-world-smoke-codex-gpt55-terra-low.yaml \
+	matrices/homepage-implementation-codex-gpt55-terra-low.yaml \
+	matrices/plan-to-code-baseline-codex-gpt55-terra-low.yaml \
+	matrices/python-code-task-baseline-codex-gpt55-terra-low.yaml \
+	matrices/refactor-library-codex-gpt55-terra-low.yaml \
+	matrices/skill-benchmark-coding-test-codex-gpt55-terra-low.yaml \
+	matrices/targeted-bugfix-codex-gpt55-terra-low.yaml \
+	matrices/test-generation-baseline-codex-gpt55-terra-low.yaml
+ifneq ($(strip $(SMOKE_MATRIX_SELECTOR)),)
+ifeq ($(filter $(SMOKE_MATRIX_SELECTOR),$(SMOKE_MATRIX_SELECTORS)),)
+$(error Unknown SMOKE_MATRIX_SELECTOR '$(SMOKE_MATRIX_SELECTOR)'; expected one of: $(SMOKE_MATRIX_SELECTORS))
+endif
+SMOKE_MATRIX_EFFECTIVE_CONFIG := $(SMOKE_MATRIX_CONFIG_$(SMOKE_MATRIX_SELECTOR))
+else
+SMOKE_MATRIX_EFFECTIVE_CONFIG := $(SMOKE_MATRIX_CONFIG)
+endif
 AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
 AGENT_SMOKE_REPEATS ?= 1
 AGENT_SMOKE_REPEAT_PARALLEL ?= 1
@@ -57,7 +82,7 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 
 .PHONY: help \
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
-	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke \
+	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke scenario-agent-matrix \
 	experiment-run matrix-run \
 	experiments-list experiments-prune \
 	benchmark-fixture-synthetic \
@@ -82,7 +107,7 @@ help:
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup                                    Cleanup stale Harbor processes and containers"
 	@echo "  make scenario-list                                     List available scenarios and revisions"
-	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario SCENARIO_REVISION=v001"
+	@echo "  make scenario-init SCENARIO_DIR=scenarios/new-scenario TEMPLATE=typescript-bun SCENARIO_REVISION=v001"
 	@echo "                                                        Scaffold a new scenario"
 	@echo "  make scenario-clone-revision SCENARIO_DIR=scenarios/homepage-implementation FROM_REVISION=v001 [TO_REVISION=v002]"
 	@echo "                                                        Create a new revision inside an existing scenario root"
@@ -105,6 +130,7 @@ help:
 	@echo "                                                        Run one scenario yaml for one AgentSpec"
 	@echo "  make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml"
 	@echo "                                                        Run a stored matrix definition"
+	@echo "  make scenario-agent-matrix                            Run and verify every scenario revision on GPT-5.5 and GPT-5.6 Terra [low]"
 	@echo "  make experiments-list [EVALUATION_PROFILE=...] [LIMIT=...]"
 	@echo "                                                        List stored experiments and summaries"
 	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
@@ -121,7 +147,11 @@ benchmark-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
 
 review-surface-data:
-	@node review-surface/scripts/build-review-data.mjs
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection \
+		--experiments-root "$(CURDIR)/experiments/benchmarks" \
+		--output "$(REPO_TMP_DIR)/review-projection.json"
+	@RAIDAR_REVIEW_PROJECTION="$(REPO_TMP_DIR)/review-projection.json" \
+		node review-surface/scripts/build-review-data.mjs
 
 review-surface-build:
 	@cd review-surface && npm install --no-fund --no-audit && npm run build
@@ -169,8 +199,10 @@ scenario-list:
 
 scenario-init:
 	$(call require_var,SCENARIO_DIR)
+	$(call require_var,TEMPLATE)
 	@$(RAIDAR) scenario init \
 		--path "$(SCENARIO_DIR)" \
+		--template "$(TEMPLATE)" \
 		$(if $(NAME),--name "$(NAME)",) \
 		$(if $(SCENARIO_REVISION),--scenario-revision "$(SCENARIO_REVISION)",) \
 		$(if $(STARTER_ROOT),--starter-root "$(STARTER_ROOT)",) \
@@ -201,6 +233,11 @@ smoke-dry-run-check:
 		RUN_PARALLELISM="2"
 	@$(MAKE) --no-print-directory -n smoke-matrix \
 		SMOKE_MATRIX_CONFIG="matrices/hello-world-smoke-trio.yaml"
+	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="codex"
+	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="gemini"
+	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="claude"
+	@! $(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="unknown" \
+		>/dev/null 2>&1
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		HARNESS="$(ORCHESTRATOR_SMOKE_HARNESS)" \
 		PROVIDER="$(ORCHESTRATOR_SMOKE_PROVIDER)" \
@@ -219,13 +256,13 @@ orchestrator-smoke: docker-check
 		--repeats "$(ORCHESTRATOR_SMOKE_REPEATS)" \
 		--repeat-parallel "$(RUN_PARALLELISM)" \
 		--rerun-unscored "$(RERUN_UNSCORED)" \
-		--experiment-kind "$(EXPERIMENT_KIND)" \
+		--experiment-kind "operational-smoke" \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
 smoke-matrix: docker-check
 	$(RAIDAR) matrix \
-		--config "$(SMOKE_MATRIX_CONFIG)" \
-		--experiment-kind "$(EXPERIMENT_KIND)"
+		--config "$(SMOKE_MATRIX_EFFECTIVE_CONFIG)" \
+		--experiment-kind "operational-smoke"
 
 agent-smoke: docker-check
 	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_HARNESS)" ] || [ -z "$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" ] || [ -z "$(AGENT_SMOKE_EFFECTIVE_MODEL)" ]; then \
@@ -245,7 +282,7 @@ agent-smoke: docker-check
 		RUN_COUNT="$(AGENT_SMOKE_REPEATS)" \
 		RUN_PARALLELISM="$(AGENT_SMOKE_REPEAT_PARALLEL)" \
 		RERUN_UNSCORED="$(AGENT_SMOKE_RERUN_UNSCORED)" \
-		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
+		EXPERIMENT_KIND="operational-smoke" \
 		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
 
 runtime-stack-scenario-smoke: docker-check
@@ -310,6 +347,20 @@ matrix-run:
 	@$(RAIDAR) matrix \
 		--config "$(CONFIG)" \
 		--experiment-kind "$(EXPERIMENT_KIND)"
+
+scenario-agent-matrix: docker-check
+	@started_after="$(SCENARIO_AGENT_MATRIX_STARTED_AFTER)"; \
+	if [ -z "$$started_after" ]; then started_after=$$(date +%s); fi; \
+	for config in $(SCENARIO_AGENT_MATRIX_CONFIGS); do \
+		echo "Running full scenario AgentSpec matrix: $$config"; \
+		make --no-print-directory matrix-run CONFIG="$$config" EXPERIMENT_KIND=benchmark || exit $$?; \
+	done; \
+	$(REPO_RUNTIME_ENV) uv run --project orchestrator python \
+		scripts/validate-scenario-agent-matrix.py \
+		$(foreach config,$(SCENARIO_AGENT_MATRIX_CONFIGS),--config "$(config)") \
+		--experiments-root "$(CURDIR)/experiments/benchmarks" \
+		--repo-root "$(CURDIR)" \
+		--started-after "$$started_after"
 
 experiments-list:
 	@$(RAIDAR) experiments list \

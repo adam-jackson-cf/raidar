@@ -8,9 +8,16 @@ from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     change_containment_metric_score,
+    functional_score_from_evidence,
     metric,
     source_and_test_files,
-    verification_stability_score,
+    verification_stability_from_evidence,
+)
+from raidar.scorers.verification import (
+    EvidenceDependency,
+    VerificationPlan,
+    VerificationPlanContext,
+    scenario_command_plan,
 )
 
 
@@ -85,36 +92,40 @@ class Refactor(BaseScorer):
             pass_fail="Passes when verification stability is greater than zero.",
         ),
     )
+    evidence_dependencies = (EvidenceDependency(kind="command"),)
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare scenario verification commands owned by this scorer."""
+
+        return scenario_command_plan(self.id, context)
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         workspace = Path(context.workspace)
-        outputs = context.execution.outputs
+        evidence = context.verification_evidence.for_owner(self.id)
         sources, tests = source_and_test_files(workspace)
         return ScorerEvidence(
             metric_scores=(
-                _behavior_preservation_score(outputs),
+                _behavior_preservation_score(functional_score_from_evidence(evidence)),
                 _structural_improvement_score(sources),
                 _public_contract_stability_score(sources, tests),
                 change_containment_metric_score(
                     workspace=workspace,
                     workspace_changes=context.workspace_changes,
                 ),
-                verification_stability_score(outputs.verification_stability),
+                verification_stability_from_evidence(evidence),
             ),
             metadata={"source_files": len(sources), "test_files": len(tests)},
         )
 
 
-def _behavior_preservation_score(outputs) -> MetricScore:
-    functional = outputs.functional
+def _behavior_preservation_score(functional: MetricScore) -> MetricScore:
     return MetricScore(
         metric_id="behavior-preservation",
         score=functional.score,
         passed=functional.passed,
         evidence=(
-            "direct: behavior preservation uses final build, test, and gate execution summaries, "
-            f"build={functional.build_succeeded}, "
-            f"tests={functional.tests_passed}/{functional.tests_total}"
+            "direct: behavior preservation uses owner-declared verification actions, "
+            f"{functional.evidence}"
         ),
     )
 

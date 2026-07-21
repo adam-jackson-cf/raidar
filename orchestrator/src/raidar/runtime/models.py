@@ -6,22 +6,20 @@ import subprocess
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from raidar.agents.config import AgentSpec
 from raidar.schemas.events import GateEvent, TraceEvent
 from raidar.schemas.scenario import ScenarioDefinition
 from raidar.schemas.scorecard import (
-    CoverageScore,
     ExecutionValidityScore,
-    FunctionalScore,
-    MetricScore,
     PerformanceGatesScore,
-    RequirementsCoverageScore,
-    VerificationStabilityScore,
-    VisualScore,
 )
 from raidar.starter import StarterSource
+
+if TYPE_CHECKING:
+    from raidar.runtime.execution_contract import EffectiveRunContract
+    from raidar.runtime.profile import RuntimeProfile
 
 RuntimeFailureCode = str
 
@@ -55,16 +53,10 @@ class WorkspaceContext:
 
 @dataclass(frozen=True, slots=True)
 class EvaluationOutputs:
-    """Computed scoring outputs for a run."""
+    """Cross-cutting execution outputs kept separate from scorer quality."""
 
-    functional: FunctionalScore
-    visual: VisualScore | None
-    verification_stability: VerificationStabilityScore
-    test_coverage: CoverageScore
-    requirements_coverage: RequirementsCoverageScore
     execution_validity: ExecutionValidityScore
     performance_gates: PerformanceGatesScore
-    metric_scores: list[MetricScore]
     gate_history: list[GateEvent]
 
 
@@ -119,7 +111,8 @@ class RunLayout:
     run_label: str
     root_dir: Path
     workspace_dir: Path
-    verifier_dir: Path
+    runner_evidence_dir: Path
+    scoring_dir: Path
     harness_dir: Path
     harbor_dir: Path
     run_json_path: Path
@@ -138,6 +131,7 @@ class HarborExecutionRequest:
     run_id: str
     timeout_sec: int
     run_env: dict[str, str]
+    runtime_profile: RuntimeProfile
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,11 +176,12 @@ class WorkspacePreparationPhaseResult:
     auth_metadata: dict[str, Any]
     screenshot_command: tuple[str, ...] | None
     evidence_errors: tuple[str, ...]
+    effective_contract: EffectiveRunContract
 
 
 @dataclass(frozen=True, slots=True)
 class ExecutionPhaseResult:
-    """Harbor execution + verifier loading phase output."""
+    """Harbor execution plus raw runner-evidence loading phase output."""
 
     harbor_result: HarborExecutionResult
     terminated_early: bool
@@ -209,7 +204,7 @@ class PersistedArtifacts:
 
     starter_meta: dict
     scenario_revision_meta: dict[str, Any]
-    verifier_artifacts: dict[str, str]
+    runner_evidence_artifacts: dict[str, str]
     harness_artifacts: dict[str, str]
     harbor_artifacts: dict[str, str]
     evidence_artifacts: dict[str, Any]

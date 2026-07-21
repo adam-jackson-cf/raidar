@@ -2,7 +2,7 @@
 
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, ConfigDict, Field, computed_field
 
 from ..config import settings
 from .events import GateEvent, TraceEvent
@@ -17,10 +17,13 @@ class FunctionalScore(BaseModel):
     build_succeeded: bool = False
     gates_passed: int = 0
     gates_total: int = 0
+    projected_score: float | None = Field(default=None, exclude=True, ge=0, le=1)
 
     @computed_field
     @property
     def score(self) -> float:
+        if self.projected_score is not None:
+            return self.projected_score
         if not self.build_succeeded:
             return 0.0
         if self.tests_total == 0:
@@ -73,10 +76,13 @@ class VerificationStabilityScore(BaseModel):
     total_gate_failures: int = 0
     unique_failure_categories: int = 0
     repeat_failures: int = 0
+    projected_score: float | None = Field(default=None, exclude=True, ge=0, le=1)
 
     @computed_field
     @property
     def score(self) -> float:
+        if self.projected_score is not None:
+            return self.projected_score
         cfg = settings.verification_stability
         raw_score = (
             1.0
@@ -219,6 +225,8 @@ class ScorerResult(BaseModel):
 class Scorecard(BaseModel):
     """Complete scorecard for an experiment run."""
 
+    model_config = ConfigDict(extra="forbid")
+
     run_id: str = ""
     scenario_name: str = ""
     scenario_revision: str = ""
@@ -231,20 +239,88 @@ class Scorecard(BaseModel):
     unscored: bool = False
     unscored_reasons: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
-    functional: FunctionalScore = Field(default_factory=FunctionalScore)
-    visual: VisualScore | None = Field(default_factory=VisualScore)
-    verification_stability: VerificationStabilityScore = Field(
-        default_factory=VerificationStabilityScore
-    )
-    test_coverage: CoverageScore = Field(default_factory=CoverageScore)
-    requirements_coverage: RequirementsCoverageScore = Field(
-        default_factory=RequirementsCoverageScore
-    )
     execution_validity: ExecutionValidityScore = Field(default_factory=ExecutionValidityScore)
     performance_gates: PerformanceGatesScore = Field(default_factory=PerformanceGatesScore)
     resource_efficiency: ResourceEfficiencyScore = Field(default_factory=ResourceEfficiencyScore)
     metric_scores: list[MetricScore] = Field(default_factory=list)
     scorer_results: list[ScorerResult] = Field(default_factory=list)
+
+    def metric_result(self, metric_id: str) -> MetricScore | None:
+        """Return one canonical metric result."""
+
+        return next(
+            (metric for metric in self.metric_scores if metric.metric_id == metric_id),
+            None,
+        )
+
+    @computed_field
+    @property
+    def functional(self) -> FunctionalScore:
+        """Project the canonical functional metric for legacy presentation clients."""
+
+        metric = self.metric_result("functional")
+        if metric is None:
+            return FunctionalScore()
+        return FunctionalScore(
+            passed=metric.passed,
+            projected_score=metric.score,
+        )
+
+    @computed_field
+    @property
+    def visual(self) -> VisualScore | None:
+        """Project the canonical visual metric for legacy presentation clients."""
+
+        metric = self.metric_result("visual-regression")
+        if metric is None:
+            return None
+        return VisualScore(similarity=metric.score, passed=metric.passed)
+
+    @computed_field
+    @property
+    def verification_stability(self) -> VerificationStabilityScore:
+        """Project canonical stability without storing independent quality state."""
+
+        metric = self.metric_result("verification-stability")
+        if metric is None:
+            return VerificationStabilityScore()
+        return VerificationStabilityScore(
+            total_gate_failures=0 if metric.passed else 1,
+            projected_score=metric.score,
+        )
+
+    @computed_field
+    @property
+    def test_coverage(self) -> CoverageScore:
+        """Project the canonical test-coverage metric."""
+
+        metric = self.metric_result("test-coverage")
+        if metric is None:
+            return CoverageScore(threshold=None, measured=None, source=None, passed=False)
+        return CoverageScore(
+            threshold=None,
+            measured=metric.score,
+            source="metric_scores:test-coverage",
+            passed=metric.passed,
+        )
+
+    @computed_field
+    @property
+    def requirements_coverage(self) -> RequirementsCoverageScore:
+        """Project the canonical requirements-coverage metric."""
+
+        metric = self.metric_result("requirements-coverage")
+        if metric is None:
+            return RequirementsCoverageScore()
+        total = metric.matched_count + len(metric.missing_patterns)
+        return RequirementsCoverageScore(
+            total_requirements=total,
+            satisfied_requirements=metric.matched_count,
+            mapped_requirements=metric.matched_count,
+            mapped_satisfied_requirements=metric.matched_count,
+            missing_requirement_ids=list(metric.missing_patterns),
+            requirement_gap_ids=list(metric.missing_patterns),
+        )
 
     @computed_field
     @property
@@ -268,39 +344,21 @@ class Scorecard(BaseModel):
 
     def metric_score(self, metric_id: str) -> float:
         """Return the scalar score for a metric id."""
-        for metric in self.metric_scores:
-            if metric.metric_id == metric_id:
-                return metric.score
-        metric_scores = {
-            "functional": self.functional.score,
-            "verification-stability": self.verification_stability.score,
+        metric = self.metric_result(metric_id)
+        if metric is not None:
+            return metric.score
+        cross_cutting_scores = {
             "execution-validity": 1.0 if self.execution_validity.passed else 0.0,
             "resource-efficiency": self.resource_efficiency.score,
-            "test-coverage": self._test_coverage_profile_score(),
-            "requirements-coverage": self._requirements_coverage_profile_score(),
-            "visual-regression": self.visual.score if self.visual else 0.0,
         }
-        return metric_scores.get(metric_id, 0.0)
-
-    def _test_coverage_profile_score(self) -> float:
-        if self.test_coverage.threshold is None or self.test_coverage.threshold <= 0:
-            return 1.0 if self.test_coverage.passed else 0.0
-        if self.test_coverage.measured is None:
-            return 0.0
-        return min(1.0, self.test_coverage.measured / self.test_coverage.threshold)
-
-    def _requirements_coverage_profile_score(self) -> float:
-        return (
-            self.requirements_coverage.presence_ratio * 0.5
-            + self.requirements_coverage.mapping_ratio * 0.5
-        )
+        return cross_cutting_scores.get(metric_id, 0.0)
 
     @computed_field
     @property
     def diagnostic_score(self) -> float:
         return round(
             (self.quality_score * 0.6)
-            + (self.requirements_coverage.mapping_ratio * 0.25)
+            + (self.metric_score("requirements-coverage") * 0.25)
             + (self.resource_efficiency.score * 0.15),
             3,
         )
@@ -310,6 +368,10 @@ class EvalConfig(BaseModel):
     """Configuration for an experiment run."""
 
     model: str = Field(description="Model identifier (provider/name)")
+    reasoning_effort: str | None = Field(
+        default=None,
+        description="Normalized reasoning effort used for the run",
+    )
     harness: str = Field(description="Harness name")
     scenario_name: str = Field(description="Scenario identifier")
     scenario_revision: str = Field(description="Scenario revision")

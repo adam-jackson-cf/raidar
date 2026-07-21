@@ -1,5 +1,19 @@
 """Tests for configuration system."""
 
+import pytest
+
+from raidar.agents.config import ModelTarget
+
+
+def test_model_target_parses_qualified_names_and_rejects_bare_models() -> None:
+    target = ModelTarget.from_string("openai/gpt-5.5")
+
+    assert target.provider == "openai"
+    assert target.name == "gpt-5.5"
+    assert target.qualified_name == "openai/gpt-5.5"
+    with pytest.raises(ValueError, match="provider/model"):
+        ModelTarget.from_string("gpt-5.5")
+
 
 class TestEvalSettings:
     """Test configuration loading and defaults."""
@@ -25,6 +39,16 @@ class TestEvalSettings:
         assert judge.model == "gpt-5.5"
         assert judge.reasoning_effort == "low"
         assert judge.codex_auth_mode == "chatgpt"
+
+    def test_visual_comparison_defaults_define_one_tool_policy(self):
+        from raidar.config import TimeoutSettings, VisualSettings
+
+        visual = VisualSettings()
+
+        assert visual.comparison_executable == "bunx"
+        assert visual.comparison_arguments_template[0] == "odiff"
+        assert visual.odiff_threshold == 0.03
+        assert TimeoutSettings().image_compare == 30
 
     def test_settings_singleton_exports(self):
         """Settings singleton should be importable and have all subsections."""

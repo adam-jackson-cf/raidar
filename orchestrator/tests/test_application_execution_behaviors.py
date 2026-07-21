@@ -12,7 +12,42 @@ from raidar.application.models import (
 from raidar.application.serializers import run_payload
 
 
+def _write_active_benchmark_scenario(path: Path) -> None:
+    path.write_text(
+        "\n".join(
+            [
+                "name: demo-scenario",
+                "display_name: Demo Scenario",
+                "scenario_revision: v001",
+                "description: Temporary execution behavior scenario",
+                "task_kind: feature_implementation",
+                "delivery_mode: direct_implementation",
+                "workspace_state: new",
+                "languages:",
+                "  - python",
+                "evaluation_role: benchmark",
+                "catalog_status: active",
+                "environment:",
+                "  kind: stack_preset",
+                "  id: node:20",
+                "starter: {}",
+                "verification:",
+                "  min_quality_score: 0.0",
+                "scorers:",
+                "  - id: resource-efficiency",
+                "    version: 1",
+                "    weight: 1.0",
+                "prompt:",
+                "  entry: prompt/task.md",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def _options(tmp_path: Path, *, repeats: int = 1) -> RunCliOptions:
+    _write_active_benchmark_scenario(tmp_path / "scenario.yaml")
     return RunCliOptions(
         scenario=tmp_path / "scenario.yaml",
         harness="codex-cli",
@@ -143,6 +178,11 @@ def test_execute_run_command_persists_experiment_summary(monkeypatch, tmp_path, 
     monkeypatch.setattr(execution, "scenario_evaluation_profile", lambda _scenario: "code-task")
     monkeypatch.setattr(execution, "scenario_metrics", lambda _scenario: ["functional"])
     monkeypatch.setattr(execution, "scenario_scorers", lambda _scenario: ("typescript-code-task",))
+    monkeypatch.setattr(
+        execution,
+        "scenario_review_contract",
+        lambda _scenario, *, scenario_dir: SimpleNamespace(scenario_dir=scenario_dir),
+    )
 
     def create_summary(summary_input):
         captured["summary_input"] = summary_input
@@ -152,7 +192,7 @@ def test_execute_run_command_persists_experiment_summary(monkeypatch, tmp_path, 
     monkeypatch.setattr(
         execution,
         "persist_experiment",
-        lambda _execution_dir, _summary: (
+        lambda _execution_dir, _summary, *, runs: (
             tmp_path / "experiment.json",
             tmp_path / "summary.json",
             tmp_path / "report.md",
@@ -171,6 +211,7 @@ def test_execute_run_command_persists_experiment_summary(monkeypatch, tmp_path, 
 
     summary_input = captured["summary_input"]
     assert summary_input.evaluation_profile == "code-task"
+    assert summary_input.model == "openai/gpt-5.5"
     assert summary_input.scorers == ["typescript-code-task"]
     assert summary_input.repeat_parallel == 1
     assert summary_input.reruns_used == 1

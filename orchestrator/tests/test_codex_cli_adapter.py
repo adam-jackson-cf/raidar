@@ -75,7 +75,7 @@ def test_validate_accepts_file_backed_chatgpt_auth(
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
     assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
-    assert adapter.local_secret_files() == {"CODEX_AUTH_JSON": auth_path}
+    assert adapter.credential_file_sources() == {"CODEX_AUTH_JSON": auth_path}
     assert "PYTHONPATH" in adapter.runtime_env()
 
 
@@ -93,8 +93,8 @@ def test_auto_mode_prefers_chatgpt_over_api_key(
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
     assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
-    assert adapter.excluded_run_env_keys() == {"OPENAI_API_KEY"}
-    assert adapter.local_secret_files() == {"CODEX_AUTH_JSON": auth_path}
+    assert adapter.credential_environment_sources() == {}
+    assert adapter.credential_file_sources() == {"CODEX_AUTH_JSON": auth_path}
 
 
 def test_api_mode_uses_api_key_even_when_auth_file_exists(
@@ -111,8 +111,8 @@ def test_api_mode_uses_api_key_even_when_auth_file_exists(
 
     assert adapter.execution_metadata()["auth_mode"] == "api"
     assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
-    assert adapter.excluded_run_env_keys() == set()
-    assert adapter.local_secret_files() == {}
+    assert adapter.credential_environment_sources() == {"OPENAI_API_KEY": "test-key"}
+    assert adapter.credential_file_sources() == {}
 
 
 def test_chatgpt_mode_requires_file_backed_auth(
@@ -135,6 +135,7 @@ def test_chatgpt_mode_requires_file_backed_auth(
         ("gpt-5.5", "openai/gpt-5.5", "medium"),
         ("gpt-5.5", "openai/gpt-5.5", "high"),
         ("gpt-5.5", "openai/gpt-5.5", "xhigh"),
+        ("gpt-5.6-terra", "openai/gpt-5.6-terra", "low"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "low"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "medium"),
         ("gpt-5.3-codex-spark", "openai/gpt-5.3-codex-spark", "high"),
@@ -171,3 +172,12 @@ def test_prepare_workspace_creates_codex_trace_dir(tmp_path: Path) -> None:
     adapter = CodexCliAdapter(_config("gpt-5.4", reasoning_effort="high"))
     adapter.prepare_workspace(tmp_path)
     assert (tmp_path / ".codex").exists()
+
+
+def test_gpt_5_6_terra_rejects_non_low_reasoning(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CODEX_CLI_PATH", "/usr/local/bin/codex")
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    adapter = CodexCliAdapter(_config("gpt-5.6-terra", reasoning_effort="medium"))
+
+    with pytest.raises(ValueError, match="only supports reasoning levels: low"):
+        adapter.validate()
