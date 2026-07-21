@@ -13,7 +13,7 @@ starting_conditions:
 languages:
 - TypeScript
 evaluation_role: benchmark
-catalog_status: active
+catalog_status: quarantined
 variant_axes: {}
 timeout_sec: 1800
 test_scripts: []

@@ -16,6 +16,7 @@ def test_bugfix_ledger_scenario_loads() -> None:
     assert scenario.scenario_revision == "v001"
     assert scenario.task_kind == "defect_repair"
     assert scenario.scorer_ids() == ["bugfix@1", "requirements@1", "resource-efficiency@1"]
+    assert scenario.catalog_status == "quarantined"
     assert scenario.metric_ids() == [
         "defect-resolution",
         "regression-protection",
