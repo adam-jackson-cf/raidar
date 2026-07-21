@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.schemas.scorecard import MetricScore
+from raidar.schemas.scorecard import CoverageScore, MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     assertion_strength_metric_score,
+    coverage_lift_metric_score,
     json_action_content,
     metric,
     production_code_guardrail_metric_score,
@@ -72,13 +73,13 @@ class TestGeneration(BaseScorer):
             "core",
             0.25,
             evidence=(
-                "Paired starter and final coverage artifacts, threshold, and coverage source."
+                "Starter or baseline coverage, final coverage, threshold, and coverage source."
             ),
             score_derivation=(
-                "Scores the measured starter-to-final coverage increase toward the threshold; "
-                "both artifacts must use the same coverage source."
+                "Scores coverage delta toward threshold; without baseline, final coverage "
+                "is capped and labelled proxy."
             ),
-            pass_fail="Passes when final coverage is greater than paired starter coverage.",
+            pass_fail="Passes when coverage improves or meets threshold with generated tests.",
         ),
         metric(
             "production-code-guardrail",
@@ -130,36 +131,182 @@ class TestGeneration(BaseScorer):
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         workspace = Path(context.workspace)
-        final_evidence = context.verification_evidence.for_owner(self.id)
-        baseline_evidence = context.baseline_verification_evidence.for_owner(self.id)
+        evidence = context.verification_evidence.for_owner(self.id)
         return ScorerEvidence(
             metric_scores=(
                 requirement_mapping_metric_score(workspace, context.scenario),
                 assertion_strength_metric_score(workspace),
-                _coverage_lift_metric_score(
-                    baseline_evidence,
-                    final_evidence,
-                    context.scenario.verification.coverage_threshold,
-                ),
-                _production_code_guardrail_metric_score(
-                    workspace,
-                    context.workspace_changes,
-                ),
-                verification_stability_from_evidence(final_evidence),
+                coverage_lift_metric_score(_coverage_from_evidence(evidence, context.scenario)),
+                production_code_guardrail_metric_score(workspace, context.workspace_changes),
+                verification_stability_from_evidence(evidence),
             )
         )
 
 
-def _coverage_lift_metric_score(
+@register_scorer(scorer_id="test-generation", version=2)
+class TestGenerationV2(BaseScorer):
+    """Test-generation scorer for the direct-evidence calibration contract."""
+
+    status = "active"
+    category = "quality"
+    description = (
+        "Scores test-generation tasks by coverage lift, meaningful requirement "
+        "mapping, and production-code guardrails."
+    )
+    metrics = (
+        metric(
+            "test-generation-requirement-mapping-v2",
+            "core",
+            0.25,
+            evidence=(
+                "Scenario requirements, changed or added tests, test names, assertions, "
+                "and requirement IDs where present."
+            ),
+            score_derivation=(
+                "Scores tests mapped to requirements or changed behavior; unmapped tests "
+                "count as proxy blind spots."
+            ),
+            pass_fail=(
+                "Passes when generated tests cover declared requirements or changed behavior."
+            ),
+        ),
+        metric(
+            "test-generation-assertion-strength-v2",
+            "core",
+            0.25,
+            evidence=(
+                "Assertion count, assertion diversity, snapshot-only checks, empty test "
+                "bodies, and skipped tests."
+            ),
+            score_derivation=(
+                "Scores non-empty test bodies, meaningful assertions, assertion diversity, "
+                "and absence of skipped or focused tests."
+            ),
+            pass_fail=(
+                "Passes when tests assert behavior with sufficient strength and no "
+                "skipped-test shortcuts."
+            ),
+        ),
+        metric(
+            "test-generation-coverage-lift-v2",
+            "core",
+            0.25,
+            evidence=(
+                "Paired starter and final coverage artifacts, threshold, and coverage source."
+            ),
+            score_derivation=(
+                "Scores the measured starter-to-final coverage increase toward the threshold; "
+                "both artifacts must use the same coverage source."
+            ),
+            pass_fail="Passes when final coverage is greater than paired starter coverage.",
+        ),
+        metric(
+            "test-generation-production-code-guardrail-v2",
+            "core",
+            0.15,
+            evidence=(
+                "Production file changes, test file changes, and scenario-declared "
+                "allowed production edits."
+            ),
+            score_derivation=(
+                "Scores 1.0 when production code is unchanged or explicitly allowed and "
+                "penalizes unapproved production edits."
+            ),
+            pass_fail=(
+                "Passes when test-generation work does not hide behavior changes in "
+                "production code."
+            ),
+        ),
+        metric(
+            "test-generation-verification-stability-v2",
+            "core",
+            0.10,
+            evidence="Verification gate failure count across the run.",
+            score_derivation="Uses the verification stability score computed from gate history.",
+            pass_fail="Passes when verification stability is greater than zero.",
+        ),
+    )
+    evidence_dependencies = (
+        EvidenceDependency(kind="command"),
+        EvidenceDependency(kind="read_json", minimum=2),
+    )
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare verification commands and common coverage report inputs."""
+
+        owner = "test-generation-v2"
+        base = scenario_command_plan(owner, context)
+        return VerificationPlan(
+            owner=owner,
+            actions=(
+                *base.actions,
+                read_json("coverage.python", ".raidar/coverage.json", required=False),
+                read_json(
+                    "coverage.typescript",
+                    "coverage/coverage-summary.json",
+                    required=False,
+                ),
+            ),
+        )
+
+    def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
+        workspace = Path(context.workspace)
+        owner = "test-generation-v2"
+        final_evidence = context.verification_evidence.for_owner(owner)
+        baseline_evidence = context.baseline_verification_evidence.for_owner(owner)
+        return ScorerEvidence(
+            metric_scores=(
+                _test_generation_v2_metric_score(
+                    requirement_mapping_metric_score(workspace, context.scenario)
+                ),
+                _test_generation_v2_metric_score(assertion_strength_metric_score(workspace)),
+                _paired_coverage_lift_metric_score(
+                    baseline_evidence,
+                    final_evidence,
+                    context.scenario.verification.coverage_threshold,
+                ),
+                _test_generation_v2_metric_score(
+                    production_code_guardrail_metric_score(workspace, context.workspace_changes)
+                ),
+                _test_generation_v2_metric_score(
+                    verification_stability_from_evidence(final_evidence)
+                ),
+            )
+        )
+
+
+def _test_generation_v2_metric_score(metric_score: MetricScore) -> MetricScore:
+    return metric_score.model_copy(
+        update={"metric_id": f"test-generation-{metric_score.metric_id}-v2"}
+    )
+
+
+def _coverage_from_evidence(evidence, scenario) -> CoverageScore:
+    measured = _coverage_value(json_action_content(evidence, "coverage.python"))
+    source = "test-generation.coverage.python"
+    if measured is None:
+        measured = _coverage_value(json_action_content(evidence, "coverage.typescript"))
+        source = "test-generation.coverage.typescript"
+    threshold = scenario.verification.coverage_threshold
+    passed = threshold is None or threshold <= 0 or (measured is not None and measured >= threshold)
+    return CoverageScore(
+        threshold=threshold,
+        measured=measured,
+        source=source if measured is not None else None,
+        passed=passed,
+    )
+
+
+def _paired_coverage_lift_metric_score(
     baseline_evidence,
     final_evidence,
     threshold: float | None,
 ) -> MetricScore:
-    baseline = _coverage_from_evidence(baseline_evidence)
-    final = _coverage_from_evidence(final_evidence)
+    baseline = _paired_coverage_from_evidence(baseline_evidence)
+    final = _paired_coverage_from_evidence(final_evidence)
     if baseline is None or final is None or baseline[0] != final[0]:
         return MetricScore(
-            metric_id="coverage-lift",
+            metric_id="test-generation-coverage-lift-v2",
             score=0.0,
             passed=False,
             missing_patterns=["paired baseline and final coverage artifacts"],
@@ -171,7 +318,7 @@ def _coverage_lift_metric_score(
     lift = final_measured - baseline_measured
     if lift <= 0:
         return MetricScore(
-            metric_id="coverage-lift",
+            metric_id="test-generation-coverage-lift-v2",
             score=0.0,
             passed=False,
             evidence=(
@@ -185,7 +332,7 @@ def _coverage_lift_metric_score(
     else:
         score = lift / (threshold - baseline_measured)
     return MetricScore(
-        metric_id="coverage-lift",
+        metric_id="test-generation-coverage-lift-v2",
         score=round(max(0.0, min(1.0, score)), 3),
         passed=True,
         evidence=(
@@ -209,16 +356,18 @@ def _production_code_guardrail_metric_score(
     )
     if not has_direct_evidence:
         return MetricScore(
-            metric_id="production-code-guardrail",
+            metric_id="test-generation-production-code-guardrail-v2",
             score=0.0,
             passed=False,
             missing_patterns=["changed-file evidence"],
             evidence="changed-file evidence is required to establish protected production integrity",
         )
-    return production_code_guardrail_metric_score(workspace, workspace_changes)
+    return _test_generation_v2_metric_score(
+        production_code_guardrail_metric_score(workspace, workspace_changes)
+    )
 
 
-def _coverage_from_evidence(evidence) -> tuple[str, float] | None:
+def _paired_coverage_from_evidence(evidence) -> tuple[str, float] | None:
     artifacts = (
         ("test-generation.coverage.python", json_action_content(evidence, "coverage.python")),
         (

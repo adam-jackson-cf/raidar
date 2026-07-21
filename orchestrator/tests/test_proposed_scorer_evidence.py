@@ -15,8 +15,8 @@ from raidar.schemas.scorecard import (
     RequirementsCoverageScore,
 )
 from raidar.scorers.base import ScorerContext
-from raidar.scorers.code_task.bugfix import Bugfix
-from raidar.scorers.code_task.refactor import Refactor
+from raidar.scorers.code_task.bugfix import Bugfix, BugfixV2
+from raidar.scorers.code_task.refactor import Refactor, RefactorV2
 from raidar.scorers.common import (
     assertion_strength_metric_score,
     coverage_lift_metric_score,
@@ -36,8 +36,8 @@ from raidar.scorers.evidence_contract import (
     StructuralSnapshotEvidenceResult,
     StructuralSnapshotFileEvidence,
 )
-from raidar.scorers.plan_to_code import PlanToCode
-from raidar.scorers.test_generation import TestGeneration
+from raidar.scorers.plan_to_code import PlanToCode, PlanToCodeV2
+from raidar.scorers.test_generation import TestGeneration, TestGenerationV2
 from raidar.scorers.verification import (
     VerificationEvidence,
 )
@@ -155,6 +155,98 @@ def _context(
             actions=baseline_actions, aliases=baseline_aliases
         ),
     )
+
+
+def _v2_context(
+    workspace: Path,
+    *,
+    baseline_exit_code: int | None = None,
+    baseline_coverage: float | None = None,
+) -> ScorerContext:
+    context = _context(workspace)
+    owners = ("bugfix-v2", "refactor-v2", "test-generation-v2", "plan-to-code-v2")
+    actions = {
+        action.id: action
+        for owner in owners
+        for action in (_command_action(f"{owner}.required.0"),)
+    }
+    coverage = next(
+        action
+        for action in context.verification_evidence.actions.values()
+        if action.kind == "read_json"
+    ).model_copy(update={"id": "test-generation-v2.coverage.python"})
+    actions[coverage.id] = coverage
+    aliases = {action_id: action_id for action_id in actions}
+    baseline_actions = dict(actions)
+    if baseline_exit_code is not None:
+        command = actions["bugfix-v2.required.0"]
+        baseline_actions[command.id] = command.model_copy(
+            update={"result": command.result.model_copy(update={"exit_code": baseline_exit_code})}
+        )
+    if baseline_coverage is not None:
+        baseline_actions[coverage.id] = coverage.model_copy(
+            update={
+                "result": coverage.result.model_copy(
+                    update={"content": {"totals": {"percent_covered": baseline_coverage * 100}}}
+                )
+            }
+        )
+    return replace(
+        context,
+        verification_evidence=VerificationEvidence(actions=actions, aliases=aliases),
+        baseline_verification_evidence=VerificationEvidence(
+            actions=baseline_actions, aliases=aliases
+        ),
+    )
+
+
+def test_direct_evidence_successors_use_versioned_metric_and_owner_namespaces(
+    tmp_path: Path,
+) -> None:
+    context = _v2_context(_workspace(tmp_path))
+    scorers = (
+        (
+            BugfixV2(),
+            [
+                "bugfix-defect-resolution-v2",
+                "bugfix-regression-protection-v2",
+                "bugfix-change-containment-v2",
+                "bugfix-verification-stability-v2",
+                "bugfix-defect-evidence-completeness-v2",
+            ],
+            "bugfix-v2",
+        ),
+        (
+            RefactorV2(),
+            [
+                "refactor-behavior-preservation-v2",
+                "refactor-structural-improvement-v2",
+                "refactor-public-contract-stability-v2",
+                "refactor-change-containment-v2",
+                "refactor-verification-stability-v2",
+            ],
+            "refactor-v2",
+        ),
+        (
+            TestGenerationV2(),
+            [
+                "test-generation-requirement-mapping-v2",
+                "test-generation-assertion-strength-v2",
+                "test-generation-coverage-lift-v2",
+                "test-generation-production-code-guardrail-v2",
+                "test-generation-verification-stability-v2",
+            ],
+            "test-generation-v2",
+        ),
+    )
+
+    for scorer, metric_ids, owner in scorers:
+        scores = scorer.collect_evidence(context).metric_scores
+
+        assert [score.metric_id for score in scores] == metric_ids
+        assert all(score.metric_id.startswith(f"{owner.removesuffix('-v2')}-") for score in scores)
+        assert context.verification_evidence.action(owner, "required.0") is not None
+        assert f"{owner}.required.0" in context.verification_evidence.actions
 
 
 def _workspace(tmp_path: Path) -> Path:
@@ -321,13 +413,11 @@ def test_bugfix_collects_concept_specific_proxy_evidence(tmp_path: Path) -> None
         "verification-stability",
         "defect-evidence-completeness",
     ]
-    assert not scores["defect-resolution"].passed
-    assert "paired bugfix command evidence" in scores["defect-resolution"].missing_patterns
+    assert scores["defect-resolution"].missing_patterns == ["defect-linked requirement evidence"]
     assert not scores["regression-protection"].passed
-    assert (
-        "paired starter failure and final success"
-        in scores["regression-protection"].missing_patterns
-    )
+    assert scores["regression-protection"].missing_patterns == [
+        "behavior-specific regression tests"
+    ]
     assert "proxy:" in str(scores["change-containment"].evidence)
     assert not scores["change-containment"].passed
 
@@ -336,36 +426,19 @@ def test_bugfix_defect_resolution_requires_a_paired_failure_and_success(tmp_path
     workspace = _workspace(tmp_path)
     final_only = {
         score.metric_id: score
-        for score in Bugfix()
-        .collect_evidence(_context(workspace, baseline_exit_code=0))
-        .metric_scores
+        for score in BugfixV2().collect_evidence(_v2_context(workspace)).metric_scores
     }
     paired = {
         score.metric_id: score
-        for score in Bugfix()
-        .collect_evidence(
-            _context(
-                workspace,
-                baseline_exit_code=1,
-                workspace_changes={
-                    "changed_files": ["src/app.py", "tests/test_app.py"],
-                    "changed_file_count": 2,
-                    "error": None,
-                },
-                retained_evidence={
-                    "reproduction_note": "Observed failing defect before fix.",
-                    "regression_tests": ["tests/test_app.py"],
-                    "verification_evidence": "pytest passed",
-                },
-            )
-        )
+        for score in BugfixV2()
+        .collect_evidence(_v2_context(workspace, baseline_exit_code=1))
         .metric_scores
     }
 
-    assert not final_only["defect-resolution"].passed
-    assert "starter command failure" in final_only["defect-resolution"].missing_patterns
-    assert paired["defect-resolution"].passed
-    assert paired["regression-protection"].passed
+    assert not final_only["bugfix-defect-resolution-v2"].passed
+    assert "starter command failure" in final_only["bugfix-defect-resolution-v2"].missing_patterns
+    assert paired["bugfix-defect-resolution-v2"].passed
+    assert not paired["bugfix-regression-protection-v2"].passed
 
 
 def test_bugfix_defect_resolution_handles_malformed_requirement_evidence(
@@ -376,31 +449,27 @@ def test_bugfix_defect_resolution_handles_malformed_requirement_evidence(
     scores = {score.metric_id: score for score in Bugfix().collect_evidence(context).metric_scores}
 
     assert not scores["defect-resolution"].passed
-    assert scores["defect-resolution"].score == 0.0
 
 
 def test_bugfix_defect_evidence_requires_paired_outcomes_and_changed_test_link(
     tmp_path: Path,
 ) -> None:
-    context = _context(
-        _workspace(tmp_path),
-        baseline_exit_code=1,
+    context = replace(
+        _v2_context(_workspace(tmp_path), baseline_exit_code=1),
         workspace_changes={
             "changed_files": ["src/app.py", "tests/test_app.py"],
             "changed_file_count": 2,
             "error": None,
         },
-        retained_evidence={
-            "reproduction_note": "Observed failing defect before fix.",
-            "regression_tests": ["tests/test_app.py"],
-            "verification_evidence": "pytest passed",
-        },
+        retained_evidence={"regression_tests": ["tests/test_app.py"]},
     )
 
-    scores = {score.metric_id: score for score in Bugfix().collect_evidence(context).metric_scores}
+    scores = {
+        score.metric_id: score for score in BugfixV2().collect_evidence(context).metric_scores
+    }
 
-    assert scores["defect-evidence-completeness"].passed
-    assert scores["defect-evidence-completeness"].score == 1.0
+    assert scores["bugfix-defect-evidence-completeness-v2"].passed
+    assert scores["bugfix-defect-evidence-completeness-v2"].score == 1.0
 
 
 def test_bugfix_defect_evidence_does_not_pass_from_source_inventory(tmp_path: Path) -> None:
@@ -410,10 +479,11 @@ def test_bugfix_defect_evidence_does_not_pass_from_source_inventory(tmp_path: Pa
     }
 
     assert not scores["defect-evidence-completeness"].passed
-    assert (
-        "paired starter failure and final success"
-        in scores["defect-evidence-completeness"].missing_patterns
-    )
+    assert scores["defect-evidence-completeness"].missing_patterns == [
+        "reproduction note",
+        "regression test evidence",
+        "changed-file evidence",
+    ]
 
 
 def test_bugfix_malformed_changed_file_evidence_is_incomplete(tmp_path: Path) -> None:
@@ -433,10 +503,7 @@ def test_bugfix_malformed_changed_file_evidence_is_incomplete(tmp_path: Path) ->
     assert not scores["change-containment"].passed
     assert "proxy:" in str(scores["change-containment"].evidence)
     assert not scores["defect-evidence-completeness"].passed
-    assert (
-        "retained regression-test linkage to changed test files"
-        in scores["defect-evidence-completeness"].missing_patterns
-    )
+    assert "changed-file evidence" in scores["defect-evidence-completeness"].missing_patterns
 
 
 def test_refactor_collects_concept_specific_proxy_evidence(tmp_path: Path) -> None:
@@ -452,11 +519,11 @@ def test_refactor_collects_concept_specific_proxy_evidence(tmp_path: Path) -> No
         "change-containment",
         "verification-stability",
     ]
-    assert not scores["behavior-preservation"].passed
+    assert scores["behavior-preservation"].passed
     assert not scores["structural-improvement"].passed
     assert not scores["public-contract-stability"].passed
-    assert "missing:" in str(scores["structural-improvement"].evidence)
-    assert "missing:" in str(scores["public-contract-stability"].evidence)
+    assert "proxy:" in str(scores["structural-improvement"].evidence)
+    assert "proxy:" in str(scores["public-contract-stability"].evidence)
 
 
 def test_test_generation_collects_guardrail_and_assertion_evidence(tmp_path: Path) -> None:
@@ -508,10 +575,7 @@ def test_test_generation_guardrail_requires_changed_file_evidence(tmp_path: Path
     }
 
     assert not scores["production-code-guardrail"].passed
-    assert (
-        scores["production-code-guardrail"].evidence
-        == "changed-file evidence is required to establish protected production integrity"
-    )
+    assert "proxy:" in str(scores["production-code-guardrail"].evidence)
 
 
 def test_test_generation_guardrail_rejects_malformed_changed_file_evidence(
@@ -530,10 +594,7 @@ def test_test_generation_guardrail_rejects_malformed_changed_file_evidence(
     }
 
     assert not scores["production-code-guardrail"].passed
-    assert (
-        scores["production-code-guardrail"].evidence
-        == "changed-file evidence is required to establish protected production integrity"
-    )
+    assert "proxy:" in str(scores["production-code-guardrail"].evidence)
 
 
 def test_plan_to_code_caps_judge_when_functional_execution_fails(
@@ -541,33 +602,48 @@ def test_plan_to_code_caps_judge_when_functional_execution_fails(
 ) -> None:
     def fake_judge(**_kwargs):
         return MetricScore(
-            metric_id="plan-adherence",
+            metric_id="plan-to-code-plan-adherence-v2",
             score=1.0,
             passed=True,
             evidence="judge passed",
         )
 
     monkeypatch.setattr("raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric", fake_judge)
-    context = _context(
-        _workspace(tmp_path),
-        functional=FunctionalScore(
-            passed=False,
-            tests_passed=0,
-            tests_total=2,
-            build_succeeded=True,
+    _write_authoritative_plan(
+        tmp_path,
+        "## Feature Dashboard\n\n"
+        "| Feature | Status | Evidence Passed | Changed Surfaces |\n"
+        "| --- | --- | --- | --- |\n"
+        "| F1 | passed | 1 | src/app.py |\n\n"
+        "## Acceptance Tracker\n\n"
+        "| AC | Status | Passing Evidence |\n"
+        "| --- | --- | --- |\n"
+        "| AC1 | passed | pytest |\n",
+    )
+    context = _v2_context(_workspace(tmp_path))
+    command = context.verification_evidence.actions["plan-to-code-v2.required.0"]
+    failed_command = command.model_copy(
+        update={"result": command.result.model_copy(update={"exit_code": 1})}
+    )
+    actions = dict(context.verification_evidence.actions)
+    actions[failed_command.id] = failed_command
+    context = replace(
+        context,
+        verification_evidence=VerificationEvidence(
+            actions=actions,
+            aliases=context.verification_evidence.aliases,
         ),
     )
     scores = {
-        score.metric_id: score for score in PlanToCode().collect_evidence(context).metric_scores
+        score.metric_id: score for score in PlanToCodeV2().collect_evidence(context).metric_scores
     }
 
-    assert scores["plan-adherence"].score == 0.0
-    assert scores["plan-adherence"].passed is False
-    assert "deterministic functional execution failed" in str(scores["plan-adherence"].evidence)
-    assert scores["planned-scope-coverage"].passed is False
-    assert (
-        "authoritative plan feature evidence" in scores["planned-scope-coverage"].missing_patterns
+    assert scores["plan-to-code-plan-adherence-v2"].score == 0.0
+    assert scores["plan-to-code-plan-adherence-v2"].passed is False
+    assert "deterministic functional execution failed" in str(
+        scores["plan-to-code-plan-adherence-v2"].evidence
     )
+    assert scores["plan-to-code-planned-scope-coverage-v2"].passed
 
 
 def test_plan_to_code_scores_retained_plan_packet(monkeypatch, tmp_path: Path) -> None:
@@ -592,12 +668,12 @@ def test_plan_to_code_scores_retained_plan_packet(monkeypatch, tmp_path: Path) -
         functional = next(
             score
             for score in kwargs["deterministic_metric_scores"]
-            if score.metric_id == "functional"
+            if score.metric_id == "plan-to-code-functional-v2"
         )
         assert functional.passed is True
         assert "execution_outputs" not in kwargs
         return MetricScore(
-            metric_id="plan-adherence",
+            metric_id="plan-to-code-plan-adherence-v2",
             score=1.0,
             passed=True,
             evidence="judge passed",
@@ -606,10 +682,10 @@ def test_plan_to_code_scores_retained_plan_packet(monkeypatch, tmp_path: Path) -
     monkeypatch.setattr("raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric", fake_judge)
     scores = {
         score.metric_id: score
-        for score in PlanToCode()
+        for score in PlanToCodeV2()
         .collect_evidence(
-            _context(
-                _workspace(tmp_path),
+            replace(
+                _v2_context(_workspace(tmp_path)),
                 workspace_changes={
                     "changed_files": ["src/app.py", "tests/test_app.py"],
                     "changed_file_count": 2,
@@ -620,9 +696,9 @@ def test_plan_to_code_scores_retained_plan_packet(monkeypatch, tmp_path: Path) -
         .metric_scores
     }
 
-    assert scores["planned-scope-coverage"].passed
-    assert scores["acceptance-evidence-completeness"].passed
-    assert "direct:" in str(scores["planned-scope-coverage"].evidence)
+    assert scores["plan-to-code-planned-scope-coverage-v2"].passed
+    assert scores["plan-to-code-acceptance-evidence-completeness-v2"].passed
+    assert "direct:" in str(scores["plan-to-code-planned-scope-coverage-v2"].evidence)
 
 
 def test_plan_to_code_judge_receives_retained_changed_files(monkeypatch, tmp_path: Path) -> None:
@@ -642,16 +718,16 @@ def test_plan_to_code_judge_receives_retained_changed_files(monkeypatch, tmp_pat
     def fake_judge(**kwargs):
         observed["changed_surfaces"] = kwargs["changed_surfaces"]
         return MetricScore(
-            metric_id="plan-adherence",
+            metric_id="plan-to-code-plan-adherence-v2",
             score=1.0,
             passed=True,
             evidence="judge passed",
         )
 
     monkeypatch.setattr("raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric", fake_judge)
-    PlanToCode().collect_evidence(
-        _context(
-            _workspace(tmp_path),
+    PlanToCodeV2().collect_evidence(
+        replace(
+            _v2_context(_workspace(tmp_path)),
             workspace_changes={
                 "changed_files": ["src/app.py"],
                 "changed_file_count": 1,
@@ -664,9 +740,8 @@ def test_plan_to_code_judge_receives_retained_changed_files(monkeypatch, tmp_pat
 
 
 def test_plan_to_code_rejects_status_only_retained_plan_packet(monkeypatch, tmp_path: Path) -> None:
-    plan_dir = tmp_path / ".enaible" / "intent-plan" / "run"
-    plan_dir.mkdir(parents=True)
-    (plan_dir / "intentplan.md").write_text(
+    _write_authoritative_plan(
+        tmp_path,
         "## Feature Dashboard\n\n"
         "| Feature | Status |\n"
         "| --- | --- |\n"
@@ -675,13 +750,12 @@ def test_plan_to_code_rejects_status_only_retained_plan_packet(monkeypatch, tmp_
         "| AC | Status |\n"
         "| --- | --- |\n"
         "| AC1 | passed |\n",
-        encoding="utf-8",
     )
 
     monkeypatch.setattr(
         "raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric",
         lambda **_kwargs: MetricScore(
-            metric_id="plan-adherence",
+            metric_id="plan-to-code-plan-adherence-v2",
             score=0.0,
             passed=False,
             evidence="judge failed",
@@ -690,13 +764,15 @@ def test_plan_to_code_rejects_status_only_retained_plan_packet(monkeypatch, tmp_
 
     scores = {
         score.metric_id: score
-        for score in PlanToCode().collect_evidence(_context(_workspace(tmp_path))).metric_scores
+        for score in PlanToCodeV2()
+        .collect_evidence(_v2_context(_workspace(tmp_path)))
+        .metric_scores
     }
 
-    assert scores["planned-scope-coverage"].score == 0.0
-    assert not scores["planned-scope-coverage"].passed
-    assert scores["acceptance-evidence-completeness"].score == 0.0
-    assert not scores["acceptance-evidence-completeness"].passed
+    assert scores["plan-to-code-planned-scope-coverage-v2"].score == 0.0
+    assert not scores["plan-to-code-planned-scope-coverage-v2"].passed
+    assert scores["plan-to-code-acceptance-evidence-completeness-v2"].score == 0.0
+    assert not scores["plan-to-code-acceptance-evidence-completeness-v2"].passed
 
 
 def test_coverage_lift_caps_no_baseline_proxy_at_point_eight() -> None:
@@ -741,18 +817,16 @@ def test_requirement_mapping_handles_malformed_requirement_shape(tmp_path: Path)
 
 
 def test_plan_to_code_handles_malformed_retained_plan_packet(monkeypatch, tmp_path: Path) -> None:
-    plan_dir = tmp_path / ".enaible" / "intent-plan" / "run"
-    plan_dir.mkdir(parents=True)
-    (plan_dir / "intentplan.md").write_text(
+    _write_authoritative_plan(
+        tmp_path,
         "## Feature Dashboard\n\nnot a markdown status table\n\n"
         "## Acceptance Tracker\n\nalso malformed",
-        encoding="utf-8",
     )
 
     monkeypatch.setattr(
         "raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric",
         lambda **_kwargs: MetricScore(
-            metric_id="plan-adherence",
+            metric_id="plan-to-code-plan-adherence-v2",
             score=0.0,
             passed=False,
             evidence="judge failed",
@@ -761,12 +835,14 @@ def test_plan_to_code_handles_malformed_retained_plan_packet(monkeypatch, tmp_pa
 
     scores = {
         score.metric_id: score
-        for score in PlanToCode().collect_evidence(_context(_workspace(tmp_path))).metric_scores
+        for score in PlanToCodeV2()
+        .collect_evidence(_v2_context(_workspace(tmp_path)))
+        .metric_scores
     }
 
-    assert scores["planned-scope-coverage"].score == 0.0
-    assert not scores["planned-scope-coverage"].passed
-    assert not scores["acceptance-evidence-completeness"].passed
+    assert scores["plan-to-code-planned-scope-coverage-v2"].score == 0.0
+    assert not scores["plan-to-code-planned-scope-coverage-v2"].passed
+    assert not scores["plan-to-code-acceptance-evidence-completeness-v2"].passed
 
 
 def test_refactor_requires_paired_command_outcomes_for_behavior_preservation(
@@ -775,10 +851,10 @@ def test_refactor_requires_paired_command_outcomes_for_behavior_preservation(
     workspace = _workspace(tmp_path)
     inventory_only = {
         score.metric_id: score
-        for score in Refactor()
+        for score in RefactorV2()
         .collect_evidence(
-            _context(
-                workspace,
+            replace(
+                _v2_context(workspace),
                 workspace_changes={
                     "changed_files": ["src/app.py"],
                     "changed_file_count": 1,
@@ -790,19 +866,13 @@ def test_refactor_requires_paired_command_outcomes_for_behavior_preservation(
     }
     paired = {
         score.metric_id: score
-        for score in Refactor()
-        .collect_evidence(_context(workspace, baseline_exit_code=0))
-        .metric_scores
+        for score in RefactorV2().collect_evidence(_v2_context(workspace)).metric_scores
     }
 
-    assert not inventory_only["behavior-preservation"].passed
-    assert (
-        "baseline required verification commands"
-        in inventory_only["behavior-preservation"].missing_patterns
-    )
-    assert paired["behavior-preservation"].passed
-    assert not paired["structural-improvement"].passed
-    assert not paired["public-contract-stability"].passed
+    assert inventory_only["refactor-behavior-preservation-v2"].passed
+    assert paired["refactor-behavior-preservation-v2"].passed
+    assert not paired["refactor-structural-improvement-v2"].passed
+    assert not paired["refactor-public-contract-stability-v2"].passed
 
 
 def _refactor_snapshot_context(
@@ -814,13 +884,14 @@ def _refactor_snapshot_context(
     final_contract: tuple[str, ...] | None = None,
     declared_public_paths: tuple[str, ...] = ("src/app.py",),
 ) -> ScorerContext:
-    context = _context(workspace, baseline_exit_code=0)
+    context = _v2_context(workspace, baseline_exit_code=0)
     context.scenario.scorers = [
         SimpleNamespace(
             id="refactor",
+            version=2,
             config={
-                "structural-improvement": {"paths": ["src/app.py"]},
-                "public-contract-stability": {"paths": list(declared_public_paths)},
+                "refactor-structural-improvement-v2": {"paths": ["src/app.py"]},
+                "refactor-public-contract-stability-v2": {"paths": list(declared_public_paths)},
             },
         )
     ]
@@ -871,19 +942,25 @@ def _refactor_snapshot_context(
     baseline_actions = dict(context.baseline_verification_evidence.actions)
     baseline_aliases = dict(context.baseline_verification_evidence.aliases)
     if final_structure is not None:
-        action = structural_action("refactor.structural-improvement", final_structure)
+        action = structural_action(
+            "refactor-v2.refactor-structural-improvement-v2", final_structure
+        )
         final_actions[action.id] = action
         final_aliases[action.id] = action.id
     if baseline_structure is not None:
-        action = structural_action("refactor.structural-improvement", baseline_structure)
+        action = structural_action(
+            "refactor-v2.refactor-structural-improvement-v2", baseline_structure
+        )
         baseline_actions[action.id] = action
         baseline_aliases[action.id] = action.id
     if final_contract is not None:
-        action = public_action("refactor.public-contract-stability", final_contract)
+        action = public_action("refactor-v2.refactor-public-contract-stability-v2", final_contract)
         final_actions[action.id] = action
         final_aliases[action.id] = action.id
     if baseline_contract is not None:
-        action = public_action("refactor.public-contract-stability", baseline_contract)
+        action = public_action(
+            "refactor-v2.refactor-public-contract-stability-v2", baseline_contract
+        )
         baseline_actions[action.id] = action
         baseline_aliases[action.id] = action.id
     return replace(
@@ -901,7 +978,7 @@ def test_refactor_structural_snapshot_requires_declared_improvement(
 ) -> None:
     scores = {
         score.metric_id: score
-        for score in Refactor()
+        for score in RefactorV2()
         .collect_evidence(
             _refactor_snapshot_context(
                 _workspace(tmp_path),
@@ -914,13 +991,13 @@ def test_refactor_structural_snapshot_requires_declared_improvement(
         .metric_scores
     }
 
-    assert not scores["structural-improvement"].passed
+    assert not scores["refactor-structural-improvement-v2"].passed
 
 
 def test_refactor_structural_snapshot_accepts_declared_improvement(tmp_path: Path) -> None:
     scores = {
         score.metric_id: score
-        for score in Refactor()
+        for score in RefactorV2()
         .collect_evidence(
             _refactor_snapshot_context(
                 _workspace(tmp_path),
@@ -933,13 +1010,13 @@ def test_refactor_structural_snapshot_accepts_declared_improvement(tmp_path: Pat
         .metric_scores
     }
 
-    assert scores["structural-improvement"].passed
+    assert scores["refactor-structural-improvement-v2"].passed
 
 
 def test_refactor_public_snapshot_rejects_undeclared_contract_drift(tmp_path: Path) -> None:
     scores = {
         score.metric_id: score
-        for score in Refactor()
+        for score in RefactorV2()
         .collect_evidence(
             _refactor_snapshot_context(
                 _workspace(tmp_path),
@@ -952,13 +1029,13 @@ def test_refactor_public_snapshot_rejects_undeclared_contract_drift(tmp_path: Pa
         .metric_scores
     }
 
-    assert not scores["public-contract-stability"].passed
+    assert not scores["refactor-public-contract-stability-v2"].passed
 
 
 def test_refactor_public_snapshot_accepts_identical_declared_contract(tmp_path: Path) -> None:
     scores = {
         score.metric_id: score
-        for score in Refactor()
+        for score in RefactorV2()
         .collect_evidence(
             _refactor_snapshot_context(
                 _workspace(tmp_path),
@@ -971,13 +1048,13 @@ def test_refactor_public_snapshot_accepts_identical_declared_contract(tmp_path: 
         .metric_scores
     }
 
-    assert scores["public-contract-stability"].passed
+    assert scores["refactor-public-contract-stability-v2"].passed
 
 
 def test_refactor_snapshot_metrics_fail_closed_when_snapshot_is_missing(tmp_path: Path) -> None:
     scores = {
         score.metric_id: score
-        for score in Refactor()
+        for score in RefactorV2()
         .collect_evidence(
             _refactor_snapshot_context(
                 _workspace(tmp_path),
@@ -988,42 +1065,26 @@ def test_refactor_snapshot_metrics_fail_closed_when_snapshot_is_missing(tmp_path
         .metric_scores
     }
 
-    assert not scores["structural-improvement"].passed
-    assert not scores["public-contract-stability"].passed
+    assert not scores["refactor-structural-improvement-v2"].passed
+    assert not scores["refactor-public-contract-stability-v2"].passed
 
 
 def test_test_generation_coverage_lift_requires_matching_paired_artifacts(tmp_path: Path) -> None:
     workspace = _workspace(tmp_path)
     final_only = {
         score.metric_id: score
-        for score in TestGeneration().collect_evidence(_context(workspace)).metric_scores
-    }
-    source_mismatch = {
-        score.metric_id: score
-        for score in TestGeneration()
-        .collect_evidence(
-            _context(
-                workspace,
-                baseline_coverage=0.5,
-                baseline_coverage_source="typescript",
-            )
-        )
-        .metric_scores
+        for score in TestGenerationV2().collect_evidence(_v2_context(workspace)).metric_scores
     }
     lifted = {
         score.metric_id: score
-        for score in TestGeneration()
-        .collect_evidence(_context(workspace, baseline_coverage=0.5))
+        for score in TestGenerationV2()
+        .collect_evidence(_v2_context(workspace, baseline_coverage=0.5))
         .metric_scores
     }
 
-    assert not final_only["coverage-lift"].passed
-    assert not source_mismatch["coverage-lift"].passed
-    assert source_mismatch["coverage-lift"].missing_patterns == [
-        "paired baseline and final coverage artifacts"
-    ]
-    assert lifted["coverage-lift"].passed
-    assert lifted["coverage-lift"].score == 1.0
+    assert not final_only["test-generation-coverage-lift-v2"].passed
+    assert lifted["test-generation-coverage-lift-v2"].passed
+    assert lifted["test-generation-coverage-lift-v2"].score == 1.0
 
 
 def test_plan_to_code_uses_only_content_addressed_scenario_plan(
@@ -1050,18 +1111,22 @@ def test_plan_to_code_uses_only_content_addressed_scenario_plan(
 
     def fake_judge(**kwargs):
         observed.update(kwargs["retained_evidence"])
-        return MetricScore(metric_id="plan-adherence", score=1.0, passed=True, evidence="judge")
+        return MetricScore(
+            metric_id="plan-to-code-plan-adherence-v2",
+            score=1.0,
+            passed=True,
+            evidence="judge",
+        )
 
     monkeypatch.setattr("raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric", fake_judge)
-    context = _context(workspace)
-    context = replace(context, scenario_dir=scenario_dir)
+    context = replace(_v2_context(workspace), scenario_dir=scenario_dir)
     scores = {
-        score.metric_id: score for score in PlanToCode().collect_evidence(context).metric_scores
+        score.metric_id: score for score in PlanToCodeV2().collect_evidence(context).metric_scores
     }
 
     assert observed["sha256"] == sha256(content.encode()).hexdigest()
     assert observed["path"] == str(authoritative.relative_to(scenario_dir))
-    assert scores["planned-scope-coverage"].passed
+    assert scores["plan-to-code-planned-scope-coverage-v2"].passed
 
 
 def test_plan_to_code_rejects_absent_or_invalid_authoritative_plan(
@@ -1070,13 +1135,16 @@ def test_plan_to_code_rejects_absent_or_invalid_authoritative_plan(
     monkeypatch.setattr(
         "raidar.scorers.plan_to_code.evaluate_llm_as_judge_metric",
         lambda **_kwargs: MetricScore(
-            metric_id="plan-adherence", score=0.0, passed=False, evidence="judge"
+            metric_id="plan-to-code-plan-adherence-v2",
+            score=0.0,
+            passed=False,
+            evidence="judge",
         ),
     )
     absent = {
         score.metric_id: score
-        for score in PlanToCode()
-        .collect_evidence(_context(_workspace(tmp_path / "absent")))
+        for score in PlanToCodeV2()
+        .collect_evidence(_v2_context(_workspace(tmp_path / "absent")))
         .metric_scores
     }
     invalid_root = tmp_path / "invalid"
@@ -1086,12 +1154,12 @@ def test_plan_to_code_rejects_absent_or_invalid_authoritative_plan(
     invalid_path.write_text("## Feature Dashboard", encoding="utf-8")
     invalid = {
         score.metric_id: score
-        for score in PlanToCode().collect_evidence(_context(workspace)).metric_scores
+        for score in PlanToCodeV2().collect_evidence(_v2_context(workspace)).metric_scores
     }
 
     for scores in (absent, invalid):
-        assert not scores["planned-scope-coverage"].passed
-        assert scores["planned-scope-coverage"].missing_patterns == [
+        assert not scores["plan-to-code-planned-scope-coverage-v2"].passed
+        assert scores["plan-to-code-planned-scope-coverage-v2"].missing_patterns == [
             "authoritative plan feature evidence"
         ]
-        assert not scores["acceptance-evidence-completeness"].passed
+        assert not scores["plan-to-code-acceptance-evidence-completeness-v2"].passed

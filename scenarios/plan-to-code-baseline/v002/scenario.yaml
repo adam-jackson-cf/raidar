@@ -1,0 +1,110 @@
+name: plan-to-code-baseline
+display_name: Planned alert-escalation implementation
+scenario_revision: v002
+parent_revision: v001
+description: Calibration successor for the plan-driven alert-escalation implementation task with authoritative plan evidence
+difficulty: medium
+task_kind: feature_implementation
+delivery_mode: plan_driven
+workspace_state: existing
+starting_conditions: []
+languages:
+- Python
+evaluation_role: benchmark
+catalog_status: calibration
+variant_axes: {}
+timeout_sec: 1800
+test_scripts: []
+environment:
+  kind: stack_preset
+  id: python:3.12
+  capabilities:
+    runtimes: {}
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  workdir: /app
+  requirements:
+    runtimes:
+      python: '>=3.12'
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+  - - python
+    - -m
+    - compileall
+    - -q
+    - src
+    - tests
+  - - python
+    - -m
+    - unittest
+    - discover
+    - -s
+    - tests
+  setup_actions: []
+  test_discovery_globs: []
+  skip_test_commands_when_no_tests: false
+  gates: []
+  workflow:
+    atomic_commits_required: false
+requirements:
+  items:
+  - id: req-authoritative-plan
+    description: Retain the authoritative SHA-256-addressed scenario-owned `intentplan.md` with Feature Dashboard and Acceptance Tracker tables.
+    check:
+      type: file_exists
+      pattern: .enaible/intent-plan/deb41670eb853b2bd8d445f8efb44a7c5bbb929a29fae9a2455dff73d58f3ae4/intentplan.md
+      description: Authoritative scenario-owned plan artifact exists.
+    required_test_evidence: []
+  - id: req-alert-module
+    description: Implement `src/alerts/escalation.py`.
+    check:
+      type: file_exists
+      pattern: src/alerts/escalation.py
+      description: Alert escalation module exists.
+    required_test_evidence: []
+  - id: req-escalation-export
+    description: Export `route_alert(alert)`.
+    check:
+      type: import_present
+      pattern: route_alert
+      description: route_alert export is present.
+    required_test_evidence: []
+  - id: req-acceptance-tests
+    description: Add tests for severity routing and missing owner fallback.
+    check:
+      type: file_exists
+      pattern: tests/test_escalation.py
+      description: Escalation test file exists.
+    required_test_evidence: []
+evidence:
+  retained_files: []
+scorers:
+- id: plan-to-code
+  version: 2
+  weight: 0.78
+  config: {}
+- id: requirements
+  version: 1
+  weight: 0.2
+  config: {}
+- id: resource-efficiency
+  version: 1
+  weight: 0.02
+  config: {}
+prompt:
+  entry: prompt/task.md
+  includes: []

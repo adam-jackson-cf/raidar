@@ -766,3 +766,121 @@ def test_removed_generic_and_acceptance_scorers_are_unknown():
             match=f"Unknown scorer definition: {scorer_id}@1",
         ):
             load_scorer_definition(scorer_id, 1)
+
+
+@pytest.mark.parametrize(
+    ("scorer_id", "historical_metric_ids", "successor_metric_ids"),
+    (
+        (
+            "bugfix",
+            {
+                "defect-resolution",
+                "regression-protection",
+                "change-containment",
+                "verification-stability",
+                "defect-evidence-completeness",
+            },
+            {
+                "bugfix-defect-resolution-v2",
+                "bugfix-regression-protection-v2",
+                "bugfix-change-containment-v2",
+                "bugfix-verification-stability-v2",
+                "bugfix-defect-evidence-completeness-v2",
+            },
+        ),
+        (
+            "refactor",
+            {
+                "behavior-preservation",
+                "structural-improvement",
+                "public-contract-stability",
+                "change-containment",
+                "verification-stability",
+            },
+            {
+                "refactor-behavior-preservation-v2",
+                "refactor-structural-improvement-v2",
+                "refactor-public-contract-stability-v2",
+                "refactor-change-containment-v2",
+                "refactor-verification-stability-v2",
+            },
+        ),
+        (
+            "test-generation",
+            {
+                "requirement-mapping",
+                "assertion-strength",
+                "coverage-lift",
+                "production-code-guardrail",
+                "verification-stability",
+            },
+            {
+                "test-generation-requirement-mapping-v2",
+                "test-generation-assertion-strength-v2",
+                "test-generation-coverage-lift-v2",
+                "test-generation-production-code-guardrail-v2",
+                "test-generation-verification-stability-v2",
+            },
+        ),
+        (
+            "plan-to-code",
+            {
+                "plan-adherence",
+                "planned-scope-coverage",
+                "acceptance-evidence-completeness",
+                "functional",
+                "verification-stability",
+            },
+            {
+                "plan-to-code-plan-adherence-v2",
+                "plan-to-code-planned-scope-coverage-v2",
+                "plan-to-code-acceptance-evidence-completeness-v2",
+                "plan-to-code-functional-v2",
+                "plan-to-code-verification-stability-v2",
+            },
+        ),
+    ),
+)
+def test_task_conditioned_scorer_versions_have_disjoint_composable_metrics(
+    scorer_id, historical_metric_ids, successor_metric_ids
+):
+    historical = load_scorer_definition(scorer_id, 1)
+    successor = load_scorer_definition(scorer_id, 2)
+
+    assert historical.version == 1
+    assert successor.version == 2
+    assert successor.extends is None
+    assert {metric.id for metric in historical.metrics} == historical_metric_ids
+    assert {metric.id for metric in successor.metrics} == successor_metric_ids
+    assert historical_metric_ids.isdisjoint(successor_metric_ids)
+    assert successor.evidence_dependencies == historical.evidence_dependencies
+
+    scenario = SimpleNamespace(
+        scorers=[
+            SimpleNamespace(id=scorer_id, version=1, weight=0.4, config={}),
+            SimpleNamespace(id=scorer_id, version=2, weight=0.4, config={}),
+            SimpleNamespace(id="resource-efficiency", version=1, weight=0.2, config={}),
+        ]
+    )
+    metrics = resolved_metrics(scenario)
+
+    assert len({metric.id for metric in metrics}) == len(metrics)
+    assert "resource-efficiency" in {metric.id for metric in metrics}
+
+
+def test_task_conditioned_v2_metrics_are_mutually_and_version_disjoint() -> None:
+    scorer_ids = ("bugfix", "refactor", "test-generation", "plan-to-code")
+    v1_metric_id_sets = {
+        scorer_id: {metric.id for metric in load_scorer_definition(scorer_id, 1).metrics}
+        for scorer_id in scorer_ids
+    }
+    v2_metric_id_sets = {
+        scorer_id: {metric.id for metric in load_scorer_definition(scorer_id, 2).metrics}
+        for scorer_id in scorer_ids
+    }
+
+    for scorer_id, metric_ids in v2_metric_id_sets.items():
+        assert metric_ids.isdisjoint(v1_metric_id_sets[scorer_id])
+
+    all_v2_metric_ids = set().union(*v2_metric_id_sets.values())
+    assert len(all_v2_metric_ids) == sum(map(len, v2_metric_id_sets.values()))

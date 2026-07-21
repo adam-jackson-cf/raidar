@@ -3,7 +3,11 @@
 import pytest
 from pydantic import ValidationError
 
-from raidar.schemas.scenario import ScenarioDefinition
+from raidar.schemas.scenario import (
+    CoreMetricDefinition,
+    LLMAsJudgeMetricDefinition,
+    ScenarioDefinition,
+)
 from raidar.scorers.registry import load_scorer_definition
 
 
@@ -157,19 +161,88 @@ def test_scorer_refs_reject_unknown_scorer() -> None:
 
 
 @pytest.mark.parametrize(
-    "scorer_id",
-    ["python-code-task", "bugfix", "refactor", "plan-to-code", "test-generation"],
+    ("scorer_id", "version"),
+    [
+        ("python-code-task", 1),
+        ("bugfix", 1),
+        ("refactor", 1),
+        ("plan-to-code", 1),
+        ("test-generation", 1),
+        ("bugfix", 2),
+        ("refactor", 2),
+        ("plan-to-code", 2),
+        ("test-generation", 2),
+    ],
 )
-def test_concrete_scorers_are_active_and_attachable(scorer_id: str) -> None:
-    scorer = load_scorer_definition(scorer_id, 1)
+def test_concrete_scorers_are_active_and_attachable(scorer_id: str, version: int) -> None:
+    scorer = load_scorer_definition(scorer_id, version)
     assert scorer.status == "active"
 
     payload = _base_scenario_payload()
-    payload["scorers"] = [{"id": scorer_id, "version": 1, "weight": 1.0}]
+    payload["scorers"] = [{"id": scorer_id, "version": version, "weight": 1.0}]
     scenario = ScenarioDefinition.model_validate(payload)
 
-    assert scenario.scorer_ids() == [f"{scorer_id}@1"]
+    assert scenario.scorer_ids() == [f"{scorer_id}@{version}"]
     assert scenario.metric_ids() == [metric.id for metric in scorer.metrics]
+
+
+@pytest.mark.parametrize(
+    "metric_id",
+    [
+        "bugfix-defect-resolution-v2",
+        "bugfix-regression-protection-v2",
+        "bugfix-change-containment-v2",
+        "bugfix-verification-stability-v2",
+        "bugfix-defect-evidence-completeness-v2",
+        "refactor-behavior-preservation-v2",
+        "refactor-structural-improvement-v2",
+        "refactor-public-contract-stability-v2",
+        "refactor-change-containment-v2",
+        "refactor-verification-stability-v2",
+        "test-generation-requirement-mapping-v2",
+        "test-generation-assertion-strength-v2",
+        "test-generation-coverage-lift-v2",
+        "test-generation-production-code-guardrail-v2",
+        "test-generation-verification-stability-v2",
+        "plan-to-code-planned-scope-coverage-v2",
+        "plan-to-code-acceptance-evidence-completeness-v2",
+        "plan-to-code-functional-v2",
+        "plan-to-code-verification-stability-v2",
+    ],
+)
+def test_schema_accepts_prefixed_v2_core_metric_ids(metric_id: str) -> None:
+    assert CoreMetricDefinition(id=metric_id).id == metric_id
+
+
+def test_schema_accepts_plan_to_code_v2_llm_judge_metric_id() -> None:
+    metric = LLMAsJudgeMetricDefinition(
+        id="plan-to-code-plan-adherence-v2",
+        config={"judge": "judges/plan-judge.toml"},
+    )
+
+    assert metric.id == "plan-to-code-plan-adherence-v2"
+
+
+@pytest.mark.parametrize(
+    ("definition", "payload"),
+    [
+        (CoreMetricDefinition, {"id": "defect-resolution-v2"}),
+        (CoreMetricDefinition, {"id": "unregistered-v2"}),
+        (
+            LLMAsJudgeMetricDefinition,
+            {
+                "id": "plan-adherence-v2",
+                "config": {"judge": "judges/plan-judge.toml"},
+            },
+        ),
+    ],
+)
+def test_schema_rejects_unsupported_v2_metric_ids(
+    definition: type[CoreMetricDefinition | LLMAsJudgeMetricDefinition],
+    payload: dict,
+) -> None:
+    with pytest.raises(ValidationError):
+        definition.model_validate(payload)
 
 
 def test_code_task_family_is_not_attachable() -> None:

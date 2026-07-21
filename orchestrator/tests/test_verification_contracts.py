@@ -10,8 +10,12 @@ import pytest
 
 from raidar.schemas.environment import CapabilityRequirements
 from raidar.scorers.base import registered_scorers
+from raidar.scorers.code_task.bugfix import Bugfix, BugfixV2
+from raidar.scorers.code_task.refactor import Refactor, RefactorV2
 from raidar.scorers.code_task.typescript import TypeScriptCodeTask
 from raidar.scorers.design_to_code import DesignToCode
+from raidar.scorers.plan_to_code import PlanToCode, PlanToCodeV2
+from raidar.scorers.test_generation import TestGeneration, TestGenerationV2
 from raidar.scorers.evidence_contract import (
     CommandEvidenceResult,
     EvidenceActionResult,
@@ -502,6 +506,53 @@ def test_every_execution_dependent_scorer_declares_a_satisfied_plan() -> None:
 
     assert dependencies
     assert set(dependencies) <= {alias.split(".", 1)[0] for alias in normalized.aliases}
+
+
+def test_task_conditioned_v2_verification_plans_use_distinct_owners() -> None:
+    scenario = SimpleNamespace(
+        visual=None,
+        verification=SimpleNamespace(
+            gates=[],
+            required_commands=[["python", "-m", "pytest"]],
+            preflight_command_timeout_sec=30,
+        ),
+    )
+    context = VerificationPlanContext(
+        scenario=scenario,
+        resolved_scorer=SimpleNamespace(metrics=()),
+        scenario_dir=Path("."),
+        environment_capabilities=CapabilityRequirements(),
+        visual_comparison=_visual_comparison_policy(),
+    )
+    scorer_pairs = (
+        (Bugfix(), BugfixV2()),
+        (Refactor(), RefactorV2()),
+        (TestGeneration(), TestGenerationV2()),
+        (PlanToCode(), PlanToCodeV2()),
+    )
+    plans = tuple(
+        plan
+        for pair in scorer_pairs
+        for plan in (pair[0].verification_plan(context), pair[1].verification_plan(context))
+    )
+
+    assert {plan.owner for plan in plans} == {
+        "bugfix",
+        "bugfix-v2",
+        "refactor",
+        "refactor-v2",
+        "test-generation",
+        "test-generation-v2",
+        "plan-to-code",
+        "plan-to-code-v2",
+    }
+    normalized = normalize_verification_plans(plans)
+    assert {
+        "bugfix-v2.required.0",
+        "refactor-v2.required.0",
+        "test-generation-v2.required.0",
+        "plan-to-code-v2.required.0",
+    } <= set(normalized.aliases)
 
 
 def test_design_to_code_verification_plan_uses_visual_and_resolved_metric_config() -> None:

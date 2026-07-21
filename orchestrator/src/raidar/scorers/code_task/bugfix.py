@@ -8,11 +8,14 @@ from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     change_containment_metric_score,
+    functional_score_from_evidence,
     is_test_path,
     metric,
+    source_and_test_files,
     valid_changed_file_paths,
     verification_stability_from_evidence,
 )
+from raidar.scorers.requirements import _requirements_coverage_score
 from raidar.scorers.verification import (
     EvidenceDependency,
     VerificationEvidence,
@@ -37,26 +40,30 @@ class Bugfix(BaseScorer):
             "defect-resolution",
             "core",
             0.30,
-            evidence="Paired bugfix-owned starter command failure and final command success.",
-            score_derivation=(
-                "Passes only when the same declared bugfix command fails on the starter "
-                "workspace and succeeds after submission."
+            evidence=(
+                "Requirement checks, failing-case reproduction evidence, final test and gate "
+                "outcomes."
             ),
-            pass_fail="Passes when at least one paired defect command resolves.",
+            score_derivation=(
+                "Scores defect-linked check pass rate, capped by functional execution score."
+            ),
+            pass_fail=(
+                "Passes when the defect-linked behavior now passes and functional execution passed."
+            ),
         ),
         metric(
             "regression-protection",
             "core",
             0.25,
             evidence=(
-                "Paired bugfix command outcomes and retained regression-test paths linked "
-                "to changed test files."
+                "Added or changed tests, test names or assertions near defect behavior, "
+                "optional starter replay when available."
             ),
             score_derivation=(
-                "Passes only when a resolved command pair and a retained changed-test "
-                "linkage are both present."
+                "Scores presence of behavior-specific regression tests; starter replay "
+                "upgrades proxy confidence when available."
             ),
-            pass_fail="Passes when retained regression evidence identifies a changed test.",
+            pass_fail="Passes when regression evidence protects the fixed behavior.",
         ),
         metric(
             "change-containment",
@@ -82,6 +89,110 @@ class Bugfix(BaseScorer):
             "core",
             0.10,
             evidence=(
+                "Reproduction note, test evidence, verification evidence, and changed file "
+                "evidence."
+            ),
+            score_derivation=(
+                "Scores required defect evidence fields present in scorer metadata or run "
+                "artifacts."
+            ),
+            pass_fail="Passes when defect, regression, and verification evidence are all present.",
+        ),
+    )
+    evidence_dependencies = (EvidenceDependency(kind="command"),)
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare scenario verification commands owned by this scorer."""
+
+        return scenario_command_plan(self.id, context)
+
+    def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
+        workspace = Path(context.workspace)
+        evidence = context.verification_evidence.for_owner(self.id)
+        functional = functional_score_from_evidence(evidence)
+        stability = verification_stability_from_evidence(evidence)
+        requirements = _requirements_coverage_score(workspace, context.scenario)
+        sources, tests = source_and_test_files(workspace)
+        return ScorerEvidence(
+            metric_scores=(
+                _defect_resolution_score(functional, requirements),
+                _regression_protection_score(tests),
+                change_containment_metric_score(
+                    workspace=workspace,
+                    workspace_changes=context.workspace_changes,
+                ),
+                stability,
+                _defect_evidence_completeness_score(
+                    functional=functional,
+                    stability=stability,
+                    retained_evidence=context.retained_evidence,
+                    workspace_changes=context.workspace_changes,
+                ),
+            ),
+            metadata={"source_files": len(sources), "test_files": len(tests)},
+        )
+
+
+@register_scorer(scorer_id="bugfix", version=2)
+class BugfixV2(BaseScorer):
+    """Bugfix scorer for the direct-evidence calibration contract."""
+
+    status = "active"
+    category = "quality"
+    description = (
+        "Scores targeted defect fixes with regression coverage, minimal unrelated "
+        "drift, and clean verification."
+    )
+    metrics = (
+        metric(
+            "bugfix-defect-resolution-v2",
+            "core",
+            0.30,
+            evidence="Paired bugfix-owned starter command failure and final command success.",
+            score_derivation=(
+                "Passes only when the same declared bugfix command fails on the starter "
+                "workspace and succeeds after submission."
+            ),
+            pass_fail="Passes when at least one paired defect command resolves.",
+        ),
+        metric(
+            "bugfix-regression-protection-v2",
+            "core",
+            0.25,
+            evidence=(
+                "Paired bugfix command outcomes and retained regression-test paths linked "
+                "to changed test files."
+            ),
+            score_derivation=(
+                "Passes only when a resolved command pair and a retained changed-test "
+                "linkage are both present."
+            ),
+            pass_fail="Passes when retained regression evidence identifies a changed test.",
+        ),
+        metric(
+            "bugfix-change-containment-v2",
+            "core",
+            0.20,
+            evidence=(
+                "Changed files, production/test diff ratio, touched modules, and "
+                "scenario-declared expected paths."
+            ),
+            score_derivation="Starts at 1.0 and subtracts unrelated production churn penalties.",
+            pass_fail="Passes when unrelated drift is absent or explicitly justified.",
+        ),
+        metric(
+            "bugfix-verification-stability-v2",
+            "core",
+            0.15,
+            evidence="Verification gate failure count across the run.",
+            score_derivation="Uses the verification stability score computed from gate history.",
+            pass_fail="Passes when verification stability is greater than zero.",
+        ),
+        metric(
+            "bugfix-defect-evidence-completeness-v2",
+            "core",
+            0.10,
+            evidence=(
                 "Paired bugfix command outcomes and retained regression-test paths linked "
                 "to changed test files."
             ),
@@ -97,7 +208,7 @@ class Bugfix(BaseScorer):
     def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
         """Declare scenario verification commands owned by this scorer."""
 
-        return scenario_command_plan(self.id, context)
+        return scenario_command_plan("bugfix-v2", context)
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         workspace = Path(context.workspace)
@@ -106,29 +217,154 @@ class Bugfix(BaseScorer):
         paired_outcomes = _paired_command_outcomes(
             baseline_evidence,
             final_evidence,
-            owner=self.id,
+            owner="bugfix-v2",
         )
         changed_test_links = _changed_test_links(
             context.retained_evidence,
             context.workspace_changes,
         )
-        stability = verification_stability_from_evidence(final_evidence.for_owner(self.id))
+        stability = verification_stability_from_evidence(final_evidence.for_owner("bugfix-v2"))
         return ScorerEvidence(
             metric_scores=(
-                _defect_resolution_score(paired_outcomes),
-                _regression_protection_score(paired_outcomes, changed_test_links),
-                change_containment_metric_score(
-                    workspace=workspace,
-                    workspace_changes=context.workspace_changes,
+                _v2_metric_score(_direct_defect_resolution_score(paired_outcomes)),
+                _v2_metric_score(
+                    _direct_regression_protection_score(paired_outcomes, changed_test_links)
                 ),
-                stability,
-                _defect_evidence_completeness_score(paired_outcomes, changed_test_links),
+                _v2_metric_score(
+                    change_containment_metric_score(
+                        workspace=workspace,
+                        workspace_changes=context.workspace_changes,
+                    )
+                ),
+                _v2_metric_score(stability),
+                _v2_metric_score(
+                    _direct_defect_evidence_completeness_score(paired_outcomes, changed_test_links)
+                ),
             ),
             metadata={
                 "paired_command_count": len(paired_outcomes),
                 "changed_test_link_count": len(changed_test_links),
             },
         )
+
+
+def _v2_metric_score(score: MetricScore) -> MetricScore:
+    if score.metric_id.startswith("bugfix-"):
+        return score
+    metric_id = score.metric_id.removesuffix("-v2")
+    return score.model_copy(update={"metric_id": f"bugfix-{metric_id}-v2"})
+
+
+def _defect_resolution_score(functional: MetricScore, requirements: MetricScore) -> MetricScore:
+    requirement_total = requirements.matched_count + len(requirements.missing_patterns)
+    if requirement_total <= 0:
+        return MetricScore(
+            metric_id="defect-resolution",
+            score=0.0,
+            passed=False,
+            missing_patterns=["defect-linked requirement evidence"],
+            evidence=(
+                f"direct: missing defect-linked requirement checks; functional={functional.score}"
+            ),
+        )
+    requirement_score = requirements.score
+    score = round(min(functional.score, requirement_score), 3)
+    return MetricScore(
+        metric_id="defect-resolution",
+        score=score,
+        passed=functional.passed and score >= 1.0,
+        evidence=(
+            "direct: functional execution capped by defect-linked requirement checks, "
+            f"functional={functional.score}, requirement_ratio={requirement_score}"
+        ),
+    )
+
+
+def _regression_protection_score(tests: list[Path]) -> MetricScore:
+    behavior_specific_tests = [
+        path
+        for path in tests
+        if any(term in path.as_posix().lower() for term in ("bug", "defect", "regression", "repro"))
+    ]
+    score = 1.0 if behavior_specific_tests else (0.5 if tests else 0.0)
+    return MetricScore(
+        metric_id="regression-protection",
+        score=score,
+        passed=bool(behavior_specific_tests),
+        missing_patterns=[] if behavior_specific_tests else ["behavior-specific regression tests"],
+        evidence=(
+            "proxy: test file inventory cannot prove failure-before-pass replay, "
+            f"test_files={len(tests)}, behavior_specific_tests={len(behavior_specific_tests)}"
+        ),
+    )
+
+
+def _defect_evidence_completeness_score(
+    *,
+    functional: MetricScore,
+    stability: MetricScore,
+    retained_evidence: dict,
+    workspace_changes: dict,
+) -> MetricScore:
+    reproduction_present = _has_text_evidence(
+        retained_evidence, ("reproduction_note", "defect_reproduction", "reproduction")
+    )
+    regression_present = _has_collection_evidence(
+        retained_evidence, ("regression_tests", "test_evidence", "passing_tests")
+    )
+    verification_present = functional.passed and (
+        stability.score > 0
+        or _has_text_evidence(retained_evidence, ("verification_evidence", "verification"))
+    )
+    changed_file_present = bool(valid_changed_file_paths(workspace_changes))
+    checks = [
+        reproduction_present,
+        regression_present,
+        verification_present,
+        changed_file_present,
+    ]
+    score = round(sum(1 for check in checks if check) / len(checks), 3)
+    missing = [
+        label
+        for label, present in (
+            ("reproduction note", reproduction_present),
+            ("regression test evidence", regression_present),
+            ("verification evidence", verification_present),
+            ("changed-file evidence", changed_file_present),
+        )
+        if not present
+    ]
+    return MetricScore(
+        metric_id="defect-evidence-completeness",
+        score=score,
+        passed=score >= 1.0,
+        missing_patterns=missing,
+        evidence=(
+            "direct: required defect evidence fields evaluated, "
+            f"reproduction_note={reproduction_present}, "
+            f"regression_tests={regression_present}, "
+            f"verification_evidence={verification_present}, "
+            f"changed_files={changed_file_present}"
+        ),
+    )
+
+
+def _has_text_evidence(evidence: dict, keys: tuple[str, ...]) -> bool:
+    for key in keys:
+        value = evidence.get(key)
+        if isinstance(value, str) and value.strip():
+            return True
+    return False
+
+
+def _has_collection_evidence(evidence: dict, keys: tuple[str, ...]) -> bool:
+    for key in keys:
+        value = evidence.get(key)
+        if isinstance(value, list | tuple | set | dict) and len(value) > 0:
+            return True
+        if isinstance(value, str) and value.strip():
+            return True
+    return False
 
 
 def _paired_command_outcomes(
@@ -177,7 +413,7 @@ def _command_succeeded(action: object) -> bool:
     )
 
 
-def _defect_resolution_score(
+def _direct_defect_resolution_score(
     paired_outcomes: tuple[tuple[str, bool, bool], ...],
 ) -> MetricScore:
     resolved_ids = [
@@ -198,7 +434,7 @@ def _defect_resolution_score(
         missing.append("paired starter command failure and matching final command success")
     score = 1.0 if resolved_ids else 0.0
     return MetricScore(
-        metric_id="defect-resolution",
+        metric_id="defect-resolution-v2",
         score=score,
         passed=bool(resolved_ids),
         matched_count=len(resolved_ids),
@@ -210,7 +446,7 @@ def _defect_resolution_score(
     )
 
 
-def _regression_protection_score(
+def _direct_regression_protection_score(
     paired_outcomes: tuple[tuple[str, bool, bool], ...],
     changed_test_links: tuple[str, ...],
 ) -> MetricScore:
@@ -224,7 +460,7 @@ def _regression_protection_score(
         missing.append("retained regression-test linkage to changed test files")
     passed = resolved and bool(changed_test_links)
     return MetricScore(
-        metric_id="regression-protection",
+        metric_id="regression-protection-v2",
         score=1.0 if passed else 0.0,
         passed=passed,
         matched_count=len(changed_test_links) if passed else 0,
@@ -236,7 +472,7 @@ def _regression_protection_score(
     )
 
 
-def _defect_evidence_completeness_score(
+def _direct_defect_evidence_completeness_score(
     paired_outcomes: tuple[tuple[str, bool, bool], ...],
     changed_test_links: tuple[str, ...],
 ) -> MetricScore:
@@ -254,7 +490,7 @@ def _defect_evidence_completeness_score(
     ]
     passed = resolved and linkage_present
     return MetricScore(
-        metric_id="defect-evidence-completeness",
+        metric_id="defect-evidence-completeness-v2",
         score=1.0 if passed else 0.0,
         passed=passed,
         matched_count=int(resolved) + int(linkage_present),

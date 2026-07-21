@@ -504,6 +504,25 @@ CoreMetricId = Literal[
     "assertion-strength",
     "coverage-lift",
     "production-code-guardrail",
+    "bugfix-defect-resolution-v2",
+    "bugfix-regression-protection-v2",
+    "bugfix-change-containment-v2",
+    "bugfix-verification-stability-v2",
+    "bugfix-defect-evidence-completeness-v2",
+    "refactor-behavior-preservation-v2",
+    "refactor-structural-improvement-v2",
+    "refactor-public-contract-stability-v2",
+    "refactor-change-containment-v2",
+    "refactor-verification-stability-v2",
+    "test-generation-requirement-mapping-v2",
+    "test-generation-assertion-strength-v2",
+    "test-generation-coverage-lift-v2",
+    "test-generation-production-code-guardrail-v2",
+    "test-generation-verification-stability-v2",
+    "plan-to-code-planned-scope-coverage-v2",
+    "plan-to-code-acceptance-evidence-completeness-v2",
+    "plan-to-code-functional-v2",
+    "plan-to-code-verification-stability-v2",
 ]
 
 MetricId = Literal[
@@ -531,6 +550,26 @@ MetricId = Literal[
     "assertion-strength",
     "coverage-lift",
     "production-code-guardrail",
+    "bugfix-defect-resolution-v2",
+    "bugfix-regression-protection-v2",
+    "bugfix-change-containment-v2",
+    "bugfix-verification-stability-v2",
+    "bugfix-defect-evidence-completeness-v2",
+    "refactor-behavior-preservation-v2",
+    "refactor-structural-improvement-v2",
+    "refactor-public-contract-stability-v2",
+    "refactor-change-containment-v2",
+    "refactor-verification-stability-v2",
+    "test-generation-requirement-mapping-v2",
+    "test-generation-assertion-strength-v2",
+    "test-generation-coverage-lift-v2",
+    "test-generation-production-code-guardrail-v2",
+    "test-generation-verification-stability-v2",
+    "plan-to-code-plan-adherence-v2",
+    "plan-to-code-planned-scope-coverage-v2",
+    "plan-to-code-acceptance-evidence-completeness-v2",
+    "plan-to-code-functional-v2",
+    "plan-to-code-verification-stability-v2",
 ]
 
 
@@ -588,7 +627,11 @@ class LLMAsJudgeMetricDefinition(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: Literal["llm-as-judge"] = "llm-as-judge"
-    id: Literal["plan-adherence", "requirements-adherence"]
+    id: Literal[
+        "plan-adherence",
+        "requirements-adherence",
+        "plan-to-code-plan-adherence-v2",
+    ]
     config: LLMAsJudgeMetricConfig = Field(description="LLM judge configuration")
 
 

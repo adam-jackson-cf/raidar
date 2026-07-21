@@ -1,0 +1,112 @@
+name: refactor-library
+display_name: Python reporting-library refactor
+scenario_revision: v002
+parent_revision: v001
+description: Baseline behavior-preserving refactor with public contract stability
+  checks
+difficulty: medium
+task_kind: refactoring
+delivery_mode: direct_implementation
+workspace_state: existing
+starting_conditions:
+- legacy_structure
+languages:
+- Python
+evaluation_role: benchmark
+catalog_status: calibration
+variant_axes: {}
+timeout_sec: 1800
+test_scripts: []
+environment:
+  kind: stack_preset
+  id: python:3.12
+  capabilities:
+    runtimes: {}
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  workdir: /app
+  requirements:
+    runtimes:
+      python: '>=3.12'
+    package_managers: {}
+    tools: {}
+    browsers: {}
+  resources:
+    cpus: 2
+    memory_mb: 4096
+    storage_mb: 10240
+  allow_internet: true
+starter:
+  root: starter
+verification:
+  max_gate_failures: 3
+  coverage_threshold: 0.8
+  min_quality_score: 0.85
+  required_commands:
+  - - python
+    - -m
+    - compileall
+    - -q
+    - src
+    - tests
+  - - python
+    - -m
+    - unittest
+    - discover
+    - -s
+    - tests
+  setup_actions: []
+  test_discovery_globs: []
+  skip_test_commands_when_no_tests: false
+  gates: []
+  workflow:
+    atomic_commits_required: false
+requirements:
+  items:
+  - id: req-public-api-stable
+    description: Preserve `build_report(rows)` as the public entrypoint.
+    check:
+      type: import_present
+      pattern: build_report
+      description: Public build_report API remains present.
+    required_test_evidence: []
+  - id: req-helper-extraction
+    description: Extract at least one focused private helper for report grouping or
+      formatting.
+    check:
+      type: import_present
+      pattern: _group
+      description: Grouping helper marker is present.
+    required_test_evidence: []
+  - id: req-tests-preserved
+    description: Existing behavior tests still pass without changing expected outputs.
+    check:
+      type: file_exists
+      pattern: tests/test_reports.py
+      description: Behavior test file exists.
+    required_test_evidence: []
+evidence:
+  retained_files: []
+scorers:
+- id: refactor
+  version: 2
+  weight: 0.78
+  config:
+    refactor-structural-improvement-v2:
+      paths:
+      - src/reporting/reports.py
+    refactor-public-contract-stability-v2:
+      paths:
+      - src/reporting/__init__.py
+- id: requirements
+  version: 1
+  weight: 0.2
+  config: {}
+- id: resource-efficiency
+  version: 1
+  weight: 0.02
+  config: {}
+prompt:
+  entry: prompt/task.md
+  includes: []

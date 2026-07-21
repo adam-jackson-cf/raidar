@@ -143,26 +143,152 @@ class PlanToCode(BaseScorer):
         )
 
 
+@register_scorer(scorer_id="plan-to-code", version=2)
+class PlanToCodeV2(BaseScorer):
+    """Plan-to-code scorer for the direct-evidence calibration contract."""
+
+    status = "active"
+    category = "quality"
+    description = (
+        "Scores implementation against an approved plan, including plan adherence "
+        "and retained acceptance evidence."
+    )
+    metrics = (
+        metric(
+            "plan-to-code-plan-adherence-v2",
+            "llm-as-judge",
+            0.35,
+            evidence=(
+                "Approved plan, implementation diff summary, acceptance tracker, decision "
+                "log, verification results, and deterministic metric summaries."
+            ),
+            score_derivation=(
+                "Judge scores how faithfully implementation follows the approved plan "
+                "with required citations to plan rows and changed surfaces."
+            ),
+            pass_fail=(
+                "Passes when the judge finds planned outcomes delivered and deviations justified."
+            ),
+            config={"judge": "judges/plan-judge.toml"},
+        ),
+        metric(
+            "plan-to-code-planned-scope-coverage-v2",
+            "core",
+            0.25,
+            evidence=(
+                "Plan feature rows, changed surfaces, completed acceptance rows, and "
+                "evidence references."
+            ),
+            score_derivation=(
+                "Scores completed planned features divided by approved planned features, "
+                "with missing evidence incomplete."
+            ),
+            pass_fail="Passes when every planned feature has retained implementation evidence.",
+        ),
+        metric(
+            "plan-to-code-acceptance-evidence-completeness-v2",
+            "core",
+            0.20,
+            evidence=(
+                "Acceptance tracker statuses, initial failures, passing evidence, and "
+                "command outputs."
+            ),
+            score_derivation=(
+                "Scores acceptance rows with valid passing evidence divided by planned "
+                "acceptance rows."
+            ),
+            pass_fail="Passes when all acceptance criteria have retained passing evidence.",
+        ),
+        metric(
+            "plan-to-code-functional-v2",
+            "core",
+            0.10,
+            evidence="Build, test, and gate execution outcomes for the submitted code.",
+            score_derivation="Uses the functional score computed from execution outputs.",
+            pass_fail="Passes when functional execution passed.",
+        ),
+        metric(
+            "plan-to-code-verification-stability-v2",
+            "core",
+            0.10,
+            evidence="Verification gate failure count across the run.",
+            score_derivation="Uses the verification stability score computed from gate history.",
+            pass_fail="Passes when verification stability is greater than zero.",
+        ),
+    )
+    evidence_dependencies = (EvidenceDependency(kind="command"),)
+
+    def verification_plan(self, context: VerificationPlanContext) -> VerificationPlan:
+        """Declare scenario verification commands owned by this scorer."""
+
+        return scenario_command_plan("plan-to-code-v2", context)
+
+    def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
+        evidence = context.verification_evidence.for_owner("plan-to-code-v2")
+        functional = functional_score_from_evidence(evidence).model_copy(
+            update={"metric_id": "plan-to-code-functional-v2"}
+        )
+        plan_packet = _authoritative_plan_packet(context)
+        deterministic_scores = (
+            _authoritative_planned_scope_coverage_score(plan_packet),
+            _authoritative_acceptance_evidence_completeness_score(plan_packet),
+            functional,
+            verification_stability_from_evidence(evidence).model_copy(
+                update={"metric_id": "plan-to-code-verification-stability-v2"}
+            ),
+        )
+        plan_adherence = evaluate_llm_as_judge_metric(
+            workspace=context.workspace,
+            scenario_dir=context.scenario_dir,
+            scenario=context.scenario,
+            metric_id="plan-to-code-plan-adherence-v2",
+            judge_path="judges/plan-judge.toml",
+            deterministic_metric_scores=deterministic_scores,
+            retained_evidence=plan_packet,
+            changed_surfaces=_changed_surfaces(context.workspace_changes),
+            executor=getattr(context, "judge_executor", None),
+        )
+        if not functional.passed:
+            plan_adherence = plan_adherence.model_copy(
+                update={
+                    "score": min(plan_adherence.score, functional.score),
+                    "passed": False,
+                    "evidence": (
+                        f"{plan_adherence.evidence}; deterministic functional execution failed"
+                    ),
+                }
+            )
+        return ScorerEvidence(
+            metric_scores=(
+                plan_adherence,
+                *deterministic_scores,
+            )
+        )
+
+
 def _planned_scope_coverage_score(plan_packet: dict[str, Any]) -> MetricScore:
     feature_count = int(plan_packet.get("feature_count", 0))
     passed_features = int(plan_packet.get("passed_feature_count", 0))
     if feature_count:
         score = passed_features / feature_count
         return MetricScore(
-            metric_id="planned-scope-coverage",
+            metric_id="plan-to-code-planned-scope-coverage-v2",
             score=round(score, 3),
             passed=score >= 1.0,
             evidence=(
-                "direct: authoritative plan feature dashboard evidence, "
+                "direct: retained plan feature dashboard evidence, "
                 f"features={feature_count}, passed={passed_features}"
             ),
         )
     return MetricScore(
-        metric_id="planned-scope-coverage",
+        metric_id="plan-to-code-planned-scope-coverage-v2",
         score=0.0,
         passed=False,
-        missing_patterns=["authoritative plan feature evidence"],
-        evidence="missing authoritative plan feature evidence",
+        missing_patterns=["retained plan packet feature evidence"],
+        evidence=(
+            "proxy: retained plan packet artifacts are not present in runtime context; "
+            "missing evidence is incomplete rather than passing"
+        ),
     )
 
 
@@ -172,7 +298,80 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
     if acceptance_count:
         score = passed_acceptance / acceptance_count
         return MetricScore(
-            metric_id="acceptance-evidence-completeness",
+            metric_id="plan-to-code-acceptance-evidence-completeness-v2",
+            score=round(score, 3),
+            passed=score >= 1.0,
+            evidence=(
+                "direct: retained acceptance tracker evidence, "
+                f"acceptance={acceptance_count}, passed={passed_acceptance}"
+            ),
+        )
+    return MetricScore(
+        metric_id="plan-to-code-acceptance-evidence-completeness-v2",
+        score=0.0,
+        passed=False,
+        missing_patterns=["retained acceptance tracker evidence"],
+        evidence=(
+            "proxy: retained acceptance tracker evidence is not present in runtime context; "
+            "missing evidence is incomplete rather than passing"
+        ),
+    )
+
+
+def _retained_plan_packet(context: ScorerContext) -> dict[str, Any]:
+    plan_path = _retained_plan_path(Path(context.scenario_dir), Path(context.workspace))
+    if plan_path is None:
+        return {}
+    text = plan_path.read_text(encoding="utf-8", errors="ignore")
+    return {
+        "path": str(plan_path),
+        **_table_evidence_counts(text, "Feature Dashboard", prefix="feature"),
+        **_table_evidence_counts(text, "Acceptance Tracker", prefix="acceptance"),
+    }
+
+
+def _retained_plan_path(scenario_dir: Path, workspace: Path) -> Path | None:
+    candidates = [
+        *scenario_dir.glob(".enaible/intent-plan/*/intentplan.md"),
+        *workspace.glob(".enaible/intent-plan/*/intentplan.md"),
+        scenario_dir / "intentplan.md",
+        workspace / "intentplan.md",
+    ]
+    return next((path for path in candidates if path.is_file()), None)
+
+
+def _authoritative_planned_scope_coverage_score(plan_packet: dict[str, Any]) -> MetricScore:
+    feature_count = int(plan_packet.get("feature_count", 0))
+    passed_features = int(plan_packet.get("passed_feature_count", 0))
+    if feature_count:
+        score = passed_features / feature_count
+        return MetricScore(
+            metric_id="plan-to-code-planned-scope-coverage-v2",
+            score=round(score, 3),
+            passed=score >= 1.0,
+            evidence=(
+                "direct: authoritative plan feature dashboard evidence, "
+                f"features={feature_count}, passed={passed_features}"
+            ),
+        )
+    return MetricScore(
+        metric_id="plan-to-code-planned-scope-coverage-v2",
+        score=0.0,
+        passed=False,
+        missing_patterns=["authoritative plan feature evidence"],
+        evidence="missing authoritative plan feature evidence",
+    )
+
+
+def _authoritative_acceptance_evidence_completeness_score(
+    plan_packet: dict[str, Any],
+) -> MetricScore:
+    acceptance_count = int(plan_packet.get("acceptance_count", 0))
+    passed_acceptance = int(plan_packet.get("passed_acceptance_count", 0))
+    if acceptance_count:
+        score = passed_acceptance / acceptance_count
+        return MetricScore(
+            metric_id="plan-to-code-acceptance-evidence-completeness-v2",
             score=round(score, 3),
             passed=score >= 1.0,
             evidence=(
@@ -181,7 +380,7 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
             ),
         )
     return MetricScore(
-        metric_id="acceptance-evidence-completeness",
+        metric_id="plan-to-code-acceptance-evidence-completeness-v2",
         score=0.0,
         passed=False,
         missing_patterns=["authoritative acceptance tracker evidence"],
@@ -189,7 +388,7 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
     )
 
 
-def _retained_plan_packet(context: ScorerContext) -> dict[str, Any]:
+def _authoritative_plan_packet(context: ScorerContext) -> dict[str, Any]:
     try:
         scenario_root = Path(context.scenario_dir).resolve(strict=True)
     except OSError:
@@ -207,8 +406,12 @@ def _retained_plan_packet(context: ScorerContext) -> dict[str, Any]:
     if plan_path.parent.name != plan_sha256:
         return {}
 
-    feature_evidence = _table_evidence_counts(text, "Feature Dashboard", prefix="feature")
-    acceptance_evidence = _table_evidence_counts(text, "Acceptance Tracker", prefix="acceptance")
+    feature_evidence = _authoritative_table_evidence_counts(
+        text, "Feature Dashboard", prefix="feature"
+    )
+    acceptance_evidence = _authoritative_table_evidence_counts(
+        text, "Acceptance Tracker", prefix="acceptance"
+    )
     if not _is_valid_plan_packet(feature_evidence, acceptance_evidence):
         return {}
 
@@ -257,7 +460,34 @@ def _table_evidence_counts(text: str, heading: str, *, prefix: str) -> dict[str,
     }
 
 
+def _authoritative_table_evidence_counts(text: str, heading: str, *, prefix: str) -> dict[str, int]:
+    rows = _authoritative_table_rows(text, heading)
+    passed_with_evidence = [
+        row
+        for row in rows
+        if _cell_value(row, "status").lower() == "passed" and _row_has_evidence(row)
+    ]
+    return {
+        f"{prefix}_count": len(rows),
+        f"passed_{prefix}_count": len(passed_with_evidence),
+    }
+
+
 def _table_rows(text: str, heading: str) -> list[dict[str, str]]:
+    section = _markdown_section(text, heading)
+    lines = [line for line in section.splitlines() if line.startswith("|")]
+    if len(lines) < 3:
+        return []
+    headers = _split_markdown_row(lines[0])
+    data_rows = [line for line in lines[2:] if "---" not in line]
+    return [
+        dict(zip(headers, _split_markdown_row(row), strict=False))
+        for row in data_rows
+        if _split_markdown_row(row)
+    ]
+
+
+def _authoritative_table_rows(text: str, heading: str) -> list[dict[str, str]]:
     section = _markdown_section(text, heading)
     lines = [line for line in section.splitlines() if line.startswith("|")]
     if len(lines) < 3:
