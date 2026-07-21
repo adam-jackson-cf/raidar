@@ -4,11 +4,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.schemas.scorecard import CoverageScore
+from raidar.schemas.scorecard import MetricScore
 from raidar.scorers.base import BaseScorer, ScorerContext, ScorerEvidence, register_scorer
 from raidar.scorers.common import (
     assertion_strength_metric_score,
-    coverage_lift_metric_score,
     json_action_content,
     metric,
     production_code_guardrail_metric_score,
@@ -73,13 +72,13 @@ class TestGeneration(BaseScorer):
             "core",
             0.25,
             evidence=(
-                "Starter or baseline coverage, final coverage, threshold, and coverage source."
+                "Paired starter and final coverage artifacts, threshold, and coverage source."
             ),
             score_derivation=(
-                "Scores coverage delta toward threshold; without baseline, final coverage "
-                "is capped and labelled proxy."
+                "Scores the measured starter-to-final coverage increase toward the threshold; "
+                "both artifacts must use the same coverage source."
             ),
-            pass_fail="Passes when coverage improves or meets threshold with generated tests.",
+            pass_fail="Passes when final coverage is greater than paired starter coverage.",
         ),
         metric(
             "production-code-guardrail",
@@ -131,32 +130,109 @@ class TestGeneration(BaseScorer):
 
     def collect_evidence(self, context: ScorerContext) -> ScorerEvidence:
         workspace = Path(context.workspace)
-        evidence = context.verification_evidence.for_owner(self.id)
+        final_evidence = context.verification_evidence.for_owner(self.id)
+        baseline_evidence = context.baseline_verification_evidence.for_owner(self.id)
         return ScorerEvidence(
             metric_scores=(
                 requirement_mapping_metric_score(workspace, context.scenario),
                 assertion_strength_metric_score(workspace),
-                coverage_lift_metric_score(_coverage_from_evidence(evidence, context.scenario)),
-                production_code_guardrail_metric_score(workspace, context.workspace_changes),
-                verification_stability_from_evidence(evidence),
+                _coverage_lift_metric_score(
+                    baseline_evidence,
+                    final_evidence,
+                    context.scenario.verification.coverage_threshold,
+                ),
+                _production_code_guardrail_metric_score(
+                    workspace,
+                    context.workspace_changes,
+                ),
+                verification_stability_from_evidence(final_evidence),
             )
         )
 
 
-def _coverage_from_evidence(evidence, scenario) -> CoverageScore:
-    measured = _coverage_value(json_action_content(evidence, "coverage.python"))
-    source = "test-generation.coverage.python"
-    if measured is None:
-        measured = _coverage_value(json_action_content(evidence, "coverage.typescript"))
-        source = "test-generation.coverage.typescript"
-    threshold = scenario.verification.coverage_threshold
-    passed = threshold is None or threshold <= 0 or (measured is not None and measured >= threshold)
-    return CoverageScore(
-        threshold=threshold,
-        measured=measured,
-        source=source if measured is not None else None,
-        passed=passed,
+def _coverage_lift_metric_score(
+    baseline_evidence,
+    final_evidence,
+    threshold: float | None,
+) -> MetricScore:
+    baseline = _coverage_from_evidence(baseline_evidence)
+    final = _coverage_from_evidence(final_evidence)
+    if baseline is None or final is None or baseline[0] != final[0]:
+        return MetricScore(
+            metric_id="coverage-lift",
+            score=0.0,
+            passed=False,
+            missing_patterns=["paired baseline and final coverage artifacts"],
+            evidence="paired baseline and final coverage artifacts are required",
+        )
+
+    source, baseline_measured = baseline
+    _, final_measured = final
+    lift = final_measured - baseline_measured
+    if lift <= 0:
+        return MetricScore(
+            metric_id="coverage-lift",
+            score=0.0,
+            passed=False,
+            evidence=(
+                f"source={source}, baseline={baseline_measured}, final={final_measured}, "
+                "coverage_lift=0.0"
+            ),
+        )
+
+    if threshold is None or threshold <= baseline_measured:
+        score = lift
+    else:
+        score = lift / (threshold - baseline_measured)
+    return MetricScore(
+        metric_id="coverage-lift",
+        score=round(max(0.0, min(1.0, score)), 3),
+        passed=True,
+        evidence=(
+            f"source={source}, baseline={baseline_measured}, final={final_measured}, "
+            f"coverage_lift={lift}"
+        ),
     )
+
+
+def _production_code_guardrail_metric_score(
+    workspace: Path,
+    workspace_changes: dict | None,
+) -> MetricScore:
+    changed_files = (
+        workspace_changes.get("changed_files") if isinstance(workspace_changes, dict) else None
+    )
+    has_direct_evidence = (
+        isinstance(changed_files, list)
+        and all(isinstance(path, str) and path for path in changed_files)
+        and workspace_changes.get("error") in (None, "")
+    )
+    if not has_direct_evidence:
+        return MetricScore(
+            metric_id="production-code-guardrail",
+            score=0.0,
+            passed=False,
+            missing_patterns=["changed-file evidence"],
+            evidence="changed-file evidence is required to establish protected production integrity",
+        )
+    return production_code_guardrail_metric_score(workspace, workspace_changes)
+
+
+def _coverage_from_evidence(evidence) -> tuple[str, float] | None:
+    artifacts = (
+        ("test-generation.coverage.python", json_action_content(evidence, "coverage.python")),
+        (
+            "test-generation.coverage.typescript",
+            json_action_content(evidence, "coverage.typescript"),
+        ),
+    )
+    available = [
+        (source, _coverage_value(content)) for source, content in artifacts if content is not None
+    ]
+    if len(available) != 1:
+        return None
+    source, measured = available[0]
+    return (source, measured) if measured is not None else None
 
 
 def _coverage_value(content) -> float | None:

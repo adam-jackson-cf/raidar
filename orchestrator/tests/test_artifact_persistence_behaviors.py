@@ -128,6 +128,15 @@ def test_persist_runner_evidence_and_scoring_artifacts(tmp_path):
         '{"status":"ok"}',
         encoding="utf-8",
     )
+    (verifier_source / "baseline" / "action-logs").mkdir(parents=True)
+    (verifier_source / "baseline" / "evidence.json").write_text(
+        '{"actions":[]}',
+        encoding="utf-8",
+    )
+    (verifier_source / "baseline" / "action-logs" / "001-build.json").write_text(
+        '{"status":"ok"}',
+        encoding="utf-8",
+    )
 
     manifest = HarborResultManifest.for_trial(trial_dir, "codex-cli")
     runner_evidence_target = tmp_path / "canonical" / "runner-evidence"
@@ -135,7 +144,20 @@ def test_persist_runner_evidence_and_scoring_artifacts(tmp_path):
     scoring_target = tmp_path / "canonical" / "scoring"
 
     copied = artifacts.persist_runner_evidence_artifacts(manifest, runner_evidence_target)
-    assert set(copied) == {"evidence.json", "action-logs"}
+    assert set(copied) == {
+        "action-logs",
+        "baseline/action-logs",
+        "baseline/evidence.json",
+        "evidence.json",
+    }
+    assert (runner_evidence_target / "baseline" / "evidence.json").exists()
+    assert (runner_evidence_target / "baseline" / "action-logs" / "001-build.json").exists()
+    try:
+        manifest.runner_evidence_artifact("baseline/../../escape.json")
+    except ValueError:
+        pass
+    else:
+        raise AssertionError("runner evidence paths must reject traversal")
     assert artifacts.persist_runner_evidence_artifacts(None, runner_evidence_target) == {}
     assert (
         artifacts.persist_runner_evidence_artifacts(

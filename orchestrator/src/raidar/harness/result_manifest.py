@@ -18,6 +18,8 @@ class HarborArtifactRole(StrEnum):
     RUNNER_EVIDENCE_ROOT = "runner-evidence-root"
     RUNNER_EVIDENCE = "runner-evidence"
     RUNNER_ACTION_LOGS = "runner-action-logs"
+    BASELINE_RUNNER_EVIDENCE = "baseline-runner-evidence"
+    BASELINE_RUNNER_ACTION_LOGS = "baseline-runner-action-logs"
     HARNESS_EVENT_STREAM = "harness-event-stream"
     FINAL_WORKSPACE_ARCHIVE = "final-workspace-archive"
 
@@ -55,6 +57,14 @@ class HarborResultManifest:
             HarborArtifactRole.RUNNER_EVIDENCE_ROOT: trial_dir / "verifier",
             HarborArtifactRole.RUNNER_EVIDENCE: trial_dir / "verifier" / "evidence.json",
             HarborArtifactRole.RUNNER_ACTION_LOGS: trial_dir / "verifier" / "action-logs",
+            HarborArtifactRole.BASELINE_RUNNER_EVIDENCE: trial_dir
+            / "verifier"
+            / "baseline"
+            / "evidence.json",
+            HarborArtifactRole.BASELINE_RUNNER_ACTION_LOGS: trial_dir
+            / "verifier"
+            / "baseline"
+            / "action-logs",
         }
         try:
             return paths[role]
@@ -70,6 +80,12 @@ class HarborResultManifest:
             HarborArtifactRole.RUNNER_EVIDENCE_ROOT: Path("/logs/verifier"),
             HarborArtifactRole.RUNNER_EVIDENCE: Path("/logs/verifier/evidence.json"),
             HarborArtifactRole.RUNNER_ACTION_LOGS: Path("/logs/verifier/action-logs"),
+            HarborArtifactRole.BASELINE_RUNNER_EVIDENCE: Path(
+                "/logs/verifier/baseline/evidence.json"
+            ),
+            HarborArtifactRole.BASELINE_RUNNER_ACTION_LOGS: Path(
+                "/logs/verifier/baseline/action-logs"
+            ),
         }
         if role in paths:
             return paths[role]

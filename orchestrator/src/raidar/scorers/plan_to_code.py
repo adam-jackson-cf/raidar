@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import re
 from pathlib import Path
 from typing import Any
@@ -152,7 +153,7 @@ def _planned_scope_coverage_score(plan_packet: dict[str, Any]) -> MetricScore:
             score=round(score, 3),
             passed=score >= 1.0,
             evidence=(
-                "direct: retained plan feature dashboard evidence, "
+                "direct: authoritative plan feature dashboard evidence, "
                 f"features={feature_count}, passed={passed_features}"
             ),
         )
@@ -160,11 +161,8 @@ def _planned_scope_coverage_score(plan_packet: dict[str, Any]) -> MetricScore:
         metric_id="planned-scope-coverage",
         score=0.0,
         passed=False,
-        missing_patterns=["retained plan packet feature evidence"],
-        evidence=(
-            "proxy: retained plan packet artifacts are not present in runtime context; "
-            "missing evidence is incomplete rather than passing"
-        ),
+        missing_patterns=["authoritative plan feature evidence"],
+        evidence="missing authoritative plan feature evidence",
     )
 
 
@@ -178,7 +176,7 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
             score=round(score, 3),
             passed=score >= 1.0,
             evidence=(
-                "direct: retained acceptance tracker evidence, "
+                "direct: authoritative acceptance tracker evidence, "
                 f"acceptance={acceptance_count}, passed={passed_acceptance}"
             ),
         )
@@ -186,34 +184,64 @@ def _acceptance_evidence_completeness_score(plan_packet: dict[str, Any]) -> Metr
         metric_id="acceptance-evidence-completeness",
         score=0.0,
         passed=False,
-        missing_patterns=["retained acceptance tracker evidence"],
-        evidence=(
-            "proxy: retained acceptance tracker evidence is not present in runtime context; "
-            "missing evidence is incomplete rather than passing"
-        ),
+        missing_patterns=["authoritative acceptance tracker evidence"],
+        evidence="missing authoritative acceptance tracker evidence",
     )
 
 
 def _retained_plan_packet(context: ScorerContext) -> dict[str, Any]:
-    plan_path = _retained_plan_path(Path(context.scenario_dir), Path(context.workspace))
+    try:
+        scenario_root = Path(context.scenario_dir).resolve(strict=True)
+    except OSError:
+        return {}
+    plan_path = _authoritative_plan_path(scenario_root)
     if plan_path is None:
         return {}
-    text = plan_path.read_text(encoding="utf-8", errors="ignore")
+    try:
+        content = plan_path.read_bytes()
+        text = content.decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return {}
+
+    plan_sha256 = hashlib.sha256(content).hexdigest()
+    if plan_path.parent.name != plan_sha256:
+        return {}
+
+    feature_evidence = _table_evidence_counts(text, "Feature Dashboard", prefix="feature")
+    acceptance_evidence = _table_evidence_counts(text, "Acceptance Tracker", prefix="acceptance")
+    if not _is_valid_plan_packet(feature_evidence, acceptance_evidence):
+        return {}
+
     return {
-        "path": str(plan_path),
-        **_table_evidence_counts(text, "Feature Dashboard", prefix="feature"),
-        **_table_evidence_counts(text, "Acceptance Tracker", prefix="acceptance"),
+        "path": str(plan_path.relative_to(scenario_root)),
+        "sha256": plan_sha256,
+        **feature_evidence,
+        **acceptance_evidence,
     }
 
 
-def _retained_plan_path(scenario_dir: Path, workspace: Path) -> Path | None:
-    candidates = [
-        *scenario_dir.glob(".enaible/intent-plan/*/intentplan.md"),
-        *workspace.glob(".enaible/intent-plan/*/intentplan.md"),
-        scenario_dir / "intentplan.md",
-        workspace / "intentplan.md",
-    ]
-    return next((path for path in candidates if path.is_file()), None)
+def _authoritative_plan_path(scenario_dir: Path) -> Path | None:
+    try:
+        scenario_root = scenario_dir.resolve(strict=True)
+    except OSError:
+        return None
+
+    plan_root = scenario_root / ".enaible" / "intent-plan"
+    try:
+        candidates = sorted(
+            path
+            for path in plan_root.glob("[0-9a-f]" * 64 + "/intentplan.md")
+            if path.is_file() and path.resolve(strict=True).is_relative_to(scenario_root)
+        )
+    except OSError:
+        return None
+    return candidates[0] if len(candidates) == 1 else None
+
+
+def _is_valid_plan_packet(
+    feature_evidence: dict[str, int], acceptance_evidence: dict[str, int]
+) -> bool:
+    return bool(feature_evidence["feature_count"] and acceptance_evidence["acceptance_count"])
 
 
 def _table_evidence_counts(text: str, heading: str, *, prefix: str) -> dict[str, int]:
@@ -235,12 +263,18 @@ def _table_rows(text: str, heading: str) -> list[dict[str, str]]:
     if len(lines) < 3:
         return []
     headers = _split_markdown_row(lines[0])
-    data_rows = [line for line in lines[2:] if "---" not in line]
-    return [
-        dict(zip(headers, _split_markdown_row(row), strict=False))
-        for row in data_rows
-        if _split_markdown_row(row)
-    ]
+    separator = _split_markdown_row(lines[1])
+    if (
+        not headers
+        or len(headers) != len(separator)
+        or any(not header for header in headers)
+        or any(not re.fullmatch(r":?-{3,}:?", cell) for cell in separator)
+    ):
+        return []
+    data_rows = [_split_markdown_row(line) for line in lines[2:]]
+    if not data_rows or any(len(row) != len(headers) for row in data_rows):
+        return []
+    return [dict(zip(headers, row, strict=True)) for row in data_rows]
 
 
 def _split_markdown_row(row: str) -> list[str]:

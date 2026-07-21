@@ -41,7 +41,12 @@ from raidar.schemas.scorecard import ExecutionValidityScore, PerformanceGatesSco
 from raidar.scorers.evidence_contract import CommandEvidenceResult, EvidenceOutput
 
 SCORING_SCHEMA_VERSION = "2.0.0"
-RUNNER_EVIDENCE_ARTIFACTS = ("action-logs", "evidence.json")
+RUNNER_EVIDENCE_ARTIFACTS = (
+    (HarborArtifactRole.RUNNER_ACTION_LOGS, "action-logs"),
+    (HarborArtifactRole.RUNNER_EVIDENCE, "evidence.json"),
+    (HarborArtifactRole.BASELINE_RUNNER_ACTION_LOGS, "baseline/action-logs"),
+    (HarborArtifactRole.BASELINE_RUNNER_EVIDENCE, "baseline/evidence.json"),
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,15 +176,15 @@ def persist_runner_evidence_artifacts(
         return {}
 
     copied: dict[str, str] = {}
-    for filename in RUNNER_EVIDENCE_ARTIFACTS:
-        source = manifest.runner_evidence_artifact(filename)
+    for role, relative_path in RUNNER_EVIDENCE_ARTIFACTS:
+        source = manifest.path(role)
         if not source.exists():
             continue
-        target = runner_evidence_dir / filename
+        target = runner_evidence_dir / relative_path
         if source.is_dir():
-            copied[filename] = str(_copy_sanitized_runner_evidence_dir(source, target))
+            copied[relative_path] = str(_copy_sanitized_runner_evidence_dir(source, target))
         else:
-            copied[filename] = str(_copy_sanitized_runner_evidence(source, target))
+            copied[relative_path] = str(_copy_sanitized_runner_evidence(source, target))
     return copied
 
 

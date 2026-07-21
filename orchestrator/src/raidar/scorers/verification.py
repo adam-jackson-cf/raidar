@@ -26,7 +26,16 @@ if TYPE_CHECKING:
 ACTION_ID_PATTERN = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9_.-]*$")
 EVIDENCE_SCHEMA_VERSION = "1"
 EVIDENCE_RUNNER_CONTRACT_VERSION = "python-evidence-runner@2"
-ACTION_KINDS = {"archive", "command", "glob", "read_file", "read_json", "visual_diff"}
+ACTION_KINDS = {
+    "archive",
+    "command",
+    "glob",
+    "public_contract_snapshot",
+    "read_file",
+    "read_json",
+    "structural_snapshot",
+    "visual_diff",
+}
 DEFAULT_SCORER_COMMAND_TIMEOUT_SEC = 60
 
 
@@ -43,7 +52,16 @@ class EvidenceDependency(BaseModel):
 
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
-    kind: Literal["archive", "command", "glob", "read_file", "read_json", "visual_diff"]
+    kind: Literal[
+        "archive",
+        "command",
+        "glob",
+        "public_contract_snapshot",
+        "read_file",
+        "read_json",
+        "structural_snapshot",
+        "visual_diff",
+    ]
     minimum: int = Field(default=1, ge=1)
 
 
@@ -82,6 +100,26 @@ class ReadActionConfig(BaseModel):
     max_bytes: int | None = Field(default=None, gt=0)
 
 
+class SnapshotActionConfig(BaseModel):
+    """Resolved source-surface snapshot configuration."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    paths: list[str] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def _validate_paths(self) -> SnapshotActionConfig:
+        if len(self.paths) != len(set(self.paths)):
+            raise ValueError("snapshot paths must be unique")
+        for index, path in enumerate(self.paths):
+            validate_relative_path(
+                path,
+                field_name=f"snapshot paths[{index}]",
+                root_name="workspace",
+            )
+        return self
+
+
 class VisualRegionActionConfig(BaseModel):
     """Resolved visual-region comparison configuration."""
 
@@ -112,6 +150,7 @@ EvidenceActionConfig = (
     | CommandActionConfig
     | GlobActionConfig
     | ReadActionConfig
+    | SnapshotActionConfig
     | VisualDiffActionConfig
 )
 
@@ -122,7 +161,16 @@ class EvidencePlanAction(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     id: str
-    kind: Literal["archive", "command", "glob", "read_file", "read_json", "visual_diff"]
+    kind: Literal[
+        "archive",
+        "command",
+        "glob",
+        "public_contract_snapshot",
+        "read_file",
+        "read_json",
+        "structural_snapshot",
+        "visual_diff",
+    ]
     timeout_sec: int | None
     required: bool
     depends_on: list[str]
@@ -134,8 +182,10 @@ class EvidencePlanAction(BaseModel):
             "archive": ArchiveActionConfig,
             "command": CommandActionConfig,
             "glob": GlobActionConfig,
+            "public_contract_snapshot": SnapshotActionConfig,
             "read_file": ReadActionConfig,
             "read_json": ReadActionConfig,
+            "structural_snapshot": SnapshotActionConfig,
             "visual_diff": VisualDiffActionConfig,
         }[self.kind]
         try:
@@ -514,6 +564,42 @@ def glob(
     )
 
 
+def structural_snapshot(
+    action_id: str,
+    paths: list[str] | tuple[str, ...],
+    *,
+    required: bool = True,
+    depends_on: tuple[str, ...] = (),
+) -> VerificationAction:
+    """Construct a deterministic source-structure snapshot action."""
+
+    return VerificationAction(
+        id=action_id,
+        kind="structural_snapshot",
+        required=required,
+        depends_on=depends_on,
+        config={"paths": list(paths)},
+    )
+
+
+def public_contract_snapshot(
+    action_id: str,
+    paths: list[str] | tuple[str, ...],
+    *,
+    required: bool = True,
+    depends_on: tuple[str, ...] = (),
+) -> VerificationAction:
+    """Construct a deterministic public-contract snapshot action."""
+
+    return VerificationAction(
+        id=action_id,
+        kind="public_contract_snapshot",
+        required=required,
+        depends_on=depends_on,
+        config={"paths": list(paths)},
+    )
+
+
 def visual_diff(
     action_id: str,
     *,
@@ -679,6 +765,8 @@ def _validate_action_config(action: VerificationAction) -> None:
         "glob": ({"pattern"}, set()),
         "read_file": ({"path"}, {"max_bytes"}),
         "read_json": ({"path"}, {"max_bytes"}),
+        "public_contract_snapshot": ({"paths"}, set()),
+        "structural_snapshot": ({"paths"}, set()),
         "visual_diff": (
             {"reference", "actual", "diff", "argv_template", "threshold", "regions"},
             set(),
@@ -696,6 +784,8 @@ def _validate_action_config(action: VerificationAction) -> None:
         "glob": _validate_glob_config,
         "read_file": _validate_read_config,
         "read_json": _validate_read_config,
+        "public_contract_snapshot": _validate_snapshot_config,
+        "structural_snapshot": _validate_snapshot_config,
         "visual_diff": _validate_visual_config,
     }
     validators[action.kind](action)
@@ -719,6 +809,31 @@ def _validate_read_config(action: VerificationAction) -> None:
         raise VerificationPlanError(
             f"verification action {action.id} max_bytes must be a positive integer"
         )
+
+
+def _validate_snapshot_config(action: VerificationAction) -> None:
+    paths = action.config.get("paths")
+    if not isinstance(paths, list) or not paths:
+        raise VerificationPlanError(
+            f"verification action {action.id} snapshot paths must be a non-empty list"
+        )
+    if len(paths) != len(set(paths)):
+        raise VerificationPlanError(
+            f"verification action {action.id} snapshot paths must be unique"
+        )
+    for index, path in enumerate(paths):
+        if not isinstance(path, str):
+            raise VerificationPlanError(
+                f"verification action {action.id} snapshot paths[{index}] is required"
+            )
+        try:
+            validate_relative_path(
+                path,
+                field_name=f"verification action {action.id}.config.paths[{index}]",
+                root_name="workspace",
+            )
+        except ValueError as exc:
+            raise VerificationPlanError(str(exc)) from exc
 
 
 def _validate_command_config(action: VerificationAction) -> None:

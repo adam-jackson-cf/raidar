@@ -6,6 +6,7 @@ without applying scorecard policy or metric scoring.
 
 from __future__ import annotations
 
+import ast
 import argparse
 import fnmatch
 import glob as globlib
@@ -44,7 +45,16 @@ EVIDENCE_FILENAME = "evidence.json"
 LOG_DIRNAME = "action-logs"
 SCHEMA_VERSION = "1"
 RUNNER_CONTRACT = "python-evidence-runner@2"
-ACTION_KINDS = {"archive", "command", "glob", "read_file", "read_json", "visual_diff"}
+ACTION_KINDS = {
+    "archive",
+    "command",
+    "glob",
+    "public_contract_snapshot",
+    "read_file",
+    "read_json",
+    "structural_snapshot",
+    "visual_diff",
+}
 SECRET_KEY_PARTS = ("api_key", "apikey", "token", "secret", "password", "passwd", "pwd")
 
 
@@ -156,9 +166,9 @@ def _validated_plan(payload: Any, plan_path: Path) -> dict[str, Any]:
         raise ValueError("verification plan workspace must be non-empty text")
     if not isinstance(payload["output_dir"], str) or not payload["output_dir"]:
         raise ValueError("verification plan output_dir must be non-empty text")
-    _validate_actions(payload["actions"])
+    policy = _policy_from_plan(payload)
+    _validate_actions(payload["actions"], max_snapshot_files=policy.list_items)
     _validate_aliases(payload["aliases"], payload["actions"])
-    _policy_from_plan(payload)
     workspace = Path(payload["workspace"])
     if not workspace.is_absolute():
         payload = {**payload, "workspace": str((plan_path.parent / workspace).resolve())}
@@ -173,12 +183,14 @@ def _require_exact_keys(payload: dict[str, Any], expected: set[str], label: str)
         raise ValueError(f"{label} keys mismatch: missing={missing}, extra={extra}")
 
 
-def _validate_actions(value: Any) -> None:
+def _validate_actions(value: Any, *, max_snapshot_files: int) -> None:
     if not isinstance(value, list) or not all(isinstance(item, dict) for item in value):
         raise ValueError("verification plan actions must be a list of objects")
     identifiers: set[str] = set()
     for action in value:
-        identifier = _validate_action_shape(action, identifiers)
+        identifier = _validate_action_shape(
+            action, identifiers, max_snapshot_files=max_snapshot_files
+        )
         identifiers.add(identifier)
     for action in value:
         unknown = sorted(set(action["depends_on"]) - identifiers)
@@ -188,14 +200,16 @@ def _validate_actions(value: Any) -> None:
             )
 
 
-def _validate_action_shape(action: dict[str, Any], identifiers: set[str]) -> str:
+def _validate_action_shape(
+    action: dict[str, Any], identifiers: set[str], *, max_snapshot_files: int
+) -> str:
     _require_exact_keys(
         action,
         {"id", "kind", "timeout_sec", "required", "depends_on", "config"},
         "verification action",
     )
     identifier = _validate_action_identity(action, identifiers)
-    _validate_action_fields(action, identifier)
+    _validate_action_fields(action, identifier, max_snapshot_files=max_snapshot_files)
     _validate_action_timeout(action, identifier)
     return identifier
 
@@ -209,7 +223,9 @@ def _validate_action_identity(action: dict[str, Any], identifiers: set[str]) -> 
     return identifier
 
 
-def _validate_action_fields(action: dict[str, Any], identifier: str) -> None:
+def _validate_action_fields(
+    action: dict[str, Any], identifier: str, *, max_snapshot_files: int
+) -> None:
     if not isinstance(action["required"], bool):
         raise ValueError(f"verification action {identifier} required must be boolean")
     if not isinstance(action["depends_on"], list) or not all(
@@ -218,7 +234,12 @@ def _validate_action_fields(action: dict[str, Any], identifier: str) -> None:
         raise ValueError(f"verification action {identifier} depends_on must be text list")
     if not isinstance(action["config"], dict):
         raise ValueError(f"verification action {identifier} config must be an object")
-    _validate_action_config(identifier, action["kind"], action["config"])
+    _validate_action_config(
+        identifier,
+        action["kind"],
+        action["config"],
+        max_snapshot_files=max_snapshot_files,
+    )
 
 
 def _validate_action_timeout(action: dict[str, Any], identifier: str) -> None:
@@ -228,13 +249,17 @@ def _validate_action_timeout(action: dict[str, Any], identifier: str) -> None:
         raise ValueError(f"verification action {identifier} timeout_sec must be positive")
 
 
-def _validate_action_config(identifier: str, kind: str, config: dict[str, Any]) -> None:
+def _validate_action_config(
+    identifier: str, kind: str, config: dict[str, Any], *, max_snapshot_files: int
+) -> None:
     required, optional = {
         "archive": ({"path", "output"}, set()),
         "command": ({"argv"}, {"cwd"}),
         "glob": ({"pattern"}, set()),
+        "public_contract_snapshot": ({"paths"}, set()),
         "read_file": ({"path"}, {"max_bytes"}),
         "read_json": ({"path"}, {"max_bytes"}),
+        "structural_snapshot": ({"paths"}, set()),
         "visual_diff": (
             {"reference", "actual", "diff", "argv_template", "threshold", "regions"},
             set(),
@@ -252,6 +277,8 @@ def _validate_action_config(identifier: str, kind: str, config: dict[str, Any]) 
         _validate_visual_config(identifier, config)
     elif kind in {"read_file", "read_json"}:
         _validate_read_config(identifier, config)
+    elif kind in {"structural_snapshot", "public_contract_snapshot"}:
+        _validate_snapshot_config(identifier, config, max_snapshot_files=max_snapshot_files)
     elif kind == "archive":
         _validate_text_fields(identifier, config, ("path", "output"))
     elif kind == "glob":
@@ -275,6 +302,28 @@ def _validate_read_config(identifier: str, config: dict[str, Any]) -> None:
         not isinstance(max_bytes, int) or isinstance(max_bytes, bool) or max_bytes <= 0
     ):
         raise ValueError(f"evidence action {identifier} max_bytes must be a positive integer")
+
+
+def _validate_snapshot_config(
+    identifier: str, config: dict[str, Any], *, max_snapshot_files: int
+) -> None:
+    paths = config.get("paths")
+    if not isinstance(paths, list) or not paths or not all(isinstance(path, str) for path in paths):
+        raise ValueError(
+            f"evidence action {identifier} snapshot paths must be a non-empty text list"
+        )
+    if len(paths) != len(set(paths)):
+        raise ValueError(f"evidence action {identifier} snapshot paths must be unique")
+    if len(paths) > max_snapshot_files:
+        raise ValueError(f"evidence action {identifier} snapshot paths exceed evidence list limit")
+    for path in paths:
+        _validate_workspace_relative_path(identifier, path)
+
+
+def _validate_workspace_relative_path(identifier: str, value: str) -> None:
+    path = Path(value)
+    if not value or path.is_absolute() or ".." in path.parts:
+        raise ValueError(f"evidence action {identifier} snapshot paths must be workspace-relative")
 
 
 def _validate_text_fields(identifier: str, config: dict[str, Any], fields: tuple[str, ...]) -> None:
@@ -478,6 +527,120 @@ def _bounded_file_bytes(config: dict[str, Any], policy: RunnerPolicy) -> int:
     if not isinstance(requested, int) or isinstance(requested, bool) or requested <= 0:
         raise ValueError("evidence max_bytes must be a positive integer")
     return min(requested, policy.file_bytes)
+
+
+def _run_structural_snapshot(
+    action: dict[str, Any], workspace: Path, policy: RunnerPolicy
+) -> dict[str, Any]:
+    files = _snapshot_files(action, workspace)
+    entries = [_structural_snapshot_file(workspace, path) for path in files]
+    return {"digest": _snapshot_digest(entries), "files": entries}
+
+
+def _run_public_contract_snapshot(
+    action: dict[str, Any], workspace: Path, policy: RunnerPolicy
+) -> dict[str, Any]:
+    files = _snapshot_files(action, workspace)
+    entries = [_public_contract_snapshot_file(workspace, path, policy) for path in files]
+    return {"digest": _snapshot_digest(entries), "files": entries}
+
+
+def _snapshot_files(action: dict[str, Any], workspace: Path) -> list[Path]:
+    paths = _action_config(action).get("paths")
+    if not isinstance(paths, list) or not paths:
+        raise ValueError("snapshot action requires config.paths")
+    files: list[Path] = []
+    for value in paths:
+        if not isinstance(value, str):
+            raise ValueError("snapshot action paths must be text")
+        path = _resolved_path(workspace, value)
+        if not path.is_file():
+            raise ValueError(f"snapshot selected file is unavailable: {value}")
+        files.append(path)
+    return files
+
+
+def _structural_snapshot_file(workspace: Path, path: Path) -> dict[str, Any]:
+    data = path.read_bytes()
+    lines = data.decode("utf-8", errors="replace").splitlines()
+    return {
+        "bytes": len(data),
+        "code_line_count": sum(
+            1 for line in lines if line.strip() and not line.lstrip().startswith(("#", "//"))
+        ),
+        "line_count": len(lines),
+        "nonempty_line_count": sum(1 for line in lines if line.strip()),
+        "path": _relative_path(workspace, path),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def _public_contract_snapshot_file(
+    workspace: Path, path: Path, policy: RunnerPolicy
+) -> dict[str, Any]:
+    data = path.read_bytes()
+    declarations = _public_declarations(path, data)
+    if len(declarations) > policy.list_items:
+        raise ValueError("public contract declarations exceed evidence list limit")
+    if any(len(declaration) > policy.list_item_chars for declaration in declarations):
+        raise ValueError("public contract declaration exceeds evidence item limit")
+    return {
+        "declarations": declarations,
+        "path": _relative_path(workspace, path),
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+
+
+def _public_declarations(path: Path, data: bytes) -> list[str]:
+    text = data.decode("utf-8", errors="replace")
+    if path.suffix == ".py":
+        return _python_public_declarations(path, text)
+    declarations: list[str] = []
+    pattern = re.compile(
+        r"^\s*export\s+(?:default\s+)?(?:async\s+)?"
+        r"(class|function|interface|type|const|let|var)\s+([A-Za-z_$][\w$]*)",
+        re.MULTILINE,
+    )
+    for match in pattern.finditer(text):
+        declarations.append(f"{match.group(1)} {match.group(2)}")
+    return declarations
+
+
+def _python_public_declarations(path: Path, text: str) -> list[str]:
+    try:
+        module = ast.parse(text, filename=path.as_posix())
+    except SyntaxError as exc:
+        raise ValueError(f"cannot parse selected Python file: {path.name}") from exc
+    declarations: list[str] = []
+    for node in module.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and not node.name.startswith(
+            "_"
+        ):
+            prefix = "async def" if isinstance(node, ast.AsyncFunctionDef) else "def"
+            declaration = f"{prefix} {node.name}({ast.unparse(node.args)})"
+            if node.returns is not None:
+                declaration += f" -> {ast.unparse(node.returns)}"
+            declarations.append(declaration)
+        elif isinstance(node, ast.ClassDef) and not node.name.startswith("_"):
+            bases = ", ".join(ast.unparse(base) for base in node.bases)
+            declarations.append(f"class {node.name}" + (f"({bases})" if bases else ""))
+        elif isinstance(node, (ast.Assign, ast.AnnAssign)):
+            declarations.extend(_public_assignment_names(node))
+    return declarations
+
+
+def _public_assignment_names(node: ast.Assign | ast.AnnAssign) -> list[str]:
+    targets = node.targets if isinstance(node, ast.Assign) else [node.target]
+    return sorted(
+        target.id
+        for target in targets
+        if isinstance(target, ast.Name) and not target.id.startswith("_")
+    )
+
+
+def _snapshot_digest(entries: list[dict[str, Any]]) -> str:
+    encoded = json.dumps(entries, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _run_glob(action: dict[str, Any], workspace: Path, policy: RunnerPolicy) -> dict[str, Any]:
@@ -769,6 +932,10 @@ def _execute_action(
         return _run_read_file(action, workspace, policy)
     if kind == "read_json":
         return _run_read_json(action, workspace, policy)
+    if kind == "structural_snapshot":
+        return _run_structural_snapshot(action, workspace, policy)
+    if kind == "public_contract_snapshot":
+        return _run_public_contract_snapshot(action, workspace, policy)
     if kind == "glob":
         return _run_glob(action, workspace, policy)
     if kind == "visual_diff":

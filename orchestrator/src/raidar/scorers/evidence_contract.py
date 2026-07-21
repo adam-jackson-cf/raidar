@@ -45,6 +45,47 @@ class JsonEvidenceResult(BaseModel):
     truncated: bool
 
 
+class StructuralSnapshotFileEvidence(BaseModel):
+    """Deterministic structural measures for one selected source file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    bytes: int = Field(ge=0)
+    code_line_count: int = Field(ge=0)
+    line_count: int = Field(ge=0)
+    nonempty_line_count: int = Field(ge=0)
+    path: str
+    sha256: str
+
+
+class StructuralSnapshotEvidenceResult(BaseModel):
+    """Deterministic structural snapshot for selected source files."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    digest: str
+    files: list[StructuralSnapshotFileEvidence] = Field(min_length=1)
+
+
+class PublicContractFileEvidence(BaseModel):
+    """Normalized public declarations for one selected source file."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    declarations: list[str]
+    path: str
+    sha256: str
+
+
+class PublicContractSnapshotEvidenceResult(BaseModel):
+    """Deterministic public-contract snapshot for selected source files."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
+
+    digest: str
+    files: list[PublicContractFileEvidence] = Field(min_length=1)
+
+
 class GlobEvidenceResult(BaseModel):
     """Bounded workspace glob result emitted by the runner."""
 
@@ -130,6 +171,8 @@ EvidenceResult = (
     | FileEvidenceResult
     | GlobEvidenceResult
     | JsonEvidenceResult
+    | PublicContractSnapshotEvidenceResult
+    | StructuralSnapshotEvidenceResult
     | VisualDiffEvidenceResult
 )
 
@@ -140,7 +183,16 @@ class EvidenceActionResult(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True, strict=True)
 
     id: str
-    kind: Literal["archive", "command", "glob", "read_file", "read_json", "visual_diff"]
+    kind: Literal[
+        "archive",
+        "command",
+        "glob",
+        "public_contract_snapshot",
+        "read_file",
+        "read_json",
+        "structural_snapshot",
+        "visual_diff",
+    ]
     required: bool
     status: Literal["ok", "error", "skipped"]
     duration_sec: float = Field(ge=0)
@@ -170,6 +222,8 @@ class EvidenceActionResult(BaseModel):
             "glob": GlobEvidenceResult,
             "read_file": FileEvidenceResult,
             "read_json": JsonEvidenceResult,
+            "public_contract_snapshot": PublicContractSnapshotEvidenceResult,
+            "structural_snapshot": StructuralSnapshotEvidenceResult,
             "visual_diff": VisualDiffEvidenceResult,
         }[self.kind]
         if self.result is not None:

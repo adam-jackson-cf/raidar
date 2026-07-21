@@ -60,6 +60,9 @@ class ScorerContext:
     resource_efficiency: Any
     execution_validity: Any
     verification_evidence: VerificationEvidence = field(default_factory=VerificationEvidence)
+    baseline_verification_evidence: VerificationEvidence = field(
+        default_factory=VerificationEvidence
+    )
     workspace_changes: dict[str, Any] = field(default_factory=dict)
     retained_evidence: dict[str, Any] = field(default_factory=dict)
     judge_executor: JudgeExecutor | None = None

@@ -126,20 +126,20 @@ def _initialize_harbor_bundle_paths(
 
 def _copy_workspace_into_bundle(
     request: RunRequest,
-    context: WorkspaceContext,
-    app_dir: Path,
+    source_workspace: Path,
+    workspace_dir: Path,
     *,
     runtime_profile: RuntimeProfile,
 ) -> None:
     shutil.copytree(
-        context.workspace,
-        app_dir,
+        source_workspace,
+        workspace_dir,
         dirs_exist_ok=True,
         ignore=shutil.ignore_patterns(*runtime_profile.copy_excludes),
     )
     visual_assets = [] if not request.scenario.visual else _visual_reference_assets(request)
     for source_reference, relative_target in visual_assets:
-        target_reference = app_dir / relative_target
+        target_reference = workspace_dir / relative_target
         target_reference.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_reference, target_reference)
 
@@ -256,10 +256,21 @@ def _write_runner_evidence_artifacts(
     runner_evidence_dir = HarborResultManifest.container_path(
         HarborArtifactRole.RUNNER_EVIDENCE_ROOT
     )
+    baseline_runner_evidence_dir = HarborResultManifest.container_path(
+        HarborArtifactRole.BASELINE_RUNNER_EVIDENCE
+    ).parent
     harness_output_dir = HarborResultManifest.container_path(HarborArtifactRole.HARNESS_OUTPUT_ROOT)
+    baseline_verification_plan = contract.evidence_runner_payload(
+        workspace="/tests/baseline-workspace",
+        output_dir=str(baseline_runner_evidence_dir),
+    )
     verification_plan = contract.evidence_runner_payload(
         workspace="/app",
         output_dir=str(runner_evidence_dir),
+    )
+    (tests_dir / "baseline-verification-plan.json").write_text(
+        json.dumps(baseline_verification_plan, indent=2) + "\n",
+        encoding="utf-8",
     )
     (tests_dir / "verification-plan.json").write_text(
         json.dumps(verification_plan, indent=2) + "\n",
@@ -281,11 +292,19 @@ def _write_runner_evidence_artifacts(
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${{BASH_SOURCE[0]}}")" && pwd)"
-mkdir -p {runner_evidence_dir} {harness_output_dir}
+mkdir -p {runner_evidence_dir} {baseline_runner_evidence_dir} {harness_output_dir}
+if [[ ! -d /tests/baseline-workspace ]]; then
+  echo "Missing baseline workspace" >&2
+  exit 1
+fi
 if [[ ! -d /app ]]; then
   echo "Missing /app workspace" >&2
   exit 1
 fi
+
+python "$SCRIPT_DIR/evidence-runner.py" \
+  "$SCRIPT_DIR/baseline-verification-plan.json" \
+  --output-dir {baseline_runner_evidence_dir}
 
 python "$SCRIPT_DIR/evidence-runner.py" \
   "$SCRIPT_DIR/verification-plan.json" \
@@ -314,7 +333,13 @@ def create_harbor_task_bundle(
     environment = contract.environment
     _copy_workspace_into_bundle(
         request,
-        context,
+        context.baseline_workspace,
+        tests_dir / "baseline-workspace",
+        runtime_profile=contract.runtime_profile,
+    )
+    _copy_workspace_into_bundle(
+        request,
+        context.workspace,
         app_dir,
         runtime_profile=contract.runtime_profile,
     )

@@ -43,6 +43,7 @@ def build_metric_scores(
         resource_efficiency=resource_efficiency,
         execution_validity=execution_validity,
         verification_evidence=_load_verification_evidence(context),
+        baseline_verification_evidence=_load_baseline_verification_evidence(context),
         workspace_changes=context.artifacts.workspace_changes,
         retained_evidence=context.artifacts.evidence_artifacts,
         judge_executor=(
@@ -157,6 +158,22 @@ def _load_verification_evidence(context: ScorecardBuildContext) -> VerificationE
     except (OSError, json.JSONDecodeError, ValidationError, VerificationEvidenceError) as exc:
         raise VerificationEvidenceError(
             f"invalid current-version verification evidence at {evidence_path}: {exc}"
+        ) from exc
+
+
+def _load_baseline_verification_evidence(
+    context: ScorecardBuildContext,
+) -> VerificationEvidence:
+    evidence_path = context.artifacts.runner_evidence_artifacts.get("baseline/evidence.json")
+    if not evidence_path:
+        raise VerificationEvidenceError("missing baseline verification evidence artifact")
+    try:
+        payload = json.loads(Path(evidence_path).read_text(encoding="utf-8"))
+        output = EvidenceOutput.model_validate(payload)
+        return VerificationEvidence.from_output(output)
+    except (OSError, json.JSONDecodeError, ValidationError, VerificationEvidenceError) as exc:
+        raise VerificationEvidenceError(
+            f"invalid baseline verification evidence at {evidence_path}: {exc}"
         ) from exc
 
 

@@ -1,3 +1,5 @@
+import json
+
 from types import SimpleNamespace
 
 import pytest
@@ -5,6 +7,10 @@ import pytest
 from raidar.schemas.scenario import DeterministicCheck
 from raidar.schemas.scorecard import (
     ResourceEfficiencyScore,
+)
+from raidar.runtime.scoring_outputs import (
+    _load_baseline_verification_evidence,
+    _load_verification_evidence,
 )
 from raidar.scorers.base import ScorerContext
 from raidar.scorers.common import (
@@ -52,7 +58,7 @@ from raidar.scorers.registry import (
 )
 from raidar.scorers.requirements import Requirements
 from raidar.scorers.resource_efficiency import ResourceEfficiency
-from raidar.scorers.verification import VerificationEvidence
+from raidar.scorers.verification import VerificationEvidence, VerificationEvidenceError
 
 
 def _visual_scoring_config() -> SimpleNamespace:
@@ -496,6 +502,93 @@ def test_design_to_code_evidence_helpers_handle_failures_and_coverage_shapes(tmp
 
 def test_scorer_context_type_import_is_available():
     assert ScorerContext is not None
+
+
+def _evidence_output_payload(action_id: str) -> dict:
+    return {
+        "schema_version": "1",
+        "runner_contract": "python-evidence-runner@2",
+        "aliases": {action_id: action_id},
+        "actions": [
+            {
+                "id": action_id,
+                "kind": "command",
+                "required": True,
+                "status": "ok",
+                "duration_sec": 0.1,
+                "result": {
+                    "command": ["true"],
+                    "cwd": ".",
+                    "duration_sec": 0.1,
+                    "exit_code": 0,
+                    "stdout": "",
+                    "stderr": "",
+                    "timed_out": False,
+                },
+            }
+        ],
+        "artifacts": [],
+        "metadata": {
+            "action_count": 1,
+            "error_count": 0,
+            "required_error_count": 0,
+            "workspace": "/workspace",
+        },
+    }
+
+
+def test_absent_baseline_verification_evidence_fails_closed():
+    context = SimpleNamespace(
+        artifacts=SimpleNamespace(runner_evidence_artifacts={}),
+    )
+
+    with pytest.raises(
+        VerificationEvidenceError,
+        match="missing baseline verification evidence artifact",
+    ):
+        _load_baseline_verification_evidence(context)
+
+
+def test_baseline_verification_evidence_loads_independently_from_final(tmp_path):
+    final_path = tmp_path / "evidence.json"
+    baseline_path = tmp_path / "baseline" / "evidence.json"
+    baseline_path.parent.mkdir()
+    final_path.write_text(
+        json.dumps(_evidence_output_payload("final.build")),
+        encoding="utf-8",
+    )
+    baseline_path.write_text(
+        json.dumps(_evidence_output_payload("baseline.build")),
+        encoding="utf-8",
+    )
+    context = SimpleNamespace(
+        artifacts=SimpleNamespace(
+            runner_evidence_artifacts={
+                "evidence.json": str(final_path),
+                "baseline/evidence.json": str(baseline_path),
+            }
+        ),
+    )
+
+    final_evidence = _load_verification_evidence(context)
+    baseline_evidence = _load_baseline_verification_evidence(context)
+
+    assert set(final_evidence.actions) == {"final.build"}
+    assert set(baseline_evidence.actions) == {"baseline.build"}
+
+
+def test_malformed_baseline_verification_evidence_fails_closed(tmp_path):
+    baseline_path = tmp_path / "baseline" / "evidence.json"
+    baseline_path.parent.mkdir()
+    baseline_path.write_text(json.dumps({"schema_version": "1"}), encoding="utf-8")
+    context = SimpleNamespace(
+        artifacts=SimpleNamespace(
+            runner_evidence_artifacts={"baseline/evidence.json": str(baseline_path)}
+        ),
+    )
+
+    with pytest.raises(VerificationEvidenceError, match="invalid baseline verification evidence"):
+        _load_baseline_verification_evidence(context)
 
 
 def test_deterministic_helpers_cover_pass_fail_and_language_selection(tmp_path):

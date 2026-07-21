@@ -18,6 +18,8 @@ from raidar.scorers.evidence_contract import (
     EvidenceOutput,
     EvidenceRunnerMetadata,
     JsonEvidenceResult,
+    PublicContractSnapshotEvidenceResult,
+    StructuralSnapshotEvidenceResult,
 )
 from raidar.scorers.verification import (
     EvidenceDependency,
@@ -34,6 +36,8 @@ from raidar.scorers.verification import (
     normalize_verification_plans,
     read_file,
     read_json,
+    public_contract_snapshot,
+    structural_snapshot,
     visual_diff,
 )
 
@@ -305,6 +309,82 @@ def test_action_constructors_include_optional_config() -> None:
         "path": "artifacts",
         "output": "archive.tar.gz",
     }
+
+
+def test_snapshot_actions_require_unique_safe_selected_paths() -> None:
+    normalized = normalize_verification_plans(
+        (
+            VerificationPlan(
+                owner="owner",
+                actions=(
+                    structural_snapshot("structure", ("src/module.py",)),
+                    public_contract_snapshot("contract", ("src/module.py",)),
+                ),
+            ),
+        )
+    )
+
+    payloads = {action["id"]: action for action in normalized.payload()["actions"]}
+    assert payloads["owner.structure"]["config"] == {"paths": ["src/module.py"]}
+    assert payloads["owner.contract"]["config"] == {"paths": ["src/module.py"]}
+
+    for paths, match in (
+        ((), "non-empty list"),
+        (("src/module.py", "src/module.py"), "must be unique"),
+        (("../module.py",), "parent traversal"),
+    ):
+        with pytest.raises(VerificationPlanError, match=match):
+            normalize_verification_plans(
+                (
+                    VerificationPlan(
+                        owner="owner",
+                        actions=(structural_snapshot("snapshot", paths),),
+                    ),
+                )
+            )
+
+
+def test_snapshot_evidence_models_are_kind_typed() -> None:
+    structural = EvidenceActionResult(
+        id="owner.structure",
+        kind="structural_snapshot",
+        required=True,
+        status="ok",
+        duration_sec=0.0,
+        result={
+            "digest": "a" * 64,
+            "files": [
+                {
+                    "bytes": 1,
+                    "code_line_count": 1,
+                    "line_count": 1,
+                    "nonempty_line_count": 1,
+                    "path": "src/module.py",
+                    "sha256": "b" * 64,
+                }
+            ],
+        },
+    )
+    contract = EvidenceActionResult(
+        id="owner.contract",
+        kind="public_contract_snapshot",
+        required=True,
+        status="ok",
+        duration_sec=0.0,
+        result={
+            "digest": "c" * 64,
+            "files": [
+                {
+                    "declarations": ["def public_api(value: int) -> str"],
+                    "path": "src/module.py",
+                    "sha256": "b" * 64,
+                }
+            ],
+        },
+    )
+
+    assert isinstance(structural.result, StructuralSnapshotEvidenceResult)
+    assert isinstance(contract.result, PublicContractSnapshotEvidenceResult)
 
 
 def test_normalize_verification_plan_rejects_unsatisfied_dependencies() -> None:
