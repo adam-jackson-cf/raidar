@@ -14,6 +14,10 @@ Cells:
                 (``--snapshot-source artifact``) instead of re-downloading.
   warm-init     as warm, plus a task compose override ``init: true`` so the
                 env container stops on SIGTERM instead of the 10 s grace.
+  pack-warm     WS-I I1: the task environment is bound to the prebuilt Python
+                pack image (Harbor ``docker_image``, no Dockerfile) with the
+                pack's ``init: true`` compose override; snapshots come from
+                the artifact copy (the accepted verifier default).
 
 Usage (orchestrator venv python; OrbStack only)::
 
@@ -74,6 +78,8 @@ def _prepare_task(cell: str, rep: int) -> Path:
             "services:\n  main:\n    init: true\n"
         )
         return dest
+    if cell == "pack-warm":
+        return _prepare_pack_task(src)
     if cell != "cold":
         return src
     dest = WORK / "tasks" / f"{SOURCE_TASK}-cold-{rep:02d}"
@@ -85,6 +91,40 @@ def _prepare_task(cell: str, rep: int) -> Path:
     idx = next(i for i, line in enumerate(lines) if line.startswith("FROM "))
     lines.insert(idx + 1, bust)
     dockerfile.write_text("\n".join(lines) + "\n")
+    return dest
+
+
+def _pack_image_record(task_dir: Path) -> dict | None:
+    """Name the exact pack image a pack-warm rep ran on (tag and image ID)."""
+    import tomllib  # noqa: PLC0415
+
+    from raidar.packs.python import inspect_image  # noqa: PLC0415 (orchestrator venv)
+
+    tag = tomllib.loads((task_dir / "task.toml").read_text())["environment"].get("docker_image")
+    record = inspect_image(tag) if tag else None
+    return {"tag": tag, "image_id": record.image_id if record else None} if tag else None
+
+
+def _prepare_pack_task(src: Path) -> Path:
+    from raidar.packs.python import (  # noqa: PLC0415 (orchestrator venv)
+        bind_task_environment,
+        image_present,
+        load_pack_spec,
+    )
+
+    spec = load_pack_spec()
+    dest = WORK / "tasks" / f"{SOURCE_TASK}-pack"
+    shutil.rmtree(dest, ignore_errors=True)
+    shutil.copytree(src, dest)
+    (dest / "environment" / "Dockerfile").unlink()
+    fields = bind_task_environment(dest / "environment", spec)
+    if not image_present(fields["docker_image"]):
+        raise SystemExit(f"missing {fields['docker_image']}: run `make pack-build RUNTIME=python`")
+    toml = dest / "task.toml"
+    lines = toml.read_text().splitlines()
+    idx = lines.index("[environment]")
+    lines.insert(idx + 1, f"docker_image = {json.dumps(fields['docker_image'])}")
+    toml.write_text("\n".join(lines) + "\n")
     return dest
 
 
@@ -184,7 +224,9 @@ async def _run_one(cell: str, rep: int, oracle_dir: Path, manifest: dict) -> dic
                 "oracle_image": image["image"],
                 "docker_context": run_trial.DOCKER_CONTEXT,
                 "uv_cache_volume": run_trial.UV_CACHE_VOLUME,
-                "snapshot_source": "artifact" if cell == "warm-artifact" else "download",
+                "snapshot_source": (
+                    "artifact" if cell in {"warm-artifact", "pack-warm"} else "download"
+                ),
                 "work_root": str(WORK / "oracle-tmp"),
             },
         ),
@@ -214,6 +256,7 @@ async def _run_one(cell: str, rep: int, oracle_dir: Path, manifest: dict) -> dic
         "trial_name": trial_name,
         "task_dir": str(task_dir),
         "oracle_image": image,
+        "pack_image": _pack_image_record(task_dir) if cell == "pack-warm" else None,
         "running_containers_at_start": load,
         "wall_s": wall_s,
         **timing,
@@ -247,7 +290,9 @@ async def _run_one(cell: str, rep: int, oracle_dir: Path, manifest: dict) -> dic
 def main() -> None:
     parser = argparse.ArgumentParser(description="Raidar overhead baseline (task 0.4)")
     parser.add_argument(
-        "--cell", choices=("cold", "warm", "warm-artifact", "warm-init"), required=True
+        "--cell",
+        choices=("cold", "warm", "warm-artifact", "warm-init", "pack-warm"),
+        required=True,
     )
     parser.add_argument("--reps", type=int, default=10)
     parser.add_argument("--start", type=int, default=1)

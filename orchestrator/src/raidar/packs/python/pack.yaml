@@ -1,0 +1,36 @@
+# Python runtime pack (reboot plan WS-I, design memo §4).
+# The agent image carries the toolchain and harness binaries only: no scorer
+# tools and no browsers. Scorer tools live in tools.lock.yaml and are
+# provisioned lazily (host-parse) or run in the eval container (eval-sandbox).
+id: python
+version: 1
+python: "3.12"
+image:
+  repository: raidar/pack-python
+  context: image
+  # Same base as the SCB python-light problem environment, pinned by digest.
+  # The toolchain differs from python-light: see image/Dockerfile (no docker
+  # CLI or compose; adds node + pinned harnesses).
+  base_image: ghcr.io/astral-sh/uv:python3.12-trixie-slim@sha256:4677e08839853fe91c523b593f822ec1e87c7b91ba4c6b30929016b2e0933cd5
+  harnesses:
+    codex-cli:
+      npm_package: "@openai/codex"
+      version: 0.156.1
+      executable: codex
+    claude-code:
+      npm_package: "@anthropic-ai/claude-code"
+      version: 2.1.285
+      executable: claude
+  # Browser executables that must never be present in the agent image.
+  forbidden_executables:
+    - chromium
+    - chromium-browser
+    - google-chrome
+    - firefox
+    - playwright
+task_environment:
+  # Accepted N1 decision (overhead-baseline.md §4 finding 1): PID 1 is
+  # `sleep infinity`, which ignores SIGTERM; `init: true` lets `compose down`
+  # stop the container without the 10 s grace.
+  compose_main_service:
+    init: true

@@ -1,0 +1,5 @@
+# Raidar oracle coverage pass: explicit coverage.py config for the pytest
+# process, so no config file inside the submission can change measurement.
+# Subprocess measurement uses the rc file the plugin generates at run time.
+[run]
+branch = true

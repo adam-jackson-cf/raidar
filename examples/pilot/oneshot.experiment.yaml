@@ -1,0 +1,44 @@
+# Phase 1 pilot, one-shot leg (1.P "plus"): circuit_eval/checkpoint_1 as a 1-step task
+# x the same arms x 3 blocks. Exercises F1 (K=1) and F15 (scb-canonical-oneshot@1).
+schema_version: 1
+id: pilot-circuit-eval-oneshot
+description: One-shot leg of the pilot; R and G are not_applicable under the one-shot policy.
+
+problems:
+  - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
+
+agents:
+  - id: codex-luna
+    harness: codex-cli
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+
+factors: [condition]
+
+conditions:
+  - id: baseline
+    components: []
+  - id: guided
+    components:
+      - use: rules-file@1
+        files: [components/guided/AGENTS.md]
+
+arms:
+  - id: baseline
+    condition: baseline
+    agent: codex-luna
+  - id: guided
+    condition: guided
+    agent: codex-luna
+
+assessment:
+  scorers: [correctness@1, code-quality@1, resource-usage@1]
+  headline_policy: scb-canonical-oneshot@1
+
+analysis:
+  baseline_arm: baseline
+  blocks: 3
+  seed: 20260929
+  concurrency: 2

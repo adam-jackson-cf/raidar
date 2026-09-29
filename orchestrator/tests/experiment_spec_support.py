@@ -1,0 +1,106 @@
+"""Builders and in-memory registry resolvers for experiment spec tests."""
+
+from __future__ import annotations
+
+import copy
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import yaml
+
+from raidar.spec.canonical import digest_json
+from raidar.spec.references import (
+    RefKind,
+    RegistryRef,
+    RegistryReferenceError,
+    ResolvedReference,
+)
+
+PILOT_EXPERIMENT = Path(__file__).resolve().parents[2] / "examples" / "pilot" / "experiment.yaml"
+PILOT_ONESHOT = PILOT_EXPERIMENT.with_name("oneshot.experiment.yaml")
+
+BASE_EXPERIMENT: dict[str, Any] = {
+    "schema_version": 1,
+    "id": "fixture",
+    "problems": [{"ref": "scb/forge@abc123"}],
+    "agents": [
+        {
+            "id": "luna",
+            "harness": "codex-cli",
+            "provider": "openai",
+            "model": "gpt-6-luna",
+            "reasoning_effort": "low",
+            "version": "0.156.1",
+        }
+    ],
+    "factors": ["condition"],
+    "conditions": [
+        {"id": "baseline", "components": []},
+        {
+            "id": "guided",
+            "components": [{"use": "rules-file@1", "files": ["components/AGENTS.md"]}],
+        },
+    ],
+    "arms": [
+        {"id": "baseline", "condition": "baseline", "agent": "luna"},
+        {"id": "guided", "condition": "guided", "agent": "luna"},
+    ],
+    "assessment": {"scorers": ["correctness@1"]},
+    "analysis": {"baseline_arm": "baseline", "blocks": 5, "seed": 7},
+}
+
+
+def experiment_document(**changes: Any) -> dict[str, Any]:
+    document = copy.deepcopy(BASE_EXPERIMENT)
+    document.update(changes)
+    return document
+
+
+def write_experiment(root: Path, document: Mapping[str, Any]) -> Path:
+    """Write the experiment plus the component files it references."""
+    components = root / "components"
+    components.mkdir(parents=True, exist_ok=True)
+    rules = components / "AGENTS.md"
+    if not rules.exists():
+        rules.write_text("Run the tests before finishing.\n", encoding="utf-8")
+    path = root / "experiment.yaml"
+    path.write_text(yaml.safe_dump(dict(document), sort_keys=False), encoding="utf-8")
+    return path
+
+
+@dataclass
+class InMemoryResolver:
+    """Registry resolver over a fixed ``ref -> metadata`` table."""
+
+    resolver_kind: RefKind
+    entries: dict[str, dict[str, object]] = field(default_factory=dict)
+    tool_versions: dict[str, str] = field(default_factory=dict)
+
+    @property
+    def kind(self) -> RefKind:
+        return self.resolver_kind
+
+    def resolve(self, ref: RegistryRef, *, base_dir: Path) -> ResolvedReference:
+        del base_dir
+        try:
+            metadata = self.entries[str(ref)]
+        except KeyError as exc:
+            raise RegistryReferenceError(f"unknown {self.kind.value} {ref}") from exc
+        return ResolvedReference(
+            ref=ref,
+            digest=digest_json({"ref": str(ref), **metadata}),
+            metadata=metadata,
+            tool_versions=self.tool_versions,
+        )
+
+
+def fixture_resolvers(*, checkpoints: int = 8) -> list[InMemoryResolver]:
+    return [
+        InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": checkpoints}}),
+        InMemoryResolver(RefKind.COMPONENT, {"rules-file@1": {"kind": "workspace"}}),
+        InMemoryResolver(
+            RefKind.SCORER, {"correctness@1": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
+        ),
+    ]

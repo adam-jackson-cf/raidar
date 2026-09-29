@@ -10,6 +10,7 @@ from raidar.commands import (
     harness,
     matrix_report,
     quality,
+    reboot,
     run_experiment,
     scenario,
 )
@@ -24,3 +25,4 @@ def register_commands(main: click.Group) -> None:
     harness.register(main)
     scenario.register(main)
     matrix_report.register(main)
+    reboot.register(main)

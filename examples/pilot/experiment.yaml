@@ -1,0 +1,59 @@
+# Phase 1 pilot (implementation-plan §3, 1.P): one validated 8-checkpoint problem
+# (forge, oracle-validation.md) x {baseline, guided} x 5 blocks, continue mode.
+# Validate: make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml
+# Lock:     make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml
+schema_version: 1
+id: pilot-forge
+description: Does an AGENTS.md rules file improve correctness and inertia on forge?
+
+problems:
+  # SCB Harbor dataset, pinned to scb-problems@38d627ecf668 (resolved by the WS-B registry).
+  - ref: scb/forge@38d627ecf668
+
+runtime:
+  language: python
+  environment: docker
+  compose_init: true
+
+agents:
+  # ADR-001 §2.7: validation trials use codex-cli + gpt-6-luna at low effort only.
+  - id: codex-luna
+    harness: codex-cli
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+
+factors: [condition]
+
+conditions:
+  - id: baseline
+    components: []
+  - id: guided
+    components:
+      - use: rules-file@1
+        files: [components/guided/AGENTS.md]
+
+arms:
+  - id: baseline
+    condition: baseline
+    agent: codex-luna
+  - id: guided
+    condition: guided
+    agent: codex-luna
+
+assessment:
+  scorers: [correctness@1, code-quality@1, resource-usage@1]
+  # Omitted headline_policy: the lock picks the default by K (K=8 -> scb-canonical@1).
+
+analysis:
+  baseline_arm: baseline
+  blocks: 5
+  seed: 20260929
+  concurrency: 2

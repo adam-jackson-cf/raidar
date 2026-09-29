@@ -29,6 +29,9 @@ EVALUATION_PROFILE ?=
 LIMIT ?=
 KEEP_PER_MODEL ?=
 EXPERIMENT_KIND ?= benchmark
+EXPERIMENT ?=
+EXPERIMENT_SET ?=
+LOCK_CHECK ?=
 STARTER_ROOT ?=
 PROMPT_ENTRY ?=
 DIFFICULTY ?=
@@ -72,8 +75,9 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 .PHONY: help \
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
 	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke \
-	experiment-run matrix-run \
-	experiments-list experiments-prune \
+	experiment-validate experiment-lock experiment-run matrix-run \
+	experiments-list experiments-prune assess-regrade \
+	pack-info pack-build pack-audit pack-tool-provision \
 	benchmark-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	quality
@@ -102,6 +106,10 @@ help:
 	@echo "                                                        Inspect a scenario and show revision yaml paths"
 	@echo "  make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml"
 	@echo "                                                        Validate a scenario contract"
+	@echo "  make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml [EXPERIMENT_SET='analysis.blocks=3']"
+	@echo "                                                        Validate an experiment.yaml (schema, references, factor guard)"
+	@echo "  make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml [LOCK_CHECK=1]"
+	@echo "                                                        Write (or check) experiment.lock.json with content hashes and versions"
 	@echo "  make quality                                           Run repo quality gates"
 	@echo ""
 	@echo "Experiment orchestration:"
@@ -121,6 +129,14 @@ help:
 	@echo "                                                        List stored experiments and summaries"
 	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
 	@echo "                                                        Preview artifact pruning decisions"
+	@echo "  make assess-regrade RUN=<trial-or-job-dir> [ORACLE_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
+	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
+	@echo ""
+	@echo "Runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
+	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
+	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
+	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned harnesses, no scorer tools or browsers"
+	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo ""
 	@echo "Review surface:"
 	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
@@ -128,6 +144,24 @@ help:
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
 	@echo "  make review-surface-test                               Run the review-surface end-to-end functional suite (Playwright)"
+
+RUNTIME ?= python
+TOOL ?=
+FORCE ?=
+PACK_DOCKER_ENV := export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" &&
+
+pack-info:
+	@$(PACK_DOCKER_ENV) $(RAIDAR) pack info "$(RUNTIME)"
+
+pack-build:
+	@$(PACK_DOCKER_ENV) $(RAIDAR) pack build "$(RUNTIME)" $(if $(FORCE),--force,)
+
+pack-audit:
+	@$(PACK_DOCKER_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
+
+pack-tool-provision:
+	$(call require_var,TOOL)
+	@$(RAIDAR) pack provision "$(RUNTIME)" "$(TOOL)"
 
 benchmark-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
@@ -198,6 +232,22 @@ scenario-clone-revision:
 scenario-info:
 	$(call require_var,SCENARIO_DIR)
 	@$(RAIDAR) info --scenario "$(if $(SCENARIO_REVISION),$(SCENARIO_DIR)/$(SCENARIO_REVISION),$(SCENARIO_DIR))"
+
+experiment-validate:
+	$(call require_var,EXPERIMENT)
+	@$(RAIDAR) validate "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)")
+
+experiment-lock:
+	$(call require_var,EXPERIMENT)
+	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
+
+RUN ?=
+ORACLE_BUNDLE ?=
+REGRADE_OUT ?=
+
+assess-regrade:
+	$(call require_var,RUN)
+	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(RUN)" --docker-context "$${DOCKER_CONTEXT}" $(if $(ORACLE_BUNDLE),--bundle "$(ORACLE_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
 
 scenario-validate:
 	$(call require_var,SCENARIO)

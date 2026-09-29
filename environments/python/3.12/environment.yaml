@@ -1,3 +1,9 @@
+# ARCHIVED scenario-epoch environment (read-only shim).
+# The canonical Python runtime is the pack at orchestrator/src/raidar/packs/python
+# (reboot plan WS-I): a scorer-free agent image plus lazily provisioned tools.
+# This entry bakes scorer tools into the agent image, which the pack forbids; it is
+# kept only so archived scenarios still resolve, and is removed with the scenario
+# execution path in plan L1.
 id: python:3.12
 version: 1
 image: raidar/python:3.12-code
