@@ -7,6 +7,7 @@ import subprocess
 
 import click
 
+from raidar.agents.adapters.base import harbor_executable
 from raidar.commands.shared import (
     ORCHESTRATOR_ROOT,
     cleanup_stale_harbor_before_runs,
@@ -80,10 +81,16 @@ def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
 
     if install_tools:
         run_or_raise(["uv", "python", "install", "3.12"], ORCHESTRATOR_ROOT)
+        # Harbor is an exact-pinned project dependency; `uv sync` installs it into
+        # the orchestrator venv, so no global `uv tool install harbor` is used.
         run_or_raise(["uv", "sync", "--frozen", *sync_arg], ORCHESTRATOR_ROOT)
-        run_or_raise(["uv", "tool", "install", "harbor"], ORCHESTRATOR_ROOT)
 
-    result = subprocess.run(["harbor", "--version"], capture_output=True, text=True, check=False)
-    if result.returncode == 0:
-        click.echo(result.stdout.strip())
+    result = subprocess.run(
+        [harbor_executable(), "--version"], capture_output=True, text=True, check=False
+    )
+    if result.returncode != 0:
+        raise click.ClickException(
+            "Project-pinned Harbor CLI is unavailable; run `make env-setup` to sync it."
+        )
+    click.echo(f"harbor {result.stdout.strip()}")
     click.echo("Environment setup completed.")

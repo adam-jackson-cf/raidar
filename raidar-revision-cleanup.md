@@ -1,5 +1,7 @@
 # Raidar Revision Cleanup Plan
 
+> **SUPERSEDED (reboot Phase 0, task 0.6).** This plan is stopped and is kept only as history. The scenario epoch (`scenarios/`, `matrices/`, existing `experiments/`) is archived read-only and no new scenario revisions are accepted. The current direction is the Harbor-kernel reboot: see [`docs/reboot/requirements.md`](docs/reboot/requirements.md) (frozen v1) and [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md). Do not start new work from this document.
+
 ## Decision
 
 Repair measurement validity before changing public taxonomy. Raidar currently has several executable SDLC tasks whose attached scorers cannot establish the outcome they claim to measure. A cosmetic scenario or scorer rename would create new identities while leaving invalid evidence paths, impossible pass conditions, and untrustworthy rankings in place.

@@ -2,7 +2,7 @@
 name = "raidar"
 version = "0.14.0"
 description = "Agentic evaluation system orchestrator for testing model/harness combinations"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
@@ -12,6 +12,12 @@ dependencies = [
     "aiohttp>=3.13.5",
     "requests>=2.33.0",
     "urllib3>=2.7.0",
+    # Harbor is exact-pinned (reboot plan task 0.2); upgrade only via a spike that
+    # reruns the Phase 0 checks.
+    "harbor==0.23.0",
+    # LiteLLM is a transitive Harbor dependency; AGENTS.md requires an exact,
+    # known-safe pin (never 1.82.7 or 1.82.8).
+    "litellm==1.102.1",
 ]
 
 [project.optional-dependencies]
@@ -38,7 +44,7 @@ packages = ["src/raidar"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 extend-exclude = [
     "experiments",
     "scenarios",
@@ -82,6 +88,6 @@ addopts = "--ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 files = ["src", "tests"]
 ignore_missing_imports = true

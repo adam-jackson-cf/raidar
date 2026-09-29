@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import click
@@ -46,6 +47,25 @@ def scenario() -> None:
 
 
 scenario.add_command(scenario_validate)
+
+
+SCENARIO_EPOCH_ARCHIVED_OVERRIDE_ENV = "RAIDAR_ALLOW_ARCHIVED_SCENARIO_AUTHORING"
+SCENARIO_EPOCH_ARCHIVED_MESSAGE = (
+    "Scenario epoch is archived: scenarios/, matrices/ and experiments/ are read-only "
+    "history and no new scenarios or scenario revisions are accepted. "
+    "See docs/reboot/requirements.md and docs/reboot/implementation-plan.md."
+)
+
+
+def _refuse_archived_scenario_authoring(command: str) -> None:
+    """Refuse scenario authoring now that the scenario epoch is archived.
+
+    The override env var exists only so tests can keep exercising the archived
+    authoring code paths; it is not a supported public workflow.
+    """
+    if os.environ.get(SCENARIO_EPOCH_ARCHIVED_OVERRIDE_ENV) == "1":
+        return
+    raise click.ClickException(f"Refusing scenario {command}: {SCENARIO_EPOCH_ARCHIVED_MESSAGE}")
 
 
 def scenario_revision_paths(scenario_root: Path) -> list[Path]:
@@ -168,7 +188,8 @@ def scenario_list(scenarios_root: Path) -> None:
 )
 @click.option("--json", "as_json", is_flag=True)
 def scenario_init(**options) -> None:
-    """Create a new versioned scenario descriptor with prompt artifacts and rules."""
+    """Create a new versioned scenario descriptor (archived: refuses by default)."""
+    _refuse_archived_scenario_authoring("init")
     try:
         result = _service_init_scenario(
             ScenarioInitRequest(
@@ -213,7 +234,8 @@ def scenario_init(**options) -> None:
 def scenario_clone_revision(
     path: Path, from_revision: str, to_revision: str | None, as_json: bool
 ) -> None:
-    """Clone a scenario revision and update revision metadata."""
+    """Clone a scenario revision (archived: refuses by default)."""
+    _refuse_archived_scenario_authoring("clone-revision")
     try:
         result = _service_clone_scenario_revision(
             ScenarioCloneRequest(path=path, from_revision=from_revision, to_revision=to_revision)

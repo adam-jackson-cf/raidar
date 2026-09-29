@@ -33,6 +33,59 @@ EvalConfig = support.EvalConfig
 EvalRun = support.EvalRun
 Scorecard = support.Scorecard
 
+
+@pytest.fixture(autouse=True)
+def _allow_archived_scenario_authoring(monkeypatch: pytest.MonkeyPatch) -> None:
+    """These tests exercise the archived scenario authoring paths directly."""
+    monkeypatch.setenv("RAIDAR_ALLOW_ARCHIVED_SCENARIO_AUTHORING", "1")
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ["scenario", "init", "--path", "unused"],
+        ["scenario", "clone-revision", "--path", ".", "--from-revision", "v001"],
+    ],
+)
+def test_scenario_authoring_refuses_while_scenario_epoch_archived(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, args: list[str]
+) -> None:
+    monkeypatch.delenv("RAIDAR_ALLOW_ARCHIVED_SCENARIO_AUTHORING", raising=False)
+    monkeypatch.chdir(tmp_path)
+    full_args = [
+        *args,
+        *(
+            [
+                "--display-name",
+                "Refused",
+                "--task-kind",
+                "feature_implementation",
+                "--delivery-mode",
+                "direct_implementation",
+                "--workspace-state",
+                "new",
+                "--language",
+                "typescript",
+                "--evaluation-role",
+                "benchmark",
+                "--catalog-status",
+                "active",
+                "--template",
+                "typescript-bun",
+            ]
+            if args[1] == "init"
+            else []
+        ),
+    ]
+
+    result = CliRunner().invoke(main, full_args)
+
+    assert result.exit_code != 0
+    assert "Scenario epoch is archived" in result.output
+    assert "docs/reboot/" in result.output
+    assert list(tmp_path.iterdir()) == []
+
+
 DEFAULT_EXPERIMENT_PROFILE = (
     "functional+requirements-coverage+verification-stability+execution-validity+resource-efficiency"
 )
@@ -595,7 +648,9 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
     assert result.exit_code == 0, result.output
     assert calls[0]["cmd"] == ["uv", "python", "install", "3.12"]
     assert calls[1]["cmd"] == ["uv", "sync", "--frozen", "--all-extras"]
-    assert calls[2]["cmd"] == ["uv", "tool", "install", "harbor"]
+    # Harbor comes from the exact-pinned project dependency, not a global uv tool.
+    assert len(calls) == 2
+    assert "harbor 0.0.0" in result.output
 
 
 def test_experiment_run_uses_harness_model_execution_suffix(tmp_path: Path, monkeypatch) -> None:
@@ -1889,21 +1944,3 @@ def test_smoke_dry_run_check_prints_all_public_smoke_shapes() -> None:
 
     assert result.returncode == 0, result.stderr
     _assert_smoke_dry_run_output(result.stdout)
-
-
-def test_scenario_agent_matrix_dry_run_is_side_effect_free() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-
-    result = subprocess.run(
-        ["make", "-n", "scenario-agent-matrix"],
-        cwd=repo_root,
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-    assert result.returncode == 0, result.stderr
-    assert "skill-benchmark-coding-test-codex-gpt55-terra-low.yaml" in result.stdout
-    assert "bugfix-ledger-balance-codex-gpt55-terra-low.yaml" not in result.stdout
-    assert "validate-scenario-agent-matrix.py" in result.stdout
-    assert "No fresh experiment summary" not in result.stderr

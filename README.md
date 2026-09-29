@@ -11,6 +11,8 @@
 
 </div>
 
+> **Reboot in progress: the scenario epoch is archived.** `scenarios/`, `matrices/` and existing `experiments/` are read-only history. No new scenarios or scenario revisions are accepted (`make scenario-init` and `make scenario-clone-revision` refuse). Existing runs can still be inspected and reviewed. The replacement design and plan live in [`docs/reboot/requirements.md`](docs/reboot/requirements.md) and [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md).
+
 ## Quick Install
 
 Prerequisites:
@@ -29,7 +31,7 @@ make env-setup
 For Codex CLI, the default auth policy is `CODEX_AUTH_MODE=auto`: prefer file-backed ChatGPT login from `~/.codex/auth.json`, otherwise fall back to `OPENAI_API_KEY`. Use `make codex-auth-setup` to create or validate file-backed Codex auth. Add `DEVICE_AUTH=1` for headless/device-code login. API keys remain the recommended default for most automation.
 
 Use `make help` from the repo root for the supported command surface and target descriptions.
-Create a brand-new scenario with `make scenario-init ...`; create a new revision of an existing scenario with `make scenario-clone-revision SCENARIO_DIR=scenarios/homepage-implementation FROM_REVISION=v001 [TO_REVISION=v002]`.
+Scenario authoring (`make scenario-init`, `make scenario-clone-revision`) is archived and refuses; see the reboot note above.
 
 ## Quick Start
 
@@ -67,8 +69,8 @@ The repository has four primary concerns:
 
 - `orchestrator/`: CLI and runtime pipeline that executes and scores scenarios.
 - `environments/`: Docker-backed runtime stack presets and capability inventories used by scenarios.
-- `matrices/`: stored matrix definitions that bind scenario revisions to AgentSpecs.
-- `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters.
+- `matrices/`: stored matrix definitions that bind scenario revisions to AgentSpecs (archived, read-only).
+- `scenarios/`: versioned scenario definitions (`scenario.yaml`), prompts, rules, references, and starters (archived, read-only).
 - `experiments/`: generated experiment artifacts with per-run evidence bundles.
 - `experiments/benchmarks/`: canonical artifact root for comparison baselines.
 

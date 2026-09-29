@@ -7,8 +7,10 @@ import os
 import shlex
 import tempfile
 from pathlib import Path
+from typing import ClassVar, Literal
 
 from harbor.agents.base import BaseAgent
+from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 
@@ -29,9 +31,35 @@ def _set_context_metadata(context: AgentContext, return_code: int, log_file: str
     context.metadata = {"return_code": return_code, "log_file": log_file}
 
 
-class CliHarborAgentBase(BaseAgent):
-    """Shared lifecycle and execution helpers for repository-local CLI agents."""
+class CliAgentOptions(AgentOptions):
+    """No user-facing kwargs; Harbor rejects unknown ``--ak`` keys (extra=forbid)."""
 
+
+ReasoningEffort = Literal["low", "medium", "high", "xhigh", "max"]
+
+
+class ClaudeCodeCliAgentOptions(AgentOptions):
+    """Validated ``--ak`` kwargs for the Claude Code CLI agent."""
+
+    effort: ReasoningEffort | None = None
+    thinking_mode: Literal["adaptive", "enabled", "disabled"] | None = None
+
+
+class CodexCliAgentOptions(AgentOptions):
+    """Validated ``--ak`` kwargs for the Codex CLI agent."""
+
+    reasoning_effort: Literal["minimal", "low", "medium", "high", "xhigh"] | None = None
+
+
+class CliHarborAgentBase(BaseAgent):
+    """Shared lifecycle and execution helpers for repository-local CLI agents.
+
+    Harbor >=0.23 validates ``AgentConfig.kwargs`` against ``options_model`` in
+    ``BaseAgent.__init__``/``preflight`` and exposes the parsed model as
+    ``self.options``.
+    """
+
+    options_model: ClassVar[type[AgentOptions] | None] = CliAgentOptions
     log_file: str = ""
 
     def version(self) -> str | None:
@@ -220,22 +248,20 @@ class GeminiCliHarborAgent(CliHarborAgentBase):
 class ClaudeCodeCliHarborAgent(CliHarborAgentBase):
     """Claude Code CLI Harbor agent that executes directly in the task image."""
 
+    options_model: ClassVar[type[AgentOptions] | None] = ClaudeCodeCliAgentOptions
     log_file = "/logs/agent/claude-code.txt"
     _ALLOWED_TOOLS = (
         "Bash Edit Write Read Glob Grep LS WebFetch NotebookEdit "
         "NotebookRead TodoRead TodoWrite Agent Skill SlashCommand Task WebSearch"
     )
 
-    def __init__(
-        self,
-        effort: str | None = None,
-        thinking_mode: str | None = None,
-        *args,
-        **kwargs,
-    ):
-        super().__init__(*args, **kwargs)
-        self._effort = effort
-        self._thinking_mode = thinking_mode
+    @property
+    def _effort(self) -> str | None:
+        return getattr(self.options, "effort", None)
+
+    @property
+    def _thinking_mode(self) -> str | None:
+        return getattr(self.options, "thinking_mode", None)
 
     @staticmethod
     def name() -> str:
@@ -287,11 +313,12 @@ class ClaudeCodeCliHarborAgent(CliHarborAgentBase):
 class CodexCliHarborAgent(CliHarborAgentBase):
     """Codex CLI Harbor agent that executes directly in the task image."""
 
+    options_model: ClassVar[type[AgentOptions] | None] = CodexCliAgentOptions
     log_file = "/logs/agent/codex.txt"
 
-    def __init__(self, reasoning_effort: str | None = None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self._reasoning_effort = reasoning_effort
+    @property
+    def _reasoning_effort(self) -> str | None:
+        return getattr(self.options, "reasoning_effort", None)
 
     @staticmethod
     def name() -> str:

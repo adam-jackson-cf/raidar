@@ -1,8 +1,10 @@
 """Tests for canonical Harbor routing."""
 
 # ruff: noqa: F403, F405
+import sys
 from pathlib import Path
 
+from raidar.agents.adapters.base import harbor_executable
 from raidar.agents.adapters.gemini_cli import GeminiCliAdapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 from raidar.agents.harbor_routing import harness_src_path
@@ -27,12 +29,32 @@ def test_harbor_routing_uses_harness_import_path(monkeypatch) -> None:
         jobs_dir=Path("/tmp/jobs"),
     )
 
-    assert "--agent-import-path" in command
-    assert "-a" not in command
-    assert "raidar.agents.harbor_agents.cli_agents:GeminiCliHarborAgent" in command
+    # Harbor >=0.23 removed --agent-import-path and --no-export-traces.
+    assert "--agent-import-path" not in command
+    assert "--no-export-traces" not in command
+    agent_index = command.index("--agent")
+    assert command[agent_index + 1] == "raidar.agents.harbor_agents.cli_agents:GeminiCliHarborAgent"
     assert "--quiet" in command
     assert "--no-delete" in command
-    assert "--no-export-traces" in command
+
+
+def test_harbor_command_uses_project_pinned_harbor(monkeypatch) -> None:
+    adapter = _gemini_adapter(monkeypatch)
+
+    command = adapter.build_harbor_command(task_path=Path("/tmp/scenario"))
+
+    assert command[0] == harbor_executable()
+    assert Path(command[0]).parent == Path(sys.executable).parent
+    assert command[1] == "run"
+
+
+def test_builtin_harness_uses_agent_name(monkeypatch) -> None:
+    adapter = _gemini_adapter(monkeypatch)
+    monkeypatch.setattr(adapter, "harbor_harness_import_path", lambda: None)
+
+    command = adapter.build_harbor_command(task_path=Path("/tmp/scenario"))
+
+    assert command[command.index("--agent") + 1] == "gemini-cli"
 
 
 def test_harbor_routing_runtime_env_includes_pythonpath(monkeypatch) -> None:

@@ -294,6 +294,7 @@ def test_scenario_echo_helpers_and_listing(monkeypatch, tmp_path) -> None:
 
 
 def test_scenario_commands_wrap_service_results(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("RAIDAR_ALLOW_ARCHIVED_SCENARIO_AUTHORING", "1")
     runner = CliRunner()
     scenario_path = tmp_path / "scenario.yaml"
     scenario_path.write_text("scenario", encoding="utf-8")

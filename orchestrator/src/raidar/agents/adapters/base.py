@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import shutil
+import sys
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -22,6 +23,18 @@ from raidar.harness.definitions import (
 
 if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
     from ..config import AgentSpec
+
+
+def harbor_executable() -> str:
+    """Return the project-pinned Harbor CLI, installed next to this interpreter.
+
+    Falls back to ``harbor`` on PATH only when the pinned entrypoint is absent
+    (for example when raidar is imported outside its uv-managed environment).
+    """
+    candidate = Path(sys.executable).parent / "harbor"
+    if candidate.is_file() and os.access(candidate, os.X_OK):
+        return str(candidate)
+    return "harbor"
 
 
 def resolve_cli_executable(
@@ -222,7 +235,7 @@ class HarnessAdapter:
     ) -> list[str]:
         """Construct the Harbor CLI command for this adapter."""
         cmd: list[str] = [
-            "harbor",
+            harbor_executable(),
             "run",
         ]
 
@@ -236,17 +249,14 @@ class HarnessAdapter:
         if jobs_dir is not None:
             cmd.extend(["--jobs-dir", str(jobs_dir)])
 
+        # Harbor >=0.23 folds custom import paths (module:Class) into --agent.
         import_path = self.harbor_harness_import_path()
-        if import_path:
-            cmd.extend(["--agent-import-path", import_path])
-        else:
-            cmd.extend(["-a", self.harbor_harness()])
+        cmd.extend(["--agent", import_path or self.harbor_harness()])
 
         cmd.extend(
             [
                 "--quiet",
                 "--no-delete",
-                "--no-export-traces",
                 "--n-concurrent",
                 "1",
                 "-m",

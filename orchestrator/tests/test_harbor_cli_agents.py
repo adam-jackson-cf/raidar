@@ -1,14 +1,7 @@
 import importlib
-import sys
-import types
 from pathlib import Path
 
 import pytest
-
-
-class _BaseAgent:
-    def __init__(self, model_name: str | None = None, **_kwargs):
-        self.model_name = model_name
 
 
 class _ExecResult:
@@ -34,25 +27,8 @@ class _Context:
 
 
 @pytest.fixture
-def harbor_cli_agents(monkeypatch):
-    modules = {
-        "harbor": types.ModuleType("harbor"),
-        "harbor.agents": types.ModuleType("harbor.agents"),
-        "harbor.agents.base": types.ModuleType("harbor.agents.base"),
-        "harbor.environments": types.ModuleType("harbor.environments"),
-        "harbor.environments.base": types.ModuleType("harbor.environments.base"),
-        "harbor.models": types.ModuleType("harbor.models"),
-        "harbor.models.agent": types.ModuleType("harbor.models.agent"),
-        "harbor.models.agent.context": types.ModuleType("harbor.models.agent.context"),
-    }
-    modules["harbor.agents.base"].BaseAgent = _BaseAgent
-    modules["harbor.environments.base"].BaseEnvironment = object
-    modules["harbor.models.agent.context"].AgentContext = _Context
-    for name, module in modules.items():
-        monkeypatch.setitem(sys.modules, name, module)
-
-    sys.modules.pop("raidar.agents.harbor_agents", None)
-    sys.modules.pop("raidar.agents.harbor_agents.cli_agents", None)
+def harbor_cli_agents():
+    """Import the repo-local agents against the project-pinned Harbor release."""
     return importlib.import_module("raidar.agents.harbor_agents.cli_agents")
 
 
@@ -143,7 +119,9 @@ async def test_gemini_agent_exports_secret_and_copies_trajectory(
 
     environment = _Environment()
     context = _Context()
-    agent = harbor_cli_agents.GeminiCliHarborAgent(model_name="google/gemini-2.5-pro")
+    agent = harbor_cli_agents.GeminiCliHarborAgent(
+        logs_dir=tmp_path, model_name="google/gemini-2.5-pro"
+    )
 
     assert agent.name() == "gemini-cli-harbor"
     assert agent.version() is None
@@ -178,6 +156,7 @@ async def test_claude_agent_configures_model_env_settings_and_secret_paths(
     environment = _Environment()
     context = _Context()
     agent = harbor_cli_agents.ClaudeCodeCliHarborAgent(
+        logs_dir=tmp_path,
         model_name="anthropic/claude-sonnet-4.5",
         effort="low",
         thinking_mode="enabled",
@@ -228,6 +207,7 @@ async def test_codex_agent_uses_oauth_auth_json_when_available(
     environment = _Environment()
     context = _Context()
     agent = harbor_cli_agents.CodexCliHarborAgent(
+        logs_dir=tmp_path,
         model_name="codex/gpt-5.5",
         reasoning_effort="medium",
     )
@@ -255,7 +235,7 @@ async def test_codex_agent_builds_auth_json_from_api_key_secret(
 
     environment = _Environment()
     context = _Context()
-    agent = harbor_cli_agents.CodexCliHarborAgent(model_name="openai/gpt-5.5")
+    agent = harbor_cli_agents.CodexCliHarborAgent(logs_dir=tmp_path, model_name="openai/gpt-5.5")
 
     await agent.run("ship", environment, context)
 
@@ -264,3 +244,24 @@ async def test_codex_agent_builds_auth_json_from_api_key_secret(
     ]
     assert '"OPENAI_API_KEY": "%s"' in str(environment.exec_calls[2]["command"])
     assert "model_reasoning_effort" not in str(environment.exec_calls[3]["command"])
+
+
+def test_cli_agents_reject_unknown_agent_kwargs(harbor_cli_agents, tmp_path: Path):
+    with pytest.raises(ValueError, match="Unknown option 'effort'"):
+        harbor_cli_agents.CodexCliHarborAgent(
+            logs_dir=tmp_path, model_name="openai/gpt-5.5", effort="low"
+        )
+    with pytest.raises(ValueError, match="Unknown option 'reasoning_effort'"):
+        harbor_cli_agents.GeminiCliHarborAgent(
+            logs_dir=tmp_path, model_name="google/gemini-3-flash-preview", reasoning_effort="low"
+        )
+
+
+def test_cli_agents_validate_agent_kwarg_values(harbor_cli_agents):
+    with pytest.raises(ValueError, match="Invalid kwargs for agent 'claude-code-harbor'"):
+        harbor_cli_agents.ClaudeCodeCliHarborAgent.preflight({"effort": "turbo"})
+
+    harbor_cli_agents.ClaudeCodeCliHarborAgent.preflight(
+        {"effort": "high", "thinking_mode": "adaptive"}
+    )
+    harbor_cli_agents.CodexCliHarborAgent.preflight({"reasoning_effort": "low"})
