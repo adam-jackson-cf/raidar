@@ -1,4 +1,0 @@
-# representative harness config component
-model_reasoning_effort = "low"
-[features]
-plugins = false

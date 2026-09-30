@@ -15,7 +15,7 @@ Raidar runs an **experiment**: the same pinned **problems** under two or more **
 
 The design lives in [`docs/reboot/requirements.md`](docs/reboot/requirements.md) (frozen v1), [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md), [`docs/reboot/adr-001.md`](docs/reboot/adr-001.md) and [`docs/reboot/design-memo.md`](docs/reboot/design-memo.md).
 
-> **History.** The scenario, revision and matrix workflow was retired at the reboot cutover: no code, target or check reads `scenarios/`, `matrices/`, `environments/` or `spikes/` any more, and their removal from the tree (`git rm`) is a pending maintainer step. Their definitions stay at commit `2b66568`, and [`CHANGELOG.md`](CHANGELOG.md) maps each removed target to its replacement. Scenario-epoch runs under `experiments/benchmarks` still render, read-only, in the review surface (`REVIEW_LEGACY_ROOT`).
+> **History.** The scenario, revision and matrix workflow was retired at the reboot cutover: no code, target or check reads `scenarios/`, `matrices/`, `environments/` or `spikes/` any more, and they have been removed from the tree. Their definitions are preserved at tag `archive/scenario-epoch`, and [`CHANGELOG.md`](CHANGELOG.md) maps each removed target to its replacement. Scenario-epoch runs under `experiments/benchmarks` still render, read-only, in the review surface (`REVIEW_LEGACY_ROOT`).
 
 ## Install
 
