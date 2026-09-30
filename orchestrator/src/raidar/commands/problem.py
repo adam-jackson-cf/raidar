@@ -1,4 +1,4 @@
-"""``raidar problem import|validate``: pinned problem import and oracle validation."""
+"""``raidar problem list|info|import|validate``: the pinned problem registry."""
 
 from __future__ import annotations
 
@@ -9,10 +9,15 @@ from pathlib import Path
 import click
 
 from raidar.problems.importer import import_problem
-from raidar.problems.models import ProblemId
+from raidar.problems.models import ProblemId, ProblemManifest
 from raidar.problems.source import SourceError
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
-from raidar.problems.validation import CheckStatus, Verdict
+from raidar.problems.validation import (
+    CheckStatus,
+    ValidationRecordError,
+    Verdict,
+    read_validation_record,
+)
 from raidar.problems.validator import (
     ENGINES,
     ValidateOptions,
@@ -66,7 +71,70 @@ def _problem_id(ref: str) -> ProblemId:
 
 @click.group()
 def problem() -> None:
-    """Pinned problem import and oracle validation."""
+    """Pinned problem registry: list, inspect, import and oracle-validate problems."""
+
+
+def _validation_state(store: ProblemStore, problem_id: ProblemId, manifest: ProblemManifest) -> str:
+    """The recorded verdict, or why there is no usable one for this manifest."""
+    try:
+        record = read_validation_record(store.validation_path(problem_id))
+    except ValidationRecordError:
+        return "not validated"
+    if record.manifest_sha256 != manifest.digest():
+        return f"stale ({record.verdict.value} for another manifest)"
+    usable = "usable" if record.usable else "not usable"
+    not_run = f"; not run: {', '.join(record.not_run)}" if record.not_run else ""
+    return f"{record.verdict.value} ({usable}{not_run})"
+
+
+def _store_state(store: ProblemStore, problem_id: ProblemId) -> str:
+    content = store.content_dir(problem_id)
+    return "imported" if (content / "task").is_dir() else "not imported"
+
+
+@problem.command("list")
+@_STORE_OPTION
+def list_command(store_root: Path | None) -> None:
+    """List every registered problem with its mode, validation and import state."""
+    store = _store(store_root)
+    try:
+        problems = store.registered()
+        rows = [(problem_id, store.load_manifest(problem_id)) for problem_id in problems]
+    except ProblemStoreError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if not rows:
+        click.echo(f"No problems registered under {store.root / 'registry'}")
+        return
+    for problem_id, manifest in rows:
+        click.echo(str(problem_id))
+        click.echo(f"  mode: {manifest.mode.value}  checkpoints: {manifest.checkpoints}")
+        click.echo(f"  validation: {_validation_state(store, problem_id, manifest)}")
+        click.echo(f"  store: {_store_state(store, problem_id)}")
+
+
+@problem.command("info")
+@click.argument("ref")
+@_STORE_OPTION
+def info_command(ref: str, store_root: Path | None) -> None:
+    """Show REF's manifest: steps, source pin, pack binding, validation and import state."""
+    store = _store(store_root)
+    problem_id = _problem_id(ref)
+    try:
+        manifest = store.load_manifest(problem_id)
+    except ProblemStoreError as exc:
+        raise click.ClickException(str(exc)) from exc
+    source = manifest.source
+    click.echo(str(problem_id))
+    click.echo(f"  mode: {manifest.mode.value}  checkpoints: {manifest.checkpoints}")
+    click.echo(f"  steps: {', '.join(step.name for step in manifest.steps)}")
+    click.echo(f"  source: {source.url}@{source.commit} ({source.problem})")
+    click.echo(f"  pack: {manifest.pack.id}@{manifest.pack.version} image {manifest.pack.image}")
+    if manifest.entry_file is not None:
+        click.echo(f"  entry_file: {manifest.entry_file}")
+    click.echo(f"  manifest: {store.manifest_path(problem_id)}  sha256: {manifest.digest()}")
+    click.echo(f"  validation: {_validation_state(store, problem_id, manifest)}")
+    click.echo(f"  validation report: {store.validation_path(problem_id)}")
+    click.echo(f"  store: {_store_state(store, problem_id)} ({store.content_dir(problem_id)})")
 
 
 @problem.command("import")

@@ -1,10 +1,11 @@
 // Quality element, experiment view: per problem, the arms' component curves,
 // paired Δ vs baseline, SCB-dashboard distributions, the head-to-head
 // checkpoint scatter and score sensitivity, then the trials to drill into.
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useMemo, useRef } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Badge } from '@/components/Badge';
+import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
 import { C } from '@/utils/colors';
 import { qualityApi } from '@/quality/api';
 import { ArmLegend, ComponentCurves } from '@/quality/components/ComponentCurves';
@@ -14,7 +15,8 @@ import { PairedDeltaTable } from '@/quality/components/PairedDeltaTable';
 import { SensitivityPanel } from '@/quality/components/SensitivityPanel';
 import { StatusBadge } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE, experimentKey, experimentLabel, fmtComponent } from '@/quality/format';
-import type { ProblemQuality, QualityRunSummary } from '@/quality/types';
+import { matchesTarget } from '@/quality/links';
+import type { ProblemQuality, QualityExperiment, QualityRunSummary } from '@/quality/types';
 import '@/quality/quality.css';
 
 function Section({ title, children, testId }: { title: string; children: React.ReactNode; testId: string }) {
@@ -73,10 +75,30 @@ function TrialList({ runs }: { runs: QualityRunSummary[] }) {
   );
 }
 
-function ProblemView({ problem, runs }: { problem: ProblemQuality; runs: QualityRunSummary[] }) {
+function ProblemView({
+  problem,
+  runs,
+  experiments,
+  focused,
+}: {
+  problem: ProblemQuality;
+  runs: QualityRunSummary[];
+  experiments: QualityExperiment[];
+  focused: boolean;
+}) {
   const members = runs.filter((run) => problem.run_ids.includes(run.id));
+  const ref = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (focused) ref.current?.scrollIntoView({ block: 'start' });
+  }, [focused]);
   return (
-    <article className="mb-8" data-testid="quality-problem" aria-label={problem.problem}>
+    <article
+      ref={ref}
+      className="mb-8 scroll-mt-2"
+      data-testid="quality-problem"
+      data-focused={focused || undefined}
+      aria-label={problem.problem}
+    >
       <header className="flex flex-wrap items-baseline gap-x-3 gap-y-1 pb-2">
         <h2 className="text-sm font-semibold" style={{ color: C.fg5 }}>
           {problem.problem}
@@ -91,6 +113,9 @@ function ProblemView({ problem, runs }: { problem: ProblemQuality; runs: Quality
           <ArmLegend arms={problem.arms} baseline={problem.baseline_arm} />
         </span>
       </header>
+      <div className="mb-2">
+        <FamilyPolicyMismatch scenario={problem.problem} quality={experiments} />
+      </div>
       {(problem.notes.length > 0 || problem.excluded.length > 0) && (
         <ul className="mb-2 text-[10px]" style={{ color: C.orange }} data-testid="quality-exclusions">
           {problem.notes.map((note) => (
@@ -128,9 +153,19 @@ function ProblemView({ problem, runs }: { problem: ProblemQuality; runs: Quality
 export function QualityPage() {
   const experiments = useQuery({ queryKey: ['quality-experiments'], queryFn: qualityApi.experiments });
   const runs = useQuery({ queryKey: ['quality-runs'], queryFn: qualityApi.runs });
-  const [selected, setSelected] = useState<string | null>(null);
+  // Deep links (?experiment=&lock=&problem=) come from the comparison views and run detail.
+  const [params, setParams] = useSearchParams();
   const list = useMemo(() => experiments.data?.experiments ?? [], [experiments.data]);
-  const current = list.find((item) => experimentKey(item) === selected) ?? list[0];
+  const focusProblem = params.get('problem');
+  const current =
+    list.find((item) => matchesTarget(item, params.get('experiment'), params.get('lock'))) ?? list[0];
+  const select = (key: string) => {
+    const item = list.find((entry) => experimentKey(entry) === key);
+    if (!item) return;
+    const next = new URLSearchParams({ experiment: item.experiment });
+    if (item.lock_sha256) next.set('lock', item.lock_sha256.slice(0, 12));
+    setParams(next, { replace: true });
+  };
 
   let body: React.ReactNode;
   if (experiments.isLoading || runs.isLoading) {
@@ -149,7 +184,13 @@ export function QualityPage() {
     );
   } else {
     body = current.problems.map((problem) => (
-      <ProblemView key={problem.problem} problem={problem} runs={runs.data?.runs ?? []} />
+      <ProblemView
+        key={problem.problem}
+        problem={problem}
+        runs={runs.data?.runs ?? []}
+        experiments={list}
+        focused={problem.problem === focusProblem}
+      />
     ));
   }
 
@@ -166,7 +207,7 @@ export function QualityPage() {
             className="q-focus ml-auto rounded px-2 py-1 text-xs"
             style={{ background: C.input, color: C.fg3, border: `1px solid ${C.borderLight}` }}
             value={current ? experimentKey(current) : ''}
-            onChange={(event) => setSelected(event.target.value)}
+            onChange={(event) => select(event.target.value)}
           >
             {list.map((item) => (
               <option key={experimentKey(item)} value={experimentKey(item)}>

@@ -10,8 +10,18 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.spec.canonical import digest_json
 from raidar.spec.loader import CliOverrides, load_experiment
-from raidar.spec.lock import LockError, build_lock, default_resolvers, render_lock
+from raidar.spec.lock import (
+    SECTIONS,
+    LockError,
+    build_lock,
+    default_resolvers,
+    describe_staleness,
+    lock_integrity_issues,
+    render_lock,
+    stale_sections,
+)
 from raidar.spec.policies import PolicyResolver
 from raidar.spec.references import (
     RefKind,
@@ -53,21 +63,21 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert first.endswith(b"\n")
     lock = json.loads(first)
     assert list(lock) == sorted(lock)
-    assert lock["files"]["components/AGENTS.md"]["sha256"]
+    execution, assessment = lock["execution"], lock["assessment"]
+    assert execution["files"]["components/AGENTS.md"]["sha256"]
     assert lock["experiment"]["source"] == "experiment.yaml"
-    assert set(lock["versions"]) == {
-        "python",
-        "harbor",
-        "litellm",
-        "raidar",
-        "raidar_spec",
-        "harnesses",
-        "tools",
+    assert execution["versions"]["harbor"] == "0.23.0"
+    assert execution["versions"]["harnesses"] == {
+        "luna": {"harness": "codex-cli", "version": "0.156.1"}
     }
-    assert lock["versions"]["harbor"] == "0.23.0"
-    assert lock["versions"]["harnesses"] == {"luna": {"harness": "codex-cli", "version": "0.156.1"}}
-    assert lock["versions"]["tools"] == {"pytest": "8.4.1"}
-    assert set(lock["references"]) == {"problem", "component", "scorer", "policy"}
+    assert set(execution["references"]) == {"problem", "component"}
+    assert set(assessment["references"]) == {"scorer", "policy"}
+    # Tools are recorded with the section whose reference pins them.
+    assert (execution["tools"], assessment["tools"]) == ({}, {"pytest": "8.4.1"})
+    assert set(lock["toolchain"]) == {"python", "litellm", "raidar", "raidar_spec"}
+    assert lock["sections"] == {name: digest_json(lock[name]) for name in SECTIONS}
+    assert lock["lock_sha256"] == lock["sections"]["execution"]
+    assert lock_integrity_issues(lock) == []
 
 
 def test_changing_a_component_file_changes_its_hash_and_the_arm_digest(tmp_path: Path) -> None:
@@ -78,10 +88,47 @@ def test_changing_a_component_file_changes_its_hash_and_the_arm_digest(tmp_path:
     after = _lock(path)
 
     file_key = "components/AGENTS.md"
-    assert before["files"][file_key]["sha256"] != after["files"][file_key]["sha256"]
-    assert before["arms"]["guided"]["digest"] != after["arms"]["guided"]["digest"]
-    assert before["arms"]["baseline"]["digest"] == after["arms"]["baseline"]["digest"]
+    before_run, after_run = before["execution"], after["execution"]
+    assert before_run["files"][file_key]["sha256"] != after_run["files"][file_key]["sha256"]
+    assert before_run["arms"]["guided"]["digest"] != after_run["arms"]["guided"]["digest"]
+    assert before_run["arms"]["baseline"]["digest"] == after_run["arms"]["baseline"]["digest"]
     assert before["lock_sha256"] != after["lock_sha256"]
+    assert stale_sections(before, after) == ("execution",)
+
+
+def _scorer_resolvers(implementation: str) -> ResolverSet:
+    problem, component, _ = fixture_resolvers()
+    scorer = InMemoryResolver(
+        RefKind.SCORER,
+        {"correctness@1": {"implementation_digest": implementation}},
+        tool_versions={"pytest": "8.4.1"},
+    )
+    return ResolverSet([problem, component, scorer, PolicyResolver()], entry_point_group=None)
+
+
+def test_assessment_and_analysis_changes_keep_the_run_identity(tmp_path: Path) -> None:
+    """lock_sha256 covers execution inputs only: scorer or threshold edits mean rescore."""
+    path = write_experiment(tmp_path, experiment_document())
+    lock_path = path.with_name("experiment.lock.json")
+
+    def locked(implementation: str, experiment: Path = path) -> dict[str, Any]:
+        loaded = load_experiment(experiment)
+        resolvers = _scorer_resolvers(implementation)
+        return json.loads(render_lock(build_lock(loaded, lock_path=lock_path, resolvers=resolvers)))
+
+    base = locked("a" * 64)
+    rescored = locked("b" * 64)
+    document = experiment_document()
+    document["analysis"]["min_pairs"] = 7
+    document["analysis"]["concurrency"] = 4
+    reanalysed = locked("a" * 64, write_experiment(tmp_path, document))
+
+    assert rescored["lock_sha256"] == base["lock_sha256"]
+    assert stale_sections(base, rescored) == ("assessment",)
+    assert reanalysed["lock_sha256"] == base["lock_sha256"]
+    # concurrency is per machine: it is part of the document, not of any section.
+    assert stale_sections(base, reanalysed) == ("analysis", "document")
+    assert "rescore" in describe_staleness(("assessment",))
 
 
 def test_directory_components_hash_every_file_but_ignore_os_noise(tmp_path: Path) -> None:
@@ -95,7 +142,7 @@ def test_directory_components_hash_every_file_but_ignore_os_noise(tmp_path: Path
 
     lock = _lock(write_experiment(tmp_path, document))
 
-    assert list(lock["files"]) == ["components/skill/SKILL.md"]
+    assert list(lock["execution"]["files"]) == ["components/skill/SKILL.md"]
 
 
 def test_relock_ignores_its_own_output_inside_a_hashed_directory(tmp_path: Path) -> None:
@@ -113,7 +160,9 @@ def test_relock_ignores_its_own_output_inside_a_hashed_directory(tmp_path: Path)
         return rendered
 
     assert relock() == relock()
-    assert list(json.loads(lock_path.read_bytes())["files"]) == ["components/AGENTS.md"]
+    assert list(json.loads(lock_path.read_bytes())["execution"]["files"]) == [
+        "components/AGENTS.md"
+    ]
 
 
 def test_files_reached_through_symlinks_outside_the_experiment_are_refused(
@@ -159,12 +208,12 @@ def test_headline_policy_defaults_by_checkpoint_count(
 ) -> None:
     lock = _lock(write_experiment(tmp_path, experiment_document()), checkpoints=checkpoints)
 
-    assert lock["headline_policy"] == {
+    assert lock["assessment"]["headline_policy"] == {
         "ref": expected,
         "selection": "default_by_k",
         "checkpoints": [checkpoints],
     }
-    assert expected in lock["references"]["policy"]
+    assert expected in lock["assessment"]["references"]["policy"]
 
 
 def test_declared_policy_must_support_every_problem_k(tmp_path: Path) -> None:
@@ -199,8 +248,8 @@ def test_local_task_problems_are_hashed_and_counted(tmp_path: Path) -> None:
 
     document["problems"] = [{"path": "tasks/forge"}]
     lock = _lock(write_experiment(tmp_path, document))
-    assert lock["problems"][0]["checkpoints"] == 2
-    assert "tasks/forge/task.toml" in lock["files"]
+    assert lock["execution"]["problems"][0]["checkpoints"] == 2
+    assert "tasks/forge/task.toml" in lock["execution"]["files"]
 
 
 def test_unusable_local_task_directories_are_reported(tmp_path: Path) -> None:
@@ -308,15 +357,29 @@ def test_lock_command_write_and_check_cycle(
 
     written = runner.invoke(main, ["lock", str(path)])
     current = runner.invoke(main, ["lock", str(path), "--check"])
+    with monkeypatch.context() as host:
+        host.setattr("platform.python_version", lambda: "3.12.0")
+        drifted = runner.invoke(main, ["lock", str(path), "--check"])
+        tolerated = runner.invoke(main, ["lock", str(path), "--check", "--ignore-host-python"])
     (tmp_path / "components" / "AGENTS.md").write_text("changed\n", encoding="utf-8")
     stale = runner.invoke(main, ["lock", str(path), "--check"])
+    lock_path.write_text(lock_path.read_text().replace('"harbor"', '"harbour"'))
+    tampered = runner.invoke(main, ["lock", str(path), "--check"])
 
     assert written.exit_code == 0, written.output
     assert json.loads(lock_path.read_bytes())["experiment"]["id"] == "fixture"
     assert current.exit_code == 0, current.output
     assert "Lock is current" in current.output
+    assert drifted.exit_code == 1
+    assert "Stale: toolchain:" in drifted.output
+    assert tolerated.exit_code == 0, tolerated.output
+    assert "host Python 3.12.0 differs" in tolerated.output
     assert stale.exit_code == 1
     assert "out of date" in stale.output
+    assert "execution: execution inputs changed" in stale.output
+    assert "assessment:" not in stale.output
+    assert tampered.exit_code == 1
+    assert "section execution does not match its digest" in tampered.output
 
 
 class _EntryPoint:

@@ -102,6 +102,20 @@ class ProblemStore:
         """Where a validation that hit infrastructure failures is written (not committed)."""
         return self.cache_dir() / "validation" / problem.name / f"{problem.version}.json"
 
+    def registered(self) -> list[ProblemId]:
+        """Every problem with a committed manifest under ``registry/``, sorted by reference."""
+        registry = self.root / "registry"
+        found: list[ProblemId] = []
+        for path in sorted(registry.glob("*/*/*.json")):
+            if path.name.endswith(".validation.json"):
+                continue
+            ref = f"{path.parent.parent.name}/{path.parent.name}@{path.stem}"
+            try:
+                found.append(ProblemId.parse(ref))
+            except ValueError as exc:
+                raise ProblemStoreError(f"unexpected registry entry {path}: {exc}") from exc
+        return sorted(found, key=str)
+
     def content_dir(self, problem: ProblemId) -> Path:
         return self.root / "store" / problem.name / problem.version
 

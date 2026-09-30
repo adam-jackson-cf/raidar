@@ -25,7 +25,9 @@ DEFAULT_EXCLUDED_PREFIXES = (
     "node_modules/",
     "orchestrator/.cache/",
     "orchestrator/.venv/",
-    "scenarios/",
+    "problems/cache/",
+    "problems/store/",
+    "runs/",
     "venv/",
 )
 

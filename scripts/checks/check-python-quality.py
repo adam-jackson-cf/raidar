@@ -33,7 +33,9 @@ EXCLUDED_PREFIXES = (
     "experiments/",
     "orchestrator/.cache/",
     "orchestrator/.venv/",
-    "scenarios/",
+    "problems/cache/",
+    "problems/store/",
+    "runs/",
 )
 GENERIC_NAME_PARTS = {"helpers", "misc", "stuff", "temp"}
 ALLOWED_TEST_ROOT_FILES = {

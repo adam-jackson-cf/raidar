@@ -276,6 +276,13 @@ def test_implementation_digest_covers_helpers_the_scorer_imports(
     before = registration.implementation_digest()
     (package / "unused.py").write_text("X = 1\n")
     assert registration.implementation_digest() == before
+    # Docstring, comment and layout edits to a covered module keep every stored Assessment.
+    (package / "kernels.py").write_text(
+        '"""Kernel helpers."""\n\n\ndef weight():  # the weight\n'
+        '    """Always one."""\n\n    return (\n        1\n    )\n'
+    )
+    (package / "__init__.py").write_text('"""The plug-in scorer package."""\n')
+    assert registration.implementation_digest() == before
     (package / "kernels.py").write_text("def weight():\n    return 2\n")
     after_kernel = registration.implementation_digest()
     assert after_kernel != before
@@ -287,7 +294,7 @@ def test_implementation_digest_covers_helpers_the_scorer_imports(
     original = sdk_result.read_bytes()
     baseline = covered.implementation_digest()
     try:
-        sdk_result.write_bytes(original + b"\n# touched\n")
+        sdk_result.write_bytes(original + b"\n_TOUCHED = 1\n")
         assert covered.implementation_digest() != baseline
     finally:
         sdk_result.write_bytes(original)
@@ -394,5 +401,7 @@ def test_lock_records_scorer_manifests_and_tool_pins_byte_identically(tmp_path: 
     )
     assert first == second
     lock = json.loads(first)
-    assert sorted(lock["references"]["scorer"]) == scorers
-    assert lock["versions"]["tools"]["ruff"] == "0.8.6"
+    assert sorted(lock["assessment"]["references"]["scorer"]) == scorers
+    assert lock["assessment"]["tools"]["ruff"] == "0.8.6"
+    # Scorer digests and pinned tools are assessment inputs, never run identity.
+    assert "ruff" not in lock["execution"]["tools"]

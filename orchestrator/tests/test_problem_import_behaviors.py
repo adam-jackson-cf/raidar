@@ -360,16 +360,17 @@ def test_lock_resolves_imported_problems_and_selects_the_policy_by_k(
     lock: Any = build_lock(
         load_experiment(path), lock_path=path.with_name("experiment.lock.json"), resolvers=resolvers
     )
-    assert lock["headline_policy"] == {
+    assert lock["assessment"]["headline_policy"] == {
         "ref": policy,
         "selection": "default_by_k",
         "checkpoints": [checkpoints],
     }
     manifest = store.load_manifest(ProblemId.parse(ref))
-    assert lock["problems"] == [
+    assert lock["execution"]["problems"] == [
         {"label": ref, "checkpoints": checkpoints, "digest": manifest.digest()}
     ]
-    assert lock["references"]["problem"][ref]["metadata"]["source"]["commit"] == "fe" * 20
+    recorded = lock["execution"]["references"]["problem"][ref]
+    assert recorded["metadata"]["source"]["commit"] == "fe" * 20
 
 
 def test_hidden_content_check_flags_renamed_copies_and_solutions(tmp_path: Path) -> None:

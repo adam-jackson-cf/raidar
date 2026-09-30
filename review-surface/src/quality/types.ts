@@ -90,6 +90,8 @@ export interface QualityRunSummary {
   truncated_to: number | null;
   score: Cell;
   sources: Record<string, string | null>;
+  /** `<runs-root name>/<run dir>/trajectories/<trial>.json`: joins the run review's artifact_paths.run_json. */
+  trajectory: string;
 }
 
 export interface QualityRunDetail {

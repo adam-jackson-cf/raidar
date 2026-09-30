@@ -8,12 +8,14 @@ import { AnnotationCards } from '@/components/AnnotationCards';
 import { AnnotationCreateForm } from '@/components/AnnotationCreateForm';
 import { FindingChips } from '@/components/FindingChips';
 import { GateChips } from '@/components/GateChips';
+import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
 import { RunHeader } from '@/components/RunHeader';
 import { ScorecardPanel } from '@/components/ScorecardPanel';
 import { RunListItem } from '@/components/RunListItem';
 import { SearchPanel } from '@/components/SearchPanel';
 import { SpanDetail } from '@/components/SpanDetail';
 import { SpanTree } from '@/components/SpanTree';
+import { RunQualityPanel } from '@/quality/components/RunQualityPanel';
 import { C } from '@/utils/colors';
 import type { Annotation, AnnotationKind, RunDetail as RunDetailData } from '@/utils/types';
 
@@ -107,11 +109,15 @@ function RunDetailView({ runId }: { runId: string }) {
         <GateChips spans={data.spans} onSelect={(spanId) => selectSpan(spanId)} />
       </RunHeader>
 
+      <FamilyPolicyMismatch scenario={data.run.scenario} />
+
       <ScorecardPanel
         spans={data.spans}
         selectedSpanId={selectedSpanId}
         onSelect={(spanId) => selectSpan(spanId)}
       />
+
+      <RunQualityPanel run={data.run} />
 
       <div
         className="flex flex-col gap-2 rounded-lg p-2.5"
@@ -235,7 +241,7 @@ export function RunsPage() {
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter scenario / agent spec / id…"
+          placeholder="Filter problem / agent spec / id…"
           className="rounded-md px-2 py-1.5 text-xs outline-none"
           style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
         />

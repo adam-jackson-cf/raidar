@@ -11,22 +11,22 @@ from pathlib import Path
 import pytest
 
 from raidar.review_projection import main, merge_review_projections
-from raidar.review_projection.fixture_legacy import (
+from raidar.review_projection.scenario_epoch import load_experiment_projection
+from raidar.review_projection.scenario_epoch.fixture import (
     LEGACY_SCENARIO,
     POLICY_MIX_RUN_PREFIX,
     frozen_projections,
-    write_benchmark_fixture,
+    write_legacy_fixture,
     write_scenario_epoch,
 )
-from raidar.review_projection.fixture_legacy import main as fixture_main
-from raidar.review_projection.legacy import load_experiment_projection
+from raidar.review_projection.scenario_epoch.fixture import main as fixture_main
 from raidar.review_projection.spans import PAYLOAD_CAP, payload, to_ms
 
 
 @pytest.fixture
 def synthetic_experiments(tmp_path: Path) -> Path:
-    root = tmp_path / "experiments"
-    write_benchmark_fixture(root)
+    root = tmp_path / "legacy-fixture"
+    write_legacy_fixture(root)
     return root
 
 
@@ -61,7 +61,7 @@ def test_scenario_epoch_fixture_relabels_one_experiment_onto_the_policy_mix_prob
     assert all(run.run.id.startswith(POLICY_MIX_RUN_PREFIX) for run in projection.runs)
 
 
-def test_benchmark_fixture_entrypoint_writes_and_reports_usage(tmp_path: Path, capsys) -> None:
+def test_legacy_fixture_entrypoint_writes_and_reports_usage(tmp_path: Path, capsys) -> None:
     assert fixture_main([str(tmp_path)]) == 0
     assert len(capsys.readouterr().out.splitlines()) == 9
     assert fixture_main([]) == 2
@@ -100,7 +100,7 @@ def test_merge_review_projections_and_cli(
         "argv",
         [
             "review_projection",
-            "--experiments-root",
+            "--legacy-root",
             str(synthetic_experiments),
             "--output",
             str(output),

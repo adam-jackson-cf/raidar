@@ -1,7 +1,7 @@
 """N1 phase timings of one trial (plan D4), with the Phase 0 phase names.
 
-Definitions follow ``spikes/overhead`` (docs/reboot/overhead-baseline.md §1-§2),
-so the accepted budgets apply unchanged:
+Definitions follow the Phase 0 overhead baseline (docs/reboot/overhead-baseline.md
+§1-§2), so the accepted budgets apply unchanged:
 
 - ``environment_start``: Harbor ``environment_setup`` (condition warm/cold).
 - ``component_apply``: host-side compile of the arm's condition plus writing
@@ -16,7 +16,10 @@ so the accepted budgets apply unchanged:
   scan that runs in that gap is recorded separately (``pre_agent_leak_check``)
   and subtracted, because the Phase 0 baseline had no such scan there.
 - ``setup_sh``: the reset script's own duration (record-only sub-phase).
-- ``artifact_collection``: agent end to verifier start (``/app`` to host).
+- ``artifact_collection``: agent end to verifier start: Harbor's agent-log sync
+  (the mounted-log ``chown``, the agent's trajectory conversion) and the
+  ``/app`` transfer to the host (``raidar.execution.environment`` runs both on
+  the engine fast path).
 - ``snapshot_transfer``, ``verifier_plumbing``, ``grader_image``,
   ``oracle_leak_check``: from the oracle step record's timings.
 - ``step_archive_gap``: verifier end to the next step's agent start, less its

@@ -2,8 +2,9 @@
 
 Old-epoch experiments persisted ``review-projection.json`` beside their runs.
 The scenario-epoch producer (scenario runner, ``EvalRun`` scorecards) was
-removed at the WS-L cutover; this module only reloads those artifacts, so
-historical experiments keep rendering in the review surface.
+removed at the reboot cutover; this module only reloads those artifacts, so
+historical experiments keep rendering in the review surface. Read-only: it
+never writes into a legacy root.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ def load_experiment_projection(path: Path) -> ExperimentReviewProjection:
         raise ValueError(f"invalid review projection {path}: {exc}") from exc
 
 
-def load_experiment_projections(experiments_root: Path) -> list[ExperimentReviewProjection]:
+def load_experiment_projections(legacy_root: Path) -> list[ExperimentReviewProjection]:
     """Every persisted projection that still validates; the others are named on stderr.
 
     A historical projection that no longer matches the frozen schema cannot
@@ -33,7 +34,7 @@ def load_experiment_projections(experiments_root: Path) -> list[ExperimentReview
     experiment does not hide the rest of the history.
     """
     projections: list[ExperimentReviewProjection] = []
-    experiment_dirs = sorted(path for path in experiments_root.iterdir() if path.is_dir())
+    experiment_dirs = sorted(path for path in legacy_root.iterdir() if path.is_dir())
     for experiment_dir in experiment_dirs:
         projection_path = experiment_dir / EXPERIMENT_PROJECTION_FILENAME
         if projection_path.is_file():

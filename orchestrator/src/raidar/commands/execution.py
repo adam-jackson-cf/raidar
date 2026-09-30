@@ -24,7 +24,14 @@ from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_
 from raidar.execution.run import RunContext, default_run_id, execute, load_problems
 from raidar.packs.python import load_pack_spec
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
-from raidar.spec.lock import LockError, build_lock, default_lock_path, render_lock
+from raidar.spec.lock import (
+    LockError,
+    StaleLockError,
+    build_lock,
+    check_lock_file,
+    default_lock_path,
+    render_lock,
+)
 
 
 def register(main: click.Group) -> None:
@@ -82,16 +89,17 @@ def _plan_options(command: Callable[..., Any]) -> Callable[..., Any]:
 
 
 def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
-    """The lock, refused unless relocking the experiment reproduces it byte for byte."""
-    if not lock_path.is_file():
-        raise click.ClickException(f"{lock_path} does not exist; run `raidar lock` first")
+    """The lock, refused unless relocking the experiment reproduces it byte for byte.
+
+    The refusal names each stale section; an assessment-only change relocks to
+    the same ``lock_sha256``, so earlier runs still match the new lock.
+    """
     try:
-        rendered = render_lock(build_lock(loaded, lock_path=lock_path))
-    except LockError as exc:
+        current = build_lock(loaded, lock_path=lock_path)
+        check_lock_file(lock_path, current)
+    except (LockError, StaleLockError) as exc:
         raise click.ClickException(str(exc)) from exc
-    if lock_path.read_bytes() != rendered:
-        raise click.ClickException(f"{lock_path} is out of date; run `raidar lock` again")
-    return dict(json.loads(rendered))
+    return dict(json.loads(render_lock(current)))
 
 
 def _build(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:

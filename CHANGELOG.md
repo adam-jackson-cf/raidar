@@ -8,21 +8,42 @@ All notable changes to this project are documented in this file.
 
 - The scenario epoch's authoring and execution paths are removed. Raidar now has one authoring convention: `experiment.yaml` (problems, agents, conditions built from components, arms, scorers, analysis), locked by `raidar lock` and run by `raidar run`.
 - Removed CLI commands: `raidar scenario ...`, `raidar info`, `raidar matrix ...`, `raidar experiment run`, `raidar experiments list|prune`, and the `raidar run --scenario` compatibility branch.
-- Removed make targets: `scenario-list`, `scenario-info`, `scenario-validate`, `scenario-init`, `scenario-clone-revision`, `experiment-run`, `matrix-run`, `runtime-stack-scenario-smoke`, `experiments-list` and `experiments-prune`. Each now refuses with a pointer to the experiment workflow.
+- Removed make targets, with no refusing stubs left behind. Old to new:
+
+  | Removed target | Replacement |
+  |---|---|
+  | `scenario-list` | `make problem-list` |
+  | `scenario-info` | `make problem-info PROBLEM=<ref>`, and `make experiment-plan EXPERIMENT=<path>` for an experiment's resolved contract |
+  | `scenario-validate` | `make experiment-validate EXPERIMENT=<path>` and `make problem-validate PROBLEM=<ref>` |
+  | `scenario-init` | `make experiment-init EXPERIMENT=<dir>/experiment.yaml` |
+  | `scenario-clone-revision` | no target: add a condition and an arm inside the existing `experiment.yaml` |
+  | `experiment-run`, `matrix-run` | `make experiment-execute EXPERIMENT=<path>` |
+  | `runtime-stack-scenario-smoke` | `make pack-audit` and `make component-probe-trials` |
+  | `experiments-list`, `experiments-prune` | none: `runs/` is a plain directory; `make harbor-cleanup` removes leftover trial environments |
+  | `smoke-matrix SMOKE_MATRIX_SELECTOR=` | `make smoke-agents SMOKE_ARM=codex\|claude` (the Gemini selector is gone; the Python pack bakes in only codex-cli and claude-code) |
+  | `benchmark-fixture-synthetic` | `make review-fixture-synthetic REVIEW_FIXTURE=legacy`, written under `.tmp/review-fixture/legacy`, never into `experiments/benchmarks` |
+
+- Review surface variables and flags: `REVIEW_EXPERIMENTS_ROOT` is now `REVIEW_LEGACY_ROOT` (default `experiments/benchmarks`, read-only), and `python -m raidar.review_projection --experiments-root` is now `--legacy-root`. The experiment fixture's scenario-epoch experiments move from `<fixture>/experiments` to `<fixture>/scenario-epoch`. `make review-surface-test` always runs on the experiment fixture (its signals need it; `REVIEW_FIXTURE=legacy` applies only to `review-fixture-synthetic`), and it takes one `REVIEW_STORE` for every `REVIEW_RUNS_ROOT` or one per root, failing on any other count instead of leaving given runs out of the Quality data.
+- The review surface's primary pages use experiment-model wording: "Problem families" anchors, the "problem / agent spec / id" runs filter, problem-scoped finding hints and failure patterns, and a "contract" tab for the scenario-epoch contract diff. The `schema_version=1` wire keys are unchanged; the Playwright specs assert the same signals under the new labels.
+- Retired directories: `scenarios/`, `matrices/`, `environments/` and the Phase 0 `spikes/`, plus `raidar-revision-cleanup.md`. Nothing references them any more; removing them from the tree (`git rm -r scenarios matrices environments spikes raidar-revision-cleanup.md`) is a pending maintainer step, and they remain at commit `2b66568` afterwards. The two spike artifacts the ADR and the N1 budgets cite are kept as `docs/reboot/evidence/a-prime-RESULTS.md` and `docs/reboot/evidence/overhead-baseline-summary.json`. The oracle-validation reproduction steps now use `make problem-validate`. The Node/Bun environment becomes a runtime pack in Phase 2.
 - Removed modules: the scenario runtime pipeline (`raidar.runtime`: task bundles, task images, workspace phases, scorecards), `raidar.application`, the scenario and scorecard schemas, the scenario-attached weighted scorers (code-task, design-to-code, plan-to-code, test-generation, requirements, resource-efficiency, and the Codex-in-Docker `llm-as-judge` default), the matrix schema, starters, the gate watcher, the evidence-runner asset, and the repository-local Harbor CLI agents and routing.
 - `raidar harbor cleanup` now removes the trial environments (run-scoped Compose projects) a stopped `raidar run` leaves behind: all of a named run's (`--run`), or every one with nothing running. It no longer matches scenario-era container names.
 
 ### Features
 
-- Experiment-path smoke targets: `make orchestrator-smoke`, `make agent-smoke` and `make smoke-matrix` run `examples/smoke/` through lock and Harbor. `smoke-matrix` has one arm per pack harness (`codex`, `claude`).
+- `raidar problem list` / `make problem-list` lists every registered problem with its mode, checkpoints, validation verdict (or why it has no usable one) and import state. `raidar problem info` / `make problem-info PROBLEM=` shows one problem's steps, source pin, pack binding, manifest digest and validation report.
+- `raidar init` / `make experiment-init EXPERIMENT= [PROBLEM=] [EXPERIMENT_ID=]` writes a two-arm starter experiment (baseline vs `rules-file@1`, agent version from the pack pin) and a stub rules file. It validates as written and refuses an existing path.
+- Experiment-path smoke targets: `make orchestrator-smoke`, `make agent-smoke` and `make smoke-agents` run `examples/smoke/` through lock and Harbor. `smoke-agents` has one arm per pack harness (`codex`, `claude`).
 - `make experiment-assess RUN= STORE= SCORERS=` rescores a run's stored trials into an Assessment store (`raidar assess --rescore`).
 - `make harbor-cleanup RUN= DRY_RUN=`.
 
 ### Chores
 
-- The scenario-epoch synthetic review fixture is frozen as persisted projections (`raidar/review_projection/scenario_epoch_fixture.json.gz`). `make benchmark-fixture-synthetic` and the review fixture's scenario-epoch experiments are written from it, so historical experiments keep rendering without the removed producer.
-- `scenarios/`, `matrices/` and `environments/` carry a read-only history note. Nothing reads them.
-- The README, `make help` and the import contracts describe the experiment, problem, component and scorer model.
+- The scenario-epoch read path is isolated in `raidar.review_projection.scenario_epoch` (`reader`, `fixture`, `frozen_fixture.json.gz`): read-only, no producer. Two import contracts keep it that way: it imports only the frozen review schema, and only the projection merge and the experiment fixture import it. The persisted `schema_version=1` wire fields (`scenario`, `revision`, `scenario_meta`, `revision_diffs`) are unchanged, so historical projections keep validating.
+- The quality gates' generated-artifact guard covers `runs/` as well as `experiments/`, and the Python check scripts exclude `runs/`, `problems/store/` and `problems/cache/` instead of `scenarios/`.
+- CI no longer installs Bun; only the removed scenario starters used it.
+- `AGENTS.md` is rewritten for the experiment, problem, component and scorer model (workflow rules, known experiment configs, smoke testing). `CODEOWNERS` drops the nonexistent `/.configs/` and `/benchmark-view/` and names the current top-level surfaces.
+- The README, `make help`, the review-surface README and the import contracts describe the experiment, problem, component and scorer model.
 
 ## 0.14.0 - 2026-07-03
 

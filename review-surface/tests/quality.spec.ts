@@ -4,8 +4,10 @@ import { test, expect, type Page } from '@playwright/test';
 const INELIGIBLE_RUN = 'synthetic-quality.synthetic-run-1.b02-p0-baseline';
 const LABELLED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-baseline';
 
+// The suite's Quality data also covers the experiment fixture's runs (run detail's Quality
+// panel), so the labelled Quality experiment is opened by its deep link.
 async function openQuality(page: Page) {
-  await page.goto('/quality');
+  await page.goto('/quality?experiment=synthetic-quality');
   await expect(page.getByTestId('quality-problem').first()).toBeVisible();
 }
 
@@ -16,10 +18,15 @@ async function removeLabels(page: Page, runId: string) {
 
 test.describe('quality navigation', () => {
   test('the /quality route opens the experiment view under its lock, labelled synthetic', async ({ page }) => {
-    await openQuality(page);
+    await page.goto('/quality');
+    await expect(page.getByTestId('quality-problem').first()).toBeVisible();
     await expect(page.getByText('Synthetic', { exact: true })).toBeVisible();
+    const selector = page.getByRole('combobox', { name: 'Experiment' });
+    await expect(selector).toContainText(/synthetic-quality · lock [0-9a-f]{12}/);
+    const option = selector.locator('option', { hasText: 'synthetic-quality' });
+    await selector.selectOption((await option.getAttribute('value'))!);
+    await expect(page).toHaveURL(/experiment=synthetic-quality&lock=[0-9a-f]{12}/);
     await expect(page.getByRole('heading', { name: 'synthetic/ledger@0' })).toBeVisible();
-    await expect(page.getByRole('combobox', { name: 'Experiment' })).toContainText(/synthetic-quality · lock [0-9a-f]{12}/);
   });
 
   test('a trial link opens its run detail and back returns', async ({ page }) => {
@@ -27,8 +34,10 @@ test.describe('quality navigation', () => {
     await page.getByTestId('quality-trials').getByRole('link', { name: 'b02-p0-baseline' }).click();
     await expect(page).toHaveURL(new RegExp(`/quality/runs/${INELIGIBLE_RUN.replace(/\./g, '\\.')}$`));
     await expect(page.getByTestId('quality-strip')).toBeVisible();
-    await page.getByRole('link', { name: 'Quality', exact: true }).click();
-    await expect(page).toHaveURL(/\/quality$/);
+    // Back returns to the run's own experiment and problem (the header nav has its own Quality link).
+    await page.getByTestId('quality-run-page').getByRole('link', { name: 'Quality', exact: true }).click();
+    await expect(page).toHaveURL(/\/quality\?experiment=synthetic-quality&lock=[0-9a-f]{12}&problem=synthetic%2Fledger%400$/);
+    await expect(page.getByRole('heading', { name: 'synthetic/ledger@0' })).toBeVisible();
   });
 });
 

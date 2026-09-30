@@ -33,7 +33,7 @@ from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, ScorePolicy
 
 
 def headline(lock: Mapping[str, Any]) -> tuple[ScorePolicy, dict[str, object]]:
-    declared = lock.get("headline_policy")
+    declared = lock["assessment"].get("headline_policy")
     if not isinstance(declared, dict) or "ref" not in declared:
         raise AnalysisInputError("the lock names no headline_policy")
     return DEFAULT_POLICY_REGISTRY.get(str(declared["ref"])), dict(declared)

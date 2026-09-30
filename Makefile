@@ -32,15 +32,13 @@ SMOKE_RUNS_DIR ?= $(CURDIR)/runs
 SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
 SMOKE_BLOCKS ?= 1
 SMOKE_CONCURRENCY ?= 1
-# smoke-matrix arms: one per harness the Python pack bakes in (examples/smoke/agents.experiment.yaml).
-SMOKE_MATRIX_SELECTOR ?=
-SMOKE_MATRIX_SELECTORS := codex claude
-ifneq ($(strip $(SMOKE_MATRIX_SELECTOR)),)
-ifeq ($(SMOKE_MATRIX_SELECTOR),gemini)
-$(error SMOKE_MATRIX_SELECTOR 'gemini' is unavailable: the Python pack bakes in only codex-cli and claude-code)
-endif
-ifeq ($(filter $(SMOKE_MATRIX_SELECTOR),$(SMOKE_MATRIX_SELECTORS)),)
-$(error Unknown SMOKE_MATRIX_SELECTOR '$(SMOKE_MATRIX_SELECTOR)'; expected one of: $(SMOKE_MATRIX_SELECTORS))
+# smoke-agents arms: one per harness the Python pack bakes in (the arm ids of
+# examples/smoke/agents.experiment.yaml). SMOKE_ARM selects one of them.
+SMOKE_ARM ?=
+SMOKE_ARMS := codex claude
+ifneq ($(strip $(SMOKE_ARM)),)
+ifeq ($(filter $(SMOKE_ARM),$(SMOKE_ARMS)),)
+$(error Unknown SMOKE_ARM '$(SMOKE_ARM)'; expected one of: $(SMOKE_ARMS))
 endif
 endif
 # agent-smoke: the smoke experiment with its one agent replaced. Harness versions must equal
@@ -59,16 +57,18 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(HARNESS_VERSION),$(AGENT_SMOKE_VERSION_$(
 
 .PHONY: help \
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check \
-	experiment-validate experiment-lock experiment-plan experiment-execute perf-check perf-fixture \
-	problem-import problem-validate \
+	experiment-init experiment-validate experiment-lock experiment-locks-check \
+	experiment-migrate-run-lock experiment-plan experiment-execute \
+	perf-check perf-fixture \
+	problem-list problem-info problem-import problem-validate \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels \
 	pack-info pack-build pack-audit pack-tool-provision \
 	component-probe-trials \
-	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
-	benchmark-fixture-synthetic review-fixture-synthetic \
+	smoke-dry-run-check orchestrator-smoke smoke-agents agent-smoke \
+	review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
-	review-surface-quality-data \
+	review-surface-quality-data quality-fixture-synthetic \
 	quality
 
 define require_var
@@ -91,6 +91,8 @@ help:
 	@echo "  make quality                                           Run repo quality gates"
 	@echo ""
 	@echo "Problems and runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
+	@echo "  make problem-list                                      List registered problems with validation and import state"
+	@echo "  make problem-info PROBLEM=scb/forge@38d627ecf668       Show one problem's steps, source pin, pack binding and validation"
 	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
 	@echo "                                                        Import a pinned problem (task + host-only oracle) into problems/"
 	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
@@ -102,10 +104,15 @@ help:
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex-cli/gpt-6-luna low trials proving every built-in component's discovery probe"
 	@echo ""
 	@echo "Experiments:"
+	@echo "  make experiment-init EXPERIMENT=my-exp/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
+	@echo "                                                        Start a new experiment: two-arm starter (baseline vs rules-file) plus stub rules file"
 	@echo "  make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml [EXPERIMENT_SET='analysis.blocks=3']"
 	@echo "                                                        Validate an experiment.yaml (schema, references, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml [LOCK_CHECK=1]"
-	@echo "                                                        Write (or check) <experiment>.lock.json with content hashes and versions"
+	@echo "                                                        Write (or check, naming stale sections) <experiment>.lock.json; lock_sha256 covers execution inputs only"
+	@echo "  make experiment-locks-check                           Fail unless every examples/**/*.lock.json is current (host Python patch aside); part of make quality"
+	@echo "  make experiment-migrate-run-lock RUN=<run-dir> EXECUTED_LOCK=<v1 lock> LOCK=<current lock>"
+	@echo "                                                        Point a run executed under a version-1 lock at the current lock, once its execution section is proven identical"
 	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
 	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [RUNS_DIR=runs] [RUN_ID=]"
@@ -117,7 +124,8 @@ help:
 	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock; overrides are labelled)"
 	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10]        Fail if any N1 phase p95 exceeds its accepted budget"
-	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>]            No-LLM fixture experiment (5 blocks x 2 arms) then perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
+	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
+	@echo "                                                        No-LLM fixture experiment (5 blocks x 2 arms) then perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
 	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
 	@echo "  make jev-export-labels POLICY=<policy> OUT=<labels.jsonl> [STORE=<assessment-store>] [LABELS=review-surface/data/jev-labels.json]"
@@ -130,21 +138,26 @@ help:
 	@echo "                                                        One one-shot trial with codex-cli + gpt-6-luna (low), correctness only"
 	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [HARNESS_VERSION=] [TIMEOUT_SEC=]"
 	@echo "                                                        The same smoke with its agent replaced (versions default to the pack pins)"
-	@echo "  make smoke-matrix [SMOKE_MATRIX_SELECTOR=codex|claude] One smoke trial per pack harness (agent is the factor), or one selected arm"
+	@echo "  make smoke-agents [SMOKE_ARM=codex|claude]             One smoke trial per pack harness (agent is the factor), or one selected arm"
 	@echo "  make smoke-dry-run-check                               Print the smoke command shapes (used by make quality)"
 	@echo ""
 	@echo "Review surface:"
-	@echo "  make benchmark-fixture-synthetic                       Write the labelled synthetic scenario-epoch fixture into experiments/benchmarks"
-	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
-	@echo "                                                        Write the labelled synthetic experiment-epoch runs + Assessment store"
-	@echo "  make review-surface-data [REVIEW_RUNS_ROOT=<runs-root>...] [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
-	@echo "                                                        Project experiment runs (and experiments/benchmarks history) into review-surface data"
+	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE=experiment|legacy] [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
+	@echo "                                                        Write the labelled synthetic fixture: experiment runs + Assessment store, or"
+	@echo "                                                        (legacy) the frozen scenario-epoch projections under <dir>/legacy"
+	@echo "  make review-surface-data [REVIEW_RUNS_ROOT=<runs-root>...] [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...] [REVIEW_LEGACY_ROOT=<dir>]"
+	@echo "                                                        Project experiment runs plus scenario-epoch history (read-only; default"
+	@echo "                                                        experiments/benchmarks when present) into review-surface data"
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
-	@echo "  make review-surface-test [REVIEW_FIXTURE=experiment|legacy] [REVIEW_RUNS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=...]"
-	@echo "                                                        Run the review-surface end-to-end suite (Playwright) on the synthetic fixture plus any given runs"
-	@echo "  make review-surface-quality-data [QUALITY_RUNS=<runs-root> QUALITY_STORE=<assessment-store>]"
-	@echo "                                                        Project Quality element data (default: labelled synthetic fixture)"
+	@echo "  make review-surface-test [REVIEW_RUNS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=... REVIEW_LEGACY_ROOT=...]"
+	@echo "                                                        Run the review-surface end-to-end suite (Playwright) on the experiment synthetic"
+	@echo "                                                        fixture plus any given runs (one REVIEW_STORE for all roots, or one per root)"
+	@echo "  make quality-fixture-synthetic [QUALITY_FIXTURE_DIR=.tmp/quality-fixture]"
+	@echo "                                                        Write the labelled synthetic Quality fixture (runs + Assessment store)"
+	@echo "  make review-surface-quality-data [QUALITY_RUNS=\"<runs-root>...\" QUALITY_STORE=\"<store>...\"]"
+	@echo "                                                        Project Quality element data, each runs root against the store at the"
+	@echo "                                                        same position (default: labelled synthetic fixture)"
 
 RUNTIME ?= python
 TOOL ?=
@@ -172,20 +185,24 @@ pack-tool-provision:
 	$(call require_var,TOOL)
 	@$(RAIDAR) pack provision "$(RUNTIME)" "$(TOOL)"
 
-benchmark-fixture-synthetic:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection.fixture_legacy "$(CURDIR)/experiments/benchmarks"
-
+# REVIEW_FIXTURE: experiment (synthetic experiment-epoch runs + store, with scenario-epoch
+# experiments beside them) or legacy (the frozen scenario-epoch projections only).
 REVIEW_FIXTURE ?= experiment
+REVIEW_FIXTURES := experiment legacy
+ifeq ($(filter $(REVIEW_FIXTURE),$(REVIEW_FIXTURES)),)
+$(error Unknown REVIEW_FIXTURE '$(REVIEW_FIXTURE)'; expected one of: $(REVIEW_FIXTURES))
+endif
 REVIEW_FIXTURE_DIR ?= $(REPO_TMP_DIR)/review-fixture
-REVIEW_EXPERIMENTS_ROOT ?= $(CURDIR)/experiments/benchmarks
+# Scenario-epoch history (review-projection.json per experiment). Read-only: nothing writes here.
+REVIEW_LEGACY_ROOT ?= $(CURDIR)/experiments/benchmarks
 REVIEW_RUNS_ROOT ?=
 REVIEW_STORE ?=
 REVIEW_LOCK ?=
 
-# $(1) scenario-epoch experiments roots (existing ones only), $(2) run roots, $(3) Assessment stores.
+# $(1) scenario-epoch history roots (existing ones only), $(2) run roots, $(3) Assessment stores.
 define review_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection \
-		$(foreach root,$(wildcard $(1)),--experiments-root "$(abspath $(root))") \
+		$(foreach root,$(wildcard $(1)),--legacy-root "$(abspath $(root))") \
 		$(foreach root,$(2),--runs-root "$(abspath $(root))") \
 		$(foreach store,$(3),--store "$(abspath $(store))") \
 		$(foreach lock,$(REVIEW_LOCK),--lock "$(abspath $(lock))") \
@@ -195,10 +212,14 @@ define review_projection
 endef
 
 review-fixture-synthetic:
-	@cd orchestrator && uv run --project . python -m raidar.review_projection.fixture "$(REVIEW_FIXTURE_DIR)"
+ifeq ($(REVIEW_FIXTURE),legacy)
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection.scenario_epoch.fixture "$(abspath $(REVIEW_FIXTURE_DIR))/legacy"
+else
+	@cd orchestrator && uv run --project . python -m raidar.review_projection.fixture "$(abspath $(REVIEW_FIXTURE_DIR))"
+endif
 
 review-surface-data:
-	$(call review_projection,$(REVIEW_EXPERIMENTS_ROOT),$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
+	$(call review_projection,$(REVIEW_LEGACY_ROOT),$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
 
 review-surface-build:
 	@cd review-surface && npm install --no-fund --no-audit && npm run build
@@ -207,29 +228,51 @@ review-surface-serve: review-surface-data
 	@cd review-surface && node server.mjs
 
 QUALITY_FIXTURE_DIR ?= $(REPO_TMP_DIR)/quality-fixture
+QUALITY_RUNS ?=
+QUALITY_STORE ?=
 
-review-surface-quality-data:
-	$(if $(QUALITY_RUNS),$(if $(QUALITY_STORE),,$(error QUALITY_STORE is required with QUALITY_RUNS)))
-	@$(if $(QUALITY_RUNS),true,$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality.synthetic "$(QUALITY_FIXTURE_DIR)")
+# $(1) run roots and $(2) Assessment stores, paired by position; $(3) --synthetic or empty.
+define quality_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality \
-		--runs-root "$(or $(QUALITY_RUNS),$(QUALITY_FIXTURE_DIR)/runs)" \
-		--store "$(or $(QUALITY_STORE),$(QUALITY_FIXTURE_DIR)/store)" \
-		--output "$(REPO_TMP_DIR)/quality-projection.json" $(if $(QUALITY_RUNS),,--synthetic)
+		$(foreach root,$(1),--runs-root "$(abspath $(root))") \
+		$(foreach store,$(2),--store "$(abspath $(store))") \
+		--output "$(REPO_TMP_DIR)/quality-projection.json" $(3)
 	@RAIDAR_QUALITY_PROJECTION="$(REPO_TMP_DIR)/quality-projection.json" \
 		node review-surface/scripts/build-quality-data.mjs
+endef
 
-# The experiment fixture replaces the scenario-epoch synthetic fixture (same run ids) and
-# carries its own scenario-epoch experiments ($(REVIEW_FIXTURE_DIR)/experiments), so the old
-# epoch always renders; experiments/benchmarks joins only when REVIEW_EXPERIMENTS_ROOT is given
-# explicitly.
-REVIEW_TEST_EXPERIMENTS_ROOT = $(REVIEW_FIXTURE_DIR)/experiments $(if $(filter command line,$(origin REVIEW_EXPERIMENTS_ROOT)),$(REVIEW_EXPERIMENTS_ROOT),)
+quality-fixture-synthetic:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality.synthetic "$(QUALITY_FIXTURE_DIR)"
 
-review-surface-test: $(if $(filter legacy,$(REVIEW_FIXTURE)),benchmark-fixture-synthetic,review-fixture-synthetic) review-surface-quality-data
-ifeq ($(REVIEW_FIXTURE),legacy)
-	$(call review_projection,$(REVIEW_EXPERIMENTS_ROOT),$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
+review-surface-quality-data:
+	$(if $(QUALITY_RUNS),$(if $(filter $(words $(QUALITY_RUNS)),$(words $(QUALITY_STORE))),,$(error QUALITY_RUNS and QUALITY_STORE need one store per runs root, in the same order)))
+ifeq ($(strip $(QUALITY_RUNS)),)
+	@$(MAKE) --no-print-directory quality-fixture-synthetic
+	$(call quality_projection,$(QUALITY_FIXTURE_DIR)/runs,$(QUALITY_FIXTURE_DIR)/store,--synthetic)
 else
-	$(call review_projection,$(REVIEW_TEST_EXPERIMENTS_ROOT),$(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_STORE))
+	$(call quality_projection,$(QUALITY_RUNS),$(QUALITY_STORE),)
 endif
+
+# The suite runs on the experiment synthetic fixture under REVIEW_FIXTURE_DIR, never on real
+# history: it carries its own scenario-epoch experiments ($(REVIEW_FIXTURE_DIR)/scenario-epoch)
+# so the old epoch always renders. The suite's signals need the experiment fixture, so it
+# always writes that one whatever REVIEW_FIXTURE says. Real history (REVIEW_LEGACY_ROOT) joins
+# only when it is given on the command line.
+REVIEW_TEST_LEGACY_ROOT = $(if $(filter command line,$(origin REVIEW_LEGACY_ROOT)),$(REVIEW_LEGACY_ROOT),)
+# Given runs and their stores: one REVIEW_STORE serves every REVIEW_RUNS_ROOT, otherwise there
+# must be one store per root in the same order (anything else fails loudly, never silently drops
+# runs from the Quality data).
+REVIEW_TEST_STORES = $(if $(filter 1,$(words $(REVIEW_STORE))),$(foreach root,$(REVIEW_RUNS_ROOT),$(REVIEW_STORE)),$(REVIEW_STORE))
+# Quality data for the suite: the labelled Quality fixture, the experiment fixture's runs (so
+# run detail shows its Quality panel) and any given runs, each against its own store.
+REVIEW_TEST_QUALITY_RUNS = $(QUALITY_FIXTURE_DIR)/runs $(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT)
+REVIEW_TEST_QUALITY_STORES = $(QUALITY_FIXTURE_DIR)/store $(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES)
+
+review-surface-test: quality-fixture-synthetic
+	$(if $(filter $(words $(REVIEW_RUNS_ROOT)),$(words $(REVIEW_TEST_STORES))),,$(error REVIEW_RUNS_ROOT and REVIEW_STORE need one store for all roots or one store per root, in the same order))
+	@$(MAKE) --no-print-directory review-fixture-synthetic REVIEW_FIXTURE=experiment
+	$(call quality_projection,$(REVIEW_TEST_QUALITY_RUNS),$(REVIEW_TEST_QUALITY_STORES),--synthetic)
+	$(call review_projection,$(REVIEW_FIXTURE_DIR)/scenario-epoch $(REVIEW_TEST_LEGACY_ROOT),$(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES))
 	@cd review-surface && npm install --no-fund --no-audit && npm run build \
 		&& npx playwright install chromium && npm test
 
@@ -264,18 +307,9 @@ docker-check:
 		exit 1; \
 	fi
 
-# Scenario-era targets removed at the WS-L cutover (scenarios/ and matrices/ are read-only
-# history). Each refuses with a pointer to the experiment workflow.
-REMOVED_SCENARIO_TARGETS := scenario-list scenario-init scenario-clone-revision scenario-info \
-	scenario-validate experiment-run matrix-run runtime-stack-scenario-smoke \
-	experiments-list experiments-prune
-
-.PHONY: $(REMOVED_SCENARIO_TARGETS)
-$(REMOVED_SCENARIO_TARGETS):
-	@echo "Refusing $@: the scenario/matrix workflow was removed at the reboot cutover (WS-L)." >&2
-	@echo "scenarios/ and matrices/ are read-only history. Author an experiment.yaml instead:" >&2
-	@echo "  make experiment-validate / experiment-lock / experiment-execute (see README.md and make help)." >&2
-	@exit 1
+experiment-init:
+	$(call require_var,EXPERIMENT)
+	@$(RAIDAR) init "$(EXPERIMENT)" $(if $(PROBLEM),--problem "$(PROBLEM)",) $(if $(EXPERIMENT_ID),--id "$(EXPERIMENT_ID)",)
 
 experiment-validate:
 	$(call require_var,EXPERIMENT)
@@ -284,6 +318,19 @@ experiment-validate:
 experiment-lock:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
+
+# Every committed example lock must match a fresh lock of its experiment, section by section.
+EXAMPLE_LOCKS := $(sort $(wildcard examples/*/*.lock.json))
+
+experiment-locks-check:
+	@$(if $(EXAMPLE_LOCKS),,$(error no example locks found under examples/))
+	@$(foreach lock,$(EXAMPLE_LOCKS),$(RAIDAR) lock "$(patsubst %.lock.json,%.yaml,$(lock))" --check --ignore-host-python &&) true
+
+experiment-migrate-run-lock:
+	$(call require_var,RUN)
+	$(call require_var,EXECUTED_LOCK)
+	$(call require_var,LOCK)
+	@$(RAIDAR) migrate-run-lock "$(RUN)" --executed-lock "$(EXECUTED_LOCK)" --lock "$(LOCK)"
 
 EXECUTION_SELECT = $(if $(LOCK),--lock "$(LOCK)",) $(foreach arm,$(ARM),--arm "$(arm)") \
 	$(foreach block,$(BLOCK),--block "$(block)") \
@@ -306,13 +353,22 @@ perf-check:
 	@$(RAIDAR) perf check $(RUN) $(if $(MIN_SAMPLES),--min-samples "$(MIN_SAMPLES)",)
 
 PERF_FIXTURE_DIR ?=
+PERF_FIXTURE_CONCURRENCY ?=
 
 perf-fixture:
 	@$(PACK_DOCKER_ENV) $(RAIDAR) pack build python
 	@$(PACK_DOCKER_ENV) export RAIDAR_EXECUTION_DOCKER=1 && \
 		$(if $(PERF_FIXTURE_DIR),export RAIDAR_PERF_FIXTURE_DIR="$(abspath $(PERF_FIXTURE_DIR))" &&,) \
+		$(if $(PERF_FIXTURE_CONCURRENCY),export RAIDAR_PERF_FIXTURE_CONCURRENCY="$(PERF_FIXTURE_CONCURRENCY)" &&,) \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
 		python -m pytest tests/test_execution_perf_fixture.py -v -s -rs
+
+problem-list:
+	@$(RAIDAR) problem list $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
+
+problem-info:
+	$(call require_var,PROBLEM)
+	@$(RAIDAR) problem info "$(PROBLEM)" $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
 
 problem-import:
 	$(call require_var,PROBLEM)
@@ -385,12 +441,10 @@ AGENT_SMOKE_SETS = $(SMOKE_SETS) \
 
 smoke-dry-run-check:
 	@$(MAKE) --no-print-directory -n orchestrator-smoke SMOKE_BLOCKS="2" SMOKE_CONCURRENCY="2"
-	@$(MAKE) --no-print-directory -n smoke-matrix
-	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="codex"
-	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="claude"
-	@! $(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="gemini" \
-		>/dev/null 2>&1
-	@! $(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="unknown" \
+	@$(MAKE) --no-print-directory -n smoke-agents
+	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="codex"
+	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="claude"
+	@! $(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="unknown" \
 		>/dev/null 2>&1
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		HARNESS="codex-cli" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
@@ -406,10 +460,11 @@ agent-smoke: docker-check
 	fi
 	$(call smoke_run,$(SMOKE_EXPERIMENT),agent-smoke,$(AGENT_SMOKE_SETS),)
 
-smoke-matrix: docker-check
-	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-matrix,$(SMOKE_SETS),$(if $(SMOKE_MATRIX_SELECTOR),--arm "$(SMOKE_MATRIX_SELECTOR)",))
+smoke-agents: docker-check
+	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-agents,$(SMOKE_SETS),$(if $(SMOKE_ARM),--arm "$(SMOKE_ARM)",))
 
 quality:
 	@$(MAKE) --no-print-directory smoke-dry-run-check
+	@$(MAKE) --no-print-directory experiment-locks-check
 	@$(RAIDAR_DEV) quality gates
 	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src

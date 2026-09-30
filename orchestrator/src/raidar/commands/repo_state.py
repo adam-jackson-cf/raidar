@@ -7,7 +7,9 @@ from pathlib import Path
 
 import click
 
-ARTIFACT_CHANGE_PREFIXES = ("experiments/",)
+# Generated runtime output that must never show up as a tracked change: scenario-epoch
+# history (experiments/) and experiment runs (runs/).
+ARTIFACT_CHANGE_PREFIXES = ("experiments/", "runs/")
 
 
 def repo_paths_from_git_cmd(args: list[str]) -> list[str]:

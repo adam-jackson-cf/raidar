@@ -39,6 +39,6 @@ For any migration from existing non wireframe implementation to a new component:
 - Make one atomic commit after each completed wireframe change set.
 - Keep commit content limited to wireframe files unless an explicit migration was approved.
 - Use a specific, concise message, e.g.:
-  - `wireframe: tune scenario and revision dropdown interaction`
+  - `wireframe: tune problem and condition dropdown interaction`
   - `wireframe: add overlay navigation for issues container`
 - Record what changed, what was validated, and whether rebuild+load check passed.

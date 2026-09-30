@@ -58,13 +58,13 @@ const UNSCORED_REASON_COPY: Record<string, { label: string; stage: string; detai
     label: 'Harness timeout',
     stage: 'execution',
     detail: 'The harness exceeded its allowed execution window before scoring could complete.',
-    action: 'Re-run this scenario, or increase the timeout if this is expected for the agent spec.',
+    action: 'Re-run this trial, or increase the timeout if this is expected for the agent spec.',
   },
   compose_version_unsupported: {
     label: 'Compose unsupported',
     stage: 'environment',
     detail: 'The local Docker Compose version is not supported by the harness.',
-    action: 'Update the local harness environment, then re-run this scenario.',
+    action: 'Update the local harness environment, then re-run this trial.',
   },
   provider_rate_limit: {
     label: 'Provider rate limit',
@@ -76,13 +76,13 @@ const UNSCORED_REASON_COPY: Record<string, { label: string; stage: string; detai
     label: 'Provider disconnect',
     stage: 'provider',
     detail: 'The model provider stream disconnected before the run completed.',
-    action: 'Re-run this scenario to obtain a complete scored run.',
+    action: 'Re-run this trial to obtain a complete scored run.',
   },
   harness_unavailable: {
     label: 'Harness unavailable',
     stage: 'environment',
     detail: 'The configured harness was unavailable when the run executed.',
-    action: 'Restore the harness environment, then re-run this scenario.',
+    action: 'Restore the harness environment, then re-run this trial.',
   },
   harbor_cli_failure: {
     label: 'Harness CLI failure',
@@ -100,7 +100,7 @@ const UNSCORED_REASON_COPY: Record<string, { label: string; stage: string; detai
     label: 'Turn failure',
     stage: 'execution',
     detail: 'The provider or harness failed during an agent turn before scoring could complete.',
-    action: 'Inspect the trace for the failing turn, then re-run this scenario.',
+    action: 'Inspect the trace for the failing turn, then re-run this trial.',
   },
 };
 
@@ -111,7 +111,7 @@ function fallbackUnscoredReason(reason: string) {
       label: 'Scoring incomplete',
       stage: 'verification',
       detail: reason,
-      action: 'Re-run this scenario to obtain a score.',
+      action: 'Re-run this trial to obtain a score.',
     };
   }
   if (normalized.includes('rate limit')) {
@@ -132,7 +132,7 @@ function fallbackUnscoredReason(reason: string) {
     label: 'Run could not be scored',
     stage: 'scoring',
     detail: reason,
-    action: 'Inspect the trace and re-run this scenario after the underlying issue is resolved.',
+    action: 'Inspect the trace and re-run this trial after the underlying issue is resolved.',
   };
 }
 

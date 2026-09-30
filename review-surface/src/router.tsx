@@ -49,6 +49,13 @@ function Layout() {
             >
               Runs
             </NavLink>
+            <NavLink
+              to="/quality"
+              className="text-xs transition"
+              style={({ isActive }) => ({ color: isActive ? C.accent : C.fg1 })}
+            >
+              Quality
+            </NavLink>
           </nav>
           <button
             type="button"

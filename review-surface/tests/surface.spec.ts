@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// Deterministic ids from the synthetic fixture (make benchmark-fixture-synthetic).
+// Deterministic ids from the synthetic fixture (make review-fixture-synthetic).
 const FAILING_RUN = 'synthetic-bugfix-gpt-5.5-low-04';
 const UNSCORED_RUN = 'synthetic-bugfix-gpt-5.5-low-05';
 const PASSING_RUN = 'synthetic-bugfix-gpt-5.5-medium-01';
@@ -19,9 +19,9 @@ test.describe('navigation', () => {
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test('scenario anchors jump to a family', async ({ page }) => {
+  test('problem anchors jump to a family', async ({ page }) => {
     await openExperiments(page);
-    const anchors = page.locator('nav[aria-label="Scenario families"] a');
+    const anchors = page.locator('nav[aria-label="Problem families"] a');
     await expect(anchors.first()).toBeVisible();
     expect(await anchors.count()).toBeGreaterThanOrEqual(2);
     await anchors.first().click();
@@ -263,7 +263,7 @@ test.describe('comparison visualisations', () => {
     const card = page.getByRole('button', { name: /contract changes/ }).first();
     await card.scrollIntoViewIfNeeded();
     await card.click();
-    await expect(page.getByRole('button', { name: /scenario \(/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /contract \(/ })).toBeVisible();
   });
 });
 

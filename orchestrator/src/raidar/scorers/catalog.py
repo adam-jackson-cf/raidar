@@ -4,8 +4,10 @@ A registration pairs a manifest with an optional implementation import path
 (``module:attribute``, imported lazily). Its implementation digest covers the
 module and every module it imports, transitively, from ``raidar`` or its own
 top-level package (shared kernels, the SDK, the oracle records), read
-statically without importing, so a change to any helper changes the
-Assessment key. The lock resolves ``name@version``
+statically without importing, so a code change to any helper changes the
+Assessment key. Each module is hashed as its normalised syntax tree
+(``raidar.spec.source_digest``): docstring, comment and layout edits leave
+the digest, and so every stored Assessment, unchanged. The lock resolves ``name@version``
 scorer references here through the ``raidar.spec.resolvers`` entry point
 ``scorer`` and records the manifest, the implementation's source digest, the
 pinned versions of the pack tools the scorer declares and, for a scorer that
@@ -31,13 +33,14 @@ from raidar.packs.python.models import ToolLock, load_tool_lock
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scorers.sdk.context import Scorer
 from raidar.scorers.sdk.manifest import ANY_RUNTIME, ScorerManifest
-from raidar.spec.canonical import digest_json, sha256_file
+from raidar.spec.canonical import digest_json
 from raidar.spec.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
     ResolvedReference,
 )
+from raidar.spec.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
 RUNTIME_TOOL_LOCKS: dict[str, Callable[[], ToolLock]] = {"python": load_tool_lock}
@@ -119,7 +122,7 @@ def _package_modules(module: str, files: tuple[tuple[str, Path], ...]) -> list[s
 
 
 def _source_digest(module: str) -> str:
-    """sha256 over the module's transitive in-scope source, without importing it."""
+    """sha256 over the module's transitive in-scope code, without importing it."""
     importlib.invalidate_caches()
     roots = _DIGEST_ROOTS | {module.split(".")[0]}
     files = _module_files(module)
@@ -133,9 +136,9 @@ def _source_digest(module: str) -> str:
             continue
         for owner, path in _module_files(name) or ():
             if owner not in digests:
-                digests[owner] = sha256_file(path)
+                digests[owner] = python_source_digest(path)
                 pending.extend(_imported(owner, path))
-    return digest_json(dict(sorted(digests.items())))
+    return digest_json({"scheme": SOURCE_DIGEST_SCHEME, "modules": dict(sorted(digests.items()))})
 
 
 StoreFactory = Callable[..., Scorer]

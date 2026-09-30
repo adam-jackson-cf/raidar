@@ -15,9 +15,9 @@ would leave them, plus an Assessment store, under ``<dest>/runs`` and
   harness, as ``CompiledCondition.digest`` does, yet both arms share a revision).
 - ``synthetic-policy-mix``: a one-shot problem scored under
   ``scb-canonical-oneshot@1``, compared with a scenario-epoch experiment on the
-  same problem (``fixture_legacy``), so the headline-policy mismatch renders.
+  same problem (``scenario_epoch.fixture``), so the headline-policy mismatch renders.
 
-``<dest>/experiments`` holds scenario-epoch experiments (``fixture_legacy``),
+``<dest>/scenario-epoch`` holds scenario-epoch experiments (``scenario_epoch.fixture``),
 so the old epoch renders beside the new one.
 
 Review ids are ``<run id>-<trial id>``; the trial ids are chosen so the frozen
@@ -41,7 +41,7 @@ from raidar.review_projection.fixture_assessments import (
     QualityPlan,
     store_assessments,
 )
-from raidar.review_projection.fixture_legacy import write_scenario_epoch
+from raidar.review_projection.fixture_lock import fixture_lock
 from raidar.review_projection.fixture_trials import (
     CheckpointScript,
     Outcome,
@@ -50,14 +50,16 @@ from raidar.review_projection.fixture_trials import (
     write_bundle,
     write_trial,
 )
+from raidar.review_projection.scenario_epoch.fixture import write_scenario_epoch
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.rescore_config import RescoreConfig
 from raidar.scorers.store import AssessmentStore
 from raidar.spec.canonical import digest_json
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
 from raidar.spec.schema import ExperimentSpec
 
 SYNTHETIC_MARKER = "synthetic"
+# Scenario-epoch experiments of the fixture, beside ``runs`` and ``store``.
+SCENARIO_EPOCH_DIR = "scenario-epoch"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
 _SCORERS = ["correctness@1", "code-quality@1", "resource-usage@1"]
@@ -268,24 +270,12 @@ def _spec(design: Design) -> ExperimentSpec:
 
 
 def _lock(design: Design, spec: ExperimentSpec) -> dict[str, object]:
-    checkpoints = len(design.trajectories[0].outcomes)
-    body: dict[str, object] = {
-        "spec": spec.to_json(),
-        "conditions": design.locked_conditions(),
-        "headline_policy": {
-            "ref": DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints).ref,
-            "selection": "default_by_k",
-            "checkpoints": [checkpoints],
-        },
-        "problems": [
-            {
-                "label": design.problem,
-                "checkpoints": checkpoints,
-                "digest": digest_json(design.problem),
-            }
-        ],
-    }
-    return {**body, "lock_sha256": digest_json(body)}
+    return fixture_lock(
+        spec.to_json(),
+        problem=design.problem,
+        checkpoints=len(design.trajectories[0].outcomes),
+        conditions=design.locked_conditions(),
+    )
 
 
 def _checkpoint(step: str, outcome: tuple[Outcome, int, int], index: int) -> CheckpointScript:
@@ -414,7 +404,7 @@ def generate_review_fixture(dest: Path) -> list[Path]:
     shutil.rmtree(dest, ignore_errors=True)
     store = AssessmentStore(dest / "store")
     runs = [_run(design, dest, store) for design in (_bugfix(), _skill(), _policy_mix())]
-    write_scenario_epoch(dest / "experiments", policy_mix_scenario=POLICY_MIX_PROBLEM)
+    write_scenario_epoch(dest / SCENARIO_EPOCH_DIR, policy_mix_scenario=POLICY_MIX_PROBLEM)
     return runs
 
 

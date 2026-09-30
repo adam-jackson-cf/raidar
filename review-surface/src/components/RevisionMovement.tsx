@@ -7,6 +7,9 @@ import { C } from '@/utils/colors';
 import { fmtTokens } from '@/utils/helpers';
 import type { ExperimentRecord, FileDiff, RevisionDiff } from '@/utils/types';
 
+/** Display names for the frozen wire keys (`scenario` is the scenario-epoch contract file). */
+const TAB_LABEL = { prompt: 'prompt', scenario: 'contract' } as const;
+
 function deltaColor(delta: number | null, higherIsBetter: boolean): string {
   if (delta == null || delta === 0) return C.fg1;
   const improved = higherIsBetter ? delta > 0 : delta < 0;
@@ -124,7 +127,7 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
                   border: `1px solid ${tab === name ? C.borderLight : C.border}`,
                 }}
               >
-                {name} (+{diff.files[name].diff.added} −{diff.files[name].diff.removed})
+                {TAB_LABEL[name]} (+{diff.files[name].diff.added} −{diff.files[name].diff.removed})
               </button>
             ))}
           </div>
@@ -189,7 +192,7 @@ export function RevisionMovement({
           Revision movement
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          did the scenario change make delivery better? review the contract diff before trusting movement
+          did the contract change make delivery better? review the contract diff before trusting movement
         </span>
       </div>
 

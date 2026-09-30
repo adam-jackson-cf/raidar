@@ -1,17 +1,19 @@
 import { Fragment, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Trophy } from 'lucide-react';
+import { ChevronRight, Gauge, Trophy } from 'lucide-react';
 import { api } from '@/api/client';
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
 import { Badge } from '@/components/Badge';
 import { FailurePatterns } from '@/components/FailurePatterns';
 import { FindingChips } from '@/components/FindingChips';
+import { PolicyMismatchNotice, familyMismatch } from '@/components/PolicyMismatchNotice';
 import { RevisionMovement } from '@/components/RevisionMovement';
 import { TradeoffScatter } from '@/components/TradeoffScatter';
 import { ScoreBar, ScoreVerdict, TierPill } from '@/components/Verdict';
 import { C } from '@/utils/colors';
+import { qualityExperimentHref, useQualityIndex, type QualityTarget } from '@/quality/links';
 import { fmtPercent, fmtScore, fmtTokens } from '@/utils/helpers';
 import {
   categoryLabel,
@@ -105,19 +107,46 @@ function MetricOutcomeRow({
   );
 }
 
+/** Links from a comparison to the Quality experiment view(s) covering its runs. */
+function QualityLinks({ targets, testId }: { targets: QualityTarget[]; testId: string }) {
+  if (targets.length === 0) return null;
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5" data-testid={testId}>
+      {targets.map((target) => (
+        <Link
+          key={`${target.experiment}@${target.lock}:${target.problem}`}
+          to={qualityExperimentHref(target)}
+          onClick={(event) => event.stopPropagation()}
+          title={`Code quality of ${target.problem} in ${target.experiment}${target.lock ? ` (lock ${target.lock.slice(0, 12)})` : ''}: component curves, paired Δ and distributions per arm`}
+          className="inline-flex items-center gap-1 rounded px-1.5 py-px text-[10px] transition hover:bg-white/10"
+          style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
+        >
+          <Gauge className="size-3" aria-hidden />
+          {targets.length === 1 ? 'Quality' : `Quality · ${target.experiment}`}
+        </Link>
+      ))}
+    </span>
+  );
+}
+
 function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   const metricOutcomes = Object.entries(exp.aggregate.metric_outcomes ?? {});
   const scorerOutcomes = Object.entries(exp.aggregate.scorer_outcomes ?? {});
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const runsById = new Map((runs.data ?? []).map((run) => [run.id, run]));
+  const quality = useQualityIndex();
+  const qualityTargets = quality.targetsFor(exp.run_ids.map((id) => runsById.get(id)?.artifact_paths.run_json));
   const failing = metricOutcomes.filter(([, o]) => o.pass_rate < 1).sort(([, a], [, b]) => a.pass_rate - b.pass_rate);
   const passing = metricOutcomes.filter(([, o]) => o.pass_rate >= 1);
   return (
     <div className="flex flex-col gap-3 px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.015)' }}>
       {exp.run_ids.length > 0 && (
         <div>
-          <div className="mb-1 text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-            Runs — open one to see its full story
+          <div className="mb-1 flex items-center gap-2">
+            <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
+              Runs — open one to see its full story
+            </span>
+            <QualityLinks targets={qualityTargets} testId="arm-quality-link" />
           </div>
           <div className="flex flex-wrap gap-1.5">
             {exp.run_ids.map((id) => (
@@ -230,7 +259,7 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
   );
 }
 
-/** One plain-language sentence answering "who wins this scenario revision, and what should I look at first?" */
+/** One plain-language sentence answering "who wins this problem condition, and what should I look at first?" */
 function GroupHeadline({ sorted, runsById }: { sorted: ExperimentRecord[]; runsById: Map<string, RunRecord> }) {
   const best = sorted[0];
   const bestMean = best?.aggregate.composite_score?.mean ?? null;
@@ -304,6 +333,10 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
 
   const bestComposite = sorted[0]?.aggregate.composite_score?.mean ?? null;
   const meta = experiments.find((e) => e.scenario_meta)?.scenario_meta ?? null;
+  const quality = useQualityIndex();
+  const qualityTargets = quality.targetsFor(
+    experiments.flatMap((exp) => exp.run_ids.map((id) => runsById.get(id)?.artifact_paths.run_json)),
+  );
 
   const toggle = (id: string) =>
     setExpanded((prev) => {
@@ -345,6 +378,9 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
           <span className="text-[10px]" style={{ color: C.fg0 }}>
             {experiments.length} agent spec{experiments.length === 1 ? '' : 's'}
           </span>
+          <span className="ml-auto">
+            <QualityLinks targets={qualityTargets} testId="group-quality-link" />
+          </span>
         </div>
         {meta?.description && (
           <span className="text-[11px]" style={{ color: C.fg1 }}>
@@ -361,7 +397,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
               <th className={TH} style={{ color: C.fg0 }}>Delivery</th>
               <th className={TH} style={{ color: C.fg0 }}>Repeatability</th>
               <th className={TH} style={{ color: C.fg0 }}>Issues</th>
-              <th className={TH} style={{ color: C.fg0 }} title="Can you trust this sample? Based on scored-run counts vs the scenario's minimum and preferred sample sizes.">
+              <th className={TH} style={{ color: C.fg0 }} title="Can you trust this sample? Based on scored-run counts vs the experiment's minimum and preferred sample sizes.">
                 Confidence
               </th>
               <th className={TH} style={{ color: C.fg0 }}>Pace</th>
@@ -546,7 +582,7 @@ export function ExperimentsPage() {
           className="num rounded px-2.5 py-1.5 text-[11px]"
           style={{ color: C.fg3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
         >
-          make benchmark-fixture-synthetic && make review-surface-data
+          make review-fixture-synthetic && make review-surface-data
         </code>
       </div>
     );
@@ -557,9 +593,9 @@ export function ExperimentsPage() {
   return (
     <div className="sb flex flex-1 flex-col gap-5 overflow-auto p-4">
       {families.length > 1 && (
-        <nav className="flex flex-wrap items-center gap-1.5" aria-label="Scenario families">
+        <nav className="flex flex-wrap items-center gap-1.5" aria-label="Problem families">
           <span className="text-[10px] uppercase tracking-wider" style={{ color: C.fg0 }}>
-            scenarios
+            problems
           </span>
           {families.map(({ family }) => (
             <a
@@ -602,6 +638,7 @@ function FamilySection({
   const familyRuns = (runs.data ?? []).filter((run) => familyRunIds.has(run.id));
   return (
     <div id={`family-${family}`} className="flex scroll-mt-4 flex-col gap-3">
+      <PolicyMismatchNotice mismatch={familyMismatch(all)} />
       {revisions.map(([revision, exps]) => (
         <ExperimentGroup key={`${family}:${revision}`} groupKey={`${family}:${revision}`} experiments={exps} />
       ))}

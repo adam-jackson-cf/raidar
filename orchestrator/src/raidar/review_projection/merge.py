@@ -2,8 +2,9 @@
 
 Experiment-epoch runs (``--runs-root``, scored from ``--store``) are projected
 from their artifacts on every build; scenario-epoch experiments
-(``--experiments-root``) are read from the ``review-projection.json`` each one
-persisted, so historical runs keep rendering unchanged.
+(``--legacy-root``) are read, read-only, from the ``review-projection.json``
+each one persisted (``raidar.review_projection.scenario_epoch``), so historical
+runs keep rendering unchanged.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ from pathlib import Path
 from raidar.review_projection.assessments import AssessmentLookup
 from raidar.review_projection.comparability import mark_policy_mismatches
 from raidar.review_projection.experiment_epoch import EpochProjection, project_sources
-from raidar.review_projection.legacy import load_experiment_projections
+from raidar.review_projection.scenario_epoch import load_experiment_projections
 from raidar.review_projection.sources import LockIndex, discover_run_dirs, load_run
 from raidar.review_projection.spans import repo_path
 from raidar.schemas.review import (
@@ -52,8 +53,8 @@ def _unique_details(details: Sequence[ReviewRunDetail]) -> list[ReviewRunDetail]
     return list(details)
 
 
-def _legacy(experiments_roots: Sequence[Path]) -> list[ExperimentReviewProjection]:
-    return [p for root in experiments_roots for p in load_experiment_projections(root)]
+def _legacy(legacy_roots: Sequence[Path]) -> list[ExperimentReviewProjection]:
+    return [p for root in legacy_roots for p in load_experiment_projections(root)]
 
 
 def _legacy_diffs(legacy: Sequence[ExperimentReviewProjection]) -> list[RevisionDiffArtifact]:
@@ -62,7 +63,7 @@ def _legacy_diffs(legacy: Sequence[ExperimentReviewProjection]) -> list[Revision
 
 
 def merge_review_projections(
-    experiments_roots: Sequence[Path] = (),
+    legacy_roots: Sequence[Path] = (),
     *,
     run_roots: Sequence[Path] = (),
     stores: Sequence[Path] = (),
@@ -70,8 +71,8 @@ def merge_review_projections(
 ) -> ReviewProjectionArtifact:
     """Project experiment-epoch runs and merge persisted scenario-epoch experiments."""
     epoch = project_experiment_epoch(run_roots, stores, locks)
-    legacy = _legacy(experiments_roots)
-    roots = [*run_roots, *experiments_roots]
+    legacy = _legacy(legacy_roots)
+    roots = [*run_roots, *legacy_roots]
     if not epoch.experiments and not legacy:
         where = ", ".join(str(root) for root in roots) or "no source"
         raise ValueError(f"no current-version review projections found under {where}")
@@ -106,11 +107,14 @@ def _artifact(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Project Raidar runs into review-surface data.")
     parser.add_argument(
-        "--experiments-root",
+        "--legacy-root",
         type=Path,
         action="append",
         default=[],
-        help="Scenario-epoch experiments root (review-projection.json per experiment); repeatable.",
+        help=(
+            "Scenario-epoch history root, read-only (review-projection.json per "
+            "experiment); repeatable."
+        ),
     )
     parser.add_argument(
         "--runs-root",
@@ -139,10 +143,10 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = _parser().parse_args(argv)
-    if not args.experiments_root and not args.runs_root:
-        raise SystemExit("give --experiments-root and/or --runs-root")
+    if not args.legacy_root and not args.runs_root:
+        raise SystemExit("give --legacy-root and/or --runs-root")
     artifact = merge_review_projections(
-        [path.resolve() for path in args.experiments_root],
+        [path.resolve() for path in args.legacy_root],
         run_roots=[path.resolve() for path in args.runs_root],
         stores=[path.resolve() for path in args.store],
         locks=[path.resolve() for path in args.lock],

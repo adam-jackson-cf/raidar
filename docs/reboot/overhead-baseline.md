@@ -3,8 +3,8 @@
 **Status: budgets PROPOSED, not yet accepted.** Requirements N1 and the Phase 0 exit criteria need the user to accept (or amend) §5 before they become enforced numbers for `raidar perf check` (plan D4).
 
 - Date: 2026-09-29.
-- Harness: `spikes/overhead/` (`bench.py`, `summarize.py`), built on the A′ spike harness in `spikes/a-prime/` (task 0.3), which it reuses without editing.
-- Raw evidence: `spikes/overhead/baseline-summary.json` (tracked) and per-rep JSON under `spikes/overhead/_work/results/<cell>/` (gitignored).
+- Harness: `spikes/overhead/` (`bench.py`, `summarize.py`), built on the A′ spike harness in `spikes/a-prime/` (task 0.3), which it reuses without editing. Both spikes are retired from the tree at the Phase 1 cutover; read them at commit `2b66568`.
+- Raw evidence: `docs/reboot/evidence/overhead-baseline-summary.json` (tracked; copied from `spikes/overhead/baseline-summary.json`) and per-rep JSON under `spikes/overhead/_work/results/<cell>/` (never tracked).
 
 ## 1. What was measured
 
@@ -147,6 +147,8 @@ A check fails when the p95 over ≥10 samples exceeds the budget. Budgets apply 
 
 ## 7. Reproduce
 
+The spike harness is retired from the tree. Check out `2b66568` (the last commit with `spikes/`) to rerun it. For the production phases, `make perf-fixture` and `make perf-check` supersede it.
+
 ```bash
 cd spikes/overhead
 export DOCKER_CONTEXT=orbstack             # OrbStack only; check orbstack-data-status first
@@ -198,3 +200,67 @@ These are measurements, not budget changes. The §5 budgets stay as accepted.
 **Real-agent trials** (codex-cli `gpt-6-luna` low: forge checkpoints 1–2, and the one-shot `circuit_eval/checkpoint_1`). There are too few samples to judge a p95, but two observations matter for the gaps in §6:
 - `artifact_collection` took 4.7–5.2 s on 2 of the 3 real steps, above the 3.5 s budget. One of those steps had an empty `/app`, so the time is not explained by tree size alone.
 - Harbor's `agent_setup` took about 36 s in both real trials, because Harbor reinstalled codex (`apt-get`, `nvm`, `npm install -g @openai/codex@0.156.1`) even though the pack image bakes in 0.156.1. The cause is that Harbor merges stderr into stdout for `codex --version`. The pack image's `HOME=/tmp/agent_home` makes codex print a `WARNING ... under temporary dir "/tmp"` line on stderr, so Harbor parses that line as the version, sees a mismatch, and reinstalls. `agent_setup` has no N1 budget, so `raidar perf check` does not catch this. It is a WS-I pack fix: move `HOME`/`CODEX_HOME` out of `/tmp`.
+
+### N1 misses: profile and fixes (2026-09-30)
+
+These are measurements after a code fix. **No budget in §5 changed.**
+
+**The misses.** The Phase 1 gate packet (§5) recorded three N1 misses:
+- `artifact_collection`: p95 3.97 s on forge-04, and 3.65 s on the concurrency-1 fixture, against a 3.5 s budget.
+- `teardown_result_write[init]`: p95 4.62 s under concurrency, against 4 s.
+- one-shot `per_step_reset`: point estimate 3.28 s against 2 s, from n=6.
+
+**Where the time went.** Profiled from Harbor 0.23's trial code and OrbStack microbenchmarks.
+- Harbor runs every main-container `exec` and `cp` as a fresh `docker compose` process. Each one re-loads the project's compose files.
+  - On OrbStack, a compose `exec`/`cp` costs about 0.30–0.32 s before the command itself runs. The same call through `docker exec`/`docker cp` costs about 0.08–0.10 s.
+  - Under concurrency the gap widens, because each compose process is CPU-bound on the host.
+- `artifact_collection` (agent end to verifier start) was 7 compose calls, plus a host-side gunzip:
+  - 3 × `chown -R` (one per writable log mount: `/logs/verifier`, `/logs/agent`, `/logs/artifacts`);
+  - `test -d /app`, then `tar czf` to a temp file in the container, `compose cp` of the archive, and `rm` of the archive.
+  - The first step also paid `docker info` (about 0.4 s, Harbor's rootless probe, cached afterwards).
+  - With a real codex or claude-code agent, the first step of each `raidar run` process also paid Harbor's lazy `import litellm` (1.6–2.1 s measured), which Harbor uses to price the step. This explains the 4.7–5.2 s real-agent samples above, one of which had an empty `/app`, and the high one-shot values (one process per leg).
+  - Tree size was not the driver: `.venv` and the caches were already excluded, with one list shared by Harbor and the verifier (`raidar.oracle.snapshot.SNAPSHOT_EXCLUDES`).
+- `per_step_reset` was 3 compose calls (`pwd`, `compose cp` of the step workdir, `bash setup.sh`) around the 0.24 s reset script. No step defines a Harbor healthcheck, so there is no second healthcheck to remove.
+- `teardown_result_write` was 3 compose `chown -R` calls plus `compose down`.
+  - `compose down` took about 0.8–1.6 s with `init: true`.
+  - `down -t 0`, and `docker rm -f` before `down`, were measured and are no faster, so the Harbor `down` is kept as is.
+
+**Fix** (`raidar.execution.environment.RunScopedDockerEnvironment`, the environment class every trial already used):
+- Once the trial's main container is resolved by its compose labels, main-service `exec` and `cp` go to `docker exec`/`docker cp`. Flags, user, workdir, env, output handling, exit status and failure message are unchanged. Anything else (`up`, `down`, sidecars, unknown flags, an unresolvable container) keeps Harbor's compose path.
+- Excluded-directory collection is one streamed `docker exec … tar cf - --exclude=… -C /app .` into a host temp file.
+  - It uses the same exclude patterns and the same `tarfile` `data` extraction filter as Harbor.
+  - There is no gzip, and no archive is left in the container.
+- The mounted-log `chown -R` covers all writable mounts in one exec, instead of one exec per mount.
+- `start()` runs Harbor's rootless probe and the agents' lazy `litellm` import concurrently with `compose up`. Neither lands in a budgeted per-step gap, and no wall time is added.
+
+**Re-measured.**
+- Setup: `make perf-fixture` on OrbStack (`external_available=True`), no LLM, 10 trajectories × 2 steps per run. Before and after were run back to back on the same host, at concurrency 1 and 3 (the new `PERF_FIXTURE_CONCURRENCY` knob).
+- Every trajectory was valid, with both checkpoints solved.
+- `make perf-check` fails both "before" runs and passes both "after" runs.
+
+Values are p50 / p95 in seconds; n=20 for per-step phases and n=10 for per-trial phases.
+
+| Phase (budget) | before c1 | after c1 | before c3 | after c3 |
+|---|---|---|---|---|
+| per_step_reset (2 s) | 1.30 / 1.44 | 0.65 / **0.74** | 1.87 / **2.26 fail** | 0.78 / **1.08** |
+| artifact_collection (3.5 s) | 2.79 / **3.75 fail** | 0.41 / **0.47** | 4.16 / **6.17 fail** | 0.66 / **0.90** |
+| step_archive_gap (2.5 s) | 1.31 / 1.48 | 0.65 / 0.69 | 1.89 / 2.05 | 0.74 / 0.85 |
+| teardown_result_write[init] (4 s) | 2.69 / 3.02 | 1.28 / **2.84** | 3.23 / **5.12 fail** | 2.13 / **2.86** |
+| environment_start[warm] (20 s) | 4.14 / 6.02 | 3.05 / 4.55 | 5.73 / 6.97 | 5.22 / 8.62 |
+| per_step_overhead (10 s) | 5.27 / 5.87 | 1.42 / 1.83 | 6.11 / 9.58 | 1.79 / 2.77 |
+| per_trial_fixed_overhead[init] (27 s) | 6.60 / 8.99 | 5.19 / 6.04 | 9.67 / 10.83 | 7.58 / 10.10 |
+| pre_agent_leak_check (record-only) | 0.64 / 1.06 | 0.44 / 0.72 | 0.74 / 1.90 | 0.49 / 0.83 |
+
+- At concurrency 3, `per_step_overhead` p95 had been 9.58 s, 0.42 s under its 10 s budget. It is now 2.77 s.
+- `teardown_result_write` p95 stays around 2.8–2.9 s, because it is now dominated by `compose down`. That leaves about 1.1 s of headroom.
+
+**Real agent.**
+- One `make orchestrator-smoke` trial: codex-cli 0.156.1, `gpt-6-luna` low, on the one-shot problem.
+- The trial was valid and solved. `trajectory.json` and usage (tokens and cost) were written as before, and codex was not reinstalled.
+- Timings: `artifact_collection` 0.47 s, `per_step_reset` 0.70 s, `teardown_result_write` 1.49 s, `agent_setup` 2.12 s.
+- The pilot's one-shot leg had measured 2.77–3.55 s, 1.30–3.58 s and 2.31–3.94 s for the same three phases.
+- n=1, so this sample confirms the fast path works with a real harness. It does not give a p95.
+
+**Remaining gap.**
+- The forge-04 and one-shot figures in the gate packet predate this fix, and no real-agent leg has been re-run at pilot concurrency (up to 5 trials plus review-loop sessions).
+- The size term in §6 is still open. Collection is now one `tar` stream, so it should scale with the non-excluded bytes of `/app`.

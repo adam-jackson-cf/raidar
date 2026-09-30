@@ -50,8 +50,8 @@ def test_plan_lists_every_arm_block_trial_with_input_hashes(
     assert len({t.hashes.trial for t in plan.trials}) == len(plan.trials)
     for trial in plan.trials:
         assert trial.hashes.lock == lock["lock_sha256"]
-        assert trial.hashes.arm == lock["arms"][trial.arm]["digest"]
-        assert trial.hashes.problem == lock["problems"][0]["digest"]
+        assert trial.hashes.arm == lock["execution"]["arms"][trial.arm]["digest"]
+        assert trial.hashes.problem == lock["execution"]["problems"][0]["digest"]
         assert trial.hashes.condition == plan.arms[trial.arm].compiled.digest
     # The baseline arm has no components but still has a compiled condition (its reset).
     baseline = plan.arms["baseline"].compiled
@@ -147,7 +147,7 @@ def test_a_lock_that_no_longer_matches_the_experiment_is_refused(
     with pytest.raises(PlanError, match="different experiment spec"):
         build_plan(changed, stale, store=fixture_problem.store, pack=load_pack_spec())
     stale = json.loads(json.dumps(lock))
-    stale["problems"][0]["digest"] = "0" * 64
+    stale["execution"]["problems"][0]["digest"] = "0" * 64
     with pytest.raises(PlanError, match="changed since the lock"):
         build_plan(changed, stale, store=fixture_problem.store, pack=load_pack_spec())
 
@@ -183,10 +183,22 @@ def test_plan_command_dry_run_and_stale_lock(
     payload = json.loads(as_json.output)
     assert len(payload["trials"]) == 10
     assert payload["arms"]["baseline"]["condition_digest"]
-    lock_path.write_text(lock_path.read_text().replace('"blocks": 5', '"blocks": 4'))
+    source = loaded.path.read_text()
+    loaded.path.write_text(source.replace("baseline_arm: baseline", "baseline_arm: guided"))
+    reanalysed = runner.invoke(main, ["plan", str(loaded.path)])
+    assert reanalysed.exit_code != 0
+    assert "Stale: analysis:" in reanalysed.output
+    assert "execution:" not in reanalysed.output
+    loaded.path.write_text(source.replace("blocks: 5", "blocks: 4"))
     stale = runner.invoke(main, ["plan", str(loaded.path)])
     assert stale.exit_code != 0
     assert "out of date" in stale.output
+    assert "execution: execution inputs changed" in stale.output
+    loaded.path.write_text(source)
+    lock_path.write_text(lock_path.read_text().replace('"blocks": 5', '"blocks": 4'))
+    tampered = runner.invoke(main, ["plan", str(loaded.path)])
+    assert tampered.exit_code != 0
+    assert "not a valid lock" in tampered.output
     lock_path.unlink()
     missing = runner.invoke(main, ["plan", str(loaded.path)])
     assert missing.exit_code != 0

@@ -9,10 +9,13 @@ from typing import Any
 import click
 
 from raidar.components.arm_check import check_arm_components
+from raidar.execution.lock_migration import LockMigrationError, migrate_run_lock
 from raidar.spec.loader import LoadedExperiment, load_experiment, overrides_from_cli
 from raidar.spec.lock import (
     LockError,
+    StaleLockError,
     build_lock,
+    check_lock_file,
     default_lock_path,
     default_resolvers,
     render_lock,
@@ -24,6 +27,7 @@ from raidar.spec.validation import SpecValidationError
 def register(main: click.Group) -> None:
     main.add_command(validate_command)
     main.add_command(lock_command)
+    main.add_command(migrate_run_lock_command)
 
 
 def _override_options(command: Callable[..., Any]) -> Callable[..., Any]:
@@ -102,7 +106,16 @@ def validate_command(
     default=None,
     help="Lock file path (default: <experiment name>.lock.json next to the experiment).",
 )
-@click.option("--check", is_flag=True, help="Fail if the existing lock differs; write nothing.")
+@click.option(
+    "--check",
+    is_flag=True,
+    help="Fail if the existing lock differs, naming each stale section; write nothing.",
+)
+@click.option(
+    "--ignore-host-python",
+    is_flag=True,
+    help="With --check: accept a different host Python patch in toolchain.python only.",
+)
 def lock_command(
     experiment: Path,
     blocks: int | None,
@@ -111,18 +124,63 @@ def lock_command(
     assignments: tuple[str, ...],
     output: Path | None,
     check: bool,
+    ignore_host_python: bool,
 ) -> None:
-    """Resolve an experiment to content hashes and pinned versions."""
+    """Resolve an experiment to content hashes and pinned versions.
+
+    ``lock_sha256`` is the digest of the execution section only: relocking
+    after a scorer, policy, threshold or toolchain change keeps it, so runs
+    executed under the earlier lock still match.
+    """
+    if ignore_host_python and not check:
+        raise click.UsageError("--ignore-host-python needs --check")
     loaded = _load(experiment, blocks, seed, concurrency, assignments)
     lock_path = output or default_lock_path(loaded.path)
     try:
-        rendered = render_lock(build_lock(loaded, lock_path=lock_path))
-    except LockError as exc:
+        lock = build_lock(loaded, lock_path=lock_path)
+        note = (
+            check_lock_file(lock_path, lock, ignore_host_python=ignore_host_python)
+            if check
+            else None
+        )
+    except (LockError, StaleLockError) as exc:
         raise click.ClickException(str(exc)) from exc
     if check:
-        if not lock_path.is_file() or lock_path.read_bytes() != rendered:
-            raise click.ClickException(f"{lock_path} is missing or out of date; run raidar lock")
-        click.echo(f"Lock is current: {lock_path}")
+        if note:
+            click.echo(f"Note: {note}")
+        click.echo(f"Lock is current: {lock_path} (lock_sha256 {str(lock['lock_sha256'])[:12]})")
         return
-    lock_path.write_bytes(rendered)
-    click.echo(f"Wrote {lock_path}")
+    lock_path.write_bytes(render_lock(lock))
+    click.echo(f"Wrote {lock_path} (lock_sha256 {str(lock['lock_sha256'])[:12]})")
+
+
+@click.command("migrate-run-lock")
+@click.argument("run_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
+@click.option(
+    "--executed-lock",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="The version-1 lock file the run was executed under.",
+)
+@click.option(
+    "--lock",
+    "lock_path",
+    required=True,
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="The current lock of the same experiment (run `raidar lock` first).",
+)
+def migrate_run_lock_command(run_dir: Path, executed_lock: Path, lock_path: Path) -> None:
+    """Point a run executed under a version-1 lock at the current lock.
+
+    Refused unless the execution section rebuilt from the executed lock equals
+    the current lock's. The executed lock is kept in the run directory and
+    run.json records both digests; plan.json and trajectories are unchanged.
+    """
+    try:
+        result = migrate_run_lock(run_dir, executed_lock, lock_path)
+    except LockMigrationError as exc:
+        raise click.ClickException(str(exc)) from exc
+    verb = "Migrated" if result.migrated else "Already migrated"
+    click.echo(
+        f"{verb} {run_dir}: lock {result.executed_lock_sha256[:12]} -> {result.lock_sha256[:12]}"
+    )

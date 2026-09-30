@@ -119,6 +119,8 @@ class QualityRunSummary(QualityModel):
     truncated_to: int | None = None
     score: Cell
     sources: dict[str, str | None]
+    trajectory: str
+    """``<runs-root name>/<run dir>/trajectories/<trial>.json``: the join key to the run review."""
 
 
 class QualityRunDetail(QualityModel):

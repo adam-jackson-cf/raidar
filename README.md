@@ -15,7 +15,7 @@ Raidar runs an **experiment**: the same pinned **problems** under two or more **
 
 The design lives in [`docs/reboot/requirements.md`](docs/reboot/requirements.md) (frozen v1), [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md), [`docs/reboot/adr-001.md`](docs/reboot/adr-001.md) and [`docs/reboot/design-memo.md`](docs/reboot/design-memo.md).
 
-> **The scenario epoch is retired.** The scenario and matrix authoring and execution paths were removed at the Phase 1 cutover. `scenarios/`, `matrices/` and `environments/` are read-only history, and nothing reads them. Scenario-epoch experiments under `experiments/` still render in the review surface from their persisted `review-projection.json`. The removed `make` targets (`scenario-*`, `experiment-run`, `matrix-run`, `experiments-*`) refuse and point here.
+> **History.** The scenario, revision and matrix workflow was retired at the reboot cutover: no code, target or check reads `scenarios/`, `matrices/`, `environments/` or `spikes/` any more, and their removal from the tree (`git rm`) is a pending maintainer step. Their definitions stay at commit `2b66568`, and [`CHANGELOG.md`](CHANGELOG.md) maps each removed target to its replacement. Scenario-epoch runs under `experiments/benchmarks` still render, read-only, in the review surface (`REVIEW_LEGACY_ROOT`).
 
 ## Install
 
@@ -38,7 +38,7 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Term | What it is | Where it lives |
 |---|---|---|
 | Experiment | The unit of authoring: problems, agents, conditions, arms, scorers and the analysis plan | `experiment.yaml` (for example `examples/pilot/`) |
-| Lock | Content hashes and pinned versions of everything the experiment resolves to. A run refuses a lock that is out of date | `<name>.lock.json` next to the experiment |
+| Lock | Content hashes and pinned versions of everything the experiment resolves to, in `execution`, `assessment`, `analysis` and `toolchain` sections. Its `lock_sha256` covers the execution section only, and every run records it. A run refuses a lock that is out of date | `<name>.lock.json` next to the experiment |
 | Problem | A pinned, oracle-validated task (one-shot or multi-checkpoint). Its oracle stays on the host and the agent never sees it | `problems/registry/`, imported into `problems/store/` |
 | Runtime pack | The agent image (toolchain and pinned harness binaries, no scorer tools) plus the scorer tool lock | `orchestrator/src/raidar/packs/python/` |
 | Component | A reusable treatment piece: `rules-file@1`, `skills@1`, `lint-config@1`, `stop-hook@1`, `mcp-server@1`, `harness-settings@1`, `workspace-files@1`, `prompt-wrapper@1`, `review-loop@1` | `orchestrator/src/raidar/components/` |
@@ -55,14 +55,15 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 
 The example compares a baseline with a rules-file treatment on the validated one-shot problem the pilot uses. Every step is a public `make` target.
 
-**1. Provide the problem and the pack.** A problem is pinned by reference and must be oracle-validated before any run can use it. `problem-validate` is needed only for a problem without a validation report in `problems/registry/`.
+**1. Provide the problem and the pack.** A problem is pinned by reference and must be oracle-validated before any run can use it. `make problem-list` shows every registered problem with its validation and import state, and `make problem-info PROBLEM=<ref>` shows one in detail. `problem-validate` is needed only for a problem without a validation report in `problems/registry/`.
 
 ```bash
+make problem-list
 make problem-import PROBLEM=scb/circuit_eval.checkpoint_1@38d627ecf668
 make pack-build
 ```
 
-**2. Write `experiment.yaml`.** Paths in `files:` are relative to the experiment file.
+**2. Write `experiment.yaml`.** `make experiment-init EXPERIMENT=my-exp/experiment.yaml` writes a starter of the shape below and a stub `components/AGENTS.md`: the id comes from the directory (or `EXPERIMENT_ID=`), the problem from `PROBLEM=` (default the one below), the agent's `version` from the pack pin, and the headline policy is left to the lock, which picks it by checkpoint count. It refuses a path that exists. Paths in `files:` are relative to the experiment file. To try another variant of a treatment later, add a condition and an arm to the same file, so the variant stays paired with the baseline arm.
 
 ```yaml
 schema_version: 1
@@ -111,7 +112,7 @@ analysis:
   alpha: 0.05
 ```
 
-**3. Validate and lock.** Validation checks the schema, the cross-references, the factor guard, and that every arm's components compile for its harness. The lock pins content hashes and versions. `raidar run` refuses to start if relocking would change the lock.
+**3. Validate and lock.** Validation checks the schema, the cross-references, the factor guard, and that every arm's components compile for its harness. The lock pins content hashes and versions. `raidar run` refuses to start if relocking would change the lock, and the refusal names each stale section. A scorer, headline-policy, threshold or toolchain change relocks to the same `lock_sha256`, so existing runs still match: rescore them (step 5) instead of rerunning. A change to problems, agents, conditions, protocol, blocks or seed gives a new `lock_sha256`, which means a new experiment. `make experiment-locks-check`, part of `make quality`, checks every lock under `examples/`.
 
 ```bash
 make experiment-validate EXPERIMENT=my-exp/experiment.yaml
@@ -141,7 +142,7 @@ make experiment-assess RUN=runs/rules-trial/first STORE=stores/rules-trial \
 make experiment-analyze RUNS="runs/rules-trial/first" STORE=stores/rules-trial ANALYSIS_OUT=analysis/rules-trial
 ```
 
-**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs. Scenario-epoch history under `experiments/benchmarks` is included when present.
+**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs. Scenario-epoch history under `experiments/benchmarks` is included, read-only, when present; point `REVIEW_LEGACY_ROOT` elsewhere to use another history root.
 
 ```bash
 make review-surface-quality-data QUALITY_RUNS=runs/rules-trial QUALITY_STORE=stores/rules-trial
@@ -155,17 +156,18 @@ The smoke targets run real agent trials of `examples/smoke/` through the same ex
 ```bash
 make orchestrator-smoke                                   # codex-cli + gpt-6-luna (low), one trial
 make agent-smoke HARNESS=claude-code PROVIDER=anthropic MODEL=claude-sonnet-4-6
-make smoke-matrix SMOKE_MATRIX_SELECTOR=codex             # one arm per pack harness: codex or claude
+make smoke-agents                                         # one trial per pack harness (arms codex, claude)
+make smoke-agents SMOKE_ARM=codex                         # one arm only
 ```
 
 ## Repository layout
 
 - `orchestrator/`: the `raidar` CLI and library (`spec`, `problems`, `packs`, `components`, `execution`, `oracle`, `scorers`, `jev`, `analysis`, `review_projection`, `review_quality`).
-- `examples/`: the Phase 1 pilot experiments and the smoke experiments.
+- `examples/`: the Phase 1 pilot experiments and the smoke experiments. Files under `examples/**/components/` are treatment content delivered to agents.
 - `problems/`: the pinned problem registry (tracked), plus the imported store and source cache (local).
 - `review-surface/`: the review UI, its frozen projection contract (`schema_version=1`) and its Playwright suite.
 - `runs/`: local run directories, ignored by git.
-- `experiments/`, `scenarios/`, `matrices/`, `environments/`: scenario-epoch history, read-only.
-- `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo and the Phase 1 gate packet.
+- `experiments/`: scenario-epoch run history, ignored by git and read-only.
+- `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo, the Phase 1 gate packet, and the tracked Phase 0 spike evidence (`evidence/`).
 
-`make quality` is the repository gate: ruff, import contracts, lizard, mypy, fan-out, and the full test suite with coverage.
+`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `examples/**/*.lock.json` is current), then ruff, import contracts, lizard, mypy, fan-out, and the full test suite with coverage.

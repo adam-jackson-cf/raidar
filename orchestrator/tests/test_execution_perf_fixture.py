@@ -7,7 +7,10 @@ per-trial phase has 10 samples and every per-step phase 20. Needs Docker with
 the Python pack image, so it runs only when opted in with
 ``RAIDAR_EXECUTION_DOCKER=1``::
 
-    make perf-fixture [PERF_FIXTURE_DIR=<dir>]   # builds the pack image if needed
+    make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=3]
+
+``RAIDAR_PERF_FIXTURE_CONCURRENCY`` (default 1) runs the same fixture with more
+trials at once, to measure the phases under host contention.
 
 Opted in, a missing prerequisite fails the test instead of skipping it, so a
 CI job or ``make perf-fixture`` can never pass without running the fixture.
@@ -32,6 +35,7 @@ from tests.component_trial_support import DOCKER_CONTEXT, orbstack_available
 from tests.execution_support import imported_pack_fixture, locked_experiment
 
 OPT_IN = "RAIDAR_EXECUTION_DOCKER"
+CONCURRENCY_ENV = "RAIDAR_PERF_FIXTURE_CONCURRENCY"
 pytestmark = pytest.mark.skipif(
     os.environ.get(OPT_IN) != "1",
     reason=f"the perf fixture runs real Harbor trials: set {OPT_IN}=1 (make perf-fixture)",
@@ -63,6 +67,7 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
     context = _docker_context()
     _require_docker(context)
     root = Path(os.environ.get("RAIDAR_PERF_FIXTURE_DIR") or tmp_path)
+    concurrency = int(os.environ.get(CONCURRENCY_ENV) or 1)
     monkeypatch.setenv("DOCKER_CONTEXT", context)
     fixture = imported_pack_fixture(root / "fixture", context)
     monkeypatch.setenv(ROOT_ENV, str(fixture.store.root))
@@ -78,7 +83,12 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
                 "components": [{"use": "lint-config@1", "files": ["components/ruff.toml"]}],
             },
         ],
-        analysis={"baseline_arm": "baseline", "blocks": 5, "seed": 20260930, "concurrency": 1},
+        analysis={
+            "baseline_arm": "baseline",
+            "blocks": 5,
+            "seed": 20260930,
+            "concurrency": concurrency,
+        },
     )
     runner = CliRunner()
     runs = root / "runs"

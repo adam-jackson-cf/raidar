@@ -26,8 +26,7 @@ from pydantic import ValidationError
 
 from raidar.analysis.report import PlannedTrial
 from raidar.execution.models import TrajectoryRecord
-from raidar.spec.canonical import digest_json
-from raidar.spec.lock import default_lock_path
+from raidar.spec.lock import default_lock_path, lock_integrity_issues
 
 
 class AnalysisInputError(ValueError):
@@ -105,11 +104,15 @@ def read_run(run_dir: Path) -> RunDir:
 
 
 def read_lock(path: Path) -> dict[str, Any]:
-    """The lock document, refused when its body does not hash to ``lock_sha256``."""
+    """The lock document, refused unless it is a sealed lock (``lock_integrity_issues``).
+
+    Its ``lock_sha256`` is the digest of its execution section, the identity
+    runs record; scorer and threshold changes relock without changing it.
+    """
     lock = _read_json(path)
-    body = {key: value for key, value in lock.items() if key != "lock_sha256"}
-    if digest_json(body) != lock.get("lock_sha256"):
-        raise AnalysisInputError(f"{path}: lock_sha256 does not match the lock body")
+    issues = lock_integrity_issues(lock)
+    if issues:
+        raise AnalysisInputError(f"{path}: not a valid lock ({'; '.join(issues)})")
     return lock
 
 
@@ -160,7 +163,8 @@ def check_runs(runs: Sequence[RunDir], lock: Mapping[str, Any]) -> None:
         if run.manifest.get("lock_sha256") != lock["lock_sha256"]:
             raise AnalysisInputError(
                 f"run {run.path} was executed under lock {run.manifest.get('lock_sha256')}, "
-                f"not {lock['lock_sha256']}"
+                f"not {lock['lock_sha256']}: the lock's execution section describes another "
+                "experiment"
             )
     trial_sets = {tuple(t["trial_id"] for t in run.plan.get("trials", ())) for run in runs}
     if len(trial_sets) != 1:

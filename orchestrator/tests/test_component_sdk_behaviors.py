@@ -274,7 +274,7 @@ def test_lock_records_component_digest_through_the_entry_point_resolver(tmp_path
     lock = build_lock(load_experiment(path), lock_path=tmp_path / "lock.json", resolvers=resolvers)
 
     assert isinstance(ResolverSet().resolver_for(RefKind.COMPONENT), ComponentResolver)
-    recorded = lock["references"]["component"]["rules-file@1"]  # type: ignore[index]
+    recorded = lock["execution"]["references"]["component"]["rules-file@1"]  # type: ignore[index]
     assert recorded["digest"] == fingerprint(RULES_FILE)
     assert recorded["metadata"]["supports"] == ["codex-cli", "claude-code"]
 

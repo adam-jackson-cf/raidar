@@ -157,7 +157,8 @@ def test_harness_setup_auth_fails_when_login_does_not_create_auth_json(
 def test_generated_artifact_paths_filters_prefixes() -> None:
     paths = [
         "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
-        "scenarios/hello-world-smoke/v001/scenario.yaml",
+        "runs/smoke/20260930T000000Z/run.json",
+        "problems/registry/scb/forge/38d627ecf668.json",
         "orchestrator/src/raidar/cli.py",
     ]
 
@@ -165,6 +166,7 @@ def test_generated_artifact_paths_filters_prefixes() -> None:
 
     assert matches == [
         "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+        "runs/smoke/20260930T000000Z/run.json",
     ]
 
 
@@ -325,8 +327,10 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "env",
         "harbor",
         "harness",
+        "init",
         "jev",
         "lock",
+        "migrate-run-lock",
         "pack",
         "perf",
         "plan",
@@ -335,6 +339,9 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "run",
         "validate",
     }
+    problem = main.commands["problem"]
+    assert isinstance(problem, click.Group)
+    assert set(problem.commands) == {"import", "info", "list", "validate"}
 
 
 def test_run_refuses_the_removed_scenario_flag(tmp_path: Path) -> None:
@@ -399,28 +406,31 @@ def test_agent_smoke_replaces_the_agent_and_pins_the_pack_version() -> None:
         assert f'--set "{assignment}"' in run_args
 
 
-@pytest.mark.parametrize("selector", ["codex", "claude"])
-def test_smoke_matrix_selector_runs_one_arm_of_the_agent_smoke(selector: str) -> None:
-    result = _make_dry_run("smoke-matrix", f"SMOKE_MATRIX_SELECTOR={selector}")
+@pytest.mark.parametrize("arm", ["codex", "claude"])
+def test_smoke_agents_arm_runs_one_arm_of_the_agents_smoke(arm: str) -> None:
+    result = _make_dry_run("smoke-agents", f"SMOKE_ARM={arm}")
 
     assert result.returncode == 0, result.stderr
     (run_args,) = _raidar_lines(result.stdout, "run")
     assert run_args.startswith('"examples/smoke/agents.experiment.yaml"')
-    assert f'--arm "{selector}"' in run_args
+    assert f'--arm "{arm}"' in run_args
 
 
-@pytest.mark.parametrize(
-    ("selector", "message"),
-    [
-        ("gemini", "the Python pack bakes in only codex-cli and claude-code"),
-        ("invalid", "Unknown SMOKE_MATRIX_SELECTOR 'invalid'"),
-    ],
-)
-def test_smoke_matrix_selector_rejects_unavailable_harnesses(selector: str, message: str) -> None:
-    result = _make_dry_run("smoke-matrix", f"SMOKE_MATRIX_SELECTOR={selector}")
+def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
+    agents_smoke = REPO_ROOT / "examples" / "smoke" / "agents.experiment.yaml"
+    spec = yaml.safe_load(agents_smoke.read_text(encoding="utf-8"))
+    makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
+    arms = " ".join(arm["id"] for arm in spec["arms"])
+
+    assert f"SMOKE_ARMS := {arms}\n" in makefile
+
+
+@pytest.mark.parametrize("arm", ["gemini", "invalid"])
+def test_smoke_agents_rejects_an_arm_the_pack_cannot_run(arm: str) -> None:
+    result = _make_dry_run("smoke-agents", f"SMOKE_ARM={arm}")
 
     assert result.returncode != 0
-    assert message in result.stderr
+    assert f"Unknown SMOKE_ARM '{arm}'; expected one of: codex claude" in result.stderr
 
 
 def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
@@ -439,9 +449,35 @@ def test_smoke_dry_run_check_prints_every_public_smoke_shape() -> None:
 
 
 @pytest.mark.parametrize(
-    "target", ["scenario-init", "scenario-info", "matrix-run", "experiment-run", "experiments-list"]
+    ("args", "command", "expected"),
+    [
+        (("problem-list",), "problem", ["list"]),
+        (
+            ("problem-info", "PROBLEM=scb/forge@38d627ecf668"),
+            "problem",
+            ["info", '"scb/forge@38d627ecf668"'],
+        ),
+        (
+            ("experiment-init", "EXPERIMENT=my-exp/experiment.yaml", "EXPERIMENT_ID=my-exp"),
+            "init",
+            ['"my-exp/experiment.yaml"', "--id", '"my-exp"'],
+        ),
+    ],
 )
-def test_removed_scenario_targets_refuse_with_a_pointer(target: str) -> None:
+def test_registry_and_init_targets_call_their_raidar_verbs(
+    args: tuple[str, ...], command: str, expected: list[str]
+) -> None:
+    result = _make_dry_run(*args)
+
+    assert result.returncode == 0, result.stderr
+    (arguments,) = _raidar_lines(result.stdout, command)
+    assert arguments.split() == expected
+
+
+@pytest.mark.parametrize(
+    ("target", "variable"), [("problem-info", "PROBLEM"), ("experiment-init", "EXPERIMENT")]
+)
+def test_registry_and_init_targets_require_their_argument(target: str, variable: str) -> None:
     result = subprocess.run(
         ["make", "--no-print-directory", target],
         cwd=REPO_ROOT,
@@ -451,8 +487,62 @@ def test_removed_scenario_targets_refuse_with_a_pointer(target: str) -> None:
     )
 
     assert result.returncode != 0
-    assert "removed at the reboot cutover" in result.stderr
-    assert "experiment.yaml" in result.stderr
+    assert f"Missing required variable: {variable}" in result.stdout
+
+
+def test_legacy_review_fixture_is_written_under_the_fixture_dir_not_history() -> None:
+    result = _make_dry_run("review-fixture-synthetic", "REVIEW_FIXTURE=legacy")
+
+    assert result.returncode == 0, result.stderr
+    assert "raidar.review_projection.scenario_epoch.fixture" in result.stdout
+    assert "/.tmp/review-fixture/legacy" in result.stdout
+    assert "experiments/" not in result.stdout
+
+
+def test_review_surface_test_reads_history_only_when_given() -> None:
+    default = _make_dry_run("review-surface-test")
+    given = _make_dry_run("review-surface-test", "REVIEW_LEGACY_ROOT=experiments")
+
+    assert default.returncode == 0, default.stderr
+    assert "experiments/benchmarks" not in default.stdout
+    assert f'--legacy-root "{REPO_ROOT / "experiments"}"' in given.stdout
+
+
+def test_review_surface_test_applies_one_store_to_every_given_runs_root() -> None:
+    result = _make_dry_run(
+        "review-surface-test", "REVIEW_RUNS_ROOT=runs/a runs/b", "REVIEW_STORE=store"
+    )
+
+    assert result.returncode == 0, result.stderr
+    joined = re.sub(r"\\\n\s*", " ", result.stdout)
+    quality = next(line for line in joined.splitlines() if "raidar.review_quality " in line)
+    assert f'--runs-root "{REPO_ROOT / "runs/a"}"' in quality
+    assert f'--runs-root "{REPO_ROOT / "runs/b"}"' in quality
+    assert quality.count(f'--store "{REPO_ROOT / "store"}"') == 2
+
+
+def test_review_surface_test_rejects_mismatched_runs_and_stores() -> None:
+    result = _make_dry_run(
+        "review-surface-test", "REVIEW_RUNS_ROOT=runs/a runs/b runs/c", "REVIEW_STORE=s1 s2"
+    )
+
+    assert result.returncode != 0
+    assert "one store for all roots or one store per root" in result.stderr
+
+
+def test_review_surface_test_always_uses_the_experiment_fixture() -> None:
+    result = _make_dry_run("review-surface-test", "REVIEW_FIXTURE=legacy")
+
+    assert result.returncode == 0, result.stderr
+    assert "raidar.review_projection.scenario_epoch.fixture" not in result.stdout
+    assert "raidar.review_projection.fixture" in result.stdout
+
+
+def test_unknown_review_fixture_is_rejected() -> None:
+    result = _make_dry_run("review-fixture-synthetic", "REVIEW_FIXTURE=scenario")
+
+    assert result.returncode != 0
+    assert "Unknown REVIEW_FIXTURE 'scenario'" in result.stderr
 
 
 def test_smoke_experiments_pin_the_pack_harness_versions() -> None:

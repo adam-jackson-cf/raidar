@@ -353,27 +353,26 @@ def test_the_most_recently_logged_assessment_of_a_scorer_wins(
     assert after.problem["C"].value == 2 / len(after.rows)
 
 
-def _lock(target: Path, headline_policy: str) -> str:
+def _lock(target: Path, headline_policy: str, experiment: str = EXPERIMENT) -> str:
     return write_synthetic_lock(
         target / "experiment.yaml",
-        experiment=EXPERIMENT,
+        experiment=experiment,
         baseline_arm="baseline",
         headline_policy=headline_policy,
     )
 
 
-def _relock(target: Path, headline_policy: str, run_id: str = RUN_ID) -> str:
-    digest = _lock(target, headline_policy)
+def _executed_lock(target: Path, run_id: str = RUN_ID) -> str:
     run = target / "runs" / EXPERIMENT / run_id / "run.json"
-    run.write_text(json.dumps({**json.loads(run.read_text()), "lock_sha256": digest}))
-    return digest
+    return str(json.loads(run.read_text())["lock_sha256"])
 
 
 def test_the_locks_headline_policy_takes_precedence_over_the_default(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
-    _relock(target, "scb-canonical-oneshot@1")
+    # A new headline policy is an assessment change: the relocked lock keeps the run's identity.
+    assert _lock(target, "scb-canonical-oneshot@1") == _executed_lock(target)
     detail = build_quality_projection(target / "runs", target / "store").run_details[
         f"{RUN_PREFIX}b00-p0-baseline"
     ]
@@ -387,13 +386,13 @@ def test_the_locks_headline_policy_takes_precedence_over_the_default(
 def test_without_the_runs_own_lock_there_is_no_baseline_and_no_paired_delta(
     fixture_dir: Path, tmp_path: Path, change: str
 ) -> None:
-    """The baseline comes from the lock the run executed under, never from a newer lock."""
+    """The baseline comes from the lock the run executed under, never from another experiment's."""
     target = _copy(fixture_dir, tmp_path)
     lock = target / "experiment.lock.json"
     if change == "missing":
         lock.unlink()
     else:
-        _lock(target, "scb-canonical-oneshot@1")
+        _lock(target, "scb-canonical-oneshot@1", experiment=f"{EXPERIMENT}-redesigned")
     result = build_quality_projection(target / "runs", target / "store")
     problem = _problem(result)
     assert problem.baseline_arm is None
@@ -506,3 +505,37 @@ def test_descriptive_statistics_boundaries() -> None:
     assert quantiles([1.0, 2.0, 3.0, 4.0, 5.0]) == (1.0, 2.0, 3.0, 4.0, 5.0)
     assert pearson([1.0, 1.0, 1.0], [1.0, 2.0, 3.0]) is None
     assert pearson([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) == pytest.approx(1.0)
+
+
+def test_each_run_carries_its_trajectory_as_the_join_key_to_the_run_review(
+    projection: QualityProjection, fixture_dir: Path
+) -> None:
+    for run in projection.runs:
+        assert run.trajectory == f"runs/{EXPERIMENT}/{RUN_ID}/trajectories/{run.trial}.json"
+        assert (fixture_dir / run.trajectory).is_file()
+
+
+def test_cli_reads_several_runs_roots_each_against_its_own_store(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    other = _copy(fixture_dir, tmp_path)
+    moved = _clone_run(other, "synthetic-run-2")
+    shutil.rmtree(other / "runs" / EXPERIMENT / RUN_ID)
+    output = tmp_path / "quality.json"
+    main(
+        [
+            *("--runs-root", str(fixture_dir / "runs"), "--store", str(fixture_dir / "store")),
+            *("--runs-root", str(other / "runs"), "--store", str(other / "store")),
+            *("--output", str(output)),
+        ]
+    )
+    loaded = QualityProjection.model_validate_json(output.read_bytes())
+    assert {run.run for run in loaded.runs} == {RUN_ID, moved.name}
+    assert len(loaded.runs) == 24
+    assert all(run.score.status != "unassessed" for run in loaded.runs if run.run == moved.name)
+
+
+def test_cli_refuses_unpaired_runs_roots_and_stores(fixture_dir: Path) -> None:
+    runs = str(fixture_dir / "runs")
+    with pytest.raises(SystemExit):
+        main(["--runs-root", runs, "--runs-root", runs, "--store", runs, "--output", "x.json"])

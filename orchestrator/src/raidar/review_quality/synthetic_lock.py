@@ -1,7 +1,8 @@
 """The synthetic Quality fixture's lock: only what the Quality view reads from a lock.
 
-Its ``lock_sha256`` is the digest of its body, as ``read_lock`` checks, and it
-sits where ``default_lock_path`` looks for it beside the experiment file.
+It is sealed like a real lock (``seal_lock``: section digests, ``lock_sha256``
+over its execution section, ``document_sha256``), as ``read_lock`` checks, and
+it sits where ``default_lock_path`` looks for it beside the experiment file.
 """
 
 from __future__ import annotations
@@ -9,8 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raidar.spec.canonical import digest_json
-from raidar.spec.lock import default_lock_path
+from raidar.spec.lock import LOCK_VERSION, default_lock_path, seal_lock
 from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
 from raidar.spec.schema import DEFAULT_ALPHA, DEFAULT_MAX_EXCLUSION_FRACTION, DEFAULT_MIN_PAIRS
 
@@ -31,17 +31,18 @@ def write_synthetic_lock(
     experiment_file: Path, *, experiment: str, baseline_arm: str, headline_policy: str
 ) -> str:
     """Write the lock beside ``experiment_file`` and return its ``lock_sha256``."""
-    body = {
-        "synthetic": True,
-        "experiment": {"id": experiment},
-        "spec": {
-            "id": experiment,
-            "analysis": {"baseline_arm": baseline_arm, **PINNED_THRESHOLDS},
-        },
-        "headline_policy": {"ref": headline_policy},
-    }
-    digest = digest_json(body)
-    default_lock_path(experiment_file).write_text(
-        json.dumps({**body, "lock_sha256": digest}, indent=2), encoding="utf-8"
+    analysis = {"baseline_arm": baseline_arm, **PINNED_THRESHOLDS}
+    lock = seal_lock(
+        {
+            "lock_version": LOCK_VERSION,
+            "synthetic": True,
+            "experiment": {"id": experiment},
+            "spec": {"id": experiment, "analysis": analysis},
+            "execution": {"design": {"id": experiment}},
+            "assessment": {"headline_policy": {"ref": headline_policy}},
+            "analysis": analysis,
+            "toolchain": {},
+        }
     )
-    return digest
+    default_lock_path(experiment_file).write_text(json.dumps(lock, indent=2), encoding="utf-8")
+    return str(lock["lock_sha256"])

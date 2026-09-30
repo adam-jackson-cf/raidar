@@ -18,7 +18,8 @@
 - The **lock** the run was executed under supplies the baseline arm and the
   headline policy, as WS-J's analysis reads them: the lock next to the
   ``run.json`` ``experiment_file`` (``default_lock_path``), accepted only when
-  its body hashes to its ``lock_sha256`` and that digest is the run's. The
+  it is a sealed lock (``read_lock``) whose ``lock_sha256`` (the digest of its
+  execution section, unchanged by scorer or threshold relocks) is the run's. The
   live experiment YAML is never read. Without a matching lock the baseline is
   unknown and the headline policy is the default by K, and the projection
   says so.
@@ -90,6 +91,18 @@ class TrialSource:
         """``path`` relative to the runs root, so the projection is not machine-specific."""
         return Path(os.path.relpath(path, self.runs_root)).as_posix()
 
+    @property
+    def trajectory(self) -> str:
+        """The trajectory file as ``<runs-root name>/<run dir>/trajectories/<trial>.json``.
+
+        The run review (``review_projection``) shows the same file as its
+        ``artifact_paths.run_json``; the surface joins a run to its Quality view
+        on this path suffix, which stays portable (no machine-specific prefix).
+        """
+        relative = Path(os.path.relpath(self.run_dir, self.runs_root))
+        path = Path(self.runs_root.name) / relative / "trajectories"
+        return (path / f"{self.record.trial.trial_id}.json").as_posix()
+
     def snapshot_digests(self) -> dict[str, str | None]:
         return {
             attempt.step: attempt.snapshot.digest if attempt.snapshot else None
@@ -99,7 +112,7 @@ class TrialSource:
 
 def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
     spec = lock.get("spec") or {}
-    headline = lock.get("headline_policy") or {}
+    headline = (lock.get("assessment") or {}).get("headline_policy") or {}
     analysis = spec.get("analysis") or {}
     return ExperimentInfo(
         lock_sha256=executed,

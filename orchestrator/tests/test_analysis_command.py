@@ -29,7 +29,7 @@ from raidar.oracle.models import CaseStatus
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.rescore import rescore_path
 from raidar.scorers.store import AssessmentStore
-from raidar.spec.canonical import digest_json
+from raidar.spec.lock import LOCK_VERSION, seal_lock
 from tests.scorer_support import APP_V1, APP_V2, StepFixture, tree_state, write_trial
 
 PASS, FAIL = CaseStatus.PASSED, CaseStatus.FAILED
@@ -45,21 +45,31 @@ SOLVES = {
 COST = {"baseline": 0.01, "guided": 0.03}
 
 
-def _lock(scorers: list[str], **thresholds: Any) -> dict[str, Any]:
-    body = {
-        "experiment": {"id": "pilot"},
-        "spec": {
-            "analysis": {"baseline_arm": "baseline", "blocks": 5, "seed": 11, **thresholds},
-            "assessment": {"scorers": scorers},
-            "protocol": {"progression": "continue"},
-        },
-        "headline_policy": {
-            "ref": "scb-canonical@1",
-            "selection": "default_by_k",
-            "checkpoints": [2],
-        },
+def _lock(scorers: list[str], *, experiment: str = "pilot", **thresholds: Any) -> dict[str, Any]:
+    analysis = {"baseline_arm": "baseline", **thresholds}
+    spec = {
+        "analysis": {**analysis, "blocks": 5, "seed": 11},
+        "assessment": {"scorers": scorers},
+        "protocol": {"progression": "continue"},
     }
-    return {**body, "lock_sha256": digest_json(body)}
+    return seal_lock(
+        {
+            "lock_version": LOCK_VERSION,
+            "experiment": {"id": experiment},
+            "spec": spec,
+            "execution": {"design": {"id": experiment, "blocks": 5, "seed": 11}},
+            "assessment": {
+                "spec": spec["assessment"],
+                "headline_policy": {
+                    "ref": "scb-canonical@1",
+                    "selection": "default_by_k",
+                    "checkpoints": [2],
+                },
+            },
+            "analysis": analysis,
+            "toolchain": {},
+        }
+    )
 
 
 def _record(
@@ -291,10 +301,15 @@ def test_analyze_refuses_to_write_into_a_run_or_to_mix_locks(
     assert inside.exit_code != 0
     assert "outside" in inside.output
     other = tmp_path / "other.lock.json"
-    other.write_text(json.dumps(_lock(["correctness@1"])))
+    other.write_text(json.dumps(_lock(["correctness@1"], experiment="other")))
     mixed = _analyze(run_dir, store, other, tmp_path / "out")
     assert mixed.exit_code != 0
     assert "executed under lock" in mixed.output
+    # A relock that only changes the scorers keeps the execution identity the run recorded.
+    rescored = _lock(["correctness@1"])
+    assert rescored["lock_sha256"] == json.loads(lock_path.read_text())["lock_sha256"]
+    other.write_text(json.dumps(rescored))
+    assert _analyze(run_dir, store, other, tmp_path / "rescored").exit_code == 0
     tampered = json.loads(lock_path.read_text())
     tampered["spec"]["analysis"]["baseline_arm"] = "guided"
     lock_path.write_text(json.dumps(tampered))

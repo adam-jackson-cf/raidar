@@ -5,7 +5,7 @@ A run directory (``raidar run``) holds ``run.json``, ``plan.json``,
 spec (agents, conditions, factors, headline policy) lives in the lock the run
 was planned from; ``run.json`` names it by ``lock_sha256``. The lock is looked
 up among the locks given explicitly and those beside the run's experiment file;
-its body must hash to its own ``lock_sha256`` and that digest must match. A run
+it must be a sealed lock whose ``lock_sha256`` (its execution digest) matches. A run
 whose lock cannot be found is refused, never projected from guesses.
 """
 
@@ -22,7 +22,7 @@ from pydantic import ValidationError
 from raidar.execution.models import TrajectoryRecord
 from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
 from raidar.spec.canonical import digest_json
-from raidar.spec.lock import LOCK_SUFFIX
+from raidar.spec.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.spec.schema import ExperimentSpec
 
 RUN_MANIFEST = "run.json"
@@ -109,19 +109,20 @@ def discover_run_dirs(roots: Iterable[Path]) -> list[Path]:
 
 
 def parse_lock(document: Mapping[str, Any], origin: Path) -> ExperimentLock:
-    """The lock, refused unless its body hashes to its ``lock_sha256`` (as ``raidar analyze``)."""
-    body = {key: value for key, value in document.items() if key != "lock_sha256"}
-    if digest_json(body) != document.get("lock_sha256"):
-        raise RunSourceError(f"{origin}: lock_sha256 does not match the lock body")
+    """The lock, refused unless it is a sealed lock (as ``raidar analyze`` reads it)."""
+    issues = lock_integrity_issues(document)
+    if issues:
+        raise RunSourceError(f"{origin}: not a valid lock ({'; '.join(issues)})")
     try:
         spec = ExperimentSpec.model_validate(document["spec"])
-        headline = document.get("headline_policy")
+        execution = document["execution"]
+        headline = document["assessment"].get("headline_policy")
         return ExperimentLock(
             sha256=str(document["lock_sha256"]),
             spec=spec,
             headline_policy=str(headline["ref"]) if isinstance(headline, Mapping) else None,
-            conditions=dict(document.get("conditions") or {}),
-            problems=tuple(document.get("problems") or ()),
+            conditions=dict(execution.get("conditions") or {}),
+            problems=tuple(execution.get("problems") or ()),
         )
     except (KeyError, TypeError, ValidationError) as exc:
         raise RunSourceError(f"{origin} is not an experiment lock: {exc}") from exc

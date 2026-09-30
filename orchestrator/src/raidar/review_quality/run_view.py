@@ -414,6 +414,7 @@ def build_run_detail(
         truncated_to=record.truncated_to,
         score=problem["S"],
         sources={CODE_QUALITY_REF: _key(quality), CORRECTNESS_REF: _key(correctness)},
+        trajectory=trial.trajectory,
     )
     return QualityRunDetail(
         run=summary,

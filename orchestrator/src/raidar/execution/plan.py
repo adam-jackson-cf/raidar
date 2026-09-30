@@ -160,7 +160,7 @@ def _lock_field(lock: Mapping[str, Any], *keys: str) -> Any:
 def _problems(
     loaded: LoadedExperiment, lock: Mapping[str, Any], store: ProblemStore
 ) -> tuple[ProblemTarget, ...]:
-    locked = _lock_field(lock, "problems")
+    locked = _lock_field(lock, "execution", "problems")
     targets = []
     for index, entry in enumerate(loaded.spec.problems):
         if entry.ref is None:
@@ -211,7 +211,7 @@ class _HashInputs:
         parts = {
             "lock": str(_lock_field(self.lock, "lock_sha256")),
             "problem": problem.digest,
-            "arm": str(_lock_field(self.lock, "arms", blueprint.arm_id, "digest")),
+            "arm": str(_lock_field(self.lock, "execution", "arms", blueprint.arm_id, "digest")),
             "condition": blueprint.compiled.digest,
             "agent": agent_digest(agent, blueprint.agent_config, self.override),
             "protocol": self.protocol,

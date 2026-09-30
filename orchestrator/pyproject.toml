@@ -72,7 +72,7 @@ line-length = 100
 target-version = "py312"
 extend-exclude = [
     "experiments",
-    "scenarios",
+    "runs",
     "workspace",
     "workspace-*",
     "results",

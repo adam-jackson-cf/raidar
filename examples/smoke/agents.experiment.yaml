@@ -1,6 +1,6 @@
-# Operational agent smoke (make smoke-matrix [SMOKE_MATRIX_SELECTOR=codex|claude]): the
+# Operational agent smoke (make smoke-agents [SMOKE_ARM=codex|claude]): the
 # smoke problem once per harness the Python pack bakes in. The agent is the factor, so
-# each arm is one harness; the selector runs one arm. Versions equal the pack.yaml pins
+# each arm is one harness; SMOKE_ARM runs one arm. Versions equal the pack.yaml pins
 # (raidar plan refuses any other). Not a benchmark: one block, correctness only.
 schema_version: 1
 id: smoke-agents

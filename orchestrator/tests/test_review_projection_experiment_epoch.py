@@ -25,7 +25,7 @@ from raidar.review_projection.comparability import (
     mark_policy_mismatches,
 )
 from raidar.review_projection.conditions import ArmSide, condition_diff
-from raidar.review_projection.fixture import generate_review_fixture
+from raidar.review_projection.fixture import SCENARIO_EPOCH_DIR, generate_review_fixture
 from raidar.review_projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.review_projection.merge import project_experiment_epoch
 from raidar.review_projection.sources import RunSourceError
@@ -494,9 +494,9 @@ def test_lock_whose_body_was_edited_is_refused(fixture_root: Path, tmp_path: Pat
     run_dir = _copy_run(fixture_root, tmp_path, "synthetic-bugfix")
     lock_path = run_dir / "experiment.lock.json"
     lock = json.loads(lock_path.read_text())
-    lock["headline_policy"]["ref"] = "scb-canonical-oneshot@1"
+    lock["assessment"]["headline_policy"]["ref"] = "scb-canonical-oneshot@1"
     lock_path.write_text(json.dumps(lock))
-    with pytest.raises(RunSourceError, match="lock_sha256 does not match the lock body"):
+    with pytest.raises(RunSourceError, match="section assessment does not match its digest"):
         project_experiment_epoch([tmp_path / "runs"])
 
 
@@ -508,7 +508,7 @@ def test_policy_shares_come_from_the_policy() -> None:
 
 def test_fixture_family_mixing_policies_renders_the_mismatch(fixture_root: Path) -> None:
     artifact = merge_review_projections(
-        [fixture_root / "experiments"],
+        [fixture_root / SCENARIO_EPOCH_DIR],
         run_roots=[fixture_root / "runs"],
         stores=[fixture_root / "store"],
     )
