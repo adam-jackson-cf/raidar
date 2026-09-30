@@ -284,7 +284,7 @@ def test_compile_arm_uses_the_arms_condition_and_agent() -> None:
     guided = compile_arm(loaded.spec, "guided", base_dir=loaded.base_dir)
     baseline = compile_arm(loaded.spec, "baseline", base_dir=loaded.base_dir)
 
-    assert list(guided.overlay) == ["AGENTS.md"]
+    assert list(guided.overlay) == ["AGENTS.md", "ruff.toml"]
     assert baseline.overlay == {}
     assert guided.digest != baseline.digest
     with pytest.raises(KeyError):
@@ -300,15 +300,18 @@ def test_copied_component_file_change_changes_the_compiled_digest(tmp_path: Path
     assert before.digest != after.digest
 
 
-def test_pilot_guided_arm_can_include_the_review_loop_workflow() -> None:
+def test_pilot_guided_arm_includes_the_review_loop_workflow() -> None:
     loaded = load_experiment(PILOT_DIR / "experiment.yaml")
     guided = loaded.spec.condition("guided")
-    extended = guided.model_copy(
-        update={"components": (*guided.components, use("review-loop@1", max_review_rounds=2))}
-    )
 
-    compiled = compile_condition(extended, loaded.spec.agent("codex-luna"), base_dir=PILOT_DIR)
+    compiled = compile_condition(guided, loaded.spec.agent("codex-luna"), base_dir=PILOT_DIR)
 
-    assert [item.ref for item in compiled.uses] == ["rules-file@1", "review-loop@1"]
+    assert [item.ref for item in compiled.uses] == [
+        "rules-file@1",
+        "skills@1",
+        "lint-config@1",
+        "stop-hook@1",
+        "review-loop@1",
+    ]
     assert compiled.agent_wrapper is not None
     assert compiled.agent_wrapper.kwargs["max_review_rounds"] == 2

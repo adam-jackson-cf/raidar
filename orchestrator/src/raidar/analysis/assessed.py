@@ -38,6 +38,7 @@ from raidar.analysis.outcomes import (
     TrajectoryOutcome,
     Value,
 )
+from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrajectoryRecord
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus
 from raidar.spec.policies import ScorePolicy, checkpoint_correctness
@@ -119,14 +120,10 @@ def headline_score(policy: ScorePolicy, checkpoints: int, components: Mapping[st
     unassessed = [f"{c}: {v.reason}" for c, v in components.items() if v.status == UNASSESSED]
     if unassessed:
         return Value.missing(UNASSESSED, f"{policy.ref}: {'; '.join(unassessed)}")
-    values: dict[str, float] = {}
-    ineligible: dict[str, list[str]] = {}
-    for component, value in components.items():
-        if value.value is not None:
-            values[component] = value.value
-        elif value.status != AssessStatus.NOT_APPLICABLE.value:
-            ineligible[component] = [f"{value.status}: {value.reason}"]
-    scored = policy.score(checkpoints=checkpoints, components=values, ineligible=ineligible)
+    inputs = {
+        component: ComponentInput.from_value(value) for component, value in components.items()
+    }
+    scored = score_inputs(policy, checkpoints, inputs)
     if scored.score is None:
         details = "; ".join(
             f"{reason.code.value}[{reason.component or '-'}]: {reason.detail}"

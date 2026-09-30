@@ -17,7 +17,6 @@ class GeminiCliAdapter(HarborCliAdapter):
     )
     CLI_ENV_VAR = "GEMINI_CLI_PATH"
     DEFAULT_BINARY = "gemini"
-    WORKSPACE_SESSION_DIR = ".gemini"
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
         "gemini-3.1-pro-preview": SupportedModelProfile(
             display_label="Gemini 3.1 Pro Preview",

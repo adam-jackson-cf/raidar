@@ -14,11 +14,12 @@ from pathlib import Path
 
 from raidar.analysis.sources import AnalysisInputError, RunDir
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
-from raidar.scorers.catalog import ScorerRegistry, tool_lock_for
-from raidar.scorers.rescore import RescoreError, scorer_identity
+from raidar.scorers.catalog import ScorerRegistry
+from raidar.scorers.keys import scorer_identity, store_key
+from raidar.scorers.rescore import RescoreError
 from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scorers.sdk.result import AssessResult
-from raidar.scorers.store import AssessmentStore, ScorerIdentity, assessment_key
+from raidar.scorers.store import AssessmentStore, ScorerIdentity
 from raidar.scorers.trial_inputs import (
     BundleCache,
     TrialInputError,
@@ -56,12 +57,12 @@ class AssessmentLookup:
             return found
         inputs = context_inputs(ctx)
         for ref in self.scorer_refs:
-            key = assessment_key(
-                self._identity(ref),
-                config=dict(config.scorers.get(ref, {})),
-                tool_lock=tool_lock_for(self.registry.get(ref).manifest),
-                inputs=inputs,
-            )
+            key = store_key(
+                self.registry.get(ref),
+                config.scorers.get(ref, {}),
+                inputs,
+                identity=self._identity(ref),
+            ).key
             assessment = self.store.get(key)
             found[ref] = assessment.result if assessment is not None else None
         return found

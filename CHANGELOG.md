@@ -2,6 +2,28 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - reboot Phase 1 cutover (WS-L)
+
+### Breaking Changes
+
+- The scenario epoch's authoring and execution paths are removed. Raidar now has one authoring convention: `experiment.yaml` (problems, agents, conditions built from components, arms, scorers, analysis), locked by `raidar lock` and run by `raidar run`.
+- Removed CLI commands: `raidar scenario ...`, `raidar info`, `raidar matrix ...`, `raidar experiment run`, `raidar experiments list|prune`, and the `raidar run --scenario` compatibility branch.
+- Removed make targets: `scenario-list`, `scenario-info`, `scenario-validate`, `scenario-init`, `scenario-clone-revision`, `experiment-run`, `matrix-run`, `runtime-stack-scenario-smoke`, `experiments-list` and `experiments-prune`. Each now refuses with a pointer to the experiment workflow.
+- Removed modules: the scenario runtime pipeline (`raidar.runtime`: task bundles, task images, workspace phases, scorecards), `raidar.application`, the scenario and scorecard schemas, the scenario-attached weighted scorers (code-task, design-to-code, plan-to-code, test-generation, requirements, resource-efficiency, and the Codex-in-Docker `llm-as-judge` default), the matrix schema, starters, the gate watcher, the evidence-runner asset, and the repository-local Harbor CLI agents and routing.
+- `raidar harbor cleanup` now removes the trial environments (run-scoped Compose projects) a stopped `raidar run` leaves behind: all of a named run's (`--run`), or every one with nothing running. It no longer matches scenario-era container names.
+
+### Features
+
+- Experiment-path smoke targets: `make orchestrator-smoke`, `make agent-smoke` and `make smoke-matrix` run `examples/smoke/` through lock and Harbor. `smoke-matrix` has one arm per pack harness (`codex`, `claude`).
+- `make experiment-assess RUN= STORE= SCORERS=` rescores a run's stored trials into an Assessment store (`raidar assess --rescore`).
+- `make harbor-cleanup RUN= DRY_RUN=`.
+
+### Chores
+
+- The scenario-epoch synthetic review fixture is frozen as persisted projections (`raidar/review_projection/scenario_epoch_fixture.json.gz`). `make benchmark-fixture-synthetic` and the review fixture's scenario-epoch experiments are written from it, so historical experiments keep rendering without the removed producer.
+- `scenarios/`, `matrices/` and `environments/` carry a read-only history note. Nothing reads them.
+- The README, `make help` and the import contracts describe the experiment, problem, component and scorer model.
+
 ## 0.14.0 - 2026-07-03
 
 ### Chores

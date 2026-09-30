@@ -127,6 +127,21 @@ def _policy_issues(spec: ExperimentSpec, policies: ScorePolicyRegistry) -> list[
     return []
 
 
+def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    # Analysis owns the outcome metric ids; imported lazily like the scorer catalog.
+    from raidar.analysis.outcomes import OUTCOME_METRICS
+
+    known = {metric.id for metric in OUTCOME_METRICS}
+    return [
+        FieldIssue(
+            f"analysis.min_effects.{name}",
+            f"unknown outcome metric {name!r}; known: {', '.join(sorted(known))}",
+        )
+        for name in spec.analysis.min_effects
+        if name not in known
+    ]
+
+
 ProtocolConfigKeys = Mapping[str, Iterable[str]]
 """``{scorer ref: ProtocolSpec field names it takes from the protocol}``."""
 
@@ -172,6 +187,7 @@ def semantic_issues(
         *_agent_issues(spec),
         *_component_overlay_issues(spec),
         *_policy_issues(spec, policies),
+        *_min_effect_issues(spec),
         *_protocol_config_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),

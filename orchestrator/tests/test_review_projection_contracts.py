@@ -1,4 +1,4 @@
-"""Boundary coverage for typed scenario and review projections."""
+"""Scenario-epoch read path: persisted projections, the frozen fixture and the merge."""
 
 from __future__ import annotations
 
@@ -10,79 +10,24 @@ from pathlib import Path
 
 import pytest
 
-from raidar.application.scenario_catalog import load_scenario
-from raidar.review_projection import (
-    build_experiment_review_projection,
-    main,
-    merge_review_projections,
+from raidar.review_projection import main, merge_review_projections
+from raidar.review_projection.fixture_legacy import (
+    LEGACY_SCENARIO,
+    POLICY_MIX_RUN_PREFIX,
+    frozen_projections,
+    write_benchmark_fixture,
+    write_scenario_epoch,
 )
-from raidar.review_projection.legacy import (
-    _summary_objects,
-    _trace_name,
-    load_experiment_projection,
-)
+from raidar.review_projection.fixture_legacy import main as fixture_main
+from raidar.review_projection.legacy import load_experiment_projection
 from raidar.review_projection.spans import PAYLOAD_CAP, payload, to_ms
-from raidar.review_scenario_projection import (
-    revision_diff_artifact,
-    scenario_comparable_config,
-    scenario_review_contract,
-)
-from raidar.synthetic import generate_synthetic_benchmark
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
 def synthetic_experiments(tmp_path: Path) -> Path:
     root = tmp_path / "experiments"
-    generate_synthetic_benchmark(root)
+    write_benchmark_fixture(root)
     return root
-
-
-def test_scenario_projection_hashes_artifacts_and_loads_parent_revision() -> None:
-    initial_dir = REPO_ROOT / "scenarios/hello-world-smoke/v001"
-    initial = load_scenario(initial_dir / "scenario.yaml")
-    comparable = scenario_comparable_config(initial, scenario_dir=initial_dir)
-
-    assert comparable.display_name == initial.display_name
-    assert comparable.task_kind == initial.task_kind
-    assert comparable.delivery_mode == initial.delivery_mode
-    assert comparable.workspace_state == initial.workspace_state
-    assert comparable.starting_conditions == initial.starting_conditions
-    assert comparable.languages == initial.languages
-    assert comparable.evaluation_role == initial.evaluation_role
-    assert comparable.catalog_status == initial.catalog_status
-    assert comparable.family_id == initial.family_id
-    assert comparable.variant_axes == initial.variant_axes
-    assert "category" not in comparable.model_dump()
-
-    assert comparable.prompt_artifacts[initial.prompt.entry]
-    assert comparable.rules_artifacts
-    assert scenario_comparable_config(initial).prompt_artifacts == {}
-
-    revision_dir = REPO_ROOT / "scenarios/skill-benchmark-coding-test/v002"
-    revision = load_scenario(revision_dir / "scenario.yaml")
-    review = scenario_review_contract(revision, scenario_dir=revision_dir)
-
-    assert review.revision_diff is not None
-    assert review.revision_diff.from_revision == "v001"
-    assert review.revision_diff.to_revision == "v002"
-
-
-def test_scenario_projection_rejects_missing_or_mismatched_parent(tmp_path: Path) -> None:
-    initial_dir = REPO_ROOT / "scenarios/hello-world-smoke/v001"
-    initial = load_scenario(initial_dir / "scenario.yaml")
-    before = scenario_comparable_config(initial)
-    other = before.model_copy(update={"scenario": "other"})
-
-    with pytest.raises(ValueError, match="same scenario"):
-        revision_diff_artifact(before, other)
-
-    missing_parent = initial.model_copy(update={"parent_revision": "v999"})
-    revision_dir = tmp_path / "demo/v002"
-    revision_dir.mkdir(parents=True)
-    with pytest.raises(ValueError, match="parent revision scenario is required"):
-        scenario_review_contract(missing_parent, scenario_dir=revision_dir)
 
 
 def test_review_projection_helpers_cover_bounded_and_invalid_values() -> None:
@@ -93,27 +38,34 @@ def test_review_projection_helpers_cover_bounded_and_invalid_values() -> None:
     assert to_ms(12.9) == 12
     assert to_ms(None) is None
     assert to_ms("not-a-timestamp") is None
-    assert _trace_name("tool_call", {"name": "read"}) == "tool read"
-
-    with pytest.raises(ValueError, match="aggregate must be an object"):
-        _summary_objects({"aggregate": [], "sample": {}, "rerun": {}, "findings": []})
-    with pytest.raises(ValueError, match="findings must be an array"):
-        _summary_objects({"aggregate": {}, "sample": {}, "rerun": {}, "findings": [1]})
 
 
-def test_review_projection_rejects_invalid_summary_configuration(
-    synthetic_experiments: Path,
+def test_frozen_fixture_writes_every_projection_byte_for_byte(synthetic_experiments: Path) -> None:
+    frozen = frozen_projections()
+
+    assert len(frozen) == 9
+    for name, text in frozen.items():
+        assert (synthetic_experiments / name / "review-projection.json").read_text() == text
+
+
+def test_scenario_epoch_fixture_relabels_one_experiment_onto_the_policy_mix_problem(
+    tmp_path: Path,
 ) -> None:
-    experiment_dir = next(path for path in synthetic_experiments.iterdir() if path.is_dir())
-    summary = json.loads((experiment_dir / "experiment-summary.json").read_text("utf-8"))
+    written = write_scenario_epoch(tmp_path, policy_mix_scenario="synthetic/policy-mix@1")
 
-    with pytest.raises(ValueError, match="config must be an object"):
-        build_experiment_review_projection(experiment_dir, {"config": []}, [])
+    assert len(written) == 7
+    assert sum(f"__{LEGACY_SCENARIO}__" in path.name for path in written) == 6
+    (relabelled,) = [path for path in written if "__policy-mix__" in path.name]
+    projection = load_experiment_projection(relabelled / "review-projection.json")
+    assert projection.experiment.scenario == "synthetic/policy-mix@1"
+    assert all(run.run.id.startswith(POLICY_MIX_RUN_PREFIX) for run in projection.runs)
 
-    invalid_reasoning = json.loads(json.dumps(summary))
-    invalid_reasoning["config"]["reasoning_effort"] = 7
-    with pytest.raises(ValueError, match="reasoning_effort must be a string or null"):
-        build_experiment_review_projection(experiment_dir, invalid_reasoning, [])
+
+def test_benchmark_fixture_entrypoint_writes_and_reports_usage(tmp_path: Path, capsys) -> None:
+    assert fixture_main([str(tmp_path)]) == 0
+    assert len(capsys.readouterr().out.splitlines()) == 9
+    assert fixture_main([]) == 2
+    assert "usage:" in capsys.readouterr().err
 
 
 def test_merge_review_projections_and_cli(

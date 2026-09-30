@@ -4,25 +4,12 @@ from __future__ import annotations
 
 import click
 
-from raidar.commands import (
-    env_harbor,
-    experiments,
-    harness,
-    matrix_report,
-    quality,
-    reboot,
-    run_experiment,
-    scenario,
-)
+from raidar.commands import env_harbor, harness, quality, workflow
 
 
 def register_commands(main: click.Group) -> None:
-    """Attach all concrete commands to the public CLI group."""
-    run_experiment.register(main)
-    quality.register(main)
-    env_harbor.register(main)
-    experiments.register(main)
+    """Attach the experiment workflow, then the operational commands."""
+    workflow.register(main)
     harness.register(main)
-    scenario.register(main)
-    matrix_report.register(main)
-    reboot.register(main)
+    env_harbor.register(main)
+    quality.register(main)

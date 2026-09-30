@@ -19,10 +19,10 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from raidar.scorers.catalog import ScorerRegistry, tool_lock_for
-from raidar.scorers.rescore import scorer_identity
+from raidar.scorers.catalog import ScorerRegistry
+from raidar.scorers.keys import scorer_identity, store_key
 from raidar.scorers.rescore_config import RescoreConfig
-from raidar.scorers.store import Assessment, AssessmentStore, ScorerIdentity, assessment_key
+from raidar.scorers.store import Assessment, AssessmentStore, ScorerIdentity
 from raidar.scorers.trial_inputs import (
     BundleCache,
     TrialInputError,
@@ -71,13 +71,7 @@ class AssessmentLookup:
         return None
 
     def _key(self, ref: str, config: Mapping[str, object], inputs: Mapping[str, object]) -> str:
-        registration = self._registry.get(ref)
-        return assessment_key(
-            self._identity(ref),
-            config=dict(config),
-            tool_lock=tool_lock_for(registration.manifest),
-            inputs=inputs,
-        )
+        return store_key(self._registry.get(ref), config, inputs, identity=self._identity(ref)).key
 
     def for_trial(
         self,

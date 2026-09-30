@@ -1,4 +1,4 @@
-"""CLI entrypoint for the scenario/experiment orchestrator."""
+"""CLI entrypoint for the Raidar experiment orchestrator."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ if ENV_PATH.exists():
 @click.group()
 @click.version_option(package_name="raidar")
 def main() -> None:
-    """Scenario/experiment orchestrator for harness/model evaluation runs."""
+    """Raidar: lock, run, assess and analyze coding-agent experiments."""
 
 
 set_harness_choices([harness.value for harness in Harness])

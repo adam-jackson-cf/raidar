@@ -1,7 +1,5 @@
 """Tests for Claude Code CLI adapter behavior."""
 
-from pathlib import Path
-
 import pytest
 
 from raidar.agents.adapters.claude_code_cli import ClaudeCodeCliAdapter
@@ -66,22 +64,6 @@ def test_validate_rejects_unsupported_reasoning_effort(monkeypatch: pytest.Monke
         adapter.validate()
 
 
-def test_default_reasoning_effort_is_forwarded_for_supported_models(
-    monkeypatch: pytest.MonkeyPatch,
-):
-    monkeypatch.setenv("CLAUDE_CODE_CLI_PATH", "/usr/local/bin/claude")
-    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
-    adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-6"))
-    adapter.validate()
-
-    assert list(adapter.extra_harbor_args()) == [
-        "--ak",
-        "thinking_mode=adaptive",
-        "--ak",
-        "effort=high",
-    ]
-
-
 @pytest.mark.parametrize(
     "model_name",
     [
@@ -106,9 +88,3 @@ def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch):
     env = adapter.runtime_env()
     assert env["CLAUDE_CODE_CLI_PATH"] == "/usr/local/bin/claude"
     assert "ANTHROPIC_API_KEY" not in env
-
-
-def test_prepare_workspace_creates_claude_trace_dir(tmp_path: Path):
-    adapter = ClaudeCodeCliAdapter(_config("claude-sonnet-4-5"))
-    adapter.prepare_workspace(tmp_path)
-    assert (tmp_path / ".claude").exists()

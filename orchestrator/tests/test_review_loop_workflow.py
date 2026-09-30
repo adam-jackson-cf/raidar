@@ -30,8 +30,11 @@ from raidar.components.review_loop import (
     CHANGES,
     EMPTY_FEEDBACK,
     NO_VERDICT,
+    PROMPT_ARG_BUDGET,
+    STAGE_PROMPTS,
     ReviewLoopAgent,
     final_message,
+    fit_diff,
     parse_verdict,
     render,
 )
@@ -293,6 +296,40 @@ def test_large_diffs_are_truncated_for_the_reviewer(
 
     assert "diff truncated at 40 characters" in ScriptedInnerAgent.prompts[1]
     assert (agent.name(), agent.version()) == ("raidar-review-loop", "1")
+
+
+def test_the_reviewer_diff_leaves_out_what_the_snapshot_leaves_out(tmp_path: Path) -> None:
+    """A ``.venv`` from ``uv run`` filled the pilot reviewer's diff (6.9 MB) and its prompt."""
+    agent, environment = _agent(tmp_path)
+    ScriptedInnerAgent.replies[:] = ["VERDICT: APPROVE"]
+    asyncio.run(agent.setup(cast(BaseEnvironment, environment)))
+    for junk in (".venv/lib/site.py", ".pytest_cache/v/x", "pkg/__pycache__/m.pyc"):
+        (tmp_path / "app" / junk).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / "app" / junk).write_text("junk\n")
+
+    _run(agent, environment)
+
+    review_prompt = ScriptedInnerAgent.prompts[1]
+    assert "feature.py" in review_prompt
+    assert ".venv" not in review_prompt
+    assert ".pytest_cache" not in review_prompt
+
+
+def _quoted(text: str) -> int:
+    return len(shlex.quote(text).encode())
+
+
+def test_the_quoted_review_prompt_fits_one_shell_argument() -> None:
+    """Linux caps one argv string at 128 KiB; a 200k-char diff crashed the reviewer (exit 255)."""
+    tokens = {"TASK": "spec ' é" * 2000, "REASONING_PATH": "/tmp/r.md"}
+    template = STAGE_PROMPTS["review"]
+    diff = ("+ it's a line with 'quotes' and é\n") * 20_000
+    fitted = fit_diff(template, tokens, diff)
+    assert fitted.endswith("... diff truncated to fit the harness prompt limit ...\n")
+    assert _quoted(render(template, {**tokens, "DIFF": fitted})) <= PROMPT_ARG_BUDGET
+    assert PROMPT_ARG_BUDGET < 128 * 1024
+    small = "+ x = 1\n"
+    assert fit_diff(template, tokens, small) == small
 
 
 def test_verdict_parsing_and_final_message_follow_factory_x_loops() -> None:

@@ -70,14 +70,20 @@ def reported_harness_pin(config: AgentConfig) -> str | None:
     in ``kwargs["inner_agent"]``; its pin is the inner agent's. ``None`` only
     for a no-LLM override, which runs no harness.
     """
-    name, kwargs = config.name, config.kwargs
-    inner = kwargs.get("inner_agent")
-    if name is None and isinstance(inner, dict):
-        name, kwargs = inner.get("name"), inner.get("kwargs") or {}
+    name, kwargs = _native_agent(config)
     if name not in HARBOR_AGENT_NAMES.values():
         return None
     version = kwargs.get("version")
     return str(version) if version is not None else None
+
+
+def _native_agent(config: AgentConfig) -> tuple[str | None, dict[str, object]]:
+    """(name, kwargs) of the native harness agent, looking inside a workflow wrapper."""
+    name, kwargs = config.name, config.kwargs
+    inner = kwargs.get("inner_agent")
+    if name is None and isinstance(inner, dict):
+        name, kwargs = inner.get("name"), inner.get("kwargs") or {}
+    return name, kwargs
 
 
 def with_host_auth(config: AgentConfig, harness: Harness) -> AgentConfig:
@@ -85,8 +91,11 @@ def with_host_auth(config: AgentConfig, harness: Harness) -> AgentConfig:
 
     Only the file path is passed (presence-checked); the credential itself is
     never read here. Without a session file Harbor falls back to OPENAI_API_KEY.
+    A workflow wrapper (review-loop@1) gets the same env: it hands its env to
+    every inner session, so reviewer and fixer sessions authenticate too.
     """
-    if config.name != HARBOR_AGENT_NAMES[Harness.CODEX_CLI] or harness is not Harness.CODEX_CLI:
+    name, _ = _native_agent(config)
+    if name != HARBOR_AGENT_NAMES[Harness.CODEX_CLI] or harness is not Harness.CODEX_CLI:
         return config
     auth = resolve_codex_auth()
     if auth.resolved_mode != "chatgpt" or auth.auth_json_path is None:

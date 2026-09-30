@@ -17,8 +17,9 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from raidar.scorers.builtin_manifests import CODE_QUALITY
-from raidar.scorers.catalog import ScorerRegistry, tool_lock_for
-from raidar.scorers.rescore import assess, scorer_identity
+from raidar.scorers.catalog import ScorerRegistry
+from raidar.scorers.keys import store_key
+from raidar.scorers.rescore import assess
 from raidar.scorers.rescore_config import RescoreConfig
 from raidar.scorers.sdk.context import AssessContext, StepInputs
 from raidar.scorers.sdk.result import (
@@ -31,7 +32,7 @@ from raidar.scorers.sdk.result import (
     transition_subject,
 )
 from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.store import Assessment, AssessmentStore, assessment_key
+from raidar.scorers.store import Assessment, AssessmentStore
 from raidar.scorers.trial_inputs import context_inputs, load_trial_context
 
 MEASURED_SCORERS = ("correctness@1", "resource-usage@1")
@@ -150,18 +151,18 @@ def store_assessments(
     for ref in MEASURED_SCORERS:
         scorer_ctx = replace(ctx, config=dict(settings.scorers.get(ref, {})))
         assess(store, registry.get(ref), scorer_ctx, trial=trial_dir.name)
-    registration = registry.get(CODE_QUALITY.ref)
-    config = dict(settings.scorers.get(CODE_QUALITY.ref, {}))
-    identity = scorer_identity(registration)
-    tool_lock = tool_lock_for(registration.manifest)
-    inputs = context_inputs(ctx)
+    parts = store_key(
+        registry.get(CODE_QUALITY.ref),
+        settings.scorers.get(CODE_QUALITY.ref, {}),
+        context_inputs(ctx),
+    )
     store.put(
         Assessment(
-            key=assessment_key(identity, config=config, tool_lock=tool_lock, inputs=inputs),
-            scorer=identity,
-            config=config,
-            tool_lock=tool_lock,
-            inputs=inputs,
+            key=parts.key,
+            scorer=parts.identity,
+            config=parts.config,
+            tool_lock=parts.tool_lock,
+            inputs=parts.inputs,
             result=quality_result(ctx, plan),
         )
     )

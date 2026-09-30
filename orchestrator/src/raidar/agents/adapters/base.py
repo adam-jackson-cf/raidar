@@ -1,7 +1,9 @@
 """Base interface for harness adapters.
 
-Adapters encapsulate harness-specific validation, workspace preparation,
-model compatibility checks, and Harbor argument generation.
+Adapters own each harness's model support table (which ``raidar validate``
+checks agent entries against) and its host-side credential and CLI checks
+(``raidar harness validate``). Trials themselves run Harbor's installed agents
+(``raidar.execution.agent_config``).
 """
 
 from __future__ import annotations
@@ -9,7 +11,7 @@ from __future__ import annotations
 import os
 import shutil
 import sys
-from collections.abc import Iterable, Mapping
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -99,7 +101,6 @@ def _missing_required_group(
 class HarnessAdapter:
     """Base adapter contract for all harness integrations."""
 
-    terminal_bench_dataset = "terminal-bench@2.0"
     CLI_ENV_VAR: str = ""
     DEFAULT_BINARY: str = ""
 
@@ -117,9 +118,6 @@ class HarnessAdapter:
     # ------------------------------------------------------------------
     def validate(self) -> None:
         """Validate configuration or environment prior to execution."""
-
-    def prepare_workspace(self, workspace: Path) -> None:
-        """Allow adapters to mutate the workspace before Harbor runs."""
 
     def runtime_env(self) -> dict[str, str]:
         """Extra environment variables required for the harness runtime."""
@@ -209,59 +207,12 @@ class HarnessAdapter:
         return self._cli_path
 
     # ------------------------------------------------------------------
-    # Harbor command wiring
+    # Harbor identity
     # ------------------------------------------------------------------
     def harbor_harness(self) -> str:
         """Return the Harbor harness identifier passed through Harbor's agent flag."""
         return self.config.harness.value
 
-    def harbor_harness_import_path(self) -> str | None:
-        """Optional Harbor import path for custom repository-local harnesses."""
-        return None
-
     def model_argument(self) -> str:
         """Render the model argument passed to Harbor."""
         return self.config.model.qualified_name
-
-    def extra_harbor_args(self) -> Iterable[str]:
-        """Adapters can append additional Harbor CLI flags."""
-        return []
-
-    def build_harbor_command(
-        self,
-        task_path: Path | None = None,
-        job_name: str | None = None,
-        jobs_dir: Path | None = None,
-    ) -> list[str]:
-        """Construct the Harbor CLI command for this adapter."""
-        cmd: list[str] = [
-            harbor_executable(),
-            "run",
-        ]
-
-        if task_path is not None:
-            cmd.extend(["--path", str(task_path)])
-        else:
-            cmd.extend(["-d", self.terminal_bench_dataset, "-l", "1"])
-
-        if job_name:
-            cmd.extend(["--job-name", job_name])
-        if jobs_dir is not None:
-            cmd.extend(["--jobs-dir", str(jobs_dir)])
-
-        # Harbor >=0.23 folds custom import paths (module:Class) into --agent.
-        import_path = self.harbor_harness_import_path()
-        cmd.extend(["--agent", import_path or self.harbor_harness()])
-
-        cmd.extend(
-            [
-                "--quiet",
-                "--no-delete",
-                "--n-concurrent",
-                "1",
-                "-m",
-                self.model_argument(),
-                *self.extra_harbor_args(),
-            ]
-        )
-        return cmd

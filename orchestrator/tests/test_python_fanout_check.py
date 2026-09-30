@@ -43,28 +43,28 @@ def test_counts_submodule_imports_without_hiding_grouped_imports(tmp_path: Path)
     fanout = _load_fanout_module()
     _git(tmp_path, "init")
     package_root = tmp_path / "orchestrator" / "src" / "raidar"
-    (package_root / "runtime").mkdir(parents=True)
+    (package_root / "sample").mkdir(parents=True)
     (package_root / "__init__.py").write_text("", encoding="utf-8")
-    (package_root / "runtime" / "__init__.py").write_text("", encoding="utf-8")
-    (package_root / "runtime" / "artifacts.py").write_text("", encoding="utf-8")
-    (package_root / "runtime" / "workspace.py").write_text("", encoding="utf-8")
-    current_path = package_root / "runtime" / "pipeline.py"
+    (package_root / "sample" / "__init__.py").write_text("", encoding="utf-8")
+    (package_root / "sample" / "artifacts.py").write_text("", encoding="utf-8")
+    (package_root / "sample" / "workspace.py").write_text("", encoding="utf-8")
+    current_path = package_root / "sample" / "pipeline.py"
     current_path.write_text(
-        "from raidar.runtime import artifacts, workspace\n",
+        "from raidar.sample import artifacts, workspace\n",
         encoding="utf-8",
     )
     current = fanout.PythonFile(
         path=current_path,
-        relpath="orchestrator/src/raidar/runtime/pipeline.py",
-        module="raidar.runtime.pipeline",
+        relpath="orchestrator/src/raidar/sample/pipeline.py",
+        module="raidar.sample.pipeline",
         is_package=False,
     )
     known_modules = {
         "raidar",
-        "raidar.runtime",
-        "raidar.runtime.artifacts",
-        "raidar.runtime.workspace",
-        "raidar.runtime.pipeline",
+        "raidar.sample",
+        "raidar.sample.artifacts",
+        "raidar.sample.workspace",
+        "raidar.sample.pipeline",
     }
 
     imports = fanout.imported_modules(
@@ -74,7 +74,7 @@ def test_counts_submodule_imports_without_hiding_grouped_imports(tmp_path: Path)
         known_modules=known_modules,
     )
 
-    assert imports == {"raidar.runtime.artifacts", "raidar.runtime.workspace"}
+    assert imports == {"raidar.sample.artifacts", "raidar.sample.workspace"}
 
 
 def test_architectural_dependencies_exclude_stdlib_but_keep_third_party(

@@ -9,15 +9,13 @@ rendering from their persisted projections. ``merge`` combines both and is the
 
 from raidar.review_projection.legacy import (
     EXPERIMENT_PROJECTION_FILENAME,
-    build_experiment_review_projection,
-    persist_experiment_review_projection,
+    load_experiment_projections,
 )
 from raidar.review_projection.merge import main, merge_review_projections
 
 __all__ = [
     "EXPERIMENT_PROJECTION_FILENAME",
-    "build_experiment_review_projection",
+    "load_experiment_projections",
     "main",
     "merge_review_projections",
-    "persist_experiment_review_projection",
 ]

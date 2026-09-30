@@ -111,6 +111,7 @@ class SampleSizeBasis(AnalysisModel):
 class ReportSettings(AnalysisModel):
     source: str = "caller"
     pinned_by_lock: bool = False
+    overridden: tuple[str, ...] = ()
     changed_from_defaults: tuple[str, ...] = ()
     min_pairs: int
     max_exclusion_fraction: float
@@ -247,6 +248,8 @@ def _arm_summary(arm: str, inputs: AnalysisInputs) -> ArmSummary:
 def _settings_out(settings: Settings) -> ReportSettings:
     return ReportSettings(
         source=settings.source,
+        pinned_by_lock=settings.pinned_by_lock,
+        overridden=settings.overridden,
         changed_from_defaults=settings.changed_from_defaults(),
         min_pairs=settings.min_pairs,
         max_exclusion_fraction=settings.max_exclusion_fraction,

@@ -14,8 +14,9 @@ every exclusion is counted by cause:
 Verdicts (memo §2.3), in precedence order:
 
 1. ``insufficient``: fewer pairs than the minimum, or the excluded share of
-   planned slots above the limit (memo §2.3 means both to be pre-registered;
-   ``Settings.source`` records where they came from);
+   planned slots above the limit (memo §2.3: both are pre-registered, pinned
+   by the lock's ``analysis`` block; ``Settings.origin`` says whether a value
+   came from the lock, a command-line override or the default);
 2. ``inconclusive``: the 95% CI spans 0 (binary outcomes: exact McNemar
    p > alpha);
 3. ``improved`` / ``worse``: the CI excludes 0, read through the metric's
@@ -60,6 +61,9 @@ from raidar.analysis.stats import (
     t_interval,
 )
 from raidar.scorers.sdk.manifest import Direction
+from raidar.spec.schema import DEFAULT_ALPHA as DEFAULT_ALPHA
+from raidar.spec.schema import DEFAULT_MAX_EXCLUSION_FRACTION as DEFAULT_MAX_EXCLUSION_FRACTION
+from raidar.spec.schema import DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS
 
 AGGREGATE = "*"
 
@@ -71,19 +75,15 @@ class Verdict(StrEnum):
     INSUFFICIENT = "insufficient"
 
 
-DEFAULT_MIN_PAIRS = 5
-DEFAULT_MAX_EXCLUSION_FRACTION = 0.2
-DEFAULT_ALPHA = 0.05
-
-
 @dataclass(frozen=True)
 class Settings:
     """Verdict thresholds and resampling settings; all of them are echoed into the report.
 
-    ``source`` says where the thresholds came from. They are meant to be
-    pre-registered (memo §2.3); until the experiment spec carries them, the
-    report lists every threshold that differs from the documented default so a
-    post-hoc change is visible.
+    The thresholds are pre-registered (memo §2.3): ``raidar.analysis.thresholds``
+    reads them from the lock's ``analysis`` block (``pinned_by_lock``) and
+    names each one a command-line option replaced (``overridden``). ``source``
+    summarises that; the report also lists every value that differs from the
+    documented default, so a post-hoc change is visible.
     """
 
     min_pairs: int = DEFAULT_MIN_PAIRS
@@ -93,6 +93,16 @@ class Settings:
     seed: int = 0
     min_effects: Mapping[str, float] = field(default_factory=dict)
     source: str = "caller"
+    pinned_by_lock: bool = False
+    overridden: tuple[str, ...] = ()
+
+    def origin(self, name: str) -> str:
+        """Where threshold ``name`` came from, for verdict reasons."""
+        if name in self.overridden:
+            return "command-line override of the lock"
+        if self.pinned_by_lock:
+            return "pinned by the lock"
+        return "not pinned by a lock"
 
     def changed_from_defaults(self) -> tuple[str, ...]:
         defaults = {
@@ -319,7 +329,7 @@ def decide(
     """The verdict and why, in the documented precedence."""
     if summary.n < settings.min_pairs:
         return Verdict.INSUFFICIENT, (
-            f"{summary.n} pairs < pre-registered minimum {settings.min_pairs}"
+            f"{summary.n} pairs < minimum {settings.min_pairs} ({settings.origin('min_pairs')})"
         )
     if exclusions.fraction > settings.max_exclusion_fraction:
         return Verdict.INSUFFICIENT, (

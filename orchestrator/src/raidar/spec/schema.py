@@ -152,11 +152,31 @@ class AssessmentSpec(SpecModel):
         return self
 
 
+DEFAULT_MIN_PAIRS = 5
+DEFAULT_MAX_EXCLUSION_FRACTION = 0.2
+DEFAULT_ALPHA = 0.05
+VERDICT_THRESHOLDS = ("min_pairs", "max_exclusion_fraction", "alpha", "min_effects")
+"""The ``analysis`` fields the lock pins before any data is seen (memo §2.3)."""
+
+PositiveFiniteFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
+
+
 class AnalysisSpec(SpecModel):
+    """Arm design plus the pre-registered verdict thresholds ``raidar analyze`` reads.
+
+    ``min_effects`` maps an outcome metric id to its smallest effect of
+    interest for the sample-size projection; ``raidar.spec.validation`` checks
+    the metric ids.
+    """
+
     baseline_arm: Identifier
     blocks: int = Field(gt=0)
     seed: int = Field(ge=0)
     concurrency: int = Field(default=1, gt=0)
+    min_pairs: int = Field(default=DEFAULT_MIN_PAIRS, ge=2)
+    max_exclusion_fraction: float = Field(default=DEFAULT_MAX_EXCLUSION_FRACTION, ge=0.0, le=1.0)
+    alpha: float = Field(default=DEFAULT_ALPHA, gt=0.0, lt=1.0)
+    min_effects: dict[str, PositiveFiniteFloat] = Field(default_factory=dict)
 
 
 FactorNoun = Literal[

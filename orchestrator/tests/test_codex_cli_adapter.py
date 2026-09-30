@@ -10,8 +10,6 @@ from raidar.agents.adapters.factory import resolve_adapter
 from raidar.agents.config import AgentSpec, Harness, ModelTarget
 from raidar.codex_auth import CODEX_AUTH_MODE_ENV
 
-CODEX_HARBOR_AGENT = "raidar.agents.harbor_agents.cli_agents:CodexCliHarborAgent"
-
 
 def _config(
     model: str,
@@ -74,9 +72,9 @@ def test_validate_accepts_file_backed_chatgpt_auth(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
-    assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
+    assert adapter.harbor_harness() == "codex"
     assert adapter.credential_file_sources() == {"CODEX_AUTH_JSON": auth_path}
-    assert "PYTHONPATH" in adapter.runtime_env()
+    assert adapter.runtime_env() == {"CODEX_CLI_PATH": "/usr/local/bin/codex"}
 
 
 def test_auto_mode_prefers_chatgpt_over_api_key(
@@ -92,7 +90,7 @@ def test_auto_mode_prefers_chatgpt_over_api_key(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "chatgpt"
-    assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
+    assert adapter.harbor_harness() == "codex"
     assert adapter.credential_environment_sources() == {}
     assert adapter.credential_file_sources() == {"CODEX_AUTH_JSON": auth_path}
 
@@ -110,7 +108,7 @@ def test_api_mode_uses_api_key_even_when_auth_file_exists(
     adapter.validate()
 
     assert adapter.execution_metadata()["auth_mode"] == "api"
-    assert adapter.harbor_harness_import_path() == CODEX_HARBOR_AGENT
+    assert adapter.harbor_harness() == "codex"
     assert adapter.credential_environment_sources() == {"OPENAI_API_KEY": "test-key"}
     assert adapter.credential_file_sources() == {}
 
@@ -164,16 +162,6 @@ def test_aliases_requested_codex_models(
     adapter = CodexCliAdapter(_config(model_name, reasoning_effort=reasoning_effort))
     adapter.validate()
     assert adapter.model_argument() == model_argument
-    if reasoning_effort:
-        assert list(adapter.extra_harbor_args()) == ["--ak", f"reasoning_effort={reasoning_effort}"]
-    else:
-        assert list(adapter.extra_harbor_args()) == []
-
-
-def test_prepare_workspace_creates_codex_trace_dir(tmp_path: Path) -> None:
-    adapter = CodexCliAdapter(_config("gpt-5.4", reasoning_effort="high"))
-    adapter.prepare_workspace(tmp_path)
-    assert (tmp_path / ".codex").exists()
 
 
 @pytest.mark.parametrize("model_name", ["gpt-5.6-terra", "gpt-5.6-luna", "gpt-6-luna"])

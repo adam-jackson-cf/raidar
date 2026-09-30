@@ -30,7 +30,7 @@ import json
 import os
 import re
 from collections import defaultdict
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -55,6 +55,8 @@ class ExperimentInfo:
     baseline_arm: str | None
     headline_policy: str | None
     note: str | None = None
+    analysis: Mapping[str, Any] | None = None
+    """The lock's ``spec.analysis`` block (verdict thresholds), when the lock was read."""
 
 
 @dataclass(frozen=True)
@@ -98,10 +100,12 @@ class TrialSource:
 def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
     spec = lock.get("spec") or {}
     headline = lock.get("headline_policy") or {}
+    analysis = spec.get("analysis") or {}
     return ExperimentInfo(
         lock_sha256=executed,
-        baseline_arm=(spec.get("analysis") or {}).get("baseline_arm"),
+        baseline_arm=analysis.get("baseline_arm"),
         headline_policy=headline.get("ref") if isinstance(headline, dict) else None,
+        analysis=analysis,
     )
 
 

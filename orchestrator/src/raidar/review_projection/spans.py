@@ -1,4 +1,4 @@
-"""Span assembly shared by the scenario-epoch and experiment-epoch producers."""
+"""Span assembly for the experiment-epoch review projection producer."""
 
 from __future__ import annotations
 

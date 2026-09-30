@@ -29,8 +29,9 @@ from pathlib import Path
 from typing import Any
 
 from raidar.oracle.regrade import RegradeError, trial_dirs
-from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, tool_lock_for
+from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry
 from raidar.scorers.inventory import InventoryPolicy
+from raidar.scorers.keys import store_key
 from raidar.scorers.sdk.context import (
     AssessContext,
     AwaitingAnswersScorer,
@@ -39,13 +40,7 @@ from raidar.scorers.sdk.context import (
 )
 from raidar.scorers.sdk.result import AssessResult, RunStats
 from raidar.scorers.sdk.validation import validate_result, validate_scorer_set
-from raidar.scorers.store import (
-    Assessment,
-    AssessmentStore,
-    PutOutcome,
-    ScorerIdentity,
-    assessment_key,
-)
+from raidar.scorers.store import Assessment, AssessmentStore, PutOutcome
 from raidar.scorers.trial_inputs import (
     BundleCache,
     TrialInputError,
@@ -72,17 +67,6 @@ class AssessmentRecord:
     key: str
     outcome: RescoreOutcome
     path: Path
-
-
-def scorer_identity(registration: ScorerRegistration) -> ScorerIdentity:
-    return ScorerIdentity.model_validate(
-        {
-            "ref": registration.manifest.ref,
-            "manifest_digest": registration.manifest.digest(),
-            "implementation_digest": registration.implementation_digest(),
-            "jev_policies": registration.jev_policy_bindings(),
-        }
-    )
 
 
 def effective_config(registration: ScorerRegistration, ctx: AssessContext) -> dict[str, Any]:
@@ -132,11 +116,8 @@ def assess(
     jev_replay_only: bool = False,
 ) -> AssessmentRecord:
     """Store (or reuse, or replay-verify) one scorer's Assessment of one trajectory."""
-    identity = scorer_identity(registration)
-    config = dict(ctx.config)
-    tool_lock = tool_lock_for(registration.manifest)
-    inputs = context_inputs(ctx)
-    key = assessment_key(identity, config=config, tool_lock=tool_lock, inputs=inputs)
+    parts = store_key(registration, ctx.config, context_inputs(ctx))
+    identity, key = parts.identity, parts.key
     stored = None if replay else store.get(key)
     if stored is not None and not stored.provisional:
         return AssessmentRecord(
@@ -151,9 +132,9 @@ def assess(
     assessment = Assessment(
         key=key,
         scorer=identity,
-        config=config,
-        tool_lock=tool_lock,
-        inputs=inputs,
+        config=parts.config,
+        tool_lock=parts.tool_lock,
+        inputs=parts.inputs,
         result=result,
         raw_payloads=produced.raw_payloads,
         provisional=produced.provisional,

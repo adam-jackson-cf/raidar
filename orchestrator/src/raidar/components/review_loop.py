@@ -35,6 +35,7 @@ from harbor.models.trial.config import AgentConfig
 from pydantic import BaseModel, ConfigDict, Field
 
 from raidar.components.evidence import read_jsonl
+from raidar.oracle.snapshot import SNAPSHOT_EXCLUDES
 
 APPROVE_LINE = "VERDICT: APPROVE"
 CHANGES_LINE = "VERDICT: CHANGES"
@@ -45,6 +46,11 @@ LOOP_DIR_NAME = "review-loop"
 LOOP_RECORD = "review-loop.json"
 DEFAULT_WORK_DIR = "/tmp/raidar-review"
 MAX_DIFF_CHARS = 200_000
+# A harness session gets its prompt as one shell-quoted argument of a ``bash -c``
+# command, and Linux caps a single argument at MAX_ARG_STRLEN (128 KiB): a larger
+# prompt fails with "argument list too long" (exit 255). The quoted review prompt
+# is kept under this budget, leaving room for the harness's own command text.
+PROMPT_ARG_BUDGET = 112 * 1024
 # Files in /logs/agent that belong to the step, not to one stage.
 STEP_LEVEL_LOGS = ("raidar-reset.json", "raidar-components.json", "raidar-components")
 USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
@@ -111,6 +117,26 @@ def parse_verdict(text: str) -> tuple[str, str]:
         return APPROVE, ""
     feedback = text[asked + len(CHANGES_LINE) :].strip()
     return (CHANGES, feedback) if feedback else (EMPTY_FEEDBACK, "")
+
+
+def _quoted_size(text: str) -> int:
+    """Bytes ``text`` takes inside a single-quoted shell word (' becomes '"'"')."""
+    return len(text.encode()) + 4 * text.count("'")
+
+
+def fit_diff(template: str, tokens: dict[str, str], diff: str) -> str:
+    """``diff``, cut so the rendered prompt stays within ``PROMPT_ARG_BUDGET``."""
+    budget = PROMPT_ARG_BUDGET - _quoted_size(render(template, {**tokens, "DIFF": ""})) - 2
+    if _quoted_size(diff) <= budget:
+        return diff
+    marker = "\n... diff truncated to fit the harness prompt limit ...\n"
+    budget -= _quoted_size(marker)
+    used = 0
+    for index, char in enumerate(diff):
+        used += _quoted_size(char)
+        if used > budget:
+            return diff[:index] + marker
+    return diff  # pragma: no cover - the loop returns once over budget
 
 
 def render(template: str, tokens: dict[str, str]) -> str:
@@ -285,7 +311,8 @@ class ReviewLoopAgent(BaseAgent):
             if work.error is not None:
                 state.termination_reason, state.error = "stage_failed", work.error
                 return
-            tokens["DIFF"] = await self._capture(environment, round_no) or "(no diff)"
+            diff = await self._capture(environment, round_no) or "(no diff)"
+            tokens["DIFF"] = fit_diff(STAGE_PROMPTS["review"], tokens, diff)
             review = await self._stage(environment, state, "review", round_no, tokens)
             if review.error is not None:
                 state.termination_reason, state.error = "stage_failed", review.error
@@ -426,10 +453,15 @@ class ReviewLoopAgent(BaseAgent):
 
 
 def _tree_copy_command(work_dir: PurePosixPath, tree: str) -> str:
-    """Copy the workspace (the exec working directory) into a comparison tree."""
+    """Copy the workspace (the exec working directory) into a comparison tree.
+
+    It leaves out what the graded snapshot leaves out (``SNAPSHOT_EXCLUDES``):
+    a ``.venv`` from ``uv run`` otherwise filled the reviewer's diff (pilot).
+    """
+    excludes = " ".join(f"--exclude={shlex.quote(name)}" for name in (*SNAPSHOT_EXCLUDES, "*.pyc"))
     return (
-        f"mkdir -p {work_dir}/trees/{tree} && tar --exclude=__pycache__ "
-        f"--exclude='*.pyc' -cf - . | tar -C {work_dir}/trees/{tree} -xf -"
+        f"mkdir -p {work_dir}/trees/{tree} && tar {excludes} "
+        f"-cf - . | tar -C {work_dir}/trees/{tree} -xf -"
     )
 
 

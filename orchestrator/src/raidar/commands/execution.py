@@ -1,15 +1,10 @@
-"""``raidar plan``, ``raidar run EXPERIMENT`` and ``raidar perf check`` (plan WS-D).
-
-``raidar run`` stays backward compatible while the scenario epoch is being
-retired (WS-L): an invocation with ``--scenario``/``-s`` goes to the archived
-scenario runner, anything else runs an ``experiment.yaml``.
-"""
+"""``raidar plan``, ``raidar run EXPERIMENT`` and ``raidar perf check`` (plan WS-D)."""
 
 from __future__ import annotations
 
 import asyncio
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -31,39 +26,11 @@ from raidar.packs.python import load_pack_spec
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
 from raidar.spec.lock import LockError, build_lock, default_lock_path, render_lock
 
-LEGACY_RUN_FLAGS = ("--scenario", "-s")
-
 
 def register(main: click.Group) -> None:
     main.add_command(plan_command)
-    main.add_command(RunDispatch(run_experiment_command, main.commands.get("run")))
+    main.add_command(run_command)
     main.add_command(perf_group)
-
-
-class RunDispatch(click.Command):
-    """``run``: an experiment run, or the archived scenario runner for ``--scenario``."""
-
-    def __init__(self, experiment: click.Command, legacy: click.Command | None) -> None:
-        super().__init__(
-            name="run",
-            help=experiment.help,
-            short_help="Run a locked experiment.yaml (or a legacy --scenario run).",
-        )
-        self.experiment = experiment
-        self.legacy = legacy
-
-    def _target(self, args: Sequence[str]) -> click.Command:
-        legacy = any(arg in LEGACY_RUN_FLAGS or arg.startswith("--scenario=") for arg in args)
-        return self.legacy if legacy and self.legacy is not None else self.experiment
-
-    def make_context(
-        self,
-        info_name: str | None,
-        args: list[str],
-        parent: click.Context | None = None,
-        **extra: Any,
-    ) -> click.Context:
-        return self._target(args).make_context(info_name, args, parent=parent, **extra)
 
 
 def _plan_options(command: Callable[..., Any]) -> Callable[..., Any]:
@@ -206,7 +173,7 @@ def plan_command(as_json: bool, **options: Any) -> None:
     help="Root for run directories (<runs-dir>/<experiment id>/<run id>/).",
 )
 @click.option("--run-id", default=None, help="Run directory name (default: UTC timestamp).")
-def run_experiment_command(runs_dir: Path, run_id: str | None, **options: Any) -> None:
+def run_command(runs_dir: Path, run_id: str | None, **options: Any) -> None:
     """Run a locked experiment.yaml: every selected trial through Harbor."""
     plan, store = _build(options)
     if not plan.selected:

@@ -14,74 +14,58 @@ RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
 RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
 # Shared public workflow defaults.
-SCENARIO ?=
-SCENARIO_DIR ?=
-SCENARIO_REVISION ?=
-NAME ?=
 HARNESS ?=
 PROVIDER ?=
 MODEL ?=
+REASONING_EFFORT ?=
 DEVICE_AUTH ?=
-RUN_COUNT ?= 5
-RUN_PARALLELISM ?= 1
-RERUN_UNSCORED ?= 0
-EVALUATION_PROFILE ?=
-LIMIT ?=
-KEEP_PER_MODEL ?=
-EXPERIMENT_KIND ?= benchmark
 EXPERIMENT ?=
 EXPERIMENT_SET ?=
 LOCK_CHECK ?=
-STARTER_ROOT ?=
-PROMPT_ENTRY ?=
-DIFFICULTY ?=
-CATEGORY ?=
 TIMEOUT_SEC ?=
-TEMPLATE ?=
 
-# Canonical smoke workflow defaults.
-ORCHESTRATOR_SMOKE_SCENARIO := scenarios/hello-world-smoke/v001/scenario.yaml
-ORCHESTRATOR_SMOKE_HARNESS := codex-cli
-ORCHESTRATOR_SMOKE_PROVIDER := openai
-ORCHESTRATOR_SMOKE_MODEL := gpt-5.5
-ORCHESTRATOR_SMOKE_REASONING_EFFORT := low
-ORCHESTRATOR_SMOKE_REPEATS ?= 1
-SMOKE_MATRIX_CONFIG ?= matrices/hello-world-smoke-trio.yaml
+# Experiment-path smoke workflow: examples/smoke/*.yaml are locked under .tmp/smoke with
+# the target's overrides and run through Harbor (Docker; OrbStack by default).
+SMOKE_EXPERIMENT ?= examples/smoke/experiment.yaml
+SMOKE_AGENTS_EXPERIMENT ?= examples/smoke/agents.experiment.yaml
+SMOKE_RUNS_DIR ?= $(CURDIR)/runs
+SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
+SMOKE_BLOCKS ?= 1
+SMOKE_CONCURRENCY ?= 1
+# smoke-matrix arms: one per harness the Python pack bakes in (examples/smoke/agents.experiment.yaml).
 SMOKE_MATRIX_SELECTOR ?=
-SMOKE_MATRIX_CONFIG_codex := matrices/hello-world-smoke-codex-gpt55.yaml
-SMOKE_MATRIX_CONFIG_gemini := matrices/hello-world-smoke-gemini.yaml
-SMOKE_MATRIX_CONFIG_claude := matrices/hello-world-smoke-claude.yaml
-SMOKE_MATRIX_SELECTORS := codex gemini claude
+SMOKE_MATRIX_SELECTORS := codex claude
 ifneq ($(strip $(SMOKE_MATRIX_SELECTOR)),)
+ifeq ($(SMOKE_MATRIX_SELECTOR),gemini)
+$(error SMOKE_MATRIX_SELECTOR 'gemini' is unavailable: the Python pack bakes in only codex-cli and claude-code)
+endif
 ifeq ($(filter $(SMOKE_MATRIX_SELECTOR),$(SMOKE_MATRIX_SELECTORS)),)
 $(error Unknown SMOKE_MATRIX_SELECTOR '$(SMOKE_MATRIX_SELECTOR)'; expected one of: $(SMOKE_MATRIX_SELECTORS))
 endif
-SMOKE_MATRIX_EFFECTIVE_CONFIG := $(SMOKE_MATRIX_CONFIG_$(SMOKE_MATRIX_SELECTOR))
-else
-SMOKE_MATRIX_EFFECTIVE_CONFIG := $(SMOKE_MATRIX_CONFIG)
 endif
-AGENT_SMOKE_SCENARIO ?= $(ORCHESTRATOR_SMOKE_SCENARIO)
-AGENT_SMOKE_REPEATS ?= 1
-AGENT_SMOKE_REPEAT_PARALLEL ?= 1
-AGENT_SMOKE_RERUN_UNSCORED ?= 0
+# agent-smoke: the smoke experiment with its one agent replaced. Harness versions must equal
+# the Python pack pins (orchestrator/src/raidar/packs/python/pack.yaml); planning refuses others.
+AGENT_SMOKE_HARNESS ?= codex-cli
+AGENT_SMOKE_PROVIDER ?= openai
+AGENT_SMOKE_MODEL ?= gpt-6-luna
 AGENT_SMOKE_REASONING_EFFORT ?= low
-AGENT_SMOKE_HARNESS ?= $(ORCHESTRATOR_SMOKE_HARNESS)
-AGENT_SMOKE_PROVIDER ?= $(ORCHESTRATOR_SMOKE_PROVIDER)
-AGENT_SMOKE_MODEL ?= $(ORCHESTRATOR_SMOKE_MODEL)
-AGENT_SMOKE_EFFECTIVE_HARNESS = $(if $(HARNESS),$(HARNESS),$(AGENT_SMOKE_HARNESS))
-AGENT_SMOKE_EFFECTIVE_PROVIDER = $(if $(PROVIDER),$(PROVIDER),$(AGENT_SMOKE_PROVIDER))
-AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
+AGENT_SMOKE_VERSION_codex-cli := 0.156.1
+AGENT_SMOKE_VERSION_claude-code := 2.1.285
+AGENT_SMOKE_EFFECTIVE_HARNESS = $(or $(HARNESS),$(AGENT_SMOKE_HARNESS))
+AGENT_SMOKE_EFFECTIVE_PROVIDER = $(or $(PROVIDER),$(AGENT_SMOKE_PROVIDER))
+AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL))
+AGENT_SMOKE_EFFECTIVE_REASONING = $(or $(REASONING_EFFORT),$(AGENT_SMOKE_REASONING_EFFORT))
+AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(HARNESS_VERSION),$(AGENT_SMOKE_VERSION_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
 
 .PHONY: help \
-	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
-	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke \
-	experiment-validate experiment-lock experiment-run matrix-run \
-	experiment-plan experiment-execute perf-check perf-fixture \
+	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check \
+	experiment-validate experiment-lock experiment-plan experiment-execute perf-check perf-fixture \
 	problem-import problem-validate \
-	experiments-list experiments-prune assess-regrade experiment-analyze jev-shadow-rubric \
+	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels \
 	pack-info pack-build pack-audit pack-tool-provision \
 	component-probe-trials \
+	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke \
 	benchmark-fixture-synthetic review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	review-surface-quality-data \
@@ -95,22 +79,29 @@ define require_var
 endef
 
 help:
-	@echo "Public workflow surface"
+	@echo "Public workflow surface (experiment -> lock -> run -> assess -> analyze -> review)"
 	@echo ""
-	@echo "Environment and validation:"
+	@echo "Environment:"
 	@echo "  make env-setup                                         Bootstrap the orchestrator environment"
 	@echo "  make harness-list                                      List supported harnesses and model coverage"
-	@echo "  make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.4-mini"
-	@echo "                                                        Validate one AgentSpec candidate"
+	@echo "  make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-6-luna [REASONING_EFFORT=low]"
+	@echo "                                                        Check one harness/model pairing and its host credentials"
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
-	@echo "  make harbor-cleanup                                    Cleanup stale Harbor processes and containers"
-	@echo "  make scenario-list                                     List available scenarios and revisions"
-	@echo "  make scenario-init                                     ARCHIVED: refuses (scenario epoch is read-only; see docs/reboot/)"
-	@echo "  make scenario-clone-revision                           ARCHIVED: refuses (scenario epoch is read-only; see docs/reboot/)"
-	@echo "  make scenario-info SCENARIO_DIR=scenarios/homepage-implementation [SCENARIO_REVISION=v001]"
-	@echo "                                                        Inspect a scenario and show revision yaml paths"
-	@echo "  make scenario-validate SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml"
-	@echo "                                                        Validate a scenario contract"
+	@echo "  make harbor-cleanup [RUN=<run-dir>] [DRY_RUN=1]        Remove trial environments a stopped run left behind"
+	@echo "  make quality                                           Run repo quality gates"
+	@echo ""
+	@echo "Problems and runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
+	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
+	@echo "                                                        Import a pinned problem (task + host-only oracle) into problems/"
+	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
+	@echo "                                                        Oracle-validate an imported problem and write its report"
+	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
+	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
+	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned harnesses, no scorer tools or browsers"
+	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
+	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex-cli/gpt-6-luna low trials proving every built-in component's discovery probe"
+	@echo ""
+	@echo "Experiments:"
 	@echo "  make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml [EXPERIMENT_SET='analysis.blocks=3']"
 	@echo "                                                        Validate an experiment.yaml (schema, references, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml [LOCK_CHECK=1]"
@@ -119,35 +110,14 @@ help:
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
 	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [RUNS_DIR=runs] [RUN_ID=]"
 	@echo "                                                        Run a locked experiment through Harbor; writes attempts, validity and N1 phases"
-	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10]        Fail if any N1 phase p95 exceeds its accepted budget"
-	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>]            No-LLM fixture experiment (5 blocks x 2 arms) then perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
-	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
-	@echo "                                                        Import a pinned problem (task + host-only oracle) into problems/"
-	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
-	@echo "                                                        Oracle-validate an imported problem and write its report"
-	@echo "  make quality                                           Run repo quality gates"
-	@echo ""
-	@echo "Experiment orchestration:"
-	@echo "  make smoke-dry-run-check                               Print the canonical smoke command shapes used by CI drift checks"
-	@echo "  make orchestrator-smoke                                Run the default orchestrator smoke scenario on codex-cli with openai/gpt-5.5 [low]"
-	@echo "                                                        Override ORCHESTRATOR_SMOKE_REPEATS and RUN_PARALLELISM for repeat smoke"
-	@echo "  make smoke-matrix                                      Run the default hello-world smoke scenario across the smoke trio matrix"
-	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5]"
-	@echo "                                                        Run the canonical agent smoke workflow via public make targets"
-	@echo "  make runtime-stack-scenario-smoke SCENARIO=... HARNESS=codex-cli PROVIDER=openai MODEL=gpt-5.5"
-	@echo "                                                        Run cold+warm scenario smoke and validate persisted runtime stack metadata"
-	@echo "  make experiment-run SCENARIO=scenarios/homepage-implementation/v001/scenario.yaml HARNESS=... PROVIDER=... MODEL=..."
-	@echo "                                                        Run one scenario yaml for one AgentSpec"
-	@echo "  make matrix-run CONFIG=matrices/homepage-v001-codex-oauth.yaml"
-	@echo "                                                        Run a stored matrix definition"
-	@echo "  make experiments-list [EVALUATION_PROFILE=...] [LIMIT=...]"
-	@echo "                                                        List stored experiments and summaries"
-	@echo "  make experiments-prune [KEEP_PER_MODEL=1]"
-	@echo "                                                        Preview artifact pruning decisions"
+	@echo "  make experiment-assess RUN=<run-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
+	@echo "                                                        Score a run's stored trials into an Assessment store (never re-runs agents)"
 	@echo "  make assess-regrade RUN=<trial-or-job-dir> [ORACLE_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
-	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=5] [MAX_EXCLUSION_FRACTION=0.2] [ALPHA=0.05] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
-	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm"
+	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
+	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock; overrides are labelled)"
+	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10]        Fail if any N1 phase p95 exceeds its accepted budget"
+	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>]            No-LLM fixture experiment (5 blocks x 2 arms) then perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
 	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
 	@echo "  make jev-export-labels POLICY=<policy> OUT=<labels.jsonl> [STORE=<assessment-store>] [LABELS=review-surface/data/jev-labels.json]"
@@ -155,15 +125,16 @@ help:
 	@echo "  make jev-import-labels POLICY=<policy> STORE=<assessment-store> LABELS_FILE=<labels.jsonl>"
 	@echo "                                                        Import calibration labels into the store's Jev audit and show enforce readiness"
 	@echo ""
-	@echo "Runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
-	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
-	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
-	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned harnesses, no scorer tools or browsers"
-	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
-	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex-cli/gpt-6-luna low trials proving every built-in component's discovery probe"
+	@echo "Smoke (real agent trials of examples/smoke; locks under .tmp/smoke, runs under runs/):"
+	@echo "  make orchestrator-smoke [SMOKE_BLOCKS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
+	@echo "                                                        One one-shot trial with codex-cli + gpt-6-luna (low), correctness only"
+	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [HARNESS_VERSION=] [TIMEOUT_SEC=]"
+	@echo "                                                        The same smoke with its agent replaced (versions default to the pack pins)"
+	@echo "  make smoke-matrix [SMOKE_MATRIX_SELECTOR=codex|claude] One smoke trial per pack harness (agent is the factor), or one selected arm"
+	@echo "  make smoke-dry-run-check                               Print the smoke command shapes (used by make quality)"
 	@echo ""
 	@echo "Review surface:"
-	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
+	@echo "  make benchmark-fixture-synthetic                       Write the labelled synthetic scenario-epoch fixture into experiments/benchmarks"
 	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
 	@echo "                                                        Write the labelled synthetic experiment-epoch runs + Assessment store"
 	@echo "  make review-surface-data [REVIEW_RUNS_ROOT=<runs-root>...] [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
@@ -202,7 +173,7 @@ pack-tool-provision:
 	@$(RAIDAR) pack provision "$(RUNTIME)" "$(TOOL)"
 
 benchmark-fixture-synthetic:
-	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection.fixture_legacy "$(CURDIR)/experiments/benchmarks"
 
 REVIEW_FIXTURE ?= experiment
 REVIEW_FIXTURE_DIR ?= $(REPO_TMP_DIR)/review-fixture
@@ -285,32 +256,26 @@ codex-auth-setup:
 		$(if $(filter 1 true yes on,$(DEVICE_AUTH)),--device-auth,)
 
 harbor-cleanup:
-	@$(RAIDAR) harbor cleanup
+	@$(PACK_DOCKER_ENV) $(RAIDAR) harbor cleanup $(if $(RUN),--run "$(RUN)",) $(if $(DRY_RUN),--dry-run,)
 
 docker-check:
-	@if ! docker info >/dev/null 2>&1; then \
-		echo "Docker daemon is required for smoke workflows that use Harbor. Start Docker and retry."; \
+	@$(PACK_DOCKER_ENV) if ! docker info >/dev/null 2>&1; then \
+		echo "Docker (context $${DOCKER_CONTEXT}) is required for smoke workflows that use Harbor. Start it and retry."; \
 		exit 1; \
 	fi
 
-scenario-list:
-	@$(RAIDAR) scenario list
+# Scenario-era targets removed at the WS-L cutover (scenarios/ and matrices/ are read-only
+# history). Each refuses with a pointer to the experiment workflow.
+REMOVED_SCENARIO_TARGETS := scenario-list scenario-init scenario-clone-revision scenario-info \
+	scenario-validate experiment-run matrix-run runtime-stack-scenario-smoke \
+	experiments-list experiments-prune
 
-# Scenario epoch archived (reboot Phase 0, task 0.6): scenarios/, matrices/ and
-# experiments/ are read-only history. New scenarios/revisions are refused.
-SCENARIO_EPOCH_ARCHIVED_MSG := Scenario epoch is archived: scenarios/, matrices/ and experiments/ are read-only history and no new scenarios or scenario revisions are accepted. See docs/reboot/requirements.md and docs/reboot/implementation-plan.md.
-
-scenario-init:
-	@echo "Refusing scenario-init: $(SCENARIO_EPOCH_ARCHIVED_MSG)" >&2
+.PHONY: $(REMOVED_SCENARIO_TARGETS)
+$(REMOVED_SCENARIO_TARGETS):
+	@echo "Refusing $@: the scenario/matrix workflow was removed at the reboot cutover (WS-L)." >&2
+	@echo "scenarios/ and matrices/ are read-only history. Author an experiment.yaml instead:" >&2
+	@echo "  make experiment-validate / experiment-lock / experiment-execute (see README.md and make help)." >&2
 	@exit 1
-
-scenario-clone-revision:
-	@echo "Refusing scenario-clone-revision: $(SCENARIO_EPOCH_ARCHIVED_MSG)" >&2
-	@exit 1
-
-scenario-info:
-	$(call require_var,SCENARIO_DIR)
-	@$(RAIDAR) info --scenario "$(if $(SCENARIO_REVISION),$(SCENARIO_DIR)/$(SCENARIO_REVISION),$(SCENARIO_DIR))"
 
 experiment-validate:
 	$(call require_var,EXPERIMENT)
@@ -365,6 +330,15 @@ RUN ?=
 ORACLE_BUNDLE ?=
 REGRADE_OUT ?=
 
+experiment-assess:
+	$(call require_var,RUN)
+	$(call require_var,STORE)
+	$(call require_var,SCORERS)
+	@$(PACK_DOCKER_ENV) $(RAIDAR) assess --rescore "$(if $(wildcard $(RUN)/trials),$(RUN)/trials,$(RUN))" --store "$(STORE)" \
+		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
+		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(REPLAY),--replay,) \
+		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
+
 assess-regrade:
 	$(call require_var,RUN)
 	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(RUN)" --docker-context "$${DOCKER_CONTEXT}" $(if $(ORACLE_BUNDLE),--bundle "$(ORACLE_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
@@ -391,141 +365,49 @@ jev-shadow-rubric:
 	$(call require_var,STORE)
 	@$(RAIDAR) jev shadow-rubric --snapshots "$(SNAPSHOTS)" --store "$(STORE)" $(if $(SPECS),--specs "$(SPECS)",) $(if $(REPLAY_ONLY),--replay-only,) $(if $(WITHIN),--within "$(WITHIN)",) $(if $(TRIAL),--trial "$(TRIAL)",) $(if $(OUT),--output "$(OUT)",)
 
-scenario-validate:
-	$(call require_var,SCENARIO)
-	@$(RAIDAR) scenario validate --scenario "$(SCENARIO)"
+# $(1) experiment file, $(2) lock name under SMOKE_LOCK_DIR, $(3) spec overrides (--set),
+# $(4) trial selection (--arm). The lock and the run see the same overrides.
+define smoke_run
+	@mkdir -p "$(SMOKE_LOCK_DIR)"
+	@$(RAIDAR) lock "$(1)" --output "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3)
+	@$(PACK_DOCKER_ENV) $(RAIDAR) run "$(1)" --lock "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3) $(4) \
+		--concurrency "$(SMOKE_CONCURRENCY)" --runs-dir "$(SMOKE_RUNS_DIR)"
+endef
+
+SMOKE_SETS = --set "analysis.blocks=$(SMOKE_BLOCKS)" \
+	$(if $(TIMEOUT_SEC),--set "protocol.agent_timeout_sec=$(TIMEOUT_SEC)",)
+AGENT_SMOKE_SETS = $(SMOKE_SETS) \
+	--set "agents.0.harness=$(AGENT_SMOKE_EFFECTIVE_HARNESS)" \
+	--set "agents.0.provider=$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" \
+	--set "agents.0.model=$(AGENT_SMOKE_EFFECTIVE_MODEL)" \
+	--set "agents.0.reasoning_effort=$(AGENT_SMOKE_EFFECTIVE_REASONING)" \
+	--set "agents.0.version='$(AGENT_SMOKE_EFFECTIVE_VERSION)'"
 
 smoke-dry-run-check:
-	@$(MAKE) --no-print-directory -n orchestrator-smoke \
-		ORCHESTRATOR_SMOKE_REPEATS="2" \
-		RUN_PARALLELISM="2"
-	@$(MAKE) --no-print-directory -n smoke-matrix \
-		SMOKE_MATRIX_CONFIG="matrices/hello-world-smoke-trio.yaml"
+	@$(MAKE) --no-print-directory -n orchestrator-smoke SMOKE_BLOCKS="2" SMOKE_CONCURRENCY="2"
+	@$(MAKE) --no-print-directory -n smoke-matrix
 	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="codex"
-	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="gemini"
 	@$(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="claude"
+	@! $(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="gemini" \
+		>/dev/null 2>&1
 	@! $(MAKE) --no-print-directory -n smoke-matrix SMOKE_MATRIX_SELECTOR="unknown" \
 		>/dev/null 2>&1
 	@$(MAKE) --no-print-directory -n agent-smoke \
-		HARNESS="$(ORCHESTRATOR_SMOKE_HARNESS)" \
-		PROVIDER="$(ORCHESTRATOR_SMOKE_PROVIDER)" \
-		MODEL="$(ORCHESTRATOR_SMOKE_MODEL)" \
-		AGENT_SMOKE_REASONING_EFFORT="$(ORCHESTRATOR_SMOKE_REASONING_EFFORT)" \
-		AGENT_SMOKE_REPEATS="2" \
-		AGENT_SMOKE_REPEAT_PARALLEL="2"
+		HARNESS="codex-cli" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
+		TIMEOUT_SEC="300"
 
 orchestrator-smoke: docker-check
-	@$(RAIDAR) run \
-		--scenario "$(ORCHESTRATOR_SMOKE_SCENARIO)" \
-		--harness "$(ORCHESTRATOR_SMOKE_HARNESS)" \
-		--provider "$(ORCHESTRATOR_SMOKE_PROVIDER)" \
-		--model "$(ORCHESTRATOR_SMOKE_MODEL)" \
-		--reasoning-effort "$(ORCHESTRATOR_SMOKE_REASONING_EFFORT)" \
-		--repeats "$(ORCHESTRATOR_SMOKE_REPEATS)" \
-		--repeat-parallel "$(RUN_PARALLELISM)" \
-		--rerun-unscored "$(RERUN_UNSCORED)" \
-		--experiment-kind "operational-smoke" \
-		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
-
-smoke-matrix: docker-check
-	$(RAIDAR) matrix \
-		--config "$(SMOKE_MATRIX_EFFECTIVE_CONFIG)" \
-		--experiment-kind "operational-smoke"
+	$(call smoke_run,$(SMOKE_EXPERIMENT),orchestrator-smoke,$(SMOKE_SETS),)
 
 agent-smoke: docker-check
-	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_HARNESS)" ] || [ -z "$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" ] || [ -z "$(AGENT_SMOKE_EFFECTIVE_MODEL)" ]; then \
-		echo "Missing agent smoke defaults: set HARNESS, PROVIDER, and MODEL"; \
+	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_VERSION)" ]; then \
+		echo "No pack pin for harness '$(AGENT_SMOKE_EFFECTIVE_HARNESS)'; set HARNESS_VERSION"; \
 		exit 1; \
 	fi
-	@start_time=$$(python3 -c 'import time; print(time.perf_counter())'); \
-	pre_experiment_sec=$$(python3 -c "import time; print(round(time.perf_counter() - float('$$start_time'), 3))"); \
-	echo "pre_experiment_sec=$$pre_experiment_sec (boundary=before experiment-run)"
-	@$(MAKE) experiment-run \
-		SCENARIO="$(AGENT_SMOKE_SCENARIO)" \
-		HARNESS="$(AGENT_SMOKE_EFFECTIVE_HARNESS)" \
-		PROVIDER="$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" \
-		MODEL="$(AGENT_SMOKE_EFFECTIVE_MODEL)" \
-		$(if $(filter codex-cli,$(AGENT_SMOKE_EFFECTIVE_HARNESS)),REASONING_EFFORT="$(AGENT_SMOKE_REASONING_EFFORT)",) \
-		$(if $(filter codex-cli,$(AGENT_SMOKE_EFFECTIVE_HARNESS)),CODEX_AUTH_MODE="chatgpt",) \
-		RUN_COUNT="$(AGENT_SMOKE_REPEATS)" \
-		RUN_PARALLELISM="$(AGENT_SMOKE_REPEAT_PARALLEL)" \
-		RERUN_UNSCORED="$(AGENT_SMOKE_RERUN_UNSCORED)" \
-		EXPERIMENT_KIND="operational-smoke" \
-		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
+	$(call smoke_run,$(SMOKE_EXPERIMENT),agent-smoke,$(AGENT_SMOKE_SETS),)
 
-runtime-stack-scenario-smoke: docker-check
-	$(call require_var,SCENARIO)
-	$(call require_var,HARNESS)
-	$(call require_var,PROVIDER)
-	$(call require_var,MODEL)
-	@echo "runtime-stack warm-up: $(SCENARIO)"
-	@$(MAKE) --no-print-directory experiment-run \
-		SCENARIO="$(SCENARIO)" \
-		HARNESS="$(HARNESS)" \
-		PROVIDER="$(PROVIDER)" \
-		MODEL="$(MODEL)" \
-		$(if $(REASONING_EFFORT),REASONING_EFFORT="$(REASONING_EFFORT)",) \
-		RUN_COUNT="1" \
-		RUN_PARALLELISM="1" \
-		RERUN_UNSCORED="0" \
-		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
-		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
-	@echo "runtime-stack measured warm run: $(SCENARIO)"
-	@$(MAKE) --no-print-directory experiment-run \
-		SCENARIO="$(SCENARIO)" \
-		HARNESS="$(HARNESS)" \
-		PROVIDER="$(PROVIDER)" \
-		MODEL="$(MODEL)" \
-		$(if $(REASONING_EFFORT),REASONING_EFFORT="$(REASONING_EFFORT)",) \
-		RUN_COUNT="1" \
-		RUN_PARALLELISM="1" \
-		RERUN_UNSCORED="0" \
-		EXPERIMENT_KIND="$(EXPERIMENT_KIND)" \
-		$(if $(TIMEOUT_SEC),TIMEOUT_SEC="$(TIMEOUT_SEC)",)
-	@$(REPO_RUNTIME_ENV) python3 scripts/validate-runtime-stack-smoke.py \
-		--scenario "$(SCENARIO)" \
-		--harness "$(HARNESS)" \
-		--provider "$(PROVIDER)" \
-		--model "$(MODEL)" \
-		--experiments-root "$(CURDIR)/experiments" \
-		--experiment-kind "$(EXPERIMENT_KIND)"
-
-experiment-run:
-	$(call require_var,SCENARIO)
-	$(call require_var,HARNESS)
-	$(call require_var,PROVIDER)
-	$(call require_var,MODEL)
-	@$(RAIDAR) experiment run \
-		--scenario "$(SCENARIO)" \
-		--harness "$(HARNESS)" \
-		--provider "$(PROVIDER)" \
-		--model "$(MODEL)" \
-		$(if $(REASONING_EFFORT),--reasoning-effort "$(REASONING_EFFORT)",) \
-		--repeats "$(RUN_COUNT)" \
-		--repeat-parallel "$(RUN_PARALLELISM)" \
-		--rerun-unscored "$(RERUN_UNSCORED)" \
-		--experiment-kind "$(EXPERIMENT_KIND)" \
-		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
-
-matrix-run:
-	@if [ -z "$(CONFIG)" ]; then \
-		echo "Usage: make matrix-run CONFIG=matrices/<matrix>.yaml"; \
-		exit 1; \
-	fi
-	@$(RAIDAR) matrix \
-		--config "$(CONFIG)" \
-		--experiment-kind "$(EXPERIMENT_KIND)"
-
-experiments-list:
-	@$(RAIDAR) experiments list \
-		--experiment-kind "$(EXPERIMENT_KIND)" \
-		$(if $(EVALUATION_PROFILE),--evaluation-profile "$(EVALUATION_PROFILE)",) \
-		$(if $(LIMIT),--limit "$(LIMIT)",)
-
-experiments-prune:
-	@$(RAIDAR) experiments prune --dry-run \
-		--experiment-kind "$(EXPERIMENT_KIND)" \
-		$(if $(KEEP_PER_MODEL),--keep-per-model "$(KEEP_PER_MODEL)",)
+smoke-matrix: docker-check
+	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-matrix,$(SMOKE_SETS),$(if $(SMOKE_MATRIX_SELECTOR),--arm "$(SMOKE_MATRIX_SELECTOR)",))
 
 quality:
 	@$(MAKE) --no-print-directory smoke-dry-run-check

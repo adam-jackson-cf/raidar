@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 
 from raidar.codex_auth import ResolvedCodexAuth, resolve_codex_auth
@@ -19,7 +18,6 @@ class CodexCliAdapter(HarborCliAdapter):
     ADAPTER_LABEL = "Codex CLI adapter"
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     DEFAULT_BINARY = "codex"
-    WORKSPACE_SESSION_DIR = ".codex"
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
         "gpt-5.6-terra": SupportedModelProfile(
             display_label="GPT-5.6 Terra",
@@ -64,12 +62,6 @@ class CodexCliAdapter(HarborCliAdapter):
             return self._resolved_auth
         self._resolved_auth = resolve_codex_auth()
         return self._resolved_auth
-
-    def extra_harbor_args(self) -> Iterable[str]:
-        reasoning_effort = self.config.model.reasoning_effort
-        if not reasoning_effort:
-            return []
-        return ["--ak", f"reasoning_effort={reasoning_effort}"]
 
     def credential_environment_sources(self) -> dict[str, str]:
         auth = self._resolve_auth()

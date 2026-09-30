@@ -19,8 +19,9 @@ from raidar.jev.process import PROCESS_POLICY
 from raidar.oracle.models import CaseStatus
 from raidar.scorers import catalog
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, default_scorer_registry
+from raidar.scorers.keys import scorer_identity
 from raidar.scorers.process_compliance.jev_residue import UNANSWERED
-from raidar.scorers.rescore import RescoreOutcome, rescore_path, scorer_identity
+from raidar.scorers.rescore import RescoreOutcome, rescore_path
 from raidar.scorers.sdk.context import AssessContext, statused_result
 from raidar.scorers.sdk.result import AssessResult, AssessStatus
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
-
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
 
 
@@ -15,7 +13,6 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
     ADAPTER_LABEL = "Claude Code CLI adapter"
     CLI_ENV_VAR = "CLAUDE_CODE_CLI_PATH"
     DEFAULT_BINARY = "claude"
-    WORKSPACE_SESSION_DIR = ".claude"
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
         "claude-opus-4-7": SupportedModelProfile(
             display_label="Claude Opus 4.7",
@@ -39,11 +36,3 @@ class ClaudeCodeCliAdapter(HarborCliAdapter):
             display_label="Claude Haiku 4.5",
         ),
     }
-
-    def extra_harbor_args(self) -> Iterable[str]:
-        model_profile = self.SUPPORTED_MODELS[self.config.model.name]
-        default_effort = model_profile.default_reasoning
-        reasoning_effort = self.config.model.reasoning_effort or default_effort
-        if not reasoning_effort:
-            return []
-        return ["--ak", "thinking_mode=adaptive", "--ak", f"effort={reasoning_effort}"]

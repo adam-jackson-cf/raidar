@@ -31,7 +31,7 @@ def test_validate_command_accepts_pilot_experiments(pilot: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert "Experiment validation passed." in result.output
-    assert "scorer references: 3 (resolver available)" in result.output
+    assert "scorer references: 4 (resolver available)" in result.output
 
 
 def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
@@ -290,3 +290,27 @@ def test_set_override_can_replace_a_list_item(tmp_path: Path) -> None:
     ).spec
 
     assert spec.assessment.scorers == ("code-quality@1",)
+
+
+def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> None:
+    document = experiment_document()
+    document["analysis"].update(
+        min_pairs=1, alpha=1.5, max_exclusion_fraction=-0.1, min_effects={"nope": 0.1}
+    )
+    issues = _issues(write_experiment(tmp_path, document))
+    assert {"analysis.min_pairs", "analysis.alpha", "analysis.max_exclusion_fraction"} <= set(
+        issues
+    )
+
+    document["analysis"].update(min_pairs=6, alpha=0.1, max_exclusion_fraction=0.25)
+    issues = _issues(write_experiment(tmp_path, document))
+    assert set(issues) == {"analysis.min_effects.nope"}
+    assert "unknown outcome metric 'nope'" in issues["analysis.min_effects.nope"]
+
+    document["analysis"]["min_effects"] = {"solve_rate": 0.2}
+    analysis = load_experiment(write_experiment(tmp_path, document)).spec.analysis
+    assert (analysis.min_pairs, analysis.alpha, dict(analysis.min_effects)) == (
+        6,
+        0.1,
+        {"solve_rate": 0.2},
+    )

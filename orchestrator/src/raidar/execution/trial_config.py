@@ -14,6 +14,7 @@ from pathlib import Path
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig, TrialConfig, VerifierConfig
 
 from raidar.execution.agent_config import with_host_auth
+from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.execution.models import PlannedTrial
 from raidar.execution.plan import ExperimentPlan
 from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
@@ -40,7 +41,12 @@ def harbor_trial_config(
         trial_name=trial.trial_id,
         trials_dir=trials_dir,
         agent=with_host_auth(plan.arms[trial.arm].agent_config, harness),
-        environment=EnvironmentConfig(type="docker", delete=True),
+        environment=EnvironmentConfig(
+            type="docker",
+            import_path=RUN_SCOPED_DOCKER_IMPORT_PATH,
+            delete=True,
+            kwargs={SCOPE_KWARG: run_scope(trials_dir)},
+        ),
         verifier=VerifierConfig(
             import_path=ORACLE_VERIFIER_IMPORT_PATH,
             override_timeout_sec=2 * grader_timeout + VERIFIER_PHASE_MARGIN_S,

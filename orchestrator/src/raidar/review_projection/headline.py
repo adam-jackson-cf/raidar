@@ -22,13 +22,13 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from raidar.analysis.assessed import infra_reasons
+from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrajectoryRecord
 from raidar.review_projection.assessments import TrialAssessments
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.spec.policies import (
     CORRECTNESS,
     DEFAULT_POLICY_REGISTRY,
-    ComponentValue,
     PolicyScore,
     ScorePolicy,
     checkpoint_correctness,
@@ -140,9 +140,8 @@ def _correctness(
 
 def _quality_inputs(
     policy: ScorePolicy, assessments: TrialAssessments
-) -> tuple[dict[str, ComponentValue], dict[str, list[str]], dict[str, Observation]]:
-    values: dict[str, ComponentValue] = {}
-    ineligible: dict[str, list[str]] = {}
+) -> tuple[dict[str, ComponentInput], dict[str, Observation]]:
+    inputs: dict[str, ComponentInput] = {}
     used: dict[str, Observation] = {}
     for component in policy.inertia_weights:
         observation = trajectory_observation(
@@ -151,11 +150,11 @@ def _quality_inputs(
         if observation is not None:
             used[component] = observation
         if observation is not None and observation.status is AssessStatus.OK:
-            values[component] = float(observation.value or 0.0)
+            inputs[component] = ComponentInput(value=float(observation.value or 0.0))
         else:
             missing = assessments.missing.get(QUALITY_SCORER)
-            ineligible[component] = [_unmeasured(observation, missing)]
-    return values, ineligible, used
+            inputs[component] = ComponentInput(gap=_unmeasured(observation, missing))
+    return inputs, used
 
 
 def _reason_text(policy: str, component: str | None, detail: str) -> str:
@@ -213,13 +212,10 @@ def headline(
         ref = policy_ref or "default"
         return Headline(ref, checkpoints, None, None, reasons=(f"{ref}: {exc}",), withheld=withheld)
     correctness, solved, correctness_gap = _correctness(assessments, checkpoints)
-    values, ineligible, used = _quality_inputs(policy, assessments)
-    if correctness is not None:
-        values[CORRECTNESS] = correctness
-    elif correctness_gap is not None:
-        ineligible[CORRECTNESS] = [correctness_gap]
+    inputs, used = _quality_inputs(policy, assessments)
+    inputs[CORRECTNESS] = ComponentInput(value=correctness, gap=correctness_gap)
     if solved is not None:
         used[CORRECTNESS] = solved
-    score = policy.score(checkpoints=checkpoints, components=values, ineligible=ineligible)
+    score = score_inputs(policy, checkpoints, inputs)
     reasons = _policy_reasons(policy, score, assessments)
     return Headline(policy.ref, checkpoints, score, correctness, used, reasons, withheld)

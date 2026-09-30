@@ -6,14 +6,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from raidar.schemas.scenario import (
-    CatalogStatus,
-    DeliveryMode,
-    EvaluationRole,
-    StartingCondition,
-    TaskKind,
-    WorkspaceState,
-)
+# Scenario-epoch taxonomy, kept here (not with the removed scenario schema) because
+# persisted scenario-epoch projections still carry it and must keep validating.
+TaskKind = Literal[
+    "feature_implementation",
+    "design_implementation",
+    "defect_repair",
+    "refactoring",
+    "test_authoring",
+]
+DeliveryMode = Literal["direct_implementation", "plan_driven", "plan_and_implement"]
+WorkspaceState = Literal["new", "existing"]
+StartingCondition = Literal["known_defect", "legacy_structure"]
+EvaluationRole = Literal["benchmark", "operational"]
+CatalogStatus = Literal["active", "calibration", "quarantined", "retired"]
 
 ReviewStatus = Literal["OK", "ERROR", "UNSET"]
 ReviewSpanType = Literal["TRACE", "AGENT_ROOT", "LLM_GENERATION", "TOOL_CALL", "INTERNAL"]

@@ -80,7 +80,7 @@ def test_too_few_pairs_is_insufficient_even_with_a_large_effect() -> None:
         _run(paired_arms("solve_rate", [0.0, 0.0, 0.0], [1.0, 0.9, 1.0]), 3), "solve_rate"
     )
     assert effect.verdict is Verdict.INSUFFICIENT
-    assert "pre-registered minimum 5" in effect.verdict_reason
+    assert effect.verdict_reason == "3 pairs < minimum 5 (not pinned by a lock)"
 
 
 def test_excluded_share_above_the_limit_is_insufficient_and_counted_by_cause() -> None:
@@ -292,3 +292,30 @@ def test_process_compliance_results_add_a_manipulation_check_per_comparison() ->
     assert manipulation.checks[0].guided.trajectories == 5
     assert "### Manipulation check: **separated**" in render_markdown(report)
     assert analyse(base, SETTINGS).comparisons[0].manipulation is None
+
+
+def test_lock_thresholds_merge_with_labelled_overrides() -> None:
+    from raidar.analysis.thresholds import settings_from_lock
+
+    block = {
+        "seed": 7,
+        "min_pairs": 6,
+        "max_exclusion_fraction": 0.1,
+        "alpha": 0.01,
+        "min_effects": {"solve_rate": 0.2, "headline_score": 5.0},
+    }
+    settings = settings_from_lock(
+        block, overrides={"alpha": None, "min_pairs": 8, "min_effects": {"solve_rate": 0.3}}
+    )
+    assert (settings.pinned_by_lock, settings.seed, settings.alpha) == (True, 7, 0.01)
+    assert settings.min_pairs == 8
+    assert dict(settings.min_effects) == {"solve_rate": 0.3, "headline_score": 5.0}
+    assert settings.overridden == ("min_pairs", "min_effect.solve_rate")
+    assert settings.origin("min_pairs") == "command-line override of the lock"
+    assert settings.origin("alpha") == "pinned by the lock"
+
+    legacy = settings_from_lock({"seed": 3, "min_pairs": 9})
+    assert (legacy.pinned_by_lock, legacy.min_pairs, legacy.alpha) == (False, 9, 0.05)
+    assert legacy.source == "defaults (lock does not pin thresholds)"
+    with pytest.raises(ValueError, match="unknown outcome metric"):
+        settings_from_lock(block, overrides={"min_effects": {"bogus": 1.0}})

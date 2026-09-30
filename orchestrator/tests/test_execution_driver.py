@@ -20,6 +20,11 @@ from raidar.codex_auth import ResolvedCodexAuth
 from raidar.execution import driver
 from raidar.execution.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
 from raidar.execution.driver import TrialRun, run_harbor_trial, run_in_order
+from raidar.execution.environment import (
+    RUN_SCOPED_DOCKER_IMPORT_PATH,
+    RunScopedDockerEnvironment,
+    run_scope,
+)
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
 from raidar.execution.run import RunContext, execute, load_problems
@@ -168,6 +173,11 @@ def test_a_run_materialises_each_trial_and_writes_attempt_records(
     assert kwargs["oracle_bundle"] == str(ctx.problems[0].bundle.root)
     assert kwargs["snapshot_source"] == "artifact"
     assert kwargs["docker_context"] == "orbstack"
+    # The Compose project is scoped to this run directory (no cross-run collision).
+    assert (config.environment.import_path, config.environment.kwargs) == (
+        RUN_SCOPED_DOCKER_IMPORT_PATH,
+        {"run_scope": run_scope(ctx.trials_dir)},
+    )
     # The verifier kwargs are ones the Raidar oracle verifier accepts.
     assert set(kwargs) <= set(inspect.signature(RaidarOracleVerifier.__init__).parameters)
     assert config.agent.name == "codex"
@@ -353,6 +363,9 @@ def test_codex_gets_the_host_session_file_path_only(
         "0.156.1"
     )
     assert reported_harness_pin(AgentConfig(name="oracle")) is None
+    # The wrapper passes its env to every inner session (implement/review/fix): without
+    # the session file its inner codex called the API with an empty key (401, pilot).
+    assert with_host_auth(wrapper, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     api = ResolvedCodexAuth("auto", "api", None, "OPENAI_API_KEY")
     monkeypatch.setattr("raidar.execution.agent_config.resolve_codex_auth", lambda: api)
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {}
@@ -384,3 +397,22 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
     assert set(ctx.problems) == {0}
     none = runner.invoke(main, ["run", str(loaded.path), "--arm", "baseline", "--block", "7"])
     assert none.exit_code != 0
+
+
+def test_run_scoped_environment_suffixes_the_compose_session(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Same trial id in two run dirs -> two Compose projects (the pilot's exit-143 collision)."""
+    first, second = tmp_path / "exp-a" / "r1" / "trials", tmp_path / "exp-b" / "r1" / "trials"
+    assert run_scope(first) == run_scope(first)
+    assert run_scope(first) != run_scope(second)
+    seen: list[str] = []
+
+    def fake_init(self: object, *args: Any, session_id: str, **kwargs: Any) -> None:
+        seen.append(session_id)
+
+    monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.__init__", fake_init)
+    for trials in (first, second):
+        RunScopedDockerEnvironment(session_id="b00-p0-baseline__env", run_scope=run_scope(trials))
+    assert seen == [f"b00-p0-baseline__env-{run_scope(t)}" for t in (first, second)]
+    assert len(set(seen)) == 2

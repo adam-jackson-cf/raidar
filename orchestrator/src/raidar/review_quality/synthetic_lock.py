@@ -12,6 +12,15 @@ from pathlib import Path
 from raidar.spec.canonical import digest_json
 from raidar.spec.lock import default_lock_path
 from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
+from raidar.spec.schema import DEFAULT_ALPHA, DEFAULT_MAX_EXCLUSION_FRACTION, DEFAULT_MIN_PAIRS
+
+PINNED_THRESHOLDS = {
+    "min_pairs": DEFAULT_MIN_PAIRS,
+    "max_exclusion_fraction": DEFAULT_MAX_EXCLUSION_FRACTION,
+    "alpha": DEFAULT_ALPHA,
+    "min_effects": {},
+}
+"""The verdict thresholds a real lock pins (``AnalysisSpec`` defaults)."""
 
 
 def default_headline_policy(checkpoints: int) -> str:
@@ -25,7 +34,10 @@ def write_synthetic_lock(
     body = {
         "synthetic": True,
         "experiment": {"id": experiment},
-        "spec": {"id": experiment, "analysis": {"baseline_arm": baseline_arm}},
+        "spec": {
+            "id": experiment,
+            "analysis": {"baseline_arm": baseline_arm, **PINNED_THRESHOLDS},
+        },
         "headline_policy": {"ref": headline_policy},
     }
     digest = digest_json(body)

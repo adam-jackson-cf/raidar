@@ -1,9 +1,8 @@
 """Metric ownership rules shared by every scorer output path.
 
 A scorer may emit only the metrics it owns, each metric exactly once, and the
-set of emitted metrics must be complete. The scenario-epoch scorecard
-(``runtime/scoring_outputs.py``) and the reboot Scorer SDK both enforce these
-rules through the helpers here, so there is one definition of each rejection.
+set of emitted metrics must be complete. The Scorer SDK enforces these rules
+through the helpers here, so there is one definition of each rejection.
 Keys are anything hashable whose ``str()`` names the metric.
 """
 

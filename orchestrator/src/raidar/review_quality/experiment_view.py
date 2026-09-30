@@ -45,6 +45,7 @@ from raidar.analysis.outcomes import (
     View,
 )
 from raidar.analysis.stats import seed_for, summarise
+from raidar.analysis.thresholds import settings_from_lock
 from raidar.review_quality import stats
 from raidar.review_quality.models import (
     COMPONENTS,
@@ -503,11 +504,18 @@ def _grouped[KeyT](
     return dict(groups)
 
 
+def _lock_settings(members: Sequence[ReviewedTrial]) -> Settings:
+    """The verdict thresholds the group's lock pins (WS-J defaults without a lock)."""
+    return settings_from_lock(members[0].source.experiment.analysis)
+
+
 def build_experiments(
     trials: Sequence[ReviewedTrial], settings: Settings | None = None
 ) -> tuple[QualityExperiment, ...]:
-    """Per experiment, lock and problem; paired Δ uses WS-J's pre-registered ``Settings``."""
-    settings = settings or Settings()
+    """Per experiment, lock and problem; paired Δ uses the thresholds the lock pins.
+
+    ``settings`` replaces the lock's thresholds for every group (tests only).
+    """
     experiments = []
     for (experiment, lock), members in sorted(
         _grouped(
@@ -515,13 +523,14 @@ def build_experiments(
         ).items()
     ):
         problems = _grouped(members, lambda t: t.source.record.trial.problem)
+        chosen = settings or _lock_settings(members)
         experiments.append(
             QualityExperiment(
                 experiment=experiment,
                 lock_sha256=lock or None,
                 runs=tuple(sorted({trial.source.run_id for trial in members})),
                 problems=tuple(
-                    _problem_quality(problem, group, settings)
+                    _problem_quality(problem, group, chosen)
                     for problem, group in sorted(problems.items())
                 ),
             )

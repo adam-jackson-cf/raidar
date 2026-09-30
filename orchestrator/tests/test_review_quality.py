@@ -221,7 +221,7 @@ def test_arm_statistics_leave_out_invalid_trials_and_pair_by_block(
     headline = next(item for item in problem.paired if item.component == "S")
     assert headline.n == 4
     assert headline.verdict == "insufficient"
-    assert "pre-registered minimum" in headline.reason
+    assert headline.reason == "4 pairs < minimum 5 (pinned by the lock)"
 
 
 def test_curves_and_distributions_cover_every_arm_and_checkpoint(

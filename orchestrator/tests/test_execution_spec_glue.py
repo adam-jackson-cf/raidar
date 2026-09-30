@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 import pytest
@@ -31,8 +32,7 @@ def test_lock_command_writes_the_keyed_default_path(
     monkeypatch.setenv(ROOT_ENV, str(PILOT_EXPERIMENT.parents[2] / "problems"))
     experiment = tmp_path / "oneshot.experiment.yaml"
     experiment.write_text(PILOT_ONESHOT.read_text())
-    (tmp_path / "components" / "guided").mkdir(parents=True)
-    (tmp_path / "components" / "guided" / "AGENTS.md").write_text("rules\n")
+    shutil.copytree(PILOT_EXPERIMENT.parent / "components", tmp_path / "components")
     result = CliRunner().invoke(main, ["lock", str(experiment)])
     assert result.exit_code == 0, result.output
     assert (tmp_path / "oneshot.experiment.lock.json").is_file()

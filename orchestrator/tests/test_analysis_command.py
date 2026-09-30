@@ -45,11 +45,11 @@ SOLVES = {
 COST = {"baseline": 0.01, "guided": 0.03}
 
 
-def _lock(scorers: list[str]) -> dict[str, Any]:
+def _lock(scorers: list[str], **thresholds: Any) -> dict[str, Any]:
     body = {
         "experiment": {"id": "pilot"},
         "spec": {
-            "analysis": {"baseline_arm": "baseline", "blocks": 5, "seed": 11},
+            "analysis": {"baseline_arm": "baseline", "blocks": 5, "seed": 11, **thresholds},
             "assessment": {"scorers": scorers},
             "protocol": {"progression": "continue"},
         },
@@ -198,10 +198,15 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     composite = _effect(report, "headline_score")
     assert composite["exclusions"]["unassessed"] == 5
     assert composite["verdict"] == "insufficient"
-    # Thresholds are not pinned by the lock yet: say so, and name every non-default.
+    # This lock predates pinned thresholds: say so, and name every override and non-default.
     settings = report["settings"]
-    assert (settings["source"], settings["pinned_by_lock"]) == ("command line", False)
+    assert settings["pinned_by_lock"] is False
+    assert settings["source"] == (
+        "defaults (lock does not pin thresholds); command line overrides min_effect.solve_rate"
+    )
+    assert settings["overridden"] == ["min_effect.solve_rate"]
     assert settings["changed_from_defaults"] == ["bootstrap_samples", "min_effect.solve_rate"]
+    assert "the lock does not pin verdict thresholds" in result.output
     assert "verdict settings changed from defaults" in result.output
     assert report["dev_run"] is None
     final = _effect(report, "final_solved")
@@ -211,6 +216,58 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert "## guided vs baseline" in markdown
     assert "**Primary outcome** `solve_rate`" in markdown
     assert "not pinned by the lock" in markdown
+
+
+PINNED = {
+    "min_pairs": 6,
+    "max_exclusion_fraction": 0.2,
+    "alpha": 0.05,
+    "min_effects": {"solve_rate": 0.25},
+}
+
+
+def _pinned_pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
+    lock = _lock(["correctness@1", "resource-usage@1"], **PINNED)
+    lock_path = tmp_path / "pinned.lock.json"
+    lock_path.write_text(json.dumps(lock))
+    run_dir = _write_run(tmp_path / "pinned", lock)
+    store = tmp_path / "pinned-store"
+    rescore_path(
+        run_dir / "trials",
+        ("correctness@1", "resource-usage@1"),
+        AssessmentStore(store),
+        default_scorer_registry(),
+    )
+    return run_dir, store, lock_path
+
+
+def test_the_lock_pins_verdict_thresholds_and_overrides_are_labelled(tmp_path: Path) -> None:
+    run_dir, store, lock_path = _pinned_pilot(tmp_path)
+    pinned = _analyze(run_dir, store, lock_path, tmp_path / "pinned-out")
+    assert pinned.exit_code == 0, pinned.output
+    report = json.loads((tmp_path / "pinned-out" / "analysis.json").read_text())
+    settings = report["settings"]
+    assert (settings["source"], settings["pinned_by_lock"]) == ("lock", True)
+    assert (settings["min_pairs"], settings["min_effects"]) == (6, {"solve_rate": 0.25})
+    assert settings["overridden"] == []
+    solve = _effect(report, "solve_rate")
+    assert solve["verdict"] == "insufficient"
+    assert solve["verdict_reason"] == "5 pairs < minimum 6 (pinned by the lock)"
+    assert solve["sample_size"]["delta_source"] == "configured"
+    assert "pinned by the lock; overridden on the command line: none" in (
+        (tmp_path / "pinned-out" / "analysis.md").read_text()
+    )
+
+    overridden = _analyze(run_dir, store, lock_path, tmp_path / "override", "--min-pairs", "5")
+    assert overridden.exit_code == 0, overridden.output
+    assert "lock-pinned thresholds overridden: min_pairs" in overridden.output
+    report = json.loads((tmp_path / "override" / "analysis.json").read_text())
+    assert report["settings"]["source"] == "lock; command line overrides min_pairs"
+    assert report["settings"]["overridden"] == ["min_pairs"]
+    assert _effect(report, "solve_rate")["verdict"] == "improved"
+    assert _effect(report, "headline_score")["verdict_reason"].endswith(
+        "(command-line override of the lock)"
+    )
 
 
 def test_an_empty_store_leaves_every_pair_unassessed(

@@ -7,21 +7,21 @@ import shutil
 
 import click
 
-from raidar.application import repo_state
+from raidar.commands import repo_state
 from raidar.commands.shared import ORCHESTRATOR_ROOT, REPO_ROOT, python_cmd, run_or_raise
 
+# Experiment-model integration paths: spec -> plan -> Harbor trial -> oracle -> projection.
 INTEGRATION_TEST_TARGETS = [
-    "tests/test_harbor_env.py",
-    "tests/test_harbor_cleanup_preflight.py",
-    "tests/test_harbor_execution_phase.py",
-    "tests/test_starter_preflight_cache.py",
-    "tests/test_task_images_and_workspace_phase.py",
+    "tests/test_execution_driver.py",
+    "tests/test_execution_attempts.py",
+    "tests/test_oracle_verifier_and_regrade.py",
+    "tests/test_harbor_cleanup.py",
+    "tests/test_review_projection_experiment_epoch.py",
 ]
 FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py"
 PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"
 IMPORT_LINTER_CONFIG = ORCHESTRATOR_ROOT / ".importlinter"
 TYPECHECK_TARGETS = [
-    "src/raidar/watcher",
     "src/raidar/agents/adapters",
     "tests/test_codex_cli_adapter.py",
     "tests/test_claude_code_cli_adapter.py",

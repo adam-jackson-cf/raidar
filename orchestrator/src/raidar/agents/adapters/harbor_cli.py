@@ -1,11 +1,9 @@
-"""Shared adapter behaviors for repository-local Harbor CLI harnesses."""
+"""Shared adapter behaviors for harnesses that Harbor runs as installed agents."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
-from ..harbor_routing import harbor_agent_import_path, with_harness_pythonpath
 from .base import HarnessAdapter
 
 
@@ -19,12 +17,11 @@ class SupportedModelProfile:
 
 
 class HarborCliAdapter(HarnessAdapter):
-    """Reusable base for harnesses executed via repository-local Harbor agents."""
+    """Reusable base for harnesses executed as Harbor installed agents."""
 
     CLI_ENV_VAR: str = ""
     DEFAULT_BINARY: str = ""
     HARBOR_HARNESS_NAME: str = ""
-    WORKSPACE_SESSION_DIR: str = ""
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {}
     REQUIRED_PROVIDER: str = ""
     ADAPTER_LABEL: str = ""
@@ -73,18 +70,8 @@ class HarborCliAdapter(HarnessAdapter):
     def harbor_harness(self) -> str:
         return self.HARBOR_HARNESS_NAME
 
-    def harbor_harness_import_path(self) -> str | None:
-        return harbor_agent_import_path(self.config.harness)
-
     def model_argument(self) -> str:
         return f"{self.config.model.provider}/{self.config.model.name}"
 
     def runtime_env(self) -> dict[str, str]:
-        env: dict[str, str] = {}
-        env[self.CLI_ENV_VAR] = self._resolve_cli()
-        return with_harness_pythonpath(env)
-
-    def prepare_workspace(self, workspace: Path) -> None:
-        if not self.WORKSPACE_SESSION_DIR:
-            return
-        (workspace / self.WORKSPACE_SESSION_DIR).mkdir(exist_ok=True)
+        return {self.CLI_ENV_VAR: self._resolve_cli()}

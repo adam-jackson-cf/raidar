@@ -193,11 +193,11 @@ def test_plan_command_dry_run_and_stale_lock(
     assert "raidar lock" in missing.output
 
 
-def test_run_command_keeps_the_legacy_scenario_path(tmp_path: Path) -> None:
+def test_run_command_is_the_experiment_runner_only(tmp_path: Path) -> None:
     runner = CliRunner()
-    legacy = runner.invoke(main, ["run", "--scenario", str(tmp_path), "--help"])
-    assert legacy.exit_code == 0
-    assert "--harness" in legacy.output
-    reboot = runner.invoke(main, ["run", "--help"])
-    assert reboot.exit_code == 0
-    assert "--agent-override" in reboot.output
+    removed = runner.invoke(main, ["run", "--scenario", str(tmp_path)])
+    assert removed.exit_code != 0
+    assert "No such option: --scenario" in removed.output
+    help_text = runner.invoke(main, ["run", "--help"])
+    assert help_text.exit_code == 0
+    assert "--agent-override" in help_text.output

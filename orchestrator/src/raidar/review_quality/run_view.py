@@ -30,6 +30,7 @@ from typing import cast, get_args
 
 from raidar.analysis.assessed import build_outcome
 from raidar.analysis.outcomes import HEADLINE_SCORE, QUALITY_COMPONENTS, SOLVE_RATE, Value
+from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.jev.audit import DecisionRecord, LabelRecord
 from raidar.review_quality.models import (
     COMPONENTS,
@@ -271,18 +272,14 @@ def _reason_text(reason: IneligibilityReason) -> str:
 
 def _policy_score(policy: ScorePolicy, checkpoints: int, cells: Mapping[str, Cell]) -> PolicyScore:
     """The headline policy applied to the problem-level cells it weighs."""
-    weighed = {
-        key: cell
+    inputs = {
+        key: ComponentInput(value=Decimal(str(cell.value)))
+        if cell.status == "ok"
+        else ComponentInput(gap=f"{cell.status}: {cell.reason}")
         for key, cell in cells.items()
         if key not in policy.not_applicable and key not in ("I", "S")
     }
-    values = {key: Decimal(str(cell.value)) for key, cell in weighed.items() if cell.status == "ok"}
-    ineligible = {
-        key: [f"{cell.status}: {cell.reason}"]
-        for key, cell in weighed.items()
-        if cell.status != "ok"
-    }
-    return policy.score(checkpoints=checkpoints, components=values, ineligible=ineligible)
+    return score_inputs(policy, checkpoints, inputs)
 
 
 def _problem_cells(

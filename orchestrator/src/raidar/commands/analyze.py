@@ -6,9 +6,12 @@ surface projects) and ``analysis.md`` (the summary for the gate packet) to
 ``--output``. Runs and the store are only read; the output directory must lie
 outside both.
 
-The verdict thresholds are command-line options until the experiment spec
-carries them; the report records them as not pinned by the lock and lists
-every one that differs from its default. Runs executed with ``max_checkpoints``
+The verdict thresholds (``min_pairs``, ``max_exclusion_fraction``, ``alpha``,
+``min_effects``) come from the lock's ``analysis`` block. A command-line option
+overrides the pinned value and the report labels it as an override; a lock
+that predates pinned thresholds falls back to the documented defaults and the
+report says it is not pinned. The report also lists every value that differs
+from its default. Runs executed with ``max_checkpoints``
 or ``agent_override`` are refused unless ``--allow-dev-runs`` labels the
 report as a development run.
 """
@@ -19,24 +22,18 @@ from pathlib import Path
 
 import click
 
-from raidar.analysis.effects import (
-    DEFAULT_ALPHA,
-    DEFAULT_MAX_EXCLUSION_FRACTION,
-    DEFAULT_MIN_PAIRS,
-    Settings,
-)
 from raidar.analysis.load import LoadRequest, load_inputs
 from raidar.analysis.markdown import render_markdown
 from raidar.analysis.outcomes import outcome_metric
 from raidar.analysis.report import analyse
 from raidar.analysis.sources import AnalysisInputError
+from raidar.analysis.thresholds import settings_from_lock
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.spec.canonical import pretty_canonical_json_bytes
 from raidar.spec.references import RegistryReferenceError
 
 REPORT_JSON = "analysis.json"
 REPORT_MARKDOWN = "analysis.md"
-SETTINGS_SOURCE = "command line"
 
 
 def register(main: click.Group) -> None:
@@ -94,24 +91,20 @@ def _check_output(output: Path, protected: list[Path]) -> None:
 @click.option(
     "--min-pairs",
     type=click.IntRange(min=2),
-    default=DEFAULT_MIN_PAIRS,
-    show_default=True,
-    help="Minimum pairs; fewer gives 'insufficient'. Fix it before the data is seen.",
+    help="Override the lock's minimum pairs (fewer gives 'insufficient'); labelled in "
+    "the report as a post-hoc override.",
 )
 @click.option(
     "--max-exclusion-fraction",
     type=click.FloatRange(0.0, 1.0),
-    default=DEFAULT_MAX_EXCLUSION_FRACTION,
-    show_default=True,
-    help="Excluded share of planned pairs above which a verdict is 'insufficient'. "
-    "Fix it before the data is seen.",
+    help="Override the lock's excluded share of planned pairs above which a verdict is "
+    "'insufficient'; labelled as an override.",
 )
 @click.option(
     "--alpha",
     type=click.FloatRange(0.0, 1.0, min_open=True, max_open=True),
-    default=DEFAULT_ALPHA,
-    show_default=True,
-    help="Significance level for the exact McNemar test of final-checkpoint solves.",
+    help="Override the lock's significance level for the exact McNemar test of "
+    "final-checkpoint solves; labelled as an override.",
 )
 @click.option(
     "--bootstrap-samples",
@@ -125,7 +118,8 @@ def _check_output(output: Path, protected: list[Path]) -> None:
     "min_effects",
     multiple=True,
     metavar="METRIC=DELTA",
-    help="Smallest effect of interest for the sample-size projection (repeatable).",
+    help="Override the lock's smallest effect of interest for one metric in the "
+    "sample-size projection (repeatable); labelled as an override.",
 )
 @click.option(
     "--allow-dev-runs",
@@ -139,9 +133,9 @@ def analyze(
     output: Path,
     lock_path: Path | None,
     assessment_config: Path | None,
-    min_pairs: int,
-    max_exclusion_fraction: float,
-    alpha: float,
+    min_pairs: int | None,
+    max_exclusion_fraction: float | None,
+    alpha: float | None,
     bootstrap_samples: int,
     min_effects: tuple[str, ...],
     allow_dev_runs: bool,
@@ -159,14 +153,15 @@ def analyze(
     )
     try:
         inputs, lock = load_inputs(request)
-        settings = Settings(
-            min_pairs=min_pairs,
-            max_exclusion_fraction=max_exclusion_fraction,
-            alpha=alpha,
+        settings = settings_from_lock(
+            lock["spec"]["analysis"],
+            overrides={
+                "min_pairs": min_pairs,
+                "max_exclusion_fraction": max_exclusion_fraction,
+                "alpha": alpha,
+                "min_effects": effects,
+            },
             bootstrap_samples=bootstrap_samples,
-            seed=int(lock["spec"]["analysis"]["seed"]),
-            min_effects=effects,
-            source=SETTINGS_SOURCE,
         )
         report = analyse(inputs, settings)
     except (AnalysisInputError, RegistryReferenceError, ValueError) as exc:
@@ -176,6 +171,11 @@ def analyze(
     (output / REPORT_MARKDOWN).write_text(render_markdown(report))
     if report.dev_run is not None:
         click.echo(f"warning: development run, not arm evidence: {report.dev_run.note}", err=True)
+    if not report.settings.pinned_by_lock:
+        click.echo("warning: the lock does not pin verdict thresholds; defaults used", err=True)
+    if report.settings.overridden:
+        overridden = ", ".join(report.settings.overridden)
+        click.echo(f"warning: lock-pinned thresholds overridden: {overridden}", err=True)
     if report.settings.changed_from_defaults:
         changed = ", ".join(report.settings.changed_from_defaults)
         click.echo(f"warning: verdict settings changed from defaults: {changed}", err=True)

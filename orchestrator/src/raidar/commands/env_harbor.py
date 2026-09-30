@@ -1,28 +1,54 @@
-"""Environment and Harbor operational CLI commands."""
+"""Environment setup and Harbor operational CLI commands."""
 
 from __future__ import annotations
 
 import os
+import re
 import subprocess
+from pathlib import Path
 
 import click
 
 from raidar.agents.adapters.base import harbor_executable
-from raidar.commands.shared import (
-    ORCHESTRATOR_ROOT,
-    cleanup_stale_harbor_before_runs,
-    run_or_raise,
-)
-from raidar.runtime.maintenance import (
-    cleanup_stale_harbor_resources,
-    docker_compose_preflight_reason,
-)
-from raidar.runtime.profile import default_runtime_profile
+from raidar.commands.shared import ORCHESTRATOR_ROOT, run_or_raise
+from raidar.execution.cleanup import cleanup_trial_projects
+
+COMPOSE_MINIMUM_VERSION = (2, 40, 1)
+_VERSION = re.compile(r"v?(\d+)\.(\d+)\.(\d+)")
 
 
 def register(main: click.Group) -> None:
     main.add_command(harbor)
     main.add_command(env)
+
+
+def compose_version(output: str) -> tuple[int, int, int] | None:
+    match = _VERSION.search(output)
+    if match is None:
+        return None
+    major, minor, patch = match.groups()
+    return int(major), int(minor), int(patch)
+
+
+def compose_preflight_reason() -> str | None:
+    """Why this Docker Compose cannot run Harbor trials, or None when it can."""
+    try:
+        result = subprocess.run(
+            ["docker", "compose", "version", "--short"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            env=dict(os.environ),
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return None
+    version = compose_version(result.stdout) if result.returncode == 0 else None
+    if version is None or version >= COMPOSE_MINIMUM_VERSION:
+        return None
+    required = ".".join(map(str, COMPOSE_MINIMUM_VERSION))
+    detected = ".".join(map(str, version))
+    return f"Unsupported docker compose version {detected}. Require >= {required} for Harbor runs."
 
 
 @click.group()
@@ -32,24 +58,27 @@ def harbor() -> None:
 
 @harbor.command("cleanup")
 @click.option(
-    "--include-containers/--no-include-containers",
-    default=True,
-    help="Remove stale stopped Harbor containers.",
+    "--run",
+    "run_dir",
+    type=click.Path(file_okay=False, path_type=Path),
+    default=None,
+    help="Remove every trial environment of this run directory, running or not.",
 )
-@click.option(
-    "--include-build-processes/--no-include-build-processes",
-    default=True,
-    help="Terminate stale orphan build processes.",
-)
-def harbor_cleanup(include_containers: bool, include_build_processes: bool) -> None:
-    """Cleanup stale Harbor processes and containers."""
-    runtime_profile = default_runtime_profile()
-    cleanup_stale_harbor_resources(
-        include_containers=include_containers,
-        include_build_processes=include_build_processes,
-        runtime_profile=runtime_profile,
-    )
-    click.echo("Harbor cleanup completed.")
+@click.option("--dry-run", is_flag=True, help="List the trial environments without removing.")
+def harbor_cleanup(run_dir: Path | None, dry_run: bool) -> None:
+    """Remove trial environments a stopped `raidar run` left behind.
+
+    Without --run, only trial environments with no running container are removed,
+    so a concurrent run on the same Docker host is never touched.
+    """
+    try:
+        removed = cleanup_trial_projects(run_dir, dry_run=dry_run)
+    except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
+        raise click.ClickException(str(exc)) from exc
+    verb = "would remove" if dry_run else "removed"
+    for project in removed:
+        click.echo(f"{verb}: {project}")
+    click.echo(f"Harbor cleanup completed ({len(removed)} trial environment(s) {verb}).")
 
 
 @click.group()
@@ -70,12 +99,7 @@ def env() -> None:
 )
 def env_setup(install_tools: bool, sync_arg: tuple[str, ...]) -> None:
     """Setup local toolchain and run Harbor preflight checks."""
-    cleanup_stale_harbor_before_runs()
-
-    reason = docker_compose_preflight_reason(
-        dict(os.environ),
-        default_runtime_profile(),
-    )
+    reason = compose_preflight_reason()
     if reason:
         raise click.ClickException(reason)
 

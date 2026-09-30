@@ -191,8 +191,10 @@ def _settings_line(report: AnalysisReport) -> str:
     settings = report.settings
     pinned = "pinned by the lock" if settings.pinned_by_lock else "not pinned by the lock"
     changed = ", ".join(settings.changed_from_defaults) or "none"
+    overridden = ", ".join(settings.overridden) or "none"
     return (
-        f"- Verdict thresholds ({settings.source}, {pinned}; changed from defaults: {changed}): "
+        f"- Verdict thresholds ({settings.source}; {pinned}; overridden on the command line: "
+        f"{overridden}; changed from defaults: {changed}): "
         f"min pairs {settings.min_pairs}, max excluded share "
         f"{settings.max_exclusion_fraction:.0%}, alpha {settings.alpha}; intervals are "
         f"paired t below {settings.bootstrap_min_pairs} pairs, bootstrap "
