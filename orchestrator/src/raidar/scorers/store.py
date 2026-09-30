@@ -12,26 +12,60 @@ The store is add-only:
 
 Replay-varying facts (duration) go to an append-only ``log.jsonl`` beside
 the objects, never into an Assessment.
+
+Raw payloads (a scorer's unparsed tool output, kept for audit) live in a
+content-addressed ``raw/`` slot beside the objects; an Assessment names them
+by sha256 in ``raw_payloads``, so a replay proves their bytes too.
+
+A scorer that decides under Jev policies carries their effective mode and
+digest in its identity (``ScorerIdentity.jev_policies``), which is part of the
+key: a mode change (shadow -> enforce, or a run lowered to off) changes what
+the Assessment says and how it may be used, so it never reuses an Assessment
+made under another mode. Shadow observations stay out of verdicts either way
+(``raidar.jev.gating``).
+
+Whether Jev answered is not in the key, because analysis must find one
+Assessment per key. Instead an Assessment made while some decision had no
+answer yet (no API key, cache miss, provider failure) is stored as
+``provisional``, with one fixed reason for every such decision, so its bytes do
+not depend on ``--jev-replay-only`` or the environment. A provisional
+Assessment is the one exception to add-only:
+
+- a rescore runs it again rather than reusing it;
+- a different, complete Assessment for the same key supersedes it (the old
+  bytes are kept under ``superseded/``, never deleted);
+- a different provisional one is still a conflict, as is any change to a
+  complete Assessment.
+
+Identities and Assessments without Jev policies, raw payloads or a provisional
+mark serialise exactly as before those fields existed, so their keys and bytes
+are unchanged.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
+import re
 import tempfile
 from collections.abc import Iterator, Mapping
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from raidar.scorers.sdk.manifest import SdkModel
 from raidar.scorers.sdk.result import AssessResult, RunStats
 from raidar.spec.canonical import canonical_json_bytes, digest_json, pretty_canonical_json_bytes
 
 OBJECTS_DIR = "assessments"
+RAW_DIR = "raw"
+SUPERSEDED_DIR = "superseded"
 LOG_FILE = "log.jsonl"
+_SHA256 = r"^[0-9a-f]{64}$"
+RAW_NAME_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._/-]*$"
 
 
 class AssessmentConflictError(RuntimeError):
@@ -41,26 +75,58 @@ class AssessmentConflictError(RuntimeError):
 class PutOutcome(StrEnum):
     ADDED = "added"
     IDENTICAL = "identical"
+    SUPERSEDED = "superseded"
+
+
+class JevPolicyBinding(SdkModel):
+    mode: str = Field(min_length=1)
+    digest: str = Field(pattern=_SHA256)
 
 
 class ScorerIdentity(SdkModel):
     ref: str = Field(min_length=1)
     manifest_digest: str = Field(min_length=1)
     implementation_digest: str | None
+    jev_policies: dict[str, JevPolicyBinding] | None = None
+
+    def payload(self) -> dict[str, Any]:
+        """JSON form; ``jev_policies`` only when the scorer decides under Jev."""
+        dumped = self.model_dump(mode="json")
+        if self.jev_policies is None:
+            dumped.pop("jev_policies")
+        return dumped
 
 
 class Assessment(SdkModel):
     kind: Literal["raidar-assessment"] = "raidar-assessment"
     schema_version: Literal[1] = 1
-    key: str = Field(pattern=r"^[0-9a-f]{64}$")
+    key: str = Field(pattern=_SHA256)
     scorer: ScorerIdentity
     config: dict[str, Any]
     tool_lock: dict[str, Any]
     inputs: dict[str, Any]
     result: AssessResult
+    # name -> sha256 of a payload in the store's raw/ slot
+    raw_payloads: dict[str, Annotated[str, Field(pattern=_SHA256)]] = Field(default_factory=dict)
+    # Some external decision had no answer yet; a complete Assessment may supersede it.
+    provisional: bool = False
+
+    @field_validator("raw_payloads")
+    @classmethod
+    def _raw_names(cls, value: dict[str, str]) -> dict[str, str]:
+        bad = sorted(name for name in value if not re.fullmatch(RAW_NAME_PATTERN, name))
+        if bad:
+            raise ValueError(f"raw payload names must match {RAW_NAME_PATTERN}: {bad}")
+        return value
 
     def render(self) -> bytes:
-        return pretty_canonical_json_bytes(self.model_dump(mode="json"))
+        dumped = self.model_dump(mode="json")
+        dumped["scorer"] = self.scorer.payload()
+        if not self.raw_payloads:
+            dumped.pop("raw_payloads")
+        if not self.provisional:
+            dumped.pop("provisional")
+        return pretty_canonical_json_bytes(dumped)
 
 
 def assessment_key(
@@ -72,7 +138,7 @@ def assessment_key(
 ) -> str:
     return digest_json(
         {
-            "scorer": scorer.model_dump(mode="json"),
+            "scorer": scorer.payload(),
             "config": dict(config),
             "tool_lock": dict(tool_lock),
             "inputs": dict(inputs),
@@ -96,20 +162,59 @@ class AssessmentStore:
             return None
         return Assessment.model_validate_json(path.read_bytes())
 
+    def raw_path(self, digest: str) -> Path:
+        return self.root / RAW_DIR / digest[:2] / digest
+
+    def put_raw(self, data: bytes) -> str:
+        """Store a raw payload once, content-addressed; returns its sha256."""
+        digest = hashlib.sha256(data).hexdigest()
+        path = self.raw_path(digest)
+        if path.is_file():
+            return digest
+        self._write_new(path, data)
+        return digest
+
+    def get_raw(self, digest: str) -> bytes | None:
+        path = self.raw_path(digest)
+        return path.read_bytes() if path.is_file() else None
+
     def stored_keys(self) -> Iterator[str]:
         for path in sorted((self.root / OBJECTS_DIR).glob("*/*.json")):
             yield path.stem
+
+    def superseded_path(self, key: str, data: bytes) -> Path:
+        digest = hashlib.sha256(data).hexdigest()
+        return self.root / SUPERSEDED_DIR / key[:2] / f"{key}.{digest}.json"
 
     def put(self, assessment: Assessment) -> PutOutcome:
         data = assessment.render()
         path = self.path_for(assessment.key)
         if path.is_file():
-            if path.read_bytes() == data:
+            stored = path.read_bytes()
+            if stored == data:
                 return PutOutcome.IDENTICAL
+            if Assessment.model_validate_json(stored).provisional and not assessment.provisional:
+                self._supersede(path, stored, data, assessment.key)
+                return PutOutcome.SUPERSEDED
             raise AssessmentConflictError(
                 f"assessment {assessment.key} ({assessment.scorer.ref}) replayed with different "
                 f"bytes; stored copy kept at {path}"
             )
+        if not self._write_new(path, data):
+            return self.put(assessment)
+        return PutOutcome.ADDED
+
+    def _supersede(self, path: Path, stored: bytes, data: bytes, key: str) -> None:
+        """Keep the provisional bytes under ``superseded/``, then swap in the complete ones."""
+        self._write_new(self.superseded_path(key, stored), stored)
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False, suffix=".tmp") as handle:
+            handle.write(data)
+            temporary = Path(handle.name)
+        os.replace(temporary, path)
+
+    @staticmethod
+    def _write_new(path: Path, data: bytes) -> bool:
+        """Atomically create ``path``; False when another writer created it first."""
         path.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(dir=path.parent, delete=False, suffix=".tmp") as handle:
             handle.write(data)
@@ -117,10 +222,10 @@ class AssessmentStore:
         try:
             os.link(temporary, path)
         except FileExistsError:
+            return False
+        finally:
             temporary.unlink()
-            return self.put(assessment)
-        temporary.unlink()
-        return PutOutcome.ADDED
+        return True
 
     def log(self, *, trial: str, key: str, scorer: str, outcome: str, stats: RunStats) -> None:
         self.root.mkdir(parents=True, exist_ok=True)

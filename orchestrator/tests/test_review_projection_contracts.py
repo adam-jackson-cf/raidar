@@ -12,16 +12,16 @@ import pytest
 
 from raidar.application.scenario_catalog import load_scenario
 from raidar.review_projection import (
-    PAYLOAD_CAP,
-    _load_experiment_projection,
-    _payload,
-    _summary_objects,
-    _to_ms,
-    _trace_name,
     build_experiment_review_projection,
     main,
     merge_review_projections,
 )
+from raidar.review_projection.legacy import (
+    _summary_objects,
+    _trace_name,
+    load_experiment_projection,
+)
+from raidar.review_projection.spans import PAYLOAD_CAP, payload, to_ms
 from raidar.review_scenario_projection import (
     revision_diff_artifact,
     scenario_comparable_config,
@@ -86,11 +86,13 @@ def test_scenario_projection_rejects_missing_or_mismatched_parent(tmp_path: Path
 
 
 def test_review_projection_helpers_cover_bounded_and_invalid_values() -> None:
-    assert _payload(None) is None
-    assert _payload("x" * (PAYLOAD_CAP + 1)).endswith("...[truncated]")
-    assert _to_ms(12.9) == 12
-    assert _to_ms(None) is None
-    assert _to_ms("not-a-timestamp") is None
+    assert payload(None) is None
+    text = payload("x" * (PAYLOAD_CAP + 1))
+    assert text is not None
+    assert text.endswith("...[truncated]")
+    assert to_ms(12.9) == 12
+    assert to_ms(None) is None
+    assert to_ms("not-a-timestamp") is None
     assert _trace_name("tool_call", {"name": "read"}) == "tool read"
 
     with pytest.raises(ValueError, match="aggregate must be an object"):
@@ -120,13 +122,12 @@ def test_merge_review_projections_and_cli(
     monkeypatch,
     capsys,
 ) -> None:
-    artifact = merge_review_projections(synthetic_experiments)
+    artifact = merge_review_projections([synthetic_experiments])
     assert len(artifact.experiments) == 9
     assert artifact.runs
     assert artifact.run_details
     assert artifact.revision_diffs
-    scenario_meta = artifact.experiments[0].scenario_meta
-    scenario_meta = scenario_meta.model_dump()
+    scenario_meta = artifact.experiments[0].scenario_meta.model_dump()
     assert {
         "display_name",
         "task_kind",
@@ -158,8 +159,8 @@ def test_merge_review_projections_and_cli(
     assert output.is_file()
     assert "Projected" in capsys.readouterr().out
 
-    with pytest.warns(RuntimeWarning, match="found in sys.modules"):
-        runpy.run_module("raidar.review_projection", run_name="__main__")
+    output.unlink()
+    runpy.run_module("raidar.review_projection", run_name="__main__")
     assert output.is_file()
 
 
@@ -171,12 +172,12 @@ def test_review_projection_loader_and_merge_fail_closed(
     invalid = tmp_path / "invalid.json"
     invalid.write_text("not-json", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid review projection"):
-        _load_experiment_projection(invalid)
+        load_experiment_projection(invalid)
 
     legacy_root = tmp_path / "legacy"
     (legacy_root / "experiment").mkdir(parents=True)
     with pytest.raises(ValueError, match="no current-version review projections"):
-        merge_review_projections(legacy_root)
+        merge_review_projections([legacy_root])
     assert "Skipping legacy experiment" in capsys.readouterr().err
 
     source = next(path for path in synthetic_experiments.iterdir() if path.is_dir())
@@ -186,4 +187,23 @@ def test_review_projection_loader_and_merge_fail_closed(
         target.mkdir(parents=True)
         shutil.copy2(source / "review-projection.json", target / "review-projection.json")
     with pytest.raises(ValueError, match="duplicate run ids"):
-        merge_review_projections(duplicate_root)
+        merge_review_projections([duplicate_root])
+
+
+def test_merge_skips_a_persisted_projection_that_fails_the_schema(
+    synthetic_experiments: Path, tmp_path: Path, capsys
+) -> None:
+    root = tmp_path / "mixed"
+    valid, stale = sorted(path for path in synthetic_experiments.iterdir() if path.is_dir())[:2]
+    shutil.copytree(valid, root / valid.name)
+    (root / stale.name).mkdir(parents=True)
+    document = json.loads((stale / "review-projection.json").read_text(encoding="utf-8"))
+    del document["experiment"]["scenario_meta"]["task_kind"]
+    (root / stale.name / "review-projection.json").write_text(json.dumps(document))
+
+    artifact = merge_review_projections([root])
+
+    assert [record.experiment_id for record in artifact.experiments] == [
+        json.loads((valid / "review-projection.json").read_text())["experiment"]["experiment_id"]
+    ]
+    assert "Skipping legacy experiment that fails the schema" in capsys.readouterr().err

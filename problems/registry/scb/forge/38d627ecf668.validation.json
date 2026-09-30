@@ -35,13 +35,13 @@
   "environment": {
     "docker_context": "orbstack",
     "engine": "harbor",
-    "grader_image": "raidar-oracle-grader:53ef42e1caacebbc",
+    "grader_image": "raidar-oracle-grader:466e21c75a524af1",
     "harbor": "0.23.0",
     "native_runner": {
       "commit": "25069ba83cdaf7abcf08acb4cf6e2b024e66d109",
       "dirty": false
     },
-    "pack_image": "raidar/pack-python:8c98ccdfd980e2a4"
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
   "grades": {
     "native": {
@@ -1654,7 +1654,7 @@
     "selection": "default_by_k"
   },
   "kind": "raidar-problem-validation",
-  "manifest_sha256": "b2de16e765322f36422e98344892f4808cd87bb7a6251530aa6206fb978a84c6",
+  "manifest_sha256": "029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94",
   "mode": "multi_checkpoint",
   "not_run": [],
   "problem": "scb/forge@38d627ecf668",

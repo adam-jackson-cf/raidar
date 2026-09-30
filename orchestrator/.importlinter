@@ -120,3 +120,25 @@ forbidden_modules =
     raidar.application
     raidar.commands
     raidar.cli
+
+[importlinter:contract:analysis-boundary]
+name = Analysis stays independent of the scenario runtime, application, commands, and CLI layers
+type = forbidden
+source_modules =
+    raidar.analysis
+forbidden_modules =
+    raidar.runtime
+    raidar.application
+    raidar.commands
+    raidar.cli
+
+[importlinter:contract:review-quality-boundary]
+name = Quality projection stays independent of the scenario runtime, application, commands, and CLI layers
+type = forbidden
+source_modules =
+    raidar.review_quality
+forbidden_modules =
+    raidar.runtime
+    raidar.application
+    raidar.commands
+    raidar.cli

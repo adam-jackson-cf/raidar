@@ -4,9 +4,10 @@ from __future__ import annotations
 
 import hashlib
 import json
+import posixpath
 import re
 from enum import StrEnum
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import yaml
@@ -38,12 +39,22 @@ class HarnessPin(_Strict):
     npm_package: str
     version: str
     executable: str
+    # Harbor ``AgentName`` whose install() version check must accept the baked-in
+    # binary; the image audit replays that check (``harness.harbor_reported_version``).
+    harbor_agent: str
+
+
+# Codex refuses to create its helper binaries under a temporary directory and
+# prints a warning line first on ``codex --version``; Harbor parses that first
+# line as the version, misses the pin and reinstalls codex in every trial.
+_TEMP_ROOTS = ("/tmp", "/var/tmp", "/dev/shm")
 
 
 class ImageSpec(_Strict):
     repository: str
     context: str
     base_image: str
+    agent_home: str
     harnesses: dict[str, HarnessPin]
     forbidden_executables: tuple[str, ...]
 
@@ -51,6 +62,22 @@ class ImageSpec(_Strict):
     def _base_image_pinned_by_digest(self) -> ImageSpec:
         if "@sha256:" not in self.base_image:
             raise ValueError("image.base_image must be pinned by digest (@sha256:...)")
+        return self
+
+    @model_validator(mode="after")
+    def _agent_home_outside_temp_dirs(self) -> ImageSpec:
+        if not PurePosixPath(self.agent_home).is_absolute():
+            raise ValueError(f"image.agent_home must be absolute, got {self.agent_home!r}")
+        # Lexically normalised, so '/home/../tmp/x' counts as under /tmp.
+        home = PurePosixPath(posixpath.normpath(self.agent_home))
+        if any(
+            home == PurePosixPath(root) or PurePosixPath(root) in home.parents
+            for root in _TEMP_ROOTS
+        ):
+            raise ValueError(
+                f"image.agent_home {self.agent_home!r} is under a temporary directory; "
+                "codex then warns on --version and Harbor reinstalls it every trial"
+            )
         return self
 
 
@@ -62,8 +89,19 @@ class PackSpec(_Strict):
     id: str
     version: int
     python: str
+    # How a problem's ``entry_file`` names its snapshot file (SCB fork
+    # environment ``commands.entry_file``, e.g. ``{entry_file}.py``).
+    entry_file_template: str = Field(pattern=r"\{entry_file\}")
     image: ImageSpec
     task_environment: TaskEnvironmentSpec
+
+    def entry_file(self, name: str) -> str:
+        """The snapshot-relative entrypoint for a problem's configured ``entry_file``."""
+        formatted = self.entry_file_template.format(entry_file=name.strip())
+        path = PurePosixPath(formatted)
+        if not name.strip() or path.is_absolute() or ".." in path.parts:
+            raise ValueError(f"entry_file {name!r} does not name a snapshot-relative file")
+        return formatted
 
     @property
     def context_dir(self) -> Path:

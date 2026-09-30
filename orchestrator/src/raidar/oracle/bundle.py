@@ -90,6 +90,9 @@ class BundleManifest(OracleModel):
     env: dict[str, str] = Field(default_factory=dict)
     grader: GraderSpec
     steps: tuple[OracleStepSpec, ...] = Field(min_length=1)
+    # The problem's snapshot-relative entrypoint (SCB config ``entry_file`` in
+    # the pack's format, e.g. ``forge.py``); scorers take it as a config default.
+    entry_file: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _unique_steps(self) -> BundleManifest:
@@ -165,7 +168,9 @@ def write_bundle(root: Path, manifest: BundleManifest, tests_source: Path) -> Or
         root / TESTS_DIR,
         ignore=lambda _d, names: {n for n in names if n in SCB_EXCLUDED_TEST_FILES},
     )
-    (root / BUNDLE_MANIFEST).write_text(manifest.model_dump_json(indent=2) + "\n")
+    # A bundle without an entrypoint keeps its pre-``entry_file`` bytes and digest.
+    omit = {"entry_file"} if manifest.entry_file is None else None
+    (root / BUNDLE_MANIFEST).write_text(manifest.model_dump_json(indent=2, exclude=omit) + "\n")
     return load_bundle(root)
 
 

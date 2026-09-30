@@ -189,7 +189,7 @@ async def execute(ctx: RunContext) -> list[TrajectoryRecord]:
     ctx.run_dir.mkdir(parents=True, exist_ok=False)
     plan = ctx.plan
     _write_json(ctx.run_dir / "plan.json", plan.to_json())
-    write_assessment_config(plan.loaded.spec.assessment, ctx.run_dir)
+    write_assessment_config(plan.loaded.spec.assessment, plan.loaded.spec.protocol, ctx.run_dir)
     manifest: dict[str, object] = {
         "kind": "raidar-run",
         "experiment": plan.experiment_id,

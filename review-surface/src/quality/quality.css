@@ -1,0 +1,32 @@
+/* Quality element chart tokens: categorical arm slots (dataviz reference
+   palette, first three slots validated all-pairs in both modes) and the
+   diverging correlation poles. */
+:root,
+[data-theme='dark'] {
+  --q-series-1: #3987e5;
+  --q-series-2: #d95926;
+  --q-series-3: #199e70;
+  --q-diverge-pos: #3987e5;
+  --q-diverge-neg: #e66767;
+  --q-grid: rgba(255, 255, 255, 0.08);
+}
+
+[data-theme='light'] {
+  --q-series-1: #2a78d6;
+  --q-series-2: #eb6834;
+  --q-series-3: #1baf7a;
+  --q-diverge-pos: #2a78d6;
+  --q-diverge-neg: #e34948;
+  --q-grid: rgba(0, 0, 0, 0.08);
+}
+
+.q-focus:focus-visible {
+  outline: 2px solid var(--q-series-1);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .q-motion {
+    transition: none !important;
+  }
+}

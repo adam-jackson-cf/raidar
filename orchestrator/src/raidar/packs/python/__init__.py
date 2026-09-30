@@ -3,6 +3,8 @@
 from raidar.packs.python.harness import (
     HarnessPinError,
     harbor_agent_kwargs,
+    harbor_reported_version,
+    harbor_version_command,
     pinned_harness_version,
 )
 from raidar.packs.python.image import (
@@ -13,7 +15,6 @@ from raidar.packs.python.image import (
     ImageRecord,
     audit_image,
     build_image,
-    harness_version_matches,
     image_lock_hash,
     image_present,
     image_tag,

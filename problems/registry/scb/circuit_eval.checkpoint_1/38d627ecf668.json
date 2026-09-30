@@ -28,9 +28,10 @@
   "pack": {
     "id": "python",
     "version": 1,
-    "image": "raidar/pack-python:8c98ccdfd980e2a4"
+    "image": "raidar/pack-python:2b91a52663e099f2"
   },
-  "task_sha256": "7888af3176e38d4f47f407f8f651c6543d80e201eccf5a6ec8eba8f95018c86f",
-  "bundle_sha256": "ead68a5fad4c645a81fe3275a9214e0db0425a4c96cb9e159ef8a0d8c740c43c",
-  "references_sha256": "9b210f38d2bab40335ebd5060a88c589819889666256331d560ce6b1586b14fe"
+  "task_sha256": "96ec208ea91b81ed25b3703cd63f3da045bb80ca2a25b526b12c307bc6a3213d",
+  "bundle_sha256": "f21fe219a120a77f882162e0844e4a550e371cc505d9b1f7824882e685d16fc9",
+  "references_sha256": "9b210f38d2bab40335ebd5060a88c589819889666256331d560ce6b1586b14fe",
+  "entry_file": "circopt.py"
 }

@@ -14,6 +14,8 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from raidar.oracle.bundle import OracleBundle
 from raidar.packs.python import PackSpec, image_tag, load_pack_spec
 from raidar.problems.content import content_digest, hidden_content_in_task
@@ -37,6 +39,7 @@ from raidar.problems.store import ProblemStore, ProblemStoreError
 # The converter's README embeds the conversion date; it is not task content.
 _CONVERTER_README = "README.md"
 _CONVERSION_OVERRIDES = "conversion.toml"
+_PROBLEM_CONFIG = "config.yaml"
 
 
 class ProblemDriftError(ProblemStoreError):
@@ -103,7 +106,22 @@ def _manifest(
         task_sha256=content_digest(content / "task"),
         bundle_sha256=content_digest(content / "oracle"),
         references_sha256=content_digest(content / "references"),
+        entry_file=materialised.bundle.manifest.entry_file,
     )
+
+
+def problem_entry_file(checkout: PinnedCheckout, problem: ProblemId, pack: PackSpec) -> str | None:
+    """The problem's ``config.yaml`` ``entry_file`` in the pack's snapshot-file format."""
+    config = yaml.safe_load((checkout.root / problem.problem / _PROBLEM_CONFIG).read_text())
+    raw = config.get("entry_file") if isinstance(config, dict) else None
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise ProblemStoreError(f"{problem.problem}/{_PROBLEM_CONFIG}: entry_file must be a string")
+    try:
+        return pack.entry_file(raw)
+    except ValueError as exc:
+        raise ProblemStoreError(f"{problem.problem}/{_PROBLEM_CONFIG}: {exc}") from exc
 
 
 @dataclass(frozen=True)
@@ -133,6 +151,7 @@ def _materialise(
             "commit": checkout.pin.commit,
             "problem": problem.problem,
         },
+        entry_file=problem_entry_file(checkout, problem, pack),
     )
     copy_references(converted, content / "references", steps)
     leaked = hidden_content_in_task(content / "task", bundle)
@@ -177,7 +196,7 @@ def import_problem(
     pack = pack or load_pack_spec()
     checkout = resolve_checkout(store, problem, source_checkout)
     checkout.verify_clean(problem.problem, checkout.converter_dir, _CONVERSION_OVERRIDES)
-    if not (checkout.root / problem.problem / "config.yaml").is_file():
+    if not (checkout.root / problem.problem / _PROBLEM_CONFIG).is_file():
         raise ProblemStoreError(f"{problem.problem} is not an SCB problem at {checkout.pin.commit}")
     recorded = _recorded(store, problem)
     with tempfile.TemporaryDirectory(prefix="raidar-problem-import-") as tmp:

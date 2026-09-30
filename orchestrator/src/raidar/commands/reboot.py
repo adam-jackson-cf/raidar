@@ -1,10 +1,10 @@
-"""Register the reboot CLI commands (spec, packs, assess, problems, jev, execution)."""
+"""Register the reboot CLI commands (spec, packs, assess, problems, jev, execution, analysis)."""
 
 from __future__ import annotations
 
 import click
 
-from raidar.commands import assess, execution, experiment_spec, jev, pack, problem
+from raidar.commands import analyze, assess, execution, experiment_spec, jev, pack, problem
 
 
 def register(main: click.Group) -> None:
@@ -15,3 +15,4 @@ def register(main: click.Group) -> None:
     problem.register(main)
     jev.register(main)
     execution.register(main)
+    analyze.register(main)

@@ -6,13 +6,13 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.process_compliance.manipulation import (
+from raidar.analysis.manipulation import (
     Separation,
     load_arm_results,
     manipulation_check,
     permutation_p,
 )
+from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.rescore import assess
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
 from raidar.scorers.store import AssessmentStore

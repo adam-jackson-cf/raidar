@@ -14,6 +14,14 @@ nothing the agent writes can move a file out of measurement.
 The only exclusions are the oracle's snapshot excludes, which the grader
 never sees either. Every excluded or ignored path is listed with a reason.
 
+``.venv`` and the other snapshot excludes differ from the fork's inventory,
+which has no directory excludes, but never observably: Harbor's ``/app``
+artifact is collected with the same list (``oracle.snapshot.app_artifact_config``),
+so a graded snapshot cannot contain them. Other environment directories
+(``venv``, ``.tox``, ``.nox``) stay in the inventory as production, exactly as
+in the fork, even though the fork's measurement producer skips them (fork
+parity goldens, ``language_features``).
+
 Evidence the assessor cannot read faithfully makes the inventory invalid
 (``score_evidence_invalid``, as in the SCB fork) instead of silently shrinking
 it: a recognised source file that is not UTF-8 or cannot be read, a path that

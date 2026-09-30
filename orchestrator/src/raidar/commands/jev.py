@@ -1,4 +1,4 @@
-"""Jev CLI commands: shadow runs of a question set, policy listing, label import."""
+"""Jev CLI commands: shadow runs of a question set, policy listing, label export and import."""
 
 from __future__ import annotations
 
@@ -8,11 +8,18 @@ from pathlib import Path
 
 import click
 
+from raidar.jev.audit import AuditLog
 from raidar.jev.calibration import (
     LabelImportError,
     import_labels,
     promotion_readiness,
     verify_promotion,
+)
+from raidar.jev.label_export import (
+    LabelExportError,
+    export_labels,
+    load_review_labels,
+    write_rows,
 )
 from raidar.jev.policies import PolicyError, PolicyRegistry
 from raidar.jev.report import rubric_shadow_report
@@ -146,3 +153,29 @@ def jev_verify_promotion(store: Path, policy: str) -> None:
     click.echo(json.dumps({"policy": policy, "supported": not failures, "failures": failures}))
     if failures:
         raise SystemExit(1)
+
+
+@jev.command("export-labels")
+@click.option(
+    "--labels",
+    "labels_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="Review-surface label file (review-surface/data/jev-labels.json).",
+)
+@click.option("--policy", required=True)
+@click.option(
+    "--store",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Assessment store whose audit the labels must match; skips already-labelled decisions.",
+)
+@click.option("--output", type=click.Path(dir_okay=False, path_type=Path), required=True)
+def jev_export_labels(labels_path: Path, policy: str, store: Path | None, output: Path) -> None:
+    """Export review-surface labels as JSON lines for `raidar jev import-labels`."""
+    try:
+        audit = AuditLog.for_store(store) if store is not None else None
+        exported = export_labels(load_review_labels(labels_path), policy, audit=audit)
+    except LabelExportError as error:
+        raise click.ClickException(str(error)) from error
+    write_rows(exported, output)
+    click.echo(json.dumps({**exported.summary(), "output": str(output)}, indent=2))

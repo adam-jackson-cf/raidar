@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 
 from pydantic import ValidationError
@@ -127,8 +127,38 @@ def _policy_issues(spec: ExperimentSpec, policies: ScorePolicyRegistry) -> list[
     return []
 
 
+ProtocolConfigKeys = Mapping[str, Iterable[str]]
+"""``{scorer ref: ProtocolSpec field names it takes from the protocol}``."""
+
+
+def _default_protocol_config() -> ProtocolConfigKeys:
+    # The scorer registry owns which scorer reads which protocol field.
+    from raidar.scorers.catalog import BUILTIN_PROTOCOL_CONFIG
+
+    return BUILTIN_PROTOCOL_CONFIG
+
+
+def _protocol_config_issues(
+    spec: ExperimentSpec, protocol_config: ProtocolConfigKeys
+) -> list[FieldIssue]:
+    """A scorer takes its protocol keys from the protocol; a contradicting config is refused."""
+    protocol = spec.protocol.model_dump(mode="json")
+    return [
+        FieldIssue(
+            f"assessment.scorer_config.{ref}.{name}",
+            f"contradicts protocol.{name} {protocol[name]!r}; {ref} takes it from the "
+            "protocol, so leave it out",
+        )
+        for ref, config in spec.assessment.scorer_config.items()
+        for name in protocol_config.get(ref, ())
+        if name in config and config[name] != protocol[name]
+    ]
+
+
 def semantic_issues(
-    spec: ExperimentSpec, policies: ScorePolicyRegistry = DEFAULT_POLICY_REGISTRY
+    spec: ExperimentSpec,
+    policies: ScorePolicyRegistry = DEFAULT_POLICY_REGISTRY,
+    protocol_config: ProtocolConfigKeys | None = None,
 ) -> list[FieldIssue]:
     """Cross-reference rules plus the factor guard, each with a field location."""
     issues = [
@@ -142,6 +172,9 @@ def semantic_issues(
         *_agent_issues(spec),
         *_component_overlay_issues(spec),
         *_policy_issues(spec, policies),
+        *_protocol_config_issues(
+            spec, _default_protocol_config() if protocol_config is None else protocol_config
+        ),
     ]
     if issues:
         # The factor guard needs resolvable arm references and unique ids.

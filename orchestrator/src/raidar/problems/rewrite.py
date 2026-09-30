@@ -119,6 +119,7 @@ def build_bundle(
     steps: list[str],
     pack_image: str,
     source: dict[str, str],
+    entry_file: str | None = None,
 ) -> OracleBundle:
     """Oracle bundle for the selected steps, graded in the agent's pack image."""
     staged = build_bundle_from_scb_harbor_task(
@@ -134,6 +135,7 @@ def build_bundle(
                 base_image=pack_image, test_dependencies=derived.grader.test_dependencies
             ),
             steps=tuple(staged.step(name) for name in steps),
+            entry_file=entry_file,
         )
         selected = {name for step in manifest.steps for name in step.test_files}
         tests = out.with_name(out.name + ".tests")

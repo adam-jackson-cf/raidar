@@ -16,11 +16,12 @@ from raidar.oracle.snapshot import APP_SOURCE
 from raidar.packs.python import image_tag, load_pack_spec
 from raidar.problems.content import content_digest, hidden_content_in_task
 from raidar.problems.importer import ProblemDriftError, import_problem
-from raidar.problems.models import ProblemId, ProblemMode
+from raidar.problems.models import ProblemId, ProblemManifest, ProblemMode
 from raidar.problems.resolver import ProblemResolver, resolver_factory
 from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
 from raidar.problems.source import SourceError
 from raidar.problems.store import ROOT_ENV, ProblemStore, ProblemStoreError, find_store_root
+from raidar.spec.canonical import digest_json
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import build_lock
 from raidar.spec.policies import PolicyResolver
@@ -99,6 +100,9 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
         ).stdout.strip()
     )
     assert manifest.pack.image == image_tag(load_pack_spec())
+    # SCB config ``entry_file: adder`` in the Python pack's snapshot-file format.
+    assert manifest.entry_file == "adder.py"
+    assert manifest.lock_metadata()["entry_file"] == "adder.py"
 
     task = Task(content / "task")
     assert task.config.environment.docker_image == manifest.pack.image
@@ -117,6 +121,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
     assert not list((content / "task").rglob("test_checkpoint_*"))
     assert not list((content / "task").rglob("solution"))
     bundle = loaded.bundle.manifest
+    assert bundle.entry_file == manifest.entry_file, "the entrypoint travels with the oracle"
     assert bundle.grader.base_image == manifest.pack.image
     assert bundle.grader.environment_dockerfile is None
     assert [step.test_files for step in bundle.steps] == [
@@ -410,3 +415,38 @@ def test_only_a_usable_verdict_for_the_current_manifest_resolves(tmp_path: Path)
         _resolve(store, POSITIVE_REF, tmp_path)
     report_path.write_text(json.dumps(report))
     assert _resolve(store, POSITIVE_REF, tmp_path) is not None
+
+
+def test_manifests_without_an_entry_file_keep_their_recorded_bytes_and_digest() -> None:
+    manifests = sorted((COMMITTED_FIXTURE / "registry").rglob("*.json"))
+    assert manifests
+    for path in manifests:
+        if path.name.endswith(".validation.json"):
+            continue
+        recorded = json.loads(path.read_text())
+        loaded = ProblemManifest.model_validate(recorded)
+        assert loaded.entry_file is None
+        assert loaded.digest() == digest_json(recorded), path
+        assert "entry_file" not in loaded.lock_metadata()
+
+
+@pytest.mark.parametrize(
+    ("configured", "expected"),
+    [
+        ("forge", "forge.py"),
+        (" circopt ", "circopt.py"),
+        ("my..tool", "my..tool.py"),
+        ("", None),
+        ("../escape", None),
+        ("pkg/../../escape", None),
+    ],
+)
+def test_the_pack_formats_entry_files_as_snapshot_relative_paths(
+    configured: str, expected: str | None
+) -> None:
+    pack = load_pack_spec()
+    if expected is not None:
+        assert pack.entry_file(configured) == expected
+        return
+    with pytest.raises(ValueError, match="snapshot-relative"):
+        pack.entry_file(configured)

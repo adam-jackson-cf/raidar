@@ -22,9 +22,13 @@ ARG CODEX_CLI_NPM_PACKAGE
 ARG CODEX_CLI_VERSION
 ARG CLAUDE_CODE_NPM_PACKAGE
 ARG CLAUDE_CODE_VERSION
+# Outside /tmp by contract (pack.yaml image.agent_home): codex warns on
+# --version when its home is under a temp dir, which breaks Harbor's version
+# check and forces a reinstall in every trial.
+ARG AGENT_HOME
 
 ENV DEBIAN_FRONTEND=noninteractive
-ENV HOME=/tmp/agent_home
+ENV HOME=${AGENT_HOME}
 ENV UV_CACHE_DIR=/tmp/uv-cache
 ENV PIP_CACHE_DIR=/tmp/pip-cache
 ENV PYTHONUNBUFFERED=1

@@ -17,6 +17,7 @@ from raidar.scorers.process_compliance import (
     ProcessComplianceScorer,
     process_compliance_scorer_for_store,
 )
+from raidar.scorers.process_compliance.jev_residue import UNANSWERED
 from raidar.scorers.sdk.context import AssessContext
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, EvidenceSource, Observation
 from raidar.scorers.sdk.validation import validate_result
@@ -278,21 +279,28 @@ def test_ambiguous_checks_go_to_the_jev_residue_and_every_decision_is_audited(
 
 
 @pytest.mark.parametrize(
-    ("mode", "transport", "reason"),
+    ("mode", "transport", "reason", "awaiting"),
     [
-        (PolicyMode.OFF, RecordedTransport(), "skipped under the off policy"),
-        (PolicyMode.SHADOW, None, "missing_key"),
-        (PolicyMode.SHADOW, RecordedTransport(status=500), "Jev decision failed"),
+        (PolicyMode.OFF, RecordedTransport(), "skipped under the off policy", False),
+        # A later run can answer these, so the reason is one fixed text (the audit says why).
+        (PolicyMode.SHADOW, None, UNANSWERED, True),
+        (PolicyMode.SHADOW, RecordedTransport(status=500), UNANSWERED, True),
     ],
 )
 def test_jev_failures_leave_the_value_unavailable(
-    tmp_path: Path, mode: PolicyMode, transport: RecordedTransport | None, reason: str
+    tmp_path: Path,
+    mode: PolicyMode,
+    transport: RecordedTransport | None,
+    reason: str,
+    awaiting: bool,
 ) -> None:
     ctx = _ctx(tmp_path / "trial", _ambiguous_trace())
-    result = _assess(ctx, _runtime(tmp_path / "store", mode, transport=transport))
+    scorer = ProcessComplianceScorer(_runtime(tmp_path / "store", mode, transport=transport))
+    result = validate_result(scorer.manifest, ctx, scorer.assess(ctx))
     item = _by_key(result)["jev_ambiguous_compliance", "checkpoint_1"]
     assert (item.status, item.value) == (AssessStatus.UNAVAILABLE, None)
     assert reason in (item.reason or "")
+    assert scorer.awaiting_answers() is awaiting
     assert result.provenance.policy_modes == {"jev_ambiguous_compliance": mode.value}
 
 
@@ -303,9 +311,13 @@ def test_a_store_bound_scorer_uses_the_versioned_policy_and_audits_in_the_store(
     scorer = process_compliance_scorer_for_store(tmp_path / "store", replay_only=True)
     result = validate_result(scorer.manifest, ctx, scorer.assess(ctx))
     item = _by_key(result)["jev_ambiguous_compliance", "checkpoint_1"]
-    # Replay-only never calls the provider: an uncached residue is a cache miss.
+    # Replay-only never calls the provider: an uncached residue is a cache miss,
+    # which the store's audit records; the observation says only that it awaits Jev.
     assert (item.status, item.value) == (AssessStatus.UNAVAILABLE, None)
-    assert "cache_miss" in (item.reason or "")
+    assert item.reason == UNANSWERED
+    assert scorer.awaiting_answers() is True
+    audit = "".join(path.read_text() for path in (tmp_path / "store").rglob("*.jsonl"))
+    assert "cache_miss" in audit
     assert result.provenance.policy_modes == {"jev_ambiguous_compliance": "shadow"}
     assert (tmp_path / "store" / "jev-audit").is_dir()
 

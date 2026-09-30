@@ -78,11 +78,13 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 	experiment-validate experiment-lock experiment-run matrix-run \
 	experiment-plan experiment-execute perf-check perf-fixture \
 	problem-import problem-validate \
-	experiments-list experiments-prune assess-regrade jev-shadow-rubric \
+	experiments-list experiments-prune assess-regrade experiment-analyze jev-shadow-rubric \
+	jev-export-labels jev-import-labels \
 	pack-info pack-build pack-audit pack-tool-provision \
 	component-probe-trials \
-	benchmark-fixture-synthetic \
+	benchmark-fixture-synthetic review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
+	review-surface-quality-data \
 	quality
 
 define require_var
@@ -144,8 +146,14 @@ help:
 	@echo "                                                        Preview artifact pruning decisions"
 	@echo "  make assess-regrade RUN=<trial-or-job-dir> [ORACLE_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
+	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=5] [MAX_EXCLUSION_FRACTION=0.2] [ALPHA=0.05] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
+	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
 	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
+	@echo "  make jev-export-labels POLICY=<policy> OUT=<labels.jsonl> [STORE=<assessment-store>] [LABELS=review-surface/data/jev-labels.json]"
+	@echo "                                                        Export review-surface Jev labels as calibration rows (one per decision)"
+	@echo "  make jev-import-labels POLICY=<policy> STORE=<assessment-store> LABELS_FILE=<labels.jsonl>"
+	@echo "                                                        Import calibration labels into the store's Jev audit and show enforce readiness"
 	@echo ""
 	@echo "Runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
 	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
@@ -156,10 +164,16 @@ help:
 	@echo ""
 	@echo "Review surface:"
 	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
-	@echo "  make review-surface-data                               Project experiments/benchmarks into review-surface data"
+	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
+	@echo "                                                        Write the labelled synthetic experiment-epoch runs + Assessment store"
+	@echo "  make review-surface-data [REVIEW_RUNS_ROOT=<runs-root>...] [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
+	@echo "                                                        Project experiment runs (and experiments/benchmarks history) into review-surface data"
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
-	@echo "  make review-surface-test                               Run the review-surface end-to-end functional suite (Playwright)"
+	@echo "  make review-surface-test [REVIEW_FIXTURE=experiment|legacy] [REVIEW_RUNS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=...]"
+	@echo "                                                        Run the review-surface end-to-end suite (Playwright) on the synthetic fixture plus any given runs"
+	@echo "  make review-surface-quality-data [QUALITY_RUNS=<runs-root> QUALITY_STORE=<assessment-store>]"
+	@echo "                                                        Project Quality element data (default: labelled synthetic fixture)"
 
 RUNTIME ?= python
 TOOL ?=
@@ -190,12 +204,30 @@ pack-tool-provision:
 benchmark-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.synthetic ../experiments/benchmarks
 
-review-surface-data:
+REVIEW_FIXTURE ?= experiment
+REVIEW_FIXTURE_DIR ?= $(REPO_TMP_DIR)/review-fixture
+REVIEW_EXPERIMENTS_ROOT ?= $(CURDIR)/experiments/benchmarks
+REVIEW_RUNS_ROOT ?=
+REVIEW_STORE ?=
+REVIEW_LOCK ?=
+
+# $(1) scenario-epoch experiments roots (existing ones only), $(2) run roots, $(3) Assessment stores.
+define review_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection \
-		--experiments-root "$(CURDIR)/experiments/benchmarks" \
+		$(foreach root,$(wildcard $(1)),--experiments-root "$(abspath $(root))") \
+		$(foreach root,$(2),--runs-root "$(abspath $(root))") \
+		$(foreach store,$(3),--store "$(abspath $(store))") \
+		$(foreach lock,$(REVIEW_LOCK),--lock "$(abspath $(lock))") \
 		--output "$(REPO_TMP_DIR)/review-projection.json"
 	@RAIDAR_REVIEW_PROJECTION="$(REPO_TMP_DIR)/review-projection.json" \
 		node review-surface/scripts/build-review-data.mjs
+endef
+
+review-fixture-synthetic:
+	@cd orchestrator && uv run --project . python -m raidar.review_projection.fixture "$(REVIEW_FIXTURE_DIR)"
+
+review-surface-data:
+	$(call review_projection,$(REVIEW_EXPERIMENTS_ROOT),$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
 
 review-surface-build:
 	@cd review-surface && npm install --no-fund --no-audit && npm run build
@@ -203,7 +235,30 @@ review-surface-build:
 review-surface-serve: review-surface-data
 	@cd review-surface && node server.mjs
 
-review-surface-test: benchmark-fixture-synthetic review-surface-data
+QUALITY_FIXTURE_DIR ?= $(REPO_TMP_DIR)/quality-fixture
+
+review-surface-quality-data:
+	$(if $(QUALITY_RUNS),$(if $(QUALITY_STORE),,$(error QUALITY_STORE is required with QUALITY_RUNS)))
+	@$(if $(QUALITY_RUNS),true,$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality.synthetic "$(QUALITY_FIXTURE_DIR)")
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality \
+		--runs-root "$(or $(QUALITY_RUNS),$(QUALITY_FIXTURE_DIR)/runs)" \
+		--store "$(or $(QUALITY_STORE),$(QUALITY_FIXTURE_DIR)/store)" \
+		--output "$(REPO_TMP_DIR)/quality-projection.json" $(if $(QUALITY_RUNS),,--synthetic)
+	@RAIDAR_QUALITY_PROJECTION="$(REPO_TMP_DIR)/quality-projection.json" \
+		node review-surface/scripts/build-quality-data.mjs
+
+# The experiment fixture replaces the scenario-epoch synthetic fixture (same run ids) and
+# carries its own scenario-epoch experiments ($(REVIEW_FIXTURE_DIR)/experiments), so the old
+# epoch always renders; experiments/benchmarks joins only when REVIEW_EXPERIMENTS_ROOT is given
+# explicitly.
+REVIEW_TEST_EXPERIMENTS_ROOT = $(REVIEW_FIXTURE_DIR)/experiments $(if $(filter command line,$(origin REVIEW_EXPERIMENTS_ROOT)),$(REVIEW_EXPERIMENTS_ROOT),)
+
+review-surface-test: $(if $(filter legacy,$(REVIEW_FIXTURE)),benchmark-fixture-synthetic,review-fixture-synthetic) review-surface-quality-data
+ifeq ($(REVIEW_FIXTURE),legacy)
+	$(call review_projection,$(REVIEW_EXPERIMENTS_ROOT),$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
+else
+	$(call review_projection,$(REVIEW_TEST_EXPERIMENTS_ROOT),$(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_STORE))
+endif
 	@cd review-surface && npm install --no-fund --no-audit && npm run build \
 		&& npx playwright install chromium && npm test
 
@@ -313,6 +368,23 @@ REGRADE_OUT ?=
 assess-regrade:
 	$(call require_var,RUN)
 	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(RUN)" --docker-context "$${DOCKER_CONTEXT}" $(if $(ORACLE_BUNDLE),--bundle "$(ORACLE_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+
+experiment-analyze:
+	$(call require_var,RUNS)
+	$(call require_var,STORE)
+	$(call require_var,ANALYSIS_OUT)
+	@$(RAIDAR) analyze $(foreach run,$(RUNS),"$(run)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_RUNS),--allow-dev-runs,)
+
+jev-export-labels:
+	$(call require_var,POLICY)
+	$(call require_var,OUT)
+	@$(RAIDAR) jev export-labels --labels "$(or $(LABELS),$(CURDIR)/review-surface/data/jev-labels.json)" --policy "$(POLICY)" $(if $(STORE),--store "$(STORE)",) --output "$(OUT)"
+
+jev-import-labels:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	$(call require_var,LABELS_FILE)
+	@$(RAIDAR) jev import-labels --store "$(STORE)" --policy "$(POLICY)" "$(LABELS_FILE)"
 
 jev-shadow-rubric:
 	$(call require_var,SNAPSHOTS)

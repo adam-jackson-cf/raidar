@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import shutil
 import subprocess
@@ -30,7 +31,8 @@ from raidar.packs.python import (
     build_image,
     compose_override,
     harbor_agent_kwargs,
-    harness_version_matches,
+    harbor_reported_version,
+    harbor_version_command,
     image_lock_hash,
     image_tag,
     load_pack_spec,
@@ -101,9 +103,26 @@ def _interpreter(version: str, **found: list[str]) -> dict[str, object]:
     return {"version": version, "modules": [], "distributions": [], **found}
 
 
+# ``--version`` output as each pinned binary prints it (stderr merged, as Harbor execs).
+_VERSION_OUTPUT = {"codex-cli": "codex-cli {version}\n", "claude-code": "{version} (Claude Code)\n"}
+_TEMP_HOME_WARNING = (
+    "WARNING: proceeding, even though we could not create PATH aliases: Refusing to "
+    'create helper binaries under temporary dir "/tmp" '
+    '(codex_home: AbsolutePathBuf("/tmp/agent_home/.codex"))\n'
+)
+
+
+def _check(output: str, exit_code: int = 0) -> dict[str, object]:
+    """One harness's version check as the probe reports it."""
+    return {"exit_code": exit_code, "output": output}
+
+
 def _clean_audit(spec: PackSpec) -> dict[str, object]:
     return {
-        "harness": {h: f"{h} {pin.version}" for h, pin in spec.image.harnesses.items()},
+        "harness": {
+            h: _check(_VERSION_OUTPUT[h].format(version=pin.version))
+            for h, pin in spec.image.harnesses.items()
+        },
         "default_python": "3.12.14",
         "interpreters": {
             DEFAULT_PYTHON: _interpreter("3.12.14"),
@@ -154,6 +173,31 @@ def test_pack_spec_rejects_a_base_image_not_pinned_by_digest() -> None:
         PackSpec.model_validate(raw)
 
 
+@pytest.mark.parametrize(
+    ("agent_home", "error"),
+    [
+        ("/tmp/agent_home", "temporary directory"),
+        ("/tmp", "temporary directory"),
+        ("/var/tmp/home", "temporary directory"),
+        ("/home/../tmp/agent", "temporary directory"),
+        ("home/agent", "absolute"),
+        ("/tmp/../home/agent", None),
+        ("/home/agent", None),
+        ("/tmpfoo/agent", None),
+    ],
+)
+def test_agent_home_must_sit_outside_temporary_directories(
+    agent_home: str, error: str | None
+) -> None:
+    raw = yaml.safe_load(PACK_SPEC_PATH.read_text())
+    raw["image"]["agent_home"] = agent_home
+    if error is None:
+        assert PackSpec.model_validate(raw).image.agent_home == agent_home
+        return
+    with pytest.raises(ValidationError, match=error):
+        PackSpec.model_validate(raw)
+
+
 def test_image_definition_names_no_scorer_tool_or_browser() -> None:
     spec, lock = load_pack_spec(), load_tool_lock()
     image_text = "\n".join(
@@ -167,11 +211,13 @@ def test_image_definition_names_no_scorer_tool_or_browser() -> None:
     assert named == []
     assert set(build_args(spec)) >= {
         "BASE_IMAGE",
+        "AGENT_HOME",
         "CODEX_CLI_NPM_PACKAGE",
         "CODEX_CLI_VERSION",
         "CLAUDE_CODE_NPM_PACKAGE",
         "CLAUDE_CODE_VERSION",
     }
+    assert build_args(spec)["AGENT_HOME"] == spec.image.agent_home
 
 
 def test_build_reuses_only_a_labelled_clean_tag_and_force_rebuilds() -> None:
@@ -201,6 +247,9 @@ def test_build_reuses_only_a_labelled_clean_tag_and_force_rebuilds() -> None:
     assert audit_call[audit_call.index("--network") + 1] == "none"
     assert IMAGE_ID in audit_call, "the audit runs the exact image it inspected"
     request = json.loads(audit_call[-1])
+    assert request["harnesses"] == {
+        h: harbor_version_command(pin) for h, pin in spec.image.harnesses.items()
+    }, "the audit runs Harbor's own install version check"
     assert set(request["executables"]) >= {"ruff", "scb-check", "pytest"}
     assert set(request["distributions"]) >= {"ruff", "radon", "scb-check", "pytest"}
 
@@ -229,7 +278,31 @@ def _dirty_audits(spec: PackSpec) -> dict[str, dict[str, object]]:
         ),
         "default python off the pack pin": _dirty(spec, default_python="3.13.5"),
         "harness off its pin": _dirty(
-            spec, harness={"codex-cli": "codex-cli 0.0.1", "claude-code": ""}
+            spec, harness={"codex-cli": _check("codex-cli 0.0.1"), "claude-code": _check("")}
+        ),
+        "harness prints its pin but exits non-zero": _dirty(
+            spec,
+            harness={
+                **_clean_audit(spec)["harness"],  # type: ignore[dict-item]
+                "codex-cli": _check(
+                    _VERSION_OUTPUT["codex-cli"].format(
+                        version=spec.image.harnesses["codex-cli"].version
+                    ),
+                    exit_code=1,
+                ),
+            },
+        ),
+        "codex warns before its version": _dirty(
+            spec,
+            harness={
+                **_clean_audit(spec)["harness"],  # type: ignore[dict-item]
+                "codex-cli": _check(
+                    _TEMP_HOME_WARNING
+                    + _VERSION_OUTPUT["codex-cli"].format(
+                        version=spec.image.harnesses["codex-cli"].version
+                    )
+                ),
+            },
         ),
     }
 
@@ -262,30 +335,35 @@ def test_audit_reports_scorer_findings_from_every_interpreter() -> None:
 
 
 @pytest.mark.parametrize(
-    ("pinned", "reported", "matches"),
+    ("harness", "reported", "exit_code", "matches"),
     [
-        ("0.156.1", "codex-cli 0.156.1", True),
-        ("2.1.285", "2.1.285 (Claude Code)", True),
-        ("0.15", "codex-cli 0.156.1", False),
-        ("0.156.1", "codex-cli 0.156.10", False),
-        ("2.1.28", "2.1.285 (Claude Code)", False),
-        ("0.156.1", "", False),
+        ("codex-cli", "codex-cli {version}\n", 0, True),
+        ("claude-code", "{version} (Claude Code)\n", 0, True),
+        ("codex-cli", "codex-cli {version}0\n", 0, False),
+        ("codex-cli", _TEMP_HOME_WARNING + "codex-cli {version}\n", 0, False),
+        ("claude-code", "", 0, False),
+        ("codex-cli", "codex-cli {version}\n", 1, False),
     ],
 )
-def test_harness_version_must_match_exactly(pinned: str, reported: str, matches: bool) -> None:
-    assert harness_version_matches(pinned, reported) is matches
+def test_harness_matches_only_when_harbor_parses_exactly_the_pin(
+    harness: str, reported: str, exit_code: int, matches: bool
+) -> None:
+    pin = load_pack_spec().image.harnesses[harness]
+    parsed = harbor_reported_version(pin, reported.format(version=pin.version), exit_code)
+    assert (parsed == pin.version) is matches
 
 
 class _VersionReportingEnvironment:
     """Answers every exec with one ``--version`` output, like the pack image would."""
 
-    def __init__(self, version_output: str) -> None:
+    def __init__(self, version_output: str, return_code: int = 0) -> None:
         self.version_output = version_output
+        self.return_code = return_code
         self.commands: list[str] = []
 
     async def exec(self, command: str, **_: object) -> ExecResult:
         self.commands.append(command)
-        return ExecResult(stdout=self.version_output, stderr="", return_code=0)
+        return ExecResult(stdout=self.version_output, stderr="", return_code=self.return_code)
 
 
 @pytest.mark.parametrize(
@@ -306,7 +384,13 @@ def test_harbor_agent_on_the_pack_pin_skips_install(
     agent = agent_class(logs_dir=tmp_path, model_name="openai/gpt-6-luna", **kwargs)
     environment = _VersionReportingEnvironment(version_output.format(version=pinned))
     asyncio.run(agent.install(environment))  # type: ignore[arg-type]
-    assert len(environment.commands) == 1, "only the version check ran; nothing was installed"
+    # Only the version check ran, and it is the command the image audit replays.
+    assert environment.commands == [harbor_version_command(spec.image.harnesses[harness])]
+
+    failing = _VersionReportingEnvironment(version_output.format(version=pinned), return_code=1)
+    with contextlib.suppress(Exception):
+        asyncio.run(agent.install(failing))  # type: ignore[arg-type]
+    assert len(failing.commands) > 1, "a non-zero version check reinstalls, as the audit assumes"
 
     with pytest.raises(HarnessPinError, match="reinstall"):
         harbor_agent_kwargs(spec, harness, configured="0.0.1")

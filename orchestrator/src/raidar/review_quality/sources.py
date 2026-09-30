@@ -1,0 +1,264 @@
+"""Inputs of the Quality projection: run directories, the Assessment store, the Jev audit.
+
+- **Trials** come from WS-D run directories
+  (``<runs_root>/<experiment>/<run>/trajectories/<trial>.json``).
+- **Assessments** come from one Assessment store. A trial's Assessment of a
+  scorer is found by content, not by the store log's trial name (trial ids
+  such as ``b00-p0-baseline`` repeat across runs): the Assessment's recorded
+  inputs must name the trial's problem and exactly its stored snapshot
+  digests, step by step. When several Assessments of one scorer match (a new
+  config or scorer build), the one logged most recently wins.
+- **Jev decisions** come from the store's audit (``<store>/jev-audit``). A
+  decision names its trial by a free string (``raidar jev shadow-rubric
+  --trial``). It attaches to a trial when that string is the trial's review id
+  (``<experiment>.<run>.<trial>``) or ``<run>/<trial>``; a bare trial id
+  attaches only when exactly one projected trial has it. Trial ids repeat
+  across runs, so an ambiguous bare id attaches nowhere and every trial that
+  shares it says so: a reviewer never labels a decision against another run.
+- The **lock** the run was executed under supplies the baseline arm and the
+  headline policy, as WS-J's analysis reads them: the lock next to the
+  ``run.json`` ``experiment_file`` (``default_lock_path``), accepted only when
+  its body hashes to its ``lock_sha256`` and that digest is the run's. The
+  live experiment YAML is never read. Without a matching lock the baseline is
+  unknown and the headline policy is the default by K, and the projection
+  says so.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+from collections import defaultdict
+from collections.abc import Iterator
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+from raidar.analysis.sources import AnalysisInputError, read_lock
+from raidar.execution.models import TrajectoryRecord
+from raidar.jev.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
+from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
+from raidar.spec.lock import default_lock_path
+
+CODE_QUALITY_REF = "code-quality@1"
+CORRECTNESS_REF = "correctness@1"
+RUN_KIND = "raidar-run"
+_UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
+
+
+@dataclass(frozen=True)
+class ExperimentInfo:
+    """What the run's lock says, or why it could not be read (``note``)."""
+
+    lock_sha256: str | None
+    baseline_arm: str | None
+    headline_policy: str | None
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class TrialSource:
+    runs_root: Path
+    run_dir: Path
+    run_id: str
+    finished_at: str
+    record: TrajectoryRecord
+    experiment: ExperimentInfo
+
+    @property
+    def trial_dir(self) -> Path:
+        stored = Path(self.record.trial_dir)
+        return stored if stored.is_absolute() else self.run_dir / stored
+
+    @property
+    def review_id(self) -> str:
+        """Review id ``<experiment>.<run>.<trial>`` (server-safe characters only)."""
+        record = self.record
+        return _UNSAFE_ID.sub("-", f"{record.experiment}.{self.run_id}.{record.trial.trial_id}")
+
+    @property
+    def truncation(self) -> str | None:
+        """Why this trajectory is a development run (``max_checkpoints``), if it is one."""
+        if self.record.truncated_to is None:
+            return None
+        return f"truncated to the first {self.record.truncated_to} checkpoint(s) (max_checkpoints)"
+
+    def portable_path(self, path: Path) -> str:
+        """``path`` relative to the runs root, so the projection is not machine-specific."""
+        return Path(os.path.relpath(path, self.runs_root)).as_posix()
+
+    def snapshot_digests(self) -> dict[str, str | None]:
+        return {
+            attempt.step: attempt.snapshot.digest if attempt.snapshot else None
+            for attempt in self.record.attempts
+        }
+
+
+def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
+    spec = lock.get("spec") or {}
+    headline = lock.get("headline_policy") or {}
+    return ExperimentInfo(
+        lock_sha256=executed,
+        baseline_arm=(spec.get("analysis") or {}).get("baseline_arm"),
+        headline_policy=headline.get("ref") if isinstance(headline, dict) else None,
+    )
+
+
+def _experiment_info(run: dict[str, Any]) -> ExperimentInfo:
+    executed = str(run.get("lock_sha256") or "") or None
+    experiment_file = run.get("experiment_file")
+    if not isinstance(experiment_file, str) or executed is None:
+        return ExperimentInfo(executed, None, None, "run.json names no experiment_file or lock")
+    path = default_lock_path(Path(experiment_file))
+    if not path.is_file():
+        return ExperimentInfo(executed, None, None, f"lock unavailable: no {path.name} found")
+    try:
+        lock = read_lock(path)
+    except AnalysisInputError as exc:
+        detail = str(exc).replace(str(path), path.name)
+        return ExperimentInfo(executed, None, None, f"lock unavailable: {detail}")
+    if lock.get("lock_sha256") != executed:
+        found = str(lock.get("lock_sha256"))[:12]
+        return ExperimentInfo(
+            executed,
+            None,
+            None,
+            f"lock unavailable: {path.name} is now {found}, but the run was executed under "
+            f"{executed[:12]}",
+        )
+    return _lock_facts(lock, executed)
+
+
+def _run_dirs(runs_root: Path) -> Iterator[Path]:
+    for manifest in sorted(runs_root.rglob("run.json")):
+        try:
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(payload, dict) and payload.get("kind") == RUN_KIND:
+            yield manifest.parent
+
+
+def discover_trials(runs_root: Path) -> list[TrialSource]:
+    """Every trajectory of every Raidar run under ``runs_root``, in path order."""
+    trials: list[TrialSource] = []
+    for run_dir in _run_dirs(runs_root):
+        run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
+        experiment = _experiment_info(run)
+        for path in sorted((run_dir / "trajectories").glob("*.json")):
+            record = TrajectoryRecord.model_validate_json(path.read_bytes())
+            trials.append(
+                TrialSource(
+                    runs_root=runs_root,
+                    run_dir=run_dir,
+                    run_id=str(run.get("run_id") or run_dir.name),
+                    finished_at=str(run.get("finished_at") or ""),
+                    record=record,
+                    experiment=experiment,
+                )
+            )
+    return trials
+
+
+def _assessment_steps(assessment: Assessment) -> dict[str, str | None]:
+    steps = assessment.inputs.get("steps") or []
+    return {str(step["step"]): step.get("snapshot") for step in steps}
+
+
+@dataclass
+class StoreIndex:
+    """Assessments of one store, looked up by scorer and trial content."""
+
+    root: Path
+    _by_scorer: dict[str, list[tuple[int, Assessment]]] = field(default_factory=dict)
+
+    @classmethod
+    def open(cls, root: Path) -> StoreIndex:
+        recency: dict[str, int] = {}
+        log = root / LOG_FILE
+        if log.is_file():
+            for position, line in enumerate(log.read_text(encoding="utf-8").splitlines()):
+                if line.strip():
+                    recency[json.loads(line)["key"]] = position
+        by_scorer: dict[str, list[tuple[int, Assessment]]] = defaultdict(list)
+        for path in sorted((root / OBJECTS_DIR).glob("*/*.json")):
+            assessment = Assessment.model_validate_json(path.read_bytes())
+            by_scorer[assessment.scorer.ref].append((recency.get(assessment.key, -1), assessment))
+        return cls(root=root, _by_scorer=dict(by_scorer))
+
+    def find(self, scorer_ref: str, trial: TrialSource) -> Assessment | None:
+        digests = trial.snapshot_digests()
+        problem = trial.record.trial.problem
+        matches = [
+            (recency, assessment.key, assessment)
+            for recency, assessment in self._by_scorer.get(scorer_ref, [])
+            if assessment.inputs.get("problem") == problem
+            and _matches(_assessment_steps(assessment), digests)
+        ]
+        if not matches:
+            return None
+        return max(matches, key=lambda item: (item[0], item[1]))[2]
+
+
+def _matches(stored: dict[str, str | None], digests: dict[str, str | None]) -> bool:
+    if not any(digests.values()):
+        return False
+    if any(digest and stored.get(step) != digest for step, digest in digests.items()):
+        return False
+    return all(
+        snapshot is None or digests.get(step) == snapshot for step, snapshot in stored.items()
+    )
+
+
+@dataclass(frozen=True)
+class JevAttachment:
+    """The decisions attached to one trial, and why others naming it were not."""
+
+    decisions: tuple[DecisionRecord, ...] = ()
+    note: str | None = None
+
+
+@dataclass(frozen=True)
+class JevAudit:
+    decisions: dict[str, list[DecisionRecord]]
+    labels: dict[str, LabelRecord]
+
+    @classmethod
+    def open(cls, store_root: Path) -> JevAudit:
+        audit = AuditLog.for_store(store_root)
+        root = store_root / AUDIT_DIR
+        by_trial: dict[str, list[DecisionRecord]] = defaultdict(list)
+        labels: dict[str, LabelRecord] = {}
+        policies = (
+            sorted(path.name for path in root.iterdir() if path.is_dir()) if root.is_dir() else []
+        )
+        for policy in policies:
+            for record in audit.decisions(policy):
+                if record.trial is not None:
+                    by_trial[record.trial].append(record)
+            labels.update(audit.labels(policy))
+        return cls(decisions=dict(by_trial), labels=labels)
+
+    def attach(self, trials: list[TrialSource]) -> dict[str, JevAttachment]:
+        """Decisions per trial review id, under the unambiguous-name rule above."""
+        by_bare: dict[str, list[TrialSource]] = defaultdict(list)
+        for trial in trials:
+            by_bare[trial.record.trial.trial_id].append(trial)
+        attached: dict[str, JevAttachment] = {}
+        for trial in trials:
+            bare = trial.record.trial.trial_id
+            names = (trial.review_id, f"{trial.run_id}/{bare}")
+            decisions = [record for name in names for record in self.decisions.get(name, [])]
+            unresolved = self.decisions.get(bare, [])
+            note = None
+            if len(by_bare[bare]) == 1:
+                decisions.extend(unresolved)
+            elif unresolved:
+                note = (
+                    f"{len(unresolved)} Jev decision(s) name trial {bare!r}, which "
+                    f"{len(by_bare[bare])} runs share; not attached. Record them with "
+                    f"--trial {trial.review_id} to review them here"
+                )
+            attached[trial.review_id] = JevAttachment(decisions=tuple(decisions), note=note)
+        return attached

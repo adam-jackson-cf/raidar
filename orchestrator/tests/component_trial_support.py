@@ -35,7 +35,7 @@ from raidar.packs.python import bind_task_environment, image_tag, load_pack_spec
 
 DOCKER_CONTEXT = "orbstack"
 PLANT_MARKER = "raidar-planted-sentinel"
-AGENT_HOME = "/tmp/agent_home"
+AGENT_HOME = load_pack_spec().image.agent_home
 # Every harness-state location the reset owns (step_reset.sh STATE_TARGETS).
 PLANT_PATHS = (
     "/tmp/codex-home/sessions/2026/rollout-{token}.jsonl",

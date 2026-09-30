@@ -7,8 +7,9 @@ top-level package (shared kernels, the SDK, the oracle records), read
 statically without importing, so a change to any helper changes the
 Assessment key. The lock resolves ``name@version``
 scorer references here through the ``raidar.spec.resolvers`` entry point
-``scorer`` and records the manifest, the implementation's source digest and
-the pinned versions of the pack tools the scorer declares.
+``scorer`` and records the manifest, the implementation's source digest, the
+pinned versions of the pack tools the scorer declares and, for a scorer that
+decides under Jev policies, those policies' effective mode and digest.
 
 A scorer whose implementation has not landed still resolves (its manifest is
 the contract), but it cannot assess: loading it raises
@@ -25,6 +26,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.jev.policies import POLICY_DIR, PolicyRegistry
 from raidar.packs.python.models import ToolLock, load_tool_lock
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scorers.sdk.context import Scorer
@@ -39,6 +41,9 @@ from raidar.spec.references import (
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
 RUNTIME_TOOL_LOCKS: dict[str, Callable[[], ToolLock]] = {"python": load_tool_lock}
+# The repo-versioned Jev policies a store-bound runtime decides under
+# (``raidar.jev.session.open_runtime`` reads the same directory).
+JEV_POLICY_DIR = POLICY_DIR
 
 
 class ScorerUnavailableError(RuntimeError):
@@ -133,35 +138,98 @@ def _source_digest(module: str) -> str:
     return digest_json(dict(sorted(digests.items())))
 
 
+StoreFactory = Callable[..., Scorer]
+"""``factory(store_root, *, replay_only, trial) -> Scorer`` (a ``module:attribute`` target)."""
+
+
+def _split_target(target: str, field: str) -> tuple[str, str]:
+    if target.count(":") != 1:
+        raise ValueError(f"{field} must be 'module:attribute', got {target!r}")
+    module, attribute = target.split(":", 1)
+    return module, attribute
+
+
 @dataclass(frozen=True)
 class ScorerRegistration:
+    """A manifest, its implementation, and what it needs from the assessment run.
+
+    - ``store_implementation``: a factory that binds the scorer to an assessment
+      store (for example a Jev runtime whose audit and cache live in it).
+      ``raidar assess --rescore`` loads through it; without one it uses
+      ``implementation``.
+    - ``jev_policies``: the Jev policy ids the store-bound scorer decides under.
+      Their effective definitions (mode included) join the scorer identity, so a
+      mode change never reuses an Assessment made under another mode.
+    - ``problem_config``: config keys whose default comes from the problem
+      (``AssessContext.problem_config``); explicit scorer config wins.
+    - ``protocol_config``: config keys the experiment protocol sets (for
+      example ``progression``), written into every run's assessment config.
+    """
+
     manifest: ScorerManifest
     implementation: str | None = None
+    store_implementation: str | None = None
+    jev_policies: tuple[str, ...] = ()
+    problem_config: tuple[str, ...] = ()
+    protocol_config: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        if self.implementation is not None and self.implementation.count(":") != 1:
-            raise ValueError(
-                f"implementation must be 'module:attribute', got {self.implementation!r}"
-            )
+        if self.implementation is not None:
+            _split_target(self.implementation, "implementation")
+        if self.store_implementation is not None:
+            if self.implementation is None:
+                raise ValueError("store_implementation needs an implementation")
+            _split_target(self.store_implementation, "store_implementation")
 
     def implementation_digest(self) -> str | None:
         if self.implementation is None:
             return None
-        return _source_digest(self.implementation.split(":", 1)[0])
+        modules = {_split_target(self.implementation, "implementation")[0]}
+        if self.store_implementation is not None:
+            modules.add(_split_target(self.store_implementation, "store_implementation")[0])
+        if len(modules) == 1:
+            return _source_digest(next(iter(modules)))
+        return digest_json({module: _source_digest(module) for module in sorted(modules)})
+
+    def _checked(self, scorer: object, target: str) -> Scorer:
+        if not isinstance(scorer, Scorer) or scorer.manifest != self.manifest:
+            raise ScorerUnavailableError(
+                f"{target} does not implement the registered {self.manifest.ref}"
+            )
+        return scorer
 
     def load(self) -> Scorer:
         if self.implementation is None:
             raise ScorerUnavailableError(
                 f"scorer {self.manifest.ref} has a manifest but no implementation yet"
             )
-        module_name, attribute = self.implementation.split(":", 1)
+        module_name, attribute = _split_target(self.implementation, "implementation")
         factory = getattr(importlib.import_module(module_name), attribute)
-        scorer = factory()
-        if not isinstance(scorer, Scorer) or scorer.manifest != self.manifest:
-            raise ScorerUnavailableError(
-                f"{self.implementation} does not implement the registered {self.manifest.ref}"
-            )
-        return scorer
+        return self._checked(factory(), self.implementation)
+
+    def load_for_store(
+        self, store_root: Path, *, replay_only: bool = False, trial: str | None = None
+    ) -> Scorer:
+        """The scorer bound to an assessment store; ``load()`` when it needs no store."""
+        if self.store_implementation is None:
+            return self.load()
+        module_name, attribute = _split_target(self.store_implementation, "store_implementation")
+        factory: StoreFactory = getattr(importlib.import_module(module_name), attribute)
+        scorer = factory(store_root, replay_only=replay_only, trial=trial)
+        return self._checked(scorer, self.store_implementation)
+
+    def jev_policy_bindings(self) -> dict[str, dict[str, str]] | None:
+        """``{policy id: {mode, digest}}`` of the repo-versioned policies; None without Jev."""
+        if not self.jev_policies:
+            return None
+        registry = PolicyRegistry.from_dir(JEV_POLICY_DIR)
+        return {
+            policy_id: {
+                "mode": registry.get(policy_id).mode.value,
+                "digest": registry.get(policy_id).digest(),
+            }
+            for policy_id in sorted(self.jev_policies)
+        }
 
 
 def tool_lock_for(manifest: ScorerManifest) -> LockedTools:
@@ -223,14 +291,39 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "resource-usage@1": "raidar.scorers.resource_usage:resource_usage_scorer",
     "process-compliance@1": "raidar.scorers.process_compliance:process_compliance_scorer",
 }
+# Scorers bound to the assessment store at rescore time, with the Jev policies
+# that store-bound runtime decides under (process-compliance: shadow residue).
+BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "process-compliance@1": (
+        "raidar.scorers.process_compliance:process_compliance_scorer_for_store",
+        ("process-compliance.residue",),
+    ),
+}
+# Config keys a scorer takes from the problem unless the experiment sets them.
+BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
+    "code-quality@1": ("entry_file",),
+}
+# Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
+BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
+    "correctness@1": ("progression",),
+}
+
+
+def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
+    store_implementation, jev_policies = BUILTIN_STORE_IMPLEMENTATIONS.get(manifest.ref, (None, ()))
+    return ScorerRegistration(
+        manifest,
+        BUILTIN_IMPLEMENTATIONS.get(manifest.ref),
+        store_implementation=store_implementation,
+        jev_policies=jev_policies,
+        problem_config=BUILTIN_PROBLEM_CONFIG.get(manifest.ref, ()),
+        protocol_config=BUILTIN_PROTOCOL_CONFIG.get(manifest.ref, ()),
+    )
 
 
 def default_scorer_registry() -> ScorerRegistry:
-    """Built-in scorers. Implementations are bound here as WS-G lands them."""
-    return ScorerRegistry(
-        ScorerRegistration(manifest, BUILTIN_IMPLEMENTATIONS.get(manifest.ref))
-        for manifest in BUILTIN_MANIFESTS
-    )
+    """Built-in scorers, with their store bindings and problem-derived config keys."""
+    return ScorerRegistry(_builtin(manifest) for manifest in BUILTIN_MANIFESTS)
 
 
 @dataclass(frozen=True)
@@ -253,6 +346,9 @@ class ScorerResolver:
             "implementation_digest": registration.implementation_digest(),
             "tool_lock": tool_lock,
         }
+        jev_policies = registration.jev_policy_bindings()
+        if jev_policies is not None:
+            metadata["jev_policies"] = jev_policies
         return ResolvedReference(
             ref=ref,
             digest=digest_json(metadata),

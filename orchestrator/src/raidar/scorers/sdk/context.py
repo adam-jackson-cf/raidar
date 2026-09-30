@@ -14,6 +14,11 @@ subjects and a scorer reports such checkpoints with an explicit status.
 Correctness comes from ``raidar-oracle/steps/*/record.json``; Harbor's
 trial-level aggregated rewards are not offered, because they count missing
 keys as zero.
+
+``problem_config`` carries the problem's own facts that scorers take as config
+defaults (for example ``entry_file``, the snapshot-relative entrypoint). It
+comes from the oracle bundle the trial was graded with, so the Assessment key
+already covers it through the problem reference and oracle record digests.
 """
 
 from __future__ import annotations
@@ -67,6 +72,7 @@ class AssessContext:
     problem: str
     steps: tuple[StepInputs, ...]
     config: Mapping[str, Any] = field(default_factory=dict)
+    problem_config: Mapping[str, Any] = field(default_factory=dict)
     starter: Path | None = None
     inventory_policy: InventoryPolicy = field(default_factory=InventoryPolicy)
     labels_blinded: bool = True
@@ -110,6 +116,30 @@ class Scorer(Protocol):
     def manifest(self) -> ScorerManifest: ...
 
     def assess(self, ctx: AssessContext) -> AssessResult: ...
+
+
+@runtime_checkable
+class RawPayloadScorer(Scorer, Protocol):
+    """A scorer that also hands back raw payloads (unparsed tool output) for audit.
+
+    The store keeps each payload content-addressed and the Assessment names it
+    by digest, so replays must reproduce the raw bytes as well as the result.
+    """
+
+    def assess_with_raw(self, ctx: AssessContext) -> tuple[AssessResult, Mapping[str, bytes]]: ...
+
+
+@runtime_checkable
+class AwaitingAnswersScorer(Scorer, Protocol):
+    """A scorer whose last ``assess`` may have left external answers outstanding.
+
+    ``awaiting_answers()`` is True when some decision had no answer yet for a
+    reason a later run can remove (for example Jev with no API key or no cached
+    answer). The store keeps that Assessment as provisional: a later rescore
+    runs it again, and a complete result supersedes it under the same key.
+    """
+
+    def awaiting_answers(self) -> bool: ...
 
 
 def statused_result(

@@ -3,9 +3,20 @@
 ``raidar assess --rescore`` runs here. Each (trial, scorer) pair is keyed
 before anything runs. An existing key is reused unless ``replay`` is set, in
 which case the scorer runs again and the store verifies the bytes are
-identical. A new scorer version (or config, tool lock or input) gives a new
-key, so rescoring only ever adds Assessments. Trial directories are read,
-never written.
+identical. A provisional Assessment (some Jev decision had no answer yet) is
+never reused: it runs again, and a complete result supersedes it. A new
+scorer version (or config, tool lock or input) gives a new key, so rescoring
+only ever adds Assessments (or completes a provisional one). Trial
+directories are read, never written.
+
+Scorers load through their store-aware factory when they have one, so
+``process-compliance@1`` gets a ``JevRuntime`` whose audit and cache live in the
+store (its repo policy mode, shadow by default; ``jev_replay_only`` never calls
+the provider). A scorer's problem-derived config keys (``entry_file``) default
+from ``AssessContext.problem_config``; explicit config wins. The key hashes the
+explicit config only: the defaults are a function of the problem reference and
+oracle records already in the key's inputs, and analysis recomputes keys from
+the run's explicit assessment config.
 """
 
 from __future__ import annotations
@@ -20,8 +31,13 @@ from typing import Any
 from raidar.oracle.regrade import RegradeError, trial_dirs
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, tool_lock_for
 from raidar.scorers.inventory import InventoryPolicy
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import RunStats
+from raidar.scorers.sdk.context import (
+    AssessContext,
+    AwaitingAnswersScorer,
+    RawPayloadScorer,
+    Scorer,
+)
+from raidar.scorers.sdk.result import AssessResult, RunStats
 from raidar.scorers.sdk.validation import validate_result, validate_scorer_set
 from raidar.scorers.store import (
     Assessment,
@@ -46,6 +62,7 @@ class RescoreOutcome(StrEnum):
     ADDED = "added"
     EXISTING = "existing"
     REPLAYED_IDENTICAL = "replayed_identical"
+    SUPERSEDED = "superseded"
 
 
 @dataclass(frozen=True)
@@ -58,11 +75,51 @@ class AssessmentRecord:
 
 
 def scorer_identity(registration: ScorerRegistration) -> ScorerIdentity:
-    return ScorerIdentity(
-        ref=registration.manifest.ref,
-        manifest_digest=registration.manifest.digest(),
-        implementation_digest=registration.implementation_digest(),
+    return ScorerIdentity.model_validate(
+        {
+            "ref": registration.manifest.ref,
+            "manifest_digest": registration.manifest.digest(),
+            "implementation_digest": registration.implementation_digest(),
+            "jev_policies": registration.jev_policy_bindings(),
+        }
     )
+
+
+def effective_config(registration: ScorerRegistration, ctx: AssessContext) -> dict[str, Any]:
+    """Problem-derived defaults for the scorer's declared keys, overlaid by explicit config."""
+    defaults = {
+        name: ctx.problem_config[name]
+        for name in registration.problem_config
+        if ctx.problem_config.get(name) is not None
+    }
+    return {**defaults, **dict(ctx.config)}
+
+
+@dataclass(frozen=True)
+class _Produced:
+    result: AssessResult
+    raw_payloads: dict[str, str]
+    provisional: bool
+
+
+def _run(scorer: Scorer, ctx: AssessContext, store: AssessmentStore) -> _Produced:
+    raw: dict[str, str] = {}
+    if isinstance(scorer, RawPayloadScorer):
+        result, payloads = scorer.assess_with_raw(ctx)
+        raw = {name: store.put_raw(data) for name, data in sorted(payloads.items())}
+    else:
+        result = scorer.assess(ctx)
+    provisional = isinstance(scorer, AwaitingAnswersScorer) and scorer.awaiting_answers()
+    return _Produced(result, raw, provisional)
+
+
+def _outcome(put: PutOutcome, *, replay: bool) -> RescoreOutcome:
+    if put is PutOutcome.ADDED:
+        return RescoreOutcome.ADDED
+    if put is PutOutcome.SUPERSEDED:
+        return RescoreOutcome.SUPERSEDED
+    # Identical bytes without --replay: a provisional Assessment still awaits answers.
+    return RescoreOutcome.REPLAYED_IDENTICAL if replay else RescoreOutcome.EXISTING
 
 
 def assess(
@@ -72,6 +129,7 @@ def assess(
     *,
     trial: str,
     replay: bool = False,
+    jev_replay_only: bool = False,
 ) -> AssessmentRecord:
     """Store (or reuse, or replay-verify) one scorer's Assessment of one trajectory."""
     identity = scorer_identity(registration)
@@ -79,13 +137,16 @@ def assess(
     tool_lock = tool_lock_for(registration.manifest)
     inputs = context_inputs(ctx)
     key = assessment_key(identity, config=config, tool_lock=tool_lock, inputs=inputs)
-    if store.has(key) and not replay:
+    stored = None if replay else store.get(key)
+    if stored is not None and not stored.provisional:
         return AssessmentRecord(
             trial, identity.ref, key, RescoreOutcome.EXISTING, store.path_for(key)
         )
-    scorer = registration.load()
+    scorer = registration.load_for_store(store.root, replay_only=jev_replay_only, trial=trial)
+    scored = replace(ctx, config=effective_config(registration, ctx))
     started = time.perf_counter()
-    result = validate_result(registration.manifest, ctx, scorer.assess(ctx))
+    produced = _run(scorer, scored, store)
+    result = validate_result(registration.manifest, scored, produced.result)
     stats = RunStats(duration_s=time.perf_counter() - started)
     assessment = Assessment(
         key=key,
@@ -94,9 +155,10 @@ def assess(
         tool_lock=tool_lock,
         inputs=inputs,
         result=result,
+        raw_payloads=produced.raw_payloads,
+        provisional=produced.provisional,
     )
-    put = store.put(assessment)
-    outcome = RescoreOutcome.ADDED if put is PutOutcome.ADDED else RescoreOutcome.REPLAYED_IDENTICAL
+    outcome = _outcome(store.put(assessment), replay=replay)
     store.log(trial=trial, key=key, scorer=identity.ref, outcome=outcome.value, stats=stats)
     return AssessmentRecord(trial, identity.ref, key, outcome, store.path_for(key))
 
@@ -124,6 +186,7 @@ def rescore_path(
     inventory_policy: InventoryPolicy | None = None,
     bundle_override: Path | None = None,
     replay: bool = False,
+    jev_replay_only: bool = False,
 ) -> list[AssessmentRecord]:
     """Assess every trial under ``target`` (a trial or job dir) with each scorer."""
     registrations = _registrations(scorer_refs, registry, config or {})
@@ -146,7 +209,16 @@ def rescore_path(
         for registration in registrations:
             scorer_config = dict((config or {}).get(registration.manifest.ref, {}))
             ctx = replace(loaded, config=scorer_config)
-            records.append(assess(store, registration, ctx, trial=trial_dir.name, replay=replay))
+            records.append(
+                assess(
+                    store,
+                    registration,
+                    ctx,
+                    trial=trial_dir.name,
+                    replay=replay,
+                    jev_replay_only=jev_replay_only,
+                )
+            )
     return records
 
 

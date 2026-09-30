@@ -1,4 +1,4 @@
-"""``process-compliance@1`` scorer (plan G5), its Jev residue and the manipulation check."""
+"""``process-compliance@1`` scorer (plan G5) and its Jev residue."""
 
 from raidar.scorers.process_compliance.scorer import (
     ProcessComplianceScorer,

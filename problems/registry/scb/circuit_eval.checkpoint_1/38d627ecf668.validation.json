@@ -35,13 +35,13 @@
   "environment": {
     "docker_context": "orbstack",
     "engine": "harbor",
-    "grader_image": "raidar-oracle-grader:53ef42e1caacebbc",
+    "grader_image": "raidar-oracle-grader:466e21c75a524af1",
     "harbor": "0.23.0",
     "native_runner": {
       "commit": "25069ba83cdaf7abcf08acb4cf6e2b024e66d109",
       "dirty": false
     },
-    "pack_image": "raidar/pack-python:8c98ccdfd980e2a4"
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
   },
   "grades": {
     "native": {
@@ -300,7 +300,7 @@
     "selection": "default_by_k"
   },
   "kind": "raidar-problem-validation",
-  "manifest_sha256": "996e75395c3c1815ea686cb48fa2dae63859e190af0b4ff1f515faa86d79372f",
+  "manifest_sha256": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
   "mode": "one_shot",
   "not_run": [],
   "problem": "scb/circuit_eval.checkpoint_1@38d627ecf668",

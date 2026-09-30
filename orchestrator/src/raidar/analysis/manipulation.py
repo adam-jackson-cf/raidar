@@ -25,9 +25,9 @@ sample size, prevented separation.
 
 The overall verdict is ``separated`` only when every requested check is.
 
-Placement: this compares arms, which F6 keeps out of scorers; it is analysis
-code that reads stored ``process-compliance@1`` results and lives beside the
-scorer only until WS-J's ``analysis/`` package exists. No scorer imports it.
+Placement: this compares arms, which F6 keeps out of scorers, so it is
+analysis code over stored ``process-compliance@1`` results. ``raidar analyze``
+runs it for every treatment arm against the baseline arm.
 """
 
 from __future__ import annotations

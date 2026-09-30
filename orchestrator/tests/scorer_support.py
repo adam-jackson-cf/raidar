@@ -88,7 +88,9 @@ class StepFixture:
     usage: dict[str, int] | None = None
 
 
-def write_toy_bundle(root: Path, steps: Sequence[str]) -> OracleBundle:
+def write_toy_bundle(
+    root: Path, steps: Sequence[str], *, entry_file: str | None = None
+) -> OracleBundle:
     """A host-side oracle bundle planning ``steps`` for problem ``toy``."""
     tests = root.parent / f"{root.name}-tests"
     write_files(tests, {f"test_{name}.py": "def test_ok():\n    pass\n" for name in steps})
@@ -104,12 +106,17 @@ def write_toy_bundle(root: Path, steps: Sequence[str]) -> OracleBundle:
             )
             for name in steps
         ),
+        entry_file=entry_file,
     )
     return write_bundle(root, manifest, tests)
 
 
 def write_trial(
-    trial_dir: Path, steps: Sequence[StepFixture], *, planned: Sequence[str] = ()
+    trial_dir: Path,
+    steps: Sequence[StepFixture],
+    *,
+    planned: Sequence[str] = (),
+    entry_file: str | None = None,
 ) -> Path:
     """A stored multi-step Harbor trial with host-side oracle records.
 
@@ -117,7 +124,9 @@ def write_trial(
     (a trial that halted or errored before reaching them).
     """
     bundle = write_toy_bundle(
-        trial_dir.parent / f"{trial_dir.name}-bundle", [*(s.name for s in steps), *planned]
+        trial_dir.parent / f"{trial_dir.name}-bundle",
+        [*(s.name for s in steps), *planned],
+        entry_file=entry_file,
     )
     step_results = []
     for step in steps:

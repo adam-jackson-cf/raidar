@@ -112,9 +112,10 @@
   "pack": {
     "id": "python",
     "version": 1,
-    "image": "raidar/pack-python:8c98ccdfd980e2a4"
+    "image": "raidar/pack-python:2b91a52663e099f2"
   },
-  "task_sha256": "6113fd2a4b0747c4bb1a118c6a680916e49cd0b995ccce3929374154f587728c",
-  "bundle_sha256": "256c0661f4d75fe7629f5348aacdb64fb6959d73780b5955d3a97889e583baa7",
-  "references_sha256": "1451f566df2cdd5e9b9c0550056cbf051eeaa70cde8f91dbbbf7f0b1988aebb8"
+  "task_sha256": "596ae5b6af7e45c4b9a05dc8c495452042a21b9f7b23d6919516074ae5ada49f",
+  "bundle_sha256": "6ab17bb4ebf36d44b488de06a5143d9d15388f8dacf7ac8a4875eeddc941c04b",
+  "references_sha256": "1451f566df2cdd5e9b9c0550056cbf051eeaa70cde8f91dbbbf7f0b1988aebb8",
+  "entry_file": "forge.py"
 }

@@ -24,6 +24,7 @@ from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from raidar.jev.client import FailureReason
 from raidar.jev.gating import jev_policy_modes
 from raidar.jev.process import (
     PROCESS_POLICY,
@@ -50,6 +51,34 @@ JEV_CHECKS = {
     TESTS_RUN_BEFORE_FINISH: ProcessCheck.TESTS_RUN_BEFORE_FINISH,
     PLAN_WRITTEN: ProcessCheck.PLAN_BEFORE_EDIT,
 }
+
+
+# Failures a later run can remove (a key, a cache entry, a working provider).
+# The Assessment reports them with one fixed reason, so its bytes do not depend
+# on why Jev had no answer this time (``--jev-replay-only``, a missing key);
+# the store's Jev audit keeps the exact reason of every decision.
+UNANSWERED_REASONS = frozenset(
+    {
+        FailureReason.MISSING_KEY,
+        FailureReason.CACHE_MISS,
+        FailureReason.NETWORK,
+        FailureReason.TIMEOUT,
+        FailureReason.HTTP_ERROR,
+        FailureReason.CREDITS,
+        FailureReason.INVALID_RESPONSE,
+        FailureReason.MODEL_MISMATCH,
+        FailureReason.INVALID_ANSWERS,
+    }
+)
+UNANSWERED = "Jev has not answered this decision yet; the store's Jev audit records why"
+
+
+def unanswered_decisions(runtime: JevRuntime | None) -> int:
+    """Decisions ``runtime`` could not get answered for a reason a later run can remove."""
+    if runtime is None:
+        return 0
+    failures = runtime.totals.failures
+    return sum(failures.get(reason.value, 0) for reason in UNANSWERED_REASONS)
 
 
 def store_runtime(store_root: Path, *, replay_only: bool, trial: str | None) -> JevRuntime:
@@ -113,6 +142,8 @@ class ResidueAnswer:
 
 def _failure(outcome: DecisionOutcome) -> str:
     record = outcome.record
+    if record.failure_reason in {reason.value for reason in UNANSWERED_REASONS}:
+        return UNANSWERED
     if record.error or record.failure_reason:
         return f"Jev decision failed: {record.failure_reason or ''} {record.error or ''}".strip()
     return f"Jev decision {record.verdict} under the {record.mode.value} policy"

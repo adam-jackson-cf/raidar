@@ -3,12 +3,20 @@
 Harbor's installed codex and claude-code agents skip ``install()`` only when
 the configured ``version`` equals the version the binary reports, and reinstall
 otherwise. The pack image bakes the pinned version in, so a trial on the pack
-image stays on the warm path only when its agent is configured with that pin.
+image stays on the warm path only when its agent is configured with that pin
+and Harbor's own version check, run in the image, parses exactly that pin.
 """
 
 from __future__ import annotations
 
-from raidar.packs.python.models import PackSpec
+import tempfile
+from pathlib import Path
+
+from harbor.agents.factory import AgentFactory
+from harbor.agents.installed.base import BaseInstalledAgent
+from harbor.models.agent.name import AgentName
+
+from raidar.packs.python.models import HarnessPin, PackSpec
 
 
 class HarnessPinError(ValueError):
@@ -38,3 +46,37 @@ def harbor_agent_kwargs(
 ) -> dict[str, str]:
     """Harbor ``AgentConfig.kwargs`` that keep the agent on the baked-in harness."""
     return {"version": pinned_harness_version(spec, harness, configured)}
+
+
+def _harbor_agent(pin: HarnessPin) -> BaseInstalledAgent:
+    agent_class = AgentFactory.get_agent_class(AgentName(pin.harbor_agent))
+    if not issubclass(agent_class, BaseInstalledAgent):
+        raise HarnessPinError(f"Harbor agent {pin.harbor_agent!r} is not an installed agent")
+    # Construction only records its arguments; logs_dir is never touched here.
+    return agent_class(logs_dir=Path(tempfile.gettempdir()), version=pin.version)
+
+
+def harbor_version_command(pin: HarnessPin) -> str:
+    """The shell command Harbor's install() runs to decide whether to reinstall.
+
+    That is the agent's ``_INSTALL_VERSION_COMMAND`` (codex, claude-code), not
+    the public ``get_version_command()``; the latter is only a fallback for an
+    agent that defines no install-time command.
+    """
+    agent = _harbor_agent(pin)
+    command = getattr(agent, "_INSTALL_VERSION_COMMAND", None) or agent.get_version_command()
+    if not isinstance(command, str) or not command:
+        raise HarnessPinError(f"Harbor agent {pin.harbor_agent!r} has no version command")
+    return command
+
+
+def harbor_reported_version(pin: HarnessPin, output: str, exit_code: int = 0) -> str:
+    """What Harbor's install check makes of the version command's result.
+
+    ``output`` is stdout and stderr merged, as Harbor execs. A non-zero exit
+    makes Harbor reinstall before it parses anything, so it reports no version
+    (the exit status, which never equals a pin).
+    """
+    if exit_code != 0:
+        return f"exit status {exit_code}"
+    return _harbor_agent(pin).parse_version(output)

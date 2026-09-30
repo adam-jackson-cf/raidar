@@ -338,8 +338,15 @@ def load_trial_context(
         problem=bundle.manifest.problem,
         steps=_planned_steps(trial_dir, executed, records, bundle),
         config=dict(config or {}),
+        problem_config=problem_config(bundle),
         inventory_policy=inventory_policy or InventoryPolicy(),
     )
+
+
+def problem_config(bundle: OracleBundle) -> dict[str, Any]:
+    """Problem facts scorers take as config defaults (``AssessContext.problem_config``)."""
+    entry_file = bundle.manifest.entry_file
+    return {"entry_file": entry_file} if entry_file is not None else {}
 
 
 def context_inputs(ctx: AssessContext) -> dict[str, object]:

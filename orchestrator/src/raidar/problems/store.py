@@ -125,7 +125,8 @@ class ProblemStore:
     def write_manifest(self, manifest: ProblemManifest) -> Path:
         path = self.manifest_path(manifest.problem_id)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(manifest.model_dump_json(indent=2) + "\n")
+        omit = {"entry_file"} if manifest.entry_file is None else None
+        path.write_text(manifest.model_dump_json(indent=2, exclude=omit) + "\n")
         return path
 
     def load(self, problem: ProblemId) -> ImportedProblem:

@@ -1,0 +1,140 @@
+import { test, expect, type Page } from '@playwright/test';
+
+// Deterministic ids from the synthetic Quality fixture (make review-surface-quality-data).
+const INELIGIBLE_RUN = 'synthetic-quality.synthetic-run-1.b02-p0-baseline';
+const LABELLED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-baseline';
+
+async function openQuality(page: Page) {
+  await page.goto('/quality');
+  await expect(page.getByTestId('quality-problem').first()).toBeVisible();
+}
+
+async function removeLabels(page: Page, runId: string) {
+  const labels = await (await page.request.get(`/api/quality/labels?run_id=${runId}`)).json();
+  for (const label of labels) await page.request.delete(`/api/quality/labels/${encodeURIComponent(label.id)}`);
+}
+
+test.describe('quality navigation', () => {
+  test('the /quality route opens the experiment view under its lock, labelled synthetic', async ({ page }) => {
+    await openQuality(page);
+    await expect(page.getByText('Synthetic', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'synthetic/ledger@0' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Experiment' })).toContainText(/synthetic-quality · lock [0-9a-f]{12}/);
+  });
+
+  test('a trial link opens its run detail and back returns', async ({ page }) => {
+    await openQuality(page);
+    await page.getByTestId('quality-trials').getByRole('link', { name: 'b02-p0-baseline' }).click();
+    await expect(page).toHaveURL(new RegExp(`/quality/runs/${INELIGIBLE_RUN.replace(/\./g, '\\.')}$`));
+    await expect(page.getByTestId('quality-strip')).toBeVisible();
+    await page.getByRole('link', { name: 'Quality', exact: true }).click();
+    await expect(page).toHaveURL(/\/quality$/);
+  });
+});
+
+test.describe('quality experiment view', () => {
+  test('component curves: one small multiple per component, both arms in the legend', async ({ page }) => {
+    await openQuality(page);
+    await expect(page.getByTestId('component-curve')).toHaveCount(8);
+    const legend = page.getByRole('list', { name: 'Arms' });
+    await expect(legend).toContainText('baseline');
+    await expect(legend).toContainText('guided');
+  });
+
+  test('paired Δ gives a verdict per component and accounts for left-out blocks', async ({ page }) => {
+    await openQuality(page);
+    const table = page.getByTestId('paired-delta');
+    await expect(table.getByTestId('paired-row')).toHaveCount(8);
+    await expect(table.getByText('Improved').first()).toBeVisible();
+    await expect(table.getByText('Insufficient').first()).toBeVisible();
+    await expect(page.getByTestId('quality-exclusions')).toContainText('invalid trajectory (infra-excluded)');
+  });
+
+  test('SCB distributions, head-to-head scatter and sensitivity render with their sources', async ({ page }) => {
+    await openQuality(page);
+    await expect(page.getByTestId('distribution')).toHaveCount(3);
+    await expect(page.getByTestId('quality-distributions')).toContainText('Lint density');
+    await expect(page.getByTestId('quality-distributions')).toContainText('CC-mass concentration');
+    await expect(page.getByTestId('quality-distributions')).toContainText('Function LOC');
+    const scatters = page.getByTestId('h2h-scatter');
+    await expect(scatters).toHaveCount(2);
+    await expect(scatters.first()).toContainText('Lint errors per checkpoint');
+    await expect(scatters.nth(1)).toContainText('Functions with CC > 10');
+    await expect(page.getByTestId('h2h-counts').first()).toHaveText(/\d+ plotted · \d+ excluded/);
+    await expect(page.getByTestId('ablation-row')).toHaveCount(5);
+    await expect(page.getByTestId('correlation-matrix')).toContainText(/-?\d\.\d\d/);
+  });
+});
+
+test.describe('quality run detail', () => {
+  test('strip shows every checkpoint plus the headline row, with eligibility reasons', async ({ page }) => {
+    await page.goto(`/quality/runs/${INELIGIBLE_RUN}`);
+    await expect(page.getByTestId('strip-row')).toHaveCount(5);
+    await expect(page.getByTestId('strip-problem')).toContainText('scb-canonical@1');
+    const badge = page.getByTestId('strip-problem').locator('[data-status="ineligible"]').first();
+    await expect(badge).toHaveAttribute('title', /no value for checkpoint_3/);
+    await expect(page.getByTestId('policy-reasons')).toContainText('component_ineligible H');
+    await expect(page.getByTestId('strip-row').first().locator('[data-status="not_applicable"]').first()).toHaveAttribute(
+      'title',
+      /no transition into the first checkpoint/,
+    );
+  });
+
+  test('a cell drill-down lists file:line evidence for that checkpoint', async ({ page }) => {
+    await page.goto(`/quality/runs/${INELIGIBLE_RUN}`);
+    await page.getByRole('button', { name: /Erosion: .*Show evidence/ }).nth(3).click();
+    const drilldown = page.getByTestId('evidence-drilldown');
+    await expect(drilldown).toContainText('checkpoint_4');
+    await expect(drilldown.getByTestId('evidence-item').first()).toContainText(/ledger\/\w+\.py:\d+-\d+/);
+    await drilldown.getByRole('button', { name: 'Close evidence' }).click();
+    await expect(page.getByTestId('evidence-drilldown')).toHaveCount(0);
+  });
+
+  test('a column header drill-down spans all checkpoints', async ({ page }) => {
+    await page.goto(`/quality/runs/${INELIGIBLE_RUN}`);
+    await page.getByRole('button', { name: 'Rework evidence, all checkpoints' }).click();
+    const drilldown = page.getByTestId('evidence-drilldown');
+    await expect(drilldown).toContainText('all checkpoints');
+    await expect(drilldown.getByTestId('evidence-item').first()).toContainText('->');
+  });
+
+  test('an unknown run says so and offers the way back', async ({ page }) => {
+    await page.goto('/quality/runs/no-such-run');
+    await expect(page.getByText('No quality data for no-such-run.')).toBeVisible();
+  });
+});
+
+test.describe('jev calibration labels', () => {
+  test.afterEach(async ({ page }) => removeLabels(page, LABELLED_RUN));
+
+  test('labelling a decision persists one label per decision, and unlabelling removes it', async ({ page }) => {
+    await removeLabels(page, LABELLED_RUN);
+    await page.goto(`/quality/runs/${LABELLED_RUN}`);
+    const decision = page.getByTestId('jev-decision').first();
+    await decision.getByRole('button', { name: 'False positive' }).click();
+    await expect(decision.getByRole('button', { name: 'False positive' })).toHaveAttribute('aria-pressed', 'true');
+    await decision.getByRole('button', { name: 'Correct' }).click();
+    await expect(decision.getByRole('button', { name: 'Correct' })).toHaveAttribute('aria-pressed', 'true');
+
+    const saved = await (await page.request.get(`/api/quality/labels?run_id=${LABELLED_RUN}`)).json();
+    expect(saved).toHaveLength(1);
+    expect(saved[0]).toMatchObject({ label: 'correct', policy: 'code-quality.rubric-smells', run_id: LABELLED_RUN });
+
+    await page.reload();
+    const reloaded = page.getByTestId('jev-decision').first();
+    await expect(reloaded.getByRole('button', { name: 'Correct' })).toHaveAttribute('aria-pressed', 'true');
+    await reloaded.getByRole('button', { name: 'Correct' }).click();
+    await expect(reloaded.getByRole('button', { name: 'Correct' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  test('the label API refuses unknown decisions and labels outside the vocabulary', async ({ page }) => {
+    const bad = await page.request.post('/api/quality/labels', {
+      data: { run_id: LABELLED_RUN, request_id: 'jevp_missing', policy: 'code-quality.rubric-smells', label: 'correct' },
+    });
+    expect(bad.status()).toBe(404);
+    const vocabulary = await page.request.post('/api/quality/labels', {
+      data: { run_id: LABELLED_RUN, request_id: 'x', policy: 'code-quality.rubric-smells', label: 'ok' },
+    });
+    expect(vocabulary.status()).toBe(400);
+  });
+});

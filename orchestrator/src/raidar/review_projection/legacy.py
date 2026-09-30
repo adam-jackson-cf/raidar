@@ -1,24 +1,24 @@
-"""Typed Python ownership for review-surface projection artifacts."""
+"""Scenario-epoch producer: ``EvalRun`` artifacts -> the frozen review projection.
+
+Old-epoch experiments persist ``review-projection.json`` beside their runs; this
+module builds and reloads those artifacts so historical runs keep rendering.
+"""
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
 import sys
 from collections import Counter
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
 from raidar.findings import run_findings_artifact
+from raidar.review_projection.spans import SpanBuilder, repo_path, to_ms
 from raidar.schemas.review import (
     ExperimentReviewProjection,
     ReviewAnnotation,
     ReviewExperimentRecord,
-    ReviewProjectionArtifact,
     ReviewRunDetail,
     ReviewRunRecord,
     ReviewScenarioMetadata,
@@ -29,77 +29,7 @@ from raidar.schemas.review import (
 )
 from raidar.schemas.scorecard import EvalRun
 
-REPO_ROOT = Path(__file__).resolve().parents[4]
 EXPERIMENT_PROJECTION_FILENAME = "review-projection.json"
-PAYLOAD_CAP = 32_000
-
-
-def _json_text(value: object) -> str:
-    return json.dumps(value, indent=2, sort_keys=True, default=str)
-
-
-def _payload(value: object) -> str | None:
-    if value is None:
-        return None
-    text = value if isinstance(value, str) else _json_text(value)
-    if len(text) <= PAYLOAD_CAP:
-        return text
-    return f"{text[:PAYLOAD_CAP]}\n...[truncated]"
-
-
-def _to_ms(value: str | int | float | None) -> int | None:
-    if isinstance(value, (int, float)):
-        return int(value)
-    if not value:
-        return None
-    try:
-        return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp() * 1000)
-    except ValueError:
-        return None
-
-
-class _SpanBuilder:
-    def __init__(self, run_id: str) -> None:
-        self.run_id = run_id
-        self.spans: list[ReviewSpan] = []
-
-    def add(
-        self,
-        *,
-        name: str,
-        span_type: ReviewSpanType,
-        status: ReviewStatus,
-        parent: str | None = None,
-        start: int | None = None,
-        duration: int | None = None,
-        model: str | None = None,
-        input_value: object = None,
-        output_value: object = None,
-        attributes: object = None,
-    ) -> str:
-        span_id = f"{self.run_id}:s{len(self.spans) + 1}"
-        self.spans.append(
-            ReviewSpan(
-                id=span_id,
-                run_id=self.run_id,
-                parent_span_id=parent,
-                name=name,
-                span_type=span_type,
-                status=status,
-                start_time_ms=start,
-                end_time_ms=(
-                    start + duration if start is not None and duration is not None else None
-                ),
-                duration_ms=duration,
-                model=model,
-                input_tokens=None,
-                output_tokens=None,
-                input_payload=_payload(input_value),
-                output_payload=_payload(output_value),
-                attributes=_payload(attributes),
-            )
-        )
-        return span_id
 
 
 def _run_status(run: EvalRun) -> ReviewStatus:
@@ -123,8 +53,8 @@ def _trace_name(event_type: str, data: dict[str, Any]) -> str:
 
 
 def _project_spans(run: EvalRun) -> list[ReviewSpan]:
-    builder = _SpanBuilder(run.id)
-    started = _to_ms(run.timestamp) or 0
+    builder = SpanBuilder(run.id)
+    started = to_ms(run.timestamp) or 0
     root = builder.add(
         name=f"{run.scores.scenario_name}@{run.scores.scenario_revision}",
         span_type="TRACE",
@@ -148,7 +78,7 @@ def _project_spans(run: EvalRun) -> list[ReviewSpan]:
     return builder.spans
 
 
-def _project_trace_spans(builder: _SpanBuilder, run: EvalRun, agent: str) -> None:
+def _project_trace_spans(builder: SpanBuilder, run: EvalRun, agent: str) -> None:
     for event in run.traces:
         event_type = event.event_type
         span_type: ReviewSpanType = "INTERNAL"
@@ -161,7 +91,7 @@ def _project_trace_spans(builder: _SpanBuilder, run: EvalRun, agent: str) -> Non
             span_type=span_type,
             status="OK",
             parent=agent,
-            start=_to_ms(event.timestamp),
+            start=to_ms(event.timestamp),
             duration=1_000,
             model=run.config.model if event_type == "assistant_message" else None,
             input_value=None if event_type == "assistant_message" else event.data,
@@ -170,7 +100,7 @@ def _project_trace_spans(builder: _SpanBuilder, run: EvalRun, agent: str) -> Non
 
 
 def _project_gate_spans(
-    builder: _SpanBuilder,
+    builder: SpanBuilder,
     run: EvalRun,
     root: str,
     started: int,
@@ -191,7 +121,7 @@ def _project_gate_spans(
             span_type="TOOL_CALL",
             status="OK" if gate.exit_code == 0 else "ERROR",
             parent=gates,
-            start=_to_ms(gate.timestamp),
+            start=to_ms(gate.timestamp),
             duration=1_200,
             input_value=gate.command,
             output_value=gate.model_dump(mode="json"),
@@ -199,7 +129,7 @@ def _project_gate_spans(
 
 
 def _project_scoring_spans(
-    builder: _SpanBuilder,
+    builder: SpanBuilder,
     run: EvalRun,
     root: str,
     started: int,
@@ -245,7 +175,7 @@ def _project_scoring_spans(
 
 
 def _project_support_spans(
-    builder: _SpanBuilder,
+    builder: SpanBuilder,
     run: EvalRun,
     root: str,
     started: int,
@@ -391,7 +321,7 @@ def _run_detail(
     reasoning_effort: str | None,
     experiment_dir: Path,
 ) -> ReviewRunDetail:
-    started_at = _to_ms(run.timestamp) or 0
+    started_at = to_ms(run.timestamp) or 0
     spans = _project_spans(run)
     annotations = _annotations(run, started_at, spans)
     record = _run_record(
@@ -450,10 +380,8 @@ def _artifact_paths(experiment_dir: Path, run_id: str) -> dict[str, str | None]:
     run_dir = experiment_dir / "runs" / run_id
     findings_path = run_dir / "findings.json"
     return {
-        "run_json": os.path.relpath(run_dir / "run.json", REPO_ROOT),
-        "findings_json": (
-            os.path.relpath(findings_path, REPO_ROOT) if findings_path.exists() else None
-        ),
+        "run_json": repo_path(run_dir / "run.json"),
+        "findings_json": (repo_path(findings_path) if findings_path.exists() else None),
     }
 
 
@@ -551,7 +479,7 @@ def _experiment_record(
     )
     return ReviewExperimentRecord(
         experiment_id=experiment_id,
-        dir=os.path.relpath(experiment_dir, REPO_ROOT),
+        dir=repo_path(experiment_dir),
         scenario=str(config["scenario_name"]),
         revision=str(config["scenario_revision"]),
         harness=str(config["harness"]),
@@ -630,20 +558,33 @@ def persist_experiment_review_projection(
     return output
 
 
-def _load_experiment_projection(path: Path) -> ExperimentReviewProjection:
+def load_experiment_projection(path: Path) -> ExperimentReviewProjection:
     try:
         return ExperimentReviewProjection.model_validate_json(path.read_text(encoding="utf-8"))
     except (OSError, ValidationError) as exc:
         raise ValueError(f"invalid review projection {path}: {exc}") from exc
 
 
-def _load_experiment_projections(experiments_root: Path) -> list[ExperimentReviewProjection]:
+def load_experiment_projections(experiments_root: Path) -> list[ExperimentReviewProjection]:
+    """Every persisted projection that still validates; the others are named on stderr.
+
+    A historical projection that no longer matches the frozen schema cannot
+    render, so it is skipped whole (never partly rendered) and one bad
+    experiment does not hide the rest of the history.
+    """
     projections: list[ExperimentReviewProjection] = []
     experiment_dirs = sorted(path for path in experiments_root.iterdir() if path.is_dir())
     for experiment_dir in experiment_dirs:
         projection_path = experiment_dir / EXPERIMENT_PROJECTION_FILENAME
         if projection_path.is_file():
-            projections.append(_load_experiment_projection(projection_path))
+            try:
+                projections.append(load_experiment_projection(projection_path))
+            except ValueError as exc:
+                first_line = str(exc).splitlines()[0]
+                print(
+                    f"Skipping legacy experiment that fails the schema: {first_line}",
+                    file=sys.stderr,
+                )
         else:
             print(
                 f"Skipping legacy experiment without {EXPERIMENT_PROJECTION_FILENAME}: "
@@ -651,59 +592,3 @@ def _load_experiment_projections(experiments_root: Path) -> list[ExperimentRevie
                 file=sys.stderr,
             )
     return projections
-
-
-def _merged_run_details(
-    projections: list[ExperimentReviewProjection],
-) -> list[ReviewRunDetail]:
-    details = [detail for projection in projections for detail in projection.runs]
-    run_ids = [detail.run.id for detail in details]
-    if len(run_ids) != len(set(run_ids)):
-        raise ValueError("review projection contains duplicate run ids")
-    return details
-
-
-def merge_review_projections(experiments_root: Path) -> ReviewProjectionArtifact:
-    """Validate and merge persisted experiment review artifacts."""
-
-    projections = _load_experiment_projections(experiments_root)
-    if not projections:
-        raise ValueError(f"no current-version review projections found under {experiments_root}")
-    details = _merged_run_details(projections)
-    revision_diffs = {
-        projection.revision_diff.key: projection.revision_diff
-        for projection in projections
-        if projection.revision_diff is not None
-    }
-    return ReviewProjectionArtifact(
-        generated_from=os.path.relpath(experiments_root, REPO_ROOT),
-        experiments=[projection.experiment for projection in projections],
-        runs=sorted(
-            (detail.run for detail in details),
-            key=lambda run: (-run.started_at, run.id),
-        ),
-        run_details={detail.run.id: detail for detail in details},
-        revision_diffs=sorted(revision_diffs.values(), key=lambda diff: diff.key),
-    )
-
-
-def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--experiments-root", type=Path, required=True)
-    parser.add_argument("--output", type=Path, required=True)
-    return parser
-
-
-def main() -> None:
-    args = _parser().parse_args()
-    artifact = merge_review_projections(args.experiments_root.resolve())
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    args.output.write_text(artifact.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    print(
-        f"Projected {len(artifact.runs)} run(s) across {len(artifact.experiments)} "
-        f"experiment(s) into {args.output}"
-    )
-
-
-if __name__ == "__main__":
-    main()

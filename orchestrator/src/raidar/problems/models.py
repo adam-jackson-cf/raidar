@@ -144,6 +144,9 @@ class ProblemManifest(ProblemModel):
     task_sha256: str
     bundle_sha256: str
     references_sha256: str
+    # Snapshot-relative entrypoint: the SCB config ``entry_file`` in the pack's
+    # format (``forge`` -> ``forge.py``). Scorers take it as a config default.
+    entry_file: str | None = Field(default=None, min_length=1)
 
     @model_validator(mode="after")
     def _consistent(self) -> ProblemManifest:
@@ -162,8 +165,15 @@ class ProblemManifest(ProblemModel):
     def problem_id(self) -> ProblemId:
         return ProblemId.parse(self.ref)
 
+    def payload(self) -> dict[str, object]:
+        """JSON form; a manifest without ``entry_file`` keeps its earlier bytes and digest."""
+        dumped = self.model_dump(mode="json")
+        if self.entry_file is None:
+            dumped.pop("entry_file")
+        return dumped
+
     def digest(self) -> str:
-        return digest_json(self.model_dump(mode="json"))
+        return digest_json(self.payload())
 
     def lock_metadata(self) -> dict[str, object]:
         """Deterministic metadata recorded by ``raidar lock`` (checkpoints is required)."""
@@ -180,4 +190,4 @@ class ProblemManifest(ProblemModel):
             "pack_image": self.pack.image,
             "task_sha256": self.task_sha256,
             "bundle_sha256": self.bundle_sha256,
-        }
+        } | ({"entry_file": self.entry_file} if self.entry_file is not None else {})

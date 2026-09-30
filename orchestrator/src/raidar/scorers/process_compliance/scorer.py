@@ -45,6 +45,7 @@ from raidar.scorers.process_compliance.jev_residue import (
     audit_settled,
     policy_modes,
     store_runtime,
+    unanswered_decisions,
 )
 from raidar.scorers.process_compliance.trace_events import (
     DEFAULT_PLAN_FILE_PATTERNS,
@@ -206,6 +207,11 @@ class ProcessComplianceScorer:
 
     def __init__(self, jev: JevRuntime | None = None) -> None:
         self._jev = jev
+        self._awaiting = False
+
+    def awaiting_answers(self) -> bool:
+        """True when the last ``assess`` left a Jev decision unanswered (no key, no cache)."""
+        return self._awaiting
 
     @property
     def manifest(self) -> ScorerManifest:
@@ -265,13 +271,16 @@ class ProcessComplianceScorer:
         )
 
     def assess(self, ctx: AssessContext) -> AssessResult:
+        self._awaiting = False
         try:
             config = ProcessComplianceConfig.model_validate(dict(ctx.config))
         except ValidationError as exc:
             return statused_result(
                 PROCESS_COMPLIANCE, ctx, AssessStatus.ERROR, f"invalid config: {exc}"
             )
+        before = unanswered_decisions(self._jev)
         steps = [(inputs, self._step(ctx, inputs, config)) for inputs in ctx.steps]
+        self._awaiting = unanswered_decisions(self._jev) > before
         return _combine(steps, policy_modes(self._jev))
 
 

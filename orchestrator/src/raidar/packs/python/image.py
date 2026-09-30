@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import re
 import subprocess
 import sys
 import time
@@ -26,12 +25,12 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
 
+from raidar.packs.python.harness import harbor_reported_version, harbor_version_command
 from raidar.packs.python.models import PackSpec, ToolLock
 
 LOCK_HASH_LABEL = "dev.raidar.pack.lock-hash"
 PACK_ID_LABEL = "dev.raidar.pack.id"
 _TAG_HASH_CHARS = 16
-_VERSION_TOKEN = re.compile(r"\d+(?:\.\d+)+(?:[-+][0-9A-Za-z.-]+)?")
 
 
 class DockerRunner(Protocol):
@@ -96,7 +95,7 @@ def _harness_arg_prefix(harness_id: str) -> str:
 
 
 def build_args(spec: PackSpec) -> dict[str, str]:
-    args = {"BASE_IMAGE": spec.image.base_image}
+    args = {"BASE_IMAGE": spec.image.base_image, "AGENT_HOME": spec.image.agent_home}
     for harness_id, pin in spec.image.harnesses.items():
         prefix = _harness_arg_prefix(harness_id)
         args[f"{prefix}_NPM_PACKAGE"] = pin.npm_package
@@ -208,6 +207,15 @@ def run(cmd):
     except (OSError, subprocess.TimeoutExpired) as error:
         return 1, f"error: {error}"
     return out.returncode, (out.stdout or out.stderr).strip()
+def run_merged(command):
+    # Harbor execs its version check as `bash -c` with stderr merged into stdout,
+    # and reinstalls on a non-zero exit before parsing, so both are reported.
+    try:
+        out = subprocess.run(["bash", "-c", command], stdout=subprocess.PIPE,
+                             stderr=subprocess.STDOUT, text=True, timeout=60)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return {"exit_code": 127, "output": f"error: {error}"}
+    return {"exit_code": out.returncode, "output": out.stdout}
 def interpreters():
     dirs = os.environ.get("PATH", "").split(os.pathsep) + ["/usr/bin", "/usr/local/bin"]
     found = {}
@@ -230,7 +238,7 @@ def manifest_digest(cmd):
     return hashlib.sha256(out.encode()).hexdigest() if code == 0 else f"error: {out[-200:]}"
 dpkg = ["dpkg-query", "-W", "-f", "${Package}=${Version}\n"]
 print(json.dumps({
-    "harness": {h: run([exe, "--version"])[1] for h, exe in req["harnesses"].items()},
+    "harness": {h: run_merged(command) for h, command in req["harnesses"].items()},
     "default_python": platform.python_version(),
     "interpreters": probed,
     "executables": [e for e in req["executables"] if shutil.which(e)],
@@ -241,15 +249,6 @@ print(json.dumps({
     },
 }))
 """
-
-
-def harness_version_matches(pinned: str, reported: str) -> bool:
-    """True when ``--version`` output reports exactly the pinned version.
-
-    Harbor's codex and claude-code agents compare the parsed version for
-    equality and reinstall otherwise, so a prefix match is not enough.
-    """
-    return pinned in _VERSION_TOKEN.findall(reported)
 
 
 def _python_matches(declared: str, actual: str) -> bool:
@@ -276,7 +275,7 @@ def audit_image(
     if record is None:
         raise ImageNotBuiltError(f"pack image {tag} is not built; run `make pack-build`")
     request = {
-        "harnesses": {h: pin.executable for h, pin in spec.image.harnesses.items()},
+        "harnesses": {h: harbor_version_command(pin) for h, pin in spec.image.harnesses.items()},
         "executables": list(lock.scorer_executables()),
         "modules": list(lock.scorer_modules()),
         "distributions": list(lock.scorer_distributions()),
@@ -289,14 +288,19 @@ def audit_image(
 
 
 def _audit_from_probe(record: ImageRecord, spec: PackSpec, found: dict[str, Any]) -> ImageAudit:
-    versions = {h: str(v) for h, v in found["harness"].items()}
+    checks: dict[str, dict[str, Any]] = found["harness"]
+    # What Harbor's install() would conclude; anything but the exact pin reinstalls.
+    versions = {
+        h: harbor_reported_version(
+            pin,
+            str(checks.get(h, {}).get("output", "")),
+            int(checks.get(h, {}).get("exit_code", 1)),
+        )
+        for h, pin in spec.image.harnesses.items()
+    }
     probed: dict[str, dict[str, Any]] = found["interpreters"]
     mismatches = tuple(
-        sorted(
-            h
-            for h, pin in spec.image.harnesses.items()
-            if not harness_version_matches(pin.version, versions.get(h, ""))
-        )
+        sorted(h for h, pin in spec.image.harnesses.items() if versions[h] != pin.version)
     )
     default_python = str(found["default_python"])
     return ImageAudit(
