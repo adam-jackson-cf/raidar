@@ -11,9 +11,9 @@ import click
 from raidar.components.arm_check import check_arm_components
 from raidar.spec.loader import LoadedExperiment, load_experiment, overrides_from_cli
 from raidar.spec.lock import (
-    DEFAULT_LOCK_NAME,
     LockError,
     build_lock,
+    default_lock_path,
     default_resolvers,
     render_lock,
 )
@@ -100,7 +100,7 @@ def validate_command(
     "--output",
     type=click.Path(dir_okay=False, path_type=Path),
     default=None,
-    help=f"Lock file path (default: {DEFAULT_LOCK_NAME} next to the experiment).",
+    help="Lock file path (default: <experiment name>.lock.json next to the experiment).",
 )
 @click.option("--check", is_flag=True, help="Fail if the existing lock differs; write nothing.")
 def lock_command(
@@ -114,7 +114,7 @@ def lock_command(
 ) -> None:
     """Resolve an experiment to content hashes and pinned versions."""
     loaded = _load(experiment, blocks, seed, concurrency, assignments)
-    lock_path = output or loaded.base_dir / DEFAULT_LOCK_NAME
+    lock_path = output or default_lock_path(loaded.path)
     try:
         rendered = render_lock(build_lock(loaded, lock_path=lock_path))
     except LockError as exc:

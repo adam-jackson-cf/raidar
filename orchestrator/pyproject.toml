@@ -30,6 +30,13 @@ dev = [
     "lizard>=1.17.10",
     "mypy>=1.11",
     "import-linter>=2.0",
+    # code-quality@1 tool-env modules are imported in-process by the tests. These
+    # pins equal the Python pack tool lock's scb-python-quality entry (a test
+    # enforces it); production measurement uses the lazily provisioned tool env.
+    "tree-sitter==0.25.2",
+    "tree-sitter-language-pack==0.13.0",
+    "networkx==3.6.1",
+    "radon==6.0.1",
 ]
 
 [project.scripts]

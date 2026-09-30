@@ -128,9 +128,26 @@ class ArmSpec(SpecModel):
     agent: Identifier
 
 
+class InventoryPolicySpec(SpecModel):
+    """Assessor-owned file classification (mirrors ``raidar.scorers.inventory.InventoryPolicy``)."""
+
+    generated_globs: tuple[str, ...] = ()
+    test_globs: tuple[str, ...] = ()
+
+
 class AssessmentSpec(SpecModel):
     scorers: tuple[Reference, ...] = Field(min_length=1)
     headline_policy: Reference | None = None
+    inventory_policy: InventoryPolicySpec = InventoryPolicySpec()
+    # Per-scorer config, keyed by a reference listed in ``scorers``.
+    scorer_config: dict[Reference, FiniteJsonObject] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _config_for_declared_scorers(self) -> AssessmentSpec:
+        unknown = sorted(set(self.scorer_config) - set(self.scorers))
+        if unknown:
+            raise ValueError(f"scorer_config names scorers not in 'scorers': {unknown}")
+        return self
 
 
 class AnalysisSpec(SpecModel):

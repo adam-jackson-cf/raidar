@@ -1,0 +1,9 @@
+# Ambiguous process-compliance checks that deterministic trace rules could not
+# settle (plan, tests before finishing, tests first). Shadow until promoted;
+# a promotion must name the runtimes it was calibrated on in place of "*".
+id: process-compliance.residue
+version: "1"
+description: Jev residue for process-compliance checks the trace rules leave ambiguous.
+mode: shadow
+question_set: process-residue@1
+runtimes: ["*"]

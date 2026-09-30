@@ -217,9 +217,20 @@ class ScorerRegistry:
             ) from exc
 
 
+BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
+    "correctness@1": "raidar.scorers.correctness:correctness_scorer",
+    "code-quality@1": "raidar.scorers.code_quality:code_quality_scorer",
+    "resource-usage@1": "raidar.scorers.resource_usage:resource_usage_scorer",
+    "process-compliance@1": "raidar.scorers.process_compliance:process_compliance_scorer",
+}
+
+
 def default_scorer_registry() -> ScorerRegistry:
     """Built-in scorers. Implementations are bound here as WS-G lands them."""
-    return ScorerRegistry(ScorerRegistration(manifest) for manifest in BUILTIN_MANIFESTS)
+    return ScorerRegistry(
+        ScorerRegistration(manifest, BUILTIN_IMPLEMENTATIONS.get(manifest.ref))
+        for manifest in BUILTIN_MANIFESTS
+    )
 
 
 @dataclass(frozen=True)

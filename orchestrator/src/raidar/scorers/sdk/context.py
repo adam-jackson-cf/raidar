@@ -43,6 +43,8 @@ class StepInputs:
     inputs are then None. ``record`` is None when the oracle did not grade the
     step (not reached, or the trial failed before verification).
     ``agent_result`` is the step's blinded Harbor usage, never its reward.
+    ``agent_execution_s`` is the duration of Harbor's ``agent_execution``
+    phase for the step, or None when Harbor did not record both ends of it.
     """
 
     step: str
@@ -55,6 +57,7 @@ class StepInputs:
     trace_dir: Path | None
     trace_digest: str | None
     agent_result: Mapping[str, Any] | None
+    agent_execution_s: float | None = None
 
 
 @dataclass

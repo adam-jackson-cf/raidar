@@ -15,7 +15,6 @@ from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CO
 from raidar.scorers.catalog import (
     ScorerRegistration,
     ScorerUnavailableError,
-    default_scorer_registry,
     scorer_resolver,
 )
 from raidar.scorers.sdk import result as result_module
@@ -376,7 +375,7 @@ def test_pilot_scorer_references_resolve_through_the_entry_point(tmp_path: Path)
 
 
 def test_scorers_without_an_implementation_cannot_assess() -> None:
-    registration = default_scorer_registry().get("correctness@1")
+    registration = ScorerRegistration(CORRECTNESS)
     with pytest.raises(ScorerUnavailableError, match="no implementation"):
         registration.load()
 

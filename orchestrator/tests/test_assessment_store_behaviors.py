@@ -12,6 +12,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.oracle.models import CaseStatus
+from raidar.scorers.catalog import BUILTIN_IMPLEMENTATIONS
 from raidar.scorers.rescore import RescoreError, RescoreOutcome, rescore_path
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.scorers.trial_inputs import TrialInputError, load_trial_context
@@ -265,7 +266,10 @@ def test_assess_rescore_cli_config_sets_the_inventory_policy_and_scorer_config(
     assert "invalid rescore config" in invalid.output
 
 
-def test_assess_rescore_cli_refuses_scorers_that_cannot_run(tmp_path: Path) -> None:
+def test_assess_rescore_cli_refuses_scorers_that_cannot_run(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.delitem(BUILTIN_IMPLEMENTATIONS, "correctness@1")
     trial = two_step_trial(tmp_path / "trial")
     runner = CliRunner()
     store = str(tmp_path / "store")

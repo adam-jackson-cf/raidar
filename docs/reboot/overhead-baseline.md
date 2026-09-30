@@ -29,7 +29,7 @@
 
 | Raidar phase | What the stub measures | Location |
 |---|---|---|
-| Component apply | Uploads a representative component bundle and installs it as root into the harness baseline dir that the per-step reset restores from. The bundle is `spikes/overhead/components/fixture`: AGENTS.md, config.toml and 3 skills, 11 files, 47 KB. It runs in `agent.setup`, so it is inside Harbor's `agent_setup` phase | `overhead_spike/components.py` |
+| Component apply | Uploads a representative component bundle and installs it as root into the harness baseline dir that the per-step reset restores from. The bundle is `spikes/overhead/components/fixture`: AGENTS.md, config.toml and 3 skills, 11 files, 47 KB. It runs in `agent.setup`, so it is inside Harbor's `agent_setup` phase. **This install-into-a-baseline-dir model is the Phase 0 stub only; the WS-C implementation does not work this way (see §8)** | `overhead_spike/components.py` |
 | Per-step reset | Real. This is the A′ `setup.sh`, plus Harbor's workdir upload and healthcheck around it | a-prime |
 | Snapshot download | Real. The verifier's `/app` download, or the artifact copy | a-prime verifier |
 | Verifier plumbing | Real. Verifier wall time minus oracle run minus snapshot transfer: Harbor verifier dispatch, test staging and `reward.json` handling. The spike-only leak scan is disabled by `OverheadVerifier`; in 0.3 it cost about 1–10 s | a-prime verifier |
@@ -120,7 +120,7 @@ A check fails when the p95 over ≥10 samples exceeds the budget. Budgets apply 
 | Environment start, warm | **20 s** | trial | 16.0 (12.2 warm-init; 28.5 outlier under load) | Image layers cached |
 | Environment start, cold | **record-only; tripwire 420 s** | trial | 339 | Network-dominated. Re-baseline after WS-I I1, when cold becomes a prebuilt-image load or pull |
 | Grader (oracle) image, warm | **1 s** (presence check) | trial | ≈0 (cached tag) | Cold build is record-only; tripwire 180 s (p95 140) |
-| Component apply [provisional] | **2.5 s** | trial | 2.1 | For bundles ≤ 1 MB. Re-baseline when WS-C lands |
+| Component apply [provisional] | **2.5 s** | trial | 2.1 | For bundles ≤ 1 MB. Phase 1 measurement (§8): about 250 ms for the all-8-built-ins `setup.sh`, which runs per step inside per-step reset; `raidar run`'s `component_apply` is host-side only. Budget unchanged |
 | Per-step reset | **2.0 s** | step | 1.73 | Includes Harbor workdir upload and healthcheck |
 | Artifact collection | **3.5 s** | step | 2.91 | Small `/app`. A size term is needed (§6) |
 | Snapshot transfer | **0.5 s** (artifact source) / 2.0 s (download) | step | 0.00 / 1.36 | Depends on adopting finding 2 |
@@ -141,7 +141,7 @@ A check fails when the p95 over ≥10 samples exceeds the budget. Budgets apply 
 ## 6. Gaps to close before `raidar perf check` gates on these (plan D4)
 
 - **Size scaling.** Re-measure collection, snapshot and archive with a realistic `/app`: a real gpt-6-luna-low agent tree of 1–50 MB with `.venv` excluded. Then express those budgets as `a + b·MB`.
-- **Stubbed phases.** Re-baseline component apply (WS-C) and scorer orchestration (real scorers) once they exist, using the same harness.
+- **Stubbed phases.** Component apply is now measured on the WS-C implementation (§8). Scorer orchestration still needs a re-baseline with real scorers; it is not produced by `raidar run`.
 - **Quiet-machine rerun.** The p95s here include cross-agent contention. A rerun with the VM otherwise idle would give tighter budgets. D4's CI job should fix its own concurrency.
 - **Longer trials.** Per-step costs were flat across checkpoints 1–2 here, and 0.3's 8-checkpoint runs showed similar per-step numbers. An 8-step warm cell would confirm there is no drift, for example from growing artifact dirs.
 
@@ -155,3 +155,46 @@ $PY bench.py --cell warm --reps 10         # also: warm-artifact, warm-init, col
 $PY summarize.py                           # writes baseline-summary.json and prints the table
 ./cleanup.sh                               # removes the per-trial ovh-* env images
 ```
+
+## 8. Phase 1 measurements on the production code (WS-C, WS-D; 2026-09-30)
+
+These are measurements, not budget changes. The §5 budgets stay as accepted.
+
+**How components are actually applied.** Phase 0 stubbed component apply as a bundle installed as root into a harness baseline directory (for example `/opt/raidar/harness-baseline`) that the reset restores from. The WS-C implementation does not do this, and nothing is written to `/opt/raidar/harness-baseline`:
+- On the host, the arm's condition is compiled (`raidar.components.compile_arm`) and written into the trial's Harbor task. Every step gets a generated `steps/<step>/workdir/setup.sh`, and the workspace overlay (for example `AGENTS.md` or lint configs) goes into the first step's `workdir/`.
+- Harbor uploads each step's `workdir/` and runs `setup.sh` as the agent user. The script runs the context reset, then materialises component support files under `/tmp/raidar-components` (never inside the workspace), records the overlay digests for the discovery probes, and deletes itself.
+
+**What `raidar run` records as N1 phases** (`raidar.execution.phases`, per trajectory record):
+- `component_apply` is the host-side compile plus writing the condition into the trial task.
+- The in-container `setup.sh` runs inside Harbor's step preparation, so it falls under `per_step_reset`. The reset's own duration (from `raidar-reset.json`) is also recorded as the record-only sub-phase `setup_sh`; the support-file materialisation after the reset (about 20 ms) is not timed separately.
+- **Consequence for the budgets.** `component_apply` no longer measures the quantity its 2.5 s budget was set from (the Phase 0 in-container install, p95 2.1 s). Against the host-side compile it is only a regression tripwire, far from binding. The in-container component work is judged by the 2.0 s `per_step_reset` budget, which Phase 0 set from a reset without components; the fixture's lint-config arm keeps `per_step_reset` at p95 1.49 s, inside it. No budget in §5 was changed; re-baselining `component_apply` (or folding it into `per_step_reset`) is a decision for the budget owner.
+- The pre-agent leak scan (WS-E guard) runs in the same gap before the agent starts. It is recorded as `pre_agent_leak_check` and subtracted from `per_step_reset` and `step_archive_gap`, because Phase 0 had no scan there.
+- Phase 0's definitions are otherwise unchanged. In particular, `step_archive_gap` still overlaps the next step's `per_step_reset`, exactly as in §2.
+
+**Measured values.**
+
+| Measurement | Result | Source |
+|---|---|---|
+| All-8-built-ins `setup.sh`, exec'd as uid 1000 in `raidar/pack-python:8c98ccdfd980e2a4` | 250–256 ms over 5 runs. The reset is 229–234 ms of that, mostly its fixed 0.2 s settle sleep, so support-file materialisation is about 20 ms. This excludes docker exec and Harbor's workdir upload | WS-C |
+| Host-side `component_apply` (compile + write) | p50 0.01 s / p95 0.01 s (n=10) | WS-D fixture |
+| `setup_sh` inside real trials (baseline and lint-config arms) | p50 0.23 s, max 0.25 s (n=20) | WS-D fixture |
+
+**WS-D no-LLM fixture** (`make perf-fixture`). This is a pack-bound 2-checkpoint problem (the WS-B importer run over the fake SCB dataset) × {baseline, lint-config} × 5 blocks, using Harbor's `oracle` agent at concurrency 1 on OrbStack. All 10 trajectories were valid and every checkpoint was solved. `raidar perf check` passed every budget:
+
+| Phase | p50 / p95 (s) | n |
+|---|---|---|
+| environment_start (warm) | 3.14 / 4.58 | 10 |
+| grader_image (warm) | 0.22 / 0.27 | 20 |
+| per_step_reset | 1.27 / 1.49 | 20 |
+| pre_agent_leak_check (record-only) | 0.57 / max 0.81 | 20 |
+| artifact_collection | 2.66 / 2.77 | 20 |
+| snapshot_transfer (artifact) | 0.00 / 0.00 | 20 |
+| verifier_plumbing | 0.00 / 0.01 | 20 |
+| step_archive_gap | 1.28 / 1.58 | 10 |
+| teardown_result_write (init) | 2.27 / 2.61 | 10 |
+| per_step_overhead | 4.79 / 5.53 | 20 |
+| per_trial_fixed_overhead (init) | 5.29 / 6.78 | 10 |
+
+**Real-agent trials** (codex-cli `gpt-6-luna` low: forge checkpoints 1–2, and the one-shot `circuit_eval/checkpoint_1`). There are too few samples to judge a p95, but two observations matter for the gaps in §6:
+- `artifact_collection` took 4.7–5.2 s on 2 of the 3 real steps, above the 3.5 s budget. One of those steps had an empty `/app`, so the time is not explained by tree size alone.
+- Harbor's `agent_setup` took about 36 s in both real trials, because Harbor reinstalled codex (`apt-get`, `nvm`, `npm install -g @openai/codex@0.156.1`) even though the pack image bakes in 0.156.1. The cause is that Harbor merges stderr into stdout for `codex --version`. The pack image's `HOME=/tmp/agent_home` makes codex print a `WARNING ... under temporary dir "/tmp"` line on stderr, so Harbor parses that line as the version, sees a mismatch, and reinstalls. `agent_setup` has no N1 budget, so `raidar perf check` does not catch this. It is a WS-I pack fix: move `HOME`/`CODEX_HOME` out of `/tmp`.

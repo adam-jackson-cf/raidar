@@ -12,20 +12,25 @@ Correctness inputs come from the oracle's ``raidar-oracle/steps/<step>/record.js
 Harbor's trial-level ``verifier_result`` is never read. Each stored snapshot
 is re-hashed and must still match the digest the oracle graded, so an
 Assessment can never be keyed on a snapshot that changed after grading.
-Harbor's ``agent_result`` is blinded before scorers see it. Nothing in the
+Harbor's ``agent_result`` is blinded before scorers see it; the step's
+``agent_execution`` duration is passed through and, like ``agent_result``, is
+part of the trace digest. Nothing in the
 trial directory is written.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 from raidar.oracle.bundle import BundleError, OracleBundle, load_bundle
 from raidar.oracle.records import (
+    FORK_EVIDENCE_FILE,
     ORACLE_DIR,
     RECORD_FILE,
     StepRecord,
@@ -69,6 +74,7 @@ class _Executed:
     step: str
     multi_step: bool
     agent_result: Any
+    agent_execution: Any = None
 
 
 def _read_json(path: Path) -> Mapping[str, Any]:
@@ -99,7 +105,9 @@ def _executed_steps(trial_dir: Path, result: Mapping[str, Any]) -> list[_Execute
             name = item.get("step_name") if isinstance(item, dict) else None
             if not isinstance(name, str) or not name:
                 raise TrialInputError(f"{trial_dir}: step_results[{index}] has no step_name")
-            executed.append(_Executed(name, True, item.get("agent_result")))
+            executed.append(
+                _Executed(name, True, item.get("agent_result"), item.get("agent_execution"))
+            )
         return executed
     records = sorted(path.name for path in (trial_dir / ORACLE_DIR / "steps").glob("*"))
     if len(records) != 1:
@@ -107,7 +115,29 @@ def _executed_steps(trial_dir: Path, result: Mapping[str, Any]) -> list[_Execute
             f"{trial_dir}: a trial without step_results needs exactly one oracle record, "
             f"found {records}"
         )
-    return [_Executed(records[0], False, result.get("agent_result"))]
+    return [_Executed(records[0], False, result.get("agent_result"), result.get("agent_execution"))]
+
+
+def _timestamp(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    # Harbor writes UTC; a zone-less stamp is read as UTC so both ends compare.
+    return parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=UTC)
+
+
+def agent_execution_seconds(timing: Any) -> float | None:
+    """Duration of a Harbor ``agent_execution`` TimingInfo, or None if either end is missing."""
+    if not isinstance(timing, Mapping):
+        return None
+    started = _timestamp(timing.get("started_at"))
+    finished = _timestamp(timing.get("finished_at"))
+    if started is None or finished is None or finished < started:
+        return None
+    return (finished - started).total_seconds()
 
 
 def blind_agent_result(raw: Any) -> dict[str, Any] | None:
@@ -198,11 +228,21 @@ def _snapshot(
     return path, digest
 
 
-def _record_digest(record: StepRecord) -> str:
-    """Content digest of an oracle record; the bundle's host location is not content."""
+def _record_digest(record_dir: Path, record: StepRecord) -> str:
+    """Content digest of an oracle record; the bundle's host location is not content.
+
+    The step's fork-shaped G run evidence (``g-kernel-input.json``), when the
+    oracle wrote it, is part of the record's content: a trial whose G input
+    differs or went missing must not share an Assessment key.
+    """
     payload = record.model_dump(mode="json")
     payload["bundle"].pop("root")
-    return digest_json(payload)
+    fork = record_dir / FORK_EVIDENCE_FILE
+    if not fork.is_file():
+        return digest_json(payload)
+    return digest_json(
+        {"record": payload, FORK_EVIDENCE_FILE: hashlib.sha256(fork.read_bytes()).hexdigest()}
+    )
 
 
 def _step_inputs(
@@ -223,6 +263,7 @@ def _step_inputs(
         {
             "files": tree_digest(trace_dir) if trace_dir is not None else None,
             "agent_result": executed.agent_result,
+            "agent_execution": executed.agent_execution,
         }
     )
     return StepInputs(
@@ -232,10 +273,13 @@ def _step_inputs(
         snapshot=snapshot,
         snapshot_digest=snapshot_digest,
         record=record,
-        record_digest=_record_digest(record) if record is not None else None,
+        record_digest=(
+            _record_digest(step_record_dir(trial_dir, step), record) if record is not None else None
+        ),
         trace_dir=trace_dir,
         trace_digest=trace_digest,
         agent_result=blind_agent_result(executed.agent_result),
+        agent_execution_s=agent_execution_seconds(executed.agent_execution),
     )
 
 

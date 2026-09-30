@@ -76,8 +76,9 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
 	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke \
 	experiment-validate experiment-lock experiment-run matrix-run \
+	experiment-plan experiment-execute perf-check perf-fixture \
 	problem-import problem-validate \
-	experiments-list experiments-prune assess-regrade \
+	experiments-list experiments-prune assess-regrade jev-shadow-rubric \
 	pack-info pack-build pack-audit pack-tool-provision \
 	component-probe-trials \
 	benchmark-fixture-synthetic \
@@ -111,7 +112,13 @@ help:
 	@echo "  make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml [EXPERIMENT_SET='analysis.blocks=3']"
 	@echo "                                                        Validate an experiment.yaml (schema, references, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml [LOCK_CHECK=1]"
-	@echo "                                                        Write (or check) experiment.lock.json with content hashes and versions"
+	@echo "                                                        Write (or check) <experiment>.lock.json with content hashes and versions"
+	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
+	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
+	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [RUNS_DIR=runs] [RUN_ID=]"
+	@echo "                                                        Run a locked experiment through Harbor; writes attempts, validity and N1 phases"
+	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10]        Fail if any N1 phase p95 exceeds its accepted budget"
+	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>]            No-LLM fixture experiment (5 blocks x 2 arms) then perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
 	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
 	@echo "                                                        Import a pinned problem (task + host-only oracle) into problems/"
 	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
@@ -137,6 +144,8 @@ help:
 	@echo "                                                        Preview artifact pruning decisions"
 	@echo "  make assess-regrade RUN=<trial-or-job-dir> [ORACLE_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
+	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
+	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
 	@echo ""
 	@echo "Runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
 	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
@@ -256,6 +265,35 @@ experiment-lock:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
 
+EXECUTION_SELECT = $(if $(LOCK),--lock "$(LOCK)",) $(foreach arm,$(ARM),--arm "$(arm)") \
+	$(foreach block,$(BLOCK),--block "$(block)") \
+	$(if $(MAX_CHECKPOINTS),--max-checkpoints "$(MAX_CHECKPOINTS)",) \
+	$(if $(AGENT_OVERRIDE),--agent-override "$(AGENT_OVERRIDE)",) \
+	$(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
+	$(foreach item,$(EXPERIMENT_SET),--set "$(item)")
+
+experiment-plan:
+	$(call require_var,EXPERIMENT)
+	@$(RAIDAR) plan "$(EXPERIMENT)" $(EXECUTION_SELECT) $(if $(PLAN_JSON),--json,)
+
+experiment-execute:
+	$(call require_var,EXPERIMENT)
+	@$(PACK_DOCKER_ENV) $(RAIDAR) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
+		--runs-dir "$(if $(RUNS_DIR),$(abspath $(RUNS_DIR)),$(CURDIR)/runs)" $(if $(RUN_ID),--run-id "$(RUN_ID)",)
+
+perf-check:
+	$(call require_var,RUN)
+	@$(RAIDAR) perf check $(RUN) $(if $(MIN_SAMPLES),--min-samples "$(MIN_SAMPLES)",)
+
+PERF_FIXTURE_DIR ?=
+
+perf-fixture:
+	@$(PACK_DOCKER_ENV) $(RAIDAR) pack build python
+	@$(PACK_DOCKER_ENV) export RAIDAR_EXECUTION_DOCKER=1 && \
+		$(if $(PERF_FIXTURE_DIR),export RAIDAR_PERF_FIXTURE_DIR="$(abspath $(PERF_FIXTURE_DIR))" &&,) \
+		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		python -m pytest tests/test_execution_perf_fixture.py -v -s -rs
+
 problem-import:
 	$(call require_var,PROBLEM)
 	@$(RAIDAR) problem import $(PROBLEM) $(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) $(if $(UPDATE),--update,)
@@ -275,6 +313,11 @@ REGRADE_OUT ?=
 assess-regrade:
 	$(call require_var,RUN)
 	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(RUN)" --docker-context "$${DOCKER_CONTEXT}" $(if $(ORACLE_BUNDLE),--bundle "$(ORACLE_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+
+jev-shadow-rubric:
+	$(call require_var,SNAPSHOTS)
+	$(call require_var,STORE)
+	@$(RAIDAR) jev shadow-rubric --snapshots "$(SNAPSHOTS)" --store "$(STORE)" $(if $(SPECS),--specs "$(SPECS)",) $(if $(REPLAY_ONLY),--replay-only,) $(if $(WITHIN),--within "$(WITHIN)",) $(if $(TRIAL),--trial "$(TRIAL)",) $(if $(OUT),--output "$(OUT)",)
 
 scenario-validate:
 	$(call require_var,SCENARIO)

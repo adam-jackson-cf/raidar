@@ -39,7 +39,7 @@ from raidar.spec.schema import ExperimentSpec, ProblemEntry
 from raidar.spec.validation import FieldIssue
 
 LOCK_VERSION = 1
-DEFAULT_LOCK_NAME = "experiment.lock.json"
+LOCK_SUFFIX = ".lock.json"
 IGNORED_TREE_NAMES = frozenset({".DS_Store", "__pycache__", ".git"})
 VERSIONED_PACKAGES = ("harbor", "litellm", "raidar")
 
@@ -49,6 +49,20 @@ class LockError(Exception):
         self.issues = tuple(sorted(issues))
         lines = "\n".join(f"  {issue.render()}" for issue in self.issues)
         super().__init__(f"{source}: cannot lock, {len(self.issues)} issue(s)\n{lines}")
+
+
+def default_lock_path(experiment_path: Path) -> Path:
+    """The lock next to an experiment file, keyed by the file's name.
+
+    ``experiment.yaml`` -> ``experiment.lock.json``; ``oneshot.experiment.yaml``
+    -> ``oneshot.experiment.lock.json``, so two experiments in one directory
+    never overwrite each other's lock.
+    """
+    name = experiment_path.name
+    stem = next(
+        (name[: -len(suffix)] for suffix in (".yaml", ".yml") if name.endswith(suffix)), name
+    )
+    return experiment_path.with_name(f"{stem}{LOCK_SUFFIX}")
 
 
 def default_resolvers(policies: ScorePolicyRegistry = DEFAULT_POLICY_REGISTRY) -> ResolverSet:
