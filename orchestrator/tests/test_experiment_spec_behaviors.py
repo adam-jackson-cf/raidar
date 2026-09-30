@@ -31,7 +31,7 @@ def test_validate_command_accepts_pilot_experiments(pilot: Path) -> None:
 
     assert result.exit_code == 0, result.output
     assert "Experiment validation passed." in result.output
-    assert "scorer references: 3 (resolver pending)" in result.output
+    assert "scorer references: 3 (resolver available)" in result.output
 
 
 def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:

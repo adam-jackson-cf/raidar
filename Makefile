@@ -76,8 +76,10 @@ AGENT_SMOKE_EFFECTIVE_MODEL = $(if $(MODEL),$(MODEL),$(AGENT_SMOKE_MODEL))
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check scenario-list scenario-init scenario-clone-revision scenario-info scenario-validate \
 	smoke-dry-run-check orchestrator-smoke smoke-matrix agent-smoke runtime-stack-scenario-smoke \
 	experiment-validate experiment-lock experiment-run matrix-run \
+	problem-import problem-validate \
 	experiments-list experiments-prune assess-regrade \
 	pack-info pack-build pack-audit pack-tool-provision \
+	component-probe-trials \
 	benchmark-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	quality
@@ -110,6 +112,10 @@ help:
 	@echo "                                                        Validate an experiment.yaml (schema, references, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml [LOCK_CHECK=1]"
 	@echo "                                                        Write (or check) experiment.lock.json with content hashes and versions"
+	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
+	@echo "                                                        Import a pinned problem (task + host-only oracle) into problems/"
+	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
+	@echo "                                                        Oracle-validate an imported problem and write its report"
 	@echo "  make quality                                           Run repo quality gates"
 	@echo ""
 	@echo "Experiment orchestration:"
@@ -137,6 +143,7 @@ help:
 	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned harnesses, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
+	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex-cli/gpt-6-luna low trials proving every built-in component's discovery probe"
 	@echo ""
 	@echo "Review surface:"
 	@echo "  make benchmark-fixture-synthetic                       Generate clearly-labeled synthetic benchmark fixtures for review-surface development"
@@ -155,6 +162,14 @@ pack-info:
 
 pack-build:
 	@$(PACK_DOCKER_ENV) $(RAIDAR) pack build "$(RUNTIME)" $(if $(FORCE),--force,)
+
+PROBE_EVIDENCE_DIR ?=
+
+component-probe-trials:
+	@$(PACK_DOCKER_ENV) export RAIDAR_REAL_LLM_PROBES=1 && \
+		$(if $(PROBE_EVIDENCE_DIR),export RAIDAR_PROBE_EVIDENCE_DIR="$(abspath $(PROBE_EVIDENCE_DIR))" &&,) \
+		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		python -m pytest tests/test_component_real_trial_probes.py -v
 
 pack-audit:
 	@$(PACK_DOCKER_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
@@ -240,6 +255,18 @@ experiment-validate:
 experiment-lock:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
+
+problem-import:
+	$(call require_var,PROBLEM)
+	@$(RAIDAR) problem import $(PROBLEM) $(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) $(if $(UPDATE),--update,)
+
+problem-validate:
+	$(call require_var,PROBLEM)
+	@$(PACK_DOCKER_ENV) $(RAIDAR) problem validate "$(PROBLEM)" \
+		$(if $(ENGINE),--engine "$(ENGINE)",) $(if $(REPEATS),--repeats "$(REPEATS)",) \
+		$(if $(NATIVE_RUNNER),--native-runner "$(NATIVE_RUNNER)",) \
+		$(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) \
+		$(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
 
 RUN ?=
 ORACLE_BUNDLE ?=

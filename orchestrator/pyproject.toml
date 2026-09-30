@@ -35,6 +35,24 @@ dev = [
 [project.scripts]
 raidar = "raidar.cli:main"
 
+# Registry resolvers loaded lazily by `raidar lock` (raidar.spec.references).
+[project.entry-points."raidar.spec.resolvers"]
+problem = "raidar.problems.resolver:resolver_factory"
+scorer = "raidar.scorers.catalog:scorer_resolver"
+component = "raidar.components.registry:component_resolver"
+
+# Component definitions (raidar.components.registry), named by reference and imported lazily.
+[project.entry-points."raidar.components"]
+"rules-file@1" = "raidar.components.builtins.workspace:RULES_FILE"
+"workspace-files@1" = "raidar.components.builtins.workspace:WORKSPACE_FILES"
+"lint-config@1" = "raidar.components.builtins.workspace:LINT_CONFIG"
+"skills@1" = "raidar.components.builtins.harness:SKILLS"
+"harness-settings@1" = "raidar.components.builtins.harness:HARNESS_SETTINGS"
+"stop-hook@1" = "raidar.components.builtins.harness:STOP_HOOK"
+"mcp-server@1" = "raidar.components.builtins.harness:MCP_SERVER"
+"prompt-wrapper@1" = "raidar.components.builtins.prompt:PROMPT_WRAPPER"
+"review-loop@1" = "raidar.components.builtins.workflow:REVIEW_LOOP"
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

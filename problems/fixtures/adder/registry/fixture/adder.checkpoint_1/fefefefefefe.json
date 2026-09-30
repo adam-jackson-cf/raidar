@@ -1,0 +1,36 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "fixture/adder.checkpoint_1@fefefefefefe",
+  "mode": "one_shot",
+  "checkpoints": 1,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "a7a6619c05c7d1340467cb1d8dbd738b4621c6b273211d04a24d84349425c69d",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "fixture",
+    "url": "fixture://adder",
+    "commit": "fefefefefefefefefefefefefefefefefefefefe",
+    "problem": "adder",
+    "checkpoint_selection": "checkpoint_1",
+    "problem_tree": "fixture",
+    "converter_tree": "fixture",
+    "conversion_overrides": null,
+    "converted_task_sha256": "fixture"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "ghcr.io/astral-sh/uv:python3.12-trixie-slim@sha256:4677e08839853fe91c523b593f822ec1e87c7b91ba4c6b30929016b2e0933cd5"
+  },
+  "task_sha256": "5b961b0c35cbaead57f19c20188311705b081e43a754dbe3872cc72eba97a36d",
+  "bundle_sha256": "182b2e11fd1385e6fb000e175194560daa82dd2472e1d4432440fe2ea1671a79",
+  "references_sha256": "b6eeb6baf055a390a42dd8b36901a0a91567a4c254a97947ae89b41fbe69f0e3"
+}

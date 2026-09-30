@@ -8,6 +8,7 @@ from typing import Any
 
 import click
 
+from raidar.components.arm_check import check_arm_components
 from raidar.spec.loader import LoadedExperiment, load_experiment, overrides_from_cli
 from raidar.spec.lock import (
     DEFAULT_LOCK_NAME,
@@ -57,9 +58,12 @@ def _load(
         blocks=blocks, seed=seed, concurrency=concurrency, assignments=assignments
     )
     try:
-        return load_experiment(experiment, overrides)
+        loaded = load_experiment(experiment, overrides)
+        # Every arm must compile for its harness (C1): rejected here, never at run time.
+        check_arm_components(loaded)
     except SpecValidationError as exc:
         raise click.ClickException(str(exc)) from exc
+    return loaded
 
 
 @click.command("validate")
@@ -71,7 +75,7 @@ def validate_command(
     concurrency: int | None,
     assignments: tuple[str, ...],
 ) -> None:
-    """Validate an experiment.yaml (schema, cross-references, factor guard)."""
+    """Validate an experiment.yaml (schema, cross-references, factor guard, arm components)."""
     loaded = _load(experiment, blocks, seed, concurrency, assignments)
     spec = loaded.spec
     available = default_resolvers().available_kinds()

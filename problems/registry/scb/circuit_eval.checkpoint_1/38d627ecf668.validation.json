@@ -1,0 +1,313 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "reference_k_passes_1..k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "reference_k-1_fails_k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_negative",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "native_parity_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "native_parity_negative",
+      "status": "pass"
+    }
+  ],
+  "engine": "harbor",
+  "environment": {
+    "docker_context": "orbstack",
+    "engine": "harbor",
+    "grader_image": "raidar-oracle-grader:53ef42e1caacebbc",
+    "harbor": "0.23.0",
+    "native_runner": {
+      "commit": "25069ba83cdaf7abcf08acb4cf6e2b024e66d109",
+      "dirty": false
+    },
+    "pack_image": "raidar/pack-python:8c98ccdfd980e2a4"
+  },
+  "grades": {
+    "native": {
+      "negative": {
+        "checkpoint_1": {
+          "all_pass": false,
+          "groups": {
+            "core": [
+              0,
+              9
+            ],
+            "error": [
+              0,
+              12
+            ],
+            "functionality": [
+              0,
+              15
+            ],
+            "regression": [
+              0,
+              0
+            ]
+          },
+          "infra_failure": null,
+          "passed": 0,
+          "total": 36
+        }
+      },
+      "positive": {
+        "checkpoint_1": {
+          "all_pass": true,
+          "groups": {
+            "core": [
+              9,
+              9
+            ],
+            "error": [
+              12,
+              12
+            ],
+            "functionality": [
+              15,
+              15
+            ],
+            "regression": [
+              0,
+              0
+            ]
+          },
+          "infra_failure": null,
+          "passed": 36,
+          "total": 36
+        }
+      }
+    },
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 36
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 36,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 36,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 36,
+            "total": 36
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 1,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "not_applicable",
+      "H": "missing",
+      "R": "not_applicable",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical-oneshot@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical-oneshot@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical-oneshot@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical-oneshot@1 requires component H"
+      }
+    ],
+    "reference_correctness": "1",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "996e75395c3c1815ea686cb48fa2dae63859e190af0b4ff1f515faa86d79372f",
+  "mode": "one_shot",
+  "not_run": [],
+  "problem": "scb/circuit_eval.checkpoint_1@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "steps": [
+    "checkpoint_1"
+  ],
+  "verdict": "validated"
+}

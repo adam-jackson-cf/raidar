@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "problem": "fixture/adder_negative@fefefefefefe",
+  "source": {
+    "format": "test-fixture"
+  },
+  "env": {
+    "TERM": "xterm"
+  },
+  "grader": {
+    "base_image": "ghcr.io/astral-sh/uv:python3.12-trixie-slim@sha256:4677e08839853fe91c523b593f822ec1e87c7b91ba4c6b30929016b2e0933cd5",
+    "environment_dockerfile": null,
+    "test_dependencies": [],
+    "cpus": 2.0,
+    "memory_mb": 4096
+  },
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ],
+      "pytest_args": [
+        "{tests}/test_checkpoint_1.py",
+        "--checkpoint",
+        "checkpoint_1",
+        "--entrypoint",
+        "python3 {app}/app.py"
+      ],
+      "timeout_s": null
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ],
+      "pytest_args": [
+        "{tests}/test_checkpoint_1.py",
+        "{tests}/test_checkpoint_2.py",
+        "--checkpoint",
+        "checkpoint_2",
+        "--entrypoint",
+        "python3 {app}/app.py"
+      ],
+      "timeout_s": null
+    }
+  ]
+}

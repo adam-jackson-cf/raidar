@@ -1,0 +1,14 @@
+schema_version = "1.1"
+
+[task]
+name = "fixture/adder"
+
+[environment]
+docker_image = "ghcr.io/astral-sh/uv:python3.12-trixie-slim@sha256:4677e08839853fe91c523b593f822ec1e87c7b91ba4c6b30929016b2e0933cd5"
+workdir = "/app"
+
+[[steps]]
+name = "checkpoint_1"
+
+[[steps]]
+name = "checkpoint_2"

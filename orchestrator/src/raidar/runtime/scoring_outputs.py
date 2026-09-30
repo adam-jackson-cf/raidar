@@ -22,6 +22,7 @@ from raidar.schemas.scorecard import (
 from raidar.scorers.base import ScorerContext, ScorerEvidence, scorer_class
 from raidar.scorers.evidence_contract import EvidenceOutput
 from raidar.scorers.llm_as_judge import codex_judge_executor
+from raidar.scorers.sdk.ownership import merge_unique, ordered_complete, reject_unowned
 from raidar.scorers.verification import (
     VerificationEvidence,
     VerificationEvidenceError,
@@ -85,13 +86,9 @@ def _validated_owned_metric_scores(
 ) -> tuple[MetricScore, ...]:
     """Normalize one scorer's outputs and reject metrics it does not own."""
 
-    scores: list[MetricScore] = []
-    for metric_score in evidence.metric_scores:
-        score = MetricScore.model_validate(metric_score)
-        if score.metric_id not in owned_metric_ids:
-            raise ValueError(f"Scorer {owner_ref} emitted unowned metric {score.metric_id!r}")
-        scores.append(score)
-    return tuple(scores)
+    scores = tuple(MetricScore.model_validate(score) for score in evidence.metric_scores)
+    reject_unowned((score.metric_id for score in scores), owned_metric_ids, owner=owner_ref)
+    return scores
 
 
 def _merge_unique_metric_scores(
@@ -100,10 +97,7 @@ def _merge_unique_metric_scores(
 ) -> None:
     """Merge scorer outputs while rejecting duplicate metric ownership."""
 
-    for score in scorer_scores:
-        if score.metric_id in metric_scores:
-            raise ValueError(f"Duplicate scorer metric output: {score.metric_id}")
-        metric_scores[score.metric_id] = score
+    merge_unique(metric_scores, ((score.metric_id, score) for score in scorer_scores))
 
 
 def _ordered_complete_metric_scores(
@@ -112,14 +106,7 @@ def _ordered_complete_metric_scores(
 ) -> list[MetricScore]:
     """Return resolved order only when every required metric was emitted."""
 
-    missing_metric_ids = [
-        metric_id for metric_id in resolved_metric_ids if metric_id not in metric_scores
-    ]
-    if missing_metric_ids:
-        raise ValueError(
-            "Scorers did not emit all resolved metrics: " + ", ".join(missing_metric_ids)
-        )
-    return [metric_scores[metric_id] for metric_id in resolved_metric_ids]
+    return ordered_complete(metric_scores, resolved_metric_ids)
 
 
 def collect_metric_scores_from_scorers(
