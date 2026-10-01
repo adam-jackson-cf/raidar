@@ -40,6 +40,8 @@ Evidence is under `runs/pilot/`, which is gitignored and local to this worktree.
 | 7 | Frozen review-surface suite green; Quality element live | **Met** | `make review-surface-test REVIEW_RUNS_ROOT="runs/pilot/pilot-forge runs/pilot/pilot-circuit-eval-oneshot" REVIEW_STORE=runs/pilot/assessment-store-v2`: **55 passed**. At the cutover commit the one store now serves both roots, so the suite's Quality data holds 58 runs (42 synthetic + the 16 pilot runs); before that fix the target silently left the pilot runs out of the suite's Quality data when the root and store counts differed, and it now fails loudly on any other mismatch (`lock-fix/review-surface-test.log`; the suite grew from 40 while the review surface was being integrated in the same worktree, see §9), with 67 runs across 19 experiments in the review projection. The 16 pilot runs resolve their migrated locks and their Assessments; 14 are scored and the 2 baseline trajectories without code-quality values (`forge-04` `b00`, `b03`) are Unscored with per-component `ineligible` reasons, which the observations (unchanged since the pilot) determine. The Quality projection over the two pilot runs with the canonical store (`lock-fix/qp-store-v2.json`) gives 16 runs across 2 experiments, 662 ok cells and no "lock unavailable" note, the same counts as the pilot-time projection. The earlier screenshots (`quality*.png`) predate this rerun. |
 | 8 | The analysis gives an honest verdict (`inconclusive` is acceptable) | **Met** | forge primary `solve_rate`: Δ 0, 95% CI [−0.22, 0.22], **inconclusive**. one-shot primary: **insufficient** (3 pairs, below the lock's minimum of 5). No override was used; the thresholds come from the locks (`pinned_by_lock=true`, min_pairs 5, alpha 0.05, max_exclusion_fraction 0.2). Reproduced on the current tree from the canonical store (`lock-fix/analysis-{forge,oneshot}`): the only field that differs from the pilot-time reports is `lock_sha256`, which is now the execution digest of the migrated lock (§1.1). |
 
+> **Pilot v2 (2026-10-01):** this table is the v1 record. The criteria re-evaluated on pilot v2 data are in §11.10, and the end-to-end process verdict is in §11.11.
+
 **Summary:** 7 of 8 criteria are met, and criterion 6 (N1 budgets) is not. Criterion 3 is met on the substituted AgentSpec only. Criteria 4, 7 and 8 reproduce on the current tree from the canonical store `runs/pilot/assessment-store-v2`, after the provenance fix in §1.1.
 
 ### 1.1 Post-pilot regression: WS-L changed every scorer digest (fixed)
@@ -408,3 +410,227 @@ The v1 pilot did not measure the treatment it meant to measure. The guided arm a
 - The relocked v2 locks no longer serve as the provenance of the v1 runs (§9). To re-analyse a v1 run, pass its own `executed-lock.json` as `LOCK=`.
 - Not addressed here: F4 (no plan instruction, `plan_written`) and F5 (stop-hook invisible under Codex).
 - Reviewer sessions remain billed to the guided arm. The re-ask adds at most one reviewer session per round.
+
+---
+
+## 11. Pilot v2 results (2026-10-01)
+
+Status: measured. This section supersedes §1-§5 as the current state of the exit criteria; §1-§5 are kept unchanged as the v1 record for comparison. v1 and v2 are different experiments (§10), so their numbers are compared, never pooled.
+
+Every real-LLM trial used codex-cli 0.156.1 + `gpt-6-luna`, reasoning effort low, on OrbStack. Jev ran in shadow, replay-only (`OPENROUTER_API_KEY` unset; out of scope until the local process is confirmed). Evidence is under `runs/pilot-v2/` (gitignored, local to this worktree).
+
+| Artifact | Path |
+|---|---|
+| Forge run (8 checkpoints × {baseline, guided} × 16 blocks planned, continue) | `runs/pilot-v2/pilot-forge/forge-02` (lock `5a73637e8ac3`) |
+| One-shot run (`circuit_eval.checkpoint_1` × {baseline, guided} × 5 blocks) | `runs/pilot-v2/pilot-circuit-eval-oneshot/oneshot-01` (lock `827ebb5a7ca9`) |
+| Aborted forge attempt (grader uv dev-group bug, fixed in `c068e4c`) | `runs/pilot-v2/_aborted/forge-01-grader-uv-dev-group` |
+| Canonical Assessment store | `runs/pilot-v2/assessment-store` |
+| Assess, rescore (store B), replay and digest evidence | `runs/pilot-v2/gate-evidence/assess/` |
+| Perf check logs | `runs/pilot-v2/gate-evidence/perf/` |
+| Analysis reports | `runs/pilot-v2/gate-evidence/analysis/{forge,oneshot}/analysis.{json,md}` |
+| Review-surface suite log, pilot-v2-only Quality projection, screenshots | `runs/pilot-v2/gate-evidence/review-surface/` |
+
+### 11.1 Execution
+
+| Leg | Run | Arms × blocks | Valid / infra | Wall time (UTC) | Concurrency |
+|---|---|---|---|---|---|
+| forge | forge-02 | 2 × 16 | 14 / 18 (b00-b06 valid in both arms; b07-b15 infra in both arms) | 11:27-16:56 (5 h 30 m), stopped by host failure | 3 |
+| one-shot | oneshot-01 | 2 × 5 | 10 / 0 | 10:24-10:49 (24 m) | 2 (concurrently with forge-01) |
+
+- **One Raidar bug found and fixed (`c068e4c`).** The offline grader (`--network none`, `UV_OFFLINE=1`) ran the SCB entrypoint `uv run --project {app} forge.py`, and uv tried to sync the submission's `dev` dependency group before starting the program, so correct work scored 0 (forge-01 guided b00: 0.0 on all 8 checkpoints). The sandbox now sets `UV_NO_SYNC=1`. A regression test runs real uv offline with and without a lockfile. `make assess-regrade` on the aborted trial then gave 1.0, 1.0, 0.94, 0.96, 0.96, 0.91, 0.90, 0.89, and regrading all 10 one-shot trials matched their recorded grades, so oneshot-01 stands. Only the scorer implementation digests moved; `lock_sha256` is unchanged for both legs.
+- **Host failure, not a Raidar bug.** At 16:56:24 UTC the external drive holding OrbStack's data (`/Volumes/UGreen-External/Docker`) returned I/O errors, the VM's btrfs volume went read-only and OrbStack stopped (`~/.orbstack/log/vmgr.log`). Every forge trial in flight or queued (b07-b15, both arms) was recorded as infra-invalid. The drive dropped off and remounted at 17:56 BST (macOS reports it mounted read-write, SMART Verified). OrbStack was restarted at 18:18 BST: Docker, signoz and a test container came up with no new btrfs or I/O errors in `vmgr.log`, and `make harbor-cleanup` removed the 3 trial environments forge-02 left behind (§11.12).
+- **v1 → v2, F1 resolved.** 0 trajectories in either arm or leg wrote nothing (v1: 2 of 5 forge baseline trajectories). 0 executed steps ended with an empty `/app`.
+- **v1 → v2, F3 resolved.** forge guided, 56 steps: review-loop@2 parsed 0 `EMPTY_FEEDBACK` (v1: 18 of 40). Terminations: `review_approved` 23, `rounds_exhausted` 32, `loop_exception` 1 (a real 1800 s agent timeout on b03 guided checkpoint_7, graded 0.88 and counted against the arm). All 3 unusable reviews were recovered by the re-ask; none ended `review_unusable_after_reask`.
+
+### 11.2 Assessment and rescoring
+
+- `make experiment-assess` with all four scorers (`correctness@1 code-quality@1 resource-usage@1 process-compliance@1`) and `JEV_REPLAY_ONLY=1` into `runs/pilot-v2/assessment-store`: 40 `added` (one-shot, 10 trials) + 68 `added` (forge, the 14 valid trials and the 3 infra trials that had executed steps).
+- The same command into a fresh store B (`gate-evidence/assess/store-b`): the same 108 Assessment files, **byte-identical** (`store-a.sha` = `store-b.sha`, 108 lines each).
+- `REPLAY=1 JEV_REPLAY_ONLY=1` over the canonical store: 40/40 and 68/68 `replayed_identical`; the store's digests are unchanged afterwards.
+- Jev shadow (`process-compliance.residue`, replay-only): 548 decisions, none enforced (532 deterministic, 16 `jev_error` "No cached decision to replay"). Those 16 leave 8 process-compliance Assessments `provisional: true` (7 forge, 1 one-shot). They resolve only when live Jev is enabled, which is out of scope for now.
+
+### 11.3 Effects: forge (`gate-evidence/analysis/forge/analysis.md`)
+
+Thresholds pinned by the lock: min pairs 5, max excluded share 20%, alpha 0.05; paired t intervals (fewer than 10 pairs). **Every verdict is `insufficient`: 9 of 16 planned pairs are infra-excluded (56% > 20%).** The point estimates below are from the 7 valid pairs and are not findings.
+
+| Metric | View | n | Baseline | Guided | Δ [95% CI] | Verdict |
+|---|---|---|---|---|---|---|
+| solve_rate (primary) | continue | 7 | 0.179 | 0.036 | −0.143 [−0.266, −0.019] | insufficient |
+| reached | strict | 7 | 1.43 | 0.29 | −1.14 [−2.13, −0.15] | insufficient |
+| final_solved | continue | 7 | 0 | 0 | 0 (McNemar: 0/0/0/7, p = 1) | insufficient |
+| headline S (`scb-canonical@1`) | headline | 6 | 14.16 | 3.55 | −10.6 [−22.7, 1.5] | insufficient (1 ineligible) |
+| V verbosity | quality | 7 | 0.999 | 0.998 | −0.001 [−0.004, 0.002] | insufficient |
+| E erosion | quality | 7 | 0.102 | 0.214 | +0.113 [0.001, 0.225] | insufficient |
+| H architecture | quality | 7 | 1.000 | 0.999 | −0.001 [−0.002, 0.000] | insufficient |
+| R rework | quality | 7 | 0.237 | 0.260 | +0.023 [−0.037, 0.082] | insufficient |
+| G regression | quality | 6 | 0.192 | 0.052 | −0.140 [−0.302, 0.021] | insufficient (1 ineligible) |
+
+- The one ineligible pair (headline S, G) has no G value for the `checkpoint_6 → checkpoint_7` transition; the scorer records the reason, it is not scored 0.
+- **Curves.** Solved share at checkpoints 1-2 is 0.71 baseline vs 0.14 guided, and 0 in both arms from checkpoint 3 on. Strict and continue views agree. Case pass rate (strict_pass_rate) is 0.99 vs 0.95 at cp1 and converges from cp3 (cp7 0.82 vs 0.89, cp8 0.80 vs 0.75). Guided's failures are near-misses, not empty work.
+- **Why guided misses checkpoint 1 (observed).** In 6 of 7 guided trajectories the only failing cp1 cases are `test_create_rejects_empty_name_string` and `test_create_rejects_empty_requirement_sets`; baseline fails the same two cases in 2 of 7. The same agent behaviour repeats across blocks, so this reads as a treatment effect on input validation, not a grader fault. It is an inference from 7 pairs, not a finding.
+- **v1 comparison.** v1 forge solve_rate was 0.10 in both arms (Δ 0, inconclusive), with a bimodal baseline (empty workspaces). The v2 baseline improved because the shared framing removed the empty-workspace failure.
+
+### 11.4 Effects: one-shot (`gate-evidence/analysis/oneshot/analysis.md`)
+
+5 pairs, 0 excluded (meets min pairs 5, unlike v1's 3).
+
+| Metric | View | n | Baseline | Guided | Δ [95% CI] | Verdict |
+|---|---|---|---|---|---|---|
+| solve_rate (primary) | continue | 5 | 0.6 | 0.8 | +0.2 [−0.84, 1.24] | **inconclusive** |
+| headline S (`scb-canonical-oneshot@1`) | headline | 5 | 54.8 | 74.5 | +19.7 [−75.1, 114.5] | inconclusive |
+| V verbosity | quality | 5 | 0.992 | 1.000 | +0.008 [−0.009, 0.025] | inconclusive |
+| E erosion | quality | 5 | 0.093 | 0.296 | +0.203 [−0.20, 0.61] | inconclusive |
+| H architecture | quality | 5 | 0.958 | 0.944 | −0.014 [−0.072, 0.043] | inconclusive |
+
+McNemar on final_solved: 2 both, 1 baseline only, 2 guided only, 0 neither; p = 1. R and G do not apply to a one-shot problem.
+
+### 11.5 Manipulation check
+
+Both legs: **`not_separated`** overall.
+- `tests_run_before_finish` separates: forge 0 vs 0.90 (p = 0.0003), one-shot 0 vs 1 (p = 0.008).
+- `plan_written` does not separate (0 vs 0 in both legs). This is F4, which v2 did not address: no component instructs a plan file. The overall verdict therefore cannot become `separated` until F4 is resolved or the check is dropped from the lock.
+
+### 11.6 Cost
+
+cost_usd is Harbor's token-priced estimate; the runs used ChatGPT session auth, so it is nominal, not billed. Means are over valid trajectories.
+
+| Leg | Arm | Mean cost / trajectory | Mean tokens | Mean agent s | Cost Δ vs baseline [95% CI] |
+|---|---|---|---|---|---|
+| forge | baseline | $0.0346 | 1.24 M | 596 | |
+| forge | guided | $0.1695 | 7.56 M | 2,724 | +$0.135 [0.113, 0.157] |
+| one-shot | baseline | $0.0042 | 99 k | 100 | |
+| one-shot | guided | $0.0202 | 764 k | 321 | +$0.016 [0.012, 0.020] |
+
+Recorded v2 spend: one-shot $0.122, forge-02 $1.569 (including steps run before the crash), aborted forge-01 $0.178. Jev spend $0.00. Guided costs about 5× baseline (v1: about 4×); review-loop@2 reviewer and re-ask sessions are billed to the arm.
+
+### 11.7 Sample-size projection (J2)
+
+| Leg | Metric | Pilot n | Pilot SD | δ (default) | Pairs needed | Additional | Projected USD |
+|---|---|---|---|---|---|---|---|
+| forge | solve_rate | 7 | 0.134 | 0.125 | 9 | 2 | $1.84 |
+| forge | headline S | 6 | 11.6 | 5 | 42 | 36 | $8.59 |
+| forge | rework R | 7 | 0.065 | 0.05 | 14 | 7 | $2.86 |
+| forge | erosion E | 7 | 0.121 | 0.05 | 46 | 39 | $9.39 |
+| forge | regression G | 6 | 0.154 | 0.05 | 75 | 69 | $15.33 |
+| one-shot | solve_rate | 5 | 0.837 | 0.125 | 352 | 347 | $8.58 |
+| one-shot | final_solved | 5 | 0.837 | 0.25 | 88 | 83 | $2.14 |
+
+The forge figures come from 7 pairs of an incomplete leg; treat them as order-of-magnitude. forge final_solved has no projection (SD 0: no trajectory solved checkpoint 8 in either arm).
+
+### 11.8 N1 overhead (`make perf-check`, real agent, post-fix tree)
+
+oneshot-01 (concurrency 2) ran alongside the aborted forge-01 (concurrency 3), up to 5 trials at once plus review-loop sessions. forge-02 started after oneshot-01 had finished (11:27 vs 10:49 UTC) and ran alone at concurrency 3. Values are p95 in seconds; only phases that fail or changed materially from v1 are shown. All other budgeted phases pass in both legs.
+
+| Phase | Budget | v1 forge-04 | v2 forge-02 (n) | v2 oneshot-01 (n) |
+|---|---|---|---|---|
+| artifact_collection | 3.5 s | **3.97 fail** | 1.28 (131) pass | 0.86 (10) pass |
+| per_step_reset | 2 s | 1.81 pass | 1.12 (131) pass | 1.66 (10) pass |
+| per_step_overhead | 10 s | 7.36 pass | 3.10 (131) pass | 2.32 (10) pass |
+| environment_start[warm] | 20 s | 10.00 pass | **20.77 (17) fail** | 19.09 (10) pass |
+| teardown_result_write[init] | 4 s | **4.62 fail** | **4.66 (17) fail** | **4.45 (10) fail** |
+
+- The §5.1 fix holds on real agents: `artifact_collection` dropped from 3.97 s to 1.28 s and every per-step phase has wide margin.
+- `teardown_result_write[init]` still fails in both legs. It is tail-driven: forge median about 2.3 s, with 2 of 17 samples over 4 s (5.71 s b01 guided, 4.40 s b02 baseline); one-shot has 2 of 10 over 4 s (4.67 s, 4.17 s). §5.1 predicted exactly this residue (pure `compose down` under host load).
+- `environment_start[warm]` fails on forge only, from the b06 pair (23.3 s, 20.1 s); the other 15 samples are 3-16.5 s. forge-02 did not overlap the one-shot leg; any contention came from its own 3 concurrent trials and the `make assess-regrade` jobs run in Docker after `c068e4c`.
+- `scorer_orchestration` is still not checked by `perf check` (measured in `raidar assess`, not `raidar run`).
+
+### 11.9 Review surface
+
+- `make review-surface-test REVIEW_RUNS_ROOT="runs/pilot-v2/pilot-forge runs/pilot-v2/pilot-circuit-eval-oneshot" REVIEW_STORE=runs/pilot-v2/assessment-store`: **55 passed** (`gate-evidence/review-surface/review-surface-test.log`). The suite's Quality data held 84 runs (42 synthetic + all 42 pilot-v2 trials) and the review projection 93 runs across 19 experiments.
+- Pilot-v2-only Quality projection (`make review-surface-quality-data QUALITY_RUNS=... QUALITY_STORE=...`, `qp-pilot-v2.json`): 42 runs across 2 experiments, not labelled synthetic.
+- Screenshots (`gate-evidence/review-surface/*.png`, served by `make review-surface-serve` with the same roots and store): run detail with the Quality panel for forge b00 baseline (S 21.0, per-checkpoint C/V/E/H/R/G/I/S), forge b05 guided and one-shot b01 guided; `/quality` for both experiments (component curves, paired Δ "7 / −9" pairs, the 18 infra-excluded forge trials listed as "Left out ... invalid trajectory (infra-excluded)"); and the forge b00 guided Quality run view. No console or page errors.
+- The 18 infra-invalid forge trials render as `Unscored` in the run list, which is the intended behaviour.
+
+### 11.10 Exit criteria re-evaluated on v2
+
+| # | Criterion | v1 status | v2 status | v2 evidence |
+|---|---|---|---|---|
+| 1 | All pilot trajectories complete with ≤1 infra exclusion per arm | Met | **Not met (forge); met (one-shot)** | one-shot 5+5 valid, 0 infra. forge 7+7 valid, 9+9 infra, all from the OrbStack drive failure (§11.1). Needs forge b07-b15 rerun after OrbStack is healthy. |
+| 2 | Context-isolation and no-test-leak checks green on every trajectory | Met | **Met** | 122/122 executed steps on valid trajectories (112 forge + 10 one-shot) have a clean `raidar-reset.json` (no error, no residual, no failed reset) and `pre-agent-leak.json` `clean: true`. `no_oracle_leak` passes on 24/24 valid trajectories. |
+| 3 | Every component's discovery probe passes | Met (codex-cli) | **Met (codex-cli)** | `component_probes` passes on 24/24 valid trajectories. Offline `probe_step` re-run: context-reset and prompt-wrapper@1 56/56 forge baseline steps; context-reset, prompt-wrapper@1, rules-file@1, skills@1, lint-config@1, stop-hook@1 and review-loop@2 56/56 forge guided steps; 5/5 for every component in both one-shot arms. Same caveats as v1 (Claude Code not run; lint-config presence-only; stop-hook fired-only under Codex). |
+| 4 | Offline rescoring reproduces deterministic observations byte-identically | Met | **Met** | §11.2: 108/108 Assessment files byte-identical across two fresh stores; 108/108 `replayed_identical`. |
+| 5 | G2 golden parity against the SCB fork passes | Met | **Met** | Unchanged code path; part of `make quality`, which passes on this tree. |
+| 6 | N1 budgets hold (`raidar perf check`) | Not met | **Not met** | §11.8: `teardown_result_write[init]` 4.66 s (forge) and 4.45 s (one-shot) against 4 s; `environment_start[warm]` 20.77 s (forge) against 20 s. The v1 `artifact_collection` miss is fixed on real agents. |
+| 7 | Frozen review-surface suite green; Quality element live | Met | **Met** | §11.9: 55 passed with the pilot-v2 runs and store; run-detail Quality panel and `/quality` render pilot-v2 data (screenshots). |
+| 8 | The analysis gives an honest verdict (`inconclusive` is acceptable) | Met | **Met** | one-shot primary **inconclusive** (5 pairs). forge primary **insufficient** because the exclusion share exceeds the lock's 20%; the analysis refuses to call an effect from a crash-truncated leg, which is the intended behaviour. No overrides; thresholds pinned by the locks. |
+
+**Summary:** 6 of 8 met on v2. Criterion 1 fails on forge only, from a host hardware failure; criterion 6 fails on teardown tail latency (both legs) and one forge env-start pair.
+
+### 11.11 E2E local process confirmed?
+
+**Verdict: yes for the process; no for the forge experiment's data.** Every stage ran on real Luna trials through public make targets, and each stage consumed the previous stage's output without manual repair:
+- the one-shot leg is a complete, clean end-to-end pass (10/10 valid, assessed, rescored byte-identically, analysed to an `inconclusive` verdict, rendered in the review surface);
+- the forge leg exercised every stage on 14 valid multi-checkpoint trajectories, but the experiment is incomplete (criterion 1) because the host's Docker drive failed mid-run;
+- criterion 6 is a performance budget miss, not a broken stage.
+
+The exact sequence a user runs (forge leg shown; for one-shot use `examples/pilot/oneshot.experiment.yaml`, `CONCURRENCY=2`, `RUN_ID=oneshot-01`):
+
+```sh
+# 0. Prerequisites (once): OrbStack running on healthy storage, Codex auth, agent image
+orbstack-data-status                       # expect external_available=True; docker --context orbstack ps must work
+make codex-auth-setup
+make pack-build
+
+# 1. Validate
+make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml
+
+# 2. Lock (and check it is current)
+make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml
+make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml LOCK_CHECK=1
+
+# 3. Plan (dry run)
+make experiment-plan EXPERIMENT=examples/pilot/experiment.yaml CONCURRENCY=3
+
+# 4. Execute (real codex-cli + gpt-6-luna low trials)
+make experiment-execute EXPERIMENT=examples/pilot/experiment.yaml CONCURRENCY=3 RUNS_DIR=runs/pilot-v2 RUN_ID=forge-02
+make harbor-cleanup RUN=runs/pilot-v2/pilot-forge/forge-02     # only after an interrupted run
+
+# 5. Assess (all four scorers, Jev replay-only shadow), then prove determinism
+make experiment-assess RUN=runs/pilot-v2/pilot-forge/forge-02 STORE=runs/pilot-v2/assessment-store \
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@1" JEV_REPLAY_ONLY=1
+make experiment-assess RUN=runs/pilot-v2/pilot-forge/forge-02 STORE=runs/pilot-v2/assessment-store \
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@1" REPLAY=1 JEV_REPLAY_ONLY=1
+make perf-check RUN=runs/pilot-v2/pilot-forge/forge-02
+
+# 6. Analyze
+make experiment-analyze RUNS="runs/pilot-v2/pilot-forge/forge-02" STORE=runs/pilot-v2/assessment-store \
+  ANALYSIS_OUT=runs/pilot-v2/gate-evidence/analysis/forge
+
+# 7. Review
+make review-surface-test REVIEW_RUNS_ROOT="runs/pilot-v2/pilot-forge runs/pilot-v2/pilot-circuit-eval-oneshot" \
+  REVIEW_STORE=runs/pilot-v2/assessment-store
+make review-surface-quality-data QUALITY_RUNS="runs/pilot-v2/pilot-forge runs/pilot-v2/pilot-circuit-eval-oneshot" \
+  QUALITY_STORE="runs/pilot-v2/assessment-store runs/pilot-v2/assessment-store"
+make review-surface-serve REVIEW_RUNS_ROOT="runs/pilot-v2/pilot-forge runs/pilot-v2/pilot-circuit-eval-oneshot" \
+  REVIEW_STORE=runs/pilot-v2/assessment-store
+```
+
+**Open before calling the forge leg done:**
+- Rerun forge blocks b07-b15 (or the full leg as a new run id) and repeat steps 5-7. OrbStack is running again and forge-02's leftover environments are cleaned up (§11.12). Before rerunning only b07-b15 into a second run, confirm how `raidar analyze` pairs a block that is infra-invalid in one run and valid in another; this has not been checked.
+- Decide N1 (§5.1 options): cap trial concurrency for `perf check` runs, or have the budget owner re-baseline `teardown_result_write[init]` (and possibly `environment_start[warm]`) for concurrent operation. Nothing is re-baselined here.
+- Known fidelity gap: a submission that declares runtime `dependencies` cannot install them in the offline grader (native SCB grades with network). No v2 snapshot hit it.
+- Scorer identity moved with `c068e4c`: oneshot-01's `run.lock.json` assessment section carries the pre-fix scorer digests, so `LOCK_CHECK` reports it as needing a rescore. Its Assessments in `runs/pilot-v2/assessment-store` were scored on the current tree.
+
+### 11.12 Independent walkthrough on a fresh experiment (2026-10-01)
+
+To confirm the process independently of the pilot runs, the README walkthrough was followed as written on a new experiment: `examples/pilot/oneshot.experiment.yaml` copied with its `components/` to `.tmp/e2e-luna/experiment.yaml`, with `id: e2e-luna-oneshot` and `blocks: 2` (codex-cli 0.156.1 + `gpt-6-luna`, reasoning low, OrbStack). Only public `make` targets were used, and each stage consumed the previous stage's output without manual repair.
+
+| Step | Command (README section) | Result |
+|---|---|---|
+| Install | `cp orchestrator/.env.example orchestrator/.env`, `make env-setup` | ok; Codex used file-backed ChatGPT auth (`CODEX_AUTH_MODE` empty means `auto`) |
+| 1 | `make problem-list`, `make problem-import PROBLEM=scb/circuit_eval.checkpoint_1@38d627ecf668`, `make pack-build` | ok; problem validated and verified against its manifest |
+| 2 | `make experiment-init EXPERIMENT=.tmp/e2e-init/rules-trial/experiment.yaml`, then validate | ok; the starter matches the README example apart from the description and the explicit `headline_policy` line |
+| 3 | `make experiment-validate`, `make experiment-lock`, `make experiment-plan` | ok; lock `ca1169ab23f1`, 4 trials planned at concurrency 2 |
+| 4 | `make experiment-execute ... RUN_ID=first` | ok; 4/4 valid, 0 infra, 9 min wall (17:21-17:30 UTC); 4/4 steps with a clean reset and leak record; `no_oracle_leak` and `component_probes` pass on all 4; review-loop@2 parsed `CHANGES` in both rounds of both guided trials (`rounds_exhausted`) |
+| 4 | `make perf-check RUN=runs/e2e-luna-oneshot/first` | **exit 2**: every phase `insufficient` (4 samples < `MIN_SAMPLES` 10). With `MIN_SAMPLES=4` all 11 applicable budgeted phases pass (env start warm p95 4.24 s, teardown 2.12 s). README now says this. |
+| 5 | `make experiment-assess ... SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@1"` | ok; 16 `added`, none provisional (every Jev residue decision was deterministic) |
+| 5 | the same with `REPLAY=1`, and into a fresh store | 16/16 `replayed_identical`, store unchanged; fresh store byte-identical (16 files) |
+| 6 | `make experiment-analyze ...` | ok; primary `solve_rate` 1.0 vs 0.5, **insufficient** (2 pairs < 5, pinned by the lock): the honest verdict for 2 blocks. Manipulation check `insufficient_data`. Cost $0.0038 vs $0.0182 per trajectory. |
+| 7 | `make review-surface-quality-data`, `make review-surface-serve` | ok; 4 Quality runs across 1 experiment; the server's `/api/runs` lists the 4 runs |
+| 7 | `make review-surface-test REVIEW_RUNS_ROOT=runs/e2e-luna-oneshot REVIEW_STORE=stores/e2e-luna-oneshot` | 55 passed (Quality data 42 synthetic + 4 real runs) |
+
+Doc fixes from this walkthrough (README): `perf-check` needs `MIN_SAMPLES` for runs under 10 trials; `process-compliance@1` stores a `provisional` Assessment when Jev cannot answer; `make review-surface-test` rewrites `review-surface/data`, so project again before serving. In §11.8, the claim that forge-02 overlapped the one-shot leg was wrong (oneshot-01 finished before forge-02 started) and is corrected.
+
+The §11.1-§11.10 figures were rechecked against the artifacts: valid and infra counts, checkpoint states, 122/122 clean steps, `no_oracle_leak` and `component_probes` 24/24, costs and wall times from the run records; effects, curves, manipulation check and J2 rows from `analysis.md`; 108 store digests recomputed equal to `store-a.sha` and `store-b.sha`; Jev audit 548 decisions (532 deterministic, 16 `jev_error`, 0 enforced) and 8 provisional Assessments (7 forge, 1 one-shot); perf p95 values from the perf logs; 55 passed in the review-surface log. All matched.
+
+**Verdict: the local end-to-end process with Luna is confirmed.** The forge leg's data is still incomplete (criterion 1) and N1 is still open (criterion 6); neither is a broken stage.

@@ -127,9 +127,11 @@ make experiment-execute EXPERIMENT=rules-trial/experiment.yaml RUN_ID=first
 make perf-check RUN=runs/rules-trial/first                 # N1 overhead budgets
 ```
 
+`perf-check` fails a phase with fewer than `MIN_SAMPLES` samples (default 10) as `insufficient`, so a run of fewer than 10 trials fails it. For a small trial run, pass `MIN_SAMPLES=<trials>` to check the budgets on what there is.
+
 If a run is stopped mid-trial, `make harbor-cleanup RUN=runs/rules-trial/first` removes the trial environments it left behind.
 
-**5. Assess.** Scorers run offline over the stored trials. They write to an Assessment store outside the run and use the assessment settings of the run's lock: the experiment's current lock when its `lock_sha256` is the run's (so an assessment-only relock applies), else the run's `run.lock.json`; `LOCK=` names another. `REPLAY=1` reruns existing Assessments and requires byte-identical output. `stores/` and `analysis/` are git-ignored.
+**5. Assess.** Scorers run offline over the stored trials. They write to an Assessment store outside the run and use the assessment settings of the run's lock: the experiment's current lock when its `lock_sha256` is the run's (so an assessment-only relock applies), else the run's `run.lock.json`; `LOCK=` names another. `REPLAY=1` reruns existing Assessments and requires byte-identical output. `process-compliance@1` asks Jev only about trace residue it cannot decide itself; when Jev cannot answer (no `OPENROUTER_API_KEY`, or `JEV_REPLAY_ONLY=1` with no cached decision) that Assessment is stored `provisional` and the store's Jev audit records why. `stores/` and `analysis/` are git-ignored.
 
 ```bash
 make experiment-assess RUN=runs/rules-trial/first STORE=stores/rules-trial \
@@ -142,7 +144,7 @@ make experiment-assess RUN=runs/rules-trial/first STORE=stores/rules-trial \
 make experiment-analyze RUNS="runs/rules-trial/first" STORE=stores/rules-trial ANALYSIS_OUT=analysis/rules-trial
 ```
 
-**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs; serve builds the UI first if `review-surface/dist` is missing (`make review-surface-build` rebuilds it). Each run's lock is found beside its experiment file or in the run directory; pass `REVIEW_LOCK=<lock>` (also used by the Quality projection, or `QUALITY_LOCK=`) for a lock kept elsewhere, such as a smoke lock under `.tmp/smoke/`. A run whose lock cannot be found is skipped with a warning. Scenario-epoch history under `experiments/benchmarks` is included, read-only, when present; point `REVIEW_LEGACY_ROOT` elsewhere to use another history root.
+**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs; serve builds the UI first if `review-surface/dist` is missing (`make review-surface-build` rebuilds it). Each run's lock is found beside its experiment file or in the run directory; pass `REVIEW_LOCK=<lock>` (also used by the Quality projection, or `QUALITY_LOCK=`) for a lock kept elsewhere, such as a smoke lock under `.tmp/smoke/`. A run whose lock cannot be found is skipped with a warning. Scenario-epoch history under `experiments/benchmarks` is included, read-only, when present; point `REVIEW_LEGACY_ROOT` elsewhere to use another history root. `make review-surface-test` rewrites `review-surface/data` with its fixtures plus the runs you pass, so run the projection again before serving.
 
 ```bash
 make review-surface-quality-data QUALITY_RUNS=runs/rules-trial QUALITY_STORE=stores/rules-trial
