@@ -199,6 +199,9 @@ class ExperimentSpec(SpecModel):
     agents: tuple[AgentEntry, ...] = Field(min_length=1)
     protocol: ProtocolSpec = ProtocolSpec()
     factors: tuple[FactorNoun, ...] = ()
+    # Applied identically to every condition, ahead of its own components: framing
+    # every arm shares (e.g. a prompt-wrapper) without being part of any factor.
+    shared_components: tuple[ComponentUse, ...] = ()
     conditions: tuple[ConditionSpec, ...] = Field(min_length=1)
     arms: tuple[ArmSpec, ...] = Field(min_length=1)
     assessment: AssessmentSpec
@@ -208,19 +211,38 @@ class ExperimentSpec(SpecModel):
         return next(agent for agent in self.agents if agent.id == agent_id)
 
     def condition(self, condition_id: str) -> ConditionSpec:
-        return next(item for item in self.conditions if item.id == condition_id)
+        """The effective condition: ``shared_components`` first, then its own components."""
+        declared = next(item for item in self.conditions if item.id == condition_id)
+        if not self.shared_components:
+            return declared
+        return declared.model_copy(
+            update={"components": (*self.shared_components, *declared.components)}
+        )
+
+    def component_uses(self) -> list[tuple[str, ComponentUse]]:
+        """Every declared component use with its field location (shared ones once)."""
+        shared = [
+            (f"shared_components.{index}", use) for index, use in enumerate(self.shared_components)
+        ]
+        own = [
+            (f"conditions.{c_index}.components.{u_index}", use)
+            for c_index, condition in enumerate(self.conditions)
+            for u_index, use in enumerate(condition.components)
+        ]
+        return [*shared, *own]
 
     def references(self) -> dict[str, tuple[str, ...]]:
         """Registry references by kind (policy only when declared)."""
         policy = self.assessment.headline_policy
         return {
             "problem": tuple(p.ref for p in self.problems if p.ref is not None),
-            "component": tuple(
-                use.use for condition in self.conditions for use in condition.components
-            ),
+            "component": tuple(use.use for _, use in self.component_uses()),
             "scorer": self.assessment.scorers,
             "policy": (policy,) if policy is not None else (),
         }
 
     def to_json(self) -> dict[str, object]:
-        return self.model_dump(mode="json", by_alias=True)
+        # An experiment without shared components serialises (and locks) exactly as
+        # before the field existed, so its spec and execution digests are unchanged.
+        exclude = None if self.shared_components else {"shared_components"}
+        return self.model_dump(mode="json", by_alias=True, exclude=exclude)

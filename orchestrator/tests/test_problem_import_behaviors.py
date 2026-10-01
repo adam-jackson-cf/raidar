@@ -451,3 +451,16 @@ def test_the_pack_formats_entry_files_as_snapshot_relative_paths(
         return
     with pytest.raises(ValueError, match="snapshot-relative"):
         pack.entry_file(configured)
+
+
+def test_import_refuses_ignored_files_under_the_problem(
+    scb: tuple[ProblemStore, Path, str],
+) -> None:
+    store, repo, commit = scb
+    (repo / ".git" / "info").mkdir(parents=True, exist_ok=True)
+    (repo / ".git" / "info" / "exclude").write_text("__pycache__/\n")
+    cache = repo / "adder" / "tests" / "__pycache__"
+    cache.mkdir(parents=True, exist_ok=True)
+    (cache / "conftest.cpython-312.pyc").write_bytes(b"\0")
+    with pytest.raises(SourceError, match="local changes"):
+        import_problem(store, _ref(commit), source_checkout=repo)

@@ -36,6 +36,7 @@ from pathlib import Path
 
 import yaml
 
+from raidar.execution.assessment import rescore_config
 from raidar.review_projection.fixture_assessments import (
     LintFinding,
     QualityPlan,
@@ -52,7 +53,6 @@ from raidar.review_projection.fixture_trials import (
 )
 from raidar.review_projection.scenario_epoch.fixture import write_scenario_epoch
 from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.rescore_config import RescoreConfig
 from raidar.scorers.store import AssessmentStore
 from raidar.spec.canonical import digest_json
 from raidar.spec.schema import ExperimentSpec
@@ -349,7 +349,8 @@ def _run(design: Design, dest: Path, store: AssessmentStore) -> Path:
         [f"checkpoint_{k + 1}" for k in range(len(design.trajectories[0].outcomes))],
     )
     _write_json(run_dir / "experiment.lock.json", lock)
-    settings = RescoreConfig()
+    # Assessments are keyed under the lock's assessment settings, as a rescore makes them.
+    settings = rescore_config(spec.assessment, spec.protocol)
     (run_dir / "assessment-config.yaml").write_text(
         yaml.safe_dump(settings.model_dump(mode="json"), sort_keys=True)
     )

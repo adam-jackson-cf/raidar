@@ -16,7 +16,12 @@ from dataclasses import dataclass
 from statistics import fmean, median, pstdev
 from typing import Any
 
-from raidar.review_projection.headline import CORRECTNESS_SCORER, QUALITY_SCORER, policy_shares
+from raidar.review_projection.headline import (
+    CORRECTNESS_SCORER,
+    QUALITY_SCORER,
+    UNDECLARED_MARKER,
+    policy_shares,
+)
 from raidar.review_projection.notes import EvidenceRef, Finding
 from raidar.review_projection.spans import repo_path
 from raidar.review_projection.trials import TrialInput
@@ -143,9 +148,33 @@ def _sample(scored: int, blocks: int) -> tuple[dict[str, Any], dict[str, Any]]:
     return sample, rerun
 
 
+def _undeclared_scorer_findings(
+    runs: Sequence[ReviewRunRecord],
+) -> tuple[list[Finding], list[str]]:
+    """Runs no rescore or rerun can score: the headline needs an undeclared scorer."""
+    undeclared = [
+        run.id
+        for run in runs
+        if run.unscored and any(UNDECLARED_MARKER in reason for reason in run.unscored_reasons)
+    ]
+    if not undeclared:
+        return [], []
+    finding = Finding(
+        id="policy-scorer-mismatch",
+        kind="note",
+        category="policy-scorer-mismatch",
+        title="The headline policy needs a scorer the experiment does not declare",
+        detail="no rescore or rerun produces a headline score; declare the scorer "
+        "in assessment.scorers and relock",
+        span=None,
+        evidence=tuple(EvidenceRef("run", run_id) for run_id in undeclared),
+    )
+    return [finding], undeclared
+
+
 def _findings(aggregate: Mapping[str, Any], runs: Sequence[ReviewRunRecord]) -> list[Finding]:
-    findings: list[Finding] = []
-    unscored = [run.id for run in runs if run.unscored]
+    findings, undeclared = _undeclared_scorer_findings(runs)
+    unscored = [run.id for run in runs if run.unscored and run.id not in undeclared]
     if unscored:
         findings.append(
             Finding(

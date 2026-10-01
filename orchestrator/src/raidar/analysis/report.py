@@ -33,6 +33,7 @@ from raidar.analysis.effects import (
     Slot,
     aggregate_effect,
     mean_or_none,
+    metric_applies,
     problem_effect,
 )
 from raidar.analysis.manipulation import ManipulationReport, manipulation_check
@@ -169,10 +170,13 @@ def _slots(inputs: AnalysisInputs, treatment: str) -> dict[str, list[Slot]]:
 def _effects(slots: Mapping[str, list[Slot]], settings: Settings, label: str) -> list[Effect]:
     effects: list[Effect] = []
     for metric in OUTCOME_METRICS:
-        per_problem = [
+        computed = [
             problem_effect(metric, problem, problem_slots, settings, label=label)
             for problem, problem_slots in slots.items()
         ]
+        # A metric undefined for a problem (R/G at K=1) has no row and stays out of
+        # the cross-problem aggregate, instead of reading as "ineligible" everywhere.
+        per_problem = [effect for effect in computed if metric_applies(effect)]
         effects.extend(per_problem)
         if len(per_problem) > 1:
             effects.append(aggregate_effect(metric, per_problem, settings))
@@ -254,6 +258,7 @@ def _settings_out(settings: Settings) -> ReportSettings:
         min_pairs=settings.min_pairs,
         max_exclusion_fraction=settings.max_exclusion_fraction,
         alpha=settings.alpha,
+        confidence=1.0 - settings.alpha,
         bootstrap_samples=settings.bootstrap_samples,
         seed=settings.seed,
         min_effects=dict(sorted(settings.min_effects.items())),

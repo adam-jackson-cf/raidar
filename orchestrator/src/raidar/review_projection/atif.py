@@ -12,6 +12,7 @@ one error span, never partially guessed.
 
 from __future__ import annotations
 
+import ast
 import re
 from pathlib import Path
 
@@ -25,15 +26,36 @@ TRAJECTORY_FILE = "trajectory.json"
 _NAME_LIMIT = 60
 _COMMAND_KEYS = ("cmd", "command")
 _EMBEDDED_COMMAND = re.compile(r"""\bcmd\s*:\s*["']((?:[^"'\\]|\\.)+)["']""")
-_EXIT_CODE = re.compile(r"(?:exit(?:ed)? (?:with )?code|exit_code\W+)\s*(-?\d+)", re.IGNORECASE)
+_EXIT_CODE = re.compile(
+    r"(?:process )?(?:exit(?:ed)? (?:with )?code|exit_code\W+)\s*:?\s*(-?\d+)", re.IGNORECASE
+)
+_FAILED_HEADERS = ("Script failed", "Script error")
+_OK_HEADERS = ("Script completed",)
+_HEADER_LINES = 3
+_PARTS_PREFIXES = ("[{'type'", '[{"type"')
 TRIAL_PROMPT = "user prompt"
 CHECKPOINT_PROMPT = "checkpoint prompt"
 SUBAGENT_PROMPT = "subagent prompt"
 
 
+def _content_parts(text: str) -> str | None:
+    """Harbor's Codex ATIF stores tool output as the Python repr of content parts
+    (``"[{'type': 'input_text', 'text': '...'}, ...]"``); join their texts."""
+    if not text.startswith(_PARTS_PREFIXES):
+        return None
+    try:
+        parts = ast.literal_eval(text)
+    except (ValueError, SyntaxError, MemoryError, RecursionError):
+        return None
+    if not isinstance(parts, list) or not all(isinstance(part, dict) for part in parts):
+        return None
+    return "".join(str(part.get("text") or "") for part in parts)
+
+
 def _text(message: object) -> str:
     if isinstance(message, str):
-        return message
+        decoded = _content_parts(message)
+        return message if decoded is None else decoded
     if isinstance(message, list):
         return "\n".join(part.text for part in message if getattr(part, "text", None))
     return ""
@@ -72,8 +94,23 @@ def _observation(step: Step, call: ToolCall) -> str | None:
 
 
 def _tool_status(output: str | None) -> ReviewStatus:
-    match = _EXIT_CODE.search(output or "")
-    return "ERROR" if match and int(match.group(1)) != 0 else "OK"
+    """The harness's own verdict line, never text inside the command's output.
+
+    Codex starts every tool result with ``Script completed`` or ``Script
+    failed``; otherwise only an exit code in the header lines counts (a body
+    line such as ``assert data["exit_code"] == 2`` is the program's text).
+    """
+    lines = [line.strip() for line in (output or "").splitlines() if line.strip()]
+    first = lines[0] if lines else ""
+    if first.startswith(_FAILED_HEADERS):
+        return "ERROR"
+    if first.startswith(_OK_HEADERS):
+        return "OK"
+    for line in lines[:_HEADER_LINES]:
+        match = _EXIT_CODE.match(line)
+        if match:
+            return "ERROR" if int(match.group(1)) != 0 else "OK"
+    return "OK"
 
 
 def _durations(steps: list[Step]) -> list[int | None]:

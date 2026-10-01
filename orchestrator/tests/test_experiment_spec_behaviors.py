@@ -14,6 +14,7 @@ from raidar.spec.validation import SpecValidationError
 from tests.experiment_spec_support import (
     PILOT_EXPERIMENT,
     PILOT_ONESHOT,
+    SHARED_FRAMING,
     experiment_document,
     write_experiment,
 )
@@ -249,6 +250,52 @@ def test_factor_guard_flags_component_differences_when_condition_is_undeclared(
     assert "undeclared noun 'condition'" in issues["arms.1"]
 
 
+def test_shared_components_lead_every_condition_and_never_split_the_arms(
+    tmp_path: Path,
+) -> None:
+    """Pilot v2: framing both arms get is not a factor, so the guard ignores it."""
+    document = experiment_document(factors=["agent.model"], shared_components=[SHARED_FRAMING])
+    document["conditions"][1]["components"] = []
+
+    spec = load_experiment(write_experiment(tmp_path, document)).spec
+
+    assert check_factors(spec) == []
+    for condition in ("baseline", "guided"):
+        assert [use.use for use in spec.condition(condition).components] == ["prompt-wrapper@1"]
+    assert spec.references()["component"] == ("prompt-wrapper@1",)
+    assert spec.to_json()["shared_components"] == [{**SHARED_FRAMING, "with": {}}]
+
+    guided = experiment_document(shared_components=[SHARED_FRAMING])
+    spec = load_experiment(write_experiment(tmp_path / "guided", guided)).spec
+    assert [use.use for use in spec.condition("guided").components] == [
+        "prompt-wrapper@1",
+        "rules-file@1",
+    ]
+    document = experiment_document(factors=["agent.model"], shared_components=[SHARED_FRAMING])
+    issues = _issues(write_experiment(tmp_path / "split", document))
+    assert list(issues) == ["arms.1"]
+    assert "undeclared noun 'condition'" in issues["arms.1"]
+
+
+def test_a_condition_may_not_repeat_a_shared_component(tmp_path: Path) -> None:
+    document = experiment_document(shared_components=[SHARED_FRAMING])
+    document["conditions"][1]["components"].append(SHARED_FRAMING)
+
+    issues = _issues(write_experiment(tmp_path, document))
+
+    assert issues == {
+        "conditions.1.components.1.use": "prompt-wrapper@1 is already in shared_components, "
+        "which every condition gets"
+    }
+
+
+def test_specs_without_shared_components_serialise_as_before(tmp_path: Path) -> None:
+    spec = load_experiment(write_experiment(tmp_path, experiment_document())).spec
+
+    assert "shared_components" not in spec.to_json()
+    assert spec.condition("guided") is spec.conditions[1]
+
+
 def test_validate_command_exits_nonzero_with_field_errors(tmp_path: Path) -> None:
     document = experiment_document()
     document["analysis"]["concurrency"] = -1
@@ -314,3 +361,28 @@ def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> 
         0.1,
         {"solve_rate": 0.2},
     )
+
+
+def test_set_overrides_change_only_the_addressed_yaml_alias(tmp_path: Path) -> None:
+    from raidar.spec.loader import _read_document, apply_assignment
+
+    path = tmp_path / "aliased.yaml"
+    path.write_text(
+        "conditions:\n"
+        "  - {id: a, components: [{use: review-loop@2, with: &w {max_review_rounds: 2}}]}\n"
+        "  - {id: b, components: [{use: review-loop@2, with: *w}]}\n"
+    )
+    document, _ = _read_document(path)
+
+    apply_assignment(document, "conditions.1.components.0.with.max_review_rounds", 3)
+
+    rounds = [c["components"][0]["with"]["max_review_rounds"] for c in document["conditions"]]
+    assert rounds == [2, 3]
+
+
+def test_concurrency_is_not_a_lock_or_validate_override(tmp_path: Path) -> None:
+    path = write_experiment(tmp_path, experiment_document())
+    for command in ("lock", "validate"):
+        result = CliRunner().invoke(main, [command, str(path), "--concurrency", "3"])
+        assert result.exit_code == 2
+        assert "No such option: --concurrency" in result.output

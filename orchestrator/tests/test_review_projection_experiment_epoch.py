@@ -28,7 +28,7 @@ from raidar.review_projection.conditions import ArmSide, condition_diff
 from raidar.review_projection.fixture import SCENARIO_EPOCH_DIR, generate_review_fixture
 from raidar.review_projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.review_projection.merge import project_experiment_epoch
-from raidar.review_projection.sources import RunSourceError
+from raidar.review_projection.sources import LockIndex, RunSourceError, load_run
 from raidar.schemas.review import ReviewProjectionArtifact, ReviewRunDetail
 from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
 from raidar.spec.schema import ExperimentSpec
@@ -296,15 +296,25 @@ def test_policy_mismatch_marks_every_compared_record_and_diff(
     assert same == projection.revision_diffs
 
 
-def test_run_without_its_lock_is_refused(fixture_root: Path, tmp_path: Path) -> None:
+def test_run_without_its_lock_is_skipped_not_fatal(
+    fixture_root: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     run = tmp_path / "runs/synthetic-bugfix/synthetic-bugfix"
     shutil.copytree(fixture_root / "runs/synthetic-bugfix/synthetic-bugfix", run)
+    shutil.copytree(
+        fixture_root / "runs/synthetic-skill/synthetic-skill",
+        tmp_path / "runs/synthetic-skill/synthetic-skill",
+    )
     lock = run / "experiment.lock.json"
     moved = tmp_path / "elsewhere.lock.json"
     lock.rename(moved)
+    skipped = project_experiment_epoch([tmp_path / "runs"])
+    assert "pass it with --lock" in capsys.readouterr().err
+    assert skipped.details  # the other run is still projected
+    assert not any("bugfix" in detail.run.id for detail in skipped.details)
     with pytest.raises(RunSourceError, match="pass it with --lock"):
-        project_experiment_epoch([tmp_path / "runs"])
-    epoch = project_experiment_epoch([tmp_path / "runs"], locks=[moved])
+        load_run(run, LockIndex())
+    epoch = project_experiment_epoch([tmp_path / "runs/synthetic-bugfix"], locks=[moved])
     assert len(epoch.details) == 5 * 3
 
 
@@ -415,17 +425,17 @@ def _edit_records(run: Path, edit: Any, pattern: str = "*.json") -> None:
         path.write_text(json.dumps(record))
 
 
-def test_unassessed_hint_names_the_runs_assessment_config(
+def test_unassessed_hint_names_the_lock_whose_settings_key_the_assessment(
     fixture_root: Path, tmp_path: Path
 ) -> None:
     artifact = merge_review_projections(
         run_roots=[fixture_root / "runs"], stores=[tmp_path / "empty-store"]
     )
     run = _detail(artifact, PASSING).run
-    config = fixture_root / "runs/synthetic-bugfix/synthetic-bugfix/assessment-config.yaml"
+    lock = (fixture_root / "runs/synthetic-bugfix/synthetic-bugfix/experiment.lock.json").resolve()
     hints = [reason for reason in run.unscored_reasons if "raidar assess --rescore" in reason]
     assert hints
-    assert all(f"--config {config}" in hint for hint in hints)
+    assert all(f"--lock {lock}" in hint for hint in hints)
     assert all(reason.startswith("scb-canonical@1 unassessed:") for reason in hints)
 
 
@@ -497,7 +507,9 @@ def test_lock_whose_body_was_edited_is_refused(fixture_root: Path, tmp_path: Pat
     lock["assessment"]["headline_policy"]["ref"] = "scb-canonical-oneshot@1"
     lock_path.write_text(json.dumps(lock))
     with pytest.raises(RunSourceError, match="section assessment does not match its digest"):
-        project_experiment_epoch([tmp_path / "runs"])
+        LockIndex([lock_path])
+    # Found by scanning, the edited lock is skipped and the run is not projected from it.
+    assert not project_experiment_epoch([tmp_path / "runs"]).details
 
 
 def test_policy_shares_come_from_the_policy() -> None:
@@ -549,3 +561,49 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
     scoring = _span(_detail(after, PASSING), "scoring")
     assert "correctness@1" in scoring["assessments"]
     assert "correctness@1" not in scoring["not_assessed"]
+
+
+def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
+    from raidar.review_projection.assessments import TrialAssessments
+    from raidar.review_projection.headline import UNDECLARED_MARKER, headline
+
+    missing = TrialAssessments(missing={"correctness@1": "no stored Assessment"})
+    result = headline("scb-canonical-oneshot@1", 1, missing, declared=["correctness@1"])
+    assert result.composite is None
+    (reason,) = result.reasons
+    assert "needs code-quality@1" in reason
+    assert UNDECLARED_MARKER in reason
+    declared = headline(
+        "scb-canonical-oneshot@1", 1, missing, declared=["correctness@1", "code-quality@1"]
+    )
+    assert all("unassessed" in reason for reason in declared.reasons)
+
+
+CODEX_OK = (
+    "[{'type': 'input_text', 'text': 'Script completed\\nWall time 0.1 seconds\\nOutput:\\n'}, "
+    "{'type': 'input_text', 'text': 'assert data[\"exit_code\"] == 2\\n1 passed\\n'}]"
+)
+CODEX_FAILED = (
+    "[{'type': 'input_text', 'text': 'Script failed\\nWall time 0.0 seconds\\nOutput:\\n'}, "
+    "{'type': 'input_text', 'text': 'Script error:\\napply_patch verification failed'}]"
+)
+
+
+def test_codex_tool_results_are_decoded_and_statused_by_their_header() -> None:
+    from raidar.review_projection.atif import _text, _tool_status
+
+    ok = _text(CODEX_OK)
+    assert ok.splitlines()[:4] == [
+        "Script completed",
+        "Wall time 0.1 seconds",
+        "Output:",
+        'assert data["exit_code"] == 2',
+    ]
+    assert _tool_status(ok) == "OK"  # body text mentioning exit_code is the program's
+    failed = _text(CODEX_FAILED)
+    assert failed.startswith("Script failed\n")
+    assert _tool_status(failed) == "ERROR"
+    assert _tool_status("Process exited with code 1\nboom") == "ERROR"
+    assert _tool_status("Process exited with code 0\nok") == "OK"
+    assert _tool_status("line one\nline two\nline three\nexit code 2") == "OK"
+    assert _text("[{'type': not python") == "[{'type': not python"

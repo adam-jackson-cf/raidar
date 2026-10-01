@@ -32,6 +32,7 @@ from raidar.oracle.verifier import RaidarOracleVerifier
 from raidar.packs.python import load_pack_spec
 from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
+from raidar.spec.lock import lock_integrity_issues
 from tests.execution_support import (
     ImportedFixture,
     StepOutcome,
@@ -110,8 +111,11 @@ def test_the_leak_guard_is_installed_before_the_trial_runs(
 
     monkeypatch.setattr(driver.Trial, "create", create)
     monkeypatch.setattr(driver, "install_leak_guard", guard)
+    monkeypatch.setattr(
+        driver, "install_agent_reaper", lambda trial, bundle: events.append("reaper")
+    )
     outcome = asyncio.run(run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle"))
-    assert events == ["create", f"guard:{tmp_path / 'bundle'}", "run"]
+    assert events == ["create", f"guard:{tmp_path / 'bundle'}", "reaper", "run"]
     assert outcome == TrialRun(tmp_path / "t", None)
 
 
@@ -208,10 +212,19 @@ def test_a_run_materialises_each_trial_and_writes_attempt_records(
     assert manifest["partial"]
     assert manifest["summary"]["valid"] == 1
     assert json.loads((run_dir / "plan.json").read_text())["lock_sha256"] == plan.lock_sha256
-    assessment = yaml.safe_load((run_dir / "assessment-config.yaml").read_text())
-    assert assessment["inventory_policy"]["generated_globs"] == ["gen/**"]
+    _assert_run_keeps_its_lock_and_settings(run_dir, plan.lock_sha256)
     with pytest.raises(FileExistsError):
         asyncio.run(execute(ctx))
+
+
+def _assert_run_keeps_its_lock_and_settings(run_dir: Path, lock_sha256: str) -> None:
+    """The run keeps the lock it executed under, so review/analysis still find it
+    after the experiment's lock is relocked or overwritten, and its assessor settings."""
+    kept = json.loads((run_dir / "run.lock.json").read_text())
+    assert kept["lock_sha256"] == lock_sha256
+    assert not lock_integrity_issues(kept)
+    assessment = yaml.safe_load((run_dir / "assessment-config.yaml").read_text())
+    assert assessment["inventory_policy"]["generated_globs"] == ["gen/**"]
 
 
 def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(

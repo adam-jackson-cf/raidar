@@ -1,19 +1,25 @@
 """Find a trial's stored Assessments by recomputing their store keys.
 
 The key is recomputed exactly as ``raidar assess --rescore`` computes it
-(scorer identity, the run's locked assessor config, tool lock and the trial's
+(scorer identity, the lock's assessor config, tool lock and the trial's
 input digests), so an Assessment is used only when the current scorer version
 produced it from this trial's exact inputs; otherwise the scorer's result is
 ``None`` and analysis reads its values as ``unassessed``.
+
+A trial whose inputs cannot be loaded (moved oracle bundle, missing snapshot)
+is recorded in ``input_errors``, never silently read as unassessed; the
+caller refuses it for a valid trajectory.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from raidar.analysis.sources import AnalysisInputError, RunDir
-from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
+from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.scorers.catalog import ScorerRegistry
 from raidar.scorers.keys import scorer_identity, store_key
 from raidar.scorers.rescore import RescoreError
@@ -39,6 +45,7 @@ class AssessmentLookup:
 
     def __post_init__(self) -> None:
         self._identities: dict[str, ScorerIdentity] = {}
+        self.input_errors: dict[Path, str] = {}
 
     def _identity(self, ref: str) -> ScorerIdentity:
         if ref not in self._identities:
@@ -53,7 +60,8 @@ class AssessmentLookup:
             ctx = load_trial_context(
                 trial_dir, inventory_policy=config.inventory_policy, bundle_cache=self.bundles
             )
-        except TrialInputError:
+        except TrialInputError as exc:
+            self.input_errors[trial_dir] = str(exc)
             return found
         inputs = context_inputs(ctx)
         for ref in self.scorer_refs:
@@ -67,8 +75,29 @@ class AssessmentLookup:
             found[ref] = assessment.result if assessment is not None else None
         return found
 
+    def valid_results(
+        self, trial_dir: Path, config: RescoreConfig, *, trial_id: str, valid: bool
+    ) -> dict[str, AssessResult | None]:
+        """``results``; a valid trajectory whose inputs cannot be loaded is refused."""
+        found = self.results(trial_dir, config)
+        if valid and trial_dir in self.input_errors:
+            raise AnalysisInputError(
+                f"trial {trial_id} ({trial_dir}) cannot be assessed: "
+                f"{self.input_errors[trial_dir]}; if its oracle bundle moved, pass "
+                "--bundle-search DIR (bundles are found again by content digest)"
+            )
+        return found
 
-def assessment_config(run: RunDir, override: Path | None) -> RescoreConfig:
+
+def assessment_config(
+    run: RunDir, override: Path | None, lock: Mapping[str, Any] | None = None
+) -> RescoreConfig:
+    """``override`` if given, else the lock's declared settings, else the run's file."""
+    if override is None and lock is not None:
+        try:
+            return lock_rescore_config(lock)
+        except ValueError as exc:
+            raise AnalysisInputError(f"the lock's assessment settings are invalid: {exc}") from exc
     path = override or run.path / ASSESSMENT_CONFIG_FILE
     if not path.is_file():
         return RescoreConfig()

@@ -8,6 +8,7 @@ from raidar.analysis.curves import Band, Curve
 from raidar.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.analysis.manipulation import ManipulationReport
 from raidar.analysis.report import AnalysisReport, ArmSummary, Comparison
+from raidar.analysis.stats import confidence_label
 
 MISSING = "—"
 
@@ -121,10 +122,11 @@ def _mcnemar(effects: Sequence[Effect]) -> list[str]:
     return ["### Final checkpoint solved (paired 2×2, exact McNemar)", "", *_table(header, rows)]
 
 
-def _comparison(comparison: Comparison) -> list[str]:
+def _comparison(comparison: Comparison, confidence: float) -> list[str]:
     primary = comparison.primary
     header = (
-        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "95% CI",
+        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ",
+        f"{confidence_label(confidence)} CI",
         "Verdict", "Excluded", "Cost Δ USD",
     )  # fmt: skip
     lines = [
@@ -222,6 +224,6 @@ def render_markdown(report: AnalysisReport) -> str:
     )  # fmt: skip
     lines += ["", "## Arms", "", *_table(header, (_arm_row(arm) for arm in report.arms))]
     for comparison in report.comparisons:
-        lines.extend(_comparison(comparison))
+        lines.extend(_comparison(comparison, report.settings.confidence))
     lines.extend(_sample_size(report))
     return "\n".join(lines).rstrip() + "\n"

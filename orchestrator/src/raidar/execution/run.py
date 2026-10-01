@@ -3,6 +3,8 @@
 Run directory (``<runs_root>/<experiment id>/<run id>/``)::
 
     run.json                 run manifest: lock, options, selected trials, outcome summary
+    run.lock.json            the lock the run executed under (found by review/analysis
+                             even after the experiment's own lock is relocked or overwritten)
     plan.json                the full plan with every trial's hashes (D1)
     assessment-config.yaml   locked assessor settings for ``raidar assess --rescore``
     tasks/<trial>/           the materialised Harbor task of each trial
@@ -176,6 +178,9 @@ def _summary(records: list[TrajectoryRecord]) -> dict[str, object]:
     }
 
 
+RUN_LOCK_FILE = "run.lock.json"  # read back by analysis.sources and review_projection.sources
+
+
 def default_run_id() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
@@ -189,6 +194,8 @@ async def execute(ctx: RunContext) -> list[TrajectoryRecord]:
     ctx.run_dir.mkdir(parents=True, exist_ok=False)
     plan = ctx.plan
     _write_json(ctx.run_dir / "plan.json", plan.to_json())
+    if plan.lock:
+        _write_json(ctx.run_dir / RUN_LOCK_FILE, plan.lock)
     write_assessment_config(plan.loaded.spec.assessment, plan.loaded.spec.protocol, ctx.run_dir)
     manifest: dict[str, object] = {
         "kind": "raidar-run",

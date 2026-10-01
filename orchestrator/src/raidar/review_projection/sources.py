@@ -4,14 +4,22 @@ A run directory (``raidar run``) holds ``run.json``, ``plan.json``,
 ``assessment-config.yaml``, ``trials/`` and ``trajectories/``. The experiment
 spec (agents, conditions, factors, headline policy) lives in the lock the run
 was planned from; ``run.json`` names it by ``lock_sha256``. The lock is looked
-up among the locks given explicitly and those beside the run's experiment file;
-it must be a sealed lock whose ``lock_sha256`` (its execution digest) matches. A run
-whose lock cannot be found is refused, never projected from guesses.
+up among the locks given explicitly, those beside the run's experiment file
+(the current lock, whose assessment settings apply after a relock that kept
+``lock_sha256``) and the run's own ``run.lock.json`` (the lock it executed
+under); it must be a sealed lock whose ``lock_sha256`` (its execution digest)
+matches. A run whose lock cannot be found is refused, never projected from
+guesses; a lock file that cannot be parsed is skipped with a warning.
+
+The assessment settings Assessments are looked up under are the lock's
+(``execution.assessment.lock_rescore_config``), the same ones ``raidar assess
+--rescore`` uses by default.
 """
 
 from __future__ import annotations
 
 import json
+import sys
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -19,8 +27,9 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from raidar.execution.assessment import rescore_config
 from raidar.execution.models import TrajectoryRecord
-from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
+from raidar.scorers.rescore_config import RescoreConfig
 from raidar.spec.canonical import digest_json
 from raidar.spec.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.spec.schema import ExperimentSpec
@@ -28,7 +37,6 @@ from raidar.spec.schema import ExperimentSpec
 RUN_MANIFEST = "run.json"
 RUN_KIND = "raidar-run"
 SYNTHETIC_MARKER = "synthetic"
-ASSESSMENT_CONFIG_FILE = "assessment-config.yaml"
 
 
 class RunSourceError(ValueError):
@@ -44,6 +52,7 @@ class ExperimentLock:
     headline_policy: str | None
     conditions: Mapping[str, Any]
     problems: tuple[Mapping[str, Any], ...]
+    path: Path | None = None
 
     def condition_digest(self, condition: str) -> str:
         """The condition's locked contents, independent of the harness an arm compiles it for."""
@@ -59,6 +68,7 @@ class RunSource:
     assessment: RescoreConfig
     records: tuple[TrajectoryRecord, ...]
     assessment_path: Path | None = None
+    """The lock whose assessment settings ``assessment`` is (for the rescore hint)."""
 
     @property
     def experiment(self) -> str:
@@ -123,6 +133,7 @@ def parse_lock(document: Mapping[str, Any], origin: Path) -> ExperimentLock:
             headline_policy=str(headline["ref"]) if isinstance(headline, Mapping) else None,
             conditions=dict(execution.get("conditions") or {}),
             problems=tuple(execution.get("problems") or ()),
+            path=origin,
         )
     except (KeyError, TypeError, ValidationError) as exc:
         raise RunSourceError(f"{origin} is not an experiment lock: {exc}") from exc
@@ -146,14 +157,19 @@ class LockIndex:
         self._locks.setdefault(lock.sha256, lock)
 
     def _scan(self, directory: Path) -> None:
+        """Every lock in ``directory``; one that cannot be parsed is skipped, not fatal."""
         for path in sorted(directory.glob(f"*{LOCK_SUFFIX}")):
-            self._add(path)
+            try:
+                self._add(path)
+            except RunSourceError as exc:
+                print(f"Skipping unusable lock {path}: {exc}", file=sys.stderr)
 
     def find(self, sha256: str, *, run_dir: Path, experiment_file: str | None) -> ExperimentLock:
         if sha256 not in self._locks:
-            self._scan(run_dir)
+            # The experiment's current lock first: its assessment settings win.
             if experiment_file:
                 self._scan(Path(experiment_file).parent)
+            self._scan(run_dir)
         lock = self._locks.get(sha256)
         if lock is None:
             raise RunSourceError(
@@ -180,14 +196,12 @@ def load_run(run_dir: Path, locks: LockIndex) -> RunSource:
         run_dir=run_dir,
         experiment_file=manifest.get("experiment_file"),
     )
-    config_path = run_dir / ASSESSMENT_CONFIG_FILE
-    has_config = config_path.is_file()
     return RunSource(
         run_dir=run_dir,
         manifest=manifest,
         plan=_read_object(run_dir / "plan.json"),
         lock=lock,
-        assessment=load_rescore_config(config_path) if has_config else RescoreConfig(),
+        assessment=rescore_config(lock.spec.assessment, lock.spec.protocol),
         records=_records(run_dir),
-        assessment_path=config_path if has_config else None,
+        assessment_path=lock.path,
     )

@@ -134,24 +134,45 @@ def seed_for(base_seed: int, label: str) -> int:
     return int.from_bytes(digest[:8], "big")
 
 
-def t_interval(centre: float, standard_error: float, df: float, method: IntervalMethod) -> Interval:
-    half = t_quantile(1.0 - (1.0 - CONFIDENCE) / 2.0, df) * standard_error
-    return Interval(low=centre - half, high=centre + half, method=method)
+def t_interval(
+    centre: float,
+    standard_error: float,
+    df: float,
+    method: IntervalMethod,
+    *,
+    confidence: float = CONFIDENCE,
+) -> Interval:
+    half = t_quantile(1.0 - (1.0 - confidence) / 2.0, df) * standard_error
+    return Interval(low=centre - half, high=centre + half, method=method, confidence=confidence)
 
 
-def bootstrap_interval(values: Sequence[float], *, seed: int, samples: int) -> Interval:
+def bootstrap_interval(
+    values: Sequence[float], *, seed: int, samples: int, confidence: float = CONFIDENCE
+) -> Interval:
     """Percentile bootstrap of the mean, resampling whole pairs."""
     rng = random.Random(seed)
     n = len(values)
     means = sorted(math.fsum(rng.choices(values, k=n)) / n for _ in range(samples))
-    alpha = (1.0 - CONFIDENCE) / 2.0
+    alpha = (1.0 - confidence) / 2.0
     low = means[max(0, math.floor(alpha * samples))]
     high = means[min(samples - 1, math.ceil((1.0 - alpha) * samples) - 1)]
-    return Interval(low=low, high=high, method=IntervalMethod.BOOTSTRAP)
+    return Interval(low=low, high=high, method=IntervalMethod.BOOTSTRAP, confidence=confidence)
 
 
-def summarise(values: Sequence[float], *, seed: int, bootstrap_samples: int) -> Summary:
-    """Mean, SD and 95% interval: paired t below 10 values, bootstrap from 10 on."""
+def confidence_label(confidence: float) -> str:
+    """``95%``, ``90%``, ``97.5%``: the interval's level as reports print it."""
+    return f"{round(confidence * 100, 4):g}%"
+
+
+def summarise(
+    values: Sequence[float],
+    *,
+    seed: int,
+    bootstrap_samples: int,
+    confidence: float = CONFIDENCE,
+) -> Summary:
+    """Mean, SD and interval at ``confidence`` (the pinned 1 - alpha in analysis):
+    paired t below 10 values, bootstrap from 10 on."""
     n = len(values)
     if n == 0:
         return Summary(n=0, mean=None, sd=None, interval=None)
@@ -160,9 +181,13 @@ def summarise(values: Sequence[float], *, seed: int, bootstrap_samples: int) -> 
         return Summary(n=n, mean=centre, sd=None, interval=None)
     sd = sample_sd(values)
     if n >= BOOTSTRAP_MIN_PAIRS:
-        interval = bootstrap_interval(values, seed=seed, samples=bootstrap_samples)
+        interval = bootstrap_interval(
+            values, seed=seed, samples=bootstrap_samples, confidence=confidence
+        )
     else:
-        interval = t_interval(centre, sd / math.sqrt(n), n - 1, IntervalMethod.PAIRED_T)
+        interval = t_interval(
+            centre, sd / math.sqrt(n), n - 1, IntervalMethod.PAIRED_T, confidence=confidence
+        )
     return Summary(n=n, mean=centre, sd=sd, interval=interval)
 
 

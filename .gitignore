@@ -38,6 +38,9 @@ coverage/
 .agentic-ci-validation/
 experiments/
 /runs/
+/stores/
+/analysis/
+/spikes/
 orchestrator/results*/
 orchestrator/workspace*/
 .enaible/

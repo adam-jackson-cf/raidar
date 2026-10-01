@@ -1,10 +1,12 @@
 """Factor guard (A3): arms may differ only in the declared factors.
 
-Each arm expands to its nouns: ``condition`` (the component list, compared by
-content, not by condition id) and the agent fields ``agent.<field>`` (compared
-by value, not by agent id). A declared factor covers a noun when it equals the
-noun or is its parent (``agent`` covers ``agent.model``). Every arm pair is
-compared, so the guard rejects an experiment before any trial is planned.
+Each arm expands to its nouns: ``condition`` (the effective component list,
+``shared_components`` included, compared by content, not by condition id) and
+the agent fields ``agent.<field>`` (compared by value, not by agent id). A
+declared factor covers a noun when it equals the noun or is its parent
+(``agent`` covers ``agent.model``). Every arm pair is compared, so the guard
+rejects an experiment before any trial is planned. Shared components are
+identical in every arm by construction, so they never make two arms differ.
 """
 
 from __future__ import annotations

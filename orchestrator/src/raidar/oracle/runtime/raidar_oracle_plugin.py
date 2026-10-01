@@ -127,8 +127,10 @@ class OraclePlugin:
         scratch: Path,
         coverage: bool,
         budget_s: float | None = None,
+        runtime: str = "",
     ) -> None:
         self._ledger_path = ledger
+        self._runtime = runtime
         self._deadline = None if budget_s is None else time.monotonic() + budget_s
         self._root = root
         self._scratch = scratch
@@ -141,7 +143,7 @@ class OraclePlugin:
     # ------------------------------------------------------------ lifecycle
     def pytest_configure(self, config: Any) -> None:
         self._config = config
-        _strip_runtime_from_pythonpath()
+        _strip_runtime_from_pythonpath(self._runtime)
         # --basetemp and HOME live under the scratch dir; pytest will not create parents.
         (self._scratch / "home").mkdir(parents=True, exist_ok=True)
         if self._coverage:
@@ -185,8 +187,7 @@ class OraclePlugin:
             "invalid_coverage_paths": self._run.invalid_coverage_paths,
             "environment": _environment_probe(),
         }
-        self._ledger_path.parent.mkdir(parents=True, exist_ok=True)
-        self._ledger_path.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+        _write_ledger(self._ledger_path, json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
     # ----------------------------------------------------------- collection
     def pytest_collection_modifyitems(self, items: list[Any]) -> None:
@@ -359,6 +360,32 @@ def _context_rows(relative: str, line: object, contexts: Any) -> list[dict[str, 
     return rows
 
 
+def _write_ledger(path: Path, text: str) -> None:
+    """Write the ledger by atomic replace, never in place.
+
+    The submission runs as the same uid and may have planted a (read-only)
+    forged ledger at the well-known path. A temp file plus ``os.replace`` in
+    the writable out dir supersedes any such file instead of failing on it.
+    """
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.unlink(missing_ok=True)
+    temporary.write_text(text)
+    os.replace(temporary, path)
+
+
+def _take_oracle_environment() -> dict[str, str]:
+    """Read and remove every ``RAIDAR_ORACLE_*`` variable from ``os.environ``.
+
+    The plugin keeps the values; submission processes the hidden tests start
+    must not learn where the verdict channel lives.
+    """
+    taken = {key: value for key, value in os.environ.items() if key.startswith("RAIDAR_ORACLE_")}
+    for key in taken:
+        os.environ.pop(key, None)
+    return taken
+
+
 def _current_coverage() -> Any:
     try:
         module = importlib.import_module("coverage")
@@ -367,9 +394,8 @@ def _current_coverage() -> Any:
     return module.Coverage.current()
 
 
-def _strip_runtime_from_pythonpath() -> None:
+def _strip_runtime_from_pythonpath(runtime: str) -> None:
     """Keep the plugin's runtime dir off the submission's import path."""
-    runtime = os.environ.get(ENV_RUNTIME, "")
     entries = [entry for entry in os.environ.get("PYTHONPATH", "").split(":") if entry]
     kept = [entry for entry in entries if entry != runtime]
     if kept:
@@ -380,12 +406,14 @@ def _strip_runtime_from_pythonpath() -> None:
 
 def pytest_configure(config: Any) -> None:
     """Register the plugin when loaded with ``-p raidar_oracle_plugin``."""
+    environment = _take_oracle_environment()
     plugin = OraclePlugin(
-        ledger=Path(os.environ[ENV_LEDGER]),
-        root=Path(os.environ[ENV_ROOT]),
-        scratch=Path(os.environ[ENV_SCRATCH]),
-        coverage=os.environ.get(ENV_COVERAGE) == "1",
-        budget_s=float(os.environ[ENV_BUDGET]) if os.environ.get(ENV_BUDGET) else None,
+        ledger=Path(environment[ENV_LEDGER]),
+        root=Path(environment[ENV_ROOT]),
+        scratch=Path(environment[ENV_SCRATCH]),
+        coverage=environment.get(ENV_COVERAGE) == "1",
+        budget_s=float(environment[ENV_BUDGET]) if environment.get(ENV_BUDGET) else None,
+        runtime=environment.get(ENV_RUNTIME, ""),
     )
     # pytest_configure is historic: pluggy replays it for the new plugin.
     config.pluginmanager.register(plugin, "raidar-oracle")

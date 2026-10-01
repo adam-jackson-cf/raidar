@@ -22,7 +22,7 @@ FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py
 PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"
 IMPORT_LINTER_CONFIG = ORCHESTRATOR_ROOT / ".importlinter"
 TYPECHECK_TARGETS = [
-    "src/raidar/agents/adapters",
+    "src/raidar",
     "tests/test_codex_cli_adapter.py",
     "tests/test_claude_code_cli_adapter.py",
     "tests/test_gemini_cli_adapter.py",

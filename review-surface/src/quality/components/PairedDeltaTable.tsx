@@ -18,15 +18,21 @@ function Interval({ delta, scale }: { delta: PairedDelta; scale: number }) {
   );
 }
 
-export function PairedDeltaTable({ paired, baseline }: { paired: PairedDelta[]; baseline: string | null }) {
+function emptyMessage(baseline: string | null, arms: readonly string[]): string {
+  if (!baseline) return 'No baseline arm is known, so there is nothing to pair against (see the notes).';
+  if (!arms.includes(baseline)) return `The baseline arm ${baseline} has no counted trials (see Left out), so nothing can be paired.`;
+  return 'Only the baseline arm has trials; add another arm to compare.';
+}
+
+export function PairedDeltaTable({ paired, baseline, arms }: { paired: PairedDelta[]; baseline: string | null; arms: readonly string[] }) {
   if (paired.length === 0) {
     return (
       <p className="text-[11px]" style={{ color: C.fg1 }}>
-        {baseline ? 'Only the baseline arm has trials; add another arm to compare.' : 'No baseline arm is declared, so there is nothing to pair against.'}
+        {emptyMessage(baseline, arms)}
       </p>
     );
   }
-  const arms = [...new Set(paired.map((item) => item.arm))];
+  const pairedArms = [...new Set(paired.map((item) => item.arm))];
   return (
     <table className="w-full border-collapse text-left" data-testid="paired-delta">
       <thead>
@@ -52,7 +58,7 @@ export function PairedDeltaTable({ paired, baseline }: { paired: PairedDelta[]; 
         </tr>
       </thead>
       <tbody>
-        {arms.flatMap((arm) =>
+        {pairedArms.flatMap((arm) =>
           paired
             .filter((item) => item.arm === arm)
             .map((item) => {

@@ -162,6 +162,50 @@ async def test_missing_artifact_falls_back_to_download_and_keeps_a_regradable_co
     assert record.coverage.parity is None
 
 
+@pytest.mark.parametrize("status", ["failed", "empty"])
+async def test_an_artifact_harbor_marked_unusable_is_never_graded(
+    tmp_path: Path, status: str
+) -> None:
+    # Harbor leaves the target dir behind (here: a truncated, wrong tree) when
+    # the /app download fails; only manifest.json records the failure.
+    artifact = place_step_artifact(tmp_path, "checkpoint_1")
+    (artifact / "app.py").write_text("raise SystemExit(1)\n")
+    (artifact.parent / "manifest.json").write_text(
+        json.dumps(
+            [
+                {
+                    "source": "/app",
+                    "destination": "artifacts/app",
+                    "type": "directory",
+                    "status": status,
+                }
+            ]
+        )
+    )
+    env = FakeAgentEnvironment(app_source=write_app(tmp_path / "live-app"))
+    verifier = await make_verifier(tmp_path, env, coverage=False)
+
+    result = await verifier.verify()
+
+    assert env.calls == ["exec", "download:/app"]
+    assert result.rewards is not None
+    assert result.rewards["solved"] == 1.0
+    record = load_step_record(step_record_dir(tmp_path / "trial", "checkpoint_1"))
+    assert record.snapshot.used == "download"
+    assert record.snapshot.fallback_reason == f"artifact_{status}"
+
+
+async def test_an_artifact_harbor_marked_ok_is_graded(tmp_path: Path) -> None:
+    artifact = place_step_artifact(tmp_path, "checkpoint_1")
+    (artifact.parent / "manifest.json").write_text(
+        json.dumps([{"source": "/app", "destination": "artifacts/app", "status": "ok"}])
+    )
+    env = FakeAgentEnvironment()
+    verifier = await make_verifier(tmp_path, env, coverage=False)
+    await verifier.verify()
+    assert env.calls == ["exec"]
+
+
 async def test_a_leaked_hidden_test_forces_a_failing_reward(tmp_path: Path) -> None:
     bundle = make_bundle(tmp_path / "fixture")
     digest = next(iter(bundle.hidden_file_hashes()))

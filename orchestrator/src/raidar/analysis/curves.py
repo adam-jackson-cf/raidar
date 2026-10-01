@@ -1,4 +1,6 @@
-"""Per-checkpoint curves with 95% bands, per arm and as paired deltas (F10).
+"""Per-checkpoint curves with ``1 - alpha`` bands, per arm and as paired deltas (F10).
+
+Bands are 95% at the default alpha.
 
 Eight checkpoints are not eight samples: each point's band is computed across
 trajectories (blocks) at that checkpoint, never across checkpoints. Only
@@ -51,7 +53,12 @@ class Curve(AnalysisModel):
 
 
 def _band(values: Sequence[float], missing: int, seed: int, settings: Settings) -> Band:
-    summary = summarise(values, seed=seed, bootstrap_samples=settings.bootstrap_samples)
+    summary = summarise(
+        values,
+        seed=seed,
+        bootstrap_samples=settings.bootstrap_samples,
+        confidence=1.0 - settings.alpha,
+    )
     return Band(n=summary.n, missing=missing, mean=summary.mean, ci=interval_out(summary.interval))
 
 

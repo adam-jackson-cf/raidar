@@ -461,6 +461,20 @@ def _sensitivity(trials: Sequence[ReviewedTrial], weights: dict[str, float]) -> 
     )
 
 
+def _problem_notes(
+    policies: Sequence[str], baseline: str | None, arms: Sequence[str], lock_note: str | None
+) -> list[str]:
+    notes = []
+    if len(policies) > 1:
+        notes.append(f"trials use different headline policies: {', '.join(policies)}")
+    if baseline is None:
+        why = lock_note or "the lock names no baseline arm"
+        notes.append(f"no baseline arm is known ({why}); no paired Δ")
+    elif baseline not in arms:
+        notes.append(f"baseline arm {baseline} has no counted trials (see Left out); no paired Δ")
+    return notes
+
+
 def _problem_quality(
     problem: str, trials: Sequence[ReviewedTrial], settings: Settings
 ) -> ProblemQuality:
@@ -473,11 +487,7 @@ def _problem_quality(
     baseline = reference.source.experiment.baseline_arm
     arms = tuple(sorted({trial.arm for trial in counted}, key=lambda arm: (arm != baseline, arm)))
     policies = sorted({trial.detail.policy.ref for trial in assessed})
-    notes = []
-    if len(policies) > 1:
-        notes.append(f"trials use different headline policies: {', '.join(policies)}")
-    if baseline is None:
-        notes.append("no baseline arm is known (experiment file unavailable); no paired Δ")
+    notes = _problem_notes(policies, baseline, arms, reference.source.experiment.note)
     return ProblemQuality(
         problem=problem,
         checkpoints=checkpoints,

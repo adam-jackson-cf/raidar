@@ -264,15 +264,19 @@ class HarnessSettings:
 
 
 def _hook_wrapper(slug: str, harness: Harness) -> bytes:
-    log = evidence_log(slug, "hook")
+    """Log the invocation, run the body as a child, then log its exit status."""
+    log = shlex.quote(str(evidence_log(slug, "hook")))
     body = component_dir(slug) / "hook-body.sh"
     return (
         "#!/usr/bin/env bash\n"
-        "# Raidar stop-hook wrapper: record the invocation, then run the hook body.\n"
-        f"mkdir -p {shlex.quote(str(log.parent))}\n"
+        "# Raidar stop-hook wrapper: record the invocation, run the hook body, record its exit.\n"
+        f"mkdir -p {shlex.quote(str(evidence_log(slug, 'hook').parent))}\n"
         f'printf \'{{"event":"stop","harness":"{harness.value}","argc":%d,"ts":%s}}\\n\' '
-        f'"$#" "$(date +%s)" >> {shlex.quote(str(log))}\n'
-        f'exec bash {shlex.quote(str(body))} "$@"\n'
+        f'"$#" "$(date +%s)" >> {log}\n'
+        f'bash {shlex.quote(str(body))} "$@"\n'
+        "status=$?\n"
+        f'printf \'{{"event":"exit","status":%d,"ts":%s}}\\n\' "$status" "$(date +%s)" >> {log}\n'
+        'exit "$status"\n'
     ).encode()
 
 
@@ -328,10 +332,20 @@ class StopHook:
         self, use: ComponentUseContext, evidence: StepEvidence, step_index: int
     ) -> ProbeOutcome:
         del step_index
-        fired = evidence.component_log(use.slug, "hook")
+        records = evidence.component_log(use.slug, "hook")
+        fired = [record for record in records if record.get("event", "stop") == "stop"]
         if not fired:
             return ProbeOutcome(False, "stop hook never ran in this step")
-        return ProbeOutcome(True, f"stop hook ran {len(fired)} time(s)")
+        statuses = [record.get("status") for record in records if record.get("event") == "exit"]
+        if statuses and 0 not in statuses:
+            # A body that can never succeed (e.g. a tool absent from the agent image,
+            # exit 127) is a turn-end check that never ran. Wrap it in `|| true` when
+            # failing is intended.
+            return ProbeOutcome(
+                False, f"stop hook ran {len(fired)} time(s) but its body never exited 0 {statuses}"
+            )
+        recorded = f"; exits {statuses}" if statuses else "; exit status not recorded"
+        return ProbeOutcome(True, f"stop hook ran {len(fired)} time(s){recorded}")
 
 
 # ---- mcp-server --------------------------------------------------------------------
@@ -393,17 +407,26 @@ class McpServer:
         del step_index
         records = evidence.component_log(use.slug, "mcp")
         initialised = any(record.get("method") == "initialize" for record in records)
-        tools = [
-            tool
-            for record in records
-            if record.get("result_of") == "tools/list"
-            for tool in record.get("tools", [])
-        ]
         if not initialised:
             return ProbeOutcome(False, "the harness never sent initialize to the MCP server")
         if not any(record.get("result_of") == "tools/list" for record in records):
             return ProbeOutcome(False, "the harness never listed the MCP server's tools")
+        if not _answered(records, "initialize"):
+            return ProbeOutcome(False, "the MCP server never answered initialize without an error")
+        listings = _answered(records, "tools/list")
+        tools = [str(tool) for record in listings for tool in record.get("tools", [])]
+        if not tools:
+            return ProbeOutcome(False, "the MCP server listed no tools (or only errors)")
         return ProbeOutcome(True, "MCP server initialised and tools listed", tuple(tools))
+
+
+def _answered(records: list[dict[str, Any]], method: str) -> list[dict[str, Any]]:
+    """The server's non-error responses to ``method``."""
+    return [
+        record
+        for record in records
+        if record.get("result_of") == method and not record.get("error")
+    ]
 
 
 SKILLS = Skills()

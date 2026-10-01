@@ -38,7 +38,11 @@ from raidar.components.manifest import (
 )
 from raidar.harness.definitions import harness_definition
 
-_FINGERPRINT = (*COMMON_FINGERPRINT, "raidar/components/builtins/workspace.py")
+_FINGERPRINT = (
+    *COMMON_FINGERPRINT,
+    "raidar/components/builtins/workspace.py",
+    "raidar/harness/definitions.py",  # rules_target: the harness's rules filename
+)
 LINT_CONFIG_NAMES = frozenset(
     {
         "ruff.toml",

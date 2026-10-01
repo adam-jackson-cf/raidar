@@ -8,7 +8,9 @@ Every arm gets one, with or without components. The script:
    (never inside the workspace);
 3. records the sha256 of every overlay path in the workspace at step start,
    the environment evidence for workspace discovery probes;
-4. deletes itself from the workspace.
+4. deletes itself from the workspace, or puts back the agent's own
+   ``setup.sh`` that the step upload overwrote (stashed by the agent-end
+   reaper, ``raidar.execution.reaper``).
 """
 
 from __future__ import annotations
@@ -26,6 +28,9 @@ from raidar.components.evidence import COMPONENT_REPORT
 SETUP_SCRIPT_NAME = "setup.sh"
 SAFE_PATH_RE = re.compile(r"^[A-Za-z0-9._@+-]+(/[A-Za-z0-9._@+-]+)*$")
 _HEREDOC = "RAIDAR_COMPONENT_FILE"
+
+# Where the agent-end reaper keeps a copy of an agent-authored ``/app/setup.sh``.
+AGENT_SETUP_STASH = "/tmp/.raidar-agent-setup.sh"
 
 
 def reset_body() -> str:
@@ -104,7 +109,14 @@ def render_setup_script(
     lines += _workspace_evidence(workspace_paths)
     lines += [
         "# ---- 5. never leave this script in the agent's workspace ----------------",
-        'if [ "${RAIDAR_RESET_KEEP_SELF:-0}" != "1" ]; then rm -f -- "$0" 2>/dev/null; fi',
+        "# The upload overwrote any agent-authored setup.sh; the agent-end reaper",
+        "# stashed that file, so it is put back instead of being deleted (F3).",
+        f'RAIDAR_AGENT_SETUP_STASH="${{RAIDAR_AGENT_SETUP_STASH:-{AGENT_SETUP_STASH}}}"',
+        'if [ "${RAIDAR_RESET_KEEP_SELF:-0}" != "1" ]; then',
+        '  if [ -f "$RAIDAR_AGENT_SETUP_STASH" ]; then',
+        '    cp -- "$RAIDAR_AGENT_SETUP_STASH" "$0" 2>/dev/null || rm -f -- "$0" 2>/dev/null',
+        '  else rm -f -- "$0" 2>/dev/null; fi',
+        "fi",
         "exit 0",
         "",
     ]

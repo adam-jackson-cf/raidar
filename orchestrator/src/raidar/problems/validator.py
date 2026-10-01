@@ -30,10 +30,13 @@ from raidar.problems.store import ImportedProblem, ProblemStore
 from raidar.problems.validation import (
     NEGATIVE,
     POSITIVE,
+    CheckStatus,
     StepGrades,
+    ValidationRecordError,
     ValidationReport,
     ValidationRuns,
     Verdict,
+    read_validation_record,
     run_checks,
 )
 
@@ -163,11 +166,25 @@ async def validate_problem(
 
 
 def default_report_path(store: ProblemStore, report: ValidationReport) -> Path:
-    """The committed report path, except for an infra failure, which never replaces it."""
+    """The committed report path, except when the new report would weaken it.
+
+    An infra failure never replaces the committed report, and neither does a
+    report for the same manifest that skipped a check the committed one ran
+    (e.g. ``--repeats 1`` over a full three-repeat validation): both go to the
+    uncommitted attempt path.
+    """
     problem_id = ProblemId.parse(report.problem)
     if report.verdict is Verdict.INFRA_FAILURE:
         return store.validation_attempt_path(problem_id)
-    return store.validation_path(problem_id)
+    committed = store.validation_path(problem_id)
+    try:
+        existing = read_validation_record(committed)
+    except ValidationRecordError:
+        return committed
+    skipped = {check.name for check in report.checks if check.status is CheckStatus.NOT_RUN}
+    if existing.manifest_sha256 == report.manifest_sha256 and skipped - set(existing.not_run):
+        return store.validation_attempt_path(problem_id)
+    return committed
 
 
 def write_report(report: ValidationReport, path: Path) -> Path:

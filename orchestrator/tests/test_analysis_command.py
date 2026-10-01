@@ -17,6 +17,7 @@ from click.testing import CliRunner
 
 from raidar.analysis.sources import AnalysisInputError, RunDir, select_records
 from raidar.cli import main
+from raidar.execution.assessment import lock_rescore_config
 from raidar.execution.models import (
     ExecutionValidity,
     PlannedTrial,
@@ -70,6 +71,10 @@ def _lock(scorers: list[str], *, experiment: str = "pilot", **thresholds: Any) -
             "toolchain": {},
         }
     )
+
+
+# Analysis looks Assessments up under the lock's assessment settings.
+LOCKED_SETTINGS = lock_rescore_config(_lock(["correctness@1"]))
 
 
 def _record(
@@ -153,6 +158,7 @@ def pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
         ("correctness@1", "resource-usage@1"),
         AssessmentStore(store),
         default_scorer_registry(),
+        config=LOCKED_SETTINGS.scorers,
     )
     return run_dir, store, lock_path
 
@@ -247,6 +253,7 @@ def _pinned_pilot(tmp_path: Path) -> tuple[Path, Path, Path]:
         ("correctness@1", "resource-usage@1"),
         AssessmentStore(store),
         default_scorer_registry(),
+        config=LOCKED_SETTINGS.scorers,
     )
     return run_dir, store, lock_path
 
@@ -342,6 +349,7 @@ def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: P
         ("correctness@1", "resource-usage@1"),
         AssessmentStore(store),
         default_scorer_registry(),
+        config=LOCKED_SETTINGS.scorers,
     )
     refused = _analyze(truncated, store, lock_path, tmp_path / "out")
     assert refused.exit_code != 0
@@ -368,3 +376,54 @@ def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: P
     disagree = _analyze(unrecorded, store, lock_path, tmp_path / "odd-out", "--allow-dev-runs")
     assert disagree.exit_code != 0
     assert "but the plan declares" in disagree.output
+
+
+def test_rescore_and_analysis_follow_the_lock_not_the_runs_execution_time_file(
+    tmp_path: Path,
+) -> None:
+    lock = _lock(["correctness@1", "code-quality@1", "resource-usage@1"])
+    lock_path = tmp_path / "pilot.lock.json"
+    lock_path.write_text(json.dumps(lock))
+    run_dir = _write_run(tmp_path, lock)  # its assessment-config.yaml says `scorers: {}`
+    store = tmp_path / "store"
+    rescored = CliRunner().invoke(
+        main,
+        [
+            "assess",
+            "--rescore",
+            str(run_dir / "trials"),
+            "--scorer",
+            "correctness@1",
+            "--store",
+            str(store),
+            "--lock",
+            str(lock_path),
+        ],
+    )
+    assert rescored.exit_code == 0, rescored.output
+    assert json.loads(rescored.output)["config"] == str(lock_path)
+
+    result = _analyze(run_dir, store, lock_path, tmp_path / "out")
+    assert result.exit_code == 0, result.output
+    report = json.loads((tmp_path / "out" / "analysis.json").read_text())
+    assert _effect(report, "solve_rate")["n_pairs"] == 5
+
+
+def test_a_moved_oracle_bundle_is_refused_or_found_by_digest_never_unassessed(
+    pilot: tuple[Path, Path, Path], tmp_path: Path
+) -> None:
+    run_dir, store, lock_path = pilot
+    moved = tmp_path / "moved-bundles"
+    moved.mkdir()
+    for bundle in sorted((run_dir / "trials").glob("*-bundle")):
+        bundle.rename(moved / bundle.name)
+
+    refused = _analyze(run_dir, store, lock_path, tmp_path / "refused")
+    assert refused.exit_code != 0
+    assert "cannot be assessed" in refused.output
+    assert "--bundle-search" in refused.output
+
+    found = _analyze(run_dir, store, lock_path, tmp_path / "found", "--bundle-search", str(moved))
+    assert found.exit_code == 0, found.output
+    report = json.loads((tmp_path / "found" / "analysis.json").read_text())
+    assert _effect(report, "solve_rate")["n_pairs"] == 5

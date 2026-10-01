@@ -3,7 +3,9 @@
 Precedence, highest first (SCB ``entrypoints/config/loader.py``):
 
 1. CLI ``key=value`` overrides (``--set analysis.blocks=3``)
-2. CLI flags (``--blocks``, ``--seed``, ``--concurrency``); unset flags are ignored
+2. CLI flags (``--blocks``, ``--seed``); unset flags are ignored. Concurrency is
+   per machine, so it is a plan/run option only, never a spec override: a lock
+   built with it would not match the spec ``plan``/``run`` reload.
 3. Values in the experiment file
 4. Built-in schema defaults
 """
@@ -31,7 +33,6 @@ from raidar.spec.validation import (
 FLAG_PATHS: Mapping[str, str] = {
     "blocks": "analysis.blocks",
     "seed": "analysis.seed",
-    "concurrency": "analysis.concurrency",
 }
 
 
@@ -136,6 +137,19 @@ def apply_assignment(document: dict[str, Any], path: str, value: object) -> None
         raise ValueError(f"override path {path!r} does not address a mapping key or list index")
 
 
+def _unshared(node: Any) -> Any:
+    """Copy containers without sharing (``copy.deepcopy`` keeps aliases shared).
+
+    YAML anchors/aliases load as one Python object; a ``--set`` override must
+    change only the node it addresses, so every container is made distinct.
+    """
+    if isinstance(node, dict):
+        return {key: _unshared(value) for key, value in node.items()}
+    if isinstance(node, list):
+        return [_unshared(value) for value in node]
+    return node
+
+
 def _read_document(path: Path) -> tuple[dict[str, Any], str]:
     raw = path.read_bytes()
     try:
@@ -146,7 +160,7 @@ def _read_document(path: Path) -> tuple[dict[str, Any], str]:
         raise SpecValidationError(
             str(path), [FieldIssue("", "experiment file must be a YAML mapping")]
         )
-    return document, sha256_hex(raw)
+    return _unshared(document), sha256_hex(raw)
 
 
 def _apply_overrides(document: dict[str, Any], overrides: CliOverrides) -> list[FieldIssue]:
@@ -200,9 +214,9 @@ def load_experiment(
 
 
 def overrides_from_cli(
-    *, blocks: int | None, seed: int | None, concurrency: int | None, assignments: Sequence[str]
+    *, blocks: int | None, seed: int | None, assignments: Sequence[str]
 ) -> CliOverrides:
     return CliOverrides(
-        flags={"blocks": blocks, "seed": seed, "concurrency": concurrency},
+        flags={"blocks": blocks, "seed": seed},
         assignments=tuple(assignments),
     )

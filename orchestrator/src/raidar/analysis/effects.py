@@ -17,8 +17,8 @@ Verdicts (memo §2.3), in precedence order:
    planned slots above the limit (memo §2.3: both are pre-registered, pinned
    by the lock's ``analysis`` block; ``Settings.origin`` says whether a value
    came from the lock, a command-line override or the default);
-2. ``inconclusive``: the 95% CI spans 0 (binary outcomes: exact McNemar
-   p > alpha);
+2. ``inconclusive``: the ``1 - alpha`` CI (95% at the default alpha) spans 0
+   (binary outcomes: exact McNemar p > alpha);
 3. ``improved`` / ``worse``: the CI excludes 0, read through the metric's
    direction.
 
@@ -53,6 +53,7 @@ from raidar.analysis.stats import (
     Interval,
     IntervalMethod,
     Summary,
+    confidence_label,
     mcnemar_exact,
     mean,
     pairs_for_power,
@@ -61,6 +62,7 @@ from raidar.analysis.stats import (
     t_interval,
 )
 from raidar.scorers.sdk.manifest import Direction
+from raidar.scorers.sdk.result import AssessStatus
 from raidar.spec.schema import DEFAULT_ALPHA as DEFAULT_ALPHA
 from raidar.spec.schema import DEFAULT_MAX_EXCLUSION_FRACTION as DEFAULT_MAX_EXCLUSION_FRACTION
 from raidar.spec.schema import DEFAULT_MIN_PAIRS as DEFAULT_MIN_PAIRS
@@ -152,6 +154,8 @@ class Exclusions(AnalysisModel):
     unassessed: int = 0
     ineligible: int = 0
     ineligible_statuses: dict[str, int] = Field(default_factory=dict)
+    not_applicable: int = 0
+    """Slots where the metric is undefined in both arms (e.g. R/G at K=1): not planned."""
 
     @property
     def excluded(self) -> int:
@@ -251,6 +255,7 @@ class _Tally:
     not_run: int = 0
     infra_error: int = 0
     unassessed: int = 0
+    not_applicable: int = 0
     statuses: dict[str, int] = field(default_factory=dict)
 
     def exclusions(self, paired: int) -> Exclusions:
@@ -262,7 +267,33 @@ class _Tally:
             unassessed=self.unassessed,
             ineligible=sum(self.statuses.values()),
             ineligible_statuses=dict(sorted(self.statuses.items())),
+            not_applicable=self.not_applicable,
         )
+
+
+NOT_APPLICABLE = AssessStatus.NOT_APPLICABLE.value
+
+
+def metric_applies(effect: Effect) -> bool:
+    """False when the metric is undefined for every slot of the problem (R/G at K=1)."""
+    return not (effect.exclusions.planned == 0 and effect.exclusions.not_applicable > 0)
+
+
+def _gap_excluded(left: Value, right: Value, tally: _Tally) -> bool:
+    """Tally a slot with a missing value; True when it was excluded (or never planned)."""
+    if left.value is not None and right.value is not None:
+        return False
+    if {left.status, right.status} == {NOT_APPLICABLE}:
+        # Undefined for this problem in both arms: no pair was ever planned.
+        tally.planned -= 1
+        tally.not_applicable += 1
+        return True
+    gap = left if left.value is None else right
+    if gap.status == UNASSESSED:
+        tally.unassessed += 1
+    else:
+        tally.statuses[gap.status] = tally.statuses.get(gap.status, 0) + 1
+    return True
 
 
 def _pair_or_exclude(slot: Slot, value_of: ValueOf, tally: _Tally) -> Pair | None:
@@ -275,12 +306,7 @@ def _pair_or_exclude(slot: Slot, value_of: ValueOf, tally: _Tally) -> Pair | Non
         tally.infra_error += 1
         return None
     left, right = value_of(baseline), value_of(treatment)
-    if left.value is None or right.value is None:
-        gap = left if left.value is None else right
-        if gap.status == UNASSESSED:
-            tally.unassessed += 1
-        else:
-            tally.statuses[gap.status] = tally.statuses.get(gap.status, 0) + 1
+    if _gap_excluded(left, right, tally) or left.value is None or right.value is None:
         return None
     return Pair(
         problem=slot.problem,
@@ -345,12 +371,13 @@ def decide(
         interval = summary.interval
         if interval is None or summary.mean is None:
             return Verdict.INCONCLUSIVE, "no interval"
+        level = confidence_label(interval.confidence)
         if interval.contains_zero():
             return Verdict.INCONCLUSIVE, (
-                f"95% CI [{interval.low:.4g}, {interval.high:.4g}] spans 0"
+                f"{level} CI [{interval.low:.4g}, {interval.high:.4g}] spans 0"
             )
         delta = summary.mean
-        reason = f"95% CI [{interval.low:.4g}, {interval.high:.4g}] excludes 0"
+        reason = f"{level} CI [{interval.low:.4g}, {interval.high:.4g}] excludes 0"
     verdict = Verdict.IMPROVED if _better(metric.direction, delta) else Verdict.WORSE
     return verdict, reason
 
@@ -378,6 +405,7 @@ def cost_beside(
         [pair.delta for pair in cost_pairs],
         seed=seed_for(settings.seed, f"cost:{label}"),
         bootstrap_samples=settings.bootstrap_samples,
+        confidence=1.0 - settings.alpha,
     )
     return CostBeside(
         n=len(cost_pairs),
@@ -449,6 +477,7 @@ def problem_effect(
         [pair.delta for pair in pairs],
         seed=seed_for(settings.seed, f"{label}:{problem}:{metric.id}"),
         bootstrap_samples=settings.bootstrap_samples,
+        confidence=1.0 - settings.alpha,
     )
     mcnemar = mcnemar_table(pairs) if metric.kind is Kind.BINARY else None
     verdict, reason = decide(metric, summary, exclusions, settings, mcnemar)
@@ -489,10 +518,11 @@ def _summed_exclusions(effects: Sequence[Effect]) -> Exclusions:
         unassessed=sum(e.exclusions.unassessed for e in effects),
         ineligible=sum(e.exclusions.ineligible for e in effects),
         ineligible_statuses=dict(sorted(statuses.items())),
+        not_applicable=sum(e.exclusions.not_applicable for e in effects),
     )
 
 
-def _equal_weight_summary(effects: Sequence[Effect]) -> Summary:
+def _equal_weight_summary(effects: Sequence[Effect], confidence: float) -> Summary:
     """Equal-weight mean of problem means; SE combines problem SEs (clustered by problem)."""
     n = min(effect.n_pairs for effect in effects)
     if n < 2 or any(e.mean_delta is None or e.sd_delta is None for e in effects):
@@ -501,7 +531,13 @@ def _equal_weight_summary(effects: Sequence[Effect]) -> Summary:
     variances = [(e.sd_delta or 0.0) ** 2 / e.n_pairs for e in effects]
     centre = mean(means)
     standard_error = math.sqrt(math.fsum(variances)) / len(effects)
-    interval = t_interval(centre, standard_error, n - 1, IntervalMethod.PROBLEM_EQUAL_WEIGHT_T)
+    interval = t_interval(
+        centre,
+        standard_error,
+        n - 1,
+        IntervalMethod.PROBLEM_EQUAL_WEIGHT_T,
+        confidence=confidence,
+    )
     return Summary(n=n, mean=centre, sd=None, interval=interval)
 
 
@@ -572,7 +608,7 @@ def aggregate_effect(metric: MetricDef, effects: Sequence[Effect], settings: Set
     ``n_pairs`` is the smallest problem's pair count, so ``insufficient``
     applies when any problem is short; exclusions are summed.
     """
-    summary = _equal_weight_summary(effects)
+    summary = _equal_weight_summary(effects, 1.0 - settings.alpha)
     exclusions = _summed_exclusions(effects)
     mcnemar = _pooled_mcnemar(effects) if metric.kind is Kind.BINARY else None
     verdict, reason = decide(metric, summary, exclusions, settings, mcnemar)

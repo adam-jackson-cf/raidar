@@ -539,3 +539,53 @@ def test_cli_refuses_unpaired_runs_roots_and_stores(fixture_dir: Path) -> None:
     runs = str(fixture_dir / "runs")
     with pytest.raises(SystemExit):
         main(["--runs-root", runs, "--runs-root", runs, "--store", runs, "--output", "x.json"])
+
+
+@pytest.mark.parametrize("source", ["flag", "run-copy"])
+def test_a_relocked_runs_lock_is_found_by_flag_or_the_runs_own_copy(
+    fixture_dir: Path, tmp_path: Path, source: str
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    lock = target / "experiment.lock.json"
+    executed = tmp_path / "executed.lock.json"
+    shutil.copy(lock, executed)
+    _lock(target, "scb-canonical-oneshot@1", experiment=f"{EXPERIMENT}-redesigned")
+    locks: tuple[Path, ...] = ()
+    if source == "flag":
+        locks = (executed,)
+    else:
+        shutil.copy(executed, target / "runs" / EXPERIMENT / RUN_ID / "run.lock.json")
+
+    result = build_quality_projection(target / "runs", target / "store", locks=locks)
+
+    problem = _problem(result)
+    assert problem.baseline_arm == "baseline"
+    assert problem.paired
+    detail = result.run_details[f"{RUN_PREFIX}b00-p0-baseline"]
+    assert detail.policy.source == "lock"
+
+
+def test_the_missing_lock_note_says_why_not_that_the_experiment_file_is_gone(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    _lock(target, "scb-canonical-oneshot@1", experiment=f"{EXPERIMENT}-redesigned")
+    problem = _problem(build_quality_projection(target / "runs", target / "store"))
+    (note,) = [note for note in problem.notes if "no baseline arm" in note]
+    assert "experiment file unavailable" not in note
+    assert "but the run was executed under" in note
+
+
+def test_a_baseline_with_no_counted_trials_is_named_in_the_notes(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    for path in (target / "runs" / EXPERIMENT / RUN_ID / "trajectories").glob("*-baseline.json"):
+        record = json.loads(path.read_text())
+        record["agent_override"] = "oracle"
+        path.write_text(json.dumps(record))
+    problem = _problem(build_quality_projection(target / "runs", target / "store"))
+    assert problem.baseline_arm == "baseline"
+    assert "baseline" not in problem.arms
+    assert problem.paired == ()
+    assert any("baseline arm baseline has no counted trials" in note for note in problem.notes)

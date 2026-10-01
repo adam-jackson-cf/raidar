@@ -1,5 +1,6 @@
 # Phase 1 pilot, one-shot leg (1.P "plus"): circuit_eval/checkpoint_1 as a 1-step task
-# x the same arms x 3 blocks. Exercises F1 (K=1) and F15 (scb-canonical-oneshot@1).
+# x the same arms x 5 blocks. Exercises F1 (K=1) and F15 (scb-canonical-oneshot@1).
+# v2: 5 blocks so blocks >= min_pairs and the leg can reach a verdict (gate packet F6).
 schema_version: 1
 id: pilot-circuit-eval-oneshot
 description: One-shot leg of the pilot; R and G are not_applicable under the one-shot policy.
@@ -17,6 +18,15 @@ agents:
     version: 0.156.1
 
 factors: [condition]
+
+# Pilot v2 (gate packet "Pilot v2 treatment revisions"): framing both arms get,
+# identically. In v1 the baseline often saw an empty /app, asked for the repository
+# and wrote nothing (F1); the guided rules supplied the missing framing, which
+# confounded the effect. The template adds only that framing: where to work, that
+# /app may start empty, what to build, and that nobody answers questions.
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
 
 conditions:
   - id: baseline
@@ -38,7 +48,9 @@ conditions:
         with:
           command: python3 -m compileall -q . >/dev/null 2>&1 || true
       # Reviewer sessions use the arm's own AgentSpec and are billed to the arm.
-      - use: review-loop@1
+      # review-loop@2 reads feedback before or after the VERDICT line and re-asks
+      # once on an unusable review (F3: @1 read 18/40 forge reviews as EMPTY_FEEDBACK).
+      - use: review-loop@2
         with:
           max_review_rounds: 2
 
@@ -56,11 +68,11 @@ assessment:
 
 analysis:
   baseline_arm: baseline
-  blocks: 3
+  blocks: 5
   seed: 20260929
   concurrency: 2
   # Pinned verdict thresholds, the memo §2.3 defaults. This leg exercises the F1/F15
-  # one-shot paths; with 3 blocks every verdict is 'insufficient' by design.
+  # one-shot paths; 5 blocks meets min_pairs only when no pair is excluded.
   min_pairs: 5
   max_exclusion_fraction: 0.2
   alpha: 0.05

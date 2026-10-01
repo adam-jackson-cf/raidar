@@ -57,6 +57,7 @@ class LoadRequest:
     lock_path: Path | None = None
     assessment_config: Path | None = None
     allow_dev_runs: bool = False
+    bundle_search: tuple[Path, ...] = ()
 
 
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
@@ -75,13 +76,15 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         store=AssessmentStore(request.store_root),
         registry=request.registry,
         scorer_refs=tuple(ref for ref in wanted if ref in declared),
-        bundles=BundleCache(),
+        bundles=BundleCache(search=request.bundle_search),
     )
     chosen, replaced = select_records(runs)
     outcomes, process = [], {}
     for trial_id, (run, record) in sorted(chosen.items()):
-        config = assessment_config(run, request.assessment_config)
-        results = lookup.results(run.trial_dir(record), config)
+        config = assessment_config(run, request.assessment_config, lock)
+        results = lookup.valid_results(
+            run.trial_dir(record), config, trial_id=record.trial.trial_id, valid=record.valid
+        )
         outcomes.append(build_outcome(record, results, policy=policy))
         process[trial_id] = results.get(PROCESS_COMPLIANCE_REF)
     inputs = AnalysisInputs(

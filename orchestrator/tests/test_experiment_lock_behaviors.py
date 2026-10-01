@@ -30,6 +30,7 @@ from raidar.spec.references import (
     ResolverSet,
 )
 from tests.experiment_spec_support import (
+    SHARED_FRAMING,
     InMemoryResolver,
     experiment_document,
     fixture_resolvers,
@@ -94,6 +95,29 @@ def test_changing_a_component_file_changes_its_hash_and_the_arm_digest(tmp_path:
     assert before_run["arms"]["baseline"]["digest"] == after_run["arms"]["baseline"]["digest"]
     assert before["lock_sha256"] != after["lock_sha256"]
     assert stale_sections(before, after) == ("execution",)
+
+
+def test_shared_components_are_hashed_into_every_condition_manifest(tmp_path: Path) -> None:
+    path = write_experiment(tmp_path, experiment_document(shared_components=[SHARED_FRAMING]))
+    without = _lock(write_experiment(tmp_path / "plain", experiment_document()))
+
+    lock = _lock(path)
+
+    execution = lock["execution"]
+    conditions = execution["conditions"]
+    assert [entry["use"] for entry in conditions["baseline"]] == ["prompt-wrapper@1"]
+    assert [entry["use"] for entry in conditions["guided"]] == ["prompt-wrapper@1", "rules-file@1"]
+    assert conditions["baseline"][0] == conditions["guided"][0]
+    assert conditions["baseline"][0]["files"]["components/framing.md"]
+    assert execution["design"]["shared_components"] == [{**SHARED_FRAMING, "with": {}}]
+    # A spec that declares no shared components locks exactly as before the field.
+    assert "shared_components" not in without["execution"]["design"]
+    assert "shared_components" not in without["spec"]
+
+    (tmp_path / "components" / "framing.md").write_text("Work.\n{{ instruction }}\n")
+    after = _lock(path)["execution"]["arms"]
+    assert after["baseline"]["digest"] != execution["arms"]["baseline"]["digest"]
+    assert after["guided"]["digest"] != execution["arms"]["guided"]["digest"]
 
 
 def _scorer_resolvers(implementation: str) -> ResolverSet:

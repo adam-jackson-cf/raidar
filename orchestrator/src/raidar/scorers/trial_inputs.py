@@ -28,7 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.bundle import BundleError, OracleBundle, load_bundle
+from raidar.oracle.bundle import BUNDLE_MANIFEST, BundleError, OracleBundle, load_bundle
 from raidar.oracle.records import (
     FORK_EVIDENCE_FILE,
     ORACLE_DIR,
@@ -54,9 +54,26 @@ class TrialInputError(ValueError):
 
 @dataclass
 class BundleCache:
-    """Loaded bundles and their digests, shared across the trials of one rescore."""
+    """Loaded bundles and their digests, shared across the trials of one rescore.
+
+    ``search`` lists directories to look in, by digest, when a recorded bundle
+    root no longer holds the bundle (the worktree moved, another host): the
+    bundle is found again only if its content digest is the recorded one.
+    """
 
     loaded: dict[Path, tuple[OracleBundle, str]] = field(default_factory=dict)
+    search: tuple[Path, ...] = ()
+
+    def relocate(self, digests: set[str]) -> OracleBundle | None:
+        for directory in self.search:
+            for marker in sorted(directory.rglob(BUNDLE_MANIFEST)):
+                try:
+                    bundle, digest = self.get(marker.parent)
+                except TrialInputError:
+                    continue
+                if digest in digests:
+                    return bundle
+        return None
 
     def get(self, root: Path) -> tuple[OracleBundle, str]:
         key = root.resolve()
@@ -206,8 +223,28 @@ def _bundle(
             f"{trial_dir}: cannot locate the oracle bundle for the planned checkpoints; "
             "pass --bundle"
         )
+    if override is None and digests:
+        return _recorded_bundle(trial_dir, root, digests, cache)
     bundle, digest = cache.get(root)
     if digests and digest not in digests:
+        raise TrialInputError(
+            f"bundle at {root} does not match the digest recorded for {trial_dir}"
+        )
+    return bundle
+
+
+def _recorded_bundle(
+    trial_dir: Path, root: Path, digests: set[str], cache: BundleCache
+) -> OracleBundle:
+    """The bundle the records name: at its recorded root, else found by digest."""
+    try:
+        bundle, digest = cache.get(root)
+    except TrialInputError:
+        relocated = cache.relocate(digests)
+        if relocated is None:
+            raise
+        return relocated
+    if digest not in digests:
         raise TrialInputError(
             f"bundle at {root} does not match the digest recorded for {trial_dir}"
         )

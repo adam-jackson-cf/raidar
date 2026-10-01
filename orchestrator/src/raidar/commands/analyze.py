@@ -86,7 +86,13 @@ def _check_output(output: Path, protected: list[Path]) -> None:
 @click.option(
     "--assessment-config",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Rescore config used for the Assessments (default: each run's assessment-config.yaml).",
+    help="Rescore config used for the Assessments (default: the lock's assessment settings).",
+)
+@click.option(
+    "--bundle-search",
+    multiple=True,
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    help="Directory to find moved oracle bundles in, by content digest (repeatable).",
 )
 @click.option(
     "--min-pairs",
@@ -133,6 +139,7 @@ def analyze(
     output: Path,
     lock_path: Path | None,
     assessment_config: Path | None,
+    bundle_search: tuple[Path, ...],
     min_pairs: int | None,
     max_exclusion_fraction: float | None,
     alpha: float | None,
@@ -150,6 +157,7 @@ def analyze(
         lock_path=lock_path,
         assessment_config=assessment_config,
         allow_dev_runs=allow_dev_runs,
+        bundle_search=bundle_search,
     )
     try:
         inputs, lock = load_inputs(request)

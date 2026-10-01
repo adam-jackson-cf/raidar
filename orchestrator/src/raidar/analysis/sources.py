@@ -116,11 +116,34 @@ def read_lock(path: Path) -> dict[str, Any]:
     return lock
 
 
+RUN_LOCK_FILE = "run.lock.json"
+
+
 def default_lock(run: RunDir) -> Path:
+    """The experiment's current lock when it still describes the run, else the run's copy.
+
+    The current lock is preferred: a relock that changes only assessment or
+    analysis settings keeps ``lock_sha256`` and its settings apply. A run's
+    ``run.lock.json`` (the lock it executed under) is used when the
+    experiment's lock is missing or now describes another experiment.
+    """
     experiment_file = run.manifest.get("experiment_file")
+    copy = run.path / RUN_LOCK_FILE
     if not isinstance(experiment_file, str):
+        if copy.is_file():
+            return copy
         raise AnalysisInputError(f"{run.path}/run.json names no experiment_file; pass --lock")
-    return default_lock_path(Path(experiment_file))
+    current = default_lock_path(Path(experiment_file))
+    if copy.is_file() and _lock_digest(current) != run.manifest.get("lock_sha256"):
+        return copy
+    return current
+
+
+def _lock_digest(path: Path) -> object:
+    try:
+        return json.loads(path.read_text()).get("lock_sha256")
+    except (OSError, ValueError, AttributeError):
+        return None
 
 
 def _record_options(record: TrajectoryRecord) -> DevOptions:

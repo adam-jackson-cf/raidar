@@ -58,6 +58,10 @@ def experiment_document(**changes: Any) -> dict[str, Any]:
     return document
 
 
+SHARED_FRAMING = {"use": "prompt-wrapper@1", "files": ["components/framing.md"]}
+"""A shared component use; ``write_experiment`` writes its template."""
+
+
 def write_experiment(root: Path, document: Mapping[str, Any]) -> Path:
     """Write the experiment plus the component files it references."""
     components = root / "components"
@@ -65,6 +69,9 @@ def write_experiment(root: Path, document: Mapping[str, Any]) -> Path:
     rules = components / "AGENTS.md"
     if not rules.exists():
         rules.write_text("Run the tests before finishing.\n", encoding="utf-8")
+    framing = components / "framing.md"
+    if document.get("shared_components") and not framing.exists():
+        framing.write_text("Work in /app.\n\n{{ instruction }}\n", encoding="utf-8")
     path = root / "experiment.yaml"
     path.write_text(yaml.safe_dump(dict(document), sort_keys=False), encoding="utf-8")
     return path
@@ -99,7 +106,10 @@ class InMemoryResolver:
 def fixture_resolvers(*, checkpoints: int = 8) -> list[InMemoryResolver]:
     return [
         InMemoryResolver(RefKind.PROBLEM, {"scb/forge@abc123": {"checkpoints": checkpoints}}),
-        InMemoryResolver(RefKind.COMPONENT, {"rules-file@1": {"kind": "workspace"}}),
+        InMemoryResolver(
+            RefKind.COMPONENT,
+            {"rules-file@1": {"kind": "workspace"}, "prompt-wrapper@1": {"kind": "prompt"}},
+        ),
         InMemoryResolver(
             RefKind.SCORER, {"correctness@1": {"exact": True}}, tool_versions={"pytest": "8.4.1"}
         ),

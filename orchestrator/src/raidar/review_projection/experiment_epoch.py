@@ -156,6 +156,7 @@ def _trial_input(
             len(record.attempts),
             assessments,
             withheld_reasons(record),
+            declared=scorers,
         ),
         synthetic=source.synthetic,
     )

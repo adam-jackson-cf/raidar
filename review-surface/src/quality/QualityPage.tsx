@@ -132,7 +132,7 @@ function ProblemView({
         <ComponentCurves arms={problem.arms} curves={problem.curves} checkpoints={problem.checkpoints} />
       </Section>
       <Section title={`Paired Δ vs ${problem.baseline_arm ?? 'baseline'}`} testId="quality-paired">
-        <PairedDeltaTable paired={problem.paired} baseline={problem.baseline_arm} />
+        <PairedDeltaTable paired={problem.paired} baseline={problem.baseline_arm} arms={problem.arms} />
       </Section>
       <Section title="Distributions" testId="quality-distributions">
         <Distributions distributions={problem.distributions} arms={problem.arms} />

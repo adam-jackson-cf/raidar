@@ -8,11 +8,14 @@ records and traces, and adds content-addressed Assessments to ``--store``
 (plan F2). It never writes to the run. ``--replay`` reruns scorers whose
 Assessment already exists and fails unless the bytes are identical.
 ``--config`` supplies the assessor inventory policy and per-scorer config.
-Without it, the run's own ``assessment-config.yaml`` (the locked assessor
-settings the run was executed with, found at the target or up to two levels
-above it: ``<run>/trials/<trial>``) is used for the scorers being run, so a
-plain rescore stores Assessments under the keys analysis looks up. The report
-names the config it used.
+Without it, the settings come from the experiment lock of the run that holds
+the target (found at the target or up to two levels above it:
+``<run>/trials/<trial>``): ``--lock`` if given, else the experiment's current
+lock when its ``lock_sha256`` is the run's, else the run's ``run.lock.json``.
+A relock that changes only assessment settings keeps ``lock_sha256``, so a
+plain rescore stores Assessments under the keys analysis looks up for that
+lock. Only a run with no findable lock falls back to its execution-time
+``assessment-config.yaml``. The report names the config it used.
 Scorers that decide under Jev (``process-compliance@1``) get a runtime whose
 audit and cache live in ``--store``; ``--jev-replay-only`` answers from that
 cache alone and never calls the provider.
@@ -27,7 +30,8 @@ from pathlib import Path
 
 import click
 
-from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
+from raidar.analysis.sources import AnalysisInputError, RunDir, default_lock, read_lock
+from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.oracle.bundle import BundleError
 from raidar.oracle.regrade import RegradeError, RegradeOptions, regrade_path
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
@@ -66,6 +70,7 @@ class _RescoreRequest:
     bundle: Path | None
     replay: bool
     jev_replay_only: bool = False
+    lock: Path | None = None
 
 
 # A trial dir sits at <run>/trials/<trial>; a job dir at <run>/trials.
@@ -82,16 +87,53 @@ def run_assessment_config(target: Path) -> Path | None:
     return None
 
 
+def _run_dir(target: Path) -> Path | None:
+    candidate = target.resolve()
+    for _ in range(_RUN_CONFIG_DEPTH + 1):
+        if (candidate / "run.json").is_file():
+            return candidate
+        candidate = candidate.parent
+    return None
+
+
+def run_lock(target: Path, explicit: Path | None) -> Path | None:
+    """The lock whose assessment settings a rescore of ``target`` uses, if one is found."""
+    run_dir = _run_dir(target)
+    if run_dir is None:
+        return explicit
+    manifest = json.loads((run_dir / "run.json").read_text())
+    path = explicit or default_lock(RunDir(path=run_dir, manifest=manifest, plan={}, records=()))
+    if not path.is_file():
+        return None
+    lock = read_lock(path)
+    if lock["lock_sha256"] != manifest.get("lock_sha256"):
+        raise ValueError(
+            f"lock {path} ({str(lock['lock_sha256'])[:12]}) is not the lock run {run_dir} "
+            f"executed under ({str(manifest.get('lock_sha256'))[:12]})"
+        )
+    return path
+
+
+def _narrowed(config: RescoreConfig, refs: tuple[str, ...]) -> RescoreConfig:
+    scorers = {ref: settings for ref, settings in config.scorers.items() if ref in refs}
+    return config.model_copy(update={"scorers": scorers})
+
+
 def _settings(request: _RescoreRequest) -> tuple[RescoreConfig, Path | None]:
-    """Explicit ``--config`` as given; else the run's config narrowed to the scorers run."""
+    """``--config`` as given; else the run's lock, narrowed to the scorers run; else its file."""
     if request.config is not None:
         return load_rescore_config(request.config), request.config
+    try:
+        lock_path = run_lock(request.target, request.lock)
+    except AnalysisInputError as exc:
+        raise ValueError(str(exc)) from exc
+    if lock_path is not None:
+        config = lock_rescore_config(read_lock(lock_path))
+        return _narrowed(config, request.scorer_refs), lock_path
     found = run_assessment_config(request.target)
     if found is None:
         return RescoreConfig(), None
-    locked = load_rescore_config(found)
-    scorers = {ref: config for ref, config in locked.scorers.items() if ref in request.scorer_refs}
-    return locked.model_copy(update={"scorers": scorers}), found
+    return _narrowed(load_rescore_config(found), request.scorer_refs), found
 
 
 def _rescore(request: _RescoreRequest, out: Path | None) -> None:
@@ -149,8 +191,15 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help=(
         "With --rescore, YAML with inventory_policy and per-scorer config (scorers: {ref: {}}); "
-        "default: the run's assessment-config.yaml."
+        "default: the assessment settings of the run's experiment lock."
     ),
+)
+@click.option(
+    "--lock",
+    "lock_path",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="With --rescore, the experiment lock whose assessment settings apply "
+    "(default: the run's experiment lock, else its run.lock.json).",
 )
 @click.option(
     "--replay",
@@ -178,6 +227,7 @@ def assess(
     scorer_refs: tuple[str, ...],
     store: Path | None,
     config_path: Path | None,
+    lock_path: Path | None,
     replay: bool,
     jev_replay_only: bool,
     bundle_override: Path | None,
@@ -197,6 +247,7 @@ def assess(
             bundle_override,
             replay,
             jev_replay_only,
+            lock_path,
         )
         _rescore(request, out)
     else:

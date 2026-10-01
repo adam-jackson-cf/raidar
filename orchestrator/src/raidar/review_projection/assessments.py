@@ -1,11 +1,11 @@
 """The stored Assessments of one trajectory, found by the key ``raidar assess --rescore`` uses.
 
 The key is ``hash(scorer identity, config, tool lock, run inputs)``, so the
-review shows exactly the Assessment a rescore with the run's locked assessment
-config would reuse. An Assessment made by another scorer implementation or
+review shows exactly the Assessment a rescore under the lock's assessment
+settings would reuse. An Assessment made by another scorer implementation or
 config is a different key and is not shown; the scorer is then reported as not
-assessed, with the command that assesses it (including ``--config`` with the
-run's ``assessment-config.yaml``, without which the key differs).
+assessed, with the command that assesses it (``--lock`` names the lock whose
+settings the key uses).
 
 ``raidar analyze`` recomputes the same key (``analysis.lookup``) over one store
 and keeps only the results; the review keeps the Assessment itself (its key is
@@ -43,10 +43,10 @@ class TrialAssessments:
         return self.found.get(ref)
 
 
-def rescore_hint(trial_dir: Path, ref: str, config_path: Path | None) -> str:
+def rescore_hint(trial_dir: Path, ref: str, lock_path: Path | None) -> str:
     """The command that stores exactly the Assessment this lookup looks for."""
-    config = f" --config {config_path}" if config_path is not None else ""
-    return f"raidar assess --rescore {trial_dir} --scorer {ref}{config} --store <store>"
+    lock = f" --lock {lock_path}" if lock_path is not None else ""
+    return f"raidar assess --rescore {trial_dir} --scorer {ref}{lock} --store <store>"
 
 
 class AssessmentLookup:
@@ -81,7 +81,7 @@ class AssessmentLookup:
         *,
         config_path: Path | None = None,
     ) -> TrialAssessments:
-        """``settings`` is the run's assessment config, read from ``config_path`` if any."""
+        """``settings`` is the lock's assessment config; ``config_path`` names that lock."""
         if not self._stores:
             return TrialAssessments(
                 missing=dict.fromkeys(scorer_refs, "no assessment store was given")

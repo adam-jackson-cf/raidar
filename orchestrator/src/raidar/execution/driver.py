@@ -4,7 +4,8 @@
 ``concurrency`` running at once. ``run_harbor_trial`` is the one place a
 Harbor trial starts: the Raidar oracle's pre-agent leak guard is installed
 before ``trial.run()``, as ``RaidarOracleVerifier`` requires (it fails closed
-without it).
+without it), together with the agent-end reaper (``execution.reaper``) that
+kills agent processes before artifacts are collected and graded.
 
 Decision (deviates from plan section 1 "Harbor JobConfigs", N4 "Harbor owns
 concurrency"): Raidar builds one Harbor ``TrialConfig`` per planned trial and
@@ -34,6 +35,7 @@ from typing import Protocol, TypeVar
 from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
+from raidar.execution.reaper import install_agent_reaper
 from raidar.oracle.guard import install_leak_guard
 
 JobT = TypeVar("JobT")
@@ -53,6 +55,7 @@ class TrialRunner(Protocol):
 async def run_harbor_trial(config: TrialConfig, bundle_root: Path) -> TrialRun:
     trial = await Trial.create(config)
     install_leak_guard(trial, bundle_root)
+    install_agent_reaper(trial, bundle_root)
     result = await trial.run()
     error = result.exception_info.exception_type if result.exception_info else None
     return TrialRun(trial.paths.trial_dir, error)

@@ -8,6 +8,7 @@ from pathlib import Path
 
 from raidar.agents.config import Harness
 from raidar.components.manifest import ComponentConfigError, ComponentUseContext
+from raidar.spec.canonical import IGNORED_TREE_NAMES
 
 BOTH_HARNESSES = (Harness.CODEX_CLI, Harness.CLAUDE_CODE)
 # The SDK files every built-in's behaviour depends on: the contract, the merge
@@ -55,10 +56,11 @@ def read_file(use: ComponentUseContext, relative: str) -> bytes:
 
 
 def tree_files(root: Path) -> list[Path]:
+    """Files a component ships from ``root``: exactly the files the lock hashes."""
     return sorted(
         path
         for path in root.rglob("*")
-        if path.is_file() and "__pycache__" not in path.relative_to(root).parts
+        if path.is_file() and not IGNORED_TREE_NAMES.intersection(path.relative_to(root).parts)
     )
 
 

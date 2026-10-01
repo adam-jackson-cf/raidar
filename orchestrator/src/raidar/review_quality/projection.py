@@ -24,16 +24,18 @@ from raidar.spec.canonical import pretty_canonical_json_bytes
 
 
 def build_quality_projection(
-    runs_root: Path, store_root: Path, *, synthetic: bool = False
+    runs_root: Path, store_root: Path, *, synthetic: bool = False, locks: Sequence[Path] = ()
 ) -> QualityProjection:
     """Every trial under ``runs_root`` with its store Assessments and Jev decisions."""
-    return build_quality_projection_from([(runs_root, store_root)], synthetic=synthetic)
+    return build_quality_projection_from(
+        [(runs_root, store_root)], synthetic=synthetic, locks=locks
+    )
 
 
-def _reviewed(runs_root: Path, store_root: Path) -> list[ReviewedTrial]:
+def _reviewed(runs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[ReviewedTrial]:
     store = StoreIndex.open(store_root)
     audit = JevAudit.open(store_root)
-    trials = discover_trials(runs_root)
+    trials = discover_trials(runs_root, locks)
     attached = audit.attach(trials)
     reviewed = []
     for trial in trials:
@@ -51,7 +53,7 @@ def _reviewed(runs_root: Path, store_root: Path) -> list[ReviewedTrial]:
 
 
 def build_quality_projection_from(
-    sources: Sequence[tuple[Path, Path]], *, synthetic: bool = False
+    sources: Sequence[tuple[Path, Path]], *, synthetic: bool = False, locks: Sequence[Path] = ()
 ) -> QualityProjection:
     """Every trial of each ``(runs_root, store)`` pair, each read against its own store.
 
@@ -60,7 +62,7 @@ def build_quality_projection_from(
     """
     if not sources:
         raise ValueError("at least one runs root and store are required")
-    reviewed = [item for runs_root, store in sources for item in _reviewed(runs_root, store)]
+    reviewed = [item for runs_root, store in sources for item in _reviewed(runs_root, store, locks)]
     _require_unique_ids(reviewed)
     return QualityProjection(
         generated_from=_generated_from(sources),
@@ -112,6 +114,14 @@ def _parser() -> argparse.ArgumentParser:
         required=True,
         help="Assessment store directory for the --runs-root at the same position",
     )
+    parser.add_argument(
+        "--lock",
+        type=Path,
+        action="append",
+        default=[],
+        help="Experiment lock to match runs against (repeatable); tried before the lock "
+        "beside each run's experiment file and the run's own run.lock.json",
+    )
     parser.add_argument("--output", type=Path, required=True, help="Projection JSON to write")
     parser.add_argument(
         "--synthetic", action="store_true", help="Mark the projection as synthetic fixture data"
@@ -128,7 +138,9 @@ def main(argv: list[str] | None = None) -> None:
             "give one store per runs root, in the same order"
         )
     projection = build_quality_projection_from(
-        list(zip(args.runs_root, args.store, strict=True)), synthetic=args.synthetic
+        list(zip(args.runs_root, args.store, strict=True)),
+        synthetic=args.synthetic,
+        locks=args.lock,
     )
     write_quality_projection(projection, args.output)
     print(

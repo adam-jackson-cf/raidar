@@ -56,6 +56,9 @@ class Verdict(StrEnum):
 # Verdicts under which a problem may be locked and run (F13): every check that
 # ran passed. ``validated_partial`` stays usable; its skipped checks are recorded.
 USABLE_VERDICTS = frozenset({Verdict.VALIDATED, Verdict.VALIDATED_PARTIAL})
+# Checks a usable verdict may never skip: plan task 0.5 requires identical
+# repeat runs, so only the native-parity arm may be left out of a partial pass.
+REQUIRED_CHECK_PREFIX = "repeat_identical"
 
 
 @dataclass(frozen=True)
@@ -352,15 +355,24 @@ class ValidationRecord:
     report_sha256: str
 
     @property
+    def missing_required(self) -> tuple[str, ...]:
+        return tuple(name for name in self.not_run if name.startswith(REQUIRED_CHECK_PREFIX))
+
+    @property
     def usable(self) -> bool:
-        return self.verdict in USABLE_VERDICTS
+        return self.verdict in USABLE_VERDICTS and not self.missing_required
 
     def lock_metadata(self) -> dict[str, object]:
-        return {
-            "verdict": self.verdict.value,
-            "not_run": list(self.not_run),
-            "report_sha256": self.report_sha256,
-        }
+        """What the lock pins: the verdict and what it did not check.
+
+        ``report_sha256`` is deliberately left out. The report's bytes carry
+        machine- and run-specific fields (Docker context, Harbor version,
+        native-runner commit, repeat count, per-run grades), so re-validating
+        an unchanged problem elsewhere would change ``lock_sha256`` and orphan
+        every earlier run. The manifest the report is for is the reference's
+        own digest.
+        """
+        return {"verdict": self.verdict.value, "not_run": list(self.not_run)}
 
 
 def read_validation_record(path: Path) -> ValidationRecord:

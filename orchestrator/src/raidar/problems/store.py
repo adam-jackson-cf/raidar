@@ -194,8 +194,13 @@ class ProblemStore:
                 f"{record.manifest_sha256[:12]}, not {manifest.digest()[:12]}; re-validate it"
             )
         if not record.usable:
+            skipped = (
+                f"; required checks not run: {', '.join(record.missing_required)}"
+                if record.missing_required
+                else ""
+            )
             raise ProblemStoreError(
                 f"problem {problem} is not usable: "
-                f"validation verdict {record.verdict.value} ({path})"
+                f"validation verdict {record.verdict.value}{skipped} ({path})"
             )
         return record

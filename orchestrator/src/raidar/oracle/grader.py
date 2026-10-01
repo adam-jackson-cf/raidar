@@ -39,6 +39,7 @@ from raidar.oracle.models import (
 )
 from raidar.oracle.normalise import (
     case_results,
+    ledger_consistency_failure,
     ledger_infra_failure,
     no_graded_cases,
     timing_sensitive,
@@ -210,7 +211,9 @@ async def run_oracle(
     return RunOutcome(
         role=role,
         cases=cases,
-        infra_failure=ledger_infra_failure(ledger) or no_graded_cases(cases),
+        infra_failure=ledger_infra_failure(ledger)
+        or ledger_consistency_failure(ledger, result.exit_code, step.test_files)
+        or no_graded_cases(cases),
         evidence=evidence,
         timing_sensitive=timing_sensitive(ledger, step.timeout_s),
         seconds=time.perf_counter() - started,

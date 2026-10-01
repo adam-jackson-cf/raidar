@@ -159,3 +159,30 @@ def test_merge_skips_a_persisted_projection_that_fails_the_schema(
         json.loads((valid / "review-projection.json").read_text())["experiment"]["experiment_id"]
     ]
     assert "Skipping legacy experiment that fails the schema" in capsys.readouterr().err
+
+
+def test_only_merge_and_fixture_import_scenario_epoch_history() -> None:
+    """The import-linter list is hand-kept; this scan covers every module, new ones too."""
+    import ast
+
+    src = Path(__file__).resolve().parents[1] / "src"
+    history = "raidar.review_projection.scenario_epoch"
+    importers = set()
+    for path in sorted((src / "raidar").rglob("*.py")):
+        parts = path.relative_to(src).with_suffix("").parts
+        module = ".".join(parts[:-1] if parts[-1] == "__init__" else parts)
+        if module.startswith(history):
+            continue
+        package = module if path.name == "__init__.py" else module.rpartition(".")[0]
+        for node in ast.walk(ast.parse(path.read_text())):
+            if isinstance(node, ast.Import):
+                names = [alias.name for alias in node.names]
+            elif isinstance(node, ast.ImportFrom):
+                base = package.rsplit(".", node.level - 1)[0] if node.level else ""
+                target = ".".join(part for part in (base, node.module or "") if part)
+                names = [target, *(f"{target}.{alias.name}" for alias in node.names)]
+            else:
+                names = []
+            if any(name == history or name.startswith(f"{history}.") for name in names):
+                importers.add(module)
+    assert importers == {"raidar.review_projection.merge", "raidar.review_projection.fixture"}

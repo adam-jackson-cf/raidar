@@ -101,19 +101,32 @@ def _component_overlay_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     """
     task_dirs = [problem.path for problem in spec.problems if problem.path is not None]
     issues: list[FieldIssue] = []
-    for c_index, condition in enumerate(spec.conditions):
-        for u_index, component in enumerate(condition.components):
-            for f_index, relative in enumerate(component.files):
-                owner = next((task for task in task_dirs if _path_owner(relative, task)), None)
-                if owner is not None:
-                    issues.append(
-                        FieldIssue(
-                            f"conditions.{c_index}.components.{u_index}.files.{f_index}",
-                            f"overlaps local problem task directory {owner!r}; component "
-                            "files may not include task or hidden test files",
-                        )
+    for loc, component in spec.component_uses():
+        for f_index, relative in enumerate(component.files):
+            owner = next((task for task in task_dirs if _path_owner(relative, task)), None)
+            if owner is not None:
+                issues.append(
+                    FieldIssue(
+                        f"{loc}.files.{f_index}",
+                        f"overlaps local problem task directory {owner!r}; component "
+                        "files may not include task or hidden test files",
                     )
+                )
     return issues
+
+
+def _shared_component_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """A condition may not repeat a shared component: the arms would not share it alone."""
+    shared = {use.use for use in spec.shared_components}
+    return [
+        FieldIssue(
+            f"conditions.{c_index}.components.{u_index}.use",
+            f"{use.use} is already in shared_components, which every condition gets",
+        )
+        for c_index, condition in enumerate(spec.conditions)
+        for u_index, use in enumerate(condition.components)
+        if use.use in shared
+    ]
 
 
 def _policy_issues(spec: ExperimentSpec, policies: ScorePolicyRegistry) -> list[FieldIssue]:
@@ -186,6 +199,7 @@ def semantic_issues(
         *_reference_issues(spec),
         *_agent_issues(spec),
         *_component_overlay_issues(spec),
+        *_shared_component_issues(spec),
         *_policy_issues(spec, policies),
         *_min_effect_issues(spec),
         *_protocol_config_issues(

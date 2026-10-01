@@ -19,6 +19,7 @@ Tests are never uploaded to the agent environment.
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 import time
@@ -68,6 +69,30 @@ def step_rewards(rewards: dict[str, float], *, leaked: bool) -> dict[str, float]
     return {INFRA_REWARD_KEY: rewards[INFRA_REWARD_KEY], LEAK_REWARD_KEY: 1.0}
 
 
+ARTIFACT_MANIFEST = "manifest.json"
+
+
+def _artifact_status(app_dir: Path) -> str | None:
+    """Harbor's recorded status for the /app artifact at ``app_dir``, if any."""
+    manifest = app_dir.parent / ARTIFACT_MANIFEST
+    if not manifest.is_file():
+        return None
+    try:
+        entries = json.loads(manifest.read_text())
+    except (OSError, ValueError):
+        return "manifest_unreadable"
+    if isinstance(entries, dict):
+        entries = entries.get("entries", [])
+    statuses = [
+        str(entry.get("status"))
+        for entry in entries
+        if isinstance(entry, dict)
+        if entry.get("source") == APP_SOURCE
+        and str(entry.get("destination", "")).endswith(f"/{APP_ARTIFACT_DESTINATION}")
+    ]
+    return statuses[-1] if statuses else None
+
+
 class RaidarOracleVerifier(BaseVerifier):
     def __init__(
         self,
@@ -115,16 +140,31 @@ class RaidarOracleVerifier(BaseVerifier):
             )
         return report
 
-    def _artifact_snapshot(self) -> Path | None:
+    def _artifact_snapshot(self) -> tuple[Path | None, str]:
+        """The collected /app artifact and, when unusable, why (the fallback reason).
+
+        Harbor creates the target directory before downloading and leaves it
+        behind when the download fails or stops partway, recording the failure
+        only in ``manifest.json``. A directory whose manifest entry is not
+        ``ok`` is therefore an empty or truncated tree, never the snapshot.
+        """
         candidates = [self.trial_paths.artifacts_dir / APP_ARTIFACT_DESTINATION]
         if self.step_name is not None:
             candidates.insert(
                 0, self.trial_paths.step_artifacts_dir(self.step_name) / APP_ARTIFACT_DESTINATION
             )
-        return next((path for path in candidates if path.is_dir()), None)
+        for path in candidates:
+            status = _artifact_status(path)
+            if status is not None:
+                return (path, "") if status == "ok" else (None, f"artifact_{status}")
+            if path.is_dir():
+                return path, ""
+        return None, "artifact_missing"
 
     async def _snapshot(self, work: Path, record_dir: Path) -> tuple[Path, SnapshotRef]:
-        artifact = self._artifact_snapshot() if self.snapshot_source == "artifact" else None
+        artifact, reason = (
+            self._artifact_snapshot() if self.snapshot_source == "artifact" else (None, "")
+        )
         if artifact is not None:
             ref = SnapshotRef(
                 requested=self.snapshot_source,
@@ -144,7 +184,7 @@ class RaidarOracleVerifier(BaseVerifier):
         ref = SnapshotRef(
             requested=self.snapshot_source,
             used="download",
-            fallback_reason="artifact_missing" if self.snapshot_source == "artifact" else None,
+            fallback_reason=reason or None,
             digest=tree_digest(downloaded),
             stored_path=kept.relative_to(self.trial_paths.trial_dir).as_posix(),
         )

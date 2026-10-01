@@ -18,7 +18,12 @@ from raidar.review_projection.assessments import AssessmentLookup
 from raidar.review_projection.comparability import mark_policy_mismatches
 from raidar.review_projection.experiment_epoch import EpochProjection, project_sources
 from raidar.review_projection.scenario_epoch import load_experiment_projections
-from raidar.review_projection.sources import LockIndex, discover_run_dirs, load_run
+from raidar.review_projection.sources import (
+    LockIndex,
+    RunSourceError,
+    discover_run_dirs,
+    load_run,
+)
 from raidar.review_projection.spans import repo_path
 from raidar.schemas.review import (
     ExperimentReviewProjection,
@@ -37,7 +42,12 @@ def project_experiment_epoch(
     index = LockIndex(locks)
     sources = []
     for run_dir in discover_run_dirs(run_roots):
-        source = load_run(run_dir, index)
+        try:
+            source = load_run(run_dir, index)
+        except RunSourceError as exc:
+            # One unprojectable run (e.g. its lock was overwritten) never aborts the build.
+            print(f"Skipping run, lock unavailable: {repo_path(run_dir)}: {exc}", file=sys.stderr)
+            continue
         if source.records:
             sources.append(source)
         else:

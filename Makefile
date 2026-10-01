@@ -117,11 +117,11 @@ help:
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
 	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [RUNS_DIR=runs] [RUN_ID=]"
 	@echo "                                                        Run a locked experiment through Harbor; writes attempts, validity and N1 phases"
-	@echo "  make experiment-assess RUN=<run-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
+	@echo "  make experiment-assess RUN=<run-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a run's stored trials into an Assessment store (never re-runs agents)"
 	@echo "  make assess-regrade RUN=<trial-or-job-dir> [ORACLE_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
-	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
+	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock; overrides are labelled)"
 	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10]        Fail if any N1 phase p95 exceeds its accepted budget"
 	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
@@ -155,7 +155,7 @@ help:
 	@echo "                                                        fixture plus any given runs (one REVIEW_STORE for all roots, or one per root)"
 	@echo "  make quality-fixture-synthetic [QUALITY_FIXTURE_DIR=.tmp/quality-fixture]"
 	@echo "                                                        Write the labelled synthetic Quality fixture (runs + Assessment store)"
-	@echo "  make review-surface-quality-data [QUALITY_RUNS=\"<runs-root>...\" QUALITY_STORE=\"<store>...\"]"
+	@echo "  make review-surface-quality-data [QUALITY_RUNS=\"<runs-root>...\" QUALITY_STORE=\"<store>...\"] [QUALITY_LOCK=<lock>...]"
 	@echo "                                                        Project Quality element data, each runs root against the store at the"
 	@echo "                                                        same position (default: labelled synthetic fixture)"
 
@@ -225,17 +225,20 @@ review-surface-build:
 	@cd review-surface && npm install --no-fund --no-audit && npm run build
 
 review-surface-serve: review-surface-data
+	@if [ ! -f review-surface/dist/index.html ]; then $(MAKE) --no-print-directory review-surface-build; fi
 	@cd review-surface && node server.mjs
 
 QUALITY_FIXTURE_DIR ?= $(REPO_TMP_DIR)/quality-fixture
 QUALITY_RUNS ?=
 QUALITY_STORE ?=
+QUALITY_LOCK ?=
 
 # $(1) run roots and $(2) Assessment stores, paired by position; $(3) --synthetic or empty.
 define quality_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality \
 		$(foreach root,$(1),--runs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
+		$(foreach lock,$(QUALITY_LOCK) $(REVIEW_LOCK),--lock "$(abspath $(lock))") \
 		--output "$(REPO_TMP_DIR)/quality-projection.json" $(3)
 	@RAIDAR_QUALITY_PROJECTION="$(REPO_TMP_DIR)/quality-projection.json" \
 		node review-surface/scripts/build-quality-data.mjs
@@ -343,7 +346,7 @@ experiment-plan:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) plan "$(EXPERIMENT)" $(EXECUTION_SELECT) $(if $(PLAN_JSON),--json,)
 
-experiment-execute:
+experiment-execute: pack-build
 	$(call require_var,EXPERIMENT)
 	@$(PACK_DOCKER_ENV) $(RAIDAR) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
 		--runs-dir "$(if $(RUNS_DIR),$(abspath $(RUNS_DIR)),$(CURDIR)/runs)" $(if $(RUN_ID),--run-id "$(RUN_ID)",)
@@ -392,7 +395,7 @@ experiment-assess:
 	$(call require_var,SCORERS)
 	@$(PACK_DOCKER_ENV) $(RAIDAR) assess --rescore "$(if $(wildcard $(RUN)/trials),$(RUN)/trials,$(RUN))" --store "$(STORE)" \
 		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
-		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(REPLAY),--replay,) \
+		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(LOCK),--lock "$(LOCK)",) $(if $(REPLAY),--replay,) \
 		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
 
 assess-regrade:
@@ -403,7 +406,7 @@ experiment-analyze:
 	$(call require_var,RUNS)
 	$(call require_var,STORE)
 	$(call require_var,ANALYSIS_OUT)
-	@$(RAIDAR) analyze $(foreach run,$(RUNS),"$(run)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_RUNS),--allow-dev-runs,)
+	@$(RAIDAR) analyze $(foreach run,$(RUNS),"$(run)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(foreach dir,$(BUNDLE_SEARCH),--bundle-search "$(dir)") $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_RUNS),--allow-dev-runs,)
 
 jev-export-labels:
 	$(call require_var,POLICY)
@@ -450,17 +453,19 @@ smoke-dry-run-check:
 		HARNESS="codex-cli" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
 		TIMEOUT_SEC="300"
 
-orchestrator-smoke: docker-check
+# Smoke and execute targets build the pack image first: trials bind the prebuilt
+# pack tag and Harbor cannot build it. pack-build is a no-op when the tag exists.
+orchestrator-smoke: docker-check pack-build
 	$(call smoke_run,$(SMOKE_EXPERIMENT),orchestrator-smoke,$(SMOKE_SETS),)
 
-agent-smoke: docker-check
+agent-smoke: docker-check pack-build
 	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_VERSION)" ]; then \
 		echo "No pack pin for harness '$(AGENT_SMOKE_EFFECTIVE_HARNESS)'; set HARNESS_VERSION"; \
 		exit 1; \
 	fi
 	$(call smoke_run,$(SMOKE_EXPERIMENT),agent-smoke,$(AGENT_SMOKE_SETS),)
 
-smoke-agents: docker-check
+smoke-agents: docker-check pack-build
 	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-agents,$(SMOKE_SETS),$(if $(SMOKE_ARM),--arm "$(SMOKE_ARM)",))
 
 quality:

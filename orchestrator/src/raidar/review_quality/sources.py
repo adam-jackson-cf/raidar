@@ -16,13 +16,15 @@
   across runs, so an ambiguous bare id attaches nowhere and every trial that
   shares it says so: a reviewer never labels a decision against another run.
 - The **lock** the run was executed under supplies the baseline arm and the
-  headline policy, as WS-J's analysis reads them: the lock next to the
-  ``run.json`` ``experiment_file`` (``default_lock_path``), accepted only when
-  it is a sealed lock (``read_lock``) whose ``lock_sha256`` (the digest of its
-  execution section, unchanged by scorer or threshold relocks) is the run's. The
-  live experiment YAML is never read. Without a matching lock the baseline is
+  headline policy, as WS-J's analysis reads them. Candidates, in order: locks
+  given with ``--lock``, the lock next to the ``run.json`` ``experiment_file``
+  (``default_lock_path``), and the locks in the run directory (``run.lock.json``,
+  written by ``raidar run``). A candidate is accepted only when it is a sealed
+  lock (``read_lock``) whose ``lock_sha256`` (the digest of its execution
+  section, unchanged by scorer or threshold relocks) is the run's. The live
+  experiment YAML is never read. Without a matching lock the baseline is
   unknown and the headline policy is the default by K, and the projection
-  says so.
+  says why (``ExperimentInfo.note``).
 """
 
 from __future__ import annotations
@@ -31,7 +33,7 @@ import json
 import os
 import re
 from collections import defaultdict
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -40,7 +42,7 @@ from raidar.analysis.sources import AnalysisInputError, read_lock
 from raidar.execution.models import TrajectoryRecord
 from raidar.jev.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
 from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
-from raidar.spec.lock import default_lock_path
+from raidar.spec.lock import LOCK_SUFFIX, default_lock_path
 
 CODE_QUALITY_REF = "code-quality@1"
 CORRECTNESS_REF = "correctness@1"
@@ -122,29 +124,39 @@ def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
     )
 
 
-def _experiment_info(run: dict[str, Any]) -> ExperimentInfo:
-    executed = str(run.get("lock_sha256") or "") or None
+def _lock_candidates(run: dict[str, Any], run_dir: Path, locks: Sequence[Path]) -> list[Path]:
+    candidates = list(locks)
     experiment_file = run.get("experiment_file")
-    if not isinstance(experiment_file, str) or executed is None:
-        return ExperimentInfo(executed, None, None, "run.json names no experiment_file or lock")
-    path = default_lock_path(Path(experiment_file))
-    if not path.is_file():
-        return ExperimentInfo(executed, None, None, f"lock unavailable: no {path.name} found")
-    try:
-        lock = read_lock(path)
-    except AnalysisInputError as exc:
-        detail = str(exc).replace(str(path), path.name)
-        return ExperimentInfo(executed, None, None, f"lock unavailable: {detail}")
-    if lock.get("lock_sha256") != executed:
+    if isinstance(experiment_file, str):
+        candidates.append(default_lock_path(Path(experiment_file)))
+    candidates.extend(sorted(run_dir.glob(f"*{LOCK_SUFFIX}")))
+    return candidates
+
+
+def _experiment_info(
+    run: dict[str, Any], run_dir: Path, locks: Sequence[Path] = ()
+) -> ExperimentInfo:
+    executed = str(run.get("lock_sha256") or "") or None
+    if executed is None:
+        return ExperimentInfo(executed, None, None, "run.json names no lock_sha256")
+    reasons: list[str] = []
+    for path in _lock_candidates(run, run_dir, locks):
+        if not path.is_file():
+            reasons.append(f"no {path.name} found")
+            continue
+        try:
+            lock = read_lock(path)
+        except AnalysisInputError as exc:
+            reasons.append(str(exc).replace(str(path), path.name))
+            continue
+        if lock.get("lock_sha256") == executed:
+            return _lock_facts(lock, executed)
         found = str(lock.get("lock_sha256"))[:12]
-        return ExperimentInfo(
-            executed,
-            None,
-            None,
-            f"lock unavailable: {path.name} is now {found}, but the run was executed under "
-            f"{executed[:12]}",
+        reasons.append(
+            f"{path.name} is now {found}, but the run was executed under {executed[:12]}"
         )
-    return _lock_facts(lock, executed)
+    detail = "; ".join(reasons) or "no candidate lock (pass --lock)"
+    return ExperimentInfo(executed, None, None, f"lock unavailable: {detail}")
 
 
 def _run_dirs(runs_root: Path) -> Iterator[Path]:
@@ -157,12 +169,12 @@ def _run_dirs(runs_root: Path) -> Iterator[Path]:
             yield manifest.parent
 
 
-def discover_trials(runs_root: Path) -> list[TrialSource]:
+def discover_trials(runs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSource]:
     """Every trajectory of every Raidar run under ``runs_root``, in path order."""
     trials: list[TrialSource] = []
     for run_dir in _run_dirs(runs_root):
         run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
-        experiment = _experiment_info(run)
+        experiment = _experiment_info(run, run_dir, locks)
         for path in sorted((run_dir / "trajectories").glob("*.json")):
             record = TrajectoryRecord.model_validate_json(path.read_bytes())
             trials.append(

@@ -23,11 +23,16 @@ _PRIVATE_KEY = re.compile(
 )
 _BEARER = re.compile(r"\b(Bearer\s+)[\w~+/-]+(?:\.[\w~+/-]+)*", re.IGNORECASE)
 _JWT = re.compile(r"\beyJ[\w-]+\.[\w-]+\.[\w-]+\b")
+# A credential-named key, then an optional closing quote or bracket (JSON keys,
+# dict literals, ``os.environ["X"]``), then ``:``/``=``/``is`` and the value.
 _ASSIGNMENT = re.compile(
-    r"\b((?:[\w.-]*(?:api[_-]?key|token|secret|password|passwd|authorization))"
-    r"\s*(?:[:=]|\bis\b)\s*['\"]?)[^\s'\",;]+",
+    r"\b((?:[\w.-]*(?:api[_-]?key|token|secret(?:[_-]?access)?[_-]?key|secret|password"
+    r"|passwd|authorization|access[_-]?key(?:[_-]?id)?|private[_-]?key|credentials?))"
+    r"['\"\]]*\s*(?:[:=]|\bis\b)\s*['\"]?)[^\s'\",;]+",
     re.IGNORECASE,
 )
+# userinfo in a URL: scheme://user:password@host
+_URL_USERINFO = re.compile(r"\b([a-z][a-z0-9+.-]*://[^\s:/@]+:)[^\s@/]+(@)", re.IGNORECASE)
 _TAIL_CAP = 2_000
 
 
@@ -38,6 +43,7 @@ def redact(text: str, api_key: str | None = None) -> str:
     out = _PRIVATE_KEY.sub("[REDACTED PRIVATE KEY]", out)
     out = _BEARER.sub(rf"\g<1>{REDACTED}", out)
     out = _JWT.sub(REDACTED, out)
+    out = _URL_USERINFO.sub(rf"\g<1>{REDACTED}\g<2>", out)
     return _ASSIGNMENT.sub(rf"\g<1>{REDACTED}", out)
 
 

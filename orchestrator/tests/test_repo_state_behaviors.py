@@ -95,3 +95,8 @@ def test_changed_paths_entries_generated_artifacts_and_unstaged_detection(monkey
         lambda *_args, **_kwargs: subprocess.CompletedProcess(["git"], 0, stdout="", stderr=""),
     )
     assert repo_state.has_unstaged_changes(tmp_path) is False
+
+
+def test_assessment_stores_and_analysis_output_are_generated_artifacts() -> None:
+    paths = ["stores/rules-trial/log.jsonl", "analysis/rules-trial/analysis.md", "src/x.py"]
+    assert repo_state.generated_artifact_paths(paths) == sorted(paths[:2])

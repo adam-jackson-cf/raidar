@@ -41,6 +41,7 @@ class ReviewLoop:
             *COMMON_FINGERPRINT,
             "raidar/components/builtins/workflow.py",
             "raidar/components/review_loop.py",
+            "raidar/oracle/snapshot.py",  # the reviewer diff leaves out SNAPSHOT_EXCLUDES
         ),
         discovery_probe=DiscoveryProbe(
             id="review-loop-reviewed",

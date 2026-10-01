@@ -38,7 +38,12 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from raidar.spec.canonical import digest_json, pretty_canonical_json_bytes, sha256_file
+from raidar.spec.canonical import (
+    IGNORED_TREE_NAMES,
+    digest_json,
+    pretty_canonical_json_bytes,
+    sha256_file,
+)
 from raidar.spec.loader import LoadedExperiment
 from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, PolicyResolver, ScorePolicyRegistry
 from raidar.spec.references import (
@@ -48,13 +53,12 @@ from raidar.spec.references import (
     ResolvedReference,
     ResolverSet,
 )
-from raidar.spec.schema import ExperimentSpec, ProblemEntry
+from raidar.spec.schema import ComponentUse, ExperimentSpec, ProblemEntry
 from raidar.spec.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.spec.validation import FieldIssue
 
 LOCK_VERSION = 2
 LOCK_SUFFIX = ".lock.json"
-IGNORED_TREE_NAMES = frozenset({".DS_Store", "__pycache__", ".git"})
 TOOLCHAIN_PACKAGES = ("litellm", "raidar")
 SECTIONS = ("execution", "assessment", "analysis", "toolchain")
 DOCUMENT = "document"
@@ -68,6 +72,7 @@ EXECUTION_SPEC_FIELDS = (
     "agents",
     "protocol",
     "factors",
+    "shared_components",
     "conditions",
     "arms",
 )
@@ -306,25 +311,33 @@ class _LockBuilder:
             return None
         return {"ref": policy.ref, "selection": selection, "checkpoints": counts}
 
+    def component(self, loc: str, component: ComponentUse) -> dict[str, object]:
+        resolved = self.resolve(f"{loc}.use", RefKind.COMPONENT, component.use)
+        files: dict[str, dict[str, object]] = {}
+        for f_index, relative in enumerate(component.files):
+            files.update(self.hash_path(f"{loc}.files.{f_index}", relative))
+        return {
+            "use": component.use,
+            "use_digest": resolved.digest if resolved else None,
+            "with": component.with_,
+            "files": {path: entry["sha256"] for path, entry in files.items()},
+        }
+
     def conditions(self) -> dict[str, object]:
+        """Each condition's effective manifest: the shared components, then its own."""
+        shared = [
+            self.component(f"shared_components.{index}", use)
+            for index, use in enumerate(self.spec.shared_components)
+        ]
         hashed: dict[str, object] = {}
         for c_index, condition in enumerate(self.spec.conditions):
-            components = []
-            for u_index, component in enumerate(condition.components):
-                loc = f"conditions.{c_index}.components.{u_index}"
-                resolved = self.resolve(f"{loc}.use", RefKind.COMPONENT, component.use)
-                files: dict[str, dict[str, object]] = {}
-                for f_index, relative in enumerate(component.files):
-                    files.update(self.hash_path(f"{loc}.files.{f_index}", relative))
-                components.append(
-                    {
-                        "use": component.use,
-                        "use_digest": resolved.digest if resolved else None,
-                        "with": component.with_,
-                        "files": {path: entry["sha256"] for path, entry in files.items()},
-                    }
-                )
-            hashed[condition.id] = components
+            hashed[condition.id] = [
+                *shared,
+                *(
+                    self.component(f"conditions.{c_index}.components.{u_index}", use)
+                    for u_index, use in enumerate(condition.components)
+                ),
+            ]
         return hashed
 
     def grouped(self, kinds: tuple[RefKind, ...]) -> tuple[dict[str, object], dict[str, str]]:
@@ -432,7 +445,8 @@ def execution_section(
     analysis = spec_json["analysis"]
     return {
         "design": {
-            **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS},
+            # ``shared_components`` is absent from specs that declare none.
+            **{name: spec_json[name] for name in EXECUTION_SPEC_FIELDS if name in spec_json},
             **{name: analysis[name] for name in EXECUTION_ANALYSIS_FIELDS},
         },
         "problems": problems,

@@ -357,3 +357,54 @@ Each option below is followed by the evidence that bears on it. The recommendati
 - `review_quality` and analysis find a run's lock through its execution digest, so the relocked pilot locks serve both as the runs' provenance and as the current locks.
 - **Clean cutover (committed after this packet):** `AGENTS.md` is rewritten for the experiment, problem, component and scorer model, including the lock-provenance rules (relock `examples/**/*.lock.json` after a spec or scorer change; a non-execution relock keeps `lock_sha256`, so rescore rather than rerun). The review surface integrates the Quality page into navigation and run detail and uses problem/condition wording; the Playwright specs assert the same F12 signals under the new labels. The retired `scenarios/`, `matrices/`, `environments/` and `spikes/` trees are unreferenced; their `git rm` is a pending maintainer step.
 - `review-surface/data/` (gitignored) holds the projection from the most recent `make review-surface-test` run; rerun the criterion 7 command to load the two pilot runs scored from `runs/pilot/assessment-store-v2`.
+
+---
+
+## 10. Pilot v2 treatment revisions
+
+Status: implemented and locked, not yet run. Nothing in this section is a measured result.
+
+The v1 pilot did not measure the treatment it meant to measure. The guided arm also carried missing task framing (F1), and its review loop usually stopped before the fix round (F3). v2 changes the treatments, and only the treatments, as follows.
+
+| Change | v1 | v2 | Why |
+|---|---|---|---|
+| Starter framing, both arms | none | `prompt-wrapper@1` with `examples/pilot/components/shared/starter-framing.md`, declared once under the new `shared_components` | F1: the baseline saw an empty `/app`, asked for the repository and wrote nothing. The guided rules supplied that framing, which confounded the effect. |
+| Review loop, guided arm | `review-loop@1` | `review-loop@2` (`max_review_rounds: 2`) | F3: 18 of 40 forge reviews (and 2 of 4 one-shot) parsed as `EMPTY_FEEDBACK`, because gpt-6-luna writes its feedback before `VERDICT: CHANGES`. |
+| forge blocks | 5 | 16 | §2.5: the J2 projection for solve_rate. |
+| one-shot blocks | 3 | 5 | F6: with 3 blocks the leg could not reach `min_pairs: 5`. |
+
+**The framing text.** The template is the following three lines, then `{{ instruction }}`. It gives no hints about the problem:
+
+> You are working non-interactively in /app. The directory may start empty.
+> Build the program described by the specification below in /app.
+> Do not ask questions: nobody will answer them during this task.
+
+**Shared components (spec schema).**
+- `shared_components` is a new top-level list in `experiment.yaml`. Its uses are put ahead of every condition's own components (`ExperimentSpec.condition()` returns this effective condition), so the arms get them byte-identically.
+- The factor guard compares effective conditions. Shared uses are identical in every arm, so v2's arms still differ only in the guided components. Validation also refuses a condition that repeats a shared component.
+- The lock hashes shared uses into every condition's manifest and into the arm digests.
+- A spec that declares no shared components serialises and locks exactly as before.
+
+**review-loop@2.**
+- `review-loop@1` and its fingerprint files (`review_loop.py`, `builtins/workflow.py`) are unchanged, and its digest is still `f33ffb58…`.
+- `@2` (`review_loop_v2.py`, `builtins/workflow_v2.py`) keeps @1's stages, prompts, diff capture, log filing, billing and probe. It changes only how a review is read:
+  - A `VERDICT: APPROVE|CHANGES` marker may carry markdown emphasis or backticks, and the last marker wins.
+  - For `CHANGES`, the feedback is the text before and after the marker. Any non-empty feedback is actionable and starts the fix round.
+  - An unusable review (no marker, or `CHANGES` and nothing else) is re-asked once. The re-ask is a fresh reviewer session that gets the task, the diff and the unusable reply.
+  - **Documented fallback:** if the re-asked review is also unusable, the loop stops with the work as it stands (`status: completed`, `termination_reason: review_unusable_after_reask`). It does not invent feedback for a fix round.
+  - Every parse is recorded in `review-loop/review-loop.json` under `parses`: round, attempt, stage, verdict, feedback position (`before`/`after`/`both`/`none`), feedback length and marker count.
+- **Interaction with the framing.** Harbor would apply the arm's prompt template to every inner session, which would tell the reviewer to build the program. @2 therefore applies the template itself, to the implementer's stages only. The reviewer judges against the bare step instruction. The prompt-wrapper probe still finds the framing lines in the implementer's rollout.
+
+**Evidence (offline).**
+- `orchestrator/tests/fixtures/review_loop/pilot-reviewer-replies.json` holds all 56 reviewer replies from forge-04 and oneshot-04.
+- Under @2, all 20 `EMPTY_FEEDBACK` replies (18 forge, 2 one-shot) parse as actionable `CHANGES` with their feedback before the marker. Every reply @1 read as `APPROVE` or `CHANGES` reads the same way. The one one-shot `NO_VERDICT` reply stays unusable, so @2 re-asks it.
+- Tests cover the re-ask, the fallback, framing scoped to the implementer, shared-component compile/lock/guard behaviour, and both pilot arms compiling with the same framing.
+- `make quality` passes.
+
+**Locks.** `examples/pilot/experiment.lock.json` and `examples/pilot/oneshot.experiment.lock.json` are relocked. `make experiment-validate` and `make experiment-plan` pass: 32 trials (forge, 16 blocks × 2 arms × 8 steps) and 10 trials (one-shot).
+
+**Knock-on effects.**
+- v1 and v2 are different experiments: the baseline arm changed too. Do not pool forge-04 or oneshot-04 with v2 runs.
+- The relocked v2 locks no longer serve as the provenance of the v1 runs (§9). To re-analyse a v1 run, pass its own `executed-lock.json` as `LOCK=`.
+- Not addressed here: F4 (no plan instruction, `plan_written`) and F5 (stop-hook invisible under Codex).
+- Reviewer sessions remain billed to the guided arm. The re-ask adds at most one reviewer session per round.

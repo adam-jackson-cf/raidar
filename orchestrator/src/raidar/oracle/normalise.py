@@ -70,6 +70,49 @@ def ledger_infra_failure(ledger: Mapping[str, Any]) -> InfraFailure | None:
     return None
 
 
+_FAILING_STATUSES = frozenset({"failed", "error"})
+
+
+def _exit_mismatch(ledger: Mapping[str, Any], exit_code: int | None) -> InfraFailure | None:
+    status = ledger.get("exit_status")
+    if exit_code is not None and status != exit_code:
+        return InfraFailure(
+            code="ledger_exit_mismatch", detail=f"sandbox exit {exit_code}, ledger {status}"
+        )
+    failing = any(str(node.get("status")) in _FAILING_STATUSES for node in ledger.get("nodes", []))
+    if (status == 0 and failing) or (status == PYTEST_TESTS_FAILED and not failing):
+        return InfraFailure(
+            code="ledger_exit_mismatch", detail=f"exit status {status} contradicts node outcomes"
+        )
+    return None
+
+
+def _corpus_mismatch(ledger: Mapping[str, Any], test_files: Sequence[str]) -> InfraFailure | None:
+    node_files = {str(node["node_id"]).split("::", 1)[0] for node in ledger.get("nodes", [])}
+
+    def covered(name: str) -> bool:
+        return any(path == name or path.endswith(f"/{name}") for path in node_files)
+
+    missing = sorted(name for name in test_files if not covered(name))
+    if missing:
+        return InfraFailure(
+            code="ledger_corpus_mismatch", detail=f"no cases from {', '.join(missing)}"
+        )
+    return None
+
+
+def ledger_consistency_failure(
+    ledger: Mapping[str, Any], exit_code: int | None, test_files: Sequence[str]
+) -> InfraFailure | None:
+    """Refuse a ledger that disagrees with what the host observed.
+
+    The submission runs as the same uid as pytest and can write files, so the
+    ledger is checked against facts it cannot forge: the container's own exit
+    code, the exit status the node outcomes imply, and the selected test files.
+    """
+    return _exit_mismatch(ledger, exit_code) or _corpus_mismatch(ledger, test_files)
+
+
 def no_graded_cases(cases: Sequence[CaseResult]) -> InfraFailure | None:
     """Every case skipped: no verdict exists, which is unavailable, not a failure."""
     if cases and all(case.status is CaseStatus.SKIPPED for case in cases):

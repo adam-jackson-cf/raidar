@@ -177,7 +177,7 @@ class ProblemManifest(ProblemModel):
 
     def lock_metadata(self) -> dict[str, object]:
         """Deterministic metadata recorded by ``raidar lock`` (checkpoints is required)."""
-        return {
+        metadata: dict[str, object] = {
             "checkpoints": self.checkpoints,
             "mode": self.mode.value,
             "steps": [step.name for step in self.steps],
@@ -190,4 +190,7 @@ class ProblemManifest(ProblemModel):
             "pack_image": self.pack.image,
             "task_sha256": self.task_sha256,
             "bundle_sha256": self.bundle_sha256,
-        } | ({"entry_file": self.entry_file} if self.entry_file is not None else {})
+        }
+        if self.entry_file is not None:
+            metadata["entry_file"] = self.entry_file
+        return metadata

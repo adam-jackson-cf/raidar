@@ -1,5 +1,6 @@
 # Phase 1 pilot (implementation-plan §3, 1.P): one validated 8-checkpoint problem
-# (forge, oracle-validation.md) x {baseline, guided} x 5 blocks, continue mode.
+# (forge, oracle-validation.md) x {baseline, guided} x 16 blocks, continue mode.
+# v2: 16 blocks is the J2 solve_rate projection from the v1 pilot (gate packet §2.5).
 # Validate: make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml
 # Lock:     make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml
 schema_version: 1
@@ -33,6 +34,15 @@ protocol:
 
 factors: [condition]
 
+# Pilot v2 (gate packet "Pilot v2 treatment revisions"): framing both arms get,
+# identically. In v1 the baseline often saw an empty /app, asked for the repository
+# and wrote nothing (F1); the guided rules supplied the missing framing, which
+# confounded the effect. The template adds only that framing: where to work, that
+# /app may start empty, what to build, and that nobody answers questions.
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
+
 conditions:
   - id: baseline
     components: []
@@ -53,7 +63,9 @@ conditions:
         with:
           command: python3 -m compileall -q . >/dev/null 2>&1 || true
       # Reviewer sessions use the arm's own AgentSpec and are billed to the arm.
-      - use: review-loop@1
+      # review-loop@2 reads feedback before or after the VERDICT line and re-asks
+      # once on an unusable review (F3: @1 read 18/40 forge reviews as EMPTY_FEEDBACK).
+      - use: review-loop@2
         with:
           max_review_rounds: 2
 
@@ -71,7 +83,7 @@ assessment:
 
 analysis:
   baseline_arm: baseline
-  blocks: 5
+  blocks: 16
   seed: 20260929
   concurrency: 2
   # Verdict thresholds, pinned by the lock before any data is seen (memo §2.3).

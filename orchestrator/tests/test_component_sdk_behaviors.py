@@ -47,6 +47,7 @@ BUILTIN_REFS = [
     "mcp-server@1",
     "prompt-wrapper@1",
     "review-loop@1",
+    "review-loop@2",
     "rules-file@1",
     "skills@1",
     "stop-hook@1",
@@ -300,18 +301,80 @@ def test_copied_component_file_change_changes_the_compiled_digest(tmp_path: Path
     assert before.digest != after.digest
 
 
-def test_pilot_guided_arm_includes_the_review_loop_workflow() -> None:
+def test_pilot_arms_share_the_framing_and_guided_adds_the_review_loop_workflow() -> None:
+    """Pilot v2: both arms get the same starter framing; only guided adds components."""
     loaded = load_experiment(PILOT_DIR / "experiment.yaml")
-    guided = loaded.spec.condition("guided")
+    agent = loaded.spec.agent("codex-luna")
+    baseline = compile_condition(loaded.spec.condition("baseline"), agent, base_dir=PILOT_DIR)
 
-    compiled = compile_condition(guided, loaded.spec.agent("codex-luna"), base_dir=PILOT_DIR)
+    compiled = compile_condition(loaded.spec.condition("guided"), agent, base_dir=PILOT_DIR)
 
+    assert [item.ref for item in baseline.uses] == ["prompt-wrapper@1"]
     assert [item.ref for item in compiled.uses] == [
+        "prompt-wrapper@1",
         "rules-file@1",
         "skills@1",
         "lint-config@1",
         "stop-hook@1",
-        "review-loop@1",
+        "review-loop@2",
     ]
+    assert baseline.prompt_template == compiled.prompt_template
+    assert baseline.uses[0].fingerprint == compiled.uses[0].fingerprint
     assert compiled.agent_wrapper is not None
+    assert compiled.agent_wrapper.import_path.endswith("review_loop_v2:ReviewLoopV2Agent")
     assert compiled.agent_wrapper.kwargs["max_review_rounds"] == 2
+
+
+def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) -> None:
+    from raidar.components.builtins._common import tree_files
+    from raidar.spec.lock import _hash_tree
+
+    skill = tmp_path / "skills" / "discipline"
+    (skill / ".git").mkdir(parents=True)
+    (skill / "SKILL.md").write_text("x\n")
+    (skill / ".DS_Store").write_bytes(b"\0")
+    (skill / ".git" / "HEAD").write_text("ref\n")
+
+    shipped = [path.relative_to(tmp_path).as_posix() for path in tree_files(skill)]
+    hashed = sorted(_hash_tree(tmp_path, "skills/discipline"))
+    assert shipped == hashed == ["skills/discipline/SKILL.md"]
+
+
+# Imported modules a fingerprint need not list: the lock's toolchain section
+# pins raidar/spec (raidar_spec digest); the registry and the harness enum are
+# lookup machinery, not component behaviour.
+_UNFINGERPRINTED_OK = {
+    "raidar/agents/config.py",
+    "raidar/components/registry.py",
+}
+
+
+def test_every_raidar_module_a_builtin_imports_is_fingerprinted() -> None:
+    import ast
+
+    from raidar.components.registry import ComponentRegistry
+
+    src = Path(__file__).resolve().parents[1] / "src"
+    registry = ComponentRegistry()
+    missing: dict[str, list[str]] = {}
+    for ref in registry.refs():
+        listed = set(registry.get(ref).manifest.fingerprint)
+        for relative in sorted(item for item in listed if item.endswith(".py")):
+            for node in ast.walk(ast.parse((src / relative).read_text())):
+                if not isinstance(node, ast.ImportFrom) or not node.module:
+                    continue
+                if not node.module.startswith("raidar."):
+                    continue
+                module = node.module.replace(".", "/")
+                path = next(
+                    (c for c in (f"{module}.py", f"{module}/__init__.py") if (src / c).is_file()),
+                    None,
+                )
+                if (
+                    path
+                    and path not in listed
+                    and path not in _UNFINGERPRINTED_OK
+                    and not path.startswith("raidar/spec/")
+                ):
+                    missing.setdefault(ref, []).append(path)
+    assert missing == {}

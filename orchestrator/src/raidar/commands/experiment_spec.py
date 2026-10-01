@@ -36,9 +36,6 @@ def _override_options(command: Callable[..., Any]) -> Callable[..., Any]:
         click.option("--blocks", type=int, default=None, help="Override analysis.blocks."),
         click.option("--seed", type=int, default=None, help="Override analysis.seed."),
         click.option(
-            "--concurrency", type=int, default=None, help="Override analysis.concurrency."
-        ),
-        click.option(
             "--set",
             "assignments",
             multiple=True,
@@ -55,12 +52,9 @@ def _load(
     experiment: Path,
     blocks: int | None,
     seed: int | None,
-    concurrency: int | None,
     assignments: Sequence[str],
 ) -> LoadedExperiment:
-    overrides = overrides_from_cli(
-        blocks=blocks, seed=seed, concurrency=concurrency, assignments=assignments
-    )
+    overrides = overrides_from_cli(blocks=blocks, seed=seed, assignments=assignments)
     try:
         loaded = load_experiment(experiment, overrides)
         # Every arm must compile for its harness (C1): rejected here, never at run time.
@@ -76,11 +70,10 @@ def validate_command(
     experiment: Path,
     blocks: int | None,
     seed: int | None,
-    concurrency: int | None,
     assignments: tuple[str, ...],
 ) -> None:
     """Validate an experiment.yaml (schema, cross-references, factor guard, arm components)."""
-    loaded = _load(experiment, blocks, seed, concurrency, assignments)
+    loaded = _load(experiment, blocks, seed, assignments)
     spec = loaded.spec
     available = default_resolvers().available_kinds()
     click.echo("Experiment validation passed.")
@@ -120,7 +113,6 @@ def lock_command(
     experiment: Path,
     blocks: int | None,
     seed: int | None,
-    concurrency: int | None,
     assignments: tuple[str, ...],
     output: Path | None,
     check: bool,
@@ -134,7 +126,7 @@ def lock_command(
     """
     if ignore_host_python and not check:
         raise click.UsageError("--ignore-host-python needs --check")
-    loaded = _load(experiment, blocks, seed, concurrency, assignments)
+    loaded = _load(experiment, blocks, seed, assignments)
     lock_path = output or default_lock_path(loaded.path)
     try:
         lock = build_lock(loaded, lock_path=lock_path)

@@ -213,3 +213,22 @@ def test_run_command_is_the_experiment_runner_only(tmp_path: Path) -> None:
     help_text = runner.invoke(main, ["run", "--help"])
     assert help_text.exit_code == 0
     assert "--agent-override" in help_text.output
+
+
+def test_a_lock_from_another_python_patch_release_still_plans(
+    locked: tuple[Any, dict[str, Any], Path],
+) -> None:
+    from raidar.spec.lock import render_lock, seal_lock
+
+    loaded, lock, lock_path = locked
+    sealed = {"sections", "lock_sha256", "document_sha256"}
+    body = {key: value for key, value in lock.items() if key not in sealed}
+    body["toolchain"] = {**lock["toolchain"], "python": "3.12.11"}
+    other = seal_lock(body)
+    assert other["lock_sha256"] == lock["lock_sha256"]
+    lock_path.write_bytes(render_lock(other))
+
+    result = CliRunner(mix_stderr=False).invoke(main, ["plan", str(loaded.path), "--json"])
+
+    assert result.exit_code == 0, (result.output, result.stderr)
+    assert "differs from the locked 3.12.11 (ignored)" in result.stderr

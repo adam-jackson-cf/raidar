@@ -8,6 +8,10 @@ from pathlib import Path
 
 _CHUNK_BYTES = 1 << 20
 
+# Names never hashed into a lock and never copied into an agent workspace: the
+# lock hashes exactly the bytes components ship (``components.builtins._common``).
+IGNORED_TREE_NAMES = frozenset({".DS_Store", "__pycache__", ".git"})
+
 
 def canonical_json_bytes(value: object) -> bytes:
     """Compact, key-sorted UTF-8 JSON used for every digest."""

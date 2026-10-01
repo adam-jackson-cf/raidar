@@ -15,7 +15,9 @@ bundle, so a run over several problems still scores each with its own.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import yaml
 
@@ -51,6 +53,26 @@ def rescore_config(
             generated_globs=policy.generated_globs, test_globs=policy.test_globs
         ),
         scorers=_scorer_configs(assessment, protocol, registry or default_scorer_registry()),
+    )
+
+
+def lock_rescore_config(
+    lock: Mapping[str, Any], registry: ScorerRegistry | None = None
+) -> RescoreConfig:
+    """The assessor settings a lock declares (its effective spec's assessment block).
+
+    Analysis and rescoring derive their config from the lock, not from the
+    run's ``assessment-config.yaml``: relocking with new inventory or scorer
+    settings keeps ``lock_sha256``, and the run's file only records what the
+    settings were when the run executed.
+    """
+    spec = lock.get("spec")
+    if not isinstance(spec, Mapping):
+        raise ValueError("the lock has no spec")
+    return rescore_config(
+        AssessmentSpec.model_validate(spec.get("assessment") or {}),
+        ProtocolSpec.model_validate(spec.get("protocol") or {}),
+        registry,
     )
 
 

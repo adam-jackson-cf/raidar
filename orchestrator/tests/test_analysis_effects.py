@@ -319,3 +319,34 @@ def test_lock_thresholds_merge_with_labelled_overrides() -> None:
     assert legacy.source == "defaults (lock does not pin thresholds)"
     with pytest.raises(ValueError, match="unknown outcome metric"):
         settings_from_lock(block, overrides={"min_effects": {"bogus": 1.0}})
+
+
+def test_the_pinned_alpha_sets_the_continuous_interval_level() -> None:
+    from raidar.analysis.stats import summarise
+
+    deltas = [0.5, -0.1, 0.4, 0.3, 0.0, 0.2]
+    verdicts = {}
+    for alpha in (0.05, 0.20):
+        summary = summarise(deltas, seed=1, bootstrap_samples=500, confidence=1 - alpha)
+        assert summary.interval is not None
+        assert summary.interval.confidence == pytest.approx(1 - alpha)
+        verdicts[alpha] = summary.interval.contains_zero()
+    assert verdicts == {0.05: True, 0.20: False}
+
+
+def test_a_metric_undefined_for_a_problem_is_left_out_not_counted_ineligible() -> None:
+    blocks = 6
+    oneshot = [
+        trajectory(arm, block, {"rework": gap("not_applicable", "K=1")}, problem="oneshot@1")
+        for block in range(blocks)
+        for arm in (BASELINE, GUIDED)
+    ]
+    multi = paired_arms(
+        "rework", [0.4, 0.5, 0.3, 0.6, 0.5, 0.4], [0.2, 0.3, 0.2, 0.3, 0.2, 0.3], problem="multi@1"
+    )
+    report = _run(oneshot + multi, blocks, problems=("oneshot@1", "multi@1"))
+    (comparison,) = report.comparisons
+    rework = [effect for effect in comparison.effects if effect.metric == "rework"]
+    assert [effect.problem for effect in rework] == ["multi@1"]
+    assert rework[0].exclusions.planned == blocks
+    assert rework[0].verdict is not Verdict.INSUFFICIENT

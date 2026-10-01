@@ -132,6 +132,7 @@ def test_codex_probes_pass_on_real_evidence_shapes(tmp_path: Path) -> None:
         step / "raidar-components" / "06-mcp-server.mcp.jsonl",
         [
             {"dir": "client", "method": "initialize"},
+            {"dir": "server", "result_of": "initialize"},
             {"dir": "server", "result_of": "tools/list", "tools": ["raidar_echo"]},
         ],
     )
@@ -171,6 +172,7 @@ def test_claude_probes_read_init_event_and_transcripts(tmp_path: Path) -> None:
         step / "raidar-components" / "06-mcp-server.mcp.jsonl",
         [
             {"dir": "client", "method": "initialize"},
+            {"dir": "server", "result_of": "initialize"},
             {"dir": "server", "result_of": "tools/list", "tools": ["raidar_echo"]},
         ],
     )
@@ -390,3 +392,68 @@ def test_stop_hook_body_can_come_from_a_component_file() -> None:
     body = compiled.support_files["00-stop-hook/hook-body.sh"]
     assert body.content == (PILOT_DIR / hook_file).read_bytes()
     assert body.executable
+
+
+@pytest.mark.parametrize(
+    ("records", "detail"),
+    [
+        (
+            [
+                {"dir": "client", "method": "initialize"},
+                {"dir": "server", "result_of": "initialize", "error": True},
+                {"dir": "server", "result_of": "tools/list", "error": True},
+            ],
+            "never answered initialize without an error",
+        ),
+        (
+            [
+                {"dir": "client", "method": "initialize"},
+                {"dir": "server", "result_of": "initialize"},
+                {"dir": "server", "result_of": "tools/list", "tools": []},
+            ],
+            "listed no tools",
+        ),
+    ],
+)
+def test_mcp_probe_fails_on_error_replies_or_an_empty_tool_list(
+    tmp_path: Path, records: list[dict[str, object]], detail: str
+) -> None:
+    from raidar.components.builtins.harness import MCP_SERVER
+    from raidar.components.evidence import StepEvidence
+    from raidar.components.manifest import ComponentUseContext
+
+    write_jsonl(tmp_path / "raidar-components" / "06-mcp-server.mcp.jsonl", records)
+    use = ComponentUseContext("06-mcp-server", Harness.CODEX_CLI, tmp_path)
+    outcome = MCP_SERVER.probe(use, StepEvidence(tmp_path), 0)
+    assert not outcome.passed
+    assert detail in outcome.detail
+
+
+@pytest.mark.parametrize(("body", "passed"), [("exit 127", False), ("true", True)])
+def test_stop_hook_probe_reads_the_body_exit_status(
+    tmp_path: Path, body: str, passed: bool
+) -> None:
+    import subprocess
+
+    from raidar.components.builtins.harness import STOP_HOOK, _hook_wrapper
+    from raidar.components.evidence import StepEvidence
+    from raidar.components.manifest import ComponentUseContext
+
+    logs, components = tmp_path / "logs", tmp_path / "components"
+    script = (
+        _hook_wrapper("05-stop-hook", Harness.CODEX_CLI)
+        .decode()
+        .replace("/logs/agent", str(logs))
+        .replace("/tmp/raidar-components", str(components))
+    )
+    (components / "05-stop-hook").mkdir(parents=True)
+    (components / "05-stop-hook" / "hook-body.sh").write_text(f"#!/usr/bin/env bash\n{body}\n")
+    wrapper = tmp_path / "stop-hook.sh"
+    wrapper.write_text(script)
+
+    done = subprocess.run(["bash", str(wrapper), "{}"], check=False)
+
+    assert done.returncode == (0 if passed else 127)
+    use = ComponentUseContext("05-stop-hook", Harness.CODEX_CLI, tmp_path)
+    outcome = STOP_HOOK.probe(use, StepEvidence(logs), 0)
+    assert outcome.passed is passed, outcome.detail

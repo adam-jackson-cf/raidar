@@ -196,6 +196,7 @@ source_modules =
     raidar.review_projection.experiment_epoch
     raidar.review_projection.experiments
     raidar.review_projection.fixture_assessments
+    raidar.review_projection.fixture_lock
     raidar.review_projection.fixture_trials
     raidar.review_projection.gates
     raidar.review_projection.headline
@@ -204,6 +205,9 @@ source_modules =
     raidar.review_projection.sources
     raidar.review_projection.spans
     raidar.review_projection.trials
+    raidar.review_projection.__main__
 forbidden_modules =
     raidar.review_projection.scenario_epoch
 allow_indirect_imports = True
+# The list above is hand-kept; tests/test_review_projection_contracts.py also asserts,
+# over every module, that only merge and fixture import scenario-epoch history.

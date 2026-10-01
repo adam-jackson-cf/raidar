@@ -404,3 +404,29 @@ def test_requests_transport_timeout_bounds_the_whole_request_not_each_read() -> 
     finally:
         server.shutdown()
         server.server_close()
+
+
+@pytest.mark.parametrize(
+    ("text", "secret"),
+    [
+        ('{"api_key": "sekret123"}', "sekret123"),
+        ("config = {'password': 'hunter2'}", "hunter2"),
+        ('os.environ["OPENAI_API_KEY"] = "abc"', "abc"),
+        ('"apiKey": "abc123"', "abc123"),
+        ('SECRET_KEY = "django-insecure-xyz"', "django-insecure-xyz"),
+        ("AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI", "wJalrXUtnFEMI"),
+        ("AWS_ACCESS_KEY_ID=abcdEFGH", "abcdEFGH"),
+        ("private_key: hunter3", "hunter3"),
+        ("DATABASE_URL=postgres://admin:hunter2@db/x", "hunter2"),
+        ("api_key = ok-value", "ok-value"),
+    ],
+)
+def test_quoted_and_compound_credential_assignments_are_redacted(text: str, secret: str) -> None:
+    redacted = redact(text)
+    assert secret not in redacted
+    assert "[REDACTED]" in redacted
+
+
+def test_ordinary_names_near_credential_words_are_kept() -> None:
+    assert redact("token_count = 5") == "token_count = 5"
+    assert redact("https://example.com/docs@v2") == "https://example.com/docs@v2"

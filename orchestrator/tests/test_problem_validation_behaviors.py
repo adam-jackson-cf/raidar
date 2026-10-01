@@ -30,6 +30,7 @@ from raidar.problems.validation import (
     check_expectation,
     check_parity,
     policy_preview,
+    read_validation_record,
     run_checks,
     verdict,
 )
@@ -437,3 +438,61 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     assert problem.manifest == store.load(ProblemId.parse(POSITIVE_REF)).manifest
     with pytest.raises(ValueError, match="engine"):
         await validate_problem(store, ProblemId.parse(POSITIVE_REF), ValidateOptions(engine="x"))
+
+
+def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None:
+    base = {"verdict": "validated", "manifest_sha256": "a" * 64, "not_run": []}
+    first, second = tmp_path / "a.json", tmp_path / "b.json"
+    first.write_text(json.dumps({**base, "environment": {"docker_context": "orbstack"}}))
+    second.write_text(
+        json.dumps({**base, "environment": {"docker_context": "other"}, "repeats": 5})
+    )
+
+    one, two = read_validation_record(first), read_validation_record(second)
+
+    assert one.report_sha256 != two.report_sha256
+    assert one.lock_metadata() == two.lock_metadata() == {"verdict": "validated", "not_run": []}
+
+
+def test_a_validation_that_skipped_the_repeat_checks_is_not_usable(tmp_path: Path) -> None:
+    path = tmp_path / "v.json"
+    path.write_text(
+        json.dumps(
+            {
+                "verdict": "validated_partial",
+                "manifest_sha256": "a" * 64,
+                "not_run": ["repeat_identical_positive", "native_parity_positive"],
+            }
+        )
+    )
+    record = read_validation_record(path)
+    assert not record.usable
+    assert record.missing_required == ("repeat_identical_positive",)
+
+    path.write_text(
+        json.dumps(
+            {
+                "verdict": "validated_partial",
+                "manifest_sha256": "a" * 64,
+                "not_run": ["native_parity_positive"],
+            }
+        )
+    )
+    assert read_validation_record(path).usable
+
+
+async def test_a_weaker_validation_never_replaces_the_committed_report(
+    store: ProblemStore, tmp_path: Path
+) -> None:
+    (tmp_path / "full").mkdir()
+    (tmp_path / "single").mkdir()
+    full = await _validate(store, ONESHOT_REF, tmp_path / "full", repeats=2)
+    committed = validator.default_report_path(store, full)
+    write_report(full, committed)
+
+    single = await _validate(store, ONESHOT_REF, tmp_path / "single", repeats=1)
+
+    weaker = validator.default_report_path(store, single)
+    assert weaker != committed
+    assert weaker == store.validation_attempt_path(ProblemId.parse(ONESHOT_REF))
+    assert validator.default_report_path(store, full) == committed

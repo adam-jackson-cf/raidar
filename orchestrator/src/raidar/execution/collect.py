@@ -13,7 +13,8 @@ Per planned checkpoint the state is decided from host-only evidence:
   guard could not scan), an oracle infrastructure failure, an oracle leak, a
   step exception that is not the agent's own failure (setup.sh, healthcheck,
   API/auth/network errors, the leak guard raising at agent start), or a failed
-  component discovery probe (F5, including the per-step reset probe).
+  component discovery probe (F5, including the per-step reset probe), or an
+  agent-end reap that failed or left an agent process alive (F3).
 - **solved** / **failed**: otherwise, from the oracle's strict all-cases verdict
   in ``raidar-oracle/steps/<step>/record.json``. Harbor's aggregated trial
   reward is never read.
@@ -46,6 +47,7 @@ from raidar.execution.models import (
     ValidityCheck,
 )
 from raidar.execution.progression import derive_reached, gate_passes
+from raidar.execution.reaper import load_reap_report, reap_infra_reason
 from raidar.execution.timestamps import span_s
 from raidar.oracle.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
 from raidar.oracle.verifier import LEAK_REWARD_KEY
@@ -110,9 +112,12 @@ def _load_record(trial_dir: Path, step: str) -> StepRecord | None:
 
 
 def _infra_reasons(
-    record: StepRecord | None, exception: str | None, probes: ProbeSummary
+    record: StepRecord | None,
+    exception: str | None,
+    probes: ProbeSummary,
+    reap: str | None = None,
 ) -> list[str]:
-    reasons = []
+    reasons = [reap] if reap else []
     if record is None:
         reasons.append("no_oracle_record" + (f":{exception}" if exception else ""))
     else:
@@ -193,7 +198,8 @@ def _attempt(
     record = _load_record(trial_dir, step)
     exception = _exception_type(item)
     probes = _probe(ctx, trial_dir, step, index)
-    reasons = _infra_reasons(record, exception, probes)
+    reap = reap_infra_reason(load_reap_report(step_record_dir(trial_dir, step)))
+    reasons = _infra_reasons(record, exception, probes, reap)
     if reasons:
         state = CheckpointState.INFRA_ERROR
     else:

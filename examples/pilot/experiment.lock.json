@@ -39,10 +39,10 @@
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "eab82dbd96258d8d1d17c9869a47fa6b8724d97eedaafeb351c33ef999135fa7",
+          "digest": "98cb757215effd535e03cfbc74fdd9e6583de9151e8faa3533db9523f3bf20f4",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "d2f0cd40c4d5f7332ea94ed80e5054d900a099f62350168ae9339d2257326df6",
+            "implementation_digest": "d183b4bf9404e6e75092853b5adf91e74bfdd9c9a148a71c8daf797a6005e2e6",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -249,10 +249,10 @@
           }
         },
         "correctness@1": {
-          "digest": "aacf02cd16054aad28ab03b7d2970319baff33c23e633050bca65b23c2c84da1",
+          "digest": "01a3209b7fea65fb9361c553f0f2fc17a87d02f8aab999749944a73734e84ea4",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "1e7356e166a52338dac88c70850820ed2276c5c0f26250c61a5a584981e9f14c",
+            "implementation_digest": "684221cffae1be86a0c4f581a776f7dfab5095d0c789aa06cf69cfe337ba1cd1",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -380,10 +380,10 @@
           }
         },
         "process-compliance@1": {
-          "digest": "e8c75fede7a1598a35fbc1fbddbe0d456d181c6474bcd810d1ca490901f54529",
+          "digest": "fa6486067488d0e29219885c0022bff9ac0f00b3de68b16f4f14f926dd2a3db6",
           "metadata": {
             "implementation": "raidar.scorers.process_compliance:process_compliance_scorer",
-            "implementation_digest": "e3fb4f5f28f6c85643fc129f1ad93c36a29287155a2704dac852c83e5a28fdb9",
+            "implementation_digest": "9775f71b1fe2d60c581fad02bec51638cfbdd808d264b1b435de242ac467dedf",
             "jev_policies": {
               "process-compliance.residue": {
                 "digest": "185bc9d44e28e1193e1d06c4b5cf56c698bd3c7fdaaf7a3d0f6f1a4a610120af",
@@ -458,10 +458,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "8fcc79af057f1712e7a0c2d26523826caf88d5d8f53c6c125a2c06e0121ec481",
+          "digest": "f0a5064e238d4aa59fc93d3c3f3b70325ee2ce1f9a00f87d6f8a1458dc3721a8",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "7980595d3548de982d9f0719c6d6ea246f440a4b03c385776173f0fb42bcf8c7",
+            "implementation_digest": "6ae8e28b0ac57358dd1ac638234189bf4a31f98c0f3ebf3769928b4f8add1884",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -613,29 +613,46 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "e00fb99043cfec4289e6e465eb768762d3b810e8614f83cf18e07f5c1f7af5af",
+  "document_sha256": "d51fa8c4869eead205a4aa4cd83e46ab87f9ca035dbc49492a4aa01fb9e33427",
   "execution": {
     "arms": {
       "baseline": {
         "agent": "codex-luna",
         "condition": "baseline",
-        "digest": "684eaf2ca0360f665f60e2942dac01ae4f76a7f38a16c92b3f6f4901a877c89a"
+        "digest": "2c31110f3844f459859d68acf379ee7aa8af13ab849ef36f92d8100179aa15ef"
       },
       "guided": {
         "agent": "codex-luna",
         "condition": "guided",
-        "digest": "a9c7afac7737a83e0ad8281c1b169cef4d8323cac59b37f08ee395ecde8fcb54"
+        "digest": "8d676c8a8f63bfe00efb123b68721ba24c60fc51e94b8afa30e375b0f7ded4c4"
       }
     },
     "conditions": {
-      "baseline": [],
+      "baseline": [
+        {
+          "files": {
+            "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
+          },
+          "use": "prompt-wrapper@1",
+          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "with": {}
+        }
+      ],
       "guided": [
+        {
+          "files": {
+            "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
+          },
+          "use": "prompt-wrapper@1",
+          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "with": {}
+        },
         {
           "files": {
             "components/guided/AGENTS.md": "f1b2d66fbb0b1be823d213d97295e898d51ab3c4190218ea6281a23b44060b06"
           },
           "use": "rules-file@1",
-          "use_digest": "e9cdc7efb470895c6bd566caa617e255926bda4ef1a108bd9263d4ce8a73f954",
+          "use_digest": "fc88c9b397e6c1798fe6b15f71a91e00037a7faa70b790183f788ef405e5d116",
           "with": {}
         },
         {
@@ -643,7 +660,7 @@
             "components/guided/skills/checkpoint-discipline/SKILL.md": "b862bf15a19d4e189b0c70cea73ce3c7989ff58bf60bbfaddd2a5030be8a9d43"
           },
           "use": "skills@1",
-          "use_digest": "1f37709c7fb53c2aef11cbc449e6ab11a0b249f772193b52c66308cb263b410e",
+          "use_digest": "a1b393af693f122e1e0ef1e04b168aa9c1402a7d9251e50510d3dfc0e70c66b4",
           "with": {}
         },
         {
@@ -651,21 +668,21 @@
             "components/guided/ruff.toml": "f716b4083856f7b9976b969b4431d17d4df6c6c71ee6839174cfa363069fef7f"
           },
           "use": "lint-config@1",
-          "use_digest": "c9b91d3039eb941d09f20b73e23fd8339c78f419645151f886c4b35dc075a8eb",
+          "use_digest": "c826d0ba066708860bf2c00d4ab9fef88ced35d553f6e612c7f80d09650f0f78",
           "with": {}
         },
         {
           "files": {},
           "use": "stop-hook@1",
-          "use_digest": "9783321ddea64f7b78595b4941ee460019691af99edf73566d6a097c354fea04",
+          "use_digest": "26a4ec63b43d49785806da8f849e342563a1b05365e12fc6b83afa7577f9af05",
           "with": {
             "command": "python3 -m compileall -q . >/dev/null 2>&1 || true"
           }
         },
         {
           "files": {},
-          "use": "review-loop@1",
-          "use_digest": "f33ffb58b5b4162d9434a542bf64b24613d1a5d7b775719fe1704cc58a450721",
+          "use": "review-loop@2",
+          "use_digest": "a6954fd777dbed455c391b7f236115a85666dbfa238ffcaad349ad84ba53b5bf",
           "with": {
             "max_review_rounds": 2
           }
@@ -695,7 +712,7 @@
           "id": "guided"
         }
       ],
-      "blocks": 5,
+      "blocks": 16,
       "conditions": [
         {
           "components": [],
@@ -733,7 +750,7 @@
             },
             {
               "files": [],
-              "use": "review-loop@1",
+              "use": "review-loop@2",
               "with": {
                 "max_review_rounds": 2
               }
@@ -764,7 +781,16 @@
         "environment": "docker",
         "language": "python"
       },
-      "seed": 20260929
+      "seed": 20260929,
+      "shared_components": [
+        {
+          "files": [
+            "components/shared/starter-framing.md"
+          ],
+          "use": "prompt-wrapper@1",
+          "with": {}
+        }
+      ]
     },
     "files": {
       "components/guided/AGENTS.md": {
@@ -778,6 +804,10 @@
       "components/guided/skills/checkpoint-discipline/SKILL.md": {
         "sha256": "b862bf15a19d4e189b0c70cea73ce3c7989ff58bf60bbfaddd2a5030be8a9d43",
         "size": 860
+      },
+      "components/shared/starter-framing.md": {
+        "sha256": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c",
+        "size": 221
       }
     },
     "problems": [
@@ -790,7 +820,7 @@
     "references": {
       "component": {
         "lint-config@1": {
-          "digest": "c9b91d3039eb941d09f20b73e23fd8339c78f419645151f886c4b35dc075a8eb",
+          "digest": "c826d0ba066708860bf2c00d4ab9fef88ced35d553f6e612c7f80d09650f0f78",
           "metadata": {
             "discovery_probe": "lint-config-present",
             "kind": "workspace",
@@ -804,8 +834,23 @@
             ]
           }
         },
-        "review-loop@1": {
-          "digest": "f33ffb58b5b4162d9434a542bf64b24613d1a5d7b775719fe1704cc58a450721",
+        "prompt-wrapper@1": {
+          "digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "metadata": {
+            "discovery_probe": "prompt-wrapper-rendered",
+            "kind": "prompt",
+            "network": {
+              "egress_hosts": []
+            },
+            "secrets": [],
+            "supports": [
+              "codex-cli",
+              "claude-code"
+            ]
+          }
+        },
+        "review-loop@2": {
+          "digest": "a6954fd777dbed455c391b7f236115a85666dbfa238ffcaad349ad84ba53b5bf",
           "metadata": {
             "discovery_probe": "review-loop-reviewed",
             "kind": "workflow",
@@ -820,7 +865,7 @@
           }
         },
         "rules-file@1": {
-          "digest": "e9cdc7efb470895c6bd566caa617e255926bda4ef1a108bd9263d4ce8a73f954",
+          "digest": "fc88c9b397e6c1798fe6b15f71a91e00037a7faa70b790183f788ef405e5d116",
           "metadata": {
             "discovery_probe": "rules-file-loaded",
             "kind": "workspace",
@@ -835,7 +880,7 @@
           }
         },
         "skills@1": {
-          "digest": "1f37709c7fb53c2aef11cbc449e6ab11a0b249f772193b52c66308cb263b410e",
+          "digest": "a1b393af693f122e1e0ef1e04b168aa9c1402a7d9251e50510d3dfc0e70c66b4",
           "metadata": {
             "discovery_probe": "skills-listed",
             "kind": "harness",
@@ -850,7 +895,7 @@
           }
         },
         "stop-hook@1": {
-          "digest": "9783321ddea64f7b78595b4941ee460019691af99edf73566d6a097c354fea04",
+          "digest": "26a4ec63b43d49785806da8f849e342563a1b05365e12fc6b83afa7577f9af05",
           "metadata": {
             "discovery_probe": "stop-hook-fired",
             "kind": "harness",
@@ -893,7 +938,6 @@
             "task_sha256": "596ae5b6af7e45c4b9a05dc8c495452042a21b9f7b23d6919516074ae5ada49f",
             "validation": {
               "not_run": [],
-              "report_sha256": "50f994fe7dd4b1a11d595b1687e9b3d7a757ec4339e53e123f219ab02fd62478",
               "verdict": "validated"
             }
           }
@@ -914,10 +958,10 @@
   "experiment": {
     "id": "pilot-forge",
     "source": "experiment.yaml",
-    "source_sha256": "d37d5fc35f4a48b327d94cf5bbb5d9519674161d1727c60f2efc1753ccca136d",
-    "spec_sha256": "7bdc06213904b0cf75b658851152d13a94b7938e6102c5d088fbf7dedbe16f86"
+    "source_sha256": "3987979ff806158b419c5ade64a74611eb4caa5170c02cfff45c2738a467333c",
+    "spec_sha256": "6096cdbcd4da0c5dbdfb2c3f1c85bc2a2a732af002fa6a1e221c15aea747bb52"
   },
-  "lock_sha256": "80e1b5fdb1a24ad4682feadb19be672a3878ffeacf6641d023653e6d7134ad36",
+  "lock_sha256": "5a73637e8ac3ce2199b37dd623c846c290a7bfb63896426925b03849d849cbde",
   "lock_version": 2,
   "overrides": {
     "flags": {},
@@ -925,9 +969,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "c8a8ffafdd24b8b5f42670c02dc18e5884e9608b8c08f6fb64842619b227165f",
-    "execution": "80e1b5fdb1a24ad4682feadb19be672a3878ffeacf6641d023653e6d7134ad36",
-    "toolchain": "8ba76cea7f8096c57cd5bc0d40ba1952b5ce41bde1ad08d2303c27b4bb88419f"
+    "assessment": "4cbc2fba10f56433b9407468f46dfc4bbe90b9dcd5bb301adc5940b738942e6b",
+    "execution": "5a73637e8ac3ce2199b37dd623c846c290a7bfb63896426925b03849d849cbde",
+    "toolchain": "b16fc93b70b52e8651466ef66b7af27cea29dc73147849c4c7221516d441ecec"
   },
   "spec": {
     "agents": [
@@ -943,7 +987,7 @@
     "analysis": {
       "alpha": 0.05,
       "baseline_arm": "baseline",
-      "blocks": 5,
+      "blocks": 16,
       "concurrency": 2,
       "max_exclusion_fraction": 0.2,
       "min_effects": {},
@@ -1013,7 +1057,7 @@
           },
           {
             "files": [],
-            "use": "review-loop@1",
+            "use": "review-loop@2",
             "with": {
               "max_review_rounds": 2
             }
@@ -1045,12 +1089,21 @@
       "environment": "docker",
       "language": "python"
     },
-    "schema_version": 1
+    "schema_version": 1,
+    "shared_components": [
+      {
+        "files": [
+          "components/shared/starter-framing.md"
+        ],
+        "use": "prompt-wrapper@1",
+        "with": {}
+      }
+    ]
   },
   "toolchain": {
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "c2e7f3a0ce6efb66ea1d3056bd26b9eff7fed4a0ef6eb2081d64a81d89aff152"
+    "raidar_spec": "a31b7fe2020db024526967336221d9ab8a640392aa839909ef9f5a141d41a933"
   }
 }

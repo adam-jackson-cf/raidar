@@ -85,6 +85,8 @@ class ExperimentPlan:
     problems: tuple[ProblemTarget, ...]
     trials: tuple[PlannedTrial, ...]
     selected: frozenset[str] = field(default_factory=frozenset)
+    lock: Mapping[str, Any] = field(default_factory=dict)
+    """The lock document the plan was built from; a run keeps a copy of it."""
 
     @property
     def experiment_id(self) -> str:
@@ -295,4 +297,5 @@ def build_plan(
         problems=problems,
         trials=tuple(trials),
         selected=_selection(trials, options),
+        lock=lock,
     )

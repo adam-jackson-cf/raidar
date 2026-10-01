@@ -36,6 +36,7 @@ def make_plugin(plugin: ModuleType, tmp_path: Path, *, coverage: bool) -> Any:
         root=tmp_path / "app",
         scratch=tmp_path / "scratch",
         coverage=coverage,
+        runtime="/runtime",
     )
 
 

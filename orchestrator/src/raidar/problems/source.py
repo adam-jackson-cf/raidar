@@ -69,8 +69,15 @@ class PinnedCheckout:
             return None
 
     def verify_clean(self, *paths: str) -> None:
-        """Refuse local edits (tracked or untracked) under the paths an import reads."""
-        dirty = _git(self.root, "status", "--porcelain", "--untracked-files=all", "--", *paths)
+        """Refuse local edits (tracked, untracked or ignored) under the paths an import reads.
+
+        Ignored files count too: the converter copies problem trees wholesale, so a
+        ``__pycache__`` or ``.DS_Store`` there would change the bundle digest while
+        the git tree ids still match the pin.
+        """
+        dirty = _git(
+            self.root, "status", "--porcelain", "--ignored", "--untracked-files=all", "--", *paths
+        )
         if dirty:
             raise SourceError(
                 f"{self.root} has local changes under {', '.join(paths)}:\n{dirty[:2000]}"

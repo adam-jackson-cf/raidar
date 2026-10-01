@@ -9,7 +9,8 @@ import click
 
 # Generated runtime output that must never show up as a tracked change: scenario-epoch
 # history (experiments/) and experiment runs (runs/).
-ARTIFACT_CHANGE_PREFIXES = ("experiments/", "runs/")
+# Generated runtime artifacts: run history, Assessment stores and analysis output.
+ARTIFACT_CHANGE_PREFIXES = ("experiments/", "runs/", "stores/", "analysis/")
 
 
 def repo_paths_from_git_cmd(args: list[str]) -> list[str]:

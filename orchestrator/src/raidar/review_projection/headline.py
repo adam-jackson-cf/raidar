@@ -17,7 +17,7 @@ not the problem's K. Their components stay visible; S, C and I do not.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
@@ -162,10 +162,37 @@ def _reason_text(policy: str, component: str | None, detail: str) -> str:
     return f"{policy} ineligible: {label}: {detail}"
 
 
+UNDECLARED_MARKER = "which the experiment does not declare"
+
+
+def needed_scorers(policy: ScorePolicy) -> tuple[str, ...]:
+    """The scorers whose Assessments the policy's components come from."""
+    return (CORRECTNESS_SCORER, QUALITY_SCORER) if policy.inertia_weights else (CORRECTNESS_SCORER,)
+
+
+def _undeclared_reasons(policy: ScorePolicy, declared: Collection[str] | None) -> tuple[str, ...]:
+    if declared is None:
+        return ()
+    return tuple(
+        f"{policy.ref} not computable: the headline policy needs {ref}, "
+        f"{UNDECLARED_MARKER} (add it to assessment.scorers and relock)"
+        for ref in needed_scorers(policy)
+        if ref not in declared
+    )
+
+
 def _policy_reasons(
-    policy: ScorePolicy, score: PolicyScore, assessments: TrialAssessments
+    policy: ScorePolicy,
+    score: PolicyScore,
+    assessments: TrialAssessments,
+    declared: Collection[str] | None = None,
 ) -> tuple[str, ...]:
-    """Unassessed takes precedence over ineligible: "not scored yet" is not "not scorable"."""
+    """Why S is missing. A scorer the experiment never declared is the real cause and is
+    named first (no rescore or rerun can fix it); then unassessed, which takes precedence
+    over ineligible: "not scored yet" is not "not scorable"."""
+    undeclared = _undeclared_reasons(policy, declared)
+    if undeclared:
+        return undeclared
     unassessed = [ref for ref in (CORRECTNESS_SCORER, QUALITY_SCORER) if ref in assessments.missing]
     if unassessed:
         return tuple(
@@ -197,6 +224,7 @@ def headline(
     checkpoints: int,
     assessments: TrialAssessments,
     withheld: tuple[str, ...] = (),
+    declared: Collection[str] | None = None,
 ) -> Headline:
     """Score one trajectory under the headline policy (the default by K when none is locked).
 
@@ -217,5 +245,5 @@ def headline(
     if solved is not None:
         used[CORRECTNESS] = solved
     score = score_inputs(policy, checkpoints, inputs)
-    reasons = _policy_reasons(policy, score, assessments)
+    reasons = _policy_reasons(policy, score, assessments, declared)
     return Headline(policy.ref, checkpoints, score, correctness, used, reasons, withheld)

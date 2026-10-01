@@ -27,6 +27,7 @@ from raidar.oracle.normalise import (
     case_results,
     checkpoint_origin,
     classify,
+    ledger_consistency_failure,
     ledger_infra_failure,
     no_graded_cases,
     timing_sensitive,
@@ -207,6 +208,82 @@ async def test_submission_modules_cannot_replace_the_grader_tools(
     assert any(c.id.endswith("test_multiplies") for c in result.grade.cases)
     assert result.parity is not None
     assert result.parity.eligible, result.parity
+
+
+FORGER = """
+import json, os, stat, sys
+from pathlib import Path
+
+leaked = sorted(key for key in os.environ if key.startswith("RAIDAR_ORACLE_"))
+(Path.cwd().parent / "leaked.json").write_text(json.dumps(leaked))
+ledger = Path.cwd().parent / "out" / "ledger.json"
+ledger.write_text(json.dumps({
+    "leaked": leaked,
+    "exit_status": 0,
+    "collect_errors": [],
+    "nodes": [{"node_id": "test_checkpoint_2.py::test_multiplies", "markers": [],
+               "status": "passed", "ran": True, "duration_s": 0.0}],
+}))
+ledger.chmod(stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH)
+print("wrong answer")
+"""
+
+
+async def test_submission_cannot_forge_the_grading_ledger(
+    tmp_path: Path, bundle, sandbox: LocalProcessSandbox
+) -> None:
+    app = tmp_path / "app"
+    app.mkdir()
+    (app / "app.py").write_text(FORGER.lstrip())
+
+    result = await grade_step(bundle, "checkpoint_2", app, sandbox, tmp_path / "w", coverage=False)
+
+    assert not result.grade.solved
+    ledger = json.loads((tmp_path / "w" / "grading" / "out" / "ledger.json").read_text())
+    assert "leaked" not in ledger  # the plugin's own ledger replaced the forgery
+    assert json.loads((sandbox.root / "leaked.json").read_text()) == []
+    assert ledger["plugin_id"] == "raidar-oracle-plugin@1"
+    assert {c.status for c in result.grade.cases} >= {CaseStatus.FAILED}
+
+
+def _consistency_ledger(status: int, node_status: str) -> dict[str, Any]:
+    return {
+        "exit_status": status,
+        "nodes": [{"node_id": "test_checkpoint_1.py::a", "status": node_status, "ran": True}],
+    }
+
+
+@pytest.mark.parametrize(
+    ("ledger", "exit_code", "files", "code"),
+    [
+        (_consistency_ledger(0, "passed"), 1, ["test_checkpoint_1.py"], "ledger_exit_mismatch"),
+        (_consistency_ledger(0, "failed"), 0, ["test_checkpoint_1.py"], "ledger_exit_mismatch"),
+        (_consistency_ledger(1, "passed"), 1, ["test_checkpoint_1.py"], "ledger_exit_mismatch"),
+        (
+            _consistency_ledger(0, "passed"),
+            0,
+            ["test_checkpoint_1.py", "test_checkpoint_2.py"],
+            "ledger_corpus_mismatch",
+        ),
+    ],
+)
+def test_ledgers_that_disagree_with_the_host_are_infra(
+    ledger: dict[str, Any], exit_code: int, files: list[str], code: str
+) -> None:
+    failure = ledger_consistency_failure(ledger, exit_code, files)
+    assert failure is not None
+    assert failure.code == code
+
+
+def test_consistent_ledgers_pass_the_host_checks() -> None:
+    assert (
+        ledger_consistency_failure(_consistency_ledger(1, "failed"), 1, ["test_checkpoint_1.py"])
+        is None
+    )
+    assert (
+        ledger_consistency_failure(_consistency_ledger(0, "passed"), 0, ["test_checkpoint_1.py"])
+        is None
+    )
 
 
 SLOW_TESTS = """

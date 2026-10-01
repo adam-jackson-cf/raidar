@@ -215,3 +215,32 @@ def test_isolation_check_detects_leaks_without_the_reset(tmp_path: Path) -> None
 
     assert any("raidar-planted-sentinel" in line for line in probe["planted_alive"])
     assert probe["token_hits"][plant["token"]], "harness-state tokens must survive without reset"
+
+
+@pytest.mark.skipif(BASH5 is None, reason="needs bash >= 4 (associative arrays)")
+@pytest.mark.parametrize("stashed", [True, False])
+def test_setup_script_puts_back_the_agents_own_setup_sh(tmp_path: Path, stashed: bool) -> None:
+    workspace, stash = tmp_path / "app", tmp_path / "stash.sh"
+    workspace.mkdir()
+    if stashed:
+        stash.write_text("echo agent-bootstrap\n")
+    script = workspace / "setup.sh"
+    script.write_text(render_setup_script(support_files={}, workspace_paths=[], component_slugs=[]))
+    env = {
+        "PATH": os.environ["PATH"],
+        "HOME": str(tmp_path / "home"),
+        "RAIDAR_CODEX_HOME": str(tmp_path / "codex-home"),
+        "RAIDAR_LOGS_DIR": str(tmp_path / "logs"),
+        "RAIDAR_COMPONENT_ROOT": str(tmp_path / "components"),
+        "RAIDAR_WORKFLOW_DIR": str(tmp_path / "review"),
+        "RAIDAR_HARNESS_BASELINE_DIR": str(tmp_path / "baseline"),
+        "RAIDAR_RESET_SKIP_KILL": "1",
+        "RAIDAR_AGENT_SETUP_STASH": str(stash),
+    }
+
+    subprocess.run([str(BASH5), str(script)], env=env, check=True)
+
+    if stashed:
+        assert script.read_text() == "echo agent-bootstrap\n"
+    else:
+        assert not script.exists()
