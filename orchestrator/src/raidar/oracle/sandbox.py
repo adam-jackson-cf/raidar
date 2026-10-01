@@ -149,6 +149,12 @@ def sandbox_env(
             "HOME": f"{layout.scratch}/home",
             "UV_CACHE_DIR": f"{layout.scratch}/uv-cache",
             "UV_OFFLINE": "1",
+            # Entrypoints are `uv run --project {app} ...`. Native SCB grades with
+            # network, so uv can sync whatever the submission's pyproject declares
+            # (e.g. a `dev = ["pytest"]` group). Offline that sync fails before the
+            # program starts and every case reads as failed. Running unsynced keeps
+            # the graded program the submission's own code, not its dev tooling.
+            "UV_NO_SYNC": "1",
             "COVERAGE_FILE": f"{layout.scratch}/coverage-data/coverage",
             "RAIDAR_ORACLE_LEDGER": f"{layout.out}/{LEDGER_NAME}",
             "RAIDAR_ORACLE_SUBMISSION_ROOT": layout.app,

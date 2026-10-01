@@ -39,10 +39,10 @@
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "98cb757215effd535e03cfbc74fdd9e6583de9151e8faa3533db9523f3bf20f4",
+          "digest": "e3a7e721e21f865e1dcaae913e58fa98a4a0d994f52f7943e4aaaaee34e7a0b9",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "d183b4bf9404e6e75092853b5adf91e74bfdd9c9a148a71c8daf797a6005e2e6",
+            "implementation_digest": "dfe67deac5d597e584b38fdd424bad77d2f61e7e5cb69012f56d3f8ea33c2f30",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -249,10 +249,10 @@
           }
         },
         "correctness@1": {
-          "digest": "01a3209b7fea65fb9361c553f0f2fc17a87d02f8aab999749944a73734e84ea4",
+          "digest": "96604010706fdc6f085db50862ef880089685e0ac817b2d345ac79bf78620c54",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "684221cffae1be86a0c4f581a776f7dfab5095d0c789aa06cf69cfe337ba1cd1",
+            "implementation_digest": "2440adc95b97ad006d5836bf2a3e5d620e1f2d401434cfe87e36cd863ca20b95",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -380,10 +380,10 @@
           }
         },
         "process-compliance@1": {
-          "digest": "fa6486067488d0e29219885c0022bff9ac0f00b3de68b16f4f14f926dd2a3db6",
+          "digest": "3ed3c9cb0e9b26242d85b3416c96b86710238379336a84313590c67a26987588",
           "metadata": {
             "implementation": "raidar.scorers.process_compliance:process_compliance_scorer",
-            "implementation_digest": "9775f71b1fe2d60c581fad02bec51638cfbdd808d264b1b435de242ac467dedf",
+            "implementation_digest": "39bff14254a34626967501a55cbb0cfdc493c253ebc09121774922d048c649ab",
             "jev_policies": {
               "process-compliance.residue": {
                 "digest": "185bc9d44e28e1193e1d06c4b5cf56c698bd3c7fdaaf7a3d0f6f1a4a610120af",
@@ -458,10 +458,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "f0a5064e238d4aa59fc93d3c3f3b70325ee2ce1f9a00f87d6f8a1458dc3721a8",
+          "digest": "d7f22ba34d4908cc0c7d2d4ad6054a219fc1d972905d74895226d33a25d616b7",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "6ae8e28b0ac57358dd1ac638234189bf4a31f98c0f3ebf3769928b4f8add1884",
+            "implementation_digest": "0d31b460940a422c8bee3e3ed36f943742c18e8a2deae678fa08696ffebb6cd3",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -613,7 +613,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "d51fa8c4869eead205a4aa4cd83e46ab87f9ca035dbc49492a4aa01fb9e33427",
+  "document_sha256": "1435267e66eff32e2108e05f3d28ef56211782e081331e940b94beed2f05c633",
   "execution": {
     "arms": {
       "baseline": {
@@ -969,7 +969,7 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "4cbc2fba10f56433b9407468f46dfc4bbe90b9dcd5bb301adc5940b738942e6b",
+    "assessment": "a2cbef98b6bc061c854bf1ac6115dbead60da9a37a2487549cb087830170e5f7",
     "execution": "5a73637e8ac3ce2199b37dd623c846c290a7bfb63896426925b03849d849cbde",
     "toolchain": "b16fc93b70b52e8651466ef66b7af27cea29dc73147849c4c7221516d441ecec"
   },
