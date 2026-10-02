@@ -226,37 +226,61 @@ def kind_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     return issues
 
 
-def _experiments_layout(path: Path) -> tuple[str, str] | None:
-    """(kind segment, id segment) when ``path`` is ``.../experiments/<kind>/<id>/<file>``."""
+EXPERIMENT_FILE = "experiment.yaml"
+
+
+def _experiments_relative(path: Path) -> tuple[str, ...] | None:
+    """The path's parts below its nearest ``experiments/`` ancestor, or None outside one."""
     parts = path.parts
-    if len(parts) >= 4 and parts[-4] == EXPERIMENTS_ROOT:
-        return parts[-3], parts[-2]
+    for index in range(len(parts) - 2, -1, -1):
+        if parts[index] == EXPERIMENTS_ROOT:
+            return parts[index + 1 :]
     return None
 
 
-def name_issues(spec: ExperimentSpec, path: Path | None) -> list[FieldIssue]:
-    """``NAME1`` (layout) and ``NAME2`` (id grammar ``<runtime>__<subject>__<intent>``)."""
+def _layout_issues(spec: ExperimentSpec, relative: tuple[str, ...]) -> list[FieldIssue]:
+    """``NAME1`` for a file below an ``experiments/`` directory."""
+    if len(relative) != 3 or relative[-1] != EXPERIMENT_FILE:
+        return [
+            FieldIssue(
+                "id",
+                f"[NAME1] the file sits at experiments/{'/'.join(relative)}; an experiment under "
+                f"experiments/ must be experiments/<kind>/<id>/{EXPERIMENT_FILE} "
+                f"(here experiments/{spec.kind}/{spec.id}/{EXPERIMENT_FILE})",
+            )
+        ]
+    kind_dir, id_dir, _ = relative
     issues = []
-    layout = _experiments_layout(path) if path is not None else None
-    if layout is not None:
-        kind_dir, id_dir = layout
-        if kind_dir != spec.kind:
-            known = ", ".join(EXPERIMENT_KINDS)
-            issues.append(
-                FieldIssue(
-                    "kind",
-                    f"[NAME1] the file sits under experiments/{kind_dir}/ but declares kind "
-                    f"{spec.kind!r}; move it to experiments/{spec.kind}/ (kinds: {known})",
-                )
+    if kind_dir != spec.kind:
+        known = ", ".join(EXPERIMENT_KINDS)
+        issues.append(
+            FieldIssue(
+                "kind",
+                f"[NAME1] the file sits under experiments/{kind_dir}/ but declares kind "
+                f"{spec.kind!r}; move it to experiments/{spec.kind}/ (kinds: {known})",
             )
-        if id_dir != spec.id:
-            issues.append(
-                FieldIssue(
-                    "id",
-                    f"[NAME1] the file sits in experiments/{kind_dir}/{id_dir}/ but declares id "
-                    f"{spec.id!r}; the directory must be named after the id",
-                )
+        )
+    if id_dir != spec.id:
+        issues.append(
+            FieldIssue(
+                "id",
+                f"[NAME1] the file sits in experiments/{kind_dir}/{id_dir}/ but declares id "
+                f"{spec.id!r}; the directory must be named after the id",
             )
+        )
+    return issues
+
+
+def name_issues(spec: ExperimentSpec, path: Path | None) -> list[FieldIssue]:
+    """``NAME1`` (layout) and ``NAME2`` (id grammar ``<runtime>__<subject>__<intent>``).
+
+    ``NAME1`` applies to any file below an ``experiments/`` directory, at any
+    depth: it must be ``experiments/<kind>/<id>/experiment.yaml``. A copy outside
+    every ``experiments/`` directory (a scratch lock input) is checked by
+    ``NAME2`` only.
+    """
+    relative = _experiments_relative(path) if path is not None else None
+    issues = _layout_issues(spec, relative) if relative is not None else []
     segments = spec.id.split(ID_SEPARATOR)
     if len(segments) != 3 or not all(segments) or segments[0] != spec.runtime:
         issues.append(

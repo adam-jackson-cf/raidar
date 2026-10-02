@@ -29,6 +29,7 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
 from raidar.jev.audit import AuditLog, ReviewerKind, reviewer_kind
+from raidar.jev.ledger import current_labels
 from raidar.jev.policies import LABELS
 
 
@@ -127,7 +128,7 @@ def _against_audit(
     unknown = sorted(label.request_id for label in chosen if label.request_id not in known)
     if unknown:
         raise LabelExportError(f"the audit holds no {policy} decision for {unknown}")
-    labelled = set(audit.labels(policy))
+    labelled = set(current_labels(audit, policy))
     already = [label.request_id for label in chosen if label.request_id in labelled]
     return [label for label in chosen if label.request_id not in labelled], already
 

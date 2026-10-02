@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 import tomllib
@@ -355,7 +356,7 @@ def test_run_refuses_the_removed_scenario_flag(tmp_path: Path) -> None:
     assert "No such option: --scenario" in result.output
 
 
-SMOKE_PATH = "experiments/smoke/python__circuit_eval-cp1__harness-health/experiment.yaml"
+SMOKE_PATH = "experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml"
 AGENTS_PATH = "experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml"
 
 
@@ -592,6 +593,45 @@ def test_renamed_make_variables_fail_with_their_new_name(old: str, new: str) -> 
 
     assert result.returncode != 0
     assert f"was renamed {new}" in result.stderr
+
+
+def test_renamed_make_variables_fail_from_the_environment_too() -> None:
+    result = subprocess.run(
+        ["make", "--no-print-directory", "-n", "help"],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+        env={**os.environ, "RUNS_DIR": "x"},
+    )
+
+    assert result.returncode != 0
+    assert "RUNS_DIR= was renamed JOBS_DIR=" in result.stderr
+
+
+@pytest.mark.skipif(
+    (REPO_ROOT / "orchestrator" / ".env").exists(), reason="a local orchestrator/.env exists"
+)
+def test_secrets_dotenv_without_an_env_file_fails_before_running_anything() -> None:
+    result = subprocess.run(
+        [
+            "make",
+            "--no-print-directory",
+            "agent-validate",
+            "SECRETS=dotenv",
+            "AGENT=codex",
+            "PROVIDER=openai",
+            "MODEL=gpt-6-luna",
+        ],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "SECRETS=dotenv but orchestrator/.env does not exist" in result.stderr
+    assert "secrets: orchestrator/.env" not in result.stderr
 
 
 def test_experiment_assess_rescores_the_run_trials_with_the_named_scorers(tmp_path: Path) -> None:

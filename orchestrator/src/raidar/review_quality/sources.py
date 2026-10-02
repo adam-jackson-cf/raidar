@@ -42,6 +42,7 @@ from typing import Any
 from raidar.analysis.sources import AnalysisInputError, read_lock
 from raidar.execution.models import TrialRecord
 from raidar.jev.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
+from raidar.jev.ledger import current_labels
 from raidar.job_layout import LEGACY_RUN_MANIFEST, is_legacy_job, legacy_job_message
 from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.spec.lock import LOCK_SUFFIX, default_lock_path
@@ -271,7 +272,7 @@ class JevAudit:
             for record in audit.decisions(policy):
                 if record.trial is not None:
                     by_trial[record.trial].append(record)
-            labels.update(audit.labels(policy))
+            labels.update(current_labels(audit, policy))
         return cls(decisions=dict(by_trial), labels=labels)
 
     def attach(self, trials: list[TrialSource]) -> dict[str, JevAttachment]:

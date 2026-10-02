@@ -27,7 +27,7 @@ import {
 import type { AnnotationKind, ArmDiff, ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
 
 function statDetail(stat: StatBlock | undefined): string {
-  if (stat?.mean == null) return 'No scored runs';
+  if (stat?.mean == null) return 'No scored trials';
   const parts = [`mean ${stat.mean.toFixed(3)}`];
   if (stat.stddev != null) parts.push(`±${stat.stddev.toFixed(3)}`);
   if (stat.median != null) parts.push(`median ${stat.median.toFixed(3)}`);
@@ -62,7 +62,7 @@ function RunPill({ run, id }: { run: RunRecord | undefined; id: string }) {
   return (
     <Link
       to={`/runs/${encodeURIComponent(id)}`}
-      title={`${id}\n${tier.label}${run?.composite_score != null ? ` · composite ${fmtScore(run.composite_score)}` : ''}${failed ? ' · run errored' : ''} — open run review`}
+      title={`${id}\n${tier.label}${run?.composite_score != null ? ` · composite ${fmtScore(run.composite_score)}` : ''}${failed ? ' · trial errored' : ''} — open trial review`}
       className="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] transition hover:bg-white/10"
       style={{ color: failed ? C.red : C.fg3, border: `1px solid ${failed ? 'rgba(235,20,20,0.35)' : C.border}` }}
     >
@@ -310,7 +310,7 @@ function GroupHeadline({ sorted, runsById }: { sorted: ExperimentRecord[]; runsB
           >
             {runLabel(worstRun.id)}
           </Link>
-          {worstRun.status === 'ERROR' ? ' (the failing run)' : ' (most issues)'}.
+          {worstRun.status === 'ERROR' ? ' (the failing trial)' : ' (most issues)'}.
         </span>
       )}
     </span>
@@ -397,7 +397,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
               <th className={TH} style={{ color: C.fg0 }}>Delivery</th>
               <th className={TH} style={{ color: C.fg0 }}>Repeatability</th>
               <th className={TH} style={{ color: C.fg0 }}>Issues</th>
-              <th className={TH} style={{ color: C.fg0 }} title="Can you trust this sample? Based on scored-run counts vs the experiment's minimum and preferred sample sizes.">
+              <th className={TH} style={{ color: C.fg0 }} title="Can you trust this sample? Based on scored-trial counts vs the experiment's minimum and preferred sample sizes.">
                 Confidence
               </th>
               <th className={TH} style={{ color: C.fg0 }}>Pace</th>
@@ -471,7 +471,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
                         return (
                           <span
                             className="flex items-center gap-1.5"
-                            title={`${issues} issue${issues === 1 ? '' : 's'}, ${counts.good ?? 0} good, ${counts.note ?? 0} note across this spec's runs and experiment checks`}
+                            title={`${issues} issue${issues === 1 ? '' : 's'}, ${counts.good ?? 0} good, ${counts.note ?? 0} note across this spec's trials and experiment checks`}
                           >
                             {issues > 0 ? (
                               <span

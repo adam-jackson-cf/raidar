@@ -228,6 +228,10 @@ def test_context_isolation_between_steps_in_a_real_harbor_trial(tmp_path: Path) 
     plant, probe = _isolation_trial(tmp_path, with_reset=True)
     trial = tmp_path / "trials" / "isolation" / "steps"
     reset = json.loads((trial / "checkpoint_2/agent/raidar-reset.json").read_text())
+    # Step 2's report must not have been written into step 1's archived copy (stale
+    # bind-mount name; RunScopedDockerEnvironment drops it before each setup.sh).
+    first = json.loads((trial / "checkpoint_1/agent/raidar-reset.json").read_text())
+    assert first["finished_ms"] < reset["started_ms"]
 
     assert "raidar-planted-sentinel-checkpoint_1" in plant["planted"]
     assert probe["planted_alive"] == []

@@ -6,7 +6,7 @@ against the digest the records carry). Executed steps come from Harbor's
 ``result.json`` ``step_results`` in order and must be a prefix of the plan; a
 one-step trial has no ``step_results`` and must have exactly one oracle
 record. Planned checkpoints the trial never reached are kept with
-``reached=False``, so every trajectory of a problem has the same subjects.
+``reached=False``, so every trial of a problem has the same subjects.
 
 Correctness inputs come from the oracle's ``raidar-oracle/steps/<step>/record.json``;
 Harbor's trial-level ``verifier_result`` is never read. Each stored snapshot

@@ -83,7 +83,7 @@ export function RunHeader({
           {run.agent_spec}
         </span>
         {run.synthetic && <Badge label="synthetic" />}
-        {!run.valid && <Badge label="invalid" color={C.red} title="Run failed validity checks" />}
+        {!run.valid && <Badge label="invalid" color={C.red} title="Trial failed validity checks" />}
         <div className="ml-auto flex items-center gap-2">
           {actions}
         <Link
@@ -111,7 +111,7 @@ export function RunHeader({
           color={tier.color}
           title={`Composite score · quality ${fmtScore(run.quality_score)} · diagnostic ${fmtScore(run.diagnostic_score)}`}
         />
-        <Fact label="run time" value={fmtDuration(run.duration_ms)} />
+        <Fact label="trial time" value={fmtDuration(run.duration_ms)} />
         {run.total_input_tokens === 0 && run.total_output_tokens === 0 ? (
           <Fact label="tokens" value="not recorded" color={C.fg0} title="No token usage captured for this trial" />
         ) : (
@@ -120,7 +120,7 @@ export function RunHeader({
             value={`${fmtTokens(run.total_input_tokens)} in · ${fmtTokens(run.total_output_tokens)} out`}
           />
         )}
-        <Fact label="steps" value={String(run.span_count)} title="Projected spans in this run's trace" />
+        <Fact label="steps" value={String(run.span_count)} title="Projected spans in this trial's trace" />
       </div>
 
       {run.unscored_reasons.length > 0 && (
@@ -157,7 +157,7 @@ export function RunHeader({
               <Fact label="diagnostic" value={fmtScore(run.diagnostic_score)} />
               <Fact label="valid" value={run.valid ? 'yes' : 'no'} color={run.valid ? C.green : C.red} />
             </div>
-            <ArtifactPath label="run json" path={run.artifact_paths.run_json} />
+            <ArtifactPath label="trial json" path={run.artifact_paths.run_json} />
             {run.artifact_paths.findings_json && (
               <ArtifactPath label="findings json" path={run.artifact_paths.findings_json} />
             )}

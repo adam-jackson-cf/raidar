@@ -2,6 +2,34 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - pilot refinement: Jev relabel, fault catalog and r3 proposal, ruff A/B
+
+### Breaking Changes
+
+- The smoke experiment is `experiments/smoke/python__circuit_eval-cp1__agent-health/` (was `...__harness-health`, the last pre-v2 word in an experiment id); relocked as `e6e0988b09f9`. `SMOKE_EXPERIMENT` defaults to it.
+- `SECRETS=dotenv` fails when `orchestrator/.env` does not exist, instead of printing `.env` as the source and running without it. Under `SECRETS=auto` with neither Infisical nor `.env`, targets print `secrets: none` and go on with the shell environment and file-backed Codex auth; the credential preflight still refuses an arm that has no credential.
+- A make variable under its pre-v2 name now fails when it comes from the environment too (`RUNS_DIR=x make help`), not only from the command line.
+- `NAME1` applies to any experiment file below an `experiments/` directory, at any depth: it must be `experiments/<kind>/<id>/experiment.yaml`. Copies outside every `experiments/` directory are still checked by `NAME2` only.
+
+### Features
+
+- `lint-tool@1`: a hash-pinned Ruff (0.8.6) installed once per trial, as root, in the agent container under `/opt/raidar-tools/<slug>/` and linked to `/usr/local/bin/ruff`, outside the agent image (the pack audit's "no scorer tools in the agent image" holds). Its probe checks, before every step, the version at the provisioned path and, at step 1, that Ruff resolves the workspace `ruff.toml`. Components opt into this through `raidar.components.provision` (`install` once, `check` per step, one evidence record per step).
+- Jev calibration ledger (`raidar.jev.ledger`): `make jev-supersede-labels` takes labels out of calibration without deleting them (append-only), `make jev-record-split` records a calibration/evaluation split before labelling (`jev-promote` defaults to the latest), and `make jev-export-blind ... REQUEST_IDS=` exports chosen decisions. Promotion, calibration, blind export, label export and the Quality projection read labels through `current_labels`, so superseded labels never count.
+- Agent skills `fault-catalog` (analyse a job into conceptual fault categories and propose component changes as the next revision) and `experiment-observations` (report what a completed experiment observed, reconciling fault evidence through `fault-catalog`) under `.agents/skills/`. They are first versions and need refining.
+- Experiments `experiments/ab-test/python__forge__ruff-lint/` (r1 shared framing only vs r2 adding `lint-config@1` + `lint-tool@1`; executed as `ruff-lint-02`) and the proposed `experiments/ab-test/python__forge__guided-r3/` (pilot guided condition vs a candidate built from the pilot v2 fault catalog; locked `12f2b2fb05fc`, not executed; `rationale.md` beside it).
+
+### Fixes
+
+- Step evidence under concurrent trials. Between steps Harbor moves the mounted `/logs/agent` into `steps/<step>/agent`; on an OrbStack bind mount the container could keep a cached entry for a moved name, so the next step's `raidar-reset.json` was written into the previous step's archived copy (overwriting it) and was missing from its own step. `RunScopedDockerEnvironment` now removes, by name and as root, every archived top-level log name the host mount no longer holds before each step's `setup.sh` (`rm -f` for files, `rmdir` for directories, so archived evidence is never touched). No component, setup script or digest changed. Three concurrent runs of the real-trial step-reset and lint-tool tests went from 3/3 failing to 6/6 passing (two rounds); the isolation test now also asserts step 1's report predates step 2's. An audit of the recorded jobs (pilot v2, `ruff-lint-02`; 391 steps) found no overwritten or missing report outside one aborted job.
+- Review-surface wording follows the vocabulary: "Trial not found", "Failed to load trial(s)", "No projected trial with id ...", "Loading trial…", "trial time", "trial json", "Synthetic fixture trial", "No scored trials", "open trial review", and the wireframes' "Trials" label and help texts. Routes (`/runs/:runId`) and `data-run-id` stay as the internal contract.
+- Docstrings in `scorers/rescore.py` and `scorers/trial_inputs.py` say trial (scorer identities checked unchanged).
+
+### Documentation
+
+- README and AGENTS.md name the remaining frozen pre-v2 words and why: the observation subject `trajectory`, the evidence input `oracle.cases` and the `@1` scorer descriptions (hashed into Assessment keys), and the problem store's `oracle/` bundle directory (inside each problem's pinned digest).
+- README: the repository ships no `orchestrator/.env`; the blind-labelling protocol gives a labeller the export alone, never beside a round's selection files (which carry Jev's scores).
+- `docs/reboot/gate-packet.md` §14 (pilot refinement), `docs/reboot/pilot-v2-fault-catalog.md` and `docs/reboot/jev-spot-check.md`.
+
 ## Unreleased - schema v2: Harbor vocabulary, experiment kinds, runtime-compatibility gate
 
 ### Breaking Changes
@@ -23,7 +51,7 @@ All notable changes to this project are documented in this file.
 
   A make variable under its old name fails with its new name. Kept: *problem*, *checkpoint*, *experiment*, *arm*, *condition*, *component*, *factor*, *lock*, *verdict*; Harbor's `oracle` agent (`AGENT_OVERRIDE=oracle`); and, byte for byte, the frozen artifacts (released components' fingerprint sources, the grader plugin, the Python pack image recipe and the verifier evidence names inside trial directories).
 - `experiment.yaml` is `schema_version: 2`: a required `kind` (`ab-test`, `benchmark`, `smoke`; `research-loop` reserved), a required `runtime`, and the renamed fields above. Schema v1 files are read-only: `raidar validate` accepts them, `lock`/`plan`/`run` refuse them; `raidar upgrade-spec` (`make experiment-upgrade`) converts one.
-- Experiments live at `experiments/<kind>/<id>/experiment.yaml` with ids `<runtime>__<subject>__<intent>` (`NAME1`, `NAME2`). `examples/` is gone: `examples/pilot/experiment.yaml` is `experiments/ab-test/python__forge__guided-pilot/`, `examples/pilot/oneshot.experiment.yaml` is `experiments/ab-test/python__circuit_eval-cp1__guided-pilot/`, `examples/smoke/experiment.yaml` is `experiments/smoke/python__circuit_eval-cp1__harness-health/` and `examples/smoke/agents.experiment.yaml` is the benchmark `experiments/benchmark/python__circuit_eval-cp1__agents/`. `experiments/` is tracked; `experiments/research_loops/` and `experiments/operational_smoke/` stay ignored.
+- Experiments live at `experiments/<kind>/<id>/experiment.yaml` with ids `<runtime>__<subject>__<intent>` (`NAME1`, `NAME2`). `examples/` is gone: `examples/pilot/experiment.yaml` is `experiments/ab-test/python__forge__guided-pilot/`, `examples/pilot/oneshot.experiment.yaml` is `experiments/ab-test/python__circuit_eval-cp1__guided-pilot/`, `examples/smoke/experiment.yaml` is `experiments/smoke/python__circuit_eval-cp1__agent-health/` and `examples/smoke/agents.experiment.yaml` is the benchmark `experiments/benchmark/python__circuit_eval-cp1__agents/`. `experiments/` is tracked; `experiments/research_loops/` and `experiments/operational_smoke/` stay ignored.
 - Lock version 3: the execution section records `kind`, `runtime`, `environment` and agent names (`versions.agents`); the assessment section records `metric`. Every experiment was relocked. `raidar migrate-run-lock` is replaced by `raidar migrate-job`.
 - The analysis report is `schema_version` 2: `runs` -> `jobs`, `headline_policy` -> `metric`, `replaced_trajectories` -> `replaced_trials`, `dev_run` -> `dev_job`, plus `experiment_kind`, `citable` and `ranking`.
 - The Quality projection's run summaries use `job`, `attempt` and `trial_record`; its experiments list `jobs`.

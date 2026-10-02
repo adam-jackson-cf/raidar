@@ -1,0 +1,111 @@
+# Research-loop iteration 1 (manual): the next revision of the guided condition,
+# proposed from the pilot v2 fault catalog (docs/reboot/pilot-v2-fault-catalog.md)
+# and argued in rationale.md beside this file. PROPOSED, NOT RUN.
+#
+# Question: on forge, does the candidate guided condition (guided-r3) beat the
+# incumbent guided condition of pilot v2 (guided-r2)? This is a new question with
+# a new baseline arm (the incumbent, not the unguided baseline), so it is its own
+# experiment rather than a third arm of python__forge__guided-pilot.
+#
+# Only components change. The problem pin, agent, protocol, shared framing,
+# scorers, headline metric and verdict thresholds are those of the pilot.
+# guided-r2's component files are byte-identical copies of the pilot's guided files.
+#
+# Validate: make experiment-validate EXPERIMENT=experiments/ab-test/python__forge__guided-r3/experiment.yaml
+# Lock:     make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guided-r3/experiment.yaml
+schema_version: 2
+kind: ab-test
+id: python__forge__guided-r3
+description: Does the revised guided condition (plan file, explicit error contract, contract propagation, available test tooling, inert components removed) beat the pilot v2 guided condition on forge?
+
+problems:
+  - ref: scb/forge@38d627ecf668
+
+runtime: python
+environment:
+  type: docker
+  compose_init: true
+
+agents:
+  # Every real-LLM trial uses codex + gpt-6-luna at low effort (user directive).
+  - id: codex-luna
+    name: codex
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+
+factors: [condition]
+
+# Unchanged from the pilot: both arms get the same starter framing.
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
+
+conditions:
+  # Incumbent: the pilot v2 guided condition, unchanged (same components, same
+  # settings, byte-identical files).
+  - id: guided-r2
+    components:
+      - use: rules-file@1
+        files: [components/guided-r2/AGENTS.md]
+      - use: skills@1
+        files: [components/guided-r2/skills/checkpoint-discipline]
+      - use: lint-config@1
+        files: [components/guided-r2/ruff.toml]
+      - use: stop-hook@1
+        with:
+          command: python3 -m compileall -q . >/dev/null 2>&1 || true
+      - use: review-loop@2
+        with:
+          max_review_rounds: 2
+  # Candidate (rationale.md, changes C1-C5):
+  # - rules-file@1 with a revised AGENTS.md: plan file before the first edit
+  #   (C1, FCR-008), the error contract on every failure path (C2, FCR-005),
+  #   propagating cross-cutting changes (C3, FCR-006), the test tooling that
+  #   exists (C4, FCR-003), and the skill's steps folded in (C5, FCR-004);
+  # - skills@1, lint-config@1 and stop-hook@1 removed (C5, FCR-004: delivered
+  #   but not consumed in pilot v2);
+  # - review-loop@2 unchanged.
+  - id: guided-r3
+    components:
+      - use: rules-file@1
+        files: [components/guided-r3/AGENTS.md]
+      - use: review-loop@2
+        with:
+          max_review_rounds: 2
+
+arms:
+  - id: incumbent
+    condition: guided-r2
+    agent: codex-luna
+  - id: candidate
+    condition: guided-r3
+    agent: codex-luna
+
+assessment:
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@1]
+  metric: scb-canonical@2
+
+analysis:
+  baseline_arm: incumbent
+  # 16 attempts, as the pilot. Both arms cost about $0.16 per trial in pilot v2,
+  # so the job is about 32 x $0.16 = $5 (nominal; ChatGPT session auth).
+  attempts: 16
+  seed: 20261002
+  concurrency: 2
+  # Verdict thresholds pinned before any data is seen; same as the pilot.
+  min_pairs: 5
+  max_exclusion_fraction: 0.2
+  alpha: 0.05
+  # Smallest effects of interest for the sample-size projection (rationale.md §5):
+  # case pass rate C, because solve_rate on forge is capped by FCR-001.
+  min_effects:
+    correctness: 0.02
+    headline_score: 2.0

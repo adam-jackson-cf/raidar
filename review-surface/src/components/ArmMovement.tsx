@@ -200,7 +200,7 @@ export function ArmMovement({
         <table className="w-full max-w-2xl border-collapse">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {['Agent spec', 'Arms', 'Delivery', 'Run time', 'Tokens'].map((label) => (
+              {['Agent spec', 'Arms', 'Delivery', 'Trial time', 'Tokens'].map((label) => (
                 <th
                   key={label}
                   className="px-2 py-1 text-left text-[9px] font-medium uppercase tracking-wider"

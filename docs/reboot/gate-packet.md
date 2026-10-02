@@ -928,3 +928,132 @@ User decisions A-E (2026-10-02) were implemented as one change. The requirements
 **Known consequences.**
 - Jev labels and the calibration split of §11.17 name trials by their old qualified ids (`pilot-forge.forge-02.b00-p0-baseline`). The audit keeps them; decisions audited after the migration use the new experiment id. Re-labelling or a split over both id forms is needed before a promotion uses them.
 - The pilot v1 jobs (`jobs/pilot/`), `jobs/e2e-luna-oneshot`, `jobs/smoke` and `jobs/pilot-checks` are not migrated; v2 readers refuse them with the migration command.
+
+## 14. Pilot refinement (2026-10-02)
+
+Priority set by the user: make the Phase 1 pilot a fully working process before any Phase 2 work. No other runtime pack was started. This section covers what was refined on top of §13, the Jev relabelling, the fault catalog with its proposed next revision (r3), and the ruff A/B test. Everything under `jobs/` and `stores/` is gitignored and local to this worktree.
+
+### 14.1 Vocabulary, layout, kinds and the gate (refinements to §13)
+
+An independent verification pass over §13 confirmed the layout and kind rules, the runtime-compatibility gate (every bypass vector refused: `--set`, `plan --set`, a hand-edited lock, `assess --rescore` with a foreign bundle), the pilot v2 reproduction of §11.13/§11.16 and `make quality`. It also found gaps, fixed here:
+
+| Finding | Fix | Evidence |
+|---|---|---|
+| **Step-evidence race.** Under 3 concurrent real-trial test runs, `test_context_isolation_between_steps_in_a_real_harbor_trial` failed 3/3: step 2's `raidar-reset.json` was missing. | Cause found and fixed outside every digest (below). | 6/6 concurrent runs pass (2 rounds × 3, `31 passed` each); the test now also asserts step 1's report predates step 2's. |
+| `SECRETS=dotenv` with no `orchestrator/.env` printed `.env` as the source and went on. | It fails with a message. Under `auto` with neither source the target prints `secrets: none` and continues with the shell environment, because file-backed Codex auth needs no secret; the credential preflight still refuses an arm without a credential. README no longer tells you to copy `.env.example`. | `test_secrets_dotenv_without_an_env_file_fails_before_running_anything` |
+| Renamed make variables were ignored when set in the environment. | They fail from the environment too. | `test_renamed_make_variables_fail_from_the_environment_too` |
+| `NAME1` only applied to `.../experiments/<kind>/<id>/<file>`. | Any file below an `experiments/` directory, at any depth, must be `experiments/<kind>/<id>/experiment.yaml`. Outside `experiments/`, only `NAME2` applies, so scratch copies stay possible. | `test_name1_applies_at_any_depth_below_an_experiments_root`, `test_name1_requires_the_experiment_file_name` |
+| UI strings still said run ("Run not found", "Failed to load run", "No projected run", "Runs", "run time", ...). | Swept to trial across the pages, components and wireframes. Routes (`/runs/:runId`) and `data-run-id` stay internal, like the projection's JSON names. | `make review-surface-test` (14.6) |
+| The smoke id still said `harness-health`. | Now `python__circuit_eval-cp1__agent-health`, relocked `e6e0988b09f9`. | |
+| Scorer subject `trajectory`, evidence input `oracle.cases`, the `@1` scorer descriptions, the problem store's `oracle/` directory. | **Documented as frozen, not renamed.** The first three are hashed into every Assessment key, so renaming them orphans the 180 rescored Assessments of §13. The fourth sits inside each problem's pinned digest. README and AGENTS.md list them. Two scorer docstrings that are not part of any identity now say trial; the scorer identities were checked unchanged before and after. | |
+
+**The step-evidence race, root cause (observed).** Between steps, Harbor *moves* the mounted `/logs/agent` contents into `steps/<step>/agent` on the host. On OrbStack's bind mount the container can keep a cached directory entry for a moved name for a short time. A write to that name then lands in the moved file: step k+1's `setup.sh` overwrote step k's archived `raidar-reset.json`, and step k+1 had none. A minimal probe reproduced it with no Raidar code: a container writes `r.json`, the host moves it, and the container writes it again. The second write landed in the moved file in 7/60 and 2/60 iterations. Removing the name first (`rm -f`, and `rmdir` for a directory) gave 0/60 in both probes, and so did writing a temporary file and renaming it.
+
+**Fix (no digest change).** `step_reset.sh` is a fingerprint source of every built-in component, so changing how it writes would move every pilot component digest (§13). The fix therefore sits in `RunScopedDockerEnvironment`, which is execution plumbing. Before each step's `bash <workdir>/setup.sh`, it removes as root every top-level name that an earlier step archived and the host mount no longer holds. Removing by name a name the host does not have only drops the stale entry, because the host answers "not found". Directories use `rmdir`, never a recursive delete, so archived evidence is never touched. This costs one extra `docker exec` per step from step 2 on, inside the `per_step_reset` gap. **Recorded jobs were not affected.** An audit of the pilot v2 jobs and `ruff-lint-02` (391 step directories) found no duplicated or out-of-order reset report. The only missing ones were 3, all in the aborted `forge-01-grader-uv-dev-group`.
+
+### 14.2 Jev relabelling and refinement (`code-quality.rubric-smells`, `scb-rubric@2`)
+
+**Why relabel.** The 33 labels of §12.4 were selected and labelled by the same agent, so their blindness could not be shown, and they named trials by pre-v2 ids (§13). They were **superseded, not deleted**: 33 append-only `LabelSupersession` records in `jev-audit/<policy>/ledger/`, with that reason. The new `raidar.jev.ledger` makes every calibration reader (promotion, calibration, blind export, label export, review_quality) use `current_labels`, which skips superseded labels. New targets: `make jev-supersede-labels`, `make jev-record-split`, and `make jev-export-blind ... REQUEST_IDS=`.
+
+**Protocol.**
+1. The split `relabel-round-1` was recorded before any new label: 22 calibration and 20 evaluation trials, stratified by problem group × arm, with both arms of an attempt kept on one side.
+2. Three relabel rounds followed. A selector agent chose the decisions and labelled nothing. Two independent blind labellers (`labeller-1`, `labeller-2`) each answered every question from the blind export, which carries state and questions only. Each round's `blind.jsonl` sha256 matches its manifest.
+3. Only consensus labels were imported. Decisions where the labellers disagreed, or one marked uncertain, were held back with no label.
+
+The selector, both labellers and this agent are all `claude-opus-5-5`.
+
+**Result.**
+- The store holds 71 label records: 33 superseded and 38 current, none of them on a superseded decision. The 38 current labels are 26 `correct` and 12 `false_positive`, all from reviewer kind `model`. 7 decisions are held back.
+- Readiness passes (`ready_for_enforce: true`): 38 labelled, 13 minority, input sufficiency 0.9993.
+- With the threshold fitted on the calibration side (0.75), evaluation gives precision 0.64, recall 1.00 and agreement 0.81, against never-flag agreement of 0.67. Under §12.5's model-made labels, evaluation was worse than never flagging (0.6 vs 0.8). On these labels it is better.
+- **Still not promoted.** Both policies stay `shadow`. Every label is model-made, selection was enriched towards Jev positives (which inflates recall), and `code-quality@1.1` does not exist.
+
+**Where Jev and the labellers disagree.** 12 Jev false positives remain. Most of them, and most positives, rest on two contested stances that a person has to decide (`docs/reboot/jev-spot-check.md` §1):
+- **Stance A:** CLI command-string dispatch counts as `stringly_typed_logic`.
+- **Stance B:** a silent `mkdir(parents=True, exist_ok=True)` counts as `silent_resource_creation`. Jev answers ≥ 0.75 on this question for 121 decisions across the store.
+
+Rejecting both stances moves evaluation to precision 0.80, recall 0.80 and agreement 0.90 at a refitted threshold of 0.89.
+
+**Refinement tried (scratch only, not in the repo).**
+- The candidate `scb-rubric@3` wording narrows `stringly_typed_logic` (boundary strings are not the pattern) and `validation_mismatch`. It was replayed on the 45 relabel decisions: the 38 labelled plus the 7 held back.
+- Replay noise of the pinned `@2` itself is small: mean |Δ| per question 0.007, and 5 of 90 decision classes flip at 0.75.
+- At its refitted threshold of 0.80, `@3` gives evaluation precision 1.00, recall 0.71 and agreement 0.90, against 0.64 / 1.00 / 0.81 for `@2`. It removes most stance-A false positives and loses 2 true positives.
+- **This is not a valid held-out result.** The wording was written after reading these labels and is scored on the same labels. It needs fresh labels, a new policy version and a new epoch before it counts.
+
+### 14.3 Fault catalog and the proposed r3 (`docs/reboot/pilot-v2-fault-catalog.md`)
+
+The `fault-catalog` skill (`.agents/skills/fault-catalog/`, a first version that needs refining) analysed all 32 valid forge trials (256 step results) of pilot v2 into 8 conceptual fault categories:
+
+| ID | Category | Class | Owner | Status |
+|---|---|---|---|---|
+| FCR-001 | Verifier asserts error-detail content or output format the specification does not determine | Measurement | problem / verifier | open |
+| FCR-002 | Specification constraint prose copied verbatim into error details | Behavioral | component (blocked by the hidden-test firewall) | open |
+| FCR-003 | The condition requires verification tools the environment lacks (pytest, ruff) | Process | component | targeted by r3 |
+| FCR-004 | Condition components delivered but not consumed (skill opened in 3/128 steps) | Process | component | targeted by r3 |
+| FCR-005 | CLI and argument-parser failures escape the error contract | Integration | component | targeted by r3 |
+| FCR-006 | A cross-cutting contract change is not propagated to earlier commands | Structural | component | targeted by r3 |
+| FCR-007 | A third-party dependency (PyYAML) is unavailable to the offline verifier | Measurement | Raidar verifier | open |
+| FCR-008 | The plan step is neither instructed nor detectable, so `plan_written` cannot separate | Process | component + analysis | targeted by r3 |
+
+**What it answers.**
+
+*Why is guided worse on the primary outcome?*
+- **Observed:** the whole gap sits at checkpoints 1-2, and it comes from two verifier cases that assert a phrase the specification never states (FCR-001).
+- **Observed:** guided implementers copy the specification's sentence verbatim more often: 12 of 16 cp1 snapshots verbatim plus 2 near-verbatim, against 5 of 16 for baseline (Fisher p = 0.003; FCR-002).
+- **Inference:** guided does not validate worse. It reproduces the specification's wording more literally, and the verifier asserts a different wording.
+
+*Why does neither arm solve checkpoint 3 or later?* 21 cases fail in all 32 trials. Under `continue` that caps `solve_rate` at 0.25 and makes `final_solved` 0 by construction.
+
+*Exploratory view (exclusions chosen after seeing the data):* excluding those 24 unspecified cases reverses the direction. Adjusted C is 0.957 vs 0.980 for guided, Δ +0.023, 95% CI [−0.002, +0.047]. The independent verification reproduced FCR-001, FCR-002 and FCR-007 exactly. For FCR-003 it got the same order of magnitude but not the exact count (60 vs 65 of 128 guided steps).
+
+**r3 proposal** (`experiments/ab-test/python__forge__guided-r3/`, `rationale.md`). It is an ab-test whose baseline arm is the pilot's guided condition: byte-identical files, condition digest `73cc19faeeb0`. The candidate changes components only:
+- C1-C4 are a revised `AGENTS.md`: write `PLAN.md` first; follow the error contract on every failure path; propagate cross-cutting changes; use `unittest`, because pytest and ruff are absent.
+- C5 drops `skills@1`, `lint-config@1` and `stop-hook@1`, which were inert under Codex. `review-loop@2` is unchanged.
+- Everything else is fixed at the pilot's values. The verification confirmed this field by field, and the lock is current (`12f2b2fb05fc`).
+- Hidden-test knowledge is kept out on purpose. Nothing targets FCR-001, FCR-002 or FCR-007, whose right answers are known only from the hidden tests.
+- **Predicted:** `solve_rate` inconclusive (capped by FCR-001); any effect shows up in C and S at checkpoints 3-8. The overall manipulation check will be `not_separated` by construction, because both arms run tests.
+- **Cost:** about $5 and about 8 h at concurrency 3 for 16 attempts. **Not executed: it needs your approval.**
+
+### 14.4 Ruff A/B test (`experiments/ab-test/python__forge__ruff-lint/`, job `ruff-lint-02`)
+
+This is a functional test of the component revision path and of `lint-tool@1`.
+- **Arms:** r1 has the shared framing only. r2 adds `lint-config@1` (the pilot's `ruff.toml`) and `lint-tool@1`, a hash-pinned Ruff 0.8.6 installed per trial outside the agent image. No text tells the agent that Ruff exists.
+- **Run:** forge, `codex` 0.156.1, `gpt-6-luna` low, 5 attempts. Lock `cc2a4b147487`.
+- **Validity:** 10/10 trials valid, 0 infra errors.
+- **Cost:** $0.0351 vs $0.0387 per trial, about $0.37 in total.
+
+| Measure | r1 baseline | r2 ruff | Verdict |
+|---|---|---|---|
+| `solve_rate` (primary) | 0.20 | 0.05 | Δ −0.15 [−0.32, 0.02], inconclusive |
+| C (case pass rate) | 0.915 | 0.919 | inconclusive |
+| Headline S (`scb-canonical@2`) | 78.71 | 78.37 | insufficient (4 pairs) |
+| E, V, H, R, G | | | inconclusive or insufficient |
+| Manipulation check | | | `not_separated` (no plan or test signal in either arm) |
+
+**The tool worked; the agents did not use it** (observed, from the provision records and Codex sessions):
+- **Provisioning:** 40/40 r2 step records show install ok, check ok, `ruff 0.8.6`, the pinned target and resolved config `/app/ruff.toml`. The verification found the probe functional: it runs the binary and checks the resolved config.
+- **Config use:** r2 agents read `ruff.toml` in 16 of 40 steps.
+- **Tool use:** the provisioned `ruff` was invoked in 0 steps. One step (b04, checkpoint 6) tried `python -m ruff` and got `No module named ruff`, because the tool is a binary on `PATH`, not a Python module.
+
+**Exploratory lint density.** At checkpoint 8, with r2's `ruff.toml` rule set applied to both arms by the host's Ruff, findings per kLOC of production code are 96.2 for baseline and 56.2 for r2 (5 trials each, unpaired). The scorer's own isolated SIM-rule density is equal (0.22 vs 0.22). **Inference:** the drop comes from agents reading the config, mostly line length and style, not from running Ruff. With n = 5 and no pre-registered lint outcome, this is a lead, not a result.
+
+**Open hardening (not done).** The probe records `path_ruff` but does not assert it, and it does not probe `python -m ruff`. Either change alters `lint-tool@1`'s fingerprint. That would make `ruff-lint-02`'s lock stale for a component used only in this test, so it waits for your call (14.7).
+
+### 14.5 Skills for the research loop
+
+`.agents/skills/fault-catalog/` analyses a job into conceptual fault categories (category, owner, mechanism, evidence, pre-registered resolution criteria) and proposes component changes as the next revision, as it did for r3. `.agents/skills/experiment-observations/` reports what a completed experiment observed (per-arm outcomes from the job, verifier records, the Assessment store and `analysis.json`), with fault evidence reconciled through `fault-catalog`. Both are first versions. In this pass the fault catalog's counts were reproduced except FCR-003's exact count, and its evidence map classifies failures by regex. These are known refinement points.
+
+### 14.6 Checks
+
+- `make quality`: exit 0. 1154 passed and 3 skipped, integration 82 passed, coverage 97.08%, lizard clean, every lock current. The spec-rule change refreshed each lock's toolchain section only: every `lock_sha256` is unchanged (forge `015c57e4f59c`, one-shot `b54c3605ced9`, r3 `12f2b2fb05fc`, ruff `cc2a4b147487`, agents `1fef5da2c46a`), and the renamed smoke is `e6e0988b09f9`.
+- `make review-surface-test REVIEW_JOBS_ROOT="jobs/pilot-v2/python__forge__guided-pilot jobs/pilot-v2/python__circuit_eval-cp1__guided-pilot" REVIEW_STORE=jobs/pilot-v2/assessment-store`: 55 passed.
+- Concurrency: 2 rounds × 3 concurrent runs of `tests/test_component_step_reset.py tests/test_component_lint_tool.py` on OrbStack, all `31 passed`, with no Raidar compose project left behind.
+
+### 14.7 Decisions for you
+
+1. **Run r3?** About $5 and about 8 h on OrbStack (`experiments/ab-test/python__forge__guided-r3/rationale.md` §7). After the run, the fault-catalog runbook reconciles FCR-003 to FCR-006 and FCR-008 against their pre-registered criteria.
+2. **Jev spot-check.** Decide stances A and B and the 7 held-back decisions (`docs/reboot/jev-spot-check.md`). Human labels there are the only way to get a non-model reference. Then decide whether to pursue `scb-rubric@3` (fresh labels, new epoch) and `code-quality@1.1`.
+3. **FCR-001 (unspecified verifier literals).** Report it upstream to SCB? And should solve-based outcomes get a pre-registered treatment of "wall" cases? Until then the forge primary outcome measures only checkpoints 1-2.
+4. **FCR-007 (PyYAML missing in the offline verifier).** Give the verifier dependency parity with native SCB grading. This changes the verifier bundle's environment, not any component.
+5. **`lint-tool@1` probe hardening** (14.4). Make it a `lint-tool@2`, or change `@1` in place before anything other than `ruff-lint-02` uses it.
+6. **Labelling isolation.** From the next round on, the labeller gets only the blind export, in a directory with nothing else (README Jev row). Model labellers' file access cannot be shown after the fact: the relabel rounds' `selector/selection.json` (which carries Jev scores) sat beside `blind/`, so "the labellers did not read it" rests on their own reports.

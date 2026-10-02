@@ -25,11 +25,13 @@ PILOT_ONESHOT = (
     EXPERIMENTS / "ab-test" / "python__circuit_eval-cp1__guided-pilot" / "experiment.yaml"
 )
 SMOKE_EXPERIMENT = (
-    EXPERIMENTS / "smoke" / "python__circuit_eval-cp1__harness-health" / "experiment.yaml"
+    EXPERIMENTS / "smoke" / "python__circuit_eval-cp1__agent-health" / "experiment.yaml"
 )
 AGENTS_BENCHMARK = (
     EXPERIMENTS / "benchmark" / "python__circuit_eval-cp1__agents" / "experiment.yaml"
 )
+GUIDED_R3_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guided-r3" / "experiment.yaml"
+RUFF_LINT_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__ruff-lint" / "experiment.yaml"
 LEGACY_V1 = Path(__file__).resolve().parent / "fixtures" / "legacy_v1"
 
 BASE_EXPERIMENT: dict[str, Any] = {

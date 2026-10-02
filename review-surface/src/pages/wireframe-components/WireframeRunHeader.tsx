@@ -15,19 +15,19 @@ type HoverPayload = {
 
 const FACT_HELPERS: Record<string, string[]> = {
   score: [
-    'Composite outcome score for this run.',
-    'This is the primary quality signal used when comparing runs.',
+    'Composite outcome score for this trial.',
+    'This is the primary quality signal used when comparing trials.',
   ],
   tokens: [
-    'Input and output token usage captured for this run.',
+    'Input and output token usage captured for this trial.',
     'Use this to understand spend and verbosity pressure.',
   ],
-  'run time': [
-    'Total elapsed runtime for this run.',
+  'trial time': [
+    'Total elapsed time for this trial.',
     'Useful for comparing speed against outcome and token spend.',
   ],
   steps: [
-    "Projected span count in this run's trace.",
+    "Projected span count in this trial's trace.",
     'A higher count usually means a more involved execution path.',
   ],
   diagnostic: [
@@ -36,11 +36,11 @@ const FACT_HELPERS: Record<string, string[]> = {
     'Use it to understand evidence quality or execution health when outcome and trace status disagree.',
   ],
   status: [
-    'Execution status for the run trace.',
-    'OK means the run completed; ERROR indicates execution failed.',
+    'Execution status for the trial trace.',
+    'OK means the trial completed; ERROR indicates execution failed.',
   ],
   valid: [
-    'Whether this run passed validity checks and can be trusted for review.',
+    'Whether this trial passed validity checks and can be trusted for review.',
     'Invalid runs may be unscored or excluded from comparison.',
   ],
 };
@@ -57,44 +57,44 @@ const UNSCORED_REASON_COPY: Record<string, { label: string; stage: string; detai
   harbor_timeout: {
     label: 'Harness timeout',
     stage: 'execution',
-    detail: 'The harness exceeded its allowed execution window before scoring could complete.',
+    detail: 'The agent exceeded its allowed execution window before scoring could complete.',
     action: 'Re-run this trial, or increase the timeout if this is expected for the agent spec.',
   },
   compose_version_unsupported: {
     label: 'Compose unsupported',
     stage: 'environment',
-    detail: 'The local Docker Compose version is not supported by the harness.',
-    action: 'Update the local harness environment, then re-run this trial.',
+    detail: 'The local Docker Compose version is not supported by Harbor.',
+    action: 'Update the local Docker environment, then re-run this trial.',
   },
   provider_rate_limit: {
     label: 'Provider rate limit',
     stage: 'provider',
-    detail: 'The model provider rate-limited the run before scoring could complete.',
+    detail: 'The model provider rate-limited the trial before scoring could complete.',
     action: 'Re-run after the provider limit clears.',
   },
   provider_stream_disconnect: {
     label: 'Provider disconnect',
     stage: 'provider',
-    detail: 'The model provider stream disconnected before the run completed.',
+    detail: 'The model provider stream disconnected before the trial completed.',
     action: 'Re-run this trial to obtain a complete scored run.',
   },
   harness_unavailable: {
     label: 'Harness unavailable',
     stage: 'environment',
-    detail: 'The configured harness was unavailable when the run executed.',
-    action: 'Restore the harness environment, then re-run this trial.',
+    detail: 'The configured agent was unavailable when the trial executed.',
+    action: 'Restore the agent environment, then re-run this trial.',
   },
   harbor_cli_failure: {
     label: 'Harness CLI failure',
     stage: 'execution',
     detail: 'The Harbor CLI returned a failure before scoring could complete.',
-    action: 'Inspect the trace for the failed command, fix the harness issue, then re-run.',
+    action: 'Inspect the trace for the failed command, fix the agent issue, then re-run.',
   },
   harbor_trial_exception: {
     label: 'Harness trial exception',
     stage: 'execution',
-    detail: 'The harness trial raised an exception before scoring could complete.',
-    action: 'Inspect the trace output, resolve the harness exception, then re-run.',
+    detail: 'The trial raised an exception before scoring could complete.',
+    action: 'Inspect the trace output, resolve the exception, then re-run.',
   },
   provider_or_harness_turn_failure: {
     label: 'Turn failure',
@@ -316,7 +316,7 @@ export function WireframeRunHeader({
             label="tokens"
             value="not recorded"
             color={C.fg0}
-            tooltip={[...FACT_HELPERS.tokens, 'No token usage captured for this run.']}
+            tooltip={[...FACT_HELPERS.tokens, 'No token usage captured for this trial.']}
             onOpen={setFactTooltip}
             onClose={() => setFactTooltip(null)}
           />
@@ -333,7 +333,7 @@ export function WireframeRunHeader({
             onClose={() => setFactTooltip(null)}
           />
         )}
-        <Fact label="run time" value={fmtDuration(run.duration_ms)} tooltip={[...FACT_HELPERS['run time'], `duration: ${fmtDuration(run.duration_ms)}`]} onOpen={setFactTooltip} onClose={() => setFactTooltip(null)} />
+        <Fact label="trial time" value={fmtDuration(run.duration_ms)} tooltip={[...FACT_HELPERS['trial time'], `duration: ${fmtDuration(run.duration_ms)}`]} onOpen={setFactTooltip} onClose={() => setFactTooltip(null)} />
         <Fact label="steps" value={String(run.span_count)} tooltip={[...FACT_HELPERS.steps, `spans: ${run.span_count}`]} onOpen={setFactTooltip} onClose={() => setFactTooltip(null)} />
         <Fact label="diagnostic" value={fmtScore(run.diagnostic_score)} tooltip={[...FACT_HELPERS.diagnostic, `diagnostic: ${fmtScore(run.diagnostic_score)}`]} onOpen={setFactTooltip} onClose={() => setFactTooltip(null)} />
         <Fact label="status" value={run.status} color={run.status === 'OK' ? C.green : run.status === 'ERROR' ? C.red : C.fg2} tooltip={[...FACT_HELPERS.status, `status: ${run.status}`]} onOpen={setFactTooltip} onClose={() => setFactTooltip(null)} />

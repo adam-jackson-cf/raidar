@@ -33,7 +33,7 @@ export function QualityRunPage() {
   };
 
   if (detail.isLoading) {
-    return <p className="p-6 text-xs" style={{ color: C.fg1 }}>Loading quality run…</p>;
+    return <p className="p-6 text-xs" style={{ color: C.fg1 }}>Loading trial quality…</p>;
   }
   if (detail.isError || !detail.data) {
     return (

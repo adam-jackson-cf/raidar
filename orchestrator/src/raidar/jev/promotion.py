@@ -4,7 +4,8 @@ A promotion is built from the store's audit and labels, never typed by hand:
 
 1. **Split.** Trials go to the calibration or the evaluation side, never both
    (a trial is one trajectory, so its near-identical checkpoints stay on one
-   side). An explicit split is used as given; otherwise ``default_split``
+   side). An explicit split is used as given (``jev promote`` falls back to
+   the policy's latest recorded split, ``ledger.SplitRecord``); otherwise ``default_split``
    orders the labelled trials by the sha256 of their id and puts the first
    half (rounded up) on the calibration side, so the split is reproducible
    and independent of labelling order.
@@ -52,6 +53,7 @@ from raidar.jev.calibration import (
     promotion_readiness,
     reference_positive,
 )
+from raidar.jev.ledger import current_labels
 from raidar.jev.policies import (
     CalibrationSplit,
     JevPolicy,
@@ -85,7 +87,7 @@ def labelled_points(
     audit: AuditLog, policy: str, trials: Collection[str] | None = None
 ) -> list[LabelledPoint]:
     """Reference-classed labelled decisions (of ``trials`` when given), by request id."""
-    labels = audit.labels(policy)
+    labels = current_labels(audit, policy)
     points = []
     for record in audit.decisions(policy):
         label = labels.get(record.request_id)
@@ -154,7 +156,7 @@ def split_metrics(points: Sequence[tuple[float, bool]], threshold: float) -> Spl
 
 def regression_corpus(audit: AuditLog, policy: str, split: CalibrationSplit) -> str:
     """sha256 of every labelled decision (uncertain ones included) in ``split``'s trials."""
-    labels = audit.labels(policy)
+    labels = current_labels(audit, policy)
     entries: list[dict[str, Any]] = []
     for record in audit.decisions(policy):
         label = labels.get(record.request_id)
@@ -318,7 +320,7 @@ def verify_promotion(
     outside = sorted(
         {
             str(trial_of[request_id])
-            for request_id in audit.labels(policy.id)
+            for request_id in current_labels(audit, policy.id)
             if request_id in trial_of and split.side(trial_of[request_id]) is None
         }
     )

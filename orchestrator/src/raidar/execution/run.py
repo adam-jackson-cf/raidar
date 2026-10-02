@@ -101,7 +101,7 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
         bundle_root=problem.bundle.root,
         docker_context=ctx.docker_context,
     )
-    outcome = await ctx.runner(config, problem.bundle.root)
+    outcome = await ctx.runner(config, problem.bundle.root, task.provisions)
     evidence = TrialEvidence(
         trial=trial,
         trial_dir=outcome.trial_dir,

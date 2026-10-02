@@ -437,7 +437,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
       </div>
       {hasChart ? (
         activeTab === 'runtime' ? (
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against run duration">
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against trial duration">
         <polygon
           points={`${PAD.left},${HEIGHT - PAD.bottom - 4} ${attractorMaxX},${PAD.top} ${PAD.left},${PAD.top}`}
           fill={C.greenBg}
@@ -506,7 +506,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
         )
       ) : (
         <div className="flex h-40 items-center justify-center rounded-md border text-xs" style={{ borderColor: C.border, color: C.fg1 }}>
-          Select at least one matching run to plot this chart.
+          Select at least one matching trial to plot this chart.
         </div>
       )}
       {tooltip ? (

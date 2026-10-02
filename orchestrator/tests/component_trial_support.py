@@ -15,6 +15,7 @@ import shlex
 import shutil
 import subprocess
 import uuid
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any, ClassVar
 
@@ -31,6 +32,7 @@ from harbor.models.trial.config import (
 )
 
 from raidar.components import CompiledCondition
+from raidar.components.provision import Provision, install_provisioning
 from raidar.execution.cleanup import cleanup_trial_projects
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.packs.python import bind_task_environment, image_tag, load_pack_spec
@@ -119,7 +121,12 @@ def build_task(
 
 
 async def run_trial(
-    task_dir: Path, trials_dir: Path, agent: AgentConfig, *, trial_name: str
+    task_dir: Path,
+    trials_dir: Path,
+    agent: AgentConfig,
+    *,
+    trial_name: str,
+    provisions: Sequence[Provision] = (),
 ) -> Path:
     """Run one trial in its own Compose project and always remove that project.
 
@@ -149,14 +156,23 @@ async def run_trial(
     )
     try:
         trial = await Trial.create(config)
+        install_provisioning(trial, provisions)
         await trial.run()
     finally:
         cleanup_trial_projects(trials_dir.parent)
     return trials_dir / trial_name
 
 
-def run_trial_sync(task_dir: Path, trials_dir: Path, agent: AgentConfig, name: str) -> Path:
-    return asyncio.run(run_trial(task_dir, trials_dir, agent, trial_name=name))
+def run_trial_sync(
+    task_dir: Path,
+    trials_dir: Path,
+    agent: AgentConfig,
+    name: str,
+    provisions: Sequence[Provision] = (),
+) -> Path:
+    return asyncio.run(
+        run_trial(task_dir, trials_dir, agent, trial_name=name, provisions=provisions)
+    )
 
 
 class IsolationOptions(AgentOptions):

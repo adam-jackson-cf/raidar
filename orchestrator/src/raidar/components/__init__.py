@@ -19,6 +19,7 @@ from raidar.components.manifest import (
     NetworkNeeds,
     ProbeOutcome,
 )
+from raidar.components.provision import Provision, condition_provisions
 from raidar.components.registry import (
     COMPONENT_ENTRY_POINT_GROUP,
     ComponentRegistry,
@@ -47,11 +48,13 @@ __all__ = [
     "ProbeOutcome",
     "ProbeReport",
     "ProbeResult",
+    "Provision",
     "StepEvidence",
     "SupportFile",
     "UnknownComponentError",
     "compile_arm",
     "compile_condition",
+    "condition_provisions",
     "component_resolver",
     "fingerprint",
 ]

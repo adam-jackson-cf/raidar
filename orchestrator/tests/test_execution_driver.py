@@ -6,6 +6,7 @@ import asyncio
 import inspect
 import json
 import tomllib
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -17,6 +18,7 @@ from harbor.models.trial.config import AgentConfig, TrialConfig
 from raidar.agents.config import Harness
 from raidar.cli import main
 from raidar.codex_auth import ResolvedCodexAuth
+from raidar.components.provision import Provision
 from raidar.execution import driver
 from raidar.execution.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
 from raidar.execution.driver import TrialRun, run_harbor_trial, run_in_order
@@ -114,8 +116,16 @@ def test_the_leak_guard_is_installed_before_the_trial_runs(
     monkeypatch.setattr(
         driver, "install_agent_reaper", lambda trial, bundle: events.append("reaper")
     )
-    outcome = asyncio.run(run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle"))
-    assert events == ["create", f"guard:{tmp_path / 'bundle'}", "reaper", "run"]
+    monkeypatch.setattr(
+        driver,
+        "install_provisioning",
+        lambda trial, provisions: events.append(f"provision:{len(provisions)}"),
+    )
+    provisions = (Provision("00-lint-tool", "lint-tool@1", "true", "true"),)
+    outcome = asyncio.run(
+        run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle", provisions)
+    )
+    assert events == ["create", f"guard:{tmp_path / 'bundle'}", "reaper", "provision:1", "run"]
     assert outcome == TrialRun(tmp_path / "t", None)
 
 
@@ -156,7 +166,9 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     plan = _plan(tmp_path, fixture_problem, protocol=protocol)
     seen: list[TrialConfig] = []
 
-    async def fake_runner(config: TrialConfig, bundle_root: Path) -> TrialRun:
+    async def fake_runner(
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+    ) -> TrialRun:
         seen.append(config)
         outcomes = [StepOutcome("checkpoint_1", passed=False)]  # halts after checkpoint 1
         return TrialRun(write_trial(config.trials_dir / config.trial_name, outcomes), None)
@@ -250,7 +262,9 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
     )
     failing = plan.selected_trials()[0].trial_id
 
-    async def fake_runner(config: TrialConfig, bundle_root: Path) -> TrialRun:
+    async def fake_runner(
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+    ) -> TrialRun:
         if config.trial_name == failing:
             raise RuntimeError("Trial.create: docker unreachable")
         await asyncio.sleep(0.05)
@@ -305,7 +319,9 @@ def test_verifier_override_carries_reference_solutions_only_then(
     )
     tasks: list[Path] = []
 
-    async def fake_runner(config: TrialConfig, bundle_root: Path) -> TrialRun:
+    async def fake_runner(
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+    ) -> TrialRun:
         tasks.append(Path(config.task.path or ""))
         assert config.agent.name == "oracle"
         return TrialRun(

@@ -187,7 +187,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "94efd2bde5c75ba8f6bb32a0c039cbc092dc8db23e3afe06d0df4c1e7b81dd2d",
+  "document_sha256": "3bf1b92c480721e774b03a84d4e66f3c8424c177052acf2cb3230afe1da88e93",
   "execution": {
     "arms": {
       "claude": {
@@ -335,7 +335,7 @@
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
     "assessment": "bb787e0f9b4ee0fb5b7568f9ed31bcac30ded7b0d4b0b05774103a6e16919712",
     "execution": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
-    "toolchain": "634af353e25dfc3625905070098a68c6560ab22d753dee474f4b77e0b97037df"
+    "toolchain": "9c31882e7001ccd744dfae686ae6eb0b44f1eed2337090e942eb2d4340326160"
   },
   "spec": {
     "agents": [
@@ -425,6 +425,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "17049b766a15f2087e4009a0f4777cfc160c2673c3f20a023fc7c326ce2c8900"
+    "raidar_spec": "028ee2fe6b13ec09431da32bce93c9248a0c9542b12369a4fdb0217216c4bec6"
   }
 }

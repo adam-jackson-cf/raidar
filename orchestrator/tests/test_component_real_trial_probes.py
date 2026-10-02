@@ -25,6 +25,7 @@ from harbor.models.trial.config import AgentConfig
 from raidar.agents.config import Harness
 from raidar.codex_auth import resolve_codex_auth
 from raidar.components import CompiledCondition
+from raidar.components.provision import condition_provisions
 from tests.component_support import PILOT_DIR, all_builtin_uses, compile_uses, use
 from tests.component_trial_support import (
     build_task,
@@ -70,7 +71,9 @@ def _run_and_probe(tmp_path: Path, compiled: CompiledCondition, name: str) -> di
     root = _evidence_dir(tmp_path) / name
     task = root / "task"
     build_task(task, compiled, {"checkpoint_1": INSTRUCTION}, agent_timeout_sec=900)
-    trial = run_trial_sync(task, root / "trials", _codex_agent(compiled), name)
+    trial = run_trial_sync(
+        task, root / "trials", _codex_agent(compiled), name, condition_provisions(compiled)
+    )
     report = compiled.probe_step(trial / "steps" / "checkpoint_1" / "agent", 0).to_json()
     result = json.loads((trial / "result.json").read_text())
     agent_result = result["step_results"][0]["agent_result"] or {}

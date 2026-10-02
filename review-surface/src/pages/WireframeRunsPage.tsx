@@ -517,7 +517,7 @@ function WireframeRunDetailPanel({ runId }: { runId: string }) {
     const message = (detail.error as Error | null)?.message ?? 'unknown error';
     return (
       <div className="flex h-full items-center justify-center text-xs" style={{ color: C.red }}>
-        {`Failed to load run: ${message}`}
+        {`Failed to load trial: ${message}`}
       </div>
     );
   }

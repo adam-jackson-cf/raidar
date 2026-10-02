@@ -187,7 +187,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "36364f916b65801a225663ac70b89307db8bbae7264fe33c8e5cff865e6ffbf3",
+  "document_sha256": "15bb4c92ad7948546087b78a01c4d584c70bdc74b6394254b31075c4d826a758",
   "execution": {
     "arms": {
       "baseline": {
@@ -229,7 +229,7 @@
         "type": "docker"
       },
       "factors": [],
-      "id": "python__circuit_eval-cp1__harness-health",
+      "id": "python__circuit_eval-cp1__agent-health",
       "kind": "smoke",
       "problems": [
         {
@@ -296,12 +296,12 @@
     }
   },
   "experiment": {
-    "id": "python__circuit_eval-cp1__harness-health",
+    "id": "python__circuit_eval-cp1__agent-health",
     "source": "experiment.yaml",
-    "source_sha256": "ff8085f7f507b7c2881e9ee56e69c1a9af06935756752b30f75d7b0ecc0ffa67",
-    "spec_sha256": "6c3b6befbb39f255d2a011abb4c9fe0a16ec103ff5734cd98d043a483ce0d38c"
+    "source_sha256": "68286c566dde428e077a2d124b0de197ac4f90caf4a9610e7a82d68c5d622a65",
+    "spec_sha256": "8ca775601293accb1d0af95ed52ffdbb122ffd8340e572ea4c60029b324f5953"
   },
-  "lock_sha256": "24bf62c6327ce34068bab5185ffa33baf60856c758b244131eee6d34ab100f6a",
+  "lock_sha256": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -310,8 +310,8 @@
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
     "assessment": "bb787e0f9b4ee0fb5b7568f9ed31bcac30ded7b0d4b0b05774103a6e16919712",
-    "execution": "24bf62c6327ce34068bab5185ffa33baf60856c758b244131eee6d34ab100f6a",
-    "toolchain": "634af353e25dfc3625905070098a68c6560ab22d753dee474f4b77e0b97037df"
+    "execution": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
+    "toolchain": "9c31882e7001ccd744dfae686ae6eb0b44f1eed2337090e942eb2d4340326160"
   },
   "spec": {
     "agents": [
@@ -364,7 +364,7 @@
       "type": "docker"
     },
     "factors": [],
-    "id": "python__circuit_eval-cp1__harness-health",
+    "id": "python__circuit_eval-cp1__agent-health",
     "kind": "smoke",
     "problems": [
       {
@@ -386,6 +386,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "17049b766a15f2087e4009a0f4777cfc160c2673c3f20a023fc7c326ce2c8900"
+    "raidar_spec": "028ee2fe6b13ec09431da32bce93c9248a0c9542b12369a4fdb0217216c4bec6"
   }
 }

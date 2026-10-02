@@ -21,9 +21,11 @@ from raidar.spec.validation import SpecValidationError, spec_warnings
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     EXPERIMENTS,
+    GUIDED_R3_EXPERIMENT,
     LEGACY_V1,
     PILOT_EXPERIMENT,
     PILOT_ONESHOT,
+    RUFF_LINT_EXPERIMENT,
     SMOKE_EXPERIMENT,
     experiment_document,
     write_experiment,
@@ -61,7 +63,16 @@ def _benchmark(**changes: Any) -> dict[str, Any]:
 
 def test_every_committed_experiment_is_schema_v2_in_its_kind_directory() -> None:
     files = sorted(EXPERIMENTS.glob("*/*/experiment.yaml"))
-    assert files == sorted([PILOT_EXPERIMENT, PILOT_ONESHOT, SMOKE_EXPERIMENT, AGENTS_BENCHMARK])
+    assert files == sorted(
+        [
+            PILOT_EXPERIMENT,
+            PILOT_ONESHOT,
+            SMOKE_EXPERIMENT,
+            AGENTS_BENCHMARK,
+            GUIDED_R3_EXPERIMENT,
+            RUFF_LINT_EXPERIMENT,
+        ]
+    )
     for path in files:
         spec = load_experiment(path).spec
         assert (path.parents[1].name, path.parent.name) == (spec.kind, spec.id)
@@ -181,6 +192,26 @@ def test_name1_the_path_names_the_kind_and_the_id(tmp_path: Path) -> None:
 
 def test_name1_does_not_apply_outside_an_experiments_root(tmp_path: Path) -> None:
     assert load_experiment(write_experiment(tmp_path / "anywhere", experiment_document())).spec
+
+
+@pytest.mark.parametrize(
+    "relative",
+    ["ab-test/python__fixture__test/nested", "ab-test", "python__fixture__test"],
+)
+def test_name1_applies_at_any_depth_below_an_experiments_root(
+    tmp_path: Path, relative: str
+) -> None:
+    path = write_experiment(tmp_path / "experiments" / relative, experiment_document())
+
+    assert "experiments/<kind>/<id>/experiment.yaml" in _issues(path)["id"]
+
+
+def test_name1_requires_the_experiment_file_name(tmp_path: Path) -> None:
+    directory = tmp_path / "experiments" / "ab-test" / "python__fixture__test"
+    directory.mkdir(parents=True)
+    renamed = write_experiment(directory, experiment_document()).rename(directory / "copy.yaml")
+
+    assert "[NAME1]" in _issues(renamed)["id"]
 
 
 @pytest.mark.parametrize(

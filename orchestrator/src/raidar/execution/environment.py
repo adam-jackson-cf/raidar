@@ -23,6 +23,19 @@ patterns and ``tarfile`` ``data`` filter. The mounted-log ``chown`` covers
 every writable mount in one exec instead of one per mount. Anything it cannot
 translate, or a main container it cannot resolve, takes Harbor's compose path
 unchanged.
+
+**Stale log names (step evidence).** Between steps Harbor *moves* the mounted
+``/logs/agent`` contents into ``steps/<step>/agent`` on the host. On a
+macOS bind mount (OrbStack) the container can keep a cached entry for a moved
+name for a short while; a write to that name in the next step then lands in
+the moved file, so step k+1's ``raidar-reset.json`` overwrites step k's
+archived copy and is missing from step k+1 (seen under concurrent trials).
+Before each step's ``setup.sh`` this class removes, by name and as root, every
+top-level name an earlier step archived that the host mount no longer holds.
+Name-based removal of a name the host does not have only drops the stale entry
+(the host answers "not found"), and directories use ``rmdir``, so an archived
+file or directory is never touched. It changes no component, setup script or
+digest.
 """
 
 from __future__ import annotations
@@ -37,7 +50,7 @@ import sys
 import tarfile
 import tempfile
 from collections.abc import Sequence
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from harbor.constants import MAIN_SERVICE_NAME
@@ -46,6 +59,7 @@ from harbor.environments.docker.docker import (
     DockerEnvironment,
     _sanitize_docker_compose_project_name,
 )
+from harbor.models.trial.paths import EnvironmentPaths
 
 RUN_SCOPED_DOCKER_IMPORT_PATH = "raidar.execution.environment:RunScopedDockerEnvironment"
 SCOPE_KWARG = "run_scope"
@@ -110,6 +124,49 @@ def engine_command(compose_args: Sequence[str], container: str, *, stdin: bool) 
     return None
 
 
+def is_step_setup(command: str) -> bool:
+    """Whether ``command`` is Harbor's per-step ``bash <workdir>/setup.sh``."""
+    try:
+        argv = shlex.split(command)
+    except ValueError:
+        return False
+    return len(argv) == 2 and argv[0] == "bash" and PurePosixPath(argv[1]).name == "setup.sh"
+
+
+def _archived_kinds(steps_dir: Path) -> dict[str, bool]:
+    """Every top-level name in earlier steps' archived agent logs -> whether it is a directory."""
+    kinds: dict[str, bool] = {}
+    archives = sorted(steps_dir.glob("*/agent")) if steps_dir.is_dir() else []
+    for archived in (path for path in archives if path.is_dir()):
+        for entry in archived.iterdir():
+            kinds.setdefault(entry.name, entry.is_dir() and not entry.is_symlink())
+    return kinds
+
+
+def _present(path: Path) -> bool:
+    return path.exists() or path.is_symlink()
+
+
+def archived_log_names(steps_dir: Path, live_dir: Path) -> tuple[list[str], list[str]]:
+    """Top-level (files, directories) archived from earlier steps' agent logs and absent live."""
+    kinds = _archived_kinds(steps_dir)
+    gone = sorted(name for name in kinds if not _present(live_dir / name))
+    return [name for name in gone if not kinds[name]], [name for name in gone if kinds[name]]
+
+
+def forget_names_script(
+    container_dir: PurePosixPath, files: Sequence[str], dirs: Sequence[str]
+) -> str:
+    """Shell that drops the container's entries for names the host mount no longer has."""
+    parts = [f"cd {shlex.quote(str(container_dir))} 2>/dev/null || exit 0"]
+    if files:
+        parts.append("rm -f -- " + " ".join(shlex.quote(name) for name in files))
+    if dirs:
+        parts.append("rmdir -- " + " ".join(shlex.quote(name) for name in dirs) + " 2>/dev/null")
+    parts.append("exit 0")
+    return "; ".join(parts)
+
+
 async def warm_agent_imports() -> None:
     """Import the agents' lazy modules off the event loop (once per process)."""
     for name in LAZY_AGENT_IMPORTS:
@@ -162,6 +219,31 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         await asyncio.gather(
             super().start(force_build), self._is_rootless_docker(), warm_agent_imports()
         )
+
+    async def exec(
+        self,
+        command: str,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+        timeout_sec: int | None = None,
+        user: str | int | None = None,
+    ) -> ExecResult:
+        if is_step_setup(command):
+            await self._forget_archived_log_names()
+        return await super().exec(command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user)
+
+    async def _forget_archived_log_names(self) -> None:
+        """Drop stale container entries for agent-log names Harbor archived (module doc)."""
+        if self._is_windows_container:
+            return
+        files, dirs = archived_log_names(self.trial_paths.steps_dir, self.trial_paths.agent_dir)
+        if not files and not dirs:
+            return
+        script = forget_names_script(EnvironmentPaths.agent_dir, files, dirs)
+        try:
+            await super().exec(script, user="root")
+        except Exception as error:  # best effort: the probes still catch missing evidence
+            self.logger.warning(f"Failed to drop archived log names: {error}")
 
     async def stop(self, delete: bool) -> None:
         try:

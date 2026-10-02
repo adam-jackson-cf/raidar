@@ -91,7 +91,7 @@ export function FailurePatterns({ runs }: { runs: RunRecord[] }) {
                   to={`/runs/${encodeURIComponent(run.id)}`}
                   className="rounded px-1 py-px text-[10px] transition hover:bg-white/10"
                   style={{ color: C.accent }}
-                  title={`${run.id} (${run.agent_spec}) — open run review`}
+                  title={`${run.id} (${run.agent_spec}) — open trial review`}
                 >
                   {runLabel(run.id)}
                 </Link>

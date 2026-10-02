@@ -16,7 +16,9 @@ RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raid
 # Secrets: targets that call model providers run under `infisical run` (project bound by
 # orchestrator/.infisical.json, env INFISICAL_ENV) when the infisical CLI is installed and
 # logged in; otherwise they fall back to orchestrator/.env. SECRETS=infisical fails instead
-# of falling back; SECRETS=dotenv skips Infisical. Detection runs at recipe time, presence
+# of falling back; SECRETS=dotenv skips Infisical and fails when orchestrator/.env is missing.
+# Under auto with neither source, the target says so and goes on with the shell environment
+# (file-backed Codex auth needs no secret). Detection runs at recipe time, presence
 # only: no secret value is ever printed. Under Infisical the CLI does not load .env.
 SECRETS ?= auto
 INFISICAL_ENV ?= dev
@@ -29,16 +31,20 @@ SECRETS_DETECT := secrets_cmd=""; \
 		echo "secrets: Infisical (env $(INFISICAL_ENV))" >&2; \
 	elif [ "$(SECRETS)" = infisical ]; then \
 		echo "SECRETS=infisical but the infisical CLI is missing or not logged in; run 'infisical login' in a terminal" >&2; exit 1; \
-	else echo "secrets: orchestrator/.env (Infisical unavailable or SECRETS=dotenv)" >&2; fi;
+	elif [ -f orchestrator/.env ]; then echo "secrets: orchestrator/.env (Infisical unavailable or SECRETS=dotenv)" >&2; \
+	elif [ "$(SECRETS)" = dotenv ]; then \
+		echo "SECRETS=dotenv but orchestrator/.env does not exist; create it from orchestrator/.env.example or use Infisical (SECRETS=auto)" >&2; exit 1; \
+	else echo "secrets: none (Infisical unavailable and no orchestrator/.env); only the shell environment and file-backed Codex auth are available, and the credential preflight refuses an arm without a credential" >&2; fi;
 RAIDAR_SECRETS := $(SECRETS_DETECT) $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --project orchestrator raidar
 
 # Schema v2 adopted Harbor's vocabulary (requirements change log 2026-10-02). A variable
-# under its old name fails loudly instead of being ignored.
+# under its old name, on the command line or in the environment, fails loudly instead of
+# being ignored.
 RENAMED_VARS := RUN:JOB RUNS:JOBS RUN_ID:JOB_ID RUNS_DIR:JOBS_DIR HARNESS:AGENT \
 	HARNESS_VERSION:AGENT_VERSION BLOCK:ATTEMPT SMOKE_BLOCKS:SMOKE_ATTEMPTS \
 	ORACLE_BUNDLE:VERIFIER_BUNDLE REVIEW_RUNS_ROOT:REVIEW_JOBS_ROOT QUALITY_RUNS:QUALITY_JOBS \
 	ALLOW_DEV_RUNS:ALLOW_DEV_JOBS SMOKE_RUNS_DIR:SMOKE_JOBS_DIR
-$(foreach pair,$(RENAMED_VARS),$(if $(filter command line,$(origin $(firstword $(subst :, ,$(pair))))),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
+$(foreach pair,$(RENAMED_VARS),$(if $(filter command line environment environment override,$(origin $(firstword $(subst :, ,$(pair))))),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
 
 # Shared public workflow defaults.
 AGENT ?=
@@ -54,7 +60,7 @@ TIMEOUT_SEC ?=
 # Experiment-path smoke workflow: the smoke experiment (kind smoke) and the agent benchmark
 # (kind benchmark) are locked under .tmp/smoke with the target's overrides and run through
 # Harbor (Docker; OrbStack by default).
-SMOKE_EXPERIMENT ?= experiments/smoke/python__circuit_eval-cp1__harness-health/experiment.yaml
+SMOKE_EXPERIMENT ?= experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
 SMOKE_AGENTS_EXPERIMENT ?= experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml
 SMOKE_JOBS_DIR ?= $(CURDIR)/jobs
 SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
@@ -98,6 +104,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	problem-list problem-info problem-import problem-validate \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels jev-export-blind jev-import-blind \
+	jev-supersede-labels jev-record-split \
 	jev-verify-promotion jev-promote \
 	pack-info pack-build pack-audit pack-tool-provision \
 	component-probe-trials \
@@ -175,10 +182,14 @@ help:
 	@echo "                                                        Export review-surface Jev labels as calibration rows (one per decision)"
 	@echo "  make jev-import-labels POLICY=<policy> STORE=<assessment-store> LABELS_FILE=<labels.jsonl> [REVIEWER=human|model REVIEWER_MODEL=<model id>]"
 	@echo "                                                        Import calibration labels into the store's Jev audit and show enforce readiness"
-	@echo "  make jev-export-blind POLICY=<policy> STORE=<assessment-store> OUT=<blind.jsonl> [JEV_TRIALS=\"<trial> ...\"] [LIMIT=N]"
+	@echo "  make jev-export-blind POLICY=<policy> STORE=<assessment-store> OUT=<blind.jsonl> [JEV_TRIALS=\"<trial> ...\"] [LIMIT=N] [REQUEST_IDS=\"<id> ...\"]"
 	@echo "                                                        Export answered, unlabelled decisions (state + questions) WITHOUT Jev's answers for a blind labeller"
 	@echo "  make jev-import-blind POLICY=<policy> STORE=<assessment-store> ANSWERS_FILE=<answers.jsonl> [REVIEWER=human|model REVIEWER_MODEL=<model id>]"
 	@echo "                                                        Derive correct/false_positive/false_negative/uncertain from the labeller's own answers vs Jev's at 0.5, and import"
+	@echo "  make jev-supersede-labels POLICY=<policy> STORE=<assessment-store> REASON=\"...\" (REQUEST_IDS=\"<id> ...\" | ALL_CURRENT=1)"
+	@echo "                                                        Take labels out of calibration without deleting them (append-only supersession)"
+	@echo "  make jev-record-split POLICY=<policy> STORE=<assessment-store> SPLIT_ID=<id> CALIBRATION=\"<trial> ...\" EVALUATION=\"<trial> ...\" REASON=\"...\""
+	@echo "                                                        Record a calibration/evaluation trial split before labelling; jev-promote defaults to the latest"
 	@echo "  make jev-verify-promotion POLICY=<policy> STORE=<assessment-store>"
 	@echo "                                                        Re-derive a policy's recorded promotion (gate, threshold, metrics, corpus sha256, reviewers, scorer version) from the audit"
 	@echo "  make jev-promote POLICY=<policy> STORE=<assessment-store> [CALIBRATION=\"<trial> ...\" EVALUATION=\"<trial> ...\"] [DRY_RUN=1] [ALLOW_SCORER_BUMP=1]"
@@ -474,13 +485,28 @@ jev-export-blind:
 	$(call require_var,POLICY)
 	$(call require_var,STORE)
 	$(call require_var,OUT)
-	@$(RAIDAR) jev export-blind --store "$(STORE)" --policy "$(POLICY)" --output "$(OUT)" $(foreach trial,$(JEV_TRIALS),--trial "$(trial)") $(if $(LIMIT),--limit "$(LIMIT)",)
+	@$(RAIDAR) jev export-blind --store "$(STORE)" --policy "$(POLICY)" --output "$(OUT)" $(foreach trial,$(JEV_TRIALS),--trial "$(trial)") $(if $(LIMIT),--limit "$(LIMIT)",) $(foreach id,$(REQUEST_IDS),--request-id "$(id)")
 
 jev-import-blind:
 	$(call require_var,POLICY)
 	$(call require_var,STORE)
 	$(call require_var,ANSWERS_FILE)
 	@$(RAIDAR) jev import-blind --store "$(STORE)" --policy "$(POLICY)" $(if $(REVIEWER),--reviewer "$(REVIEWER)",) $(if $(REVIEWER_MODEL),--reviewer-model "$(REVIEWER_MODEL)",) "$(ANSWERS_FILE)"
+
+jev-supersede-labels:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	$(call require_var,REASON)
+	@$(RAIDAR) jev supersede-labels --store "$(STORE)" --policy "$(POLICY)" --reason "$(REASON)" $(foreach id,$(REQUEST_IDS),--request-id "$(id)") $(if $(ALL_CURRENT),--all-current,)
+
+jev-record-split:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	$(call require_var,SPLIT_ID)
+	$(call require_var,CALIBRATION)
+	$(call require_var,EVALUATION)
+	$(call require_var,REASON)
+	@$(RAIDAR) jev record-split --store "$(STORE)" --policy "$(POLICY)" --split-id "$(SPLIT_ID)" --calibration "$(CALIBRATION)" --evaluation "$(EVALUATION)" --reason "$(REASON)"
 
 jev-verify-promotion:
 	$(call require_var,POLICY)

@@ -322,3 +322,111 @@ async def test_stopping_the_environment_or_main_service_forgets_the_container(
     env._main_container = "cid"  # noqa: SLF001
     await env.stop(delete=True)
     assert env._main_container is None  # noqa: SLF001
+
+
+@pytest.mark.parametrize(
+    ("command", "expected"),
+    [
+        ("bash /app/setup.sh", True),
+        ("bash '/work dir/setup.sh'", True),
+        ("bash /app/setup.sh.bak", False),
+        ("sh /app/setup.sh", False),
+        ("bash -c /app/setup.sh", False),
+        ("bash 'unterminated", False),
+    ],
+)
+def test_only_harbors_step_setup_command_is_recognised(command: str, expected: bool) -> None:
+    assert env_module.is_step_setup(command) is expected
+
+
+def test_archived_log_names_are_the_earlier_steps_names_the_live_mount_lacks(
+    tmp_path: Path,
+) -> None:
+    steps, live = tmp_path / "steps", tmp_path / "agent"
+    (steps / "checkpoint_1" / "agent" / "raidar-components").mkdir(parents=True)
+    (steps / "checkpoint_1" / "agent" / "raidar-reset.json").write_text("{}")
+    (steps / "checkpoint_1" / "agent" / "codex.txt").write_text("")
+    (steps / "checkpoint_2" / "verifier").mkdir(parents=True)
+    live.mkdir()
+    (live / "codex.txt").write_text("kept: the live mount still has it (resumed step)")
+
+    assert env_module.archived_log_names(steps, live) == (
+        ["raidar-reset.json"],
+        ["raidar-components"],
+    )
+    assert env_module.archived_log_names(tmp_path / "no-steps", live) == ([], [])
+
+
+def test_forget_script_removes_files_by_name_and_only_rmdirs_directories() -> None:
+    script = env_module.forget_names_script(
+        env_module.EnvironmentPaths.agent_dir,
+        ["raidar-reset.json", "a b.json"],
+        ["raidar-components"],
+    )
+    assert script == (
+        "cd /logs/agent 2>/dev/null || exit 0; rm -f -- raidar-reset.json 'a b.json'; "
+        "rmdir -- raidar-components 2>/dev/null; exit 0"
+    )
+    assert "rm -rf" not in script
+    assert env_module.forget_names_script(env_module.EnvironmentPaths.agent_dir, [], []) == (
+        "cd /logs/agent 2>/dev/null || exit 0; exit 0"
+    )
+
+
+async def test_step_setup_first_drops_stale_names_of_archived_logs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[tuple[str, Any]] = []
+
+    async def harbor_exec(self: Any, command: str, user: Any = None, **_: Any) -> ExecResult:
+        calls.append((command, user))
+        return ExecResult(return_code=0)
+
+    monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.exec", harbor_exec)
+    env = _bare_env("cid")
+    paths = type("Paths", (), {"steps_dir": tmp_path / "steps", "agent_dir": tmp_path / "agent"})
+    env.trial_paths = paths  # type: ignore[assignment]
+    (tmp_path / "agent").mkdir()
+
+    await env.exec("bash /app/setup.sh", user="agent")
+    (tmp_path / "steps" / "checkpoint_1" / "agent").mkdir(parents=True)
+    (tmp_path / "steps" / "checkpoint_1" / "agent" / "raidar-reset.json").write_text("{}")
+    await env.exec("pwd")
+    await env.exec("bash /app/setup.sh", user="agent")
+
+    assert calls == [
+        ("bash /app/setup.sh", "agent"),
+        ("pwd", None),
+        ("cd /logs/agent 2>/dev/null || exit 0; rm -f -- raidar-reset.json; exit 0", "root"),
+        ("bash /app/setup.sh", "agent"),
+    ]
+
+
+async def test_a_failed_name_drop_is_logged_and_the_setup_still_runs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    calls: list[str] = []
+    warnings: list[str] = []
+
+    async def harbor_exec(self: Any, command: str, user: Any = None, **_: Any) -> ExecResult:
+        calls.append(command)
+        if user == "root":
+            raise RuntimeError("exec failed")
+        return ExecResult(return_code=0)
+
+    monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.exec", harbor_exec)
+    env = _bare_env("cid")
+    env.logger = type("L", (), {"warning": staticmethod(warnings.append)})()  # type: ignore[assignment]
+    archived = tmp_path / "steps" / "checkpoint_1" / "agent"
+    archived.mkdir(parents=True)
+    (archived / "raidar-reset.json").write_text("{}")
+    paths = type("Paths", (), {"steps_dir": tmp_path / "steps", "agent_dir": tmp_path / "agent"})
+    env.trial_paths = paths  # type: ignore[assignment]
+
+    await env.exec("bash /app/setup.sh")
+    assert calls[-1] == "bash /app/setup.sh"
+    assert warnings == ["Failed to drop archived log names: exec failed"]
+    env._is_windows_container = True  # noqa: SLF001
+    await env.exec("bash /app/setup.sh")
+    assert calls[-1] == "bash /app/setup.sh"
+    assert len(calls) == 3

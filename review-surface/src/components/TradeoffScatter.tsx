@@ -101,7 +101,7 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
             onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
           >
             <title>
-              {`${runLabel(run.id)} · ${run.agent_spec}\nscore ${fmtScore(run.composite_score)} in ${fmtDuration(run.duration_ms)}${run.status === 'ERROR' ? ' · run errored' : ''}\n${run.id}`}
+              {`${runLabel(run.id)} · ${run.agent_spec}\nscore ${fmtScore(run.composite_score)} in ${fmtDuration(run.duration_ms)}${run.status === 'ERROR' ? ' · trial errored' : ''}\n${run.id}`}
             </title>
           </circle>
         ))}

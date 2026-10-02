@@ -359,7 +359,7 @@ function PatternOverlay({ overlay, pinned, onPin, onClose }: {
       <div className="mt-2 space-y-1 text-[10px] leading-4">
         <div><span style={{ color: C.fg0 }}>Agents </span><span style={{ color: C.fg3 }}>{pattern.agentSpecs.join(', ') || '—'}</span></div>
         <div><span style={{ color: C.fg0 }}>Arms </span><span className="num" style={{ color: C.fg3 }}>{pattern.arms.join(', ') || '—'}</span></div>
-        <div><span style={{ color: C.fg0 }}>Runs </span><span className="num" style={{ color: C.fg3 }}>{pattern.runIds.slice(0, 8).map(runLabel).join(', ')}{pattern.runIds.length > 8 ? ` +${pattern.runIds.length - 8}` : ''}</span></div>
+        <div><span style={{ color: C.fg0 }}>Trials </span><span className="num" style={{ color: C.fg3 }}>{pattern.runIds.slice(0, 8).map(runLabel).join(', ')}{pattern.runIds.length > 8 ? ` +${pattern.runIds.length - 8}` : ''}</span></div>
       </div>
     </div>
   );

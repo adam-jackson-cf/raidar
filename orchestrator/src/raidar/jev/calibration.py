@@ -18,6 +18,11 @@ label: a correct positive or a false negative is a reference positive, a
 correct negative or a false positive is a reference negative; ``uncertain``
 labels are excluded from both.
 
+A label is never deleted: ``supersede_labels`` takes current labels out of
+calibration (``ledger.LabelSupersession``) so their decisions can be labelled
+again, and ``record_split`` fixes a calibration/evaluation split of the
+audited trials before the labels it will judge are written.
+
 Fitting the frozen threshold, building a promotion and verifying a recorded
 one against the audit live in ``raidar.jev.promotion``.
 """
@@ -37,6 +42,14 @@ from raidar.jev.audit import (
     SufficiencyLevel,
     reviewer_kind,
     utc_timestamp,
+)
+from raidar.jev.ledger import (
+    LabelSupersession,
+    SplitRecord,
+    append_split,
+    append_supersession,
+    current_labels,
+    splits,
 )
 from raidar.jev.policies import (
     LABELS,
@@ -80,7 +93,7 @@ def import_labels(audit: AuditLog, policy: str, rows: Iterable[Mapping[str, obje
     ``reviewer_model`` (required for ``model``) and ``blind``.
     """
     known = {record.request_id for record in audit.decisions(policy)}
-    labelled = set(audit.labels(policy))
+    labelled = set(current_labels(audit, policy))
     pending = []
     for index, row in enumerate(rows):
         request_id, label = row.get("request_id"), row.get("label")
@@ -95,6 +108,73 @@ def import_labels(audit: AuditLog, policy: str, rows: Iterable[Mapping[str, obje
     for record in pending:
         audit.append_label(record)
     return len(pending)
+
+
+def supersede_labels(
+    audit: AuditLog,
+    policy: str,
+    *,
+    reason: str,
+    request_ids: Collection[str] | None = None,
+) -> list[LabelSupersession]:
+    """Supersede the current labels of ``request_ids`` (all current labels when None).
+
+    Refused whole when a named decision has no current label or the reason is blank.
+    """
+    if not reason.strip():
+        raise LabelImportError("a supersession needs a reason")
+    current = current_labels(audit, policy)
+    chosen = sorted(current) if request_ids is None else sorted(set(request_ids))
+    missing = [request_id for request_id in chosen if request_id not in current]
+    if missing:
+        raise LabelImportError(f"no current {policy} label for {missing}")
+    if not chosen:
+        raise LabelImportError(f"{policy} has no current label to supersede")
+    timestamp = utc_timestamp()
+    records = [
+        LabelSupersession(
+            timestamp=timestamp,
+            request_id=request_id,
+            policy=policy,
+            label_timestamp=current[request_id].timestamp,
+            reason=reason,
+        )
+        for request_id in chosen
+    ]
+    for record in records:
+        append_supersession(audit, record)
+    return records
+
+
+def record_split(
+    audit: AuditLog,
+    policy: str,
+    *,
+    split_id: str,
+    calibration: Collection[str],
+    evaluation: Collection[str],
+    reason: str,
+) -> SplitRecord:
+    """Append a split of audited trials; refused when it names a trial the audit lacks
+    or reuses an id already recorded."""
+    known = {record.trial for record in audit.decisions(policy) if record.trial is not None}
+    unknown = sorted((set(calibration) | set(evaluation)) - known)
+    if unknown:
+        raise LabelImportError(f"no {policy} decisions for trials {unknown}")
+    if any(split.split_id == split_id for split in splits(audit, policy)):
+        raise LabelImportError(f"split {split_id!r} is already recorded for {policy}")
+    try:
+        record = SplitRecord(
+            timestamp=utc_timestamp(),
+            policy=policy,
+            split_id=split_id,
+            calibration=tuple(sorted(set(calibration))),
+            evaluation=tuple(sorted(set(evaluation))),
+            reason=reason,
+        )
+    except ValueError as error:
+        raise LabelImportError(str(error)) from error
+    return append_split(audit, record)
 
 
 @dataclass(frozen=True)
@@ -198,7 +278,7 @@ def promotion_readiness(
 ) -> Readiness:
     """Readiness over the policy's audit, or over the decisions of ``trials`` only."""
     decisions = [record for record in audit.decisions(policy) if _in(record, trials)]
-    labels = audit.labels(policy)
+    labels = current_labels(audit, policy)
     positives = negatives = 0
     reviewers: Counter[str] = Counter()
     for record in decisions:

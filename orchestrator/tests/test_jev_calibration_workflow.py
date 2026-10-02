@@ -13,7 +13,13 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.jev.audit import LabelRecord, ReviewerKind
 from raidar.jev.blind import derive_blind_labels, export_blind
-from raidar.jev.calibration import LabelImportError, import_labels, promotion_readiness
+from raidar.jev.calibration import (
+    LabelImportError,
+    import_labels,
+    promotion_readiness,
+    supersede_labels,
+)
+from raidar.jev.ledger import current_labels, label_history, superseded_request_ids
 from raidar.jev.policies import POLICY_DIR, CalibrationSplit, PolicyMode, load_policy
 from raidar.jev.promotion import (
     PromotionError,
@@ -361,3 +367,113 @@ def test_blind_decisions_without_noul_questions_compare_choices_and_scores(
     for bad, message in ((row("c", 1), "one of its options"), (row("a", 3), "level index")):
         with pytest.raises(LabelImportError, match=message):
             derive(bad)
+
+
+def test_superseded_labels_leave_calibration_but_stay_on_file(tmp_path: Path) -> None:
+    # A selector who also labelled cannot show blindness: its labels are superseded, not
+    # deleted, and the decisions may be relabelled by a separate blind labeller.
+    policies = tmp_path / "policies"
+    shutil.copytree(POLICY_DIR, policies)
+    store = tmp_path / "store"
+    runtime, records = _promotable(store)
+    before = promotion_readiness(runtime.audit, RUBRIC)
+    assert before.labelled == 40
+    old = [record.request_id for record in records[:10]]
+    with pytest.raises(LabelImportError, match="needs a reason"):
+        supersede_labels(runtime.audit, RUBRIC, reason=" ", request_ids=old)
+    with pytest.raises(LabelImportError, match="no current"):
+        supersede_labels(runtime.audit, RUBRIC, reason="x", request_ids=["jevp_unknown"])
+    assert (
+        len(supersede_labels(runtime.audit, RUBRIC, reason="selector labelled", request_ids=old))
+        == 10
+    )
+
+    assert promotion_readiness(runtime.audit, RUBRIC).labelled == 30
+    assert len(label_history(runtime.audit, RUBRIC)) == 40  # nothing deleted
+    assert len(runtime.audit.decisions(RUBRIC)) == 40  # supersessions are not decisions
+    assert superseded_request_ids(runtime.audit, RUBRIC) == set(old)
+    # Superseding again finds no current label; the decision can be relabelled.
+    with pytest.raises(LabelImportError, match="no current"):
+        supersede_labels(runtime.audit, RUBRIC, reason="again", request_ids=old[:1])
+    import_labels(runtime.audit, RUBRIC, [{"request_id": old[0], "label": "false_positive"}])
+    assert current_labels(runtime.audit, RUBRIC)[old[0]].label == "false_positive"
+
+    # A selector names exactly the decisions to export; labelled ones are refused.
+    chosen = old[1:4]
+    exported = export_blind(runtime.audit, RUBRIC, request_ids=chosen)
+    assert [row["request_id"] for row in exported] == sorted(chosen)
+    assert '"noul":' not in json.dumps(exported)
+    with pytest.raises(LabelImportError, match="not unlabelled answered"):
+        export_blind(runtime.audit, RUBRIC, request_ids=[old[0], *chosen])
+
+    # A split recorded ahead of labelling is what `jev promote` uses by default.
+    runner = CliRunner()
+    common = ["--store", str(store), "--policy", RUBRIC]
+    bad = runner.invoke(
+        main,
+        [
+            "jev",
+            "record-split",
+            *common,
+            "--split-id",
+            "r1",
+            "--calibration",
+            "t1 t9",
+            "--evaluation",
+            "t3",
+            "--reason",
+            "x",
+        ],
+    )
+    assert bad.exit_code != 0
+    assert "t9" in bad.output
+    recorded = runner.invoke(
+        main,
+        [
+            "jev",
+            "record-split",
+            *common,
+            "--split-id",
+            "r1",
+            "--calibration",
+            "t1,t2",
+            "--evaluation",
+            "t3 t4",
+            "--reason",
+            "stratified by arm",
+        ],
+    )
+    assert recorded.exit_code == 0, recorded.output
+    again = runner.invoke(
+        main,
+        [
+            "jev",
+            "record-split",
+            *common,
+            "--split-id",
+            "r1",
+            "--calibration",
+            "t1",
+            "--evaluation",
+            "t3",
+            "--reason",
+            "x",
+        ],
+    )
+    assert again.exit_code != 0
+    assert "already recorded" in again.output
+    dry = runner.invoke(
+        main, ["jev", "promote", *common, "--policy-dir", str(policies), "--dry-run"]
+    )
+    assert dry.exit_code == 0, dry.output
+    split = json.loads(dry.output)["promotion"]["split"]
+    assert split == {"calibration": ["t1", "t2"], "evaluation": ["t3", "t4"]}
+    assert json.loads(dry.output)["promotion"]["labelled"] == 31
+
+    superseded = runner.invoke(main, ["jev", "supersede-labels", *common, "--reason", "r"])
+    assert superseded.exit_code != 0  # needs --request-id or --all-current
+    cleared = runner.invoke(
+        main, ["jev", "supersede-labels", *common, "--reason", "round reset", "--all-current"]
+    )
+    assert cleared.exit_code == 0, cleared.output
+    assert json.loads(cleared.output)["labelled"] == 0

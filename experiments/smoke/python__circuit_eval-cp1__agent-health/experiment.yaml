@@ -4,10 +4,10 @@
 # kind smoke: same engine, but its analysis is stamped not citable. The smoke targets
 # relock it under .tmp/ with their overrides (agent, attempts, timeout), so this file
 # stays the default. Formerly examples/smoke/experiment.yaml (id smoke).
-# Validate: make experiment-validate EXPERIMENT=experiments/smoke/python__circuit_eval-cp1__harness-health/experiment.yaml
+# Validate: make experiment-validate EXPERIMENT=experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
 schema_version: 2
 kind: smoke
-id: python__circuit_eval-cp1__harness-health
+id: python__circuit_eval-cp1__agent-health
 description: Operational smoke of the experiment path; not citable.
 
 problems:

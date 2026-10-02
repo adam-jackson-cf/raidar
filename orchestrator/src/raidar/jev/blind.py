@@ -5,7 +5,9 @@ avoids that:
 
 1. ``export_blind`` writes, for each answered and not yet labelled decision of
    a policy, what Jev was given (``state`` and ``questions``) and nothing it
-   returned: no answers, verdict, model, cost or cache key.
+   returned: no answers, verdict, model, cost or cache key. A selector may
+   name the decisions (``request_ids``) so that choosing them and labelling
+   them are separate roles; the export is then exactly those decisions.
 2. The labeller (a person, or a model named by its id) answers each question
    in the shape Jev uses: ``{"type": "noul", "noul": p}``,
    ``{"type": "choice", "choice": option}`` or ``{"type": "score", "score": level}``.
@@ -31,8 +33,34 @@ from typing import Any
 
 from raidar.jev.audit import AuditLog, DecisionRecord, DecisionStage, ReviewerKind
 from raidar.jev.calibration import PROVISIONAL_THRESHOLD, LabelImportError, decision_score
+from raidar.jev.ledger import current_labels
 
 _NOTE_CHARS = 4000
+
+
+def _exportable(
+    record: DecisionRecord,
+    labelled: Collection[str],
+    trials: Collection[str] | None,
+    wanted: Collection[str] | None,
+) -> bool:
+    if wanted is not None and record.request_id not in wanted:
+        return False
+    if record.stage is not DecisionStage.JEV or not record.answers:
+        return False
+    return record.request_id not in labelled and (trials is None or record.trial in trials)
+
+
+def _blind_row(record: DecisionRecord, policy: str) -> dict[str, Any]:
+    return {
+        "request_id": record.request_id,
+        "policy": policy,
+        "question_set": record.question_set,
+        "trial": record.trial,
+        "subject": record.subject,
+        "state": record.state,
+        "questions": record.questions,
+    }
 
 
 def export_blind(
@@ -41,27 +69,27 @@ def export_blind(
     *,
     trials: Collection[str] | None = None,
     limit: int | None = None,
+    request_ids: Collection[str] | None = None,
 ) -> list[dict[str, Any]]:
-    """What Jev was asked, without its answers, for each unlabelled answered decision."""
-    labelled = set(audit.labels(policy))
-    rows = []
-    for record in audit.decisions(policy):
-        if record.stage is not DecisionStage.JEV or not record.answers:
-            continue
-        if record.request_id in labelled or (trials is not None and record.trial not in trials):
-            continue
-        rows.append(
-            {
-                "request_id": record.request_id,
-                "policy": policy,
-                "question_set": record.question_set,
-                "trial": record.trial,
-                "subject": record.subject,
-                "state": record.state,
-                "questions": record.questions,
-            }
-        )
-    rows.sort(key=lambda row: row["request_id"])
+    """What Jev was asked, without its answers, for each unlabelled answered decision.
+
+    With ``request_ids``, exactly those decisions; any that is unknown, labelled
+    or unanswered is refused (``LabelImportError``).
+    """
+    labelled = set(current_labels(audit, policy))
+    wanted = None if request_ids is None else set(request_ids)
+    rows = sorted(
+        (
+            _blind_row(record, policy)
+            for record in audit.decisions(policy)
+            if _exportable(record, labelled, trials, wanted)
+        ),
+        key=lambda row: row["request_id"],
+    )
+    if wanted is not None:
+        unexportable = sorted(wanted - {row["request_id"] for row in rows})
+        if unexportable:
+            raise LabelImportError(f"not unlabelled answered {policy} decisions: {unexportable}")
     return rows if limit is None else rows[:limit]
 
 

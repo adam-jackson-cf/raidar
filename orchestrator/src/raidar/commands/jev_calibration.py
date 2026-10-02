@@ -1,4 +1,5 @@
-"""Jev calibration commands: labels (direct and blind), promotion and its verification.
+"""Jev calibration commands: labels (direct and blind), supersessions, recorded splits,
+promotion and its verification.
 
 Attached to the ``raidar jev`` group by ``raidar.commands.jev``.
 """
@@ -12,7 +13,14 @@ import click
 
 from raidar.jev.audit import ReviewerKind
 from raidar.jev.blind import derive_blind_labels, export_blind
-from raidar.jev.calibration import LabelImportError, import_labels, promotion_readiness
+from raidar.jev.calibration import (
+    LabelImportError,
+    import_labels,
+    promotion_readiness,
+    record_split,
+    supersede_labels,
+)
+from raidar.jev.ledger import SplitRecord, recorded_split
 from raidar.jev.policies import POLICY_DIR, CalibrationSplit, PolicyError
 from raidar.jev.promotion import (
     PromotionError,
@@ -80,16 +88,33 @@ def jev_import_labels(
 @click.option("--output", type=click.Path(dir_okay=False, path_type=Path), required=True)
 @click.option("--trial", "trials", multiple=True, help="Only decisions of this trial; repeatable.")
 @click.option("--limit", type=click.IntRange(min=1), help="At most this many decisions.")
+@click.option(
+    "--request-id",
+    "request_ids",
+    multiple=True,
+    help="Exactly this selected decision (repeatable); refused unless unlabelled and answered.",
+)
 def jev_export_blind(
-    store: Path, policy: str, output: Path, trials: tuple[str, ...], limit: int | None
+    store: Path,
+    policy: str,
+    output: Path,
+    trials: tuple[str, ...],
+    limit: int | None,
+    request_ids: tuple[str, ...],
 ) -> None:
     """Export unlabelled answered decisions WITHOUT Jev's answers, for a blind labeller."""
     runtime = open_runtime(store, replay_only=True)
     try:
         runtime.policies.get(policy)
-    except PolicyError as error:
+        rows = export_blind(
+            runtime.audit,
+            policy,
+            trials=set(trials) or None,
+            limit=limit,
+            request_ids=set(request_ids) or None,
+        )
+    except (PolicyError, LabelImportError) as error:
         raise click.ClickException(str(error)) from error
-    rows = export_blind(runtime.audit, policy, trials=set(trials) or None, limit=limit)
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(
         "".join(json.dumps(row, sort_keys=True) + "\n" for row in rows), encoding="utf-8"
@@ -126,6 +151,61 @@ def jev_import_blind(
     readiness = promotion_readiness(runtime.audit, policy)
     report = {"imported": added, "derived": dict(sorted(derived.items())), **readiness.summary()}
     click.echo(json.dumps(report, indent=2))
+
+
+@click.command("supersede-labels")
+@_STORE
+@click.option("--policy", required=True)
+@click.option("--reason", required=True, help="Why these labels no longer count.")
+@click.option("--request-id", "request_ids", multiple=True, help="Label to supersede; repeatable.")
+@click.option("--all-current", is_flag=True, help="Supersede every current label of the policy.")
+def jev_supersede_labels(
+    store: Path, policy: str, reason: str, request_ids: tuple[str, ...], all_current: bool
+) -> None:
+    """Take labels out of calibration without deleting them, and show readiness."""
+    if bool(request_ids) == all_current:
+        raise click.ClickException("name labels with --request-id or pass --all-current (one)")
+    runtime = open_runtime(store, replay_only=True)
+    try:
+        runtime.policies.get(policy)
+        records = supersede_labels(
+            runtime.audit, policy, reason=reason, request_ids=request_ids or None
+        )
+    except (PolicyError, LabelImportError) as error:
+        raise click.ClickException(str(error)) from error
+    readiness = promotion_readiness(runtime.audit, policy)
+    click.echo(json.dumps({"superseded": len(records), **readiness.summary()}, indent=2))
+
+
+@click.command("record-split")
+@_STORE
+@click.option("--policy", required=True)
+@click.option("--split-id", required=True, help="Name of this split, unique per policy.")
+@click.option(
+    "--calibration", required=True, help="Calibration trial ids (space or comma separated)."
+)
+@click.option(
+    "--evaluation", required=True, help="Evaluation trial ids (space or comma separated)."
+)
+@click.option("--reason", required=True, help="How and why the split was chosen.")
+def jev_record_split(
+    store: Path, policy: str, split_id: str, calibration: str, evaluation: str, reason: str
+) -> None:
+    """Record a calibration/evaluation split of trials before labelling against it."""
+    runtime = open_runtime(store, replay_only=True)
+    try:
+        runtime.policies.get(policy)
+        record = record_split(
+            runtime.audit,
+            policy,
+            split_id=split_id,
+            calibration=_trial_list(calibration),
+            evaluation=_trial_list(evaluation),
+            reason=reason,
+        )
+    except (PolicyError, LabelImportError) as error:
+        raise click.ClickException(str(error)) from error
+    click.echo(json.dumps(record.model_dump(mode="json"), indent=2))
 
 
 def scorer_versions() -> dict[str, str]:
@@ -168,9 +248,14 @@ def _trial_list(raw: str | None) -> tuple[str, ...]:
     return tuple(item for item in (raw or "").replace(",", " ").split() if item)
 
 
-def _split(calibration: str | None, evaluation: str | None) -> CalibrationSplit | None:
+def _split(
+    calibration: str | None, evaluation: str | None, recorded: SplitRecord | None
+) -> CalibrationSplit | None:
+    """The explicit split, else the policy's latest recorded one, else None (default split)."""
     if not (calibration or evaluation):
-        return None
+        if recorded is None:
+            return None
+        return CalibrationSplit(calibration=recorded.calibration, evaluation=recorded.evaluation)
     return CalibrationSplit(
         calibration=_trial_list(calibration), evaluation=_trial_list(evaluation)
     )
@@ -187,8 +272,14 @@ def _write(path: Path, plan: PromotionPlan) -> str:
 @click.command("promote")
 @_STORE
 @click.option("--policy", required=True)
-@click.option("--calibration", help="Calibration trial ids (space or comma separated).")
-@click.option("--evaluation", help="Evaluation trial ids (space or comma separated).")
+@click.option(
+    "--calibration",
+    help="Calibration trial ids (space or comma separated); default: the recorded split.",
+)
+@click.option(
+    "--evaluation",
+    help="Evaluation trial ids (space or comma separated); default: the recorded split.",
+)
 @click.option("--dry-run", is_flag=True, help="Report the promotion without writing the policy.")
 @click.option(
     "--allow-pending-scorer-bump",
@@ -218,7 +309,7 @@ def jev_promote(
     runtime = open_runtime(store, replay_only=True, policy_dir=policy_dir)
     try:
         current = runtime.policies.get(policy)
-        split = _split(calibration, evaluation)
+        split = _split(calibration, evaluation, recorded_split(runtime.audit, policy))
     except (PolicyError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     version = scorer_versions().get(scorer_id(policy))
@@ -237,6 +328,8 @@ def register(group: click.Group) -> None:
         jev_import_labels,
         jev_export_blind,
         jev_import_blind,
+        jev_supersede_labels,
+        jev_record_split,
         jev_verify_promotion,
         jev_promote,
     ):

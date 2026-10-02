@@ -45,6 +45,7 @@ SDK_RUNTIME_SOURCES = [
 BUILTIN_REFS = [
     "harness-settings@1",
     "lint-config@1",
+    "lint-tool@1",
     "mcp-server@1",
     "prompt-wrapper@1",
     "review-loop@1",
@@ -66,6 +67,7 @@ def test_builtins_register_under_entry_points_with_complete_manifests() -> None:
         ComponentKind.HARNESS,
         ComponentKind.PROMPT,
         ComponentKind.WORKFLOW,
+        ComponentKind.SERVICE,
     }
     for ref in BUILTIN_REFS:
         manifest = registry.get(ref).manifest

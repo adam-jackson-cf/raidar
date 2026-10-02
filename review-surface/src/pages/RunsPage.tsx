@@ -70,7 +70,7 @@ function RunDetailView({ runId }: { runId: string }) {
   if (detail.isLoading) {
     return (
       <div className="flex h-full items-center justify-center text-xs" style={{ color: C.fg1 }}>
-        Loading run…
+        Loading trial…
       </div>
     );
   }
@@ -80,11 +80,11 @@ function RunDetailView({ runId }: { runId: string }) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1.5">
         <span className="text-sm" style={{ color: notFound ? C.fg3 : C.red }}>
-          {notFound ? 'Run not found' : `Failed to load run: ${message}`}
+          {notFound ? 'Trial not found' : `Failed to load trial: ${message}`}
         </span>
         <span className="text-xs" style={{ color: C.fg0 }}>
           {notFound
-            ? `No projected run with id “${runId}”. Re-run make review-surface-data if the benchmark exists.`
+            ? `No projected trial with id “${runId}”. Re-run make review-surface-data if the job exists.`
             : 'Check that the review-surface server is running.'}
         </span>
       </div>
@@ -253,7 +253,7 @@ export function RunsPage() {
           )}
           {runs.isError && (
             <div className="p-2 text-xs" style={{ color: C.red }}>
-              Failed to load runs.
+              Failed to load trials.
             </div>
           )}
           {grouped.map((group) => (

@@ -155,7 +155,7 @@ def assess(
     replay: bool = False,
     jev_replay_only: bool = False,
 ) -> AssessmentRecord:
-    """Store (or reuse, or replay-verify) one scorer's Assessment of one trajectory."""
+    """Store (or reuse, or replay-verify) one scorer's Assessment of one trial."""
     parts = store_key(registration, ctx.config, context_inputs(ctx))
     identity, key = parts.identity, parts.key
     stored = None if replay else store.get(key)
