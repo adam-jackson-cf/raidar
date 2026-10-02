@@ -24,11 +24,22 @@ Trajectory metrics follow the progression the trial ran under (scorer config
 - ``solved_checkpoints`` (continue view) needs a verdict for every planned
   checkpoint. Under ``halt_on_failure``, checkpoints after the failed one that
   stopped the trial were never attempted and count as unsolved.
+
+Errata-applied metrics (``solved_errata``, ``solved_checkpoints_errata``,
+``reached_errata``) apply the same rules to the errata-applied verdict
+(``raidar.verifier.errata.errata_solved``): the strict rule over the graded
+cases the problem's pinned errata keeps. The errata arrives as config
+``errata`` (``{problem ref: ErrataRef}``, set from the lock only). Without an
+errata for the trial's problem they are ``not_applicable``; when the verifier
+recorded a different errata digest than the config pins they are
+``ineligible``. The raw metrics never change: both are always reported.
+Under ``halt_on_failure`` the stop is the raw verdict's (Harbor's gate), so
+checkpoints after it stay unattempted under errata too.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Literal
 
 from pydantic import ValidationError
@@ -42,6 +53,7 @@ from raidar.scorers.sdk.result import (
     AssessStatus,
     Observation,
 )
+from raidar.verifier.errata import ErrataRef, errata_solved
 from raidar.verifier.models import CaseGroup, CaseStatus, VerifierGrade
 
 LEAK_REWARD_KEY = "oracle_leak"
@@ -55,9 +67,14 @@ _CHECKPOINT_METRICS = (
 
 
 class CorrectnessConfig(SdkModel):
-    """Scorer config: the progression the assessed trials ran under."""
+    """Scorer config: the progression the trials ran under and the errata the lock pins."""
 
     progression: Literal["continue", "halt_on_failure"] = "continue"
+    errata: dict[str, ErrataRef] = {}
+
+
+Verdict = Callable[[StepInputs], bool | None]
+"""A checkpoint's verdict from its inputs: solved, failed, or None without one."""
 
 
 def verdict_gap(inputs: StepInputs) -> tuple[AssessStatus, str] | None:
@@ -145,12 +162,16 @@ def checkpoint_observations(inputs: StepInputs) -> list[Observation]:
     ]
 
 
-def _verdicts(steps: Iterable[StepInputs]) -> list[bool | None]:
+def raw_verdict(step: StepInputs) -> bool | None:
+    """The record's strict verdict, or None when the checkpoint has none."""
+    if verdict_gap(step) is not None or step.record is None:
+        return None
+    return step.record.grade.solved
+
+
+def _verdicts(steps: Iterable[StepInputs], verdict: Verdict = raw_verdict) -> list[bool | None]:
     """Per planned checkpoint: solved, failed, or None when there is no verdict."""
-    return [
-        None if verdict_gap(step) is not None or step.record is None else step.record.grade.solved
-        for step in steps
-    ]
+    return [verdict(step) for step in steps]
 
 
 def _trajectory(metric: str, value: int | None, reason: str) -> Observation:
@@ -187,17 +208,22 @@ def _halted_verdicts(steps: tuple[StepInputs, ...]) -> list[bool | None] | None:
     return verdicts[:stop] if stop > 0 and verdicts[stop - 1] is False else None
 
 
-def solved_count(steps: tuple[StepInputs, ...], progression: str) -> int | None:
-    """Solved checkpoints over the plan; None when some checkpoint's verdict is unknown."""
-    stopped = not all(step.reached for step in steps)
-    counted = (
-        _halted_verdicts(steps)
-        if stopped and progression == "halt_on_failure"
-        else _verdicts(steps)
-    )
-    if counted is None or None in counted:
+def solved_count(
+    steps: tuple[StepInputs, ...], progression: str, verdict: Verdict = raw_verdict
+) -> int | None:
+    """Solved checkpoints over the plan; None when some checkpoint's verdict is unknown.
+
+    A ``halt_on_failure`` stop is found from the raw verdicts (the gate Harbor
+    applied); ``verdict`` then decides which attempted checkpoints count as solved.
+    """
+    attempted: tuple[StepInputs, ...] | None = steps
+    if not all(step.reached for step in steps) and progression == "halt_on_failure":
+        halted = _halted_verdicts(steps)
+        attempted = steps[: len(halted)] if halted is not None else None
+    counted = _verdicts(attempted, verdict) if attempted is not None else [None]
+    if None in counted:
         return None
-    return sum(1 for verdict in counted if verdict)
+    return sum(1 for solved in counted if solved)
 
 
 def solved_gap(steps: tuple[StepInputs, ...], progression: str) -> str:
@@ -214,6 +240,85 @@ def solved_gap(steps: tuple[StepInputs, ...], progression: str) -> str:
             "halt_on_failure, rescore with progression=halt_on_failure"
         )
     return reason
+
+
+ERRATA_CHECKPOINT_METRIC = "solved_errata"
+ERRATA_TRAJECTORY_METRICS = ("solved_checkpoints_errata", "reached_errata")
+
+
+def errata_verdict(errata: ErrataRef) -> Verdict:
+    """The errata-applied verdict, recomputed from the record's raw cases."""
+    excluded = frozenset(errata.exclude_from_solved)
+
+    def verdict(step: StepInputs) -> bool | None:
+        if raw_verdict(step) is None or step.record is None:
+            return None
+        return errata_solved(step.record.grade, excluded)
+
+    return verdict
+
+
+def _errata_mismatch(steps: Iterable[StepInputs], errata: ErrataRef) -> str | None:
+    """Why the records contradict the pinned errata (a verifier ran under another one)."""
+    for step in steps:
+        recorded = step.record.errata if step.record is not None else None
+        if recorded is not None and recorded.sha256 != errata.sha256:
+            return (
+                f"{step.step}: the verifier recorded errata {recorded.sha256[:12]}, "
+                f"the assessment config pins {errata.sha256[:12]}"
+            )
+    return None
+
+
+def _statused_errata(
+    steps: tuple[StepInputs, ...], status: AssessStatus, reason: str
+) -> list[Observation]:
+    subjects = [(ERRATA_CHECKPOINT_METRIC, step.step) for step in steps]
+    subjects += [(metric, TRAJECTORY_SUBJECT) for metric in ERRATA_TRAJECTORY_METRICS]
+    return [
+        Observation(metric=metric, subject=subject, status=status, reason=reason)
+        for metric, subject in subjects
+    ]
+
+
+def errata_observations(ctx: AssessContext, config: CorrectnessConfig) -> list[Observation]:
+    """Errata-applied solve metrics, statused when the problem has no usable errata."""
+    errata = config.errata.get(ctx.problem)
+    if errata is None:
+        reason = f"no errata is pinned for {ctx.problem}"
+        return _statused_errata(ctx.steps, AssessStatus.NOT_APPLICABLE, reason)
+    mismatch = _errata_mismatch(ctx.steps, errata)
+    if mismatch is not None:
+        return _statused_errata(ctx.steps, AssessStatus.INELIGIBLE, mismatch)
+    verdict = errata_verdict(errata)
+    observations = []
+    for step in ctx.steps:
+        gap = verdict_gap(step)
+        solved = verdict(step)
+        if gap is not None or solved is None:
+            status, reason = gap or (AssessStatus.UNAVAILABLE, "no oracle verdict")
+            observations.append(
+                Observation(
+                    metric=ERRATA_CHECKPOINT_METRIC, subject=step.step, status=status, reason=reason
+                )
+            )
+        else:
+            observations.append(_ok(ERRATA_CHECKPOINT_METRIC, step.step, 1.0 if solved else 0.0))
+    observations.append(
+        _trajectory(
+            "solved_checkpoints_errata",
+            solved_count(ctx.steps, config.progression, verdict),
+            solved_gap(ctx.steps, config.progression),
+        )
+    )
+    observations.append(
+        _trajectory(
+            "reached_errata",
+            reached_count(_verdicts(ctx.steps, verdict)),
+            "a checkpoint before the first errata-applied failure has no verdict",
+        )
+    )
+    return observations
 
 
 class CorrectnessScorer:
@@ -247,6 +352,7 @@ class CorrectnessScorer:
                 "a checkpoint before the first failure has no oracle verdict",
             )
         )
+        observations.extend(errata_observations(ctx, config))
         measured = any(item.status is AssessStatus.OK for item in observations)
         return AssessResult(
             status=AssessStatus.OK if measured else AssessStatus.UNAVAILABLE,

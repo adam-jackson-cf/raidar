@@ -1,6 +1,6 @@
 # python__forge__guided-r3: rationale
 
-- **Status:** proposed. Validated and locked (`experiment.lock.json`, lock `12f2b2fb05fc`); **not executed**.
+- **Status:** proposed. Validated and locked (`experiment.lock.json`, lock `d4e2c9171a28`: `12f2b2fb05fc` relocked with the forge errata `9a6dec369dea` pinned, no other execution change); **not executed**.
 - **Iteration:** research loop, manual iteration 1, built from the pilot v2 fault catalog (`docs/reboot/pilot-v2-fault-catalog.md`, FCR-001 to FCR-008).
 - **Question:** on `scb/forge@38d627ecf668`, does the candidate guided condition (`guided-r3`) beat the incumbent pilot v2 guided condition (`guided-r2`)?
 

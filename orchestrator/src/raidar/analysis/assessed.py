@@ -17,6 +17,9 @@ Two derivations are analysis-owned:
 - ``final_solved`` under ``halt_on_failure`` is 0 when the trial halted
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
+- the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
+  ``final_solved`` over ``correctness@1``'s errata-applied metrics (the problem's
+  pinned errata); they are labelled as such and never replace the raw ones;
 - a trial truncated by ``max_checkpoints`` has no trial-level
   outcome (S, C, reached, final solved, quality means): each is statused
   ``truncated``, because its last run checkpoint is not the problem's final
@@ -33,11 +36,14 @@ from decimal import Decimal
 from raidar.analysis.outcomes import (
     CORRECTNESS_METRIC,
     FINAL_SOLVED,
+    FINAL_SOLVED_ERRATA,
     HEADLINE_SCORE,
     OUTCOME_METRICS,
     QUALITY_COMPONENTS,
     REACHED,
+    REACHED_ERRATA,
     SOLVE_RATE,
+    SOLVE_RATE_ERRATA,
     SOLVED,
     STRICT_SOLVED,
     TRUNCATED,
@@ -125,18 +131,31 @@ def infra_reasons(record: TrialRecord) -> tuple[str, ...]:
     return tuple(dict.fromkeys(reasons))
 
 
-def _final_solved(correctness: Observed, steps: tuple[str, ...], progression: str) -> Value:
-    last = correctness.value(SOLVED, steps[-1])
+ERRATA_SOLVED = "solved_errata"
+
+
+def _final_solved(
+    correctness: Observed,
+    steps: tuple[str, ...],
+    progression: str,
+    *,
+    solved: str = SOLVED,
+    reached: str = REACHED,
+) -> Value:
+    last = correctness.value(solved, steps[-1])
     halted = (
         progression == "halt_on_failure"
         and last.status == AssessStatus.NOT_APPLICABLE.value
-        and correctness.value(REACHED).measured
+        and correctness.value(reached).measured
+        and correctness.value(SOLVED, steps[-1]).status == AssessStatus.NOT_APPLICABLE.value
     )
     return Value.ok(0.0) if halted else last
 
 
-def _solve_rate(correctness: Observed, checkpoints: int) -> Value:
-    solved = correctness.value("solved_checkpoints")
+def _solve_rate(
+    correctness: Observed, checkpoints: int, metric: str = "solved_checkpoints"
+) -> Value:
+    solved = correctness.value(metric)
     if solved.value is None:
         return solved
     return Value.ok(float(checkpoint_solve_rate(int(solved.value), checkpoints)))
@@ -269,6 +288,15 @@ def build_outcome(
         SOLVE_RATE: solve_rate,
         REACHED: reached,
         FINAL_SOLVED: _final_solved(correctness, steps, record.progression.mode),
+        SOLVE_RATE_ERRATA: _solve_rate(correctness, checkpoints, "solved_checkpoints_errata"),
+        REACHED_ERRATA: correctness.value(REACHED_ERRATA),
+        FINAL_SOLVED_ERRATA: _final_solved(
+            correctness,
+            steps,
+            record.progression.mode,
+            solved=ERRATA_SOLVED,
+            reached=REACHED_ERRATA,
+        ),
         **quality,
         **{name: observed[RESOURCE_USAGE_REF].value(name) for name in _COST_TOTALS},
     }

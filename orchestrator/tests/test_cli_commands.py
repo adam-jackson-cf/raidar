@@ -346,7 +346,7 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
     }
     problem = main.commands["problem"]
     assert isinstance(problem, click.Group)
-    assert set(problem.commands) == {"import", "info", "list", "validate"}
+    assert set(problem.commands) == {"errata-draft", "import", "info", "list", "validate"}
 
 
 def test_run_refuses_the_removed_scenario_flag(tmp_path: Path) -> None:

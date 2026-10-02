@@ -175,7 +175,11 @@ def analyze(
     except (AnalysisInputError, RegistryReferenceError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     output.mkdir(parents=True, exist_ok=True)
-    (output / REPORT_JSON).write_bytes(pretty_canonical_json_bytes(report.model_dump(mode="json")))
+    payload = report.model_dump(mode="json")
+    if payload.get("errata") is None:
+        # A lock without problem errata writes the report exactly as before errata existed.
+        payload.pop("errata", None)
+    (output / REPORT_JSON).write_bytes(pretty_canonical_json_bytes(payload))
     (output / REPORT_MARKDOWN).write_text(render_markdown(report))
     if report.dev_job is not None:
         click.echo(f"warning: development job, not arm evidence: {report.dev_job.note}", err=True)

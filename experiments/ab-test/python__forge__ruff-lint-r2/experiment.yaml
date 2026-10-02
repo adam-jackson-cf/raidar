@@ -1,0 +1,94 @@
+# Ruff lint A/B on forge, revision 2: python__forge__ruff-lint with r2's tool moved from
+# lint-tool@1 to lint-tool@2. Everything else (problem pin, agent, protocol, framing,
+# ruff.toml, assessment, analysis) is unchanged.
+# Why: in job ruff-lint-02 the r2 agents never ran the provisioned ruff; the one attempt
+# (b04, checkpoint 6) was `python -m ruff`, which lint-tool@1 does not support (gate packet
+# section 14.4). lint-tool@2 keeps @1's install (a hash-pinned ruff installed per trial in the
+# agent container, outside the agent image, so the pack audit's "no scorer tools in the agent
+# image" stays true) and adds a root-owned .pth so `python -m ruff` / `python3 -m ruff` run it;
+# `uv run ruff` reaches it through PATH. Its probe asserts, before step 1's agent, that every
+# one of those invocations answers the pinned version and that ruff resolves /app/ruff.toml,
+# and records at every step which invocations still run the pin.
+# No prompt or rules text tells the agent that Ruff exists or that ruff.toml is there:
+# whether it finds and runs it is an outcome.
+# Validate: make experiment-validate EXPERIMENT=experiments/ab-test/python__forge__ruff-lint-r2/experiment.yaml
+# Lock:     make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__ruff-lint-r2/experiment.yaml
+schema_version: 2
+kind: ab-test
+id: python__forge__ruff-lint-r2
+description: Does a pinned Ruff the agent can run as 'ruff', 'python -m ruff' or 'uv run ruff', plus a workspace Ruff config, reduce lint density on forge?
+
+problems:
+  # SCB Harbor dataset, pinned to scb-problems@38d627ecf668 (8 checkpoints).
+  - ref: scb/forge@38d627ecf668
+
+runtime: python
+environment:
+  type: docker
+  compose_init: true
+
+agents:
+  # Real-LLM policy (ADR-001 section 2.7): codex + gpt-6-luna at low effort.
+  - id: codex-luna
+    name: codex
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+
+factors: [condition]
+
+# Both arms get the same framing (pilot v2): where to work, that /app may start empty,
+# what to build, and that nobody answers questions.
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
+
+conditions:
+  - id: r1-baseline
+    components: []
+  - id: r2-ruff
+    components:
+      # The rule set of the guided pilot's ruff.toml, with no comments: the agent reads
+      # this file, so it carries no hint about the tool, the scorer or the experiment.
+      # It includes the SIM family the code-quality scorer counts, but the scorer never
+      # reads it: it runs its own Ruff with --isolated and its own rule set (design memo
+      # section 10.5, invariant 3).
+      - use: lint-config@1
+        files: [components/r2-ruff/ruff.toml]
+      # The probe proves, before every step's agent, that ruff 0.8.6 answers at the
+      # provisioned path; at step 1, that 'ruff', 'python -m ruff', 'python3 -m ruff' and
+      # 'uv run ruff' all answer it and that it resolves /app/ruff.toml.
+      - use: lint-tool@2
+        with:
+          version: "0.8.6"
+          config: ruff.toml
+
+arms:
+  - id: r1-baseline
+    condition: r1-baseline
+    agent: codex-luna
+  - id: r2-ruff
+    condition: r2-ruff
+    agent: codex-luna
+
+assessment:
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@1]
+  metric: scb-canonical@2
+
+analysis:
+  baseline_arm: r1-baseline
+  # A functional test: 5 attempts per arm is expected to end insufficient/inconclusive.
+  attempts: 5
+  seed: 20261002
+  concurrency: 3
+  min_pairs: 5
+  max_exclusion_fraction: 0.2
+  alpha: 0.05
+  min_effects: {}

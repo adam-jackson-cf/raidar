@@ -91,6 +91,7 @@ class AnalysisInputs:
     kind: str = "ab-test"
     rank_by: str | None = None
     attempts: int = 1
+    errata: Mapping[str, Mapping[str, object]] | None = None
 
 
 class ArmSummary(AnalysisModel):
@@ -153,6 +154,9 @@ class AnalysisReport(AnalysisModel):
     replaced_trials: tuple[str, ...] = ()
     comparisons: tuple[Comparison, ...]
     ranking: Ranking | None = None
+    errata: dict[str, dict[str, object]] | None = None
+    """``{problem ref: {sha256, exclude_from_solved}}`` the lock pins; only the ``*_errata``
+    outcomes apply it. Absent (not written) when the lock pins no errata."""
     sample_size_basis: SampleSizeBasis = Field(
         default_factory=lambda: SampleSizeBasis(
             standardized={f"{d:g}": pairs_for_power(1.0, d) for d in STANDARDIZED_EFFECTS}
@@ -322,6 +326,9 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         replaced_trials=inputs.replaced,
         comparisons=tuple(_comparison(inputs, arm, settings) for arm in treatments),
         ranking=_ranking(inputs, settings, summaries),
+        errata={ref: dict(pinned) for ref, pinned in inputs.errata.items()}
+        if inputs.errata
+        else None,
     )
 
 

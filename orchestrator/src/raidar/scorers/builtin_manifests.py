@@ -113,6 +113,32 @@ CORRECTNESS = ScorerManifest(
             _HIGHER,
             Exactness.NATIVE,
         ),
+        _metric(
+            "solved_errata",
+            "Errata-applied solve: the strict rule over the graded cases the lock's pinned "
+            "problem errata keeps (exclude-from-solved cases left out); not_applicable "
+            "without an errata.",
+            _CHECKPOINT,
+            MetricType.BOOLEAN,
+            _HIGHER,
+            Exactness.NATIVE,
+        ),
+        _metric(
+            "solved_checkpoints_errata",
+            "Errata-applied solved checkpoints in the trajectory (continue view).",
+            _TRAJECTORY,
+            MetricType.COUNT,
+            _HIGHER,
+            Exactness.NATIVE,
+        ),
+        _metric(
+            "reached_errata",
+            "Errata-applied consecutive checkpoints solved from the first (strict view).",
+            _TRAJECTORY,
+            MetricType.COUNT,
+            _HIGHER,
+            Exactness.NATIVE,
+        ),
     ),
 )
 

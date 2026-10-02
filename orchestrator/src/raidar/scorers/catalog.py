@@ -167,6 +167,9 @@ class ScorerRegistration:
       (``AssessContext.problem_config``); explicit scorer config wins.
     - ``protocol_config``: config keys the experiment protocol sets (for
       example ``progression``), written into every run's assessment config.
+    - ``errata_config``: the scorer takes the problem errata the lock pins
+      (config key ``errata``: ``{problem ref: ErrataRef}``); set only from a
+      lock, never by the experiment.
     """
 
     manifest: ScorerManifest
@@ -175,6 +178,7 @@ class ScorerRegistration:
     jev_policies: tuple[str, ...] = ()
     problem_config: tuple[str, ...] = ()
     protocol_config: tuple[str, ...] = ()
+    errata_config: bool = False
 
     def __post_init__(self) -> None:
         if self.implementation is not None:
@@ -310,6 +314,9 @@ BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
 BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
     "correctness@1": ("progression",),
 }
+# Scorers that take the lock's pinned problem errata as config key ``errata``.
+ERRATA_CONFIG_KEY = "errata"
+BUILTIN_ERRATA_CONFIG: frozenset[str] = frozenset({"correctness@1"})
 
 
 def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
@@ -321,6 +328,7 @@ def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
         jev_policies=jev_policies,
         problem_config=BUILTIN_PROBLEM_CONFIG.get(manifest.ref, ()),
         protocol_config=BUILTIN_PROTOCOL_CONFIG.get(manifest.ref, ()),
+        errata_config=manifest.ref in BUILTIN_ERRATA_CONFIG,
     )
 
 

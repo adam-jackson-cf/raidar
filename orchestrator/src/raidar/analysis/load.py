@@ -26,6 +26,7 @@ from raidar.analysis.sources import (
     read_lock,
     select_records,
 )
+from raidar.execution.assessment import lock_errata
 from raidar.scorers.catalog import ScorerRegistry
 from raidar.scorers.store import AssessmentStore
 from raidar.scorers.trial_inputs import BundleCache
@@ -90,6 +91,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
     inputs = AnalysisInputs(
         experiment=str(lock["experiment"]["id"]),
         lock_sha256=str(lock["lock_sha256"]),
+        errata={ref: errata.model_dump(mode="json") for ref, errata in lock_errata(lock).items()},
         jobs=tuple(job.job_id for job in jobs),
         kind=str(spec.get("kind", "ab-test")),
         rank_by=spec["analysis"].get("rank_by"),

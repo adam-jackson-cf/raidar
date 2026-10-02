@@ -27,6 +27,9 @@ directories, tasks and the assessment config are never touched; the trial
 hashes keep the digest the trials executed under. A job under a directory
 named after its old experiment id moves to one named after the new id.
 Re-running the migration on a migrated job is a no-op.
+
+A schema v2 job whose lock differs from the target only in pinned problem
+errata is moved by ``raidar.execution.errata_migration`` instead.
 """
 
 from __future__ import annotations
@@ -40,6 +43,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.agents.config import agent_name_for
+from raidar.execution.errata_migration import ErrataMigrationError, adopt_errata
 from raidar.execution.models import TrialRecord
 from raidar.job_layout import (
     ARCHIVED_LEGACY_DIR,
@@ -399,13 +403,30 @@ def _already_migrated(job_dir: Path, lock_sha256: str) -> JobMigration | None:
     if (job_dir / LEGACY_RUN_MANIFEST).is_file():
         raise JobMigrationError(f"{job_dir} has both {JOB_MANIFEST} and {LEGACY_RUN_MANIFEST}")
     manifest = _read_object(manifest_path)
-    record = manifest.get("job_migration")
+    history = manifest.get("lock_migrations") or []
+    record = history[-1] if history else manifest.get("job_migration")
     if not isinstance(record, Mapping) or manifest.get("lock_sha256") != lock_sha256:
         raise JobMigrationError(
             f"{job_dir} is already a v2 job (lock {str(manifest.get('lock_sha256'))[:12]}); "
             "nothing to migrate onto this lock"
         )
     return JobMigration(job_dir, str(record["from"]["lock_sha256"]), lock_sha256, migrated=False)
+
+
+def _adopt_errata(job_dir: Path, current: Mapping[str, Any], lock_path: Path) -> JobMigration:
+    try:
+        executed_sha, target_sha = adopt_errata(job_dir, current, lock_path.read_bytes())
+    except ErrataMigrationError as exc:
+        raise JobMigrationError(str(exc)) from exc
+    return JobMigration(job_dir, executed_sha, target_sha, migrated=True)
+
+
+def _v2_lock_change(job_dir: Path, lock_sha256: str) -> bool:
+    """A schema v2 job recorded under another lock (an errata adoption candidate)."""
+    manifest_path = job_dir / JOB_MANIFEST
+    if not manifest_path.is_file() or (job_dir / LEGACY_RUN_MANIFEST).is_file():
+        return False
+    return _read_object(manifest_path).get("lock_sha256") != lock_sha256
 
 
 def _verified(
@@ -459,6 +480,8 @@ def migrate_job(
     job_dir = job_dir.resolve()
     current = _current_lock(lock_path)
     target_sha = str(current["lock_sha256"])
+    if _v2_lock_change(job_dir, target_sha):
+        return _adopt_errata(job_dir, current, lock_path)
     done = _already_migrated(job_dir, target_sha)
     if done is not None:
         return done

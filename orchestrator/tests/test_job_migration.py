@@ -12,6 +12,8 @@ from click.testing import CliRunner
 
 from raidar.agents.config import agent_cli
 from raidar.cli import main
+from raidar.execution.assessment import lock_errata
+from raidar.execution.errata_migration import without_errata
 from raidar.execution.job_migration import (
     LEGACY_DIR,
     differences,
@@ -54,7 +56,9 @@ def test_the_pilot_locks_translate_to_the_v2_locks_field_for_field(
     """The executed pilot locks (5a73637e8ac3, 827ebb5a7ca9) describe the v2 pilot experiments.
 
     This also pins the released components: editing a fingerprint source changes a
-    component digest, and the translated execution would no longer match.
+    component digest, and the translated execution would no longer match. A problem
+    errata registered since (forge) is the one permitted difference: it never changes
+    what ran (errata adoption, ``raidar.execution.errata_migration``).
     """
     executed = json.loads((LEGACY_V1 / legacy).read_text())
     lock = json.loads(current.with_name("experiment.lock.json").read_text())
@@ -64,8 +68,10 @@ def test_the_pilot_locks_translate_to_the_v2_locks_field_for_field(
         executed["execution"], kind=design["kind"], experiment_id=design["id"]
     )
 
-    assert differences(translated, lock["execution"]) == []
-    assert digest_json(translated) == lock["lock_sha256"]
+    assert differences(translated, without_errata(lock["execution"])) == []
+    assert digest_json(translated) == digest_json(without_errata(lock["execution"]))
+    if not lock_errata(lock):
+        assert digest_json(translated) == lock["lock_sha256"]
     assert executed["lock_sha256"] != lock["lock_sha256"]
 
 

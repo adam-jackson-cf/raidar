@@ -9,6 +9,11 @@ dependencies) live in a separate venv inside this image only. They never enter
 the agent image (the Python pack asserts that side). The submission keeps
 running on the base interpreter, as it did in the agent environment.
 
+Pinned copies of the third-party packages the problem's SCB configuration
+names (``raidar.verifier.submission_deps``) are installed into per-package
+directories outside both interpreters; the graded program sees one only when
+its snapshot declares it.
+
 The tag is content-addressed over the Dockerfile text, so the warm path is a
 presence check (N1 budget: grader image warm 1 s; cold build is record-only).
 The tag is not a reproducibility proof (a base tag or an unpinned test
@@ -25,6 +30,7 @@ from dataclasses import dataclass
 
 from raidar.verifier.bundle import GraderSpec
 from raidar.verifier.sandbox import CONTAINER_LAYOUT, docker_cli_env
+from raidar.verifier.submission_deps import dockerfile_layer, provisioned_pins
 
 GRADER_TOOLS: tuple[str, ...] = (
     "pytest==9.0.3",
@@ -33,6 +39,7 @@ GRADER_TOOLS: tuple[str, ...] = (
 )
 GRADER_VENV = CONTAINER_LAYOUT.python.removesuffix("/bin/python")
 GRADER_REPOSITORY = "raidar-oracle-grader"
+SUBMISSION_PYTHON = "/usr/local/bin/python3"
 BUILD_TIMEOUT_S = 900.0
 
 
@@ -42,9 +49,10 @@ def grader_dockerfile(spec: GraderSpec) -> str:
     return (
         f"{environment.rstrip()}\n"
         "USER root\n"
-        f"RUN uv venv --python /usr/local/bin/python3 {GRADER_VENV} \\\n"
+        f"RUN uv venv --python {SUBMISSION_PYTHON} {GRADER_VENV} \\\n"
         f" && uv pip install --no-cache --python {GRADER_VENV}/bin/python {packages} \\\n"
         f" && chmod -R a+rX {GRADER_VENV}\n"
+        f"{dockerfile_layer(provisioned_pins(spec.test_dependencies), SUBMISSION_PYTHON)}"
     )
 
 

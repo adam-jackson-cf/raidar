@@ -101,7 +101,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute \
 	perf-check perf-fixture perf-gate \
-	problem-list problem-info problem-import problem-validate \
+	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels jev-export-blind jev-import-blind \
 	jev-supersede-labels jev-record-split \
@@ -140,8 +140,11 @@ help:
 	@echo "  make problem-info PROBLEM=scb/forge@38d627ecf668       Show one problem's steps, source pin, pack binding and validation"
 	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
 	@echo "                                                        Import a pinned problem binding (task + host-only verifier bundle) into problems/"
-	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
-	@echo "                                                        Verifier-validate an imported problem and write its report"
+	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3] [CONCURRENCY=4] [AUDIT=0] [AUDIT_ONLY=1]"
+	@echo "                                                        Verifier-validate an imported problem and write its report, with the"
+	@echo "                                                        spec-determinacy audit (AUDIT_ONLY=1: audit only, into the committed report)"
+	@echo "  make problem-errata-draft PROBLEM=scb/forge@38d627ecf668 OUT=<path> REGISTERED=<yyyy-mm-dd>"
+	@echo "                                                        Draft a problem errata from its report's audit (review, then commit it)"
 	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
 	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
@@ -445,6 +448,15 @@ problem-validate:
 		$(if $(ENGINE),--engine "$(ENGINE)",) $(if $(REPEATS),--repeats "$(REPEATS)",) \
 		$(if $(NATIVE_RUNNER),--native-runner "$(NATIVE_RUNNER)",) \
 		$(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) \
+		$(if $(filter 0,$(AUDIT)),--no-audit,) $(if $(AUDIT_ONLY),--audit-only,) \
+		$(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
+		$(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
+
+problem-errata-draft:
+	$(call require_var,PROBLEM)
+	$(call require_var,OUT)
+	$(call require_var,REGISTERED)
+	@$(RAIDAR) problem errata-draft "$(PROBLEM)" --output "$(OUT)" --registered "$(REGISTERED)" \
 		$(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
 
 JOB ?=

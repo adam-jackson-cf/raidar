@@ -19,6 +19,11 @@ problem is neither validated nor excluded.
 Verdict precedence: any ``fail`` -> ``excluded``; else any ``infra_error`` ->
 ``infra_failure``; else any ``not_run`` -> ``validated_partial`` (the report
 names the skipped checks); else ``validated``.
+
+The report also carries the spec-determinacy audit (``spec_determinacy``,
+``raidar.problems.audit``) when it ran. The audit never changes the verdict: a
+problem whose tests assert undetermined values stays usable, and its pinned
+errata (``raidar.problems.errata``) is the policy response.
 """
 
 from __future__ import annotations
@@ -322,6 +327,7 @@ class ValidationReport:
     checks: list[Check]
     runs: ValidationRuns
     environment: dict[str, object] = field(default_factory=dict)
+    spec_determinacy: dict[str, object] | None = None
 
     @property
     def verdict(self) -> Verdict:
@@ -355,6 +361,11 @@ class ValidationReport:
             "headline_policy": policy_preview(self.runs.oracle[POSITIVE][0], len(self.steps)),
             "environment": self.environment,
             "group_order": [group.value for group in CaseGroup],
+            **(
+                {"spec_determinacy": self.spec_determinacy}
+                if self.spec_determinacy is not None
+                else {}
+            ),
         }
 
 

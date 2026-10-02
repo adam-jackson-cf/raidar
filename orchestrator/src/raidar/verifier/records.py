@@ -10,15 +10,18 @@ running) must never see verifier results (F4). Harbor receives only the reward.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field
 
+from raidar.verifier.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.verifier.grader import RunOutcome, StepGrade
 from raidar.verifier.leak import LeakReport
 from raidar.verifier.models import CaseResult, ParityVerdict, VerifierGrade, VerifierModel
 from raidar.verifier.parity import fork_regression_run_evidence
+from raidar.verifier.submission_deps import SubmissionDependencies
 
 VERIFIER_RECORD_DIR = "raidar-oracle"
 RECORD_FILE = "record.json"
@@ -79,6 +82,10 @@ class StepRecord(VerifierModel):
     pre_agent_leak_check: LeakReport | None = None
     rewards: dict[str, float]
     timings: dict[str, float] = Field(default_factory=dict)
+    errata: ErrataOutcome | None = None
+    """The errata-applied verdict when the trial ran under a pinned errata; ``grade``
+    and ``rewards`` stay the raw SCB verdict either way."""
+    submission_dependencies: SubmissionDependencies | None = None
 
 
 def _run_payload(run: RunOutcome | None) -> dict[str, object] | None:
@@ -102,6 +109,16 @@ def _fork_payload(result: StepGrade) -> dict[str, object] | None:
         "baseline": fork_regression_run_evidence(grading.evidence, cases),
         "produced": fork_regression_run_evidence(coverage.evidence, coverage.cases),
     }
+
+
+def parse_errata(errata: Mapping[str, Any] | None) -> ErrataRef | None:
+    """The verifier's ``errata`` argument (the lock's pinned errata), validated."""
+    return ErrataRef.model_validate(dict(errata)) if errata is not None else None
+
+
+def errata_for(grade: VerifierGrade, errata: ErrataRef | None) -> ErrataOutcome | None:
+    """The record's errata section: the errata-applied verdict, when an errata is pinned."""
+    return errata_outcome(grade, errata) if errata is not None else None
 
 
 def write_step_evidence(record_dir: Path, result: StepGrade) -> None:

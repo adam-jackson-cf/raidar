@@ -46,6 +46,7 @@ BUILTIN_REFS = [
     "harness-settings@1",
     "lint-config@1",
     "lint-tool@1",
+    "lint-tool@2",
     "mcp-server@1",
     "prompt-wrapper@1",
     "review-loop@1",

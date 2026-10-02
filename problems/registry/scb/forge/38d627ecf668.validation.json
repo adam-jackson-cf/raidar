@@ -1660,6 +1660,1538 @@
   "problem": "scb/forge@38d627ecf668",
   "repeats": 3,
   "schema_version": 1,
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 95,
+      "by_rule": {
+        "content-stated": 39,
+        "content-unstated": 6,
+        "exact-unstated": 14,
+        "format-unstated": 1,
+        "literal-in-spec": 33,
+        "wording-unstated": 2
+      }
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {
+        "docker_context": "orbstack",
+        "grader_environment_id": "sha256:874d2b90b9adadca5aae0958053763e32c961f56990fcb952b2ed02a015ef9bf",
+        "grader_image": "raidar-oracle-grader:76fabb7fb4f407d7"
+      },
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='validation_error', detail_contains='name must be a non-empty string')",
+            "category": "validation_error",
+            "checkpoint_origin": "checkpoint_1",
+            "expected": "'name must be a non-empty string'",
+            "function": "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+            "kind": "error_text_contains",
+            "line": 568,
+            "rule": "wording-unstated",
+            "why": "'name must be a non-empty string' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
+          }
+        ],
+        "case": "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+        "checkpoint_origin": "checkpoint_1",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='validation_error', detail_contains='requirement_sets must be a non-empty array')",
+            "category": "validation_error",
+            "checkpoint_origin": "checkpoint_1",
+            "expected": "'requirement_sets must be a non-empty array'",
+            "function": "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+            "kind": "error_text_contains",
+            "line": 588,
+            "rule": "wording-unstated",
+            "why": "'requirement_sets must be a non-empty array' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
+          }
+        ],
+        "case": "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+        "checkpoint_origin": "checkpoint_1",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(duplicate, category='duplicate_assignment', detail_contains=assignment_id)",
+            "category": "duplicate_assignment",
+            "checkpoint_origin": "checkpoint_3",
+            "expected": "assignment_id",
+            "function": "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+            "kind": "error_text_contains",
+            "line": 310,
+            "rule": "content-unstated",
+            "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+        "checkpoint_origin": "checkpoint_3",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='invalid_operation', detail_contains='not-an-op')",
+            "category": "invalid_operation",
+            "checkpoint_origin": "checkpoint_3",
+            "expected": "'not-an-op'",
+            "function": "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+            "kind": "error_text_contains",
+            "line": 381,
+            "rule": "content-unstated",
+            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'not-an-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+        "checkpoint_origin": "checkpoint_3",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='invalid_operation', detail_contains='invalid-op')",
+            "category": "invalid_operation",
+            "checkpoint_origin": "checkpoint_3",
+            "expected": "'invalid-op'",
+            "function": "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+            "kind": "error_text_contains",
+            "line": 265,
+            "rule": "content-unstated",
+            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'invalid-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+        "checkpoint_origin": "checkpoint_3",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(mixed, category='duplicate_assignment', detail_contains=assignment_id)",
+            "category": "duplicate_assignment",
+            "checkpoint_origin": "checkpoint_3",
+            "expected": "assignment_id",
+            "function": "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+            "kind": "error_text_contains",
+            "line": 344,
+            "rule": "content-unstated",
+            "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+        "checkpoint_origin": "checkpoint_3",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
+            "category": "invalid_operation",
+            "checkpoint_origin": "checkpoint_3",
+            "expected": "'bad-op'",
+            "function": "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+            "kind": "error_text_contains",
+            "line": 499,
+            "rule": "content-unstated",
+            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+        "checkpoint_origin": "checkpoint_3",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
+            "category": "invalid_operation",
+            "checkpoint_origin": "checkpoint_3",
+            "expected": "'bad-op'",
+            "function": "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+            "kind": "error_text_contains",
+            "line": 624,
+            "rule": "content-unstated",
+            "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+        "checkpoint_origin": "checkpoint_3",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='invalid_image', detail='A1B2C3D4-E5F6-7890-ABCD-EF1234567890')",
+            "category": "invalid_image",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "'A1B2C3D4-E5F6-7890-ABCD-EF1234567890'",
+            "function": "test_checkpoint_6.py::test_create_invalid_firmware_image",
+            "kind": "error_text_equals",
+            "line": 362,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the invalid_image error text to equal 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890', but no paragraph of the specification states what a invalid_image detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_create_invalid_firmware_image",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=missing)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "missing",
+            "function": "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+            "kind": "error_text_equals",
+            "line": 208,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category=category, detail=detail)",
+            "category": null,
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "detail",
+            "function": "test_checkpoint_6.py::test_flash_bad_image",
+            "kind": "error_text_equals",
+            "line": 329,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category=category, detail=detail)",
+            "category": null,
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "detail",
+            "function": "test_checkpoint_6.py::test_flash_bad_image",
+            "kind": "error_text_equals",
+            "line": 329,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category=category, detail=detail)",
+            "category": null,
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "detail",
+            "function": "test_checkpoint_6.py::test_flash_bad_image",
+            "kind": "error_text_equals",
+            "line": 329,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='invalid_image', detail='NOT-A-VALID-UUID')",
+            "category": "invalid_image",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "'NOT-A-VALID-UUID'",
+            "function": "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+            "kind": "error_text_equals",
+            "line": 343,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the invalid_image error text to equal 'NOT-A-VALID-UUID', but no paragraph of the specification states what a invalid_image detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(final_attempt, category='flash_failed', detail=image_a)",
+            "category": "flash_failed",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "image_a",
+            "function": "test_checkpoint_6.py::test_flash_requires_stored_image",
+            "kind": "error_text_equals",
+            "line": 193,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the flash_failed error text to equal image_a, but no paragraph of the specification states what a flash_failed detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_flash_requires_stored_image",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(first_attempt, category='flash_failed', detail=new_image)",
+            "category": "flash_failed",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "new_image",
+            "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+            "kind": "error_text_equals",
+            "line": 1017,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
+          },
+          {
+            "assertion": "assert_error(second_attempt, category='flash_failed', detail=new_image)",
+            "category": "flash_failed",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "new_image",
+            "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+            "kind": "error_text_equals",
+            "line": 1024,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=missing)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "missing",
+            "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+            "kind": "error_text_equals",
+            "line": 376,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+          },
+          {
+            "assertion": "assert_error(flash, category='not_found', detail=missing)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "missing",
+            "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+            "kind": "error_text_equals",
+            "line": 383,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=missing)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "missing",
+            "function": "test_checkpoint_6.py::test_tag_create_requires_module",
+            "kind": "error_text_equals",
+            "line": 519,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_tag_create_requires_module",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(get_deleted, category='not_found', detail=tag['uuid'])",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "tag['uuid']",
+            "function": "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+            "kind": "error_text_equals",
+            "line": 289,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal tag['uuid'], but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=missing)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "missing",
+            "function": "test_checkpoint_6.py::test_tag_get_delete_nonexistent",
+            "kind": "error_text_equals",
+            "line": 1170,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=missing)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_6",
+            "expected": "missing",
+            "function": "test_checkpoint_6.py::test_tag_get_delete_nonexistent",
+            "kind": "error_text_equals",
+            "line": 1170,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
+        "checkpoint_origin": "checkpoint_6",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=uuid_shaped_name, revision='1.2')",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_7",
+            "expected": "uuid_shaped_name",
+            "function": "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+            "kind": "error_text_equals",
+            "line": 925,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal uuid_shaped_name, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+        "checkpoint_origin": "checkpoint_7",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_compact_sorted_json_output(result)",
+            "category": null,
+            "checkpoint_origin": "checkpoint_7",
+            "expected": "",
+            "function": "test_checkpoint_7.py::test_revision_preserves_compact_json",
+            "kind": "output_bytes",
+            "line": 469,
+            "rule": "format-unstated",
+            "why": "the test compares stdout byte for byte, but the specification names no output byte format (none of: compact, sorted key, sort_keys, key order, keys sorted, whitespace between, no whitespace, trailing newline, no newline, indent, separators)"
+          }
+        ],
+        "case": "test_checkpoint_7.py::test_revision_preserves_compact_json",
+        "checkpoint_origin": "checkpoint_7",
+        "variants": [
+          "reformatted_json"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=parent_uuid, revision=revision)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_7",
+            "expected": "parent_uuid",
+            "function": "test_checkpoint_7.py::test_unit_missing_parent_not_found",
+            "kind": "error_text_equals",
+            "line": 952,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal parent_uuid, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
+        "checkpoint_origin": "checkpoint_7",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "assertions": [
+          {
+            "assertion": "assert_error(result, category='not_found', detail=parent_uuid, revision=revision)",
+            "category": "not_found",
+            "checkpoint_origin": "checkpoint_7",
+            "expected": "parent_uuid",
+            "function": "test_checkpoint_7.py::test_unit_missing_parent_not_found",
+            "kind": "error_text_equals",
+            "line": 952,
+            "rule": "exact-unstated",
+            "why": "the error_text_equals assertion needs the not_found error text to equal parent_uuid, but no paragraph of the specification states what a not_found detail or message contains"
+          }
+        ],
+        "case": "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]",
+        "checkpoint_origin": "checkpoint_7",
+        "variants": [
+          "neutral_error_text"
+        ]
+      }
+    ],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [
+      {
+        "case": "test_checkpoint_1.py::test_blueprint_delete_missing_uuid_returns_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_blueprint_get_and_delete_single_uuid",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_blueprint_get_nonexistent_uuid_returns_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_missing_required_fields_reports_sorted_unique_messages",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_boolean_resource_count",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_capabilities_with_non_string_elements",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_duplicate_name_with_conflict",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_float_resource_count",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_invalid_json_input",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_multiple_unsupported_keys",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_non_array_requirement_sets",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_non_string_name_type",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_requirement_set_missing_required_keys",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_rejects_unsupported_key_as_sole_violation",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_validation_aggregates_top_level_and_nested_failures",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_validation_aggregates_unique_sorted_messages",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_validation_deduplicates_messages_across_requirement_sets",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_create_validation_failure_is_atomic",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_1.py::test_delete_names_is_atomic_and_reports_sorted_unresolved",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_2.py::test_allocation_create_unknown_blueprint_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_2.py::test_allocation_get_malformed_uuid_returns_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_2.py::test_allocation_get_unknown_uuid_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_bind_missing_assignment_id",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_bind_not_found_lists_sorted_ids",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_bind_rejects_empty_allocations[empty_allocations]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_bind_rejects_empty_allocations[missing_allocations]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_delete_ids_rejects_partial_matches",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_delete_ids_reports_missing_uuids",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[both_flags]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[no_flag]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_not_found_mixed_ops_atomic_vs_duplicate",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_not_found_precedes_duplicate",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_3.py::test_validation_precedes_op_and_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_bool_capacity[False]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_bool_capacity[True]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_float_capacity",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_invalid_parent_uuid[123]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_invalid_parent_uuid[]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_missing_all_required_fields",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_parent_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_rejects_wrong_types[category-123]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_rejects_wrong_types[host-field_value2]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_rejects_wrong_types[manufacturer-True]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_reports_all_invalid",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_string_capacity",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_get_missing_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_4.py::test_get_not_found_exact_detail",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_create_rejects_non_array_capabilities",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_create_rejects_non_string_capabilities",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_5.py::test_transition_unknown_unit_not_found",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_create_component_type_null",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_create_missing_component_type",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_create_missing_unit_uuid",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_create_rejects_bad_component_type[7]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_create_rejects_bad_component_type[]",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_list_filter_requires_equals",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_tag_conflict_detail",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_tag_create_rejects_empty",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_tag_duplicate_key_conflict",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_tag_key_scope_per_module",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_6.py::test_tag_update_unknown_command",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_blueprint_get_missing_name",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_blueprint_get_name_requires_1_2",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_blueprint_get_uppercase_uuid_as_name",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_blueprint_get_uuid_not_gated",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_blueprint_name_lookup_at_1_1_rejected",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_not_found_atomic_bind_state",
+        "variants": [
+          "neutral_error_text"
+        ]
+      },
+      {
+        "case": "test_checkpoint_7.py::test_tenant_bind_requires_1_1",
+        "variants": [
+          "neutral_error_text"
+        ]
+      }
+    ],
+    "sensitive_unexplained": [],
+    "static_undetermined": [
+      {
+        "assertion": "assert_error(result, category='validation_error', detail_contains='name must be a non-empty string')",
+        "category": "validation_error",
+        "checkpoint_origin": "checkpoint_1",
+        "expected": "'name must be a non-empty string'",
+        "function": "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+        "kind": "error_text_contains",
+        "line": 568,
+        "rule": "wording-unstated",
+        "why": "'name must be a non-empty string' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
+      },
+      {
+        "assertion": "assert_error(result, category='validation_error', detail_contains='requirement_sets must be a non-empty array')",
+        "category": "validation_error",
+        "checkpoint_origin": "checkpoint_1",
+        "expected": "'requirement_sets must be a non-empty array'",
+        "function": "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+        "kind": "error_text_contains",
+        "line": 588,
+        "rule": "wording-unstated",
+        "why": "'requirement_sets must be a non-empty array' occurs neither in the specification nor among the test's inputs, so a conforming program would have to guess this wording"
+      },
+      {
+        "assertion": "assert_error(result, category='invalid_operation', detail_contains='invalid-op')",
+        "category": "invalid_operation",
+        "checkpoint_origin": "checkpoint_3",
+        "expected": "'invalid-op'",
+        "function": "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+        "kind": "error_text_contains",
+        "line": 265,
+        "rule": "content-unstated",
+        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'invalid-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+      },
+      {
+        "assertion": "assert_error(duplicate, category='duplicate_assignment', detail_contains=assignment_id)",
+        "category": "duplicate_assignment",
+        "checkpoint_origin": "checkpoint_3",
+        "expected": "assignment_id",
+        "function": "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+        "kind": "error_text_contains",
+        "line": 310,
+        "rule": "content-unstated",
+        "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
+      },
+      {
+        "assertion": "assert_error(mixed, category='duplicate_assignment', detail_contains=assignment_id)",
+        "category": "duplicate_assignment",
+        "checkpoint_origin": "checkpoint_3",
+        "expected": "assignment_id",
+        "function": "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+        "kind": "error_text_contains",
+        "line": 344,
+        "rule": "content-unstated",
+        "why": "the error_text_contains assertion needs the duplicate_assignment error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='invalid_operation', detail_contains='not-an-op')",
+        "category": "invalid_operation",
+        "checkpoint_origin": "checkpoint_3",
+        "expected": "'not-an-op'",
+        "function": "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+        "kind": "error_text_contains",
+        "line": 381,
+        "rule": "content-unstated",
+        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'not-an-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
+        "category": "invalid_operation",
+        "checkpoint_origin": "checkpoint_3",
+        "expected": "'bad-op'",
+        "function": "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+        "kind": "error_text_contains",
+        "line": 499,
+        "rule": "content-unstated",
+        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='invalid_operation', detail_contains='bad-op')",
+        "category": "invalid_operation",
+        "checkpoint_origin": "checkpoint_3",
+        "expected": "'bad-op'",
+        "function": "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+        "kind": "error_text_contains",
+        "line": 624,
+        "rule": "content-unstated",
+        "why": "the error_text_contains assertion needs the invalid_operation error text to contain 'bad-op', but no paragraph of the specification states what a invalid_operation detail or message contains"
+      },
+      {
+        "assertion": "assert_error(final_attempt, category='flash_failed', detail=image_a)",
+        "category": "flash_failed",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "image_a",
+        "function": "test_checkpoint_6.py::test_flash_requires_stored_image",
+        "kind": "error_text_equals",
+        "line": 193,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the flash_failed error text to equal image_a, but no paragraph of the specification states what a flash_failed detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='not_found', detail=missing)",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "missing",
+        "function": "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+        "kind": "error_text_equals",
+        "line": 208,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_error(get_deleted, category='not_found', detail=tag['uuid'])",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "tag['uuid']",
+        "function": "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+        "kind": "error_text_equals",
+        "line": 289,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal tag['uuid'], but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category=category, detail=detail)",
+        "category": null,
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "detail",
+        "function": "test_checkpoint_6.py::test_flash_bad_image",
+        "kind": "error_text_equals",
+        "line": 329,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the <unknown category> error text to equal detail, but no paragraph of the specification states what a <unknown category> detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='invalid_image', detail='NOT-A-VALID-UUID')",
+        "category": "invalid_image",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "'NOT-A-VALID-UUID'",
+        "function": "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+        "kind": "error_text_equals",
+        "line": 343,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the invalid_image error text to equal 'NOT-A-VALID-UUID', but no paragraph of the specification states what a invalid_image detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='invalid_image', detail='A1B2C3D4-E5F6-7890-ABCD-EF1234567890')",
+        "category": "invalid_image",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "'A1B2C3D4-E5F6-7890-ABCD-EF1234567890'",
+        "function": "test_checkpoint_6.py::test_create_invalid_firmware_image",
+        "kind": "error_text_equals",
+        "line": 362,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the invalid_image error text to equal 'A1B2C3D4-E5F6-7890-ABCD-EF1234567890', but no paragraph of the specification states what a invalid_image detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='not_found', detail=missing)",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "missing",
+        "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+        "kind": "error_text_equals",
+        "line": 376,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_error(flash, category='not_found', detail=missing)",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "missing",
+        "function": "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+        "kind": "error_text_equals",
+        "line": 383,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='not_found', detail=missing)",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "missing",
+        "function": "test_checkpoint_6.py::test_tag_create_requires_module",
+        "kind": "error_text_equals",
+        "line": 519,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_error(first_attempt, category='flash_failed', detail=new_image)",
+        "category": "flash_failed",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "new_image",
+        "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+        "kind": "error_text_equals",
+        "line": 1017,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
+      },
+      {
+        "assertion": "assert_error(second_attempt, category='flash_failed', detail=new_image)",
+        "category": "flash_failed",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "new_image",
+        "function": "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+        "kind": "error_text_equals",
+        "line": 1024,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the flash_failed error text to equal new_image, but no paragraph of the specification states what a flash_failed detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='not_found', detail=missing)",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_6",
+        "expected": "missing",
+        "function": "test_checkpoint_6.py::test_tag_get_delete_nonexistent",
+        "kind": "error_text_equals",
+        "line": 1170,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal missing, but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_compact_sorted_json_output(result)",
+        "category": null,
+        "checkpoint_origin": "checkpoint_7",
+        "expected": "",
+        "function": "test_checkpoint_7.py::test_revision_preserves_compact_json",
+        "kind": "output_bytes",
+        "line": 469,
+        "rule": "format-unstated",
+        "why": "the test compares stdout byte for byte, but the specification names no output byte format (none of: compact, sorted key, sort_keys, key order, keys sorted, whitespace between, no whitespace, trailing newline, no newline, indent, separators)"
+      },
+      {
+        "assertion": "assert_error(result, category='not_found', detail=uuid_shaped_name, revision='1.2')",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_7",
+        "expected": "uuid_shaped_name",
+        "function": "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+        "kind": "error_text_equals",
+        "line": 925,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal uuid_shaped_name, but no paragraph of the specification states what a not_found detail or message contains"
+      },
+      {
+        "assertion": "assert_error(result, category='not_found', detail=parent_uuid, revision=revision)",
+        "category": "not_found",
+        "checkpoint_origin": "checkpoint_7",
+        "expected": "parent_uuid",
+        "function": "test_checkpoint_7.py::test_unit_missing_parent_not_found",
+        "kind": "error_text_equals",
+        "line": 952,
+        "rule": "exact-unstated",
+        "why": "the error_text_equals assertion needs the not_found error text to equal parent_uuid, but no paragraph of the specification states what a not_found detail or message contains"
+      }
+    ],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 40,
+          "total": 40
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 19,
+            "sensitive": [
+              "test_checkpoint_1.py::test_blueprint_delete_missing_uuid_returns_not_found",
+              "test_checkpoint_1.py::test_blueprint_get_and_delete_single_uuid",
+              "test_checkpoint_1.py::test_blueprint_get_nonexistent_uuid_returns_not_found",
+              "test_checkpoint_1.py::test_create_missing_required_fields_reports_sorted_unique_messages",
+              "test_checkpoint_1.py::test_create_rejects_boolean_resource_count",
+              "test_checkpoint_1.py::test_create_rejects_capabilities_with_non_string_elements",
+              "test_checkpoint_1.py::test_create_rejects_duplicate_name_with_conflict",
+              "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+              "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+              "test_checkpoint_1.py::test_create_rejects_float_resource_count",
+              "test_checkpoint_1.py::test_create_rejects_invalid_json_input",
+              "test_checkpoint_1.py::test_create_rejects_multiple_unsupported_keys",
+              "test_checkpoint_1.py::test_create_rejects_non_array_requirement_sets",
+              "test_checkpoint_1.py::test_create_rejects_non_string_name_type",
+              "test_checkpoint_1.py::test_create_rejects_requirement_set_missing_required_keys",
+              "test_checkpoint_1.py::test_create_rejects_unsupported_key_as_sole_violation",
+              "test_checkpoint_1.py::test_create_validation_aggregates_top_level_and_nested_failures",
+              "test_checkpoint_1.py::test_create_validation_aggregates_unique_sorted_messages",
+              "test_checkpoint_1.py::test_create_validation_deduplicates_messages_across_requirement_sets",
+              "test_checkpoint_1.py::test_create_validation_failure_is_atomic",
+              "test_checkpoint_1.py::test_delete_names_is_atomic_and_reports_sorted_unresolved"
+            ],
+            "total": 40
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 40,
+            "sensitive": [],
+            "total": 40
+          }
+        }
+      },
+      "checkpoint_2": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 70,
+          "total": 70
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 46,
+            "sensitive": [
+              "test_checkpoint_2.py::test_allocation_create_unknown_blueprint_not_found",
+              "test_checkpoint_2.py::test_allocation_get_malformed_uuid_returns_not_found",
+              "test_checkpoint_2.py::test_allocation_get_unknown_uuid_not_found"
+            ],
+            "total": 70
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 70,
+            "sensitive": [],
+            "total": 70
+          }
+        }
+      },
+      "checkpoint_3": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 101,
+          "total": 101
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 60,
+            "sensitive": [
+              "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+              "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+              "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+              "test_checkpoint_3.py::test_bind_missing_assignment_id",
+              "test_checkpoint_3.py::test_bind_not_found_lists_sorted_ids",
+              "test_checkpoint_3.py::test_bind_rejects_empty_allocations[empty_allocations]",
+              "test_checkpoint_3.py::test_bind_rejects_empty_allocations[missing_allocations]",
+              "test_checkpoint_3.py::test_delete_ids_rejects_partial_matches",
+              "test_checkpoint_3.py::test_delete_ids_reports_missing_uuids",
+              "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[both_flags]",
+              "test_checkpoint_3.py::test_delete_requires_exactly_one_mode_flag[no_flag]",
+              "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+              "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+              "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+              "test_checkpoint_3.py::test_not_found_mixed_ops_atomic_vs_duplicate",
+              "test_checkpoint_3.py::test_not_found_precedes_duplicate",
+              "test_checkpoint_3.py::test_validation_precedes_op_and_not_found"
+            ],
+            "total": 101
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 101,
+            "sensitive": [],
+            "total": 101
+          }
+        }
+      },
+      "checkpoint_4": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 142,
+          "total": 142
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 85,
+            "sensitive": [
+              "test_checkpoint_4.py::test_create_bool_capacity[False]",
+              "test_checkpoint_4.py::test_create_bool_capacity[True]",
+              "test_checkpoint_4.py::test_create_float_capacity",
+              "test_checkpoint_4.py::test_create_invalid_parent_uuid[123]",
+              "test_checkpoint_4.py::test_create_invalid_parent_uuid[]",
+              "test_checkpoint_4.py::test_create_missing_all_required_fields",
+              "test_checkpoint_4.py::test_create_parent_not_found",
+              "test_checkpoint_4.py::test_create_rejects_wrong_types[category-123]",
+              "test_checkpoint_4.py::test_create_rejects_wrong_types[host-field_value2]",
+              "test_checkpoint_4.py::test_create_rejects_wrong_types[manufacturer-True]",
+              "test_checkpoint_4.py::test_create_reports_all_invalid",
+              "test_checkpoint_4.py::test_create_string_capacity",
+              "test_checkpoint_4.py::test_create_uuid_parent_not_found[11111111-1111-1111-1111-111111111111]",
+              "test_checkpoint_4.py::test_create_uuid_parent_not_found[aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa]",
+              "test_checkpoint_4.py::test_get_missing_not_found",
+              "test_checkpoint_4.py::test_get_not_found_exact_detail"
+            ],
+            "total": 142
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 142,
+            "sensitive": [],
+            "total": 142
+          }
+        }
+      },
+      "checkpoint_5": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 166,
+          "total": 166
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 106,
+            "sensitive": [
+              "test_checkpoint_5.py::test_create_rejects_non_array_capabilities",
+              "test_checkpoint_5.py::test_create_rejects_non_string_capabilities",
+              "test_checkpoint_5.py::test_transition_unknown_unit_not_found"
+            ],
+            "total": 166
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 166,
+            "sensitive": [],
+            "total": 166
+          }
+        }
+      },
+      "checkpoint_6": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 214,
+          "total": 214
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 130,
+            "sensitive": [
+              "test_checkpoint_6.py::test_create_component_type_null",
+              "test_checkpoint_6.py::test_create_invalid_firmware_image",
+              "test_checkpoint_6.py::test_create_missing_component_type",
+              "test_checkpoint_6.py::test_create_missing_unit_uuid",
+              "test_checkpoint_6.py::test_create_rejects_bad_component_type[7]",
+              "test_checkpoint_6.py::test_create_rejects_bad_component_type[]",
+              "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+              "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
+              "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
+              "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
+              "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+              "test_checkpoint_6.py::test_flash_requires_stored_image",
+              "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+              "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+              "test_checkpoint_6.py::test_list_filter_requires_equals",
+              "test_checkpoint_6.py::test_tag_conflict_detail",
+              "test_checkpoint_6.py::test_tag_create_rejects_empty",
+              "test_checkpoint_6.py::test_tag_create_requires_module",
+              "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+              "test_checkpoint_6.py::test_tag_duplicate_key_conflict",
+              "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
+              "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
+              "test_checkpoint_6.py::test_tag_key_scope_per_module",
+              "test_checkpoint_6.py::test_tag_update_unknown_command"
+            ],
+            "total": 214
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 214,
+            "sensitive": [],
+            "total": 214
+          }
+        }
+      },
+      "checkpoint_7": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 251,
+          "total": 251
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 157,
+            "sensitive": [
+              "test_checkpoint_7.py::test_blueprint_get_missing_name",
+              "test_checkpoint_7.py::test_blueprint_get_name_requires_1_2",
+              "test_checkpoint_7.py::test_blueprint_get_uppercase_uuid_as_name",
+              "test_checkpoint_7.py::test_blueprint_get_uuid_not_gated",
+              "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+              "test_checkpoint_7.py::test_blueprint_name_lookup_at_1_1_rejected",
+              "test_checkpoint_7.py::test_not_found_atomic_bind_state",
+              "test_checkpoint_7.py::test_tenant_bind_requires_1_1",
+              "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
+              "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
+            ],
+            "total": 251
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 250,
+            "sensitive": [
+              "test_checkpoint_7.py::test_revision_preserves_compact_json"
+            ],
+            "total": 251
+          }
+        }
+      },
+      "checkpoint_8": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 295,
+          "total": 295
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 201,
+            "sensitive": [],
+            "total": 295
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 294,
+            "sensitive": [],
+            "total": 295
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 25,
+      "flagged_by_checkpoint": {
+        "checkpoint_1": 2,
+        "checkpoint_3": 6,
+        "checkpoint_6": 13,
+        "checkpoint_7": 4
+      },
+      "flagged_by_rule": {
+        "content-unstated": 6,
+        "exact-unstated": 16,
+        "format-unstated": 1,
+        "wording-unstated": 2
+      },
+      "sensitive_determined": 70,
+      "sensitive_unexplained": 0,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
   "steps": [
     "checkpoint_1",
     "checkpoint_2",

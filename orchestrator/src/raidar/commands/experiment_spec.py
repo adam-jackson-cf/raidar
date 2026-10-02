@@ -207,6 +207,10 @@ def migrate_job_command(
     Refused unless the executed lock's execution section, translated into the
     v2 vocabulary, equals the current lock's. Legacy files are kept byte for
     byte in legacy-v1/ and job.json records both digests and their sha256.
+
+    A schema v2 job whose lock differs from --lock only in pinned problem errata
+    is moved onto it instead (errata adoption): its executed lock is kept in
+    lock-history/ and job.json records the move under lock_migrations.
     """
     try:
         result = migrate_job(

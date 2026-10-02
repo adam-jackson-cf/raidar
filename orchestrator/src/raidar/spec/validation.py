@@ -363,6 +363,22 @@ def _protocol_config_issues(
     ]
 
 
+ERRATA_CONFIG_KEY = "errata"
+
+
+def _errata_config_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """Problem errata come from the problem's committed errata file through the lock only."""
+    return [
+        FieldIssue(
+            f"assessment.scorer_config.{ref}.{ERRATA_CONFIG_KEY}",
+            "problem errata are pinned by the problem's committed <version>.errata.yaml and "
+            "reach scorers through the lock; leave it out",
+        )
+        for ref, config in spec.assessment.scorer_config.items()
+        if ERRATA_CONFIG_KEY in config
+    ]
+
+
 def semantic_issues(
     spec: ExperimentSpec,
     metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
@@ -392,6 +408,7 @@ def semantic_issues(
         *_protocol_config_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),
+        *_errata_config_issues(spec),
     ]
     labels = [*kind_issues(spec), *(name_issues(spec, path) if naming else [])]
     if structural:

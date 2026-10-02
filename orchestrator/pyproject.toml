@@ -7,6 +7,8 @@ dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "pyyaml>=6.0",
+    # PEP 508/440 parsing of the requirements a graded submission declares (FCR-007).
+    "packaging>=24.0",
     "click>=8.0",
     "python-dotenv>=1.2.2",
     "aiohttp>=3.13.5",
@@ -54,6 +56,7 @@ component = "raidar.components.registry:component_resolver"
 "workspace-files@1" = "raidar.components.builtins.workspace:WORKSPACE_FILES"
 "lint-config@1" = "raidar.components.builtins.workspace:LINT_CONFIG"
 "lint-tool@1" = "raidar.components.builtins.tools:LINT_TOOL"
+"lint-tool@2" = "raidar.components.builtins.tools_v2:LINT_TOOL_V2"
 "skills@1" = "raidar.components.builtins.harness:SKILLS"
 "harness-settings@1" = "raidar.components.builtins.harness:HARNESS_SETTINGS"
 "stop-hook@1" = "raidar.components.builtins.harness:STOP_HOOK"

@@ -41,10 +41,10 @@
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "a53964055b630d41c67c5113287c596a35689c77d211fdd7fa9ca880281510df",
+          "digest": "411904325ac881d76447e7e94f0687fa8160c6778c8173f43b8e83b30717309a",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "a0b243a11d545e50af43e0353948ae72f7256ff2737d536d2f726e632c56e6bf",
+            "implementation_digest": "09fe7aaee12c76ac2650006abf85de85ade5abb752f29d2f43829a3a334acd87",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -251,10 +251,10 @@
           }
         },
         "correctness@1": {
-          "digest": "d81a153b6d0017fdab92d5dc0e7d16653854a4d0553305e680a2fffc07db9632",
+          "digest": "de2e67bd3d4e10cd7fda39536a91035d92e9fa75311fe6bd0ca80964c4627523",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "0658561ed5985d7de95fd102e7b2b50251f61d39e40a8787ad56509d296dd64f",
+            "implementation_digest": "357ddba8d0496fe374fac912c04a6fb146b3a4ebf28c9a2334569ed9ff862a25",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -370,6 +370,42 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "Errata-applied solve: the strict rule over the graded cases the lock's pinned problem errata keeps (exclude-from-solved cases left out); not_applicable without an errata.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_errata",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
@@ -382,10 +418,10 @@
           }
         },
         "process-compliance@1": {
-          "digest": "a7f692794fff18b6c84ad5f9f5d0492e6c877a75bb7a742773505d57cc3a68ab",
+          "digest": "63f895bd106c2381593dfb13e802cd61beb886b94d7a46c23830b21132e23925",
           "metadata": {
             "implementation": "raidar.scorers.process_compliance:process_compliance_scorer",
-            "implementation_digest": "fa56bb3b00234860e92f9098178a5b8540be5d801c145a05e792d795235f079c",
+            "implementation_digest": "ab434a2dd46fab6a3983c27c46f1ee4fb074ddd30f8c187a144a2f0ccdaf819c",
             "jev_policies": {
               "process-compliance.residue": {
                 "digest": "b2805ba4272ecfdf47d52f3e71a64cd6d633e689621eb62def8926ddb076a215",
@@ -460,10 +496,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "51a7f116d57136fd2560c9cd7b1c64ba3b6d3fd6b31e749584d1646e61e6bdbb",
+          "digest": "8d26a20690177b8d1ea3369c699e2cfff0f526fc212a524ffa0789407c9f71da",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "ad6657b5e86c1e141d6b6c871304c46b74179578f52712398e9d7fea7155f1ce",
+            "implementation_digest": "bf8b7e08ce1f284c27af931f133900aea4098c5f30be4a990e453b26c0626145",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -615,7 +651,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "4fec360e7836b7ee544fe31d6fa1685379e1af8ca3a5adb8e7c15f9fb409a2c9",
+  "document_sha256": "ebaad4123a52e12ffef13888cc4caf96ba508f0732816205669b75c87bf6ef43",
   "execution": {
     "arms": {
       "baseline": {
@@ -920,6 +956,37 @@
             "bundle_sha256": "6ab17bb4ebf36d44b488de06a5143d9d15388f8dacf7ac8a4875eeddc941c04b",
             "checkpoints": 8,
             "entry_file": "forge.py",
+            "errata": {
+              "exclude_from_solved": [
+                "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+                "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+                "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+                "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+                "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+                "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+                "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+                "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+                "test_checkpoint_6.py::test_create_invalid_firmware_image",
+                "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+                "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
+                "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
+                "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
+                "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+                "test_checkpoint_6.py::test_flash_requires_stored_image",
+                "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+                "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+                "test_checkpoint_6.py::test_tag_create_requires_module",
+                "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+                "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
+                "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
+                "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+                "test_checkpoint_7.py::test_revision_preserves_compact_json",
+                "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
+                "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
+              ],
+              "informational": [],
+              "sha256": "9a6dec369dea9c158ea93b6adbcb5db9a487078a7067dc75f967e5e1b3002d4e"
+            },
             "mode": "multi_checkpoint",
             "pack_image": "raidar/pack-python:2b91a52663e099f2",
             "source": {
@@ -964,7 +1031,7 @@
     "source_sha256": "b57891fe34bc8f2714146692df6f9df36a6bec8e42a28e3455012979cccf46ec",
     "spec_sha256": "a155a33425bfa932544cf6c5d863b1427811032113ee66230ec97983ec11ac63"
   },
-  "lock_sha256": "015c57e4f59cb842d9c4557b3486490ca699c12d6d4b52c744da0bdfc478acb1",
+  "lock_sha256": "15c1eb4e3a1b243ce47090737a04cc9dc06a14a40b6621ab59f220123e38b901",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -972,9 +1039,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "21e9979674cf9850cc02fcba308bfa515d40902d2ed9e142441b014768d2d70b",
-    "execution": "015c57e4f59cb842d9c4557b3486490ca699c12d6d4b52c744da0bdfc478acb1",
-    "toolchain": "9c31882e7001ccd744dfae686ae6eb0b44f1eed2337090e942eb2d4340326160"
+    "assessment": "875b3ca455c5012097e51a75f3028401d7d33e9cdb4b11f3aab889006f1991e0",
+    "execution": "15c1eb4e3a1b243ce47090737a04cc9dc06a14a40b6621ab59f220123e38b901",
+    "toolchain": "1ac701670acfa918d3b4b47df46826715896dfef29b4a2e7b566f3b8d4006344"
   },
   "spec": {
     "agents": [
@@ -1108,6 +1175,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "028ee2fe6b13ec09431da32bce93c9248a0c9542b12369a4fdb0217216c4bec6"
+    "raidar_spec": "7148e129dc90f308013ecb5ba1a502739de1b67a4cbca408aa123b688334113c"
   }
 }

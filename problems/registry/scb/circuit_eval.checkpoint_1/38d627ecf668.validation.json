@@ -306,6 +306,85 @@
   "problem": "scb/circuit_eval.checkpoint_1@38d627ecf668",
   "repeats": 3,
   "schema_version": 1,
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 2,
+      "by_rule": {
+        "content-stated": 1,
+        "literal-in-spec": 1
+      }
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {
+        "docker_context": "orbstack",
+        "grader_environment_id": "sha256:874d2b90b9adadca5aae0958053763e32c961f56990fcb952b2ed02a015ef9bf",
+        "grader_image": "raidar-oracle-grader:76fabb7fb4f407d7"
+      },
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [
+      {
+        "case": "test_checkpoint_1.py::test_check_cycle_error_message",
+        "variants": [
+          "neutral_error_text"
+        ]
+      }
+    ],
+    "sensitive_unexplained": [],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 36,
+          "total": 36
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 35,
+            "sensitive": [
+              "test_checkpoint_1.py::test_check_cycle_error_message"
+            ],
+            "total": 36
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 36,
+            "sensitive": [],
+            "total": 36
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 1,
+      "sensitive_unexplained": 0,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
   "steps": [
     "checkpoint_1"
   ],

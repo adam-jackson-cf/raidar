@@ -4,12 +4,15 @@ Wiring (ADR-001 Appendix A.1): the Raidar verifier is selected per trial
 through ``TrialConfig.verifier`` (it is not a ``task.toml`` setting in Harbor
 0.23), pointed at the problem's host-only verifier bundle, grading Harbor's host
 copy of ``/app`` (accepted N1 decision ``snapshot_source=artifact``) with the
-separate coverage pass on.
+separate coverage pass on. A problem whose lock pins an errata passes it to the
+verifier, which records the errata-applied verdict beside the raw grade.
 """
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig, TrialConfig, VerifierConfig
 
@@ -32,6 +35,7 @@ def harbor_trial_config(
     trials_dir: Path,
     bundle_root: Path,
     docker_context: str,
+    errata: Mapping[str, Any] | None = None,
 ) -> TrialConfig:
     spec = plan.loaded.spec
     harness = spec.agent(next(a.agent for a in spec.arms if a.id == trial.arm)).harness
@@ -56,6 +60,7 @@ def harbor_trial_config(
                 "snapshot_source": spec.protocol.snapshot_source,
                 "coverage": True,
                 "grader_timeout_s": grader_timeout,
+                **({"errata": dict(errata)} if errata is not None else {}),
             },
         ),
     )

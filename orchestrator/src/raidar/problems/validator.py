@@ -7,7 +7,11 @@ Engines:
 - ``harbor``: the imported task run as Harbor trials with the ``oracle`` agent
   and the Raidar verifier (``raidar.problems.harbor_engine``).
 
-The native parity arm runs only when an SCB fork checkout is given.
+The native parity arm runs only when an SCB fork checkout is given. The
+spec-determinacy audit (``raidar.problems.audit``) runs by default and grades its
+reference variants in the direct engine's grader sandbox whatever the engine;
+``audit_problem`` runs it alone and ``merge_audit`` writes it into the committed
+report without touching that report's checks or verdict.
 """
 
 from __future__ import annotations
@@ -20,6 +24,7 @@ from importlib.metadata import version
 from pathlib import Path
 
 from raidar.problems import direct, harbor_engine
+from raidar.problems.audit import DynamicEvidence, audit_report, grade_audit_variants
 from raidar.problems.importer import resolve_checkout
 from raidar.problems.models import ProblemId
 from raidar.problems.native import NativeRunner, stage_catalog
@@ -36,7 +41,6 @@ from raidar.problems.validation import (
     read_validation_record,
     run_checks,
 )
-from raidar.verifier.grader import DEFAULT_RUN_TIMEOUT_S
 from raidar.verifier.grader_image import ensure_grader_image, grader_image_tag
 from raidar.verifier.sandbox import DockerSandbox, GradingSandbox
 
@@ -48,10 +52,11 @@ class ValidateOptions:
     engine: str = "direct"
     repeats: int = 3
     concurrency: int = direct.DEFAULT_CONCURRENCY
-    timeout_s: float = DEFAULT_RUN_TIMEOUT_S
+    timeout_s: float = direct.DEFAULT_RUN_TIMEOUT_S
     docker_context: str = "orbstack"
     native_runner: Path | None = None
     source_checkout: Path | None = None
+    audit: bool = True
 
 
 async def _docker_sandbox(
@@ -151,6 +156,11 @@ async def validate_problem(
         if options.native_runner is not None:
             native = await asyncio.to_thread(_native_runs, store, problem, options, work)
             environment["native_runner"] = NativeRunner(options.native_runner).revision()
+        audit = (
+            await _audit(problem, options, sandbox=sandbox, work_root=work)
+            if options.audit
+            else None
+        )
     runs = ValidationRuns(oracle=oracle, native=native)
     return ValidationReport(
         problem=str(problem_id),
@@ -162,7 +172,58 @@ async def validate_problem(
         checks=run_checks(runs),
         runs=runs,
         environment=environment,
+        spec_determinacy=audit,
     )
+
+
+async def _audit(
+    problem: ImportedProblem,
+    options: ValidateOptions,
+    *,
+    sandbox: GradingSandbox | None,
+    work_root: Path | None,
+) -> dict[str, object]:
+    details: dict[str, object] = {}
+    if sandbox is None:
+        sandbox, details = await _docker_sandbox(problem, options.docker_context)
+    dynamic = await grade_audit_variants(
+        problem,
+        sandbox,
+        concurrency=options.concurrency,
+        timeout_s=options.timeout_s,
+        work_root=work_root,
+    )
+    environment = {**details, **(dynamic.environment or {})}
+    return audit_report(problem, DynamicEvidence(dynamic.grades, dynamic.not_run, environment))
+
+
+async def audit_problem(
+    store: ProblemStore,
+    problem_id: ProblemId,
+    options: ValidateOptions,
+    *,
+    sandbox: GradingSandbox | None = None,
+    work_root: Path | None = None,
+) -> dict[str, object]:
+    """The spec-determinacy audit alone (``raidar problem validate --audit-only``)."""
+    problem = store.load(problem_id)
+    return await _audit(problem, options, sandbox=sandbox, work_root=work_root)
+
+
+def merge_audit(store: ProblemStore, problem_id: ProblemId, audit: dict[str, object]) -> Path:
+    """Write ``audit`` into the committed report of the current manifest; nothing else changes."""
+    path = store.validation_path(problem_id)
+    manifest = store.load_manifest(problem_id)
+    record = read_validation_record(path)
+    if record.manifest_sha256 != manifest.digest():
+        raise ValidationRecordError(
+            f"{path} is for manifest {record.manifest_sha256[:12]}, not "
+            f"{manifest.digest()[:12]}; run a full validation instead"
+        )
+    report = json.loads(path.read_text())
+    report["spec_determinacy"] = audit
+    path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n")
+    return path
 
 
 def default_report_path(store: ProblemStore, report: ValidationReport) -> Path:

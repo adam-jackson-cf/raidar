@@ -56,6 +56,12 @@ from raidar.verifier.sandbox import (
     sandbox_argv,
     sandbox_env,
 )
+from raidar.verifier.submission_deps import (
+    SubmissionDependencies,
+    provisioned_pins,
+    python_path_entries,
+    resolve_dependencies,
+)
 
 DEFAULT_RUN_TIMEOUT_S = 900.0
 BUDGET_MARGIN_S = 60.0
@@ -70,6 +76,7 @@ class RunOutcome:
     evidence: RunEvidence | None
     timing_sensitive: tuple[str, ...]
     seconds: float
+    dependencies: SubmissionDependencies | None = None
 
 
 @dataclass(frozen=True)
@@ -172,6 +179,9 @@ async def run_oracle(
     role = "coverage" if coverage else "grading"
     started = time.perf_counter()
     app, out = _stage(snapshot, run_dir)
+    dependencies = resolve_dependencies(
+        app, provisioned_pins(bundle.manifest.grader.test_dependencies)
+    )
     argv, prefix = sandbox_argv(step, sandbox.layout, coverage=coverage)
     result = await sandbox.run(
         SandboxRun(
@@ -184,6 +194,7 @@ async def run_oracle(
                 sandbox.layout,
                 coverage=coverage,
                 budget_s=grading_budget(step, timeout_s),
+                python_path=python_path_entries(dependencies),
             ),
             timeout_s=timeout_s,
             cpus=bundle.manifest.grader.cpus,
@@ -193,7 +204,7 @@ async def run_oracle(
     (out / "sandbox.log").write_text(result.output)
     infra = _sandbox_infra(result, out / LEDGER_NAME)
     if infra is not None:
-        return RunOutcome(role, (), infra, None, (), time.perf_counter() - started)
+        return RunOutcome(role, (), infra, None, (), time.perf_counter() - started, dependencies)
     ledger = json.loads((out / LEDGER_NAME).read_text())
     evidence = _evidence(
         role,
@@ -217,6 +228,7 @@ async def run_oracle(
         evidence=evidence,
         timing_sensitive=timing_sensitive(ledger, step.timeout_s),
         seconds=time.perf_counter() - started,
+        dependencies=dependencies,
     )
 
 

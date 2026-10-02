@@ -15,7 +15,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.execution.agent_config import reported_harness_pin
-from raidar.execution.assessment import write_assessment_config
+from raidar.execution.assessment import lock_errata, write_assessment_config
 from raidar.execution.driver import TrialRunner, run_harbor_trial, run_in_order
 from raidar.execution.materialise import MaterialisedTask, environment_cold, materialise_task
 from raidar.execution.models import PlannedTrial, TrialRecord
@@ -100,6 +100,7 @@ async def _run_and_classify(ctx: JobContext, trial: PlannedTrial) -> TrialRecord
         trials_dir=ctx.trials_dir,
         bundle_root=problem.bundle.root,
         docker_context=ctx.docker_context,
+        errata=plan.problems[trial.problem_index].errata,
     )
     outcome = await ctx.runner(config, problem.bundle.root, task.provisions)
     evidence = TrialEvidence(
@@ -184,7 +185,12 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
     _write_json(ctx.job_dir / PLAN_FILE, plan.to_json())
     if plan.lock:
         _write_json(ctx.job_dir / JOB_LOCK_FILE, plan.lock)
-    write_assessment_config(plan.loaded.spec.assessment, plan.loaded.spec.protocol, ctx.job_dir)
+    write_assessment_config(
+        plan.loaded.spec.assessment,
+        plan.loaded.spec.protocol,
+        ctx.job_dir,
+        lock_errata(plan.lock),
+    )
     manifest: dict[str, object] = {
         "kind": JOB_KIND,
         "experiment": plan.experiment_id,

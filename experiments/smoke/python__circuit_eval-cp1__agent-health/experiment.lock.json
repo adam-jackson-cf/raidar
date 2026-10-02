@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@1": {
-          "digest": "d81a153b6d0017fdab92d5dc0e7d16653854a4d0553305e680a2fffc07db9632",
+          "digest": "de2e67bd3d4e10cd7fda39536a91035d92e9fa75311fe6bd0ca80964c4627523",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "0658561ed5985d7de95fd102e7b2b50251f61d39e40a8787ad56509d296dd64f",
+            "implementation_digest": "357ddba8d0496fe374fac912c04a6fb146b3a4ebf28c9a2334569ed9ff862a25",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -161,6 +161,42 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "Errata-applied solve: the strict rule over the graded cases the lock's pinned problem errata keeps (exclude-from-solved cases left out); not_applicable without an errata.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_errata",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
@@ -187,7 +223,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "15bb4c92ad7948546087b78a01c4d584c70bdc74b6394254b31075c4d826a758",
+  "document_sha256": "a9ec62f1694a3074cf62cdaef0a8e36d47dc5eea5d5dc35f36a476c3cd0f22d9",
   "execution": {
     "arms": {
       "baseline": {
@@ -309,9 +345,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "bb787e0f9b4ee0fb5b7568f9ed31bcac30ded7b0d4b0b05774103a6e16919712",
+    "assessment": "6be68c3511af4365c8e11039950508df13cd651f105efbfcadfa325d66e5d2e2",
     "execution": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
-    "toolchain": "9c31882e7001ccd744dfae686ae6eb0b44f1eed2337090e942eb2d4340326160"
+    "toolchain": "1ac701670acfa918d3b4b47df46826715896dfef29b4a2e7b566f3b8d4006344"
   },
   "spec": {
     "agents": [
@@ -386,6 +422,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "028ee2fe6b13ec09431da32bce93c9248a0c9542b12369a4fdb0217216c4bec6"
+    "raidar_spec": "7148e129dc90f308013ecb5ba1a502739de1b67a4cbca408aa123b688334113c"
   }
 }

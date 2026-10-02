@@ -21,19 +21,20 @@ from __future__ import annotations
 import json
 import sys
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from pydantic import ValidationError
 
-from raidar.execution.assessment import rescore_config
+from raidar.execution.assessment import lock_errata, rescore_config
 from raidar.execution.models import TrialRecord
 from raidar.job_layout import is_legacy_job, legacy_job_message
 from raidar.scorers.rescore_config import RescoreConfig
 from raidar.spec.canonical import digest_json
 from raidar.spec.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.spec.schema import ExperimentSpec
+from raidar.verifier.errata import ErrataRef
 
 JOB_MANIFEST = "job.json"
 JOB_KIND = "raidar-job"
@@ -54,6 +55,8 @@ class ExperimentLock:
     conditions: Mapping[str, Any]
     problems: tuple[Mapping[str, Any], ...]
     path: Path | None = None
+    errata: Mapping[str, ErrataRef] = field(default_factory=dict)
+    """The problem errata the lock pins; correctness Assessments are keyed with them."""
 
     def condition_digest(self, condition: str) -> str:
         """The condition's locked contents, independent of the harness an arm compiles it for."""
@@ -138,6 +141,7 @@ def parse_lock(document: Mapping[str, Any], origin: Path) -> ExperimentLock:
             conditions=dict(execution.get("conditions") or {}),
             problems=tuple(execution.get("problems") or ()),
             path=origin,
+            errata=lock_errata(document),
         )
     except (KeyError, TypeError, ValidationError) as exc:
         raise JobSourceError(f"{origin} is not an experiment lock: {exc}") from exc
@@ -205,7 +209,7 @@ def load_job(job_dir: Path, locks: LockIndex) -> JobSource:
         manifest=manifest,
         plan=_read_object(job_dir / "plan.json"),
         lock=lock,
-        assessment=rescore_config(lock.spec.assessment, lock.spec.protocol),
+        assessment=rescore_config(lock.spec.assessment, lock.spec.protocol, errata=lock.errata),
         records=_records(job_dir),
         assessment_path=lock.path,
     )

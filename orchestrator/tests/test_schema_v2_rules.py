@@ -26,6 +26,7 @@ from tests.experiment_spec_support import (
     PILOT_EXPERIMENT,
     PILOT_ONESHOT,
     RUFF_LINT_EXPERIMENT,
+    RUFF_LINT_R2_EXPERIMENT,
     SMOKE_EXPERIMENT,
     experiment_document,
     write_experiment,
@@ -71,6 +72,7 @@ def test_every_committed_experiment_is_schema_v2_in_its_kind_directory() -> None
             AGENTS_BENCHMARK,
             GUIDED_R3_EXPERIMENT,
             RUFF_LINT_EXPERIMENT,
+            RUFF_LINT_R2_EXPERIMENT,
         ]
     )
     for path in files:

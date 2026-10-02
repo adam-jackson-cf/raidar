@@ -190,6 +190,26 @@ def _sample_size(report: AnalysisReport) -> list[str]:
     ]
 
 
+def _count(value: object) -> int:
+    return len(value) if isinstance(value, list) else 0
+
+
+def _errata_lines(report: AnalysisReport) -> list[str]:
+    """Which errata the ``*_errata`` outcomes apply; every other outcome is the raw grade."""
+    if not report.errata:
+        return []
+    pinned = "; ".join(
+        f"`{ref}` errata `{str(errata.get('sha256'))[:12]}` "
+        f"({_count(errata.get('exclude_from_solved'))} exclude-from-solved cases)"
+        for ref, errata in sorted(report.errata.items())
+    )
+    return [
+        f"- Problem errata: {pinned}. Only the `*_errata` outcomes (errata-applied solve, "
+        "reached, final solved) use it; every other outcome, including the primary, is the "
+        "raw SCB grade"
+    ]
+
+
 def _settings_line(report: AnalysisReport) -> str:
     settings = report.settings
     pinned = "pinned by the lock" if settings.pinned_by_lock else "not pinned by the lock"
@@ -259,6 +279,7 @@ def render_markdown(report: AnalysisReport) -> str:
     ]
     if report.replaced_trials:
         lines.append(f"- Replaced invalid trials: {', '.join(report.replaced_trials)}")
+    lines.extend(_errata_lines(report))
     header = (
         "Arm", "Planned", "Run", "Valid", "Infra error", "Not run",
         "Mean cost USD", "Mean tokens", "Mean agent s",

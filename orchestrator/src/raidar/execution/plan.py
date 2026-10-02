@@ -28,7 +28,7 @@ from raidar.execution.models import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.execution.progression import progression_rule
 from raidar.packs.python import PackSpec
 from raidar.problems.models import ProblemId
-from raidar.problems.store import ProblemStore
+from raidar.problems.store import ProblemStore, ProblemStoreError
 from raidar.spec.canonical import digest_json
 from raidar.spec.loader import LoadedExperiment
 
@@ -70,6 +70,9 @@ class ProblemTarget:
     ref: ProblemId
     digest: str
     steps: tuple[str, ...]
+    errata: Mapping[str, Any] | None = None
+    """The errata the lock pins (``sha256``, ``exclude_from_solved``); the verifier records
+    its verdicts."""
 
     def run_steps(self, max_checkpoints: int | None) -> tuple[str, ...]:
         return self.steps[:max_checkpoints] if max_checkpoints else self.steps
@@ -175,8 +178,16 @@ def _problems(
         manifest = store.load_manifest(problem)
         if manifest.digest() != locked[index]["digest"]:
             raise PlanError(f"problems.{index}: {entry.ref} changed since the lock; relock")
+        references = _lock_field(lock, "execution", "references").get("problem", {})
+        pinned = ((references.get(entry.ref) or {}).get("metadata") or {}).get("errata")
+        try:
+            errata = store.pinned_errata(problem, manifest, pinned)
+        except ProblemStoreError as exc:
+            raise PlanError(f"problems.{index}: {exc}") from exc
         targets.append(
-            ProblemTarget(index, problem, manifest.digest(), tuple(s.name for s in manifest.steps))
+            ProblemTarget(
+                index, problem, manifest.digest(), tuple(s.name for s in manifest.steps), errata
+            )
         )
     return tuple(targets)
 

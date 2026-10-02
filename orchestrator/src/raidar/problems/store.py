@@ -7,6 +7,8 @@ Layout (repo-root ``problems/``)::
     registry/.../<version>.validation.json     validation report (committed); a problem
                                                locks only under a usable verdict for
                                                its current manifest (F13)
+    registry/.../<version>.errata.yaml         optional pre-registered errata (committed);
+                                               the lock pins its sha256
     store/<dataset>/<problem>/<version>/       generated, gitignored:
         task/        agent-visible Harbor task (no hidden tests, no solutions)
         oracle/      host-only verifier bundle (hidden tests)
@@ -21,13 +23,16 @@ the start directory holding ``problems/sources.yaml`` wins.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import yaml
 from pydantic import ValidationError
 
 from raidar.problems.content import content_digest, hidden_content_in_task
+from raidar.problems.errata import ERRATA_SUFFIX, ErrataError, LoadedErrata, load_errata
 from raidar.problems.models import ProblemId, ProblemManifest, SourcePin
 from raidar.problems.validation import (
     ValidationRecord,
@@ -97,6 +102,37 @@ class ProblemStore:
 
     def validation_path(self, problem: ProblemId) -> Path:
         return self.root / "registry" / problem.name / f"{problem.version}.validation.json"
+
+    def errata_path(self, problem: ProblemId) -> Path:
+        return self.root / "registry" / problem.name / f"{problem.version}{ERRATA_SUFFIX}"
+
+    def load_errata(self, problem: ProblemId, manifest: ProblemManifest) -> LoadedErrata | None:
+        """The committed errata (None when there is none), refused if for another manifest."""
+        try:
+            return load_errata(
+                self.errata_path(problem), problem=str(problem), manifest_sha256=manifest.digest()
+            )
+        except ErrataError as exc:
+            raise ProblemStoreError(str(exc)) from exc
+
+    def pinned_errata(
+        self, problem: ProblemId, manifest: ProblemManifest, pinned: Mapping[str, Any] | None
+    ) -> dict[str, Any] | None:
+        """The errata a lock pinned (its metadata form), refused unless the store still holds it.
+
+        ``pinned`` is the lock's ``metadata.errata`` for the problem (None when it pins none).
+        """
+        current = self.load_errata(problem, manifest)
+        current_sha = current.sha256 if current is not None else None
+        pinned_sha = pinned.get("sha256") if pinned is not None else None
+        if pinned_sha != current_sha:
+            raise ProblemStoreError(f"{problem} errata changed since the lock; relock")
+        if pinned is None:
+            return None
+        return {
+            "sha256": str(pinned["sha256"]),
+            "exclude_from_solved": [str(case) for case in pinned.get("exclude_from_solved", [])],
+        }
 
     def validation_attempt_path(self, problem: ProblemId) -> Path:
         """Where a validation that hit infrastructure failures is written (not committed)."""

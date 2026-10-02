@@ -133,6 +133,12 @@ CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
+# Errata-applied solve outcomes (``correctness@1`` ``*_errata`` metrics): the same rules
+# over the cases the problem's pinned errata keeps. Never the primary outcome; reported
+# beside the raw ones and ``not_applicable`` for a problem without an errata.
+SOLVE_RATE_ERRATA = "solve_rate_errata"
+REACHED_ERRATA = "reached_errata"
+FINAL_SOLVED_ERRATA = "final_solved_errata"
 QUALITY_COMPONENTS = {
     "verbosity": "V",
     "erosion": "E",
@@ -176,6 +182,28 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
         "Final checkpoint solved",
         View.CONTINUE,
         declared_direction(CORRECTNESS, "solved"),
+        0.25,
+        Kind.BINARY,
+    ),
+    MetricDef(
+        SOLVE_RATE_ERRATA,
+        "Checkpoint solve rate under errata (errata-applied, not the raw SCB grade)",
+        View.CONTINUE,
+        declared_direction(CORRECTNESS, "solved_checkpoints_errata"),
+        0.125,
+    ),
+    MetricDef(
+        REACHED_ERRATA,
+        "Checkpoints reached under errata (errata-applied, strict)",
+        View.STRICT,
+        declared_direction(CORRECTNESS, REACHED_ERRATA),
+        1.0,
+    ),
+    MetricDef(
+        FINAL_SOLVED_ERRATA,
+        "Final checkpoint solved under errata (errata-applied)",
+        View.CONTINUE,
+        declared_direction(CORRECTNESS, "solved_errata"),
         0.25,
         Kind.BINARY,
     ),

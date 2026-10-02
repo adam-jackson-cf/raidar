@@ -145,11 +145,13 @@ def sandbox_env(
     *,
     coverage: bool,
     budget_s: float | None = None,
+    python_path: tuple[str, ...] = (),
 ) -> dict[str, str]:
+    """The grader's environment; ``python_path`` adds the submission's provided packages."""
     env = dict(bundle.manifest.env)
     env.update(
         {
-            "PYTHONPATH": layout.runtime,
+            "PYTHONPATH": ":".join((layout.runtime, *python_path)),
             "PYTHONDONTWRITEBYTECODE": "1",
             "HOME": f"{layout.scratch}/home",
             "UV_CACHE_DIR": f"{layout.scratch}/uv-cache",

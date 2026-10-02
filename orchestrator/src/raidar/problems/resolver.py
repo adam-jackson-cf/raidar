@@ -13,6 +13,13 @@ reported to the compatibility gate (``binding.validated``), which refuses the
 lock with ``RT0``; a validated problem's lock records the verdict and report
 digest.
 
+A problem with a committed errata (``<version>.errata.yaml``) also records it
+under ``metadata.errata``: the sha256 of the file and its case ids by
+disposition. The metadata is part of the execution section, so registering or
+changing an errata changes ``lock_sha256``: the verifier records
+errata-applied verdicts, and jobs say which errata they ran under. An errata
+for another manifest refuses the reference.
+
 A problem reference names a *binding*: one upstream problem imported against
 one runtime pack (``scb/...`` is the python binding, ``scb-node-ts/...`` would be
 the node-ts one). The manifest's ``pack`` is authoritative and reaches the gate
@@ -53,6 +60,7 @@ class ProblemResolver:
         try:
             store = ProblemStore(self.store_root or find_store_root(base_dir))
             manifest = store.load_manifest(problem)
+            errata = store.load_errata(problem, manifest)
         except ProblemStoreError as exc:
             raise RegistryReferenceError(str(exc)) from exc
         binding: dict[str, object] = {
@@ -69,6 +77,8 @@ class ProblemResolver:
                 binding={**binding, "validated": False, "validation_issue": str(exc)},
             )
         metadata = {**manifest.lock_metadata(), "validation": validation.lock_metadata()}
+        if errata is not None:
+            metadata["errata"] = errata.lock_metadata()
         return ResolvedReference(
             ref=ref,
             digest=manifest.digest(),

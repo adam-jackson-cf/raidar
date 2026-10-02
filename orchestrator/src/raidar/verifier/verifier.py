@@ -15,6 +15,10 @@ recorded), (3) grades a copy in a fresh
 no-network grader container and, optionally, (4) runs the separate coverage
 pass. It returns only the reward to Harbor and writes its records host-side.
 Tests are never uploaded to the agent environment.
+
+With ``errata`` (the lock's pinned ``ErrataRef``) the record also carries the
+errata-applied verdict (``raidar.verifier.errata``). The reward stays the raw
+verdict, so progression gates and every raw outcome are unchanged.
 """
 
 from __future__ import annotations
@@ -46,7 +50,9 @@ from raidar.verifier.records import (
     GraderRef,
     SnapshotRef,
     StepRecord,
+    errata_for,
     load_pre_agent_leak,
+    parse_errata,
     step_record_dir,
     stored_snapshot_path,
     write_step_evidence,
@@ -104,6 +110,7 @@ class RaidarVerifier(BaseVerifier):
         grader_timeout_s: float = DEFAULT_RUN_TIMEOUT_S,
         work_root: str | None = None,
         require_pre_agent_check: bool = True,
+        errata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -116,6 +123,7 @@ class RaidarVerifier(BaseVerifier):
         self.grader_timeout_s = grader_timeout_s
         self.work_root = Path(work_root) if work_root else None
         self.require_pre_agent_check = require_pre_agent_check
+        self.errata = parse_errata(errata)
 
     # --------------------------------------------------------------- hooks
     async def prepare_sandbox(self) -> tuple[GradingSandbox, GraderRef]:
@@ -269,6 +277,8 @@ class RaidarVerifier(BaseVerifier):
             pre_agent_leak_check=leaks[1],
             rewards=rewards,
             timings=dict(timings),
+            errata=errata_for(result.grade, self.errata),
+            submission_dependencies=result.grading.dependencies,
         )
 
 
