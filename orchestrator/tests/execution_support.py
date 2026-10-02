@@ -73,7 +73,8 @@ def imported_pack_fixture(root: Path, docker_context: str) -> ImportedFixture:
         validate_problem(
             store,
             problem,
-            ValidateOptions(repeats=1, concurrency=2, docker_context=docker_context),
+            # Two repeats: a usable verdict needs the repeat_identical checks (dab09a0).
+            ValidateOptions(repeats=2, concurrency=2, docker_context=docker_context),
             work_root=root,
         )
     )

@@ -124,10 +124,12 @@ make experiment-plan EXPERIMENT=rules-trial/experiment.yaml     # dry run: every
 
 ```bash
 make experiment-execute EXPERIMENT=rules-trial/experiment.yaml RUN_ID=first
-make perf-check RUN=runs/rules-trial/first                 # N1 overhead budgets
+make perf-check RUN=runs/rules-trial/first                 # N1 overhead budgets (report-only)
 ```
 
-`perf-check` fails a phase with fewer than `MIN_SAMPLES` samples (default 10) as `insufficient`, so a run of fewer than 10 trials fails it. For a small trial run, pass `MIN_SAMPLES=<trials>` to check the budgets on what there is.
+On a real run, `perf-check` is report-only. It lists each phase's p95 against its accepted budget and prints breaches as warnings: over budget, `insufficient` (fewer than `MIN_SAMPLES` samples, default 10), or `missing`. It also prints the run's contention context: the configured concurrency, the peak number of trials running at once, and any other Raidar runs under the same runs root that overlapped in time. It exits 0 on breaches and non-zero only on malformed or empty input. `PERF_STRICT=1` makes breaches fail. For a small trial run, pass `MIN_SAMPLES=<trials>` to judge the budgets on what there is.
+
+The enforced overhead check is `make perf-gate`. It runs the no-LLM fixture experiment (`make perf-fixture`) at concurrency 1 and then 3 and fails on any breach of the accepted budgets. It needs Docker, so it is a release/gate check and is not part of `make quality`.
 
 If a run is stopped mid-trial, `make harbor-cleanup RUN=runs/rules-trial/first` removes the trial environments it left behind.
 
@@ -172,4 +174,4 @@ make smoke-agents SMOKE_ARM=codex                         # one arm only
 - `experiments/`: scenario-epoch run history, ignored by git and read-only.
 - `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo, the Phase 1 gate packet, and the tracked Phase 0 spike evidence (`evidence/`).
 
-`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `examples/**/*.lock.json` is current), then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`.
+`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `examples/**/*.lock.json` is current), then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`. Docker-backed tests stay opt-in and are skipped there; the N1 overhead gate (`make perf-gate`) is run separately as a release/gate check.

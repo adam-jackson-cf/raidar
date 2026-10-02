@@ -59,7 +59,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(HARNESS_VERSION),$(AGENT_SMOKE_VERSION_$(
 	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-migrate-run-lock experiment-plan experiment-execute \
-	perf-check perf-fixture \
+	perf-check perf-fixture perf-gate \
 	problem-list problem-info problem-import problem-validate \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels \
@@ -123,9 +123,11 @@ help:
 	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
 	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock; overrides are labelled)"
-	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10]        Fail if any N1 phase p95 exceeds its accepted budget"
+	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10] [PERF_STRICT=1]"
+	@echo "                                                        Report each N1 phase p95 vs its budget plus trial concurrency/contention; breaches are warnings (exit 0) unless PERF_STRICT=1"
 	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
-	@echo "                                                        No-LLM fixture experiment (5 blocks x 2 arms) then perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
+	@echo "                                                        No-LLM fixture experiment (5 blocks x 2 arms) then strict perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
+	@echo "  make perf-gate [PERF_GATE_DIR=.tmp/perf-gate]          Enforced N1 overhead gate: perf-fixture at concurrency 1 and 3, strict; fails on any breach (Docker; release/gate check, not in make quality)"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
 	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
 	@echo "  make jev-export-labels POLICY=<policy> OUT=<labels.jsonl> [STORE=<assessment-store>] [LABELS=review-surface/data/jev-labels.json]"
@@ -353,7 +355,7 @@ experiment-execute: pack-build
 
 perf-check:
 	$(call require_var,RUN)
-	@$(RAIDAR) perf check $(RUN) $(if $(MIN_SAMPLES),--min-samples "$(MIN_SAMPLES)",)
+	@$(RAIDAR) perf check $(RUN) $(if $(MIN_SAMPLES),--min-samples "$(MIN_SAMPLES)",) $(if $(filter 1,$(PERF_STRICT)),--strict,)
 
 PERF_FIXTURE_DIR ?=
 PERF_FIXTURE_CONCURRENCY ?=
@@ -365,6 +367,16 @@ perf-fixture:
 		$(if $(PERF_FIXTURE_CONCURRENCY),export RAIDAR_PERF_FIXTURE_CONCURRENCY="$(PERF_FIXTURE_CONCURRENCY)" &&,) \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
 		python -m pytest tests/test_execution_perf_fixture.py -v -s -rs
+
+# The enforced N1 overhead gate: the no-LLM fixture at fixed concurrency 1 and 3, each
+# checked strictly against the accepted budgets. Needs Docker, so it is a release/gate
+# check, not part of make quality (whose Docker tests stay opt-in and skipped).
+PERF_GATE_DIR ?= $(REPO_TMP_DIR)/perf-gate
+
+perf-gate: docker-check
+	@rm -rf "$(PERF_GATE_DIR)"
+	@$(MAKE) --no-print-directory perf-fixture PERF_FIXTURE_CONCURRENCY=1 PERF_FIXTURE_DIR="$(PERF_GATE_DIR)/concurrency-1"
+	@$(MAKE) --no-print-directory perf-fixture PERF_FIXTURE_CONCURRENCY=3 PERF_FIXTURE_DIR="$(PERF_GATE_DIR)/concurrency-3"
 
 problem-list:
 	@$(RAIDAR) problem list $(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)

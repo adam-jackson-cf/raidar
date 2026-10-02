@@ -1,4 +1,4 @@
-"""``raidar plan``, ``raidar run EXPERIMENT`` and ``raidar perf check`` (plan WS-D)."""
+"""``raidar plan`` and ``raidar run EXPERIMENT`` (plan WS-D); ``raidar perf`` lives in ``perf``."""
 
 from __future__ import annotations
 
@@ -11,15 +11,8 @@ from typing import Any
 import click
 
 from raidar.commands.experiment_spec import _load
+from raidar.commands.perf import perf_group
 from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
-from raidar.execution.budgets import (
-    MIN_SAMPLES,
-    NOT_RECORDED_BY_RUNS,
-    PhaseCheck,
-    check_budgets,
-    checks_pass,
-    load_run_samples,
-)
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.execution.run import RunContext, default_run_id, execute, load_problems
 from raidar.packs.python import load_pack_spec
@@ -209,57 +202,3 @@ def run_command(runs_dir: Path, run_id: str | None, **options: Any) -> None:
             f"  {record.trial.trial_id}: valid={record.valid} reached={sum(record.reached)} "
             f"[{states}]"
         )
-
-
-def _check_line(check: PhaseCheck) -> str:
-    budget = check.budget
-    label = f"{budget.phase}[{budget.condition}]" if budget.condition else budget.phase
-    value = check.maximum if budget.tripwire else check.p95
-    shown = f"{value:.2f}" if value is not None else "-"
-    kind = "max" if budget.tripwire else "p95"
-    return (
-        f"  {check.verdict.value:12} {label:40} n={check.samples:<4} "
-        f"{kind}={shown:>7} budget={budget.seconds:g}s"
-    )
-
-
-@click.group("perf")
-def perf_group() -> None:
-    """N1 framework-overhead budgets."""
-
-
-@perf_group.command("check")
-@click.argument("run_dirs", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path))
-@click.option(
-    "--min-samples",
-    type=click.IntRange(min=1),
-    default=MIN_SAMPLES,
-    show_default=True,
-    help="Samples a budgeted phase needs before its p95 is judged.",
-)
-@click.option("--json", "as_json", is_flag=True, help="Emit the checks as JSON.")
-def perf_check_command(run_dirs: tuple[Path, ...], min_samples: int, as_json: bool) -> None:
-    """Fail when a phase's p95 exceeds its accepted N1 budget (overhead-baseline.md §5)."""
-    loaded = load_run_samples(list(run_dirs))
-    trajectories = loaded.trajectories
-    if not trajectories:
-        raise click.ClickException("no trajectory records under the given run directories")
-    checks = check_budgets(loaded.samples, min_samples=min_samples, multi_step=loaded.multi_step)
-    passed = checks_pass(checks)
-    if as_json:
-        payload = {
-            "passed": passed,
-            "trajectories": trajectories,
-            "min_samples": min_samples,
-            "checks": [check.to_json() for check in checks],
-            "not_recorded_by_runs": NOT_RECORDED_BY_RUNS,
-        }
-        click.echo(json.dumps(payload, indent=2, sort_keys=True))
-    else:
-        click.echo(f"N1 budget check over {trajectories} trajectories (min samples {min_samples})")
-        for check in checks:
-            click.echo(_check_line(check))
-        for phase, reason in NOT_RECORDED_BY_RUNS.items():
-            click.echo(f"  {'not-checked':12} {phase:40} {reason}")
-    if not passed:
-        raise SystemExit(1)

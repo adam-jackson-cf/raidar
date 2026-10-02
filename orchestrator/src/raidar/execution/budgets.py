@@ -23,6 +23,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path
 
+from pydantic import ValidationError
+
 from raidar.execution.models import PhaseSample, TrajectoryRecord
 
 MIN_SAMPLES = 10
@@ -175,25 +177,51 @@ def check_budgets(
     return checks
 
 
+class PerfInputError(ValueError):
+    """A trajectory record or run manifest that cannot be read: malformed input, not a breach."""
+
+
+@dataclass(frozen=True)
+class TrialSamples:
+    """One trajectory's phase samples, keyed by its run directory and trial id."""
+
+    run: str
+    trial: str
+    trial_dir: Path
+    samples: tuple[PhaseSample, ...]
+
+
 @dataclass(frozen=True)
 class RunSamples:
     samples: list[PhaseSample]
     trajectories: int
     multi_step: bool  # some trajectory ran two or more checkpoints
+    trials: tuple[TrialSamples, ...] = ()
+
+
+def _read_record(path: Path) -> TrajectoryRecord:
+    try:
+        return TrajectoryRecord.model_validate_json(path.read_text())
+    except (OSError, ValidationError) as error:
+        raise PerfInputError(f"{path}: not a readable trajectory record ({error})") from error
 
 
 def load_run_samples(run_dirs: Sequence[Path]) -> RunSamples:
     """Every phase sample recorded under the runs' trajectory records."""
     samples: list[PhaseSample] = []
-    trajectories = 0
+    trials: list[TrialSamples] = []
     multi_step = False
     for run_dir in run_dirs:
         for path in sorted(run_dir.glob(TRAJECTORY_GLOB)):
-            record = TrajectoryRecord.model_validate_json(path.read_text())
+            record = _read_record(path)
             samples.extend(record.phases)
-            trajectories += 1
+            trials.append(
+                TrialSamples(
+                    str(run_dir), record.trial.trial_id, run_dir / record.trial_dir, record.phases
+                )
+            )
             multi_step = multi_step or len(record.trial.steps) >= 2
-    return RunSamples(samples, trajectories, multi_step)
+    return RunSamples(samples, len(trials), multi_step, tuple(trials))
 
 
 def checks_pass(checks: Sequence[PhaseCheck]) -> bool:

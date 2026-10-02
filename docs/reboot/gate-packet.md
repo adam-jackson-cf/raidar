@@ -1,6 +1,6 @@
 # Phase 1 gate packet (pause-and-review)
 
-- **Date:** 2026-09-30
+- **Date:** 2026-09-30 (v1 record); updated 2026-10-02 with the N1 enforcement model (§5.2), the completed pilot v2 forge leg (§11.13), the current exit criteria (§11.14) and the decisions now open (§11.15).
 - **Plan reference:** `docs/reboot/implementation-plan.md` §3 (1.P pilot and the Phase 1 exit criteria) and §4 (this packet and the gate decisions).
 - **Branch:** `reboot-impl`. The wave 1-4 work is committed up to `6b8e44d`. The pilot's infra fixes, this packet, **and the WS-L scenario-era cutover** (251 tracked files, about −47k lines, including scorer package files) are committed together on top of it (see §9). The WS-L cutover landed after the pilot ran and after the pilot store and locks were built; its consequences for the pilot evidence are in §1.1.
 - **AgentSpec substitution (user directive):** plan 1.P names Claude Code as the pilot's single AgentSpec. By user directive (ADR-001 §2.7), every real-LLM trial in this pilot used **codex-cli 0.156.1 + `gpt-6-luna`, reasoning effort low**. No Claude Code trial has run, so the Claude mappings of the built-in components are unit-tested only.
@@ -36,11 +36,11 @@ Evidence is under `runs/pilot/`, which is gitignored and local to this worktree.
 | 3 | Every component's discovery probe passes | **Met (on codex-cli)** | Offline re-evaluation (`gate-evidence/pilot/probes.txt`): context-reset passes on 40+40 forge and 3+3 one-shot steps. rules-file, skills, lint-config, stop-hook and review-loop pass on all 40 forge and 3 one-shot guided steps (re-run on the post-WS-L code: same table). workspace-files, harness-settings, mcp-server and prompt-wrapper were not in the pilot; their only real-trial probe evidence is the WS-C run (`ws-c/probe-trials-v2/builtins-codex/probe-summary.json`, all passed, compiled digest `30f8bac2`, taken before the later component-fingerprint change). Caveats: C2's acceptance names Claude Code, which was substituted (see header) and never ran, so that part is unverified. The lint-config and workspace-files probes only check that the file is present; the stop-hook probe proves only that it fired (under Codex it maps to `notify`, and the agent never sees its output). On guided trials the `harness_version` validity check compares the 0.156.1 pin with the review-loop wrapper's report, not the inner Codex (rollout traces do show 0.156.1). |
 | 4 | Offline rescoring reproduces deterministic observations byte-identically | **Met** | On the current tree, `make experiment-assess` rescored both runs with all four scorers into the canonical store `runs/pilot/assessment-store-v2` (40 + 24 `added`) and again into a fresh store B: the same 64 Assessment keys, and all 64 files are byte-identical (`lock-fix/store-v2.sha` = `lock-fix/store-b.sha`). `REPLAY=1 JEV_REPLAY_ONLY=1` over the canonical store then gave 64/64 `replayed_identical`. Against the original pilot store the 64 Assessments pair one to one and differ only in `.key` and `.scorer.implementation_digest` (the digest scheme changed, §1.1): every observation is unchanged. The Jev audit log is excluded from these comparisons: it carries timestamps and request ids by design. |
 | 5 | G2 golden parity against the SCB fork passes | **Met** | `tests/test_code_quality_fork_parity.py`: 15/15 pass (adapters, V/E/H evidence, R/G live producers, lineage and regression kernels, problem arithmetic, sensitivity). Together with `test_code_quality_invariants.py`, 61/61 pass. |
-| 6 | N1 budgets hold (`raidar perf check`) | **Not met** | forge-04: 10 of 12 phases pass. `artifact_collection` p95 was 3.97 s against a 3.5 s budget, and `teardown_result_write[init]` p95 was 4.62 s against 4 s. one-shot: every phase is `insufficient` (6 trajectories, fewer than the 10-sample minimum), but two point estimates are already over budget: `per_step_reset` 3.28 s against 2 s and `artifact_collection` 3.54 s against 3.5 s. The no-LLM `make perf-fixture` rerun also fails `artifact_collection` (p95 3.65 s against 3.5 s) and passes teardown (3.38 s). See §5. **Update (§5.1):** all three misses are fixed in code and every budget passes on the no-LLM fixture at concurrency 1 and 3; the criterion stays Not met until one real-agent leg is re-run on the fixed tree. |
+| 6 | N1 budgets hold (`raidar perf check`) | **Not met** | forge-04: 10 of 12 phases pass. `artifact_collection` p95 was 3.97 s against a 3.5 s budget, and `teardown_result_write[init]` p95 was 4.62 s against 4 s. one-shot: every phase is `insufficient` (6 trajectories, fewer than the 10-sample minimum), but two point estimates are already over budget: `per_step_reset` 3.28 s against 2 s and `artifact_collection` 3.54 s against 3.5 s. The no-LLM `make perf-fixture` rerun also fails `artifact_collection` (p95 3.65 s against 3.5 s) and passes teardown (3.38 s). See §5. **Update (§5.1):** all three misses are fixed in code and every budget passes on the no-LLM fixture at concurrency 1 and 3; the criterion stays Not met until one real-agent leg is re-run on the fixed tree. **Update (§5.2, §11.14):** under the user's 2026-10-01 enforcement model the criterion is judged on `make perf-gate`, which passes on its latest run. |
 | 7 | Frozen review-surface suite green; Quality element live | **Met** | `make review-surface-test REVIEW_RUNS_ROOT="runs/pilot/pilot-forge runs/pilot/pilot-circuit-eval-oneshot" REVIEW_STORE=runs/pilot/assessment-store-v2`: **55 passed**. At the cutover commit the one store now serves both roots, so the suite's Quality data holds 58 runs (42 synthetic + the 16 pilot runs); before that fix the target silently left the pilot runs out of the suite's Quality data when the root and store counts differed, and it now fails loudly on any other mismatch (`lock-fix/review-surface-test.log`; the suite grew from 40 while the review surface was being integrated in the same worktree, see §9), with 67 runs across 19 experiments in the review projection. The 16 pilot runs resolve their migrated locks and their Assessments; 14 are scored and the 2 baseline trajectories without code-quality values (`forge-04` `b00`, `b03`) are Unscored with per-component `ineligible` reasons, which the observations (unchanged since the pilot) determine. The Quality projection over the two pilot runs with the canonical store (`lock-fix/qp-store-v2.json`) gives 16 runs across 2 experiments, 662 ok cells and no "lock unavailable" note, the same counts as the pilot-time projection. The earlier screenshots (`quality*.png`) predate this rerun. |
 | 8 | The analysis gives an honest verdict (`inconclusive` is acceptable) | **Met** | forge primary `solve_rate`: Δ 0, 95% CI [−0.22, 0.22], **inconclusive**. one-shot primary: **insufficient** (3 pairs, below the lock's minimum of 5). No override was used; the thresholds come from the locks (`pinned_by_lock=true`, min_pairs 5, alpha 0.05, max_exclusion_fraction 0.2). Reproduced on the current tree from the canonical store (`lock-fix/analysis-{forge,oneshot}`): the only field that differs from the pilot-time reports is `lock_sha256`, which is now the execution digest of the migrated lock (§1.1). |
 
-> **Pilot v2 (2026-10-01):** this table is the v1 record. The criteria re-evaluated on pilot v2 data are in §11.10, and the end-to-end process verdict is in §11.11.
+> **Pilot v2 (2026-10-01):** this table is the v1 record. The criteria re-evaluated on pilot v2 data are in §11.10, and the end-to-end process verdict is in §11.11. **The current status, after the forge leg was completed, is §11.14.**
 
 **Summary:** 7 of 8 criteria are met, and criterion 6 (N1 budgets) is not. Criterion 3 is met on the substituted AgentSpec only. Criteria 4, 7 and 8 reproduce on the current tree from the canonical store `runs/pilot/assessment-store-v2`, after the provenance fix in §1.1.
 
@@ -247,9 +247,34 @@ Tested in `tests/test_execution_environment.py`. Full measurements, including p5
 
 **No re-baseline is recommended.** Every budget now holds with margin on the fixture at concurrency 1 and 3. The smallest margin is teardown, about 1.1 s at p95, now dominated by `compose down`; `down -t 0` and `rm -f` first were measured and are no faster.
 
-**Next action** (the Phase 2 entry condition proposed in §8):
+**Next action** (the Phase 2 entry condition proposed in §8; superseded by the user decision in §5.2):
 - Re-run one real-agent leg on the fixed tree at pilot concurrency, then `make perf-check` it. The forge leg has 80 per-step samples; the one-shot leg needs at least 10 trajectories for any verdict.
 - If `teardown_result_write[init]` still exceeds 4 s there, it is pure `compose down` under host load. The options would then be to cap trial concurrency for `perf check` runs, or for the budget owner to re-baseline teardown for concurrency at 5 s. This is not applied.
+
+### 5.2 N1 enforcement model (user decision, 2026-10-01) and measurements
+
+**The decision, as implemented.** No budget value and no budget structure changed (`execution/budgets.py` adds only `PerfInputError`, `TrialSamples` and record loading; `overhead-baseline.md` is unmodified).
+
+| Check | What it runs | On a budget breach | Where it is wired |
+|---|---|---|---|
+| **Enforced:** `make perf-gate` | `make perf-fixture` (no LLM, 5 blocks × 2 arms, 2 checkpoints) at fixed concurrency 1, then 3, each judged with `perf check --strict` against the accepted budgets | fails (non-zero) | Release/gate check, run separately. `make quality` has no Docker step (Docker-backed tests are opt-in and skipped there), so the gate is documented in `AGENTS.md` ("Performance") and `README.md` instead of being added to `make quality`. |
+| **Report-only:** `make perf-check RUN=...` | every phase of a real experiment run against its budget | warning, exit 0; `PERF_STRICT=1` (`--strict`) makes it fail | Run after any real experiment. Malformed or empty input (a corrupt trajectory, `run.json` or trial `result.json`, or no trajectories) still exits non-zero and names the file. |
+
+`perf-check` also records each run's contention context: configured trial concurrency (`run.json`), peak concurrent trials in the checked runs, the peak including other Raidar runs under the same runs root that overlapped in time (listed by path), and trials without timestamps. Each breached p95 budget is re-judged separately for trials that ran at ≤3 and at ≥4 concurrent trials (JSON: `contention`, `warnings[].by_concurrency`). Docker work outside Raidar runs is not recorded and is reported as not detected.
+
+**Budget structure rule (decision 3).** A concurrency-scaled `teardown_result_write[init]` budget (strict 4 s at ≤3 concurrent trials, a separate value at ≥4) is introduced only if, after the forge completion run on a healthy drive at pilot concurrency 3, its p95 still exceeds 4 s at ≥4 concurrent trials. **It did not apply:** forge-02 and forge-03 never exceeded 3 concurrent Raidar trials, even counting overlapping runs, so there are no ≥4 samples (§11.13). The misses at ≤3 concurrent are reported as a regression to investigate, not re-baselined.
+
+**Enforced gate runs** (logs in `runs/pilot-v2/gate-evidence/perf/perf-gate-*.log`), p95 seconds:
+
+| Run (UTC) | Concurrency | env_start[warm] (20) | per_step_reset (2) | artifact_collection (3.5) | teardown[init] (4) | per_trial_fixed[init] (27) | Result |
+|---|---|---|---|---|---|---|---|
+| 1, 2026-10-01 18:09 | 1 | | | | | | did not run: the fixture problem was `validated_partial` (one validation repeat); the fixture now validates with two repeats |
+| 2, 2026-10-01 ~18:14-18:20 | 1 | 5.68 | 0.97 | 0.94 | 2.64 | 7.94 | pass |
+| 2 | 3 | 13.76 | 1.28 | 1.03 | **4.85** | 18.38 | **fail** (`make: *** [perf-gate] Error 2`) |
+| 3, 2026-10-02 01:30-01:38 | 1 | 6.15 | 0.76 | 0.91 | 2.46 | 8.13 | pass |
+| 3 | 3 | 6.63 | 1.26 | 1.57 | 2.14 | 8.31 | **pass** (exit 0) |
+
+Every other budgeted phase passes in all four fixture runs. Run 2 finished before forge-03 started; external Docker load at that time was not sampled. Run 3 ran with 1-2 containers of another project (`slop-code`) on the same OrbStack VM (sampled every 30 s, `perf-gate-3-external-containers.log`). **Reading:** the enforced gate passes on its latest run, but its c3 teardown margin is not stable: one of two complete gate runs breached it at 4.85 s. The gate is sensitive to host load, which is what the regression investigation in §11.15 has to settle.
 
 ---
 
@@ -434,11 +459,11 @@ Every real-LLM trial used codex-cli 0.156.1 + `gpt-6-luna`, reasoning effort low
 
 | Leg | Run | Arms × blocks | Valid / infra | Wall time (UTC) | Concurrency |
 |---|---|---|---|---|---|
-| forge | forge-02 | 2 × 16 | 14 / 18 (b00-b06 valid in both arms; b07-b15 infra in both arms) | 11:27-16:56 (5 h 30 m), stopped by host failure | 3 |
+| forge | forge-02 | 2 × 16 | 14 / 18 (b00-b06 valid in both arms; b07-b15 infra in both arms) | 11:27-16:56 (5 h 30 m), stopped when the drive holding OrbStack's data was switched off | 3 |
 | one-shot | oneshot-01 | 2 × 5 | 10 / 0 | 10:24-10:49 (24 m) | 2 (concurrently with forge-01) |
 
 - **One Raidar bug found and fixed (`c068e4c`).** The offline grader (`--network none`, `UV_OFFLINE=1`) ran the SCB entrypoint `uv run --project {app} forge.py`, and uv tried to sync the submission's `dev` dependency group before starting the program, so correct work scored 0 (forge-01 guided b00: 0.0 on all 8 checkpoints). The sandbox now sets `UV_NO_SYNC=1`. A regression test runs real uv offline with and without a lockfile. `make assess-regrade` on the aborted trial then gave 1.0, 1.0, 0.94, 0.96, 0.96, 0.91, 0.90, 0.89, and regrading all 10 one-shot trials matched their recorded grades, so oneshot-01 stands. Only the scorer implementation digests moved; `lock_sha256` is unchanged for both legs.
-- **Host failure, not a Raidar bug.** At 16:56:24 UTC the external drive holding OrbStack's data (`/Volumes/UGreen-External/Docker`) returned I/O errors, the VM's btrfs volume went read-only and OrbStack stopped (`~/.orbstack/log/vmgr.log`). Every forge trial in flight or queued (b07-b15, both arms) was recorded as infra-invalid. The drive dropped off and remounted at 17:56 BST (macOS reports it mounted read-write, SMART Verified). OrbStack was restarted at 18:18 BST: Docker, signoz and a test container came up with no new btrfs or I/O errors in `vmgr.log`, and `make harbor-cleanup` removed the 3 trial environments forge-02 left behind (§11.12).
+- **Drive switched off, not a Raidar bug or a hardware fault.** At 16:56:24 UTC (17:56 BST) the user switched off the external drive holding OrbStack's data (`/Volumes/UGreen-External/Docker`). The I/O errors in `~/.orbstack/log/vmgr.log` at that moment are the switch-off: the VM's btrfs volume went read-only and OrbStack stopped. Every forge trial in flight or queued (b07-b15, both arms) was recorded as infra-invalid. The drive is healthy (macOS reports it mounted read-write, SMART Verified). OrbStack was restarted at 18:18 BST: Docker, signoz and a test container came up with no new btrfs or I/O errors in `vmgr.log`, and `make harbor-cleanup` removed the 3 trial environments forge-02 left behind (§11.12).
 - **v1 → v2, F1 resolved.** 0 trajectories in either arm or leg wrote nothing (v1: 2 of 5 forge baseline trajectories). 0 executed steps ended with an empty `/app`.
 - **v1 → v2, F3 resolved.** forge guided, 56 steps: review-loop@2 parsed 0 `EMPTY_FEEDBACK` (v1: 18 of 40). Terminations: `review_approved` 23, `rounds_exhausted` 32, `loop_exception` 1 (a real 1800 s agent timeout on b03 guided checkpoint_7, graded 0.88 and counted against the arm). All 3 unusable reviews were recovered by the re-ask; none ended `review_unusable_after_reask`.
 
@@ -545,7 +570,7 @@ oneshot-01 (concurrency 2) ran alongside the aborted forge-01 (concurrency 3), u
 
 | # | Criterion | v1 status | v2 status | v2 evidence |
 |---|---|---|---|---|
-| 1 | All pilot trajectories complete with ≤1 infra exclusion per arm | Met | **Not met (forge); met (one-shot)** | one-shot 5+5 valid, 0 infra. forge 7+7 valid, 9+9 infra, all from the OrbStack drive failure (§11.1). Needs forge b07-b15 rerun after OrbStack is healthy. |
+| 1 | All pilot trajectories complete with ≤1 infra exclusion per arm | Met | **Not met (forge); met (one-shot)** | one-shot 5+5 valid, 0 infra. forge 7+7 valid, 9+9 infra, all from the drive being switched off mid-run (§11.1). **Update (§11.13): met after the b07-b15 rerun, 16+16 valid, 0 infra.** |
 | 2 | Context-isolation and no-test-leak checks green on every trajectory | Met | **Met** | 122/122 executed steps on valid trajectories (112 forge + 10 one-shot) have a clean `raidar-reset.json` (no error, no residual, no failed reset) and `pre-agent-leak.json` `clean: true`. `no_oracle_leak` passes on 24/24 valid trajectories. |
 | 3 | Every component's discovery probe passes | Met (codex-cli) | **Met (codex-cli)** | `component_probes` passes on 24/24 valid trajectories. Offline `probe_step` re-run: context-reset and prompt-wrapper@1 56/56 forge baseline steps; context-reset, prompt-wrapper@1, rules-file@1, skills@1, lint-config@1, stop-hook@1 and review-loop@2 56/56 forge guided steps; 5/5 for every component in both one-shot arms. Same caveats as v1 (Claude Code not run; lint-config presence-only; stop-hook fired-only under Codex). |
 | 4 | Offline rescoring reproduces deterministic observations byte-identically | Met | **Met** | §11.2: 108/108 Assessment files byte-identical across two fresh stores; 108/108 `replayed_identical`. |
@@ -554,13 +579,13 @@ oneshot-01 (concurrency 2) ran alongside the aborted forge-01 (concurrency 3), u
 | 7 | Frozen review-surface suite green; Quality element live | Met | **Met** | §11.9: 55 passed with the pilot-v2 runs and store; run-detail Quality panel and `/quality` render pilot-v2 data (screenshots). |
 | 8 | The analysis gives an honest verdict (`inconclusive` is acceptable) | Met | **Met** | one-shot primary **inconclusive** (5 pairs). forge primary **insufficient** because the exclusion share exceeds the lock's 20%; the analysis refuses to call an effect from a crash-truncated leg, which is the intended behaviour. No overrides; thresholds pinned by the locks. |
 
-**Summary:** 6 of 8 met on v2. Criterion 1 fails on forge only, from a host hardware failure; criterion 6 fails on teardown tail latency (both legs) and one forge env-start pair.
+**Summary:** 6 of 8 met on v2. Criterion 1 fails on forge only, because the drive holding OrbStack's data was switched off mid-run (resolved in §11.13); criterion 6 fails on teardown tail latency (both legs) and one forge env-start pair.
 
 ### 11.11 E2E local process confirmed?
 
 **Verdict: yes for the process; no for the forge experiment's data.** Every stage ran on real Luna trials through public make targets, and each stage consumed the previous stage's output without manual repair:
 - the one-shot leg is a complete, clean end-to-end pass (10/10 valid, assessed, rescored byte-identically, analysed to an `inconclusive` verdict, rendered in the review surface);
-- the forge leg exercised every stage on 14 valid multi-checkpoint trajectories, but the experiment is incomplete (criterion 1) because the host's Docker drive failed mid-run;
+- the forge leg exercised every stage on 14 valid multi-checkpoint trajectories, but the experiment is incomplete (criterion 1) because the drive holding OrbStack's data was switched off mid-run (completed in §11.13);
 - criterion 6 is a performance budget miss, not a broken stage.
 
 The exact sequence a user runs (forge leg shown; for one-shot use `examples/pilot/oneshot.experiment.yaml`, `CONCURRENCY=2`, `RUN_ID=oneshot-01`):
@@ -606,8 +631,8 @@ make review-surface-serve REVIEW_RUNS_ROOT="runs/pilot-v2/pilot-forge runs/pilot
 ```
 
 **Open before calling the forge leg done:**
-- Rerun forge blocks b07-b15 (or the full leg as a new run id) and repeat steps 5-7. OrbStack is running again and forge-02's leftover environments are cleaned up (§11.12). Before rerunning only b07-b15 into a second run, confirm how `raidar analyze` pairs a block that is infra-invalid in one run and valid in another; this has not been checked.
-- Decide N1 (§5.1 options): cap trial concurrency for `perf check` runs, or have the budget owner re-baseline `teardown_result_write[init]` (and possibly `environment_start[warm]`) for concurrent operation. Nothing is re-baselined here.
+- Rerun forge blocks b07-b15 (or the full leg as a new run id) and repeat steps 5-7. OrbStack is running again and forge-02's leftover environments are cleaned up (§11.12). Before rerunning only b07-b15 into a second run, confirm how `raidar analyze` pairs a block that is infra-invalid in one run and valid in another; this has not been checked. **Done (§11.13):** b07-b15 rerun as forge-03; the replacement rule pairs them, and criterion 1 is met.
+- Decide N1 (§5.1 options): cap trial concurrency for `perf check` runs, or have the budget owner re-baseline `teardown_result_write[init]` (and possibly `environment_start[warm]`) for concurrent operation. Nothing is re-baselined here. **Decided (§5.2):** the user chose a fixture-enforced gate (`make perf-gate`) with report-only `perf-check` on real runs and no re-baseline.
 - Known fidelity gap: a submission that declares runtime `dependencies` cannot install them in the offline grader (native SCB grades with network). No v2 snapshot hit it.
 - Scorer identity moved with `c068e4c`: oneshot-01's `run.lock.json` assessment section carries the pre-fix scorer digests, so `LOCK_CHECK` reports it as needing a rescore. Its Assessments in `runs/pilot-v2/assessment-store` were scored on the current tree.
 
@@ -634,3 +659,100 @@ Doc fixes from this walkthrough (README): `perf-check` needs `MIN_SAMPLES` for r
 The §11.1-§11.10 figures were rechecked against the artifacts: valid and infra counts, checkpoint states, 122/122 clean steps, `no_oracle_leak` and `component_probes` 24/24, costs and wall times from the run records; effects, curves, manipulation check and J2 rows from `analysis.md`; 108 store digests recomputed equal to `store-a.sha` and `store-b.sha`; Jev audit 548 decisions (532 deterministic, 16 `jev_error`, 0 enforced) and 8 provisional Assessments (7 forge, 1 one-shot); perf p95 values from the perf logs; 55 passed in the review-surface log. All matched.
 
 **Verdict: the local end-to-end process with Luna is confirmed.** The forge leg's data is still incomplete (criterion 1) and N1 is still open (criterion 6); neither is a broken stage.
+
+### 11.13 Forge leg completed: b07-b15 rerun (2026-10-01/02)
+
+**Replacement path (no driver change).** `raidar run` refuses an existing run directory, so forge-02 cannot be extended in place. The supported path is a second run of the same lock, analysed together with the first: `raidar analyze` keeps one record per trial id, a valid trajectory replaces an invalid one, the replaced ids are listed in `replaced_trajectories`, and two valid records for one trial are refused (`analysis/sources.py` `select_records`, tested in `test_analysis_command.py`). Every b07-b15 trial was invalid in both arms of forge-02, so both arms of each rerun block come from the new run and every block still pairs within one run. The lock was current (`make experiment-lock ... LOCK_CHECK=1`: `5a73637e8ac3`, the lock forge-02 executed under), and the planned trial hashes matched forge-02's.
+
+```sh
+make experiment-execute EXPERIMENT=examples/pilot/experiment.yaml CONCURRENCY=3 \
+  BLOCK="7 8 9 10 11 12 13 14 15" RUNS_DIR=runs/pilot-v2 RUN_ID=forge-03
+make experiment-assess RUN=runs/pilot-v2/pilot-forge/forge-03 STORE=runs/pilot-v2/assessment-store \
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@1" JEV_REPLAY_ONLY=1
+make experiment-assess ... REPLAY=1 JEV_REPLAY_ONLY=1
+make experiment-analyze RUNS="runs/pilot-v2/pilot-forge/forge-02 runs/pilot-v2/pilot-forge/forge-03" \
+  STORE=runs/pilot-v2/assessment-store ANALYSIS_OUT=runs/pilot-v2/gate-evidence/analysis/forge-complete
+make perf-check RUN=runs/pilot-v2/pilot-forge/forge-03
+make perf-check RUN="runs/pilot-v2/pilot-forge/forge-02 runs/pilot-v2/pilot-forge/forge-03"
+```
+
+**Execution.** forge-03: 18/18 valid, 0 infra, 18:33-01:05 UTC (6 h 32 m), concurrency 3, codex-cli 0.156.1 + `gpt-6-luna` low on OrbStack (`external_available=True` before launch). Every validity check passed on all 18 (including `no_oracle_leak` and `component_probes`). Spend $1.674 (baseline $0.326, guided $1.348).
+
+**Assessment.** 72 `added` into `runs/pilot-v2/assessment-store`; the 108 existing files are byte-identical before and after (add-only; `gate-evidence/assess/store-a-{pre,post}-forge-03.sha`). Replay: 72/72 `replayed_identical`, store unchanged. Rescore into store B: 180 files byte-identical to the canonical store. 5 process-compliance Assessments are `provisional` (Jev replay-only, no cached decision), as in §11.2.
+
+**Exit criterion 1: met.** After replacement, 16/16 valid per arm, 0 infra (the 18 forge-02 b07-b15 records are listed as replaced).
+
+**Effects (`gate-evidence/analysis/forge-complete/analysis.md`, 16 pairs, 0 excluded; bootstrap intervals).**
+
+| Metric | View | n | Baseline | Guided | Δ [95% CI] | Verdict |
+|---|---|---|---|---|---|---|
+| solve_rate (primary) | continue | 16 | 0.156 | 0.031 | −0.125 [−0.188, −0.063] | **worse** |
+| reached | strict | 16 | 1.25 | 0.25 | −1.0 [−1.5, −0.5] | **worse** |
+| final_solved | continue | 16 | 0 | 0 | 0 (McNemar 0/0/0/16, p = 1) | inconclusive |
+| headline S (`scb-canonical@1`) | headline | 15 | 12.77 | 2.85 | −9.92 [−15.58, −4.27] | **worse** (1 ineligible) |
+| V verbosity | quality | 16 | 0.9986 | 0.9990 | +0.0004 [−0.0012, 0.0020] | inconclusive |
+| E erosion | quality | 16 | 0.114 | 0.242 | +0.128 [0.067, 0.186] | improved |
+| H architecture | quality | 16 | 1.000 | 0.9991 | −0.0009 [−0.0015, −0.0004] | worse |
+| R rework | quality | 16 | 0.256 | 0.271 | +0.015 [−0.013, 0.047] | inconclusive |
+| G regression | quality | 15 | 0.183 | 0.042 | −0.141 [−0.210, −0.072] | worse (1 ineligible) |
+
+The 7-pair direction of §11.3 holds on 16 pairs: guided solves checkpoints 1-2 in 2/16 trajectories vs 10/16 for baseline, and neither arm solves checkpoint 3 or later. Guided's case pass rate is higher from checkpoint 6 (cp7 0.889 vs 0.838). Component directions are the scorer manifest's (each in [0, 1], 1 best).
+
+**Manipulation check: `not_separated`.** `tests_run_before_finish` separates (0 vs 0.947, p = 5e-05); `plan_written` does not (0 vs 0; F4 is still open).
+
+**Cost.** Mean per trajectory: baseline $0.0355 (1.28 M tokens, 596 agent s), guided $0.1584 (7.03 M tokens, 2,397 agent s); Δ +$0.123 [0.114, 0.133]. Spend on the 32 analysed trajectories is $3.10; recorded forge spend is $3.24 (forge-02 $1.569 including steps before the switch-off, forge-03 $1.674).
+
+**J2 projection (16 pairs).** solve_rate SD 0.129, δ 0.125 → 9 pairs (0 more); reached 9 (0 more); rework R 13 (0 more); headline S SD 11.0, δ 5 → 38 pairs (23 more, $7.35); erosion E 51 (35 more, $9.89); regression G 65 (50 more, $12.57); final_solved has no projection (SD 0).
+
+**review-loop@2 (128 guided steps).** Terminations: `review_approved` 63, `rounds_exhausted` 64, `loop_exception` 1 (the forge-02 b03 checkpoint_7 agent timeout, §11.1). Parses: `CHANGES` 159 (all with feedback text), `APPROVE` 63 (no feedback), `NO_VERDICT` 4, all 4 recovered by the re-ask. 0 `EMPTY_FEEDBACK`; none ended `review_unusable_after_reask`. forge-03 alone: 72 steps, 40 approved, 32 rounds exhausted, 1 re-ask.
+
+**Baseline stalls.** 0 baseline steps ended with an empty `/app`, and 0 baseline steps timed out. 1 baseline step left the snapshot unchanged (forge-02 b04 checkpoint_5, 18 s of agent time, graded 0.75 on the carried-forward code). 1 baseline step scored 0.0 case pass rate after changing the code (forge-03 b07 checkpoint_8); that is a broken submission, not a stall.
+
+**N1 overhead (report-only `make perf-check`), p95 seconds.** Raidar's own trial concurrency never exceeded 3 (perf-check peak 3 with and without overlapping runs; per-trial windows show 1-3 open trials at every environment start and teardown). Other Docker activity was present: another project's `slop-code` agent and evaluator containers ran on the same OrbStack VM throughout forge-03, 3-11 at a time (sampled every 30 s; `perf check` cannot detect this). The drive was healthy throughout.
+
+| Phase | Budget | forge-02 valid b00-b06 (n=14) | forge-03 (n=18) | completed forge, 32 analysed trials |
+|---|---|---|---|---|
+| environment_start[warm] | 20 s | 21.26 fail | 29.74 fail | 25.25 fail (p50 9.59, max 42.06) |
+| teardown_result_write[init] | 4 s | 4.86 fail | 5.12 fail | 5.10 fail (p50 2.44, max 8.04) |
+| per_trial_fixed_overhead[init] | 27 s | — | 33.08 fail | 27.74 fail |
+| per_step_reset | 2 s | | 1.32 pass | |
+| artifact_collection | 3.5 s | | 1.32 pass | |
+| per_step_overhead | 10 s | | 3.42 pass | |
+
+Every other budgeted phase passes in forge-03. `make perf-check` over both runs (50 trajectories, including the 18 replaced infra records) gives env start 24.61 s and teardown 4.94 s, both warnings, exit 0.
+
+**Decision (3) applied.** Every teardown and environment-start sample was taken at ≤3 concurrent Raidar trials, so the condition for a concurrency-scaled budget (a miss at ≥4 concurrent trials) did not occur. **Budgets are unchanged and nothing is re-baselined**; `overhead-baseline.md` §5 is not edited. Per the decision, the miss at ≤3 concurrent on a healthy drive is reported as a regression to investigate:
+- `teardown_result_write[init]`: tail-driven. Median 2.4-2.7 s; 3 of 18 forge-03 samples are over 4 s (b13 baseline 8.04 s, b14 baseline 4.61 s, b14 guided 4.22 s; b13 guided 3.97 s is just under), and all three finished while 7-10 external containers were running. The enforced no-LLM gate (`make perf-gate`) passes at concurrency 1 and 3 on its latest run, but failed this phase at concurrency 3 (4.85 s) on the run before forge-03 (§5.2).
+- `per_trial_fixed_overhead[init]`: over budget in forge-03 (33.08 s) and over the 32 analysed trials (27.74 s); it is the sum of the per-trial phases, so it follows the environment-start and teardown tails.
+- `environment_start[warm]`: also tail-driven (median about 10 s). The forge-03 outliers are b15 guided 42.06 s and b08 baseline 27.57 s, with 5-8 external containers running.
+- The external load is a confound that this run could not remove, so these numbers do not separate a Raidar regression from host contention. A clean answer needs a real-agent leg with no other Docker workload on the VM.
+
+**Verdicts (forge, 16 pairs, thresholds pinned by the lock).** The guided treatment is **worse** on the primary `solve_rate` (−0.125 [−0.188, −0.063]), on `reached` and on headline S (−9.92 [−15.58, −4.27]); **worse** on H and G; **improved** on E; inconclusive on V, R and `final_solved`. These are pilot-scale results on one problem and one model at low reasoning effort, not confirmatory findings. One-shot stays **inconclusive** (§11.4).
+
+### 11.14 Exit criteria, current status (after the forge leg completed, 2026-10-02)
+
+Data: forge-02 + forge-03 (forge, 16+16 valid) and oneshot-01 (5+5 valid), canonical store `runs/pilot-v2/assessment-store` (180 Assessments).
+
+| # | Criterion | Status | Evidence |
+|---|---|---|---|
+| 1 | All pilot trajectories complete with ≤1 infra exclusion per arm | **Met** | forge 16/16 valid per arm, 0 infra after replacing the 18 forge-02 b07-b15 records with forge-03 (listed in `replaced_trajectories`; `select_records` refuses a trial valid in two runs). one-shot 5/5 per arm, 0 infra. |
+| 2 | Context-isolation and no-test-leak checks green on every trajectory | **Met** | 266/266 executed steps on valid trajectories (forge-02 112, forge-03 144, one-shot 10) have a clean `raidar-reset.json` (no error, residual or failed reset) and `pre-agent-leak.json` `clean: true`. `no_oracle_leak` passes on 42/42 valid trajectories. |
+| 3 | Every component's discovery probe passes | **Met (codex-cli only)** | `component_probes` passes on 42/42 valid trajectories. The offline `probe_step` re-run (§11.10) covers forge-02 and one-shot; it was not repeated on forge-03, whose evidence is the validity check. Caveats unchanged: Claude Code never ran; lint-config is presence-only; stop-hook is fired-only under Codex. |
+| 4 | Offline rescoring reproduces deterministic observations byte-identically | **Met** | 180/180 Assessment files byte-identical between the canonical store and a fresh store B; forge-03 replay 72/72 `replayed_identical` (forge-02 and one-shot 108/108, §11.2). The 108 earlier files were unchanged by adding forge-03. |
+| 5 | G2 golden parity against the SCB fork passes | **Met** | Part of `make quality`, which passes on the commit that adds this section. |
+| 6 | N1 budgets hold | **Met under the enforced gate; open regression** | By the user's decision (§5.2) the criterion is judged on `make perf-gate`: its latest run passes every budget at concurrency 1 and 3. Caveats: the previous complete gate run failed `teardown_result_write[init]` at concurrency 3 (4.85 s), and report-only `perf-check` on the real forge runs warns on `environment_start[warm]` (25.25 s), `teardown_result_write[init]` (5.10 s) and `per_trial_fixed_overhead[init]` (27.74 s) at ≤3 concurrent trials, with another project's containers on the VM. No budget changed. |
+| 7 | Frozen review-surface suite green; Quality element live | **Met** | `make review-surface-test REVIEW_RUNS_ROOT=runs/pilot-v2 REVIEW_STORE=runs/pilot-v2/assessment-store`, rerun after forge-03: 55 passed; the projections include forge-02 and forge-03. |
+| 8 | The analysis gives an honest verdict | **Met** | forge primary **worse** at 16 pairs with no exclusions; one-shot primary **inconclusive** (5 pairs). Thresholds pinned by the locks, no overrides. `make experiment-analyze` reproduces `gate-evidence/analysis/forge-complete` byte for byte. |
+
+**Summary:** all 8 criteria are met on pilot v2 data, criterion 3 on the substituted AgentSpec only, and criterion 6 only under the fixture-enforced model, with a real-run regression still to investigate.
+
+### 11.15 Decisions now open for the user
+
+1. **Phase 2 entry.** Every exit criterion is met (§11.14). *Proposal:* proceed, with the N1 regression investigation (2) as a tracked item rather than an entry blocker, because the enforced gate passes. Say so if the unstable c3 teardown margin should block instead.
+2. **N1 regression investigation.** The real-run misses happened at ≤3 concurrent trials on a healthy drive, so decision (3) treats them as a regression, but external Docker load (another project's containers) confounds every real-run sample and one fixture gate run. *Proposal:* rerun one real-agent forge leg (or the c3 fixture several times) with no other Docker workload on the VM. If the misses persist on a quiet host, profile `compose down` and environment start; if they vanish, decide whether the gate must be run on a quiet host.
+3. **The treatment made forge worse.** guided solves checkpoints 1-2 in 2/16 trajectories against 10/16 for baseline, mostly by failing two input-validation cases at checkpoint 1 (§11.3). Decide whether to investigate the guided components (rules, skills, review-loop@2) for this effect before any confirmatory run, or accept it as the measured result.
+4. **Manipulation check (F4).** `plan_written` is 0 in both arms, so the overall verdict cannot be `separated`. Add a plan instruction to the treatment, or drop `plan_written` from the lock's requested checks.
+5. **Sample size.** At 16 pairs, `solve_rate`, `reached` and R need no more pairs at the default δ; headline S needs 23 more ($7.35), E 35 more ($9.89) and G 50 more ($12.57). one-shot `solve_rate` needs about 350 pairs. Decide which metrics a confirmatory run must power.
+6. **S2-SS-1: the definition of C (deferred scoring finding).** ADR-001 defines the correctness component C as solved checkpoints over K (`solved/K`); the design memo and the SCB fork use the mean case pass rate. The current scorer follows the memo and fork: `scorers/code_quality/arithmetic.py` takes C as the mean of the per-checkpoint `passed/total` rates. Every headline S in this packet uses that definition, and S would change under `solved/K` (on forge, mostly towards 0, since no trajectory solves checkpoint 3 or later). Decide which definition is canonical, then align ADR-001 or the scorer.
+7. **S2-SS-2: S when C = 0 (deferred scoring finding).** The current policy (`spec/policies.py`) computes S = 100 · C · (base + share · inertia), so a trajectory with C = 0 and every other component measured scores S = 0 and stays in the headline analysis; it is `ineligible` only when a component is missing or ineligible. The alternative is to mark C = 0 trajectories `ineligible`. The choice changes which pairs the headline S analysis keeps and its mean. Decide which rule applies.
+8. **Jev.** Still shadow only, with live calls blocked (no `OPENROUTER_API_KEY`) and 5+8 provisional process-compliance Assessments. Out of scope until you decide to enable it.

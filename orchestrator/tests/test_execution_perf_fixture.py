@@ -10,7 +10,10 @@ the Python pack image, so it runs only when opted in with
     make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=3]
 
 ``RAIDAR_PERF_FIXTURE_CONCURRENCY`` (default 1) runs the same fixture with more
-trials at once, to measure the phases under host contention.
+trials at once, to measure the phases under host contention. ``make perf-gate``
+runs it at concurrency 1 and 3 and is the enforced overhead gate: the check
+here is ``--strict`` against the accepted budgets, unchanged. The strict JSON
+report is written to ``<fixture dir>/perf-check.json``.
 
 Opted in, a missing prerequisite fails the test instead of skipping it, so a
 CI job or ``make perf-fixture`` can never pass without running the fixture.
@@ -35,6 +38,9 @@ from tests.component_trial_support import DOCKER_CONTEXT, orbstack_available
 from tests.execution_support import imported_pack_fixture, locked_experiment
 
 OPT_IN = "RAIDAR_EXECUTION_DOCKER"
+# The fixture is the ENFORCED N1 gate (make perf-gate): it checks strictly, unlike the
+# report-only default that ``make perf-check`` applies to real experiment runs.
+STRICT_CHECK = ("perf", "check", "--strict")
 CONCURRENCY_ENV = "RAIDAR_PERF_FIXTURE_CONCURRENCY"
 pytestmark = pytest.mark.skipif(
     os.environ.get(OPT_IN) != "1",
@@ -112,6 +118,8 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
     for record in records:
         assert all(check["passed"] for check in record["validity"]["checks"]), record["validity"]
         assert [a["checkpoint_state"] for a in record["attempts"]] == ["solved", "solved"]
-    checked = runner.invoke(main, ["perf", "check", str(run_dir)])
+    checked = runner.invoke(main, [*STRICT_CHECK, str(run_dir)])
     print(checked.output)
+    report = runner.invoke(main, [*STRICT_CHECK, "--json", str(run_dir)])
+    (root / "perf-check.json").write_text(report.output)
     assert checked.exit_code == 0, checked.output

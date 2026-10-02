@@ -162,9 +162,16 @@ def test_perf_check_command_passes_and_fails_on_recorded_runs(tmp_path: Path) ->
     assert result.exit_code == 0, verdicts
     assert verdicts[("per_step_overhead", None)] == "pass"
     assert "scorer_orchestration" in payload["not_recorded_by_runs"]
-    short = runner.invoke(main, ["perf", "check", str(_run_dir(tmp_path / "short", 3))])
-    assert short.exit_code == 1
-    assert "insufficient" in short.output
+    short_run = str(_run_dir(tmp_path / "short", 3))
+    # Report-only by default: an insufficient phase is a warning, not a failure ...
+    short = runner.invoke(main, ["perf", "check", short_run])
+    assert short.exit_code == 0, short.output
+    assert "WARNING insufficient" in short.output
+    assert "report-only" in short.output
+    # ... and --strict restores the failing gate.
+    strict = runner.invoke(main, ["perf", "check", "--strict", short_run])
+    assert strict.exit_code == 1
+    assert "insufficient" in strict.output
     # A one-shot (K=1) experiment has no between-step gap and still passes.
     one_shot = runner.invoke(main, ["perf", "check", str(_run_dir(tmp_path / "k1", 10, 1))])
     assert one_shot.exit_code == 0, one_shot.output

@@ -42,6 +42,12 @@
 - Codex-only smoke arm: `make smoke-agents SMOKE_ARM=codex`
 - Claude-only smoke arm: `make smoke-agents SMOKE_ARM=claude`
 
+## Performance (N1 overhead budgets)
+
+- The enforced overhead check is `make perf-gate`: the no-LLM fixture (`make perf-fixture`) at fixed concurrency 1 and 3, each checked strictly against the accepted budgets in `docs/reboot/overhead-baseline.md` §5. It needs Docker (OrbStack; check `orbstack-data-status` reports `external_available=True` first), so it is a release/gate check and is not part of `make quality`. Run it before a phase gate or release and after changes to the execution path.
+- `make perf-check RUN=<run-dir>` on real experiment runs is report-only: it lists every phase against its budget, prints breaches as warnings with the run's trial concurrency and contention, and exits 0. Malformed input still fails. Use `PERF_STRICT=1` only when a strict check of a real run is wanted.
+- Do not re-baseline or change budgets to make a run pass. A budget structure change (such as a concurrency-scaled budget) needs user approval and is recorded in `overhead-baseline.md` §5.
+
 ## Branch Syncing
 
 - The canonical autoresearch removal commit is `d1973d6` `refactor: remove autoresearch surface from main`.
