@@ -1,14 +1,14 @@
-// Revision movement and scenario diff review, adapted from the deprecated
+// Arm movement and condition diff review, adapted from the deprecated
 // benchmark-view's trajectory/delta/diff panels: review what changed in the
-// scenario contract before trusting score movement between revisions.
+// condition contract before trusting score movement between arms.
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, MoveRight, TriangleAlert } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { fmtTokens } from '@/utils/helpers';
-import type { ExperimentRecord, FileDiff, RevisionDiff } from '@/utils/types';
+import type { ArmDiff, ExperimentRecord, FileDiff } from '@/utils/types';
 
-/** Display names for the frozen wire keys (`scenario` is the scenario-epoch contract file). */
-const TAB_LABEL = { prompt: 'prompt', scenario: 'contract' } as const;
+/** Display names for the diff's wire keys (`condition` is the locked condition contract). */
+const TAB_LABEL = { prompt: 'prompt', condition: 'contract' } as const;
 
 function deltaColor(delta: number | null, higherIsBetter: boolean): string {
   if (delta == null || delta === 0) return C.fg1;
@@ -73,9 +73,9 @@ function DiffBlock({ file }: { file: FileDiff }) {
   );
 }
 
-function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
+function ArmDiffCard({ diff }: { diff: ArmDiff }) {
   const [open, setOpen] = useState(false);
-  const [tab, setTab] = useState<'prompt' | 'scenario'>('prompt');
+  const [tab, setTab] = useState<'prompt' | 'condition'>('prompt');
   const file = diff.files[tab];
   return (
     <div className="rounded-md p-2" style={{ background: 'rgba(255,255,255,0.015)', border: `1px solid ${C.border}` }}>
@@ -86,7 +86,7 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
           <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
         )}
         <span className="num text-[11px] font-medium" style={{ color: C.fg3 }}>
-          {diff.from_revision} <MoveRight className="inline size-3" /> {diff.to_revision} contract changes
+          {diff.from_arm} <MoveRight className="inline size-3" /> {diff.to_arm} contract changes
         </span>
         {diff.summary
           .filter(
@@ -116,7 +116,7 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
       {open && (
         <div className="mt-2 flex flex-col gap-1.5">
           <div className="flex gap-1">
-            {(['prompt', 'scenario'] as const).map((name) => (
+            {(['prompt', 'condition'] as const).map((name) => (
               <button
                 key={name}
                 onClick={() => setTab(name)}
@@ -138,15 +138,15 @@ function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
   );
 }
 
-export function RevisionMovement({
+export function ArmMovement({
   experiments,
   diffs,
 }: {
   experiments: ExperimentRecord[];
-  diffs: RevisionDiff[];
+  diffs: ArmDiff[];
 }) {
   const movements = useMemo(() => {
-    const revisions = [...new Set(experiments.map((e) => e.revision).filter(Boolean))].sort() as string[];
+    const arms = [...new Set(experiments.map((e) => e.arm).filter(Boolean))].sort() as string[];
     const rows: Array<{
       agentSpec: string;
       from: string;
@@ -155,19 +155,19 @@ export function RevisionMovement({
       duration: number | null;
       tokens: number | null;
     }> = [];
-    for (let index = 1; index < revisions.length; index += 1) {
-      const fromRevision = revisions[index - 1];
-      const toRevision = revisions[index];
-      const before = experiments.filter((e) => e.revision === fromRevision);
-      const after = experiments.filter((e) => e.revision === toRevision);
+    for (let index = 1; index < arms.length; index += 1) {
+      const fromArm = arms[index - 1];
+      const toArm = arms[index];
+      const before = experiments.filter((e) => e.arm === fromArm);
+      const after = experiments.filter((e) => e.arm === toArm);
       for (const target of after) {
         const source = before.find((e) => e.agent_spec === target.agent_spec);
         if (!source) continue;
         const num = (a?: number, b?: number) => (a != null && b != null ? a - b : null);
         rows.push({
           agentSpec: target.agent_spec,
-          from: fromRevision,
-          to: toRevision,
+          from: fromArm,
+          to: toArm,
           composite: num(target.aggregate.composite_score?.mean, source.aggregate.composite_score?.mean),
           duration: num(target.aggregate.duration_sec?.mean, source.aggregate.duration_sec?.mean),
           tokens: num(
@@ -189,10 +189,10 @@ export function RevisionMovement({
     >
       <div className="flex items-center gap-2">
         <span className="text-xs font-medium" style={{ color: C.fg3 }}>
-          Revision movement
+          Arm movement
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          did the contract change make delivery better? review the contract diff before trusting movement
+          did the condition change make delivery better? review the contract diff before trusting movement
         </span>
       </div>
 
@@ -200,7 +200,7 @@ export function RevisionMovement({
         <table className="w-full max-w-2xl border-collapse">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {['Agent spec', 'Revisions', 'Delivery', 'Run time', 'Tokens'].map((label) => (
+              {['Agent spec', 'Arms', 'Delivery', 'Run time', 'Tokens'].map((label) => (
                 <th
                   key={label}
                   className="px-2 py-1 text-left text-[9px] font-medium uppercase tracking-wider"
@@ -247,7 +247,7 @@ export function RevisionMovement({
       )}
 
       {diffs.map((diff) => (
-        <RevisionDiffCard key={diff.key} diff={diff} />
+        <ArmDiffCard key={diff.key} diff={diff} />
       ))}
     </div>
   );

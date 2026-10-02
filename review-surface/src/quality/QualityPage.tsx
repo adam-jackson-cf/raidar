@@ -114,7 +114,7 @@ function ProblemView({
         </span>
       </header>
       <div className="mb-2">
-        <FamilyPolicyMismatch scenario={problem.problem} quality={experiments} />
+        <FamilyPolicyMismatch problem={problem.problem} quality={experiments} />
       </div>
       {(problem.notes.length > 0 || problem.excluded.length > 0) && (
         <ul className="mb-2 text-[10px]" style={{ color: C.orange }} data-testid="quality-exclusions">

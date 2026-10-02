@@ -37,10 +37,10 @@ from itertools import combinations
 
 from raidar.analysis.effects import Exclusions, Settings, decide
 from raidar.analysis.outcomes import (
+    CORRECTNESS_METRIC,
     HEADLINE_SCORE,
     OUTCOME_METRICS,
     QUALITY_COMPONENTS,
-    SOLVE_RATE,
     MetricDef,
     View,
 )
@@ -66,7 +66,7 @@ from raidar.review_quality.sources import TrialSource
 from raidar.scorers.sdk.manifest import Direction
 
 _SCORE_SCALE = Decimal(30)  # S loses 100 * 0.30 * C * w * x when a weight is zeroed.
-_COMPONENT_METRIC = {"C": SOLVE_RATE, "S": HEADLINE_SCORE} | {
+_COMPONENT_METRIC = {"C": CORRECTNESS_METRIC, "S": HEADLINE_SCORE} | {
     key: name for name, key in QUALITY_COMPONENTS.items()
 }
 _METRICS = {metric.id: metric for metric in OUTCOME_METRICS}

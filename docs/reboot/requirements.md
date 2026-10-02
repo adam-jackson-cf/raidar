@@ -53,3 +53,6 @@ Benchmark coding agents (harness + model) against defined problems that have hid
   - F14: port the SCB-fork quality scoring.
   - F15: one-shot policy drops R/G, with weights .30/.30/.40.
   - Headline-policy warning.
+- 2026-10-02, scoring-definition alignment (S2-SS-1, S2-SS-2; user decision 2026-10-01: "go with what you think best"). The F15 text above is unchanged. These notes define its terms:
+  - C in F15's `S = 100·C·(…)` is the SCB fork's correctness: the mean per-checkpoint case pass rate, with an unreached checkpoint counted 0. It is not solved checkpoints / K. F14 (port the fork's scoring) requires this. ADR-001 §2.4 is corrected. `scb-canonical@1` and `scb-canonical-oneshot@1` now compute C this way everywhere.
+  - New policy versions `scb-canonical@2` and `scb-canonical-oneshot@2` add one rule: C = 0 gives S = 0 even when a quality component is missing or ineligible. Ineligible applies only when C > 0. F15's defaults by K remain the `@1` policies. The pilot experiments declare `@2` as their headline policy.

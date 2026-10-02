@@ -1,11 +1,10 @@
 """Experiment records: one per (experiment lock, problem, arm), comparing agent specs.
 
-The frozen surface groups experiment records by ``scenario`` (here the problem)
-and ``revision`` (here the arm's condition) and ranks agent specs inside each
-group, so one record holds the trajectories (blocks) of one arm on one
-problem. Aggregates follow the scenario epoch's shapes and thresholds: scored
-runs are those with a headline score, repeatability flags a composite stddev
-of 0.1 or more, and the sample is adequate at 3 scored runs and preferred at 5.
+The surface groups experiment records by ``problem`` and ``arm`` (the arm's
+condition label) and ranks agent specs inside each group, so one record holds
+the trajectories (blocks) of one arm on one problem. Scored runs are those
+with a headline score, repeatability flags a composite stddev of 0.1 or more,
+and the sample is adequate at 3 scored runs and preferred at 5.
 """
 
 from __future__ import annotations
@@ -26,13 +25,13 @@ from raidar.review_projection.notes import EvidenceRef, Finding
 from raidar.review_projection.spans import repo_path
 from raidar.review_projection.trials import TrialInput
 from raidar.schemas.review import (
+    ArmChangeCategory,
+    ArmComparableConfig,
     ResolvedScorerReviewConfig,
     ReviewExperimentRecord,
+    ReviewProblemMetadata,
     ReviewRunDetail,
     ReviewRunRecord,
-    ReviewScenarioMetadata,
-    RevisionChangeCategory,
-    ScenarioComparableConfig,
 )
 from raidar.spec.canonical import digest_json
 from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
@@ -54,8 +53,8 @@ class ArmGroup:
     arm: str
     condition_manifest: object
     rules_artifacts: Mapping[str, str]
-    parent_revision: str | None
-    change_categories: Sequence[RevisionChangeCategory]
+    parent_arm: str | None
+    change_categories: Sequence[ArmChangeCategory]
     headline_policy: str
     trials: Sequence[TrialInput]
     details: Sequence[ReviewRunDetail]
@@ -218,46 +217,38 @@ def _task_document(trial: TrialInput) -> Mapping[str, Any]:
     return tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
-def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ScenarioComparableConfig:
+def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ArmComparableConfig:
     spec, first = group.spec, group.trials[0]
     labels, record = first.labels, first.record
     info, metadata = task.get("task", {}), task.get("metadata", {})
     body: dict[str, Any] = {
-        "scenario": labels.problem,
+        "problem": labels.problem,
         "display_name": str(info.get("name") or labels.problem),
-        "revision": labels.revision,
-        "parent_revision": group.parent_revision,
+        "arm": labels.arm,
+        "parent_arm": group.parent_arm,
         "description": str(info.get("description") or spec.description or labels.problem),
         "difficulty": str(metadata.get("difficulty") or "unrated"),
-        "task_kind": "feature_implementation",
-        "delivery_mode": "direct_implementation",
-        "workspace_state": "new",
-        "starting_conditions": [],
         "languages": [spec.runtime.language.capitalize()],
-        "evaluation_role": "benchmark",
-        "catalog_status": "active",
-        "family_id": labels.problem.split("@", 1)[0],
-        "variant_axes": {"checkpoints": str(len(record.attempts)), "arm": group.arm},
+        "checkpoints": len(record.attempts),
         "timeout_sec": spec.protocol.agent_timeout_sec,
         "environment": spec.runtime.model_dump(mode="json"),
-        "starter": {},
         "verification": {
             "oracle": "raidar oracle, strict all-cases verdict per checkpoint",
             "progression": spec.protocol.model_dump(mode="json"),
             "problem_digest": record.trial.hashes.problem,
             "checkpoints": [attempt.checkpoint for attempt in record.attempts],
         },
-        "requirements": {},
-        "evidence": {},
-        "visual": None,
         "scorers": [
             _scorer(ref, _shares(group.headline_policy)) for ref in spec.assessment.scorers
         ],
-        "prompt": {"condition": labels.revision, "components": group.condition_manifest},
-        "prompt_artifacts": {},
+        "condition": {
+            "label": labels.arm,
+            "arm": group.arm,
+            "components": group.condition_manifest,
+        },
         "rules_artifacts": dict(group.rules_artifacts),
     }
-    config = ScenarioComparableConfig(**body, fingerprint="")
+    config = ArmComparableConfig(**body, fingerprint="")
     identity = config.model_dump(mode="json", exclude={"fingerprint"})
     return config.model_copy(update={"fingerprint": digest_json(identity)})
 
@@ -282,9 +273,9 @@ def _scorer(ref: str, shares: Mapping[str, float]) -> ResolvedScorerReviewConfig
     )
 
 
-def _metadata(comparable: ScenarioComparableConfig) -> ReviewScenarioMetadata:
-    fields = ReviewScenarioMetadata.model_fields
-    return ReviewScenarioMetadata(**{name: getattr(comparable, name) for name in fields})
+def _metadata(comparable: ArmComparableConfig) -> ReviewProblemMetadata:
+    fields = ReviewProblemMetadata.model_fields
+    return ReviewProblemMetadata(**{name: getattr(comparable, name) for name in fields})
 
 
 def experiment_record(group: ArmGroup) -> ReviewExperimentRecord:
@@ -298,15 +289,15 @@ def experiment_record(group: ArmGroup) -> ReviewExperimentRecord:
     return ReviewExperimentRecord(
         experiment_id=group.experiment_id,
         dir=repo_path(first.run_dir.parent),
-        scenario=labels.problem,
-        revision=labels.revision,
+        problem=labels.problem,
+        arm=labels.arm,
         harness=labels.harness,
         model=labels.model,
         reasoning_effort=labels.reasoning_effort,
         agent_spec=labels.agent_spec,
         synthetic=any(trial.synthetic for trial in group.trials),
         repeats=group.spec.analysis.blocks,
-        scenario_meta=_metadata(comparable),
+        problem_meta=_metadata(comparable),
         comparable_config=comparable,
         change_categories=list(group.change_categories),
         aggregate=aggregate,

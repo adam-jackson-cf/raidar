@@ -28,6 +28,8 @@ Thumbs.db
 
 # Test outputs
 coverage/
+.coverage
+.coverage.*
 .pytest_cache/
 .import_linter_cache/
 .ruff_cache/

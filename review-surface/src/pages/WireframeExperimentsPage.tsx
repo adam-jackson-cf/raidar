@@ -6,7 +6,7 @@ import { WireframePatternsMap } from './wireframe-components/WireframePatternsMa
 import { KIND_STYLES } from '@/components/AnnotationChip';
 import { EvidenceRefList } from '@/components/AnnotationCards';
 import { WireframeTradeoffScatter } from './wireframe-components/WireframeTradeoffScatter';
-import { RevisionDiffCard } from './wireframe-components/WireframeRevisionMovement';
+import { ArmDiffCard } from './wireframe-components/WireframeArmMovement';
 import { compactSpec } from './wireframe-components/wireframeLabels';
 import { api } from '@/api/client';
 import { C } from '@/utils/colors';
@@ -128,7 +128,7 @@ function criterionOverlay(metric: string, outcome: MetricOutcome): Pick<HoverPay
       'Scorer: metric outcomes',
       `Scorer field: aggregate.metric_outcomes["${metric}"]`,
       `Criterion label: ${humanize(metric)}`,
-      `${outcome.pass_count} pass / ${outcome.fail_count} fail from ${outcome.sample_size} scored checks in this agent revision.`,
+      `${outcome.pass_count} pass / ${outcome.fail_count} fail from ${outcome.sample_size} scored checks in this agent arm.`,
       `Mean score: ${fmtScore(outcome.mean_score)}`,
     ],
   };
@@ -310,11 +310,11 @@ function runCoverageColor(validRuns: number, totalRuns: number): string {
 const COLUMN_HELPERS: Record<string, string[]> = {
   'Agent spec': [
     'Identifies the harness and model used by this experiment run in compact form.',
-    'Use this for quick model/agent comparison within a scenario family.',
+    'Use this for quick model/agent comparison within a problem family.',
   ],
   Outcome: [
     'Primary objective score for the run, represented as mean outcome quality.',
-    'Higher scores mean stronger overall performance against the scenario target.',
+    'Higher scores mean stronger overall performance against the problem target.',
   ],
   Stability: [
     'Outcome consistency across runs after repeatability processing.',
@@ -325,15 +325,15 @@ const COLUMN_HELPERS: Record<string, string[]> = {
     'Derived from scored runs vs total runs and whether sample thresholds are met.',
   ],
   Runtime: [
-    'Runtime movement for this revision row compared with the previous revision of the same agent.',
+    'Runtime movement for this arm row compared with the previous arm of the same agent.',
     'Lower runtime is better, so downward movement is green and upward movement is red.',
   ],
   Input: [
-    'Input token movement for this revision row compared with the previous revision of the same agent.',
+    'Input token movement for this arm row compared with the previous arm of the same agent.',
     'Lower input token use is better, so downward movement is green and upward movement is red.',
   ],
   Output: [
-    'Output token movement for this revision row compared with the previous revision of the same agent.',
+    'Output token movement for this arm row compared with the previous arm of the same agent.',
     'Lower output token use is better, so downward movement is green and upward movement is red.',
   ],
   Run: [
@@ -341,7 +341,7 @@ const COLUMN_HELPERS: Record<string, string[]> = {
     'Higher fill means stronger signal strength for this experiment.',
   ],
   Findings: [
-    'Grouped runtime findings collected from the scenario checks.',
+    'Grouped runtime findings collected from the problem checks.',
     'Use it to open issue context and review supporting evidence quickly.',
   ],
 };
@@ -643,34 +643,34 @@ function findingPanelKey(experimentKey: string, kind: FindingKind) {
   return `${experimentKey}:${kind}`;
 }
 
-type RevisionFilterMap = Record<string, string[]>;
+type ArmFilterMap = Record<string, string[]>;
 
 function formatFamilyMenuLabel(allSelected: boolean, families: string[]) {
-  if (allSelected) return 'all scenarios';
+  if (allSelected) return 'all problems';
   if (families.length === 1) return families[0];
-  if (families.length > 0) return `${families.length} scenarios`;
-  return 'all scenarios';
+  if (families.length > 0) return `${families.length} problems`;
+  return 'all problems';
 }
 
-function formatRevisionMenuLabel(allSelected: boolean, revisions: string[], hasHidden: boolean) {
-  if (allSelected) return 'all revisions';
-  if (revisions.length === 0) return 'no revisions';
-  if (!hasHidden) return `revision ${revisions[0]}`;
-  if (revisions.length === 1) return `revision ${revisions[0]}`;
-  return `${revisions.length} revisions`;
+function formatArmMenuLabel(allSelected: boolean, arms: string[], hasHidden: boolean) {
+  if (allSelected) return 'all arms';
+  if (arms.length === 0) return 'no arms';
+  if (!hasHidden) return `arm ${arms[0]}`;
+  if (arms.length === 1) return `arm ${arms[0]}`;
+  return `${arms.length} arms`;
 }
 
-function findMissingRevisionLabel(revisions: string[], selected: string[]) {
-  return revisions.some((revision) => !selected.includes(revision));
+function findMissingArmLabel(arms: string[], selected: string[]) {
+  return arms.some((arm) => !selected.includes(arm));
 }
 
 function experimentRowKey(exp: ExperimentRecord) {
-  return `${exp.experiment_id}|${compactSpec(exp.agent_spec)}|${exp.revision ?? ''}`;
+  return `${exp.experiment_id}|${compactSpec(exp.agent_spec)}|${exp.arm ?? ''}`;
 }
 
-function revisionSortValue(revision?: string | null) {
-  if (!revision) return 0;
-  const match = revision.match(/\d+/g);
+function armSortValue(arm?: string | null) {
+  if (!arm) return 0;
+  const match = arm.match(/\d+/g);
   if (!match?.length) return 0;
   return Number(match.join('')) || 0;
 }
@@ -703,10 +703,10 @@ function patternDemoOutcome(pass: number, fail: number): MetricOutcome {
 
 function withPatternDemoData(experiments: ExperimentRecord[]) {
   const targetFamily = 'skill-benchmark-coding-test';
-  const hasTarget = experiments.some((exp) => exp.synthetic && exp.scenario === targetFamily);
+  const hasTarget = experiments.some((exp) => exp.synthetic && exp.problem === targetFamily);
   if (!hasTarget) return experiments;
 
-  const patternByRevision: Record<string, Record<string, MetricOutcome>> = {
+  const patternByArm: Record<string, Record<string, MetricOutcome>> = {
     v001: {
       'code-quality': patternDemoOutcome(1, 2),
       functional: patternDemoOutcome(3, 0),
@@ -725,7 +725,7 @@ function withPatternDemoData(experiments: ExperimentRecord[]) {
   };
 
   return experiments.map((exp) => {
-    const overrides = exp.synthetic && exp.scenario === targetFamily && exp.revision ? patternByRevision[exp.revision] : undefined;
+    const overrides = exp.synthetic && exp.problem === targetFamily && exp.arm ? patternByArm[exp.arm] : undefined;
     if (!overrides) return exp;
     return {
       ...exp,
@@ -763,7 +763,7 @@ function experimentRankKey(exp: ExperimentRecord) {
     sampleScore == null ? -1 : sampleScore,
     scoredRuns,
     totalRuns,
-    revisionSortValue(exp.revision),
+    armSortValue(exp.arm),
   ];
 }
 
@@ -838,19 +838,19 @@ function FindingClusterBadge({
 export function WireframeExperimentsPage() {
   const query = useQuery({ queryKey: ['experiments'], queryFn: api.experiments });
   const runsQuery = useQuery({ queryKey: ['runs'], queryFn: api.runs });
-  const [scenarioFilter, setScenarioFilter] = useState('');
-  const [selectedFamilies, setSelectedFamilies] = useState<string[]>(['__all_scenarios__']);
+  const [problemFilter, setProblemFilter] = useState('');
+  const [selectedFamilies, setSelectedFamilies] = useState<string[]>(['__all_problems__']);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [openFamilyMenu, setOpenFamilyMenu] = useState(false);
-  const [openRevisionMenu, setOpenRevisionMenu] = useState<string | null>(null);
+  const [openArmMenu, setOpenArmMenu] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<HoverPayload | null>(null);
   const [columnTooltip, setColumnTooltip] = useState<HoverPayload | null>(null);
   const [pinnedTooltips, setPinnedTooltips] = useState<HoverPayload[]>([]);
   const [findingPanel, setFindingPanel] = useState<FindingPanelState | null>(null);
   const [pinnedFindingPanels, setPinnedFindingPanels] = useState<FindingPanelState[]>([]);
-  const [selectedRevisions, setSelectedRevisions] = useState<RevisionFilterMap>({});
-  const [scenarioSortMode, setScenarioSortMode] = useState<'most_recent' | 'revision_improvement'>('most_recent');
-  const [revisionSortModes, setRevisionSortModes] = useState<Record<string, 'outcome' | 'agent' | 'revision'>>({});
+  const [selectedArms, setSelectedArms] = useState<ArmFilterMap>({});
+  const [problemSortMode, setProblemSortMode] = useState<'most_recent' | 'arm_improvement'>('most_recent');
+  const [armSortModes, setArmSortModes] = useState<Record<string, 'outcome' | 'agent' | 'arm'>>({});
 
   useEffect(() => {
     if (!findingPanel?.pinned) return;
@@ -993,42 +993,42 @@ export function WireframeExperimentsPage() {
   const families = useMemo(() => {
     const groups = new Map<string, Map<string, ExperimentRecord[]>>();
     for (const exp of experiments) {
-      const family = exp.scenario ?? 'unknown';
-      const revision = exp.revision ?? 'unknown';
-      const revisions = groups.get(family) ?? new Map<string, ExperimentRecord[]>();
-      const list = revisions.get(revision) ?? [];
+      const family = exp.problem ?? 'unknown';
+      const arm = exp.arm ?? 'unknown';
+      const arms = groups.get(family) ?? new Map<string, ExperimentRecord[]>();
+      const list = arms.get(arm) ?? [];
       list.push(exp);
-      revisions.set(revision, list);
-      groups.set(family, revisions);
+      arms.set(arm, list);
+      groups.set(family, arms);
     }
     return [...groups.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
-      .map(([family, revisionMap]) => ({
+      .map(([family, armMap]) => ({
         family,
-        revisions: [...revisionMap.entries()]
+        arms: [...armMap.entries()]
           .sort(([a], [b]) => a.localeCompare(b))
-          .map(([revision, exps]) => ({ revision, exps: exps.sort((a, b) => (b.revision ?? '').localeCompare(a.revision ?? '')) })),
+          .map(([arm, exps]) => ({ arm, exps: exps.sort((a, b) => (b.arm ?? '').localeCompare(a.arm ?? '')) })),
       }));
   }, [experiments]);
 
-  const getLatestRevision = (revisions: Array<{ revision: string }>) => {
-    if (revisions.length === 0) return 'unknown';
-    const sorted = [...revisions].sort((a, b) => a.revision.localeCompare(b.revision));
-    return sorted.at(-1)?.revision ?? 'unknown';
+  const getLatestArm = (arms: Array<{ arm: string }>) => {
+    if (arms.length === 0) return 'unknown';
+    const sorted = [...arms].sort((a, b) => a.arm.localeCompare(b.arm));
+    return sorted.at(-1)?.arm ?? 'unknown';
   };
 
   useEffect(() => {
-    setSelectedRevisions((current) => {
+    setSelectedArms((current) => {
       const next = { ...current };
       let changed = false;
 
-      for (const { family, revisions } of families) {
-        const revisionIds = revisions.map((revision) => revision.revision);
-        const validCurrent = next[family]?.filter((revision) => revisionIds.includes(revision));
+      for (const { family, arms } of families) {
+        const armIds = arms.map((arm) => arm.arm);
+        const validCurrent = next[family]?.filter((arm) => armIds.includes(arm));
         if (validCurrent && validCurrent.length > 0) {
           next[family] = validCurrent;
         } else {
-          next[family] = [getLatestRevision(revisions)];
+          next[family] = [getLatestArm(arms)];
           changed = true;
         }
       }
@@ -1048,25 +1048,25 @@ export function WireframeExperimentsPage() {
     });
   }, [families]);
 
-  const toggleRevisionVisibility = (family: string, revision: string) => {
-    setSelectedRevisions((current) => {
-      const revisions = current[family] ?? [getLatestRevision(families.find((entry) => entry.family === family)?.revisions ?? [])];
-      if (revisions.includes(revision)) {
-        return { ...current, [family]: revisions.filter((entry) => entry !== revision) };
+  const toggleArmVisibility = (family: string, arm: string) => {
+    setSelectedArms((current) => {
+      const arms = current[family] ?? [getLatestArm(families.find((entry) => entry.family === family)?.arms ?? [])];
+      if (arms.includes(arm)) {
+        return { ...current, [family]: arms.filter((entry) => entry !== arm) };
       }
-      return { ...current, [family]: [...revisions, revision] };
+      return { ...current, [family]: [...arms, arm] };
     });
   };
 
-  const showAllRevisionsForFamily = (family: string) => {
-    const revisionIds = families.find((entry) => entry.family === family)?.revisions ?? [];
-    setSelectedRevisions((current) => ({ ...current, [family]: revisionIds.map((revision) => revision.revision) }));
+  const showAllArmsForFamily = (family: string) => {
+    const armIds = families.find((entry) => entry.family === family)?.arms ?? [];
+    setSelectedArms((current) => ({ ...current, [family]: armIds.map((arm) => arm.arm) }));
   };
 
   useEffect(() => {
     setSelectedFamilies((current) => {
       const available = families.map((entry) => entry.family);
-      const allToken = '__all_scenarios__';
+      const allToken = '__all_problems__';
       if (current.includes(allToken)) {
         return [allToken];
       }
@@ -1083,8 +1083,8 @@ export function WireframeExperimentsPage() {
   }, [families]);
 
   const filteredFamilies = useMemo(() => {
-    const search = scenarioFilter.trim().toLowerCase();
-    const familySelection = selectedFamilies.includes('__all_scenarios__') || selectedFamilies.length === 0
+    const search = problemFilter.trim().toLowerCase();
+    const familySelection = selectedFamilies.includes('__all_problems__') || selectedFamilies.length === 0
       ? null
       : new Set(selectedFamilies);
     const base = families
@@ -1092,22 +1092,22 @@ export function WireframeExperimentsPage() {
       .filter(({ family }) => !search || family.toLowerCase().includes(search));
 
     return [...base].sort((left, right) => {
-      if (scenarioSortMode === 'most_recent') {
-        const leftStamp = revisionSortValue(left.revisions.at(-1)?.revision);
-        const rightStamp = revisionSortValue(right.revisions.at(-1)?.revision);
+      if (problemSortMode === 'most_recent') {
+        const leftStamp = armSortValue(left.arms.at(-1)?.arm);
+        const rightStamp = armSortValue(right.arms.at(-1)?.arm);
         if (leftStamp !== rightStamp) {
           return rightStamp - leftStamp;
         }
         return left.family.localeCompare(right.family);
       }
 
-      const leftRevisions = [...left.revisions].sort((a, b) => revisionSortValue(a.revision) - revisionSortValue(b.revision));
-      const rightRevisions = [...right.revisions].sort((a, b) => revisionSortValue(a.revision) - revisionSortValue(b.revision));
+      const leftArms = [...left.arms].sort((a, b) => armSortValue(a.arm) - armSortValue(b.arm));
+      const rightArms = [...right.arms].sort((a, b) => armSortValue(a.arm) - armSortValue(b.arm));
 
-      const leftCurrent = leftRevisions.at(-1);
-      const leftPrevious = leftRevisions.length > 1 ? leftRevisions.at(-2) : undefined;
-      const rightCurrent = rightRevisions.at(-1);
-      const rightPrevious = rightRevisions.length > 1 ? rightRevisions.at(-2) : undefined;
+      const leftCurrent = leftArms.at(-1);
+      const leftPrevious = leftArms.length > 1 ? leftArms.at(-2) : undefined;
+      const rightCurrent = rightArms.at(-1);
+      const rightPrevious = rightArms.length > 1 ? rightArms.at(-2) : undefined;
 
       const leftDelivery = topDeliveryScore(leftCurrent?.exps ?? []);
       const rightDelivery = topDeliveryScore(rightCurrent?.exps ?? []);
@@ -1126,26 +1126,26 @@ export function WireframeExperimentsPage() {
 
       return left.family.localeCompare(right.family);
     });
-  }, [families, selectedFamilies, scenarioFilter, scenarioSortMode]);
+  }, [families, selectedFamilies, problemFilter, problemSortMode]);
 
-  const hasHiddenScenarios = useMemo(() => {
-    if (selectedFamilies.includes('__all_scenarios__') || selectedFamilies.length === 0) {
+  const hasHiddenProblems = useMemo(() => {
+    if (selectedFamilies.includes('__all_problems__') || selectedFamilies.length === 0) {
       return false;
     }
     return selectedFamilies.length < families.length;
   }, [families.length, selectedFamilies]);
 
-  const scenarioFilterSuggestion = useMemo(() => {
-    const queryText = scenarioFilter.trim().toLowerCase();
+  const problemFilterSuggestion = useMemo(() => {
+    const queryText = problemFilter.trim().toLowerCase();
     if (!queryText) return null;
     return families.find(({ family }) => family.toLowerCase().startsWith(queryText) && family.toLowerCase() !== queryText)?.family ?? null;
-  }, [families, scenarioFilter]);
+  }, [families, problemFilter]);
 
   const rankedByFamily = useMemo(() => {
     const map = new Map<string, { winnerId: string; runnerUpId?: string }>();
 
-    for (const { family, revisions } of families) {
-      for (const { revision, exps } of revisions) {
+    for (const { family, arms } of families) {
+      for (const { arm, exps } of arms) {
         const ranked = exps
         .map((exp) => {
         const rowKey = experimentRowKey(exp);
@@ -1161,7 +1161,7 @@ export function WireframeExperimentsPage() {
         winnerId: ranked[0].rowKey,
         runnerUpId: ranked[1]?.rowKey,
       });
-      map.set(`${family}::${revision}`, {
+      map.set(`${family}::${arm}`, {
         winnerId: ranked[0].rowKey,
         runnerUpId: ranked[1]?.rowKey,
       });
@@ -1177,7 +1177,7 @@ export function WireframeExperimentsPage() {
       const target = event.target;
       if (!(target instanceof Element) || !target.closest('[data-wireframe-menu]')) {
         setOpenFamilyMenu(false);
-        setOpenRevisionMenu(null);
+        setOpenArmMenu(null);
       }
     };
 
@@ -1216,14 +1216,14 @@ export function WireframeExperimentsPage() {
             type="button"
             className="inline-flex size-7 items-center justify-center rounded border"
             onClick={() => {
-              if (hasHiddenScenarios) {
-                setSelectedFamilies(['__all_scenarios__']);
+              if (hasHiddenProblems) {
+                setSelectedFamilies(['__all_problems__']);
               }
             }}
-            aria-label={hasHiddenScenarios ? 'Show all scenario families' : 'All scenario families visible'}
-            title={hasHiddenScenarios ? 'Show all scenario families' : 'All scenario families visible'}
+            aria-label={hasHiddenProblems ? 'Show all problem families' : 'All problem families visible'}
+            title={hasHiddenProblems ? 'Show all problem families' : 'All problem families visible'}
           >
-            {hasHiddenScenarios ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
+            {hasHiddenProblems ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
           </button>
           <div className="relative" data-wireframe-menu>
                 <button
@@ -1232,26 +1232,26 @@ export function WireframeExperimentsPage() {
                   style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
                   onClick={() => setOpenFamilyMenu((open) => !open)}
                 >
-                  {formatFamilyMenuLabel(selectedFamilies.includes('__all_scenarios__'), selectedFamilies.filter((item) => item !== '__all_scenarios__'))}
+                  {formatFamilyMenuLabel(selectedFamilies.includes('__all_problems__'), selectedFamilies.filter((item) => item !== '__all_problems__'))}
                 </button>
                 {openFamilyMenu ? (
               <div className="absolute left-0 top-full z-20 mt-1 min-w-56 rounded-md border  p-2 text-xs" data-wireframe-menu>
                 <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
                     <input
                     type="checkbox"
-                    checked={selectedFamilies.includes('__all_scenarios__')}
+                    checked={selectedFamilies.includes('__all_problems__')}
                     onChange={(event) => {
                       if (event.target.checked) {
-                        setSelectedFamilies(['__all_scenarios__']);
+                        setSelectedFamilies(['__all_problems__']);
                       } else {
                         setSelectedFamilies([]);
                       }
                     }}
                   />
-                  all scenarios
+                  all problems
                 </label>
                 {families.map(({ family }) => {
-                  const checked = !selectedFamilies.includes('__all_scenarios__') && selectedFamilies.includes(family);
+                  const checked = !selectedFamilies.includes('__all_problems__') && selectedFamilies.includes(family);
                   return (
                     <label key={family} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
                       <input
@@ -1266,14 +1266,14 @@ export function WireframeExperimentsPage() {
                               if (isSingleSelect) {
                                 return [family];
                               }
-                              const next = [...current.filter((value) => value !== '__all_scenarios__'), family];
+                              const next = [...current.filter((value) => value !== '__all_problems__'), family];
                               return [...new Set(next)];
                             }
                             const next = current.filter((value) => value !== family);
                             if (next.length === 0) {
-                              return ['__all_scenarios__'];
+                              return ['__all_problems__'];
                             }
-                            return next.includes('__all_scenarios__') ? ['__all_scenarios__'] : next;
+                            return next.includes('__all_problems__') ? ['__all_problems__'] : next;
                           });
                         }}
                       />
@@ -1285,63 +1285,63 @@ export function WireframeExperimentsPage() {
             ) : null}
           </div>
           <div className="relative min-w-56">
-            {scenarioFilterSuggestion ? (
+            {problemFilterSuggestion ? (
               <div
                 className="pointer-events-none absolute inset-0 h-7 rounded-md px-2 py-1 text-xs"
                 style={{ border: `1px solid transparent`, color: C.fg0 }}
                 aria-hidden="true"
               >
-                <span style={{ visibility: 'hidden' }}>{scenarioFilter}</span>
-                <span>{scenarioFilterSuggestion.slice(scenarioFilter.length)}</span>
+                <span style={{ visibility: 'hidden' }}>{problemFilter}</span>
+                <span>{problemFilterSuggestion.slice(problemFilter.length)}</span>
               </div>
             ) : null}
             <input
               className="relative h-7 w-full rounded-md px-2 py-1 text-xs"
               style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
-              value={scenarioFilter}
-              placeholder="Search scenario family…"
-              onChange={(event) => setScenarioFilter(event.target.value)}
+              value={problemFilter}
+              placeholder="Search problem family…"
+              onChange={(event) => setProblemFilter(event.target.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Tab' && scenarioFilterSuggestion) {
+                if (event.key === 'Tab' && problemFilterSuggestion) {
                   event.preventDefault();
-                  setScenarioFilter(scenarioFilterSuggestion);
+                  setProblemFilter(problemFilterSuggestion);
                 }
               }}
-              aria-label="Scenario family filter"
+              aria-label="Problem family filter"
             />
           </div>
           <div className="ml-auto flex items-center gap-2">
-            <label className="text-xs" style={{ color: C.fg2 }} htmlFor="scenario-sort-mode">
+            <label className="text-xs" style={{ color: C.fg2 }} htmlFor="problem-sort-mode">
               Sort:
             </label>
             <select
-              id="scenario-sort-mode"
-              value={scenarioSortMode}
-              onChange={(event) => setScenarioSortMode(event.target.value as 'most_recent' | 'revision_improvement')}
+              id="problem-sort-mode"
+              value={problemSortMode}
+              onChange={(event) => setProblemSortMode(event.target.value as 'most_recent' | 'arm_improvement')}
               className="h-7 min-w-[250px] rounded-md px-2 py-1 text-xs"
               style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
             >
               <option value="most_recent">latest data</option>
-              <option value="revision_improvement">delivery score</option>
+              <option value="arm_improvement">delivery score</option>
             </select>
           </div>
         </div>
       </div>
 
-      {filteredFamilies.map(({ family, revisions }) => {
-        const hasSynthetic = revisions.some(({ exps }) => exps.some((exp) => exp.synthetic));
-                const revisionIds = revisions.map((revision) => revision.revision);
-                const selected = selectedRevisions[family] ?? [getLatestRevision(revisions)];
+      {filteredFamilies.map(({ family, arms }) => {
+        const hasSynthetic = arms.some(({ exps }) => exps.some((exp) => exp.synthetic));
+                const armIds = arms.map((arm) => arm.arm);
+                const selected = selectedArms[family] ?? [getLatestArm(arms)];
                 const selectedSet = new Set(selected);
-                const hasHiddenRevisions = revisionIds.some((revision) => !selectedSet.has(revision));
-                const allFamilyExps = revisions.flatMap(({ exps }) => exps);
+                const hasHiddenArms = armIds.some((arm) => !selectedSet.has(arm));
+                const allFamilyExps = arms.flatMap(({ exps }) => exps);
                 const allFamilyRunIds = new Set(allFamilyExps.flatMap((exp) => exp.run_ids));
                 const familyRuns = (runsQuery.data ?? []).filter((run) => allFamilyRunIds.has(run.id));
-                const familyDiffs = (query.data?.revision_diffs ?? []).filter((diff) => diff.scenario === family);
-                const revisionSortMode = revisionSortModes[family] ?? 'outcome';
-                const baseRevisionRows = revisions
-                  .filter(({ revision }) => selectedSet.has(revision))
-                  .flatMap(({ revision, exps }) => exps.map((exp) => ({ revision, exp })));
+                const familyDiffs = (query.data?.arm_diffs ?? []).filter((diff) => diff.problem === family);
+                const armSortMode = armSortModes[family] ?? 'outcome';
+                const baseArmRows = arms
+                  .filter(({ arm }) => selectedSet.has(arm))
+                  .flatMap(({ arm, exps }) => exps.map((exp) => ({ arm, exp })));
                 const outputMeanFor = (exp: ExperimentRecord) => {
                   const values = exp.run_ids
                     .map((id) => runsById.get(id)?.total_output_tokens)
@@ -1355,7 +1355,7 @@ export function WireframeExperimentsPage() {
                   return input + (outputMeanFor(exp) ?? 0);
                 };
                 const trustFor = (exp: ExperimentRecord) => confidenceScore(exp.aggregate.run_count_scored ?? 0, exp.aggregate.run_count_total ?? 0);
-                const compareRevisionRowOutcome = (left: { revision: string; exp: ExperimentRecord }, right: { revision: string; exp: ExperimentRecord }) => {
+                const compareArmRowOutcome = (left: { arm: string; exp: ExperimentRecord }, right: { arm: string; exp: ExperimentRecord }) => {
                   const scoreLeft = findabilityScore(left.exp.aggregate.composite_score?.mean, left.exp.aggregate.quality_score?.mean) ?? -1;
                   const scoreRight = findabilityScore(right.exp.aggregate.composite_score?.mean, right.exp.aggregate.quality_score?.mean) ?? -1;
                   if (scoreRight !== scoreLeft) return scoreRight - scoreLeft;
@@ -1376,21 +1376,21 @@ export function WireframeExperimentsPage() {
                   const trustRight = trustFor(right.exp);
                   if (trustRight !== trustLeft) return trustRight - trustLeft;
 
-                  return revisionSortValue(left.revision) - revisionSortValue(right.revision);
+                  return armSortValue(left.arm) - armSortValue(right.arm);
                 };
-                const scenarioRankedRows = [...baseRevisionRows].sort(compareRevisionRowOutcome);
-                const scenarioWinnerId = scenarioRankedRows[0] ? experimentRowKey(scenarioRankedRows[0].exp) : null;
-                const scenarioRunnerUpId = scenarioRankedRows[1] ? experimentRowKey(scenarioRankedRows[1].exp) : null;
-                const visibleRevisionRows = [...baseRevisionRows].sort((left, right) => {
-                  if (revisionSortMode === 'agent') {
+                const problemRankedRows = [...baseArmRows].sort(compareArmRowOutcome);
+                const problemWinnerId = problemRankedRows[0] ? experimentRowKey(problemRankedRows[0].exp) : null;
+                const problemRunnerUpId = problemRankedRows[1] ? experimentRowKey(problemRankedRows[1].exp) : null;
+                const visibleArmRows = [...baseArmRows].sort((left, right) => {
+                  if (armSortMode === 'agent') {
                     const agentSort = compactSpec(left.exp.agent_spec).localeCompare(compactSpec(right.exp.agent_spec));
                     if (agentSort !== 0) return agentSort;
                   }
-                  if (revisionSortMode === 'revision') {
-                    const revisionSort = revisionSortValue(right.revision) - revisionSortValue(left.revision);
-                    if (revisionSort !== 0) return revisionSort;
+                  if (armSortMode === 'arm') {
+                    const armSort = armSortValue(right.arm) - armSortValue(left.arm);
+                    if (armSort !== 0) return armSort;
                   }
-                  return compareRevisionRowOutcome(left, right);
+                  return compareArmRowOutcome(left, right);
                 });
                 return (
           <section
@@ -1422,7 +1422,7 @@ export function WireframeExperimentsPage() {
                 ) : null}
               </div>
               <div className="text-[11px]" style={{ color: C.fg1 }}>
-                {(revisions[0]?.exps[0]?.scenario_meta?.description || 'Scenario family').slice(0, 180)}
+                {(arms[0]?.exps[0]?.problem_meta?.description || 'Problem family').slice(0, 180)}
               </div>
             </div>
           <div
@@ -1438,12 +1438,12 @@ export function WireframeExperimentsPage() {
                     <div>
                       <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
                         <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
-                        Revision movement
+                        Arm movement
                         <button
                           type="button"
                           className="inline-flex size-4 items-center justify-center rounded-full border"
                           style={{ color: C.fg1, borderColor: C.border }}
-                          aria-label="Revision movement sort explanation"
+                          aria-label="Arm movement sort explanation"
                           onMouseEnter={(event) => {
                             const rect = event.currentTarget.getBoundingClientRect();
                             setColumnTooltip({
@@ -1451,9 +1451,9 @@ export function WireframeExperimentsPage() {
                               y: rect.bottom + 4,
                               title: 'Outcome sorting',
                               lines: [
-                                'Default order ranks the visible revision rows in this scenario together.',
+                                'Default order ranks the visible arm rows in this problem together.',
                                 'Sort priority: highest outcome, lower runtime, lower spend, higher stability, higher trust.',
-                                'Agent and Revision sort modes group first, then apply the same outcome ranking inside each group.',
+                                'Agent and Arm sort modes group first, then apply the same outcome ranking inside each group.',
                               ],
                             });
                           }}
@@ -1470,62 +1470,62 @@ export function WireframeExperimentsPage() {
                       type="button"
                       className="inline-flex size-7 items-center justify-center rounded border"
                       onClick={() => {
-                                if (hasHiddenRevisions) {
-                                  showAllRevisionsForFamily(family);
+                                if (hasHiddenArms) {
+                                  showAllArmsForFamily(family);
                                 }
                       }}
-                      aria-label={hasHiddenRevisions ? 'Show all revision rows' : 'All revision rows visible'}
-                      title={hasHiddenRevisions ? 'Show all revision rows' : 'All revision rows visible'}
+                      aria-label={hasHiddenArms ? 'Show all arm rows' : 'All arm rows visible'}
+                      title={hasHiddenArms ? 'Show all arm rows' : 'All arm rows visible'}
                                 >
-                      {hasHiddenRevisions ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
+                      {hasHiddenArms ? <EyeOff size={12} color={C.red} /> : <Eye size={12} color={C.fg3} />}
                                 </button>
                                 <div className="relative" data-wireframe-menu>
                       <button
                                 type="button"
                                 className="min-w-60 h-7 rounded-md px-2 py-1 text-left text-xs"
                                 style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
-                                onClick={() => setOpenRevisionMenu((current) => (current === family ? null : family))}
+                                onClick={() => setOpenArmMenu((current) => (current === family ? null : family))}
                       >
-                                {formatRevisionMenuLabel(
-                                  selectedSet.size === revisionIds.length,
+                                {formatArmMenuLabel(
+                                  selectedSet.size === armIds.length,
                                   selected,
-                                  hasHiddenRevisions,
+                                  hasHiddenArms,
                                 )}
                       </button>
-                      {openRevisionMenu === family ? (
+                      {openArmMenu === family ? (
                                 <div className="absolute left-0 top-full z-20 mt-1 min-w-60 rounded-md border  p-2 text-xs" data-wireframe-menu>
                                   <label className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
                                     <input
                                       type="checkbox"
-                                      checked={selectedSet.size === revisionIds.length}
+                                      checked={selectedSet.size === armIds.length}
                                       onChange={(event) => {
-                                        setSelectedRevisions((current) => ({ ...current, [family]: event.target.checked ? revisionIds : [] }));
+                                        setSelectedArms((current) => ({ ...current, [family]: event.target.checked ? armIds : [] }));
                                       }}
                                     />
-                                    all revisions
+                                    all arms
                                   </label>
-                                  {revisionIds.map((revision) => {
-                                    const revisionChecked = selectedSet.has(revision);
+                                  {armIds.map((arm) => {
+                                    const armChecked = selectedSet.has(arm);
                                     return (
-                                      <label key={`${family}-revision-${revision}`} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
+                                      <label key={`${family}-arm-${arm}`} className="mb-1 flex cursor-pointer items-center gap-1.5 px-1 py-1">
                                         <input
                                           type="checkbox"
                                           onMouseDown={(event) => event.stopPropagation()}
-                                          checked={revisionChecked}
+                                          checked={armChecked}
                                           onClick={(event) => {
                                             const isSingleSelect = event.ctrlKey || event.metaKey;
                                             const nextChecked = event.currentTarget.checked;
-                                            setSelectedRevisions((current) => {
-                                              const currentSelected = current[family] ?? [getLatestRevision(families.find((entry) => entry.family === family)?.revisions ?? [])];
+                                            setSelectedArms((current) => {
+                                              const currentSelected = current[family] ?? [getLatestArm(families.find((entry) => entry.family === family)?.arms ?? [])];
                                               if (nextChecked) {
-                                                if (isSingleSelect) return { ...current, [family]: [revision] };
-                                                return { ...current, [family]: Array.from(new Set([...currentSelected, revision])) };
+                                                if (isSingleSelect) return { ...current, [family]: [arm] };
+                                                return { ...current, [family]: Array.from(new Set([...currentSelected, arm])) };
                                               }
-                                              return { ...current, [family]: currentSelected.filter((value) => value !== revision) };
+                                              return { ...current, [family]: currentSelected.filter((value) => value !== arm) };
                                             });
                                           }}
                                         />
-                                        revision {revision}
+                                        arm {arm}
                                       </label>
                                     );
                                   })}
@@ -1536,19 +1536,19 @@ export function WireframeExperimentsPage() {
 
                     </div>
                     <div className="flex items-center gap-2">
-                      <label className="text-xs" style={{ color: C.fg2 }} htmlFor={`revision-sort-mode-${family}`}>
+                      <label className="text-xs" style={{ color: C.fg2 }} htmlFor={`arm-sort-mode-${family}`}>
                         Sort:
                       </label>
                       <select
-                        id={`revision-sort-mode-${family}`}
-                        value={revisionSortMode}
-                        onChange={(event) => setRevisionSortModes((current) => ({ ...current, [family]: event.target.value as 'outcome' | 'agent' | 'revision' }))}
+                        id={`arm-sort-mode-${family}`}
+                        value={armSortMode}
+                        onChange={(event) => setArmSortModes((current) => ({ ...current, [family]: event.target.value as 'outcome' | 'agent' | 'arm' }))}
                         className="h-7 rounded-md px-2 py-1 text-xs"
                         style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
                       >
                         <option value="outcome">Outcome</option>
                         <option value="agent">Agent</option>
-                        <option value="revision">Revision</option>
+                        <option value="arm">Arm</option>
                       </select>
                     </div>
                   </div>
@@ -1568,11 +1568,11 @@ export function WireframeExperimentsPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {visibleRevisionRows
-                        .map(({ revision, exp }) => {
-                          const previousRevision = revisionIds[revisionIds.indexOf(revision) - 1];
-                          const previousExp = previousRevision
-                            ? revisions.find((entry) => entry.revision === previousRevision)?.exps.find((candidate) => candidate.agent_spec === exp.agent_spec)
+                      {visibleArmRows
+                        .map(({ arm, exp }) => {
+                          const previousArm = armIds[armIds.indexOf(arm) - 1];
+                          const previousExp = previousArm
+                            ? arms.find((entry) => entry.arm === previousArm)?.exps.find((candidate) => candidate.agent_spec === exp.agent_spec)
                             : undefined;
                           const movementDelta = (before: number | null | undefined, after: number | null | undefined) =>
                             before == null || after == null ? null : after - before;
@@ -1626,8 +1626,8 @@ export function WireframeExperimentsPage() {
                           const outputMove = movementDelta(previousOutputMean, outputMean);
                           const outcomeMove = movementDelta(previousExp?.aggregate.composite_score?.mean, exp.aggregate.composite_score?.mean);
                           const experimentKey = experimentRowKey(exp);
-                          const isWinner = scenarioWinnerId === experimentKey;
-                          const isRunnerUp = scenarioRunnerUpId === experimentKey;
+                          const isWinner = problemWinnerId === experimentKey;
+                          const isRunnerUp = problemRunnerUpId === experimentKey;
                           const composite = findabilityScore(exp.aggregate.composite_score?.mean, exp.aggregate.quality_score?.mean);
                           const compact = compactSpec(exp.agent_spec);
                           const deliveryColor = deliveryRingColor(composite);
@@ -1656,10 +1656,10 @@ export function WireframeExperimentsPage() {
                                     <div className="min-w-0">
                                       <div className="flex items-center gap-2 truncate">
                                         <span className="truncate">{compact}</span>
-                                        {isWinner ? <Trophy className="shrink-0" size={15} style={{ color: C.orange }} aria-label="Top scoring experiment in visible scenario rows" /> : null}
-                                        {isRunnerUp ? <Trophy className="shrink-0" size={15} style={{ color: '#C0C0C0' }} aria-label="Runner-up experiment in visible scenario rows" /> : null}
+                                        {isWinner ? <Trophy className="shrink-0" size={15} style={{ color: C.orange }} aria-label="Top scoring experiment in visible problem rows" /> : null}
+                                        {isRunnerUp ? <Trophy className="shrink-0" size={15} style={{ color: '#C0C0C0' }} aria-label="Runner-up experiment in visible problem rows" /> : null}
                                       </div>
-                                      <div className="num mt-0.5 text-[10px]" style={{ color: C.fg1 }}>revision {revision}</div>
+                                      <div className="num mt-0.5 text-[10px]" style={{ color: C.fg1 }}>arm {arm}</div>
                                     </div>
                                   </div>
                                 </td>
@@ -1722,7 +1722,7 @@ export function WireframeExperimentsPage() {
                   </table>
                 </div>
                 <div className="space-y-1.5 border-t p-2.5" style={{ borderColor: C.border }}>
-                  {familyDiffs.filter((diff) => selectedSet.has(diff.to_revision)).map((diff) => <RevisionDiffCard key={diff.key} diff={diff} />)}
+                  {familyDiffs.filter((diff) => selectedSet.has(diff.to_arm)).map((diff) => <ArmDiffCard key={diff.key} diff={diff} />)}
                 </div>
               </div>
               <WireframePatternsMap experiments={allFamilyExps} runs={familyRuns} />
@@ -1742,7 +1742,7 @@ export function WireframeExperimentsPage() {
                         y: rect.bottom + 4,
                         title: 'Trends',
                         lines: [
-                          'Scenario view across all revisions and agent specs.',
+                          'Problem view across all arms and agent specs.',
                           'Charts use the highest outcome run for each agent spec, then cheapest, quickest, earliest run.',
                         ],
                       });
@@ -1752,7 +1752,7 @@ export function WireframeExperimentsPage() {
                     <Info className="size-3" />
                   </button>
                   <span className="text-[11px] font-normal leading-4" style={{ color: C.fg0 }}>
-                    Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.
+                    Problem view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.
                   </span>
                 </div>
                 <WireframeTradeoffScatter runs={familyRuns} borderless showSubtitle={false} />

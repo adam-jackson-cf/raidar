@@ -48,8 +48,8 @@ type Criterion = {
   sample: number;
 };
 
-type RevisionRow = {
-  revision: string;
+type ArmRow = {
+  arm: string;
   cells: Record<string, Cell>;
 };
 
@@ -74,9 +74,9 @@ function metricOutcomes(exp: ExperimentRecord) {
   return Object.entries(exp.aggregate.metric_outcomes ?? {}) as Array<[string, MetricOutcome]>;
 }
 
-function revisionValue(revision?: string | null) {
-  if (!revision) return 0;
-  const match = revision.match(/\d+/g);
+function armValue(arm?: string | null) {
+  if (!arm) return 0;
+  const match = arm.match(/\d+/g);
   return match ? Number(match.join('')) : 0;
 }
 
@@ -104,7 +104,7 @@ function criterionOverlayLines(criterion: Criterion) {
     `Scorer: metric outcomes`,
     `Scorer field: aggregate.metric_outcomes["${criterion.key}"]`,
     `Criterion label: ${criterion.label}`,
-    `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the scenario.`,
+    `${criterion.pass} pass / ${criterion.fail} fail from ${criterion.sample} scored checks across the problem.`,
     `Latest classification: ${criterion.state}.`,
   ];
 }
@@ -205,19 +205,19 @@ function criterionStateFromCell(cell: Cell | undefined): CriterionState {
 }
 
 function buildMap(experiments: ExperimentRecord[]) {
-  const revisions = [...new Set(experiments.map((exp) => exp.revision).filter(Boolean) as string[])].sort(
-    (left, right) => revisionValue(left) - revisionValue(right),
+  const arms = [...new Set(experiments.map((exp) => exp.arm).filter(Boolean) as string[])].sort(
+    (left, right) => armValue(left) - armValue(right),
   );
-  const latestRevision = revisions[revisions.length - 1] ?? null;
+  const latestArm = arms[arms.length - 1] ?? null;
   const metrics = [...new Set(experiments.flatMap((exp) => metricOutcomes(exp).map(([metric]) => metric)))].sort();
-  const revisionExperiments = new Map(revisions.map((revision) => [revision, experiments.filter((exp) => exp.revision === revision)]));
+  const armExperiments = new Map(arms.map((arm) => [arm, experiments.filter((exp) => exp.arm === arm)]));
 
-  const cellsByRevision = new Map<string, Record<string, Cell>>();
+  const cellsByArm = new Map<string, Record<string, Cell>>();
   const priorCostingByMetric = new Map<string, boolean>();
 
-  for (const revision of revisions) {
+  for (const arm of arms) {
     const rowCells: Record<string, Cell> = {};
-    const exps = revisionExperiments.get(revision) ?? [];
+    const exps = armExperiments.get(arm) ?? [];
     for (const metric of metrics) {
       let pass = 0;
       let fail = 0;
@@ -244,15 +244,15 @@ function buildMap(experiments: ExperimentRecord[]) {
       };
       if (state === 'fail') priorCostingByMetric.set(metric, true);
     }
-    cellsByRevision.set(revision, rowCells);
+    cellsByArm.set(arm, rowCells);
   }
 
   const criteria: Criterion[] = metrics.map((metric) => {
     let pass = 0;
     let fail = 0;
     let sample = 0;
-    for (const revision of revisions) {
-      const cell = cellsByRevision.get(revision)?.[metric];
+    for (const arm of arms) {
+      const cell = cellsByArm.get(arm)?.[metric];
       pass += cell?.pass ?? 0;
       fail += cell?.fail ?? 0;
       sample += cell?.sample ?? 0;
@@ -261,7 +261,7 @@ function buildMap(experiments: ExperimentRecord[]) {
       key: metric,
       label: humanize(metric),
       shortLabel: shortCriterion(metric),
-      state: criterionStateFromCell(latestRevision ? cellsByRevision.get(latestRevision)?.[metric] : undefined),
+      state: criterionStateFromCell(latestArm ? cellsByArm.get(latestArm)?.[metric] : undefined),
       pass,
       fail,
       sample,
@@ -271,9 +271,9 @@ function buildMap(experiments: ExperimentRecord[]) {
     return stateOrder[left.state] - stateOrder[right.state] || left.label.localeCompare(right.label);
   });
 
-  const rows: RevisionRow[] = [...revisions].reverse().map((revision) => ({ revision, cells: cellsByRevision.get(revision) ?? {} }));
+  const rows: ArmRow[] = [...arms].reverse().map((arm) => ({ arm, cells: cellsByArm.get(arm) ?? {} }));
   const agentCount = new Set(experiments.map((exp) => exp.agent_spec)).size;
-  return { criteria, rows, revisions, latestRevision, agentCount };
+  return { criteria, rows, arms, latestArm, agentCount };
 }
 
 function pct(value: number | null) {
@@ -351,7 +351,7 @@ function DetailOverlay({ overlay, pinned, onPin, onClose }: {
 }
 
 export function WireframePatternsMap({ experiments, runs }: { experiments: ExperimentRecord[]; runs: RunRecord[] }) {
-  const { criteria, rows, revisions, latestRevision, agentCount } = useMemo(() => buildMap(experiments), [experiments]);
+  const { criteria, rows, arms, latestArm, agentCount } = useMemo(() => buildMap(experiments), [experiments]);
   const [hovered, setHovered] = useState<Overlay | null>(null);
   const [pinned, setPinned] = useState<Overlay[]>([]);
   const costing = criteria.filter((criterion) => criterion.state === 'costing');
@@ -359,9 +359,9 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
   const repeatable = criteria.filter((criterion) => criterion.state === 'repeatable');
   const passTotal = criteria.reduce((sum, criterion) => sum + criterion.pass, 0);
   const failTotal = criteria.reduce((sum, criterion) => sum + criterion.fail, 0);
-  const costingCopy = costing.length ? `Latest revision has criteria with fail rate at or above 34%.` : `No criteria are above the failure threshold in ${latestRevision ?? 'latest'}.`;
+  const costingCopy = costing.length ? `Latest arm has criteria with fail rate at or above 34%.` : `No criteria are above the failure threshold in ${latestArm ?? 'latest'}.`;
   const trendingCopy = trending.length ? 'Previously costing criteria are now below the failure threshold.' : 'No criterion has cleared after previously costing.';
-  const strengthsCopy = repeatable.length ? 'Latest revision criteria pass at or above 80%.' : 'No latest-revision strengths above threshold.';
+  const strengthsCopy = repeatable.length ? 'Latest arm criteria pass at or above 80%.' : 'No latest-arm strengths above threshold.';
 
   const openOverlay = (event: MouseEvent<HTMLElement>, overlay: Omit<Overlay, 'x' | 'y'>) => {
     setHovered({ ...overlay, x: event.clientX + 14, y: event.clientY + 14 });
@@ -382,15 +382,15 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
 
   if (criteria.length === 0 || rows.length === 0) return null;
 
-  const cellLines = (revision: string, criterion: Criterion, cell: Cell) => [
+  const cellLines = (arm: string, criterion: Criterion, cell: Cell) => [
     cellTitle(cell.state),
-    `Revision: ${revision}`,
+    `Arm: ${arm}`,
     `Sample: ${cell.sample} checks · threshold ${cell.threshold}`,
     `Pass/fail: ${cell.pass} pass / ${cell.fail} fail`,
     `Rates: ${pct(cell.passRate)} pass / ${pct(cell.failRate)} fail`,
     agentLine('Top agent', cell.topAgents[0]),
     agentLine('Runner-up', cell.topAgents[1]),
-    'Agent ranking uses the revision trophy order: highest outcome, lower runtime, lower spend, higher stability, higher trust.',
+    'Agent ranking uses the arm trophy order: highest outcome, lower runtime, lower spend, higher stability, higher trust.',
   ];
 
   return (
@@ -406,7 +406,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
               id: 'hover-threshold',
               title: 'Pattern threshold',
               lines: [
-                'Each cell aggregates one revision and one scoring criterion across all agent specs and scored runs in the scenario.',
+                'Each cell aggregates one arm and one scoring criterion across all agent specs and scored runs in the problem.',
                 'Costing: fail rate >= 34%. Strength: pass rate >= 80%. Trending: previously costing and now below the failure threshold.',
                 'Cells with fewer than 3 checks, or mixed results below threshold, stay muted.',
               ],
@@ -415,7 +415,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
               id: 'hover-threshold',
               title: 'Pattern threshold',
               lines: [
-                'Each cell aggregates one revision and one scoring criterion across all agent specs and scored runs in the scenario.',
+                'Each cell aggregates one arm and one scoring criterion across all agent specs and scored runs in the problem.',
                 'Costing: fail rate >= 34%. Strength: pass rate >= 80%. Trending: previously costing and now below the failure threshold.',
                 'Cells with fewer than 3 checks, or mixed results below threshold, stay muted.',
               ],
@@ -429,7 +429,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           </span>
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-[11px]" style={{ color: C.fg1 }}>
-          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>revisions <span className="num" style={{ color: C.fg4 }}>{revisions.length}</span></span>
+          <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>arms <span className="num" style={{ color: C.fg4 }}>{arms.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>agent specs <span className="num" style={{ color: C.fg4 }}>{agentCount}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>criteria <span className="num" style={{ color: C.fg4 }}>{criteria.length}</span></span>
           <span className="rounded border px-2 py-1" style={{ borderColor: C.border }}>runs <span className="num" style={{ color: C.fg4 }}>{runs.length}</span></span>
@@ -447,7 +447,7 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
         <table className="min-w-full border-collapse text-[11px]">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              <th className="sticky left-0 z-10 w-32 px-2 py-1" style={{ background: C.surface }} aria-label="Revision" />
+              <th className="sticky left-0 z-10 w-32 px-2 py-1" style={{ background: C.surface }} aria-label="Arm" />
               {criteria.map((criterion) => (
                 <th key={criterion.key} className="relative h-20 min-w-14 px-1 pb-2 text-left align-bottom" style={{ color: C.fg1 }}>
                   <button
@@ -478,10 +478,10 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.revision} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
+              <tr key={row.arm} style={{ borderBottom: `1px solid ${C.rowBorder}` }}>
                 <td className="sticky left-0 z-10 w-32 px-2 py-2 align-middle" style={{ background: C.surface }}>
                   <span className="num block text-left text-[11px] font-medium leading-none" style={{ color: C.fg3 }}>
-                    revision {row.revision}
+                    arm {row.arm}
                   </span>
                 </td>
                 {criteria.map((criterion) => {
@@ -489,25 +489,25 @@ export function WireframePatternsMap({ experiments, runs }: { experiments: Exper
                   const state = cell?.state ?? 'missing';
                   const color = stateColor(state);
                   return (
-                    <td key={`${row.revision}-${criterion.key}`} className="px-1 py-2 text-center">
+                    <td key={`${row.arm}-${criterion.key}`} className="px-1 py-2 text-center">
                       <button
                         className="inline-flex size-7 items-center justify-center rounded border text-[13px] font-bold"
                         style={{ color, borderColor: `${color}55`, background: `${color}14` }}
                         onMouseEnter={(event) => openOverlay(event, {
-                          id: `hover-cell-${row.revision}-${criterion.key}`,
-                          title: `${row.revision} · ${criterion.label}`,
-                          lines: cellLines(row.revision, criterion, cell),
+                          id: `hover-cell-${row.arm}-${criterion.key}`,
+                          title: `${row.arm} · ${criterion.label}`,
+                          lines: cellLines(row.arm, criterion, cell),
                         })}
                         onMouseMove={(event) => openOverlay(event, {
-                          id: `hover-cell-${row.revision}-${criterion.key}`,
-                          title: `${row.revision} · ${criterion.label}`,
-                          lines: cellLines(row.revision, criterion, cell),
+                          id: `hover-cell-${row.arm}-${criterion.key}`,
+                          title: `${row.arm} · ${criterion.label}`,
+                          lines: cellLines(row.arm, criterion, cell),
                         })}
                         onMouseLeave={() => setHovered(null)}
                         onClick={(event) => pinOverlay(event, {
-                          id: `cell-${row.revision}-${criterion.key}`,
-                          title: `${row.revision} · ${criterion.label}`,
-                          lines: cellLines(row.revision, criterion, cell),
+                          id: `cell-${row.arm}-${criterion.key}`,
+                          title: `${row.arm} · ${criterion.label}`,
+                          lines: cellLines(row.arm, criterion, cell),
                         })}
                       >
                         {cellSymbol(state)}

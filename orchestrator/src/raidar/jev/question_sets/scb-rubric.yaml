@@ -6,12 +6,12 @@
 #   symbol   - the symbol's own source (always sent)
 #   file     - the whole file around the symbol
 #   spec     - the cumulative checkpoint specification
-#   codebase - usages across the codebase; never in a per-symbol state, so these
-#              criteria are recorded as input-missing (audited, not asked) until a
-#              codebase-level state template exists.
+#   codebase - usages across the codebase: a bounded whole-codebase state
+#              (raidar.jev.codebase: inventory, inheritance/interface graph and the
+#              symbol's call and access sites) of at most codebase_chars.
 # kinds: which symbol kinds a criterion applies to (default: function, method, module).
 id: scb-rubric
-version: "1"
+version: "2"
 source:
   file: scb_rubric_llm_judge.jsonl
   upstream: slop-code-bench configs/rubrics/llm_judge.jsonl
@@ -22,6 +22,8 @@ max_questions_per_request: 12
 symbol_chars: 24000
 file_chars: 60000
 spec_chars: 40000
+# symbol (24k) + codebase (48k) + task stay under Jev's 96k-character state cap.
+codebase_chars: 48000
 criteria:
   echo_docstrings: {kinds: [function, method]}
   entry_exit_logging: {kinds: [function, method]}

@@ -25,7 +25,7 @@ type Pattern = {
   count: number;
   sample: number;
   agentSpecs: string[];
-  revisions: string[];
+  arms: string[];
   runIds: string[];
   severity: number;
 };
@@ -57,7 +57,7 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
       pass: number;
       fail: number;
       agentSpecs: string[];
-      revisions: string[];
+      arms: string[];
       runIds: string[];
       scoreTotal: number;
       scoreSamples: number;
@@ -71,7 +71,7 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
         pass: 0,
         fail: 0,
         agentSpecs: [],
-        revisions: [],
+        arms: [],
         runIds: [],
         scoreTotal: 0,
         scoreSamples: 0,
@@ -80,7 +80,7 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
       entry.pass += outcome.pass_count;
       entry.fail += outcome.fail_count;
       entry.agentSpecs.push(exp.agent_spec);
-      if (exp.revision) entry.revisions.push(exp.revision);
+      if (exp.arm) entry.arms.push(exp.arm);
       entry.runIds.push(...exp.run_ids);
       entry.scoreTotal += outcome.mean_score * outcome.sample_size;
       entry.scoreSamples += outcome.sample_size;
@@ -94,7 +94,7 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
     const minimum = threshold(entry.sample);
     const label = humanize(metric);
     const agents = uniqueSorted(entry.agentSpecs).map(compactSpec);
-    const revisions = uniqueSorted(entry.revisions);
+    const arms = uniqueSorted(entry.arms);
     const runIds = uniqueSorted(entry.runIds);
     const meanScore = entry.scoreSamples > 0 ? entry.scoreTotal / entry.scoreSamples : null;
     if (entry.fail >= minimum) {
@@ -107,9 +107,9 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
         count: entry.fail,
         sample: entry.sample,
         agentSpecs: agents,
-        revisions,
+        arms,
         runIds,
-        severity: entry.fail / entry.sample + agents.length * 0.1 + revisions.length * 0.05,
+        severity: entry.fail / entry.sample + agents.length * 0.1 + arms.length * 0.05,
       });
     }
     if (entry.pass >= minimum) {
@@ -122,9 +122,9 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
         count: entry.pass,
         sample: entry.sample,
         agentSpecs: agents,
-        revisions,
+        arms,
         runIds,
-        severity: entry.pass / entry.sample + agents.length * 0.1 + revisions.length * 0.05,
+        severity: entry.pass / entry.sample + agents.length * 0.1 + arms.length * 0.05,
       });
     }
   }
@@ -132,13 +132,13 @@ function buildCriteriaPatterns(experiments: ExperimentRecord[]): Pattern[] {
 }
 
 function buildGatePatterns(runs: RunRecord[]): Pattern[] {
-  const byGate = new Map<string, { runIds: string[]; agentSpecs: string[]; revisions: string[] }>();
+  const byGate = new Map<string, { runIds: string[]; agentSpecs: string[]; arms: string[] }>();
   for (const run of runs) {
     for (const gate of run.failed_gates) {
-      const entry = byGate.get(gate) ?? { runIds: [], agentSpecs: [], revisions: [] };
+      const entry = byGate.get(gate) ?? { runIds: [], agentSpecs: [], arms: [] };
       entry.runIds.push(run.id);
       entry.agentSpecs.push(run.agent_spec);
-      entry.revisions.push(run.revision);
+      entry.arms.push(run.arm);
       byGate.set(gate, entry);
     }
   }
@@ -148,7 +148,7 @@ function buildGatePatterns(runs: RunRecord[]): Pattern[] {
     .map(([gate, entry]) => {
       const runIds = uniqueSorted(entry.runIds);
       const agents = uniqueSorted(entry.agentSpecs).map(compactSpec);
-      const revisions = uniqueSorted(entry.revisions);
+      const arms = uniqueSorted(entry.arms);
       return {
         id: `gate-${gate}`,
         kind: 'friction' as const,
@@ -158,7 +158,7 @@ function buildGatePatterns(runs: RunRecord[]): Pattern[] {
         count: runIds.length,
         sample: runs.length,
         agentSpecs: agents,
-        revisions,
+        arms,
         runIds,
         severity: 2 + runIds.length / Math.max(1, runs.length) + agents.length * 0.1,
       };
@@ -166,14 +166,14 @@ function buildGatePatterns(runs: RunRecord[]): Pattern[] {
 }
 
 function buildRunIssuePatterns(runs: RunRecord[]): Pattern[] {
-  const byCategory = new Map<string, { runIds: string[]; agentSpecs: string[]; revisions: string[] }>();
+  const byCategory = new Map<string, { runIds: string[]; agentSpecs: string[]; arms: string[] }>();
   for (const run of runs) {
     for (const [category, count] of Object.entries(run.issue_categories)) {
       if (category === 'failed-gate' || count <= 0) continue;
-      const entry = byCategory.get(category) ?? { runIds: [], agentSpecs: [], revisions: [] };
+      const entry = byCategory.get(category) ?? { runIds: [], agentSpecs: [], arms: [] };
       entry.runIds.push(run.id);
       entry.agentSpecs.push(run.agent_spec);
-      entry.revisions.push(run.revision);
+      entry.arms.push(run.arm);
       byCategory.set(category, entry);
     }
   }
@@ -183,7 +183,7 @@ function buildRunIssuePatterns(runs: RunRecord[]): Pattern[] {
     .map(([category, entry]) => {
       const runIds = uniqueSorted(entry.runIds);
       const agents = uniqueSorted(entry.agentSpecs).map(compactSpec);
-      const revisions = uniqueSorted(entry.revisions);
+      const arms = uniqueSorted(entry.arms);
       return {
         id: `finding-issue-${category}`,
         kind: 'friction' as const,
@@ -193,15 +193,15 @@ function buildRunIssuePatterns(runs: RunRecord[]): Pattern[] {
         count: runIds.length,
         sample: runs.length,
         agentSpecs: agents,
-        revisions,
+        arms,
         runIds,
-        severity: runIds.length / Math.max(1, runs.length) + agents.length * 0.1 + revisions.length * 0.05,
+        severity: runIds.length / Math.max(1, runs.length) + agents.length * 0.1 + arms.length * 0.05,
       };
     });
 }
 
 function buildExperimentFindingPatterns(experiments: ExperimentRecord[], visibleRunCount: number): Pattern[] {
-  const byCategory = new Map<string, { kind: PatternKind; runIds: string[]; agentSpecs: string[]; revisions: string[] }>();
+  const byCategory = new Map<string, { kind: PatternKind; runIds: string[]; agentSpecs: string[]; arms: string[] }>();
   for (const exp of experiments) {
     for (const finding of exp.findings) {
       if (finding.kind !== 'good' && finding.kind !== 'issue') continue;
@@ -210,11 +210,11 @@ function buildExperimentFindingPatterns(experiments: ExperimentRecord[], visible
         kind: finding.kind === 'good' ? 'strength' : 'friction',
         runIds: [],
         agentSpecs: [],
-        revisions: [],
+        arms: [],
       };
       entry.runIds.push(...exp.run_ids);
       entry.agentSpecs.push(exp.agent_spec);
-      if (exp.revision) entry.revisions.push(exp.revision);
+      if (exp.arm) entry.arms.push(exp.arm);
       byCategory.set(key, entry);
     }
   }
@@ -225,7 +225,7 @@ function buildExperimentFindingPatterns(experiments: ExperimentRecord[], visible
       const [, category] = key.split(':');
       const runIds = uniqueSorted(entry.runIds);
       const agents = uniqueSorted(entry.agentSpecs).map(compactSpec);
-      const revisions = uniqueSorted(entry.revisions);
+      const arms = uniqueSorted(entry.arms);
       return {
         id: `experiment-finding-${key}`,
         kind: entry.kind,
@@ -235,9 +235,9 @@ function buildExperimentFindingPatterns(experiments: ExperimentRecord[], visible
         count: runIds.length,
         sample: visibleRunCount,
         agentSpecs: agents,
-        revisions,
+        arms,
         runIds,
-        severity: runIds.length / Math.max(1, visibleRunCount) + agents.length * 0.1 + revisions.length * 0.05,
+        severity: runIds.length / Math.max(1, visibleRunCount) + agents.length * 0.1 + arms.length * 0.05,
       };
     });
 }
@@ -358,7 +358,7 @@ function PatternOverlay({ overlay, pinned, onPin, onClose }: {
       </div>
       <div className="mt-2 space-y-1 text-[10px] leading-4">
         <div><span style={{ color: C.fg0 }}>Agents </span><span style={{ color: C.fg3 }}>{pattern.agentSpecs.join(', ') || '—'}</span></div>
-        <div><span style={{ color: C.fg0 }}>Revisions </span><span className="num" style={{ color: C.fg3 }}>{pattern.revisions.join(', ') || '—'}</span></div>
+        <div><span style={{ color: C.fg0 }}>Arms </span><span className="num" style={{ color: C.fg3 }}>{pattern.arms.join(', ') || '—'}</span></div>
         <div><span style={{ color: C.fg0 }}>Runs </span><span className="num" style={{ color: C.fg3 }}>{pattern.runIds.slice(0, 8).map(runLabel).join(', ')}{pattern.runIds.length > 8 ? ` +${pattern.runIds.length - 8}` : ''}</span></div>
       </div>
     </div>

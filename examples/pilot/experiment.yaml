@@ -79,7 +79,9 @@ arms:
 
 assessment:
   scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@1]
-  # Omitted headline_policy: the lock picks the default by K (K=8 -> scb-canonical@1).
+  # scb-canonical@2: the fork's score plus zero_correctness (C = 0 -> S = 0 even when a
+  # quality component is missing), so failed trajectories stay in the paired S analysis.
+  headline_policy: scb-canonical@2
 
 analysis:
   baseline_arm: baseline

@@ -63,6 +63,7 @@ class _QuestionSetFile(_Frozen):
     symbol_chars: int = Field(ge=1000)
     file_chars: int = Field(ge=1000)
     spec_chars: int = Field(ge=1000)
+    codebase_chars: int = Field(ge=1000)
     criteria: dict[str, _CriterionOverlay] = Field(default_factory=dict)
 
 
@@ -101,6 +102,7 @@ class RubricQuestionSet:
     symbol_chars: int
     file_chars: int
     spec_chars: int
+    codebase_chars: int
     source_sha256: str
 
     @property
@@ -152,5 +154,6 @@ def load_rubric_question_set(path: Path = SCB_RUBRIC_FILE) -> RubricQuestionSet:
         symbol_chars=definition.symbol_chars,
         file_chars=definition.file_chars,
         spec_chars=definition.spec_chars,
+        codebase_chars=definition.codebase_chars,
         source_sha256=actual,
     )

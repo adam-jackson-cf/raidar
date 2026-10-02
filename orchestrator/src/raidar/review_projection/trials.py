@@ -2,7 +2,7 @@
 
 The span tree is::
 
-    <problem>@<condition>                       TRACE
+    <problem>@<arm>                             TRACE
       <harness> · <model>                       AGENT_ROOT
         <checkpoint>                            one per attempted checkpoint
           system/user prompt, assistant message, tool calls   (ATIF)
@@ -35,11 +35,15 @@ _POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, QUALITY_SCORER})
 
 @dataclass(frozen=True)
 class ArmLabels:
-    """How a trajectory's arm reads on the surface."""
+    """How a trajectory's arm reads on the surface.
+
+    ``arm`` is the label of the arm's condition (``experiment_epoch._condition_labels``),
+    so arms of one condition on different harnesses share it.
+    """
 
     experiment_id: str
     problem: str
-    revision: str
+    arm: str
     harness: str
     model: str
     reasoning_effort: str | None
@@ -183,7 +187,7 @@ def _support_spans(builder: SpanBuilder, trial: TrialInput, root: str, start: in
 def _spans(builder: SpanBuilder, trial: TrialInput, start: int, duration: int) -> list[Finding]:
     labels, status = trial.labels, _status(trial)
     root = builder.add(
-        name=f"{labels.problem}@{labels.revision}",
+        name=f"{labels.problem}@{labels.arm}",
         span_type="TRACE",
         status=status,
         start=start,
@@ -229,9 +233,9 @@ def run_detail(trial: TrialInput) -> ReviewRunDetail:
     unscored = headline.composite is None
     record = ReviewRunRecord(
         id=trial.review_id,
-        name=f"{labels.problem}@{labels.revision} · {trial.review_id}",
-        scenario=labels.problem,
-        revision=labels.revision,
+        name=f"{labels.problem}@{labels.arm} · {trial.review_id}",
+        problem=labels.problem,
+        arm=labels.arm,
         harness=labels.harness,
         model=labels.model,
         reasoning_effort=labels.reasoning_effort,

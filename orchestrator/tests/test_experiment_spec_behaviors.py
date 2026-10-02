@@ -9,7 +9,7 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.spec.factor_guard import check_factors
-from raidar.spec.loader import CliOverrides, load_experiment, parse_assignment
+from raidar.spec.loader import UNSET, CliOverrides, load_experiment, parse_assignment
 from raidar.spec.validation import SpecValidationError
 from tests.experiment_spec_support import (
     PILOT_EXPERIMENT,
@@ -190,7 +190,9 @@ def test_override_values_are_typed_like_scb() -> None:
     assert parse_assignment("a=true") == ("a", True)
     assert parse_assignment("a=gpt-6-luna") == ("a", "gpt-6-luna")
     assert parse_assignment("a=2026-09-29") == ("a", "2026-09-29")
-    assert parse_assignment("a=") == ("a", "")
+    # An empty value unsets the key; quoted empty is the empty string (Raidar addition).
+    assert parse_assignment("a=") == ("a", UNSET)
+    assert parse_assignment("a=''") == ("a", "")
     assert parse_assignment("a=1e3") == ("a", 1000.0)
     assert parse_assignment("a=FALSE") == ("a", False)
     # SCB infers only bool/int/float; YAML-only spellings stay strings.

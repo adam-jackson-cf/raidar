@@ -11,6 +11,7 @@ import click
 REPO_ROOT = Path(__file__).resolve().parents[4]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[3]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
+SECRETS_SOURCE_ENV = "RAIDAR_SECRETS_SOURCE"
 HARNESS_CHOICES: list[str] = []
 
 

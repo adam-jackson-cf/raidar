@@ -22,7 +22,7 @@ from raidar.components.mcp_shim import parse_args, run
 from tests.component_support import (
     CLAUDE_SETTINGS,
     CODEX_SETTINGS,
-    PILOT_DIR,
+    FIXTURES_DIR,
     PROBE_DIR,
     all_builtin_uses,
     codex_message,
@@ -32,7 +32,7 @@ from tests.component_support import (
     write_step_reports,
 )
 
-RULES_TEXT = (PILOT_DIR / PROBE_DIR / "AGENTS.md").read_text()
+RULES_TEXT = (FIXTURES_DIR / PROBE_DIR / "AGENTS.md").read_text()
 
 
 def _sha(path: Path) -> str:
@@ -40,7 +40,7 @@ def _sha(path: Path) -> str:
 
 
 def _overlay_evidence(harness: Harness) -> dict[str, str | None]:
-    probe = PILOT_DIR / PROBE_DIR
+    probe = FIXTURES_DIR / PROBE_DIR
     rules = "AGENTS.md" if harness is Harness.CODEX_CLI else "CLAUDE.md"
     return {
         rules: _sha(probe / "AGENTS.md"),
@@ -228,7 +228,7 @@ def test_rules_file_changed_by_the_agent_is_not_held_against_later_steps(tmp_pat
 
 def test_mcp_shim_relays_and_records_the_handshake(tmp_path: Path) -> None:
     log = tmp_path / "mcp.jsonl"
-    server = PILOT_DIR / PROBE_DIR / "mcp_echo_server.py"
+    server = FIXTURES_DIR / PROBE_DIR / "mcp_echo_server.py"
     requests = [
         {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
         {"jsonrpc": "2.0", "method": "notifications/initialized"},
@@ -390,7 +390,7 @@ def test_stop_hook_body_can_come_from_a_component_file() -> None:
     compiled = compile_uses(use("stop-hook@1", (hook_file,)))
 
     body = compiled.support_files["00-stop-hook/hook-body.sh"]
-    assert body.content == (PILOT_DIR / hook_file).read_bytes()
+    assert body.content == (FIXTURES_DIR / hook_file).read_bytes()
     assert body.executable
 
 

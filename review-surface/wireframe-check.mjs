@@ -11,21 +11,21 @@ page.on('console', (msg) => {
 await page.goto('http://127.0.0.1:5950/wireframe', { waitUntil: 'domcontentloaded' });
 await page.waitForSelector('section[id^="family-"]', { timeout: 10000 });
 
-const visibleRevisionBlocksCount = await page.locator('section[id^="family-"] .overflow-hidden.rounded-md.border').count();
-const scenarioSections = page.locator('section[id^="family-"]');
-const sectionsToCheck = Math.min(3, await scenarioSections.count());
+const visibleArmBlocksCount = await page.locator('section[id^="family-"] .overflow-hidden.rounded-md.border').count();
+const problemSections = page.locator('section[id^="family-"]');
+const sectionsToCheck = Math.min(3, await problemSections.count());
 
 const expectedVisiblePlotCount = async (sectionId) => {
   return page.evaluate(async (id) => {
     const section = document.querySelector(`[id=${JSON.stringify(id)}]`);
-    if (!section) return { chartRuns: 0, visibleRevisions: [] };
+    if (!section) return { chartRuns: 0, visibleArms: [] };
 
     const family = section.id.replace('family-', '');
-    const revisionBlocks = Array.from(section.querySelectorAll('.overflow-hidden.rounded-md.border'));
-    const visibleRevisions = revisionBlocks
+    const armBlocks = Array.from(section.querySelectorAll('.overflow-hidden.rounded-md.border'));
+    const visibleArms = armBlocks
       .map((block) => {
         const headerText = block.querySelector('div')?.textContent ?? '';
-        const match = headerText.match(/Revision\s+([\w.-]+)/);
+        const match = headerText.match(/Arm\s+([\w.-]+)/);
         return match?.[1]?.trim();
       })
       .filter(Boolean);
@@ -38,14 +38,14 @@ const expectedVisiblePlotCount = async (sectionId) => {
 
     const selectedRunIds = new Set(
       experiments
-        .filter((exp) => visibleRevisions.includes(exp.revision) && exp.scenario === family)
+        .filter((exp) => visibleArms.includes(exp.arm) && exp.problem === family)
         .flatMap((exp) => exp.run_ids),
     );
 
     const chartRuns = runs
       .filter((run) => selectedRunIds.has(run.id) && run.composite_score != null && run.duration_ms > 0)
       .reduce((buckets, run) => {
-        const key = `${run.revision}|${run.agent_spec}`;
+        const key = `${run.arm}|${run.agent_spec}`;
         const existing = buckets.get(key) ?? [];
         existing.push(run);
         buckets.set(key, existing);
@@ -77,12 +77,12 @@ const expectedVisiblePlotCount = async (sectionId) => {
       }
     }
 
-    return { chartRuns: bestRunCount, visibleRevisions };
+    return { chartRuns: bestRunCount, visibleArms };
   }, sectionId);
 };
 
 for (let i = 0; i < sectionsToCheck; i += 1) {
-  const section = scenarioSections.nth(i);
+  const section = problemSections.nth(i);
   const sectionId = await section.getAttribute('id');
   if (!sectionId) continue;
 
@@ -101,21 +101,21 @@ for (let i = 0; i < sectionsToCheck; i += 1) {
     throw new Error(`Initial chart mismatch for ${sectionId}: rendered ${initialCircles} vs expected ${initial.chartRuns}`);
   }
 
-  const visibleRevisionSections = section.locator('.overflow-hidden.rounded-md.border');
-  const visibleRevisionCount = await visibleRevisionSections.count();
+  const visibleArmSections = section.locator('.overflow-hidden.rounded-md.border');
+  const visibleArmCount = await visibleArmSections.count();
 
-  if (visibleRevisionCount > 1) {
-    const secondRevisionEye = visibleRevisionSections.nth(1).locator('button').first();
-    await secondRevisionEye.click();
+  if (visibleArmCount > 1) {
+    const secondArmEye = visibleArmSections.nth(1).locator('button').first();
+    await secondArmEye.click();
     await page.waitForTimeout(250);
 
     const afterHide = await expectedVisiblePlotCount(sectionId);
     const hiddenCircles = await chart.locator('circle').count();
     if (hiddenCircles !== afterHide.chartRuns) {
-      throw new Error(`After hiding revision for ${sectionId}: rendered ${hiddenCircles} vs expected ${afterHide.chartRuns}`);
+      throw new Error(`After hiding arm for ${sectionId}: rendered ${hiddenCircles} vs expected ${afterHide.chartRuns}`);
     }
 
-    const familyReveal = section.locator('button[aria-label="Show all revision tables"]');
+    const familyReveal = section.locator('button[aria-label="Show all arm tables"]');
     const showAllVisible = await familyReveal.count();
     if (showAllVisible === 1) {
       await familyReveal.click();
@@ -125,11 +125,11 @@ for (let i = 0; i < sectionsToCheck; i += 1) {
     const afterShow = await expectedVisiblePlotCount(sectionId);
     const restoredCircles = await chart.locator('circle').count();
     if (restoredCircles !== afterShow.chartRuns) {
-      throw new Error(`After restoring revisions for ${sectionId}: rendered ${restoredCircles} vs expected ${afterShow.chartRuns}`);
+      throw new Error(`After restoring arms for ${sectionId}: rendered ${restoredCircles} vs expected ${afterShow.chartRuns}`);
     }
   }
 }
 
-console.log('revisions', visibleRevisionBlocksCount);
+console.log('arms', visibleArmBlocksCount);
 console.log('errors', JSON.stringify(errors, null, 2));
 await browser.close();

@@ -21,13 +21,13 @@ It currently identifies repeated signals from scorer criteria, gates, and findin
 1. What frictions are costing them and why.
 2. Which strengths are trending up or producing repeatable consistency.
 3. Why a raw value like `6 of 6` matters.
-4. How the pattern summary connects to revision movement and visible revision state.
+4. How the pattern summary connects to arm movement and visible arm state.
 
 The panel should help a reviewer understand consequence, trajectory, and confidence, not just counts.
 
 ## Desired conceptual model
 
-Use visible scenario family + visible revisions as the scope.
+Use visible problem family + visible arms as the scope.
 
 The control should answer:
 
@@ -37,9 +37,9 @@ The control should answer:
 
 Prefer interpretive states over raw threshold buckets:
 
-- `Costing you`: current/latest visible revision still fails above threshold, or failures spread across multiple agents/revisions.
-- `Trending up`: earlier failures improved or cleared in later visible revisions.
-- `Repeatable strengths`: consistently passing in current/latest visible revision, especially across multiple agents.
+- `Costing you`: current/latest visible arm still fails above threshold, or failures spread across multiple agents/arms.
+- `Trending up`: earlier failures improved or cleared in later visible arms.
+- `Repeatable strengths`: consistently passing in current/latest visible arm, especially across multiple agents.
 - Optional `Watchlist`: mixed signal below threshold, if useful.
 
 Avoid letting one metric appear as both friction and strength. Classify each scorer criterion into one dominant state.
@@ -56,8 +56,8 @@ From `ExperimentRecord`:
 
 ```ts
 interface ExperimentRecord {
-  scenario: string | null;
-  revision: string | null;
+  problem: string | null;
+  arm: string | null;
   agent_spec: string;
   synthetic: boolean;
   repeats: number | null;
@@ -104,8 +104,8 @@ From `RunRecord`:
 ```ts
 interface RunRecord {
   id: string;
-  scenario: string;
-  revision: string;
+  problem: string;
+  arm: string;
   agent_spec: string;
   duration_ms: number;
   status: 'OK' | 'ERROR' | 'UNSET';
@@ -121,13 +121,13 @@ interface RunRecord {
 }
 ```
 
-From revision diffs:
+From arm diffs:
 
 ```ts
-interface RevisionDiff {
-  scenario: string;
-  from_revision: string;
-  to_revision: string;
+interface ArmDiff {
+  problem: string;
+  from_arm: string;
+  to_arm: string;
   summary: string[];
 }
 ```

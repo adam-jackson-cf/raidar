@@ -16,7 +16,11 @@ so a mode change is a reviewed diff. Modes:
   (a ``*`` wildcard policy cannot be promoted), and its calibration and
   evaluation trials must be disjoint, so near-identical checkpoints of one
   trajectory cannot sit on both sides. The numbers written here are claims:
-  ``raidar.jev.calibration.verify_promotion`` re-derives them from the audit.
+  ``raidar.jev.promotion.verify_promotion`` re-derives them from the audit.
+  A promotion also records which reviewer kinds (``human``, ``model`` and the
+  model ids) its labels came from, the precision, recall and agreement of the
+  frozen threshold on each side of the split, and the scorer version the
+  enforce mode ships with (``raidar.jev.promotion`` writes all of these).
 
 A run may lower a policy's mode (for example ``shadow`` to ``off``) but never
 raise it; raising is a new policy version.
@@ -27,7 +31,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from enum import StrEnum
 from pathlib import Path
-from typing import Self
+from typing import Literal, Self
 
 import yaml
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -79,6 +83,15 @@ class CalibrationSplit(_Frozen):
         return "evaluation" if trial in self.evaluation else None
 
 
+class SplitMetrics(_Frozen):
+    """How the frozen threshold agrees with the labels on one side of the split."""
+
+    labelled: int = Field(ge=0)
+    precision: float | None = Field(default=None, ge=0.0, le=1.0)
+    recall: float | None = Field(default=None, ge=0.0, le=1.0)
+    agreement: float | None = Field(default=None, ge=0.0, le=1.0)
+
+
 class Promotion(_Frozen):
     """Evidence that a policy passed the enforce gate; the threshold is frozen here."""
 
@@ -89,6 +102,11 @@ class Promotion(_Frozen):
     runtimes: tuple[str, ...] = Field(min_length=1)
     split: CalibrationSplit
     regression_corpus: str = Field(pattern=r"^[0-9a-f]{64}$")
+    reviewers: dict[Literal["human", "model"], int] | None = None
+    reviewer_models: tuple[str, ...] = ()
+    calibration_metrics: SplitMetrics | None = None
+    evaluation_metrics: SplitMetrics | None = None
+    scorer: str | None = Field(default=None, pattern=r"^[a-z0-9][a-z0-9-]*@[A-Za-z0-9._+-]+$")
 
     def gate_failures(self, policy_runtimes: tuple[str, ...]) -> list[str]:
         failures = []

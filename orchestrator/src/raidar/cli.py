@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+import os
+
 import click
 from dotenv import load_dotenv
 
 from raidar.agents.config import Harness
 from raidar.commands.register import register_commands
-from raidar.commands.shared import ENV_PATH, set_harness_choices
+from raidar.commands.shared import ENV_PATH, SECRETS_SOURCE_ENV, set_harness_choices
 
-if ENV_PATH.exists():
+# orchestrator/.env is the fallback secret source. When the make targets inject secrets
+# from Infisical they set RAIDAR_SECRETS_SOURCE=infisical, and .env stays unread so a
+# stale local value can never stand in for a secret Infisical lacks.
+if ENV_PATH.exists() and os.environ.get(SECRETS_SOURCE_ENV) != "infisical":
     load_dotenv(ENV_PATH, override=False)
 
 

@@ -9,7 +9,7 @@ import { Badge } from '@/components/Badge';
 import { FailurePatterns } from '@/components/FailurePatterns';
 import { FindingChips } from '@/components/FindingChips';
 import { PolicyMismatchNotice, familyMismatch } from '@/components/PolicyMismatchNotice';
-import { RevisionMovement } from '@/components/RevisionMovement';
+import { ArmMovement } from '@/components/ArmMovement';
 import { TradeoffScatter } from '@/components/TradeoffScatter';
 import { ScoreBar, ScoreVerdict, TierPill } from '@/components/Verdict';
 import { C } from '@/utils/colors';
@@ -24,7 +24,7 @@ import {
   scorerName,
   spreadTier,
 } from '@/utils/verdict';
-import type { AnnotationKind, ExperimentRecord, RevisionDiff, RunRecord, StatBlock } from '@/utils/types';
+import type { AnnotationKind, ArmDiff, ExperimentRecord, RunRecord, StatBlock } from '@/utils/types';
 
 function statDetail(stat: StatBlock | undefined): string {
   if (stat?.mean == null) return 'No scored runs';
@@ -332,7 +332,7 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
   );
 
   const bestComposite = sorted[0]?.aggregate.composite_score?.mean ?? null;
-  const meta = experiments.find((e) => e.scenario_meta)?.scenario_meta ?? null;
+  const meta = experiments.find((e) => e.problem_meta)?.problem_meta ?? null;
   const quality = useQualityIndex();
   const qualityTargets = quality.targetsFor(
     experiments.flatMap((exp) => exp.run_ids.map((id) => runsById.get(id)?.artifact_paths.run_json)),
@@ -359,12 +359,12 @@ function ExperimentGroup({ groupKey, experiments }: { groupKey: string; experime
           <span className="text-sm font-medium" style={{ color: C.fg5 }}>
             {groupKey}
           </span>
-          {meta?.category && (
+          {meta && (
             <span
               className="rounded px-1.5 py-px text-[9px] font-medium uppercase tracking-wide"
               style={{ color: C.fg1, background: 'rgba(255,255,255,0.05)' }}
             >
-              {meta.category}
+              {meta.checkpoints} checkpoint{meta.checkpoints === 1 ? '' : 's'}
             </span>
           )}
           {meta?.difficulty && (
@@ -537,18 +537,18 @@ export function ExperimentsPage() {
   const families = useMemo(() => {
     const map = new Map<string, Map<string, ExperimentRecord[]>>();
     for (const exp of experiments.data?.experiments ?? []) {
-      const family = exp.scenario ?? 'unknown';
-      const revision = exp.revision ?? 'unknown';
-      const revisions = map.get(family) ?? new Map<string, ExperimentRecord[]>();
-      const list = revisions.get(revision) ?? [];
+      const family = exp.problem ?? 'unknown';
+      const arm = exp.arm ?? 'unknown';
+      const arms = map.get(family) ?? new Map<string, ExperimentRecord[]>();
+      const list = arms.get(arm) ?? [];
       list.push(exp);
-      revisions.set(revision, list);
-      map.set(family, revisions);
+      arms.set(arm, list);
+      map.set(family, arms);
     }
-    return [...map.entries()].map(([family, revisions]) => ({
+    return [...map.entries()].map(([family, arms]) => ({
       family,
-      revisions: [...revisions.entries()].sort(([a], [b]) => a.localeCompare(b)),
-      all: [...revisions.values()].flat(),
+      arms: [...arms.entries()].sort(([a], [b]) => a.localeCompare(b)),
+      all: [...arms.values()].flat(),
     }));
   }, [experiments.data]);
 
@@ -582,13 +582,13 @@ export function ExperimentsPage() {
           className="num rounded px-2.5 py-1.5 text-[11px]"
           style={{ color: C.fg3, background: 'rgba(255,255,255,0.04)', border: `1px solid ${C.border}` }}
         >
-          make review-fixture-synthetic && make review-surface-data
+          make review-surface-data REVIEW_RUNS_ROOT=&lt;runs-root&gt; REVIEW_STORE=&lt;store&gt;
         </code>
       </div>
     );
   }
 
-  const revisionDiffs = experiments.data?.revision_diffs ?? [];
+  const armDiffs = experiments.data?.arm_diffs ?? [];
 
   return (
     <div className="sb flex flex-1 flex-col gap-5 overflow-auto p-4">
@@ -609,13 +609,13 @@ export function ExperimentsPage() {
           ))}
         </nav>
       )}
-      {families.map(({ family, revisions, all }) => (
+      {families.map(({ family, arms, all }) => (
         <FamilySection
           key={family}
           family={family}
-          revisions={revisions}
+          arms={arms}
           all={all}
-          diffs={revisionDiffs.filter((diff) => diff.scenario === family)}
+          diffs={armDiffs.filter((diff) => diff.problem === family)}
         />
       ))}
     </div>
@@ -624,14 +624,14 @@ export function ExperimentsPage() {
 
 function FamilySection({
   family,
-  revisions,
+  arms,
   all,
   diffs,
 }: {
   family: string;
-  revisions: Array<[string, ExperimentRecord[]]>;
+  arms: Array<[string, ExperimentRecord[]]>;
   all: ExperimentRecord[];
-  diffs: RevisionDiff[];
+  diffs: ArmDiff[];
 }) {
   const runs = useQuery({ queryKey: ['runs'], queryFn: api.runs });
   const familyRunIds = new Set(all.flatMap((exp) => exp.run_ids));
@@ -639,14 +639,14 @@ function FamilySection({
   return (
     <div id={`family-${family}`} className="flex scroll-mt-4 flex-col gap-3">
       <PolicyMismatchNotice mismatch={familyMismatch(all)} />
-      {revisions.map(([revision, exps]) => (
-        <ExperimentGroup key={`${family}:${revision}`} groupKey={`${family}:${revision}`} experiments={exps} />
+      {arms.map(([arm, exps]) => (
+        <ExperimentGroup key={`${family}:${arm}`} groupKey={`${family}:${arm}`} experiments={exps} />
       ))}
       <div className="grid items-start gap-3 xl:grid-cols-2">
         <TradeoffScatter runs={familyRuns} />
         <FailurePatterns runs={familyRuns} />
       </div>
-      <RevisionMovement experiments={all} diffs={diffs} />
+      <ArmMovement experiments={all} diffs={diffs} />
     </div>
   );
 }

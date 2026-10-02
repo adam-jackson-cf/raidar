@@ -25,7 +25,7 @@ from harbor.models.trial.config import AgentConfig
 from raidar.agents.config import Harness
 from raidar.codex_auth import resolve_codex_auth
 from raidar.components import CompiledCondition
-from tests.component_support import all_builtin_uses, compile_uses, use
+from tests.component_support import PILOT_DIR, all_builtin_uses, compile_uses, use
 from tests.component_trial_support import (
     build_task,
     orbstack_available,
@@ -101,6 +101,7 @@ def test_review_loop_runs_reviewer_sessions_billed_to_the_arm(tmp_path: Path) ->
     compiled = compile_uses(
         use("review-loop@1", max_review_rounds=1),
         use("rules-file@1", ("components/guided/AGENTS.md",)),
+        base_dir=PILOT_DIR,
     )
 
     summary = _run_and_probe(tmp_path, compiled, "review-loop-codex")

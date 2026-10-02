@@ -12,8 +12,12 @@ of ``~/.omp``: decisions append to ``<store>/jev-audit/<policy>/<YYYY-MM-DD>.jso
 (UTC date of the record) and labels to ``<store>/jev-audit/<policy>/labels.jsonl``,
 mode 0600. Absent optional fields are omitted, never written as ``null``,
 because the lab's schema treats them as ``optional`` and rejects ``null``.
-A decision holds at most one human label, the first one written, as in
-``jev-lab``. Like the store's
+A decision holds at most one label, the first one written, as in
+``jev-lab``. A label names its reviewer: ``human`` (a person, including a
+review-surface ``user``) or ``model``, which must name the model id that
+labelled, so calibration can report and gate on where its labels came from.
+A ``blind`` label was derived by comparing a labeller's own answers with
+Jev's (``raidar.jev.blind``) rather than by judging Jev's answer directly. Like the store's
 ``log.jsonl``, it holds replay-varying facts (timestamps, request ids,
 latency) and is never part of an Assessment key.
 """
@@ -25,9 +29,9 @@ import uuid
 from datetime import UTC, datetime
 from enum import StrEnum
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 from raidar.jev.policies import LABELS, PolicyMode
@@ -98,6 +102,29 @@ class DecisionRecord(_Record):
     labels: tuple[str, ...] = LABELS
 
 
+class ReviewerKind(StrEnum):
+    HUMAN = "human"
+    MODEL = "model"
+
+
+# Aliases a label source may use for a reviewer kind (the review surface says ``user``).
+REVIEWER_ALIASES = {"user": ReviewerKind.HUMAN}
+
+
+def reviewer_kind(raw: object) -> ReviewerKind:
+    """The reviewer kind ``raw`` names (``human`` when absent; ``user`` is ``human``)."""
+    if raw is None or raw == "":
+        return ReviewerKind.HUMAN
+    text = str(raw)
+    if text in REVIEWER_ALIASES:
+        return REVIEWER_ALIASES[text]
+    try:
+        return ReviewerKind(text)
+    except ValueError:
+        kinds = [kind.value for kind in ReviewerKind]
+        raise ValueError(f"reviewer {text!r} is not one of {kinds}") from None
+
+
 class LabelRecord(_Record):
     schema_: Literal[1] = Field(default=1, alias="schema")
     type: Literal["label"] = "label"
@@ -105,8 +132,25 @@ class LabelRecord(_Record):
     request_id: str
     policy: str
     label: str
-    reviewer: Literal["human"] = "human"
+    reviewer: ReviewerKind = ReviewerKind.HUMAN
+    reviewer_model: str | None = None
+    blind: bool | None = None
     note: str | None = None
+
+    @model_validator(mode="after")
+    def _model_reviewer_names_its_model(self) -> Self:
+        if self.reviewer is ReviewerKind.MODEL and not (self.reviewer_model or "").strip():
+            raise ValueError("a model reviewer's label needs reviewer_model (the model id)")
+        if self.reviewer is ReviewerKind.HUMAN and self.reviewer_model is not None:
+            raise ValueError("a human reviewer's label takes no reviewer_model")
+        return self
+
+    @property
+    def reviewer_ref(self) -> str:
+        """``human`` or ``model:<model id>``."""
+        if self.reviewer is ReviewerKind.MODEL:
+            return f"model:{self.reviewer_model}"
+        return self.reviewer.value
 
 
 def new_request_id() -> str:

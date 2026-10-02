@@ -1,8 +1,7 @@
-"""Synthetic experiment-epoch fixture for the review surface (``make review-fixture-synthetic``).
+"""Synthetic review-surface fixture (``make review-fixture-synthetic``).
 
-Writes two clearly labelled synthetic experiments as a real ``raidar run``
-would leave them, plus an Assessment store, under ``<dest>/runs`` and
-``<dest>/store``:
+Writes clearly labelled synthetic experiments as a real ``raidar run`` would
+leave them, plus one Assessment store, under ``<dest>``:
 
 - ``synthetic-bugfix``: one 3-checkpoint problem, one condition, three agent
   specs (reasoning effort is the factor). The low-effort spec has a degraded
@@ -12,17 +11,20 @@ would leave them, plus an Assessment store, under ``<dest>/runs`` and
 - ``synthetic-skill``: one 2-checkpoint problem, conditions ``baseline`` and
   ``skills`` crossed with two agent specs on two harnesses, so condition diffs
   and per-condition comparisons render (each arm's condition digest covers its
-  harness, as ``CompiledCondition.digest`` does, yet both arms share a revision).
-- ``synthetic-policy-mix``: a one-shot problem scored under
-  ``scb-canonical-oneshot@1``, compared with a scenario-epoch experiment on the
-  same problem (``scenario_epoch.fixture``), so the headline-policy mismatch renders.
+  harness, as ``CompiledCondition.digest`` does, yet both arms share a label).
+- ``synthetic-policy-mix`` and ``synthetic-policy-mix-k2``: the same problem id
+  locked once with one checkpoint (``scb-canonical-oneshot@1``) and once with
+  two (``scb-canonical@1``). A real problem version has one checkpoint count;
+  this synthetic contrivance makes one compared family mix headline policies,
+  so the headline-policy mismatch renders.
+- ``synthetic-review-only`` (under ``<dest>/review-only``, not ``<dest>/runs``):
+  runs projected for review whose Quality data was never built, so the surface
+  shows what a run and a family without Quality data look like.
 
-``<dest>/scenario-epoch`` holds scenario-epoch experiments (``scenario_epoch.fixture``),
-so the old epoch renders beside the new one.
-
-Review ids are ``<run id>-<trial id>``; the trial ids are chosen so the frozen
-review-surface suite's deterministic ids (``synthetic-bugfix-gpt-5.5-low-04``
-and friends) name the same kinds of trajectories as in the scenario epoch.
+``<dest>/runs`` and ``<dest>/review-only`` are run roots, ``<dest>/store`` the
+Assessment store of both. Review ids are ``<run id>-<trial id>``; the trial ids
+keep the review-surface suite's deterministic ids (``synthetic-bugfix-gpt-5.5-low-04``
+and friends) stable.
 """
 
 from __future__ import annotations
@@ -51,15 +53,16 @@ from raidar.review_projection.fixture_trials import (
     write_bundle,
     write_trial,
 )
-from raidar.review_projection.scenario_epoch.fixture import write_scenario_epoch
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.store import AssessmentStore
 from raidar.spec.canonical import digest_json
 from raidar.spec.schema import ExperimentSpec
 
 SYNTHETIC_MARKER = "synthetic"
-# Scenario-epoch experiments of the fixture, beside ``runs`` and ``store``.
-SCENARIO_EPOCH_DIR = "scenario-epoch"
+# Run roots of the fixture: ``runs`` is projected for review and Quality, ``review-only``
+# for review alone.
+RUNS_DIR = "runs"
+REVIEW_ONLY_DIR = "review-only"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
 _SCORERS = ["correctness@1", "code-quality@1", "resource-usage@1"]
@@ -213,22 +216,52 @@ def _skill() -> Design:
     )
 
 
-def _policy_mix() -> Design:
+def _single_arm(experiment: str, problem: str, title: str, agent: str, checkpoints: int) -> Design:
     return Design(
-        experiment="synthetic-policy-mix",
-        problem=POLICY_MIX_PROBLEM,
-        title="Synthetic one-shot ledger check, compared across headline policies",
+        experiment=experiment,
+        problem=problem,
+        title=title,
         prompt=_BUGFIX_PROMPT,
         factors=["agent.reasoning_effort"],
         conditions={"baseline": {}},
         component_paths={"baseline": []},
-        arms={"gpt55-low": ("baseline", "gpt55-low")},
-        baseline_arm="gpt55-low",
+        arms={agent: ("baseline", agent)},
+        baseline_arm=agent,
         blocks=3,
         trajectories=tuple(
-            PlannedTrajectory("gpt55-low", block, _solved(1), 0.84 + 0.02 * block)
+            PlannedTrajectory(agent, block, _solved(checkpoints), 0.84 + 0.02 * block)
             for block in (1, 2, 3)
         ),
+    )
+
+
+def _policy_mix() -> Design:
+    return _single_arm(
+        "synthetic-policy-mix",
+        POLICY_MIX_PROBLEM,
+        "Synthetic one-shot ledger check, compared across headline policies",
+        "gpt55-low",
+        checkpoints=1,
+    )
+
+
+def _policy_mix_k2() -> Design:
+    return _single_arm(
+        "synthetic-policy-mix-k2",
+        POLICY_MIX_PROBLEM,
+        "Synthetic two-checkpoint lock of the one-shot ledger check (policy mismatch)",
+        "gpt55-medium",
+        checkpoints=2,
+    )
+
+
+def _review_only() -> Design:
+    return _single_arm(
+        "synthetic-review-only",
+        "synthetic/review-only@1",
+        "Synthetic ledger check projected for review without Quality data",
+        "gpt55-low",
+        checkpoints=2,
     )
 
 
@@ -339,10 +372,10 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def _run(design: Design, dest: Path, store: AssessmentStore) -> Path:
+def _run(design: Design, dest: Path, store: AssessmentStore, root: str = RUNS_DIR) -> Path:
     spec = _spec(design)
     lock = _lock(design, spec)
-    run_dir = dest / "runs" / design.experiment / design.experiment
+    run_dir = dest / root / design.experiment / design.experiment
     bundle = write_bundle(
         dest / "bundles" / design.experiment,
         design.problem,
@@ -398,14 +431,15 @@ def _run(design: Design, dest: Path, store: AssessmentStore) -> Path:
 
 
 def generate_review_fixture(dest: Path) -> list[Path]:
-    """Write the synthetic runs, their Assessment store and scenario-epoch experiments.
+    """Write the synthetic runs of both run roots and their Assessment store.
 
     Returns the run directories.
     """
     shutil.rmtree(dest, ignore_errors=True)
     store = AssessmentStore(dest / "store")
-    runs = [_run(design, dest, store) for design in (_bugfix(), _skill(), _policy_mix())]
-    write_scenario_epoch(dest / SCENARIO_EPOCH_DIR, policy_mix_scenario=POLICY_MIX_PROBLEM)
+    designs = (_bugfix(), _skill(), _policy_mix(), _policy_mix_k2())
+    runs = [_run(design, dest, store) for design in designs]
+    runs.append(_run(_review_only(), dest, store, REVIEW_ONLY_DIR))
     return runs
 
 

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, MoveRight, TriangleAlert, Trophy } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { fmtTokens } from '@/utils/helpers';
-import type { ExperimentRecord, FileDiff, RevisionDiff, StatBlock } from '@/utils/types';
+import type { ExperimentRecord, FileDiff, ArmDiff, StatBlock } from '@/utils/types';
 import { compactSpec } from './wireframeLabels';
 
 type MovementMetric = 'outcome' | 'runtime' | 'spend';
@@ -25,9 +25,9 @@ type MovementRow = {
   rank: number;
 };
 
-function revisionSortValue(revision?: string | null) {
-  if (!revision) return 0;
-  const match = revision.match(/\d+/g);
+function armSortValue(arm?: string | null) {
+  if (!arm) return 0;
+  const match = arm.match(/\d+/g);
   return match ? Number(match.join('')) : 0;
 }
 
@@ -143,7 +143,7 @@ function DiffBlock({ file }: { file: FileDiff }) {
 
 type DiffPill = { label: string; warning: boolean; tab: string };
 
-export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
+export function ArmDiffCard({ diff }: { diff: ArmDiff }) {
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState('prompt');
   const pillConfig = (flag: string) => {
@@ -157,7 +157,7 @@ export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
     return null;
   };
   const pills = diff.summary.map(pillConfig).filter(Boolean) as DiffPill[];
-  const sections = diff.sections ?? { prompt: diff.files.prompt, scenario: diff.files.scenario };
+  const sections = diff.sections ?? { prompt: diff.files.prompt, condition: diff.files.condition };
   const tabs = pills.filter((pill) => sections[pill.tab]);
   const activeTab = sections[tab] ? tab : (tabs[0]?.tab ?? 'prompt');
   const file = sections[activeTab] ?? diff.files.prompt;
@@ -175,7 +175,7 @@ export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
           <ChevronRight className="size-3.5" style={{ color: C.fg0 }} />
         )}
         <span className="num text-[11px] font-medium" style={{ color: C.fg3 }}>
-          {diff.from_revision} <MoveRight className="inline size-3" /> {diff.to_revision}
+          {diff.from_arm} <MoveRight className="inline size-3" /> {diff.to_arm}
         </span>
         {pills.filter((pill) => !pill.warning).map((pill) => (
           <span
@@ -257,42 +257,42 @@ export function RevisionDiffCard({ diff }: { diff: RevisionDiff }) {
   );
 }
 
-export function WireframeRevisionMovement({
+export function WireframeArmMovement({
   experiments,
   diffs,
-  selectedRevisions,
-  allRevisionSelected,
+  selectedArms,
+  allArmSelected,
 }: {
   experiments: ExperimentRecord[];
-  diffs: RevisionDiff[];
-  selectedRevisions: string[];
-  allRevisionSelected: boolean;
+  diffs: ArmDiff[];
+  selectedArms: string[];
+  allArmSelected: boolean;
 }) {
   const movements = useMemo(() => {
-    const revisions = [...new Set(experiments.map((experiment) => experiment.revision).filter(Boolean))].sort(
-      (left, right) => revisionSortValue(left) - revisionSortValue(right),
+    const arms = [...new Set(experiments.map((experiment) => experiment.arm).filter(Boolean))].sort(
+      (left, right) => armSortValue(left) - armSortValue(right),
     ) as string[];
-    const selected = allRevisionSelected ? revisions : selectedRevisions;
+    const selected = allArmSelected ? arms : selectedArms;
     const rows: MovementRow[] = [];
 
-    for (const revision of selected) {
-      const revisionIndex = revisions.indexOf(revision);
-      if (revisionIndex <= 0) continue;
+    for (const arm of selected) {
+      const armIndex = arms.indexOf(arm);
+      if (armIndex <= 0) continue;
 
-      const previousRevision = revisions[revisionIndex - 1];
-      const currentExperiments = experiments.filter((experiment) => experiment.revision === revision);
-      const previousExperiments = experiments.filter((experiment) => experiment.revision === previousRevision);
+      const previousArm = arms[armIndex - 1];
+      const currentExperiments = experiments.filter((experiment) => experiment.arm === arm);
+      const previousExperiments = experiments.filter((experiment) => experiment.arm === previousArm);
 
       for (const target of currentExperiments) {
         const source = previousExperiments.find((experiment) => experiment.agent_spec === target.agent_spec);
         if (!source) continue;
 
         rows.push({
-          key: `${target.agent_spec}-${previousRevision}-${revision}`,
+          key: `${target.agent_spec}-${previousArm}-${arm}`,
           agentSpec: target.agent_spec,
           agentLabel: compactSpec(target.agent_spec),
-          from: previousRevision,
-          to: revision,
+          from: previousArm,
+          to: arm,
           outcome: delta(statMean(source.aggregate.composite_score), statMean(target.aggregate.composite_score)),
           runtime: delta(statMean(source.aggregate.duration_sec), statMean(target.aggregate.duration_sec)),
           spend: delta(spendMean(source), spendMean(target)),
@@ -318,11 +318,11 @@ export function WireframeRevisionMovement({
         return left.agentLabel.localeCompare(right.agentLabel);
       })
       .map((row, index) => ({ ...row, rank: index + 1 }));
-  }, [allRevisionSelected, experiments, selectedRevisions]);
+  }, [allArmSelected, experiments, selectedArms]);
 
   const visibleDiffs = useMemo(() => {
     const pairs = new Set(movements.map((movement) => `${movement.from}->${movement.to}`));
-    return diffs.filter((diff) => pairs.has(`${diff.from_revision}->${diff.to_revision}`));
+    return diffs.filter((diff) => pairs.has(`${diff.from_arm}->${diff.to_arm}`));
   }, [diffs, movements]);
 
   return (
@@ -330,7 +330,7 @@ export function WireframeRevisionMovement({
       <div>
         <div className="flex items-center gap-2 text-[15px] font-semibold" style={{ color: C.fg4 }}>
           <span className="inline-block size-1.5 rounded-full" style={{ background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />
-          Revision movement
+          Arm movement
         </div>
         <div className="mt-1 text-[11px] leading-4" style={{ color: C.fg0 }}>
           Did the outcome improve, contract diff shows changes
@@ -339,7 +339,7 @@ export function WireframeRevisionMovement({
 
       {movements.length === 0 && (
         <div className="rounded-md px-2 py-4 text-[11px]" style={{ color: C.fg1, border: `1px dashed ${C.border}` }}>
-          No previous visible revision to compare.
+          No previous visible arm to compare.
         </div>
       )}
 
@@ -347,7 +347,7 @@ export function WireframeRevisionMovement({
         <table className="w-full max-w-3xl border-collapse">
           <thead>
             <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-              {['Agent', 'Revision', 'Outcome', 'Runtime', 'Spend'].map((label) => (
+              {['Agent', 'Arm', 'Outcome', 'Runtime', 'Spend'].map((label) => (
                 <th
                   key={label}
                   className="px-2 py-1 text-left text-[9px] font-medium uppercase tracking-wider"
@@ -380,7 +380,7 @@ export function WireframeRevisionMovement({
                         className="shrink-0"
                         size={15}
                         style={{ color: C.orange }}
-                        aria-label="Highest outcome improvement between compared revisions"
+                        aria-label="Highest outcome improvement between compared arms"
                       />
                     ) : null}
                     {movement.rank === 2 ? (
@@ -388,7 +388,7 @@ export function WireframeRevisionMovement({
                         className="shrink-0"
                         size={15}
                         style={{ color: '#C0C0C0' }}
-                        aria-label="Runner-up outcome improvement between compared revisions"
+                        aria-label="Runner-up outcome improvement between compared arms"
                       />
                     ) : null}
                   </span>
@@ -412,7 +412,7 @@ export function WireframeRevisionMovement({
       )}
 
       {visibleDiffs.map((diff) => (
-        <RevisionDiffCard key={diff.key} diff={diff} />
+        <ArmDiffCard key={diff.key} diff={diff} />
       ))}
     </div>
   );

@@ -11,11 +11,15 @@ from raidar.spec.policies import (
     DEFAULT_POLICY_REGISTRY,
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,
+    SCB_CANONICAL_ONESHOT_V2,
+    SCB_CANONICAL_V2,
     ComponentStatus,
     IneligibilityCode,
     PolicyResolver,
     ScorePolicy,
-    checkpoint_correctness,
+    checkpoint_pass_rate,
+    checkpoint_solve_rate,
+    problem_correctness,
 )
 from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError
 
@@ -128,13 +132,122 @@ def test_invalid_component_values_are_rejected(components: dict, error: type) ->
         SCB_CANONICAL.score(checkpoints=8, components=components)
 
 
-def test_checkpoint_correctness_is_solved_over_k() -> None:
-    assert checkpoint_correctness(3, 8) == Decimal("0.375")
-    assert checkpoint_correctness(0, 1) == Decimal("0")
+def test_checkpoint_solve_rate_is_solved_over_k() -> None:
+    assert checkpoint_solve_rate(3, 8) == Decimal("0.375")
+    assert checkpoint_solve_rate(0, 1) == Decimal("0")
     with pytest.raises(ValueError, match="solved"):
-        checkpoint_correctness(9, 8)
+        checkpoint_solve_rate(9, 8)
     with pytest.raises(ValueError, match="checkpoint count"):
         DEFAULT_POLICY_REGISTRY.default_for_checkpoints(0)
+
+
+def test_correctness_is_the_fork_mean_checkpoint_pass_rate_not_solved_over_k() -> None:
+    # Fork C_p = sum(passed_k/total_k)/K: 0.9 and 0.5 are both unsolved checkpoints,
+    # so solved/K would be 0, but C is their mean pass rate (with an unreached 0).
+    rates = [checkpoint_pass_rate(9, 10), checkpoint_pass_rate(1, 2), Decimal(0)]
+
+    # Precision 50, ROUND_HALF_EVEN, as the fork's _mean.
+    assert problem_correctness(rates) == Decimal("0.4" + "6" * 48 + "7")
+    assert problem_correctness([checkpoint_pass_rate(5, 5)] * 8) == Decimal("1")
+    with pytest.raises(ValueError, match="graded"):
+        checkpoint_pass_rate(0, 0)
+    with pytest.raises(ValueError, match="at least one"):
+        problem_correctness([])
+    with pytest.raises(ValueError, match=r"\[0, 1\]"):
+        problem_correctness([Decimal("1.1")])
+
+
+QUALITY_GAPS = [
+    pytest.param({"V": 1, "E": 1, "H": 1, "R": 1}, {}, id="G-missing"),
+    pytest.param(FULL, {"G": ["measurement_environment_mismatch"]}, id="G-ineligible"),
+    pytest.param({}, {}, id="all-quality-missing"),
+]
+
+
+@pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
+def test_v1_is_fork_exact_c_zero_with_a_quality_gap_is_ineligible(
+    quality: dict, ineligible: dict
+) -> None:
+    components = {**quality, "C": 0}
+
+    result = SCB_CANONICAL.score(checkpoints=8, components=components, ineligible=ineligible)
+
+    assert result.score is None
+    assert not result.eligible
+    assert not result.zero_correctness
+
+
+@pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
+def test_v2_c_zero_scores_zero_even_with_a_quality_gap(quality: dict, ineligible: dict) -> None:
+    components = {**quality, "C": 0}
+
+    result = SCB_CANONICAL_V2.score(checkpoints=8, components=components, ineligible=ineligible)
+
+    assert result.eligible
+    assert result.score == Decimal("0.000000")
+    assert result.correctness == Decimal("0E-12")
+    assert result.zero_correctness
+    assert result.inertia is None
+    assert result.components["C"] is ComponentStatus.USED
+    assert ComponentStatus.USED not in {
+        status for key, status in result.components.items() if key == "G"
+    }
+
+
+@pytest.mark.parametrize(("quality", "ineligible"), QUALITY_GAPS)
+def test_v2_c_above_zero_with_a_quality_gap_stays_ineligible(
+    quality: dict, ineligible: dict
+) -> None:
+    components = {**quality, "C": Decimal("0.000000000001")}
+
+    result = SCB_CANONICAL_V2.score(checkpoints=8, components=components, ineligible=ineligible)
+
+    assert result.score is None
+    assert not result.zero_correctness
+    assert {reason.code for reason in result.reasons} <= {
+        IneligibilityCode.COMPONENT_MISSING,
+        IneligibilityCode.COMPONENT_INELIGIBLE,
+    }
+
+
+def test_v2_unmeasured_c_is_still_ineligible() -> None:
+    missing = SCB_CANONICAL_V2.score(checkpoints=8, components={"V": 1})
+    flagged = SCB_CANONICAL_V2.score(
+        checkpoints=8, components={**FULL, "C": 0}, ineligible={"C": ["oracle leak"]}
+    )
+
+    assert missing.score is None
+    assert missing.components["C"] is ComponentStatus.MISSING
+    assert flagged.score is None
+    assert flagged.components["C"] is ComponentStatus.INELIGIBLE
+
+
+def test_v2_c_zero_does_not_override_an_unsupported_k() -> None:
+    result = SCB_CANONICAL_V2.score(checkpoints=1, components={"C": 0})
+
+    assert result.score is None
+    assert result.reasons[0].code is IneligibilityCode.CHECKPOINT_COUNT_UNSUPPORTED
+
+
+def test_oneshot_v2_c_zero_scores_zero_without_quality() -> None:
+    v1 = SCB_CANONICAL_ONESHOT.score(checkpoints=1, components={"C": 0, "V": 1})
+    v2 = SCB_CANONICAL_ONESHOT_V2.score(checkpoints=1, components={"C": 0, "V": 1})
+
+    assert v1.score is None
+    assert v2.score == Decimal("0.000000")
+    assert v2.components["R"] is ComponentStatus.NOT_APPLICABLE
+
+
+def test_v2_matches_v1_whenever_every_component_is_measured() -> None:
+    for components in (FULL, {**FULL, "C": 0}, {**FULL, "C": 0.5, "V": 0.2, "G": 0}):
+        v1 = SCB_CANONICAL.score(checkpoints=8, components=components)
+        v2 = SCB_CANONICAL_V2.score(checkpoints=8, components=components)
+        assert (v1.score, v1.inertia, v1.correctness) == (v2.score, v2.inertia, v2.correctness)
+    # Same components, different rule: the digests must differ so locks notice.
+    assert SCB_CANONICAL.digest() != SCB_CANONICAL_V2.digest()
+    assert SCB_CANONICAL.definition()["zero_correctness"] is None
+    assert SCB_CANONICAL_V2.definition()["zero_correctness"]
+    assert "passed_k/graded_k" in str(SCB_CANONICAL.definition()["correctness"])
 
 
 def test_policy_definitions_enforce_weight_invariants() -> None:
@@ -157,7 +270,12 @@ def test_policy_registry_and_resolver() -> None:
         RegistryRef.parse(RefKind.POLICY, "scb-canonical-oneshot@1"), base_dir=Path()
     )
 
-    assert DEFAULT_POLICY_REGISTRY.refs() == ("scb-canonical-oneshot@1", "scb-canonical@1")
+    assert DEFAULT_POLICY_REGISTRY.refs() == (
+        "scb-canonical-oneshot@1",
+        "scb-canonical-oneshot@2",
+        "scb-canonical@1",
+        "scb-canonical@2",
+    )
     assert canonical.digest == SCB_CANONICAL.digest() != oneshot.digest
     assert canonical.metadata["inertia_weights"] == {
         "V": "0.15",
@@ -167,6 +285,6 @@ def test_policy_registry_and_resolver() -> None:
         "G": "0.20",
     }
     with pytest.raises(RegistryReferenceError, match="unknown score policy"):
-        resolver.resolve(RegistryRef.parse(RefKind.POLICY, "scb-canonical@2"), base_dir=Path())
+        resolver.resolve(RegistryRef.parse(RefKind.POLICY, "scb-canonical@9"), base_dir=Path())
     with pytest.raises(ValueError, match="duplicate"):
         type(DEFAULT_POLICY_REGISTRY)((SCB_CANONICAL, SCB_CANONICAL))

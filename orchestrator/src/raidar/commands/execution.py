@@ -13,6 +13,7 @@ import click
 from raidar.commands.experiment_spec import _load
 from raidar.commands.perf import perf_group
 from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
+from raidar.execution.credentials import CredentialPreflightError, preflight_credentials
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.execution.run import RunContext, default_run_id, execute, load_problems
 from raidar.packs.python import load_pack_spec
@@ -183,6 +184,10 @@ def run_command(runs_dir: Path, run_id: str | None, **options: Any) -> None:
     plan, store = _build(options)
     if not plan.selected:
         raise click.ClickException("the selection matches no trial")
+    try:
+        preflight_credentials(plan)
+    except CredentialPreflightError as exc:
+        raise click.ClickException(str(exc)) from exc
     run_id = run_id or default_run_id()
     try:
         problems = load_problems(plan, store)

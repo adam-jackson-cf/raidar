@@ -245,10 +245,10 @@
 <div class="panel">
   <div class="panel-head">
     <h1><span class="dot"></span> Patterns · Evidence map</h1>
-    <p>Recurring signals mapped across the runs in view — each criterion linked to the revisions and agents where it fired, so a pattern is traceable to its evidence, not just counted.</p>
+    <p>Recurring signals mapped across the runs in view — each criterion linked to the arms and agents where it fired, so a pattern is traceable to its evidence, not just counted.</p>
     <div class="meta-row">
       <span class="chip"><b>skill-benchmark-coding-test</b></span>
-      <span class="chip">revisions <b>v001 · v002 · v003</b></span>
+      <span class="chip">arms <b>v001 · v002 · v003</b></span>
       <span class="chip">agents <b>2</b></span>
       <span class="chip">criteria <b>8</b></span>
       <span class="chip">overall <b style="color:var(--green)">12 pass</b> / <b style="color:var(--red)">6 fail</b></span>
@@ -259,7 +259,7 @@
     <div class="concept c-cost">
       <div class="label"><span class="tick"></span> Costing you</div>
       <div class="count">2</div>
-      <div class="sub">Criteria still failing in v003 — block latest revision on both agents.</div>
+      <div class="sub">Criteria still failing in v003 — block latest arm on both agents.</div>
     </div>
     <div class="concept c-trend">
       <div class="label"><span class="tick"></span> Trending up</div>
@@ -269,13 +269,13 @@
     <div class="concept c-strength">
       <div class="label"><span class="tick"></span> Repeatable strengths</div>
       <div class="count">3</div>
-      <div class="sub">Pass on every revision where evaluated, across both agents.</div>
+      <div class="sub">Pass on every arm where evaluated, across both agents.</div>
     </div>
   </div>
 
   <div class="map-wrap">
     <div class="map-title">
-      <span>Criterion → revision × agent</span>
+      <span>Criterion → arm × agent</span>
       <span class="legend">
         <span><i class="swatch sw-pass"></i> pass</span>
         <span><i class="swatch sw-fix"></i> cleared</span>
@@ -379,8 +379,8 @@
       <div class="ev-card cost">
         <div class="hd"><span class="tick" style="width:8px;height:8px;border-radius:2px;background:var(--red);display:inline-block;"></span> Friction · why it costs<span class="cost-badge">blocks v003</span></div>
         <div class="crit-name">code-quality — Claude-Claude-S-4.6</div>
-        <p>Fails on <b>all three revisions</b> for this agent while Codex passes clean. Not flaky and not recovering — a persistent gap localized to one agent.</p>
-        <p><b>Cost:</b> holds the latest revision below merge bar despite requirements criteria now green. Every re-run spends budget re-failing the same lint/structure checks instead of advancing.</p>
+        <p>Fails on <b>all three arms</b> for this agent while Codex passes clean. Not flaky and not recovering — a persistent gap localized to one agent.</p>
+        <p><b>Cost:</b> holds the latest arm below merge bar despite requirements criteria now green. Every re-run spends budget re-failing the same lint/structure checks instead of advancing.</p>
         <div class="trail">
           <span class="pip f">v001 ✕</span><span class="arrow">→</span>
           <span class="pip f">v002 ✕</span><span class="arrow">→</span>
@@ -392,8 +392,8 @@
       <div class="ev-card strength">
         <div class="hd"><span class="tick" style="width:8px;height:8px;border-radius:2px;background:var(--green);display:inline-block;"></span> Strength · why it holds<span class="trend-badge">stable 6/6</span></div>
         <div class="crit-name">functional — both agents</div>
-        <p>Passes on <b>6 of 6</b> cells — but the signal is the <b>shape</b>: green across every revision <i>and</i> both agents, with zero dips even while v001 was failing requirements.</p>
-        <p><b>Consistency:</b> independent of revision churn and agent choice, so it is safe to treat as a baseline rather than re-verify each run. Contrast with trending-up criteria, which only just stabilized at v003.</p>
+        <p>Passes on <b>6 of 6</b> cells — but the signal is the <b>shape</b>: green across every arm <i>and</i> both agents, with zero dips even while v001 was failing requirements.</p>
+        <p><b>Consistency:</b> independent of arm churn and agent choice, so it is safe to treat as a baseline rather than re-verify each run. Contrast with trending-up criteria, which only just stabilized at v003.</p>
         <div class="trail">
           <span class="pip p">Claude 3/3 ✓</span>
           <span class="pip p">Codex 3/3 ✓</span>
@@ -404,7 +404,7 @@
   </div>
 
   <div class="foot">
-    <span>Evidence map · linked to 18 evaluated cells across 3 revisions</span>
+    <span>Evidence map · linked to 18 evaluated cells across 3 arms</span>
     <span>cleared = failed earlier, green in v003</span>
   </div>
 </div>

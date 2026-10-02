@@ -21,8 +21,8 @@
 - Real-LLM trials default to `codex-cli` with `gpt-6-luna` at `low` reasoning effort. Containers run on OrbStack by default (`DOCKER_CONTEXT=orbstack`). After a stopped run use `make harbor-cleanup RUN=<run-dir>`.
 - Exclude component payloads under `examples/**/components/**` (rules files, skills, starter files) from analysis and code-quality checks by default; they are treatment content delivered to agents, not canonical shared product code.
 - Treat `runs/`, Assessment stores (`stores/`), analysis output (`analysis/`), `problems/store/`, `problems/cache/`, `.tmp/` and `experiments/` as generated runtime artifacts by default: exclude them from quality checks unless the request explicitly asks to review/analyze them.
-- `experiments/` holds scenario-epoch history only. It is read-only: the review surface renders it through the legacy read path (`REVIEW_LEGACY_ROOT`, default `experiments/benchmarks`) from each persisted `review-projection.json`. Never write runs or synthetic fixtures into it; `make review-fixture-synthetic` writes under `.tmp/review-fixture/`.
-- The review surface's user flow and the signals and persona questions it surfaces must not be lost (requirements F12). Layout and navigation may change; Playwright specs may be updated only where the flow legitimately changes, and every signal they assert must still be asserted. Run `make review-surface-test` after review-surface or projection changes; to include real runs pass `REVIEW_RUNS_ROOT` with one `REVIEW_STORE` for all roots or one per root. Use problem/condition/arm wording in the UI; `scenario`/`revision` survive only as frozen `schema_version=1` wire fields and scenario-epoch history labels.
+- Nothing reads `experiments/` any more: the scenario-epoch review read path is removed. Never write runs or synthetic fixtures into it; `make review-fixture-synthetic` writes under `.tmp/review-fixture/`.
+- The review surface's user flow and the signals and persona questions it surfaces must not be lost (requirements F12). Layout and navigation may change; Playwright specs may be updated only where the flow legitimately changes, and every signal they assert must still be asserted. Run `make review-surface-test` after review-surface or projection changes; to include real runs pass `REVIEW_RUNS_ROOT` with one `REVIEW_STORE` for all roots or one per root. Use problem/condition/arm wording in the UI; the review projection (`schema_version=2`) uses `problem`, `arm` (the arm's condition label), `problem_meta` and `arm_diffs`.
 - Task completion requires `make quality` to pass.
 
 ## Known Experiment Configs
@@ -30,7 +30,7 @@
 - `examples/pilot/experiment.yaml`: Phase 1 pilot `pilot-forge` on `scb/forge@38d627ecf668` (8 checkpoints), pilot v2: both arms share the `prompt-wrapper@1` starter framing; `baseline` vs `guided` (rules-file, skills, lint-config, stop-hook, review-loop@2) on codex-cli `gpt-6-luna` low, 16 blocks, all four scorers.
 - `examples/pilot/oneshot.experiment.yaml`: one-shot pilot `pilot-circuit-eval-oneshot` on `scb/circuit_eval.checkpoint_1@38d627ecf668`, same arms, 5 blocks, `scb-canonical-oneshot@1`.
 - `examples/smoke/experiment.yaml`: operational smoke `smoke` (one codex-cli `gpt-6-luna` low agent, correctness only); not a benchmark.
-- `examples/smoke/agents.experiment.yaml`: operational smoke `smoke-agents`, one arm per pack harness (`codex`, `claude`); not a benchmark.
+- `examples/smoke/agents.experiment.yaml`: operational smoke `smoke-agents`, one arm per pack harness (`codex`: `gpt-6-luna` low; `claude`: `claude-haiku-4-5`, no reasoning effort); not a benchmark.
 
 ## Smoke Testing
 
@@ -41,6 +41,15 @@
 - One smoke trial per pack harness: `make smoke-agents`
 - Codex-only smoke arm: `make smoke-agents SMOKE_ARM=codex`
 - Claude-only smoke arm: `make smoke-agents SMOKE_ARM=claude`
+- Single Claude Code smoke: `make agent-smoke HARNESS=claude-code` (defaults to `claude-haiku-4-5` with no reasoning effort). Claude Code trials run only on `claude-haiku-4-5` without `REASONING_EFFORT`.
+- An empty override unsets the field: `REASONING_EFFORT=` (and `EXPERIMENT_SET='agents.0.reasoning_effort='`) leaves the effort unset; `''` sets an empty string.
+
+## Secrets
+
+- Secrets live in the Infisical project `mac-os-cf` (env `dev`), bound by `orchestrator/.infisical.json`. Setup: `infisical login` in a real terminal (interactive).
+- Secret-using targets (`experiment-execute`, smoke targets, `experiment-assess`, `jev-shadow-rubric`, `harness-validate`, `component-probe-trials`) run under `infisical run` when the CLI is installed and logged in, else fall back to `orchestrator/.env`. `SECRETS=infisical|dotenv` forces a source.
+- `orchestrator/.env.example` lists key names only. Never print secret values; use presence or length checks. Do not delete `orchestrator/.env` without user approval.
+- `raidar run` preflights credentials (presence only) for every selected arm before any trial and fails naming the `agents.<i>.harness` field.
 
 ## Performance (N1 overhead budgets)
 

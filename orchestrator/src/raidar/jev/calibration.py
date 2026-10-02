@@ -1,10 +1,13 @@
 """Label import and the enforce-promotion readiness check (plan H2, K4).
 
-Labels come from review-surface annotations in the vocabulary
+Labels come from review-surface annotations (or blind labelling,
+``raidar.jev.blind``) in the vocabulary
 ``correct | false_positive | false_negative | uncertain`` and refer to an
-audited decision by its request id. A decision takes one label, as in
-``jev-lab``: the first label written stands, and an import that would label a
-decision again (or twice in one batch) is refused whole.
+audited decision by its request id. Each row may name its reviewer
+(``human``, the default, or ``model`` with ``reviewer_model``; the surface's
+``user`` is ``human``), and readiness reports labelled counts per reviewer.
+A decision takes one label, as in ``jev-lab``: the first label written
+stands, and an import that would label a decision again (or twice in one batch) is refused whole.
 
 Readiness follows ``evaluate-jev/references/policies.md``: at least 30
 labelled decisions, at least 5 in the minority reference class, and input
@@ -15,23 +18,24 @@ label: a correct positive or a false negative is a reference positive, a
 correct negative or a false positive is a reference negative; ``uncertain``
 labels are excluded from both.
 
-``verify_promotion`` holds an ``enforce`` policy's recorded promotion to the
-audit: the labelled decisions must all come from trials on one side of the
-promotion's split, and the audit over those trials must meet the gate and
-support every number the policy file claims.
+Fitting the frozen threshold, building a promotion and verifying a recorded
+one against the audit live in ``raidar.jev.promotion``.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Collection, Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from raidar.jev.audit import (
     AuditLog,
     DecisionRecord,
     DecisionStage,
     LabelRecord,
+    ReviewerKind,
     SufficiencyLevel,
+    reviewer_kind,
     utc_timestamp,
 )
 from raidar.jev.policies import (
@@ -39,7 +43,6 @@ from raidar.jev.policies import (
     MIN_INPUT_SUFFICIENCY,
     MIN_LABELLED,
     MIN_MINORITY,
-    JevPolicy,
 )
 from raidar.jev.runtime import RULE_INPUT_MISSING
 
@@ -51,8 +54,31 @@ class LabelImportError(ValueError):
     """An exported label is malformed or names no audited decision of the policy."""
 
 
-def import_labels(audit: AuditLog, policy: str, rows: Iterable[Mapping[str, str]]) -> int:
-    """Append exported labels (``request_id``, ``label``, optional ``note``) for ``policy``."""
+def _label_record(index: int, policy: str, row: Mapping[str, object]) -> LabelRecord:
+    try:
+        kind = reviewer_kind(row.get("reviewer"))
+        model = row.get("reviewer_model")
+        return LabelRecord(
+            timestamp=utc_timestamp(),
+            request_id=str(row["request_id"]),
+            policy=policy,
+            label=str(row["label"]),
+            reviewer=kind,
+            reviewer_model=str(model) if model and kind is ReviewerKind.MODEL else None,
+            blind=True if row.get("blind") else None,
+            note=str(row.get("note") or "") or None,
+        )
+    except ValueError as error:
+        raise LabelImportError(f"row {index}: {error}") from error
+
+
+def import_labels(audit: AuditLog, policy: str, rows: Iterable[Mapping[str, object]]) -> int:
+    """Append exported labels for ``policy``.
+
+    A row holds ``request_id``, ``label``, and optionally ``note``,
+    ``reviewer`` (``human`` | ``model``; ``user`` means ``human``),
+    ``reviewer_model`` (required for ``model``) and ``blind``.
+    """
     known = {record.request_id for record in audit.decisions(policy)}
     labelled = set(audit.labels(policy))
     pending = []
@@ -64,16 +90,8 @@ def import_labels(audit: AuditLog, policy: str, rows: Iterable[Mapping[str, str]
             raise LabelImportError(f"row {index}: no {policy} decision {request_id!r}")
         if request_id in labelled:
             raise LabelImportError(f"row {index}: decision {request_id} already has a label")
-        labelled.add(request_id)
-        pending.append(
-            LabelRecord(
-                timestamp=utc_timestamp(),
-                request_id=request_id,
-                policy=policy,
-                label=label,
-                note=row.get("note") or None,
-            )
-        )
+        labelled.add(str(request_id))
+        pending.append(_label_record(index, policy, row))
     for record in pending:
         audit.append_label(record)
     return len(pending)
@@ -87,6 +105,29 @@ class Readiness:
     reference_negative: int
     asked: int
     sufficient: int
+    by_reviewer: Mapping[str, int] = field(default_factory=dict)
+    """Reference-classed labels per reviewer: ``human`` and ``model:<model id>``."""
+
+    @property
+    def reviewer_kinds(self) -> dict[str, int]:
+        """Reference-classed labels per reviewer kind (``human`` | ``model``)."""
+        kinds: Counter[str] = Counter()
+        for reviewer, count in self.by_reviewer.items():
+            kinds[reviewer.split(":", 1)[0]] += count
+        return dict(sorted(kinds.items()))
+
+    def summary(self) -> dict[str, object]:
+        return {
+            "labelled": self.labelled,
+            "minority": self.minority,
+            "reference_positive": self.reference_positive,
+            "reference_negative": self.reference_negative,
+            "input_sufficiency": self.input_sufficiency,
+            "labelled_by_reviewer_kind": self.reviewer_kinds,
+            "labelled_by_reviewer": dict(sorted(self.by_reviewer.items())),
+            "ready_for_enforce": self.ready,
+            "gate_failures": list(self.failures),
+        }
 
     @property
     def minority(self) -> int:
@@ -115,18 +156,27 @@ class Readiness:
         return not self.failures
 
 
-def _provisional_positive(record: DecisionRecord) -> bool:
+def decision_score(record: DecisionRecord) -> float:
+    """The decision's highest noul answer (0 when it has none): what a threshold cuts."""
     answers = record.answers or {}
-    return any(
-        answer.get("type") == "noul" and answer.get("noul", 0.0) >= PROVISIONAL_THRESHOLD
+    values = [
+        float(answer.get("noul", 0.0))
         for answer in answers.values()
-    )
+        if isinstance(answer, Mapping) and answer.get("type") == "noul"
+    ]
+    return max(values, default=0.0)
 
 
-def _reference_positive(record: DecisionRecord, label: str) -> bool | None:
+def provisional_positive(record: DecisionRecord) -> bool:
+    """Jev's prediction before calibration: some noul answer is at least the provisional cut."""
+    return decision_score(record) >= PROVISIONAL_THRESHOLD
+
+
+def reference_positive(record: DecisionRecord, label: str) -> bool | None:
+    """The labelled truth: positive, negative, or None (uncertain or not a Jev answer)."""
     if label == "uncertain" or record.stage is not DecisionStage.JEV:
         return None
-    predicted = _provisional_positive(record)
+    predicted = provisional_positive(record)
     return predicted if label == "correct" else not predicted
 
 
@@ -148,13 +198,16 @@ def promotion_readiness(
 ) -> Readiness:
     """Readiness over the policy's audit, or over the decisions of ``trials`` only."""
     decisions = [record for record in audit.decisions(policy) if _in(record, trials)]
-    labels = {request_id: record.label for request_id, record in audit.labels(policy).items()}
+    labels = audit.labels(policy)
     positives = negatives = 0
+    reviewers: Counter[str] = Counter()
     for record in decisions:
         label = labels.get(record.request_id)
-        reference = None if label is None else _reference_positive(record, label)
+        reference = None if label is None else reference_positive(record, label.label)
         positives += reference is True
         negatives += reference is False
+        if label is not None and reference is not None:
+            reviewers[label.reviewer_ref] += 1
     asked = [record for record in decisions if _was_asked(record)]
     return Readiness(
         policy=policy,
@@ -163,34 +216,5 @@ def promotion_readiness(
         reference_negative=negatives,
         asked=len(asked),
         sufficient=sum(_sufficient(record) for record in asked),
+        by_reviewer=dict(reviewers),
     )
-
-
-def verify_promotion(policy: JevPolicy, audit: AuditLog) -> tuple[str, ...]:
-    """Why the audit does not support ``policy``'s recorded promotion (empty when it does)."""
-    promotion = policy.promotion
-    if promotion is None:
-        return (f"policy {policy.id} has no recorded promotion",)
-    split = promotion.split
-    trial_of = {record.request_id: record.trial for record in audit.decisions(policy.id)}
-    outside = sorted(
-        {
-            str(trial_of[request_id])
-            for request_id in audit.labels(policy.id)
-            if request_id in trial_of and split.side(trial_of[request_id]) is None
-        }
-    )
-    failures = [f"labelled decisions from trials outside the split: {outside}"] if outside else []
-    measured = promotion_readiness(audit, policy.id, trials={*split.calibration, *split.evaluation})
-    failures += measured.failures
-    claims = (
-        ("labelled", promotion.labelled, measured.labelled),
-        ("minority", promotion.minority, measured.minority),
-        ("input_sufficiency", promotion.input_sufficiency, measured.input_sufficiency or 0.0),
-    )
-    failures += [
-        f"recorded {name} {claimed} exceeds the audited {actual}"
-        for name, claimed, actual in claims
-        if claimed > actual
-    ]
-    return tuple(failures)

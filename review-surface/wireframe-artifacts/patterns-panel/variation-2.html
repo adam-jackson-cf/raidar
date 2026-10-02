@@ -55,12 +55,12 @@
 </head>
 <body>
 <div class="panel">
-  <h1>Patterns · Revision trajectory</h1>
-  <div class="sub">Every recurring signal plotted across the visible revisions, so movement and consequence read at a glance.</div>
+  <h1>Patterns · Arm trajectory</h1>
+  <div class="sub">Every recurring signal plotted across the visible arms, so movement and consequence read at a glance.</div>
   <div class="scope mono">scope <b>skill-benchmark-coding-test</b> · <b>v001 → v003</b> · <b>2 agents</b> · <b>18 runs</b> · diff v001→v002: requirements · rules · prompt changed</div>
 
   <!-- COSTING YOU -->
-  <div class="grouphead g-cost"><span class="ico"></span>Costing you<span class="note">latest revision still under-performs</span></div>
+  <div class="grouphead g-cost"><span class="ico"></span>Costing you<span class="note">latest arm still under-performs</span></div>
   <div class="row">
     <div>
       <div class="crit">Resource efficiency</div>
@@ -72,7 +72,7 @@
       <div class="col"><span class="val mono">.88</span><div class="bar w" style="height:64%"></div><span class="rev mono">v003</span></div>
     </div>
     <div class="read"><span class="big cost mono">0.88</span>flat · lowest scorer</div>
-    <div class="why"><b>Why it costs you:</b> while every other scorer climbed to 0.95 by v003, resource efficiency stalled at 0.88 across two revisions. It is now the ceiling on the composite — fixing it is the only remaining headroom in this family.</div>
+    <div class="why"><b>Why it costs you:</b> while every other scorer climbed to 0.95 by v003, resource efficiency stalled at 0.88 across two arms. It is now the ceiling on the composite — fixing it is the only remaining headroom in this family.</div>
   </div>
 
   <!-- TRENDING UP -->
@@ -104,10 +104,10 @@
       <div class="col"><span class="val mono">.95</span><div class="bar p" style="height:95%"></div><span class="rev mono">v003</span></div>
     </div>
     <div class="read"><span class="big rep mono">12/12</span>σ = 0</div>
-    <div class="why"><b>Why it beats a raw 12 of 12:</b> introduced at v002, it passed on every run of two different agents across two revisions with zero variance. Independent agent agreement is the signal of trust — this one you can build on.<span class="agents"><span class="ad"></span><span class="ad"></span> both agents</span></div>
+    <div class="why"><b>Why it beats a raw 12 of 12:</b> introduced at v002, it passed on every run of two different agents across two arms with zero variance. Independent agent agreement is the signal of trust — this one you can build on.<span class="agents"><span class="ad"></span><span class="ad"></span> both agents</span></div>
   </div>
 
-  <div class="foot mono">Bars show the scorer mean / pass-state per revision. Threshold to surface: pass-or-fail count ≥ ceil(sample/3). Each criterion classified into one dominant state.</div>
+  <div class="foot mono">Bars show the scorer mean / pass-state per arm. Threshold to surface: pass-or-fail count ≥ ceil(sample/3). Each criterion classified into one dominant state.</div>
 </div>
 </body>
 </html>

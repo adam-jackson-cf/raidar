@@ -127,7 +127,14 @@ test.describe('jev calibration labels', () => {
 
     const saved = await (await page.request.get(`/api/quality/labels?run_id=${LABELLED_RUN}`)).json();
     expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({ label: 'correct', policy: 'code-quality.rubric-smells', run_id: LABELLED_RUN });
+    expect(saved[0]).toMatchObject({
+      label: 'correct',
+      policy: 'code-quality.rubric-smells',
+      run_id: LABELLED_RUN,
+      source: 'user',
+      reviewer: 'human',
+      reviewer_model: null,
+    });
 
     await page.reload();
     const reloaded = page.getByTestId('jev-decision').first();
@@ -145,5 +152,9 @@ test.describe('jev calibration labels', () => {
       data: { run_id: LABELLED_RUN, request_id: 'x', policy: 'code-quality.rubric-smells', label: 'ok' },
     });
     expect(vocabulary.status()).toBe(400);
+    const unnamedModel = await page.request.post('/api/quality/labels', {
+      data: { run_id: LABELLED_RUN, request_id: 'x', policy: 'code-quality.rubric-smells', label: 'correct', reviewer: 'model' },
+    });
+    expect(unnamedModel.status()).toBe(400);
   });
 });

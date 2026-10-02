@@ -753,6 +753,55 @@ Data: forge-02 + forge-03 (forge, 16+16 valid) and oneshot-01 (5+5 valid), canon
 3. **The treatment made forge worse.** guided solves checkpoints 1-2 in 2/16 trajectories against 10/16 for baseline, mostly by failing two input-validation cases at checkpoint 1 (§11.3). Decide whether to investigate the guided components (rules, skills, review-loop@2) for this effect before any confirmatory run, or accept it as the measured result.
 4. **Manipulation check (F4).** `plan_written` is 0 in both arms, so the overall verdict cannot be `separated`. Add a plan instruction to the treatment, or drop `plan_written` from the lock's requested checks.
 5. **Sample size.** At 16 pairs, `solve_rate`, `reached` and R need no more pairs at the default δ; headline S needs 23 more ($7.35), E 35 more ($9.89) and G 50 more ($12.57). one-shot `solve_rate` needs about 350 pairs. Decide which metrics a confirmatory run must power.
-6. **S2-SS-1: the definition of C (deferred scoring finding).** ADR-001 defines the correctness component C as solved checkpoints over K (`solved/K`); the design memo and the SCB fork use the mean case pass rate. The current scorer follows the memo and fork: `scorers/code_quality/arithmetic.py` takes C as the mean of the per-checkpoint `passed/total` rates. Every headline S in this packet uses that definition, and S would change under `solved/K` (on forge, mostly towards 0, since no trajectory solves checkpoint 3 or later). Decide which definition is canonical, then align ADR-001 or the scorer.
-7. **S2-SS-2: S when C = 0 (deferred scoring finding).** The current policy (`spec/policies.py`) computes S = 100 · C · (base + share · inertia), so a trajectory with C = 0 and every other component measured scores S = 0 and stays in the headline analysis; it is `ineligible` only when a component is missing or ineligible. The alternative is to mark C = 0 trajectories `ineligible`. The choice changes which pairs the headline S analysis keeps and its mean. Decide which rule applies.
+6. **S2-SS-1: the definition of C. Resolved 2026-10-02 (§11.16).** C now follows the SCB fork: the mean per-checkpoint case pass rate. *Correction:* this item first said every headline S in this packet used the mean case pass rate. That was wrong. Only the G2 golden path (`scorers/code_quality/arithmetic.py`) did. Analysis (`analysis/assessed.py`) and the review projection fed solved/K into S, so the headline S figures in §11.3, §11.4, §11.7 and §11.13 are solved/K-based. §11.16 gives the corrected values.
+7. **S2-SS-2: S when C = 0. Resolved 2026-10-02 (§11.16).** The fork marks S ineligible when any quality component is missing, even at C = 0, and `@1` keeps that rule. The new `scb-canonical@2` and `scb-canonical-oneshot@2` score S = 0 whenever C = 0 and are ineligible only when C > 0 and a component is missing. Both pilot experiments now declare `@2`.
 8. **Jev.** Still shadow only, with live calls blocked (no `OPENROUTER_API_KEY`) and 5+8 provisional process-compliance Assessments. Out of scope until you decide to enable it.
+
+
+### 11.16 Scoring-definition alignment (S2-SS-1, S2-SS-2; 2026-10-02)
+
+User decision (2026-10-01): "go with what you think best". The recommendation was applied: follow the SCB fork for C, and S = 0 whenever C = 0.
+
+**What the fork computes (read from `slop-code-bench` `src/slop_code/metrics/scoring`).**
+- `schema.py` `FORMULAS["correctness"] = "C_p=sum(C_p,k)/K_p"`. `_calculate_problem` takes the plain mean of the per-checkpoint rates.
+- `live_evidence._correctness`: `rate = Σ pass_counts / Σ total_counts` over all test groups, including Regression. Skipped tests count in neither (`evaluation/report.py` `add_test_result`). Raidar's `strict_pass_rate` already matches this.
+- An unproduced checkpoint (no inference result) gets `rate 0`. A produced checkpoint with `total = 0` is ineligible (`canonical_test_denominator_zero`).
+- Any produced checkpoint without quality evidence makes the whole generation ineligible, whatever its correctness. The fork has no C = 0 exception.
+
+**What Raidar did before.** `scb-canonical@1` itself did not define C. `spec.policies.checkpoint_correctness` (solved/K) fed S in analysis, the review projection and the problem-validation preview. Only the G2 golden path used the fork's mean. Because nearly every forge checkpoint is a near miss (case pass rates 0.8-0.99, solved only at checkpoints 1-2), solved/K pushed forge S towards 0.
+
+**What changed.**
+- `spec/policies.py`:
+  - `problem_correctness` (the fork's `C_p`) and `checkpoint_pass_rate` are the single definition of C. Analysis, the review projection, the Quality view and the validation preview all use it, with exact passed/graded counts where the scorer records them.
+  - The policy definition now records C, so the `@1` digests changed.
+  - `checkpoint_correctness` is renamed `checkpoint_solve_rate`. It stays the primary outcome `solve_rate`, which is unchanged.
+- New `scb-canonical@2` and `scb-canonical-oneshot@2`: `@1` plus `zero_correctness`.
+- Analysis reports C as its own metric (`correctness`).
+- `examples/pilot/{experiment,oneshot.experiment}.yaml` declare `@2`. After the relock, `lock_sha256` is unchanged (`5a73637e8ac3`, `827ebb5a7ca9`), so forge-02, forge-03 and oneshot-01 still match their locks.
+- ADR-001 §2.4 is corrected. `requirements.md` has a change-log entry; the frozen F15 text is untouched.
+- Boundary tests:
+  - `test_score_policy_behaviors.py`: C = 0 with G missing, G ineligible or all quality missing gives S = 0 under `@2` and ineligible under `@1`. C > 0 with a gap is ineligible under `@2`. An unmeasured C, or an unsupported K, stays ineligible. The fork mean is checked against solved/K.
+  - `test_analysis_outcomes.py`: the same cases through `build_outcome`, plus a reached checkpoint with no graded case giving an ineligible C (never 0).
+
+**Rescore (add-only).** Only `code-quality@1`'s identity moved, because its transitive source includes `spec/policies.py`. `correctness@1` and `resource-usage@1` are unchanged.
+- `make experiment-assess SCORERS="code-quality@1"` over forge-02, forge-03 and oneshot-01 into `runs/pilot-v2/assessment-store` gave 45 `added`.
+- The 180 earlier files are byte-identical before and after (`gate-evidence/assess/store-a-{pre,post}-scoring-alignment.sha`; 0 changed, 45 new).
+- All 45 new results equal their predecessors observation for observation; only the scorer identity differs.
+- The rescore and analysis ran from a clean export of HEAD plus this change only, because other workstreams' in-flight `jev` edits in the worktree also move `process-compliance@1`'s identity.
+
+**Re-analysis (`gate-evidence/analysis/{forge-complete,oneshot}-scb2/`; the earlier `forge-complete` and `oneshot` outputs are kept).**
+
+| Leg | Metric | n | Baseline | Guided | Δ [95% CI] | Verdict | Before (§11.13 / §11.4) |
+|---|---|---|---|---|---|---|---|
+| forge | headline S (`scb-canonical@2`) | 15 | 76.87 | 78.42 | +1.55 [−0.12, 3.33] | inconclusive (1 ineligible) | 12.77 vs 2.85, −9.92, **worse** |
+| forge | correctness C (new) | 16 | 0.912 | 0.923 | +0.011 [−0.013, 0.035] | inconclusive | — |
+| forge | solve_rate (primary) | 16 | 0.156 | 0.031 | −0.125 [−0.188, −0.063] | **worse** | unchanged |
+| one-shot | headline S (`scb-canonical-oneshot@2`) | 5 | 90.25 | 92.48 | +2.23 [−1.56, 6.01] | inconclusive | 54.8 vs 74.5, +19.7, inconclusive |
+| one-shot | correctness C (new) | 5 | 0.989 | 0.994 | +0.006 [−0.023, 0.034] | inconclusive | — |
+
+- The primary outcome and every quality component are unchanged (`solve_rate`, `reached`, `final_solved`, V/E/H/R/G as in §11.13 and §11.4).
+- The one forge S exclusion is the same G gap as before (`checkpoint_6 → checkpoint_7`, C > 0), so it stays ineligible under `@2`.
+- No trajectory has C = 0 in either leg, so the zero-correctness rule did not fire. On this data `@2` gives the same S as `@1` would with the corrected C.
+- J2 for headline S at the default δ 5: forge 4 pairs (SD 3.56; 0 more), one-shot 3 pairs (SD 3.05; 0 more), down from 38 and n/a.
+- **The forge headline verdict changes from `worse` to `inconclusive`.** Guided's lower checkpoint-solve rate comes from a few failed cases per checkpoint (§11.3), and the fork's C weighs those as near misses. The §11.13 verdict list now reads: guided is worse on `solve_rate`, `reached`, H and G, improved on E, and inconclusive on headline S, C, V, R and `final_solved`.
+

@@ -19,8 +19,9 @@ agents:
   - id: claude
     harness: claude-code
     provider: anthropic
-    model: claude-sonnet-4-6
-    reasoning_effort: low
+    # Claude Code smokes run the cheapest model, claude-haiku-4-5, which has no
+    # effort levels, so reasoning_effort stays unset.
+    model: claude-haiku-4-5
     version: 2.1.285
 
 protocol:

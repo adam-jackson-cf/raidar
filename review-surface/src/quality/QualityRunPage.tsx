@@ -70,7 +70,7 @@ export function QualityRunPage() {
           </p>
         ))}
         <div className="mt-2">
-          <FamilyPolicyMismatch scenario={run.problem} quality={index.experiments} />
+          <FamilyPolicyMismatch problem={run.problem} quality={index.experiments} />
         </div>
       </header>
       <section aria-label="Checkpoint strip" className="rounded-md p-2" style={{ border: `1px solid ${C.border}`, background: C.surface }}>

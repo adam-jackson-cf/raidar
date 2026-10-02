@@ -3,11 +3,15 @@
 Reviewers label a run's Jev decisions on the review surface's Quality page;
 the server keeps those labels in ``review-surface/data/jev-labels.json``.
 This module turns them into the JSON-lines rows ``raidar jev import-labels``
-reads (``request_id``, ``label``, optional ``note``), one policy per file.
+reads (``request_id``, ``label``, ``reviewer``, optional ``reviewer_model``
+and ``note``), one policy per file.
 
 Rules, matching the import side (``calibration.import_labels``):
 
 - the vocabulary is ``correct | false_positive | false_negative | uncertain``;
+- each row names its reviewer: ``reviewer`` (``human`` | ``model``, with
+  ``reviewer_model`` for a model) when the surface recorded one, else the
+  label's ``source``, where the surface's ``user`` is ``human``;
 - one row per decision: when a decision was labelled more than once on the
   surface, the latest label wins;
 - with the store's audit, decisions it does not know are refused, and
@@ -22,9 +26,9 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from pydantic import BaseModel, ConfigDict, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, ValidationError, field_validator, model_validator
 
-from raidar.jev.audit import AuditLog
+from raidar.jev.audit import AuditLog, ReviewerKind, reviewer_kind
 from raidar.jev.policies import LABELS
 
 
@@ -43,6 +47,20 @@ class ReviewLabel(BaseModel):
     label: str
     note: str | None = None
     created_at: int = 0
+    source: str | None = None
+    reviewer: str | None = None
+    reviewer_model: str | None = None
+
+    @model_validator(mode="after")
+    def _known_reviewer(self) -> ReviewLabel:
+        kind = self.reviewer_kind
+        if kind is ReviewerKind.MODEL and not (self.reviewer_model or "").strip():
+            raise ValueError("a model reviewer's label needs reviewer_model")
+        return self
+
+    @property
+    def reviewer_kind(self) -> ReviewerKind:
+        return reviewer_kind(self.reviewer or self.source)
 
     @field_validator("label")
     @classmethod
@@ -65,7 +83,14 @@ class LabelExport:
             "exported": len(self.rows),
             "superseded_on_surface": self.superseded,
             "already_labelled": list(self.already_labelled),
+            "by_reviewer": self.by_reviewer(),
         }
+
+    def by_reviewer(self) -> dict[str, int]:
+        counts: dict[str, int] = {}
+        for row in self.rows:
+            counts[row["reviewer"]] = counts.get(row["reviewer"], 0) + 1
+        return dict(sorted(counts.items()))
 
 
 def load_review_labels(path: Path) -> list[ReviewLabel]:
@@ -108,7 +133,10 @@ def _against_audit(
 
 
 def _row(label: ReviewLabel) -> dict[str, str]:
-    row = {"request_id": label.request_id, "label": label.label}
+    kind = label.reviewer_kind
+    row = {"request_id": label.request_id, "label": label.label, "reviewer": kind.value}
+    if kind is ReviewerKind.MODEL and label.reviewer_model:
+        row["reviewer_model"] = label.reviewer_model
     if label.note:
         row["note"] = label.note
     return row

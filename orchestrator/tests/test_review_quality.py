@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 
 from raidar.analysis.assessed import build_outcome
-from raidar.analysis.outcomes import HEADLINE_SCORE, SOLVE_RATE
+from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.execution.models import TrajectoryRecord
 from raidar.review_quality.models import COMPONENTS, QualityProjection
 from raidar.review_quality.projection import build_quality_projection, main
@@ -112,7 +112,8 @@ def test_first_checkpoint_has_no_transition_and_later_ones_use_the_one_into_them
 def test_problem_row_is_the_analysis_outcome_of_the_same_assessments(
     fixture_dir: Path, projection: QualityProjection
 ) -> None:
-    """C = solved checkpoints / K (ADR-001 §2.4) and S agree with WS-J for every trial."""
+    """C = mean per-checkpoint case pass rate (ADR-001 §2.4, the fork's C_p) and S agree
+    with WS-J for every trial."""
     store = AssessmentStore(fixture_dir / "store")
     trajectories = fixture_dir / "runs" / EXPERIMENT / RUN_ID / "trajectories"
     for detail in projection.run_details.values():
@@ -125,14 +126,16 @@ def test_problem_row_is_the_analysis_outcome_of_the_same_assessments(
             if key and (assessment := store.get(key)) is not None
         }
         outcome = build_outcome(record, results, policy=SCB_CANONICAL)
-        solved = next(
-            item.value
+        rates = {
+            item.subject: item.value or 0.0
             for item in results["correctness@1"].observations
-            if item.metric == "solved_checkpoints"
-        )
-        assert solved is not None
-        assert detail.problem["C"].value == pytest.approx(solved / len(record.trial.steps))
-        assert detail.problem["C"].value == outcome.metrics[SOLVE_RATE].value
+            if item.metric == "strict_pass_rate" and item.status is AssessStatus.OK
+        }
+        steps = record.trial.steps
+        if len(rates) == len(steps):
+            expected = sum(rates[step] for step in steps) / len(steps)
+            assert detail.problem["C"].value == pytest.approx(expected)
+        assert detail.problem["C"].value == outcome.metrics[CORRECTNESS_METRIC].value
         assert detail.problem["S"].status == outcome.metrics[HEADLINE_SCORE].status
         assert detail.problem["S"].value == outcome.metrics[HEADLINE_SCORE].value
 
@@ -350,7 +353,8 @@ def test_the_most_recently_logged_assessment_of_a_scorer_wins(
     after = build_quality_projection(target / "runs", target / "store").run_details[run_id]
     assert after.run.sources["correctness@1"] == "e" * 64
     assert after.rows[0].cells["C"].value == 0.5
-    assert after.problem["C"].value == 2 / len(after.rows)
+    # C is the mean case pass rate (0.5 everywhere), not solved_checkpoints / K.
+    assert after.problem["C"].value == 0.5
 
 
 def _lock(target: Path, headline_policy: str, experiment: str = EXPERIMENT) -> str:

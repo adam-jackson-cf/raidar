@@ -23,7 +23,7 @@ const SYNTHETIC_FILTER_OPTIONS: Array<{ value: SyntheticFilterValue; label: stri
   { value: 'real', label: 'not synthetic' },
 ];
 
-function truncateScenarioLabel(value: string, maxChars = 18) {
+function truncateProblemLabel(value: string, maxChars = 18) {
   if (value.length <= maxChars) return value;
   return `${value.slice(0, maxChars - 1)}…`;
 }
@@ -49,7 +49,7 @@ function syntheticFilterValue(run: RunRecord): SyntheticFilterValue {
 }
 
 function runGroupKey(run: RunRecord) {
-  return `${run.scenario}::${run.revision}::${run.agent_spec}`;
+  return `${run.problem}::${run.arm}::${run.agent_spec}`;
 }
 
 function WireframeRunList({
@@ -63,18 +63,18 @@ function WireframeRunList({
   isLoading: boolean;
   onSelectRun: (id: string) => void;
 }) {
-  const [scenarioSearch, setScenarioSearch] = useState('');
+  const [problemSearch, setProblemSearch] = useState('');
   const [filterOpen, setFilterOpen] = useState(false);
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedAgentSpecs, setSelectedAgentSpecs] = useState<string[]>([]);
   const [selectedSynthetic, setSelectedSynthetic] = useState<SyntheticFilterValue[]>(
     SYNTHETIC_FILTER_OPTIONS.map((option) => option.value),
   );
-  const [collapsedScenarios, setCollapsedScenarios] = useState<Set<string>>(new Set());
-  const [collapsedRevisions, setCollapsedRevisions] = useState<Set<string>>(new Set());
+  const [collapsedProblems, setCollapsedProblems] = useState<Set<string>>(new Set());
+  const [collapsedArms, setCollapsedArms] = useState<Set<string>>(new Set());
   const [collapsedAgentSpecs, setCollapsedAgentSpecs] = useState<Set<string>>(new Set());
-  const q = scenarioSearch.trim().toLowerCase();
-  const scenarios = useMemo(() => [...new Set(runs.map((run) => run.scenario))].sort(), [runs]);
+  const q = problemSearch.trim().toLowerCase();
+  const problems = useMemo(() => [...new Set(runs.map((run) => run.problem))].sort(), [runs]);
   const providerOptions = useMemo(() => [...new Set(runs.map(providerValue))].sort(), [runs]);
   const agentSpecOptions = useMemo(() => [...new Set(runs.map((run) => run.agent_spec))].sort(), [runs]);
 
@@ -97,13 +97,13 @@ function WireframeRunList({
     return () => document.removeEventListener('mousedown', close);
   }, [filterOpen]);
 
-  const scenarioSuggestion = useMemo(() => {
+  const problemSuggestion = useMemo(() => {
     if (!q) return '';
-    const match = scenarios.find((scenario) => scenario.toLowerCase().startsWith(q));
+    const match = problems.find((problem) => problem.toLowerCase().startsWith(q));
     if (!match || match.toLowerCase() === q) return '';
     return match;
-  }, [q, scenarios]);
-  const suggestionSuffix = scenarioSuggestion ? scenarioSuggestion.slice(scenarioSearch.length) : '';
+  }, [q, problems]);
+  const suggestionSuffix = problemSuggestion ? problemSuggestion.slice(problemSearch.length) : '';
 
   const filtered = useMemo(() => {
     return runs.filter((run) => {
@@ -111,21 +111,21 @@ function WireframeRunList({
       const agentSpecSelected = selectedAgentSpecs.length === 0 || selectedAgentSpecs.includes(run.agent_spec);
       const syntheticSelected = selectedSynthetic.includes(syntheticFilterValue(run));
       if (!providerSelected || !agentSpecSelected || !syntheticSelected) return false;
-      return !q || run.scenario.toLowerCase().includes(q);
+      return !q || run.problem.toLowerCase().includes(q);
     });
   }, [runs, q, selectedAgentSpecs, selectedProviders, selectedSynthetic]);
 
   const grouped = useMemo(() => {
     const byExperiment = new Map<
       string,
-      { scenario: string; revision: string; experimentId: string; agentSpec: string; runs: RunRecord[] }
+      { problem: string; arm: string; experimentId: string; agentSpec: string; runs: RunRecord[] }
     >();
     for (const run of filtered) {
       const key = runGroupKey(run);
       const entry =
         byExperiment.get(key) ?? {
-          scenario: run.scenario,
-          revision: run.revision,
+          problem: run.problem,
+          arm: run.arm,
           experimentId: key,
           agentSpec: run.agent_spec,
           runs: [],
@@ -134,38 +134,38 @@ function WireframeRunList({
       byExperiment.set(key, entry);
     }
 
-    const byScenario = new Map<
+    const byProblem = new Map<
       string,
       {
-        scenario: string;
+        problem: string;
         synthetic: boolean;
-        revisions: Array<{
-          revision: string;
-          blocks: Array<{ revision: string; experimentId: string; agentSpec: string; runs: RunRecord[] }>;
+        arms: Array<{
+          arm: string;
+          blocks: Array<{ arm: string; experimentId: string; agentSpec: string; runs: RunRecord[] }>;
         }>;
       }
     >();
     for (const block of byExperiment.values()) {
-      const scenario = byScenario.get(block.scenario) ?? {
-        scenario: block.scenario,
+      const problem = byProblem.get(block.problem) ?? {
+        problem: block.problem,
         synthetic: false,
-        revisions: [],
+        arms: [],
       };
-      scenario.synthetic = scenario.synthetic || block.runs.some((run) => run.synthetic);
-      const revision = scenario.revisions.find((item) => item.revision === block.revision) ?? {
-        revision: block.revision,
+      problem.synthetic = problem.synthetic || block.runs.some((run) => run.synthetic);
+      const arm = problem.arms.find((item) => item.arm === block.arm) ?? {
+        arm: block.arm,
         blocks: [],
       };
-      revision.blocks.push({
-        revision: block.revision,
+      arm.blocks.push({
+        arm: block.arm,
         experimentId: block.experimentId,
         agentSpec: block.agentSpec,
         runs: block.runs,
       });
-      if (!scenario.revisions.includes(revision)) scenario.revisions.push(revision);
-      byScenario.set(block.scenario, scenario);
+      if (!problem.arms.includes(arm)) problem.arms.push(arm);
+      byProblem.set(block.problem, problem);
     }
-    return [...byScenario.values()];
+    return [...byProblem.values()];
   }, [filtered]);
 
   const toggleCollapsed = (setter: (value: Set<string>) => void, current: Set<string>, key: string) => {
@@ -183,22 +183,22 @@ function WireframeRunList({
       <div className="flex items-center gap-2 rounded border px-2 py-1" style={{ borderColor: C.border, background: C.inputSoft }}>
           <Search className="size-3.5 shrink-0" style={{ color: C.fg0 }} />
           <div className="relative min-w-0 flex-1">
-            {scenarioSearch && suggestionSuffix ? (
+            {problemSearch && suggestionSuffix ? (
               <div className="pointer-events-none absolute inset-0 flex items-center text-xs">
-                <span className="invisible whitespace-pre">{scenarioSearch}</span>
+                <span className="invisible whitespace-pre">{problemSearch}</span>
                 <span style={{ color: C.fg0 }}>{suggestionSuffix}</span>
               </div>
             ) : null}
             <input
-              value={scenarioSearch}
-              onChange={(event: ChangeEvent<HTMLInputElement>) => setScenarioSearch(event.currentTarget.value)}
+              value={problemSearch}
+              onChange={(event: ChangeEvent<HTMLInputElement>) => setProblemSearch(event.currentTarget.value)}
               onKeyDown={(event) => {
-                if (event.key === 'Tab' && scenarioSuggestion) {
+                if (event.key === 'Tab' && problemSuggestion) {
                   event.preventDefault();
-                  setScenarioSearch(scenarioSuggestion);
+                  setProblemSearch(problemSuggestion);
                 }
               }}
-              placeholder="Search scenarios"
+              placeholder="Search problems"
               className="relative w-full bg-transparent text-xs outline-none"
               style={{ color: C.fg4 }}
             />
@@ -302,21 +302,21 @@ function WireframeRunList({
             No runs match this filter.
           </div>
         )}
-        {grouped.map((scenario) => (
-          <div key={scenario.scenario} className="flex flex-col gap-2 border-b pb-2 last:border-b-0" style={{ borderColor: C.rowBorder }}>
+        {grouped.map((problem) => (
+          <div key={problem.problem} className="flex flex-col gap-2 border-b pb-2 last:border-b-0" style={{ borderColor: C.rowBorder }}>
             <div className="flex items-center gap-1.5 px-2 pt-1 text-xs font-semibold" style={{ color: C.fg2 }}>
               <button
                 type="button"
                 className="inline-flex size-4 shrink-0 items-center justify-center rounded hover:bg-white/5"
-                aria-label={collapsedScenarios.has(scenario.scenario) ? 'Expand scenario' : 'Collapse scenario'}
-                onClick={() => toggleCollapsed(setCollapsedScenarios, collapsedScenarios, scenario.scenario)}
+                aria-label={collapsedProblems.has(problem.problem) ? 'Expand problem' : 'Collapse problem'}
+                onClick={() => toggleCollapsed(setCollapsedProblems, collapsedProblems, problem.problem)}
               >
-                {collapsedScenarios.has(scenario.scenario) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
+                {collapsedProblems.has(problem.problem) ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
               </button>
-              <span className="min-w-0 truncate" title={scenario.scenario}>
-                {truncateScenarioLabel(scenario.scenario)}
+              <span className="min-w-0 truncate" title={problem.problem}>
+                {truncateProblemLabel(problem.problem)}
               </span>
-              {scenario.synthetic ? (
+              {problem.synthetic ? (
                 <span
                   className="rounded border px-1 py-0.5 text-[8px] font-semibold uppercase tracking-wide"
                   style={{
@@ -329,25 +329,25 @@ function WireframeRunList({
                 </span>
               ) : null}
             </div>
-            {!collapsedScenarios.has(scenario.scenario) && scenario.revisions.map((revision) => {
-              const revisionKey = `${scenario.scenario}:${revision.revision}`;
-              const revisionRunCount = revision.blocks.reduce((total, block) => total + block.runs.length, 0);
+            {!collapsedProblems.has(problem.problem) && problem.arms.map((arm) => {
+              const armKey = `${problem.problem}:${arm.arm}`;
+              const armRunCount = arm.blocks.reduce((total, block) => total + block.runs.length, 0);
               return (
-                <div key={revisionKey} className="flex flex-col gap-1">
+                <div key={armKey} className="flex flex-col gap-1">
                   <div className="flex items-center gap-1.5 px-2 text-[10px]" style={{ color: C.fg1 }}>
                     <button
                       type="button"
                       className="inline-flex size-4 shrink-0 items-center justify-center rounded hover:bg-white/5"
-                      aria-label={collapsedRevisions.has(revisionKey) ? 'Expand revision' : 'Collapse revision'}
-                      onClick={() => toggleCollapsed(setCollapsedRevisions, collapsedRevisions, revisionKey)}
+                      aria-label={collapsedArms.has(armKey) ? 'Expand arm' : 'Collapse arm'}
+                      onClick={() => toggleCollapsed(setCollapsedArms, collapsedArms, armKey)}
                     >
-                      {collapsedRevisions.has(revisionKey) ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
+                      {collapsedArms.has(armKey) ? <ChevronRight size={11} /> : <ChevronDown size={11} />}
                     </button>
-                    <span>{revision.revision}</span>
-                    <span className="ml-auto">{revisionRunCount} runs</span>
+                    <span>{arm.arm}</span>
+                    <span className="ml-auto">{armRunCount} runs</span>
                   </div>
-                  {!collapsedRevisions.has(revisionKey) && revision.blocks.map((block) => {
-                    const blockKey = `${revisionKey}:${block.experimentId}`;
+                  {!collapsedArms.has(armKey) && arm.blocks.map((block) => {
+                    const blockKey = `${armKey}:${block.experimentId}`;
                     return (
                       <div key={block.experimentId} className="flex flex-col gap-1">
                         <div className="flex items-center gap-1.5 px-2 text-[9px]" style={{ color: C.fg1 }}>
@@ -648,7 +648,7 @@ export function WireframeRunsPage() {
               Pick a run to inspect score, findings, and execution traces.
             </span>
             <span className="max-w-sm text-xs leading-relaxed" style={{ color: C.fg0 }}>
-              Use the scenario selector to jump between runs and compare outcomes quickly.
+              Use the problem selector to jump between runs and compare outcomes quickly.
             </span>
             <Link
               to="/wireframe"

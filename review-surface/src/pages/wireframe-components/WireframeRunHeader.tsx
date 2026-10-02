@@ -248,7 +248,7 @@ export function WireframeRunHeader({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium" style={{ color: C.fg5 }}>
-          {run.scenario}@{run.revision} · {runLabel(run.id)}
+          {run.problem}@{run.arm} · {runLabel(run.id)}
         </span>
         {run.synthetic && (
           <span
@@ -275,10 +275,10 @@ export function WireframeRunHeader({
             <MessageSquarePlus className="size-3.5" />
           </button>
           <Link
-            to={`/#family-${encodeURIComponent(run.scenario)}`}
+            to={`/#family-${encodeURIComponent(run.problem)}`}
             className="inline-flex size-6 items-center justify-center rounded border transition hover:bg-white/10"
             style={{ color: C.accent, borderColor: C.selectedBorder }}
-            title={`Compare agent specs for ${run.scenario}`}
+            title={`Compare agent specs for ${run.problem}`}
             aria-label="Compare agent specs"
           >
             <ArrowUpRight className="size-3.5" />

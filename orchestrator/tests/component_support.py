@@ -14,6 +14,8 @@ from raidar.spec.schema import AgentEntry, ComponentUse, ConditionSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PILOT_DIR = REPO_ROOT / "examples" / "pilot"
+# Component proof fixtures: probe files every built-in compiles from, relative to FIXTURES_DIR.
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 PROBE_DIR = "components/probe"
 CODEX_SETTINGS: dict[str, JsonValue] = {
     "developer_instructions": "RAIDAR-PROBE-SETTINGS: prefer the standard library.",
@@ -61,7 +63,7 @@ def all_builtin_uses(harness: Harness) -> list[ComponentUse]:
 
 
 def compile_uses(
-    *uses: ComponentUse, harness: Harness = Harness.CODEX_CLI, base_dir: Path = PILOT_DIR
+    *uses: ComponentUse, harness: Harness = Harness.CODEX_CLI, base_dir: Path = FIXTURES_DIR
 ) -> CompiledCondition:
     return compile_condition(condition(*uses), agent(harness), base_dir=base_dir)
 

@@ -1,18 +1,18 @@
-"""Experiment-epoch producer: run directories + Assessment stores -> the frozen projection.
+"""Experiment-epoch producer: run directories + Assessment stores -> the review projection.
 
-Frozen concept -> source (design memo §12.1):
+Concept -> source (design memo §12.1):
 
-- ``scenario`` -> the problem; ``revision`` -> the arm's condition (suffixed with
-  the digest of its locked contents when two experiments give one condition id
-  different contents; the harness an arm compiles it for is not part of it, so
-  arms of one condition on different harnesses share one revision);
+- ``problem`` -> the problem; ``arm`` -> the label of the arm's condition
+  (suffixed with the digest of its locked contents when two experiments give one
+  condition id different contents; the harness an arm compiles it for is not
+  part of it, so arms of one condition on different harnesses share one label);
 - one experiment record per (experiment, lock, problem, arm, agent override,
   ``max_checkpoints`` truncation): development runs are never pooled with arm
   evidence, and their headline is withheld (``headline.withheld_reasons``);
 - ``composite_score`` -> the headline ScorePolicy's S/100 (``headline``);
 - gates -> one gate per checkpoint plus the validity gates (``gates``);
 - spans -> Harbor ATIF trajectories, one parent span per checkpoint (``atif``);
-- revision diffs -> condition diffs with arm-diff-guard warnings (``conditions``).
+- arm diffs -> condition diffs with arm-diff-guard warnings (``conditions``).
 """
 
 from __future__ import annotations
@@ -30,10 +30,10 @@ from raidar.review_projection.sources import RunSource
 from raidar.review_projection.spans import safe_id
 from raidar.review_projection.trials import ArmLabels, TrialInput, run_detail
 from raidar.schemas.review import (
+    ArmChangeCategory,
+    ArmDiffArtifact,
     ReviewExperimentRecord,
     ReviewRunDetail,
-    RevisionChangeCategory,
-    RevisionDiffArtifact,
 )
 from raidar.spec.schema import ExperimentSpec
 
@@ -45,7 +45,7 @@ GroupKey = tuple[str, str, str, str, str, str]
 class EpochProjection:
     experiments: list[ReviewExperimentRecord] = field(default_factory=list)
     details: list[ReviewRunDetail] = field(default_factory=list)
-    diffs: list[RevisionDiffArtifact] = field(default_factory=list)
+    diffs: list[ArmDiffArtifact] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -109,7 +109,7 @@ def _experiment_id(key: GroupKey) -> str:
     return f"{experiment}:{problem}:{arm}@{lock[:8]}{suffix}"
 
 
-def _labels(trial: _Trial, revision: str) -> ArmLabels:
+def _labels(trial: _Trial, arm_label: str) -> ArmLabels:
     spec = trial.source.lock.spec
     arm = next(item for item in spec.arms if item.id == trial.arm)
     agent = spec.agent(arm.agent)
@@ -127,7 +127,7 @@ def _labels(trial: _Trial, revision: str) -> ArmLabels:
     return ArmLabels(
         experiment_id=_experiment_id(trial.group_key),
         problem=trial.problem,
-        revision=revision,
+        arm=arm_label,
         harness=str(harness),
         model=model,
         reasoning_effort=effort,
@@ -136,7 +136,7 @@ def _labels(trial: _Trial, revision: str) -> ArmLabels:
 
 
 def _trial_input(
-    trial: _Trial, review_id: str, revision: str, lookup: AssessmentLookup
+    trial: _Trial, review_id: str, arm_label: str, lookup: AssessmentLookup
 ) -> TrialInput:
     source, record = trial.source, trial.record
     trial_dir = source.run_dir / record.trial_dir
@@ -149,11 +149,11 @@ def _trial_input(
         run_dir=source.run_dir,
         run_started=source.manifest.get("started_at"),
         record=record,
-        labels=_labels(trial, revision),
+        labels=_labels(trial, arm_label),
         assessments=assessments,
         headline=headline(
             source.lock.headline_policy,
-            len(record.attempts),
+            record.trial.steps,
             assessments,
             withheld_reasons(record),
             declared=scorers,
@@ -164,16 +164,16 @@ def _trial_input(
 
 def _diffs(
     inputs: Sequence[tuple[_Trial, TrialInput]],
-) -> dict[tuple[str, str, str], RevisionDiffArtifact]:
+) -> dict[tuple[str, str, str], ArmDiffArtifact]:
     """Condition diffs by (lock, problem, arm), each from its baseline counterpart arm."""
     first: dict[tuple[str, str, str], tuple[_Trial, TrialInput]] = {}
     for trial, view in inputs:
         first.setdefault((trial.source.lock.sha256, trial.problem, trial.arm), (trial, view))
-    diffs: dict[tuple[str, str, str], RevisionDiffArtifact] = {}
+    diffs: dict[tuple[str, str, str], ArmDiffArtifact] = {}
     for (lock, problem, arm), (trial, view) in sorted(first.items(), key=lambda item: item[0]):
         spec = trial.source.lock.spec
         baseline = first.get((lock, problem, baseline_counterpart(spec, arm)))
-        if baseline is None or baseline[1].labels.revision == view.labels.revision:
+        if baseline is None or baseline[1].labels.arm == view.labels.arm:
             continue
         diffs[(lock, problem, arm)] = condition_diff(
             spec, problem, _side(*baseline), _side(trial, view)
@@ -199,7 +199,7 @@ def _side(trial: _Trial, view: TrialInput) -> ArmSide:
     arm = next(item for item in spec.arms if item.id == trial.arm)
     return ArmSide(
         arm=arm,
-        label=view.labels.revision,
+        label=view.labels.arm,
         manifest=trial.source.lock.conditions.get(trial.condition, []),
         task_dir=trial.source.run_dir / "tasks" / trial.record.trial.trial_id,
     )
@@ -219,13 +219,13 @@ def _rules_artifacts(manifest: object) -> dict[str, str]:
 def _group(
     key: GroupKey,
     members: Sequence[tuple[_Trial, TrialInput, ReviewRunDetail]],
-    diffs: Mapping[tuple[str, str, str], RevisionDiffArtifact],
+    diffs: Mapping[tuple[str, str, str], ArmDiffArtifact],
 ) -> ArmGroup:
     trial = members[0][0]
     lock = trial.source.lock
     diff = diffs.get((lock.sha256, trial.problem, trial.arm))
-    categories: list[RevisionChangeCategory] = (
-        list(diff.change_categories) if diff is not None else ["initial-revision"]
+    categories: list[ArmChangeCategory] = (
+        list(diff.change_categories) if diff is not None else ["baseline"]
     )
     manifest = lock.conditions.get(trial.condition, [])
     return ArmGroup(
@@ -234,7 +234,7 @@ def _group(
         arm=trial.arm,
         condition_manifest=manifest,
         rules_artifacts=_rules_artifacts(manifest),
-        parent_revision=diff.from_revision if diff is not None else None,
+        parent_arm=diff.from_arm if diff is not None else None,
         change_categories=categories,
         headline_policy=members[0][1].headline.policy,
         trials=[view for _, view, _ in members],

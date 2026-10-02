@@ -1,13 +1,13 @@
 # Raidar Patterns Panel — Wireframe Artifacts
 
-Four standalone UI explorations for the Raidar Patterns panel. Each takes a different angle on surfacing recurring review patterns across revisions.
+Four standalone UI explorations for the Raidar Patterns panel. Each takes a different angle on surfacing recurring review patterns across arms.
 
 ## Variations
 
 - **variation-1.html — Consequence lanes.** Three lanes make cost, trend, and repeatability explicit, so each pattern lands in the lane that matches its consequence.
-- **variation-2.html — Revision trajectory.** Rows focus on revision-by-revision movement, showing what cleared and what still costs outcome.
+- **variation-2.html — Arm trajectory.** Rows focus on arm-by-arm movement, showing what cleared and what still costs outcome.
 - **variation-3.html — Priority ledger.** A ranked ledger classifies each criterion once into costing, trending, repeatable, or watchlist.
-- **variation-4.html — Evidence map.** A compact grid links criteria to revisions and agents, so the reviewer can see spread and trajectory at a glance.
+- **variation-4.html — Evidence map.** A compact grid links criteria to arms and agents, so the reviewer can see spread and trajectory at a glance.
 
 ## Opening locally
 

@@ -1,6 +1,6 @@
 // Validates and copies the semantic review projection emitted by the Python
-// orchestrator. This build step intentionally owns no scenario, scoring, or
-// status interpretation.
+// orchestrator (schema_version 2). This build step intentionally owns no
+// problem, scoring, or status interpretation.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +12,7 @@ const dataRoot = path.join(surfaceRoot, 'data');
 const projectionPath = process.env.RAIDAR_REVIEW_PROJECTION
   ? path.resolve(process.env.RAIDAR_REVIEW_PROJECTION)
   : path.join(repoRoot, '.tmp', 'review-projection.json');
+const SCHEMA_VERSION = 2;
 
 function invariant(condition, message) {
   if (!condition) throw new Error(`Invalid review projection: ${message}`);
@@ -33,7 +34,7 @@ function text(value, name) {
 
 function validateRun(run, name) {
   object(run, name);
-  for (const key of ['id', 'name', 'scenario', 'revision', 'harness', 'model', 'agent_spec', 'experiment_id']) {
+  for (const key of ['id', 'name', 'problem', 'arm', 'harness', 'model', 'agent_spec', 'experiment_id']) {
     text(run[key], `${name}.${key}`);
   }
   invariant(['OK', 'ERROR', 'UNSET'].includes(run.status), `${name}.status is unsupported`);
@@ -61,27 +62,27 @@ function validateDetail(detail, runId) {
 
 function validateExperiment(experiment, index) {
   object(experiment, `experiments[${index}]`);
-  for (const key of ['experiment_id', 'dir', 'scenario', 'revision', 'harness', 'model', 'agent_spec']) {
+  for (const key of ['experiment_id', 'dir', 'problem', 'arm', 'harness', 'model', 'agent_spec']) {
     text(experiment[key], `experiments[${index}].${key}`);
   }
-  object(experiment.scenario_meta, `experiments[${index}].scenario_meta`);
+  object(experiment.problem_meta, `experiments[${index}].problem_meta`);
   object(experiment.comparable_config, `experiments[${index}].comparable_config`);
   text(experiment.comparable_config.fingerprint, `experiments[${index}].comparable_config.fingerprint`);
   array(experiment.change_categories, `experiments[${index}].change_categories`);
   array(experiment.run_ids, `experiments[${index}].run_ids`);
 }
 
-function validateRevisionDiff(diff, index) {
-  object(diff, `revision_diffs[${index}]`);
-  invariant(diff.schema_version === 1, `revision_diffs[${index}].schema_version must be 1`);
-  for (const key of ['key', 'scenario', 'from_revision', 'to_revision']) {
-    text(diff[key], `revision_diffs[${index}].${key}`);
+function validateArmDiff(diff, index) {
+  object(diff, `arm_diffs[${index}]`);
+  invariant(diff.schema_version === SCHEMA_VERSION, `arm_diffs[${index}].schema_version must be ${SCHEMA_VERSION}`);
+  for (const key of ['key', 'problem', 'from_arm', 'to_arm']) {
+    text(diff[key], `arm_diffs[${index}].${key}`);
   }
-  array(diff.change_categories, `revision_diffs[${index}].change_categories`);
-  array(diff.summary, `revision_diffs[${index}].summary`);
-  array(diff.comparable_warnings, `revision_diffs[${index}].comparable_warnings`);
-  object(diff.sections, `revision_diffs[${index}].sections`);
-  object(diff.files, `revision_diffs[${index}].files`);
+  array(diff.change_categories, `arm_diffs[${index}].change_categories`);
+  array(diff.summary, `arm_diffs[${index}].summary`);
+  array(diff.comparable_warnings, `arm_diffs[${index}].comparable_warnings`);
+  object(diff.sections, `arm_diffs[${index}].sections`);
+  object(diff.files, `arm_diffs[${index}].files`);
 }
 
 function loadProjection() {
@@ -92,11 +93,11 @@ function loadProjection() {
     throw new Error(`Unable to read Python review projection at ${projectionPath}: ${error.message}`);
   }
   object(projection, 'root');
-  invariant(projection.schema_version === 1, 'schema_version must be 1');
+  invariant(projection.schema_version === SCHEMA_VERSION, `schema_version must be ${SCHEMA_VERSION}`);
   text(projection.generated_from, 'generated_from');
   array(projection.runs, 'runs').forEach((run, index) => validateRun(run, `runs[${index}]`));
   array(projection.experiments, 'experiments').forEach(validateExperiment);
-  array(projection.revision_diffs, 'revision_diffs').forEach(validateRevisionDiff);
+  array(projection.arm_diffs, 'arm_diffs').forEach(validateArmDiff);
   const details = object(projection.run_details, 'run_details');
   for (const [runId, detail] of Object.entries(details)) validateDetail(detail, runId);
   const indexedIds = new Set(projection.runs.map((run) => run.id));
@@ -119,7 +120,7 @@ function main() {
   );
   fs.writeFileSync(
     path.join(dataRoot, 'experiments.json'),
-    `${JSON.stringify({ experiments: projection.experiments, revision_diffs: projection.revision_diffs }, null, 2)}\n`,
+    `${JSON.stringify({ experiments: projection.experiments, arm_diffs: projection.arm_diffs }, null, 2)}\n`,
   );
   console.log(
     `Copied ${projection.runs.length} validated run(s) across ${projection.experiments.length} experiment(s) into ${path.relative(repoRoot, dataRoot)}`,

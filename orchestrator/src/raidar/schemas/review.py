@@ -1,4 +1,10 @@
-"""Versioned contracts for persisted review-surface projections."""
+"""Versioned contract of the review-surface projection (``schema_version=2``).
+
+The surface groups experiment records by ``problem`` (the problem id) and
+``arm`` (the label of the arm's condition, so arms of one condition on
+different harnesses share it) and ranks agent specs inside each group.
+``arm_diffs`` are condition diffs between the baseline arm and another arm.
+"""
 
 from __future__ import annotations
 
@@ -6,40 +12,20 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
-# Scenario-epoch taxonomy, kept here (not with the removed scenario schema) because
-# persisted scenario-epoch projections still carry it and must keep validating.
-TaskKind = Literal[
-    "feature_implementation",
-    "design_implementation",
-    "defect_repair",
-    "refactoring",
-    "test_authoring",
-]
-DeliveryMode = Literal["direct_implementation", "plan_driven", "plan_and_implement"]
-WorkspaceState = Literal["new", "existing"]
-StartingCondition = Literal["known_defect", "legacy_structure"]
-EvaluationRole = Literal["benchmark", "operational"]
-CatalogStatus = Literal["active", "calibration", "quarantined", "retired"]
-
 ReviewStatus = Literal["OK", "ERROR", "UNSET"]
 ReviewSpanType = Literal["TRACE", "AGENT_ROOT", "LLM_GENERATION", "TOOL_CALL", "INTERNAL"]
-RevisionChangeCategory = Literal[
-    "initial-revision",
+ArmChangeCategory = Literal[
+    "baseline",
     "metadata",
     "environment",
     "starter",
-    "verification",
-    "requirements",
-    "evidence",
-    "visual",
-    "scorers",
     "prompt",
     "rules",
 ]
 
 
 class ResolvedScorerReviewConfig(BaseModel):
-    """Exact resolved scorer configuration used by a scenario revision."""
+    """Exact resolved scorer configuration an arm is assessed with."""
 
     model_config = ConfigDict(extra="forbid")
 
@@ -50,36 +36,24 @@ class ResolvedScorerReviewConfig(BaseModel):
     metrics: list[dict[str, Any]]
 
 
-class ScenarioComparableConfig(BaseModel):
-    """Semantic scenario configuration used for revision comparability."""
+class ArmComparableConfig(BaseModel):
+    """Semantic configuration of one arm on one problem, used for arm comparability."""
 
     model_config = ConfigDict(extra="forbid")
 
-    scenario: str
+    problem: str
     display_name: str
-    revision: str
-    parent_revision: str | None
+    arm: str
+    parent_arm: str | None
     description: str
     difficulty: str
-    task_kind: TaskKind
-    delivery_mode: DeliveryMode
-    workspace_state: WorkspaceState
-    starting_conditions: list[StartingCondition]
     languages: list[str]
-    evaluation_role: EvaluationRole
-    catalog_status: CatalogStatus
-    family_id: str | None
-    variant_axes: dict[str, str]
+    checkpoints: int
     timeout_sec: int
     environment: dict[str, Any]
-    starter: dict[str, Any]
     verification: dict[str, Any]
-    requirements: dict[str, Any]
-    evidence: dict[str, Any]
-    visual: dict[str, Any] | None
     scorers: list[ResolvedScorerReviewConfig]
-    prompt: dict[str, Any]
-    prompt_artifacts: dict[str, str] = Field(default_factory=dict)
+    condition: dict[str, Any]
     rules_artifacts: dict[str, str] = Field(default_factory=dict)
     fingerprint: str
 
@@ -107,32 +81,21 @@ class FileDiff(BaseModel):
     diff: TextDiff
 
 
-class RevisionDiffArtifact(BaseModel):
-    """Typed semantic diff between two scenario revisions."""
+class ArmDiffArtifact(BaseModel):
+    """Typed condition diff between the baseline arm and another arm of one problem."""
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     key: str
-    scenario: str
-    from_revision: str
-    to_revision: str
-    change_categories: list[RevisionChangeCategory]
+    problem: str
+    from_arm: str
+    to_arm: str
+    change_categories: list[ArmChangeCategory]
     summary: list[str]
     comparable_warnings: list[str]
     sections: dict[str, FileDiff]
     files: dict[str, FileDiff]
-
-
-class ScenarioReviewContract(BaseModel):
-    """Scenario semantics persisted with every experiment."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: Literal[1] = 1
-    comparable_config: ScenarioComparableConfig
-    change_categories: list[RevisionChangeCategory]
-    revision_diff: RevisionDiffArtifact | None = None
 
 
 class ReviewSpan(BaseModel):
@@ -176,8 +139,8 @@ class ReviewRunRecord(BaseModel):
 
     id: str
     name: str
-    scenario: str
-    revision: str
+    problem: str
+    arm: str
     harness: str
     model: str
     reasoning_effort: str | None
@@ -203,23 +166,16 @@ class ReviewRunRecord(BaseModel):
     artifact_paths: dict[str, str | None]
 
 
-class ReviewScenarioMetadata(BaseModel):
-    """Filterable scenario taxonomy shown in experiment review records."""
+class ReviewProblemMetadata(BaseModel):
+    """Problem metadata shown in experiment review records."""
 
     model_config = ConfigDict(extra="forbid")
 
     display_name: str
     description: str
     difficulty: str
-    task_kind: TaskKind
-    delivery_mode: DeliveryMode
-    workspace_state: WorkspaceState
-    starting_conditions: list[StartingCondition]
     languages: list[str]
-    evaluation_role: EvaluationRole
-    catalog_status: CatalogStatus
-    family_id: str | None
-    variant_axes: dict[str, str]
+    checkpoints: int
     timeout_sec: int
 
 
@@ -238,17 +194,17 @@ class ReviewExperimentRecord(BaseModel):
 
     experiment_id: str
     dir: str
-    scenario: str
-    revision: str
+    problem: str
+    arm: str
     harness: str
     model: str
     reasoning_effort: str | None
     agent_spec: str
     synthetic: bool
     repeats: int
-    scenario_meta: ReviewScenarioMetadata
-    comparable_config: ScenarioComparableConfig
-    change_categories: list[RevisionChangeCategory]
+    problem_meta: ReviewProblemMetadata
+    comparable_config: ArmComparableConfig
+    change_categories: list[ArmChangeCategory]
     aggregate: dict[str, Any]
     sample: dict[str, Any]
     rerun: dict[str, Any]
@@ -257,25 +213,14 @@ class ReviewExperimentRecord(BaseModel):
     run_ids: list[str]
 
 
-class ExperimentReviewProjection(BaseModel):
-    """One experiment's fully semantic, regenerable review projection."""
-
-    model_config = ConfigDict(extra="forbid")
-
-    schema_version: Literal[1] = 1
-    experiment: ReviewExperimentRecord
-    runs: list[ReviewRunDetail]
-    revision_diff: RevisionDiffArtifact | None = None
-
-
 class ReviewProjectionArtifact(BaseModel):
     """Merged projection copied by the JavaScript data build."""
 
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1] = 1
+    schema_version: Literal[2] = 2
     generated_from: str
     experiments: list[ReviewExperimentRecord]
     runs: list[ReviewRunRecord]
     run_details: dict[str, ReviewRunDetail]
-    revision_diffs: list[RevisionDiffArtifact]
+    arm_diffs: list[ArmDiffArtifact]

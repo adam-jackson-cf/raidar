@@ -15,7 +15,7 @@ Raidar runs an **experiment**: the same pinned **problems** under two or more **
 
 The design lives in [`docs/reboot/requirements.md`](docs/reboot/requirements.md) (frozen v1), [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md), [`docs/reboot/adr-001.md`](docs/reboot/adr-001.md) and [`docs/reboot/design-memo.md`](docs/reboot/design-memo.md).
 
-> **History.** The scenario, revision and matrix workflow was retired at the reboot cutover: no code, target or check reads `scenarios/`, `matrices/`, `environments/` or `spikes/` any more, and they have been removed from the tree. Their definitions are preserved at tag `archive/scenario-epoch`, and [`CHANGELOG.md`](CHANGELOG.md) maps each removed target to its replacement. Scenario-epoch runs under `experiments/benchmarks` still render, read-only, in the review surface (`REVIEW_LEGACY_ROOT`).
+> **History.** The scenario, revision and matrix workflow was retired at the reboot cutover: no code, target or check reads `scenarios/`, `matrices/`, `environments/` or `spikes/` any more, and they have been removed from the tree. Their definitions are preserved at tag `archive/scenario-epoch`, and [`CHANGELOG.md`](CHANGELOG.md) maps each removed target to its replacement. The review surface no longer reads scenario-epoch history.
 
 ## Install
 
@@ -25,11 +25,15 @@ Prerequisites:
 - Docker with `docker compose` 2.40.1 or newer. OrbStack is the default: `DOCKER_CONTEXT` defaults to `orbstack`.
 - Node 18 or newer, for the review surface
 - Agent credentials: file-backed Codex auth (`make codex-auth-setup`) or `OPENAI_API_KEY` for codex-cli; `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` for claude-code
+- Optional but preferred: the [Infisical CLI](https://infisical.com/docs/cli/overview), logged in once with `infisical login` in a real terminal (it is interactive)
 
 ```bash
-cp orchestrator/.env.example orchestrator/.env
 make env-setup
+# Only without Infisical: copy the key names and fill the values locally.
+cp orchestrator/.env.example orchestrator/.env
 ```
+
+Secrets live in the Infisical project `mac-os-cf` (env `dev`), bound by `orchestrator/.infisical.json`. Targets that call a model provider (`experiment-execute`, the smoke targets, `experiment-assess`, `jev-shadow-rubric`, `harness-validate`, `component-probe-trials`) run under `infisical run` when the CLI is installed and logged in, and otherwise read `orchestrator/.env`; each prints which source it used, never a value. `SECRETS=infisical` fails instead of falling back, `SECRETS=dotenv` skips Infisical, and `INFISICAL_ENV=` picks another environment. Before any trial starts, `experiment-execute` and the smoke targets check that every selected arm's harness has a credential (presence only) and name the agent field that lacks one.
 
 For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file-backed ChatGPT login from `~/.codex/auth.json` and falls back to `OPENAI_API_KEY`. A login kept in the OS keyring cannot be passed into Harbor, so switch Codex to file-backed credential storage first. `make help` lists every public target.
 
@@ -49,7 +53,7 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 | Scorer and Assessment | A versioned scorer (`correctness@1`, `code-quality@1`, `resource-usage@1`, `process-compliance@1`) runs offline over stored trials. Each result is an Assessment keyed by its inputs | an Assessment store directory, outside the run |
 | Headline policy | How component scores combine into the headline S (`scb-canonical@1`, `scb-canonical-oneshot@1`). The lock pins it | `assessment.headline_policy` |
 | Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm | the `make experiment-analyze` output directory |
-| Jev | Decomposed LLM-judge questions. They run in shadow until a policy is calibrated and promoted | `raidar jev ...`; the audit sits in the Assessment store |
+| Jev | Decomposed LLM-judge questions. They run in shadow until a policy is calibrated and promoted: label decisions (review surface, or blind with `make jev-export-blind`/`jev-import-blind`; each label records a `human` or `model` reviewer), then `make jev-promote` fits and freezes the threshold on a calibration split and writes `mode: enforce` only when the audit re-derives every recorded number; `make jev-verify-promotion` then also requires the scorer's minor-version bump the promotion names | `raidar jev ...`; the audit sits in the Assessment store |
 
 ## Walkthrough: experiment.yaml to review
 
@@ -146,7 +150,7 @@ make experiment-assess RUN=runs/rules-trial/first STORE=stores/rules-trial \
 make experiment-analyze RUNS="runs/rules-trial/first" STORE=stores/rules-trial ANALYSIS_OUT=analysis/rules-trial
 ```
 
-**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs; serve builds the UI first if `review-surface/dist` is missing (`make review-surface-build` rebuilds it). Each run's lock is found beside its experiment file or in the run directory; pass `REVIEW_LOCK=<lock>` (also used by the Quality projection, or `QUALITY_LOCK=`) for a lock kept elsewhere, such as a smoke lock under `.tmp/smoke/`. A run whose lock cannot be found is skipped with a warning. Scenario-epoch history under `experiments/benchmarks` is included, read-only, when present; point `REVIEW_LEGACY_ROOT` elsewhere to use another history root. `make review-surface-test` rewrites `review-surface/data` with its fixtures plus the runs you pass, so run the projection again before serving.
+**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs; serve builds the UI first if `review-surface/dist` is missing (`make review-surface-build` rebuilds it). Each run's lock is found beside its experiment file or in the run directory; pass `REVIEW_LOCK=<lock>` (also used by the Quality projection, or `QUALITY_LOCK=`) for a lock kept elsewhere, such as a smoke lock under `.tmp/smoke/`. A run whose lock cannot be found is skipped with a warning. `make review-surface-test` rewrites `review-surface/data` with its fixtures plus the runs you pass, so run the projection again before serving.
 
 ```bash
 make review-surface-quality-data QUALITY_RUNS=runs/rules-trial QUALITY_STORE=stores/rules-trial
@@ -171,7 +175,7 @@ make smoke-agents SMOKE_ARM=codex                         # one arm only
 - `problems/`: the pinned problem registry (tracked), plus the imported store and source cache (local).
 - `review-surface/`: the review UI, its frozen projection contract (`schema_version=1`) and its Playwright suite.
 - `runs/`: local run directories, ignored by git.
-- `experiments/`: scenario-epoch run history, ignored by git and read-only.
+- `experiments/`: ignored by git; nothing in Raidar reads or writes it.
 - `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo, the Phase 1 gate packet, and the tracked Phase 0 spike evidence (`evidence/`).
 
 `make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `examples/**/*.lock.json` is current), then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`. Docker-backed tests stay opt-in and are skipped there; the N1 overhead gate (`make perf-gate`) is run separately as a release/gate check.

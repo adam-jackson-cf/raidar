@@ -258,7 +258,7 @@ test.describe('comparison visualisations', () => {
     await expect(page.getByText('Failure patterns').first()).toBeVisible();
   });
 
-  test('revision movement diff expands with tabs', async ({ page }) => {
+  test('arm movement diff expands with tabs', async ({ page }) => {
     await openExperiments(page);
     const card = page.getByRole('button', { name: /contract changes/ }).first();
     await card.scrollIntoViewIfNeeded();

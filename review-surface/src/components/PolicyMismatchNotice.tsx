@@ -1,6 +1,6 @@
 // Headline-policy mismatch: one notice, one wording, wherever a headline score
 // is compared or shown. The projection marks every experiment of a compared
-// family (one problem, or one scenario-epoch scenario) that mixes headline
+// family (one problem) that mixes headline
 // policies with a `headline-policy-mismatch` finding; the Quality element adds
 // the policies its own experiments score the same problem under.
 import { useMemo } from 'react';
@@ -59,14 +59,14 @@ function merge(a: PolicyMismatch | null, b: PolicyMismatch | null): PolicyMismat
   return { policies: [...byPolicy.entries()].sort().map(([policy, ids]) => ({ policy, experiments: [...ids] })) };
 }
 
-/** Mismatch for the family a run review or Quality view belongs to (`scenario` = problem id). */
-export function usePolicyMismatch(scenario: string | null | undefined, quality?: QualityExperiment[]) {
+/** Mismatch for the family (problem id) a run review or Quality view belongs to. */
+export function usePolicyMismatch(problem: string | null | undefined, quality?: QualityExperiment[]) {
   const experiments = useQuery({ queryKey: ['experiments'], queryFn: api.experiments });
   return useMemo(() => {
-    if (!scenario) return null;
-    const family = (experiments.data?.experiments ?? []).filter((exp) => exp.scenario === scenario);
-    return merge(familyMismatch(family), quality ? qualityMismatch(quality, scenario) : null);
-  }, [experiments.data, scenario, quality]);
+    if (!problem) return null;
+    const family = (experiments.data?.experiments ?? []).filter((exp) => exp.problem === problem);
+    return merge(familyMismatch(family), quality ? qualityMismatch(quality, problem) : null);
+  }, [experiments.data, problem, quality]);
 }
 
 export function PolicyMismatchNotice({ mismatch }: { mismatch: PolicyMismatch | null }) {
@@ -102,7 +102,7 @@ export function PolicyMismatchNotice({ mismatch }: { mismatch: PolicyMismatch | 
   );
 }
 
-/** The notice for one family (`scenario` = problem id), for places that know only the family. */
-export function FamilyPolicyMismatch({ scenario, quality }: { scenario: string | null | undefined; quality?: QualityExperiment[] }) {
-  return <PolicyMismatchNotice mismatch={usePolicyMismatch(scenario, quality)} />;
+/** The notice for one family (problem id), for places that know only the family. */
+export function FamilyPolicyMismatch({ problem, quality }: { problem: string | null | undefined; quality?: QualityExperiment[] }) {
+  return <PolicyMismatchNotice mismatch={usePolicyMismatch(problem, quality)} />;
 }

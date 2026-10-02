@@ -15,7 +15,6 @@ from raidar.jev.calibration import (
     LabelImportError,
     import_labels,
     promotion_readiness,
-    verify_promotion,
 )
 from raidar.jev.gating import jev_policy_modes, uncalibrated_observations, verdict_observations
 from raidar.jev.policies import (
@@ -26,6 +25,7 @@ from raidar.jev.policies import (
     PolicyRegistry,
     load_policy,
 )
+from raidar.jev.promotion import build_promotion, verify_promotion
 from raidar.jev.protocol import NoulQuestion
 from raidar.jev.runtime import RULE_INPUT_MISSING
 from raidar.scorers.builtin_manifests import PROCESS_COMPLIANCE
@@ -251,14 +251,15 @@ def test_promotion_claims_are_verified_against_the_split_audit(tmp_path: Path) -
     claimed = policy(RUBRIC, PolicyMode.ENFORCE)  # claims 40 labelled, 8 minority, 0.9 input
     split = CalibrationSplit(calibration=("t1",), evaluation=("t2",))
     assert claimed.promotion is not None
-    honest = claimed.model_copy(
-        update={
-            "promotion": claimed.promotion.model_copy(
-                update={"labelled": 32, "minority": 6, "input_sufficiency": 1.0, "split": split}
-            )
-        }
-    )
+    built = build_promotion(claimed, runtime.audit, split, scorer_version="1")
+    assert (built.labelled, built.minority, built.input_sufficiency) == (32, 6, 1.0)
+    honest = claimed.model_copy(update={"promotion": built})
     assert verify_promotion(honest, runtime.audit) == ()
+    # A hand-edited number no longer matches what the audit re-derives.
+    edited = honest.model_copy(update={"promotion": built.model_copy(update={"threshold": 0.7})})
+    assert verify_promotion(edited, runtime.audit) == (
+        "recorded threshold 0.7 is not the audited 0.5",
+    )
     failures = verify_promotion(claimed, runtime.audit)
     assert any("outside the split: ['t1', 't2']" in failure for failure in failures)
     assert any("recorded labelled 40 exceeds the audited 0" in failure for failure in failures)

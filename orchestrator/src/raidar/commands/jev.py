@@ -1,4 +1,4 @@
-"""Jev CLI commands: shadow runs of a question set, policy listing, label export and import."""
+"""Jev CLI commands: shadow runs, policies, labels (direct and blind) and promotion."""
 
 from __future__ import annotations
 
@@ -8,20 +8,15 @@ from pathlib import Path
 
 import click
 
+from raidar.commands import jev_calibration
 from raidar.jev.audit import AuditLog
-from raidar.jev.calibration import (
-    LabelImportError,
-    import_labels,
-    promotion_readiness,
-    verify_promotion,
-)
 from raidar.jev.label_export import (
     LabelExportError,
     export_labels,
     load_review_labels,
     write_rows,
 )
-from raidar.jev.policies import PolicyError, PolicyRegistry
+from raidar.jev.policies import PolicyRegistry
 from raidar.jev.report import rubric_shadow_report
 from raidar.jev.rubric import RUBRIC_POLICY, CheckpointSource, RubricRunner
 from raidar.jev.rubric_questions import load_rubric_question_set
@@ -31,6 +26,7 @@ _NUMBER = re.compile(r"(\d+)")
 
 
 def register(main: click.Group) -> None:
+    jev_calibration.register(jev)
     main.add_command(jev)
 
 
@@ -105,54 +101,6 @@ def jev_shadow_rubric(
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(report + "\n", encoding="utf-8")
     click.echo(report)
-
-
-@jev.command("import-labels")
-@click.option(
-    "--store", type=click.Path(exists=True, file_okay=False, path_type=Path), required=True
-)
-@click.option("--policy", required=True)
-@click.argument("labels", type=click.Path(exists=True, dir_okay=False, path_type=Path))
-def jev_import_labels(store: Path, policy: str, labels: Path) -> None:
-    """Import exported labels (JSON lines: request_id, label, note) and show readiness."""
-    runtime = open_runtime(store, replay_only=True)
-    try:
-        runtime.policies.get(policy)
-        rows = [json.loads(line) for line in labels.read_text("utf-8").splitlines() if line.strip()]
-        added = import_labels(runtime.audit, policy, rows)
-    except (PolicyError, LabelImportError, json.JSONDecodeError) as error:
-        raise click.ClickException(str(error)) from error
-    readiness = promotion_readiness(runtime.audit, policy)
-    click.echo(
-        json.dumps(
-            {
-                "imported": added,
-                "labelled": readiness.labelled,
-                "minority": readiness.minority,
-                "input_sufficiency": readiness.input_sufficiency,
-                "ready_for_enforce": readiness.ready,
-                "gate_failures": list(readiness.failures),
-            },
-            indent=2,
-        )
-    )
-
-
-@jev.command("verify-promotion")
-@click.option(
-    "--store", type=click.Path(exists=True, file_okay=False, path_type=Path), required=True
-)
-@click.option("--policy", required=True)
-def jev_verify_promotion(store: Path, policy: str) -> None:
-    """Check a policy's recorded promotion against the store's audit and labels."""
-    runtime = open_runtime(store, replay_only=True)
-    try:
-        failures = verify_promotion(runtime.policies.get(policy), runtime.audit)
-    except PolicyError as error:
-        raise click.ClickException(str(error)) from error
-    click.echo(json.dumps({"policy": policy, "supported": not failures, "failures": failures}))
-    if failures:
-        raise SystemExit(1)
 
 
 @jev.command("export-labels")

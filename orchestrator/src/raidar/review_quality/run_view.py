@@ -29,7 +29,7 @@ from pathlib import Path
 from typing import cast, get_args
 
 from raidar.analysis.assessed import build_outcome
-from raidar.analysis.outcomes import HEADLINE_SCORE, QUALITY_COMPONENTS, SOLVE_RATE, Value
+from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE, QUALITY_COMPONENTS, Value
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.jev.audit import DecisionRecord, LabelRecord
 from raidar.review_quality.models import (
@@ -134,7 +134,10 @@ def _inertia(policy: ScorePolicy, cells: Mapping[str, Cell]) -> Cell:
     return Cell(status="ok", value=float(inertia.quantize(COMPONENT_PLACES)))
 
 
-def _score(correctness: Cell, inertia: Cell) -> Cell:
+def _score(policy: ScorePolicy, correctness: Cell, inertia: Cell) -> Cell:
+    """Per-checkpoint S; under ``zero_correctness`` a measured C = 0 is S = 0 (``@2``)."""
+    if policy.zero_correctness and correctness.status == "ok" and correctness.value == 0:
+        return Cell(status="ok", value=0.0)
     for key, cell in (("C", correctness), ("I", inertia)):
         if cell.status != "ok":
             status: CellStatus = "not_applicable" if cell.status == _NOT_REACHED else "ineligible"
@@ -185,7 +188,7 @@ def _row_cells(
     for key in policy.not_applicable:
         cells[key] = Cell(status="not_applicable", reason=f"{policy.ref} does not use {key}")
     cells["I"] = _inertia(policy, cells)
-    cells["S"] = _score(cells["C"], cells["I"])
+    cells["S"] = _score(policy, cells["C"], cells["I"])
     return {key: cells[key] for key in COMPONENTS}
 
 
@@ -297,7 +300,7 @@ def _problem_cells(
         },
         policy=policy,
     )
-    cells = {"C": _from_value(outcome.metrics[SOLVE_RATE])}
+    cells = {"C": _from_value(outcome.metrics[CORRECTNESS_METRIC])}
     for name, key in QUALITY_COMPONENTS.items():
         cells[key] = _from_value(outcome.metrics[name])
     cells["S"] = _from_value(outcome.metrics[HEADLINE_SCORE])

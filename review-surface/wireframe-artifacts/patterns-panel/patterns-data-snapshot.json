@@ -1,8 +1,8 @@
 {
   "experiments": [
     {
-      "scenario": "bugfix-ledger-balance",
-      "revision": "v001",
+      "problem": "bugfix-ledger-balance",
+      "arm": "v001",
       "agent_spec": "codex-cli · openai/gpt-5.5:high",
       "run_ids": [
         "synthetic-bugfix-gpt-5.5-high-01",
@@ -109,7 +109,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "review",
@@ -137,8 +137,8 @@
       ]
     },
     {
-      "scenario": "bugfix-ledger-balance",
-      "revision": "v001",
+      "problem": "bugfix-ledger-balance",
+      "arm": "v001",
       "agent_spec": "codex-cli · openai/gpt-5.5:low",
       "run_ids": [
         "synthetic-bugfix-gpt-5.5-low-01",
@@ -245,7 +245,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "review",
@@ -260,12 +260,12 @@
           "kind": "issue",
           "category": "unscored-run",
           "title": "Run synthetic-bugfix-gpt-5.5-low-05 is unscored",
-          "detail": "Scoring did not complete: the harness exited before verification finished., Re-run this scenario to obtain a score.",
+          "detail": "Scoring did not complete: the harness exited before verification finished., Re-run this problem to obtain a score.",
           "evidence": [
             {
               "source": "run",
               "reference": "synthetic-bugfix-gpt-5.5-low-05",
-              "detail": "Scoring did not complete: the harness exited before verification finished., Re-run this scenario to obtain a score."
+              "detail": "Scoring did not complete: the harness exited before verification finished., Re-run this problem to obtain a score."
             }
           ],
           "source": "deterministic"
@@ -318,8 +318,8 @@
       ]
     },
     {
-      "scenario": "bugfix-ledger-balance",
-      "revision": "v001",
+      "problem": "bugfix-ledger-balance",
+      "arm": "v001",
       "agent_spec": "codex-cli · openai/gpt-5.5:medium",
       "run_ids": [
         "synthetic-bugfix-gpt-5.5-medium-01",
@@ -426,7 +426,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "review",
@@ -454,8 +454,8 @@
       ]
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "revision": "v001",
+      "problem": "skill-benchmark-coding-test",
+      "arm": "v001",
       "agent_spec": "claude-code · anthropic/claude-sonnet-4.6",
       "run_ids": [
         "synthetic-skill-v001-claude-sonnet-4.6-01",
@@ -542,7 +542,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "smoke",
@@ -554,8 +554,8 @@
       "findings": []
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "revision": "v001",
+      "problem": "skill-benchmark-coding-test",
+      "arm": "v001",
       "agent_spec": "codex-cli · openai/gpt-5.5:low",
       "run_ids": [
         "synthetic-skill-v001-gpt-5.5-low-01",
@@ -642,7 +642,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "smoke",
@@ -654,8 +654,8 @@
       "findings": []
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "revision": "v002",
+      "problem": "skill-benchmark-coding-test",
+      "arm": "v002",
       "agent_spec": "claude-code · anthropic/claude-sonnet-4.6",
       "run_ids": [
         "synthetic-skill-v002-claude-sonnet-4.6-01",
@@ -760,7 +760,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "smoke",
@@ -772,8 +772,8 @@
       "findings": []
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "revision": "v002",
+      "problem": "skill-benchmark-coding-test",
+      "arm": "v002",
       "agent_spec": "codex-cli · openai/gpt-5.5:low",
       "run_ids": [
         "synthetic-skill-v002-gpt-5.5-low-01",
@@ -878,7 +878,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "smoke",
@@ -890,8 +890,8 @@
       "findings": []
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "revision": "v003",
+      "problem": "skill-benchmark-coding-test",
+      "arm": "v003",
       "agent_spec": "claude-code · anthropic/claude-sonnet-4.6",
       "run_ids": [
         "synthetic-skill-v003-claude-sonnet-4.6-01",
@@ -996,7 +996,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "smoke",
@@ -1008,8 +1008,8 @@
       "findings": []
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "revision": "v003",
+      "problem": "skill-benchmark-coding-test",
+      "arm": "v003",
       "agent_spec": "codex-cli · openai/gpt-5.5:low",
       "run_ids": [
         "synthetic-skill-v003-gpt-5.5-low-01",
@@ -1114,7 +1114,7 @@
         }
       },
       "sample": {
-        "scenario_family": "code-task-nonvisual",
+        "problem_family": "code-task-nonvisual",
         "minimum_scored_runs": 3,
         "preferred_scored_runs": 5,
         "sample_class": "smoke",
@@ -1126,11 +1126,11 @@
       "findings": []
     }
   ],
-  "revision_diffs": [
+  "arm_diffs": [
     {
-      "scenario": "skill-benchmark-coding-test",
-      "from_revision": "v001",
-      "to_revision": "v002",
+      "problem": "skill-benchmark-coding-test",
+      "from_arm": "v001",
+      "to_arm": "v002",
       "summary": [
         "requirements changed",
         "rules changed",
@@ -1138,9 +1138,9 @@
       ]
     },
     {
-      "scenario": "skill-benchmark-coding-test",
-      "from_revision": "v002",
-      "to_revision": "v003",
+      "problem": "skill-benchmark-coding-test",
+      "from_arm": "v002",
+      "to_arm": "v003",
       "summary": [
         "evaluation profile changed",
         "rules changed",

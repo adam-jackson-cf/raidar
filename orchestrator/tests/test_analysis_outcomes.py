@@ -28,7 +28,12 @@ from raidar.execution.models import (
     ValidityCheck,
 )
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.spec.policies import SCB_CANONICAL, SCB_CANONICAL_ONESHOT
+from raidar.spec.policies import (
+    SCB_CANONICAL,
+    SCB_CANONICAL_ONESHOT,
+    SCB_CANONICAL_ONESHOT_V2,
+    SCB_CANONICAL_V2,
+)
 
 STEPS = ("checkpoint_1", "checkpoint_2", "checkpoint_3")
 HASHES = TrialHashes(
@@ -154,8 +159,11 @@ def test_headline_is_the_policy_score_of_scorer_components() -> None:
     results = {CORRECTNESS_REF: _halted_correctness(), CODE_QUALITY_REF: _quality()}
     outcome = build_outcome(_record(), results, policy=SCB_CANONICAL)
     inertia = 0.15 * 0.8 + 0.15 * 0.6 + 0.20 * 1.0 + 0.30 * 0.5 + 0.20 * 0.9
+    # C is the fork's mean case pass rate (1.0, 0.5, unreached 0), not solved/K (1/3).
+    assert outcome.metrics["correctness"] == Value.ok(0.5)
+    assert outcome.metrics["solve_rate"].value == pytest.approx(1 / 3)
     assert outcome.metrics["headline_score"].value == pytest.approx(
-        100 * (1 / 3) * (0.7 + 0.3 * inertia), abs=1e-6
+        100 * 0.5 * (0.7 + 0.3 * inertia), abs=1e-6
     )
     assert outcome.metrics["verbosity"] == Value.ok(0.8)
     assert outcome.series["verbosity"][0] == Value.ok(0.7)
@@ -204,3 +212,102 @@ def test_invalid_or_infra_trajectories_are_flagged_with_reasons() -> None:
         "validity:steps_started",
         "checkpoint_2:oracle:no_graded_cases",
     )
+
+
+def _failed_correctness(rate: float) -> AssessResult:
+    """Every checkpoint reached and failed, each at case pass rate ``rate``."""
+    return AssessResult(
+        status=AssessStatus.OK,
+        observations=(
+            *(_ok("solved", step, 0.0) for step in STEPS),
+            *(_ok("strict_pass_rate", step, rate) for step in STEPS),
+            _ok("solved_checkpoints", TRAJECTORY_SUBJECT, 0.0),
+            _ok("reached", TRAJECTORY_SUBJECT, 0.0),
+        ),
+    )
+
+
+def _rework_gap() -> AssessResult:
+    rework = _gap("problem_rework", TRAJECTORY_SUBJECT, AssessStatus.INELIGIBLE, "bad inventory")
+    return _quality(rework=rework)
+
+
+def test_v2_c_zero_scores_zero_and_keeps_the_trajectory_despite_quality_gaps() -> None:
+    # S2-SS-2: dropping C = 0 trajectories would bias paired S towards the arm that fails more.
+    for quality in (_rework_gap(), None):
+        results = {CORRECTNESS_REF: _failed_correctness(0.0)}
+        if quality is not None:
+            results[CODE_QUALITY_REF] = quality
+        v2 = build_outcome(_record(), results, policy=SCB_CANONICAL_V2)
+        v1 = build_outcome(_record(), results, policy=SCB_CANONICAL)
+        assert v2.metrics["correctness"] == Value.ok(0.0)
+        assert v2.metrics["headline_score"] == Value.ok(0.0)
+        # @1 is fork-exact: any quality gap leaves S unscored, even at C = 0.
+        assert v1.metrics["headline_score"].value is None
+        assert v1.metrics["headline_score"].status == ("ineligible" if quality else UNASSESSED)
+
+
+def test_v2_c_above_zero_with_a_quality_gap_is_ineligible() -> None:
+    results = {CORRECTNESS_REF: _failed_correctness(0.25), CODE_QUALITY_REF: _rework_gap()}
+    outcome = build_outcome(_record(), results, policy=SCB_CANONICAL_V2)
+    assert outcome.metrics["correctness"] == Value.ok(0.25)
+    assert outcome.metrics["headline_score"].status == "ineligible"
+    assert "bad inventory" in (outcome.metrics["headline_score"].reason or "")
+    missing = build_outcome(
+        _record(), {CORRECTNESS_REF: _failed_correctness(0.25)}, policy=SCB_CANONICAL_V2
+    )
+    assert missing.metrics["headline_score"].status == UNASSESSED
+
+
+def test_v2_all_checkpoints_failed_but_partially_passing_is_not_zero() -> None:
+    # solved/K is 0 here, but C (mean pass rate) is 0.9, so the zero rule does not fire.
+    results = {CORRECTNESS_REF: _failed_correctness(0.9), CODE_QUALITY_REF: _quality()}
+    outcome = build_outcome(_record(), results, policy=SCB_CANONICAL_V2)
+    assert outcome.metrics["solve_rate"] == Value.ok(0.0)
+    assert outcome.metrics["correctness"].value == pytest.approx(0.9)
+    assert (outcome.metrics["headline_score"].value or 0) > 0
+
+
+def test_a_reached_checkpoint_with_no_graded_case_makes_c_ineligible_not_zero() -> None:
+    observations = list(_failed_correctness(0.0).observations)
+    observations[3] = _gap(
+        "strict_pass_rate", "checkpoint_1", AssessStatus.NOT_APPLICABLE, "no graded oracle cases"
+    )
+    result = AssessResult(status=AssessStatus.OK, observations=tuple(observations))
+    outcome = build_outcome(
+        _record(), {CORRECTNESS_REF: result, CODE_QUALITY_REF: _quality()}, policy=SCB_CANONICAL_V2
+    )
+    assert outcome.metrics["correctness"].status == "ineligible"
+    assert "no graded oracle cases" in (outcome.metrics["correctness"].reason or "")
+    assert outcome.metrics["headline_score"].status == "ineligible"
+
+
+def test_c_uses_exact_case_counts_when_the_scorer_records_them() -> None:
+    observations = (
+        *(_ok("solved", step, 0.0) for step in STEPS),
+        *(
+            Observation(
+                metric="strict_pass_rate",
+                subject=step,
+                status=AssessStatus.OK,
+                value=2 / 3,
+                numerator=2,
+                denominator=3,
+            )
+            for step in STEPS
+        ),
+    )
+    result = AssessResult(status=AssessStatus.OK, observations=observations)
+    outcome = build_outcome(
+        _record(), {CORRECTNESS_REF: result, CODE_QUALITY_REF: _quality()}, policy=SCB_CANONICAL
+    )
+    inertia = 0.15 * 0.8 + 0.15 * 0.6 + 0.20 * 1.0 + 0.30 * 0.5 + 0.20 * 0.9
+    assert outcome.metrics["headline_score"].value == pytest.approx(
+        100 * (2 / 3) * (0.7 + 0.3 * inertia), abs=1e-6
+    )
+
+
+def test_oneshot_v2_c_zero_scores_zero_without_quality() -> None:
+    components = {"C": Value.ok(0.0), "V": Value.missing("ineligible", "no files")}
+    assert headline_score(SCB_CANONICAL_ONESHOT_V2, 1, components) == Value.ok(0.0)
+    assert headline_score(SCB_CANONICAL_ONESHOT, 1, components).status == "ineligible"

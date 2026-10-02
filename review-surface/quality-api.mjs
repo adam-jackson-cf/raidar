@@ -6,6 +6,9 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 export const JEV_LABELS = ['correct', 'false_positive', 'false_negative', 'uncertain'];
+// Label provenance: a person on this surface is a `human` reviewer (source
+// `user`); a `model` reviewer must name its model id in `reviewer_model`.
+export const JEV_REVIEWERS = ['human', 'model'];
 const SAFE_ID = /^[A-Za-z0-9._-]+$/;
 
 function readJson(filePath, fallback) {
@@ -33,6 +36,11 @@ export function createQualityApi({ dataRoot, sendJson, readBody }) {
     if (!body?.run_id || !body?.request_id || !body?.policy || !JEV_LABELS.includes(body.label)) {
       return sendJson(res, 400, { error: `run_id, request_id, policy and label (${JEV_LABELS.join('|')}) required` });
     }
+    const reviewer = body.reviewer == null || body.reviewer === 'user' ? 'human' : body.reviewer;
+    const reviewerModel = body.reviewer_model ? String(body.reviewer_model).slice(0, 200) : null;
+    if (!JEV_REVIEWERS.includes(reviewer) || (reviewer === 'model') !== Boolean(reviewerModel)) {
+      return sendJson(res, 400, { error: `reviewer (${JEV_REVIEWERS.join('|')}) needs reviewer_model exactly when it is model` });
+    }
     const detail = loadDetail(String(body.run_id));
     const decision = detail?.jev_decisions?.find(
       (item) => item.request_id === body.request_id && item.policy === body.policy,
@@ -46,7 +54,9 @@ export function createQualityApi({ dataRoot, sendJson, readBody }) {
       policy: String(body.policy),
       label: body.label,
       note: body.note ? String(body.note).slice(0, 4000) : null,
-      source: 'user',
+      source: reviewer === 'human' ? 'user' : 'model',
+      reviewer,
+      reviewer_model: reviewerModel,
       category: 'jev_label',
       created_at: Date.now(),
     };

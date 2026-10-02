@@ -29,6 +29,7 @@ from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, PolicyResolver
 from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError, ResolverSet
 from tests.component_support import (
     PILOT_DIR,
+    PROBE_DIR,
     agent,
     all_builtin_uses,
     compile_uses,
@@ -99,7 +100,7 @@ def test_unknown_component_rejects_the_arm_and_lists_every_issue() -> None:
         compile_uses(
             use("no-such-thing@1"),
             use("rules-file@9"),
-            use("rules-file@1", ("components/guided/AGENTS.md",)),
+            use("rules-file@1", (f"{PROBE_DIR}/AGENTS.md",)),
         )
 
     issues = raised.value.issues
@@ -127,12 +128,12 @@ def test_component_without_mapping_for_the_harness_rejects_the_arm() -> None:
 def test_invalid_use_and_conflicting_uses_reject_the_arm() -> None:
     cases = [
         (use("rules-file@1"), "expects 1 file"),
-        (use("rules-file@1", ("components/guided/AGENTS.md",), extra=1), "unknown 'with' keys"),
+        (use("rules-file@1", (f"{PROBE_DIR}/AGENTS.md",), extra=1), "unknown 'with' keys"),
         (use("harness-settings@1", settings={"model": "x"}), "not harness-settings"),
         (use("harness-settings@1", settings={"web_search": "live"}), "no discovery probe"),
-        (use("lint-config@1", ("components/guided/AGENTS.md",)), "not a known lint config"),
+        (use("lint-config@1", (f"{PROBE_DIR}/AGENTS.md",)), "not a known lint config"),
         (use("review-loop@1", max_review_rounds=9), "integer 1..5"),
-        (use("rules-file@1", ("components/guided",)), "must be a file"),
+        (use("rules-file@1", (PROBE_DIR,)), "must be a file"),
         (use("harness-settings@1"), "missing required 'with' keys"),
         (use("harness-settings@1", settings={}), "non-empty object"),
         (use("stop-hook@1"), "exactly one of"),
@@ -140,9 +141,9 @@ def test_invalid_use_and_conflicting_uses_reject_the_arm() -> None:
         (use("mcp-server@1", name="bad name", command="x"), "must match"),
         (use("mcp-server@1", name="ok", command=""), "non-empty string"),
         (use("mcp-server@1", name="ok", command="x", args="y"), "list of strings"),
-        (use("skills@1", ("components/guided",)), "directory with SKILL.md"),
-        (use("workspace-files@1", ("components/guided",), dest=3), "relative path string"),
-        (use("workspace-files@1", ("components/guided",), dest="../x"), "inside the workspace"),
+        (use("skills@1", (PROBE_DIR,)), "directory with SKILL.md"),
+        (use("workspace-files@1", (PROBE_DIR,), dest=3), "relative path string"),
+        (use("workspace-files@1", (PROBE_DIR,), dest="../x"), "inside the workspace"),
     ]
     for bad, message in cases:
         with pytest.raises(ComponentRejectedError, match=message):
@@ -159,8 +160,8 @@ def test_invalid_use_and_conflicting_uses_reject_the_arm() -> None:
             compile_uses(*pair)
     with pytest.raises(ComponentRejectedError, match="set twice"):
         compile_uses(
-            use("rules-file@1", ("components/guided/AGENTS.md",)),
-            use("workspace-files@1", ("components/guided/AGENTS.md",)),
+            use("rules-file@1", (f"{PROBE_DIR}/AGENTS.md",)),
+            use("workspace-files@1", (f"{PROBE_DIR}/AGENTS.md",)),
         )
     two_hooks = (use("stop-hook@1", command="echo a"), use("stop-hook@1", command="echo b"))
     with pytest.raises(ComponentRejectedError, match="'notify' is set to both"):

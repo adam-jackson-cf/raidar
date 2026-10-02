@@ -21,11 +21,11 @@ from raidar.review_projection.assessments import TrialAssessments
 from raidar.review_projection.atif import tool_label
 from raidar.review_projection.comparability import (
     MISMATCH_CATEGORY,
-    SCENARIO_EPOCH_POLICY,
+    UNKNOWN_POLICY,
     mark_policy_mismatches,
 )
 from raidar.review_projection.conditions import ArmSide, condition_diff
-from raidar.review_projection.fixture import SCENARIO_EPOCH_DIR, generate_review_fixture
+from raidar.review_projection.fixture import REVIEW_ONLY_DIR, generate_review_fixture
 from raidar.review_projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.review_projection.merge import project_experiment_epoch
 from raidar.review_projection.sources import LockIndex, RunSourceError, load_run
@@ -65,22 +65,23 @@ def test_frozen_concepts_map_to_problem_condition_and_agent(
     projection: ReviewProjectionArtifact,
 ) -> None:
     run = _detail(projection, PASSING).run
-    assert run.scenario == "synthetic/ledger-balance@1"
-    assert run.revision == "baseline"
+    assert run.problem == "synthetic/ledger-balance@1"
+    assert run.arm == "baseline"
     assert run.agent_spec == "codex-cli · openai/gpt-5.5 [medium]"
     assert run.synthetic
-    families = {(record.scenario, record.revision) for record in projection.experiments}
+    families = {(record.problem, record.arm) for record in projection.experiments}
     assert ("synthetic/skill-coding@1", "skills") in families
     assert {
-        record.scenario: record.aggregate["headline_policy"] for record in projection.experiments
+        (record.problem, record.aggregate["headline_policy"]) for record in projection.experiments
     } == {
-        "synthetic/ledger-balance@1": "scb-canonical@1",
-        "synthetic/skill-coding@1": "scb-canonical@1",
-        "synthetic/policy-mix@1": "scb-canonical-oneshot@1",
+        ("synthetic/ledger-balance@1", "scb-canonical@1"),
+        ("synthetic/skill-coding@1", "scb-canonical@1"),
+        ("synthetic/policy-mix@1", "scb-canonical-oneshot@1"),
+        ("synthetic/policy-mix@1", "scb-canonical@1"),
     }
 
 
-def test_arms_of_one_condition_on_different_harnesses_share_a_revision(
+def test_arms_of_one_condition_on_different_harnesses_share_an_arm_label(
     fixture_root: Path, projection: ReviewProjectionArtifact
 ) -> None:
     trajectories = fixture_root / "runs/synthetic-skill/synthetic-skill/trajectories"
@@ -89,12 +90,12 @@ def test_arms_of_one_condition_on_different_harnesses_share_a_revision(
         for path in trajectories.glob("baseline-*-01.json")
     }
     assert len(digests) == 2  # codex-cli and claude-code compile the condition differently
-    revisions = {
-        (record.harness, record.revision)
+    labels = {
+        (record.harness, record.arm)
         for record in projection.experiments
-        if record.scenario == "synthetic/skill-coding@1"
+        if record.problem == "synthetic/skill-coding@1"
     }
-    assert revisions == {
+    assert labels == {
         ("codex-cli", "baseline"),
         ("claude-code", "baseline"),
         ("codex-cli", "skills"),
@@ -136,7 +137,8 @@ def test_failing_checkpoint_is_a_failed_gate_with_a_regression_finding(
     detail = _detail(projection, FAILING)
     run = detail.run
     assert run.failed_gates == ["checkpoint_3"]
-    assert run.diagnostic_score == pytest.approx(2 / 3)
+    # C = mean case pass rate (1, 1, 1/3), the fork's C_p; solved/K would be 2/3.
+    assert run.diagnostic_score == pytest.approx((1 + 1 + 1 / 3) / 3)
     assert 0.5 <= (run.composite_score or 0) < 0.75
     categories = {note.category for note in detail.annotations}
     assert {"failed-gate", "regressed-checkpoint", "quality-evidence"} <= categories
@@ -206,13 +208,13 @@ def test_unreadable_trajectory_is_one_error_span(fixture_root: Path, tmp_path: P
 def test_condition_diff_pairs_baseline_with_the_same_agent(
     projection: ReviewProjectionArtifact,
 ) -> None:
-    [diff] = projection.revision_diffs
+    [diff] = projection.arm_diffs
     assert diff.key == "synthetic/skill-coding@1:baseline->skills"
     assert diff.summary == ["arm baseline-gpt -> skills-gpt", "+ component skills@1"]
     assert diff.comparable_warnings == []
     assert diff.change_categories == ["rules"]
     assert "workdir/skills/tdd/SKILL.md" in diff.sections
-    assert set(diff.files) == {"scenario", "prompt"}
+    assert set(diff.files) == {"condition", "prompt"}
 
 
 def _spec(factors: list[str]) -> ExperimentSpec:
@@ -281,19 +283,20 @@ def test_policy_mismatch_marks_every_compared_record_and_diff(
             "aggregate": {**records[0].aggregate, "headline_policy": "scb-canonical-oneshot@1"},
         }
     )
-    skill = [r for r in records if r.scenario == "synthetic/skill-coding@1"][0]
-    legacy = skill.model_copy(update={"experiment_id": "legacy", "aggregate": {}})
-    marked, diffs = mark_policy_mismatches([*records, other, legacy], projection.revision_diffs)
+    skill = [r for r in records if r.problem == "synthetic/skill-coding@1"][0]
+    unrecorded = skill.model_copy(update={"experiment_id": "unrecorded", "aggregate": {}})
+    single = [r for r in records if r.problem != "synthetic/policy-mix@1"]
+    marked, diffs = mark_policy_mismatches([*single, other, unrecorded], projection.arm_diffs)
     flagged = {
-        record.scenario
+        record.problem
         for record in marked
         if any(finding["category"] == MISMATCH_CATEGORY for finding in record.findings)
     }
     assert flagged == {"synthetic/ledger-balance@1", "synthetic/skill-coding@1"}
-    assert SCENARIO_EPOCH_POLICY in diffs[0].comparable_warnings[-1]
-    unchanged, same = mark_policy_mismatches(records, projection.revision_diffs)
-    assert unchanged == records
-    assert same == projection.revision_diffs
+    assert UNKNOWN_POLICY in diffs[0].comparable_warnings[-1]
+    unchanged, same = mark_policy_mismatches(single, projection.arm_diffs)
+    assert unchanged == single
+    assert same == projection.arm_diffs
 
 
 def test_run_without_its_lock_is_skipped_not_fatal(
@@ -335,10 +338,10 @@ def test_colliding_review_ids_are_qualified_by_experiment(
     } <= ids
 
 
-def test_merge_combines_epochs_and_fails_closed_without_sources(
+def test_merge_combines_run_roots_and_fails_closed_without_sources(
     fixture_root: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    with pytest.raises(ValueError, match="no current-version review projections"):
+    with pytest.raises(ValueError, match="no projectable runs found under"):
         merge_review_projections(run_roots=[tmp_path])
     empty = tmp_path / "runs/pending/r1"
     empty.mkdir(parents=True)
@@ -364,8 +367,8 @@ def test_merge_combines_epochs_and_fails_closed_without_sources(
         ]
     )
     artifact = ReviewProjectionArtifact.model_validate_json(output.read_text())
-    assert len(artifact.runs) == 30
-    assert len(artifact.experiments) == 8
+    assert len(artifact.runs) == 33
+    assert len(artifact.experiments) == 9
     captured = capsys.readouterr()
     assert "Skipping run without trajectory records" in captured.err
     with pytest.raises(SystemExit):
@@ -373,7 +376,9 @@ def test_merge_combines_epochs_and_fails_closed_without_sources(
 
 
 def test_unknown_headline_policy_is_ineligible_not_zero() -> None:
-    result = headline("nope@1", 3, TrialAssessments())
+    result = headline(
+        "nope@1", ("checkpoint_1", "checkpoint_2", "checkpoint_3"), TrialAssessments()
+    )
     assert result.composite is None
     assert result.score is None
     assert result.reasons
@@ -492,9 +497,7 @@ def test_invalid_execution_withholds_the_headline_even_when_measured(
     assert run.unscored_reasons[0] == (
         "Execution invalid: component_probes: AGENTS.md lines not in the harness context"
     )
-    record = next(
-        r for r in artifact.experiments if r.revision == "skills" and r.harness == "codex-cli"
-    )
+    record = next(r for r in artifact.experiments if r.arm == "skills" and r.harness == "codex-cli")
     assert record.aggregate["run_count_scored"] == 2
     detail = _detail(artifact, "synthetic-skill-skills-gpt-01")
     assert _span(detail, "metric:problem_verbosity")["status"] == "ok"
@@ -520,17 +523,21 @@ def test_policy_shares_come_from_the_policy() -> None:
 
 def test_fixture_family_mixing_policies_renders_the_mismatch(fixture_root: Path) -> None:
     artifact = merge_review_projections(
-        [fixture_root / SCENARIO_EPOCH_DIR],
-        run_roots=[fixture_root / "runs"],
+        run_roots=[fixture_root / "runs", fixture_root / REVIEW_ONLY_DIR],
         stores=[fixture_root / "store"],
     )
     flagged = {
-        (record.scenario, record.revision)
+        (record.problem, record.aggregate["headline_policy"])
         for record in artifact.experiments
         if any(finding["category"] == MISMATCH_CATEGORY for finding in record.findings)
     }
-    assert flagged == {("synthetic/policy-mix@1", "baseline"), ("synthetic/policy-mix@1", "v001")}
-    assert any(run.scenario == "skill-benchmark-coding-test" for run in artifact.runs)
+    assert flagged == {
+        ("synthetic/policy-mix@1", "scb-canonical-oneshot@1"),
+        ("synthetic/policy-mix@1", "scb-canonical@1"),
+    }
+    review_only = [run for run in artifact.runs if run.problem == "synthetic/review-only@1"]
+    assert len(review_only) == 3
+    assert all(not run.unscored for run in review_only)
 
 
 def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
@@ -568,13 +575,14 @@ def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed
     from raidar.review_projection.headline import UNDECLARED_MARKER, headline
 
     missing = TrialAssessments(missing={"correctness@1": "no stored Assessment"})
-    result = headline("scb-canonical-oneshot@1", 1, missing, declared=["correctness@1"])
+    one = ("checkpoint_1",)
+    result = headline("scb-canonical-oneshot@1", one, missing, declared=["correctness@1"])
     assert result.composite is None
     (reason,) = result.reasons
     assert "needs code-quality@1" in reason
     assert UNDECLARED_MARKER in reason
     declared = headline(
-        "scb-canonical-oneshot@1", 1, missing, declared=["correctness@1", "code-quality@1"]
+        "scb-canonical-oneshot@1", one, missing, declared=["correctness@1", "code-quality@1"]
     )
     assert all("unassessed" in reason for reason in declared.reasons)
 

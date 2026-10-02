@@ -1,5 +1,5 @@
 # Phase 1 pilot, one-shot leg (1.P "plus"): circuit_eval/checkpoint_1 as a 1-step task
-# x the same arms x 5 blocks. Exercises F1 (K=1) and F15 (scb-canonical-oneshot@1).
+# x the same arms x 5 blocks. Exercises F1 (K=1) and F15 (scb-canonical-oneshot@2).
 # v2: 5 blocks so blocks >= min_pairs and the leg can reach a verdict (gate packet F6).
 schema_version: 1
 id: pilot-circuit-eval-oneshot
@@ -64,7 +64,8 @@ arms:
 
 assessment:
   scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@1]
-  headline_policy: scb-canonical-oneshot@1
+  # @2 adds zero_correctness to @1: C = 0 scores S = 0 even when a quality component is missing.
+  headline_policy: scb-canonical-oneshot@2
 
 analysis:
   baseline_arm: baseline

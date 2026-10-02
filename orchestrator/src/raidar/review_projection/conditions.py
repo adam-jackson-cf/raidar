@@ -1,10 +1,10 @@
 """Condition diffs: what differs between the baseline arm and another arm of one experiment.
 
-The frozen surface calls these "contract changes" between revisions; in the
-experiment epoch a revision is a condition. Each diff compares the baseline
-arm's condition with another condition of the same experiment lock and problem:
+The surface calls these "contract changes" between arms. Each diff compares the
+baseline arm's condition with another condition of the same experiment lock and
+problem:
 
-- ``files.scenario``: the locked condition manifest (components, file hashes, ``with``);
+- ``files.condition``: the locked condition manifest (components, file hashes, ``with``);
 - ``files.prompt``: the first checkpoint's rendered instruction, as the agent saw it;
 - ``sections``: every file of the materialised workspace overlay.
 
@@ -25,10 +25,10 @@ from typing import Literal
 import yaml
 
 from raidar.schemas.review import (
+    ArmChangeCategory,
+    ArmDiffArtifact,
     DiffLine,
     FileDiff,
-    RevisionChangeCategory,
-    RevisionDiffArtifact,
     TextDiff,
 )
 from raidar.spec.factor_guard import arm_nouns
@@ -36,7 +36,7 @@ from raidar.spec.schema import ArmSpec, ExperimentSpec
 
 MAX_DIFF_LINES = 160
 INSTRUCTION_FILE = "instruction.md"
-_COMPONENT_CATEGORIES: dict[str, RevisionChangeCategory] = {
+_COMPONENT_CATEGORIES: dict[str, ArmChangeCategory] = {
     "rules-file": "rules",
     "skills": "rules",
     "workspace-files": "starter",
@@ -107,11 +107,9 @@ def _component_names(manifest: object) -> set[str]:
     return {str(item.get("use", "")) for item in manifest if isinstance(item, Mapping)}
 
 
-def _categories(
-    before: ArmSide, after: ArmSide, nouns: Sequence[str]
-) -> list[RevisionChangeCategory]:
+def _categories(before: ArmSide, after: ArmSide, nouns: Sequence[str]) -> list[ArmChangeCategory]:
     changed = _component_names(before.manifest) ^ _component_names(after.manifest)
-    categories: set[RevisionChangeCategory] = {
+    categories: set[ArmChangeCategory] = {
         _COMPONENT_CATEGORIES.get(ref.split("@", 1)[0], "environment") for ref in changed
     }
     if before.manifest != after.manifest and not changed:
@@ -150,7 +148,7 @@ def condition_diff(
     before: ArmSide,
     after: ArmSide,
     extra_warnings: Sequence[str] = (),
-) -> RevisionDiffArtifact:
+) -> ArmDiffArtifact:
     nouns = differing_nouns(spec, before.arm, after.arm)
     old, new = _overlay(before.task_dir), _overlay(after.task_dir)
     sections = {
@@ -164,17 +162,17 @@ def condition_diff(
         },
     }
     prompt_path = INSTRUCTION_FILE
-    return RevisionDiffArtifact(
+    return ArmDiffArtifact(
         key=f"{problem}:{before.label}->{after.label}",
-        scenario=problem,
-        from_revision=before.label,
-        to_revision=after.label,
+        problem=problem,
+        from_arm=before.label,
+        to_arm=after.label,
         change_categories=_categories(before, after, nouns),
         summary=_summary(before, after, nouns),
         comparable_warnings=[*_undeclared(spec, nouns), *extra_warnings],
         sections=sections,
         files={
-            "scenario": sections["condition.yaml"],
+            "condition": sections["condition.yaml"],
             "prompt": FileDiff(
                 path=prompt_path,
                 diff=text_diff(old.get(prompt_path, ""), new.get(prompt_path, "")),

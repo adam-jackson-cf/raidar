@@ -45,9 +45,10 @@ def _surface_label(
         "policy": extra.pop("policy", RUBRIC_POLICY),
         "label": label,
         "note": extra.pop("note", None),
-        "source": "user",
+        "source": extra.pop("source", "user"),
         "category": "jev_label",
         "created_at": created_at,
+        **extra,
     }
 
 
@@ -72,8 +73,8 @@ def test_exported_labels_load_into_the_calibration_workflow(store: Path, tmp_pat
     audit = AuditLog.for_store(store)
     exported = export_labels(labels, RUBRIC_POLICY, audit=audit)
     assert exported.rows == (
-        {"request_id": first, "label": "correct", "note": "checked the span"},
-        {"request_id": second, "label": "false_negative"},
+        {"request_id": first, "label": "correct", "reviewer": "human", "note": "checked the span"},
+        {"request_id": second, "label": "false_negative", "reviewer": "human"},
     )
     assert exported.superseded == 1
     assert import_labels(audit, RUBRIC_POLICY, exported.rows) == 2
@@ -84,6 +85,52 @@ def test_exported_labels_load_into_the_calibration_workflow(store: Path, tmp_pat
     readiness = promotion_readiness(audit, RUBRIC_POLICY)
     assert readiness.labelled == 2
     assert not readiness.ready
+
+
+def test_label_provenance_carries_reviewer_kind_and_model_into_readiness(
+    store: Path, tmp_path: Path
+) -> None:
+    first, second, third = _decision_ids(store)[:3]
+    model = {"reviewer": "model", "reviewer_model": "anthropic/claude-haiku-4-5", "source": "model"}
+    legacy = _surface_label(third, "correct", 1)
+    del legacy["source"]  # written before the surface recorded provenance
+    labels = load_review_labels(
+        _write(
+            tmp_path / "jev-labels.json",
+            [
+                _surface_label(first, "correct", 1),
+                _surface_label(second, "correct", 1, **model),
+                legacy,
+            ],
+        )
+    )
+    audit = AuditLog.for_store(store)
+    exported = export_labels(labels, RUBRIC_POLICY, audit=audit)
+    # Rows are in request-id order, and the ids were taken sorted.
+    assert [(row["reviewer"], row.get("reviewer_model")) for row in exported.rows] == [
+        ("human", None),
+        ("model", "anthropic/claude-haiku-4-5"),
+        ("human", None),
+    ]
+    assert exported.summary()["by_reviewer"] == {"human": 2, "model": 1}
+    import_labels(audit, RUBRIC_POLICY, exported.rows)
+    stored = audit.labels(RUBRIC_POLICY)
+    assert stored[second].reviewer_ref == "model:anthropic/claude-haiku-4-5"
+    assert stored[first].reviewer_ref == "human"
+    readiness = promotion_readiness(audit, RUBRIC_POLICY)
+    assert sum(readiness.by_reviewer.values()) == readiness.labelled
+    assert set(readiness.reviewer_kinds) <= {"human", "model"}
+    assert readiness.summary()["labelled_by_reviewer_kind"] == readiness.reviewer_kinds
+
+    unnamed = _surface_label(first, "correct", 3, reviewer="model")
+    with pytest.raises(LabelExportError, match="reviewer_model"):
+        load_review_labels(_write(tmp_path / "bad.json", [unnamed]))
+    with pytest.raises(LabelImportError, match="reviewer_model"):
+        import_labels(
+            audit,
+            RUBRIC_POLICY,
+            [{"request_id": _decision_ids(store)[3], "label": "correct", "reviewer": "model"}],
+        )
 
 
 def test_already_imported_decisions_are_left_out_so_a_reexport_imports_cleanly(

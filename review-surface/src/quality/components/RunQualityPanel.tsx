@@ -39,8 +39,7 @@ export function RunQualityPanel({ run }: { run: RunRecord }) {
 
   if (!index.loaded) return null;
   if (!quality) {
-    // Scenario-epoch runs predate the code-quality scorer: nothing to say about them.
-    if (!run.artifact_paths.run_json?.includes('/trajectories/')) return null;
+    // Projected for review, but not in the Quality data: say how to add it.
     return (
       <Shell>
         <span className="flex items-center gap-2 text-xs">

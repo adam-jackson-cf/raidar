@@ -11,15 +11,16 @@
       "checkpoints": [
         8
       ],
-      "ref": "scb-canonical@1",
-      "selection": "default_by_k"
+      "ref": "scb-canonical@2",
+      "selection": "declared"
     },
     "references": {
       "policy": {
-        "scb-canonical@1": {
-          "digest": "c65acf1361a112bb82fb8bdcbd69869059f04bf6f2c49ff6fdcfb05253ba083b",
+        "scb-canonical@2": {
+          "digest": "95c28b4207a52992e38808ebb45dda7b571d6c8abfc59fbf8963b5ca672a2e91",
           "metadata": {
             "component_places": "1E-12",
+            "correctness": "C=sum_k(passed_k/graded_k)/K over planned checkpoints; unreached checkpoint=0; reached checkpoint with graded_k=0 -> ineligible",
             "formula": "S=100*C*(0.70+0.30*I)",
             "inertia_weights": {
               "E": "0.15",
@@ -31,18 +32,19 @@
             "max_checkpoints": null,
             "min_checkpoints": 2,
             "not_applicable": [],
-            "ref": "scb-canonical@1",
+            "ref": "scb-canonical@2",
             "rounding": "ROUND_HALF_EVEN",
-            "score_places": "0.000001"
+            "score_places": "0.000001",
+            "zero_correctness": "C=0 -> S=0 even when a quality component is missing or ineligible"
           }
         }
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "e3a7e721e21f865e1dcaae913e58fa98a4a0d994f52f7943e4aaaaee34e7a0b9",
+          "digest": "edbdb70d19d4282e42a02aeade995f212de66ce7e792e64e2cd0851cfa9e6b42",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "dfe67deac5d597e584b38fdd424bad77d2f61e7e5cb69012f56d3f8ea33c2f30",
+            "implementation_digest": "a54be4d7daa6b3d672728c33cb0e1b57db9f7c75550cecf12f8d27a4ae6156ca",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -380,13 +382,13 @@
           }
         },
         "process-compliance@1": {
-          "digest": "3ed3c9cb0e9b26242d85b3416c96b86710238379336a84313590c67a26987588",
+          "digest": "ab170d379f8bb283dcfe340943d45cd59746d8715db31fa6417d9cd089cc5aad",
           "metadata": {
             "implementation": "raidar.scorers.process_compliance:process_compliance_scorer",
-            "implementation_digest": "39bff14254a34626967501a55cbb0cfdc493c253ebc09121774922d048c649ab",
+            "implementation_digest": "f2bb0ef0796f5058bbafe459e1d2a8d484b0b8183e0933fe84b292385c5e725d",
             "jev_policies": {
               "process-compliance.residue": {
-                "digest": "185bc9d44e28e1193e1d06c4b5cf56c698bd3c7fdaaf7a3d0f6f1a4a610120af",
+                "digest": "b2805ba4272ecfdf47d52f3e71a64cd6d633e689621eb62def8926ddb076a215",
                 "mode": "shadow"
               }
             },
@@ -591,7 +593,7 @@
       }
     },
     "spec": {
-      "headline_policy": null,
+      "headline_policy": "scb-canonical@2",
       "inventory_policy": {
         "generated_globs": [],
         "test_globs": []
@@ -613,7 +615,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "1435267e66eff32e2108e05f3d28ef56211782e081331e940b94beed2f05c633",
+  "document_sha256": "a9a2bf8fcdbd5382b121607db9cd34d25fcbe6d72c548fc3533ddcba3dfb0296",
   "execution": {
     "arms": {
       "baseline": {
@@ -958,8 +960,8 @@
   "experiment": {
     "id": "pilot-forge",
     "source": "experiment.yaml",
-    "source_sha256": "3987979ff806158b419c5ade64a74611eb4caa5170c02cfff45c2738a467333c",
-    "spec_sha256": "6096cdbcd4da0c5dbdfb2c3f1c85bc2a2a732af002fa6a1e221c15aea747bb52"
+    "source_sha256": "0521e02c3431a1af9d95dbe7e4d9ff5a597440979859ec71db26b3f8d80a9a9a",
+    "spec_sha256": "87d9d311b51d0018872e9d2496cc74b85523feeaddc7e4744e7677f04501c9f0"
   },
   "lock_sha256": "5a73637e8ac3ce2199b37dd623c846c290a7bfb63896426925b03849d849cbde",
   "lock_version": 2,
@@ -969,9 +971,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "a2cbef98b6bc061c854bf1ac6115dbead60da9a37a2487549cb087830170e5f7",
+    "assessment": "663c737603d26be5b70deee7316116d965a4e3834a95d14e02e95cab444f7e82",
     "execution": "5a73637e8ac3ce2199b37dd623c846c290a7bfb63896426925b03849d849cbde",
-    "toolchain": "b16fc93b70b52e8651466ef66b7af27cea29dc73147849c4c7221516d441ecec"
+    "toolchain": "1cfa704cfe9c09c3fb0b8ee4dd37d7a53d84d7108ca6d84456ac634155e7c615"
   },
   "spec": {
     "agents": [
@@ -1007,7 +1009,7 @@
       }
     ],
     "assessment": {
-      "headline_policy": null,
+      "headline_policy": "scb-canonical@2",
       "inventory_policy": {
         "generated_globs": [],
         "test_globs": []
@@ -1104,6 +1106,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "a31b7fe2020db024526967336221d9ab8a640392aa839909ef9f5a141d41a933"
+    "raidar_spec": "326370898f8d7903d84e0df8f005979c1cfa8c64f869231950f0aeb03fb850b3"
   }
 }

@@ -12,6 +12,7 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.jev.audit import DecisionStage, SufficiencyLevel
 from raidar.jev.carry_forward import is_span_unchanged, parse_diff_hunks, unified_diff_text
+from raidar.jev.codebase import CodebaseIndex
 from raidar.jev.process import (
     EVENTS_BUDGET_CHARS,
     EventKind,
@@ -44,7 +45,7 @@ PROCESS = "process-compliance.residue"
 def test_rubric_question_set_is_the_pinned_scb_criteria_as_noul_questions(tmp_path: Path) -> None:
     question_set = load_rubric_question_set()
     names = [criterion.name for criterion in question_set.criteria]
-    assert (question_set.ref, len(names), len(set(names))) == ("scb-rubric@1", 45, 45)
+    assert (question_set.ref, len(names), len(set(names))) == ("scb-rubric@2", 45, 45)
     stub = next(item for item in question_set.criteria if item.name == "stub_implementations")
     question = stub.question()
     assert question.type == "noul"
@@ -169,19 +170,13 @@ def test_rubric_asks_changed_symbols_carries_unchanged_ones_and_replays_for_free
         return [item for item in checkpoint.judgements if item.symbol.qualname == qualname]
 
     assert first.python_files == 1  # .gitignore does not hide app.py from the assessor
-    assert {item.status for item in first.judgements} == {
-        JudgementStatus.ANSWERED,
-        JudgementStatus.INSUFFICIENT,
-    }
+    # Every requirement, codebase scope included, has its input: all are asked.
+    assert {item.status for item in first.judgements} == {JudgementStatus.ANSWERED}
     stable = by_symbol(second, "stable")
     carried = [item for item in stable if item.status is JudgementStatus.CARRIED]
     # Only changed symbols are asked (memo §3.5): an unchanged span carries every
     # settled request, although the file and the cumulative spec both changed.
-    assert {item.requires for item in carried} == {
-        Requirement.SYMBOL,
-        Requirement.FILE,
-        Requirement.SPEC,
-    }
+    assert {item.requires for item in carried} == set(Requirement)
     assert JudgementStatus.ANSWERED not in {item.status for item in stable}
     assert all(item.carried_from == "checkpoint_1" for item in carried)
     assert all(not item.span_unchanged for item in by_symbol(second, "edited"))
@@ -202,13 +197,13 @@ def test_rubric_asks_changed_symbols_carries_unchanged_ones_and_replays_for_free
         )
     asked_questions = [q for call in transport.calls for q in call["body"]["questions"]]
     codebase = {c.name for c in question_set.criteria if c.requires is Requirement.CODEBASE}
-    assert not codebase & set(asked_questions)
+    assert "implicit_default_parameters" in codebase & set(asked_questions)
 
     # ΣP is a number only for fully settled criteria, never a partial sum.
     counts = first.expected_counts()
     assert counts["stub_implementations"] == pytest.approx(0.5 * 2)
-    assert {name for name, value in counts.items() if value is None} == codebase & set(counts)
-    assert first.complete is False
+    assert None not in counts.values()
+    assert first.complete is True
     assert set(second.expected_counts().values()) == {None}  # x.js is unjudged code
 
     replay = make_runtime(tmp_path / "store", replay_only=True, policies=(policy(RUBRIC_POLICY),))
@@ -237,7 +232,7 @@ def test_shadow_report_gives_coverage_and_input_sufficiency_with_denominators(
     assert totals["question_coverage"]["value"] == 0.0
     assert totals["failure_reasons"] == {"missing_key": totals["requests"]["error"]}
     sufficiency = totals["sufficiency"]
-    assert sufficiency["missing"] == totals["requests"]["insufficient"]
+    assert sufficiency["missing"] == totals["requests"].get("insufficient", 0) == 0
     assert (
         totals["input_sufficiency"]["denominator"] == totals["asked"] == sum(sufficiency.values())
     )
@@ -331,3 +326,106 @@ def test_process_residue_state_sufficiency_and_audit(tmp_path: Path) -> None:
     assert (settled.stage, settled.verdict) == (DecisionStage.DETERMINISTIC, "complied")
     assert len(runtime.audit.decisions(PROCESS)) == 3
     assert len(transport.calls) == 1
+
+
+CODEBASE_APP = """from abc import ABC, abstractmethod
+from functools import cached_property
+
+
+class Store(ABC):
+    @abstractmethod
+    def save(self, item): ...
+
+
+class FileStore(Store):
+    def save(self, item):
+        return item
+
+    @cached_property
+    def path(self):
+        return "/tmp/x"
+
+
+def render(item, sep=", "):
+    return sep.join(item)
+
+
+def main():
+    store = FileStore()
+    store.save(render(["a"]))
+    return store.path, render(["b"])
+"""
+
+
+def test_codebase_scope_criteria_get_a_bounded_whole_codebase_state(tmp_path: Path) -> None:
+    snapshot = tmp_path / "snapshots" / "checkpoint_1"
+    snapshot.mkdir(parents=True)
+    (snapshot / "app.py").write_text(CODEBASE_APP)
+    transport = RecordedTransport()
+    runtime = make_runtime(
+        tmp_path / "store", transport=transport, policies=(policy(RUBRIC_POLICY),)
+    )
+    question_set = load_rubric_question_set()
+    source = CheckpointSource("checkpoint_1", snapshot, spec="Store items.")
+    (result,) = RubricRunner(runtime, question_set).run([source])
+
+    codebase = [item for item in result.judgements if item.requires is Requirement.CODEBASE]
+    assert {item.status for item in codebase} == {JudgementStatus.ANSWERED}
+    assert {item.sufficiency for item in codebase} == {SufficiencyLevel.SUFFICIENT}
+    states = {
+        call["body"]["state"]["symbol"]["qualname"]: call["body"]["state"]["codebase"]
+        for call in transport.calls
+        if "codebase" in call["body"]["state"]
+    }
+    store_focus = states["Store"]["focus"]
+    assert "class Store(ABC) [abstract]" in store_focus
+    assert "direct subclasses: app.py::FileStore" in store_focus
+    assert "calls of .save: 1 site(s)" in store_focus
+    assert "accesses of .path: 1 site(s)" in states["FileStore"]["focus"]
+    render_focus = states["render"]["focus"]
+    assert "def render(item, sep=', ')" in render_focus
+    assert "calls of render: 2 site(s)" in render_focus
+    assert "app.py:26 in main: render(['b'])" in render_focus
+    assert "class FileStore(Store)" in states["render"]["inventory"]
+    # Every criterion is measured: none waits on a missing codebase input.
+    assert None not in result.expected_counts().values()
+    report = rubric_shadow_report([result], runtime, policy_id=RUBRIC_POLICY)
+    assert report["totals"]["input_sufficiency"]["value"] == 1.0
+
+    # A codebase too large for the budget is clipped (partial) and stays under the cap.
+    label = "x" * 400
+    big = "\n".join(
+        f"def helper_{i}(value, scale=1, label='{label}'):\n    return render([value])\n"
+        for i in range(120)
+    )
+    (snapshot / "big.py").write_text("from app import render\n\n" + big)
+    capped = make_runtime(
+        tmp_path / "s2", transport=RecordedTransport(), policies=(policy(RUBRIC_POLICY),)
+    )
+    (large,) = RubricRunner(capped, question_set).run([source])
+    render_requests = [
+        item
+        for item in large.judgements
+        if item.requires is Requirement.CODEBASE and item.symbol.qualname == "render"
+    ]
+    assert [item.sufficiency for item in render_requests] == [SufficiencyLevel.PARTIAL]
+    assert render_requests[0].status is JudgementStatus.ANSWERED
+    assert capped.totals.failures == {}
+
+
+def test_codebase_focus_for_module_statements_lists_uses_of_module_names() -> None:
+    files = {
+        "cfg.py": "NAMES = ['a', 'b']\nSIZES = [1, 2]\n",
+        "use.py": "from cfg import NAMES, SIZES\n\n\ndef pair():\n    return zip(NAMES, SIZES)\n",
+        "bad.py": "def (:\n",
+    }
+    index = CodebaseIndex(files)
+    (module,) = [
+        s for s in extract_symbols("cfg.py", files["cfg.py"]) if s.kind is SymbolKind.MODULE
+    ]
+    focus = index.focus(module)
+    assert "uses of NAMES: 1 site(s)" in focus
+    assert "use.py:5 in pair: NAMES" in focus
+    assert "bad.py" not in index.inventory()  # unparsable files are reported by the rubric
+    sections = index.state(module, budget=2000).sections
+    assert set(sections) == {"focus", "inventory"}

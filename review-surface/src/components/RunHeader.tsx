@@ -73,7 +73,7 @@ export function RunHeader({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium" style={{ color: C.fg5 }}>
-          {run.scenario}@{run.revision} · {runLabel(run.id)}
+          {run.problem}@{run.arm} · {runLabel(run.id)}
         </span>
         <TierPill tier={tier} size="lg" detail={`Composite ${fmtScore(run.composite_score)} — ${tier.blurb}`} />
         <span
@@ -87,10 +87,10 @@ export function RunHeader({
         <div className="ml-auto flex items-center gap-2">
           {actions}
         <Link
-          to={`/#family-${encodeURIComponent(run.scenario)}`}
+          to={`/#family-${encodeURIComponent(run.problem)}`}
           className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
           style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
-          title={`Open the ${run.scenario} comparison in Experiments`}
+          title={`Open the ${run.problem} comparison in Experiments`}
         >
           Compare agent specs
           <ArrowUpRight className="size-2.5" />

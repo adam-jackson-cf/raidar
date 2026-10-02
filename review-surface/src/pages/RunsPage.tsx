@@ -109,7 +109,7 @@ function RunDetailView({ runId }: { runId: string }) {
         <GateChips spans={data.spans} onSelect={(spanId) => selectSpan(spanId)} />
       </RunHeader>
 
-      <FamilyPolicyMismatch scenario={data.run.scenario} />
+      <FamilyPolicyMismatch problem={data.run.problem} />
 
       <ScorecardPanel
         spans={data.spans}
@@ -210,18 +210,18 @@ export function RunsPage() {
     if (!q) return list;
     return list.filter(
       (r) =>
-        r.scenario.toLowerCase().includes(q) ||
+        r.problem.toLowerCase().includes(q) ||
         r.agent_spec.toLowerCase().includes(q) ||
         r.id.toLowerCase().includes(q),
     );
   }, [runs.data, filter]);
 
   const grouped = useMemo(() => {
-    const groups = new Map<string, { scenario: string; spec: string; experimentId: string; runs: typeof filtered }>();
+    const groups = new Map<string, { problem: string; spec: string; experimentId: string; runs: typeof filtered }>();
     for (const run of filtered) {
       const key = run.experiment_id;
       const entry = groups.get(key) ?? {
-        scenario: `${run.scenario}@${run.revision}`,
+        problem: `${run.problem}@${run.arm}`,
         spec: run.agent_spec,
         experimentId: run.experiment_id,
         runs: [],
@@ -264,7 +264,7 @@ export function RunsPage() {
                 title={group.experimentId}
               >
                 <span className="truncate text-[10px] font-medium" style={{ color: C.fg2 }}>
-                  {group.scenario}
+                  {group.problem}
                 </span>
                 <span className="num truncate text-[9px]" style={{ color: C.cyan }}>
                   {group.spec}

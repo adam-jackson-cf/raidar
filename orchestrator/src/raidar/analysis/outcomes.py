@@ -14,8 +14,11 @@ and a manifest change carries through. The one exception is the composite S,
 which a ScorePolicy defines as higher-better (F15).
 
 ``primary_metric`` names the experiment's primary outcome (memo §2.3,
-§10.1): the checkpoint-solve rate C under ``continue`` progression and the
-strict ``reached`` count under ``halt_on_failure``.
+§10.1): the checkpoint-solve rate (solved / K, the memo's ``C_r``) under
+``continue`` progression and the strict ``reached`` count under
+``halt_on_failure``. The score component C that the headline policy weighs is
+a different quantity (``correctness``: the mean per-checkpoint case pass rate,
+the SCB fork's ``C_p``) and is reported as its own metric.
 """
 
 from __future__ import annotations
@@ -126,6 +129,7 @@ def declared_direction(manifest: ScorerManifest, metric_id: str) -> Direction:
 
 
 HEADLINE_SCORE = "headline_score"
+CORRECTNESS_METRIC = "correctness"
 SOLVE_RATE = "solve_rate"
 REACHED = "reached"
 FINAL_SOLVED = "final_solved"
@@ -147,8 +151,15 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
         5.0,
     ),
     MetricDef(
+        CORRECTNESS_METRIC,
+        "Correctness C (mean case pass rate, headline policy input)",
+        View.HEADLINE,
+        declared_direction(CORRECTNESS, "strict_pass_rate"),
+        0.05,
+    ),
+    MetricDef(
         SOLVE_RATE,
-        "Checkpoint solve rate C",
+        "Checkpoint solve rate (solved / K)",
         View.CONTINUE,
         declared_direction(CORRECTNESS, "solved_checkpoints"),
         0.125,

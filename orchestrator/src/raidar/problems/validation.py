@@ -27,11 +27,16 @@ import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
+from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 
 from raidar.oracle.models import CaseGroup, CaseStatus, OracleGrade
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, checkpoint_correctness
+from raidar.spec.policies import (
+    DEFAULT_POLICY_REGISTRY,
+    checkpoint_pass_rate,
+    problem_correctness,
+)
 
 POSITIVE = "positive"
 NEGATIVE = "negative"
@@ -258,6 +263,25 @@ def verdict(checks: Sequence[Check]) -> Verdict:
     return Verdict.VALIDATED
 
 
+def _reference_correctness(positive: StepGrades) -> tuple[Decimal | None, list[str]]:
+    """The reference trajectory's C (the fork's mean pass rate), or why it is ineligible.
+
+    Unavailable is never zero (F6): an ungraded step makes C ineligible with the
+    infra reason, and a step with no graded case with the fork's
+    ``canonical_test_denominator_zero``.
+    """
+    ungraded = sorted(step for step, grade in positive.items() if not grade.has_verdict)
+    if ungraded:
+        return None, [
+            f"oracle_infra_failure: {step} ({positive[step].infra_failure})" for step in ungraded
+        ]
+    empty = sorted(step for step, grade in positive.items() if grade.total == 0)
+    if empty:
+        return None, [f"no_graded_cases: {step}" for step in empty]
+    rates = [checkpoint_pass_rate(grade.passed, grade.total) for grade in positive.values()]
+    return problem_correctness(rates), []
+
+
 def policy_preview(positive: StepGrades, checkpoints: int) -> dict[str, object]:
     """Headline policy selected by K, applied to the reference trajectory's C.
 
@@ -266,19 +290,12 @@ def policy_preview(positive: StepGrades, checkpoints: int) -> dict[str, object]:
     ``not_applicable`` and which are still missing - it is not a score.
     """
     policy = DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints)
-    ungraded = sorted(step for step, grade in positive.items() if not grade.has_verdict)
-    if ungraded:
-        # Unavailable is never zero (F6): C is ineligible with the infra reason.
-        reasons = [
-            f"oracle_infra_failure: {step} ({positive[step].infra_failure})" for step in ungraded
-        ]
+    value, reasons = _reference_correctness(positive)
+    if value is None:
         result = policy.score(checkpoints=checkpoints, components={}, ineligible={"C": reasons})
-        correctness: str | None = None
     else:
-        solved = sum(1 for grade in positive.values() if grade.all_pass)
-        value = checkpoint_correctness(solved, checkpoints)
         result = policy.score(checkpoints=checkpoints, components={"C": value})
-        correctness = str(value)
+    correctness = None if value is None else str(value)
     return {
         "policy": policy.ref,
         "selection": "default_by_k",

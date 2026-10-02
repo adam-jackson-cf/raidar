@@ -21,9 +21,11 @@ For each checkpoint, in order:
 ``expected_counts`` gives the ΣP expected smell count per criterion (design
 memo §3.4). A criterion's count is a number only when every request that
 applies it at the checkpoint settled; otherwise it is ``None`` (unmeasured),
-never a partial sum. Codebase-scope criteria need a whole-codebase state this
-question set does not build, so they are audited as ``input_missing`` and stay
-unmeasured while the per-symbol criteria are reported.
+never a partial sum. Codebase-scope criteria are asked with a bounded
+whole-codebase state built once per checkpoint (``raidar.jev.codebase``): the
+module, class and function inventory, the inheritance and interface graph,
+and name-matched call and access sites of the symbol. The whole state is held
+under Jev's 96k-character cap; whatever is clipped makes the input ``partial``.
 """
 
 from __future__ import annotations
@@ -41,7 +43,9 @@ from raidar.jev.carry_forward import (
     parse_diff_hunks,
     unified_diff_text,
 )
-from raidar.jev.protocol import JevAnswers, NoulAnswer
+from raidar.jev.client import state_text
+from raidar.jev.codebase import CodebaseIndex
+from raidar.jev.protocol import JEV_STATE_CHAR_LIMIT, JevAnswers, NoulAnswer
 from raidar.jev.redaction import Clipped, clip
 from raidar.jev.rubric_questions import Criterion, Requirement, RubricQuestionSet
 from raidar.jev.runtime import RULE_INPUT_MISSING, DecisionOutcome, JevRuntime
@@ -50,6 +54,8 @@ from raidar.scorers.inventory import FileRole, InventoryPolicy, build_inventory
 
 RUBRIC_POLICY = "code-quality.rubric-smells"
 RULE_CARRY_FORWARD = "carry_forward"
+_MIN_CODEBASE_CHARS = 2_000
+_CAP_MARGIN = 1_000
 _TASK = (
     "Judge one Python symbol from an agent-written program against one code-quality "
     "criterion per question. Judge only the code in symbol.source; other fields are context."
@@ -170,25 +176,69 @@ def _chunks(
     ]
 
 
+@dataclass(frozen=True)
+class _Inputs:
+    """What one symbol's requests can draw on beyond its own source."""
+
+    file_text: str
+    spec: str | None
+    codebase: CodebaseIndex | None
+
+
 def _context(
-    question_set: RubricQuestionSet, requirement: Requirement, file_text: str, spec: str | None
+    question_set: RubricQuestionSet,
+    symbol: Symbol,
+    requirement: Requirement,
+    inputs: _Inputs,
+    budget: int,
 ) -> dict[str, Clipped] | None:
     """The clipped extra inputs a requirement needs, or None when one is unavailable."""
-    if requirement is Requirement.CODEBASE or (requirement is Requirement.SPEC and spec is None):
-        return None
     if requirement is Requirement.FILE:
-        return {"file": clip(file_text, question_set.file_chars)}
-    if requirement is Requirement.SPEC and spec is not None:
-        return {"spec": clip(spec, question_set.spec_chars)}
+        return {"file": clip(inputs.file_text, question_set.file_chars)}
+    if requirement is Requirement.SPEC:
+        return None if inputs.spec is None else {"spec": clip(inputs.spec, question_set.spec_chars)}
+    if requirement is Requirement.CODEBASE:
+        if inputs.codebase is None:
+            return None
+        sections = inputs.codebase.state(symbol, budget).sections
+        return {f"codebase.{name}": text for name, text in sections.items()}
     return {}
+
+
+def _place(state: dict[str, Any], symbol: Symbol, name: str, text: str) -> None:
+    if name == "file":
+        state["file"] = {"path": symbol.path, "source": text}
+    elif name.startswith("codebase."):
+        state.setdefault("codebase", {})[name.split(".", 1)[1]] = text
+    else:
+        state[name] = text
+
+
+def _fit_codebase(
+    question_set: RubricQuestionSet,
+    symbol: Symbol,
+    inputs: _Inputs,
+    state: dict[str, Any],
+    context: dict[str, Clipped],
+) -> dict[str, Clipped]:
+    """Shrink the codebase share until the state fits Jev's cap (JSON escaping adds length)."""
+    budget = question_set.codebase_chars
+    overflow = len(state_text(state)) - JEV_STATE_CHAR_LIMIT
+    while overflow > 0 and budget > _MIN_CODEBASE_CHARS:
+        budget = max(_MIN_CODEBASE_CHARS, budget - overflow - _CAP_MARGIN)
+        context = _context(question_set, symbol, Requirement.CODEBASE, inputs, budget) or {}
+        state.pop("codebase", None)
+        for name, text in context.items():
+            _place(state, symbol, name, text.text)
+        overflow = len(state_text(state)) - JEV_STATE_CHAR_LIMIT
+    return context
 
 
 def _state(
     question_set: RubricQuestionSet,
     symbol: Symbol,
     requirement: Requirement,
-    file_text: str,
-    spec: str | None,
+    inputs: _Inputs,
 ) -> tuple[dict[str, Any], InputSufficiency]:
     source = clip(symbol.source, question_set.symbol_chars)
     state: dict[str, Any] = {
@@ -200,12 +250,14 @@ def _state(
             "source": source.text,
         },
     }
-    context = _context(question_set, requirement, file_text, spec)
+    context = _context(question_set, symbol, requirement, inputs, question_set.codebase_chars)
     if context is None:
         missing = InputSufficiency(level=SufficiencyLevel.MISSING, missing=(requirement.value,))
         return state, missing
     for name, text in context.items():
-        state[name] = {"path": symbol.path, "source": text.text} if name == "file" else text.text
+        _place(state, symbol, name, text.text)
+    if requirement is Requirement.CODEBASE:
+        context = _fit_codebase(question_set, symbol, inputs, state, context)
     parts = {"symbol": source, **context}
     clipped = tuple(name for name, text in parts.items() if text.clipped)
     level = SufficiencyLevel.PARTIAL if clipped else SufficiencyLevel.SUFFICIENT
@@ -254,6 +306,9 @@ class RubricRunner:
         self.question_set = question_set
         self.policy_id = policy_id
         self.inventory_policy = inventory_policy
+        self._asks_codebase = any(
+            criterion.requires is Requirement.CODEBASE for criterion in question_set.criteria
+        )
 
     def run(self, checkpoints: Sequence[CheckpointSource]) -> list[RubricCheckpoint]:
         prior = _Prior()
@@ -268,6 +323,7 @@ class RubricRunner:
     ) -> tuple[RubricCheckpoint, _Prior]:
         snapshot = _read_snapshot(source.root, self.inventory_policy)
         current = _Prior(checkpoint=source.name, files=snapshot.files)
+        codebase = CodebaseIndex(snapshot.files) if self._asks_codebase else None
         judgements: list[Judgement] = []
         errors = []
         for path, text in sorted(snapshot.files.items()):
@@ -282,7 +338,12 @@ class RubricRunner:
                 unchanged = self._unchanged(symbol, prior, hunks, path in prior.files)
                 for requirement, criteria in _chunks(self.question_set, symbol):
                     judgement = self._judge(
-                        source, symbol, requirement, criteria, text, prior if unchanged else None
+                        source,
+                        symbol,
+                        requirement,
+                        criteria,
+                        _Inputs(text, source.spec, codebase),
+                        prior if unchanged else None,
                     )
                     judgement = replace(judgement, span_unchanged=unchanged)
                     key = (*symbol.identity, requirement.value, judgement.criteria)
@@ -312,7 +373,7 @@ class RubricRunner:
         symbol: Symbol,
         requirement: Requirement,
         criteria: tuple[Criterion, ...],
-        file_text: str,
+        inputs: _Inputs,
         prior: _Prior | None,
     ) -> Judgement:
         names = tuple(criterion.name for criterion in criteria)
@@ -345,7 +406,7 @@ class RubricRunner:
                 origin_request_id=origin_request,
                 carry_eligible=True,
             )
-        state, sufficiency = _state(self.question_set, symbol, requirement, file_text, source.spec)
+        state, sufficiency = _state(self.question_set, symbol, requirement, inputs)
         outcome = self.runtime.decide(
             self.policy_id,
             subject=subject,

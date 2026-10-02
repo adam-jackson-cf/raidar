@@ -385,25 +385,39 @@ def test_orchestrator_smoke_locks_and_runs_the_smoke_experiment_with_the_same_ov
 
 
 def test_agent_smoke_replaces_the_agent_and_pins_the_pack_version() -> None:
-    result = _make_dry_run(
-        "agent-smoke",
-        "HARNESS=claude-code",
-        "PROVIDER=anthropic",
-        "MODEL=claude-sonnet-4-6",
-        "TIMEOUT_SEC=300",
-    )
+    # HARNESS=claude-code alone defaults to claude-haiku-4-5 with the effort unset
+    # (an empty --set value unsets the field; haiku has no effort levels).
+    result = _make_dry_run("agent-smoke", "HARNESS=claude-code", "TIMEOUT_SEC=300")
 
     assert result.returncode == 0, result.stderr
     (run_args,) = _raidar_lines(result.stdout, "run")
     for assignment in (
         "agents.0.harness=claude-code",
         "agents.0.provider=anthropic",
-        "agents.0.model=claude-sonnet-4-6",
-        "agents.0.reasoning_effort=low",
+        "agents.0.model=claude-haiku-4-5",
+        "agents.0.reasoning_effort=",
         "agents.0.version='2.1.285'",
         "protocol.agent_timeout_sec=300",
     ):
         assert f'--set "{assignment}"' in run_args
+
+
+@pytest.mark.parametrize(
+    ("args", "effort"),
+    [
+        ((), "low"),
+        (("REASONING_EFFORT=",), ""),
+        (("HARNESS=claude-code", "REASONING_EFFORT=low"), "low"),
+    ],
+)
+def test_agent_smoke_effort_defaults_per_harness_and_empty_means_unset(
+    args: tuple[str, ...], effort: str
+) -> None:
+    result = _make_dry_run("agent-smoke", *args)
+
+    assert result.returncode == 0, result.stderr
+    (run_args,) = _raidar_lines(result.stdout, "run")
+    assert f'--set "agents.0.reasoning_effort={effort}"' in run_args
 
 
 @pytest.mark.parametrize("arm", ["codex", "claude"])
@@ -490,22 +504,39 @@ def test_registry_and_init_targets_require_their_argument(target: str, variable:
     assert f"Missing required variable: {variable}" in result.stdout
 
 
-def test_legacy_review_fixture_is_written_under_the_fixture_dir_not_history() -> None:
-    result = _make_dry_run("review-fixture-synthetic", "REVIEW_FIXTURE=legacy")
+def test_review_fixture_is_written_under_the_fixture_dir() -> None:
+    result = _make_dry_run("review-fixture-synthetic")
 
     assert result.returncode == 0, result.stderr
-    assert "raidar.review_projection.scenario_epoch.fixture" in result.stdout
-    assert "/.tmp/review-fixture/legacy" in result.stdout
+    assert "raidar.review_projection.fixture" in result.stdout
+    assert "/.tmp/review-fixture" in result.stdout
     assert "experiments/" not in result.stdout
 
 
-def test_review_surface_test_reads_history_only_when_given() -> None:
-    default = _make_dry_run("review-surface-test")
-    given = _make_dry_run("review-surface-test", "REVIEW_LEGACY_ROOT=experiments")
+def test_review_surface_test_projects_both_fixture_roots_but_quality_only_one() -> None:
+    result = _make_dry_run("review-surface-test")
 
-    assert default.returncode == 0, default.stderr
-    assert "experiments/benchmarks" not in default.stdout
-    assert f'--legacy-root "{REPO_ROOT / "experiments"}"' in given.stdout
+    assert result.returncode == 0, result.stderr
+    joined = re.sub(r"\\\n\s*", " ", result.stdout)
+    review = next(line for line in joined.splitlines() if "raidar.review_projection " in line)
+    quality = next(line for line in joined.splitlines() if "raidar.review_quality " in line)
+    assert "--legacy-root" not in review
+    assert "/.tmp/review-fixture/review-only" in review
+    assert "/.tmp/review-fixture/runs" in review
+    assert "/.tmp/review-fixture/review-only" not in quality
+
+
+def test_review_surface_data_requires_runs() -> None:
+    result = subprocess.run(
+        ["make", "--no-print-directory", "review-surface-data", "REVIEW_RUNS_ROOT="],
+        cwd=REPO_ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode != 0
+    assert "Missing required variable: REVIEW_RUNS_ROOT" in result.stdout
 
 
 def test_review_surface_test_applies_one_store_to_every_given_runs_root() -> None:
@@ -528,21 +559,6 @@ def test_review_surface_test_rejects_mismatched_runs_and_stores() -> None:
 
     assert result.returncode != 0
     assert "one store for all roots or one store per root" in result.stderr
-
-
-def test_review_surface_test_always_uses_the_experiment_fixture() -> None:
-    result = _make_dry_run("review-surface-test", "REVIEW_FIXTURE=legacy")
-
-    assert result.returncode == 0, result.stderr
-    assert "raidar.review_projection.scenario_epoch.fixture" not in result.stdout
-    assert "raidar.review_projection.fixture" in result.stdout
-
-
-def test_unknown_review_fixture_is_rejected() -> None:
-    result = _make_dry_run("review-fixture-synthetic", "REVIEW_FIXTURE=scenario")
-
-    assert result.returncode != 0
-    assert "Unknown REVIEW_FIXTURE 'scenario'" in result.stderr
 
 
 def test_smoke_experiments_pin_the_pack_harness_versions() -> None:

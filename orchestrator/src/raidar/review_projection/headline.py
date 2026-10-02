@@ -3,11 +3,14 @@
 ``composite_score`` is S/100 under the headline policy (``scb-canonical@1`` or
 its one-shot variant), so the review surface's delivery tiers keep their
 meaning: S is correctness-gated. ``quality_score`` is the policy's inertia I and
-``diagnostic_score`` is correctness C. C comes from ``correctness@1``'s
-``solved_checkpoints``; V/E/H/R/G come from ``code-quality@1``'s problem-level
+``diagnostic_score`` is correctness C. C is the policy's definition (the SCB
+fork's ``C_p``, ``analysis.assessed.correctness_component``): the mean of
+``correctness@1``'s per-checkpoint ``strict_pass_rate``, an unreached
+checkpoint counting 0. V/E/H/R/G come from ``code-quality@1``'s problem-level
 means. A component that is not ``ok`` makes the score ineligible with the
 scorer's own reason, and a scorer with no stored Assessment makes it
-unassessed; neither is ever read as zero.
+unassessed; neither is ever read as zero. Under a policy with the
+``zero_correctness`` rule (``@2``), a measured C = 0 scores S = 0 regardless.
 
 Two trajectory states withhold the headline even when every component is
 measured, exactly as ``raidar analyze`` excludes them (``analysis.assessed``):
@@ -21,7 +24,7 @@ from collections.abc import Collection, Mapping
 from dataclasses import dataclass, field
 from decimal import Decimal
 
-from raidar.analysis.assessed import infra_reasons
+from raidar.analysis.assessed import Observed, correctness_component, infra_reasons
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrajectoryRecord
 from raidar.review_projection.assessments import TrialAssessments
@@ -31,13 +34,11 @@ from raidar.spec.policies import (
     DEFAULT_POLICY_REGISTRY,
     PolicyScore,
     ScorePolicy,
-    checkpoint_correctness,
 )
 from raidar.spec.references import RegistryReferenceError
 
 CORRECTNESS_SCORER = "correctness@1"
 QUALITY_SCORER = "code-quality@1"
-SOLVED_METRIC = "solved_checkpoints"
 COMPONENT_METRICS = {
     "V": "problem_verbosity",
     "E": "problem_erosion",
@@ -128,14 +129,32 @@ def _unmeasured(observation: Observation | None, missing: str | None) -> str:
 
 
 def _correctness(
-    assessments: TrialAssessments, checkpoints: int
+    assessments: TrialAssessments, steps: tuple[str, ...]
 ) -> tuple[Decimal | None, Observation | None, str | None]:
-    observation = trajectory_observation(assessments, CORRECTNESS_SCORER, SOLVED_METRIC)
-    if observation is None or observation.status is not AssessStatus.OK:
-        reason = _unmeasured(observation, assessments.missing.get(CORRECTNESS_SCORER))
-        return None, observation, reason
-    solved = int(observation.value or 0)
-    return checkpoint_correctness(solved, checkpoints), observation, None
+    """C over ``steps`` and the observation that stands for it in the panel.
+
+    The observation is a trajectory-level C built from the per-checkpoint pass
+    rates (status ``ok``), or the first per-checkpoint gap.
+    """
+    assessment = assessments.get(CORRECTNESS_SCORER)
+    if assessment is None:
+        return None, None, _unmeasured(None, assessments.missing.get(CORRECTNESS_SCORER))
+    value = correctness_component(Observed(CORRECTNESS_SCORER, assessment.result), steps)
+    if isinstance(value, Decimal):
+        observation = Observation(
+            metric="correctness",
+            subject=TRAJECTORY_SUBJECT,
+            status=AssessStatus.OK,
+            value=float(value),
+        )
+        return value, observation, None
+    observation = Observation(
+        metric="correctness",
+        subject=TRAJECTORY_SUBJECT,
+        status=AssessStatus(value.status),
+        reason=value.reason,
+    )
+    return None, observation, _unmeasured(observation, None)
 
 
 def _quality_inputs(
@@ -221,15 +240,17 @@ def policy_shares(policy: ScorePolicy) -> tuple[float, float]:
 
 def headline(
     policy_ref: str | None,
-    checkpoints: int,
+    steps: tuple[str, ...],
     assessments: TrialAssessments,
     withheld: tuple[str, ...] = (),
     declared: Collection[str] | None = None,
 ) -> Headline:
     """Score one trajectory under the headline policy (the default by K when none is locked).
 
+    ``steps`` are the trajectory's planned checkpoints (K = their count).
     ``withheld`` (``withheld_reasons``) keeps the components but suppresses S, C and I.
     """
+    checkpoints = len(steps)
     try:
         policy = (
             DEFAULT_POLICY_REGISTRY.get(policy_ref)
@@ -239,11 +260,13 @@ def headline(
     except RegistryReferenceError as exc:
         ref = policy_ref or "default"
         return Headline(ref, checkpoints, None, None, reasons=(f"{ref}: {exc}",), withheld=withheld)
-    correctness, solved, correctness_gap = _correctness(assessments, checkpoints)
+    correctness, observed, correctness_gap = _correctness(assessments, steps)
     inputs, used = _quality_inputs(policy, assessments)
     inputs[CORRECTNESS] = ComponentInput(value=correctness, gap=correctness_gap)
-    if solved is not None:
-        used[CORRECTNESS] = solved
+    if observed is not None:
+        used[CORRECTNESS] = observed
     score = score_inputs(policy, checkpoints, inputs)
-    reasons = _policy_reasons(policy, score, assessments, declared)
+    reasons = (
+        () if score.score is not None else _policy_reasons(policy, score, assessments, declared)
+    )
     return Headline(policy.ref, checkpoints, score, correctness, used, reasons, withheld)

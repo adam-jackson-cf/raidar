@@ -86,12 +86,26 @@ class LoadedExperiment:
         return self.path.parent
 
 
+class _Unset:
+    """Override value that removes its key (written as an empty ``key=``)."""
+
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+UNSET: Any = _Unset()
+
+
 def _typed_value(raw: str) -> object:
     """SCB ``parse_override`` typing: true/false, then int, then float, else str.
 
-    One addition: a value wrapped in matching quotes stays a string, so a
-    numeric-looking string (``agents.0.version='1.10'``) can be set verbatim.
+    Two additions: a value wrapped in matching quotes stays a string, so a
+    numeric-looking string (``agents.0.version='1.10'``) can be set verbatim; and
+    an empty value (``agents.0.reasoning_effort=``) is ``UNSET``, which removes the
+    key so the field falls back to its schema default (``''`` sets an empty string).
     """
+    if raw == "":
+        return UNSET
     if len(raw) >= 2 and raw[0] == raw[-1] and raw[0] in {"'", '"'}:
         return raw[1:-1]
     if raw.lower() == "true":
@@ -129,7 +143,11 @@ def apply_assignment(document: dict[str, Any], path: str, value: object) -> None
     for part in parts[:-1]:
         target = _step(target, part, path)
     last = parts[-1]
-    if isinstance(target, dict):
+    if value is UNSET:
+        if not isinstance(target, dict):
+            raise ValueError(f"override path {path!r}: only a mapping key can be unset")
+        target.pop(last, None)
+    elif isinstance(target, dict):
         target[last] = value
     elif isinstance(target, list) and last.isdigit() and int(last) < len(target):
         target[int(last)] = value

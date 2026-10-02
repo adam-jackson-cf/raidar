@@ -11,15 +11,16 @@
       "checkpoints": [
         1
       ],
-      "ref": "scb-canonical-oneshot@1",
+      "ref": "scb-canonical-oneshot@2",
       "selection": "declared"
     },
     "references": {
       "policy": {
-        "scb-canonical-oneshot@1": {
-          "digest": "6eb7ee711dcbd5cfaadb7793446153cb809ecda9931693c188a32591a42a3605",
+        "scb-canonical-oneshot@2": {
+          "digest": "a4017b172fab1975145116cc33d9902da066e715a7aff5ac0b86d8e6e79fca8a",
           "metadata": {
             "component_places": "1E-12",
+            "correctness": "C=sum_k(passed_k/graded_k)/K over planned checkpoints; unreached checkpoint=0; reached checkpoint with graded_k=0 -> ineligible",
             "formula": "S=100*C*(0.70+0.30*I)",
             "inertia_weights": {
               "E": "0.30",
@@ -32,18 +33,19 @@
               "G",
               "R"
             ],
-            "ref": "scb-canonical-oneshot@1",
+            "ref": "scb-canonical-oneshot@2",
             "rounding": "ROUND_HALF_EVEN",
-            "score_places": "0.000001"
+            "score_places": "0.000001",
+            "zero_correctness": "C=0 -> S=0 even when a quality component is missing or ineligible"
           }
         }
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "e3a7e721e21f865e1dcaae913e58fa98a4a0d994f52f7943e4aaaaee34e7a0b9",
+          "digest": "edbdb70d19d4282e42a02aeade995f212de66ce7e792e64e2cd0851cfa9e6b42",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "dfe67deac5d597e584b38fdd424bad77d2f61e7e5cb69012f56d3f8ea33c2f30",
+            "implementation_digest": "a54be4d7daa6b3d672728c33cb0e1b57db9f7c75550cecf12f8d27a4ae6156ca",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -381,13 +383,13 @@
           }
         },
         "process-compliance@1": {
-          "digest": "3ed3c9cb0e9b26242d85b3416c96b86710238379336a84313590c67a26987588",
+          "digest": "ab170d379f8bb283dcfe340943d45cd59746d8715db31fa6417d9cd089cc5aad",
           "metadata": {
             "implementation": "raidar.scorers.process_compliance:process_compliance_scorer",
-            "implementation_digest": "39bff14254a34626967501a55cbb0cfdc493c253ebc09121774922d048c649ab",
+            "implementation_digest": "f2bb0ef0796f5058bbafe459e1d2a8d484b0b8183e0933fe84b292385c5e725d",
             "jev_policies": {
               "process-compliance.residue": {
-                "digest": "185bc9d44e28e1193e1d06c4b5cf56c698bd3c7fdaaf7a3d0f6f1a4a610120af",
+                "digest": "b2805ba4272ecfdf47d52f3e71a64cd6d633e689621eb62def8926ddb076a215",
                 "mode": "shadow"
               }
             },
@@ -592,7 +594,7 @@
       }
     },
     "spec": {
-      "headline_policy": "scb-canonical-oneshot@1",
+      "headline_policy": "scb-canonical-oneshot@2",
       "inventory_policy": {
         "generated_globs": [],
         "test_globs": []
@@ -614,7 +616,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "38e7ac5d99047d9a48aa130e66b23145a9a3194019620395bb0dcb539678214a",
+  "document_sha256": "53d33b7771c55ce28b2e27b092dabfb0019f224eb631b4fd38bd847f27dae4f3",
   "execution": {
     "arms": {
       "baseline": {
@@ -952,8 +954,8 @@
   "experiment": {
     "id": "pilot-circuit-eval-oneshot",
     "source": "oneshot.experiment.yaml",
-    "source_sha256": "13beb28b8ffd43f29b5a1807b4e706c27c0f0aa6d4ea381afe26cc75dfe9ac75",
-    "spec_sha256": "0f6b5f8bc8bed0402fdbd43480bef86a04c2ab1d95b71fd6bdab86cd479a8d04"
+    "source_sha256": "002bdddb48b436cc1ecfc513d428ded35de816d580cdd6d11463aecaa7b1fb59",
+    "spec_sha256": "56e28556377259b675b9a3977505022b302723625fe01397c8aa6350c61fa7d4"
   },
   "lock_sha256": "827ebb5a7ca9d1063bb430af294c4e4a5ef8038cbe7e6da25f474d1b12866096",
   "lock_version": 2,
@@ -963,9 +965,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "dd90f6c6ad5471f2fd9171c6534a856b5a404e6404ca93e9851983e2e251be07",
+    "assessment": "3f0edc97c9f68c10e518c9b84902088b71f1dc0e2162ac611b98d6b3a5b70cd9",
     "execution": "827ebb5a7ca9d1063bb430af294c4e4a5ef8038cbe7e6da25f474d1b12866096",
-    "toolchain": "b16fc93b70b52e8651466ef66b7af27cea29dc73147849c4c7221516d441ecec"
+    "toolchain": "1cfa704cfe9c09c3fb0b8ee4dd37d7a53d84d7108ca6d84456ac634155e7c615"
   },
   "spec": {
     "agents": [
@@ -1001,7 +1003,7 @@
       }
     ],
     "assessment": {
-      "headline_policy": "scb-canonical-oneshot@1",
+      "headline_policy": "scb-canonical-oneshot@2",
       "inventory_policy": {
         "generated_globs": [],
         "test_globs": []
@@ -1098,6 +1100,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "a31b7fe2020db024526967336221d9ab8a640392aa839909ef9f5a141d41a933"
+    "raidar_spec": "326370898f8d7903d84e0df8f005979c1cfa8c64f869231950f0aeb03fb850b3"
   }
 }

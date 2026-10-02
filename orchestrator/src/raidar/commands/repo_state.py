@@ -7,9 +7,8 @@ from pathlib import Path
 
 import click
 
-# Generated runtime output that must never show up as a tracked change: scenario-epoch
-# history (experiments/) and experiment runs (runs/).
-# Generated runtime artifacts: run history, Assessment stores and analysis output.
+# Generated runtime output that must never show up as a tracked change: the retired
+# experiments/ directory, experiment runs, Assessment stores and analysis output.
 ARTIFACT_CHANGE_PREFIXES = ("experiments/", "runs/", "stores/", "analysis/")
 
 

@@ -318,3 +318,37 @@ def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) 
     # A trial outside any run falls back to an empty config.
     loose = two_step_trial(tmp_path / "loose" / "trial")
     assert rescore(loose, "correctness@1")["config"] is None
+
+
+def test_rescore_records_run_qualified_trial_ids_so_shared_trial_ids_stay_apart(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Gate packet F10: two runs of one experiment share bare trial ids."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    store = AssessmentStore(tmp_path / "store")
+    registry = default_scorer_registry()
+    for run_id in ("run-a", "run-b"):
+        run = tmp_path / "runs" / "pilot" / run_id
+        _ambiguous_trial(run / "trials" / "b01-p0-guided")
+        (run / "run.json").write_text(json.dumps({"experiment": "pilot", "run_id": run_id}))
+        (record,) = rescore_path(run / "trials", [PROCESS], store, registry, jev_replay_only=True)
+        assert record.trial == f"pilot.{run_id}.b01-p0-guided"
+
+    decisions = [
+        json.loads(line)
+        for path in (store.root / "jev-audit").rglob("*.jsonl")
+        for line in path.read_text().splitlines()
+    ]
+    assert {record["trial"] for record in decisions} == {
+        "pilot.run-a.b01-p0-guided",
+        "pilot.run-b.b01-p0-guided",
+    }
+    logged = {entry["trial"] for entry in store.read_log()}
+    assert logged == {"pilot.run-a.b01-p0-guided", "pilot.run-b.b01-p0-guided"}
+
+    # A trial outside any run keeps its directory name.
+    loose = _ambiguous_trial(tmp_path / "loose" / "b01-p0-guided")
+    (record,) = rescore_path(
+        loose, [PROCESS], AssessmentStore(tmp_path / "s2"), registry, jev_replay_only=True
+    )
+    assert record.trial == "b01-p0-guided"

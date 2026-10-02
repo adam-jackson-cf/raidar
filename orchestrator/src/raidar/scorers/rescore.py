@@ -17,10 +17,21 @@ from ``AssessContext.problem_config``; explicit config wins. The key hashes the
 explicit config only: the defaults are a function of the problem reference and
 oracle records already in the key's inputs, and analysis recomputes keys from
 the run's explicit assessment config.
+
+Trial ids such as ``b01-p0-guided`` repeat across runs, so a trial inside a
+WS-D run (``<run>/trials/<trial>`` with ``<run>/run.json``) is recorded as
+its review id ``<experiment>.<run>.<trial>`` (``qualified_trial_id``; ``<run>/<trial>``
+when ``run.json`` names no experiment), in the
+store log and in every Jev decision the scorers audit. Calibration splits
+over those ids are then disjoint across runs, and the Quality view attaches
+the decisions to exactly one trial. A trial outside a run keeps its directory
+name.
 """
 
 from __future__ import annotations
 
+import json
+import re
 import time
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
@@ -51,6 +62,35 @@ from raidar.scorers.trial_inputs import (
 
 class RescoreError(ValueError):
     """The rescore request cannot run (bad target, unknown scorer, invalid input)."""
+
+
+_RUN_MANIFEST = "run.json"
+# A trial dir sits at <run>/trials/<trial>, so its run.json is at most two levels up.
+_RUN_DEPTH = 2
+_UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
+
+
+def qualified_trial_id(trial_dir: Path) -> str:
+    """``<experiment>.<run>.<trial>`` for a trial inside a run, else the directory name.
+
+    A ``run.json`` that names no experiment gives ``<run>/<trial>``.
+    The same id the Quality view gives the trial (``TrialSource.review_id``).
+    """
+    candidate = trial_dir.resolve().parent
+    for _ in range(_RUN_DEPTH):
+        manifest = candidate / _RUN_MANIFEST
+        if manifest.is_file():
+            try:
+                run = json.loads(manifest.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise RescoreError(f"cannot read {manifest}: {exc}") from exc
+            experiment = run.get("experiment")
+            run_id = run.get("run_id") or candidate.name
+            if not experiment:  # the Quality view also attaches ``<run>/<trial>``
+                return f"{run_id}/{trial_dir.name}"
+            return _UNSAFE_ID.sub("-", f"{experiment}.{run_id}.{trial_dir.name}")
+        candidate = candidate.parent
+    return trial_dir.name
 
 
 class RescoreOutcome(StrEnum):
@@ -187,6 +227,7 @@ def rescore_path(
             )
         except TrialInputError as exc:
             raise RescoreError(str(exc)) from exc
+        trial_id = qualified_trial_id(trial_dir)
         for registration in registrations:
             scorer_config = dict((config or {}).get(registration.manifest.ref, {}))
             ctx = replace(loaded, config=scorer_config)
@@ -195,7 +236,7 @@ def rescore_path(
                     store,
                     registration,
                     ctx,
-                    trial=trial_dir.name,
+                    trial=trial_id,
                     replay=replay,
                     jev_replay_only=jev_replay_only,
                 )

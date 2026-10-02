@@ -1,11 +1,11 @@
-# SCB rubric criteria asked per changed symbol (question set scb-rubric@1).
+# SCB rubric criteria asked per changed symbol (question set scb-rubric@2).
 # Shadow: decisions are audited and shown as uncalibrated; they never feed
 # ScorePolicies or verdicts. Promotion to enforce needs a recorded promotion
 # (>=30 labels, >=5 minority, input sufficiency >=0.8, frozen threshold) and a
 # code-quality scorer minor version bump.
 id: code-quality.rubric-smells
-version: "1"
+version: "2"
 description: SCB rubric smells per changed Python symbol, with carry-forward.
 mode: shadow
-question_set: scb-rubric@1
+question_set: scb-rubric@2
 runtimes: [python]

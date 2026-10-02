@@ -13,6 +13,25 @@ REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
 RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
+# Secrets: targets that call model providers run under `infisical run` (project bound by
+# orchestrator/.infisical.json, env INFISICAL_ENV) when the infisical CLI is installed and
+# logged in; otherwise they fall back to orchestrator/.env. SECRETS=infisical fails instead
+# of falling back; SECRETS=dotenv skips Infisical. Detection runs at recipe time, presence
+# only: no secret value is ever printed. Under Infisical the CLI does not load .env.
+SECRETS ?= auto
+INFISICAL_ENV ?= dev
+INFISICAL_PROJECT_ID := $(shell sed -n 's/.*"workspaceId"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' orchestrator/.infisical.json 2>/dev/null)
+INFISICAL_RUN := infisical run --silent --env=$(INFISICAL_ENV) --projectId=$(INFISICAL_PROJECT_ID) --
+SECRETS_DETECT := secrets_cmd=""; \
+	if [ "$(SECRETS)" != dotenv ] && [ -n "$(INFISICAL_PROJECT_ID)" ] && command -v infisical >/dev/null 2>&1 \
+		&& $(INFISICAL_RUN) true </dev/null >/dev/null 2>&1; then \
+		secrets_cmd="RAIDAR_SECRETS_SOURCE=infisical $(INFISICAL_RUN)"; \
+		echo "secrets: Infisical (env $(INFISICAL_ENV))" >&2; \
+	elif [ "$(SECRETS)" = infisical ]; then \
+		echo "SECRETS=infisical but the infisical CLI is missing or not logged in; run 'infisical login' in a terminal" >&2; exit 1; \
+	else echo "secrets: orchestrator/.env (Infisical unavailable or SECRETS=dotenv)" >&2; fi;
+RAIDAR_SECRETS := $(SECRETS_DETECT) $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --project orchestrator raidar
+
 # Shared public workflow defaults.
 HARNESS ?=
 PROVIDER ?=
@@ -43,16 +62,22 @@ endif
 endif
 # agent-smoke: the smoke experiment with its one agent replaced. Harness versions must equal
 # the Python pack pins (orchestrator/src/raidar/packs/python/pack.yaml); planning refuses others.
+# Provider/model/effort default per harness: codex-cli runs gpt-6-luna at low effort;
+# claude-code runs claude-haiku-4-5, which has no effort levels, so its effort is unset.
+# REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
 AGENT_SMOKE_HARNESS ?= codex-cli
-AGENT_SMOKE_PROVIDER ?= openai
-AGENT_SMOKE_MODEL ?= gpt-6-luna
-AGENT_SMOKE_REASONING_EFFORT ?= low
+AGENT_SMOKE_PROVIDER_codex-cli := openai
+AGENT_SMOKE_MODEL_codex-cli := gpt-6-luna
+AGENT_SMOKE_REASONING_codex-cli := low
+AGENT_SMOKE_PROVIDER_claude-code := anthropic
+AGENT_SMOKE_MODEL_claude-code := claude-haiku-4-5
+AGENT_SMOKE_REASONING_claude-code :=
 AGENT_SMOKE_VERSION_codex-cli := 0.156.1
 AGENT_SMOKE_VERSION_claude-code := 2.1.285
 AGENT_SMOKE_EFFECTIVE_HARNESS = $(or $(HARNESS),$(AGENT_SMOKE_HARNESS))
-AGENT_SMOKE_EFFECTIVE_PROVIDER = $(or $(PROVIDER),$(AGENT_SMOKE_PROVIDER))
-AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL))
-AGENT_SMOKE_EFFECTIVE_REASONING = $(or $(REASONING_EFFORT),$(AGENT_SMOKE_REASONING_EFFORT))
+AGENT_SMOKE_EFFECTIVE_PROVIDER = $(or $(PROVIDER),$(AGENT_SMOKE_PROVIDER_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
+AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
+AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origin REASONING_EFFORT)),$(strip $(REASONING_EFFORT)),$(AGENT_SMOKE_REASONING_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
 AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(HARNESS_VERSION),$(AGENT_SMOKE_VERSION_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
 
 .PHONY: help \
@@ -62,7 +87,8 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(HARNESS_VERSION),$(AGENT_SMOKE_VERSION_$(
 	perf-check perf-fixture perf-gate \
 	problem-list problem-info problem-import problem-validate \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
-	jev-export-labels jev-import-labels \
+	jev-export-labels jev-import-labels jev-export-blind jev-import-blind \
+	jev-verify-promotion jev-promote \
 	pack-info pack-build pack-audit pack-tool-provision \
 	component-probe-trials \
 	smoke-dry-run-check orchestrator-smoke smoke-agents agent-smoke \
@@ -89,6 +115,8 @@ help:
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup [RUN=<run-dir>] [DRY_RUN=1]        Remove trial environments a stopped run left behind"
 	@echo "  make quality                                           Run repo quality gates"
+	@echo "  Secrets: run/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
+	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
 	@echo ""
 	@echo "Problems and runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
 	@echo "  make problem-list                                      List registered problems with validation and import state"
@@ -132,27 +160,34 @@ help:
 	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
 	@echo "  make jev-export-labels POLICY=<policy> OUT=<labels.jsonl> [STORE=<assessment-store>] [LABELS=review-surface/data/jev-labels.json]"
 	@echo "                                                        Export review-surface Jev labels as calibration rows (one per decision)"
-	@echo "  make jev-import-labels POLICY=<policy> STORE=<assessment-store> LABELS_FILE=<labels.jsonl>"
+	@echo "  make jev-import-labels POLICY=<policy> STORE=<assessment-store> LABELS_FILE=<labels.jsonl> [REVIEWER=human|model REVIEWER_MODEL=<model id>]"
 	@echo "                                                        Import calibration labels into the store's Jev audit and show enforce readiness"
+	@echo "  make jev-export-blind POLICY=<policy> STORE=<assessment-store> OUT=<blind.jsonl> [JEV_TRIALS=\"<trial> ...\"] [LIMIT=N]"
+	@echo "                                                        Export answered, unlabelled decisions (state + questions) WITHOUT Jev's answers for a blind labeller"
+	@echo "  make jev-import-blind POLICY=<policy> STORE=<assessment-store> ANSWERS_FILE=<answers.jsonl> [REVIEWER=human|model REVIEWER_MODEL=<model id>]"
+	@echo "                                                        Derive correct/false_positive/false_negative/uncertain from the labeller's own answers vs Jev's at 0.5, and import"
+	@echo "  make jev-verify-promotion POLICY=<policy> STORE=<assessment-store>"
+	@echo "                                                        Re-derive a policy's recorded promotion (gate, threshold, metrics, corpus sha256, reviewers, scorer version) from the audit"
+	@echo "  make jev-promote POLICY=<policy> STORE=<assessment-store> [CALIBRATION=\"<trial> ...\" EVALUATION=\"<trial> ...\"] [DRY_RUN=1]"
+	@echo "                                                        Fit and freeze the threshold on the calibration split; write mode: enforce + promotion only if it verifies"
 	@echo ""
 	@echo "Smoke (real agent trials of examples/smoke; locks under .tmp/smoke, runs under runs/):"
 	@echo "  make orchestrator-smoke [SMOKE_BLOCKS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
 	@echo "                                                        One one-shot trial with codex-cli + gpt-6-luna (low), correctness only"
 	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [HARNESS_VERSION=] [TIMEOUT_SEC=]"
-	@echo "                                                        The same smoke with its agent replaced (versions default to the pack pins)"
-	@echo "  make smoke-agents [SMOKE_ARM=codex|claude]             One smoke trial per pack harness (agent is the factor), or one selected arm"
+	@echo "                                                        The same smoke with its agent replaced (versions default to the pack pins;"
+	@echo "                                                        HARNESS=claude-code defaults to claude-haiku-4-5, no effort; REASONING_EFFORT= unsets)"
+	@echo "  make smoke-agents [SMOKE_ARM=codex|claude]             One smoke trial per pack harness (codex: gpt-6-luna low; claude: claude-haiku-4-5)"
 	@echo "  make smoke-dry-run-check                               Print the smoke command shapes (used by make quality)"
 	@echo ""
 	@echo "Review surface:"
-	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE=experiment|legacy] [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
-	@echo "                                                        Write the labelled synthetic fixture: experiment runs + Assessment store, or"
-	@echo "                                                        (legacy) the frozen scenario-epoch projections under <dir>/legacy"
-	@echo "  make review-surface-data [REVIEW_RUNS_ROOT=<runs-root>...] [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...] [REVIEW_LEGACY_ROOT=<dir>]"
-	@echo "                                                        Project experiment runs plus scenario-epoch history (read-only; default"
-	@echo "                                                        experiments/benchmarks when present) into review-surface data"
+	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
+	@echo "                                                        Write the labelled synthetic review fixture (run roots + Assessment store)"
+	@echo "  make review-surface-data REVIEW_RUNS_ROOT=<runs-root>... [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
+	@echo "                                                        Project experiment runs into review-surface data"
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
-	@echo "  make review-surface-test [REVIEW_RUNS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=... REVIEW_LEGACY_ROOT=...]"
+	@echo "  make review-surface-test [REVIEW_RUNS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=...]"
 	@echo "                                                        Run the review-surface end-to-end suite (Playwright) on the experiment synthetic"
 	@echo "                                                        fixture plus any given runs (one REVIEW_STORE for all roots, or one per root)"
 	@echo "  make quality-fixture-synthetic [QUALITY_FIXTURE_DIR=.tmp/quality-fixture]"
@@ -177,7 +212,7 @@ PROBE_EVIDENCE_DIR ?=
 component-probe-trials:
 	@$(PACK_DOCKER_ENV) export RAIDAR_REAL_LLM_PROBES=1 && \
 		$(if $(PROBE_EVIDENCE_DIR),export RAIDAR_PROBE_EVIDENCE_DIR="$(abspath $(PROBE_EVIDENCE_DIR))" &&,) \
-		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
+		$(SECRETS_DETECT) cd orchestrator && $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --project . --extra dev \
 		python -m pytest tests/test_component_real_trial_probes.py -v
 
 pack-audit:
@@ -187,26 +222,17 @@ pack-tool-provision:
 	$(call require_var,TOOL)
 	@$(RAIDAR) pack provision "$(RUNTIME)" "$(TOOL)"
 
-# REVIEW_FIXTURE: experiment (synthetic experiment-epoch runs + store, with scenario-epoch
-# experiments beside them) or legacy (the frozen scenario-epoch projections only).
-REVIEW_FIXTURE ?= experiment
-REVIEW_FIXTURES := experiment legacy
-ifeq ($(filter $(REVIEW_FIXTURE),$(REVIEW_FIXTURES)),)
-$(error Unknown REVIEW_FIXTURE '$(REVIEW_FIXTURE)'; expected one of: $(REVIEW_FIXTURES))
-endif
+# The synthetic review fixture: run roots <dir>/runs and <dir>/review-only, store <dir>/store.
 REVIEW_FIXTURE_DIR ?= $(REPO_TMP_DIR)/review-fixture
-# Scenario-epoch history (review-projection.json per experiment). Read-only: nothing writes here.
-REVIEW_LEGACY_ROOT ?= $(CURDIR)/experiments/benchmarks
 REVIEW_RUNS_ROOT ?=
 REVIEW_STORE ?=
 REVIEW_LOCK ?=
 
-# $(1) scenario-epoch history roots (existing ones only), $(2) run roots, $(3) Assessment stores.
+# $(1) run roots, $(2) Assessment stores.
 define review_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection \
-		$(foreach root,$(wildcard $(1)),--legacy-root "$(abspath $(root))") \
-		$(foreach root,$(2),--runs-root "$(abspath $(root))") \
-		$(foreach store,$(3),--store "$(abspath $(store))") \
+		$(foreach root,$(1),--runs-root "$(abspath $(root))") \
+		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(REVIEW_LOCK),--lock "$(abspath $(lock))") \
 		--output "$(REPO_TMP_DIR)/review-projection.json"
 	@RAIDAR_REVIEW_PROJECTION="$(REPO_TMP_DIR)/review-projection.json" \
@@ -214,14 +240,11 @@ define review_projection
 endef
 
 review-fixture-synthetic:
-ifeq ($(REVIEW_FIXTURE),legacy)
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection.scenario_epoch.fixture "$(abspath $(REVIEW_FIXTURE_DIR))/legacy"
-else
 	@cd orchestrator && uv run --project . python -m raidar.review_projection.fixture "$(abspath $(REVIEW_FIXTURE_DIR))"
-endif
 
 review-surface-data:
-	$(call review_projection,$(REVIEW_LEGACY_ROOT),$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
+	$(call require_var,REVIEW_RUNS_ROOT)
+	$(call review_projection,$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
 
 review-surface-build:
 	@cd review-surface && npm install --no-fund --no-audit && npm run build
@@ -258,26 +281,22 @@ else
 	$(call quality_projection,$(QUALITY_RUNS),$(QUALITY_STORE),)
 endif
 
-# The suite runs on the experiment synthetic fixture under REVIEW_FIXTURE_DIR, never on real
-# history: it carries its own scenario-epoch experiments ($(REVIEW_FIXTURE_DIR)/scenario-epoch)
-# so the old epoch always renders. The suite's signals need the experiment fixture, so it
-# always writes that one whatever REVIEW_FIXTURE says. Real history (REVIEW_LEGACY_ROOT) joins
-# only when it is given on the command line.
-REVIEW_TEST_LEGACY_ROOT = $(if $(filter command line,$(origin REVIEW_LEGACY_ROOT)),$(REVIEW_LEGACY_ROOT),)
+# The suite runs on the synthetic review fixture under REVIEW_FIXTURE_DIR plus any given runs.
 # Given runs and their stores: one REVIEW_STORE serves every REVIEW_RUNS_ROOT, otherwise there
 # must be one store per root in the same order (anything else fails loudly, never silently drops
 # runs from the Quality data).
 REVIEW_TEST_STORES = $(if $(filter 1,$(words $(REVIEW_STORE))),$(foreach root,$(REVIEW_RUNS_ROOT),$(REVIEW_STORE)),$(REVIEW_STORE))
-# Quality data for the suite: the labelled Quality fixture, the experiment fixture's runs (so
-# run detail shows its Quality panel) and any given runs, each against its own store.
+# Quality data for the suite: the labelled Quality fixture, the review fixture's runs (so run
+# detail shows its Quality panel) and any given runs, each against its own store. The review
+# fixture's review-only root is left out on purpose: it shows runs without Quality data.
 REVIEW_TEST_QUALITY_RUNS = $(QUALITY_FIXTURE_DIR)/runs $(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT)
 REVIEW_TEST_QUALITY_STORES = $(QUALITY_FIXTURE_DIR)/store $(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES)
 
 review-surface-test: quality-fixture-synthetic
 	$(if $(filter $(words $(REVIEW_RUNS_ROOT)),$(words $(REVIEW_TEST_STORES))),,$(error REVIEW_RUNS_ROOT and REVIEW_STORE need one store for all roots or one store per root, in the same order))
-	@$(MAKE) --no-print-directory review-fixture-synthetic REVIEW_FIXTURE=experiment
+	@$(MAKE) --no-print-directory review-fixture-synthetic
 	$(call quality_projection,$(REVIEW_TEST_QUALITY_RUNS),$(REVIEW_TEST_QUALITY_STORES),--synthetic)
-	$(call review_projection,$(REVIEW_FIXTURE_DIR)/scenario-epoch $(REVIEW_TEST_LEGACY_ROOT),$(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES))
+	$(call review_projection,$(REVIEW_FIXTURE_DIR)/runs $(REVIEW_FIXTURE_DIR)/review-only $(REVIEW_RUNS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES))
 	@cd review-surface && npm install --no-fund --no-audit && npm run build \
 		&& npx playwright install chromium && npm test
 
@@ -291,7 +310,7 @@ harness-validate:
 	$(call require_var,HARNESS)
 	$(call require_var,PROVIDER)
 	$(call require_var,MODEL)
-	@$(RAIDAR) harness validate \
+	@$(RAIDAR_SECRETS) harness validate \
 		--harness "$(HARNESS)" \
 		--provider "$(PROVIDER)" \
 		--model "$(MODEL)" \
@@ -350,7 +369,7 @@ experiment-plan:
 
 experiment-execute: pack-build
 	$(call require_var,EXPERIMENT)
-	@$(PACK_DOCKER_ENV) $(RAIDAR) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
+	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
 		--runs-dir "$(if $(RUNS_DIR),$(abspath $(RUNS_DIR)),$(CURDIR)/runs)" $(if $(RUN_ID),--run-id "$(RUN_ID)",)
 
 perf-check:
@@ -405,7 +424,7 @@ experiment-assess:
 	$(call require_var,RUN)
 	$(call require_var,STORE)
 	$(call require_var,SCORERS)
-	@$(PACK_DOCKER_ENV) $(RAIDAR) assess --rescore "$(if $(wildcard $(RUN)/trials),$(RUN)/trials,$(RUN))" --store "$(STORE)" \
+	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(RUN)/trials),$(RUN)/trials,$(RUN))" --store "$(STORE)" \
 		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
 		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(LOCK),--lock "$(LOCK)",) $(if $(REPLAY),--replay,) \
 		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
@@ -429,19 +448,41 @@ jev-import-labels:
 	$(call require_var,POLICY)
 	$(call require_var,STORE)
 	$(call require_var,LABELS_FILE)
-	@$(RAIDAR) jev import-labels --store "$(STORE)" --policy "$(POLICY)" "$(LABELS_FILE)"
+	@$(RAIDAR) jev import-labels --store "$(STORE)" --policy "$(POLICY)" $(if $(REVIEWER),--reviewer "$(REVIEWER)",) $(if $(REVIEWER_MODEL),--reviewer-model "$(REVIEWER_MODEL)",) "$(LABELS_FILE)"
+
+jev-export-blind:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	$(call require_var,OUT)
+	@$(RAIDAR) jev export-blind --store "$(STORE)" --policy "$(POLICY)" --output "$(OUT)" $(foreach trial,$(JEV_TRIALS),--trial "$(trial)") $(if $(LIMIT),--limit "$(LIMIT)",)
+
+jev-import-blind:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	$(call require_var,ANSWERS_FILE)
+	@$(RAIDAR) jev import-blind --store "$(STORE)" --policy "$(POLICY)" $(if $(REVIEWER),--reviewer "$(REVIEWER)",) $(if $(REVIEWER_MODEL),--reviewer-model "$(REVIEWER_MODEL)",) "$(ANSWERS_FILE)"
+
+jev-verify-promotion:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	@$(RAIDAR) jev verify-promotion --store "$(STORE)" --policy "$(POLICY)"
+
+jev-promote:
+	$(call require_var,POLICY)
+	$(call require_var,STORE)
+	@$(RAIDAR) jev promote --store "$(STORE)" --policy "$(POLICY)" $(if $(CALIBRATION),--calibration "$(CALIBRATION)",) $(if $(EVALUATION),--evaluation "$(EVALUATION)",) $(if $(DRY_RUN),--dry-run,)
 
 jev-shadow-rubric:
 	$(call require_var,SNAPSHOTS)
 	$(call require_var,STORE)
-	@$(RAIDAR) jev shadow-rubric --snapshots "$(SNAPSHOTS)" --store "$(STORE)" $(if $(SPECS),--specs "$(SPECS)",) $(if $(REPLAY_ONLY),--replay-only,) $(if $(WITHIN),--within "$(WITHIN)",) $(if $(TRIAL),--trial "$(TRIAL)",) $(if $(OUT),--output "$(OUT)",)
+	@$(RAIDAR_SECRETS) jev shadow-rubric --snapshots "$(SNAPSHOTS)" --store "$(STORE)" $(if $(SPECS),--specs "$(SPECS)",) $(if $(REPLAY_ONLY),--replay-only,) $(if $(WITHIN),--within "$(WITHIN)",) $(if $(TRIAL),--trial "$(TRIAL)",) $(if $(OUT),--output "$(OUT)",)
 
 # $(1) experiment file, $(2) lock name under SMOKE_LOCK_DIR, $(3) spec overrides (--set),
 # $(4) trial selection (--arm). The lock and the run see the same overrides.
 define smoke_run
 	@mkdir -p "$(SMOKE_LOCK_DIR)"
 	@$(RAIDAR) lock "$(1)" --output "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3)
-	@$(PACK_DOCKER_ENV) $(RAIDAR) run "$(1)" --lock "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3) $(4) \
+	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(1)" --lock "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3) $(4) \
 		--concurrency "$(SMOKE_CONCURRENCY)" --runs-dir "$(SMOKE_RUNS_DIR)"
 endef
 
@@ -461,6 +502,12 @@ smoke-dry-run-check:
 	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="claude"
 	@! $(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="unknown" \
 		>/dev/null 2>&1
+	@$(MAKE) --no-print-directory -n agent-smoke HARNESS="claude-code" \
+		| grep -q -- '--set "agents.0.model=claude-haiku-4-5" --set "agents.0.reasoning_effort="'
+	@$(MAKE) --no-print-directory -n agent-smoke REASONING_EFFORT= \
+		| grep -q -- '--set "agents.0.reasoning_effort="'
+	@$(MAKE) --no-print-directory -n agent-smoke \
+		| grep -q -- '--set "agents.0.reasoning_effort=low"'
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		HARNESS="codex-cli" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
 		TIMEOUT_SEC="300"

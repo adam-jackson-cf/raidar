@@ -7,7 +7,8 @@ import { test, expect, type Page } from '@playwright/test';
 const PASSING_RUN = 'synthetic-bugfix-gpt-5.5-medium-01';
 const INELIGIBLE_RUN = 'synthetic-bugfix-gpt-5.5-low-05';
 const POLICY_MIX_RUN = 'synthetic-policy-mix-gpt-5.5-low-01';
-const SCENARIO_EPOCH_RUN = 'synthetic-skill-v001-gpt-5.5-low-01';
+// Projected for review from the fixture's review-only root, which has no Quality data.
+const REVIEW_ONLY_RUN = 'synthetic-review-only-gpt-5.5-low-01';
 const QUALITY_ID = (trial: string) => `synthetic-bugfix.synthetic-bugfix.${trial}`;
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -100,9 +101,12 @@ test.describe('run detail quality panel', () => {
     await expect(panel.getByTestId('run-quality-score')).toBeVisible();
   });
 
-  test('scenario-epoch runs, which predate the scorer, show no quality panel', async ({ page }) => {
-    await openRun(page, SCENARIO_EPOCH_RUN);
-    await expect(page.getByTestId('run-quality-panel')).toHaveCount(0);
+  test('runs without Quality data say so instead of showing a strip', async ({ page }) => {
+    await openRun(page, REVIEW_ONLY_RUN);
+    const panel = page.getByTestId('run-quality-panel');
+    await expect(panel).toContainText('Not assessed yet');
+    await expect(panel.getByTestId('quality-strip')).toHaveCount(0);
+    await expect(panel.getByTestId('run-quality-score')).toHaveCount(0);
   });
 });
 
@@ -127,9 +131,9 @@ test.describe('comparison views link to the experiment quality view', () => {
     await expect(page).toHaveURL(/\/quality\?experiment=synthetic-bugfix&/);
   });
 
-  test('scenario-epoch families have no quality link', async ({ page }) => {
+  test('families without Quality data have no quality link', async ({ page }) => {
     await page.goto('/');
-    const family = page.locator('[id="family-skill-benchmark-coding-test"]');
+    const family = page.locator('[id="family-synthetic/review-only@1"]');
     await expect(family).toBeVisible();
     await expect(family.getByTestId('group-quality-link')).toHaveCount(0);
   });
@@ -144,7 +148,7 @@ test.describe('headline-policy mismatch notice', () => {
     await expect(notice).toBeVisible();
     await expect(notice).toContainText('Headline policies differ in this comparison');
     await expect(notice).toContainText('scb-canonical-oneshot@1');
-    await expect(notice).toContainText('scenario-weighted composite (scenario epoch)');
+    await expect(notice).toContainText(/scb-canonical@1/);
     await expect(page.locator('[id="family-synthetic/ledger-balance@1"]').getByTestId('policy-mismatch')).toHaveCount(0);
   });
 
@@ -171,7 +175,7 @@ test('no console or page errors across the quality entry points', async ({ page 
   page.on('pageerror', (e) => errors.push(e.message));
   await openRun(page, PASSING_RUN);
   await expect(page.getByTestId('run-quality-panel').getByTestId('quality-strip')).toBeVisible();
-  await openRun(page, SCENARIO_EPOCH_RUN);
+  await openRun(page, REVIEW_ONLY_RUN);
   await page.goto('/quality?experiment=synthetic-bugfix&problem=synthetic%2Fledger-balance%401');
   await expect(page.getByTestId('quality-problem').first()).toBeVisible();
   await page.goto(`/quality/runs/${QUALITY_ID('gpt-5.5-low-05')}?component=V&checkpoint=checkpoint_2`);
