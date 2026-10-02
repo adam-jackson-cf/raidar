@@ -43,6 +43,23 @@ All notable changes to this project are documented in this file.
 - Experiment-path smoke targets: `make orchestrator-smoke`, `make agent-smoke` and `make smoke-agents` run `examples/smoke/` through lock and Harbor. `smoke-agents` has one arm per pack harness (`codex`, `claude`).
 - `make experiment-assess RUN= STORE= SCORERS=` rescores a run's stored trials into an Assessment store (`raidar assess --rescore`).
 - `make harbor-cleanup RUN= DRY_RUN=`.
+- Secrets come from Infisical (project `mac-os-cf`, environment `dev`, bound by `orchestrator/.infisical.json`). Targets that run agents or Jev wrap `raidar` in `infisical run --env=dev`. `SECRETS=auto` (default) uses Infisical when the CLI is installed and logged in and otherwise falls back to `orchestrator/.env`; `SECRETS=infisical` fails instead of falling back; `SECRETS=dotenv` skips Infisical. Only the source is printed, never a value.
+- `raidar run` runs a presence-only credential preflight for every selected arm before any trial starts, and exits 2 naming the missing variables. It does not check that an account is funded.
+- `make agent-smoke HARNESS=claude-code` defaults to `claude-haiku-4-5` with no reasoning effort, and the `smoke-agents` claude arm uses the same model. An empty override (`REASONING_EFFORT=`) unsets the key.
+- Jev calibration: labels record a `human` or `model` reviewer (and the model id) through import, export, readiness and the review-surface labels API. `make jev-export-blind` / `make jev-import-blind` run blind labelling. `make jev-promote` fits and freezes a threshold on a calibration/evaluation split and records metrics, a regression corpus and reviewers; `make jev-verify-promotion` re-derives them. Rubric question set `scb-rubric@2` asks codebase-scope criteria with an indexed focus.
+- Scoring alignment: correctness C is the SCB fork's mean per-checkpoint case pass rate everywhere S is computed, and analysis reports C as `correctness`. New headline policies `scb-canonical@2` and `scb-canonical-oneshot@2` score S = 0 when C = 0; the pilot experiments declare `@2`.
+
+### Bug Fixes
+
+- `make jev-promote` no longer writes `mode: enforce` while the scorer minor bump the promotion names is still missing. Writing it then left a repo policy that `make jev-verify-promotion` rejects. The command now exits 1 with `"blocked_on_scorer_bump": true`; `ALLOW_SCORER_BUMP=1` (`--allow-pending-scorer-bump`) writes anyway, for the "promote, then bump the scorer" sequence.
+
+### Tests
+
+- An end-to-end analysis test checks the `scb-canonical@2` zero-correctness rule through rescore and `raidar analyze`: C = 0 trajectories with a quality gap score S = 0 and are paired, C > 0 ones stay unassessed, and `@1` leaves all of them unassessed. No pilot trajectory has C = 0, so this path was otherwise covered only by unit tests.
+
+### Documentation
+
+- Gate packet §12 closes Phase 1: Infisical secrets, Claude Haiku readiness (blocked on Anthropic account credit), live shadow Jev (15,516 provider calls, about $2.33), labelling provenance and its limits, the promotion outcome (not promoted), scoring alignment and cleanup. §6 and §11.15 no longer say live Jev is blocked, and §11.17 states what the labelling artifacts can and cannot prove.
 
 ### Chores
 

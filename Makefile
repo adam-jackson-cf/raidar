@@ -168,8 +168,9 @@ help:
 	@echo "                                                        Derive correct/false_positive/false_negative/uncertain from the labeller's own answers vs Jev's at 0.5, and import"
 	@echo "  make jev-verify-promotion POLICY=<policy> STORE=<assessment-store>"
 	@echo "                                                        Re-derive a policy's recorded promotion (gate, threshold, metrics, corpus sha256, reviewers, scorer version) from the audit"
-	@echo "  make jev-promote POLICY=<policy> STORE=<assessment-store> [CALIBRATION=\"<trial> ...\" EVALUATION=\"<trial> ...\"] [DRY_RUN=1]"
+	@echo "  make jev-promote POLICY=<policy> STORE=<assessment-store> [CALIBRATION=\"<trial> ...\" EVALUATION=\"<trial> ...\"] [DRY_RUN=1] [ALLOW_SCORER_BUMP=1]"
 	@echo "                                                        Fit and freeze the threshold on the calibration split; write mode: enforce + promotion only if it verifies"
+	@echo "                                                        (refused while the scorer's minor bump is pending unless ALLOW_SCORER_BUMP=1)"
 	@echo ""
 	@echo "Smoke (real agent trials of examples/smoke; locks under .tmp/smoke, runs under runs/):"
 	@echo "  make orchestrator-smoke [SMOKE_BLOCKS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
@@ -470,7 +471,7 @@ jev-verify-promotion:
 jev-promote:
 	$(call require_var,POLICY)
 	$(call require_var,STORE)
-	@$(RAIDAR) jev promote --store "$(STORE)" --policy "$(POLICY)" $(if $(CALIBRATION),--calibration "$(CALIBRATION)",) $(if $(EVALUATION),--evaluation "$(EVALUATION)",) $(if $(DRY_RUN),--dry-run,)
+	@$(RAIDAR) jev promote --store "$(STORE)" --policy "$(POLICY)" $(if $(CALIBRATION),--calibration "$(CALIBRATION)",) $(if $(EVALUATION),--evaluation "$(EVALUATION)",) $(if $(DRY_RUN),--dry-run,) $(if $(ALLOW_SCORER_BUMP),--allow-pending-scorer-bump,)
 
 jev-shadow-rubric:
 	$(call require_var,SNAPSHOTS)

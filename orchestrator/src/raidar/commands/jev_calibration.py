@@ -16,6 +16,7 @@ from raidar.jev.calibration import LabelImportError, import_labels, promotion_re
 from raidar.jev.policies import POLICY_DIR, CalibrationSplit, PolicyError
 from raidar.jev.promotion import (
     PromotionError,
+    PromotionPlan,
     plan_promotion,
     scorer_id,
     verify_promotion,
@@ -167,12 +168,36 @@ def _trial_list(raw: str | None) -> tuple[str, ...]:
     return tuple(item for item in (raw or "").replace(",", " ").split() if item)
 
 
+def _split(calibration: str | None, evaluation: str | None) -> CalibrationSplit | None:
+    if not (calibration or evaluation):
+        return None
+    return CalibrationSplit(
+        calibration=_trial_list(calibration), evaluation=_trial_list(evaluation)
+    )
+
+
+def _write(path: Path, plan: PromotionPlan) -> str:
+    try:
+        write_promotion(path, plan)
+    except PromotionError as error:
+        raise click.ClickException(str(error)) from error
+    return str(path)
+
+
 @click.command("promote")
 @_STORE
 @click.option("--policy", required=True)
 @click.option("--calibration", help="Calibration trial ids (space or comma separated).")
 @click.option("--evaluation", help="Evaluation trial ids (space or comma separated).")
 @click.option("--dry-run", is_flag=True, help="Report the promotion without writing the policy.")
+@click.option(
+    "--allow-pending-scorer-bump",
+    is_flag=True,
+    help=(
+        "Write the enforce policy even though its scorer still needs the minor bump the "
+        "promotion ships with; `jev verify-promotion` fails until that bump lands."
+    ),
+)
 @_POLICY_DIR
 def jev_promote(
     store: Path,
@@ -180,31 +205,30 @@ def jev_promote(
     calibration: str | None,
     evaluation: str | None,
     dry_run: bool,
+    allow_pending_scorer_bump: bool,
     policy_dir: Path,
 ) -> None:
-    """Fit and freeze the threshold, then write the enforce promotion if it verifies."""
+    """Fit and freeze the threshold, then write the enforce promotion if it verifies.
+
+    A promotion ships with the next minor version of its scorer. While that bump is
+    still pending, writing ``mode: enforce`` would leave a repo policy that
+    ``jev verify-promotion`` rejects, so the write is refused unless
+    ``--allow-pending-scorer-bump`` is given.
+    """
     runtime = open_runtime(store, replay_only=True, policy_dir=policy_dir)
     try:
         current = runtime.policies.get(policy)
-        split = None
-        if calibration or evaluation:
-            split = CalibrationSplit(
-                calibration=_trial_list(calibration), evaluation=_trial_list(evaluation)
-            )
+        split = _split(calibration, evaluation)
     except (PolicyError, ValueError) as error:
         raise click.ClickException(str(error)) from error
     version = scorer_versions().get(scorer_id(policy))
     plan = plan_promotion(current, runtime.audit, split=split, scorer_version=version)
-    written = None
-    if plan.ok and not dry_run:
-        path = policy_dir / f"{policy}.yaml"
-        try:
-            write_promotion(path, plan)
-        except PromotionError as error:
-            raise click.ClickException(str(error)) from error
-        written = str(path)
-    click.echo(json.dumps({**plan.summary(), "written": written}, indent=2))
-    if not plan.ok:
+    blocked = plan.ok and plan.scorer_bump is not None and not allow_pending_scorer_bump
+    write = plan.ok and not dry_run and not blocked
+    written = _write(policy_dir / f"{policy}.yaml", plan) if write else None
+    report = {**plan.summary(), "written": written, "blocked_on_scorer_bump": blocked}
+    click.echo(json.dumps(report, indent=2))
+    if not plan.ok or (blocked and not dry_run):
         raise SystemExit(1)
 
 

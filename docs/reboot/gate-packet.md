@@ -1,10 +1,10 @@
 # Phase 1 gate packet (pause-and-review)
 
-- **Date:** 2026-09-30 (v1 record); updated 2026-10-02 with the N1 enforcement model (§5.2), the completed pilot v2 forge leg (§11.13), the current exit criteria (§11.14) and the decisions now open (§11.15).
+- **Date:** 2026-09-30 (v1 record); updated 2026-10-02 with the N1 enforcement model (§5.2), the completed pilot v2 forge leg (§11.13), the current exit criteria (§11.14) the decisions now open (§11.15), the Jev calibration and promotion attempt (§11.17) and the Phase 1 close-out (§12: Infisical secrets, Claude Haiku readiness, live Jev, labelling provenance, promotion, scoring alignment, cleanup).
 - **Plan reference:** `docs/reboot/implementation-plan.md` §3 (1.P pilot and the Phase 1 exit criteria) and §4 (this packet and the gate decisions).
 - **Branch:** `reboot-impl`. The wave 1-4 work is committed up to `6b8e44d`. The pilot's infra fixes, this packet, **and the WS-L scenario-era cutover** (251 tracked files, about −47k lines, including scorer package files) are committed together on top of it (see §9). The WS-L cutover landed after the pilot ran and after the pilot store and locks were built; its consequences for the pilot evidence are in §1.1.
 - **AgentSpec substitution (user directive):** plan 1.P names Claude Code as the pilot's single AgentSpec. By user directive (ADR-001 §2.7), every real-LLM trial in this pilot used **codex-cli 0.156.1 + `gpt-6-luna`, reasoning effort low**. No Claude Code trial has run, so the Claude mappings of the built-in components are unit-tested only.
-- **Jev:** `OPENROUTER_API_KEY` is not set. Jev ran in shadow with replay and fixtures only; every live call is reported below as blocked.
+- **Jev:** `OPENROUTER_API_KEY` is not set. Jev ran in shadow with replay and fixtures only; every live call is reported below as blocked. *Superseded 2026-10-02:* the key now comes from Infisical and live Jev ran over the whole pilot (§12.3).
 
 Evidence is under `runs/pilot/`, which is gitignored and local to this worktree. Paths below are relative to the worktree root. `<scratchpad>` (and bare `verify/…`, `ws-c/…` paths) means the orchestration session scratchpad, `/private/tmp/claude-501/-Users-adamjackson-Projects-complete-raidar/4bbb344c-08b8-464f-941e-9702963aa2f2/scratchpad`, which is also local and not committed.
 
@@ -280,6 +280,8 @@ Every other budgeted phase passes in all four fixture runs. Run 2 finished befor
 
 ## 6. Jev shadow audit
 
+**Current state (2026-10-02; supersedes the blocked-call statements in this section).** `OPENROUTER_API_KEY` is injected from Infisical (§12.1), and live Jev has run in shadow over every pilot v2 trial: 15,516 provider calls for $2.33 in total (§12.3). The `process-compliance@1` rescore added 44 Assessments, and **0 of them are provisional**. The 5+8 provisional Assessments described below and in §11.2/§11.13 stay in the store (it is add-only) under the earlier scorer identity, so they are history, not open work. Nothing is enforced: both policies are still `shadow` (§11.17, §12.5). The text below is the 2026-09-30 record, kept as it was.
+
 Everything below is shadow: `counts_toward_verdicts: false` on every decision. Pinned model: `typesafe/jev-1.13-20260917`.
 
 **Process-compliance residue** (`process-compliance.residue`, question set `process-residue@1`; 140 decisions across 16 trajectories in one rescore):
@@ -366,7 +368,7 @@ Each option below is followed by the evidence that bears on it. The recommendati
 5. **Promote any Jev policy to enforce.**
    - **Not possible.** No provider key means 0 Jev answers and 0 labels, against a requirement of at least 30 labels with at least 5 minority labels and a frozen threshold.
    - Both policies stay in shadow.
-   - Next step: set `OPENROUTER_API_KEY`, rescore (the provisional Assessments re-ask automatically), then label decisions in the review surface and export them with `make jev-export-labels`.
+   - *Done 2026-10-02 (§12.3, §11.17).* Next step was: set `OPENROUTER_API_KEY`, rescore (the provisional Assessments re-ask automatically), then label decisions in the review surface and export them with `make jev-export-labels`.
 
 ---
 
@@ -755,7 +757,7 @@ Data: forge-02 + forge-03 (forge, 16+16 valid) and oneshot-01 (5+5 valid), canon
 5. **Sample size.** At 16 pairs, `solve_rate`, `reached` and R need no more pairs at the default δ; headline S needs 23 more ($7.35), E 35 more ($9.89) and G 50 more ($12.57). one-shot `solve_rate` needs about 350 pairs. Decide which metrics a confirmatory run must power.
 6. **S2-SS-1: the definition of C. Resolved 2026-10-02 (§11.16).** C now follows the SCB fork: the mean per-checkpoint case pass rate. *Correction:* this item first said every headline S in this packet used the mean case pass rate. That was wrong. Only the G2 golden path (`scorers/code_quality/arithmetic.py`) did. Analysis (`analysis/assessed.py`) and the review projection fed solved/K into S, so the headline S figures in §11.3, §11.4, §11.7 and §11.13 are solved/K-based. §11.16 gives the corrected values.
 7. **S2-SS-2: S when C = 0. Resolved 2026-10-02 (§11.16).** The fork marks S ineligible when any quality component is missing, even at C = 0, and `@1` keeps that rule. The new `scb-canonical@2` and `scb-canonical-oneshot@2` score S = 0 whenever C = 0 and are ineligible only when C > 0 and a component is missing. Both pilot experiments now declare `@2`.
-8. **Jev.** Still shadow only, with live calls blocked (no `OPENROUTER_API_KEY`) and 5+8 provisional process-compliance Assessments. Out of scope until you decide to enable it.
+8. **Jev.** Still shadow only. Live calls now run (key from Infisical): 15,516 provider calls for $2.33 over the whole pilot, and 0 of the 44 new `process-compliance@1` Assessments are provisional (§12.3). **Update (§11.17):** `code-quality.rubric-smells` now has 33 model-made labels and passes the label, minority and sufficiency gates, but it was not promoted. `make jev-verify-promotion` fails on the required `code-quality@1.1` scorer bump, and the frozen threshold does worse than never flagging on the evaluation split.
 
 
 ### 11.16 Scoring-definition alignment (S2-SS-1, S2-SS-2; 2026-10-02)
@@ -805,3 +807,99 @@ User decision (2026-10-01): "go with what you think best". The recommendation wa
 - J2 for headline S at the default δ 5: forge 4 pairs (SD 3.56; 0 more), one-shot 3 pairs (SD 3.05; 0 more), down from 38 and n/a.
 - **The forge headline verdict changes from `worse` to `inconclusive`.** Guided's lower checkpoint-solve rate comes from a few failed cases per checkpoint (§11.3), and the fork's C weighs those as near misses. The §11.13 verdict list now reads: guided is worse on `solve_rate`, `reached`, H and G, improved on E, and inconclusive on headline S, C, V, R and `final_solved`.
 
+### 11.17 Jev calibration and promotion attempt (2026-10-02)
+
+**Outcome: not promoted. Both policies stay `shadow`.** Evidence is in `runs/pilot-v2/gate-evidence/jev-labelling/` (labelling rounds, fixed split) and `runs/pilot-v2/gate-evidence/jev-promotion/` (dry runs, what-if, verify output).
+
+**Labels are model-made.** All 33 labels on `code-quality.rubric-smells` are blind labels with reviewer kind `model`, model id `claude-opus-5-5`, imported in two rounds with `make jev-import-blind REVIEWER=model REVIEWER_MODEL=claude-opus-5-5`. There are 0 human labels. The labeller was given only blind exports (state and questions). Selection used Jev's answers only for aggregate pool enrichment: `round-2/select.py` read them from the audit to build the pools and printed only aggregate counts. The same agent ran selection and labelling, so the artifacts cannot prove that agent never saw an answer (§12.4). Jev's decision log was unchanged by both imports (sha256 checked). Sampling was enriched towards Jev's provisional positives so that the minority class could reach 5. Metrics on these labels are therefore not population estimates.
+
+**`code-quality.rubric-smells` (question set `scb-rubric@2`).** `make jev-promote ... CALIBRATION=... EVALUATION=... DRY_RUN=1` was run on the split fixed in labelling round 1 (`jev-labelling/split.json`). That split has 21 calibration and 21 evaluation trials, whole trials, disjoint and stratified by problem and arm.
+
+| Gate or measure | Value | Result |
+|---|---|---|
+| Labelled decisions (≥30) | 33 (calibration 18, evaluation 15) | pass |
+| Minority labels (≥5) | 9 reference positives (calibration 6, evaluation 3) | pass |
+| Input sufficiency (≥0.8) | 0.9993 | pass |
+| Threshold, fitted on calibration only and frozen | 0.65 | — |
+| Calibration precision / recall / agreement | 0.7143 / 0.8333 / 0.8333 | reported |
+| **Evaluation** precision / recall / agreement | **0.2 / 0.3333 / 0.6** | reported |
+| Regression corpus sha256 | `da2c672734c84be0623ea6c3de47d0ae693c6da9956a2a2ecfa02bcb32b5dc21` | — |
+| Reviewers | `{model: 33}`, models `[claude-opus-5-5]` | recorded |
+| `make jev-verify-promotion` | fails: "scorer code-quality is at 1; the promotion ships with code-quality@1.1, so bump its manifest (and registrations) first" | **fail** |
+
+How the verify result was obtained: `make jev-verify-promotion` on the repo policy reports "has no recorded promotion", because nothing is recorded until a promotion is written. To check what the verifier would say after a promotion, the promotion was written to a scratch copy of the policy directory (`jev-promotion/what-if-policies/`) and verified against that copy. The assessment store was byte-identical before and after.
+
+Why the policy was not promoted:
+1. **The verifier gate fails.** A promotion ships with the next scorer minor version (design memo §3.5). `code-quality@1.1` does not exist, and `code-quality@1` does not consume `code-quality.rubric-smells` decisions at all; only `process-compliance@1` is bound to a Jev policy (`scorers/catalog.py` `BUILTIN_STORE_IMPLEMENTATIONS`). Writing `mode: enforce` now would leave a repo policy that `make jev-verify-promotion` rejects. It would also change no Assessment, so a rescore would show nothing.
+2. **The frozen threshold does not hold out.** On evaluation, never flagging agrees with 12 of 15 labels (0.8), but the threshold agrees with 9 of 15 (0.6). It catches 1 of 3 positives with 4 false flags. The provisional 0.5 cut does no better there (0.6 agreement, precision 0.3333, recall 1.0). The gate as coded has no metric floor, so this is a judgement, not a gate failure.
+
+What enforce would change in the shadow audit (inference from the what-if; nothing was enforced): of 17,248 Jev-answered decisions, 1,522 would be flagged at 0.65, against 2,449 at the provisional 0.5. The audit holds 41,405 decisions; the other 24,157 were settled deterministically. 0 decisions are enforced today.
+
+**`process-compliance.residue` does not qualify.** The dry run fails with "0 labelled decisions < 30", "0 minority labels < 5", "input sufficiency 0/62 < 0.8" and "a split needs labelled decisions from at least 2 trials". The 28 `jev_error` decisions and the 34 partial-input decisions keep sufficiency below 0.8 whatever the labels are.
+
+**What promotion would need (proposal):**
+- a `code-quality@1.1` that emits a Jev-tier rubric metric bound to this policy, with registrations and a new epoch;
+- a human spot-check of the two stances that 7 of the 9 positives rest on: mkdir in persistence code counts as auto-correction or silent resource creation (5), and raw string tags count as stringly typed (2);
+- more evaluation positives (only 3 today), so that held-out precision and recall rest on more than a handful of cases;
+- a re-fit on the same split, then `make jev-promote` and `make jev-verify-promotion`.
+
+## 12. Phase 1 close-out (2026-10-02)
+
+This section closes Phase 1. Each part names its evidence. Everything under `runs/` is gitignored and local to this worktree.
+
+### 12.1 Secrets via Infisical
+
+- Raidar's secrets live in the Infisical project `mac-os-cf`, environment `dev`, bound by `orchestrator/.infisical.json`. Every make target that runs agents or Jev injects them through `infisical run --env=dev` (`SECRETS=auto|infisical|dotenv`, default `auto`). The Makefile prints only the source (`secrets: Infisical (env dev)` or `secrets: orchestrator/.env`), never a value.
+- Behaviour, checked independently through the real Makefile: logged in → Infisical. Not logged in or CLI missing → falls back to `orchestrator/.env` and exits 0 in under a second, with no interactive prompt. `SECRETS=infisical` while not logged in → fails with an `infisical login` message. `SECRETS=dotenv` → `.env`.
+- Leak check: the actual values of `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `OPENROUTER_API_KEY` and `GEMINI_API_KEY` were compared byte for byte against 228,755 files (the whole worktree including `runs/`, `stores/`, `.tmp/` and `docs/`, plus the session scratchpad). There were 0 hits. A pattern grep of tracked files matched only two test fixtures, neither a real key.
+- `orchestrator/.env` still exists. Its ANTHROPIC, OPENAI, GEMINI and `CODEX_AUTH_MODE` entries are empty, so it is now only a fallback. **Deleting it needs your approval** (§12.7).
+
+### 12.2 Claude Code readiness on `claude-haiku-4-5`
+
+- **Result: blocked on account funding, not on Raidar.** Run `runs/smoke/20261002T030840Z` used `make agent-smoke HARNESS=claude-code`: claude-code 2.1.285, `anthropic/claude-haiku-4-5`, no reasoning effort, OrbStack. The key reached the agent from Infisical, and the agent reached the Anthropic API, which answered `Credit balance is too low`. The trial ended `infra_error` (0 valid), and no tokens were spent.
+- A presence-only credential preflight (`execution/credentials.py`) runs in `raidar run` before any trial starts. With empty credentials (`SECRETS=dotenv`), `make agent-smoke HARNESS=claude-code` exits 2 with "credential preflight failed; no trial was started". `docker ps -a` showed no new container and no new run directory. The preflight checks presence only, so an unfunded key still gets through to a trial, as happened above.
+- The Claude mappings of the built-in components are still unit-tested only. **Next action (yours):** fund the Anthropic organisation behind `ANTHROPIC_API_KEY` in `mac-os-cf/dev`, then run `make smoke-agents SMOKE_ARM=claude`.
+
+### 12.3 Live Jev (shadow) and its cost
+
+Pinned model `typesafe/jev-1.13-20260917`, mode `shadow`, `counts_toward_verdicts: false` everywhere, 0 decisions enforced. Store: `runs/pilot-v2/assessment-store`.
+
+| Policy | Decisions | Jev-answered | Fresh provider calls | Cache hits | Cost (USD) | Evidence |
+|---|---|---|---|---|---|---|
+| `code-quality.rubric-smells@2` (`scb-rubric@2`), 42 trials, 266 checkpoints | 41,405 (24,157 carried forward deterministically) | 17,248; question, symbol and criterion coverage 100%; 12 partial-input, 0 missing | 15,499 | 1,749 | 2.3221 | `gate-evidence/jev-rubric-live/` |
+| `process-compliance.residue` (`process-residue@1`), forge-02, forge-03, oneshot-01 | 1,702 on 2026-10-02 (1,656 deterministic) | 34 | 17 | 17 (replay pass) | 0.0037 | `gate-evidence/jev-live/` |
+| **Total** | | | **15,516** | | **≈ 2.33** | |
+
+- The `process-compliance@1` rescore added 44 Assessments (17 forge-02, 17 forge-03, 10 oneshot-01). **0 are provisional.** The replay pass gave `replayed_identical` for every one and left the store unchanged (`store-assessments-{pre,post-live,post-replay}.sha`).
+- 12 `jev_error / cache_miss` rows were logged at 01:05Z on 2026-10-02. They come from a replay-only rescore made before the key existed, and the live run superseded them.
+- Every Jev answer is `uncalibrated`: no threshold is in force, and no answer changes a verdict or an S value.
+
+### 12.4 Labelling provenance and readiness
+
+- 33 blind labels on `code-quality.rubric-smells`, all with reviewer kind `model` and model id `claude-opus-5-5` (round 1: 18, round 2: 15). There are 0 human labels. They cover 33 distinct requests and cache keys, with at most one label per trial-request and no replay duplicates. An independent re-derivation of every label from the labeller's answers against Jev's audited answers at the 0.5 cut gave 0 mismatches.
+- What the labeller received: `blind-round-{1,2}.jsonl` carry only `policy`, `question_set`, `questions`, `request_id`, `state`, `subject` and `trial`. They contain no answers, verdicts, cache keys, costs or model ids.
+- **Limit on the provenance claim.** Pool selection was enriched towards Jev's provisional positives so that the minority class could reach 5. To build the pools, `round-2/select.py` read Jev's answers from the audit; it printed only aggregate counts and shuffled the output. The same agent ran selection and labelling. The data handed to the labeller is provably blind, but the artifacts cannot prove that the agent itself never saw an answer. *Proposal:* a separate agent or person runs selection in future rounds, and the labeller receives only the blind export.
+- Readiness (`code-quality.rubric-smells`): labelled 33 ≥ 30, minority 9 ≥ 5, input sufficiency 0.9993 ≥ 0.8, all pass. The labels are enriched and model-made, so metrics on them are not population estimates. `process-compliance.residue` has 0 labels and sufficiency 0/62, so it does not qualify.
+
+### 12.5 Promotion outcome
+
+- **Not promoted. Both policies stay `shadow`** (details in §11.17). On the fixed 21/21-trial split the frozen threshold is 0.65. Calibration P/R/agreement is 0.7143/0.8333/0.8333; evaluation is 0.2/0.3333/0.6, worse than never flagging (0.8). `make jev-verify-promotion` would fail on the missing `code-quality@1.1` bump, and `code-quality@1` does not consume this policy's decisions.
+- **Tooling fix in this close-out.** `make jev-promote` used to write `mode: enforce` whenever the audit re-derived. It did so even when the scorer's minor bump the promotion names did not exist yet, which left a repo policy that `make jev-verify-promotion` rejects. `raidar jev promote` now refuses to write in that case: it exits 1 and reports `"blocked_on_scorer_bump": true` and `"written": null`. `--allow-pending-scorer-bump` (`make jev-promote ... ALLOW_SCORER_BUMP=1`) writes anyway, for the deliberate sequence "promote, then bump the scorer". A dry run reports the flag and exits 0. Covered by `test_promote_writes_enforce_only_when_the_audit_verifies`.
+- What promotion would need is listed at the end of §11.17: a `code-quality@1.1` bound to the policy, a human spot-check of the two stances behind 7 of the 9 positives, more evaluation positives, and a re-fit.
+
+### 12.6 Scoring alignment (S2-SS-1, S2-SS-2)
+
+- C follows the SCB fork (`~/Projects/inflight/slop-code-bench` at `3357617`). It is the plain mean of per-checkpoint case pass rates. Skipped cases leave the denominator, an unreached checkpoint scores 0, and a checkpoint with 0 graded cases is ineligible. The mean runs at Decimal precision 50 with ROUND_HALF_EVEN. An independent read of the fork confirmed the match (§11.16).
+- `scb-canonical@2` and `scb-canonical-oneshot@2` set S = 0 when C is used and exactly 0. Both pilot experiments declare `@2`. Re-analysis moved the forge headline from `worse` to `inconclusive`, and the primary `solve_rate` is still `worse` for guided (§11.16).
+- **Coverage gap closed in this close-out.** No pilot trajectory has C = 0 under the new C, so pilot data never exercises the C = 0 → S = 0 path. A new end-to-end test, `test_v2_scores_c_zero_trajectories_zero_end_to_end_while_v1_leaves_them_unscored` (`tests/test_analysis_command.py`), writes trials, rescores them with the real scorers and runs `raidar analyze` with code-quality never assessed. Under `@2` the two C = 0 pairs score S = 0 and are paired, and the three C > 0 trajectories stay unassessed. Under `@1` all five are unassessed.
+- Minor, not fixed: `_checkpoint_rate` falls back to `Decimal(str(float))` when an observation has no numerator or denominator, which may differ from the fork's exact ratio in the last digits. Current scorers record exact counts, so no pilot value is affected.
+
+### 12.7 Cleanup and what remains for you
+
+- Done: scenario-era code paths, the frozen fixture, `--legacy-root` and their import contracts are removed, and the review projection is `schema_version 2` with problem and arm naming (commit `1cf9d2f`). Generated `.coverage` files are untracked. No Raidar trial container is left on OrbStack (`docker ps -a` shows only other projects' containers and signoz).
+- Unchanged by design (a separate decision is pending with you): the experiment folder layout (`examples/`), experiment `kind`, and the runtime-compat gate.
+- **Needs your decision or input:**
+  1. **Delete the plaintext `orchestrator/.env`.** Infisical works, and every credential entry in `.env` is empty, but it remains the fallback when Infisical is not logged in. Deleting it makes `SECRETS=auto` fail closed, with no credentials, instead of silently using `.env`. This was not done because it needs your approval.
+  2. **Fund the Anthropic organisation** behind `ANTHROPIC_API_KEY` in `mac-os-cf/dev`. Claude Code readiness (§12.2) waits on it.
+  3. **Jev promotion path**: whether to build `code-quality@1.1` with a Jev-tier rubric metric, and who does the human spot-check (§11.17).
+  4. The open §11.15 items: Phase 2 entry, the N1 regression investigation, the guided-arm forge effect, the manipulation check (`plan_written`) and the confirmatory sample size.

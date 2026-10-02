@@ -245,11 +245,13 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     dry = runner.invoke(main, ["jev", "promote", *base, "--dry-run"])
     assert dry.exit_code == 0, dry.output
     assert json.loads(dry.output)["written"] is None
+    split_args = ["--calibration", "t1 t2", "--evaluation", "t3,t4"]
     promoted = runner.invoke(
-        main, ["jev", "promote", *base, "--calibration", "t1 t2", "--evaluation", "t3,t4"]
+        main, ["jev", "promote", *base, *split_args, "--allow-pending-scorer-bump"]
     )
     assert promoted.exit_code == 0, promoted.output
     report = json.loads(promoted.output)
+    assert report["blocked_on_scorer_bump"] is False
     assert report["scorer_bump_required"] == {"scorer": "code-quality", "from": "1", "to": "1.1"}
 
     written = load_policy(policies / f"{RUBRIC}.yaml")
@@ -285,6 +287,32 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     import_labels(runtime.audit, RUBRIC, [{"request_id": late.request_id, "label": "correct"}])
     stale = json.loads(runner.invoke(main, ["jev", "verify-promotion", *base]).output)
     assert any("regression_corpus" in failure for failure in stale["failures"])
+
+
+def test_promote_refuses_to_write_while_the_scorer_bump_is_pending(tmp_path: Path) -> None:
+    # The plan verifies, but code-quality@1.1 does not exist yet: writing enforce now would
+    # leave a repo policy that `jev verify-promotion` rejects, so no write without the flag.
+    policies = tmp_path / "policies"
+    shutil.copytree(POLICY_DIR, policies)
+    store = tmp_path / "store"
+    _promotable(store)
+    base = ["--store", str(store), "--policy", RUBRIC, "--policy-dir", str(policies)]
+    split_args = ["--calibration", "t1 t2", "--evaluation", "t3,t4"]
+    runner = CliRunner()
+
+    dry = runner.invoke(main, ["jev", "promote", *base, *split_args, "--dry-run"])
+    assert dry.exit_code == 0, dry.output
+    assert json.loads(dry.output)["blocked_on_scorer_bump"] is True
+    pending = runner.invoke(main, ["jev", "promote", *base, *split_args])
+    assert pending.exit_code == 1, pending.output
+    report = json.loads(pending.output)
+    assert (report["verified"], report["written"], report["blocked_on_scorer_bump"]) == (
+        True,
+        None,
+        True,
+    )
+    assert report["scorer_bump_required"] == {"scorer": "code-quality", "from": "1", "to": "1.1"}
+    assert load_policy(policies / f"{RUBRIC}.yaml").mode is PolicyMode.SHADOW
 
 
 def test_blind_decisions_without_noul_questions_compare_choices_and_scores(

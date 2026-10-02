@@ -46,7 +46,13 @@ SOLVES = {
 COST = {"baseline": 0.01, "guided": 0.03}
 
 
-def _lock(scorers: list[str], *, experiment: str = "pilot", **thresholds: Any) -> dict[str, Any]:
+def _lock(
+    scorers: list[str],
+    *,
+    experiment: str = "pilot",
+    headline: str = "scb-canonical@1",
+    **thresholds: Any,
+) -> dict[str, Any]:
     analysis = {"baseline_arm": "baseline", **thresholds}
     spec = {
         "analysis": {**analysis, "blocks": 5, "seed": 11},
@@ -62,7 +68,7 @@ def _lock(scorers: list[str], *, experiment: str = "pilot", **thresholds: Any) -
             "assessment": {
                 "spec": spec["assessment"],
                 "headline_policy": {
-                    "ref": "scb-canonical@1",
+                    "ref": headline,
                     "selection": "default_by_k",
                     "checkpoints": [2],
                 },
@@ -120,10 +126,11 @@ def _write_run(
     name: str = "run-1",
     max_checkpoints: int | None = None,
     record_truncation: bool = True,
+    outcomes: dict[str, list[tuple[CaseStatus, CaseStatus]]] | None = None,
 ) -> Path:
     run_dir = root / name
     trials = []
-    for arm, solves in SOLVES.items():
+    for arm, solves in (outcomes or SOLVES).items():
         for block, (first, second) in enumerate(solves):
             trial_id = f"toy-{arm}-b{block}"
             trial_dir = write_trial(
@@ -232,6 +239,45 @@ def test_analyze_reports_stored_assessments_without_touching_inputs(
     assert "## guided vs baseline" in markdown
     assert "**Primary outcome** `solve_rate`" in markdown
     assert "not pinned by the lock" in markdown
+
+
+def test_v2_scores_c_zero_trajectories_zero_end_to_end_while_v1_leaves_them_unscored(
+    tmp_path: Path,
+) -> None:
+    # S2-SS-2 through rescore and `raidar analyze`: code-quality@1 is never rescored, so every
+    # trajectory has a quality gap. Under @2 a trajectory with C = 0 still scores S = 0 and is
+    # paired; one with C > 0 stays unassessed. Under @1 (fork-exact) every S is unassessed.
+    outcomes = {
+        "baseline": [(FAIL, FAIL)] * 5,
+        "guided": [(FAIL, FAIL)] * 2 + [(PASS, FAIL)] * 3,
+    }
+    scorers = ["correctness@1", "code-quality@1", "resource-usage@1"]
+    for headline, pairs, unassessed in (("scb-canonical@2", 2, 3), ("scb-canonical@1", 0, 5)):
+        root = tmp_path / headline
+        lock = _lock(scorers, headline=headline)
+        lock_path = root / "pilot.lock.json"
+        root.mkdir()
+        lock_path.write_text(json.dumps(lock))
+        run_dir = _write_run(root, lock, outcomes=outcomes)
+        store = root / "store"
+        rescore_path(
+            run_dir / "trials",
+            ("correctness@1", "resource-usage@1"),
+            AssessmentStore(store),
+            default_scorer_registry(),
+            config=lock_rescore_config(lock).scorers,
+        )
+        result = _analyze(run_dir, store, lock_path, root / "analysis")
+        assert result.exit_code == 0, result.output
+        report = json.loads((root / "analysis" / "analysis.json").read_text())
+        correctness = _effect(report, "correctness")
+        assert correctness["n_pairs"] == 5
+        assert correctness["mean_delta"] == pytest.approx(0.3)  # 3 of 5 guided at C = 0.5
+        headline_effect = _effect(report, "headline_score")
+        assert headline_effect["n_pairs"] == pairs, headline
+        assert headline_effect["exclusions"]["unassessed"] == unassessed, headline
+        if pairs:
+            assert headline_effect["mean_delta"] == 0.0  # both arms S = 0 on the C = 0 pairs
 
 
 PINNED = {

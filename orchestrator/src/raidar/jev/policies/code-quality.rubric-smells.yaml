@@ -9,3 +9,14 @@ description: SCB rubric smells per changed Python symbol, with carry-forward.
 mode: shadow
 question_set: scb-rubric@2
 runtimes: [python]
+
+# Calibration status (2026-10-02; NOT promoted, see gate packet §11.17). This
+# trailing note is dropped by `make jev-promote`, whose promotion block records
+# reviewers itself:
+# - Labels: 33 blind labels in runs/pilot-v2/assessment-store, all
+#   model-made (reviewer kind "model", model id "claude-opus-5-5"); 0 human.
+# - Candidate on the fixed split (21/21 trials): threshold 0.65, regression
+#   corpus da2c672734c84be0623ea6c3de47d0ae693c6da9956a2a2ecfa02bcb32b5dc21,
+#   evaluation precision 0.2 / recall 0.3333 / agreement 0.6 (n=15, 3 positives).
+# - Held in shadow: jev-verify-promotion fails until a code-quality@1.1 exists,
+#   and code-quality@1 does not consume this policy's decisions.
