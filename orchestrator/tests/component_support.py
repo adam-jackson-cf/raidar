@@ -8,12 +8,12 @@ from typing import Any
 
 from pydantic import JsonValue
 
-from raidar.agents.config import Harness
+from raidar.agents.config import Harness, agent_name_for
 from raidar.components import CompiledCondition, compile_condition
 from raidar.spec.schema import AgentEntry, ComponentUse, ConditionSpec
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PILOT_DIR = REPO_ROOT / "examples" / "pilot"
+PILOT_DIR = REPO_ROOT / "experiments" / "ab-test" / "python__forge__guided-pilot"
 # Component proof fixtures: probe files every built-in compiles from, relative to FIXTURES_DIR.
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 PROBE_DIR = "components/probe"
@@ -26,7 +26,7 @@ CLAUDE_SETTINGS: dict[str, JsonValue] = {"outputStyle": "Explanatory"}
 def agent(harness: Harness = Harness.CODEX_CLI) -> AgentEntry:
     return AgentEntry(
         id="agent",
-        harness=harness,
+        name=agent_name_for(harness),
         provider="openai" if harness is Harness.CODEX_CLI else "anthropic",
         model="gpt-6-luna" if harness is Harness.CODEX_CLI else "claude-sonnet",
         version="0.156.1",

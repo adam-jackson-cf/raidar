@@ -5,16 +5,16 @@ tests, per-step ``test.sh`` and reference solutions. Raidar splits it into:
 
 - ``task/``: what Harbor loads and the agent environment sees. Instructions,
   a stub ``tests/test.sh`` (Harbor 0.23 requires one for shared-mode steps;
-  the Raidar oracle verifier never uploads it), the Python pack image with the
+  the Raidar verifier never uploads it), the Python pack image with the
   compose ``init: true`` override, and a ``/app`` artifact per step for the
-  host-side oracle. No hidden test, test script or solution is present.
-- ``oracle/``: the host-only oracle bundle (``raidar.oracle.bundle``), graded
+  host-side verifier. No hidden test, test script or solution is present.
+- ``oracle/``: the host-only verifier bundle (``raidar.verifier.bundle``), graded
   in the pack image so grader and agent run the submission on one image.
 - ``references/<step>/``: the converter's canary-stripped reference payload
   per step, used only by ``raidar problem validate``.
 
 Step verification is selected per trial with
-``VerifierConfig(import_path=ORACLE_VERIFIER_IMPORT_PATH, kwargs={"oracle_bundle": ...})``.
+``VerifierConfig(import_path=VERIFIER_IMPORT_PATH, kwargs={"oracle_bundle": ...})``.
 """
 
 from __future__ import annotations
@@ -27,23 +27,23 @@ from pathlib import Path
 from harbor.models.task.config import ArtifactConfig, TaskConfig, VerifierEnvironmentMode
 from harbor.models.task.task import Task
 
-from raidar.oracle.bundle import (
-    BundleManifest,
-    GraderSpec,
-    OracleBundle,
-    build_bundle_from_scb_harbor_task,
-    write_bundle,
-)
 from raidar.oracle.snapshot import app_artifact_config
 from raidar.packs.python import PackSpec, bind_task_environment
 from raidar.problems.models import ProblemId
+from raidar.verifier.bundle import (
+    BundleManifest,
+    GraderSpec,
+    VerifierBundle,
+    build_bundle_from_scb_harbor_task,
+    write_bundle,
+)
 
-ORACLE_VERIFIER_IMPORT_PATH = "raidar.oracle.verifier:RaidarOracleVerifier"
+VERIFIER_IMPORT_PATH = "raidar.verifier.verifier:RaidarVerifier"
 AGENT_USER = "agent"
 STUB_TEST_SH = """#!/bin/bash
-# Raidar: hidden tests are graded host-side by raidar.oracle.verifier.
+# Raidar: hidden tests are graded host-side by raidar.verifier.verifier.
 # Harbor requires a test script for shared-mode steps; this one is never run.
-echo "raidar: the oracle is host-side" >&2
+echo "raidar: the verifier is host-side" >&2
 exit 1
 """
 # Checkpoint test modules a bundle keeps only when one of its steps selects them.
@@ -120,8 +120,8 @@ def build_bundle(
     pack_image: str,
     source: dict[str, str],
     entry_file: str | None = None,
-) -> OracleBundle:
-    """Oracle bundle for the selected steps, graded in the agent's pack image."""
+) -> VerifierBundle:
+    """Verifier bundle for the selected steps, graded in the agent's pack image."""
     staged = build_bundle_from_scb_harbor_task(
         converted, out.with_name(out.name + ".staged"), source=source
     )

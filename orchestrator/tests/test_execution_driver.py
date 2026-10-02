@@ -1,4 +1,4 @@
-"""Execution driver (D1 concurrency, D2): ordering, guard wiring, run directory records."""
+"""Execution driver (D1 concurrency, D2): ordering, guard wiring, job directory records."""
 
 from __future__ import annotations
 
@@ -27,12 +27,12 @@ from raidar.execution.environment import (
 )
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
-from raidar.execution.run import RunContext, execute, load_problems
-from raidar.oracle.verifier import RaidarOracleVerifier
+from raidar.execution.run import JobContext, execute, load_problems
 from raidar.packs.python import load_pack_spec
-from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
+from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
 from raidar.spec.lock import lock_integrity_issues
+from raidar.verifier.verifier import RaidarVerifier
 from tests.execution_support import (
     ImportedFixture,
     StepOutcome,
@@ -128,7 +128,7 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
         fixture.ref,
-        runtime={"compose_init": False},
+        environment={"compose_init": False},
         assessment={
             "scorers": ["correctness@1"],
             "inventory_policy": {"generated_globs": ["gen/**"]},
@@ -140,15 +140,15 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         lock,
         store=fixture.store,
         pack=load_pack_spec(),
-        options=PlanOptions(blocks=(0,)),
+        options=PlanOptions(attempts=(0,)),
     )
 
 
-def test_a_run_materialises_each_trial_and_writes_attempt_records(
+def test_a_run_materialises_each_trial_and_writes_step_results(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.execution.run.image_present", lambda tag: True)
+    monkeypatch.setattr("raidar.execution.materialise.image_present", lambda tag: True)
     monkeypatch.setattr(
         "raidar.execution.trial_config.with_host_auth", lambda config, harness: config
     )
@@ -161,10 +161,10 @@ def test_a_run_materialises_each_trial_and_writes_attempt_records(
         outcomes = [StepOutcome("checkpoint_1", passed=False)]  # halts after checkpoint 1
         return TrialRun(write_trial(config.trials_dir / config.trial_name, outcomes), None)
 
-    ctx = RunContext(
+    ctx = JobContext(
         plan=plan,
-        run_dir=tmp_path / "runs" / plan.experiment_id / "r1",
-        run_id="r1",
+        job_dir=tmp_path / "jobs" / plan.experiment_id / "r1",
+        job_id="r1",
         problems=load_problems(plan, fixture_problem.store),
         runner=fake_runner,
         docker_context="orbstack",
@@ -172,18 +172,18 @@ def test_a_run_materialises_each_trial_and_writes_attempt_records(
     records = asyncio.run(execute(ctx))
     assert [r.trial.trial_id for r in records] == [t.trial_id for t in plan.selected_trials()]
     config = seen[0]
-    assert config.verifier.import_path == ORACLE_VERIFIER_IMPORT_PATH
+    assert config.verifier.import_path == VERIFIER_IMPORT_PATH
     kwargs = config.verifier.kwargs
     assert kwargs["oracle_bundle"] == str(ctx.problems[0].bundle.root)
     assert kwargs["snapshot_source"] == "artifact"
     assert kwargs["docker_context"] == "orbstack"
-    # The Compose project is scoped to this run directory (no cross-run collision).
+    # The Compose project is scoped to this job directory (no cross-run collision).
     assert (config.environment.import_path, config.environment.kwargs) == (
         RUN_SCOPED_DOCKER_IMPORT_PATH,
         {"run_scope": run_scope(ctx.trials_dir)},
     )
-    # The verifier kwargs are ones the Raidar oracle verifier accepts.
-    assert set(kwargs) <= set(inspect.signature(RaidarOracleVerifier.__init__).parameters)
+    # The verifier kwargs are ones the Raidar verifier accepts.
+    assert set(kwargs) <= set(inspect.signature(RaidarVerifier.__init__).parameters)
     assert config.agent.name == "codex"
     assert config.agent.kwargs["version"] == "0.156.1"
     task = Path(config.task.path or "")
@@ -193,37 +193,37 @@ def test_a_run_materialises_each_trial_and_writes_attempt_records(
     guided = next(c for c in seen if c.trial_name.endswith("guided"))
     assert (Path(guided.task.path or "") / "steps/checkpoint_1/workdir/AGENTS.md").is_file()
     record = next(r for r in records if r.trial.arm == "baseline")
-    assert [a.checkpoint_state.value for a in record.attempts] == ["failed", "not_attempted"]
+    assert [a.checkpoint_state.value for a in record.step_results] == ["failed", "not_attempted"]
     # The synthetic trial holds no harness context, so the guided arm's rules-file
-    # discovery probe fails: that step is infra_error and the trajectory is invalid.
+    # discovery probe fails: that step is infra_error and the trial is invalid.
     guided_record = next(r for r in records if r.trial.arm == "guided")
-    assert guided_record.attempts[0].checkpoint_state.value == "infra_error"
-    assert guided_record.attempts[0].infra_reasons[0].startswith("component_probe:rules-file@1")
+    assert guided_record.step_results[0].checkpoint_state.value == "infra_error"
+    assert guided_record.step_results[0].infra_reasons[0].startswith("component_probe:rules-file@1")
     assert not guided_record.valid
     assert record.reached == (True, False)
     assert record.reached_source == "executed"
     assert record.valid
     phases = {p.phase for p in record.phases}
     assert {"component_apply", "per_step_reset", "raidar_result_write"} <= phases
-    run_dir = ctx.run_dir
-    stored = json.loads((run_dir / "trajectories" / f"{record.trial.trial_id}.json").read_text())
-    assert stored["attempts"][0]["checkpoint_state"] == "failed"
-    manifest = json.loads((run_dir / "run.json").read_text())
+    job_dir = ctx.job_dir
+    stored = json.loads((job_dir / "trial-records" / f"{record.trial.trial_id}.json").read_text())
+    assert stored["step_results"][0]["checkpoint_state"] == "failed"
+    manifest = json.loads((job_dir / "job.json").read_text())
     assert manifest["partial"]
     assert manifest["summary"]["valid"] == 1
-    assert json.loads((run_dir / "plan.json").read_text())["lock_sha256"] == plan.lock_sha256
-    _assert_run_keeps_its_lock_and_settings(run_dir, plan.lock_sha256)
+    assert json.loads((job_dir / "plan.json").read_text())["lock_sha256"] == plan.lock_sha256
+    _assert_run_keeps_its_lock_and_settings(job_dir, plan.lock_sha256)
     with pytest.raises(FileExistsError):
         asyncio.run(execute(ctx))
 
 
-def _assert_run_keeps_its_lock_and_settings(run_dir: Path, lock_sha256: str) -> None:
+def _assert_run_keeps_its_lock_and_settings(job_dir: Path, lock_sha256: str) -> None:
     """The run keeps the lock it executed under, so review/analysis still find it
     after the experiment's lock is relocked or overwritten, and its assessor settings."""
-    kept = json.loads((run_dir / "run.lock.json").read_text())
+    kept = json.loads((job_dir / "job.lock.json").read_text())
     assert kept["lock_sha256"] == lock_sha256
     assert not lock_integrity_issues(kept)
-    assessment = yaml.safe_load((run_dir / "assessment-config.yaml").read_text())
+    assessment = yaml.safe_load((job_dir / "assessment-config.yaml").read_text())
     assert assessment["inventory_policy"]["generated_globs"] == ["gen/**"]
 
 
@@ -231,15 +231,15 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.execution.run.image_present", lambda tag: True)
+    monkeypatch.setattr("raidar.execution.materialise.image_present", lambda tag: True)
     monkeypatch.setattr(
         "raidar.execution.trial_config.with_host_auth", lambda config, harness: config
     )
     loaded, lock, _ = locked_experiment(
         tmp_path / "exp",
         fixture_problem.ref,
-        runtime={"compose_init": False},
-        analysis={"baseline_arm": "baseline", "blocks": 2, "seed": 1, "concurrency": 2},
+        environment={"compose_init": False},
+        analysis={"baseline_arm": "baseline", "attempts": 2, "seed": 1, "concurrency": 2},
     )
     plan = build_plan(
         loaded,
@@ -257,39 +257,42 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
         outcomes = [StepOutcome("checkpoint_1")]
         return TrialRun(write_trial(config.trials_dir / config.trial_name, outcomes), None)
 
-    ctx = RunContext(
+    ctx = JobContext(
         plan=plan,
-        run_dir=tmp_path / "run",
-        run_id="r",
+        job_dir=tmp_path / "run",
+        job_id="r",
         problems=load_problems(plan, fixture_problem.store),
         runner=fake_runner,
     )
     records = {r.trial.trial_id: r for r in asyncio.run(execute(ctx))}
     assert set(records) == {t.trial_id for t in plan.selected_trials()}
     broken = records.pop(failing)
-    assert [a.checkpoint_state.value for a in broken.attempts] == ["infra_error", "not_attempted"]
-    assert broken.attempts[0].infra_reasons == ("runner_exception:RuntimeError",)
+    assert [a.checkpoint_state.value for a in broken.step_results] == [
+        "infra_error",
+        "not_attempted",
+    ]
+    assert broken.step_results[0].infra_reasons == ("runner_exception:RuntimeError",)
     assert broken.trial_exception == "RuntimeError"
     assert not broken.valid
     assert "docker unreachable" in broken.validity.checks[0].detail
     assert (ctx.trials_dir / failing / "raidar-runner-error.txt").is_file()
-    assert (ctx.run_dir / "trajectories" / f"{failing}.json").is_file()
+    assert (ctx.job_dir / "trial-records" / f"{failing}.json").is_file()
     (sibling,) = records.values()
     assert sibling.valid
-    manifest = json.loads((ctx.run_dir / "run.json").read_text())
+    manifest = json.loads((ctx.job_dir / "job.json").read_text())
     assert manifest["finished_at"]
     assert "aborted" not in manifest
-    assert manifest["summary"]["trajectories"] == 2
+    assert manifest["summary"]["trials"] == 2
     assert manifest["summary"]["valid"] == 1
 
 
-def test_oracle_override_carries_reference_solutions_only_then(
+def test_verifier_override_carries_reference_solutions_only_then(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    monkeypatch.setattr("raidar.execution.run.image_present", lambda tag: False)
+    monkeypatch.setattr("raidar.execution.materialise.image_present", lambda tag: False)
     loaded, lock, _ = locked_experiment(
-        tmp_path / "exp", fixture_problem.ref, runtime={"compose_init": False}
+        tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
     )
     plan = build_plan(
         loaded,
@@ -297,7 +300,7 @@ def test_oracle_override_carries_reference_solutions_only_then(
         store=fixture_problem.store,
         pack=load_pack_spec(),
         options=PlanOptions(
-            arms=("baseline",), blocks=(0,), max_checkpoints=1, agent_override="oracle"
+            arms=("baseline",), attempts=(0,), max_checkpoints=1, agent_override="oracle"
         ),
     )
     tasks: list[Path] = []
@@ -310,10 +313,10 @@ def test_oracle_override_carries_reference_solutions_only_then(
             None,
         )
 
-    ctx = RunContext(
+    ctx = JobContext(
         plan=plan,
-        run_dir=tmp_path / "run",
-        run_id="r",
+        job_dir=tmp_path / "run",
+        job_id="r",
         problems=load_problems(plan, fixture_problem.store),
         runner=fake_runner,
     )
@@ -389,33 +392,33 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
 ) -> None:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
     loaded, _, _ = locked_experiment(
-        tmp_path / "exp", fixture_problem.ref, runtime={"compose_init": False}
+        tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
     )
-    contexts: list[RunContext] = []
+    contexts: list[JobContext] = []
 
-    async def fake_execute(ctx: RunContext) -> list[Any]:
+    async def fake_execute(ctx: JobContext) -> list[Any]:
         contexts.append(ctx)
         return []
 
     monkeypatch.setattr("raidar.commands.execution.execute", fake_execute)
     runner = CliRunner()
-    arguments = ["run", str(loaded.path), "--arm", "baseline", "--block", "1"]
+    arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1"]
     result = runner.invoke(
-        main, [*arguments, "--runs-dir", str(tmp_path / "runs"), "--run-id", "x"]
+        main, [*arguments, "--jobs-dir", str(tmp_path / "jobs"), "--job-id", "x"]
     )
     assert result.exit_code == 0, result.output
     (ctx,) = contexts
-    assert ctx.run_dir == (tmp_path / "runs" / loaded.spec.id / "x").resolve()
+    assert ctx.job_dir == (tmp_path / "jobs" / loaded.spec.id / "x").resolve()
     assert [t.trial_id for t in ctx.plan.selected_trials()] == ["b01-p0-baseline"]
     assert set(ctx.problems) == {0}
-    none = runner.invoke(main, ["run", str(loaded.path), "--arm", "baseline", "--block", "7"])
+    none = runner.invoke(main, ["run", str(loaded.path), "--arm", "baseline", "--attempt", "7"])
     assert none.exit_code != 0
 
 
 def test_run_scoped_environment_suffixes_the_compose_session(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Same trial id in two run dirs -> two Compose projects (the pilot's exit-143 collision)."""
+    """Same trial id in two job dirs -> two Compose projects (the pilot's exit-143 collision)."""
     first, second = tmp_path / "exp-a" / "r1" / "trials", tmp_path / "exp-b" / "r1" / "trials"
     assert run_scope(first) == run_scope(first)
     assert run_scope(first) != run_scope(second)

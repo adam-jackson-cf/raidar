@@ -1,6 +1,6 @@
 // Head-to-head checkpoint scatter (docs/reboot/h2h-signals.md): lint findings
 // and functions with CC > 10, arm A on x and arm B on y, one point per
-// checkpoint (median across blocks), dashed y = x parity. Below the line, B
+// checkpoint (median across attempts), dashed y = x parity. Below the line, B
 // is better. Plotted and excluded counts are always shown.
 import { C } from '@/utils/colors';
 import type { HeadToHead, HeadToHeadSignal } from '@/quality/types';
@@ -64,7 +64,7 @@ export function HeadToHeadScatter({ headToHead }: { headToHead: HeadToHead | nul
   return (
     <div>
       <p className="mb-2 text-[10px]" style={{ color: C.fg1 }}>
-        {headToHead.arm_a} vs {headToHead.arm_b}, median across blocks per checkpoint. Lower is better; points below the dashed line favour {headToHead.arm_b}.
+        {headToHead.arm_a} vs {headToHead.arm_b}, median across attempts per checkpoint. Lower is better; points below the dashed line favour {headToHead.arm_b}.
       </p>
       <div className="grid gap-6 sm:grid-cols-2">
         {headToHead.signals.map((signal) => (

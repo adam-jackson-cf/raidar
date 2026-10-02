@@ -2,7 +2,7 @@
 
 On real experiment runs the check is REPORT-ONLY (user decision 2026-10-01):
 every phase is reported against its accepted budget, breaches become
-warnings, and the run's trial concurrency and contention context is recorded
+warnings, and the job's trial concurrency and contention context is recorded
 beside them. ``--strict`` turns breaches back into a failure. The enforced
 overhead gate is the controlled no-LLM fixture (``make perf-gate``), which
 runs this check strictly.
@@ -20,9 +20,9 @@ from pathlib import Path
 
 from raidar.execution.budgets import (
     PASSING,
+    JobSamples,
     PerfInputError,
     PhaseCheck,
-    RunSamples,
     Verdict,
     check_budgets,
 )
@@ -63,14 +63,14 @@ class PerfReport:
         return not self.breaches
 
 
-def _windows(loaded: RunSamples) -> tuple[list[TrialWindow], int]:
+def _windows(loaded: JobSamples) -> tuple[list[TrialWindow], int]:
     windows = [trial_window(t.run, t.trial, t.trial_dir) for t in loaded.trials]
     timed = [window for window in windows if window is not None]
     return timed, len(windows) - len(timed)
 
 
 def _split(
-    loaded: RunSamples, check: PhaseCheck, peaks: dict[tuple[str, str], int], min_samples: int
+    loaded: JobSamples, check: PhaseCheck, peaks: dict[tuple[str, str], int], min_samples: int
 ) -> list[SplitCheck]:
     buckets = {
         f"<={CONCURRENCY_SPLIT}": lambda peak: peak <= CONCURRENCY_SPLIT,
@@ -92,13 +92,13 @@ def _split(
     return splits
 
 
-def build_report(run_dirs: Sequence[Path], loaded: RunSamples, *, min_samples: int) -> PerfReport:
+def build_report(job_dirs: Sequence[Path], loaded: JobSamples, *, min_samples: int) -> PerfReport:
     """Checks, contention and per-contention splits of each breached p95 budget."""
     checks = check_budgets(loaded.samples, min_samples=min_samples, multi_step=loaded.multi_step)
     try:
         windows, untimed = _windows(loaded)
-        contention = measure_contention(run_dirs, windows, untimed)
-    except ValueError as error:  # malformed run.json / result.json, not a budget breach
+        contention = measure_contention(job_dirs, windows, untimed)
+    except ValueError as error:  # malformed job.json / result.json, not a budget breach
         raise PerfInputError(str(error)) from error
     splits = {
         index: _split(loaded, check, contention.trial_peaks, min_samples)

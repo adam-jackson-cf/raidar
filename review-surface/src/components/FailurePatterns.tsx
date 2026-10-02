@@ -65,7 +65,7 @@ export function FailurePatterns({ runs }: { runs: RunRecord[] }) {
           Failure patterns
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          recurring issues across this problem's runs — open a run to inspect the evidence
+          recurring issues across this problem's trials — open a trial to inspect the evidence
         </span>
       </div>
       <div className="flex flex-col gap-1">

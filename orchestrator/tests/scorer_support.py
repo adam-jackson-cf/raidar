@@ -8,24 +8,6 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.oracle.bundle import (
-    BundleManifest,
-    GraderSpec,
-    OracleBundle,
-    OracleStepSpec,
-    write_bundle,
-)
-from raidar.oracle.models import CaseGroup, CaseResult, CaseStatus, OracleGrade
-from raidar.oracle.records import (
-    BundleRef,
-    CoverageRef,
-    GraderRef,
-    SnapshotRef,
-    StepRecord,
-    step_record_dir,
-    stored_snapshot_path,
-    write_step_record,
-)
 from raidar.oracle.snapshot import tree_digest
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry
 from raidar.scorers.inventory import FileRole
@@ -49,6 +31,24 @@ from raidar.scorers.sdk.result import (
     Observation,
     Span,
 )
+from raidar.verifier.bundle import (
+    BundleManifest,
+    GraderSpec,
+    VerifierBundle,
+    VerifierStepSpec,
+    write_bundle,
+)
+from raidar.verifier.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
+from raidar.verifier.records import (
+    BundleRef,
+    CoverageRef,
+    GraderRef,
+    SnapshotRef,
+    StepRecord,
+    step_record_dir,
+    stored_snapshot_path,
+    write_step_record,
+)
 
 APP_V1 = {"app/main.py": "def add(a, b):\n    return a + b\n"}
 APP_V2 = {
@@ -57,7 +57,7 @@ APP_V2 = {
 }
 
 
-def _grade(step: str, statuses: Sequence[CaseStatus]) -> OracleGrade:
+def _grade(step: str, statuses: Sequence[CaseStatus]) -> VerifierGrade:
     cases = tuple(
         CaseResult(
             id=f"test_{step}.py::case_{index}",
@@ -67,7 +67,7 @@ def _grade(step: str, statuses: Sequence[CaseStatus]) -> OracleGrade:
         )
         for index, status in enumerate(statuses)
     )
-    return OracleGrade(step=step, checkpoint=step, cases=cases)
+    return VerifierGrade(step=step, checkpoint=step, cases=cases)
 
 
 def write_files(root: Path, files: Mapping[str, str | bytes]) -> None:
@@ -84,21 +84,21 @@ def write_files(root: Path, files: Mapping[str, str | bytes]) -> None:
 class StepFixture:
     name: str
     files: Mapping[str, str | bytes]
-    statuses: tuple[CaseStatus, ...] | None  # None: the oracle never graded this step
+    statuses: tuple[CaseStatus, ...] | None  # None: the verifier never graded this step
     usage: dict[str, int] | None = None
 
 
 def write_toy_bundle(
     root: Path, steps: Sequence[str], *, entry_file: str | None = None
-) -> OracleBundle:
-    """A host-side oracle bundle planning ``steps`` for problem ``toy``."""
+) -> VerifierBundle:
+    """A host-side verifier bundle planning ``steps`` for problem ``toy``."""
     tests = root.parent / f"{root.name}-tests"
     write_files(tests, {f"test_{name}.py": "def test_ok():\n    pass\n" for name in steps})
     manifest = BundleManifest(
         problem="toy",
         grader=GraderSpec(base_image="local"),
         steps=tuple(
-            OracleStepSpec(
+            VerifierStepSpec(
                 name=name,
                 checkpoint=name,
                 test_files=(f"test_{name}.py",),
@@ -118,7 +118,7 @@ def write_trial(
     planned: Sequence[str] = (),
     entry_file: str | None = None,
 ) -> Path:
-    """A stored multi-step Harbor trial with host-side oracle records.
+    """A stored multi-step Harbor trial with host-side verifier records.
 
     ``planned`` adds checkpoints the bundle plans after the executed ``steps``
     (a trial that halted or errored before reaching them).
@@ -237,7 +237,7 @@ def fake_manifest(version: str = "1", *, extra_metric: bool = False) -> ScorerMa
     return ScorerManifest(
         id="fake-quality",
         version=version,
-        description="Test scorer over inventories and oracle records.",
+        description="Test scorer over inventories and verifier records.",
         runtimes=("*",),
         evidence_required=(EvidenceInput.SNAPSHOT_CURRENT, EvidenceInput.ORACLE_CASES),
         metrics=tuple(metrics),

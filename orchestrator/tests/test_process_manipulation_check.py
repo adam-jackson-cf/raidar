@@ -79,8 +79,8 @@ def test_a_guided_arm_that_complies_is_separated_from_baseline() -> None:
     assert (tests.check, tests.verdict) == (TESTS, Separation.SEPARATED)
     assert tests.p_value == pytest.approx(1 / 252)
     assert tests.method == "exact-permutation"
-    # Trajectories without a decided checkpoint are not units.
-    assert (plan.guided.trajectories, plan.baseline.trajectories) == (5, 4)
+    # Trials without a decided checkpoint are not units.
+    assert (plan.guided.trials, plan.baseline.trials) == (5, 4)
     assert plan.verdict is Separation.SEPARATED
 
 

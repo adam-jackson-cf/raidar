@@ -7,7 +7,7 @@ Entry points for scorers:
 - ``raidar.jev.process``: the process-compliance residue interface.
 - ``raidar.jev.rubric.RubricRunner``: SCB rubric criteria per changed symbol.
 - ``raidar.jev.gating.verdict_observations``: keeps shadow Jev observations
-  out of ScorePolicies and verdicts.
+  out of Metrics and verdicts.
 """
 
 from raidar.jev.audit import AuditLog, DecisionRecord, InputSufficiency, SufficiencyLevel

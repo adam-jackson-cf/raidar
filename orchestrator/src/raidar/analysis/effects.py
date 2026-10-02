@@ -1,11 +1,11 @@
-"""Paired effects: treatment minus baseline per block, per problem (F10, memo §2.3).
+"""Paired effects: treatment minus baseline per attempt, per problem (F10, memo §2.3).
 
-A *slot* is one (problem, block) the plan scheduled for both arms. Each slot
+A *slot* is one (problem, attempt) the plan scheduled for both arms. Each slot
 either yields a pair ``D = Y[treatment] − Y[baseline]`` or is excluded, and
 every exclusion is counted by cause:
 
-- ``not_run``: an arm's trajectory is absent from the analysed runs;
-- ``infra_error``: an arm's trajectory failed the execution-validity gate or
+- ``not_run``: an arm's trial is absent from the analysed runs;
+- ``infra_error``: an arm's trial failed the execution-validity gate or
   has an ``infra_error`` checkpoint;
 - ``unassessed``: the Assessment store has no result for the needed scorer;
 - ``ineligible``: the value exists as a statused gap (``ineligible``,
@@ -15,7 +15,7 @@ Verdicts (memo §2.3), in precedence order:
 
 1. ``insufficient``: fewer pairs than the minimum, or the excluded share of
    planned slots above the limit (memo §2.3: both are pre-registered, pinned
-   by the lock's ``analysis`` block; ``Settings.origin`` says whether a value
+   by the lock's ``analysis`` section; ``Settings.origin`` says whether a value
    came from the lock, a command-line override or the default);
 2. ``inconclusive``: the ``1 - alpha`` CI (95% at the default alpha) spans 0
    (binary outcomes: exact McNemar p > alpha);
@@ -25,7 +25,7 @@ Verdicts (memo §2.3), in precedence order:
 Cost is estimated on the same pairs and shown beside every effect; it never
 gets a verdict of its own. The J2 projection ``n = 7.84·(SD/δ)²`` uses the
 effect's pilot SD. The equal-weight aggregate projects the pairs per problem
-that give its equal-weight mean the same power, and costs one more block
+that give its equal-weight mean the same power, and costs one more attempt
 across every problem.
 """
 
@@ -44,7 +44,7 @@ from raidar.analysis.outcomes import (
     AnalysisModel,
     Kind,
     MetricDef,
-    TrajectoryOutcome,
+    TrialOutcome,
     Value,
 )
 from raidar.analysis.stats import (
@@ -82,7 +82,7 @@ class Settings:
     """Verdict thresholds and resampling settings; all of them are echoed into the report.
 
     The thresholds are pre-registered (memo §2.3): ``raidar.analysis.thresholds``
-    reads them from the lock's ``analysis`` block (``pinned_by_lock``) and
+    reads them from the lock's ``analysis`` section (``pinned_by_lock``) and
     names each one a command-line option replaced (``overridden``). ``source``
     summarises that; the report also lists every value that differs from the
     documented default, so a post-hoc change is visible.
@@ -168,7 +168,7 @@ class Exclusions(AnalysisModel):
 
 class Pair(AnalysisModel):
     problem: str
-    block: int
+    attempt: int
     baseline_trial: str
     treatment_trial: str
     baseline: float
@@ -199,8 +199,8 @@ class CostBeside(AnalysisModel):
 class SampleSize(AnalysisModel):
     """J2: pairs for 80% power at alpha 0.05 from the pilot SD.
 
-    ``recommended_pairs`` counts blocks per problem; ``per_pair_cost_usd`` is
-    one more block (both arms, every problem the effect covers).
+    ``recommended_pairs`` counts attempts per problem; ``per_pair_cost_usd`` is
+    one more attempt (both arms, every problem the effect covers).
     """
 
     basis: str = "problem"
@@ -241,12 +241,12 @@ class Effect(AnalysisModel):
 @dataclass(frozen=True)
 class Slot:
     problem: str
-    block: int
-    baseline: TrajectoryOutcome | None
-    treatment: TrajectoryOutcome | None
+    attempt: int
+    baseline: TrialOutcome | None
+    treatment: TrialOutcome | None
 
 
-ValueOf = Callable[[TrajectoryOutcome], Value]
+ValueOf = Callable[[TrialOutcome], Value]
 
 
 @dataclass
@@ -310,7 +310,7 @@ def _pair_or_exclude(slot: Slot, value_of: ValueOf, tally: _Tally) -> Pair | Non
         return None
     return Pair(
         problem=slot.problem,
-        block=slot.block,
+        attempt=slot.attempt,
         baseline_trial=baseline.trial_id,
         treatment_trial=treatment.trial_id,
         baseline=left.value,
@@ -395,10 +395,10 @@ def mean_if_complete(values: Sequence[float | None]) -> float | None:
 def cost_beside(
     pairs: Sequence[Pair], slots: Sequence[Slot], settings: Settings, *, label: str
 ) -> CostBeside:
-    """Paired ``total_cost_usd`` on the blocks behind ``pairs``."""
-    blocks = {pair.block for pair in pairs}
+    """Paired ``total_cost_usd`` on the attempts behind ``pairs``."""
+    attempts = {pair.attempt for pair in pairs}
     cost_pairs, exclusions = collect_pairs(
-        [slot for slot in slots if slot.block in blocks],
+        [slot for slot in slots if slot.attempt in attempts],
         lambda outcome: outcome.metric(TOTAL_COST),
     )
     summary = summarise(
@@ -418,7 +418,7 @@ def cost_beside(
 
 
 def _per_pair_cost(cost: CostBeside) -> float | None:
-    """One more pair costs a baseline and a treatment trajectory."""
+    """One more pair costs a baseline and a treatment trial."""
     if cost.baseline_mean is None or cost.treatment_mean is None:
         return None
     return cost.baseline_mean + cost.treatment_mean
@@ -549,8 +549,8 @@ def _effective_sd(effects: Sequence[Effect]) -> float | None:
     return math.sqrt(math.fsum((sd or 0.0) ** 2 for sd in sds)) / len(effects)
 
 
-def _block_cost(effects: Sequence[Effect]) -> float | None:
-    """One more block: a pair on every problem, when every problem's cost is known."""
+def _attempt_cost(effects: Sequence[Effect]) -> float | None:
+    """One more attempt: a pair on every problem, when every problem's cost is known."""
     costs = [_per_pair_cost(effect.cost) for effect in effects]
     if any(cost is None for cost in costs):
         return None
@@ -570,7 +570,7 @@ def _aggregate_sample_size(
     return sample_size(
         metric,
         summary,
-        _block_cost(effects),
+        _attempt_cost(effects),
         settings,
         basis=f"equal-weight aggregate of {len(effects)} problems (pairs per problem)",
     )

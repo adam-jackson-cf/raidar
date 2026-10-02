@@ -15,6 +15,7 @@ from raidar.execution.plan import PlanError, PlanOptions, arm_order, build_plan
 from raidar.packs.python import HarnessPinError, load_pack_spec
 from raidar.problems.store import ROOT_ENV
 from raidar.spec.loader import load_experiment
+from raidar.spec.lock import LockError
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 
 
@@ -28,7 +29,9 @@ def locked(
     tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
 ) -> tuple[Any, dict[str, Any], Path]:
     monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
-    return locked_experiment(tmp_path / "exp", fixture_problem.ref, runtime={"compose_init": False})
+    return locked_experiment(
+        tmp_path / "exp", fixture_problem.ref, environment={"compose_init": False}
+    )
 
 
 def _plan(locked: tuple[Any, dict[str, Any], Path], fixture: ImportedFixture, **options: Any):
@@ -38,13 +41,13 @@ def _plan(locked: tuple[Any, dict[str, Any], Path], fixture: ImportedFixture, **
     )
 
 
-def test_plan_lists_every_arm_block_trial_with_input_hashes(
+def test_plan_lists_every_arm_attempt_trial_with_input_hashes(
     locked: tuple[Any, dict[str, Any], Path], fixture_problem: ImportedFixture
 ) -> None:
     plan = _plan(locked, fixture_problem)
     loaded, lock, _ = locked
     spec = loaded.spec
-    assert len(plan.trials) == len(spec.arms) * spec.analysis.blocks
+    assert len(plan.trials) == len(spec.arms) * spec.analysis.attempts
     assert Counter(t.arm for t in plan.trials) == {"baseline": 5, "guided": 5}
     assert [t.sequence for t in plan.trials] == list(range(len(plan.trials)))
     assert len({t.hashes.trial for t in plan.trials}) == len(plan.trials)
@@ -65,19 +68,19 @@ def test_plan_lists_every_arm_block_trial_with_input_hashes(
 @pytest.mark.parametrize("arms", [["a", "b"], ["a", "b", "c"], ["a", "b", "c", "d"]])
 def test_arm_order_is_counterbalanced_seeded_and_reproducible(arms: list[str]) -> None:
     n = len(arms)
-    blocks = 6 * n
-    orders = [tuple(arm_order(20260929, block, 0, arms)) for block in range(blocks)]
+    attempts = 6 * n
+    orders = [tuple(arm_order(20260929, attempt, 0, arms)) for attempt in range(attempts)]
     assert all(sorted(order) == arms for order in orders)
-    # Every complete cycle of len(arms) blocks puts each arm in each position once
+    # Every complete cycle of len(arms) attempts puts each arm in each position once
     # (AB/BA for two arms), so start-order effects cancel within the cycle.
-    for start in range(0, blocks, n):
+    for start in range(0, attempts, n):
         cycle = orders[start : start + n]
         for position in range(n):
             assert sorted(order[position] for order in cycle) == arms
-    assert orders == [tuple(arm_order(20260929, block, 0, arms)) for block in range(blocks)]
+    assert orders == [tuple(arm_order(20260929, attempt, 0, arms)) for attempt in range(attempts)]
     # The lead arm of each cycle is drawn from the seed, not fixed.
-    assert len({orders[start] for start in range(0, blocks, n)}) > 1
-    other_seed = [tuple(arm_order(7, block, 0, arms)) for block in range(blocks)]
+    assert len({orders[start] for start in range(0, attempts, n)}) > 1
+    other_seed = [tuple(arm_order(7, attempt, 0, arms)) for attempt in range(attempts)]
     assert other_seed != orders
 
 
@@ -107,7 +110,7 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
 ) -> None:
     full = _plan(locked, fixture_problem)
     assert full.selected == {t.trial_id for t in full.trials}
-    subset = _plan(locked, fixture_problem, arms=("baseline",), blocks=(0,), max_checkpoints=1)
+    subset = _plan(locked, fixture_problem, arms=("baseline",), attempts=(0,), max_checkpoints=1)
     assert [t.trial_id for t in subset.selected_trials()] == ["b00-p0-baseline"]
     assert len(subset.trials) == len(full.trials)
     trial = subset.selected_trials()[0]
@@ -119,8 +122,8 @@ def test_selection_and_truncation_change_what_runs_not_the_condition(
     assert trial.hashes.trial != original.hashes.trial
     with pytest.raises(PlanError, match="unknown arms"):
         _plan(locked, fixture_problem, arms=("nope",))
-    with pytest.raises(PlanError, match="blocks"):
-        _plan(locked, fixture_problem, blocks=(99,))
+    with pytest.raises(PlanError, match="attempts"):
+        _plan(locked, fixture_problem, attempts=(99,))
 
 
 def test_agent_runs_the_pack_pinned_harness_with_the_arm_condition(
@@ -159,15 +162,17 @@ def test_an_off_pin_harness_version_is_refused_before_any_trial(
     agents = [
         {
             "id": "luna",
-            "harness": "codex-cli",
+            "name": "codex",
             "provider": "openai",
             "model": "gpt-6-luna",
             "version": "0.1.0",
         }
     ]
-    loaded, lock, _ = locked_experiment(tmp_path / "exp", fixture_problem.ref, agents=agents)
-    with pytest.raises(HarnessPinError):
-        build_plan(loaded, lock, store=fixture_problem.store, pack=load_pack_spec())
+    # The lock refuses it (RT5), so no plan or job can exist for it; the plan's own
+    # pin check (HarnessPinError) stays as the second line of defence.
+    with pytest.raises(LockError, match=r"agents\.0\.version: \[RT5\] codex 0\.1\.0"):
+        locked_experiment(tmp_path / "exp", fixture_problem.ref, agents=agents)
+    assert issubclass(HarnessPinError, ValueError)
 
 
 def test_plan_command_dry_run_and_stale_lock(
@@ -175,7 +180,7 @@ def test_plan_command_dry_run_and_stale_lock(
 ) -> None:
     loaded, _, lock_path = locked
     runner = CliRunner()
-    shown = runner.invoke(main, ["plan", str(loaded.path), "--arm", "baseline", "--block", "0"])
+    shown = runner.invoke(main, ["plan", str(loaded.path), "--arm", "baseline", "--attempt", "0"])
     assert shown.exit_code == 0, shown.output
     assert "1/10 trials selected" in shown.output
     assert shown.output.count("condition=") == 10
@@ -189,13 +194,13 @@ def test_plan_command_dry_run_and_stale_lock(
     assert reanalysed.exit_code != 0
     assert "Stale: analysis:" in reanalysed.output
     assert "execution:" not in reanalysed.output
-    loaded.path.write_text(source.replace("blocks: 5", "blocks: 4"))
+    loaded.path.write_text(source.replace("attempts: 5", "attempts: 4"))
     stale = runner.invoke(main, ["plan", str(loaded.path)])
     assert stale.exit_code != 0
     assert "out of date" in stale.output
     assert "execution: execution inputs changed" in stale.output
     loaded.path.write_text(source)
-    lock_path.write_text(lock_path.read_text().replace('"blocks": 5', '"blocks": 4'))
+    lock_path.write_text(lock_path.read_text().replace('"attempts": 5', '"attempts": 4'))
     tampered = runner.invoke(main, ["plan", str(loaded.path)])
     assert tampered.exit_code != 0
     assert "not a valid lock" in tampered.output

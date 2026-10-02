@@ -1,1 +1,1 @@
-"""Experiment spec: ``experiment.yaml`` schema, lock, factor guard, ScorePolicies."""
+"""Experiment spec: ``experiment.yaml`` schema, lock, factor guard, Metrics."""

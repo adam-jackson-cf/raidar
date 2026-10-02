@@ -1,12 +1,12 @@
-"""Experiment-epoch inputs: run directories, their experiment locks and trajectory records.
+"""Experiment-epoch inputs: job directories, their experiment locks and trial records.
 
-A run directory (``raidar run``) holds ``run.json``, ``plan.json``,
-``assessment-config.yaml``, ``trials/`` and ``trajectories/``. The experiment
-spec (agents, conditions, factors, headline policy) lives in the lock the run
-was planned from; ``run.json`` names it by ``lock_sha256``. The lock is looked
+A job directory (``raidar run``) holds ``job.json``, ``plan.json``,
+``assessment-config.yaml``, ``trials/`` and ``trials/``. The experiment
+spec (agents, conditions, factors, headline metric) lives in the lock the run
+was planned from; ``job.json`` names it by ``lock_sha256``. The lock is looked
 up among the locks given explicitly, those beside the run's experiment file
 (the current lock, whose assessment settings apply after a relock that kept
-``lock_sha256``) and the run's own ``run.lock.json`` (the lock it executed
+``lock_sha256``) and the run's own ``job.lock.json`` (the lock it executed
 under); it must be a sealed lock whose ``lock_sha256`` (its execution digest)
 matches. A run whose lock cannot be found is refused, never projected from
 guesses; a lock file that cannot be parsed is skipped with a warning.
@@ -28,19 +28,20 @@ from typing import Any
 from pydantic import ValidationError
 
 from raidar.execution.assessment import rescore_config
-from raidar.execution.models import TrajectoryRecord
+from raidar.execution.models import TrialRecord
+from raidar.job_layout import is_legacy_job, legacy_job_message
 from raidar.scorers.rescore_config import RescoreConfig
 from raidar.spec.canonical import digest_json
 from raidar.spec.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.spec.schema import ExperimentSpec
 
-RUN_MANIFEST = "run.json"
-RUN_KIND = "raidar-run"
+JOB_MANIFEST = "job.json"
+JOB_KIND = "raidar-job"
 SYNTHETIC_MARKER = "synthetic"
 
 
-class RunSourceError(ValueError):
-    """A run directory cannot be projected as stored."""
+class JobSourceError(ValueError):
+    """A job directory cannot be projected as stored."""
 
 
 @dataclass(frozen=True)
@@ -49,7 +50,7 @@ class ExperimentLock:
 
     sha256: str
     spec: ExperimentSpec
-    headline_policy: str | None
+    metric: str | None
     conditions: Mapping[str, Any]
     problems: tuple[Mapping[str, Any], ...]
     path: Path | None = None
@@ -60,13 +61,13 @@ class ExperimentLock:
 
 
 @dataclass(frozen=True)
-class RunSource:
-    run_dir: Path
+class JobSource:
+    job_dir: Path
     manifest: Mapping[str, Any]
     plan: Mapping[str, Any]
     lock: ExperimentLock
     assessment: RescoreConfig
-    records: tuple[TrajectoryRecord, ...]
+    records: tuple[TrialRecord, ...]
     assessment_path: Path | None = None
     """The lock whose assessment settings ``assessment`` is (for the rescore hint)."""
 
@@ -75,8 +76,8 @@ class RunSource:
         return str(self.manifest["experiment"])
 
     @property
-    def run_id(self) -> str:
-        return str(self.manifest["run_id"])
+    def job_id(self) -> str:
+        return str(self.manifest["job_id"])
 
     @property
     def synthetic(self) -> bool:
@@ -93,28 +94,31 @@ def _read_object(path: Path) -> dict[str, Any]:
     try:
         loaded = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
-        raise RunSourceError(f"cannot read {path}: {exc}") from exc
+        raise JobSourceError(f"cannot read {path}: {exc}") from exc
     if not isinstance(loaded, dict):
-        raise RunSourceError(f"{path} is not a JSON object")
+        raise JobSourceError(f"{path} is not a JSON object")
     return loaded
 
 
-def _is_run_dir(path: Path) -> bool:
-    manifest = path / RUN_MANIFEST
+def _is_job_dir(path: Path) -> bool:
+    manifest = path / JOB_MANIFEST
     if not manifest.is_file():
         return False
     try:
-        return json.loads(manifest.read_text(encoding="utf-8")).get("kind") == RUN_KIND
+        return json.loads(manifest.read_text(encoding="utf-8")).get("kind") == JOB_KIND
     except (OSError, json.JSONDecodeError, AttributeError):
         return False
 
 
-def discover_run_dirs(roots: Iterable[Path]) -> list[Path]:
-    """Run directories at, one below, or two below each root (``<experiment>/<run>``)."""
+def discover_job_dirs(roots: Iterable[Path]) -> list[Path]:
+    """Job directories at, one below, or two below each root (``<experiment>/<job>``)."""
     found: set[Path] = set()
     for root in roots:
         candidates = [root, *root.glob("*"), *root.glob("*/*")]
-        found.update(path.resolve() for path in candidates if path.is_dir() and _is_run_dir(path))
+        for path in candidates:
+            if path.is_dir() and is_legacy_job(path):
+                print(f"Skipping {legacy_job_message(path)}", file=sys.stderr)
+        found.update(path.resolve() for path in candidates if path.is_dir() and _is_job_dir(path))
     return sorted(found)
 
 
@@ -122,21 +126,21 @@ def parse_lock(document: Mapping[str, Any], origin: Path) -> ExperimentLock:
     """The lock, refused unless it is a sealed lock (as ``raidar analyze`` reads it)."""
     issues = lock_integrity_issues(document)
     if issues:
-        raise RunSourceError(f"{origin}: not a valid lock ({'; '.join(issues)})")
+        raise JobSourceError(f"{origin}: not a valid lock ({'; '.join(issues)})")
     try:
         spec = ExperimentSpec.model_validate(document["spec"])
         execution = document["execution"]
-        headline = document["assessment"].get("headline_policy")
+        headline = document["assessment"].get("metric")
         return ExperimentLock(
             sha256=str(document["lock_sha256"]),
             spec=spec,
-            headline_policy=str(headline["ref"]) if isinstance(headline, Mapping) else None,
+            metric=str(headline["ref"]) if isinstance(headline, Mapping) else None,
             conditions=dict(execution.get("conditions") or {}),
             problems=tuple(execution.get("problems") or ()),
             path=origin,
         )
     except (KeyError, TypeError, ValidationError) as exc:
-        raise RunSourceError(f"{origin} is not an experiment lock: {exc}") from exc
+        raise JobSourceError(f"{origin} is not an experiment lock: {exc}") from exc
 
 
 class LockIndex:
@@ -161,47 +165,47 @@ class LockIndex:
         for path in sorted(directory.glob(f"*{LOCK_SUFFIX}")):
             try:
                 self._add(path)
-            except RunSourceError as exc:
+            except JobSourceError as exc:
                 print(f"Skipping unusable lock {path}: {exc}", file=sys.stderr)
 
-    def find(self, sha256: str, *, run_dir: Path, experiment_file: str | None) -> ExperimentLock:
+    def find(self, sha256: str, *, job_dir: Path, experiment_file: str | None) -> ExperimentLock:
         if sha256 not in self._locks:
             # The experiment's current lock first: its assessment settings win.
             if experiment_file:
                 self._scan(Path(experiment_file).parent)
-            self._scan(run_dir)
+            self._scan(job_dir)
         lock = self._locks.get(sha256)
         if lock is None:
-            raise RunSourceError(
-                f"{run_dir}: no experiment lock with lock_sha256 {sha256} beside the run or its "
+            raise JobSourceError(
+                f"{job_dir}: no experiment lock with lock_sha256 {sha256} beside the run or its "
                 "experiment file; pass it with --lock"
             )
         return lock
 
 
-def _records(run_dir: Path) -> tuple[TrajectoryRecord, ...]:
+def _records(job_dir: Path) -> tuple[TrialRecord, ...]:
     records = []
-    for path in sorted((run_dir / "trajectories").glob("*.json")):
+    for path in sorted((job_dir / "trial-records").glob("*.json")):
         try:
-            records.append(TrajectoryRecord.model_validate_json(path.read_text(encoding="utf-8")))
+            records.append(TrialRecord.model_validate_json(path.read_text(encoding="utf-8")))
         except (OSError, ValidationError) as exc:
-            raise RunSourceError(f"invalid trajectory record {path}: {exc}") from exc
+            raise JobSourceError(f"invalid trial record {path}: {exc}") from exc
     return tuple(records)
 
 
-def load_run(run_dir: Path, locks: LockIndex) -> RunSource:
-    manifest = _read_object(run_dir / RUN_MANIFEST)
+def load_job(job_dir: Path, locks: LockIndex) -> JobSource:
+    manifest = _read_object(job_dir / JOB_MANIFEST)
     lock = locks.find(
         str(manifest.get("lock_sha256")),
-        run_dir=run_dir,
+        job_dir=job_dir,
         experiment_file=manifest.get("experiment_file"),
     )
-    return RunSource(
-        run_dir=run_dir,
+    return JobSource(
+        job_dir=job_dir,
         manifest=manifest,
-        plan=_read_object(run_dir / "plan.json"),
+        plan=_read_object(job_dir / "plan.json"),
         lock=lock,
         assessment=rescore_config(lock.spec.assessment, lock.spec.protocol),
-        records=_records(run_dir),
+        records=_records(job_dir),
         assessment_path=lock.path,
     )

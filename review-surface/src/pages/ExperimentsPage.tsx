@@ -144,7 +144,7 @@ function ExperimentExpansion({ exp }: { exp: ExperimentRecord }) {
         <div>
           <div className="mb-1 flex items-center gap-2">
             <span className="text-[10px] font-medium uppercase tracking-wide" style={{ color: C.fg1 }}>
-              Runs — open one to see its full story
+              Trials — open one to see its full story
             </span>
             <QualityLinks targets={qualityTargets} testId="arm-quality-link" />
           </div>

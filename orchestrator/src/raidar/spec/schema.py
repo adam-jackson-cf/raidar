@@ -1,9 +1,18 @@
-"""Pydantic schema for ``experiment.yaml`` (F9, F10).
+"""Pydantic schema for ``experiment.yaml``, schema v2 (F9, F10).
 
 Every model forbids unknown keys, so typos surface as field-level errors.
 Cross-reference rules (unique ids, arm → agent/condition, baseline arm, known
-policy) are checked by ``raidar.spec.validation`` so each error carries the
-path of the offending field.
+metric), the kind rules (``KIND*``) and the naming rules (``NAME*``) are
+checked by ``raidar.spec.validation`` so each error carries the path of the
+offending field.
+
+Vocabulary (Harbor's, requirements change log 2026-10-02): an experiment has
+a ``kind`` (``ab-test``, ``benchmark``, ``smoke``; ``research-loop`` is
+reserved), one ``runtime`` (a runtime pack id), a Harbor ``environment``
+(``type: docker``), agents named by Harbor ``AgentName`` (``codex``,
+``claude-code``), a headline ``metric`` and ``analysis.attempts``: the
+paired, counterbalanced replicates of every arm. Schema v1 files stay
+loadable read-only (``raidar.spec.schema_v1``).
 """
 
 from __future__ import annotations
@@ -14,14 +23,21 @@ from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, model_validator
 
-from raidar.agents.config import Harness
+from raidar.agents.config import AgentName, Harness, agent_cli
 from raidar.spec.references import REFERENCE_PATTERN
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 IDENTIFIER_PATTERN = r"^[a-z0-9][a-z0-9_-]*$"
+RUNTIMES = ("python", "node-ts", "go", "rust", "java", "dotnet")
+"""Runtime pack ids (F8). A runtime is a language toolchain; only ``python`` has a pack yet."""
+EXPERIMENT_KINDS = ("ab-test", "benchmark", "smoke", "research-loop")
+RESERVED_KINDS = ("research-loop",)
+"""Kinds the schema accepts but no controller implements yet (``KIND0``)."""
 
 Identifier = Annotated[str, Field(pattern=IDENTIFIER_PATTERN, max_length=64)]
 Reference = Annotated[str, Field(pattern=REFERENCE_PATTERN)]
+Runtime = Literal["python", "node-ts", "go", "rust", "java", "dotnet"]
+ExperimentKind = Literal["ab-test", "benchmark", "smoke", "research-loop"]
 # A pinned release (``0.156.1``, ``2.1.4-beta.2``): starts with a digit, so
 # floating tags (``latest``, ``stable``) and ranges (``^1.2``, ``>=1``) are refused.
 PINNED_VERSION_PATTERN = r"^[0-9]+(\.[0-9]+)*([-+][0-9A-Za-z][0-9A-Za-z.-]*)?$"
@@ -60,7 +76,7 @@ class SpecModel(BaseModel):
 
 
 class ProblemEntry(SpecModel):
-    """One problem: a registry reference or a local Harbor task directory."""
+    """One problem: a registry reference (a binding) or a local Harbor task directory."""
 
     ref: Reference | None = None
     path: RelativePath | None = None
@@ -76,27 +92,33 @@ class ProblemEntry(SpecModel):
         return self.ref if self.ref is not None else f"path:{self.path}"
 
 
-class RuntimeSpec(SpecModel):
-    language: Literal["python"] = "python"
-    environment: Literal["docker"] = "docker"
+class EnvironmentSpec(SpecModel):
+    """Harbor ``environment``: where trials run (``type`` is Harbor's environment type)."""
+
+    type: Literal["docker"] = "docker"
     # Overhead-baseline decision: compose ``init: true`` cuts teardown 12.7s -> 2.1s p50.
     compose_init: bool = True
 
 
 class AgentEntry(SpecModel):
+    """One agent: Harbor agent ``name`` + model + kwargs (``reasoning_effort``) + version."""
+
     id: Identifier
-    harness: Harness
+    name: AgentName
     provider: str = Field(min_length=1)
     model: str = Field(min_length=1)
     reasoning_effort: str | None = None
-    version: str = Field(
-        pattern=PINNED_VERSION_PATTERN, description="Pinned harness CLI release (N3)"
-    )
+    version: str = Field(pattern=PINNED_VERSION_PATTERN, description="Pinned agent CLI release")
+
+    @property
+    def harness(self) -> Harness:
+        """The agent's CLI install id, as released components and the pack image key it."""
+        return agent_cli(self.name)
 
 
 class ProtocolSpec(SpecModel):
     # Also scorer config: raidar.execution.assessment writes it for every scorer
-    # that declares ``progression`` (correctness@1), so scoring follows the run.
+    # that declares ``progression`` (correctness@1), so scoring follows the job.
     progression: Literal["continue", "halt_on_failure"] = "continue"
     min_reward: float | None = Field(default=None, gt=0.0, le=1.0)
     agent_timeout_sec: int = Field(default=1800, gt=0)
@@ -139,7 +161,8 @@ class InventoryPolicySpec(SpecModel):
 
 class AssessmentSpec(SpecModel):
     scorers: tuple[Reference, ...] = Field(min_length=1)
-    headline_policy: Reference | None = None
+    metric: Reference | None = None
+    """The headline metric (``scb-canonical@2``); the lock picks the default by K when unset."""
     inventory_policy: InventoryPolicySpec = InventoryPolicySpec()
     # Per-scorer config, keyed by a reference listed in ``scorers``.
     scorer_config: dict[Reference, FiniteJsonObject] = Field(default_factory=dict)
@@ -155,6 +178,8 @@ class AssessmentSpec(SpecModel):
 DEFAULT_MIN_PAIRS = 5
 DEFAULT_MAX_EXCLUSION_FRACTION = 0.2
 DEFAULT_ALPHA = 0.05
+BENCHMARK_MIN_ATTEMPTS = 5
+"""Terminal-Bench's convention; a benchmark below it validates with a warning."""
 VERDICT_THRESHOLDS = ("min_pairs", "max_exclusion_fraction", "alpha", "min_effects")
 """The ``analysis`` fields the lock pins before any data is seen (memo §2.3)."""
 
@@ -164,25 +189,30 @@ PositiveFiniteFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 class AnalysisSpec(SpecModel):
     """Arm design plus the pre-registered verdict thresholds ``raidar analyze`` reads.
 
-    ``min_effects`` maps an outcome metric id to its smallest effect of
-    interest for the sample-size projection; ``raidar.spec.validation`` checks
-    the metric ids.
+    ``attempts`` are Raidar's paired replicates: every attempt runs each arm
+    once per problem, in a counterbalanced, seeded order, and analysis pairs
+    the arms by attempt index (Harbor's ``n_attempts`` has no pairing or
+    counterbalancing). ``min_effects`` maps an outcome metric id to its
+    smallest effect of interest for the sample-size projection;
+    ``rank_by`` (benchmarks only) names the outcome metric the ranking view
+    orders agents by. ``raidar.spec.validation`` checks both metric ids.
     """
 
     baseline_arm: Identifier
-    blocks: int = Field(gt=0)
+    attempts: int = Field(gt=0)
     seed: int = Field(ge=0)
     concurrency: int = Field(default=1, gt=0)
     min_pairs: int = Field(default=DEFAULT_MIN_PAIRS, ge=2)
     max_exclusion_fraction: float = Field(default=DEFAULT_MAX_EXCLUSION_FRACTION, ge=0.0, le=1.0)
     alpha: float = Field(default=DEFAULT_ALPHA, gt=0.0, lt=1.0)
     min_effects: dict[str, PositiveFiniteFloat] = Field(default_factory=dict)
+    rank_by: str | None = None
 
 
 FactorNoun = Literal[
     "condition",
     "agent",
-    "agent.harness",
+    "agent.name",
     "agent.provider",
     "agent.model",
     "agent.reasoning_effort",
@@ -191,11 +221,13 @@ FactorNoun = Literal[
 
 
 class ExperimentSpec(SpecModel):
-    schema_version: Literal[1]
+    schema_version: Literal[2]
+    kind: ExperimentKind
     id: Identifier
     description: str = ""
     problems: tuple[ProblemEntry, ...] = Field(min_length=1)
-    runtime: RuntimeSpec = RuntimeSpec()
+    runtime: Runtime
+    environment: EnvironmentSpec = EnvironmentSpec()
     agents: tuple[AgentEntry, ...] = Field(min_length=1)
     protocol: ProtocolSpec = ProtocolSpec()
     factors: tuple[FactorNoun, ...] = ()
@@ -232,17 +264,21 @@ class ExperimentSpec(SpecModel):
         return [*shared, *own]
 
     def references(self) -> dict[str, tuple[str, ...]]:
-        """Registry references by kind (policy only when declared)."""
-        policy = self.assessment.headline_policy
+        """Registry references by kind (metric only when declared)."""
+        metric = self.assessment.metric
         return {
             "problem": tuple(p.ref for p in self.problems if p.ref is not None),
             "component": tuple(use.use for _, use in self.component_uses()),
             "scorer": self.assessment.scorers,
-            "policy": (policy,) if policy is not None else (),
+            "metric": (metric,) if metric is not None else (),
         }
 
     def to_json(self) -> dict[str, object]:
-        # An experiment without shared components serialises (and locks) exactly as
-        # before the field existed, so its spec and execution digests are unchanged.
-        exclude = None if self.shared_components else {"shared_components"}
-        return self.model_dump(mode="json", by_alias=True, exclude=exclude)
+        # Optional fields left unset are omitted, as schema v1 omitted them, so the
+        # execution section of a migrated v1 lock compares field for field.
+        exclude: dict[str, object] = {}
+        if not self.shared_components:
+            exclude["shared_components"] = True
+        if self.analysis.rank_by is None:
+            exclude["analysis"] = {"rank_by"}
+        return self.model_dump(mode="json", by_alias=True, exclude=exclude or None)

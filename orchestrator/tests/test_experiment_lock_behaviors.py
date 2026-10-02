@@ -22,7 +22,7 @@ from raidar.spec.lock import (
     render_lock,
     stale_sections,
 )
-from raidar.spec.policies import PolicyResolver
+from raidar.spec.metrics import MetricResolver
 from raidar.spec.references import (
     RefKind,
     RegistryRef,
@@ -37,12 +37,15 @@ from tests.experiment_spec_support import (
     write_experiment,
 )
 
+PYTHON_TASK = '[metadata]\nraidar_runtime = "python"\n'
+"""A local task declares its runtime (``RT1``)."""
+
 
 def _lock_bytes(
     path: Path, *, checkpoints: int = 8, overrides: CliOverrides | None = None
 ) -> bytes:
     resolvers = ResolverSet(
-        [*fixture_resolvers(checkpoints=checkpoints), PolicyResolver()], entry_point_group=None
+        [*fixture_resolvers(checkpoints=checkpoints), MetricResolver()], entry_point_group=None
     )
     loaded = load_experiment(path, overrides)
     return render_lock(
@@ -68,11 +71,9 @@ def test_relocking_unchanged_inputs_is_byte_identical(tmp_path: Path) -> None:
     assert execution["files"]["components/AGENTS.md"]["sha256"]
     assert lock["experiment"]["source"] == "experiment.yaml"
     assert execution["versions"]["harbor"] == "0.23.0"
-    assert execution["versions"]["harnesses"] == {
-        "luna": {"harness": "codex-cli", "version": "0.156.1"}
-    }
+    assert execution["versions"]["agents"] == {"luna": {"name": "codex", "version": "0.156.1"}}
     assert set(execution["references"]) == {"problem", "component"}
-    assert set(assessment["references"]) == {"scorer", "policy"}
+    assert set(assessment["references"]) == {"scorer", "metric"}
     # Tools are recorded with the section whose reference pins them.
     assert (execution["tools"], assessment["tools"]) == ({}, {"pytest": "8.4.1"})
     assert set(lock["toolchain"]) == {"python", "litellm", "raidar", "raidar_spec"}
@@ -127,7 +128,7 @@ def _scorer_resolvers(implementation: str) -> ResolverSet:
         {"correctness@1": {"implementation_digest": implementation}},
         tool_versions={"pytest": "8.4.1"},
     )
-    return ResolverSet([problem, component, scorer, PolicyResolver()], entry_point_group=None)
+    return ResolverSet([problem, component, scorer, MetricResolver()], entry_point_group=None)
 
 
 def test_assessment_and_analysis_changes_keep_the_run_identity(tmp_path: Path) -> None:
@@ -174,7 +175,7 @@ def test_relock_ignores_its_own_output_inside_a_hashed_directory(tmp_path: Path)
     document["conditions"][1]["components"][0]["files"] = ["components"]
     path = write_experiment(tmp_path, document)
     lock_path = tmp_path / "components" / "experiment.lock.json"
-    resolvers = ResolverSet([*fixture_resolvers(), PolicyResolver()], entry_point_group=None)
+    resolvers = ResolverSet([*fixture_resolvers(), MetricResolver()], entry_point_group=None)
 
     def relock() -> bytes:
         rendered = render_lock(
@@ -216,11 +217,11 @@ def test_overrides_are_recorded_and_change_the_lock(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
 
     lock = _lock(
-        path, overrides=CliOverrides(flags={"blocks": 2}, assignments=("analysis.seed=1",))
+        path, overrides=CliOverrides(flags={"attempts": 2}, assignments=("analysis.seed=1",))
     )
 
-    assert lock["overrides"] == {"flags": {"blocks": 2}, "set": ["analysis.seed=1"]}
-    assert (lock["spec"]["analysis"]["blocks"], lock["spec"]["analysis"]["seed"]) == (2, 1)
+    assert lock["overrides"] == {"flags": {"attempts": 2}, "set": ["analysis.seed=1"]}
+    assert (lock["spec"]["analysis"]["attempts"], lock["spec"]["analysis"]["seed"]) == (2, 1)
     assert lock["lock_sha256"] != _lock(path)["lock_sha256"]
 
 
@@ -232,38 +233,39 @@ def test_headline_policy_defaults_by_checkpoint_count(
 ) -> None:
     lock = _lock(write_experiment(tmp_path, experiment_document()), checkpoints=checkpoints)
 
-    assert lock["assessment"]["headline_policy"] == {
+    assert lock["assessment"]["metric"] == {
         "ref": expected,
         "selection": "default_by_k",
         "checkpoints": [checkpoints],
     }
-    assert expected in lock["assessment"]["references"]["policy"]
+    assert expected in lock["assessment"]["references"]["metric"]
 
 
 def test_declared_policy_must_support_every_problem_k(tmp_path: Path) -> None:
     document = experiment_document()
-    document["assessment"]["headline_policy"] = "scb-canonical@1"
+    document["assessment"]["metric"] = "scb-canonical@1"
     path = write_experiment(tmp_path, document)
 
     with pytest.raises(LockError) as caught:
         _lock(path, checkpoints=1)
 
-    assert [issue.loc for issue in caught.value.issues] == ["assessment.headline_policy"]
+    assert [issue.loc for issue in caught.value.issues] == ["assessment.metric"]
 
 
 def test_local_task_problems_are_hashed_and_counted(tmp_path: Path) -> None:
     task = tmp_path / "tasks" / "forge"
     task.mkdir(parents=True)
     (task / "task.toml").write_text(
-        '[[steps]]\nname = "checkpoint_1"\n[[steps]]\nname = "checkpoint_2"\n', encoding="utf-8"
+        f'{PYTHON_TASK}[[steps]]\nname = "checkpoint_1"\n[[steps]]\nname = "checkpoint_2"\n',
+        encoding="utf-8",
     )
     single = tmp_path / "tasks" / "oneshot"
     single.mkdir()
-    (single / "task.toml").write_text('[task]\nname = "one"\n', encoding="utf-8")
+    (single / "task.toml").write_text(f'{PYTHON_TASK}[task]\nname = "one"\n', encoding="utf-8")
     document = experiment_document(
         problems=[{"path": "tasks/forge"}, {"path": "tasks/oneshot"}],
     )
-    document["assessment"]["headline_policy"] = "scb-canonical@1"
+    document["assessment"]["metric"] = "scb-canonical@1"
     path = write_experiment(tmp_path, document)
 
     with pytest.raises(LockError) as caught:
@@ -296,7 +298,9 @@ def test_mixed_k_without_declared_policy_is_rejected(tmp_path: Path) -> None:
     for name, steps in (("a", 1), ("b", 3)):
         task = tmp_path / name
         task.mkdir()
-        (task / "task.toml").write_text('[[steps]]\nname = "s"\n' * steps, encoding="utf-8")
+        (task / "task.toml").write_text(
+            PYTHON_TASK + '[[steps]]\nname = "s"\n' * steps, encoding="utf-8"
+        )
     path = write_experiment(tmp_path, experiment_document(problems=[{"path": "a"}, {"path": "b"}]))
 
     with pytest.raises(LockError) as caught:
@@ -335,20 +339,20 @@ def test_conflicting_tool_pins_are_rejected(tmp_path: Path) -> None:
     component = InMemoryResolver(
         RefKind.COMPONENT, {"rules-file@1": {}}, tool_versions={"pytest": "7.0.0"}
     )
-    resolvers = ResolverSet([problem, component, scorer, PolicyResolver()], entry_point_group=None)
+    resolvers = ResolverSet([problem, component, scorer, MetricResolver()], entry_point_group=None)
 
     with pytest.raises(LockError, match="tool 'pytest' pinned to both 8.4.1 and 7.0.0"):
         build_lock(load_experiment(path), lock_path=path, resolvers=resolvers)
 
 
 def test_resolver_set_rules() -> None:
-    resolvers = ResolverSet([PolicyResolver()], entry_point_group=None)
+    resolvers = ResolverSet([MetricResolver()], entry_point_group=None)
 
-    assert resolvers.available_kinds() == frozenset({RefKind.POLICY})
+    assert resolvers.available_kinds() == frozenset({RefKind.METRIC})
     assert resolvers.resolver_for(RefKind.SCORER) is None
-    assert RefKind.POLICY in default_resolvers().available_kinds()
+    assert RefKind.METRIC in default_resolvers().available_kinds()
     with pytest.raises(RegistryReferenceError, match="duplicate resolver"):
-        ResolverSet([PolicyResolver(), PolicyResolver()], entry_point_group=None)
+        ResolverSet([MetricResolver(), MetricResolver()], entry_point_group=None)
     with pytest.raises(RegistryReferenceError, match="expected name@version"):
         RegistryRef.parse(RefKind.SCORER, "correctness")
     assert str(RegistryRef.parse(RefKind.PROBLEM, "scb/forge@38d627e")) == "scb/forge@38d627e"
@@ -373,7 +377,7 @@ def test_lock_command_write_and_check_cycle(
     monkeypatch.setattr(
         "raidar.spec.lock.default_resolvers",
         lambda policies: ResolverSet(
-            [*fixture_resolvers(), PolicyResolver(policies)], entry_point_group=None
+            [*fixture_resolvers(), MetricResolver(policies)], entry_point_group=None
         ),
     )
     runner = CliRunner()
@@ -391,7 +395,7 @@ def test_lock_command_write_and_check_cycle(
     tampered = runner.invoke(main, ["lock", str(path), "--check"])
 
     assert written.exit_code == 0, written.output
-    assert json.loads(lock_path.read_bytes())["experiment"]["id"] == "fixture"
+    assert json.loads(lock_path.read_bytes())["experiment"]["id"] == "python__fixture__test"
     assert current.exit_code == 0, current.output
     assert "Lock is current" in current.output
     assert drifted.exit_code == 1

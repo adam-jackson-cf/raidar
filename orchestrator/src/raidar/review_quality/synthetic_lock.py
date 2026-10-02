@@ -11,7 +11,7 @@ import json
 from pathlib import Path
 
 from raidar.spec.lock import LOCK_VERSION, default_lock_path, seal_lock
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.spec.schema import DEFAULT_ALPHA, DEFAULT_MAX_EXCLUSION_FRACTION, DEFAULT_MIN_PAIRS
 
 PINNED_THRESHOLDS = {
@@ -23,12 +23,12 @@ PINNED_THRESHOLDS = {
 """The verdict thresholds a real lock pins (``AnalysisSpec`` defaults)."""
 
 
-def default_headline_policy(checkpoints: int) -> str:
-    return DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints).ref
+def default_metric(checkpoints: int) -> str:
+    return DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints).ref
 
 
 def write_synthetic_lock(
-    experiment_file: Path, *, experiment: str, baseline_arm: str, headline_policy: str
+    experiment_file: Path, *, experiment: str, baseline_arm: str, metric: str
 ) -> str:
     """Write the lock beside ``experiment_file`` and return its ``lock_sha256``."""
     analysis = {"baseline_arm": baseline_arm, **PINNED_THRESHOLDS}
@@ -39,7 +39,7 @@ def write_synthetic_lock(
             "experiment": {"id": experiment},
             "spec": {"id": experiment, "analysis": analysis},
             "execution": {"design": {"id": experiment}},
-            "assessment": {"headline_policy": {"ref": headline_policy}},
+            "assessment": {"metric": {"ref": metric}},
             "analysis": analysis,
             "toolchain": {},
         }

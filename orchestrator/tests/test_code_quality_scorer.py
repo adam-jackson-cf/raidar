@@ -1,6 +1,6 @@
 """code-quality@1 behaviour over stored trials (plan G2/G3 acceptance).
 
-A trial's per-step snapshots and oracle records go in; the Assessment holds
+A trial's per-step snapshots and verifier records go in; the Assessment holds
 V/E/H per checkpoint and R/G per transition with the fork's values, every
 unavailable value explicitly statused (never zero), and evidence that the
 store validates against the stored snapshots (file, sha256, line spans).
@@ -16,13 +16,6 @@ from typing import Any
 
 import pytest
 
-from raidar.oracle.models import CaseStatus, ParityVerdict
-from raidar.oracle.records import (
-    FORK_EVIDENCE_FILE,
-    load_step_record,
-    step_record_dir,
-    write_step_record,
-)
 from raidar.oracle.snapshot import tree_digest
 from raidar.packs.python.models import load_tool_lock
 from raidar.packs.python.provisioner import ToolProvisioningError
@@ -37,6 +30,13 @@ from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
 from raidar.scorers.sdk.validation import validate_result
 from raidar.scorers.store import AssessmentStore
 from raidar.scorers.trial_inputs import load_trial_context
+from raidar.verifier.models import CaseStatus, ParityVerdict
+from raidar.verifier.records import (
+    FORK_EVIDENCE_FILE,
+    load_step_record,
+    step_record_dir,
+    write_step_record,
+)
 from tests.code_quality_support import case_trial, golden_case, quality_tools
 from tests.scorer_support import StepFixture, tree_state, write_files, write_trial
 

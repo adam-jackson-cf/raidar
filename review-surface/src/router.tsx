@@ -47,7 +47,7 @@ function Layout() {
               className="text-xs transition"
               style={({ isActive }) => ({ color: isActive ? C.accent : C.fg1 })}
             >
-              Runs
+              Trials
             </NavLink>
             <NavLink
               to="/quality"

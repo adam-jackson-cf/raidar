@@ -1,4 +1,4 @@
-"""Experiment-epoch producer: run directories + Assessment stores -> the review projection.
+"""Experiment-epoch producer: job directories + Assessment stores -> the review projection.
 
 Concept -> source (design memo §12.1):
 
@@ -9,7 +9,7 @@ Concept -> source (design memo §12.1):
 - one experiment record per (experiment, lock, problem, arm, agent override,
   ``max_checkpoints`` truncation): development runs are never pooled with arm
   evidence, and their headline is withheld (``headline.withheld_reasons``);
-- ``composite_score`` -> the headline ScorePolicy's S/100 (``headline``);
+- ``composite_score`` -> the headline metric's S/100 (``headline``);
 - gates -> one gate per checkpoint plus the validity gates (``gates``);
 - spans -> Harbor ATIF trajectories, one parent span per checkpoint (``atif``);
 - arm diffs -> condition diffs with arm-diff-guard warnings (``conditions``).
@@ -21,12 +21,12 @@ from collections import Counter, defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
-from raidar.execution.models import TrajectoryRecord
+from raidar.execution.models import TrialRecord
 from raidar.review_projection.assessments import AssessmentLookup
 from raidar.review_projection.conditions import ArmSide, condition_diff
 from raidar.review_projection.experiments import ArmGroup, experiment_record
 from raidar.review_projection.headline import headline, withheld_reasons
-from raidar.review_projection.sources import RunSource
+from raidar.review_projection.sources import JobSource
 from raidar.review_projection.spans import safe_id
 from raidar.review_projection.trials import ArmLabels, TrialInput, run_detail
 from raidar.schemas.review import (
@@ -50,8 +50,8 @@ class EpochProjection:
 
 @dataclass(frozen=True)
 class _Trial:
-    source: RunSource
-    record: TrajectoryRecord
+    source: JobSource
+    record: TrialRecord
 
     @property
     def arm(self) -> str:
@@ -93,8 +93,8 @@ def _condition_labels(trials: Sequence[_Trial]) -> dict[tuple[str, str, str], st
 
 
 def _review_ids(trials: Sequence[_Trial]) -> dict[int, str]:
-    """``<run>-<trial>``, qualified by the experiment only where two runs share a run id."""
-    short = [safe_id(f"{t.source.run_id}-{t.record.trial.trial_id}") for t in trials]
+    """``<job>-<trial>``, qualified by the experiment only where two runs share a job id."""
+    short = [safe_id(f"{t.source.job_id}-{t.record.trial.trial_id}") for t in trials]
     counts = Counter(short)
     return {
         index: name if counts[name] == 1 else safe_id(f"{trial.source.experiment}-{name}")
@@ -118,12 +118,12 @@ def _labels(trial: _Trial, arm_label: str) -> ArmLabels:
         harness, model, effort = override, _OVERRIDE_MODELS.get(override, override), None
         agent_spec = f"{override} override · {model}"
     else:
-        harness, effort = agent.harness, agent.reasoning_effort
+        harness, effort = agent.name.value, agent.reasoning_effort
         model = f"{agent.provider}/{agent.model}"
         agent_spec = f"{harness} · {model}" + (f" [{effort}]" if effort else "")
     truncated = trial.record.truncated_to
     if truncated is not None:
-        agent_spec += f" · dev run, first {truncated} checkpoint(s)"
+        agent_spec += f" · dev job, first {truncated} checkpoint(s)"
     return ArmLabels(
         experiment_id=_experiment_id(trial.group_key),
         problem=trial.problem,
@@ -139,20 +139,20 @@ def _trial_input(
     trial: _Trial, review_id: str, arm_label: str, lookup: AssessmentLookup
 ) -> TrialInput:
     source, record = trial.source, trial.record
-    trial_dir = source.run_dir / record.trial_dir
+    trial_dir = source.job_dir / record.trial_dir
     scorers = source.lock.spec.assessment.scorers
     assessments = lookup.for_trial(
         trial_dir, scorers, source.assessment, config_path=source.assessment_path
     )
     return TrialInput(
         review_id=review_id,
-        run_dir=source.run_dir,
+        job_dir=source.job_dir,
         run_started=source.manifest.get("started_at"),
         record=record,
         labels=_labels(trial, arm_label),
         assessments=assessments,
         headline=headline(
-            source.lock.headline_policy,
+            source.lock.metric,
             record.trial.steps,
             assessments,
             withheld_reasons(record),
@@ -201,7 +201,7 @@ def _side(trial: _Trial, view: TrialInput) -> ArmSide:
         arm=arm,
         label=view.labels.arm,
         manifest=trial.source.lock.conditions.get(trial.condition, []),
-        task_dir=trial.source.run_dir / "tasks" / trial.record.trial.trial_id,
+        task_dir=trial.source.job_dir / "tasks" / trial.record.trial.trial_id,
     )
 
 
@@ -236,13 +236,13 @@ def _group(
         rules_artifacts=_rules_artifacts(manifest),
         parent_arm=diff.from_arm if diff is not None else None,
         change_categories=categories,
-        headline_policy=members[0][1].headline.policy,
+        metric=members[0][1].headline.policy,
         trials=[view for _, view, _ in members],
         details=[detail for _, _, detail in members],
     )
 
 
-def project_sources(sources: Sequence[RunSource], lookup: AssessmentLookup) -> EpochProjection:
+def project_sources(sources: Sequence[JobSource], lookup: AssessmentLookup) -> EpochProjection:
     trials = [_Trial(source, record) for source in sources for record in source.records]
     labels = _condition_labels(trials)
     ids = _review_ids(trials)

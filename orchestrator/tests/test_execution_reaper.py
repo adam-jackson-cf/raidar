@@ -20,8 +20,8 @@ from raidar.execution.reaper import (
     reap_infra_reason,
     reap_script,
 )
-from raidar.oracle.records import step_record_dir
-from tests.oracle_support import make_bundle
+from raidar.verifier.records import step_record_dir
+from tests.verifier_support import make_bundle
 
 KILLED_OUTPUT = (
     "@@RAIDAR_KILLED\n"

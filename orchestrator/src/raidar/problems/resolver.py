@@ -4,12 +4,19 @@ Resolution reads only committed records - the manifest and its validation
 report - so ``raidar lock`` works without materialised task content (and
 without Docker). The digest is the manifest's canonical digest, which covers
 the pinned source commit, git tree ids and the content digests of the task,
-oracle bundle and references.
+verifier bundle and references.
 
-A problem resolves only after oracle validation (F13; plan task 0.5: "any
+A problem resolves only after verifier validation (F13; plan task 0.5: "any
 failing problem is excluded"): its report must be for the current manifest and
 carry a usable verdict. Excluded, infra-failed, stale or missing validation is
-a resolution error, and the lock records the verdict and report digest.
+reported to the compatibility gate (``binding.validated``), which refuses the
+lock with ``RT0``; a validated problem's lock records the verdict and report
+digest.
+
+A problem reference names a *binding*: one upstream problem imported against
+one runtime pack (``scb/...`` is the python binding, ``scb-node-ts/...`` would be
+the node-ts one). The manifest's ``pack`` is authoritative and reaches the gate
+through ``binding`` only, so the recorded lock metadata is unchanged.
 """
 
 from __future__ import annotations
@@ -46,11 +53,28 @@ class ProblemResolver:
         try:
             store = ProblemStore(self.store_root or find_store_root(base_dir))
             manifest = store.load_manifest(problem)
-            validation = store.require_validated(problem, manifest)
         except ProblemStoreError as exc:
             raise RegistryReferenceError(str(exc)) from exc
+        binding: dict[str, object] = {
+            "runtime": manifest.pack.id,
+            "pack_version": manifest.pack.version,
+        }
+        try:
+            validation = store.require_validated(problem, manifest)
+        except ProblemStoreError as exc:
+            return ResolvedReference(
+                ref=ref,
+                digest=manifest.digest(),
+                metadata=manifest.lock_metadata(),
+                binding={**binding, "validated": False, "validation_issue": str(exc)},
+            )
         metadata = {**manifest.lock_metadata(), "validation": validation.lock_metadata()}
-        return ResolvedReference(ref=ref, digest=manifest.digest(), metadata=metadata)
+        return ResolvedReference(
+            ref=ref,
+            digest=manifest.digest(),
+            metadata=metadata,
+            binding={**binding, "validated": True},
+        )
 
 
 def resolver_factory() -> ProblemResolver:

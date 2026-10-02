@@ -12,11 +12,10 @@ from click.testing import CliRunner
 from harbor.models.task.task import Task
 
 from raidar.cli import main
-from raidar.oracle.sandbox import SandboxResult, SandboxRun
 from raidar.problems import direct, harbor_engine, validator
 from raidar.problems.models import ProblemId
 from raidar.problems.native import grade_from_evaluation, stage_catalog
-from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
+from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ProblemStore
 from raidar.problems.validation import (
     NEGATIVE,
@@ -35,13 +34,14 @@ from raidar.problems.validation import (
     verdict,
 )
 from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from tests.oracle_support import LocalProcessSandbox
+from raidar.verifier.sandbox import SandboxResult, SandboxRun
 from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,
     POSITIVE_REF,
     build_fixture_store,
 )
+from tests.verifier_support import LocalProcessSandbox
 
 
 class DownSandbox(LocalProcessSandbox):
@@ -74,7 +74,7 @@ async def _validate(
     )
 
 
-async def test_reference_trajectory_validates_with_oracle_grading(
+async def test_reference_trial_validates_with_oracle_grading(
     store: ProblemStore, tmp_path: Path
 ) -> None:
     report = await _validate(store, POSITIVE_REF, tmp_path)
@@ -215,12 +215,12 @@ def test_policy_preview_never_scores_an_ungraded_reference_as_zero() -> None:
     assert preview["reference_correctness"] == "0.5"
     assert preview["components"]["C"] == "used"
 
-    ungraded = {**graded, "s2": _grade("s2", {}, infra="no_oracle_record")}
+    ungraded = {**graded, "s2": _grade("s2", {}, infra="no_verifier_record")}
     preview = policy_preview(ungraded, 2)
     assert preview["reference_correctness"] is None
     assert preview["components"]["C"] == "ineligible"
     assert preview["eligible"] is False
-    assert any("oracle_infra_failure: s2" in r["detail"] for r in preview["reasons"])
+    assert any("verifier_infra_failure: s2" in r["detail"] for r in preview["reasons"])
 
 
 def test_native_evaluation_reduces_to_the_same_case_keys_as_the_oracle(tmp_path: Path) -> None:
@@ -286,16 +286,16 @@ def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
         task, tmp_path / "trials", "negative-0", problem.bundle.root, docker_context="orbstack"
     )
     assert config.agent.name == "oracle"
-    assert config.verifier.import_path == ORACLE_VERIFIER_IMPORT_PATH
+    assert config.verifier.import_path == VERIFIER_IMPORT_PATH
     assert config.verifier.kwargs["oracle_bundle"] == str(problem.bundle.root)
     assert config.verifier.kwargs["snapshot_source"] == "artifact"
     grades = harbor_engine.read_grades(tmp_path / "trials" / "negative-0", ["checkpoint_1"])
-    assert grades["checkpoint_1"].infra_failure == "no_oracle_record"
+    assert grades["checkpoint_1"].infra_failure == "no_verifier_record"
     # Harbor records (does not raise) trial exceptions; the type survives as the reason.
     crashed = harbor_engine.read_grades(
         tmp_path / "trials" / "negative-0", ["checkpoint_1"], "DockerException"
     )
-    assert crashed["checkpoint_1"].infra_failure == "no_oracle_record:DockerException"
+    assert crashed["checkpoint_1"].infra_failure == "no_verifier_record:DockerException"
     assert [step.name for step in Task(task).config.steps or []] == ["checkpoint_1", "checkpoint_2"]
 
 
@@ -343,9 +343,11 @@ def test_validate_command_exit_codes_follow_the_verdict(
     assert "[INFRA] reference_k_passes_1..k" in outage.output
     assert "INFRA_FAILURE" in outage.output
     assert written.read_bytes() == committed
-    attempt = json.loads(store.validation_attempt_path(ProblemId.parse(NEGATIVE_REF)).read_text())
-    assert attempt["verdict"] == "infra_failure"
-    assert attempt["headline_policy"]["reference_correctness"] is None
+    step_result = json.loads(
+        store.validation_attempt_path(ProblemId.parse(NEGATIVE_REF)).read_text()
+    )
+    assert step_result["verdict"] == "infra_failure"
+    assert step_result["headline_policy"]["reference_correctness"] is None
 
     missing = runner.invoke(main, [*base, "fixture/absent@fefefefefefe"])
     assert missing.exit_code == 2

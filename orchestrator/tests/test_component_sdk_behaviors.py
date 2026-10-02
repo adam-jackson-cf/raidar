@@ -25,7 +25,7 @@ from raidar.components.builtins.workspace import RULES_FILE, RulesFile
 from raidar.components.manifest import ComponentManifest, DiscoveryProbe
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import build_lock
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, PolicyResolver
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
 from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError, ResolverSet
 from tests.component_support import (
     PILOT_DIR,
@@ -179,7 +179,7 @@ def test_validate_and_lock_reject_an_arm_the_compiler_would_reject(tmp_path: Pat
     document["agents"].append(
         {
             "id": "gem",
-            "harness": "gemini",
+            "name": "gemini-cli",
             "provider": "google",
             "model": "gemini-3-flash-preview",
             "version": "0.156.1",
@@ -191,7 +191,7 @@ def test_validate_and_lock_reject_an_arm_the_compiler_would_reject(tmp_path: Pat
     document["arms"].append({"id": "gem-guided", "condition": "guided", "agent": "gem"})
     document["factors"] = [
         "condition",
-        "agent.harness",
+        "agent.name",
         "agent.model",
         "agent.provider",
         "agent.reasoning_effort",
@@ -271,14 +271,14 @@ def test_resolver_digest_tracks_manifest_and_implementation_sources(tmp_path: Pa
 def test_lock_records_component_digest_through_the_entry_point_resolver(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
     others = [r for r in fixture_resolvers() if r.kind is not RefKind.COMPONENT]
-    resolvers = ResolverSet([PolicyResolver(DEFAULT_POLICY_REGISTRY), *others])
+    resolvers = ResolverSet([MetricResolver(DEFAULT_METRIC_REGISTRY), *others])
 
     lock = build_lock(load_experiment(path), lock_path=tmp_path / "lock.json", resolvers=resolvers)
 
     assert isinstance(ResolverSet().resolver_for(RefKind.COMPONENT), ComponentResolver)
     recorded = lock["execution"]["references"]["component"]["rules-file@1"]  # type: ignore[index]
     assert recorded["digest"] == fingerprint(RULES_FILE)
-    assert recorded["metadata"]["supports"] == ["codex-cli", "claude-code"]
+    assert recorded["metadata"]["supports"] == ["codex", "claude-code"]
 
 
 def test_compile_arm_uses_the_arms_condition_and_agent() -> None:

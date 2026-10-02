@@ -1,4 +1,4 @@
-"""Map a finished Harbor trial to ``CheckpointAttempt`` records (plan D2).
+"""Map a finished Harbor trial to ``StepResult`` records (plan D2).
 
 Per planned checkpoint the state is decided from host-only evidence:
 
@@ -10,18 +10,18 @@ Per planned checkpoint the state is decided from host-only evidence:
   aborted without a verdict), or the step started but has no trustworthy
   verdict: no oracle
   record (the verifier failed closed, e.g. no pre-agent leak check because the
-  guard could not scan), an oracle infrastructure failure, an oracle leak, a
+  guard could not scan), a verifier infrastructure failure, a verifier leak, a
   step exception that is not the agent's own failure (setup.sh, healthcheck,
   API/auth/network errors, the leak guard raising at agent start), or a failed
   component discovery probe (F5, including the per-step reset probe), or an
   agent-end reap that failed or left an agent process alive (F3).
-- **solved** / **failed**: otherwise, from the oracle's strict all-cases verdict
+- **solved** / **failed**: otherwise, from the verifier's strict all-cases verdict
   in ``raidar-oracle/steps/<step>/record.json``. Harbor's aggregated trial
   reward is never read.
 
-The trajectory's execution-validity gate fails when any step is an infra
+The trial's execution-validity gate fails when any step is an infra
 error, the trial raised, a halt run did not execute exactly what its gate
-allows, or the harness did not run at its pinned version.
+allows, or the agent CLI did not run at its pinned version.
 """
 
 from __future__ import annotations
@@ -36,21 +36,21 @@ from typing import Any
 
 from raidar.components import CompiledCondition
 from raidar.execution.models import (
-    CheckpointAttempt,
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,
     ProbeSummary,
     ProgressionRule,
     SnapshotInfo,
+    StepResult,
     Usage,
     ValidityCheck,
 )
 from raidar.execution.progression import derive_reached, gate_passes
 from raidar.execution.reaper import load_reap_report, reap_infra_reason
 from raidar.execution.timestamps import span_s
-from raidar.oracle.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
-from raidar.oracle.verifier import LEAK_REWARD_KEY
+from raidar.verifier.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
+from raidar.verifier.verifier import LEAK_REWARD_KEY
 
 RESULT_FILE = "result.json"
 TRIAL_LOG = "trial.log"
@@ -119,12 +119,12 @@ def _infra_reasons(
 ) -> list[str]:
     reasons = [reap] if reap else []
     if record is None:
-        reasons.append("no_oracle_record" + (f":{exception}" if exception else ""))
+        reasons.append("no_verifier_record" + (f":{exception}" if exception else ""))
     else:
         if record.grade.infra_failure is not None:
-            reasons.append(f"oracle_infra:{record.grade.infra_failure.code}")
+            reasons.append(f"verifier_infra:{record.grade.infra_failure.code}")
         if record.rewards.get(LEAK_REWARD_KEY, 0.0) > 0:
-            reasons.append("oracle_leak")
+            reasons.append("verifier_leak")
     if exception is not None and exception not in AGENT_FAILURE_EXCEPTIONS:
         reasons.append(f"step_exception:{exception}")
     reasons.extend(f"component_probe:{failure}" for failure in probes.failures)
@@ -153,7 +153,7 @@ def _probe(ctx: TrialContext, trial_dir: Path, step: str, index: int) -> ProbeSu
 
 def _not_run(
     ctx: TrialContext, base: Mapping[str, Any], halted: bool, trial_error: str | None
-) -> CheckpointAttempt:
+) -> StepResult:
     """A planned checkpoint Harbor never started: by design, or because infrastructure broke."""
     if base["step"] not in ctx.trial.steps:
         reason = "truncated"
@@ -161,18 +161,16 @@ def _not_run(
         reason = "halted"
     else:
         cause = f"{NOT_STARTED}:{trial_error}" if trial_error else NOT_STARTED
-        return CheckpointAttempt(
+        return StepResult(
             **base,
             checkpoint_state=CheckpointState.INFRA_ERROR,
             infra_reasons=(cause,),
             termination=NOT_STARTED,
         )
-    return CheckpointAttempt(
-        **base, checkpoint_state=CheckpointState.NOT_ATTEMPTED, termination=reason
-    )
+    return StepResult(**base, checkpoint_state=CheckpointState.NOT_ATTEMPTED, termination=reason)
 
 
-def _attempt(
+def _step_result(
     ctx: TrialContext,
     trial_dir: Path,
     index: int,
@@ -181,12 +179,12 @@ def _attempt(
     *,
     halted: bool = False,
     trial_error: str | None = None,
-) -> CheckpointAttempt:
+) -> StepResult:
     step, checkpoint = ctx.planned_steps[index]
     base: dict[str, Any] = {
         "trial_id": ctx.trial.trial_id,
         "arm": ctx.trial.arm,
-        "block": ctx.trial.block,
+        "attempt": ctx.trial.attempt,
         "problem": ctx.trial.problem,
         "index": index,
         "step": step,
@@ -205,13 +203,13 @@ def _attempt(
     else:
         assert record is not None  # no reasons implies a record
         state = CheckpointState.SOLVED if record.grade.solved else CheckpointState.FAILED
-    return CheckpointAttempt(
+    return StepResult(
         **base,
         checkpoint_state=state,
         infra_reasons=tuple(reasons),
         strict_pass_rate=record.grade.pass_rate() if record else None,
         rewards=dict(record.rewards) if record else None,
-        oracle_record=(
+        verifier_record=(
             step_record_dir(trial_dir, step).relative_to(trial_dir) / RECORD_FILE
         ).as_posix()
         if record
@@ -228,21 +226,21 @@ def _attempt(
     )
 
 
-def _halts(attempt: CheckpointAttempt, rule: ProgressionRule) -> bool:
+def _halts(step_result: StepResult, rule: ProgressionRule) -> bool:
     """A graded verdict below the halt gate: later steps are legitimately not run."""
-    graded = attempt.checkpoint_state in (CheckpointState.SOLVED, CheckpointState.FAILED)
-    return rule.mode == "halt_on_failure" and graded and not gate_passes(attempt.rewards, rule)
+    graded = step_result.checkpoint_state in (CheckpointState.SOLVED, CheckpointState.FAILED)
+    return rule.mode == "halt_on_failure" and graded and not gate_passes(step_result.rewards, rule)
 
 
-def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[CheckpointAttempt, ...]:
+def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[StepResult, ...]:
     result = read_result(trial_dir)
     items = step_results(result)
     trial_error = _exception_type(result) if result is not None else "no_result"
-    attempts: list[CheckpointAttempt] = []
+    results: list[StepResult] = []
     parent: str | None = None
     halted = False
     for index, (step, _) in enumerate(ctx.planned_steps):
-        attempt = _attempt(
+        step_result = _step_result(
             ctx,
             trial_dir,
             index,
@@ -251,15 +249,15 @@ def classify_trial(trial_dir: Path, ctx: TrialContext) -> tuple[CheckpointAttemp
             halted=halted,
             trial_error=trial_error,
         )
-        if attempt.snapshot is not None:
-            parent = attempt.snapshot.digest
-        halted = halted or _halts(attempt, ctx.rule)
-        attempts.append(attempt)
-    return tuple(attempts)
+        if step_result.snapshot is not None:
+            parent = step_result.snapshot.digest
+        halted = halted or _halts(step_result, ctx.rule)
+        results.append(step_result)
+    return tuple(results)
 
 
 def harness_installs(trial_dir: Path) -> list[str]:
-    """Versions Harbor installed the harness at during this trial ("" = unpinned/latest)."""
+    """Versions Harbor installed the agent CLI at during this trial ("" = unpinned/latest)."""
     path = trial_dir / TRIAL_LOG
     if not path.is_file():
         return []
@@ -277,17 +275,17 @@ def harness_installs(trial_dir: Path) -> list[str]:
 def _harness_check(
     result: Mapping[str, Any] | None, pinned: str | None, trial_dir: Path
 ) -> ValidityCheck:
-    """The harness ran at the pack pin.
+    """The agent CLI ran at the pack pin.
 
     Harbor reports the configured ``version`` kwarg, not what is installed, and
     a workflow wrapper reports its own version, so the evidence is what Harbor
     installed: an install at any version other than the pin (or unpinned)
-    fails. A reinstall at the pin still runs the pinned harness; it is recorded
-    in the detail because it means the pack's pre-installed harness was missed.
+    fails. A reinstall at the pin still runs the pinned agent CLI; it is recorded
+    in the detail because it means the pack's pre-installed agent CLI was missed.
     """
     if pinned is None:
         return ValidityCheck(
-            name="harness_version", passed=True, detail="no-LLM agent override: no harness"
+            name="agent_version", passed=True, detail="no-LLM agent override: no agent CLI"
         )
     agent_info = (result or {}).get("agent_info") or {}
     installs = harness_installs(trial_dir)
@@ -298,31 +296,31 @@ def _harness_check(
     if off_pin:
         detail += f"; installed off-pin {off_pin}"
     elif installs:
-        detail += "; reinstalled at the pin (pack pre-installed harness missed)"
-    return ValidityCheck(name="harness_version", passed=not off_pin, detail=detail)
+        detail += "; reinstalled at the pin (pack pre-installed agent CLI missed)"
+    return ValidityCheck(name="agent_version", passed=not off_pin, detail=detail)
 
 
-def _reason_check(name: str, attempts: Sequence[CheckpointAttempt], prefix: str) -> ValidityCheck:
+def _reason_check(name: str, step_results: Sequence[StepResult], prefix: str) -> ValidityCheck:
     hits = [
-        f"{attempt.step}: {reason}"
-        for attempt in attempts
-        for reason in attempt.infra_reasons
+        f"{step_result.step}: {reason}"
+        for step_result in step_results
+        for reason in step_result.infra_reasons
         if reason.startswith(prefix)
     ]
     return ValidityCheck(name=name, passed=not hits, detail="; ".join(hits))
 
 
 def _halt_check(
-    attempts: Sequence[CheckpointAttempt], rule: ProgressionRule, runnable: int | None
+    step_results: Sequence[StepResult], rule: ProgressionRule, runnable: int | None
 ) -> ValidityCheck:
     """A halt run executed exactly the checkpoints its own gate allows."""
     if rule.mode != "halt_on_failure":
         return ValidityCheck(name="progression", passed=True, detail="continue")
     executed = tuple(
         a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED and a.termination != NOT_STARTED
-        for a in attempts
+        for a in step_results
     )
-    allowed = derive_reached([a.rewards for a in attempts], rule, runnable=runnable)
+    allowed = derive_reached([a.rewards for a in step_results], rule, runnable=runnable)
     return ValidityCheck(
         name="progression",
         passed=executed == allowed,
@@ -332,7 +330,7 @@ def _halt_check(
 
 def execution_validity(
     trial_dir: Path,
-    attempts: Sequence[CheckpointAttempt],
+    step_results: Sequence[StepResult],
     pinned: str | None,
     rule: ProgressionRule,
     *,
@@ -340,7 +338,7 @@ def execution_validity(
 ) -> ExecutionValidity:
     result = read_result(trial_dir)
     trial_exception = _exception_type(result)
-    started = any(a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED for a in attempts)
+    started = any(a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED for a in step_results)
     checks = [
         ValidityCheck(
             name="trial_completed",
@@ -349,13 +347,13 @@ def execution_validity(
             if result is None
             else (trial_exception or ("" if started else "no step started")),
         ),
-        _reason_check("steps_started", attempts, NOT_STARTED),
-        _reason_check("oracle_verdicts", attempts, "no_oracle_record"),
-        _reason_check("oracle_infra", attempts, "oracle_infra"),
-        _reason_check("no_oracle_leak", attempts, "oracle_leak"),
-        _reason_check("agent_infra", attempts, "step_exception"),
-        _reason_check("component_probes", attempts, "component_probe"),
-        _halt_check(attempts, rule, runnable),
+        _reason_check("steps_started", step_results, NOT_STARTED),
+        _reason_check("verifier_verdicts", step_results, "no_verifier_record"),
+        _reason_check("verifier_infra", step_results, "verifier_infra"),
+        _reason_check("no_verifier_leak", step_results, "verifier_leak"),
+        _reason_check("agent_infra", step_results, "step_exception"),
+        _reason_check("component_probes", step_results, "component_probe"),
+        _halt_check(step_results, rule, runnable),
         _harness_check(result, pinned, trial_dir),
     ]
     return ExecutionValidity(checks=tuple(checks))

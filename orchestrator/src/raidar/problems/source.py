@@ -16,7 +16,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 
-from raidar.problems.models import DatasetPin
+from raidar.problems.models import SourcePin
 
 CONVERTER_ORG = "scb"
 CONVERTER_TIMEOUT_S = 600
@@ -52,7 +52,7 @@ class PinnedCheckout:
     """A dataset checkout verified to sit at its pinned commit."""
 
     root: Path
-    pin: DatasetPin
+    pin: SourcePin
 
     @property
     def converter_dir(self) -> str:
@@ -84,7 +84,7 @@ class PinnedCheckout:
             )
 
 
-def converter_path(pin: DatasetPin) -> PurePosixPath:
+def converter_path(pin: SourcePin) -> PurePosixPath:
     """The pin's converter as a checkout-relative path; it may not leave the checkout."""
     path = PurePosixPath(pin.converter)
     if path.is_absolute() or ".." in path.parts or len(path.parts) < 2:
@@ -95,14 +95,14 @@ def converter_path(pin: DatasetPin) -> PurePosixPath:
     return path
 
 
-def open_checkout(root: Path, pin: DatasetPin) -> PinnedCheckout:
+def open_checkout(root: Path, pin: SourcePin) -> PinnedCheckout:
     head = _git(root, "rev-parse", "HEAD")
     if head != pin.commit:
         raise SourceError(f"{root} is at {head}, expected pinned commit {pin.commit}")
     return PinnedCheckout(root=root, pin=pin)
 
 
-def ensure_checkout(cache_dir: Path, name: str, pin: DatasetPin) -> PinnedCheckout:
+def ensure_checkout(cache_dir: Path, name: str, pin: SourcePin) -> PinnedCheckout:
     """Clone ``pin.url`` into the cache once and check out the pinned commit."""
     root = cache_dir / "sources" / f"{name}-{pin.version}"
     if not (root / ".git").exists():

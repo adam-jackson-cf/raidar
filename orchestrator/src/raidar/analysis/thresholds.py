@@ -1,6 +1,6 @@
 """Verdict thresholds from the lock (memo §2.3: fixed before any data is seen).
 
-The lock's ``spec.analysis`` block pins ``min_pairs``, ``max_exclusion_fraction``,
+The lock's ``spec.analysis`` section pins ``min_pairs``, ``max_exclusion_fraction``,
 ``alpha`` and ``min_effects`` (``raidar.spec.schema.VERDICT_THRESHOLDS``). A lock
 written before the schema carried them is *not pinned*: the documented
 defaults fill the missing values and the report says so. A caller-supplied override (the
@@ -50,22 +50,22 @@ def settings_from_lock(
     overrides: Mapping[str, Any] | None = None,
     bootstrap_samples: int = BOOTSTRAP_SAMPLES,
 ) -> Settings:
-    """``Settings`` from a lock's ``spec.analysis`` block plus labelled overrides.
+    """``Settings`` from a lock's ``spec.analysis`` section plus labelled overrides.
 
     ``overrides`` keys are ``min_pairs``, ``max_exclusion_fraction``, ``alpha``
     (a value of ``None`` means "not given") and ``min_effects`` (merged per
     metric over the lock's). Raises ``ValueError`` for an unknown metric or an
     out-of-range value.
     """
-    block = dict(analysis or {})
-    pinned = all(name in block for name in VERDICT_THRESHOLDS)
+    section = dict(analysis or {})
+    pinned = all(name in section for name in VERDICT_THRESHOLDS)
     values: dict[str, Any] = {
         "min_pairs": DEFAULT_MIN_PAIRS,
         "max_exclusion_fraction": DEFAULT_MAX_EXCLUSION_FRACTION,
         "alpha": DEFAULT_ALPHA,
         "min_effects": {},
     }
-    values.update({name: block[name] for name in VERDICT_THRESHOLDS if name in block})
+    values.update({name: section[name] for name in VERDICT_THRESHOLDS if name in section})
     values["min_effects"] = _min_effects(values["min_effects"])
     overridden: list[str] = []
     for name, value in (overrides or {}).items():
@@ -81,7 +81,7 @@ def settings_from_lock(
         max_exclusion_fraction=float(values["max_exclusion_fraction"]),
         alpha=float(values["alpha"]),
         bootstrap_samples=bootstrap_samples,
-        seed=int(block.get("seed", 0)),
+        seed=int(section.get("seed", 0)),
         min_effects=values["min_effects"],
         source=_source(pinned, tuple(overridden)),
         pinned_by_lock=pinned,

@@ -11,11 +11,11 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.oracle.models import CaseStatus
 from raidar.scorers.catalog import BUILTIN_IMPLEMENTATIONS
 from raidar.scorers.rescore import RescoreError, RescoreOutcome, rescore_path
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.scorers.trial_inputs import TrialInputError, load_trial_context
+from raidar.verifier.models import CaseStatus
 from tests.scorer_support import (
     APP_V1,
     APP_V2,
@@ -111,7 +111,7 @@ def test_deterministic_replay_is_byte_identical_and_a_divergent_replay_is_refuse
 
 def test_assessment_keys_follow_config_and_inputs(tmp_path: Path) -> None:
     store = AssessmentStore(tmp_path / "store")
-    trial = two_step_trial(tmp_path / "runs" / "trial")
+    trial = two_step_trial(tmp_path / "jobs" / "trial")
     plain = rescore_path(trial, [V1], store, fake_registry())
     configured = rescore_path(trial, [V1], store, fake_registry(), config={V1: {"threshold": 3}})
     copy = two_step_trial(tmp_path / "elsewhere" / "trial-copy")
@@ -137,7 +137,7 @@ def test_scores_come_from_oracle_records_and_unavailable_steps_carry_no_value(
     assessment = store.get(record.key)
     assert assessment is not None
     values = {(o.metric, o.subject): o for o in assessment.result.observations}
-    # Harbor's aggregated rewards in result.json say solved=0.0; the oracle record says solved.
+    # Harbor's aggregated rewards in result.json say solved=0.0; the verifier record says solved.
     assert values[("solved", "checkpoint_1")].value == 1.0
     assert values[("solved_checkpoints", "trajectory")].value == 1
     ungraded = values[("solved", "checkpoint_2")]
@@ -146,7 +146,7 @@ def test_scores_come_from_oracle_records_and_unavailable_steps_carry_no_value(
     assert assessment.inputs["steps"][1]["oracle_record"] is None
 
 
-def test_trajectories_that_stop_early_keep_every_planned_checkpoint_as_a_subject(
+def test_trials_that_stop_early_keep_every_planned_checkpoint_as_a_subject(
     tmp_path: Path,
 ) -> None:
     halted = write_trial(

@@ -1,11 +1,11 @@
 """Progression (plan D3; requirements F4): continue by default, halt via ``min_reward``.
 
-Halting is Harbor's native ``[[steps]].min_reward`` gate on the oracle's step
+Halting is Harbor's native ``[[steps]].min_reward`` gate on the verifier's step
 reward ``strict_pass_rate``. The oracle omits every rate when the verdict is
-unavailable (infrastructure failure, oracle leak, no graded case), and Harbor
+unavailable (infrastructure failure, verifier leak, no graded case), and Harbor
 treats a missing key as -inf, so those steps halt too.
 
-Because the agent never sees oracle results (F4), a continue run's first k
+Because the agent never sees verifier results (F4), a continue run's first k
 checkpoints are exactly what a halt run would have executed. The strict
 ``reached`` vector is therefore derived from a continue run by replaying the
 gate over the recorded step rewards: checkpoint k is reached iff every
@@ -59,8 +59,8 @@ def derive_reached(
     """Strict ``reached`` per planned checkpoint from a continue run's step rewards.
 
     ``rewards_by_step`` has one entry per planned checkpoint in order: the
-    oracle rewards of an attempted step, ``None`` for a step without a verdict
-    or never attempted. ``runnable`` caps the trajectory (a truncated run),
+    verifier rewards of an attempted step, ``None`` for a step without a verdict
+    or never attempted. ``runnable`` caps the trial (a truncated run),
     exactly as it caps what a halt run could execute.
     """
     limit = len(rewards_by_step) if runnable is None else runnable

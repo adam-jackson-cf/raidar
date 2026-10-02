@@ -8,13 +8,13 @@ Checkpoint cells come straight from the stored observations:
   the first checkpoint has none (``not_applicable``).
 
 The checkpoint-level I and S are a review view, not a headline: they apply
-the headline policy's weights and formula to one checkpoint's components.
+the headline metric's weights and formula to one checkpoint's components.
 
-The problem-level row is the headline, and it is WS-J's trajectory outcome
+The problem-level row is the headline, and it is WS-J's trial outcome
 (``raidar.analysis.assessed.build_outcome``), so the Quality element, the
 analysis report and the review projection agree for one trial: C is
 ``solved_checkpoints / K`` (ADR-001 §2.4), V..G are the ``problem_*`` means,
-and S is the headline policy applied to them. A trajectory truncated by
+and S is the headline metric applied to them. A trial truncated by
 ``max_checkpoints`` has no problem-level outcome (every cell is
 ``truncated``). Only I is derived here, from the same policy score. Nothing
 unmeasured becomes a zero: every missing value keeps its reason.
@@ -48,12 +48,12 @@ from raidar.review_quality.models import (
 from raidar.review_quality.sources import CODE_QUALITY_REF, CORRECTNESS_REF, TrialSource
 from raidar.scorers.sdk.result import TRANSITION_SEPARATOR, Observation
 from raidar.scorers.store import Assessment
-from raidar.spec.policies import (
+from raidar.spec.metrics import (
     COMPONENT_PLACES,
-    DEFAULT_POLICY_REGISTRY,
+    DEFAULT_METRIC_REGISTRY,
     IneligibilityReason,
-    PolicyScore,
-    ScorePolicy,
+    Metric,
+    MetricScore,
 )
 
 CHECKPOINT_METRICS = {"V": "verbosity", "E": "erosion", "H": "architecture"}
@@ -70,12 +70,12 @@ _NOT_REACHED: CellStatus = "not_applicable"
 _TRUNCATED: CellStatus = "truncated"
 
 
-def resolve_policy(from_lock: str | None, checkpoints: int) -> tuple[ScorePolicy, PolicyInfo]:
-    """The lock's headline policy, or (no matching lock) the default for ``checkpoints``."""
+def resolve_policy(from_lock: str | None, checkpoints: int) -> tuple[Metric, PolicyInfo]:
+    """The lock's headline metric, or (no matching lock) the default for ``checkpoints``."""
     policy = (
-        DEFAULT_POLICY_REGISTRY.get(from_lock)
+        DEFAULT_METRIC_REGISTRY.get(from_lock)
         if from_lock
-        else DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints)
+        else DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints)
     )
     info = PolicyInfo(
         ref=policy.ref,
@@ -119,7 +119,7 @@ class _Observations:
         return item.value if item is not None else None
 
 
-def _inertia(policy: ScorePolicy, cells: Mapping[str, Cell]) -> Cell:
+def _inertia(policy: Metric, cells: Mapping[str, Cell]) -> Cell:
     weights = policy.inertia_weights
     missing = {key: cells[key] for key in weights if cells[key].status != "ok"}
     if missing:
@@ -134,7 +134,7 @@ def _inertia(policy: ScorePolicy, cells: Mapping[str, Cell]) -> Cell:
     return Cell(status="ok", value=float(inertia.quantize(COMPONENT_PLACES)))
 
 
-def _score(policy: ScorePolicy, correctness: Cell, inertia: Cell) -> Cell:
+def _score(policy: Metric, correctness: Cell, inertia: Cell) -> Cell:
     """Per-checkpoint S; under ``zero_correctness`` a measured C = 0 is S = 0 (``@2``)."""
     if policy.zero_correctness and correctness.status == "ok" and correctness.value == 0:
         return Cell(status="ok", value=0.0)
@@ -169,7 +169,7 @@ def _checkpoints(trial: TrialSource, *assessments: Assessment | None) -> tuple[s
 
 
 def _row_cells(
-    policy: ScorePolicy,
+    policy: Metric,
     checkpoint: str,
     previous: str | None,
     quality: _Observations,
@@ -227,9 +227,9 @@ def _signals(
 
 def _snapshot_roots(trial: TrialSource) -> dict[str, Path]:
     return {
-        attempt.step: trial.trial_dir / attempt.snapshot.path
-        for attempt in trial.record.attempts
-        if attempt.snapshot is not None
+        step_result.step: trial.trial_dir / step_result.snapshot.path
+        for step_result in trial.record.step_results
+        if step_result.snapshot is not None
     }
 
 
@@ -273,8 +273,8 @@ def _reason_text(reason: IneligibilityReason) -> str:
     return f"{reason.code.value}{component}: {reason.detail}"
 
 
-def _policy_score(policy: ScorePolicy, checkpoints: int, cells: Mapping[str, Cell]) -> PolicyScore:
-    """The headline policy applied to the problem-level cells it weighs."""
+def _policy_score(policy: Metric, checkpoints: int, cells: Mapping[str, Cell]) -> MetricScore:
+    """The headline metric applied to the problem-level cells it weighs."""
     inputs = {
         key: ComponentInput(value=Decimal(str(cell.value)))
         if cell.status == "ok"
@@ -287,11 +287,11 @@ def _policy_score(policy: ScorePolicy, checkpoints: int, cells: Mapping[str, Cel
 
 def _problem_cells(
     trial: TrialSource,
-    policy: ScorePolicy,
+    policy: Metric,
     quality: Assessment | None,
     correctness: Assessment | None,
 ) -> tuple[dict[str, Cell], tuple[str, ...]]:
-    """WS-J's trajectory outcome as cells, plus the inertia of the same policy score."""
+    """WS-J's trial outcome as cells, plus the inertia of the same policy score."""
     outcome = build_outcome(
         trial.record,
         {
@@ -349,26 +349,26 @@ def _notes(trial: TrialSource, jev_note: str | None) -> tuple[str, ...]:
     if trial.record.agent_override:
         notes.append(f"agent override: {trial.record.agent_override}")
     if trial.truncation is not None:
-        notes.append(f"development run, {trial.truncation}: no problem-level outcome")
+        notes.append(f"development job, {trial.truncation}: no problem-level outcome")
     return tuple(note for note in notes if note)
 
 
 def _problem_k(trial: TrialSource, checkpoints: Sequence[str]) -> int:
-    """The problem's K: a truncated trial's steps are cut, its attempts cover every planned step."""
-    if trial.truncation is not None and trial.record.attempts:
-        return len(trial.record.attempts)
+    """The problem's K: a truncated trial's steps are cut; its step results cover every step."""
+    if trial.truncation is not None and trial.record.step_results:
+        return len(trial.record.step_results)
     return len(checkpoints)
 
 
 def _rows(
     trial: TrialSource,
-    policy: ScorePolicy,
+    policy: Metric,
     checkpoints: Sequence[str],
     observations: tuple[_Observations, _Observations],
     evidence: Sequence[EvidenceItem],
 ) -> tuple[CheckpointRow, ...]:
     quality, correctness = observations
-    states = {attempt.step: attempt.checkpoint_state.value for attempt in trial.record.attempts}
+    states = {result.step: result.checkpoint_state.value for result in trial.record.step_results}
     previous: list[str | None] = [None, *checkpoints[:-1]]
     return tuple(
         CheckpointRow(
@@ -396,7 +396,7 @@ def build_run_detail(
 ) -> QualityRunDetail:
     record = trial.record
     checkpoints = _checkpoints(trial, quality, correctness)
-    policy, info = resolve_policy(trial.experiment.headline_policy, _problem_k(trial, checkpoints))
+    policy, info = resolve_policy(trial.experiment.metric, _problem_k(trial, checkpoints))
     quality_obs = _Observations(quality, f"no {CODE_QUALITY_REF} assessment matches this trial")
     correctness_obs = _Observations(
         correctness, f"no {CORRECTNESS_REF} assessment matches this trial"
@@ -407,17 +407,17 @@ def build_run_detail(
     summary = QualityRunSummary(
         id=trial.review_id,
         experiment=record.experiment,
-        run=trial.run_id,
+        job=trial.job_id,
         trial=record.trial.trial_id,
         arm=record.trial.arm,
         problem=record.trial.problem,
-        block=record.trial.block,
+        attempt=record.trial.attempt,
         valid=record.valid,
         checkpoints=len(checkpoints),
         truncated_to=record.truncated_to,
         score=problem["S"],
         sources={CODE_QUALITY_REF: _key(quality), CORRECTNESS_REF: _key(correctness)},
-        trajectory=trial.trajectory,
+        trial_record=trial.trial_record,
     )
     return QualityRunDetail(
         run=summary,

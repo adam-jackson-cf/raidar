@@ -3,8 +3,8 @@
 Bands are 95% at the default alpha.
 
 Eight checkpoints are not eight samples: each point's band is computed across
-trajectories (blocks) at that checkpoint, never across checkpoints. Only
-execution-valid trajectories contribute; a checkpoint whose value is a
+trials (attempts) at that checkpoint, never across checkpoints. Only
+execution-valid trials contribute; a checkpoint whose value is a
 statused gap (for example not reached, or ineligible) leaves that point's
 ``n`` and is counted in ``missing``.
 
@@ -22,7 +22,7 @@ from raidar.analysis.outcomes import (
     CHECKPOINT_SERIES,
     AnalysisModel,
     SeriesDef,
-    TrajectoryOutcome,
+    TrialOutcome,
 )
 from raidar.analysis.stats import seed_for, summarise
 from raidar.scorers.sdk.manifest import Direction
@@ -63,7 +63,7 @@ def _band(values: Sequence[float], missing: int, seed: int, settings: Settings) 
 
 
 def _arm_band(
-    outcomes: Sequence[TrajectoryOutcome], series: str, index: int, seed: int, settings: Settings
+    outcomes: Sequence[TrialOutcome], series: str, index: int, seed: int, settings: Settings
 ) -> Band:
     points = [outcome.point(series, index) for outcome in outcomes]
     values = [point.value for point in points if point.value is not None]
@@ -71,7 +71,7 @@ def _arm_band(
 
 
 def _delta_band(
-    paired: Sequence[tuple[TrajectoryOutcome, TrajectoryOutcome]],
+    paired: Sequence[tuple[TrialOutcome, TrialOutcome]],
     series: str,
     index: int,
     seed: int,
@@ -85,7 +85,7 @@ def _delta_band(
     return _band(deltas, len(paired) - len(deltas), seed, settings)
 
 
-def _valid(outcomes: Sequence[TrajectoryOutcome | None]) -> list[TrajectoryOutcome]:
+def _valid(outcomes: Sequence[TrialOutcome | None]) -> list[TrialOutcome]:
     return [outcome for outcome in outcomes if outcome is not None and not outcome.infra_error]
 
 

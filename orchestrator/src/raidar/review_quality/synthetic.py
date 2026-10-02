@@ -4,22 +4,22 @@ Writes, under one directory, clearly labelled synthetic data in the real
 WS-D/WS-F/WS-H shapes:
 
 - ``experiment.yaml``, a digest-checked ``experiment.lock.json`` beside it
-  (baseline arm and headline policy, as a real lock carries them), and
-  ``runs/synthetic-quality/<run>/`` run directories (``run.json`` naming the
-  lock digest + ``trajectories/*.json`` TrajectoryRecords);
+  (baseline arm and headline metric, as a real lock carries them), and
+  ``runs/synthetic-quality/<job>/`` job directories (``job.json`` naming the
+  lock digest + ``trial-records/*.json`` TrialRecords);
 - ``store/``: ``code-quality@1`` and ``correctness@1`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real
   scorer's shape: per-checkpoint ``solved`` and ``strict_pass_rate``, and
-  trajectory ``solved_checkpoints`` and ``reached``), plus a Jev audit of
+  trial ``solved_checkpoints`` and ``reached``), plus a Jev audit of
   rubric decisions for the label-export flow.
 
-The experiment id, run ids, problem and every snapshot digest carry a
+The experiment id, job ids, problem and every snapshot digest carry a
 ``synthetic`` marker, and the projection built from it sets
 ``synthetic: true``. It is never benchmark evidence.
 
 Built-in shape (deterministic, seeded): two arms (``baseline``, ``guided``)
-x 6 blocks x one 5-checkpoint problem. ``guided`` is better on E and R;
-block 4 of ``guided`` is an invalid trajectory (infra-excluded); block 2 of
+x 6 attempts x one 5-checkpoint problem. ``guided`` is better on E and R;
+attempt 4 of ``guided`` is an invalid trial (infra-excluded); attempt 2 of
 ``baseline`` has an ineligible H at checkpoint 3, so its headline S is
 ineligible with reasons.
 """
@@ -35,14 +35,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from raidar.execution.models import (
-    CheckpointAttempt,
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,
     SnapshotInfo,
-    TrajectoryRecord,
+    StepResult,
     TrialHashes,
+    TrialRecord,
     ValidityCheck,
 )
 from raidar.jev.audit import (
@@ -54,7 +54,7 @@ from raidar.jev.audit import (
 )
 from raidar.jev.policies import PolicyMode
 from raidar.jev.rubric import RUBRIC_POLICY
-from raidar.review_quality.synthetic_lock import default_headline_policy, write_synthetic_lock
+from raidar.review_quality.synthetic_lock import default_metric, write_synthetic_lock
 from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS
 from raidar.scorers.sdk.manifest import ScorerManifest
 from raidar.scorers.sdk.result import (
@@ -87,7 +87,7 @@ def _digest(*parts: object) -> str:
 @dataclass
 class _Trial:
     arm: str
-    block: int
+    attempt: int
     rng: random.Random
     observations: list[Observation] = field(default_factory=list)
     evidence: list[Evidence] = field(default_factory=list)
@@ -95,7 +95,7 @@ class _Trial:
 
     @property
     def trial_id(self) -> str:
-        return f"b{self.block:02d}-p0-{self.arm}"
+        return f"b{self.attempt:02d}-p0-{self.arm}"
 
     def snapshot(self, checkpoint: str) -> str:
         return _digest(EXPERIMENT, self.trial_id, checkpoint)
@@ -123,7 +123,7 @@ class _Trial:
 
 
 def _architecture(trial: _Trial, checkpoint: str) -> float | None:
-    if (trial.arm, trial.block, checkpoint) == INELIGIBLE_H:
+    if (trial.arm, trial.attempt, checkpoint) == INELIGIBLE_H:
         trial.observations.append(
             Observation(
                 metric="architecture",
@@ -292,13 +292,13 @@ def _assessment(manifest: ScorerManifest, trial: _Trial, result: AssessResult) -
     )
 
 
-def _record(trial: _Trial) -> TrajectoryRecord:
-    valid = (trial.arm, trial.block) != INVALID
-    attempts = tuple(
-        CheckpointAttempt(
+def _record(trial: _Trial) -> TrialRecord:
+    valid = (trial.arm, trial.attempt) != INVALID
+    step_results = tuple(
+        StepResult(
             trial_id=trial.trial_id,
             arm=trial.arm,
-            block=trial.block,
+            attempt=trial.attempt,
             problem=PROBLEM,
             index=index,
             step=checkpoint,
@@ -323,14 +323,14 @@ def _record(trial: _Trial) -> TrajectoryRecord:
         name: _digest(name, trial.trial_id)
         for name in ("lock", "problem", "arm", "condition", "agent", "protocol", "trial")
     }
-    return TrajectoryRecord(
+    return TrialRecord(
         experiment=EXPERIMENT,
-        run_id=RUN_ID,
+        job_id=RUN_ID,
         trial=PlannedTrial(
             trial_id=trial.trial_id,
-            block=trial.block,
+            attempt=trial.attempt,
             order=ARMS.index(trial.arm),
-            sequence=trial.block * len(ARMS) + ARMS.index(trial.arm),
+            sequence=trial.attempt * len(ARMS) + ARMS.index(trial.arm),
             arm=trial.arm,
             problem=PROBLEM,
             problem_index=0,
@@ -339,7 +339,7 @@ def _record(trial: _Trial) -> TrajectoryRecord:
         ),
         trial_dir=f"trials/{trial.trial_id}",
         progression=ProgressionRule(mode="continue", reward_key="strict_pass_rate"),
-        attempts=attempts,
+        step_results=step_results,
         reached=tuple(True for _ in CHECKPOINTS),
         reached_source="derived",
         validity=ExecutionValidity(
@@ -355,10 +355,10 @@ def _record(trial: _Trial) -> TrajectoryRecord:
 
 
 def _decisions(audit: AuditLog, trial: _Trial) -> None:
-    if trial.block > 1:
+    if trial.attempt > 1:
         return
     for number, checkpoint in enumerate(CHECKPOINTS[:3]):
-        flagged = (number + trial.block) % 2 == 0
+        flagged = (number + trial.attempt) % 2 == 0
         audit.append(
             DecisionRecord(
                 timestamp=_TIMESTAMP,
@@ -382,12 +382,12 @@ def _decisions(audit: AuditLog, trial: _Trial) -> None:
 def generate_quality_fixture(dest: Path) -> Path:
     """Write the synthetic runs, experiment file and store under ``dest`` (replaced)."""
     shutil.rmtree(dest, ignore_errors=True)
-    run_dir = dest / "runs" / EXPERIMENT / RUN_ID
-    (run_dir / "trajectories").mkdir(parents=True)
+    job_dir = dest / "jobs" / EXPERIMENT / RUN_ID
+    (job_dir / "trial-records").mkdir(parents=True)
     experiment_file = dest / "experiment.yaml"
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
-        "analysis:\n  baseline_arm: baseline\n  blocks: 6\n  seed: 20260930\n"
+        "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
         "assessment:\n  scorers: [correctness@1, code-quality@1]\n",
         encoding="utf-8",
     )
@@ -395,17 +395,17 @@ def generate_quality_fixture(dest: Path) -> Path:
         experiment_file,
         experiment=EXPERIMENT,
         baseline_arm=ARMS[0],
-        headline_policy=default_headline_policy(len(CHECKPOINTS)),
+        metric=default_metric(len(CHECKPOINTS)),
     )
-    run_dir.joinpath("run.json").write_text(
+    job_dir.joinpath("job.json").write_text(
         json.dumps(
             {
-                "kind": "raidar-run",
+                "kind": "raidar-job",
                 "synthetic": True,
                 "experiment": EXPERIMENT,
                 "experiment_file": str(experiment_file),
                 "lock_sha256": lock_sha256,
-                "run_id": RUN_ID,
+                "job_id": RUN_ID,
                 "finished_at": _TIMESTAMP,
             },
             indent=2,
@@ -415,9 +415,9 @@ def generate_quality_fixture(dest: Path) -> Path:
     store = AssessmentStore(dest / "store")
     audit = AuditLog.for_store(dest / "store")
     rng = random.Random(_SEED)
-    for block in range(BLOCKS):
+    for attempt in range(BLOCKS):
         for arm in ARMS:
-            trial = _Trial(arm=arm, block=block, rng=random.Random(rng.random()))
+            trial = _Trial(arm=arm, attempt=attempt, rng=random.Random(rng.random()))
             _measure(trial)
             store.put(
                 _assessment(
@@ -438,7 +438,7 @@ def generate_quality_fixture(dest: Path) -> Path:
                 )
             )
             record = _record(trial)
-            (run_dir / "trajectories" / f"{trial.trial_id}.json").write_text(
+            (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
                 record.model_dump_json(indent=2), encoding="utf-8"
             )
             _decisions(audit, trial)

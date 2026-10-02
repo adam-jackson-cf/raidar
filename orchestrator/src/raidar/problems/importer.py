@@ -1,4 +1,4 @@
-"""``raidar problem import``: pinned SCB problem -> Raidar task + oracle bundle.
+"""``raidar problem import``: pinned SCB problem -> Raidar task + verifier bundle.
 
 Import is reproducible: the manifest records git tree ids of the problem and
 the converter at the pinned commit plus content digests of everything
@@ -16,8 +16,8 @@ from pathlib import Path
 
 import yaml
 
-from raidar.oracle.bundle import OracleBundle
-from raidar.packs.python import PackSpec, image_tag, load_pack_spec
+from raidar.packs import UnknownPackError, load_runtime_pack
+from raidar.packs.python import PackSpec, image_tag
 from raidar.problems.content import content_digest, hidden_content_in_task
 from raidar.problems.models import (
     PackBinding,
@@ -35,6 +35,7 @@ from raidar.problems.rewrite import (
 )
 from raidar.problems.source import PinnedCheckout, convert_problem, ensure_checkout, open_checkout
 from raidar.problems.store import ProblemStore, ProblemStoreError
+from raidar.verifier.bundle import VerifierBundle
 
 # The converter's README embeds the conversion date; it is not task content.
 _CONVERTER_README = "README.md"
@@ -127,7 +128,7 @@ def problem_entry_file(checkout: PinnedCheckout, problem: ProblemId, pack: PackS
 @dataclass(frozen=True)
 class _Materialised:
     content: Path
-    bundle: OracleBundle
+    bundle: VerifierBundle
     converted_sha256: str
 
 
@@ -156,7 +157,7 @@ def _materialise(
     copy_references(converted, content / "references", steps)
     leaked = hidden_content_in_task(content / "task", bundle)
     if leaked:
-        raise ProblemStoreError(f"hidden oracle content in the agent task: {leaked}")
+        raise ProblemStoreError(f"hidden verifier content in the agent task: {leaked}")
     return _Materialised(content=content, bundle=bundle, converted_sha256=converted_sha256)
 
 
@@ -184,6 +185,20 @@ def _content_matches(store: ProblemStore, problem: ProblemId) -> bool:
     return True
 
 
+def _runtime_pack(runtime: str, given: PackSpec | None = None, dataset: str = "") -> PackSpec:
+    """The pack of the source's runtime; a given pack of another runtime is refused (RT1)."""
+    try:
+        pack = given or load_runtime_pack(runtime)
+    except UnknownPackError as exc:
+        raise ProblemStoreError(f"[RT6] {exc}") from exc
+    if pack.id != runtime:
+        raise ProblemStoreError(
+            f"[RT1] source {dataset!r} binds runtime {runtime}; "
+            f"refusing to import it against pack {pack.id}"
+        )
+    return pack
+
+
 def import_problem(
     store: ProblemStore,
     problem: ProblemId,
@@ -193,8 +208,8 @@ def import_problem(
     pack: PackSpec | None = None,
 ) -> ImportResult:
     """Import (or re-materialise) one problem into the store."""
-    pack = pack or load_pack_spec()
     checkout = resolve_checkout(store, problem, source_checkout)
+    pack = _runtime_pack(checkout.pin.runtime, pack, problem.dataset)
     checkout.verify_clean(problem.problem, checkout.converter_dir, _CONVERSION_OVERRIDES)
     if not (checkout.root / problem.problem / _PROBLEM_CONFIG).is_file():
         raise ProblemStoreError(f"{problem.problem} is not an SCB problem at {checkout.pin.commit}")

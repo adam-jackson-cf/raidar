@@ -4,12 +4,12 @@ from __future__ import annotations
 
 import click
 
-from raidar.commands import env_harbor, harness, quality, workflow
+from raidar.commands import agent, env_harbor, quality, workflow
 
 
 def register_commands(main: click.Group) -> None:
     """Attach the experiment workflow, then the operational commands."""
     workflow.register(main)
-    harness.register(main)
+    agent.register(main)
     env_harbor.register(main)
     quality.register(main)

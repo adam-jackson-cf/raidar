@@ -2,8 +2,8 @@
 
 ``run_in_order`` starts jobs strictly in plan order and never has more than
 ``concurrency`` running at once. ``run_harbor_trial`` is the one place a
-Harbor trial starts: the Raidar oracle's pre-agent leak guard is installed
-before ``trial.run()``, as ``RaidarOracleVerifier`` requires (it fails closed
+Harbor trial starts: the Raidar verifier's pre-agent leak guard is installed
+before ``trial.run()``, as ``RaidarVerifier`` requires (it fails closed
 without it), together with the agent-end reaper (``execution.reaper``) that
 kills agent processes before artifacts are collected and graded.
 
@@ -36,7 +36,7 @@ from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
 from raidar.execution.reaper import install_agent_reaper
-from raidar.oracle.guard import install_leak_guard
+from raidar.verifier.guard import install_leak_guard
 
 JobT = TypeVar("JobT")
 ResultT = TypeVar("ResultT")

@@ -12,7 +12,7 @@ import type { ExperimentRecord } from '@/utils/types';
 import type { QualityExperiment } from '@/quality/types';
 
 export const MISMATCH_CATEGORY = 'headline-policy-mismatch';
-export const MISMATCH_TITLE = 'Headline policies differ in this comparison';
+export const MISMATCH_TITLE = 'Headline metrics differ in this comparison';
 
 export interface PolicyMismatch {
   /** policy ref -> experiments scored under it */
@@ -32,7 +32,7 @@ export function familyMismatch(experiments: ExperimentRecord[]): PolicyMismatch 
   };
 }
 
-/** Quality experiments scoring `problem` under more than one headline policy. */
+/** Quality experiments scoring `problem` under more than one headline metric. */
 export function qualityMismatch(experiments: QualityExperiment[], problem: string): PolicyMismatch | null {
   const byPolicy = new Map<string, string[]>();
   for (const item of experiments) {

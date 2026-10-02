@@ -1,4 +1,4 @@
-"""Credential preflight: every selected arm's harness has its host credential before any trial.
+"""Credential preflight: every selected arm's agent has its host credential before any trial.
 
 Presence only: values are never read beyond a non-empty check, never printed and
 never returned. A run whose arm lacks a credential would otherwise start Harbor,
@@ -30,7 +30,7 @@ SECRETS_HINT = "(Infisical project mac-os-cf, env dev, via make; else orchestrat
 
 
 class CredentialPreflightError(RuntimeError):
-    """Raised when a selected arm's harness has no usable host credential."""
+    """Raised when a selected arm's agent has no usable host credential."""
 
 
 @dataclass(frozen=True)
@@ -102,15 +102,15 @@ def credential_issues(
         index, agent = next((i, a) for i, a in enumerate(spec.agents) if a.id == arm.agent)
         problem = harness_credential_issue(agent.harness, env)
         if problem is not None:
-            field = f"agents.{index}.harness ({agent.id!r}, {agent.harness.value}, arm {arm.id!r})"
+            field = f"agents.{index}.name ({agent.id!r}, {agent.name.value}, arm {arm.id!r})"
             issues.append(CredentialIssue(field, problem))
     return issues
 
 
 def preflight_credentials(plan: ExperimentPlan, env: Mapping[str, str] | None = None) -> None:
-    """Fail before any trial unless every selected arm's harness can authenticate.
+    """Fail before any trial unless every selected arm's agent can authenticate.
 
-    A no-LLM agent override (oracle/nop) runs no harness, so it needs nothing.
+    A no-LLM agent override (oracle/nop) runs no agent CLI, so it needs nothing.
     """
     if plan.options.agent_override is not None:
         return

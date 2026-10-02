@@ -1,11 +1,11 @@
-"""``raidar problem validate``: run the oracle validation checks and write a report.
+"""``raidar problem validate``: run the verifier validation checks and write a report.
 
 Engines:
 
-- ``direct`` (default): reference payloads graded by the Raidar oracle in
+- ``direct`` (default): reference payloads graded by the Raidar verifier in
   fresh grader containers (``raidar.problems.direct``);
 - ``harbor``: the imported task run as Harbor trials with the ``oracle`` agent
-  and the Raidar oracle verifier (``raidar.problems.harbor_engine``).
+  and the Raidar verifier (``raidar.problems.harbor_engine``).
 
 The native parity arm runs only when an SCB fork checkout is given.
 """
@@ -19,9 +19,6 @@ from dataclasses import dataclass
 from importlib.metadata import version
 from pathlib import Path
 
-from raidar.oracle.grader import DEFAULT_RUN_TIMEOUT_S
-from raidar.oracle.grader_image import ensure_grader_image, grader_image_tag
-from raidar.oracle.sandbox import DockerSandbox, GradingSandbox
 from raidar.problems import direct, harbor_engine
 from raidar.problems.importer import resolve_checkout
 from raidar.problems.models import ProblemId
@@ -39,6 +36,9 @@ from raidar.problems.validation import (
     read_validation_record,
     run_checks,
 )
+from raidar.verifier.grader import DEFAULT_RUN_TIMEOUT_S
+from raidar.verifier.grader_image import ensure_grader_image, grader_image_tag
+from raidar.verifier.sandbox import DockerSandbox, GradingSandbox
 
 ENGINES = ("direct", "harbor")
 

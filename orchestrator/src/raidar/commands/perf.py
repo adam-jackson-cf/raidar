@@ -18,7 +18,7 @@ from raidar.execution.budgets import (
     NOT_RECORDED_BY_RUNS,
     PerfInputError,
     PhaseCheck,
-    load_run_samples,
+    load_job_samples,
 )
 from raidar.execution.contention import UNDETECTED_DOCKER_ACTIVITY, Contention
 from raidar.execution.perf_report import PerfReport, build_report
@@ -49,9 +49,9 @@ def _contention_lines(contention: Contention) -> list[str]:
         "Contention context:",
         f"  configured concurrency: {configured}",
         f"  peak concurrent trials (checked runs): {contention.peak_concurrent_trials}",
-        f"  peak concurrent trials incl. overlapping runs: {contention.peak_including_other_runs}",
+        f"  peak concurrent trials incl. overlapping runs: {contention.peak_including_other_jobs}",
     ]
-    lines += [f"  overlapping run: {run}" for run in contention.overlapping_runs]
+    lines += [f"  overlapping run: {run}" for run in contention.overlapping_jobs]
     if contention.untimed_trials:
         lines.append(f"  trials without start/finish timestamps: {contention.untimed_trials}")
     lines.append(f"  note: {UNDETECTED_DOCKER_ACTIVITY}")
@@ -70,11 +70,9 @@ def _warning_lines(report: PerfReport) -> list[str]:
     return lines
 
 
-def _echo_text(report: PerfReport, trajectories: int, min_samples: int, strict: bool) -> None:
+def _echo_text(report: PerfReport, trials: int, min_samples: int, strict: bool) -> None:
     mode = "strict" if strict else "report-only"
-    click.echo(
-        f"N1 budget check ({mode}) over {trajectories} trajectories (min samples {min_samples})"
-    )
+    click.echo(f"N1 budget check ({mode}) over {trials} trials (min samples {min_samples})")
     for check in report.checks:
         click.echo(_check_line(check))
     for phase, reason in NOT_RECORDED_BY_RUNS.items():
@@ -89,13 +87,11 @@ def _echo_text(report: PerfReport, trajectories: int, min_samples: int, strict: 
             click.echo("report-only: breaches are warnings (exit 0); pass --strict to fail on them")
 
 
-def _payload(
-    report: PerfReport, trajectories: int, min_samples: int, strict: bool
-) -> dict[str, object]:
+def _payload(report: PerfReport, trials: int, min_samples: int, strict: bool) -> dict[str, object]:
     return {
         "passed": report.passed,
         "strict": strict,
-        "trajectories": trajectories,
+        "trials": trials,
         "min_samples": min_samples,
         "checks": [check.to_json() for check in report.checks],
         "warnings": [
@@ -117,7 +113,7 @@ def perf_group() -> None:
 
 
 @perf_group.command("check")
-@click.argument("run_dirs", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path))
+@click.argument("job_dirs", nargs=-1, required=True, type=click.Path(exists=True, path_type=Path))
 @click.option(
     "--min-samples",
     type=click.IntRange(min=1),
@@ -132,7 +128,7 @@ def perf_group() -> None:
 )
 @click.option("--json", "as_json", is_flag=True, help="Emit the checks as JSON.")
 def perf_check_command(
-    run_dirs: tuple[Path, ...], min_samples: int, strict: bool, as_json: bool
+    job_dirs: tuple[Path, ...], min_samples: int, strict: bool, as_json: bool
 ) -> None:
     """Report each phase's p95 against its accepted N1 budget (overhead-baseline.md §5).
 
@@ -140,16 +136,16 @@ def perf_check_command(
     Malformed or empty input always exits non-zero.
     """
     try:
-        loaded = load_run_samples(list(run_dirs))
-        if not loaded.trajectories:
-            raise click.ClickException("no trajectory records under the given run directories")
-        report = build_report(list(run_dirs), loaded, min_samples=min_samples)
+        loaded = load_job_samples(list(job_dirs))
+        if not loaded.trial_count:
+            raise click.ClickException("no trial records under the given job directories")
+        report = build_report(list(job_dirs), loaded, min_samples=min_samples)
     except PerfInputError as error:
         raise click.ClickException(str(error)) from error
     if as_json:
-        payload = _payload(report, loaded.trajectories, min_samples, strict)
+        payload = _payload(report, loaded.trial_count, min_samples, strict)
         click.echo(json.dumps(payload, indent=2, sort_keys=True))
     else:
-        _echo_text(report, loaded.trajectories, min_samples, strict)
+        _echo_text(report, loaded.trial_count, min_samples, strict)
     if strict and not report.passed:
         raise SystemExit(1)

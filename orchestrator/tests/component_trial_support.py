@@ -31,6 +31,8 @@ from harbor.models.trial.config import (
 )
 
 from raidar.components import CompiledCondition
+from raidar.execution.cleanup import cleanup_trial_projects
+from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.packs.python import bind_task_environment, image_tag, load_pack_spec
 
 DOCKER_CONTEXT = "orbstack"
@@ -119,19 +121,37 @@ def build_task(
 async def run_trial(
     task_dir: Path, trials_dir: Path, agent: AgentConfig, *, trial_name: str
 ) -> Path:
+    """Run one trial in its own Compose project and always remove that project.
+
+    Harbor alone names the project ``<trial_name>__env``, so two test runs on
+    one Docker host (same trial name, different ``tmp_path``) recreated each
+    other's container. The production run-scoped environment suffixes the
+    project with a token of ``trials_dir``, which is unique per test run; the
+    ``finally`` removes this run's projects even when the trial raises.
+    """
     from harbor.trial.trial import Trial
 
+    if trials_dir.name != "trials":
+        raise ValueError(f"trials_dir must be named 'trials' (run scope): {trials_dir}")
     os.environ["DOCKER_CONTEXT"] = DOCKER_CONTEXT
     config = TrialConfig(
         task=TaskConfig(path=task_dir),
         trial_name=trial_name,
         trials_dir=trials_dir,
         agent=agent,
-        environment=EnvironmentConfig(type="docker", delete=False),
+        environment=EnvironmentConfig(
+            type="docker",
+            import_path=RUN_SCOPED_DOCKER_IMPORT_PATH,
+            delete=True,
+            kwargs={SCOPE_KWARG: run_scope(trials_dir)},
+        ),
         verifier=VerifierConfig(disable=True),
     )
-    trial = await Trial.create(config)
-    await trial.run()
+    try:
+        trial = await Trial.create(config)
+        await trial.run()
+    finally:
+        cleanup_trial_projects(trials_dir.parent)
     return trials_dir / trial_name
 
 

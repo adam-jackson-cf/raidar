@@ -17,6 +17,7 @@ from __future__ import annotations
 import shutil
 import stat
 import time
+import tomllib
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -26,6 +27,7 @@ from harbor.models.task.config import TaskConfig
 
 from raidar.components import CompiledCondition, compile_arm
 from raidar.execution.models import ProgressionRule
+from raidar.packs.python import image_present
 from raidar.problems.content import content_digest
 from raidar.problems.harbor_engine import SOLVE_SH
 from raidar.spec.loader import LoadedExperiment
@@ -97,10 +99,10 @@ def materialise_task(
     if dest.exists():
         raise MaterialiseError(f"{dest} already exists; trial tasks are never reused")
     loaded, arm_id, planned_digest = condition
-    if compose_init(source) != loaded.spec.runtime.compose_init:
+    if compose_init(source) != loaded.spec.environment.compose_init:
         raise MaterialiseError(
             f"{source}: compose init is {compose_init(source)}, the experiment requires "
-            f"runtime.compose_init={loaded.spec.runtime.compose_init}"
+            f"environment.compose_init={loaded.spec.environment.compose_init}"
         )
     shutil.copytree(source, dest, symlinks=True)
     _rewrite_task_toml(dest, steps, rule)
@@ -115,3 +117,10 @@ def materialise_task(
     if references is not None:
         _write_solutions(dest, {step: references[step] for step in steps})
     return MaterialisedTask(dest, content_digest(dest), compiled, component_apply_s)
+
+
+def environment_cold(task_dir: Path) -> bool:
+    """True when the task's environment image is not in the local image store yet."""
+    document = tomllib.loads((task_dir / "task.toml").read_text())
+    image = (document.get("environment") or {}).get("docker_image")
+    return isinstance(image, str) and not image_present(image)

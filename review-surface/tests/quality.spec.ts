@@ -56,7 +56,7 @@ test.describe('quality experiment view', () => {
     await expect(table.getByTestId('paired-row')).toHaveCount(8);
     await expect(table.getByText('Improved').first()).toBeVisible();
     await expect(table.getByText('Insufficient').first()).toBeVisible();
-    await expect(page.getByTestId('quality-exclusions')).toContainText('invalid trajectory (infra-excluded)');
+    await expect(page.getByTestId('quality-exclusions')).toContainText('invalid trial (infra-excluded)');
   });
 
   test('SCB distributions, head-to-head scatter and sensitivity render with their sources', async ({ page }) => {

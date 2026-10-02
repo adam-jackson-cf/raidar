@@ -1,4 +1,4 @@
-"""correctness@1 behaviour: values equal the oracle step records, gaps are statused."""
+"""correctness@1 behaviour: values equal the verifier step records, gaps are statused."""
 
 from __future__ import annotations
 
@@ -6,20 +6,20 @@ from pathlib import Path
 
 import pytest
 
-from raidar.oracle.models import (
-    CaseGroup,
-    CaseResult,
-    CaseStatus,
-    InfraFailure,
-    OracleGrade,
-)
-from raidar.oracle.records import load_step_record, step_record_dir, write_step_record
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.correctness import correctness_scorer
 from raidar.scorers.sdk.context import AssessContext
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
 from raidar.scorers.sdk.validation import validate_result
 from raidar.scorers.trial_inputs import load_trial_context
+from raidar.verifier.models import (
+    CaseGroup,
+    CaseResult,
+    CaseStatus,
+    InfraFailure,
+    VerifierGrade,
+)
+from raidar.verifier.records import load_step_record, step_record_dir, write_step_record
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 
 P, F, E, S = CaseStatus.PASSED, CaseStatus.FAILED, CaseStatus.ERROR, CaseStatus.SKIPPED
@@ -32,17 +32,17 @@ def _case(step: str, index: int, group: CaseGroup, status: CaseStatus) -> CaseRe
     )
 
 
-def _grade(step: str, cases: dict[CaseGroup, tuple[CaseStatus, ...]]) -> OracleGrade:
+def _grade(step: str, cases: dict[CaseGroup, tuple[CaseStatus, ...]]) -> VerifierGrade:
     results = tuple(
         _case(step, index, group, status)
         for group, statuses in cases.items()
         for index, status in enumerate(statuses)
     )
-    return OracleGrade(step=step, checkpoint=step, cases=results)
+    return VerifierGrade(step=step, checkpoint=step, cases=results)
 
 
 def _set_grade(
-    trial: Path, step: str, grade: OracleGrade, rewards: dict[str, float] | None = None
+    trial: Path, step: str, grade: VerifierGrade, rewards: dict[str, float] | None = None
 ) -> None:
     """Replace a stored record's grade the way the verifier writes it."""
     directory = step_record_dir(trial, step)
@@ -126,7 +126,7 @@ def test_missing_verdicts_are_statused_never_zero(tmp_path: Path) -> None:
         ],
         planned=["checkpoint_5"],
     )
-    infra = OracleGrade(
+    infra = VerifierGrade(
         step="checkpoint_2",
         checkpoint="checkpoint_2",
         cases=(),

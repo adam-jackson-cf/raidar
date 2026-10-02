@@ -1,17 +1,38 @@
-"""Field-level validation errors and cross-reference rules for experiments."""
+"""Field-level validation errors and cross-reference rules for experiments.
+
+Besides the cross-reference rules and the factor guard, schema v2 adds:
+
+- kind rules (``KIND0``-``KIND3``): ``research-loop`` is reserved; an
+  ``ab-test`` compares conditions; a ``benchmark`` compares agents under one
+  condition; ``analysis.rank_by`` is a benchmark setting;
+- naming rules (``NAME1``, ``NAME2``): an experiment under
+  ``experiments/<kind>/<id>/`` sits in the directory of its kind and id, and
+  its id is ``<runtime>__<subject>__<intent>`` with the experiment's runtime.
+
+They forbid contradictions only; designs the factor guard allows stay allowed.
+"""
 
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from pydantic import ValidationError
 
 from raidar.spec.agent_support import agent_support_issues
 from raidar.spec.factor_guard import check_factors
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, ScorePolicyRegistry
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
 from raidar.spec.references import RegistryReferenceError
-from raidar.spec.schema import ExperimentSpec
+from raidar.spec.schema import (
+    BENCHMARK_MIN_ATTEMPTS,
+    EXPERIMENT_KINDS,
+    RESERVED_KINDS,
+    ExperimentSpec,
+)
+
+EXPERIMENTS_ROOT = "experiments"
+ID_SEPARATOR = "__"
 
 
 @dataclass(frozen=True, order=True)
@@ -129,15 +150,141 @@ def _shared_component_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     ]
 
 
-def _policy_issues(spec: ExperimentSpec, policies: ScorePolicyRegistry) -> list[FieldIssue]:
-    ref = spec.assessment.headline_policy
+def _metric_issues(spec: ExperimentSpec, metrics: MetricRegistry) -> list[FieldIssue]:
+    ref = spec.assessment.metric
     if ref is None:
         return []
     try:
-        policies.get(ref)
+        metrics.get(ref)
     except RegistryReferenceError as exc:
-        return [FieldIssue("assessment.headline_policy", str(exc))]
+        return [FieldIssue("assessment.metric", str(exc))]
     return []
+
+
+def _agent_factor(factor: str) -> bool:
+    return factor == "agent" or factor.startswith("agent.")
+
+
+def _ab_test_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    issues = []
+    if "condition" not in spec.factors:
+        issues.append(
+            FieldIssue(
+                "factors",
+                "[KIND1] an ab-test compares conditions: factors must include 'condition' "
+                "(agent.* factors may be added)",
+            )
+        )
+    if len(spec.conditions) < 2:
+        issues.append(FieldIssue("conditions", "[KIND1] an ab-test needs at least two conditions"))
+    return issues
+
+
+def _benchmark_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    issues = []
+    if not spec.factors or not all(_agent_factor(factor) for factor in spec.factors):
+        issues.append(
+            FieldIssue(
+                "factors",
+                "[KIND2] a benchmark compares agents: factors must be a non-empty set of "
+                "agent factors (agent, agent.name, agent.model, ...), never 'condition'",
+            )
+        )
+    if len(spec.conditions) != 1:
+        issues.append(
+            FieldIssue(
+                "conditions",
+                "[KIND2] a benchmark runs every agent under exactly one condition "
+                "(put shared framing in shared_components)",
+            )
+        )
+    return issues
+
+
+def kind_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """``KIND*``: the design must not contradict the declared kind."""
+    if spec.kind in RESERVED_KINDS:
+        return [
+            FieldIssue(
+                "kind",
+                f"[KIND0] kind {spec.kind!r} is reserved for the research-loop controller, "
+                "which is not implemented yet",
+            )
+        ]
+    issues = []
+    if spec.kind == "ab-test":
+        issues.extend(_ab_test_issues(spec))
+    elif spec.kind == "benchmark":
+        issues.extend(_benchmark_issues(spec))
+    if spec.analysis.rank_by is not None and spec.kind != "benchmark":
+        issues.append(
+            FieldIssue(
+                "analysis.rank_by",
+                f"[KIND3] rank_by orders a benchmark's ranking view; kind {spec.kind!r} has none",
+            )
+        )
+    return issues
+
+
+def _experiments_layout(path: Path) -> tuple[str, str] | None:
+    """(kind segment, id segment) when ``path`` is ``.../experiments/<kind>/<id>/<file>``."""
+    parts = path.parts
+    if len(parts) >= 4 and parts[-4] == EXPERIMENTS_ROOT:
+        return parts[-3], parts[-2]
+    return None
+
+
+def name_issues(spec: ExperimentSpec, path: Path | None) -> list[FieldIssue]:
+    """``NAME1`` (layout) and ``NAME2`` (id grammar ``<runtime>__<subject>__<intent>``)."""
+    issues = []
+    layout = _experiments_layout(path) if path is not None else None
+    if layout is not None:
+        kind_dir, id_dir = layout
+        if kind_dir != spec.kind:
+            known = ", ".join(EXPERIMENT_KINDS)
+            issues.append(
+                FieldIssue(
+                    "kind",
+                    f"[NAME1] the file sits under experiments/{kind_dir}/ but declares kind "
+                    f"{spec.kind!r}; move it to experiments/{spec.kind}/ (kinds: {known})",
+                )
+            )
+        if id_dir != spec.id:
+            issues.append(
+                FieldIssue(
+                    "id",
+                    f"[NAME1] the file sits in experiments/{kind_dir}/{id_dir}/ but declares id "
+                    f"{spec.id!r}; the directory must be named after the id",
+                )
+            )
+    segments = spec.id.split(ID_SEPARATOR)
+    if len(segments) != 3 or not all(segments) or segments[0] != spec.runtime:
+        issues.append(
+            FieldIssue(
+                "id",
+                f"[NAME2] id {spec.id!r} must be <runtime>__<subject>__<intent> with runtime "
+                f"{spec.runtime!r} first (for example {spec.runtime}__forge__review-loop)",
+            )
+        )
+    return issues
+
+
+def spec_warnings(spec: ExperimentSpec) -> list[FieldIssue]:
+    """Advice that does not block validation (printed by validate, lock and plan)."""
+    warnings = []
+    if spec.kind == "benchmark" and spec.analysis.attempts < BENCHMARK_MIN_ATTEMPTS:
+        warnings.append(
+            FieldIssue(
+                "analysis.attempts",
+                f"a benchmark with {spec.analysis.attempts} attempt(s) is below the "
+                f"{BENCHMARK_MIN_ATTEMPTS} attempts per agent Terminal-Bench reports with",
+            )
+        )
+    if spec.kind == "smoke":
+        warnings.append(
+            FieldIssue("kind", "a smoke experiment checks operational health; it is not citable")
+        )
+    return warnings
 
 
 def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
@@ -145,7 +292,7 @@ def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     from raidar.analysis.outcomes import OUTCOME_METRICS
 
     known = {metric.id for metric in OUTCOME_METRICS}
-    return [
+    issues = [
         FieldIssue(
             f"analysis.min_effects.{name}",
             f"unknown outcome metric {name!r}; known: {', '.join(sorted(known))}",
@@ -153,6 +300,15 @@ def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
         for name in spec.analysis.min_effects
         if name not in known
     ]
+    rank_by = spec.analysis.rank_by
+    if rank_by is not None and rank_by not in known:
+        issues.append(
+            FieldIssue(
+                "analysis.rank_by",
+                f"unknown outcome metric {rank_by!r}; known: {', '.join(sorted(known))}",
+            )
+        )
+    return issues
 
 
 ProtocolConfigKeys = Mapping[str, Iterable[str]]
@@ -185,11 +341,18 @@ def _protocol_config_issues(
 
 def semantic_issues(
     spec: ExperimentSpec,
-    policies: ScorePolicyRegistry = DEFAULT_POLICY_REGISTRY,
+    metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
     protocol_config: ProtocolConfigKeys | None = None,
+    *,
+    path: Path | None = None,
+    naming: bool = True,
 ) -> list[FieldIssue]:
-    """Cross-reference rules plus the factor guard, each with a field location."""
-    issues = [
+    """Cross-reference, kind and naming rules plus the factor guard, each with a location.
+
+    ``naming=False`` skips ``NAME*`` (a schema v1 file read through its
+    translation keeps its v1 id until it is upgraded).
+    """
+    structural = [
         *_duplicate_ids("agents", (agent.id for agent in spec.agents)),
         *_duplicate_ids("conditions", (condition.id for condition in spec.conditions)),
         *_duplicate_ids("arms", (arm.id for arm in spec.arms)),
@@ -200,13 +363,14 @@ def semantic_issues(
         *_agent_issues(spec),
         *_component_overlay_issues(spec),
         *_shared_component_issues(spec),
-        *_policy_issues(spec, policies),
+        *_metric_issues(spec, metrics),
         *_min_effect_issues(spec),
         *_protocol_config_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),
     ]
-    if issues:
+    labels = [*kind_issues(spec), *(name_issues(spec, path) if naming else [])]
+    if structural:
         # The factor guard needs resolvable arm references and unique ids.
-        return issues
-    return [FieldIssue(item.loc, item.message) for item in check_factors(spec)]
+        return [*structural, *labels]
+    return [*labels, *(FieldIssue(item.loc, item.message) for item in check_factors(spec))]

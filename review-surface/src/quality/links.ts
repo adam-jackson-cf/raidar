@@ -1,7 +1,7 @@
 // Joins between the run review and the Quality element. A run review record and
-// a Quality run describe the same trajectory file: the run review shows it as
+// a Quality run describe the same trial record: the run review shows it as
 // artifact_paths.run_json (repo-relative), the Quality projection as
-// `<runs-root name>/<run dir>/trajectories/<trial>.json`, so a path-suffix match
+// `<jobs-root name>/<job dir>/trial-records/<trial>.json`, so a path-suffix match
 // is the join. Deep links carry the experiment (name + lock prefix) and problem
 // for the experiment view, and the drill-down selection for the run view.
 import { useMemo } from 'react';
@@ -55,8 +55,8 @@ export function matchesTarget(
   return !lock || (item.lock_sha256 ?? '').startsWith(lock);
 }
 
-function joins(runJson: string, trajectory: string): boolean {
-  return runJson === trajectory || runJson.endsWith(`/${trajectory}`);
+function joins(runJson: string, trialRecord: string): boolean {
+  return runJson === trialRecord || runJson.endsWith(`/${trialRecord}`);
 }
 
 /** Quality runs and experiments, shared (same query keys) with the Quality pages. */
@@ -67,10 +67,10 @@ export function useQualityIndex() {
     const runList = runs.data?.runs ?? [];
     const experimentList = experiments.data?.experiments ?? [];
 
-    /** The Quality run of a run review's trajectory; null when absent or ambiguous. */
+    /** The Quality run of a run review's trial record; null when absent or ambiguous. */
     const runFor = (runJson: string | null | undefined): QualityRunSummary | null => {
       if (!runJson) return null;
-      const matches = runList.filter((run) => joins(runJson, run.trajectory));
+      const matches = runList.filter((run) => joins(runJson, run.trial_record));
       return matches.length === 1 ? matches[0] : null;
     };
 
@@ -78,7 +78,7 @@ export function useQualityIndex() {
       experimentList.find(
         (item) =>
           item.experiment === run.experiment &&
-          item.runs.includes(run.run) &&
+          item.jobs.includes(run.job) &&
           item.problems.some((problem) => problem.run_ids.includes(run.id)),
       ) ?? null;
 
@@ -88,7 +88,7 @@ export function useQualityIndex() {
       problem: run.problem,
     });
 
-    /** Distinct experiment views covering the given run reviews' trajectories. */
+    /** Distinct experiment views covering the given run reviews' trials. */
     const targetsFor = (runJsons: Array<string | null | undefined>): QualityTarget[] => {
       const seen = new Map<string, QualityTarget>();
       for (const runJson of runJsons) {

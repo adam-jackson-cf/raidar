@@ -1,17 +1,17 @@
 """Experiment-level Quality view, per problem: curves, paired Δ, distributions, H2H, sensitivity.
 
 Runs are pooled only under one lock: an experiment's runs are grouped by the
-``lock_sha256`` they were executed under, as WS-J's ``check_runs`` requires,
+``lock_sha256`` they were executed under, as WS-J's ``check_jobs`` requires,
 and each group is its own ``QualityExperiment``.
 
 Which trials count (each exclusion is listed, never silent):
 
-- an invalid trajectory (execution-validity gate failed) is infra-excluded;
+- an invalid trial (execution-validity gate failed) is infra-excluded;
 - a trial run under an agent override (for example Harbor's ``oracle``) is
   not the declared agent and stays out of arm statistics;
-- a trajectory truncated by ``max_checkpoints`` is a development run with no
+- a trial truncated by ``max_checkpoints`` is a development job with no
   problem-level outcome and stays out of arm statistics;
-- when one (arm, block) was run more than once, the latest run counts and the
+- when one (arm, attempt) was run more than once, the latest run counts and the
   earlier ones are superseded.
 
 Curve points carry WS-J's 95% interval (``raidar.analysis.stats.summarise``,
@@ -23,7 +23,7 @@ h2h-signals.md), re-sourced from ``code-quality@1``: Ruff findings under the
 fork's contract rule set (Ruff 0.8.6 SIM allowlist, not the dashboard's
 ~85-selector set), and functions or methods with cc > 10 as measured by the
 fork's production-quality evaluator (not the dashboard's tree-sitter count).
-Each point is one checkpoint: the median across blocks of arm A (x) and arm B
+Each point is one checkpoint: the median across attempts of arm A (x) and arm B
 (y). Lower is better for both.
 """
 
@@ -82,8 +82,8 @@ class ReviewedTrial:
         return self.source.record.trial.arm
 
     @property
-    def block(self) -> int:
-        return self.source.record.trial.block
+    def attempt(self) -> int:
+        return self.source.record.trial.attempt
 
 
 def _counted(
@@ -95,14 +95,14 @@ def _counted(
     for trial in trials:
         record, name = trial.source.record, trial.detail.run.id
         if not record.valid:
-            excluded.append(f"{name}: invalid trajectory (infra-excluded)")
-            infra.add((trial.arm, trial.block))
+            excluded.append(f"{name}: invalid trial (infra-excluded)")
+            infra.add((trial.arm, trial.attempt))
         elif record.agent_override:
             excluded.append(f"{name}: agent override {record.agent_override}")
         elif trial.source.truncation is not None:
-            excluded.append(f"{name}: development run, {trial.source.truncation}")
+            excluded.append(f"{name}: development job, {trial.source.truncation}")
         else:
-            key = (trial.arm, trial.block)
+            key = (trial.arm, trial.attempt)
             current = latest.get(key)
             if current is None or trial.source.finished_at >= current.source.finished_at:
                 if current is not None:
@@ -110,14 +110,14 @@ def _counted(
                 latest[key] = trial
             else:
                 excluded.append(f"{name}: superseded by {current.detail.run.id}")
-    counted = sorted(latest.values(), key=lambda trial: (trial.arm, trial.block))
+    counted = sorted(latest.values(), key=lambda trial: (trial.arm, trial.attempt))
     return counted, excluded, infra - set(latest)
 
 
 def _curve_point(
     checkpoint: str, values: Sequence[float], label: str, settings: Settings
 ) -> CurvePoint:
-    """Mean across blocks with WS-J's 95% interval (paired t, bootstrap from 10 values)."""
+    """Mean across attempts with WS-J's 95% interval (paired t, bootstrap from 10 values)."""
     summary = summarise(
         values,
         seed=seed_for(settings.seed, f"quality-curve:{label}:{checkpoint}"),
@@ -177,24 +177,24 @@ def _pair_component(
     infra: set[tuple[str, int]],
     arms: tuple[str, str],
 ) -> tuple[list[float], Exclusions, list[str]]:
-    """Within-block differences, tallied the way WS-J tallies exclusions."""
+    """Within-attempt differences, tallied the way WS-J tallies exclusions."""
     differences: list[float] = []
     reasons: list[str] = []
     tally = {"not_run": 0, "infra_error": 0, "ineligible": 0}
     statuses: dict[str, int] = defaultdict(int)
-    for block, base, other in pairs:
+    for attempt, base, other in pairs:
         if base is None or other is None:
             missing = arms[0] if base is None else arms[1]
-            cause = "infra_error" if (missing, block) in infra else "not_run"
+            cause = "infra_error" if (missing, attempt) in infra else "not_run"
             tally[cause] += 1
-            reasons.append(f"block {block}: {missing} {cause.replace('_', ' ')}")
+            reasons.append(f"attempt {attempt}: {missing} {cause.replace('_', ' ')}")
             continue
         base_cell, other_cell = base.detail.problem[component], other.detail.problem[component]
         if base_cell.value is None or other_cell.value is None:
             gap = base_cell if base_cell.value is None else other_cell
             tally["ineligible"] += 1
             statuses[gap.status] += 1
-            reasons.append(f"block {block}: {gap.status}")
+            reasons.append(f"attempt {attempt}: {gap.status}")
             continue
         differences.append(other_cell.value - base_cell.value)
     exclusions = Exclusions(
@@ -240,14 +240,15 @@ def _paired(
 ) -> tuple[PairedDelta, ...]:
     if baseline is None or baseline not in arms:
         return ()
-    by_block = {(trial.arm, trial.block): trial for trial in trials}
-    blocks = sorted({trial.block for trial in trials} | {block for _, block in infra})
+    by_attempt = {(trial.arm, trial.attempt): trial for trial in trials}
+    attempts = sorted({trial.attempt for trial in trials} | {attempt for _, attempt in infra})
     deltas: list[PairedDelta] = []
     for arm in arms:
         if arm == baseline:
             continue
         pairs = [
-            (block, by_block.get((baseline, block)), by_block.get((arm, block))) for block in blocks
+            (attempt, by_attempt.get((baseline, attempt)), by_attempt.get((arm, attempt)))
+            for attempt in attempts
         ]
         deltas.extend(
             _delta(
@@ -466,7 +467,7 @@ def _problem_notes(
 ) -> list[str]:
     notes = []
     if len(policies) > 1:
-        notes.append(f"trials use different headline policies: {', '.join(policies)}")
+        notes.append(f"trials use different headline metrics: {', '.join(policies)}")
     if baseline is None:
         why = lock_note or "the lock names no baseline arm"
         notes.append(f"no baseline arm is known ({why}); no paired Δ")
@@ -538,7 +539,7 @@ def build_experiments(
             QualityExperiment(
                 experiment=experiment,
                 lock_sha256=lock or None,
-                runs=tuple(sorted({trial.source.run_id for trial in members})),
+                jobs=tuple(sorted({trial.source.job_id for trial in members})),
                 problems=tuple(
                     _problem_quality(problem, group, chosen)
                     for problem, group in sorted(problems.items())

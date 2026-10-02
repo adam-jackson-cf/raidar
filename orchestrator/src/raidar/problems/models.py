@@ -9,7 +9,7 @@ A problem reference is ``<dataset>/<problem>[.<checkpoint>]@<version>``:
 
 ``version`` is the first 12 hex characters of the pinned dataset commit, so a
 reference can never silently float to other content. The manifest is the
-committed record of one import; the materialised task, oracle bundle and
+committed record of one import; the materialised task, verifier bundle and
 reference payloads it describes are regenerated from the pinned source and
 must reproduce the recorded digests.
 """
@@ -46,13 +46,20 @@ class ProblemModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
-class DatasetPin(ProblemModel):
-    """A dataset pinned to one git commit (``problems/sources.yaml``)."""
+class SourcePin(ProblemModel):
+    """A source pinned to one git commit and bound to one runtime (``problems/sources.yaml``).
+
+    A source key is the binding's dataset segment: ``scb`` is the python
+    binding of the SCB problems, a ``scb-node-ts`` key would bind the same
+    upstream to the node-ts pack (Terminal-Bench's variant-suffix convention).
+    The importer refuses a pack whose id is not the source's ``runtime``.
+    """
 
     format: Literal["scb-problems"] = "scb-problems"
     url: str = Field(min_length=1)
     commit: str = Field(pattern=_COMMIT.pattern)
     converter: str = "scripts/scb_to_harbor.py"
+    runtime: str = "python"
 
     @property
     def version(self) -> str:

@@ -41,7 +41,7 @@ class ReviewLabel(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
-    run_id: str
+    job_id: str
     request_id: str
     policy: str
     label: str

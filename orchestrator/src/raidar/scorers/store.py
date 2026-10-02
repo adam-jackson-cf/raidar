@@ -7,7 +7,7 @@ The store is add-only:
 - a new key is written once, atomically;
 - writing an existing key succeeds only when the bytes are identical (a
   deterministic replay), otherwise it raises ``AssessmentConflictError``;
-- nothing is ever overwritten or deleted, and run directories are never
+- nothing is ever overwritten or deleted, and job directories are never
   touched (the store lives outside them).
 
 Replay-varying facts (duration) go to an append-only ``log.jsonl`` beside

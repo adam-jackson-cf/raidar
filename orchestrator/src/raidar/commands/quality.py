@@ -13,8 +13,8 @@ from raidar.commands.shared import ORCHESTRATOR_ROOT, REPO_ROOT, python_cmd, run
 # Experiment-model integration paths: spec -> plan -> Harbor trial -> oracle -> projection.
 INTEGRATION_TEST_TARGETS = [
     "tests/test_execution_driver.py",
-    "tests/test_execution_attempts.py",
-    "tests/test_oracle_verifier_and_regrade.py",
+    "tests/test_execution_step_results.py",
+    "tests/test_verifier_and_regrade.py",
     "tests/test_harbor_cleanup.py",
     "tests/test_review_projection_experiment_epoch.py",
 ]

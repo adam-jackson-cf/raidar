@@ -39,7 +39,7 @@ def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
     document = experiment_document(unknown_key=1)
     document["agents"][0]["harness"] = "not-a-harness"
     document["agents"][0]["version"] = "latest"
-    document["analysis"]["blocks"] = 0
+    document["analysis"]["attempts"] = 0
     document["problems"] = [{"ref": "forge"}, {"path": "."}]
     document["conditions"][1]["components"][0]["files"] = ["/etc/passwd", "../../etc/hosts"]
     document["conditions"][1]["components"][0]["with"] = {"depth": {"limit": float("nan")}}
@@ -51,7 +51,7 @@ def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
         "unknown_key",
         "agents.0.harness",
         "agents.0.version",
-        "analysis.blocks",
+        "analysis.attempts",
         "problems.0.ref",
         "problems.1.path",
         "conditions.1.components.0.files.0",
@@ -70,11 +70,11 @@ def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
         ({"model": "claude-opus-4-7"}, "agents.0.model"),
         ({"reasoning_effort": "xhigh"}, "agents.0.reasoning_effort"),
         (
-            {"harness": "gemini", "provider": "google", "model": "gemini-3-pro-preview"},
+            {"name": "gemini-cli", "provider": "google", "model": "gemini-3-pro-preview"},
             "agents.0",
         ),
-        ({"harness": "cursor", "provider": "acme", "model": "any"}, "agents.0.provider"),
-        ({"harness": "cursor", "provider": "openai", "model": "any"}, None),
+        ({"name": "cursor-cli", "provider": "acme", "model": "any"}, "agents.0.provider"),
+        ({"name": "cursor-cli", "provider": "openai", "model": "any"}, None),
     ],
     ids=[
         "provider",
@@ -125,7 +125,7 @@ def test_cross_reference_errors_are_located_on_the_referring_field(tmp_path: Pat
     document["arms"][1]["agent"] = "ghost"
     document["arms"].append({"id": "guided", "condition": "nowhere", "agent": "luna"})
     document["analysis"]["baseline_arm"] = "control"
-    document["assessment"]["headline_policy"] = "scb-canonical@9"
+    document["assessment"]["metric"] = "scb-canonical@9"
 
     issues = _issues(write_experiment(tmp_path, document))
 
@@ -134,7 +134,7 @@ def test_cross_reference_errors_are_located_on_the_referring_field(tmp_path: Pat
         "arms.2.id",
         "arms.2.condition",
         "analysis.baseline_arm",
-        "assessment.headline_policy",
+        "assessment.metric",
     }
 
 
@@ -151,16 +151,18 @@ def test_cli_overrides_follow_scb_precedence(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
 
     from_file = load_experiment(path).spec.analysis
-    from_flag = load_experiment(path, CliOverrides(flags={"blocks": 3, "seed": None})).spec
+    from_flag = load_experiment(path, CliOverrides(flags={"attempts": 3, "seed": None})).spec
     from_set = load_experiment(
         path,
-        CliOverrides(flags={"blocks": 3}, assignments=("analysis.blocks=9", "arms.1.id=treated")),
+        CliOverrides(
+            flags={"attempts": 3}, assignments=("analysis.attempts=9", "arms.1.id=treated")
+        ),
     ).spec
 
-    assert (from_file.blocks, from_file.seed, from_file.concurrency) == (5, 7, 1)
-    assert from_flag.analysis.blocks == 3
+    assert (from_file.attempts, from_file.seed, from_file.concurrency) == (5, 7, 1)
+    assert from_flag.analysis.attempts == 3
     assert from_flag.analysis.seed == 7  # unset flag leaves the file value
-    assert from_set.analysis.blocks == 9  # key=value beats the flag
+    assert from_set.analysis.attempts == 9  # key=value beats the flag
     assert from_set.arms[1].id == "treated"
     assert from_set.protocol.progression == "continue"  # built-in default
 
@@ -172,15 +174,15 @@ def test_invalid_overrides_are_rejected_with_their_location(tmp_path: Path) -> N
         path,
         CliOverrides(
             flags={"retries": 2},
-            assignments=("blocks", "arms.7.id=x", "analysis.blocks.deep=1"),
+            assignments=("attempts", "arms.7.id=x", "analysis.attempts.deep=1"),
         ),
     )
 
     assert set(issues) == {
         "--retries",
-        "--set blocks",
+        "--set attempts",
         "--set arms.7.id=x",
-        "--set analysis.blocks.deep=1",
+        "--set analysis.attempts.deep=1",
     }
 
 
@@ -244,7 +246,7 @@ def test_factor_guard_accepts_declared_parent_noun_and_ignores_ids(tmp_path: Pat
 def test_factor_guard_flags_component_differences_when_condition_is_undeclared(
     tmp_path: Path,
 ) -> None:
-    document = experiment_document(factors=["agent.model"])
+    document = experiment_document(kind="smoke", factors=["agent.model"])
 
     issues = _issues(write_experiment(tmp_path, document))
 
@@ -256,7 +258,9 @@ def test_shared_components_lead_every_condition_and_never_split_the_arms(
     tmp_path: Path,
 ) -> None:
     """Pilot v2: framing both arms get is not a factor, so the guard ignores it."""
-    document = experiment_document(factors=["agent.model"], shared_components=[SHARED_FRAMING])
+    document = experiment_document(
+        kind="smoke", factors=["agent.model"], shared_components=[SHARED_FRAMING]
+    )
     document["conditions"][1]["components"] = []
 
     spec = load_experiment(write_experiment(tmp_path, document)).spec
@@ -273,7 +277,9 @@ def test_shared_components_lead_every_condition_and_never_split_the_arms(
         "prompt-wrapper@1",
         "rules-file@1",
     ]
-    document = experiment_document(factors=["agent.model"], shared_components=[SHARED_FRAMING])
+    document = experiment_document(
+        kind="smoke", factors=["agent.model"], shared_components=[SHARED_FRAMING]
+    )
     issues = _issues(write_experiment(tmp_path / "split", document))
     assert list(issues) == ["arms.1"]
     assert "undeclared noun 'condition'" in issues["arms.1"]

@@ -2,9 +2,9 @@
 
 **Run scope.** Harbor names a trial's Compose project ``<trial_name>__env``.
 Raidar's trial names are plan trial ids (``b00-p0-baseline``), which repeat
-across runs and experiments, so two runs on one Docker host (two pilot legs,
+across jobs and experiments, so two runs on one Docker host (two pilot legs,
 or a replacement run beside the original) shared a Compose project: the second
-``compose up`` recreated the first run's container, which exited 143 and was
+``compose up`` recreated the first job's container, which exited 143 and was
 recorded as an infra error. The scope suffix makes the project unique per run
 directory while the trial directory stays ``trials/<trial id>`` and no plan
 hash changes.
@@ -60,7 +60,7 @@ LAZY_AGENT_IMPORTS: tuple[str, ...] = ("litellm",)
 
 
 def run_scope(trials_dir: Path) -> str:
-    """A short, stable token for one run directory."""
+    """A short, stable token for one job directory."""
     return hashlib.sha256(str(trials_dir.resolve()).encode()).hexdigest()[:10]
 
 

@@ -5,7 +5,7 @@ Definitions follow the Phase 0 overhead baseline (docs/reboot/overhead-baseline.
 
 - ``environment_start``: Harbor ``environment_setup`` (condition warm/cold).
 - ``component_apply``: host-side compile of the arm's condition plus writing
-  its inputs into the trial task (measured by the run). This is not the
+  its inputs into the trial task (measured by the job). This is not the
   Phase 0 stub's quantity (an in-container bundle install, p95 2.1 s): the
   in-container share, ``setup.sh`` materialising support files (about 20 ms of
   a ~250 ms script, the rest being the reset), runs in Harbor's step
@@ -17,16 +17,16 @@ Definitions follow the Phase 0 overhead baseline (docs/reboot/overhead-baseline.
   and subtracted, because the Phase 0 baseline had no such scan there.
 - ``setup_sh``: the reset script's own duration (record-only sub-phase).
 - ``artifact_collection``: agent end to verifier start: Harbor's agent-log sync
-  (the mounted-log ``chown``, the agent's trajectory conversion) and the
+  (the mounted-log ``chown``, the agent's trial conversion) and the
   ``/app`` transfer to the host (``raidar.execution.environment`` runs both on
   the engine fast path).
 - ``snapshot_transfer``, ``verifier_plumbing``, ``grader_image``,
-  ``oracle_leak_check``: from the oracle step record's timings.
+  ``verifier_leak_check``: from the verifier step record's timings.
 - ``step_archive_gap``: verifier end to the next step's agent start, less its
   leak scan. As in Phase 0 this interval overlaps the next step's
   ``per_step_reset``; both keep the baseline definitions.
 - ``teardown_result_write``: last step end to trial end (condition init/no-init).
-- ``raidar_result_write``: writing the trajectory record (measured by the run).
+- ``raidar_result_write``: writing the trial record (measured by the job).
 - Aggregates ``per_step_overhead`` and ``per_trial_fixed_overhead`` sum the
   budgeted per-step and per-trial phases.
 
@@ -43,7 +43,7 @@ from typing import Any
 from raidar.execution.collect import read_result
 from raidar.execution.models import PhaseSample
 from raidar.execution.timestamps import diff_s, parse_ts, span_s
-from raidar.oracle.records import (
+from raidar.verifier.records import (
     RECORD_FILE,
     load_pre_agent_leak,
     load_step_record,
@@ -63,8 +63,8 @@ _RECORD_TIMINGS = {
     "snapshot_transfer": "snapshot_transfer_s",
     "verifier_plumbing": "verifier_plumbing_s",
     "grader_image": "grader_image_s",
-    "oracle_leak_check": "leak_check_s",
-    "oracle_run": "oracle_run_s",
+    "verifier_leak_check": "leak_check_s",
+    "verifier_run": "oracle_run_s",
     "coverage_run": "coverage_run_s",
 }
 
@@ -169,7 +169,7 @@ def trial_phases(
     environment_cold: bool,
     compose_init: bool,
 ) -> list[PhaseSample]:
-    """Every N1 phase this trial exposes (raidar_result_write is added by the run)."""
+    """Every N1 phase this trial exposes (raidar_result_write is added by the job)."""
     result = read_result(trial_dir) or {}
     condition = {"environment": "cold" if environment_cold else "warm"}
     condition["teardown"] = "init" if compose_init else "no-init"

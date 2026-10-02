@@ -22,8 +22,8 @@ from raidar.execution.models import (
     PhaseSample,
     PlannedTrial,
     ProgressionRule,
-    TrajectoryRecord,
     TrialHashes,
+    TrialRecord,
 )
 from raidar.execution.phases import trial_phases
 from tests.execution_support import StepOutcome, write_trial
@@ -100,7 +100,7 @@ def test_conditions_select_budgets_and_cold_is_a_tripwire() -> None:
     assert next(c for c in tripped if c.budget.phase == "environment_start").verdict is Verdict.FAIL
 
 
-def test_between_step_budgets_apply_only_when_a_trajectory_ran_two_checkpoints() -> None:
+def test_between_step_budgets_apply_only_when_a_trial_ran_two_checkpoints() -> None:
     budgets = (Budget("per_step_reset", 2.0), Budget("step_archive_gap", 2.5, multi_step_only=True))
     samples = _samples("per_step_reset", [1.0] * 10)
     one_shot = check_budgets(samples, budgets=budgets, multi_step=False)
@@ -111,7 +111,7 @@ def test_between_step_budgets_apply_only_when_a_trajectory_ran_two_checkpoints()
     assert not checks_pass(multi)
 
 
-def _run_dir(root: Path, trials: int, steps: int = 2) -> Path:
+def _job_dir(root: Path, trials: int, steps: int = 2) -> Path:
     hashes = TrialHashes(
         lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
     )
@@ -123,12 +123,12 @@ def _run_dir(root: Path, trials: int, steps: int = 2) -> Path:
         phases = trial_phases(
             trial_dir, component_apply_s=0.05, environment_cold=False, compose_init=True
         )
-        record = TrajectoryRecord(
+        record = TrialRecord(
             experiment="e",
-            run_id="r",
+            job_id="r",
             trial=PlannedTrial(
                 trial_id=f"t{index}",
-                block=index,
+                attempt=index,
                 order=0,
                 sequence=index,
                 arm="baseline",
@@ -139,13 +139,13 @@ def _run_dir(root: Path, trials: int, steps: int = 2) -> Path:
             ),
             trial_dir=f"trials/t{index}",
             progression=ProgressionRule(mode="continue", reward_key="strict_pass_rate"),
-            attempts=(),
+            step_results=(),
             reached=(),
             reached_source="derived",
             validity=ExecutionValidity(checks=()),
             phases=(*phases, PhaseSample(phase="raidar_result_write", seconds=0.001)),
         )
-        path = root / "trajectories" / f"t{index}.json"
+        path = root / "trial-records" / f"t{index}.json"
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(record.model_dump_json())
     return root
@@ -153,7 +153,7 @@ def _run_dir(root: Path, trials: int, steps: int = 2) -> Path:
 
 def test_perf_check_command_passes_and_fails_on_recorded_runs(tmp_path: Path) -> None:
     runner = CliRunner()
-    run = _run_dir(tmp_path / "run", 10)
+    run = _job_dir(tmp_path / "run", 10)
     # The synthetic timeline has 10 s environment starts and 3 s collection: within budget,
     # except the 3 s teardown, which is also within the 4 s init budget.
     result = runner.invoke(main, ["perf", "check", str(run), "--json"])
@@ -162,7 +162,7 @@ def test_perf_check_command_passes_and_fails_on_recorded_runs(tmp_path: Path) ->
     assert result.exit_code == 0, verdicts
     assert verdicts[("per_step_overhead", None)] == "pass"
     assert "scorer_orchestration" in payload["not_recorded_by_runs"]
-    short_run = str(_run_dir(tmp_path / "short", 3))
+    short_run = str(_job_dir(tmp_path / "short", 3))
     # Report-only by default: an insufficient phase is a warning, not a failure ...
     short = runner.invoke(main, ["perf", "check", short_run])
     assert short.exit_code == 0, short.output
@@ -173,7 +173,7 @@ def test_perf_check_command_passes_and_fails_on_recorded_runs(tmp_path: Path) ->
     assert strict.exit_code == 1
     assert "insufficient" in strict.output
     # A one-shot (K=1) experiment has no between-step gap and still passes.
-    one_shot = runner.invoke(main, ["perf", "check", str(_run_dir(tmp_path / "k1", 10, 1))])
+    one_shot = runner.invoke(main, ["perf", "check", str(_job_dir(tmp_path / "k1", 10, 1))])
     assert one_shot.exit_code == 0, one_shot.output
     assert "not_applicable" in one_shot.output
     empty = tmp_path / "empty"

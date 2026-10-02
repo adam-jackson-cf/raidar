@@ -13,7 +13,7 @@ the snapshot). A step with no source edit is ``not_applicable``. An
 ambiguous check is ``insufficient_evidence``; with a ``JevRuntime`` bound
 (``jev_residue``), the step's ``jev_ambiguous_compliance`` carries the Jev
 probability that the agent complied (tier ``jev``; never an input to a
-ScorePolicy), and every deterministic decision is audited too. The Jev mode
+Metric), and every deterministic decision is audited too. The Jev mode
 is the runtime's versioned ``process-compliance.residue`` policy, recorded in
 the result's provenance under the metric id; with no runtime it is ``off``.
 A step whose

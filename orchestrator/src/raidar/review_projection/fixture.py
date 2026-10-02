@@ -5,7 +5,7 @@ leave them, plus one Assessment store, under ``<dest>``:
 
 - ``synthetic-bugfix``: one 3-checkpoint problem, one condition, three agent
   specs (reasoning effort is the factor). The low-effort spec has a degraded
-  trajectory (checkpoint 3 fails) and one whose harness exited before
+  trial (checkpoint 3 fails) and one whose agent exited before
   verification (no headline score), so ranking, Δ-vs-best, unscored and
   failure paths all render.
 - ``synthetic-skill``: one 2-checkpoint problem, conditions ``baseline`` and
@@ -15,14 +15,14 @@ leave them, plus one Assessment store, under ``<dest>``:
 - ``synthetic-policy-mix`` and ``synthetic-policy-mix-k2``: the same problem id
   locked once with one checkpoint (``scb-canonical-oneshot@1``) and once with
   two (``scb-canonical@1``). A real problem version has one checkpoint count;
-  this synthetic contrivance makes one compared family mix headline policies,
+  this synthetic contrivance makes one compared family mix headline metrics,
   so the headline-policy mismatch renders.
 - ``synthetic-review-only`` (under ``<dest>/review-only``, not ``<dest>/runs``):
   runs projected for review whose Quality data was never built, so the surface
   shows what a run and a family without Quality data look like.
 
 ``<dest>/runs`` and ``<dest>/review-only`` are run roots, ``<dest>/store`` the
-Assessment store of both. Review ids are ``<run id>-<trial id>``; the trial ids
+Assessment store of both. Review ids are ``<job id>-<trial id>``; the trial ids
 keep the review-surface suite's deterministic ids (``synthetic-bugfix-gpt-5.5-low-04``
 and friends) stable.
 """
@@ -61,7 +61,7 @@ from raidar.spec.schema import ExperimentSpec
 SYNTHETIC_MARKER = "synthetic"
 # Run roots of the fixture: ``runs`` is projected for review and Quality, ``review-only``
 # for review alone.
-RUNS_DIR = "runs"
+JOBS_DIR = "jobs"
 REVIEW_ONLY_DIR = "review-only"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
@@ -84,19 +84,19 @@ _SKILL_DIR = "skills/tdd"
 _SKILL_FILE = f"{_SKILL_DIR}/SKILL.md"
 _SKILL_TEXT = "# tdd\nWrite the failing test first, then the smallest change that passes it.\n"
 _AGENTS = {
-    "gpt55-low": ("codex-cli", "openai", "gpt-5.5", "low", "gpt-5.5-low"),
-    "gpt55-medium": ("codex-cli", "openai", "gpt-5.5", "medium", "gpt-5.5-medium"),
-    "gpt55-high": ("codex-cli", "openai", "gpt-5.5", "high", "gpt-5.5-high"),
+    "gpt55-low": ("codex", "openai", "gpt-5.5", "low", "gpt-5.5-low"),
+    "gpt55-medium": ("codex", "openai", "gpt-5.5", "medium", "gpt-5.5-medium"),
+    "gpt55-high": ("codex", "openai", "gpt-5.5", "high", "gpt-5.5-high"),
     "sonnet": ("claude-code", "anthropic", "claude-sonnet-4.6", None, "claude-sonnet-4.6"),
 }
 
 
 @dataclass(frozen=True)
-class PlannedTrajectory:
-    """One planned synthetic trajectory: arm, block, checkpoint outcomes and code quality."""
+class FixtureTrial:
+    """One planned synthetic trial: arm, attempt, checkpoint outcomes and code quality."""
 
     arm: str
-    block: int
+    attempt: int
     outcomes: tuple[tuple[Outcome, int, int], ...]
     quality: float
     lint: bool = False
@@ -114,8 +114,8 @@ class Design:
     component_paths: dict[str, list[str]]
     arms: dict[str, tuple[str, str]]
     baseline_arm: str
-    blocks: int
-    trajectories: tuple[PlannedTrajectory, ...]
+    attempts: int
+    trials: tuple[FixtureTrial, ...]
 
     def locked_conditions(self) -> dict[str, list[dict[str, object]]]:
         """The lock's hashed conditions: ``skills@1`` with the hash of each skill file."""
@@ -141,19 +141,20 @@ def _solved(checkpoints: int) -> tuple[tuple[Outcome, int, int], ...]:
 
 
 def _bugfix() -> Design:
-    harness_exit = "the harness exited before verification finished (exit code 137)"
+    harness_exit = "the agent exited before verification finished (exit code 137)"
     low = [
-        PlannedTrajectory("gpt55-low", block, _solved(3), 0.9 + 0.01 * block) for block in (1, 2, 3)
+        FixtureTrial("gpt55-low", attempt, _solved(3), 0.9 + 0.01 * attempt)
+        for attempt in (1, 2, 3)
     ]
     low += [
-        PlannedTrajectory(
+        FixtureTrial(
             "gpt55-low",
             4,
             (("solved", 6, 6), ("solved", 6, 6), ("failed", 2, 6)),
             0.8,
             lint=True,
         ),
-        PlannedTrajectory("gpt55-low", 5, (("infra", 0, 0),) * 3, 0.0, failure=harness_exit),
+        FixtureTrial("gpt55-low", 5, (("infra", 0, 0),) * 3, 0.0, failure=harness_exit),
     ]
     return Design(
         experiment="synthetic-bugfix",
@@ -165,13 +166,10 @@ def _bugfix() -> Design:
         component_paths={"baseline": []},
         arms={arm: ("baseline", arm) for arm in ("gpt55-medium", "gpt55-high", "gpt55-low")},
         baseline_arm="gpt55-medium",
-        blocks=5,
-        trajectories=(
-            *(
-                PlannedTrajectory("gpt55-medium", b, _solved(3), 0.92 + 0.005 * b)
-                for b in range(1, 6)
-            ),
-            *(PlannedTrajectory("gpt55-high", b, _solved(3), 0.8 + 0.004 * b) for b in range(1, 6)),
+        attempts=5,
+        trials=(
+            *(FixtureTrial("gpt55-medium", b, _solved(3), 0.92 + 0.005 * b) for b in range(1, 6)),
+            *(FixtureTrial("gpt55-high", b, _solved(3), 0.8 + 0.004 * b) for b in range(1, 6)),
             *low,
         ),
     )
@@ -184,17 +182,17 @@ def _skill() -> Design:
         "skills-gpt": 0.86,
         "skills-sonnet": 0.9,
     }
-    trajectories = [
-        PlannedTrajectory(
+    trials = [
+        FixtureTrial(
             arm,
-            block,
+            attempt,
             (("solved", 4, 4), ("failed", 3, 4))
-            if arm.startswith("baseline") and block == 2
+            if arm.startswith("baseline") and attempt == 2
             else _solved(2),
-            value + 0.01 * (block - 2),
+            value + 0.01 * (attempt - 2),
         )
         for arm, value in quality.items()
-        for block in (1, 2, 3)
+        for attempt in (1, 2, 3)
     ]
     return Design(
         experiment="synthetic-skill",
@@ -211,8 +209,8 @@ def _skill() -> Design:
             "skills-sonnet": ("skills", "sonnet"),
         },
         baseline_arm="baseline-gpt",
-        blocks=3,
-        trajectories=tuple(trajectories),
+        attempts=3,
+        trials=tuple(trials),
     )
 
 
@@ -227,10 +225,10 @@ def _single_arm(experiment: str, problem: str, title: str, agent: str, checkpoin
         component_paths={"baseline": []},
         arms={agent: ("baseline", agent)},
         baseline_arm=agent,
-        blocks=3,
-        trajectories=tuple(
-            PlannedTrajectory(agent, block, _solved(checkpoints), 0.84 + 0.02 * block)
-            for block in (1, 2, 3)
+        attempts=3,
+        trials=tuple(
+            FixtureTrial(agent, attempt, _solved(checkpoints), 0.84 + 0.02 * attempt)
+            for attempt in (1, 2, 3)
         ),
     )
 
@@ -239,7 +237,7 @@ def _policy_mix() -> Design:
     return _single_arm(
         "synthetic-policy-mix",
         POLICY_MIX_PROBLEM,
-        "Synthetic one-shot ledger check, compared across headline policies",
+        "Synthetic one-shot ledger check, compared across headline metrics",
         "gpt55-low",
         checkpoints=1,
     )
@@ -269,14 +267,16 @@ def _spec(design: Design) -> ExperimentSpec:
     agents = sorted({agent for _, agent in design.arms.values()})
     return ExperimentSpec.model_validate(
         {
-            "schema_version": 1,
+            "schema_version": 2,
+            "kind": "ab-test" if "condition" in design.factors else "benchmark",
             "id": design.experiment,
             "description": f"{design.title} (synthetic review-surface fixture)",
             "problems": [{"ref": design.problem}],
+            "runtime": "python",
             "agents": [
                 {
                     "id": agent,
-                    "harness": _AGENTS[agent][0],
+                    "name": _AGENTS[agent][0],
                     "provider": _AGENTS[agent][1],
                     "model": _AGENTS[agent][2],
                     "reasoning_effort": _AGENTS[agent][3],
@@ -297,7 +297,11 @@ def _spec(design: Design) -> ExperimentSpec:
                 for arm, (condition, agent) in design.arms.items()
             ],
             "assessment": {"scorers": _SCORERS},
-            "analysis": {"baseline_arm": design.baseline_arm, "blocks": design.blocks, "seed": 0},
+            "analysis": {
+                "baseline_arm": design.baseline_arm,
+                "attempts": design.attempts,
+                "seed": 0,
+            },
         }
     )
 
@@ -306,7 +310,7 @@ def _lock(design: Design, spec: ExperimentSpec) -> dict[str, object]:
     return fixture_lock(
         spec.to_json(),
         problem=design.problem,
-        checkpoints=len(design.trajectories[0].outcomes),
+        checkpoints=len(design.trials[0].outcomes),
         conditions=design.locked_conditions(),
     )
 
@@ -329,39 +333,39 @@ def _checkpoint(step: str, outcome: tuple[Outcome, int, int], index: int) -> Che
     )
 
 
-def _script(design: Design, trajectory: PlannedTrajectory, index: int) -> TrialScript:
-    condition, agent = design.arms[trajectory.arm]
+def _script(design: Design, trial: FixtureTrial, index: int) -> TrialScript:
+    condition, agent = design.arms[trial.arm]
     label = _AGENTS[agent][4]
     trial_id = (
-        f"{label}-{trajectory.block:02d}"
+        f"{label}-{trial.attempt:02d}"
         if len(design.conditions) == 1
-        else f"{trajectory.arm}-{trajectory.block:02d}"
+        else f"{trial.arm}-{trial.attempt:02d}"
     )
     return TrialScript(
         trial_id=trial_id,
-        arm=trajectory.arm,
-        block=trajectory.block,
+        arm=trial.arm,
+        attempt=trial.attempt,
         model=f"{_AGENTS[agent][1]}/{_AGENTS[agent][2]}",
         started=_STARTED + timedelta(minutes=10 * index),
         prompt=design.prompt,
         checkpoints=tuple(
             _checkpoint(f"checkpoint_{k + 1}", outcome, k)
-            for k, outcome in enumerate(trajectory.outcomes)
+            for k, outcome in enumerate(trial.outcomes)
         ),
         overlay=tuple(design.conditions[condition].items()),
-        failure=trajectory.failure,
+        failure=trial.failure,
     )
 
 
-def _quality(trajectory: PlannedTrajectory, steps: int) -> QualityPlan:
-    value = round(trajectory.quality, 6)
+def _quality(trial: FixtureTrial, steps: int) -> QualityPlan:
+    value = round(trial.quality, 6)
     names = ("verbosity", "erosion", "architecture", "rework", "regression")
     lint = (
         [
             LintFinding(f"checkpoint_{k + 1}", 1, "F401 `os` imported but unused")
             for k in range(steps)
         ]
-        if trajectory.lint
+        if trial.lint
         else []
     )
     return QualityPlan(values=dict.fromkeys(names, value), lint=lint)
@@ -372,68 +376,68 @@ def _write_json(path: Path, payload: object) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
-def _run(design: Design, dest: Path, store: AssessmentStore, root: str = RUNS_DIR) -> Path:
+def _run(design: Design, dest: Path, store: AssessmentStore, root: str = JOBS_DIR) -> Path:
     spec = _spec(design)
     lock = _lock(design, spec)
-    run_dir = dest / root / design.experiment / design.experiment
+    job_dir = dest / root / design.experiment / design.experiment
     bundle = write_bundle(
         dest / "bundles" / design.experiment,
         design.problem,
-        [f"checkpoint_{k + 1}" for k in range(len(design.trajectories[0].outcomes))],
+        [f"checkpoint_{k + 1}" for k in range(len(design.trials[0].outcomes))],
     )
-    _write_json(run_dir / "experiment.lock.json", lock)
+    _write_json(job_dir / "experiment.lock.json", lock)
     # Assessments are keyed under the lock's assessment settings, as a rescore makes them.
     settings = rescore_config(spec.assessment, spec.protocol)
-    (run_dir / "assessment-config.yaml").write_text(
+    (job_dir / "assessment-config.yaml").write_text(
         yaml.safe_dump(settings.model_dump(mode="json"), sort_keys=True)
     )
     registry = default_scorer_registry()
     conditions = design.locked_conditions()
-    for index, trajectory in enumerate(design.trajectories):
-        condition, agent = design.arms[trajectory.arm]
+    for index, trial in enumerate(design.trials):
+        condition, agent = design.arms[trial.arm]
         plan = TrialPlan(
             experiment=design.experiment,
-            run_id=design.experiment,
-            run_dir=run_dir,
+            job_id=design.experiment,
+            job_dir=job_dir,
             problem=design.problem,
             problem_title=design.title,
             bundle=bundle,
             lock_sha256=str(lock["lock_sha256"]),
-            # Like CompiledCondition.digest: the contents compiled for this arm's harness.
+            # Like CompiledCondition.digest: the contents compiled for this arm's agent.
             condition_digest=digest_json(
-                {"harness": _AGENTS[agent][0], "condition": conditions[condition]}
+                {"agent": _AGENTS[agent][0], "condition": conditions[condition]}
             ),
             agent_digest=digest_json(_AGENTS[agent]),
         )
-        script = _script(design, trajectory, index)
+        script = _script(design, trial, index)
         write_trial(plan, script)
         store_assessments(
             store,
             registry,
-            run_dir / "trials" / script.trial_id,
+            job_dir / "trials" / script.trial_id,
             settings,
-            _quality(trajectory, len(trajectory.outcomes)),
+            _quality(trial, len(trial.outcomes)),
         )
-    _write_json(run_dir / "plan.json", {"kind": "raidar-plan", "options": {"agent_override": None}})
+    _write_json(job_dir / "plan.json", {"kind": "raidar-plan", "options": {"agent_override": None}})
     _write_json(
-        run_dir / "run.json",
+        job_dir / "job.json",
         {
-            "kind": "raidar-run",
+            "kind": "raidar-job",
             "experiment": design.experiment,
-            "run_id": design.experiment,
+            "job_id": design.experiment,
             "lock_sha256": lock["lock_sha256"],
             "experiment_file": None,
             "started_at": _STARTED.isoformat(),
             SYNTHETIC_MARKER: True,
         },
     )
-    return run_dir
+    return job_dir
 
 
 def generate_review_fixture(dest: Path) -> list[Path]:
     """Write the synthetic runs of both run roots and their Assessment store.
 
-    Returns the run directories.
+    Returns the job directories.
     """
     shutil.rmtree(dest, ignore_errors=True)
     store = AssessmentStore(dest / "store")
@@ -445,8 +449,8 @@ def generate_review_fixture(dest: Path) -> list[Path]:
 
 def main() -> None:
     dest = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("../.tmp/review-fixture")
-    for run_dir in generate_review_fixture(dest.resolve()):
-        print(f"Wrote synthetic run: {run_dir}")
+    for job_dir in generate_review_fixture(dest.resolve()):
+        print(f"Wrote synthetic run: {job_dir}")
 
 
 if __name__ == "__main__":

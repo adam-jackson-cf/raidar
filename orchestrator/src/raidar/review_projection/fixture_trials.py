@@ -1,7 +1,7 @@
 """Synthetic experiment-epoch trial artifacts, written with the production models.
 
 Every file a real ``raidar run`` leaves for review is written here from the
-same models (Harbor ATIF, oracle bundle and step records, ``TrajectoryRecord``),
+same models (Harbor ATIF, verifier bundle and step records, ``TrialRecord``),
 so the review projection and the real scorers read the fixture exactly as they
 read a real run. Nothing here is real benchmark evidence: the fixture's runs are
 marked ``synthetic`` and its problems live under ``synthetic/``.
@@ -28,22 +28,24 @@ from harbor.models.trajectories import (
 
 from raidar.execution.collect import NOT_STARTED
 from raidar.execution.models import (
-    CheckpointAttempt,
     CheckpointState,
     ExecutionValidity,
     PhaseSample,
     PlannedTrial,
     ProgressionRule,
     SnapshotInfo,
-    TrajectoryRecord,
+    StepResult,
     TrialHashes,
+    TrialRecord,
     Usage,
     ValidityCheck,
 )
 from raidar.execution.progression import derive_reached, strict_rule
-from raidar.oracle.bundle import BundleManifest, GraderSpec, OracleStepSpec, load_bundle
-from raidar.oracle.models import CaseGroup, CaseResult, CaseStatus, OracleGrade
-from raidar.oracle.records import (
+from raidar.oracle.snapshot import tree_digest
+from raidar.spec.canonical import digest_json
+from raidar.verifier.bundle import BundleManifest, GraderSpec, VerifierStepSpec, load_bundle
+from raidar.verifier.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
+from raidar.verifier.records import (
     BundleRef,
     CoverageRef,
     GraderRef,
@@ -51,8 +53,6 @@ from raidar.oracle.records import (
     StepRecord,
     write_step_record,
 )
-from raidar.oracle.snapshot import tree_digest
-from raidar.spec.canonical import digest_json
 
 Outcome = Literal["solved", "failed", "infra"]
 HARNESS_EXIT = "NonZeroAgentExitCodeError"
@@ -75,7 +75,7 @@ class CheckpointScript:
 class TrialScript:
     trial_id: str
     arm: str
-    block: int
+    attempt: int
     model: str
     started: datetime
     prompt: str
@@ -89,8 +89,8 @@ class TrialPlan:
     """Experiment-level identities a trial is written under."""
 
     experiment: str
-    run_id: str
-    run_dir: Path
+    job_id: str
+    job_dir: Path
     problem: str
     problem_title: str
     bundle: Path
@@ -100,7 +100,7 @@ class TrialPlan:
 
 
 def write_bundle(root: Path, problem: str, steps: Sequence[str]) -> Path:
-    """A host-only oracle bundle with one hidden test file per checkpoint."""
+    """A host-only verifier bundle with one hidden test file per checkpoint."""
     tests = root / "tests"
     tests.mkdir(parents=True, exist_ok=True)
     specs = []
@@ -108,7 +108,7 @@ def write_bundle(root: Path, problem: str, steps: Sequence[str]) -> Path:
         name = f"test_{step}.py"
         (tests / name).write_text(f"def test_{step}():\n    assert True\n", encoding="utf-8")
         specs.append(
-            OracleStepSpec(
+            VerifierStepSpec(
                 name=step, checkpoint=step, test_files=(name,), pytest_args=(f"{{tests}}/{name}",)
             )
         )
@@ -211,7 +211,7 @@ def _record(
     plan: TrialPlan, trial_dir: Path, checkpoint: CheckpointScript, prior: str | None
 ) -> StepRecord:
     cases = _cases(checkpoint, prior)
-    grade = OracleGrade(step=checkpoint.step, checkpoint=checkpoint.step, cases=cases)
+    grade = VerifierGrade(step=checkpoint.step, checkpoint=checkpoint.step, cases=cases)
     stored = f"steps/{checkpoint.step}/artifacts/app"
     record = StepRecord(
         step=checkpoint.step,
@@ -267,7 +267,7 @@ def _write_step(
 
 
 def _task(plan: TrialPlan, script: TrialScript) -> None:
-    task = plan.run_dir / "tasks" / script.trial_id
+    task = plan.job_dir / "tasks" / script.trial_id
     task.mkdir(parents=True, exist_ok=True)
     (task / "task.toml").write_text(
         "[task]\n"
@@ -295,7 +295,7 @@ def _state(checkpoint: CheckpointScript) -> CheckpointState:
 
 
 def _graded(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, object]:
-    """What the oracle record gives the attempt (nothing when the step has no verdict)."""
+    """What the verifier record gives the step_result (nothing when the step has no verdict)."""
     if checkpoint.outcome == "infra":
         return {}
     relative = f"raidar-oracle/steps/{checkpoint.step}/record.json"
@@ -303,7 +303,7 @@ def _graded(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, object]:
     return {
         "strict_pass_rate": rewards.get("strict_pass_rate"),
         "rewards": rewards,
-        "oracle_record": relative,
+        "verifier_record": relative,
     }
 
 
@@ -318,16 +318,16 @@ def _executed_step(trial_dir: Path, checkpoint: CheckpointScript) -> dict[str, o
     }
 
 
-def _attempt(
+def _step_result(
     plan: TrialPlan, script: TrialScript, index: int, checkpoint: CheckpointScript, ran: bool
-) -> CheckpointAttempt:
-    trial_dir = plan.run_dir / "trials" / script.trial_id
+) -> StepResult:
+    trial_dir = plan.job_dir / "trials" / script.trial_id
     graded = _graded(trial_dir, checkpoint)
-    return CheckpointAttempt.model_validate(
+    return StepResult.model_validate(
         {
             "trial_id": script.trial_id,
             "arm": script.arm,
-            "block": script.block,
+            "attempt": script.attempt,
             "problem": plan.problem,
             "index": index,
             "step": checkpoint.step,
@@ -345,30 +345,30 @@ def _infra_reasons(ran: bool) -> tuple[str, ...]:
     """The execution driver's codes for a harness that exited before verification."""
     if not ran:
         return (f"{NOT_STARTED}:{HARNESS_EXIT}",)
-    return (f"no_oracle_record:{HARNESS_EXIT}", f"step_exception:{HARNESS_EXIT}")
+    return (f"no_verifier_record:{HARNESS_EXIT}", f"step_exception:{HARNESS_EXIT}")
 
 
-def _reason_detail(attempts: Sequence[CheckpointAttempt], prefix: str) -> str | None:
+def _reason_detail(step_results: Sequence[StepResult], prefix: str) -> str | None:
     hits = [
-        f"{attempt.step}: {reason}"
-        for attempt in attempts
-        for reason in attempt.infra_reasons
+        f"{step_result.step}: {reason}"
+        for step_result in step_results
+        for reason in step_result.infra_reasons
         if reason.startswith(prefix)
     ]
     return "; ".join(hits) or None
 
 
-def _validity(script: TrialScript, attempts: Sequence[CheckpointAttempt]) -> ExecutionValidity:
+def _validity(script: TrialScript, step_results: Sequence[StepResult]) -> ExecutionValidity:
     checks = {
         "trial_completed": HARNESS_EXIT if script.failure else None,
-        "steps_started": _reason_detail(attempts, NOT_STARTED),
-        "oracle_verdicts": _reason_detail(attempts, "no_oracle_record"),
-        "oracle_infra": None,
-        "no_oracle_leak": None,
-        "agent_infra": _reason_detail(attempts, "step_exception"),
+        "steps_started": _reason_detail(step_results, NOT_STARTED),
+        "verifier_verdicts": _reason_detail(step_results, "no_verifier_record"),
+        "verifier_infra": None,
+        "no_verifier_leak": None,
+        "agent_infra": _reason_detail(step_results, "step_exception"),
         "component_probes": None,
         "progression": None,
-        "harness_version": None,
+        "agent_version": None,
     }
     return ExecutionValidity(
         checks=tuple(
@@ -389,9 +389,9 @@ def _planned(plan: TrialPlan, script: TrialScript) -> PlannedTrial:
     }
     return PlannedTrial(
         trial_id=script.trial_id,
-        block=script.block,
+        attempt=script.attempt,
         order=0,
-        sequence=script.block,
+        sequence=script.attempt,
         arm=script.arm,
         problem=plan.problem,
         problem_index=0,
@@ -401,7 +401,7 @@ def _planned(plan: TrialPlan, script: TrialScript) -> PlannedTrial:
 
 
 def _exception_info(script: TrialScript, at: datetime) -> dict[str, str] | None:
-    """Harbor's ``ExceptionInfo`` for a trial whose harness exited (None otherwise)."""
+    """Harbor's ``ExceptionInfo`` for a trial whose agent exited (None otherwise)."""
     if script.failure is None:
         return None
     return {
@@ -422,9 +422,9 @@ def _executed(script: TrialScript) -> list[CheckpointScript]:
     return executed
 
 
-def write_trial(plan: TrialPlan, script: TrialScript) -> TrajectoryRecord:
-    """Write one synthetic trial (trial dir, task dir, trajectory record) and return its record."""
-    trial_dir = plan.run_dir / "trials" / script.trial_id
+def write_trial(plan: TrialPlan, script: TrialScript) -> TrialRecord:
+    """Write one synthetic trial (trial dir, task dir, trial record) and return its record."""
+    trial_dir = plan.job_dir / "trials" / script.trial_id
     steps, at = [], script.started
     for checkpoint in _executed(script):
         steps.append(_write_step(plan, script, trial_dir, checkpoint, at))
@@ -445,36 +445,36 @@ def write_trial(plan: TrialPlan, script: TrialScript) -> TrajectoryRecord:
     )
     _task(plan, script)
     ran = len(steps)
-    attempts = tuple(
-        _attempt(plan, script, index, checkpoint, index < ran)
+    step_results = tuple(
+        _step_result(plan, script, index, checkpoint, index < ran)
         for index, checkpoint in enumerate(script.checkpoints)
     )
-    rewards = [attempt.rewards for attempt in attempts]
-    record = TrajectoryRecord(
+    rewards = [step_result.rewards for step_result in step_results]
+    record = TrialRecord(
         experiment=plan.experiment,
-        run_id=plan.run_id,
+        job_id=plan.job_id,
         trial=_planned(plan, script),
         trial_dir=f"trials/{script.trial_id}",
         progression=_CONTINUE,
-        attempts=attempts,
+        step_results=step_results,
         reached=derive_reached(rewards, strict_rule(_CONTINUE)),
         reached_source="derived",
-        validity=_validity(script, attempts),
+        validity=_validity(script, step_results),
         phases=(
             PhaseSample(phase="environment_start", seconds=4.0, condition="warm"),
             PhaseSample(phase="agent_setup", seconds=2.0),
             *(
                 PhaseSample(
                     phase="agent_execution",
-                    seconds=attempt.agent_execution_s or 0.0,
-                    step=attempt.step,
+                    seconds=step_result.agent_execution_s or 0.0,
+                    step=step_result.step,
                 )
-                for attempt in attempts
+                for step_result in step_results
             ),
         ),
         trial_exception=HARNESS_EXIT if script.failure else None,
     )
-    path = plan.run_dir / "trajectories" / f"{script.trial_id}.json"
+    path = plan.job_dir / "trial-records" / f"{script.trial_id}.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(record.model_dump_json(indent=2) + "\n")
     return record

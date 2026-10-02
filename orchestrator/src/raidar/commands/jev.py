@@ -56,7 +56,7 @@ def checkpoint_sources(
 
 @click.group()
 def jev() -> None:
-    """Jev classifier: policies, shadow runs and calibration labels."""
+    """Jev classifier: policies, shadow jobs and calibration labels."""
 
 
 @jev.command("policies")

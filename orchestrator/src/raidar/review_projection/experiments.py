@@ -2,7 +2,7 @@
 
 The surface groups experiment records by ``problem`` and ``arm`` (the arm's
 condition label) and ranks agent specs inside each group, so one record holds
-the trajectories (blocks) of one arm on one problem. Scored runs are those
+the trials (attempts) of one arm on one problem. Scored runs are those
 with a headline score, repeatability flags a composite stddev of 0.1 or more,
 and the sample is adequate at 3 scored runs and preferred at 5.
 """
@@ -34,7 +34,7 @@ from raidar.schemas.review import (
     ReviewRunRecord,
 )
 from raidar.spec.canonical import digest_json
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.spec.references import RegistryReferenceError
 from raidar.spec.schema import ExperimentSpec
 
@@ -46,7 +46,7 @@ _POLICY_CATEGORIES = {CORRECTNESS_SCORER: "correctness", QUALITY_SCORER: "qualit
 
 @dataclass(frozen=True)
 class ArmGroup:
-    """The trajectories of one arm on one problem under one experiment lock."""
+    """The trials of one arm on one problem under one experiment lock."""
 
     experiment_id: str
     spec: ExperimentSpec
@@ -55,7 +55,7 @@ class ArmGroup:
     rules_artifacts: Mapping[str, str]
     parent_arm: str | None
     change_categories: Sequence[ArmChangeCategory]
-    headline_policy: str
+    metric: str
     trials: Sequence[TrialInput]
     details: Sequence[ReviewRunDetail]
 
@@ -73,7 +73,7 @@ def stat_block(values: Sequence[float]) -> dict[str, float]:
 
 
 def _checkpoint_outcomes(runs: Sequence[ReviewRunRecord]) -> dict[str, dict[str, Any]]:
-    """Per checkpoint: how many runs solved it (runs without an oracle verdict excluded)."""
+    """Per checkpoint: how many runs solved it (runs without a verifier verdict excluded)."""
     by_metric: dict[str, list[tuple[bool, float]]] = {}
     for run in runs:
         for metric in run.metric_scores:
@@ -129,20 +129,20 @@ def _aggregate(runs: Sequence[ReviewRunRecord], policy: str) -> dict[str, Any]:
     }
 
 
-def _sample(scored: int, blocks: int) -> tuple[dict[str, Any], dict[str, Any]]:
+def _sample(scored: int, attempts: int) -> tuple[dict[str, Any], dict[str, Any]]:
     sample = {
         "minimum_scored_runs": MINIMUM_SCORED_RUNS,
         "preferred_scored_runs": PREFERRED_SCORED_RUNS,
-        "sample_class": "review" if blocks >= PREFERRED_SCORED_RUNS else "smoke",
+        "sample_class": "review" if attempts >= PREFERRED_SCORED_RUNS else "smoke",
         "achieved_scored_runs": scored,
         "minimum_met": scored >= MINIMUM_SCORED_RUNS,
         "preferred_met": scored >= PREFERRED_SCORED_RUNS,
         "sample_adequacy": round(min(scored / PREFERRED_SCORED_RUNS, 1.0), 6),
     }
     rerun = {
-        "target_scored_runs": blocks,
+        "target_scored_runs": attempts,
         "achieved_scored_runs": scored,
-        "target_met": scored >= blocks,
+        "target_met": scored >= attempts,
     }
     return sample, rerun
 
@@ -162,7 +162,7 @@ def _undeclared_scorer_findings(
         id="policy-scorer-mismatch",
         kind="note",
         category="policy-scorer-mismatch",
-        title="The headline policy needs a scorer the experiment does not declare",
+        title="The headline metric needs a scorer the experiment does not declare",
         detail="no rescore or rerun produces a headline score; declare the scorer "
         "in assessment.scorers and relock",
         span=None,
@@ -180,8 +180,8 @@ def _findings(aggregate: Mapping[str, Any], runs: Sequence[ReviewRunRecord]) -> 
                 id="rerun-target",
                 kind="issue",
                 category="rerun-target",
-                title=f"{len(unscored)} trajectory(ies) without a headline score",
-                detail="assess or rerun these trajectories before trusting the arm's mean",
+                title=f"{len(unscored)} trial(ies) without a headline score",
+                detail="assess or rerun these trials before trusting the arm's mean",
                 span=None,
                 evidence=tuple(EvidenceRef("run", run_id) for run_id in unscored),
             )
@@ -204,8 +204,8 @@ def _findings(aggregate: Mapping[str, Any], runs: Sequence[ReviewRunRecord]) -> 
                 id="repeat-variance",
                 kind="issue",
                 category="repeat-variance",
-                title="Blocks disagree",
-                detail=f"composite stddev {stddev:.3f} across blocks",
+                title="Attempts disagree",
+                detail=f"composite stddev {stddev:.3f} across attempts",
                 span=None,
             )
         )
@@ -213,7 +213,7 @@ def _findings(aggregate: Mapping[str, Any], runs: Sequence[ReviewRunRecord]) -> 
 
 
 def _task_document(trial: TrialInput) -> Mapping[str, Any]:
-    path = trial.run_dir / "tasks" / trial.record.trial.trial_id / "task.toml"
+    path = trial.job_dir / "tasks" / trial.record.trial.trial_id / "task.toml"
     return tomllib.loads(path.read_text(encoding="utf-8")) if path.is_file() else {}
 
 
@@ -228,19 +228,17 @@ def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ArmComparableConfig
         "parent_arm": group.parent_arm,
         "description": str(info.get("description") or spec.description or labels.problem),
         "difficulty": str(metadata.get("difficulty") or "unrated"),
-        "languages": [spec.runtime.language.capitalize()],
-        "checkpoints": len(record.attempts),
+        "languages": [spec.runtime.capitalize()],
+        "checkpoints": len(record.step_results),
         "timeout_sec": spec.protocol.agent_timeout_sec,
-        "environment": spec.runtime.model_dump(mode="json"),
+        "environment": {"runtime": spec.runtime, **spec.environment.model_dump(mode="json")},
         "verification": {
-            "oracle": "raidar oracle, strict all-cases verdict per checkpoint",
+            "oracle": "raidar verifier, strict all-cases verdict per checkpoint",
             "progression": spec.protocol.model_dump(mode="json"),
             "problem_digest": record.trial.hashes.problem,
-            "checkpoints": [attempt.checkpoint for attempt in record.attempts],
+            "checkpoints": [step_result.checkpoint for step_result in record.step_results],
         },
-        "scorers": [
-            _scorer(ref, _shares(group.headline_policy)) for ref in spec.assessment.scorers
-        ],
+        "scorers": [_scorer(ref, _shares(group.metric)) for ref in spec.assessment.scorers],
         "condition": {
             "label": labels.arm,
             "arm": group.arm,
@@ -254,9 +252,9 @@ def _comparable(group: ArmGroup, task: Mapping[str, Any]) -> ArmComparableConfig
 
 
 def _shares(policy_ref: str) -> dict[str, float]:
-    """Each policy scorer's share of S under the headline policy; none for an unknown policy."""
+    """Each policy scorer's share of S under the headline metric; none for an unknown policy."""
     try:
-        base, inertia = policy_shares(DEFAULT_POLICY_REGISTRY.get(policy_ref))
+        base, inertia = policy_shares(DEFAULT_METRIC_REGISTRY.get(policy_ref))
     except RegistryReferenceError:
         return {}
     return {CORRECTNESS_SCORER: base, QUALITY_SCORER: inertia}
@@ -282,13 +280,13 @@ def experiment_record(group: ArmGroup) -> ReviewExperimentRecord:
     first = group.trials[0]
     labels = first.labels
     runs = [detail.run for detail in group.details]
-    aggregate = _aggregate(runs, group.headline_policy)
-    sample, rerun = _sample(aggregate["run_count_scored"], group.spec.analysis.blocks)
+    aggregate = _aggregate(runs, group.metric)
+    sample, rerun = _sample(aggregate["run_count_scored"], group.spec.analysis.attempts)
     rerun["unresolved_unscored_count"] = aggregate["unscored_count"]
     comparable = _comparable(group, _task_document(first))
     return ReviewExperimentRecord(
         experiment_id=group.experiment_id,
-        dir=repo_path(first.run_dir.parent),
+        dir=repo_path(first.job_dir.parent),
         problem=labels.problem,
         arm=labels.arm,
         harness=labels.harness,
@@ -296,7 +294,7 @@ def experiment_record(group: ArmGroup) -> ReviewExperimentRecord:
         reasoning_effort=labels.reasoning_effort,
         agent_spec=labels.agent_spec,
         synthetic=any(trial.synthetic for trial in group.trials),
-        repeats=group.spec.analysis.blocks,
+        repeats=group.spec.analysis.attempts,
         problem_meta=_metadata(comparable),
         comparable_config=comparable,
         change_categories=list(group.change_categories),

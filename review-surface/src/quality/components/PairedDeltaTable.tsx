@@ -1,4 +1,4 @@
-// Paired Δ per component vs the baseline arm: within-block differences, mean
+// Paired Δ per component vs the baseline arm: within-attempt differences, mean
 // with a 95% paired-t interval, and a verdict only when the interval excludes 0.
 import { C } from '@/utils/colors';
 import { COMPONENT_INFO, VERDICT_STYLE, fmtSigned } from '@/quality/format';
@@ -43,7 +43,7 @@ export function PairedDeltaTable({ paired, baseline, arms }: { paired: PairedDel
           <th className="px-2 py-1 text-[10px] font-medium" style={{ color: C.fg1 }}>
             Arm
           </th>
-          <th className="px-2 py-1 text-right text-[10px] font-medium" style={{ color: C.fg1 }} title="Mean within-block difference (arm − baseline)">
+          <th className="px-2 py-1 text-right text-[10px] font-medium" style={{ color: C.fg1 }} title="Mean within-attempt difference (arm − baseline)">
             Δ
           </th>
           <th className="px-2 py-1 text-[10px] font-medium" style={{ color: C.fg1 }} title="95% paired-t interval; the centre line is 0">
@@ -52,7 +52,7 @@ export function PairedDeltaTable({ paired, baseline, arms }: { paired: PairedDel
           <th className="px-2 py-1 text-[10px] font-medium" style={{ color: C.fg1 }}>
             Verdict
           </th>
-          <th className="px-2 py-1 text-right text-[10px] font-medium" style={{ color: C.fg1 }} title="Blocks paired / blocks left out">
+          <th className="px-2 py-1 text-right text-[10px] font-medium" style={{ color: C.fg1 }} title="Attempts paired / attempts left out">
             Pairs
           </th>
         </tr>

@@ -8,7 +8,7 @@ frozen UI and its projection stay untouched, and the Quality route reads
 Every cell is statused. A value is present only when the status is ``ok``;
 otherwise the cell carries the scorer's or policy's reason, never a zero
 (F6). Components are the SCB fork's: C (correctness), V, E, H, R, G, the
-inertia I and the score S, weighted by the run's headline ScorePolicy.
+inertia I and the score S, weighted by the run's headline metric.
 """
 
 from __future__ import annotations
@@ -109,18 +109,18 @@ class JevDecisionItem(QualityModel):
 class QualityRunSummary(QualityModel):
     id: str
     experiment: str
-    run: str
+    job: str
     trial: str
     arm: str
     problem: str
-    block: int
+    attempt: int
     valid: bool
     checkpoints: int
     truncated_to: int | None = None
     score: Cell
     sources: dict[str, str | None]
-    trajectory: str
-    """``<runs-root name>/<run dir>/trajectories/<trial>.json``: the join key to the run review."""
+    trial_record: str
+    """``<jobs-root name>/<job dir>/trial-records/<trial>.json``: the join key to the run review."""
 
 
 class QualityRunDetail(QualityModel):
@@ -136,7 +136,7 @@ class QualityRunDetail(QualityModel):
 
 
 class CurvePoint(QualityModel):
-    """Mean across blocks with WS-J's 95% interval (``low``/``high``; two values needed)."""
+    """Mean across attempts with WS-J's 95% interval (``low``/``high``; two values needed)."""
 
     checkpoint: str
     n: int
@@ -195,7 +195,7 @@ class HeadToHeadSignal(QualityModel):
 class HeadToHead(QualityModel):
     arm_a: str
     arm_b: str
-    aggregation: Literal["median_across_blocks"] = "median_across_blocks"
+    aggregation: Literal["median_across_attempts"] = "median_across_attempts"
     signals: tuple[HeadToHeadSignal, ...]
 
 
@@ -231,11 +231,11 @@ class ProblemQuality(QualityModel):
 
 
 class QualityExperiment(QualityModel):
-    """One experiment under one lock: runs under different locks are never pooled."""
+    """One experiment under one lock: jobs under different locks are never pooled."""
 
     experiment: str
     lock_sha256: str | None
-    runs: tuple[str, ...]
+    jobs: tuple[str, ...]
     problems: tuple[ProblemQuality, ...]
 
 

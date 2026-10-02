@@ -7,9 +7,9 @@ import os
 import click
 from dotenv import load_dotenv
 
-from raidar.agents.config import Harness
+from raidar.agents.config import AgentName
 from raidar.commands.register import register_commands
-from raidar.commands.shared import ENV_PATH, SECRETS_SOURCE_ENV, set_harness_choices
+from raidar.commands.shared import ENV_PATH, SECRETS_SOURCE_ENV, set_agent_choices
 
 # orchestrator/.env is the fallback secret source. When the make targets inject secrets
 # from Infisical they set RAIDAR_SECRETS_SOURCE=infisical, and .env stays unread so a
@@ -24,7 +24,7 @@ def main() -> None:
     """Raidar: lock, run, assess and analyze coding-agent experiments."""
 
 
-set_harness_choices([harness.value for harness in Harness])
+set_agent_choices([name.value for name in AgentName])
 register_commands(main)
 
 

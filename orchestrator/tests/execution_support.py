@@ -2,13 +2,13 @@
 
 - ``validated_fixture``: the WS-B ``fixture/adder`` store, validated with the
   local grader (no Docker) so it locks. Its task is not pack-bound (no compose
-  override), so experiments over it set ``runtime.compose_init: false``.
+  override), so experiments over it set ``environment.compose_init: false``.
 - ``imported_pack_fixture``: the real WS-B importer over the fake SCB dataset,
   so the task is pack-bound exactly like a pilot problem (pack image, ``agent``
   user, compose ``init: true``, per-step ``/app`` artifacts), validated with the
   Docker grader. Used by the Docker-gated perf fixture.
 - ``write_trial``: a synthetic trial directory mirroring what Harbor and the
-  Raidar oracle write, for classification, progression and phase tests.
+  Raidar verifier write, for classification, progression and phase tests.
 """
 
 from __future__ import annotations
@@ -21,9 +21,15 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.leak import LeakReport
-from raidar.oracle.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, OracleGrade
-from raidar.oracle.records import (
+from raidar.problems.importer import import_problem
+from raidar.problems.models import ProblemId
+from raidar.problems.store import ProblemStore
+from raidar.problems.validator import ValidateOptions, validate_problem, write_report
+from raidar.spec.loader import LoadedExperiment, load_experiment
+from raidar.spec.lock import build_lock, default_lock_path, default_resolvers, render_lock
+from raidar.verifier.leak import LeakReport
+from raidar.verifier.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
+from raidar.verifier.records import (
     BundleRef,
     CoverageRef,
     GraderRef,
@@ -33,13 +39,7 @@ from raidar.oracle.records import (
     write_pre_agent_leak,
     write_step_record,
 )
-from raidar.oracle.verifier import step_rewards
-from raidar.problems.importer import import_problem
-from raidar.problems.models import ProblemId
-from raidar.problems.store import ProblemStore
-from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from raidar.spec.loader import LoadedExperiment, load_experiment
-from raidar.spec.lock import build_lock, default_lock_path, default_resolvers, render_lock
+from raidar.verifier.verifier import step_rewards
 from tests.experiment_spec_support import experiment_document, write_experiment
 from tests.problems_support import (
     POSITIVE_REF,
@@ -101,14 +101,14 @@ class StepOutcome:
     """What one executed step leaves behind."""
 
     name: str
-    passed: bool | None = True  # None: no oracle record (verifier failed closed)
+    passed: bool | None = True  # None: no verifier record (verifier failed closed)
     infra: str | None = None
     leaked: bool = False
     exception: str | None = None
     reset_ok: bool = True
 
 
-def oracle_grade(step: str, outcome: StepOutcome) -> OracleGrade:
+def verifier_grade(step: str, outcome: StepOutcome) -> VerifierGrade:
     status = CaseStatus.PASSED if outcome.passed else CaseStatus.FAILED
     cases = (
         CaseResult(id=f"{step}::a", group=CaseGroup.CORE, checkpoint_origin=step, status=status),
@@ -120,11 +120,11 @@ def oracle_grade(step: str, outcome: StepOutcome) -> OracleGrade:
         ),
     )
     infra = InfraFailure(code=outcome.infra) if outcome.infra else None
-    return OracleGrade(step=step, checkpoint=step, cases=cases, infra_failure=infra)
+    return VerifierGrade(step=step, checkpoint=step, cases=cases, infra_failure=infra)
 
 
 def _record(step: str, outcome: StepOutcome, trial_dir: Path) -> StepRecord:
-    grade = oracle_grade(step, outcome)
+    grade = verifier_grade(step, outcome)
     rewards = step_rewards(grade.rewards(), leaked=outcome.leaked)
     return StepRecord(
         step=step,
@@ -179,7 +179,7 @@ def write_trial(
     agent_version: str = "0.156.1",
     trial_exception: str | None = None,
 ) -> Path:
-    """A Harbor multi-step trial dir: result.json, oracle records, reset reports.
+    """A Harbor multi-step trial dir: result.json, verifier records, reset reports.
 
     Timeline (seconds): env setup 0-10, agent setup 10-11; each step takes 20 s
     (2 s reset gap incl. a 0.5 s pre-agent scan, 10 s agent, 3 s collection,

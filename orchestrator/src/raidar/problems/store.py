@@ -9,7 +9,7 @@ Layout (repo-root ``problems/``)::
                                                its current manifest (F13)
     store/<dataset>/<problem>/<version>/       generated, gitignored:
         task/        agent-visible Harbor task (no hidden tests, no solutions)
-        oracle/      host-only oracle bundle (hidden tests)
+        oracle/      host-only verifier bundle (hidden tests)
         references/  host-only reference payload per step (validation only)
     cache/                                     pinned dataset checkouts and
                                                infra-failed validation attempts, gitignored
@@ -27,14 +27,14 @@ from pathlib import Path
 import yaml
 from pydantic import ValidationError
 
-from raidar.oracle.bundle import OracleBundle, load_bundle
 from raidar.problems.content import content_digest, hidden_content_in_task
-from raidar.problems.models import DatasetPin, ProblemId, ProblemManifest
+from raidar.problems.models import ProblemId, ProblemManifest, SourcePin
 from raidar.problems.validation import (
     ValidationRecord,
     ValidationRecordError,
     read_validation_record,
 )
+from raidar.verifier.bundle import VerifierBundle, load_bundle
 
 ROOT_ENV = "RAIDAR_PROBLEMS_ROOT"
 STORE_DIR_NAME = "problems"
@@ -64,7 +64,7 @@ class ImportedProblem:
 
     manifest: ProblemManifest
     task_dir: Path
-    bundle: OracleBundle
+    bundle: VerifierBundle
     references_dir: Path
 
     def reference(self, step: str) -> Path:
@@ -75,18 +75,18 @@ class ImportedProblem:
 class ProblemStore:
     root: Path
 
-    def sources(self) -> dict[str, DatasetPin]:
+    def sources(self) -> dict[str, SourcePin]:
         path = self.root / SOURCES_FILE
         try:
             raw = yaml.safe_load(path.read_text()) or {}
             return {
-                name: DatasetPin.model_validate(pin)
+                name: SourcePin.model_validate(pin)
                 for name, pin in (raw.get("sources") or {}).items()
             }
         except (OSError, yaml.YAMLError, ValidationError, AttributeError) as exc:
             raise ProblemStoreError(f"invalid {path}: {exc}") from exc
 
-    def pin(self, dataset: str) -> DatasetPin:
+    def pin(self, dataset: str) -> SourcePin:
         pins = self.sources()
         if dataset not in pins:
             raise ProblemStoreError(f"dataset {dataset!r} is not pinned in {SOURCES_FILE}")
@@ -173,7 +173,7 @@ class ProblemStore:
         leaked = hidden_content_in_task(task_dir, bundle)
         if leaked:
             raise ProblemStoreError(
-                f"problem {problem} task exposes hidden oracle content: {leaked}"
+                f"problem {problem} task exposes hidden verifier content: {leaked}"
             )
         return ImportedProblem(
             manifest=manifest, task_dir=task_dir, bundle=bundle, references_dir=references
@@ -186,7 +186,8 @@ class ProblemStore:
             record = read_validation_record(path)
         except ValidationRecordError as exc:
             raise ProblemStoreError(
-                f"problem {problem} is not oracle-validated ({exc}); run `raidar problem validate`"
+                f"problem {problem} is not verifier-validated ({exc}); "
+                "run `raidar problem validate`"
             ) from exc
         if record.manifest_sha256 != manifest.digest():
             raise ProblemStoreError(

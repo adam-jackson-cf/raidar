@@ -13,7 +13,6 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.oracle.grader_image import GRADER_TOOLS
 from raidar.packs.python import (
     EvalSandboxToolError,
     ToolExecution,
@@ -32,6 +31,7 @@ from raidar.packs.python.provisioner import (
     TOOL_CACHE_ENV,
     default_cache_root,
 )
+from raidar.verifier.grader_image import GRADER_TOOLS
 
 UV = "/fake/bin/uv"
 

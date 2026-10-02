@@ -16,7 +16,6 @@ from raidar.cli import main
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
 from raidar.jev.policies import POLICY_DIR, PolicyMode
 from raidar.jev.process import PROCESS_POLICY
-from raidar.oracle.models import CaseStatus
 from raidar.scorers import catalog
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, default_scorer_registry
 from raidar.scorers.keys import scorer_identity
@@ -26,6 +25,7 @@ from raidar.scorers.sdk.context import AssessContext, statused_result
 from raidar.scorers.sdk.result import AssessResult, AssessStatus
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.spec.schema import ProtocolSpec
+from raidar.verifier.models import CaseStatus
 from tests.scorer_support import (
     APP_V1,
     FakeScorer,
@@ -62,7 +62,7 @@ def test_rescore_binds_process_compliance_to_a_shadow_jev_runtime_in_the_store(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    trial = _ambiguous_trial(tmp_path / "runs" / "trial")
+    trial = _ambiguous_trial(tmp_path / "jobs" / "trial")
     store = tmp_path / "store"
     args = ["assess", "--rescore", str(trial), "--scorer", PROCESS, "--store", str(store)]
 
@@ -115,7 +115,7 @@ def test_a_provisional_assessment_is_rerun_and_superseded_once_answered(
 ) -> None:
     monkeypatch.setattr(Awaiting, "answered", False)
     monkeypatch.setattr(Awaiting, "runs", 0)
-    trial = two_step_trial(tmp_path / "runs" / "trial")
+    trial = two_step_trial(tmp_path / "jobs" / "trial")
     store = AssessmentStore(tmp_path / "store")
     registry = _registry(implementation="tests.test_rescore_store_bindings:awaiting_scorer")
 
@@ -198,7 +198,7 @@ def _registry(**registration: object) -> ScorerRegistry:
 def test_raw_payloads_are_stored_content_addressed_and_proven_on_replay(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    trial = two_step_trial(tmp_path / "runs" / "trial")
+    trial = two_step_trial(tmp_path / "jobs" / "trial")
     store = AssessmentStore(tmp_path / "store")
     registry = _registry(implementation="tests.test_rescore_store_bindings:raw_scorer")
 
@@ -246,7 +246,7 @@ def test_problem_facts_default_the_scorer_config_and_explicit_config_wins(
     tmp_path: Path,
 ) -> None:
     steps = [StepFixture("checkpoint_1", APP_V1, (CaseStatus.PASSED,))]
-    trial = write_trial(tmp_path / "runs" / "trial", steps, entry_file="app/main.py")
+    trial = write_trial(tmp_path / "jobs" / "trial", steps, entry_file="app/main.py")
     registry = _registry(
         implementation="tests.test_rescore_store_bindings:config_echo",
         problem_config=("entry_file",),
@@ -270,7 +270,7 @@ def test_problem_facts_default_the_scorer_config_and_explicit_config_wins(
     assert _seen_config(AssessmentStore(tmp_path / "s2"), plain.key) == {}
 
     # Problems without an entrypoint pass nothing, so the scorer's own default applies.
-    bare = write_trial(tmp_path / "runs" / "bare", steps)
+    bare = write_trial(tmp_path / "jobs" / "bare", steps)
     (none,) = rescore_path(bare, [FAKE], AssessmentStore(tmp_path / "s3"), registry)
     assert _seen_config(AssessmentStore(tmp_path / "s3"), none.key) == {}
 
@@ -327,12 +327,12 @@ def test_rescore_records_run_qualified_trial_ids_so_shared_trial_ids_stay_apart(
     monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     store = AssessmentStore(tmp_path / "store")
     registry = default_scorer_registry()
-    for run_id in ("run-a", "run-b"):
-        run = tmp_path / "runs" / "pilot" / run_id
+    for job_id in ("run-a", "run-b"):
+        run = tmp_path / "jobs" / "pilot" / job_id
         _ambiguous_trial(run / "trials" / "b01-p0-guided")
-        (run / "run.json").write_text(json.dumps({"experiment": "pilot", "run_id": run_id}))
+        (run / "job.json").write_text(json.dumps({"experiment": "pilot", "job_id": job_id}))
         (record,) = rescore_path(run / "trials", [PROCESS], store, registry, jev_replay_only=True)
-        assert record.trial == f"pilot.{run_id}.b01-p0-guided"
+        assert record.trial == f"pilot.{job_id}.b01-p0-guided"
 
     decisions = [
         json.loads(line)

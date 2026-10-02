@@ -2,6 +2,40 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - schema v2: Harbor vocabulary, experiment kinds, runtime-compatibility gate
+
+### Breaking Changes
+
+- Harbor's vocabulary replaces Raidar's wherever Harbor has a term (requirements change log 2026-10-02). Old to new:
+
+  | Was | Now |
+  |---|---|
+  | run, `runs/`, `run.json`, `run.lock.json`, `RUN=`, `RUNS=`, `RUN_ID=`, `RUNS_DIR=`, `--run-id`, `--runs-dir`, `--allow-dev-runs` | job, `jobs/`, `job.json`, `job.lock.json`, `JOB=`, `JOBS=`, `JOB_ID=`, `JOBS_DIR=`, `--job-id`, `--jobs-dir`, `--allow-dev-jobs` |
+  | trajectory, `TrajectoryRecord`, `trajectories/<trial>.json` (`raidar-trajectory`) | trial, `TrialRecord`, `trial-records/<trial>.json` (`raidar-trial`, schema 2) |
+  | `CheckpointAttempt` (`raidar-checkpoint-attempt`), record field `attempts` | `StepResult` (`raidar-step-result`), record field `step_results` |
+  | blocks, `analysis.blocks`, `--blocks`/`--block`, `BLOCK=`, `SMOKE_BLOCKS=` | attempts, `analysis.attempts`, `--attempts`/`--attempt`, `ATTEMPT=`, `SMOKE_ATTEMPTS=` |
+  | oracle (hidden grader), `raidar.oracle`, `RaidarOracleVerifier`, `OracleBundle`, `ORACLE_BUNDLE=` | verifier, `raidar.verifier`, `RaidarVerifier`, `VerifierBundle`, `VERIFIER_BUNDLE=` |
+  | harness (`codex-cli`), `agents[].harness`, factor `agent.harness`, `raidar harness ...`, `make harness-list/harness-validate`, `HARNESS=`, `HARNESS_VERSION=` | agent name (Harbor `AgentName`: `codex`, `claude-code`), `agents[].name`, factor `agent.name`, `raidar agent ...`, `make agent-list/agent-validate`, `AGENT=`, `AGENT_VERSION=` |
+  | `runtime: {language, environment, compose_init}` | `runtime: <pack id>` and `environment: {type, compose_init}` |
+  | headline policy, `assessment.headline_policy`, `ScorePolicy`, `raidar.spec.policies`, reference kind `policy` | headline metric, `assessment.metric`, `Metric`, `raidar.spec.metrics`, reference kind `metric` (ids `scb-canonical@1/@2` unchanged) |
+  | validity checks `oracle_verdicts`, `oracle_infra`, `no_oracle_leak`, `harness_version`; phases `oracle_leak_check`, `oracle_run` | `verifier_verdicts`, `verifier_infra`, `no_verifier_leak`, `agent_version`; `verifier_leak_check`, `verifier_run` |
+  | `REVIEW_RUNS_ROOT=`, `QUALITY_RUNS=`, `--runs-root` | `REVIEW_JOBS_ROOT=`, `QUALITY_JOBS=`, `--jobs-root` |
+
+  A make variable under its old name fails with its new name. Kept: *problem*, *checkpoint*, *experiment*, *arm*, *condition*, *component*, *factor*, *lock*, *verdict*; Harbor's `oracle` agent (`AGENT_OVERRIDE=oracle`); and, byte for byte, the frozen artifacts (released components' fingerprint sources, the grader plugin, the Python pack image recipe and the verifier evidence names inside trial directories).
+- `experiment.yaml` is `schema_version: 2`: a required `kind` (`ab-test`, `benchmark`, `smoke`; `research-loop` reserved), a required `runtime`, and the renamed fields above. Schema v1 files are read-only: `raidar validate` accepts them, `lock`/`plan`/`run` refuse them; `raidar upgrade-spec` (`make experiment-upgrade`) converts one.
+- Experiments live at `experiments/<kind>/<id>/experiment.yaml` with ids `<runtime>__<subject>__<intent>` (`NAME1`, `NAME2`). `examples/` is gone: `examples/pilot/experiment.yaml` is `experiments/ab-test/python__forge__guided-pilot/`, `examples/pilot/oneshot.experiment.yaml` is `experiments/ab-test/python__circuit_eval-cp1__guided-pilot/`, `examples/smoke/experiment.yaml` is `experiments/smoke/python__circuit_eval-cp1__harness-health/` and `examples/smoke/agents.experiment.yaml` is the benchmark `experiments/benchmark/python__circuit_eval-cp1__agents/`. `experiments/` is tracked; `experiments/research_loops/` and `experiments/operational_smoke/` stay ignored.
+- Lock version 3: the execution section records `kind`, `runtime`, `environment` and agent names (`versions.agents`); the assessment section records `metric`. Every experiment was relocked. `raidar migrate-run-lock` is replaced by `raidar migrate-job`.
+- The analysis report is `schema_version` 2: `runs` -> `jobs`, `headline_policy` -> `metric`, `replaced_trajectories` -> `replaced_trials`, `dev_run` -> `dev_job`, plus `experiment_kind`, `citable` and `ranking`.
+- The Quality projection's run summaries use `job`, `attempt` and `trial_record`; its experiments list `jobs`.
+- Review-surface labels follow the vocabulary: Trials (navigation, trial detail, "Annotate trial", "trial id"), attempts, jobs and "Headline metrics differ in this comparison". The flow, signals and persona questions are unchanged and still asserted by the Playwright specs.
+
+### Features
+
+- Experiment kinds. An `ab-test` compares conditions; a `benchmark` compares agents under one condition, keeps the paired verdicts against its reference agent (the baseline arm) and adds a ranking view (`analysis.rank_by`, default the primary outcome): per agent the mean with its 95% interval, pass@k for every k up to the attempts, and mean cost, tokens and agent seconds. A `smoke` report is stamped not citable. Kind rules (`KIND0`-`KIND3`) forbid only contradictions; a benchmark below 5 attempts validates with a warning.
+- Runtime-compatibility gate in `build_lock` (`RT0`-`RT6`), reported as field-level errors all at once and not bypassable through `--set`, local `path:` problems (which now declare `[metadata] raidar_runtime`), one-shot refs or the smoke targets: unvalidated binding, binding runtime, stale binding contract, component runtimes and agent support, scorer and headline-metric runtimes, agent version against the pack pin, and a missing pack. `plan`/`run` load the pack of the lock's runtime and refuse pack drift; `assess --rescore/--regrade` check scorers and `--bundle` against the job's lock (`AS1`). Resolvers report these facts in `ResolvedReference.binding`, which the lock never records, so the gate changed no execution digest.
+- Runtime packs are loaded through `raidar.packs.load_runtime_pack(runtime)`; `problems/sources.yaml` keys bind a runtime (`runtime:`, default `python`), and the importer refuses another pack.
+- `raidar migrate-job` / `make experiment-migrate-job JOB= LOCK= [EXECUTED_LOCK=]` moves a pre-v2 job onto its experiment's v2 lock after proving the translated execution section equal, keeping the legacy files in `legacy-v1/` with their sha256 in `job.json`. The pilot v2 jobs forge-02, forge-03 and oneshot-01 were migrated with it.
+
 ## Unreleased - reboot Phase 1 cutover (WS-L)
 
 ### Breaking Changes

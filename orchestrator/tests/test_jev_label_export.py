@@ -40,7 +40,7 @@ def _surface_label(
     """A label as review-surface/quality-api.mjs writes it."""
     return {
         "id": f"jevlabel-{request_id}-{created_at}",
-        "run_id": RUN,
+        "job_id": RUN,
         "request_id": request_id,
         "policy": extra.pop("policy", RUBRIC_POLICY),
         "label": label,

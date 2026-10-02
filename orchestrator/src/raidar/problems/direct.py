@@ -1,8 +1,8 @@
-"""Direct validation engine: grade reference payloads with the Raidar oracle.
+"""Direct validation engine: grade reference payloads with the Raidar verifier.
 
-Each (variant, step, repeat) is one ``raidar.oracle.grader.grade_step`` call:
+Each (variant, step, repeat) is one ``raidar.verifier.grader.grade_step`` call:
 a fresh grader sandbox (Docker, ``--network none``) on a fresh copy of the
-reference snapshot. This is the grading the oracle verifier performs inside a
+reference snapshot. This is the grading the verifier performs inside a
 Harbor trial, without the agent environment around it.
 
 The converter's ``solve.sh`` installs ``requirements.txt`` before a reference
@@ -16,11 +16,11 @@ import asyncio
 import tempfile
 from pathlib import Path
 
-from raidar.oracle.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
-from raidar.oracle.sandbox import GradingSandbox
 from raidar.problems.models import ProblemMode
 from raidar.problems.store import ImportedProblem
 from raidar.problems.validation import NEGATIVE, POSITIVE, Grade, StepGrades
+from raidar.verifier.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
+from raidar.verifier.sandbox import GradingSandbox
 
 DEFAULT_CONCURRENCY = 4
 
@@ -103,7 +103,7 @@ async def grade_references(
                     coverage=False,
                     timeout_s=timeout_s,
                 )
-            return Grade.from_oracle(result.grade)
+            return Grade.from_verifier(result.grade)
 
         keys: list[GradeKey] = [
             (variant, step, repeat)

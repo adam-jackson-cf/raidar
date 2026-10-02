@@ -15,8 +15,9 @@ from raidar.commands.perf import perf_group
 from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
 from raidar.execution.credentials import CredentialPreflightError, preflight_credentials
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
-from raidar.execution.run import RunContext, default_run_id, execute, load_problems
-from raidar.packs.python import load_pack_spec
+from raidar.execution.run import JobContext, default_job_id, execute, load_problems
+from raidar.packs import PackDriftError, PackSpec, UnknownPackError
+from raidar.packs import lock_runtime_pack as locked_pack
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
 from raidar.spec.lock import (
     LockError,
@@ -37,7 +38,7 @@ def register(main: click.Group) -> None:
 def _plan_options(command: Callable[..., Any]) -> Callable[..., Any]:
     decorators = [
         click.argument("experiment", type=click.Path(exists=True, dir_okay=False, path_type=Path)),
-        click.option("--blocks", type=int, default=None, help="Override analysis.blocks."),
+        click.option("--attempts", type=int, default=None, help="Override analysis.attempts."),
         click.option("--seed", type=int, default=None, help="Override analysis.seed."),
         click.option(
             "--concurrency",
@@ -62,19 +63,23 @@ def _plan_options(command: Callable[..., Any]) -> Callable[..., Any]:
         ),
         click.option("--arm", "arms", multiple=True, help="Run only these arms (repeatable)."),
         click.option(
-            "--block", "blocks_selected", type=int, multiple=True, help="Run only these blocks."
+            "--attempt",
+            "attempts_selected",
+            type=int,
+            multiple=True,
+            help="Run only these attempts.",
         ),
         click.option(
             "--max-checkpoints",
             type=click.IntRange(min=1),
             default=None,
-            help="Truncate every trajectory to its first N checkpoints (dev/validation).",
+            help="Truncate every trial to its first N checkpoints (dev/validation).",
         ),
         click.option(
             "--agent-override",
             type=click.Choice(AGENT_OVERRIDES),
             default=None,
-            help="Replace every arm's agent with Harbor's no-LLM agent (perf/CI fixture runs).",
+            help="Replace every arm's agent with Harbor's no-LLM agent (perf/CI fixture jobs).",
         ),
     ]
     for decorator in reversed(decorators):
@@ -89,7 +94,7 @@ def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
     the same ``lock_sha256``, so earlier runs still match the new lock. Only the
     host's Python patch release (``toolchain.python``, outside ``lock_sha256``)
     may differ from a committed lock, as ``make experiment-locks-check`` allows;
-    the run records the host's value in its own ``run.lock.json``.
+    the job records the host's value in its own ``job.lock.json``.
     """
     try:
         current = build_lock(loaded, lock_path=lock_path)
@@ -101,10 +106,20 @@ def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
     return dict(json.loads(render_lock(current)))
 
 
+def lock_runtime_pack(lock: dict[str, Any]) -> PackSpec:
+    """The pack of the lock's runtime (``RT6``: refused when missing or drifted)."""
+    try:
+        return locked_pack(lock)
+    except UnknownPackError as exc:
+        raise click.ClickException(f"[RT6] {exc}") from exc
+    except PackDriftError as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
 def _build(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
     loaded = _load(
         options["experiment"],
-        options["blocks"],
+        options["attempts"],
         options["seed"],
         options["assignments"],
     )
@@ -116,10 +131,10 @@ def _build(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
             loaded,
             lock,
             store=store,
-            pack=load_pack_spec(),
+            pack=lock_runtime_pack(lock),
             options=PlanOptions(
                 arms=tuple(options["arms"]),
-                blocks=tuple(options["blocks_selected"]),
+                attempts=tuple(options["attempts_selected"]),
                 max_checkpoints=options["max_checkpoints"],
                 agent_override=override,
                 concurrency=options["concurrency"],
@@ -149,7 +164,7 @@ def _echo_plan(plan: ExperimentPlan) -> None:
         hashes = trial.hashes
         click.echo(
             f" {mark} {trial.sequence:03d} {trial.trial_id} "
-            f"block={trial.block} order={trial.order} "
+            f"attempt={trial.attempt} order={trial.order} "
             f"steps={len(trial.steps)} trial={hashes.trial[:12]} condition={hashes.condition[:12]} "
             f"arm={hashes.arm[:12]} problem={hashes.problem[:12]} agent={hashes.agent[:12]} "
             f"protocol={hashes.protocol[:12]}"
@@ -172,14 +187,14 @@ def plan_command(as_json: bool, **options: Any) -> None:
 @click.command("run")
 @_plan_options
 @click.option(
-    "--runs-dir",
+    "--jobs-dir",
     type=click.Path(file_okay=False, path_type=Path),
-    default=Path("runs"),
+    default=Path("jobs"),
     show_default=True,
-    help="Root for run directories (<runs-dir>/<experiment id>/<run id>/).",
+    help="Root for job directories (<jobs-dir>/<experiment id>/<job id>/).",
 )
-@click.option("--run-id", default=None, help="Run directory name (default: UTC timestamp).")
-def run_command(runs_dir: Path, run_id: str | None, **options: Any) -> None:
+@click.option("--job-id", default=None, help="Job directory name (default: UTC timestamp).")
+def run_command(jobs_dir: Path, job_id: str | None, **options: Any) -> None:
     """Run a locked experiment.yaml: every selected trial through Harbor."""
     plan, store = _build(options)
     if not plan.selected:
@@ -188,21 +203,21 @@ def run_command(runs_dir: Path, run_id: str | None, **options: Any) -> None:
         preflight_credentials(plan)
     except CredentialPreflightError as exc:
         raise click.ClickException(str(exc)) from exc
-    run_id = run_id or default_run_id()
+    job_id = job_id or default_job_id()
     try:
         problems = load_problems(plan, store)
     except ProblemStoreError as exc:
         raise click.ClickException(str(exc)) from exc
-    ctx = RunContext(
+    ctx = JobContext(
         plan=plan,
-        run_dir=runs_dir.resolve() / plan.experiment_id / run_id,
-        run_id=run_id,
+        job_dir=jobs_dir.resolve() / plan.experiment_id / job_id,
+        job_id=job_id,
         problems=problems,
     )
     records = asyncio.run(execute(ctx))
-    click.echo(f"Run {ctx.run_dir}")
+    click.echo(f"Job {ctx.job_dir}")
     for record in records:
-        states = " ".join(a.checkpoint_state.value for a in record.attempts)
+        states = " ".join(a.checkpoint_state.value for a in record.step_results)
         click.echo(
             f"  {record.trial.trial_id}: valid={record.valid} reached={sum(record.reached)} "
             f"[{states}]"

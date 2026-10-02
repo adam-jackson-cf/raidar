@@ -1,16 +1,8 @@
-"""Raidar oracle plugin: host-side hidden-test verification (reboot plan WS-E).
+"""Frozen location of ``snapshot.py`` (schema v2 vocabulary: the hidden grader is the *verifier*).
 
-Entry points for other workstreams:
-
-- ``raidar.oracle.verifier:RaidarOracleVerifier`` - Harbor ``verifier.import_path``.
-- ``raidar.oracle.guard.install_leak_guard`` - required pre-agent leak check (trial hook).
-- ``raidar.oracle.bundle`` - host-only bundle format, ``build_bundle_from_scb_harbor_task``.
-- ``raidar.oracle.snapshot.app_artifact_config`` - the ``/app`` step artifact entry.
-- ``raidar.oracle.grader.grade_step`` - grade one snapshot (used by regrade).
-- ``raidar.oracle.records`` - host-only per-step records and G-kernel evidence.
-- ``raidar.oracle.regrade.regrade_path`` - ``raidar assess --regrade``.
+The verifier lives in ``raidar.verifier``. ``raidar/oracle/snapshot.py`` stays at
+this path, byte for byte, because it is a fingerprint source of the released
+``review-loop@1`` and ``review-loop@2`` components: moving or editing it would
+change their component digests and so the execution identity (``lock_sha256``)
+of every experiment that uses them.
 """
-
-from raidar.oracle.models import CaseGroup, CaseResult, CaseStatus, OracleGrade, ParityVerdict
-
-__all__ = ["CaseGroup", "CaseResult", "CaseStatus", "OracleGrade", "ParityVerdict"]

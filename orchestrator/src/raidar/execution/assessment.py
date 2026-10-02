@@ -1,7 +1,7 @@
 """The experiment's assessment settings as a rescore config (spec -> scorers glue).
 
 ``experiment.yaml``'s ``assessment.inventory_policy`` and
-``assessment.scorer_config`` are written next to every run as
+``assessment.scorer_config`` are written next to every job as
 ``assessment-config.yaml``, the file ``raidar assess --rescore --config``
 reads, so scoring a run uses exactly the locked assessor settings.
 
@@ -59,12 +59,12 @@ def rescore_config(
 def lock_rescore_config(
     lock: Mapping[str, Any], registry: ScorerRegistry | None = None
 ) -> RescoreConfig:
-    """The assessor settings a lock declares (its effective spec's assessment block).
+    """The assessor settings a lock declares (its effective spec's assessment section).
 
     Analysis and rescoring derive their config from the lock, not from the
     run's ``assessment-config.yaml``: relocking with new inventory or scorer
-    settings keeps ``lock_sha256``, and the run's file only records what the
-    settings were when the run executed.
+    settings keeps ``lock_sha256``, and the job's file only records what the
+    settings were when the job executed.
     """
     spec = lock.get("spec")
     if not isinstance(spec, Mapping):
@@ -77,9 +77,9 @@ def lock_rescore_config(
 
 
 def write_assessment_config(
-    assessment: AssessmentSpec, protocol: ProtocolSpec, run_dir: Path
+    assessment: AssessmentSpec, protocol: ProtocolSpec, job_dir: Path
 ) -> Path:
-    path = run_dir / ASSESSMENT_CONFIG_FILE
+    path = job_dir / ASSESSMENT_CONFIG_FILE
     document = rescore_config(assessment, protocol).model_dump(mode="json")
     path.write_text(yaml.safe_dump(document, sort_keys=True))
     return path

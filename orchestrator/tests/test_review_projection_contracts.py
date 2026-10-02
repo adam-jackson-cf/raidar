@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from raidar.review_projection import main, merge_review_projections
-from raidar.review_projection.fixture import REVIEW_ONLY_DIR, RUNS_DIR, generate_review_fixture
+from raidar.review_projection.fixture import JOBS_DIR, REVIEW_ONLY_DIR, generate_review_fixture
 from raidar.review_projection.spans import PAYLOAD_CAP, payload, to_ms
 from raidar.schemas.review import ReviewProjectionArtifact
 
@@ -35,7 +35,7 @@ def test_review_projection_helpers_cover_bounded_and_invalid_values() -> None:
 
 def test_projection_wire_contract_uses_problem_and_arm(fixture_root: Path) -> None:
     artifact = merge_review_projections(
-        run_roots=[fixture_root / RUNS_DIR], stores=[fixture_root / "store"]
+        job_roots=[fixture_root / JOBS_DIR], stores=[fixture_root / "store"]
     )
     document = json.loads(artifact.model_dump_json())
     assert document["schema_version"] == 2
@@ -69,7 +69,7 @@ def test_review_projection_cli_writes_the_artifact(
         "argv",
         [
             "review_projection",
-            "--runs-root",
+            "--jobs-root",
             str(fixture_root / REVIEW_ONLY_DIR),
             "--store",
             str(fixture_root / "store"),
@@ -92,12 +92,12 @@ def test_review_projection_fails_closed_without_runs_or_with_duplicate_ids(
     fixture_root: Path, tmp_path: Path
 ) -> None:
     with pytest.raises(ValueError, match="no projectable runs found under"):
-        merge_review_projections(run_roots=[tmp_path / "empty"])
-    with pytest.raises(SystemExit, match="--runs-root"):
+        merge_review_projections(job_roots=[tmp_path / "empty"])
+    with pytest.raises(SystemExit, match="--jobs-root"):
         main(["--output", str(tmp_path / "out.json")])
 
     source = fixture_root / REVIEW_ONLY_DIR
     for name in ("one", "two"):
         shutil.copytree(source, tmp_path / name)
-    with pytest.raises(ValueError, match="duplicate run ids"):
-        merge_review_projections(run_roots=[tmp_path / "one", tmp_path / "two"])
+    with pytest.raises(ValueError, match="duplicate job ids"):
+        merge_review_projections(job_roots=[tmp_path / "one", tmp_path / "two"])

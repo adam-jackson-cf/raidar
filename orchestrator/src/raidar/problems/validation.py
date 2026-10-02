@@ -8,10 +8,10 @@ For each step k (checkpoint k):
 - ``repeat_identical_{positive,negative}``: every repeat gives identical
   per-case outcomes and group counts;
 - ``native_parity_{positive,negative}``: SCB's native runner grades the same
-  snapshots case by case like the Raidar oracle (``not_run`` when skipped).
+  snapshots case by case like the Raidar verifier (``not_run`` when skipped).
 
 A step "passes" under the strict all-cases rule. An infrastructure failure (no
-oracle record, a grader infra code, no native evaluation) is never a pass or a
+verifier record, a grader infra code, no native evaluation) is never a pass or a
 fail: the check it touches is ``infra_error`` and, unless another check found
 a real defect, the verdict is ``infra_failure`` - evidence is missing, so the
 problem is neither validated nor excluded.
@@ -31,12 +31,12 @@ from decimal import Decimal
 from enum import StrEnum
 from pathlib import Path
 
-from raidar.oracle.models import CaseGroup, CaseStatus, OracleGrade
-from raidar.spec.policies import (
-    DEFAULT_POLICY_REGISTRY,
+from raidar.spec.metrics import (
+    DEFAULT_METRIC_REGISTRY,
     checkpoint_pass_rate,
     problem_correctness,
 )
+from raidar.verifier.models import CaseGroup, CaseStatus, VerifierGrade
 
 POSITIVE = "positive"
 NEGATIVE = "negative"
@@ -77,7 +77,7 @@ class Grade:
     infra_failure: str | None = None
 
     @classmethod
-    def from_oracle(cls, grade: OracleGrade, source: str = "oracle") -> Grade:
+    def from_verifier(cls, grade: VerifierGrade, source: str = "oracle") -> Grade:
         outcomes = {
             f"{case.checkpoint_origin}::{case.id.split('::', 1)[-1]}": case.status.value
             for case in grade.cases
@@ -264,7 +264,7 @@ def verdict(checks: Sequence[Check]) -> Verdict:
 
 
 def _reference_correctness(positive: StepGrades) -> tuple[Decimal | None, list[str]]:
-    """The reference trajectory's C (the fork's mean pass rate), or why it is ineligible.
+    """The reference solution's C (the fork's mean pass rate), or why it is ineligible.
 
     Unavailable is never zero (F6): an ungraded step makes C ineligible with the
     infra reason, and a step with no graded case with the fork's
@@ -273,7 +273,7 @@ def _reference_correctness(positive: StepGrades) -> tuple[Decimal | None, list[s
     ungraded = sorted(step for step, grade in positive.items() if not grade.has_verdict)
     if ungraded:
         return None, [
-            f"oracle_infra_failure: {step} ({positive[step].infra_failure})" for step in ungraded
+            f"verifier_infra_failure: {step} ({positive[step].infra_failure})" for step in ungraded
         ]
     empty = sorted(step for step, grade in positive.items() if grade.total == 0)
     if empty:
@@ -283,13 +283,13 @@ def _reference_correctness(positive: StepGrades) -> tuple[Decimal | None, list[s
 
 
 def policy_preview(positive: StepGrades, checkpoints: int) -> dict[str, object]:
-    """Headline policy selected by K, applied to the reference trajectory's C.
+    """Headline metric selected by K, applied to the reference solution's C.
 
     Only correctness is known here; the other components come from scorers
     (WS-G), so the preview shows which components the policy uses, which are
     ``not_applicable`` and which are still missing - it is not a score.
     """
-    policy = DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints)
+    policy = DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints)
     value, reasons = _reference_correctness(positive)
     if value is None:
         result = policy.score(checkpoints=checkpoints, components={}, ineligible={"C": reasons})

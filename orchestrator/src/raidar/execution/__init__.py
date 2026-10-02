@@ -1,1 +1,1 @@
-"""Execution (plan WS-D): planner, trial driver, attempt records, N1 phase timing."""
+"""Execution (plan WS-D): planner, trial driver, step_result records, N1 phase timing."""

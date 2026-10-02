@@ -20,8 +20,8 @@ from raidar.execution.models import (
     PhaseSample,
     PlannedTrial,
     ProgressionRule,
-    TrajectoryRecord,
     TrialHashes,
+    TrialRecord,
 )
 from raidar.execution.phases import trial_phases
 from tests.execution_support import StepOutcome, write_trial
@@ -40,8 +40,8 @@ def _shift(trial_dir: Path, offset_s: float) -> None:
     path.write_text(json.dumps(result))
 
 
-def _record(run_dir: Path, index: int, teardown_s: float) -> TrajectoryRecord:
-    trial_dir = run_dir / "trials" / f"t{index}"
+def _record(job_dir: Path, index: int, teardown_s: float) -> TrialRecord:
+    trial_dir = job_dir / "trials" / f"t{index}"
     phases = [
         sample if sample.phase != TEARDOWN else sample.model_copy(update={"seconds": teardown_s})
         for sample in trial_phases(
@@ -51,12 +51,12 @@ def _record(run_dir: Path, index: int, teardown_s: float) -> TrajectoryRecord:
     hashes = TrialHashes(
         lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"
     )
-    return TrajectoryRecord(
+    return TrialRecord(
         experiment="e",
-        run_id=run_dir.name,
+        job_id=job_dir.name,
         trial=PlannedTrial(
             trial_id=f"t{index}",
-            block=index,
+            attempt=index,
             order=0,
             sequence=index,
             arm="baseline",
@@ -67,7 +67,7 @@ def _record(run_dir: Path, index: int, teardown_s: float) -> TrajectoryRecord:
         ),
         trial_dir=f"trials/t{index}",
         progression=ProgressionRule(mode="continue", reward_key="strict_pass_rate"),
-        attempts=(),
+        step_results=(),
         reached=(),
         reached_source="derived",
         validity=ExecutionValidity(checks=()),
@@ -76,24 +76,24 @@ def _record(run_dir: Path, index: int, teardown_s: float) -> TrajectoryRecord:
 
 
 def _run(
-    run_dir: Path,
+    job_dir: Path,
     offsets: list[float],
     *,
     teardown: Callable[[int], float] = lambda _: 1.0,
     concurrency: int | None = 1,
-    trajectories: bool = True,
+    trials: bool = True,
 ) -> Path:
     """A run whose trial ``i`` starts at ``offsets[i]`` s (each trial lasts 54 s)."""
     steps = [StepOutcome("checkpoint_1"), StepOutcome("checkpoint_2")]
     for index, offset in enumerate(offsets):
-        _shift(write_trial(run_dir / "trials" / f"t{index}", steps), offset)
-        if trajectories:
-            path = run_dir / "trajectories" / f"t{index}.json"
+        _shift(write_trial(job_dir / "trials" / f"t{index}", steps), offset)
+        if trials:
+            path = job_dir / "trial-records" / f"t{index}.json"
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(_record(run_dir, index, teardown(index)).model_dump_json())
-    manifest = {"kind": "raidar-run", "run_id": run_dir.name, "concurrency": concurrency}
-    (run_dir / "run.json").write_text(json.dumps(manifest))
-    return run_dir
+            path.write_text(_record(job_dir, index, teardown(index)).model_dump_json())
+    manifest = {"kind": "raidar-job", "job_id": job_dir.name, "concurrency": concurrency}
+    (job_dir / "job.json").write_text(json.dumps(manifest))
+    return job_dir
 
 
 def _check(*args: str) -> tuple[int, dict]:
@@ -116,7 +116,7 @@ def test_peak_overlap_counts_open_windows_and_touching_windows_do_not_overlap() 
 
 
 def test_breaches_are_report_only_warnings_and_strict_fails(tmp_path: Path) -> None:
-    run = _run(tmp_path / "runs" / "e" / "r1", [i * 100.0 for i in range(10)], teardown=lambda _: 6)
+    run = _run(tmp_path / "jobs" / "e" / "r1", [i * 100.0 for i in range(10)], teardown=lambda _: 6)
     code, payload = _check(str(run))
     assert code == 0
     assert payload["strict"] is False
@@ -138,7 +138,7 @@ def test_contention_records_concurrency_and_splits_a_breach_by_it(tmp_path: Path
     # only the contended four have a slow teardown.
     offsets = [i * 100.0 for i in range(6)] + [1000.0] * 4
     run = _run(
-        tmp_path / "runs" / "e" / "r1",
+        tmp_path / "jobs" / "e" / "r1",
         offsets,
         teardown=lambda index: 6.0 if index >= 6 else 1.0,
         concurrency=4,
@@ -148,8 +148,8 @@ def test_contention_records_concurrency_and_splits_a_breach_by_it(tmp_path: Path
     contention = payload["contention"]
     assert contention["configured_concurrency"] == {str(run): 4}
     assert contention["peak_concurrent_trials"] == 4
-    assert contention["peak_including_other_runs"] == 4
-    assert contention["overlapping_runs"] == []
+    assert contention["peak_including_other_jobs"] == 4
+    assert contention["overlapping_jobs"] == []
     assert "not detected" in contention["other_docker_activity"]
     warning = next(w for w in payload["warnings"] if w["phase"] == TEARDOWN)
     split = {s["concurrent_trials"]: s for s in warning["by_concurrency"]}
@@ -163,20 +163,20 @@ def test_contention_records_concurrency_and_splits_a_breach_by_it(tmp_path: Path
 
 
 def test_overlapping_sibling_runs_are_recorded_as_contention(tmp_path: Path) -> None:
-    root = tmp_path / "runs"
+    root = tmp_path / "jobs"
     run = _run(root / "e" / "r1", [i * 100.0 for i in range(10)])
-    _run(root / "e" / "busy", [150.0, 160.0], trajectories=False)
-    _run(root / "other" / "later", [5000.0], trajectories=False)
+    _run(root / "e" / "busy", [150.0, 160.0], trials=False)
+    _run(root / "other" / "later", [5000.0], trials=False)
     code, payload = _check(str(run))
     assert code == 0, payload
     contention = payload["contention"]
-    assert contention["overlapping_runs"] == [str((root / "e" / "busy").resolve())]
+    assert contention["overlapping_jobs"] == [str((root / "e" / "busy").resolve())]
     assert contention["peak_concurrent_trials"] == 1
-    assert contention["peak_including_other_runs"] == 3
+    assert contention["peak_including_other_jobs"] == 3
 
 
 def test_untimed_trials_and_unrecorded_concurrency_are_reported(tmp_path: Path) -> None:
-    run = _run(tmp_path / "runs" / "e" / "r1", [i * 100.0 for i in range(10)], concurrency=None)
+    run = _run(tmp_path / "jobs" / "e" / "r1", [i * 100.0 for i in range(10)], concurrency=None)
     result = json.loads((run / "trials" / "t0" / "result.json").read_text())
     result.pop("finished_at")
     (run / "trials" / "t0" / "result.json").write_text(json.dumps(result))
@@ -191,10 +191,10 @@ def test_untimed_trials_and_unrecorded_concurrency_are_reported(tmp_path: Path) 
 
 @pytest.mark.parametrize("broken", ["trajectory", "manifest", "result"])
 def test_malformed_input_exits_non_zero_even_when_report_only(tmp_path: Path, broken: str) -> None:
-    run = _run(tmp_path / "runs" / "e" / "r1", [i * 100.0 for i in range(10)])
+    run = _run(tmp_path / "jobs" / "e" / "r1", [i * 100.0 for i in range(10)])
     target = {
-        "trajectory": run / "trajectories" / "t0.json",
-        "manifest": run / "run.json",
+        "trajectory": run / "trial-records" / "t0.json",
+        "manifest": run / "job.json",
         "result": run / "trials" / "t0" / "result.json",
     }[broken]
     target.write_text("{not json")
@@ -237,10 +237,10 @@ def test_perf_gate_runs_the_strict_fixture_at_concurrency_1_and_3(tmp_path: Path
 
 
 def test_perf_check_target_is_report_only_unless_perf_strict(tmp_path: Path) -> None:
-    default = _dry_run("perf-check", f"RUN={tmp_path}")
+    default = _dry_run("perf-check", f"JOB={tmp_path}")
     assert f"raidar perf check {tmp_path}" in default
     assert "--strict" not in default
-    assert "--strict" in _dry_run("perf-check", f"RUN={tmp_path}", "PERF_STRICT=1")
+    assert "--strict" in _dry_run("perf-check", f"JOB={tmp_path}", "PERF_STRICT=1")
 
 
 def test_make_quality_does_not_run_the_docker_perf_gate() -> None:

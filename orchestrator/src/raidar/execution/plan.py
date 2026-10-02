@@ -1,7 +1,7 @@
-"""Planner (plan D1): experiment + lock -> one Harbor trial per arm x block x problem.
+"""Planner (plan D1): experiment + lock -> one Harbor trial per arm x attempt x problem.
 
-Every block is one replicate slot for all arms (the pairing unit). Within a
-block the arm order is counterbalanced across blocks and randomised from the
+Every attempt is one replicate slot for all arms (the pairing unit). Within an
+attempt the arm order is counterbalanced across attempts and randomised from the
 experiment seed (AB/BA for two arms; see ``arm_order``), so the order is
 balanced, random and reproducible. Trials start in plan order, at most
 ``analysis.concurrency`` at a time.
@@ -41,8 +41,8 @@ class PlanError(ValueError):
 class PlanOptions:
     """Execution-only choices; none of them changes the locked experiment.
 
-    ``arms``/``blocks`` select a subset of the plan to run (the plan still
-    lists every trial). ``max_checkpoints`` truncates every trajectory to its
+    ``arms``/``attempts`` select a subset of the plan to run (the plan still
+    lists every trial). ``max_checkpoints`` truncates every trial to its
     first N checkpoints (a dev/validation option; the rest stay
     ``not_attempted``). ``agent_override`` swaps in a no-LLM Harbor agent.
     ``concurrency`` replaces ``analysis.concurrency`` for this machine: it is
@@ -51,7 +51,7 @@ class PlanOptions:
     """
 
     arms: tuple[str, ...] = ()
-    blocks: tuple[int, ...] = ()
+    attempts: tuple[int, ...] = ()
     max_checkpoints: int | None = None
     agent_override: AgentOverride | None = None
     concurrency: int | None = None
@@ -86,7 +86,7 @@ class ExperimentPlan:
     trials: tuple[PlannedTrial, ...]
     selected: frozenset[str] = field(default_factory=frozenset)
     lock: Mapping[str, Any] = field(default_factory=dict)
-    """The lock document the plan was built from; a run keeps a copy of it."""
+    """The lock document the plan was built from; a job keeps a copy of it."""
 
     @property
     def experiment_id(self) -> str:
@@ -103,13 +103,14 @@ class ExperimentPlan:
     def to_json(self) -> dict[str, Any]:
         return {
             "kind": "raidar-plan",
+            "schema_version": 2,
             "experiment": self.experiment_id,
             "lock_sha256": self.lock_sha256,
             "concurrency": self.concurrency,
             "progression": self.rule.model_dump(mode="json"),
             "options": {
                 "arms": list(self.options.arms),
-                "blocks": list(self.options.blocks),
+                "attempts": list(self.options.attempts),
                 "max_checkpoints": self.options.max_checkpoints,
                 "agent_override": self.options.agent_override,
                 "concurrency": self.options.concurrency,
@@ -131,11 +132,11 @@ class ExperimentPlan:
         }
 
 
-def arm_order(seed: int, block: int, problem_index: int, arms: Sequence[str]) -> list[str]:
-    """The block's arm order: counterbalanced, randomised from the experiment seed.
+def arm_order(seed: int, attempt: int, problem_index: int, arms: Sequence[str]) -> list[str]:
+    """The attempt's arm order: counterbalanced, randomised from the experiment seed.
 
-    Blocks are grouped into cycles of ``len(arms)``. Each cycle draws one
-    seeded random base order and rotates it by the block's position in the
+    Attempts are grouped into cycles of ``len(arms)``. Each cycle draws one
+    seeded random base order and rotates it by the attempt's position in the
     cycle (a cyclic Latin square), so within every complete cycle each arm
     runs in each position exactly once: AB/BA for two arms, with the pair's
     lead arm drawn at random.
@@ -143,7 +144,7 @@ def arm_order(seed: int, block: int, problem_index: int, arms: Sequence[str]) ->
     count = len(arms)
     if count == 0:
         return []
-    cycle, shift = divmod(block, count)
+    cycle, shift = divmod(attempt, count)
     key = hashlib.sha256(f"{seed}:{cycle}:{problem_index}".encode()).hexdigest()
     base = list(arms)
     random.Random(int(key[:16], 16)).shuffle(base)
@@ -167,7 +168,7 @@ def _problems(
     for index, entry in enumerate(loaded.spec.problems):
         if entry.ref is None:
             raise PlanError(
-                f"problems.{index}: a local task path has no host-only oracle bundle; "
+                f"problems.{index}: a local task path has no host-only verifier bundle; "
                 "import the problem (`raidar problem import`) and reference it by name"
             )
         problem = ProblemId.parse(entry.ref)
@@ -206,7 +207,7 @@ class _HashInputs:
     override: AgentOverride | None
 
     def trial(
-        self, blueprint: ArmBlueprint, problem: ProblemTarget, block: int, steps: tuple[str, ...]
+        self, blueprint: ArmBlueprint, problem: ProblemTarget, attempt: int, steps: tuple[str, ...]
     ) -> TrialHashes:
         spec = self.loaded.spec
         agent = spec.agent(next(a.agent for a in spec.arms if a.id == blueprint.arm_id))
@@ -218,7 +219,7 @@ class _HashInputs:
             "agent": agent_digest(agent, blueprint.agent_config, self.override),
             "protocol": self.protocol,
         }
-        trial = digest_json({**parts, "block": block, "steps": list(steps)})
+        trial = digest_json({**parts, "attempt": attempt, "steps": list(steps)})
         return TrialHashes(**parts, trial=trial)
 
 
@@ -227,16 +228,16 @@ def _selection(trials: Sequence[PlannedTrial], options: PlanOptions) -> frozense
         trial.trial_id
         for trial in trials
         if (not options.arms or trial.arm in options.arms)
-        and (not options.blocks or trial.block in options.blocks)
+        and (not options.attempts or trial.attempt in options.attempts)
     )
 
 
 def _check_options(loaded: LoadedExperiment, options: PlanOptions) -> None:
     spec = loaded.spec
     unknown_arms = sorted(set(options.arms) - {arm.id for arm in spec.arms})
-    bad_blocks = sorted(b for b in options.blocks if not 0 <= b < spec.analysis.blocks)
-    if unknown_arms or bad_blocks:
-        raise PlanError(f"unknown arms {unknown_arms} or blocks {bad_blocks} in the selection")
+    bad_attempts = sorted(b for b in options.attempts if not 0 <= b < spec.analysis.attempts)
+    if unknown_arms or bad_attempts:
+        raise PlanError(f"unknown arms {unknown_arms} or attempts {bad_attempts} in the selection")
     if options.max_checkpoints is not None and options.max_checkpoints < 1:
         raise PlanError("max_checkpoints must be >= 1")
     if options.concurrency is not None and options.concurrency < 1:
@@ -270,22 +271,22 @@ def build_plan(
     problems = _problems(loaded, lock, store)
     arms = _blueprints(loaded, pack, options)
     trials: list[PlannedTrial] = []
-    for block in range(spec.analysis.blocks):
+    for attempt in range(spec.analysis.attempts):
         for problem in problems:
             steps = problem.run_steps(options.max_checkpoints)
-            order = arm_order(spec.analysis.seed, block, problem.index, list(arms))
+            order = arm_order(spec.analysis.seed, attempt, problem.index, list(arms))
             for position, arm_id in enumerate(order):
                 trials.append(
                     PlannedTrial(
-                        trial_id=f"b{block:02d}-p{problem.index}-{arm_id}",
-                        block=block,
+                        trial_id=f"b{attempt:02d}-p{problem.index}-{arm_id}",
+                        attempt=attempt,
                         order=position,
                         sequence=len(trials),
                         arm=arm_id,
                         problem=str(problem.ref),
                         problem_index=problem.index,
                         steps=steps,
-                        hashes=hashes.trial(arms[arm_id], problem, block, steps),
+                        hashes=hashes.trial(arms[arm_id], problem, attempt, steps),
                     )
                 )
     return ExperimentPlan(

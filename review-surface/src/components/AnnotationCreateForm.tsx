@@ -67,11 +67,11 @@ export function AnnotationCreateForm({
                 {selectedSpan.name}
               </code>{' '}
               <button className="underline" style={{ color: C.fg1 }} onClick={onClearSpan}>
-                use run instead
+                use trial instead
               </button>
             </>
           ) : (
-            'attaches to run'
+            'attaches to trial'
           )}
           {' · '}
           <kbd className="rounded bg-white/5 px-1">⌘↵</kbd> save
@@ -98,7 +98,7 @@ export function AnnotationCreateForm({
           className="rounded-md px-2.5 py-1 text-[11px] font-medium disabled:opacity-40"
           style={{ background: C.fg5, color: '#000', border: `1px solid ${C.fg5}` }}
         >
-          {pending ? 'Saving…' : selectedSpan ? 'Annotate span' : 'Annotate run'}
+          {pending ? 'Saving…' : selectedSpan ? 'Annotate span' : 'Annotate trial'}
         </button>
       </div>
     </div>

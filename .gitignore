@@ -38,7 +38,13 @@ coverage/
 .tmp/
 .clawpatch/
 .agentic-ci-validation/
-experiments/
+# Experiment definitions are tracked under experiments/<kind>/<id>/; job outputs live in
+# jobs/, stores/ and analysis/. Legacy data some checkouts still hold under experiments/
+# (autoresearch research_loops, scenario-epoch operational_smoke) stays untracked.
+/experiments/research_loops/
+/experiments/operational_smoke/
+/jobs/
+# Pre-schema-v2 job root (renamed jobs/); kept ignored for checkouts that still hold one.
 /runs/
 /stores/
 /analysis/

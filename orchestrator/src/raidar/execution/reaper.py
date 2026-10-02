@@ -28,10 +28,10 @@ from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
 from raidar.components.setup_script import AGENT_SETUP_STASH, SETUP_SCRIPT_NAME
-from raidar.oracle.bundle import OracleBundle, load_bundle
-from raidar.oracle.guard import current_step
-from raidar.oracle.records import step_record_dir
 from raidar.oracle.snapshot import APP_SOURCE
+from raidar.verifier.bundle import VerifierBundle, load_bundle
+from raidar.verifier.guard import current_step
+from raidar.verifier.records import step_record_dir
 
 REAP_REPORT = "agent-reap.json"
 REAP_TIMEOUT_S = 60
@@ -147,10 +147,10 @@ def reap_infra_reason(report: dict[str, Any] | None) -> str | None:
     return None
 
 
-def install_agent_reaper(trial: Trial, oracle_bundle: str | Path | OracleBundle) -> None:
+def install_agent_reaper(trial: Trial, oracle_bundle: str | Path | VerifierBundle) -> None:
     bundle = (
         oracle_bundle
-        if isinstance(oracle_bundle, OracleBundle)
+        if isinstance(oracle_bundle, VerifierBundle)
         else load_bundle(Path(oracle_bundle))
     )
 

@@ -357,6 +357,7 @@ class ScorerResolver:
             digest=digest_json(metadata),
             metadata=metadata,
             tool_versions=_tool_versions(tool_lock),
+            binding={"runtimes": list(registration.manifest.runtimes)},
         )
 
 

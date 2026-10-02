@@ -58,11 +58,11 @@ export function QualityRunPage() {
           {run.trial} <span className="font-normal" style={{ color: C.fg2 }}>{run.arm}</span>
         </h1>
         <p className="text-[11px]" style={{ color: C.fg1 }}>
-          {run.experiment} · {run.run} · block {run.block} · {run.problem} ·{' '}
+          {run.experiment} · {run.job} · attempt {run.attempt} · {run.problem} ·{' '}
           <span title={POLICY_SOURCE_TITLE[data.policy.source]}>
             {data.policy.ref}
           </span>
-          {!run.valid && <span style={{ color: C.orange }}> · invalid trajectory (excluded from arm statistics)</span>}
+          {!run.valid && <span style={{ color: C.orange }}> · invalid trial (excluded from arm statistics)</span>}
         </p>
         {data.notes.map((note) => (
           <p key={note} className="text-[10px]" style={{ color: C.orange }}>

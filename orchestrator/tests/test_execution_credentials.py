@@ -17,10 +17,10 @@ from raidar.execution.credentials import (
 from raidar.execution.plan import PlanOptions
 from raidar.spec.loader import CliOverrides, load_experiment
 from raidar.spec.validation import SpecValidationError
+from tests.experiment_spec_support import AGENTS_BENCHMARK, SMOKE_EXPERIMENT
 
-EXAMPLES = Path(__file__).resolve().parents[2] / "examples" / "smoke"
-SMOKE = EXAMPLES / "experiment.yaml"
-SMOKE_AGENTS = EXAMPLES / "agents.experiment.yaml"
+SMOKE = SMOKE_EXPERIMENT
+SMOKE_AGENTS = AGENTS_BENCHMARK
 FAKE = "x" * 24  # placeholder credential value; never a real secret
 
 
@@ -65,13 +65,13 @@ def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -
     issues = credential_issues(spec, ["codex", "claude"], env)
     fields = [issue.field for issue in issues]
     assert fields == [
-        "agents.0.harness ('codex', codex-cli, arm 'codex')",
-        "agents.1.harness ('claude', claude-code, arm 'claude')",
+        "agents.0.name ('codex', codex, arm 'codex')",
+        "agents.1.name ('claude', claude-code, arm 'claude')",
     ]
     only_claude = credential_issues(spec, ["claude"], {**env, "ANTHROPIC_API_KEY": FAKE})
     assert only_claude == []
     rendered = issues[1].render()
-    assert rendered.startswith("agents.1.harness")
+    assert rendered.startswith("agents.1.name")
     assert FAKE not in rendered
 
 
@@ -93,7 +93,7 @@ def test_preflight_fails_before_any_trial_without_echoing_values(tmp_path: Path)
         preflight_credentials(_Plan(["codex", "claude"]), env)  # type: ignore[arg-type]
     message = str(caught.value)
     assert "no trial was started" in message
-    assert "agents.1.harness" in message
+    assert "agents.1.name" in message
     assert "agents.0" not in message
     assert FAKE not in message
     preflight_credentials(_Plan(["codex"]), env)  # type: ignore[arg-type]
@@ -102,7 +102,7 @@ def test_preflight_fails_before_any_trial_without_echoing_values(tmp_path: Path)
 
 def test_empty_reasoning_effort_override_unsets_it_so_haiku_validates() -> None:
     claude_haiku = (
-        "agents.0.harness=claude-code",
+        "agents.0.name=claude-code",
         "agents.0.provider=anthropic",
         "agents.0.model=claude-haiku-4-5",
         "agents.0.version='2.1.285'",

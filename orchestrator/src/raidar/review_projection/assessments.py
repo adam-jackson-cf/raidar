@@ -1,4 +1,4 @@
-"""The stored Assessments of one trajectory, found by the key ``raidar assess --rescore`` uses.
+"""The stored Assessments of one trial, found by the key ``raidar assess --rescore`` uses.
 
 The key is ``hash(scorer identity, config, tool lock, run inputs)``, so the
 review shows exactly the Assessment a rescore under the lock's assessment
@@ -34,7 +34,7 @@ from raidar.spec.references import RegistryReferenceError
 
 @dataclass(frozen=True)
 class TrialAssessments:
-    """Assessments found for one trajectory, and why any scorer has none."""
+    """Assessments found for one trial, and why any scorer has none."""
 
     found: Mapping[str, Assessment] = field(default_factory=dict)
     missing: Mapping[str, str] = field(default_factory=dict)

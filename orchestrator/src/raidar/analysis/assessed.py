@@ -1,11 +1,11 @@
-"""Reduce one trajectory's record and Assessments to a ``TrajectoryOutcome``.
+"""Reduce one trial's record and Assessments to a ``TrialOutcome``.
 
-Inputs are the run's ``TrajectoryRecord`` (validity and identity) and the
+Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
-Assessment for this trajectory). Nothing is recomputed from raw run files:
+Assessment for this trial). Nothing is recomputed from raw run files:
 correctness comes from ``correctness@1``, quality from ``code-quality@1``,
 cost from ``resource-usage@1``, and the headline score from the experiment's
-ScorePolicy applied to those components.
+Metric applied to those components.
 
 The score component C (``correctness``) is the policy's definition
 (``spec.policies.problem_correctness``, the SCB fork's ``C_p``): the mean of
@@ -17,7 +17,7 @@ Two derivations are analysis-owned:
 - ``final_solved`` under ``halt_on_failure`` is 0 when the trial halted
   before the last checkpoint (``not_attempted`` counts as unsolved, memo §10.1);
 - ``strict_solved[k]`` is 1 exactly when ``k`` lies in the reached prefix;
-- a trajectory truncated by ``max_checkpoints`` has no trajectory-level
+- a trial truncated by ``max_checkpoints`` has no trial-level
   outcome (S, C, reached, final solved, quality means): each is statused
   ``truncated``, because its last run checkpoint is not the problem's final
   checkpoint and K is not the problem's K. Per-checkpoint series and cost
@@ -42,20 +42,20 @@ from raidar.analysis.outcomes import (
     STRICT_SOLVED,
     TRUNCATED,
     UNASSESSED,
-    TrajectoryOutcome,
+    TrialOutcome,
     Value,
 )
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
-from raidar.execution.models import CheckpointState, TrajectoryRecord
+from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.scorers.sdk.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
     AssessStatus,
     Observation,
 )
-from raidar.spec.policies import (
+from raidar.spec.metrics import (
     CORRECTNESS,
-    ScorePolicy,
+    Metric,
     checkpoint_pass_rate,
     checkpoint_solve_rate,
     problem_correctness,
@@ -113,13 +113,13 @@ class Observed:
         return Value.missing(status.value, reason)
 
 
-def infra_reasons(record: TrajectoryRecord) -> tuple[str, ...]:
-    """Why a trajectory is infra-excluded: failed validity checks and infra checkpoints."""
+def infra_reasons(record: TrialRecord) -> tuple[str, ...]:
+    """Why a trial is infra-excluded: failed validity checks and infra checkpoints."""
     reasons = [f"validity:{check.name}" for check in record.validity.checks if not check.passed]
-    for attempt in record.attempts:
-        if attempt.checkpoint_state is CheckpointState.INFRA_ERROR:
-            detail = ",".join(attempt.infra_reasons) or "infra_error"
-            reasons.append(f"{attempt.step}:{detail}")
+    for step_result in record.step_results:
+        if step_result.checkpoint_state is CheckpointState.INFRA_ERROR:
+            detail = ",".join(step_result.infra_reasons) or "infra_error"
+            reasons.append(f"{step_result.step}:{detail}")
     if record.trial_exception:
         reasons.append(f"trial_exception:{record.trial_exception}")
     return tuple(dict.fromkeys(reasons))
@@ -186,7 +186,7 @@ def _policy_inputs(
 
 
 def headline_score(
-    policy: ScorePolicy,
+    policy: Metric,
     checkpoints: int,
     components: Mapping[str, Value],
     exact: Mapping[str, Decimal] | None = None,
@@ -229,21 +229,21 @@ def _series(
     return series
 
 
-def _truncated(record: TrajectoryRecord) -> dict[str, Value]:
+def _truncated(record: TrialRecord) -> dict[str, Value]:
     reason = (
         f"run truncated to the first {record.truncated_to} checkpoint(s) (max_checkpoints); "
-        "the trajectory-level outcome needs every checkpoint"
+        "the trial-level outcome needs every checkpoint"
     )
     return {metric.id: Value.missing(TRUNCATED, reason) for metric in OUTCOME_METRICS}
 
 
 def build_outcome(
-    record: TrajectoryRecord,
+    record: TrialRecord,
     results: Mapping[str, AssessResult | None],
     *,
-    policy: ScorePolicy,
-) -> TrajectoryOutcome:
-    """One trajectory's statused metrics and per-checkpoint series."""
+    policy: Metric,
+) -> TrialOutcome:
+    """One trial's statused metrics and per-checkpoint series."""
     observed = {ref: Observed(ref, results.get(ref)) for ref in ANALYSED_SCORERS}
     correctness = observed[CORRECTNESS_REF]
     steps = record.trial.steps
@@ -275,11 +275,11 @@ def build_outcome(
     if record.truncated_to is not None:
         metrics |= _truncated(record)
     reasons = infra_reasons(record)
-    return TrajectoryOutcome(
+    return TrialOutcome(
         trial_id=record.trial.trial_id,
-        run_id=record.run_id,
+        job_id=record.job_id,
         arm=record.trial.arm,
-        block=record.trial.block,
+        attempt=record.trial.attempt,
         problem=record.trial.problem,
         steps=steps,
         infra_error=bool(reasons),

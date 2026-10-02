@@ -10,7 +10,6 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from raidar.oracle.models import CaseStatus
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS
 from raidar.scorers.catalog import (
     ScorerRegistration,
@@ -48,8 +47,9 @@ from raidar.scorers.sdk.validation import (
 from raidar.scorers.trial_inputs import load_trial_context
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import build_lock, render_lock
-from raidar.spec.policies import PolicyResolver
+from raidar.spec.metrics import MetricResolver
 from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError, ResolverSet
+from raidar.verifier.models import CaseStatus
 from tests.experiment_spec_support import (
     PILOT_EXPERIMENT,
     PILOT_ONESHOT,
@@ -392,7 +392,7 @@ def test_lock_records_scorer_manifests_and_tool_pins_byte_identically(tmp_path: 
     path = write_experiment(tmp_path, experiment_document(assessment={"scorers": scorers}))
     problem, component, _ = fixture_resolvers()
     resolvers = ResolverSet(
-        [problem, component, PolicyResolver(), scorer_resolver()], entry_point_group=None
+        [problem, component, MetricResolver(), scorer_resolver()], entry_point_group=None
     )
     lock_path = path.with_name("experiment.lock.json")
     first = render_lock(build_lock(load_experiment(path), lock_path=lock_path, resolvers=resolvers))

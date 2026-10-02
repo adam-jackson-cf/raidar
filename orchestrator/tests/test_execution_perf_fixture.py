@@ -1,7 +1,7 @@
 """The N1 fixture experiment (plan D4): real Harbor trials, no LLM, then ``raidar perf check``.
 
 A pack-bound two-checkpoint problem (the real WS-B importer over the fake SCB
-dataset, graded by the Docker oracle) x {baseline, guided} x 5 blocks, run
+dataset, graded by the Docker oracle) x {baseline, guided} x 5 attempts, run
 with Harbor's no-LLM ``oracle`` agent at concurrency 1, so every budgeted
 per-trial phase has 10 samples and every per-step phase 20. Needs Docker with
 the Python pack image, so it runs only when opted in with
@@ -91,13 +91,13 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
         ],
         analysis={
             "baseline_arm": "baseline",
-            "blocks": 5,
+            "attempts": 5,
             "seed": 20260930,
             "concurrency": concurrency,
         },
     )
     runner = CliRunner()
-    runs = root / "runs"
+    runs = root / "jobs"
     ran = runner.invoke(
         main,
         [
@@ -105,21 +105,23 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
             str(loaded.path),
             "--agent-override",
             "oracle",
-            "--runs-dir",
+            "--jobs-dir",
             str(runs),
-            "--run-id",
+            "--job-id",
             "perf-fixture",
         ],
     )
     assert ran.exit_code == 0, ran.output
-    run_dir = runs / loaded.spec.id / "perf-fixture"
-    records = [json.loads(p.read_text()) for p in sorted((run_dir / "trajectories").glob("*.json"))]
+    job_dir = runs / loaded.spec.id / "perf-fixture"
+    records = [
+        json.loads(p.read_text()) for p in sorted((job_dir / "trial-records").glob("*.json"))
+    ]
     assert len(records) == 10
     for record in records:
         assert all(check["passed"] for check in record["validity"]["checks"]), record["validity"]
-        assert [a["checkpoint_state"] for a in record["attempts"]] == ["solved", "solved"]
-    checked = runner.invoke(main, [*STRICT_CHECK, str(run_dir)])
+        assert [a["checkpoint_state"] for a in record["step_results"]] == ["solved", "solved"]
+    checked = runner.invoke(main, [*STRICT_CHECK, str(job_dir)])
     print(checked.output)
-    report = runner.invoke(main, [*STRICT_CHECK, "--json", str(run_dir)])
+    report = runner.invoke(main, [*STRICT_CHECK, "--json", str(job_dir)])
     (root / "perf-check.json").write_text(report.output)
     assert checked.exit_code == 0, checked.output

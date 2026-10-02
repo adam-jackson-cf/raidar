@@ -21,8 +21,8 @@ from typing import Any
 
 import yaml
 
-from raidar.oracle.models import CaseGroup
 from raidar.problems.validation import Grade
+from raidar.verifier.models import CaseGroup
 
 # The fork's evaluator pins (docs/evaluation/configuration.md in the SCB fork).
 NATIVE_EVALUATOR_DEPS = (

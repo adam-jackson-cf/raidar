@@ -12,11 +12,11 @@ REPO_ROOT = Path(__file__).resolve().parents[4]
 ORCHESTRATOR_ROOT = Path(__file__).resolve().parents[3]
 ENV_PATH = ORCHESTRATOR_ROOT / ".env"
 SECRETS_SOURCE_ENV = "RAIDAR_SECRETS_SOURCE"
-HARNESS_CHOICES: list[str] = []
+AGENT_CHOICES: list[str] = []
 
 
-def set_harness_choices(choices: list[str]) -> None:
-    HARNESS_CHOICES[:] = choices
+def set_agent_choices(choices: list[str]) -> None:
+    AGENT_CHOICES[:] = choices
 
 
 def run_or_raise(cmd: list[str], cwd: Path, *, env: dict[str, str] | None = None) -> None:

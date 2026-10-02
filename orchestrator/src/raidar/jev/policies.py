@@ -6,7 +6,7 @@ so a mode change is a reviewed diff. Modes:
 - ``off``: no Jev call; every decision is still audited as ``skipped``.
 - ``shadow`` (the default for new policies): decisions are made, cached and
   audited, and their observations are shown as uncalibrated. They never feed
-  ScorePolicies or verdicts.
+  Metrics or verdicts.
 - ``enforce``: decisions count. A policy may only be ``enforce`` with a
   recorded promotion that meets the gate from
   ``evaluate-jev/references/policies.md``: at least 30 labelled decisions, at

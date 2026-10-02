@@ -3,7 +3,7 @@
 An ``experiment.yaml`` names problems, components, scorers and score policies by
 registry reference. The lock resolves each reference through a
 ``RegistryResolver`` registered for its kind. The spec package ships the
-``policy`` resolver (the ScorePolicy registry); other workstreams plug in their
+``metric`` resolver (the headline metric registry); other workstreams plug in their
 registries either by passing a resolver to ``ResolverSet`` directly or by
 exposing a zero-argument factory under the ``raidar.spec.resolvers`` entry-point
 group. Entry points are loaded lazily, only when a reference of that kind must
@@ -34,7 +34,7 @@ class RefKind(StrEnum):
     PROBLEM = "problem"
     COMPONENT = "component"
     SCORER = "scorer"
-    POLICY = "policy"
+    METRIC = "metric"
 
 
 class RegistryReferenceError(ValueError):
@@ -71,12 +71,22 @@ class ResolvedReference:
     upstream digest). ``metadata`` is JSON-serialisable and must be
     deterministic. Problem resolvers must provide an integer ``checkpoints``
     entry. ``tool_versions`` feeds the lock's recorded tool versions.
+
+    ``binding`` holds the facts the runtime-compatibility gate reads
+    (``raidar.spec.compat``) and is never recorded in the lock, so adding the
+    gate left every execution digest unchanged:
+
+    - problem: ``runtime`` (the binding's pack id), ``pack_version``,
+      ``validated`` and, when not validated, ``validation_issue``;
+    - component: ``runtimes`` (``["*"]`` for any) and ``supports`` (agent CLI ids);
+    - scorer and metric: ``runtimes``.
     """
 
     ref: RegistryRef
     digest: str
     metadata: Mapping[str, object] = field(default_factory=dict)
     tool_versions: Mapping[str, str] = field(default_factory=dict)
+    binding: Mapping[str, object] = field(default_factory=dict)
 
 
 @runtime_checkable

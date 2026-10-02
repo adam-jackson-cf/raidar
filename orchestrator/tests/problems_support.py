@@ -22,7 +22,6 @@ import subprocess
 import textwrap
 from pathlib import Path
 
-from raidar.oracle.bundle import BundleManifest, GraderSpec, OracleStepSpec, write_bundle
 from raidar.problems.content import content_digest
 from raidar.problems.models import (
     PackBinding,
@@ -35,7 +34,8 @@ from raidar.problems.models import (
 from raidar.problems.store import ProblemStore
 from raidar.problems.validation import ValidationReport
 from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from tests.oracle_support import LocalProcessSandbox, write_app, write_tests
+from raidar.verifier.bundle import BundleManifest, GraderSpec, VerifierStepSpec, write_bundle
+from tests.verifier_support import LocalProcessSandbox, write_app, write_tests
 
 FIXTURE_COMMIT = "fe" * 20
 FIXTURE_VERSION = FIXTURE_COMMIT[:12]
@@ -65,8 +65,8 @@ workdir = "/app"
 """
 
 
-def _step(name: str, files: list[str]) -> OracleStepSpec:
-    return OracleStepSpec(
+def _step(name: str, files: list[str]) -> VerifierStepSpec:
+    return VerifierStepSpec(
         name=name,
         checkpoint=name,
         test_files=tuple(files),

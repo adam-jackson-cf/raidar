@@ -113,7 +113,7 @@ export function RunHeader({
         />
         <Fact label="run time" value={fmtDuration(run.duration_ms)} />
         {run.total_input_tokens === 0 && run.total_output_tokens === 0 ? (
-          <Fact label="tokens" value="not recorded" color={C.fg0} title="No token usage captured for this run" />
+          <Fact label="tokens" value="not recorded" color={C.fg0} title="No token usage captured for this trial" />
         ) : (
           <Fact
             label="tokens"
@@ -129,7 +129,7 @@ export function RunHeader({
           style={{ background: `${C.orange}0d`, border: `1px solid ${C.orange}30` }}
         >
           <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: C.orange }}>
-            Why this run is unscored
+            Why this trial is unscored
           </span>
           {run.unscored_reasons.map((reason, i) => (
             <span key={i} className="text-[11px]" style={{ color: C.fg3 }}>
@@ -151,7 +151,7 @@ export function RunHeader({
         {detailsOpen && (
           <div className="flex flex-col gap-1.5 rounded-md p-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
-              <Fact label="run id" value={run.id} color={C.fg2} />
+              <Fact label="trial id" value={run.id} color={C.fg2} />
               <Fact label="status" value={run.status} color={run.status === 'OK' ? C.green : run.status === 'ERROR' ? C.red : C.fg2} />
               <Fact label="quality" value={fmtScore(run.quality_score)} />
               <Fact label="diagnostic" value={fmtScore(run.diagnostic_score)} />

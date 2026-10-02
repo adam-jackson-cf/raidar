@@ -58,21 +58,21 @@ def harbor() -> None:
 
 @harbor.command("cleanup")
 @click.option(
-    "--run",
-    "run_dir",
+    "--job",
+    "job_dir",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help="Remove every trial environment of this run directory, running or not.",
+    help="Remove every trial environment of this job directory, running or not.",
 )
 @click.option("--dry-run", is_flag=True, help="List the trial environments without removing.")
-def harbor_cleanup(run_dir: Path | None, dry_run: bool) -> None:
+def harbor_cleanup(job_dir: Path | None, dry_run: bool) -> None:
     """Remove trial environments a stopped `raidar run` left behind.
 
-    Without --run, only trial environments with no running container are removed,
-    so a concurrent run on the same Docker host is never touched.
+    Without --job, only trial environments with no running container are removed,
+    so a concurrent job on the same Docker host is never touched.
     """
     try:
-        removed = cleanup_trial_projects(run_dir, dry_run=dry_run)
+        removed = cleanup_trial_projects(job_dir, dry_run=dry_run)
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         raise click.ClickException(str(exc)) from exc
     verb = "would remove" if dry_run else "removed"

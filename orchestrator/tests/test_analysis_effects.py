@@ -1,4 +1,4 @@
-"""Analysis on synthetic trajectories with known effects (WS-J J1, J2).
+"""Analysis on synthetic trials with known effects (WS-J J1, J2).
 
 Each scenario plants an effect and checks the verdict the report gives it:
 improved, worse, inconclusive and insufficient, plus the exclusion counts,
@@ -25,7 +25,7 @@ from tests.analysis_support import (
     gap,
     inputs,
     paired_arms,
-    trajectory,
+    trial,
 )
 
 SETTINGS = Settings(min_pairs=5, max_exclusion_fraction=0.2, bootstrap_samples=2000, seed=7)
@@ -36,8 +36,8 @@ def _effect(report: AnalysisReport, metric: str, problem: str = "toy@1"):
     return next(e for e in comparison.effects if e.metric == metric and e.problem == problem)
 
 
-def _run(outcomes, blocks, settings=SETTINGS, problems=("toy@1",)) -> AnalysisReport:
-    return analyse(inputs(outcomes, blocks, problems), settings)
+def _run(outcomes, attempts, settings=SETTINGS, problems=("toy@1",)) -> AnalysisReport:
+    return analyse(inputs(outcomes, attempts, problems), settings)
 
 
 def test_consistent_gain_is_improved_with_cost_beside() -> None:
@@ -53,7 +53,7 @@ def test_consistent_gain_is_improved_with_cost_beside() -> None:
     assert effect.cost.baseline_mean == pytest.approx(1.0)
     assert effect.cost.treatment_mean == pytest.approx(1.5)
     assert effect.cost.delta_mean == pytest.approx(0.5)
-    assert [pair.block for pair in effect.pairs] == [0, 1, 2, 3, 4]
+    assert [pair.attempt for pair in effect.pairs] == [0, 1, 2, 3, 4]
 
 
 def test_consistent_loss_is_worse_and_direction_follows_the_metric() -> None:
@@ -85,12 +85,12 @@ def test_too_few_pairs_is_insufficient_even_with_a_large_effect() -> None:
 
 def test_excluded_share_above_the_limit_is_insufficient_and_counted_by_cause() -> None:
     outcomes = paired_arms("solve_rate", [0.2] * 7, [0.8, 0.9, 0.7, 0.8, 0.9, 0.8, 0.9])
-    # Block 5: infra-invalid treatment; block 6: baseline value is an ineligible gap.
-    outcomes[11] = trajectory(GUIDED, 5, {"solve_rate": 0.9}, infra=True)
-    outcomes[12] = trajectory(BASELINE, 6, {"solve_rate": gap("unavailable", "no verdict")})
-    # Block 7 is planned but never ran; block 8's baseline was never assessed.
-    outcomes.append(trajectory(GUIDED, 7, {"solve_rate": 0.9}))
-    outcomes += [trajectory(BASELINE, 8, {}), trajectory(GUIDED, 8, {"solve_rate": 0.9})]
+    # Attempt 5: infra-invalid treatment; attempt 6: baseline value is an ineligible gap.
+    outcomes[11] = trial(GUIDED, 5, {"solve_rate": 0.9}, infra=True)
+    outcomes[12] = trial(BASELINE, 6, {"solve_rate": gap("unavailable", "no verdict")})
+    # Attempt 7 is planned but never ran; attempt 8's baseline was never assessed.
+    outcomes.append(trial(GUIDED, 7, {"solve_rate": 0.9}))
+    outcomes += [trial(BASELINE, 8, {}), trial(GUIDED, 8, {"solve_rate": 0.9})]
     effect = _effect(_run(outcomes, 9), "solve_rate")
     exclusions = effect.exclusions
     assert (exclusions.planned, exclusions.paired) == (9, 5)
@@ -139,15 +139,15 @@ def test_primary_outcome_follows_progression_and_s_is_secondary(
     progression: str, primary: str
 ) -> None:
     outcomes = []
-    for block in range(5):
+    for attempt in range(5):
         base = {"headline_score": 50.0, "solve_rate": 0.25, "reached": 1.0}
-        wiggle = block % 2
+        wiggle = attempt % 2
         treated = {
             "headline_score": 60.0 + wiggle,
             "solve_rate": 0.75 - 0.125 * wiggle,
             "reached": 3.0 - wiggle,
         }
-        outcomes += [trajectory(BASELINE, block, base), trajectory(GUIDED, block, treated)]
+        outcomes += [trial(BASELINE, attempt, base), trial(GUIDED, attempt, treated)]
     report = analyse(inputs(outcomes, 5, progression=progression), SETTINGS)
     (comparison,) = report.comparisons
     assert report.primary_metric == primary
@@ -155,7 +155,7 @@ def test_primary_outcome_follows_progression_and_s_is_secondary(
     assert comparison.primary.verdict is Verdict.IMPROVED
     assert [e.metric for e in comparison.effects] == [m.id for m in OUTCOME_METRICS]
     assert _effect(report, "headline_score").view == "headline"
-    assert report.headline_policy["ref"] == "scb-canonical@1"
+    assert report.metric["ref"] == "scb-canonical@1"
     # Metrics nobody measured are unassessed exclusions, never zeros; a missing
     # quality component leaves S's verdict open without touching the primary one.
     quality = _effect(report, "verbosity")
@@ -165,7 +165,7 @@ def test_primary_outcome_follows_progression_and_s_is_secondary(
     assert quality.mean_delta is None
 
 
-def test_trajectories_of_one_problem_must_cover_the_same_checkpoints() -> None:
+def test_trials_of_one_problem_must_cover_the_same_checkpoints() -> None:
     outcomes = paired_arms("solve_rate", [0.2] * 5, [0.6] * 5)
     outcomes[1] = outcomes[1].model_copy(update={"steps": outcomes[1].steps[:2]})
     with pytest.raises(ValueError, match="different checkpoint lists"):
@@ -187,7 +187,7 @@ def test_several_problems_get_an_equal_weight_aggregate() -> None:
     assert aggregate.verdict is Verdict.IMPROVED
     assert report.comparisons[0].primary.problem == "*"
     # J2 for the aggregate: pairs per problem from the effective SD sqrt(sum SD_p^2) / P,
-    # costed as one more block on every problem.
+    # costed as one more attempt on every problem.
     size = aggregate.sample_size
     assert size is not None
     sds = [effect.sd_delta for effect in per_problem]
@@ -198,12 +198,12 @@ def test_several_problems_get_an_equal_weight_aggregate() -> None:
     assert size.basis.startswith("equal-weight aggregate of 2 problems")
 
 
-def test_curves_band_each_checkpoint_across_blocks_and_skip_invalid_trajectories() -> None:
-    outcomes = [trajectory(BASELINE, b, {}, solved=[1.0, 0.0, 0.0, None]) for b in range(5)] + [
-        trajectory(GUIDED, b, {}, solved=[1.0, 1.0, 0.0 if b else 1.0, None]) for b in range(5)
+def test_curves_band_each_checkpoint_across_attempts_and_skip_invalid_trials() -> None:
+    outcomes = [trial(BASELINE, b, {}, solved=[1.0, 0.0, 0.0, None]) for b in range(5)] + [
+        trial(GUIDED, b, {}, solved=[1.0, 1.0, 0.0 if b else 1.0, None]) for b in range(5)
     ]
-    outcomes.append(trajectory(GUIDED, 5, {}, infra=True, solved=[0.0, 0.0, 0.0, 0.0]))
-    outcomes.append(trajectory(BASELINE, 5, {}, solved=[1.0, 0.0, 0.0, 0.0]))
+    outcomes.append(trial(GUIDED, 5, {}, infra=True, solved=[0.0, 0.0, 0.0, 0.0]))
+    outcomes.append(trial(BASELINE, 5, {}, solved=[1.0, 0.0, 0.0, 0.0]))
     (comparison,) = _run(outcomes, 6).comparisons
     curve = next(c for c in comparison.curves if c.series == "solved")
     first, second, third, fourth = curve.points
@@ -281,15 +281,15 @@ def _compliance(share: float) -> AssessResult:
 
 def test_process_compliance_results_add_a_manipulation_check_per_comparison() -> None:
     outcomes = paired_arms("solve_rate", [0.2] * 5, [0.6] * 5)
-    outcomes.append(trajectory(GUIDED, 5, {}, infra=True))
+    outcomes.append(trial(GUIDED, 5, {}, infra=True))
     process = {o.trial_id: _compliance(1.0 if o.arm == GUIDED else 0.0) for o in outcomes}
     base = inputs(outcomes, 6)
     report = analyse(dataclasses.replace(base, process_results=process), SETTINGS)
     manipulation = report.comparisons[0].manipulation
     assert manipulation is not None
     assert manipulation.verdict.value == "separated"
-    # The infra-invalid guided trajectory is left out of the check.
-    assert manipulation.checks[0].guided.trajectories == 5
+    # The infra-invalid guided trial is left out of the check.
+    assert manipulation.checks[0].guided.trials == 5
     assert "### Manipulation check: **separated**" in render_markdown(report)
     assert analyse(base, SETTINGS).comparisons[0].manipulation is None
 
@@ -297,7 +297,7 @@ def test_process_compliance_results_add_a_manipulation_check_per_comparison() ->
 def test_lock_thresholds_merge_with_labelled_overrides() -> None:
     from raidar.analysis.thresholds import settings_from_lock
 
-    block = {
+    attempt = {
         "seed": 7,
         "min_pairs": 6,
         "max_exclusion_fraction": 0.1,
@@ -305,7 +305,7 @@ def test_lock_thresholds_merge_with_labelled_overrides() -> None:
         "min_effects": {"solve_rate": 0.2, "headline_score": 5.0},
     }
     settings = settings_from_lock(
-        block, overrides={"alpha": None, "min_pairs": 8, "min_effects": {"solve_rate": 0.3}}
+        attempt, overrides={"alpha": None, "min_pairs": 8, "min_effects": {"solve_rate": 0.3}}
     )
     assert (settings.pinned_by_lock, settings.seed, settings.alpha) == (True, 7, 0.01)
     assert settings.min_pairs == 8
@@ -318,7 +318,7 @@ def test_lock_thresholds_merge_with_labelled_overrides() -> None:
     assert (legacy.pinned_by_lock, legacy.min_pairs, legacy.alpha) == (False, 9, 0.05)
     assert legacy.source == "defaults (lock does not pin thresholds)"
     with pytest.raises(ValueError, match="unknown outcome metric"):
-        settings_from_lock(block, overrides={"min_effects": {"bogus": 1.0}})
+        settings_from_lock(attempt, overrides={"min_effects": {"bogus": 1.0}})
 
 
 def test_the_pinned_alpha_sets_the_continuous_interval_level() -> None:
@@ -335,18 +335,18 @@ def test_the_pinned_alpha_sets_the_continuous_interval_level() -> None:
 
 
 def test_a_metric_undefined_for_a_problem_is_left_out_not_counted_ineligible() -> None:
-    blocks = 6
+    attempts = 6
     oneshot = [
-        trajectory(arm, block, {"rework": gap("not_applicable", "K=1")}, problem="oneshot@1")
-        for block in range(blocks)
+        trial(arm, attempt, {"rework": gap("not_applicable", "K=1")}, problem="oneshot@1")
+        for attempt in range(attempts)
         for arm in (BASELINE, GUIDED)
     ]
     multi = paired_arms(
         "rework", [0.4, 0.5, 0.3, 0.6, 0.5, 0.4], [0.2, 0.3, 0.2, 0.3, 0.2, 0.3], problem="multi@1"
     )
-    report = _run(oneshot + multi, blocks, problems=("oneshot@1", "multi@1"))
+    report = _run(oneshot + multi, attempts, problems=("oneshot@1", "multi@1"))
     (comparison,) = report.comparisons
     rework = [effect for effect in comparison.effects if effect.metric == "rework"]
     assert [effect.problem for effect in rework] == ["multi@1"]
-    assert rework[0].exclusions.planned == blocks
+    assert rework[0].exclusions.planned == attempts
     assert rework[0].verdict is not Verdict.INSUFFICIENT

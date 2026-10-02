@@ -224,7 +224,7 @@ def validate_command(
         for line in check.detail:
             click.echo(f"    {line}")
     payload = report.to_json()
-    click.echo(f"headline policy: {json.dumps(payload['headline_policy'])}")
+    click.echo(f"headline metric: {json.dumps(payload['headline_policy'])}")
     not_run = payload["not_run"]
     skipped = f" (not run: {', '.join(not_run)})" if isinstance(not_run, list) and not_run else ""
     click.echo(f"{report.problem}: {report.verdict.value.upper()}{skipped}")

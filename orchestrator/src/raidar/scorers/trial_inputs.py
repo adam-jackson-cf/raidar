@@ -28,20 +28,20 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.bundle import BUNDLE_MANIFEST, BundleError, OracleBundle, load_bundle
-from raidar.oracle.records import (
+from raidar.oracle.snapshot import tree_digest
+from raidar.scorers.inventory import InventoryPolicy
+from raidar.scorers.sdk.context import AssessContext, StepInputs
+from raidar.spec.canonical import digest_json
+from raidar.verifier.bundle import BUNDLE_MANIFEST, BundleError, VerifierBundle, load_bundle
+from raidar.verifier.records import (
     FORK_EVIDENCE_FILE,
-    ORACLE_DIR,
     RECORD_FILE,
+    VERIFIER_RECORD_DIR,
     StepRecord,
     load_step_record,
     step_record_dir,
     stored_snapshot_path,
 )
-from raidar.oracle.snapshot import tree_digest
-from raidar.scorers.inventory import InventoryPolicy
-from raidar.scorers.sdk.context import AssessContext, StepInputs
-from raidar.spec.canonical import digest_json
 
 RESULT_FILE = "result.json"
 _VERIFIER_CONFIG_FILES = ("lock.json", "config.json")
@@ -61,10 +61,10 @@ class BundleCache:
     bundle is found again only if its content digest is the recorded one.
     """
 
-    loaded: dict[Path, tuple[OracleBundle, str]] = field(default_factory=dict)
+    loaded: dict[Path, tuple[VerifierBundle, str]] = field(default_factory=dict)
     search: tuple[Path, ...] = ()
 
-    def relocate(self, digests: set[str]) -> OracleBundle | None:
+    def relocate(self, digests: set[str]) -> VerifierBundle | None:
         for directory in self.search:
             for marker in sorted(directory.rglob(BUNDLE_MANIFEST)):
                 try:
@@ -75,7 +75,7 @@ class BundleCache:
                     return bundle
         return None
 
-    def get(self, root: Path) -> tuple[OracleBundle, str]:
+    def get(self, root: Path) -> tuple[VerifierBundle, str]:
         key = root.resolve()
         if key not in self.loaded:
             try:
@@ -126,7 +126,7 @@ def _executed_steps(trial_dir: Path, result: Mapping[str, Any]) -> list[_Execute
                 _Executed(name, True, item.get("agent_result"), item.get("agent_execution"))
             )
         return executed
-    records = sorted(path.name for path in (trial_dir / ORACLE_DIR / "steps").glob("*"))
+    records = sorted(path.name for path in (trial_dir / VERIFIER_RECORD_DIR / "steps").glob("*"))
     if len(records) != 1:
         raise TrialInputError(
             f"{trial_dir}: a trial without step_results needs exactly one oracle record, "
@@ -212,7 +212,7 @@ def _bundle(
     records: Mapping[str, StepRecord],
     override: Path | None,
     cache: BundleCache,
-) -> OracleBundle:
+) -> VerifierBundle:
     digests = {record.bundle.digest for record in records.values()}
     if len(digests) > 1:
         raise TrialInputError(f"{trial_dir}: oracle records name several bundles")
@@ -235,7 +235,7 @@ def _bundle(
 
 def _recorded_bundle(
     trial_dir: Path, root: Path, digests: set[str], cache: BundleCache
-) -> OracleBundle:
+) -> VerifierBundle:
     """The bundle the records name: at its recorded root, else found by digest."""
     try:
         bundle, digest = cache.get(root)
@@ -339,7 +339,7 @@ def _planned_steps(
     trial_dir: Path,
     executed: Sequence[_Executed],
     records: Mapping[str, StepRecord],
-    bundle: OracleBundle,
+    bundle: VerifierBundle,
 ) -> tuple[StepInputs, ...]:
     """Every planned checkpoint in order; the executed ones must be a prefix of the plan."""
     planned = [(step.name, step.checkpoint) for step in bundle.manifest.steps]
@@ -380,7 +380,7 @@ def load_trial_context(
     )
 
 
-def problem_config(bundle: OracleBundle) -> dict[str, Any]:
+def problem_config(bundle: VerifierBundle) -> dict[str, Any]:
     """Problem facts scorers take as config defaults (``AssessContext.problem_config``)."""
     entry_file = bundle.manifest.entry_file
     return {"entry_file": entry_file} if entry_file is not None else {}

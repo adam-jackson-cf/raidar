@@ -1,4 +1,4 @@
-"""Headline S from statused components: the one place a ScorePolicy is applied (F6, F15).
+"""Headline S from statused components: the one place a Metric is applied (F6, F15).
 
 Analysis (``assessed.headline_score``), the frozen review projection
 (``review_projection.headline``) and the Quality projection
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 
 from raidar.analysis.outcomes import Value
 from raidar.scorers.sdk.result import AssessStatus
-from raidar.spec.policies import ComponentValue, PolicyScore, ScorePolicy
+from raidar.spec.metrics import ComponentValue, Metric, MetricScore
 
 
 @dataclass(frozen=True)
@@ -36,8 +36,8 @@ class ComponentInput:
 
 
 def score_inputs(
-    policy: ScorePolicy, checkpoints: int, inputs: Mapping[str, ComponentInput]
-) -> PolicyScore:
+    policy: Metric, checkpoints: int, inputs: Mapping[str, ComponentInput]
+) -> MetricScore:
     """Apply ``policy`` to the measured components; each gap is an ineligibility reason."""
     values = {key: item.value for key, item in inputs.items() if item.value is not None}
     ineligible = {

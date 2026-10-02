@@ -33,7 +33,6 @@ from typing import Literal
 
 from pydantic import ValidationError
 
-from raidar.oracle.models import CaseGroup, CaseStatus, OracleGrade
 from raidar.scorers.builtin_manifests import CORRECTNESS
 from raidar.scorers.sdk.context import AssessContext, StepInputs, statused_result
 from raidar.scorers.sdk.manifest import ScorerManifest, SdkModel
@@ -43,6 +42,7 @@ from raidar.scorers.sdk.result import (
     AssessStatus,
     Observation,
 )
+from raidar.verifier.models import CaseGroup, CaseStatus, VerifierGrade
 
 LEAK_REWARD_KEY = "oracle_leak"
 _GROUP_METRICS = {group: f"{group.value}_pass_rate" for group in CaseGroup}
@@ -100,7 +100,7 @@ def _rate(metric: str, subject: str, passed: int, total: int, label: str) -> Obs
     return _ok(metric, subject, passed / total, (passed, total))
 
 
-def _graded_observations(subject: str, grade: OracleGrade) -> list[Observation]:
+def _graded_observations(subject: str, grade: VerifierGrade) -> list[Observation]:
     counts = grade.group_counts()
     passed = sum(count.passed for count in counts.values())
     total = sum(count.total for count in counts.values())

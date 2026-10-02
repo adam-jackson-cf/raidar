@@ -28,7 +28,6 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
 
-from raidar.oracle.records import StepRecord
 from raidar.scorers.inventory import Inventory, InventoryPolicy, build_inventory
 from raidar.scorers.sdk.manifest import MetricLevel, ScorerManifest
 from raidar.scorers.sdk.result import (
@@ -38,6 +37,7 @@ from raidar.scorers.sdk.result import (
     Observation,
     transition_subject,
 )
+from raidar.verifier.records import StepRecord
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class StepInputs:
 
 @dataclass
 class AssessContext:
-    """Read-only inputs for one trajectory (one problem attempt)."""
+    """Read-only inputs for one trajectory (one problem step_result)."""
 
     problem: str
     steps: tuple[StepInputs, ...]

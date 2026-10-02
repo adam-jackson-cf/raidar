@@ -6,9 +6,9 @@ input digests), so an Assessment is used only when the current scorer version
 produced it from this trial's exact inputs; otherwise the scorer's result is
 ``None`` and analysis reads its values as ``unassessed``.
 
-A trial whose inputs cannot be loaded (moved oracle bundle, missing snapshot)
+A trial whose inputs cannot be loaded (moved verifier bundle, missing snapshot)
 is recorded in ``input_errors``, never silently read as unassessed; the
-caller refuses it for a valid trajectory.
+caller refuses it for a valid trial.
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.analysis.sources import AnalysisInputError, RunDir
+from raidar.analysis.sources import AnalysisInputError, JobDir
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.scorers.catalog import ScorerRegistry
 from raidar.scorers.keys import scorer_identity, store_key
@@ -78,21 +78,21 @@ class AssessmentLookup:
     def valid_results(
         self, trial_dir: Path, config: RescoreConfig, *, trial_id: str, valid: bool
     ) -> dict[str, AssessResult | None]:
-        """``results``; a valid trajectory whose inputs cannot be loaded is refused."""
+        """``results``; a valid trial whose inputs cannot be loaded is refused."""
         found = self.results(trial_dir, config)
         if valid and trial_dir in self.input_errors:
             raise AnalysisInputError(
                 f"trial {trial_id} ({trial_dir}) cannot be assessed: "
-                f"{self.input_errors[trial_dir]}; if its oracle bundle moved, pass "
+                f"{self.input_errors[trial_dir]}; if its verifier bundle moved, pass "
                 "--bundle-search DIR (bundles are found again by content digest)"
             )
         return found
 
 
 def assessment_config(
-    run: RunDir, override: Path | None, lock: Mapping[str, Any] | None = None
+    run: JobDir, override: Path | None, lock: Mapping[str, Any] | None = None
 ) -> RescoreConfig:
-    """``override`` if given, else the lock's declared settings, else the run's file."""
+    """``override`` if given, else the lock's declared settings, else the job's file."""
     if override is None and lock is not None:
         try:
             return lock_rescore_config(lock)

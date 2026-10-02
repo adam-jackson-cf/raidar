@@ -37,7 +37,7 @@ MODEL = "openai/gpt-6-luna"
 REASONING_EFFORT = "low"
 CODEX_VERSION = "0.156.1"
 INSTRUCTION = (
-    "Create a file hello.py in the current directory whose main block prints exactly "
+    "Create a file hello.py in the current directory whose main attempt prints exactly "
     "'hello'. Keep it minimal and stop when done."
 )
 

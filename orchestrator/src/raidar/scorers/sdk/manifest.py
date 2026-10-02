@@ -3,7 +3,7 @@
 A manifest declares everything a scorer may emit before it runs: each metric's
 level, type, direction, measurement tier and SCB exactness. Scorers observe
 only; nothing here carries a weight or a success rule (F6). Weights live in
-ScorePolicies (``raidar.spec.policies``).
+Metrics (``raidar.spec.metrics``).
 """
 
 from __future__ import annotations

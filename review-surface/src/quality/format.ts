@@ -5,7 +5,7 @@ import type { Cell, CellStatus, Component, Verdict } from '@/quality/types';
 export const COMPONENT_INFO: Record<Component, { name: string; definition: string }> = {
   C: {
     name: 'Correctness',
-    definition: 'Checkpoint: passed / graded oracle cases (strict, all groups). Headline row: solved checkpoints / K.',
+    definition: 'Checkpoint: passed / graded verifier cases (strict, all groups). Headline row: solved checkpoints / K.',
   },
   V: { name: 'Verbosity', definition: '1 − lines flagged by Ruff (SCB SIM allowlist) or clones / production LOC.' },
   E: { name: 'Erosion', definition: '1 − cc·√sloc mass share of functions with cc > 10.' },
@@ -29,8 +29,8 @@ export const STATUS_BADGE: Record<Exclude<CellStatus, 'ok'>, string> = {
 };
 
 export const POLICY_SOURCE_TITLE: Record<'lock' | 'default_by_k', string> = {
-  lock: 'Headline policy from the lock the run was executed under',
-  default_by_k: 'No matching lock: default headline policy for the problem\'s checkpoint count',
+  lock: 'Headline metric from the lock the job was executed under',
+  default_by_k: 'No matching lock: default headline metric for the problem\'s checkpoint count',
 };
 
 /** Selector key of an experiment under one lock (runs under different locks are never pooled). */

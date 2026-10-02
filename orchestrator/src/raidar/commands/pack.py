@@ -8,6 +8,7 @@ from dataclasses import asdict
 
 import click
 
+from raidar.packs import available_runtimes, load_runtime_pack
 from raidar.packs.python import (
     EvalSandboxToolError,
     ImageAuditError,
@@ -20,11 +21,10 @@ from raidar.packs.python import (
     image_lock_hash,
     image_tag,
     inspect_image,
-    load_pack_spec,
     load_tool_lock,
 )
 
-RUNTIME_CHOICE = click.Choice(["python"])
+RUNTIME_CHOICE = click.Choice(list(available_runtimes()))
 
 
 def register(main: click.Group) -> None:
@@ -51,7 +51,7 @@ def pack() -> None:
 @click.argument("runtime", type=RUNTIME_CHOICE)
 def pack_info(runtime: str) -> None:
     """Show the pack image tag, lock hashes and tool classes."""
-    spec, lock = load_pack_spec(), load_tool_lock()
+    spec, lock = load_runtime_pack(runtime), load_tool_lock()
     provisioner = ToolProvisioner(lock)
     record = inspect_image(image_tag(spec))
     _echo_json(
@@ -77,9 +77,8 @@ def pack_info(runtime: str) -> None:
 @click.option("--force", is_flag=True, help="Rebuild even if the lock-hash tag exists.")
 def pack_build(runtime: str, force: bool) -> None:
     """Build the agent image once per lock hash and assert it has no scorer tools."""
-    del runtime
     try:
-        result = build_image(load_pack_spec(), load_tool_lock(), force=force)
+        result = build_image(load_runtime_pack(runtime), load_tool_lock(), force=force)
     except ImageAuditError as error:
         _echo_json(asdict(error.audit) | {"ok": False})
         raise click.ClickException(f"pack image {error.audit.tag} failed its audit") from error
@@ -91,9 +90,8 @@ def pack_build(runtime: str, force: bool) -> None:
 @pack.command("audit")
 @click.argument("runtime", type=RUNTIME_CHOICE)
 def pack_audit(runtime: str) -> None:
-    """Assert the built agent image has the pinned harnesses and no scorer tools or browsers."""
-    del runtime
-    spec = load_pack_spec()
+    """Assert the built agent image has the pinned agent CLIs and no scorer tools or browsers."""
+    spec = load_runtime_pack(runtime)
     try:
         audit = audit_image(image_tag(spec), spec, load_tool_lock())
     except ImageNotBuiltError as error:

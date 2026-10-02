@@ -1,7 +1,7 @@
 """Checkpoints and execution validity projected as the surface's verification gates.
 
 There is one ``gate:<checkpoint>`` per checkpoint the trial attempted, passed
-exactly when the oracle's strict all-cases verdict solved it, plus the
+exactly when the verifier's strict all-cases verdict solved it, plus the
 validity gates: ``gate:infra`` (every execution-validity check except the
 component probes) and ``gate:component-probes``. A checkpoint without a
 verdict because infrastructure broke keeps its failed gate span, and the
@@ -15,15 +15,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.execution.models import (
-    CheckpointAttempt,
     CheckpointState,
-    TrajectoryRecord,
+    StepResult,
+    TrialRecord,
     ValidityCheck,
 )
-from raidar.oracle.models import CaseStatus
-from raidar.oracle.records import StepRecord, load_step_record
 from raidar.review_projection.notes import EvidenceRef, Finding
 from raidar.review_projection.spans import SpanBuilder
+from raidar.verifier.models import CaseStatus
+from raidar.verifier.records import StepRecord, load_step_record
 
 PROBE_CHECK = "component_probes"
 INFRA_GATE = "infra"
@@ -37,17 +37,19 @@ class GateContext:
     root: str
     start: int
     trial_dir: Path
-    record: TrajectoryRecord
+    record: TrialRecord
 
 
-def oracle_record(trial_dir: Path, attempt: CheckpointAttempt) -> StepRecord | None:
-    if attempt.oracle_record is None:
+def verifier_record(trial_dir: Path, step_result: StepResult) -> StepRecord | None:
+    if step_result.verifier_record is None:
         return None
-    return load_step_record((trial_dir / attempt.oracle_record).parent)
+    return load_step_record((trial_dir / step_result.verifier_record).parent)
 
 
-def attempted(record: TrajectoryRecord) -> list[CheckpointAttempt]:
-    return [a for a in record.attempts if a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED]
+def attempted(record: TrialRecord) -> list[StepResult]:
+    return [
+        a for a in record.step_results if a.checkpoint_state is not CheckpointState.NOT_ATTEMPTED
+    ]
 
 
 def _case_summary(step: StepRecord | None) -> dict[str, object]:
@@ -66,46 +68,46 @@ def _case_summary(step: StepRecord | None) -> dict[str, object]:
     }
 
 
-def _case_detail(step: StepRecord | None, attempt: CheckpointAttempt) -> str:
-    if attempt.checkpoint_state is CheckpointState.INFRA_ERROR:
-        return "no verdict: " + ("; ".join(attempt.infra_reasons) or "infrastructure error")
+def _case_detail(step: StepRecord | None, step_result: StepResult) -> str:
+    if step_result.checkpoint_state is CheckpointState.INFRA_ERROR:
+        return "no verdict: " + ("; ".join(step_result.infra_reasons) or "infrastructure error")
     if step is None:
-        return "no oracle record"
+        return "no verifier record"
     counts = step.grade.group_counts().values()
     passed, total = sum(c.passed for c in counts), sum(c.total for c in counts)
     return f"{passed}/{total} graded cases passed"
 
 
-def _checkpoint_gate(ctx: GateContext, parent: str, attempt: CheckpointAttempt) -> Finding | None:
-    step = oracle_record(ctx.trial_dir, attempt)
-    solved = attempt.checkpoint_state is CheckpointState.SOLVED
-    name = f"gate:{attempt.checkpoint}"
+def _checkpoint_gate(ctx: GateContext, parent: str, step_result: StepResult) -> Finding | None:
+    step = verifier_record(ctx.trial_dir, step_result)
+    solved = step_result.checkpoint_state is CheckpointState.SOLVED
+    name = f"gate:{step_result.checkpoint}"
     ctx.builder.add(
         name=name,
         span_type="TOOL_CALL",
         status="OK" if solved else "ERROR",
         parent=parent,
         start=ctx.start,
-        input_value=f"oracle strict all-cases verdict for {attempt.step}",
+        input_value=f"oracle strict all-cases verdict for {step_result.step}",
         output_value={
-            "checkpoint_state": attempt.checkpoint_state.value,
-            "strict_pass_rate": attempt.strict_pass_rate,
-            "rewards": attempt.rewards,
-            "infra_reasons": list(attempt.infra_reasons),
+            "checkpoint_state": step_result.checkpoint_state.value,
+            "strict_pass_rate": step_result.strict_pass_rate,
+            "rewards": step_result.rewards,
+            "infra_reasons": list(step_result.infra_reasons),
             **_case_summary(step),
         },
     )
-    if solved or attempt.checkpoint_state is CheckpointState.INFRA_ERROR:
+    if solved or step_result.checkpoint_state is CheckpointState.INFRA_ERROR:
         return None  # an infrastructure error is reported once, by the infra gate
-    detail = _case_detail(step, attempt)
+    detail = _case_detail(step, step_result)
     return Finding(
-        id=f"gate-{attempt.checkpoint}",
+        id=f"gate-{step_result.checkpoint}",
         kind="issue",
         category="failed-gate",
-        title=f"{attempt.checkpoint} not solved",
+        title=f"{step_result.checkpoint} not solved",
         detail=detail,
         span=name,
-        evidence=(EvidenceRef("oracle", attempt.checkpoint, detail),),
+        evidence=(EvidenceRef("oracle", step_result.checkpoint, detail),),
     )
 
 
@@ -142,8 +144,8 @@ def _validity_gate(ctx: GateContext, parent: str, gate: str, probes: bool) -> Fi
     return _validity_finding(gate, failed) if failed else None
 
 
-def _clean(record: TrajectoryRecord) -> Finding | None:
-    states = {attempt.checkpoint_state for attempt in record.attempts}
+def _clean(record: TrialRecord) -> Finding | None:
+    states = {step_result.checkpoint_state for step_result in record.step_results}
     if states != {CheckpointState.SOLVED} or not record.valid:
         return None
     return Finding(
@@ -151,15 +153,15 @@ def _clean(record: TrajectoryRecord) -> Finding | None:
         kind="good",
         category="clean-verification",
         title="Every checkpoint solved",
-        detail=f"all {len(record.attempts)} checkpoints passed the oracle's strict verdict",
+        detail=f"all {len(record.step_results)} checkpoints passed the verifier's strict verdict",
         span="verification gates",
     )
 
 
 def project_gates(ctx: GateContext) -> list[Finding]:
     """Add the gate spans and return the findings they support."""
-    attempts = attempted(ctx.record)
-    failing = any(a.checkpoint_state is not CheckpointState.SOLVED for a in attempts)
+    step_results = attempted(ctx.record)
+    failing = any(a.checkpoint_state is not CheckpointState.SOLVED for a in step_results)
     parent = ctx.builder.add(
         name="verification gates",
         span_type="INTERNAL",
@@ -168,7 +170,7 @@ def project_gates(ctx: GateContext) -> list[Finding]:
         start=ctx.start,
     )
     findings: Sequence[Finding | None] = [
-        *(_checkpoint_gate(ctx, parent, attempt) for attempt in attempts),
+        *(_checkpoint_gate(ctx, parent, step_result) for step_result in step_results),
         _validity_gate(ctx, parent, INFRA_GATE, probes=False),
         _validity_gate(ctx, parent, PROBE_GATE, probes=True),
         _clean(ctx.record),

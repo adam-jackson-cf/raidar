@@ -2,7 +2,7 @@
 
 <h1>Raidar</h1>
 
-**Controlled experiments on coding agents: does a treatment (rules, skills, hooks, review loops) change what a harness + model delivers on pinned problems?**
+**Controlled experiments on coding agents: does a treatment (rules, skills, hooks, review loops) change what an agent + model delivers on pinned problems, and which agent does best?**
 
 ![Status](https://img.shields.io/badge/status-active-brightgreen.svg?style=flat-square)
 ![Python](https://img.shields.io/badge/python-3.12-blue.svg?style=flat-square)
@@ -11,7 +11,9 @@
 
 </div>
 
-Raidar runs an **experiment**: the same pinned **problems** under two or more **arms** (a condition built from **components**, on an agent), repeated in counterbalanced **blocks**. Every trial runs through [Harbor](https://pypi.org/project/harbor/) in the runtime pack's Docker image and is graded by a host-only **oracle**. **Scorers** turn stored trials into **Assessments** offline. The analysis reports paired effects against the baseline arm with a verdict of `improved`, `worse`, `inconclusive` or `insufficient`. The review surface shows the runs and their Quality components.
+Raidar runs an **experiment**: the same pinned **problems** under two or more **arms** (a condition built from **components**, on an agent), repeated in counterbalanced **attempts**. One execution of a locked experiment is a **job**; every **trial** in it runs through [Harbor](https://pypi.org/project/harbor/) in the runtime pack's Docker image and each checkpoint is graded by a host-only **verifier**. **Scorers** turn stored trials into **Assessments** offline. The analysis reports paired effects against the baseline arm with a verdict of `improved`, `worse`, `inconclusive` or `insufficient`; a benchmark adds a ranking of its agents. The review surface shows the trials and their Quality components.
+
+Raidar uses [Harbor's vocabulary](#concepts) wherever Harbor has a term (job, trial, step result, attempts, verifier, reward, agent name, environment type, metric), and keeps SCB's *problem* and *checkpoint* and its own *experiment*, *arm*, *condition*, *component*, *factor*, *lock* and *verdict*.
 
 The design lives in [`docs/reboot/requirements.md`](docs/reboot/requirements.md) (frozen v1), [`docs/reboot/implementation-plan.md`](docs/reboot/implementation-plan.md), [`docs/reboot/adr-001.md`](docs/reboot/adr-001.md) and [`docs/reboot/design-memo.md`](docs/reboot/design-memo.md).
 
@@ -24,7 +26,7 @@ Prerequisites:
 - `uv`
 - Docker with `docker compose` 2.40.1 or newer. OrbStack is the default: `DOCKER_CONTEXT` defaults to `orbstack`.
 - Node 18 or newer, for the review surface
-- Agent credentials: file-backed Codex auth (`make codex-auth-setup`) or `OPENAI_API_KEY` for codex-cli; `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` for claude-code
+- Agent credentials: file-backed Codex auth (`make codex-auth-setup`) or `OPENAI_API_KEY` for `codex`; `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` for `claude-code`
 - Optional but preferred: the [Infisical CLI](https://infisical.com/docs/cli/overview), logged in once with `infisical login` in a real terminal (it is interactive)
 
 ```bash
@@ -33,7 +35,7 @@ make env-setup
 cp orchestrator/.env.example orchestrator/.env
 ```
 
-Secrets live in the Infisical project `mac-os-cf` (env `dev`), bound by `orchestrator/.infisical.json`. Targets that call a model provider (`experiment-execute`, the smoke targets, `experiment-assess`, `jev-shadow-rubric`, `harness-validate`, `component-probe-trials`) run under `infisical run` when the CLI is installed and logged in, and otherwise read `orchestrator/.env`; each prints which source it used, never a value. `SECRETS=infisical` fails instead of falling back, `SECRETS=dotenv` skips Infisical, and `INFISICAL_ENV=` picks another environment. Before any trial starts, `experiment-execute` and the smoke targets check that every selected arm's harness has a credential (presence only) and name the agent field that lacks one.
+Secrets live in the Infisical project `mac-os-cf` (env `dev`), bound by `orchestrator/.infisical.json`. Targets that call a model provider (`experiment-execute`, the smoke targets, `experiment-assess`, `jev-shadow-rubric`, `agent-validate`, `component-probe-trials`) run under `infisical run` when the CLI is installed and logged in, and otherwise read `orchestrator/.env`; each prints which source it used, never a value. `SECRETS=infisical` fails instead of falling back, `SECRETS=dotenv` skips Infisical, and `INFISICAL_ENV=` picks another environment. Before any trial starts, `experiment-execute` and the smoke targets check that every selected arm's agent has a credential (presence only) and name the agent field that lacks one.
 
 For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file-backed ChatGPT login from `~/.codex/auth.json` and falls back to `OPENAI_API_KEY`. A login kept in the OS keyring cannot be passed into Harbor, so switch Codex to file-backed credential storage first. `make help` lists every public target.
 
@@ -41,25 +43,30 @@ For Codex CLI the default auth policy is `CODEX_AUTH_MODE=auto`: it prefers file
 
 | Term | What it is | Where it lives |
 |---|---|---|
-| Experiment | The unit of authoring: problems, agents, conditions, arms, scorers and the analysis plan | `experiment.yaml` (for example `examples/pilot/`) |
-| Lock | Content hashes and pinned versions of everything the experiment resolves to, in `execution`, `assessment`, `analysis` and `toolchain` sections. Its `lock_sha256` covers the execution section only, and every run records it. A run refuses a lock that is out of date | `<name>.lock.json` next to the experiment |
-| Problem | A pinned, oracle-validated task (one-shot or multi-checkpoint). Its oracle stays on the host and the agent never sees it | `problems/registry/`, imported into `problems/store/` |
-| Runtime pack | The agent image (toolchain and pinned harness binaries, no scorer tools) plus the scorer tool lock | `orchestrator/src/raidar/packs/python/` |
-| Component | A reusable treatment piece: `rules-file@1`, `skills@1`, `lint-config@1`, `stop-hook@1`, `mcp-server@1`, `harness-settings@1`, `workspace-files@1`, `prompt-wrapper@1`, `review-loop@1`, `review-loop@2` (verdict feedback read before or after the `VERDICT` line; one re-ask) | `orchestrator/src/raidar/components/` |
+| Experiment | The unit of authoring: a `kind`, one runtime, problems, agents, conditions, arms, scorers and the analysis plan. Its id is `<runtime>__<subject>__<intent>` | `experiments/<kind>/<id>/experiment.yaml` |
+| Kind | `ab-test` (conditions are compared; `agent.*` factors may be added), `benchmark` (agents are compared under one condition: paired verdicts against a reference agent plus a ranking view with mean ± CI, pass@k, cost and tokens) or `smoke` (the same engine; reports are stamped not citable). `research-loop` is reserved. The kind is part of the lock's execution identity | `kind:` |
+| Lock | Content hashes and pinned versions of everything the experiment resolves to, in `execution`, `assessment`, `analysis` and `toolchain` sections. Its `lock_sha256` covers the execution section only, and every job records it. A job refuses a lock that is out of date, and no lock is written for a design its runtime cannot run (`RT0`-`RT6`) | `experiment.lock.json` next to the experiment |
+| Runtime and pack | A runtime is a language toolchain and equals a runtime pack id (`python`; `node-ts`, `go`, `rust`, `java`, `dotnet` later). The pack is the agent image (toolchain and pinned agent CLIs, no scorer tools) plus the scorer tool lock | `runtime:`; `orchestrator/src/raidar/packs/<runtime>/` |
+| Problem (binding) | A pinned, verifier-validated task (one-shot or multi-checkpoint) imported against one runtime pack: `scb/<problem>` is the python binding, another runtime's binding would be `scb-<runtime>/<problem>`. Its verifier bundle stays on the host and the agent never sees it | `problems/registry/`, imported into `problems/store/` |
+| Component | A reusable treatment piece: `rules-file@1`, `skills@1`, `lint-config@1`, `stop-hook@1`, `mcp-server@1`, `harness-settings@1`, `workspace-files@1`, `prompt-wrapper@1`, `review-loop@1`, `review-loop@2` (verdict feedback read before or after the `VERDICT` line; one re-ask). Released components are immutable: a change is a new `@version` | `orchestrator/src/raidar/components/` |
 | Condition and arm | A condition is a list of components; `shared_components` are put ahead of every condition's own, identically. An arm is one condition on one agent. The factor guard keeps arms differing only in the declared factors | `shared_components:`, `conditions:` and `arms:` |
-| Agent | Harness, provider, model, reasoning effort and the pinned harness version | `agents:` |
-| Block | One pass over every arm and problem, in counterbalanced order. Blocks supply the paired samples | `analysis.blocks` |
-| Run | One execution of a locked experiment: trials, trajectories, attempts, validity checks and N1 phase timings | `runs/<experiment>/<run id>/` |
-| Scorer and Assessment | A versioned scorer (`correctness@1`, `code-quality@1`, `resource-usage@1`, `process-compliance@1`) runs offline over stored trials. Each result is an Assessment keyed by its inputs | an Assessment store directory, outside the run |
-| Headline policy | How component scores combine into the headline S (`scb-canonical@1`, `scb-canonical-oneshot@1`). The lock pins it | `assessment.headline_policy` |
-| Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm | the `make experiment-analyze` output directory |
+| Agent | A Harbor agent name (`codex`, `claude-code`), provider, model, kwargs (`reasoning_effort`) and the pinned version, which must equal the pack pin | `agents:` |
+| Attempts | The replicates of every arm: each attempt runs every arm once per problem, in a seeded, counterbalanced order. Analysis pairs arms by attempt index | `analysis.attempts` |
+| Job | One execution of a locked experiment: its trials, their step results, validity checks and N1 phase timings | `jobs/<experiment id>/<job id>/` (`job.json`, `job.lock.json`, `trial-records/`) |
+| Trial and step result | A trial is one arm × attempt × problem through every checkpoint (a Harbor trial, id `bNN-pN-<arm>`, where `bNN` is the attempt index); a step result is one checkpoint of it | `trials/<trial>/`, `trial-records/<trial>.json` |
+| Verifier and reward | The hidden, trusted grader: strict all-cases per checkpoint, run host-side; its per-step output is the reward. Harbor's `oracle` agent is something else (it replays reference solutions) | `orchestrator/src/raidar/verifier/` |
+| Scorer and Assessment | A versioned scorer (`correctness@1`, `code-quality@1`, `resource-usage@1`, `process-compliance@1`) runs offline over stored trials. Each result is an Assessment keyed by its inputs | an Assessment store directory, outside the job |
+| Headline metric | How component scores combine into the headline S (`scb-canonical@1/@2`, `scb-canonical-oneshot@1/@2`). The lock pins it | `assessment.metric` |
+| Analysis | Paired deltas, confidence intervals, curves, verdicts, exclusions and a sample-size projection against the baseline arm; a benchmark adds its ranking view | the `make experiment-analyze` output directory |
 | Jev | Decomposed LLM-judge questions. They run in shadow until a policy is calibrated and promoted: label decisions (review surface, or blind with `make jev-export-blind`/`jev-import-blind`; each label records a `human` or `model` reviewer), then `make jev-promote` fits and freezes the threshold on a calibration split and writes `mode: enforce` only when the audit re-derives every recorded number and, unless `ALLOW_SCORER_BUMP=1`, the scorer's minor-version bump the promotion names already exists; `make jev-verify-promotion` requires that bump | `raidar jev ...`; the audit sits in the Assessment store |
+
+Inside each Harbor trial directory the verifier keeps its original evidence names (`raidar-oracle/steps/<step>/record.json`, reward key `oracle_leak`): they are wire names that released scorers and `make assess-regrade` read the same way for every job.
 
 ## Walkthrough: experiment.yaml to review
 
-The example compares a baseline with a rules-file treatment on the validated one-shot problem the pilot uses. Every step is a public `make` target.
+The example is an `ab-test` comparing a baseline with a rules-file treatment on the validated one-shot problem the pilot uses. Every step is a public `make` target.
 
-**1. Provide the problem and the pack.** A problem is pinned by reference and must be oracle-validated before any run can use it. `make problem-list` shows every registered problem with its validation and import state, and `make problem-info PROBLEM=<ref>` shows one in detail. `problem-validate` is needed only for a problem without a validation report in `problems/registry/`.
+**1. Provide the problem and the pack.** A problem is pinned by reference and must be verifier-validated before any job can use it. `make problem-list` shows every registered problem with its validation and import state, and `make problem-info PROBLEM=<ref>` shows one in detail. `problem-validate` is needed only for a problem without a validation report in `problems/registry/`.
 
 ```bash
 make problem-list
@@ -67,23 +74,26 @@ make problem-import PROBLEM=scb/circuit_eval.checkpoint_1@38d627ecf668
 make pack-build
 ```
 
-**2. Write `experiment.yaml`.** `make experiment-init EXPERIMENT=rules-trial/experiment.yaml` writes a starter of the shape below and a stub `components/AGENTS.md`: the id comes from the directory (or `EXPERIMENT_ID=`), the problem from `PROBLEM=` (default the one below), the agent's `version` from the pack pin, and the headline policy is left to the lock, which picks it by checkpoint count. It refuses a path that exists. Paths in `files:` are relative to the experiment file. To try another variant of a treatment later, add a condition and an arm to the same file, so the variant stays paired with the baseline arm.
+**2. Write `experiment.yaml`.** `make experiment-init EXPERIMENT=experiments/ab-test/python__circuit_eval-cp1__rules-trial/experiment.yaml` writes a starter of the shape below and a stub `components/AGENTS.md`: the id comes from the directory (or `EXPERIMENT_ID=`), the problem from `PROBLEM=` (default the one below), the agent's `version` from the pack pin, and the headline metric is left to the lock, which picks it by checkpoint count. It refuses a path that exists. Paths in `files:` are relative to the experiment file. To try another variant of a treatment later, add a condition and an arm to the same file, so the variant stays paired with the baseline arm.
 
 ```yaml
-schema_version: 1
-id: rules-trial
+schema_version: 2
+kind: ab-test                # ab-test | benchmark | smoke
+id: python__circuit_eval-cp1__rules-trial   # <runtime>__<subject>__<intent>
 description: Does an AGENTS.md rules file change correctness on circuit_eval?
 
 problems:
   - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
 
+runtime: python              # one runtime pack per experiment
+
 agents:
   - id: codex-luna
-    harness: codex-cli
+    name: codex              # Harbor agent name
     provider: openai
     model: gpt-6-luna
     reasoning_effort: low
-    version: 0.156.1          # must equal the pack pin
+    version: 0.156.1         # must equal the pack pin
 
 factors: [condition]
 
@@ -105,77 +115,85 @@ arms:
 
 assessment:
   scorers: [correctness@1, code-quality@1, resource-usage@1]
-  headline_policy: scb-canonical-oneshot@1
+  metric: scb-canonical-oneshot@1
 
 analysis:
   baseline_arm: baseline
-  blocks: 5
+  attempts: 5
   seed: 20260930
   min_pairs: 5               # the lock pins these verdict thresholds
   max_exclusion_fraction: 0.2
   alpha: 0.05
 ```
 
-**3. Validate and lock.** Validation checks the schema, the cross-references, the factor guard, and that every arm's components compile for its harness. The lock pins content hashes and versions. `raidar run` refuses to start if relocking would change the lock, and the refusal names each stale section. A scorer, headline-policy, threshold or toolchain change relocks to the same `lock_sha256`, so existing runs still match: rescore them (step 5) instead of rerunning. A change to problems, agents, conditions, protocol, blocks or seed gives a new `lock_sha256`, which means a new experiment. `make experiment-locks-check`, part of `make quality`, checks every lock under `examples/`.
+Validation checks that the design does not contradict its kind (`KIND*`: an ab-test compares conditions; a benchmark compares agents under one condition, warns below 5 attempts and may set `analysis.rank_by`; `research-loop` is reserved) and its name (`NAME1`: a file under `experiments/<kind>/<id>/` sits in the directory of its kind and id; `NAME2`: the id starts with the experiment's runtime). A schema v1 file still validates, read-only; `make experiment-upgrade EXPERIMENT=<v1 file> KIND=<kind> EXPERIMENT_ID=<id> OUT=experiments/<kind>/<id>/experiment.yaml` writes its schema v2 form.
+
+**3. Validate and lock.** Validation checks the schema, the cross-references, the kind and naming rules, the factor guard, and that every arm's components compile for its agent. The lock pins content hashes and versions and runs the runtime-compatibility gate, reporting every issue at once: each problem binding must be validated (`RT0`) and bound to the experiment's runtime (`RT1`; a local `path:` task declares `[metadata] raidar_runtime`), imported against the current pack contract (`RT2`); every component must cover the runtime and support the arm's agent (`RT3`), every scorer and the headline metric must cover the runtime (`RT4`), each agent's version must be the pack pin (`RT5`), and the runtime must have a pack (`RT6`). The gate sees the effective spec, so `--set` overrides cannot bypass it. `raidar run` refuses to start if relocking would change the lock (naming each stale section) or if the pack now builds another image than the locked one (`RT6` drift). A scorer, headline-metric, threshold or toolchain change relocks to the same `lock_sha256`, so existing jobs still match: rescore them (step 5) instead of rerunning. A change to the kind, problems, agents, conditions, protocol, attempts or seed gives a new `lock_sha256`, which means a new experiment. `make experiment-locks-check`, part of `make quality`, checks every lock under `experiments/`.
 
 ```bash
-make experiment-validate EXPERIMENT=rules-trial/experiment.yaml
-make experiment-lock EXPERIMENT=rules-trial/experiment.yaml
-make experiment-plan EXPERIMENT=rules-trial/experiment.yaml     # dry run: every trial and its hashes
+E=experiments/ab-test/python__circuit_eval-cp1__rules-trial/experiment.yaml
+make experiment-validate EXPERIMENT=$E
+make experiment-lock EXPERIMENT=$E
+make experiment-plan EXPERIMENT=$E     # dry run: every trial and its hashes
 ```
 
-**4. Run.** Each trial runs through Harbor (the pack image is built first if missing). The run directory `runs/<experiment id>/<RUN_ID>` records attempts, validity checks (context isolation, no test leak, progression), N1 phase timings and `run.lock.json`, the lock the run executed under. Agent processes are reaped when each agent phase ends, before its work is collected and graded.
+**4. Run a job.** Each trial runs through Harbor (the pack image is built first if missing). The job directory `jobs/<experiment id>/<JOB_ID>` records step results, validity checks (context isolation, no test leak, progression), N1 phase timings and `job.lock.json`, the lock the job executed under. Agent processes are reaped when each agent phase ends, before its work is collected and graded.
 
 ```bash
-make experiment-execute EXPERIMENT=rules-trial/experiment.yaml RUN_ID=first
-make perf-check RUN=runs/rules-trial/first                 # N1 overhead budgets (report-only)
+make experiment-execute EXPERIMENT=$E JOB_ID=first
+make perf-check JOB=jobs/python__circuit_eval-cp1__rules-trial/first     # N1 overhead budgets (report-only)
 ```
 
-On a real run, `perf-check` is report-only. It lists each phase's p95 against its accepted budget and prints breaches as warnings: over budget, `insufficient` (fewer than `MIN_SAMPLES` samples, default 10), or `missing`. It also prints the run's contention context: the configured concurrency, the peak number of trials running at once, and any other Raidar runs under the same runs root that overlapped in time. It exits 0 on breaches and non-zero only on malformed or empty input. `PERF_STRICT=1` makes breaches fail. For a small trial run, pass `MIN_SAMPLES=<trials>` to judge the budgets on what there is.
+On a real job, `perf-check` is report-only. It lists each phase's p95 against its accepted budget and prints breaches as warnings: over budget, `insufficient` (fewer than `MIN_SAMPLES` samples, default 10), or `missing`. It also prints the job's contention context: the configured concurrency, the peak number of trials running at once, and any other Raidar jobs under the same jobs root that overlapped in time. It exits 0 on breaches and non-zero only on malformed or empty input. `PERF_STRICT=1` makes breaches fail. For a small job, pass `MIN_SAMPLES=<trials>` to judge the budgets on what there is.
 
 The enforced overhead check is `make perf-gate`. It runs the no-LLM fixture experiment (`make perf-fixture`) at concurrency 1 and then 3 and fails on any breach of the accepted budgets. It needs Docker, so it is a release/gate check and is not part of `make quality`.
 
-If a run is stopped mid-trial, `make harbor-cleanup RUN=runs/rules-trial/first` removes the trial environments it left behind.
+If a job is stopped mid-trial, `make harbor-cleanup JOB=jobs/python__circuit_eval-cp1__rules-trial/first` removes the trial environments it left behind.
 
-**5. Assess.** Scorers run offline over the stored trials. They write to an Assessment store outside the run and use the assessment settings of the run's lock: the experiment's current lock when its `lock_sha256` is the run's (so an assessment-only relock applies), else the run's `run.lock.json`; `LOCK=` names another. `REPLAY=1` reruns existing Assessments and requires byte-identical output. `process-compliance@1` asks Jev only about trace residue it cannot decide itself; when Jev cannot answer (no `OPENROUTER_API_KEY`, or `JEV_REPLAY_ONLY=1` with no cached decision) that Assessment is stored `provisional` and the store's Jev audit records why. `stores/` and `analysis/` are git-ignored.
+**5. Assess.** Scorers run offline over the stored trials. They write to an Assessment store outside the job and use the assessment settings of the job's lock: the experiment's current lock when its `lock_sha256` is the job's (so an assessment-only relock applies), else the job's `job.lock.json`; `LOCK=` names another. Scorers given on the command line must cover the job's runtime, and a `--bundle` must be the verifier bundle of a problem the lock binds (`AS1`). `REPLAY=1` reruns existing Assessments and requires byte-identical output. `process-compliance@1` asks Jev only about trace residue it cannot decide itself; when Jev cannot answer (no `OPENROUTER_API_KEY`, or `JEV_REPLAY_ONLY=1` with no cached decision) that Assessment is stored `provisional` and the store's Jev audit records why. `jobs/`, `stores/` and `analysis/` are git-ignored.
 
 ```bash
-make experiment-assess RUN=runs/rules-trial/first STORE=stores/rules-trial \
+make experiment-assess JOB=jobs/python__circuit_eval-cp1__rules-trial/first STORE=stores/rules-trial \
   SCORERS="correctness@1 code-quality@1 resource-usage@1"
 ```
 
-**6. Analyze.** The verdict thresholds and the assessment settings come from the lock. The report labels any command-line override. A trial whose inputs cannot be loaded is refused, never read as unassessed; if the problem store moved, pass `BUNDLE_SEARCH=<dir>` to find oracle bundles by digest.
+**6. Analyze.** The verdict thresholds and the assessment settings come from the lock. The report labels any command-line override. A trial whose inputs cannot be loaded is refused, never read as unassessed; if the problem store moved, pass `BUNDLE_SEARCH=<dir>` to find verifier bundles by digest. A benchmark's report adds the ranking view; a smoke report says it is not citable.
 
 ```bash
-make experiment-analyze RUNS="runs/rules-trial/first" STORE=stores/rules-trial ANALYSIS_OUT=analysis/rules-trial
+make experiment-analyze JOBS="jobs/python__circuit_eval-cp1__rules-trial/first" STORE=stores/rules-trial ANALYSIS_OUT=analysis/rules-trial
 ```
 
-**7. Review.** Project the Quality element from the runs and the store, then serve the surface with the same runs; serve builds the UI first if `review-surface/dist` is missing (`make review-surface-build` rebuilds it). Each run's lock is found beside its experiment file or in the run directory; pass `REVIEW_LOCK=<lock>` (also used by the Quality projection, or `QUALITY_LOCK=`) for a lock kept elsewhere, such as a smoke lock under `.tmp/smoke/`. A run whose lock cannot be found is skipped with a warning. `make review-surface-test` rewrites `review-surface/data` with its fixtures plus the runs you pass, so run the projection again before serving.
+**7. Review.** Project the Quality element from the jobs and the store, then serve the surface with the same jobs; serve builds the UI first if `review-surface/dist` is missing (`make review-surface-build` rebuilds it). Each job's lock is found beside its experiment file or in the job directory; pass `REVIEW_LOCK=<lock>` (also used by the Quality projection, or `QUALITY_LOCK=`) for a lock kept elsewhere, such as a smoke lock under `.tmp/smoke/`. A job whose lock cannot be found is skipped with a warning. `make review-surface-test` rewrites `review-surface/data` with its fixtures plus the jobs you pass, so run the projection again before serving.
 
 ```bash
-make review-surface-quality-data QUALITY_RUNS=runs/rules-trial QUALITY_STORE=stores/rules-trial
-make review-surface-serve REVIEW_RUNS_ROOT=runs/rules-trial REVIEW_STORE=stores/rules-trial
+make review-surface-quality-data QUALITY_JOBS=jobs/python__circuit_eval-cp1__rules-trial QUALITY_STORE=stores/rules-trial
+make review-surface-serve REVIEW_JOBS_ROOT=jobs/python__circuit_eval-cp1__rules-trial REVIEW_STORE=stores/rules-trial
 ```
+
+### Jobs from before schema v2
+
+A job written before schema v2 (`run.json`, `run.lock.json`, `trajectories/`) is refused by analysis, assessment and review with a pointer to the migration. `make experiment-migrate-job JOB=<job dir> LOCK=<the experiment's v2 lock>` moves it onto the v2 layout only after proving that its executed lock, translated field by field into the v2 vocabulary, equals the v2 lock's execution section. The legacy files are kept byte for byte in `legacy-v1/`, and `job.json` records both lock digests and the sha256 of every legacy file. Rescore a migrated job into its store (step 5) before analysing it: the scorers' identities moved with the vocabulary, while their observations are unchanged.
 
 ## Smoke checks
 
-The smoke targets run real agent trials of `examples/smoke/` through the same experiment path. Each target locks its experiment under `.tmp/smoke/` with its own overrides and writes runs under `runs/`.
+The smoke targets run real agent trials through the same experiment path: `experiments/smoke/python__circuit_eval-cp1__harness-health/` (kind `smoke`) and the agent benchmark `experiments/benchmark/python__circuit_eval-cp1__agents/` (one arm per pack agent). Each target locks its experiment under `.tmp/smoke/` with its own overrides and writes jobs under `jobs/`.
 
 ```bash
-make orchestrator-smoke                                   # codex-cli + gpt-6-luna (low), one trial
-make agent-smoke HARNESS=claude-code PROVIDER=anthropic MODEL=claude-sonnet-4-6
-make smoke-agents                                         # one trial per pack harness (arms codex, claude)
+make orchestrator-smoke                                   # codex + gpt-6-luna (low), one trial
+make agent-smoke AGENT=claude-code PROVIDER=anthropic MODEL=claude-sonnet-4-6
+make smoke-agents                                         # one trial per pack agent (arms codex, claude)
 make smoke-agents SMOKE_ARM=codex                         # one arm only
 ```
 
+Make variables follow the vocabulary: `JOB`, `JOBS`, `JOB_ID`, `JOBS_DIR`, `AGENT`, `AGENT_VERSION`, `ATTEMPT`, `SMOKE_ATTEMPTS`, `VERIFIER_BUNDLE`, `REVIEW_JOBS_ROOT`, `QUALITY_JOBS`, `ALLOW_DEV_JOBS`. A variable under its old name (`RUN=`, `HARNESS=`, `BLOCK=`, ...) fails with its new name.
+
 ## Repository layout
 
-- `orchestrator/`: the `raidar` CLI and library (`spec`, `problems`, `packs`, `components`, `execution`, `oracle`, `scorers`, `jev`, `analysis`, `review_projection`, `review_quality`).
-- `examples/`: the Phase 1 pilot experiments and the smoke experiments. Files under `examples/**/components/` are treatment content delivered to agents.
+- `orchestrator/`: the `raidar` CLI and library (`spec`, `problems`, `packs`, `components`, `execution`, `verifier`, `scorers`, `jev`, `analysis`, `review_projection`, `review_quality`). `raidar/oracle/` holds only `snapshot.py`, a frozen fingerprint source of the released review-loop components.
+- `experiments/<kind>/<id>/`: experiment definitions with their locks and component files (the Phase 1 pilot ab-tests, the smoke experiment and the agent benchmark). Files under `experiments/**/components/` are treatment content delivered to agents. Legacy data some checkouts keep under `experiments/` (`research_loops/`, `operational_smoke/`) is git-ignored.
 - `problems/`: the pinned problem registry (tracked), plus the imported store and source cache (local).
-- `review-surface/`: the review UI, its frozen projection contract (`schema_version=1`) and its Playwright suite.
-- `runs/`: local run directories, ignored by git.
-- `experiments/`: ignored by git; nothing in Raidar reads or writes it.
+- `review-surface/`: the review UI, its frozen projection contract and its Playwright suite.
+- `jobs/`, `stores/`, `analysis/`: local job directories, Assessment stores and analysis output, ignored by git.
 - `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo, the Phase 1 gate packet, and the tracked Phase 0 spike evidence (`evidence/`).
 
-`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `examples/**/*.lock.json` is current), then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`. Docker-backed tests stay opt-in and are skipped there; the N1 overhead gate (`make perf-gate`) is run separately as a release/gate check.
+`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `experiments/*/*/*.lock.json` is current), then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`. Docker-backed tests stay opt-in and are skipped there; the N1 overhead gate (`make perf-gate`) is run separately as a release/gate check.

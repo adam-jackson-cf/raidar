@@ -51,11 +51,11 @@ forbidden_modules =
     raidar.commands
     raidar.cli
 
-[importlinter:contract:oracle-boundary]
-name = Oracle plugin stays independent of execution, agents, commands, and CLI layers
+[importlinter:contract:verifier-boundary]
+name = Verifier stays independent of execution, agents, commands, and CLI layers
 type = forbidden
 source_modules =
-    raidar.oracle
+    raidar.verifier
 forbidden_modules =
     raidar.execution
     raidar.agents

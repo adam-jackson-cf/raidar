@@ -1,11 +1,16 @@
-"""Execution records (plan WS-D): planned trials, checkpoint attempts, trajectories.
+"""Execution records (plan WS-D): planned trials, step results, trial records.
 
-A ``PlannedTrial`` is one arm x block x problem trajectory (one Harbor
-multi-step trial). After it runs, the driver writes one ``TrajectoryRecord``
-holding a ``CheckpointAttempt`` per planned checkpoint, the execution-validity
-gate and the N1 phase timings. Correctness facts come from the host-only
-oracle records (``raidar-oracle/steps/<step>/record.json``), never from
-Harbor's aggregated trial reward.
+A ``PlannedTrial`` is one arm x attempt x problem trial (one Harbor
+multi-step trial). After it runs, the driver writes one ``TrialRecord``
+holding a ``StepResult`` per planned checkpoint (Harbor's per-step result),
+the execution-validity gate and the N1 phase timings. Correctness facts come
+from the host-only verifier records (``raidar-oracle/steps/<step>/record.json``,
+a v1 wire path kept for every job), never from Harbor's aggregated trial reward.
+
+Schema v2 vocabulary (Harbor's): a *job* is one execution of a locked
+experiment, a *trial* is one arm x attempt x problem run through every
+checkpoint, a *step result* is one checkpoint of a trial, and *attempts* are
+the paired, counterbalanced replicates of every arm.
 """
 
 from __future__ import annotations
@@ -41,8 +46,8 @@ class TrialHashes(ExecutionModel):
 
 class PlannedTrial(ExecutionModel):
     trial_id: str
-    block: int = Field(ge=0)
-    order: int = Field(ge=0, description="Position within the block (AB/BA order)")
+    attempt: int = Field(ge=0)
+    order: int = Field(ge=0, description="Position within the attempt (AB/BA order)")
     sequence: int = Field(ge=0, description="Global start order across the plan")
     arm: str
     problem: str
@@ -52,7 +57,7 @@ class PlannedTrial(ExecutionModel):
 
 
 class ProgressionRule(ExecutionModel):
-    """How a trajectory proceeds past a checkpoint (F4)."""
+    """How a trial proceeds past a checkpoint (F4)."""
 
     mode: Literal["continue", "halt_on_failure"]
     reward_key: str
@@ -82,12 +87,12 @@ class ProbeSummary(ExecutionModel):
     failures: tuple[str, ...] = ()
 
 
-class CheckpointAttempt(ExecutionModel):
-    kind: Literal["raidar-checkpoint-attempt"] = "raidar-checkpoint-attempt"
-    schema_version: Literal[1] = 1
+class StepResult(ExecutionModel):
+    kind: Literal["raidar-step-result"] = "raidar-step-result"
+    schema_version: Literal[2] = 2
     trial_id: str
     arm: str
-    block: int
+    attempt: int
     problem: str
     index: int = Field(ge=0)
     step: str
@@ -96,7 +101,7 @@ class CheckpointAttempt(ExecutionModel):
     infra_reasons: tuple[str, ...] = ()
     strict_pass_rate: float | None = None
     rewards: dict[str, float] | None = None
-    oracle_record: str | None = None
+    verifier_record: str | None = None
     instruction_sha256: str | None = None
     snapshot: SnapshotInfo | None = None
     parent_snapshot_digest: str | None = None
@@ -114,7 +119,7 @@ class ValidityCheck(ExecutionModel):
 
 
 class ExecutionValidity(ExecutionModel):
-    """The kept execution-validity gate: an invalid trajectory is infra-excluded."""
+    """The kept execution-validity gate: an invalid trial is infra-excluded."""
 
     checks: tuple[ValidityCheck, ...]
 
@@ -134,17 +139,17 @@ class PhaseSample(ExecutionModel):
     )
 
 
-class TrajectoryRecord(ExecutionModel):
-    kind: Literal["raidar-trajectory"] = "raidar-trajectory"
-    schema_version: Literal[1] = 1
+class TrialRecord(ExecutionModel):
+    kind: Literal["raidar-trial"] = "raidar-trial"
+    schema_version: Literal[2] = 2
     experiment: str
-    run_id: str
+    job_id: str
     trial: PlannedTrial
     trial_dir: str
     progression: ProgressionRule
     truncated_to: int | None = None
     agent_override: str | None = None
-    attempts: tuple[CheckpointAttempt, ...]
+    step_results: tuple[StepResult, ...]
     reached: tuple[bool, ...]
     reached_source: Literal["executed", "derived"]
     validity: ExecutionValidity

@@ -2,7 +2,7 @@
 
 ``content_digest`` hashes every file under a root. Unlike the workspace
 snapshot digest (``raidar.oracle.snapshot.tree_digest``) it has no exclude
-list: a task, oracle bundle or reference payload is input content (N3), so a
+list: a task, verifier bundle or reference payload is input content (N3), so a
 file under ``build/``, ``dist/`` or ``__pycache__/`` is part of its identity.
 The encoding is otherwise the same, so trees without such directories hash
 identically under both.
@@ -15,7 +15,7 @@ import os
 import stat
 from pathlib import Path
 
-from raidar.oracle.bundle import OracleBundle
+from raidar.verifier.bundle import VerifierBundle
 
 HIDDEN_FILE_NAMES = frozenset({"conftest.py", "solve.sh", "_ctrf_to_reward.py", "test.sh"})
 
@@ -44,8 +44,8 @@ def content_digest(root: Path) -> str:
     return digest.hexdigest()
 
 
-def hidden_content_in_task(task_dir: Path, bundle: OracleBundle) -> list[str]:
-    """Task files that are, or byte-match, hidden oracle content (must be empty)."""
+def hidden_content_in_task(task_dir: Path, bundle: VerifierBundle) -> list[str]:
+    """Task files that are, or byte-match, hidden verifier content (must be empty)."""
     hidden = bundle.hidden_file_hashes()
     stub = task_dir / "tests" / "test.sh"
     found: list[str] = []

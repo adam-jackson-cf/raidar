@@ -74,7 +74,7 @@ export function SearchPanel({
         <input
           value={pattern}
           onChange={(e) => setPattern(e.target.value)}
-          placeholder="Search this run's evidence — commands, file paths, error text…"
+          placeholder="Search this trial's evidence — commands, file paths, error text…"
           className="num min-w-0 flex-1 rounded-md px-2 py-1 text-xs outline-none"
           style={{ border: `1px solid ${C.border}`, background: C.input, color: C.fg4 }}
         />

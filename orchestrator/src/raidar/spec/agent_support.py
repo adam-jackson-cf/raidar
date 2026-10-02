@@ -1,8 +1,8 @@
-"""Agent entries checked against the harness adapter's declared model support.
+"""Agent entries checked against the agent CLI adapter's declared model support.
 
 The spec reuses the adapters' own support tables (``REQUIRED_PROVIDER``,
 ``SUPPORTED_MODELS`` with per-model reasoning levels, ``ALLOWED_PROVIDERS``)
-so an agent the harness would refuse at execution time is rejected by
+so an agent its CLI adapter would refuse at execution time is rejected by
 ``raidar validate``, with each problem located on the offending field.
 Environment checks (CLI binary, credentials) stay with execution.
 """
@@ -21,7 +21,7 @@ AgentIssue = tuple[str, str]
 def _harbor_issues(
     loc: str, agent: AgentEntry, adapter: type[HarborCliAdapter]
 ) -> list[AgentIssue]:
-    label = adapter.ADAPTER_LABEL or agent.harness.value
+    label = adapter.ADAPTER_LABEL or agent.name.value
     if adapter.REQUIRED_PROVIDER and agent.provider != adapter.REQUIRED_PROVIDER:
         return [
             (
@@ -62,7 +62,7 @@ def _external_issues(
         return [
             (
                 f"{loc}.provider",
-                f"{agent.harness.value} supports providers {', '.join(allowed)}; "
+                f"{agent.name.value} supports providers {', '.join(allowed)}; "
                 f"got {agent.provider!r}",
             )
         ]
@@ -70,11 +70,11 @@ def _external_issues(
 
 
 def agent_support_issues(index: int, agent: AgentEntry) -> list[AgentIssue]:
-    """Provider/model/reasoning problems for one agent, per its harness adapter."""
+    """Provider/model/reasoning problems for one agent, per its agent CLI adapter."""
     loc = f"agents.{index}"
     adapter = adapter_class_for_harness(agent.harness)
     if issubclass(adapter, HarborCliAdapter):
         return _harbor_issues(loc, agent, adapter)
     if issubclass(adapter, ExternalCliAdapter):
         return _external_issues(loc, agent, adapter)
-    return [(f"{loc}.harness", f"no model support declared for {agent.harness.value}")]
+    return [(f"{loc}.name", f"no model support declared for agent {agent.name.value}")]

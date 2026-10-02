@@ -1,7 +1,7 @@
 """Reducing a trajectory's record and Assessments to analysis outcomes (WS-J J1).
 
-Covers the strict and continue views of a halted trajectory, the headline
-ScorePolicy applied to scorer components, and the rule that a gap is never
+Covers the strict and continue views of a halted trial, the headline
+Metric applied to scorer components, and the rule that a gap is never
 read as zero.
 """
 
@@ -18,17 +18,17 @@ from raidar.analysis.assessed import (
 )
 from raidar.analysis.outcomes import OUTCOME_METRICS, TRUNCATED, UNASSESSED, Value
 from raidar.execution.models import (
-    CheckpointAttempt,
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,
-    TrajectoryRecord,
+    StepResult,
     TrialHashes,
+    TrialRecord,
     ValidityCheck,
 )
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.spec.policies import (
+from raidar.spec.metrics import (
     SCB_CANONICAL,
     SCB_CANONICAL_ONESHOT,
     SCB_CANONICAL_ONESHOT_V2,
@@ -47,12 +47,12 @@ def _record(
     steps: tuple[str, ...] = STEPS,
     valid: bool = True,
     infra_step: str | None = None,
-) -> TrajectoryRecord:
-    attempts = tuple(
-        CheckpointAttempt(
+) -> TrialRecord:
+    step_results = tuple(
+        StepResult(
             trial_id="t0",
             arm="guided",
-            block=0,
+            attempt=0,
             problem="toy@1",
             index=index,
             step=step,
@@ -64,12 +64,12 @@ def _record(
         )
         for index, step in enumerate(steps)
     )
-    return TrajectoryRecord(
+    return TrialRecord(
         experiment="e",
-        run_id="r",
+        job_id="r",
         trial=PlannedTrial(
             trial_id="t0",
-            block=0,
+            attempt=0,
             order=0,
             sequence=0,
             arm="guided",
@@ -84,7 +84,7 @@ def _record(
             reward_key="solved",
             threshold=1.0 if mode == "halt_on_failure" else None,
         ),
-        attempts=attempts,
+        step_results=step_results,
         reached=tuple(True for _ in steps),
         reached_source="derived",
         validity=ExecutionValidity(checks=(ValidityCheck(name="steps_started", passed=valid),)),
@@ -129,7 +129,7 @@ def _quality(*, rework: Observation | None = None) -> AssessResult:
     )
 
 
-def test_halted_trajectory_reads_strict_and_continue_views() -> None:
+def test_halted_trial_reads_strict_and_continue_views() -> None:
     results = {CORRECTNESS_REF: _halted_correctness(), CODE_QUALITY_REF: _quality()}
     outcome = build_outcome(_record("halt_on_failure"), results, policy=SCB_CANONICAL)
     assert outcome.metrics["solve_rate"].value == pytest.approx(1 / 3)
@@ -143,7 +143,7 @@ def test_halted_trajectory_reads_strict_and_continue_views() -> None:
     assert continued.metrics["final_solved"].status == "not_applicable"
 
 
-def test_a_truncated_trajectory_has_no_trajectory_level_outcome() -> None:
+def test_a_truncated_trial_has_no_trial_level_outcome() -> None:
     results = {CORRECTNESS_REF: _halted_correctness(), CODE_QUALITY_REF: _quality()}
     record = _record(steps=STEPS[:2]).model_copy(update={"truncated_to": 2})
     outcome = build_outcome(record, results, policy=SCB_CANONICAL)
@@ -197,7 +197,7 @@ def test_one_shot_policy_drops_not_applicable_transitions() -> None:
     assert headline_score(SCB_CANONICAL, 3, components).status == "ineligible"
 
 
-def test_invalid_or_infra_trajectories_are_flagged_with_reasons() -> None:
+def test_invalid_or_infra_trials_are_flagged_with_reasons() -> None:
     usage = AssessResult(
         status=AssessStatus.OK, observations=(_ok("total_cost_usd", TRAJECTORY_SUBJECT, 0.02),)
     )
@@ -232,8 +232,8 @@ def _rework_gap() -> AssessResult:
     return _quality(rework=rework)
 
 
-def test_v2_c_zero_scores_zero_and_keeps_the_trajectory_despite_quality_gaps() -> None:
-    # S2-SS-2: dropping C = 0 trajectories would bias paired S towards the arm that fails more.
+def test_v2_c_zero_scores_zero_and_keeps_the_trial_despite_quality_gaps() -> None:
+    # S2-SS-2: dropping C = 0 trials would bias paired S towards the arm that fails more.
     for quality in (_rework_gap(), None):
         results = {CORRECTNESS_REF: _failed_correctness(0.0)}
         if quality is not None:

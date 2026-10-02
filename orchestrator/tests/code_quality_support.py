@@ -16,15 +16,15 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.models import CaseStatus, ParityVerdict
-from raidar.oracle.records import (
+from raidar.scorers.code_quality.measurement import ToolEnvironment, provisioned_environment
+from raidar.verifier.models import CaseStatus, ParityVerdict
+from raidar.verifier.records import (
     FORK_EVIDENCE_FILE,
     CoverageRef,
     load_step_record,
     step_record_dir,
     write_step_record,
 )
-from raidar.scorers.code_quality.measurement import ToolEnvironment, provisioned_environment
 from tests.scorer_support import StepFixture, write_files, write_trial
 
 GOLDENS = Path(__file__).parent / "fixtures" / "code_quality" / "fork_goldens.json.gz"
@@ -81,7 +81,7 @@ def case_trial(
     """A stored trial whose steps are a golden case's snapshots, with G run evidence.
 
     Steps with fork run evidence get a coverage-enabled record (parity as
-    given, eligible by default) and the oracle's ``g-kernel-input.json``.
+    given, eligible by default) and the verifier's ``g-kernel-input.json``.
     """
     checkpoints = list(case["checkpoints"])[:reached]
     write_trial(

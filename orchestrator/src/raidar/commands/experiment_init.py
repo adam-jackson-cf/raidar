@@ -1,12 +1,14 @@
 """``raidar init``: start a new experiment.yaml from the two-arm starter.
 
-The starter is the README walkthrough's shape: one pinned problem, one agent
-on the pack's pinned harness version, a ``baseline`` condition and a ``rules``
+The starter is the README walkthrough's shape: an ``ab-test`` with one pinned
+problem, one agent on the pack's pinned version, a ``baseline`` condition and a ``rules``
 condition (``rules-file@1`` with a stub ``components/AGENTS.md``), and the
 paired analysis plan. It validates as written; the author then edits the
 problems, conditions and analysis plan. Another variant of an existing
 experiment's treatment is a new condition and arm inside that experiment, not
-a new file, so ``init`` refuses a path that already exists.
+a new file, so ``init`` refuses a path that already exists. The id follows the
+``<runtime>__<subject>__<intent>`` grammar (``NAME2``) and defaults to the
+directory name, so ``experiments/ab-test/<id>/experiment.yaml`` satisfies ``NAME1``.
 """
 
 from __future__ import annotations
@@ -16,23 +18,27 @@ from pathlib import Path
 
 import click
 
-from raidar.packs.python.models import load_pack_spec
+from raidar.agents.config import AgentName, agent_cli
+from raidar.packs import load_runtime_pack
 
 DEFAULT_PROBLEM = "scb/circuit_eval.checkpoint_1@38d627ecf668"
 RULES_FILE = Path("components") / "AGENTS.md"
-_EXPERIMENT_ID = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+_EXPERIMENT_ID = re.compile(r"^python__[a-z0-9][a-z0-9_.-]*__[a-z0-9][a-z0-9_-]*$")
 
 _STARTER = """\
-schema_version: 1
+schema_version: 2
+kind: ab-test
 id: {experiment_id}
 description: Does an AGENTS.md rules file change what the agent delivers?
 
 problems:
   - ref: {problem}
 
+runtime: python
+
 agents:
   - id: codex-luna
-    harness: codex-cli
+    name: codex
     provider: openai
     model: gpt-6-luna
     reasoning_effort: low
@@ -61,7 +67,7 @@ assessment:
 
 analysis:
   baseline_arm: baseline
-  blocks: 5
+  attempts: 5
   seed: 20260930
   min_pairs: 5               # the lock pins these verdict thresholds
   max_exclusion_fraction: 0.2
@@ -83,15 +89,16 @@ def _experiment_id(experiment: Path, given: str | None) -> str:
     candidate = given or experiment.resolve().parent.name
     if not _EXPERIMENT_ID.fullmatch(candidate):
         raise click.BadParameter(
-            f"{candidate!r} is not a valid experiment id (lowercase letters, digits, '-')",
+            f"{candidate!r} is not a valid experiment id: use python__<subject>__<intent> "
+            "(lowercase letters, digits, '-', '_')",
             param_hint="--id",
         )
     return candidate
 
 
 def render_starter(experiment_id: str, problem: str) -> str:
-    """The starter experiment.yaml text, pinned to the Python pack's codex-cli version."""
-    codex = load_pack_spec().image.harnesses["codex-cli"]
+    """The starter experiment.yaml text, pinned to the Python pack's codex version."""
+    codex = load_runtime_pack("python").image.harnesses[agent_cli(AgentName.CODEX).value]
     return _STARTER.format(
         experiment_id=experiment_id,
         problem=problem,

@@ -11,7 +11,7 @@ import pytest
 
 from raidar.analysis.assessed import build_outcome
 from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
-from raidar.execution.models import TrajectoryRecord
+from raidar.execution.models import TrialRecord
 from raidar.review_quality.models import COMPONENTS, QualityProjection
 from raidar.review_quality.projection import build_quality_projection, main
 from raidar.review_quality.stats import pearson, quantiles
@@ -25,7 +25,7 @@ from raidar.review_quality.synthetic import (
 from raidar.review_quality.synthetic_lock import write_synthetic_lock
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation, RunStats
 from raidar.scorers.store import AssessmentStore
-from raidar.spec.policies import SCB_CANONICAL
+from raidar.spec.metrics import SCB_CANONICAL
 
 RUN_PREFIX = f"{EXPERIMENT}.{RUN_ID}."
 
@@ -37,13 +37,13 @@ def fixture_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="module")
 def projection(fixture_dir: Path) -> QualityProjection:
-    return build_quality_projection(fixture_dir / "runs", fixture_dir / "store", synthetic=True)
+    return build_quality_projection(fixture_dir / "jobs", fixture_dir / "store", synthetic=True)
 
 
 def _copy(fixture_dir: Path, tmp_path: Path) -> Path:
     target = tmp_path / "fx"
     shutil.copytree(fixture_dir, target)
-    run = target / "runs" / EXPERIMENT / RUN_ID / "run.json"
+    run = target / "jobs" / EXPERIMENT / RUN_ID / "job.json"
     payload = json.loads(run.read_text())
     payload["experiment_file"] = str(target / "experiment.yaml")
     run.write_text(json.dumps(payload))
@@ -56,24 +56,24 @@ def _problem(projection: QualityProjection):
     return problem
 
 
-def _edit_record(target: Path, run_id: str, trial_id: str, **changes: object) -> None:
-    path = target / "runs" / EXPERIMENT / run_id / "trajectories" / f"{trial_id}.json"
+def _edit_record(target: Path, job_id: str, trial_id: str, **changes: object) -> None:
+    path = target / "jobs" / EXPERIMENT / job_id / "trial-records" / f"{trial_id}.json"
     record = json.loads(path.read_text())
     record.update(changes)
     path.write_text(json.dumps(record))
 
 
-def _clone_run(target: Path, run_id: str, **manifest: object) -> Path:
+def _clone_run(target: Path, job_id: str, **manifest: object) -> Path:
     """A second run of the same trials (same snapshots), finishing later."""
-    source = target / "runs" / EXPERIMENT / RUN_ID
-    other = target / "runs" / EXPERIMENT / run_id
+    source = target / "jobs" / EXPERIMENT / RUN_ID
+    other = target / "jobs" / EXPERIMENT / job_id
     shutil.copytree(source, other)
-    payload = json.loads((other / "run.json").read_text())
-    payload.update(run_id=run_id, finished_at="2026-10-01T00:00:00.000Z", **manifest)
-    (other / "run.json").write_text(json.dumps(payload))
-    for path in (other / "trajectories").glob("*.json"):
+    payload = json.loads((other / "job.json").read_text())
+    payload.update(job_id=job_id, finished_at="2026-10-01T00:00:00.000Z", **manifest)
+    (other / "job.json").write_text(json.dumps(payload))
+    for path in (other / "trial-records").glob("*.json"):
         record = json.loads(path.read_text())
-        record["run_id"] = run_id
+        record["job_id"] = job_id
         path.write_text(json.dumps(record))
     return other
 
@@ -115,11 +115,9 @@ def test_problem_row_is_the_analysis_outcome_of_the_same_assessments(
     """C = mean per-checkpoint case pass rate (ADR-001 §2.4, the fork's C_p) and S agree
     with WS-J for every trial."""
     store = AssessmentStore(fixture_dir / "store")
-    trajectories = fixture_dir / "runs" / EXPERIMENT / RUN_ID / "trajectories"
+    trials = fixture_dir / "jobs" / EXPERIMENT / RUN_ID / "trial-records"
     for detail in projection.run_details.values():
-        record = TrajectoryRecord.model_validate_json(
-            (trajectories / f"{detail.run.trial}.json").read_bytes()
-        )
+        record = TrialRecord.model_validate_json((trials / f"{detail.run.trial}.json").read_bytes())
         results = {
             ref: assessment.result
             for ref, key in detail.run.sources.items()
@@ -155,8 +153,8 @@ def test_problem_row_is_the_headline_policy_score(projection: QualityProjection)
 def test_an_ineligible_component_makes_the_headline_ineligible_with_reasons(
     projection: QualityProjection,
 ) -> None:
-    arm, block, checkpoint = INELIGIBLE_H
-    detail = projection.run_details[f"{RUN_PREFIX}b{block:02d}-p0-{arm}"]
+    arm, attempt, checkpoint = INELIGIBLE_H
+    detail = projection.run_details[f"{RUN_PREFIX}b{attempt:02d}-p0-{arm}"]
     row = next(row for row in detail.rows if row.checkpoint == checkpoint)
     assert row.cells["H"].status == "ineligible"
     assert row.cells["I"].status == "ineligible"
@@ -200,9 +198,9 @@ def test_jev_decisions_never_attach_to_a_run_they_may_not_belong_to(
             for line in lines
         ]
         path.write_text("\n".join(rewritten) + "\n")
-    result = build_quality_projection(target / "runs", target / "store")
-    for run_id in (RUN_ID, "synthetic-run-2"):
-        detail = result.run_details[f"{EXPERIMENT}.{run_id}.b00-p0-baseline"]
+    result = build_quality_projection(target / "jobs", target / "store")
+    for job_id in (RUN_ID, "synthetic-run-2"):
+        detail = result.run_details[f"{EXPERIMENT}.{job_id}.b00-p0-baseline"]
         assert detail.jev_decisions == ()
         assert any("not attached" in note and "2 runs share" in note for note in detail.notes)
     qualified = f"{EXPERIMENT}.synthetic-run-2.b01-p0-baseline"
@@ -210,16 +208,16 @@ def test_jev_decisions_never_attach_to_a_run_they_may_not_belong_to(
     assert result.run_details[f"{RUN_PREFIX}b01-p0-baseline"].jev_decisions == ()
 
 
-def test_arm_statistics_leave_out_invalid_trials_and_pair_by_block(
+def test_arm_statistics_leave_out_invalid_trials_and_pair_by_attempt(
     projection: QualityProjection,
 ) -> None:
     problem = _problem(projection)
-    arm, block = INVALID
+    arm, attempt = INVALID
     assert problem.arms == ("baseline", "guided")
     assert any("infra-excluded" in item for item in problem.excluded)
     erosion = next(item for item in problem.paired if item.component == "E")
     assert erosion.n == 5
-    assert f"block {block}: {arm} infra error" in erosion.excluded
+    assert f"attempt {attempt}: {arm} infra error" in erosion.excluded
     assert erosion.verdict == "improved"
     headline = next(item for item in problem.paired if item.component == "S")
     assert headline.n == 4
@@ -253,12 +251,12 @@ def test_head_to_head_uses_per_checkpoint_medians_of_both_arms(
     lint = next(signal for signal in h2h.signals if signal.signal == "lint_findings")
     assert [point.checkpoint for point in lint.points] == list(problem.checkpoints)
     first = lint.points[0]
-    blocks = [
+    attempts = [
         detail
         for detail in projection.run_details.values()
         if detail.run.arm == "baseline" and detail.run.valid
     ]
-    values = sorted(float(detail.rows[0].signals.lint_findings or 0) for detail in blocks)
+    values = sorted(float(detail.rows[0].signals.lint_findings or 0) for detail in attempts)
     assert first.a == quantiles(values)[2]  # type: ignore[index]
     assert first.n_a == len(values)
 
@@ -284,20 +282,20 @@ def test_assessments_are_matched_by_snapshot_content_not_trial_name(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
-    source = target / "runs" / EXPERIMENT / RUN_ID
-    other = target / "runs" / EXPERIMENT / "synthetic-run-2"
+    source = target / "jobs" / EXPERIMENT / RUN_ID
+    other = target / "jobs" / EXPERIMENT / "synthetic-run-2"
     other.mkdir()
-    (other / "trajectories").mkdir()
-    shutil.copy(source / "run.json", other / "run.json")
-    record = json.loads((source / "trajectories" / "b00-p0-baseline.json").read_text())
-    for attempt in record["attempts"]:
-        attempt["snapshot"]["digest"] = "f" * 64
-    (other / "trajectories" / "b00-p0-baseline.json").write_text(json.dumps(record))
-    payload = json.loads((other / "run.json").read_text())
-    payload["run_id"] = "synthetic-run-2"
-    (other / "run.json").write_text(json.dumps(payload))
+    (other / "trial-records").mkdir()
+    shutil.copy(source / "job.json", other / "job.json")
+    record = json.loads((source / "trial-records" / "b00-p0-baseline.json").read_text())
+    for step_result in record["step_results"]:
+        step_result["snapshot"]["digest"] = "f" * 64
+    (other / "trial-records" / "b00-p0-baseline.json").write_text(json.dumps(record))
+    payload = json.loads((other / "job.json").read_text())
+    payload["job_id"] = "synthetic-run-2"
+    (other / "job.json").write_text(json.dumps(payload))
 
-    result = build_quality_projection(target / "runs", target / "store")
+    result = build_quality_projection(target / "jobs", target / "store")
     unmatched = result.run_details[f"{EXPERIMENT}.synthetic-run-2.b00-p0-baseline"]
     assert unmatched.run.sources == {"code-quality@1": None, "correctness@1": None}
     assert unmatched.rows[0].cells["V"].status == "unavailable"
@@ -312,8 +310,8 @@ def test_the_most_recently_logged_assessment_of_a_scorer_wins(
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
     store = AssessmentStore(target / "store")
-    run_id = f"{RUN_PREFIX}b00-p0-baseline"
-    before = build_quality_projection(target / "runs", target / "store").run_details[run_id]
+    job_id = f"{RUN_PREFIX}b00-p0-baseline"
+    before = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
     original = store.get(before.run.sources["correctness@1"] or "")
     assert original is not None
     replacement = original.model_copy(
@@ -350,7 +348,7 @@ def test_the_most_recently_logged_assessment_of_a_scorer_wins(
         outcome="added",
         stats=RunStats(duration_s=0),
     )
-    after = build_quality_projection(target / "runs", target / "store").run_details[run_id]
+    after = build_quality_projection(target / "jobs", target / "store").run_details[job_id]
     assert after.run.sources["correctness@1"] == "e" * 64
     assert after.rows[0].cells["C"].value == 0.5
     # C is the mean case pass rate (0.5 everywhere), not solved_checkpoints / K.
@@ -362,12 +360,12 @@ def _lock(target: Path, headline_policy: str, experiment: str = EXPERIMENT) -> s
         target / "experiment.yaml",
         experiment=experiment,
         baseline_arm="baseline",
-        headline_policy=headline_policy,
+        metric=headline_policy,
     )
 
 
-def _executed_lock(target: Path, run_id: str = RUN_ID) -> str:
-    run = target / "runs" / EXPERIMENT / run_id / "run.json"
+def _executed_lock(target: Path, job_id: str = RUN_ID) -> str:
+    run = target / "jobs" / EXPERIMENT / job_id / "job.json"
     return str(json.loads(run.read_text())["lock_sha256"])
 
 
@@ -375,9 +373,9 @@ def test_the_locks_headline_policy_takes_precedence_over_the_default(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
-    # A new headline policy is an assessment change: the relocked lock keeps the run's identity.
+    # A new headline metric is an assessment change: the relocked lock keeps the run's identity.
     assert _lock(target, "scb-canonical-oneshot@1") == _executed_lock(target)
-    detail = build_quality_projection(target / "runs", target / "store").run_details[
+    detail = build_quality_projection(target / "jobs", target / "store").run_details[
         f"{RUN_PREFIX}b00-p0-baseline"
     ]
     assert (detail.policy.ref, detail.policy.source) == ("scb-canonical-oneshot@1", "lock")
@@ -397,7 +395,7 @@ def test_without_the_runs_own_lock_there_is_no_baseline_and_no_paired_delta(
         lock.unlink()
     else:
         _lock(target, "scb-canonical-oneshot@1", experiment=f"{EXPERIMENT}-redesigned")
-    result = build_quality_projection(target / "runs", target / "store")
+    result = build_quality_projection(target / "jobs", target / "store")
     problem = _problem(result)
     assert problem.baseline_arm is None
     assert problem.paired == ()
@@ -410,28 +408,28 @@ def test_without_the_runs_own_lock_there_is_no_baseline_and_no_paired_delta(
 def test_runs_under_different_locks_are_never_pooled(fixture_dir: Path, tmp_path: Path) -> None:
     target = _copy(fixture_dir, tmp_path)
     _clone_run(target, "synthetic-run-2", lock_sha256="0" * 64)
-    result = build_quality_projection(target / "runs", target / "store")
+    result = build_quality_projection(target / "jobs", target / "store")
     by_lock = {item.lock_sha256: item for item in result.experiments}
     assert len(by_lock) == 2
-    assert by_lock["0" * 64].runs == ("synthetic-run-2",)
+    assert by_lock["0" * 64].jobs == ("synthetic-run-2",)
     original = next(item for lock, item in by_lock.items() if lock != "0" * 64)
-    assert original.runs == (RUN_ID,)
+    assert original.jobs == (RUN_ID,)
     assert not any("superseded" in item for item in original.problems[0].excluded)
     assert original.problems[0].baseline_arm == "baseline"
 
 
-def test_truncated_trajectories_have_no_problem_outcome_and_stay_out_of_arm_statistics(
+def test_truncated_trials_have_no_problem_outcome_and_stay_out_of_arm_statistics(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     """A max_checkpoints run never scores its unrun checkpoints as zero (F6)."""
     target = _copy(fixture_dir, tmp_path)
-    path = target / "runs" / EXPERIMENT / RUN_ID / "trajectories" / "b00-p0-guided.json"
+    path = target / "jobs" / EXPERIMENT / RUN_ID / "trial-records" / "b00-p0-guided.json"
     record = json.loads(path.read_text())
-    attempts = [
-        record["attempts"][0],
+    step_results = [
+        record["step_results"][0],
         *(
-            {**attempt, "snapshot": None, "checkpoint_state": "not_attempted"}
-            for attempt in record["attempts"][1:]
+            {**step_result, "snapshot": None, "checkpoint_state": "not_attempted"}
+            for step_result in record["step_results"][1:]
         ),
     ]
     _edit_record(
@@ -440,22 +438,22 @@ def test_truncated_trajectories_have_no_problem_outcome_and_stay_out_of_arm_stat
         "b00-p0-guided",
         truncated_to=1,
         trial={**record["trial"], "steps": ["checkpoint_1"]},
-        attempts=attempts,
+        step_results=step_results,
     )
     # Without the lock, the default policy is chosen by the problem's K (every planned
-    # attempt), not by the one step that ran: no one-shot default for a 5-checkpoint problem.
+    # step_result), not by the one step that ran: no one-shot default for a 5-checkpoint problem.
     (target / "experiment.lock.json").unlink()
-    result = build_quality_projection(target / "runs", target / "store")
+    result = build_quality_projection(target / "jobs", target / "store")
     detail = result.run_details[f"{RUN_PREFIX}b00-p0-guided"]
     assert detail.run.truncated_to == 1
     assert (detail.policy.ref, detail.policy.source) == ("scb-canonical@1", "default_by_k")
     assert {cell.status for cell in detail.problem.values()} == {"truncated"}
     assert all("max_checkpoints" in (cell.reason or "") for cell in detail.problem.values())
-    assert any("development run" in note for note in detail.notes)
+    assert any("development job" in note for note in detail.notes)
     assert [row.checkpoint for row in detail.rows] == ["checkpoint_1"]
     problem = _problem(result)
-    assert any("b00-p0-guided: development run" in item for item in problem.excluded)
-    # Six guided blocks less the invalid one and the truncated one.
+    assert any("b00-p0-guided: development job" in item for item in problem.excluded)
+    # Six guided attempts less the invalid one and the truncated one.
     assert problem.curves["guided"]["E"][0].n == 4
 
 
@@ -463,28 +461,28 @@ def test_agent_override_trials_render_but_stay_out_of_arm_statistics(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
-    path = target / "runs" / EXPERIMENT / RUN_ID / "trajectories" / "b00-p0-guided.json"
+    path = target / "jobs" / EXPERIMENT / RUN_ID / "trial-records" / "b00-p0-guided.json"
     record = json.loads(path.read_text())
     record["agent_override"] = "oracle"
     path.write_text(json.dumps(record))
-    result = build_quality_projection(target / "runs", target / "store")
+    result = build_quality_projection(target / "jobs", target / "store")
     detail = result.run_details[f"{RUN_PREFIX}b00-p0-guided"]
     assert "agent override: oracle" in detail.notes
     problem = _problem(result)
     assert any("agent override oracle" in item for item in problem.excluded)
     erosion = next(item for item in problem.paired if item.component == "E")
-    assert "block 0: guided not run" in erosion.excluded
+    assert "attempt 0: guided not run" in erosion.excluded
 
 
 def test_one_arm_has_no_head_to_head_and_small_samples_have_no_correlation(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
-    trajectories = target / "runs" / EXPERIMENT / RUN_ID / "trajectories"
-    for path in trajectories.glob("*.json"):
+    trials = target / "jobs" / EXPERIMENT / RUN_ID / "trial-records"
+    for path in trials.glob("*.json"):
         if "guided" in path.name or path.name[:3] not in {"b00", "b01"}:
             path.unlink()
-    problem = _problem(build_quality_projection(target / "runs", target / "store"))
+    problem = _problem(build_quality_projection(target / "jobs", target / "store"))
     assert problem.arms == ("baseline",)
     assert problem.head_to_head is None
     assert problem.paired == ()
@@ -495,8 +493,8 @@ def test_one_arm_has_no_head_to_head_and_small_samples_have_no_correlation(
 
 def test_cli_writes_a_projection_that_round_trips(fixture_dir: Path, tmp_path: Path) -> None:
     output = tmp_path / "quality.json"
-    runs, store = str(fixture_dir / "runs"), str(fixture_dir / "store")
-    main(["--runs-root", runs, "--store", store, "--output", str(output), "--synthetic"])
+    runs, store = str(fixture_dir / "jobs"), str(fixture_dir / "store")
+    main(["--jobs-root", runs, "--store", store, "--output", str(output), "--synthetic"])
     loaded = QualityProjection.model_validate_json(output.read_bytes())
     assert loaded.synthetic
     assert len(loaded.runs) == 12
@@ -511,12 +509,12 @@ def test_descriptive_statistics_boundaries() -> None:
     assert pearson([1.0, 2.0, 3.0], [2.0, 4.0, 6.0]) == pytest.approx(1.0)
 
 
-def test_each_run_carries_its_trajectory_as_the_join_key_to_the_run_review(
+def test_each_run_carries_its_trial_record_as_the_join_key_to_the_run_review(
     projection: QualityProjection, fixture_dir: Path
 ) -> None:
     for run in projection.runs:
-        assert run.trajectory == f"runs/{EXPERIMENT}/{RUN_ID}/trajectories/{run.trial}.json"
-        assert (fixture_dir / run.trajectory).is_file()
+        assert run.trial_record == f"jobs/{EXPERIMENT}/{RUN_ID}/trial-records/{run.trial}.json"
+        assert (fixture_dir / run.trial_record).is_file()
 
 
 def test_cli_reads_several_runs_roots_each_against_its_own_store(
@@ -524,25 +522,25 @@ def test_cli_reads_several_runs_roots_each_against_its_own_store(
 ) -> None:
     other = _copy(fixture_dir, tmp_path)
     moved = _clone_run(other, "synthetic-run-2")
-    shutil.rmtree(other / "runs" / EXPERIMENT / RUN_ID)
+    shutil.rmtree(other / "jobs" / EXPERIMENT / RUN_ID)
     output = tmp_path / "quality.json"
     main(
         [
-            *("--runs-root", str(fixture_dir / "runs"), "--store", str(fixture_dir / "store")),
-            *("--runs-root", str(other / "runs"), "--store", str(other / "store")),
+            *("--jobs-root", str(fixture_dir / "jobs"), "--store", str(fixture_dir / "store")),
+            *("--jobs-root", str(other / "jobs"), "--store", str(other / "store")),
             *("--output", str(output)),
         ]
     )
     loaded = QualityProjection.model_validate_json(output.read_bytes())
-    assert {run.run for run in loaded.runs} == {RUN_ID, moved.name}
+    assert {run.job for run in loaded.runs} == {RUN_ID, moved.name}
     assert len(loaded.runs) == 24
-    assert all(run.score.status != "unassessed" for run in loaded.runs if run.run == moved.name)
+    assert all(run.score.status != "unassessed" for run in loaded.runs if run.job == moved.name)
 
 
 def test_cli_refuses_unpaired_runs_roots_and_stores(fixture_dir: Path) -> None:
-    runs = str(fixture_dir / "runs")
+    runs = str(fixture_dir / "jobs")
     with pytest.raises(SystemExit):
-        main(["--runs-root", runs, "--runs-root", runs, "--store", runs, "--output", "x.json"])
+        main(["--jobs-root", runs, "--jobs-root", runs, "--store", runs, "--output", "x.json"])
 
 
 @pytest.mark.parametrize("source", ["flag", "run-copy"])
@@ -558,9 +556,9 @@ def test_a_relocked_runs_lock_is_found_by_flag_or_the_runs_own_copy(
     if source == "flag":
         locks = (executed,)
     else:
-        shutil.copy(executed, target / "runs" / EXPERIMENT / RUN_ID / "run.lock.json")
+        shutil.copy(executed, target / "jobs" / EXPERIMENT / RUN_ID / "job.lock.json")
 
-    result = build_quality_projection(target / "runs", target / "store", locks=locks)
+    result = build_quality_projection(target / "jobs", target / "store", locks=locks)
 
     problem = _problem(result)
     assert problem.baseline_arm == "baseline"
@@ -574,7 +572,7 @@ def test_the_missing_lock_note_says_why_not_that_the_experiment_file_is_gone(
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
     _lock(target, "scb-canonical-oneshot@1", experiment=f"{EXPERIMENT}-redesigned")
-    problem = _problem(build_quality_projection(target / "runs", target / "store"))
+    problem = _problem(build_quality_projection(target / "jobs", target / "store"))
     (note,) = [note for note in problem.notes if "no baseline arm" in note]
     assert "experiment file unavailable" not in note
     assert "but the run was executed under" in note
@@ -584,11 +582,11 @@ def test_a_baseline_with_no_counted_trials_is_named_in_the_notes(
     fixture_dir: Path, tmp_path: Path
 ) -> None:
     target = _copy(fixture_dir, tmp_path)
-    for path in (target / "runs" / EXPERIMENT / RUN_ID / "trajectories").glob("*-baseline.json"):
+    for path in (target / "jobs" / EXPERIMENT / RUN_ID / "trial-records").glob("*-baseline.json"):
         record = json.loads(path.read_text())
         record["agent_override"] = "oracle"
         path.write_text(json.dumps(record))
-    problem = _problem(build_quality_projection(target / "runs", target / "store"))
+    problem = _problem(build_quality_projection(target / "jobs", target / "store"))
     assert problem.baseline_arm == "baseline"
     assert "baseline" not in problem.arms
     assert problem.paired == ()

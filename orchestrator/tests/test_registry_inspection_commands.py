@@ -108,7 +108,8 @@ def test_problem_info_reports_a_problem_whose_content_is_not_materialised(
 def test_init_writes_a_validating_two_arm_starter_and_refuses_to_overwrite(
     tmp_path: Path,
 ) -> None:
-    experiment = tmp_path / "rules-trial" / "experiment.yaml"
+    experiment_id = "python__circuit_eval-cp1__rules-trial"
+    experiment = tmp_path / "experiments" / "ab-test" / experiment_id / "experiment.yaml"
     runner = CliRunner()
 
     result = runner.invoke(main, ["init", str(experiment)])
@@ -116,7 +117,9 @@ def test_init_writes_a_validating_two_arm_starter_and_refuses_to_overwrite(
     assert result.exit_code == 0, result.output
     text = experiment.read_text()
     codex = load_pack_spec().image.harnesses["codex-cli"]
-    assert "id: rules-trial" in text
+    assert f"id: {experiment_id}" in text
+    assert "kind: ab-test" in text
+    assert "name: codex" in text
     assert f"version: {codex.version}" in text
     assert (experiment.parent / "components" / "AGENTS.md").is_file()
     validated = runner.invoke(main, ["validate", str(experiment)])
@@ -128,9 +131,10 @@ def test_init_writes_a_validating_two_arm_starter_and_refuses_to_overwrite(
     assert "add a condition and an arm" in again.output
 
 
-def test_init_rejects_an_invalid_experiment_id(tmp_path: Path) -> None:
+@pytest.mark.parametrize("bad", ["Not Valid", "rules-trial", "node-ts__x__y", "python__x"])
+def test_init_rejects_an_invalid_experiment_id(tmp_path: Path, bad: str) -> None:
     result = CliRunner().invoke(
-        main, ["init", str(tmp_path / "x" / "experiment.yaml"), "--id", "Not Valid"]
+        main, ["init", str(tmp_path / "x" / "experiment.yaml"), "--id", bad]
     )
 
     assert result.exit_code != 0

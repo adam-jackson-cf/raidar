@@ -22,12 +22,15 @@ DEFAULT_EXCLUDED_PREFIXES = (
     "dist/",
     "docs/",
     "experiments/",
+    "jobs/",
     "node_modules/",
     "orchestrator/.cache/",
     "orchestrator/.venv/",
     "problems/cache/",
     "problems/store/",
     "runs/",
+    "stores/",
+    "analysis/",
     "venv/",
 )
 

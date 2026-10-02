@@ -299,7 +299,7 @@ function WireframeRunList({
         )}
         {!isLoading && grouped.length === 0 && (
           <div className="p-2 text-xs" style={{ color: C.fg0 }}>
-            No runs match this filter.
+            No trials match this filter.
           </div>
         )}
         {grouped.map((problem) => (
@@ -645,7 +645,7 @@ export function WireframeRunsPage() {
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <span className="text-sm" style={{ color: C.fg3 }}>
-              Pick a run to inspect score, findings, and execution traces.
+              Pick a trial to inspect score, findings, and execution traces.
             </span>
             <span className="max-w-sm text-xs leading-relaxed" style={{ color: C.fg0 }}>
               Use the problem selector to jump between runs and compare outcomes quickly.

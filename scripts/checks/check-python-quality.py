@@ -31,11 +31,14 @@ EXCLUDED_PREFIXES = (
     ".venv/",
     "docs/",
     "experiments/",
+    "jobs/",
     "orchestrator/.cache/",
     "orchestrator/.venv/",
     "problems/cache/",
     "problems/store/",
     "runs/",
+    "stores/",
+    "analysis/",
 )
 GENERIC_NAME_PARTS = {"helpers", "misc", "stuff", "temp"}
 ALLOWED_TEST_ROOT_FILES = {

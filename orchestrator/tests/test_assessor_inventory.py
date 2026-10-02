@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from raidar.oracle.models import CaseStatus
 from raidar.scorers.inventory import (
     GENERATED_MARKER_CLAIM,
     INVALID_EVIDENCE,
@@ -16,6 +15,7 @@ from raidar.scorers.inventory import (
 )
 from raidar.scorers.rescore import rescore_path
 from raidar.scorers.store import AssessmentStore
+from raidar.verifier.models import CaseStatus
 from tests.scorer_support import StepFixture, fake_registry, write_files, write_trial
 
 HIDING_SNAPSHOT = {

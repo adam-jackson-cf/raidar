@@ -1,22 +1,22 @@
-"""What analysis reads per trajectory, and the metrics it compares (F10).
+"""What analysis reads per trial, and the metrics it compares (F10).
 
-A ``TrajectoryOutcome`` is one arm x block x problem trajectory reduced to
-statused values: the trajectory-level metrics that effects are estimated on
+A ``TrialOutcome`` is one arm x attempt x problem trial reduced to
+statused values: the trial-level metrics that effects are estimated on
 and the per-checkpoint series that curves are drawn from. It is built from
-the run's ``TrajectoryRecord`` (validity, arm, block) and the Assessment
-store (scorer observations), plus the headline ScorePolicy output. An
+the job's ``TrialRecord`` (validity, arm, attempt) and the Assessment
+store (scorer observations), plus the headline metric output. An
 unavailable value stays unavailable with its status and reason; it is never
 zero (F6), and analysis counts it as an exclusion instead.
 
 Every direction is read from the built-in scorer manifest of the metric it is
 computed from, so "improved" means better in the sense the scorer declared
 and a manifest change carries through. The one exception is the composite S,
-which a ScorePolicy defines as higher-better (F15).
+which a Metric defines as higher-better (F15).
 
 ``primary_metric`` names the experiment's primary outcome (memo §2.3,
 §10.1): the checkpoint-solve rate (solved / K, the memo's ``C_r``) under
 ``continue`` progression and the strict ``reached`` count under
-``halt_on_failure``. The score component C that the headline policy weighs is
+``halt_on_failure``. The score component C that the headline metric weighs is
 a different quantity (``correctness``: the mean per-checkpoint case pass rate,
 the SCB fork's ``C_p``) and is reported as its own metric.
 """
@@ -69,11 +69,11 @@ class Value(AnalysisModel):
         return self.status == OK
 
 
-class TrajectoryOutcome(AnalysisModel):
+class TrialOutcome(AnalysisModel):
     trial_id: str
-    run_id: str
+    job_id: str
     arm: str
-    block: int = Field(ge=0)
+    attempt: int = Field(ge=0)
     problem: str
     steps: tuple[str, ...] = Field(min_length=1)
     infra_error: bool
@@ -95,7 +95,7 @@ class TrajectoryOutcome(AnalysisModel):
 
 
 class View(StrEnum):
-    """How a metric reads a trajectory (design memo §10.1)."""
+    """How a metric reads a trial (design memo §10.1)."""
 
     HEADLINE = "headline"
     CONTINUE = "continue"
@@ -145,14 +145,14 @@ SCORE_POLICY_DIRECTION = Direction.HIGHER_BETTER
 OUTCOME_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         HEADLINE_SCORE,
-        "Composite score S (headline ScorePolicy, 0-100)",
+        "Composite score S (headline metric, 0-100)",
         View.HEADLINE,
         SCORE_POLICY_DIRECTION,
         5.0,
     ),
     MetricDef(
         CORRECTNESS_METRIC,
-        "Correctness C (mean case pass rate, headline policy input)",
+        "Correctness C (mean case pass rate, headline metric input)",
         View.HEADLINE,
         declared_direction(CORRECTNESS, "strict_pass_rate"),
         0.05,

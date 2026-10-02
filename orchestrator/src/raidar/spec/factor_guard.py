@@ -17,7 +17,7 @@ from itertools import combinations
 from raidar.spec.canonical import canonical_json_bytes
 from raidar.spec.schema import ArmSpec, ExperimentSpec
 
-AGENT_NOUN_FIELDS = ("harness", "provider", "model", "reasoning_effort", "version")
+AGENT_NOUN_FIELDS = ("name", "provider", "model", "reasoning_effort", "version")
 
 
 @dataclass(frozen=True)

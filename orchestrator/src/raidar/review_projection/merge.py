@@ -1,6 +1,6 @@
 """Project runs into the one ``schema_version=2`` artifact the surface build copies.
 
-Experiment runs (``--runs-root``, scored from ``--store``) are projected from
+Experiment runs (``--jobs-root``, scored from ``--store``) are projected from
 their artifacts on every build; nothing is persisted per experiment.
 """
 
@@ -15,10 +15,10 @@ from raidar.review_projection.assessments import AssessmentLookup
 from raidar.review_projection.comparability import mark_policy_mismatches
 from raidar.review_projection.experiment_epoch import EpochProjection, project_sources
 from raidar.review_projection.sources import (
+    JobSourceError,
     LockIndex,
-    RunSourceError,
-    discover_run_dirs,
-    load_run,
+    discover_job_dirs,
+    load_job,
 )
 from raidar.review_projection.spans import repo_path
 from raidar.schemas.review import (
@@ -32,21 +32,21 @@ from raidar.scorers.store import AssessmentStore
 
 
 def project_experiment_epoch(
-    run_roots: Sequence[Path], stores: Sequence[Path] = (), locks: Sequence[Path] = ()
+    job_roots: Sequence[Path], stores: Sequence[Path] = (), locks: Sequence[Path] = ()
 ) -> EpochProjection:
     index = LockIndex(locks)
     sources = []
-    for run_dir in discover_run_dirs(run_roots):
+    for job_dir in discover_job_dirs(job_roots):
         try:
-            source = load_run(run_dir, index)
-        except RunSourceError as exc:
+            source = load_job(job_dir, index)
+        except JobSourceError as exc:
             # One unprojectable run (e.g. its lock was overwritten) never aborts the build.
-            print(f"Skipping run, lock unavailable: {repo_path(run_dir)}: {exc}", file=sys.stderr)
+            print(f"Skipping run, lock unavailable: {repo_path(job_dir)}: {exc}", file=sys.stderr)
             continue
         if source.records:
             sources.append(source)
         else:
-            print(f"Skipping run without trajectory records: {repo_path(run_dir)}", file=sys.stderr)
+            print(f"Skipping run without trial records: {repo_path(job_dir)}", file=sys.stderr)
     lookup = AssessmentLookup([AssessmentStore(path) for path in stores], default_scorer_registry())
     return project_sources(sources, lookup)
 
@@ -54,23 +54,23 @@ def project_experiment_epoch(
 def _unique_details(details: Sequence[ReviewRunDetail]) -> list[ReviewRunDetail]:
     run_ids = [detail.run.id for detail in details]
     if len(run_ids) != len(set(run_ids)):
-        raise ValueError("review projection contains duplicate run ids")
+        raise ValueError("review projection contains duplicate job ids")
     return list(details)
 
 
 def merge_review_projections(
     *,
-    run_roots: Sequence[Path] = (),
+    job_roots: Sequence[Path] = (),
     stores: Sequence[Path] = (),
     locks: Sequence[Path] = (),
 ) -> ReviewProjectionArtifact:
-    """Project the runs under ``run_roots`` and flag families that mix headline policies."""
-    epoch = project_experiment_epoch(run_roots, stores, locks)
+    """Project the runs under ``job_roots`` and flag families that mix headline metrics."""
+    epoch = project_experiment_epoch(job_roots, stores, locks)
     if not epoch.experiments:
-        where = ", ".join(str(root) for root in run_roots) or "no source"
+        where = ", ".join(str(root) for root in job_roots) or "no source"
         raise ValueError(f"no projectable runs found under {where}")
     experiments, diffs = mark_policy_mismatches(epoch.experiments, epoch.diffs)
-    return _artifact(run_roots, experiments, _unique_details(epoch.details), diffs)
+    return _artifact(job_roots, experiments, _unique_details(epoch.details), diffs)
 
 
 def _artifact(
@@ -91,11 +91,11 @@ def _artifact(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Project Raidar runs into review-surface data.")
     parser.add_argument(
-        "--runs-root",
+        "--jobs-root",
         type=Path,
         action="append",
         default=[],
-        help="Experiment-epoch runs root (<experiment>/<run>/run.json); repeatable.",
+        help="Experiment-epoch jobs root (<experiment>/<job>/run.json); repeatable.",
     )
     parser.add_argument(
         "--store",
@@ -117,10 +117,10 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: Sequence[str] | None = None) -> None:
     args = _parser().parse_args(argv)
-    if not args.runs_root:
-        raise SystemExit("give at least one --runs-root")
+    if not args.jobs_root:
+        raise SystemExit("give at least one --jobs-root")
     artifact = merge_review_projections(
-        run_roots=[path.resolve() for path in args.runs_root],
+        job_roots=[path.resolve() for path in args.jobs_root],
         stores=[path.resolve() for path in args.store],
         locks=[path.resolve() for path in args.lock],
     )

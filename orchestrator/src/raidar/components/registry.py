@@ -15,6 +15,7 @@ from collections.abc import Iterable
 from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 
+from raidar.agents.config import agent_name_for
 from raidar.components.manifest import ComponentDefinition
 from raidar.spec.canonical import digest_json, sha256_file
 from raidar.spec.references import (
@@ -85,6 +86,27 @@ def _source_root(definition: ComponentDefinition) -> Path:
     return Path(sys.modules[top].__file__ or ".").resolve().parent.parent
 
 
+ANY_RUNTIME = "*"
+BUILTIN_COMPONENT_RUNTIMES: dict[str, tuple[str, ...]] = {
+    # lint-config@1 delivers ruff/mypy-style Python config files.
+    "lint-config@1": ("python",),
+}
+"""Runtimes of the released built-ins, kept beside (not in) their frozen manifests.
+
+A released component's manifest and fingerprint sources are frozen (editing
+them would change its digest), so its runtimes live here; a built-in not
+listed works on any runtime. A third-party definition may set ``runtimes``.
+"""
+
+
+def component_runtimes(definition: ComponentDefinition) -> tuple[str, ...]:
+    """The runtimes a component works on (``("*",)`` for any)."""
+    declared = getattr(definition, "runtimes", None)
+    if declared is not None:
+        return tuple(declared)
+    return BUILTIN_COMPONENT_RUNTIMES.get(definition.manifest.ref, (ANY_RUNTIME,))
+
+
 def fingerprint(definition: ComponentDefinition) -> str:
     """sha256 over the manifest and the bytes of every fingerprint source file."""
     root = _source_root(definition)
@@ -118,10 +140,14 @@ class ComponentResolver:
             digest=fingerprint(definition),
             metadata={
                 "kind": manifest.kind.value,
-                "supports": [harness.value for harness in manifest.supports],
+                "supports": [agent_name_for(cli).value for cli in manifest.supports],
                 "network": {"egress_hosts": list(manifest.network.egress_hosts)},
                 "secrets": list(manifest.secrets),
                 "discovery_probe": manifest.discovery_probe.id,
+            },
+            binding={
+                "runtimes": list(component_runtimes(definition)),
+                "supports": [cli.value for cli in manifest.supports],
             },
         )
 

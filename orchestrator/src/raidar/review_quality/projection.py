@@ -24,18 +24,18 @@ from raidar.spec.canonical import pretty_canonical_json_bytes
 
 
 def build_quality_projection(
-    runs_root: Path, store_root: Path, *, synthetic: bool = False, locks: Sequence[Path] = ()
+    jobs_root: Path, store_root: Path, *, synthetic: bool = False, locks: Sequence[Path] = ()
 ) -> QualityProjection:
-    """Every trial under ``runs_root`` with its store Assessments and Jev decisions."""
+    """Every trial under ``jobs_root`` with its store Assessments and Jev decisions."""
     return build_quality_projection_from(
-        [(runs_root, store_root)], synthetic=synthetic, locks=locks
+        [(jobs_root, store_root)], synthetic=synthetic, locks=locks
     )
 
 
-def _reviewed(runs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[ReviewedTrial]:
+def _reviewed(jobs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[ReviewedTrial]:
     store = StoreIndex.open(store_root)
     audit = JevAudit.open(store_root)
-    trials = discover_trials(runs_root, locks)
+    trials = discover_trials(jobs_root, locks)
     attached = audit.attach(trials)
     reviewed = []
     for trial in trials:
@@ -55,14 +55,14 @@ def _reviewed(runs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[
 def build_quality_projection_from(
     sources: Sequence[tuple[Path, Path]], *, synthetic: bool = False, locks: Sequence[Path] = ()
 ) -> QualityProjection:
-    """Every trial of each ``(runs_root, store)`` pair, each read against its own store.
+    """Every trial of each ``(jobs_root, store)`` pair, each read against its own store.
 
     Experiments are grouped across all pairs (runs under one lock are one
     experiment wherever they sit), and review ids must stay unique across them.
     """
     if not sources:
-        raise ValueError("at least one runs root and store are required")
-    reviewed = [item for runs_root, store in sources for item in _reviewed(runs_root, store, locks)]
+        raise ValueError("at least one jobs root and store are required")
+    reviewed = [item for jobs_root, store in sources for item in _reviewed(jobs_root, store, locks)]
     _require_unique_ids(reviewed)
     return QualityProjection(
         generated_from=_generated_from(sources),
@@ -75,13 +75,13 @@ def build_quality_projection_from(
 
 def _require_unique_ids(reviewed: Sequence[ReviewedTrial]) -> None:
     ids = [item.detail.run.id for item in reviewed]
-    duplicates = sorted({run_id for run_id in ids if ids.count(run_id) > 1})
+    duplicates = sorted({job_id for job_id in ids if ids.count(job_id) > 1})
     if duplicates:
         raise ValueError(f"trials share review ids: {duplicates}")
 
 
 def _generated_from(sources: Sequence[tuple[Path, Path]]) -> str:
-    return "; ".join(f"{_portable(runs_root)} + {_portable(store)}" for runs_root, store in sources)
+    return "; ".join(f"{_portable(jobs_root)} + {_portable(store)}" for jobs_root, store in sources)
 
 
 def _portable(path: Path) -> str:
@@ -101,18 +101,18 @@ def write_quality_projection(projection: QualityProjection, output: Path) -> Non
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Project Raidar runs into the Quality view data.")
     parser.add_argument(
-        "--runs-root",
+        "--jobs-root",
         type=Path,
         action="append",
         required=True,
-        help="Directory holding run dirs (repeatable; paired with --store by position)",
+        help="Directory holding job dirs (repeatable; paired with --store by position)",
     )
     parser.add_argument(
         "--store",
         type=Path,
         action="append",
         required=True,
-        help="Assessment store directory for the --runs-root at the same position",
+        help="Assessment store directory for the --jobs-root at the same position",
     )
     parser.add_argument(
         "--lock",
@@ -120,7 +120,7 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="Experiment lock to match runs against (repeatable); tried before the lock "
-        "beside each run's experiment file and the run's own run.lock.json",
+        "beside each run's experiment file and the run's own job.lock.json",
     )
     parser.add_argument("--output", type=Path, required=True, help="Projection JSON to write")
     parser.add_argument(
@@ -132,13 +132,13 @@ def _parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     parser = _parser()
     args = parser.parse_args(argv)
-    if len(args.runs_root) != len(args.store):
+    if len(args.jobs_root) != len(args.store):
         parser.error(
-            f"{len(args.runs_root)} --runs-root but {len(args.store)} --store: "
-            "give one store per runs root, in the same order"
+            f"{len(args.jobs_root)} --jobs-root but {len(args.store)} --store: "
+            "give one store per jobs root, in the same order"
         )
     projection = build_quality_projection_from(
-        list(zip(args.runs_root, args.store, strict=True)),
+        list(zip(args.jobs_root, args.store, strict=True)),
         synthetic=args.synthetic,
         locks=args.lock,
     )

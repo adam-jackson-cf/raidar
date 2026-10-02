@@ -1,7 +1,7 @@
-"""Inputs of the Quality projection: run directories, the Assessment store, the Jev audit.
+"""Inputs of the Quality projection: job directories, the Assessment store, the Jev audit.
 
-- **Trials** come from WS-D run directories
-  (``<runs_root>/<experiment>/<run>/trajectories/<trial>.json``).
+- **Trials** come from WS-D job directories
+  (``<jobs_root>/<experiment>/<job>/trial-records/<trial>.json``).
 - **Assessments** come from one Assessment store. A trial's Assessment of a
   scorer is found by content, not by the store log's trial name (trial ids
   such as ``b00-p0-baseline`` repeat across runs): the Assessment's recorded
@@ -11,19 +11,19 @@
 - **Jev decisions** come from the store's audit (``<store>/jev-audit``). A
   decision names its trial by a free string (``raidar jev shadow-rubric
   --trial``). It attaches to a trial when that string is the trial's review id
-  (``<experiment>.<run>.<trial>``) or ``<run>/<trial>``; a bare trial id
+  (``<experiment>.<job>.<trial>``) or ``<job>/<trial>``; a bare trial id
   attaches only when exactly one projected trial has it. Trial ids repeat
   across runs, so an ambiguous bare id attaches nowhere and every trial that
   shares it says so: a reviewer never labels a decision against another run.
 - The **lock** the run was executed under supplies the baseline arm and the
-  headline policy, as WS-J's analysis reads them. Candidates, in order: locks
-  given with ``--lock``, the lock next to the ``run.json`` ``experiment_file``
-  (``default_lock_path``), and the locks in the run directory (``run.lock.json``,
+  headline metric, as WS-J's analysis reads them. Candidates, in order: locks
+  given with ``--lock``, the lock next to the ``job.json`` ``experiment_file``
+  (``default_lock_path``), and the locks in the job directory (``job.lock.json``,
   written by ``raidar run``). A candidate is accepted only when it is a sealed
   lock (``read_lock``) whose ``lock_sha256`` (the digest of its execution
   section, unchanged by scorer or threshold relocks) is the run's. The live
   experiment YAML is never read. Without a matching lock the baseline is
-  unknown and the headline policy is the default by K, and the projection
+  unknown and the headline metric is the default by K, and the projection
   says why (``ExperimentInfo.note``).
 """
 
@@ -32,6 +32,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import sys
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -39,14 +40,15 @@ from pathlib import Path
 from typing import Any
 
 from raidar.analysis.sources import AnalysisInputError, read_lock
-from raidar.execution.models import TrajectoryRecord
+from raidar.execution.models import TrialRecord
 from raidar.jev.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
+from raidar.job_layout import LEGACY_RUN_MANIFEST, is_legacy_job, legacy_job_message
 from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.spec.lock import LOCK_SUFFIX, default_lock_path
 
 CODE_QUALITY_REF = "code-quality@1"
 CORRECTNESS_REF = "correctness@1"
-RUN_KIND = "raidar-run"
+JOB_KIND = "raidar-job"
 _UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
 
 
@@ -56,91 +58,91 @@ class ExperimentInfo:
 
     lock_sha256: str | None
     baseline_arm: str | None
-    headline_policy: str | None
+    metric: str | None
     note: str | None = None
     analysis: Mapping[str, Any] | None = None
-    """The lock's ``spec.analysis`` block (verdict thresholds), when the lock was read."""
+    """The lock's ``spec.analysis`` section (verdict thresholds), when the lock was read."""
 
 
 @dataclass(frozen=True)
 class TrialSource:
-    runs_root: Path
-    run_dir: Path
-    run_id: str
+    jobs_root: Path
+    job_dir: Path
+    job_id: str
     finished_at: str
-    record: TrajectoryRecord
+    record: TrialRecord
     experiment: ExperimentInfo
 
     @property
     def trial_dir(self) -> Path:
         stored = Path(self.record.trial_dir)
-        return stored if stored.is_absolute() else self.run_dir / stored
+        return stored if stored.is_absolute() else self.job_dir / stored
 
     @property
     def review_id(self) -> str:
-        """Review id ``<experiment>.<run>.<trial>`` (server-safe characters only)."""
+        """Review id ``<experiment>.<job>.<trial>`` (server-safe characters only)."""
         record = self.record
-        return _UNSAFE_ID.sub("-", f"{record.experiment}.{self.run_id}.{record.trial.trial_id}")
+        return _UNSAFE_ID.sub("-", f"{record.experiment}.{self.job_id}.{record.trial.trial_id}")
 
     @property
     def truncation(self) -> str | None:
-        """Why this trajectory is a development run (``max_checkpoints``), if it is one."""
+        """Why this trial is a development job (``max_checkpoints``), if it is one."""
         if self.record.truncated_to is None:
             return None
         return f"truncated to the first {self.record.truncated_to} checkpoint(s) (max_checkpoints)"
 
     def portable_path(self, path: Path) -> str:
-        """``path`` relative to the runs root, so the projection is not machine-specific."""
-        return Path(os.path.relpath(path, self.runs_root)).as_posix()
+        """``path`` relative to the jobs root, so the projection is not machine-specific."""
+        return Path(os.path.relpath(path, self.jobs_root)).as_posix()
 
     @property
-    def trajectory(self) -> str:
-        """The trajectory file as ``<runs-root name>/<run dir>/trajectories/<trial>.json``.
+    def trial_record(self) -> str:
+        """The trial record as ``<jobs-root name>/<job dir>/trial-records/<trial>.json``.
 
         The run review (``review_projection``) shows the same file as its
         ``artifact_paths.run_json``; the surface joins a run to its Quality view
         on this path suffix, which stays portable (no machine-specific prefix).
         """
-        relative = Path(os.path.relpath(self.run_dir, self.runs_root))
-        path = Path(self.runs_root.name) / relative / "trajectories"
+        relative = Path(os.path.relpath(self.job_dir, self.jobs_root))
+        path = Path(self.jobs_root.name) / relative / "trial-records"
         return (path / f"{self.record.trial.trial_id}.json").as_posix()
 
     def snapshot_digests(self) -> dict[str, str | None]:
         return {
-            attempt.step: attempt.snapshot.digest if attempt.snapshot else None
-            for attempt in self.record.attempts
+            step_result.step: step_result.snapshot.digest if step_result.snapshot else None
+            for step_result in self.record.step_results
         }
 
 
 def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
     spec = lock.get("spec") or {}
-    headline = (lock.get("assessment") or {}).get("headline_policy") or {}
+    headline = (lock.get("assessment") or {}).get("metric") or {}
     analysis = spec.get("analysis") or {}
     return ExperimentInfo(
         lock_sha256=executed,
         baseline_arm=analysis.get("baseline_arm"),
-        headline_policy=headline.get("ref") if isinstance(headline, dict) else None,
+        metric=headline.get("ref") if isinstance(headline, dict) else None,
         analysis=analysis,
     )
 
 
-def _lock_candidates(run: dict[str, Any], run_dir: Path, locks: Sequence[Path]) -> list[Path]:
+def _lock_candidates(run: dict[str, Any], job_dir: Path, locks: Sequence[Path]) -> list[Path]:
     candidates = list(locks)
     experiment_file = run.get("experiment_file")
     if isinstance(experiment_file, str):
         candidates.append(default_lock_path(Path(experiment_file)))
-    candidates.extend(sorted(run_dir.glob(f"*{LOCK_SUFFIX}")))
+    candidates.extend(sorted(job_dir.glob(f"*{LOCK_SUFFIX}")))
     return candidates
 
 
 def _experiment_info(
-    run: dict[str, Any], run_dir: Path, locks: Sequence[Path] = ()
+    run: dict[str, Any], job_dir: Path, locks: Sequence[Path] = ()
 ) -> ExperimentInfo:
     executed = str(run.get("lock_sha256") or "") or None
     if executed is None:
-        return ExperimentInfo(executed, None, None, "run.json names no lock_sha256")
+        return ExperimentInfo(executed, None, None, "job.json names no lock_sha256")
     reasons: list[str] = []
-    for path in _lock_candidates(run, run_dir, locks):
+    for path in _lock_candidates(run, job_dir, locks):
         if not path.is_file():
             reasons.append(f"no {path.name} found")
             continue
@@ -159,29 +161,32 @@ def _experiment_info(
     return ExperimentInfo(executed, None, None, f"lock unavailable: {detail}")
 
 
-def _run_dirs(runs_root: Path) -> Iterator[Path]:
-    for manifest in sorted(runs_root.rglob("run.json")):
+def _job_dirs(jobs_root: Path) -> Iterator[Path]:
+    for legacy in sorted(jobs_root.rglob(LEGACY_RUN_MANIFEST)):
+        if is_legacy_job(legacy.parent):
+            print(f"Skipping {legacy_job_message(legacy.parent)}", file=sys.stderr)
+    for manifest in sorted(jobs_root.rglob("job.json")):
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
             continue
-        if isinstance(payload, dict) and payload.get("kind") == RUN_KIND:
+        if isinstance(payload, dict) and payload.get("kind") == JOB_KIND:
             yield manifest.parent
 
 
-def discover_trials(runs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSource]:
-    """Every trajectory of every Raidar run under ``runs_root``, in path order."""
+def discover_trials(jobs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSource]:
+    """Every trial of every Raidar run under ``jobs_root``, in path order."""
     trials: list[TrialSource] = []
-    for run_dir in _run_dirs(runs_root):
-        run = json.loads((run_dir / "run.json").read_text(encoding="utf-8"))
-        experiment = _experiment_info(run, run_dir, locks)
-        for path in sorted((run_dir / "trajectories").glob("*.json")):
-            record = TrajectoryRecord.model_validate_json(path.read_bytes())
+    for job_dir in _job_dirs(jobs_root):
+        run = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+        experiment = _experiment_info(run, job_dir, locks)
+        for path in sorted((job_dir / "trial-records").glob("*.json")):
+            record = TrialRecord.model_validate_json(path.read_bytes())
             trials.append(
                 TrialSource(
-                    runs_root=runs_root,
-                    run_dir=run_dir,
-                    run_id=str(run.get("run_id") or run_dir.name),
+                    jobs_root=jobs_root,
+                    job_dir=job_dir,
+                    job_id=str(run.get("job_id") or job_dir.name),
                     finished_at=str(run.get("finished_at") or ""),
                     record=record,
                     experiment=experiment,
@@ -277,7 +282,7 @@ class JevAudit:
         attached: dict[str, JevAttachment] = {}
         for trial in trials:
             bare = trial.record.trial.trial_id
-            names = (trial.review_id, f"{trial.run_id}/{bare}")
+            names = (trial.review_id, f"{trial.job_id}/{bare}")
             decisions = [record for name in names for record in self.decisions.get(name, [])]
             unresolved = self.decisions.get(bare, [])
             note = None

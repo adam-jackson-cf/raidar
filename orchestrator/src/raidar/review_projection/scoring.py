@@ -1,6 +1,6 @@
 """Assessments projected as the surface's scorecard (``scorer:*`` and ``metric:*`` spans).
 
-The scorecard is the headline policy's view: ``S = 100·C·(base + inertia·I)``.
+The scorecard is the headline metric's view: ``S = 100·C·(base + inertia·I)``.
 ``scorer:correctness@1`` carries C (the base share) with one metric per
 checkpoint, and ``scorer:code-quality@1`` carries I (the inertia share) with one
 metric per inertia component at its policy weight; both shares are read from the
@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from raidar.execution.models import CheckpointAttempt, CheckpointState, TrajectoryRecord
+from raidar.execution.models import CheckpointState, StepResult, TrialRecord
 from raidar.review_projection.assessments import TrialAssessments
 from raidar.review_projection.headline import (
     COMPONENT_METRICS,
@@ -28,7 +28,7 @@ from raidar.review_projection.headline import (
 from raidar.review_projection.notes import EvidenceRef, Finding
 from raidar.review_projection.spans import SpanBuilder
 from raidar.scorers.sdk.result import AssessStatus, Observation
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
 
 _EVIDENCE_LIMIT = 10
 
@@ -38,31 +38,31 @@ class ScoringContext:
     builder: SpanBuilder
     root: str
     start: int
-    record: TrajectoryRecord
+    record: TrialRecord
     headline: Headline
     assessments: TrialAssessments
 
 
-def _checkpoint_payload(attempt: CheckpointAttempt, assessments: TrialAssessments) -> dict:
-    solved = attempt.checkpoint_state is CheckpointState.SOLVED
+def _checkpoint_payload(step_result: StepResult, assessments: TrialAssessments) -> dict:
+    solved = step_result.checkpoint_state is CheckpointState.SOLVED
     assessment = assessments.get(CORRECTNESS_SCORER)
     observations = (
         [
             item.model_dump(mode="json")
             for item in assessment.result.observations
-            if item.subject == attempt.step
+            if item.subject == step_result.step
         ]
         if assessment is not None
         else []
     )
-    rate = attempt.strict_pass_rate
+    rate = step_result.strict_pass_rate
     return {
-        "metric_id": attempt.checkpoint,
+        "metric_id": step_result.checkpoint,
         "passed": solved,
         "score": rate,
-        "checkpoint_state": attempt.checkpoint_state.value,
+        "checkpoint_state": step_result.checkpoint_state.value,
         "evidence": (
-            f"{attempt.checkpoint_state.value}; strict pass rate "
+            f"{step_result.checkpoint_state.value}; strict pass rate "
             + (f"{rate:.3f}" if rate is not None else "unavailable")
         ),
         "observations": observations,
@@ -70,10 +70,10 @@ def _checkpoint_payload(attempt: CheckpointAttempt, assessments: TrialAssessment
 
 
 def _correctness(ctx: ScoringContext, scoring: str) -> None:
-    attempts = ctx.record.attempts
+    step_results = ctx.record.step_results
     area = None
     if ctx.headline.diagnostic is not None:
-        base, _ = policy_shares(DEFAULT_POLICY_REGISTRY.get(ctx.headline.policy))
+        base, _ = policy_shares(DEFAULT_METRIC_REGISTRY.get(ctx.headline.policy))
         area = ctx.builder.add(
             name=f"scorer:{CORRECTNESS_SCORER}",
             span_type="INTERNAL",
@@ -89,24 +89,26 @@ def _correctness(ctx: ScoringContext, scoring: str) -> None:
                 "component": "C",
                 "metric_contributions": [
                     {
-                        "metric_id": attempt.checkpoint,
-                        "weight": 1 / len(attempts),
-                        "score": 1.0 if attempt.checkpoint_state is CheckpointState.SOLVED else 0.0,
+                        "metric_id": step_result.checkpoint,
+                        "weight": 1 / len(step_results),
+                        "score": 1.0
+                        if step_result.checkpoint_state is CheckpointState.SOLVED
+                        else 0.0,
                     }
-                    for attempt in attempts
+                    for step_result in step_results
                 ],
             },
         )
-    for attempt in attempts:
-        if area is None and attempt.checkpoint_state is CheckpointState.NOT_ATTEMPTED:
+    for step_result in step_results:
+        if area is None and step_result.checkpoint_state is CheckpointState.NOT_ATTEMPTED:
             continue
         ctx.builder.add(
-            name=f"metric:{attempt.checkpoint}",
+            name=f"metric:{step_result.checkpoint}",
             span_type="INTERNAL",
-            status="OK" if attempt.checkpoint_state is CheckpointState.SOLVED else "ERROR",
+            status="OK" if step_result.checkpoint_state is CheckpointState.SOLVED else "ERROR",
             parent=area or scoring,
             start=ctx.start,
-            output_value=_checkpoint_payload(attempt, ctx.assessments),
+            output_value=_checkpoint_payload(step_result, ctx.assessments),
         )
 
 
@@ -128,7 +130,7 @@ def _component_payload(component: str, observation: Observation | None, weight: 
 
 
 def _quality(ctx: ScoringContext, scoring: str) -> None:
-    policy = DEFAULT_POLICY_REGISTRY.get(ctx.headline.policy)
+    policy = DEFAULT_METRIC_REGISTRY.get(ctx.headline.policy)
     weights = policy.inertia_weights
     area = None
     if ctx.headline.quality is not None:

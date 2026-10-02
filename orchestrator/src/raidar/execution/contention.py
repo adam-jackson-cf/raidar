@@ -2,10 +2,10 @@
 
 A real experiment run's phase timings depend on how many trials shared the
 host. This module reconstructs that from what runs already record: each
-checked run's configured ``concurrency`` (``run.json``), every trial's
+checked run's configured ``concurrency`` (``job.json``), every trial's
 ``started_at``/``finished_at`` window (Harbor ``result.json``), and the other
-Raidar runs under the same runs root whose trials overlapped in time. Docker
-work outside Raidar runs (builds, other projects) is not recorded by runs and
+Raidar jobs under the same jobs root whose trials overlapped in time. Docker
+work outside Raidar runs (builds, other projects) is not recorded by jobs and
 so is not detectable here; the report says so rather than implying a clean host.
 """
 
@@ -21,10 +21,10 @@ from typing import Any
 from raidar.execution.collect import RESULT_FILE, read_result
 from raidar.execution.timestamps import parse_ts
 
-RUN_MANIFEST = "run.json"
+JOB_MANIFEST = "job.json"
 UNDETECTED_DOCKER_ACTIVITY = (
     "Docker activity outside Raidar runs (image builds, other projects) is not "
-    "recorded by runs and is not detected"
+    "recorded by jobs and is not detected"
 )
 
 
@@ -42,8 +42,8 @@ class Contention:
 
     configured_concurrency: dict[str, int | None]
     peak_concurrent_trials: int
-    peak_including_other_runs: int
-    overlapping_runs: tuple[str, ...]
+    peak_including_other_jobs: int
+    overlapping_jobs: tuple[str, ...]
     untimed_trials: int
     trial_peaks: dict[tuple[str, str], int] = field(default_factory=dict)
 
@@ -51,8 +51,8 @@ class Contention:
         return {
             "configured_concurrency": self.configured_concurrency,
             "peak_concurrent_trials": self.peak_concurrent_trials,
-            "peak_including_other_runs": self.peak_including_other_runs,
-            "overlapping_runs": list(self.overlapping_runs),
+            "peak_including_other_jobs": self.peak_including_other_jobs,
+            "overlapping_jobs": list(self.overlapping_jobs),
             "untimed_trials": self.untimed_trials,
             "other_docker_activity": UNDETECTED_DOCKER_ACTIVITY,
         }
@@ -77,17 +77,17 @@ def peak_during(window: TrialWindow, windows: Sequence[TrialWindow]) -> int:
     return max(sum(1 for w in windows if w.start <= instant < w.end) for instant in instants)
 
 
-def read_manifest(run_dir: Path) -> dict[str, Any]:
-    """The run manifest, ``{}`` when absent; malformed JSON raises ``ValueError``."""
-    path = run_dir / RUN_MANIFEST
+def read_manifest(job_dir: Path) -> dict[str, Any]:
+    """The job manifest, ``{}`` when absent; malformed JSON raises ``ValueError``."""
+    path = job_dir / JOB_MANIFEST
     if not path.is_file():
         return {}
     try:
         loaded = json.loads(path.read_text())
     except (OSError, ValueError) as error:
-        raise ValueError(f"{path}: not a readable run manifest ({error})") from error
+        raise ValueError(f"{path}: not a readable job manifest ({error})") from error
     if not isinstance(loaded, dict):
-        raise ValueError(f"{path}: run manifest is not a JSON object")
+        raise ValueError(f"{path}: job manifest is not a JSON object")
     return loaded
 
 
@@ -104,24 +104,24 @@ def trial_window(run: str, trial: str, trial_dir: Path) -> TrialWindow | None:
     return TrialWindow(run, trial, start, end)
 
 
-def _run_windows(run_dir: Path) -> list[TrialWindow]:
-    label = str(run_dir)
-    trials = sorted(path for path in (run_dir / "trials").glob("*") if path.is_dir())
+def _job_windows(job_dir: Path) -> list[TrialWindow]:
+    label = str(job_dir)
+    trials = sorted(path for path in (job_dir / "trials").glob("*") if path.is_dir())
     return [w for path in trials if (w := trial_window(label, path.name, path)) is not None]
 
 
-def _sibling_runs(run_dirs: Sequence[Path]) -> list[Path]:
-    """Other run directories under the same ``<runs-root>/<experiment>/<run>`` roots."""
-    checked = {path.resolve() for path in run_dirs}
-    roots = {path.resolve().parent.parent for path in run_dirs}
+def _sibling_jobs(job_dirs: Sequence[Path]) -> list[Path]:
+    """Other job directories under the same ``<jobs-root>/<experiment>/<job>`` roots."""
+    checked = {path.resolve() for path in job_dirs}
+    roots = {path.resolve().parent.parent for path in job_dirs}
     found = {
-        manifest.parent.resolve() for root in roots for manifest in root.glob(f"*/*/{RUN_MANIFEST}")
+        manifest.parent.resolve() for root in roots for manifest in root.glob(f"*/*/{JOB_MANIFEST}")
     }
     return sorted(found - checked)
 
 
-def other_run_windows(
-    run_dirs: Sequence[Path], checked: Sequence[TrialWindow]
+def other_job_windows(
+    job_dirs: Sequence[Path], checked: Sequence[TrialWindow]
 ) -> tuple[list[TrialWindow], tuple[str, ...]]:
     """Trial windows of sibling runs that overlap the checked trials' span."""
     if not checked:
@@ -129,8 +129,8 @@ def other_run_windows(
     start, end = min(w.start for w in checked), max(w.end for w in checked)
     windows: list[TrialWindow] = []
     runs: list[str] = []
-    for sibling in _sibling_runs(run_dirs):
-        overlapping = [w for w in _run_windows(sibling) if w.start < end and w.end > start]
+    for sibling in _sibling_jobs(job_dirs):
+        overlapping = [w for w in _job_windows(sibling) if w.start < end and w.end > start]
         if overlapping:
             windows.extend(overlapping)
             runs.append(str(sibling))
@@ -138,20 +138,20 @@ def other_run_windows(
 
 
 def measure_contention(
-    run_dirs: Sequence[Path], checked: Sequence[TrialWindow], untimed: int
+    job_dirs: Sequence[Path], checked: Sequence[TrialWindow], untimed: int
 ) -> Contention:
     """Concurrency context for the checked trials' windows."""
     configured = {
-        str(run_dir): _concurrency(read_manifest(run_dir).get("concurrency"))
-        for run_dir in run_dirs
+        str(job_dir): _concurrency(read_manifest(job_dir).get("concurrency"))
+        for job_dir in job_dirs
     }
-    others, overlapping = other_run_windows(run_dirs, checked)
+    others, overlapping = other_job_windows(job_dirs, checked)
     everything = [*checked, *others]
     return Contention(
         configured_concurrency=configured,
         peak_concurrent_trials=peak_overlap(checked),
-        peak_including_other_runs=peak_overlap(everything),
-        overlapping_runs=overlapping,
+        peak_including_other_jobs=peak_overlap(everything),
+        overlapping_jobs=overlapping,
         untimed_trials=untimed,
         trial_peaks={(w.run, w.trial): peak_during(w, everything) for w in checked},
     )

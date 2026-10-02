@@ -9,7 +9,7 @@ tripwire: any single cold sample above it fails. Percentiles interpolate
 linearly between order statistics, as in the baseline.
 
 A budget over a gap *between* steps (``step_archive_gap``) is undefined when
-every checked trajectory runs a single checkpoint (a one-shot K=1 problem,
+every checked trial runs a single checkpoint (a one-shot K=1 problem,
 F1, or a run truncated to one checkpoint): it is then ``not_applicable``,
 which passes, rather than ``missing``.
 """
@@ -25,10 +25,10 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from raidar.execution.models import PhaseSample, TrajectoryRecord
+from raidar.execution.models import PhaseSample, TrialRecord
+from raidar.job_layout import TRIAL_RECORD_GLOB, is_legacy_job, legacy_job_message
 
 MIN_SAMPLES = 10
-TRAJECTORY_GLOB = "trajectories/*.json"
 
 
 @dataclass(frozen=True)
@@ -145,7 +145,7 @@ def check_budgets(
 ) -> list[PhaseCheck]:
     """One check per budget that has samples; a budgeted phase with none is MISSING.
 
-    ``multi_step`` is False when no checked trajectory ran two or more
+    ``multi_step`` is False when no checked trial ran two or more
     checkpoints; between-step budgets are then NOT_APPLICABLE.
     """
     grouped: dict[tuple[str, str | None], list[float]] = defaultdict(list)
@@ -178,12 +178,12 @@ def check_budgets(
 
 
 class PerfInputError(ValueError):
-    """A trajectory record or run manifest that cannot be read: malformed input, not a breach."""
+    """A trial record or job manifest that cannot be read: malformed input, not a breach."""
 
 
 @dataclass(frozen=True)
 class TrialSamples:
-    """One trajectory's phase samples, keyed by its run directory and trial id."""
+    """One trial's phase samples, keyed by its job directory and trial id."""
 
     run: str
     trial: str
@@ -192,36 +192,38 @@ class TrialSamples:
 
 
 @dataclass(frozen=True)
-class RunSamples:
+class JobSamples:
     samples: list[PhaseSample]
-    trajectories: int
-    multi_step: bool  # some trajectory ran two or more checkpoints
+    trial_count: int
+    multi_step: bool  # some trial ran two or more checkpoints
     trials: tuple[TrialSamples, ...] = ()
 
 
-def _read_record(path: Path) -> TrajectoryRecord:
+def _read_record(path: Path) -> TrialRecord:
     try:
-        return TrajectoryRecord.model_validate_json(path.read_text())
+        return TrialRecord.model_validate_json(path.read_text())
     except (OSError, ValidationError) as error:
-        raise PerfInputError(f"{path}: not a readable trajectory record ({error})") from error
+        raise PerfInputError(f"{path}: not a readable trial record ({error})") from error
 
 
-def load_run_samples(run_dirs: Sequence[Path]) -> RunSamples:
-    """Every phase sample recorded under the runs' trajectory records."""
+def load_job_samples(job_dirs: Sequence[Path]) -> JobSamples:
+    """Every phase sample recorded under the jobs' trial records."""
     samples: list[PhaseSample] = []
     trials: list[TrialSamples] = []
     multi_step = False
-    for run_dir in run_dirs:
-        for path in sorted(run_dir.glob(TRAJECTORY_GLOB)):
+    for job_dir in job_dirs:
+        if is_legacy_job(job_dir):
+            raise PerfInputError(legacy_job_message(job_dir))
+        for path in sorted(job_dir.glob(TRIAL_RECORD_GLOB)):
             record = _read_record(path)
             samples.extend(record.phases)
             trials.append(
                 TrialSamples(
-                    str(run_dir), record.trial.trial_id, run_dir / record.trial_dir, record.phases
+                    str(job_dir), record.trial.trial_id, job_dir / record.trial_dir, record.phases
                 )
             )
             multi_step = multi_step or len(record.trial.steps) >= 2
-    return RunSamples(samples, len(trials), multi_step, tuple(trials))
+    return JobSamples(samples, len(trials), multi_step, tuple(trials))
 
 
 def checks_pass(checks: Sequence[PhaseCheck]) -> bool:

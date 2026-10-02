@@ -7,6 +7,7 @@ from collections.abc import Iterable, Sequence
 from raidar.analysis.curves import Band, Curve
 from raidar.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.analysis.manipulation import ManipulationReport
+from raidar.analysis.ranking import Ranking
 from raidar.analysis.report import AnalysisReport, ArmSummary, Comparison
 from raidar.analysis.stats import confidence_label
 
@@ -135,7 +136,7 @@ def _comparison(comparison: Comparison, confidence: float) -> list[str]:
         f"**Primary outcome** `{primary.metric}` ({primary.problem}): "
         f"Δ {_num(primary.mean_delta)} {_ci(primary.ci)} "
         f"→ **{primary.verdict.value}** ({primary.verdict_reason}); "
-        f"cost Δ {_num(primary.cost.delta_mean)} USD per trajectory.",
+        f"cost Δ {_num(primary.cost.delta_mean)} USD per trial.",
         "",
         "### Effects",
         "",
@@ -204,25 +205,66 @@ def _settings_line(report: AnalysisReport) -> str:
     )
 
 
+def _ranking(ranking: Ranking | None) -> list[str]:
+    if ranking is None:
+        return []
+    ks = [entry.k for entry in ranking.rows[0].pass_at_k] if ranking.rows else []
+    header = (
+        "Rank", "Arm", "n", f"Mean {ranking.rank_by}", "95% CI",
+        *(f"pass@{k}" for k in ks), "Mean cost USD", "Mean tokens", "Mean agent s",
+    )  # fmt: skip
+    rows = [
+        [
+            str(row.rank),
+            row.arm + (" (reference)" if row.arm == ranking.reference_arm else ""),
+            str(row.n),
+            _num(row.mean),
+            _ci(row.interval),
+            *(_num(entry.value) for entry in row.pass_at_k),
+            _num(row.cost_means.get("total_cost_usd")),
+            _num(row.cost_means.get("total_tokens")),
+            _num(row.cost_means.get("total_agent_wall_s")),
+        ]
+        for row in ranking.rows
+    ]
+    return [
+        "",
+        "## Ranking (benchmark)",
+        "",
+        f"Ordered by `{ranking.rank_by}` ({ranking.direction}); pass@k counts "
+        f"{ranking.pass_definition}. Paired verdicts against the reference agent follow.",
+        "",
+        *_table(header, rows),
+    ]
+
+
 def render_markdown(report: AnalysisReport) -> str:
-    policy = report.headline_policy
+    metric = report.metric
     lines = [f"# Analysis: {report.experiment}", ""]
-    if report.dev_run is not None:
-        lines += [f"> **Development run, not arm evidence:** {report.dev_run.note}.", ""]
+    if not report.citable:
+        lines += [
+            f"> **Not citable:** a {report.experiment_kind} experiment checks operational "
+            "health; its verdicts are not evidence about any treatment or agent.",
+            "",
+        ]
+    if report.dev_job is not None:
+        lines += [f"> **Development job, not arm evidence:** {report.dev_job.note}.", ""]
     lines += [
-        f"- Lock: `{report.lock_sha256[:12]}`; runs: {', '.join(report.runs)}",
+        f"- Kind: `{report.experiment_kind}`; lock: `{report.lock_sha256[:12]}`; "
+        f"jobs: {', '.join(report.jobs)}",
         f"- Primary outcome: `{report.primary_metric}` (progression `{report.progression}`); "
         f"baseline arm: `{report.baseline_arm}`",
-        f"- Composite S: headline policy `{policy.get('ref')}` ({policy.get('selection')})",
+        f"- Composite S: headline metric `{metric.get('ref')}` ({metric.get('selection')})",
         _settings_line(report),
     ]
-    if report.replaced_trajectories:
-        lines.append(f"- Replaced invalid trajectories: {', '.join(report.replaced_trajectories)}")
+    if report.replaced_trials:
+        lines.append(f"- Replaced invalid trials: {', '.join(report.replaced_trials)}")
     header = (
         "Arm", "Planned", "Run", "Valid", "Infra error", "Not run",
         "Mean cost USD", "Mean tokens", "Mean agent s",
     )  # fmt: skip
     lines += ["", "## Arms", "", *_table(header, (_arm_row(arm) for arm in report.arms))]
+    lines.extend(_ranking(report.ranking))
     for comparison in report.comparisons:
         lines.extend(_comparison(comparison, report.settings.confidence))
     lines.extend(_sample_size(report))

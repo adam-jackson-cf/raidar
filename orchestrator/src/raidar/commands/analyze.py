@@ -1,19 +1,19 @@
-"""``raidar analyze``: paired arm comparisons over executed runs (plan WS-J).
+"""``raidar analyze``: paired arm comparisons over executed jobs (plan WS-J).
 
-Reads one or more run directories of a locked experiment and the Assessment
+Reads one or more job directories of a locked experiment and the Assessment
 store, and writes ``analysis.json`` (the machine-readable report the review
 surface projects) and ``analysis.md`` (the summary for the gate packet) to
-``--output``. Runs and the store are only read; the output directory must lie
+``--output``. Jobs and the store are only read; the output directory must lie
 outside both.
 
 The verdict thresholds (``min_pairs``, ``max_exclusion_fraction``, ``alpha``,
-``min_effects``) come from the lock's ``analysis`` block. A command-line option
+``min_effects``) come from the lock's ``analysis`` section. A command-line option
 overrides the pinned value and the report labels it as an override; a lock
 that predates pinned thresholds falls back to the documented defaults and the
 report says it is not pinned. The report also lists every value that differs
-from its default. Runs executed with ``max_checkpoints``
-or ``agent_override`` are refused unless ``--allow-dev-runs`` labels the
-report as a development run.
+from its default. Jobs executed with ``max_checkpoints``
+or ``agent_override`` are refused unless ``--allow-dev-jobs`` labels the
+report as a development job.
 """
 
 from __future__ import annotations
@@ -63,25 +63,25 @@ def _check_output(output: Path, protected: list[Path]) -> None:
 
 @click.command()
 @click.argument(
-    "runs", nargs=-1, required=True, type=click.Path(exists=True, file_okay=False, path_type=Path)
+    "jobs", nargs=-1, required=True, type=click.Path(exists=True, file_okay=False, path_type=Path)
 )
 @click.option(
     "--store",
     required=True,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Assessment store the runs were rescored into.",
+    help="Assessment store the jobs were rescored into.",
 )
 @click.option(
     "--output",
     required=True,
     type=click.Path(file_okay=False, path_type=Path),
-    help="Directory for analysis.json and analysis.md (outside the runs and the store).",
+    help="Directory for analysis.json and analysis.md (outside the jobs and the store).",
 )
 @click.option(
     "--lock",
     "lock_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
-    help="Experiment lock (default: the lock next to run.json's experiment_file).",
+    help="Experiment lock (default: the lock next to job.json's experiment_file).",
 )
 @click.option(
     "--assessment-config",
@@ -92,7 +92,7 @@ def _check_output(output: Path, protected: list[Path]) -> None:
     "--bundle-search",
     multiple=True,
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Directory to find moved oracle bundles in, by content digest (repeatable).",
+    help="Directory to find moved verifier bundles in, by content digest (repeatable).",
 )
 @click.option(
     "--min-pairs",
@@ -128,13 +128,13 @@ def _check_output(output: Path, protected: list[Path]) -> None:
     "sample-size projection (repeatable); labelled as an override.",
 )
 @click.option(
-    "--allow-dev-runs",
+    "--allow-dev-jobs",
     is_flag=True,
-    help="Analyse runs executed with max_checkpoints or agent_override, labelled as a "
-    "development run (not arm evidence).",
+    help="Analyse jobs executed with max_checkpoints or agent_override, labelled as a "
+    "development job (not arm evidence).",
 )
 def analyze(
-    runs: tuple[Path, ...],
+    jobs: tuple[Path, ...],
     store: Path,
     output: Path,
     lock_path: Path | None,
@@ -145,18 +145,18 @@ def analyze(
     alpha: float | None,
     bootstrap_samples: int,
     min_effects: tuple[str, ...],
-    allow_dev_runs: bool,
+    allow_dev_jobs: bool,
 ) -> None:
     """Paired deltas, CIs, curves and verdicts for every arm against the baseline."""
-    _check_output(output, [*runs, store])
+    _check_output(output, [*jobs, store])
     effects = _min_effects(min_effects)
     request = LoadRequest(
-        run_dirs=runs,
+        job_dirs=jobs,
         store_root=store,
         registry=default_scorer_registry(),
         lock_path=lock_path,
         assessment_config=assessment_config,
-        allow_dev_runs=allow_dev_runs,
+        allow_dev_jobs=allow_dev_jobs,
         bundle_search=bundle_search,
     )
     try:
@@ -177,8 +177,8 @@ def analyze(
     output.mkdir(parents=True, exist_ok=True)
     (output / REPORT_JSON).write_bytes(pretty_canonical_json_bytes(report.model_dump(mode="json")))
     (output / REPORT_MARKDOWN).write_text(render_markdown(report))
-    if report.dev_run is not None:
-        click.echo(f"warning: development run, not arm evidence: {report.dev_run.note}", err=True)
+    if report.dev_job is not None:
+        click.echo(f"warning: development job, not arm evidence: {report.dev_job.note}", err=True)
     if not report.settings.pinned_by_lock:
         click.echo("warning: the lock does not pin verdict thresholds; defaults used", err=True)
     if report.settings.overridden:

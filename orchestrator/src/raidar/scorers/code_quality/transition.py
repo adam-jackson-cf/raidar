@@ -24,7 +24,6 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import ValidationError
 
-from raidar.oracle.records import FORK_EVIDENCE_FILE, step_record_dir
 from raidar.scorers.code_quality.checkpoint import CheckpointMeasure, Gap, Measured
 from raidar.scorers.code_quality.diffs import changed_lines, regression_scope, rework_symbols
 from raidar.scorers.code_quality.lineage import Ledger, calculate_transition_rework, next_ledger
@@ -38,6 +37,7 @@ from raidar.scorers.code_quality.lineage_models import (
 from raidar.scorers.code_quality.regression import PARITY_UNAVAILABLE, calculate_regression_breadth
 from raidar.scorers.sdk.context import StepInputs
 from raidar.scorers.sdk.result import AssessStatus
+from raidar.verifier.records import FORK_EVIDENCE_FILE, step_record_dir
 
 PARITY_FAILED = "coverage_parity_failed"
 PROVENANCE_UNAVAILABLE = "canonical_provenance_unavailable"
@@ -101,7 +101,7 @@ def _rework(
     return calculate_transition_rework(*symbols, removed, added, ledger)
 
 
-def oracle_record_dir(step: StepInputs) -> Path | None:
+def verifier_record_dir(step: StepInputs) -> Path | None:
     """The step's host-side oracle record directory, found from its stored snapshot."""
     if step.snapshot is None or step.record is None:
         return None
@@ -119,7 +119,7 @@ def _run_evidence(step: StepInputs) -> tuple[RegressionRunEvidence, RegressionRu
     if parity is None or not parity.eligible:
         detail = ", ".join(parity.reasons) if parity is not None else "no parity verdict"
         return Gap(AssessStatus.INELIGIBLE, f"{PARITY_FAILED}: {detail}")
-    directory = oracle_record_dir(step)
+    directory = verifier_record_dir(step)
     path = directory / FORK_EVIDENCE_FILE if directory is not None else None
     if path is None or not path.is_file():
         return Gap(AssessStatus.INELIGIBLE, f"{PARITY_UNAVAILABLE}: {FORK_EVIDENCE_FILE} missing")

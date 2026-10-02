@@ -1,4 +1,4 @@
-"""One trajectory (a Harbor multi-step trial) projected as a review run.
+"""One trial (a Harbor multi-step trial) projected as a review run.
 
 The span tree is::
 
@@ -7,10 +7,10 @@ The span tree is::
         <checkpoint>                            one per attempted checkpoint
           system/user prompt, assistant message, tool calls   (ATIF)
       verification gates                        gate:<checkpoint>, gate:infra, gate:component-probes
-      scoring                                   scorer:* / metric:* (headline policy)
+      scoring                                   scorer:* / metric:* (headline metric)
       execution validity                        validity checks, reached, progression
       process metrics                           N1 phases, usage, unweighted scorer observations
-      artifacts & evidence                      trial dir, snapshots, oracle records, assessments
+      artifacts & evidence                      trial dir, snapshots, verifier records, assessments
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.execution.models import CheckpointState, TrajectoryRecord
+from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review_projection.assessments import TrialAssessments
 from raidar.review_projection.atif import project_trajectory
 from raidar.review_projection.gates import GateContext, failed_gates, project_gates
@@ -35,7 +35,7 @@ _POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, QUALITY_SCORER})
 
 @dataclass(frozen=True)
 class ArmLabels:
-    """How a trajectory's arm reads on the surface.
+    """How a trial's arm reads on the surface.
 
     ``arm`` is the label of the arm's condition (``experiment_epoch._condition_labels``),
     so arms of one condition on different harnesses share it.
@@ -53,9 +53,9 @@ class ArmLabels:
 @dataclass(frozen=True)
 class TrialInput:
     review_id: str
-    run_dir: Path
+    job_dir: Path
     run_started: str | None
-    record: TrajectoryRecord
+    record: TrialRecord
     labels: ArmLabels
     assessments: TrialAssessments
     headline: Headline
@@ -63,7 +63,7 @@ class TrialInput:
 
     @property
     def trial_dir(self) -> Path:
-        return self.run_dir / self.record.trial_dir
+        return self.job_dir / self.record.trial_dir
 
 
 def _harbor_result(trial_dir: Path) -> dict[str, Any]:
@@ -75,7 +75,7 @@ def _harbor_result(trial_dir: Path) -> dict[str, Any]:
 
 
 def _timing(trial: TrialInput) -> tuple[int, int]:
-    """Start (epoch ms) and duration of the trial from Harbor's result, else the run manifest."""
+    """Start (epoch ms) and duration of the trial from Harbor's result, else the job manifest."""
     result = _harbor_result(trial.trial_dir)
     started = to_ms(result.get("started_at")) or to_ms(trial.run_started) or 0
     finished = to_ms(result.get("finished_at"))
@@ -84,11 +84,11 @@ def _timing(trial: TrialInput) -> tuple[int, int]:
     return started, round(sum(sample.seconds for sample in trial.record.phases) * 1000)
 
 
-def _tokens(record: TrajectoryRecord) -> tuple[int, int]:
+def _tokens(record: TrialRecord) -> tuple[int, int]:
     """Uncached input and output tokens over every step (Harbor per-step usage)."""
     uncached = output = 0
-    for attempt in record.attempts:
-        usage = attempt.usage
+    for step_result in record.step_results:
+        usage = step_result.usage
         if usage is None:
             continue
         uncached += (usage.n_input_tokens or 0) - (usage.n_cache_tokens or 0)
@@ -101,25 +101,28 @@ def _status(trial: TrialInput) -> ReviewStatus:
 
 
 def _agent_spans(builder: SpanBuilder, trial: TrialInput, agent: str) -> None:
-    for attempt in trial.record.attempts:
-        if attempt.checkpoint_state is CheckpointState.NOT_ATTEMPTED:
+    for step_result in trial.record.step_results:
+        if step_result.checkpoint_state is CheckpointState.NOT_ATTEMPTED:
             continue
-        seconds = attempt.agent_execution_s
+        seconds = step_result.agent_execution_s
         checkpoint = builder.add(
-            name=attempt.checkpoint,
+            name=step_result.checkpoint,
             span_type="INTERNAL",
-            status="OK" if attempt.checkpoint_state is CheckpointState.SOLVED else "ERROR",
+            status="OK" if step_result.checkpoint_state is CheckpointState.SOLVED else "ERROR",
             parent=agent,
             duration=round(seconds * 1000) if seconds is not None else None,
-            input_value={"step": attempt.step, "instruction_sha256": attempt.instruction_sha256},
-            output_value={"usage": attempt.usage.model_dump() if attempt.usage else None},
+            input_value={
+                "step": step_result.step,
+                "instruction_sha256": step_result.instruction_sha256,
+            },
+            output_value={"usage": step_result.usage.model_dump() if step_result.usage else None},
         )
-        if attempt.trace_dir is not None:
+        if step_result.trace_dir is not None:
             project_trajectory(
                 builder,
-                trial.trial_dir / attempt.trace_dir,
+                trial.trial_dir / step_result.trace_dir,
                 checkpoint,
-                first_checkpoint=attempt.index == 0,
+                first_checkpoint=step_result.index == 0,
             )
 
 
@@ -176,9 +179,13 @@ def _support_spans(builder: SpanBuilder, trial: TrialInput, root: str, start: in
         output_value={
             "trial_dir": repo_path(trial.trial_dir),
             "snapshots": {
-                a.step: a.snapshot.model_dump() for a in record.attempts if a.snapshot is not None
+                a.step: a.snapshot.model_dump()
+                for a in record.step_results
+                if a.snapshot is not None
             },
-            "oracle_records": {a.step: a.oracle_record for a in record.attempts if a.oracle_record},
+            "verifier_records": {
+                a.step: a.verifier_record for a in record.step_results if a.verifier_record
+            },
             "trial_hashes": record.trial.hashes.model_dump(),
         },
     )
@@ -211,15 +218,15 @@ def _spans(builder: SpanBuilder, trial: TrialInput, start: int, duration: int) -
     return findings
 
 
-def _metric_scores(record: TrajectoryRecord) -> list[dict[str, object]]:
+def _metric_scores(record: TrialRecord) -> list[dict[str, object]]:
     return [
         {
-            "metric_id": attempt.checkpoint,
-            "score": attempt.strict_pass_rate,
-            "passed": attempt.checkpoint_state is CheckpointState.SOLVED,
+            "metric_id": step_result.checkpoint,
+            "score": step_result.strict_pass_rate,
+            "passed": step_result.checkpoint_state is CheckpointState.SOLVED,
         }
-        for attempt in record.attempts
-        if attempt.strict_pass_rate is not None
+        for step_result in record.step_results
+        if step_result.strict_pass_rate is not None
     ]
 
 
@@ -260,7 +267,7 @@ def run_detail(trial: TrialInput) -> ReviewRunDetail:
         failed_gates=failed_gates(builder),
         artifact_paths={
             "run_json": repo_path(
-                trial.run_dir / "trajectories" / f"{trial.record.trial.trial_id}.json"
+                trial.job_dir / "trial-records" / f"{trial.record.trial.trial_id}.json"
             ),
             "findings_json": None,
             "trial_dir": repo_path(trial.trial_dir),

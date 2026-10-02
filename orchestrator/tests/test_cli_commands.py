@@ -12,6 +12,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
+from raidar.agents.config import agent_name_for
 from raidar.cli import main
 from raidar.commands import env_harbor
 from raidar.commands.repo_state import (
@@ -36,13 +37,14 @@ def test_cli_version_matches_pyproject_version() -> None:
     assert result.output.strip().endswith(expected_version)
 
 
-def test_harness_list_includes_model_variations() -> None:
+def test_agent_list_names_harbor_agents_with_model_variations() -> None:
     runner = CliRunner()
 
-    result = runner.invoke(main, ["harness", "list"])
+    result = runner.invoke(main, ["agent", "list"])
 
     assert result.exit_code == 0, result.output
-    assert "claude-code  -> CLAUDE.md" in result.output
+    assert "claude-code  -> CLAUDE.md  (CLI claude-code)" in result.output
+    assert "codex        -> AGENTS.md  (CLI codex-cli)" in result.output
     assert (
         "models: anthropic/claude-haiku-4-5, anthropic/claude-opus-4-6, anthropic/claude-opus-4-7, "
         "anthropic/claude-sonnet-4-5, anthropic/claude-sonnet-4-6"
@@ -60,7 +62,7 @@ def test_harness_list_includes_model_variations() -> None:
     assert "models: inflection/*" in result.output
 
 
-def test_harness_validate_reports_codex_auth_mode(
+def test_agent_validate_reports_codex_auth_mode(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runner = CliRunner()
@@ -71,10 +73,10 @@ def test_harness_validate_reports_codex_auth_mode(
     result = runner.invoke(
         main,
         [
-            "harness",
+            "agent",
             "validate",
-            "--harness",
-            "codex-cli",
+            "--agent",
+            "codex",
             "--provider",
             "openai",
             "--model",
@@ -88,7 +90,7 @@ def test_harness_validate_reports_codex_auth_mode(
     assert "auth_source: OPENAI_API_KEY" in result.output
 
 
-def test_harness_setup_auth_is_noop_when_auth_exists(
+def test_agent_setup_auth_is_noop_when_auth_exists(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runner = CliRunner()
@@ -97,14 +99,14 @@ def test_harness_setup_auth_is_noop_when_auth_exists(
     (auth_dir / "auth.json").write_text('{"access_token":"token"}', encoding="utf-8")
     monkeypatch.setenv("CODEX_HOME", str(auth_dir))
 
-    result = runner.invoke(main, ["harness", "setup-auth", "--harness", "codex-cli"])
+    result = runner.invoke(main, ["agent", "setup-auth", "--agent", "codex"])
 
     assert result.exit_code == 0, result.output
     assert "Codex auth is already configured." in result.output
     assert f"auth_json_path: {auth_dir / 'auth.json'}" in result.output
 
 
-def test_harness_setup_auth_runs_codex_login_with_device_auth(
+def test_agent_setup_auth_runs_codex_login_with_device_auth(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runner = CliRunner()
@@ -121,11 +123,11 @@ def test_harness_setup_auth_runs_codex_login_with_device_auth(
         auth_path.write_text('{"access_token":"token"}', encoding="utf-8")
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("raidar.commands.harness.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.commands.agent.subprocess.run", fake_run)
 
     result = runner.invoke(
         main,
-        ["harness", "setup-auth", "--harness", "codex-cli", "--device-auth"],
+        ["agent", "setup-auth", "--agent", "codex", "--device-auth"],
     )
 
     assert result.exit_code == 0, result.output
@@ -133,7 +135,7 @@ def test_harness_setup_auth_runs_codex_login_with_device_auth(
     assert "Codex auth setup complete." in result.output
 
 
-def test_harness_setup_auth_fails_when_login_does_not_create_auth_json(
+def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     runner = CliRunner()
@@ -146,9 +148,9 @@ def test_harness_setup_auth_fails_when_login_does_not_create_auth_json(
         del check
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("raidar.commands.harness.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.commands.agent.subprocess.run", fake_run)
 
-    result = runner.invoke(main, ["harness", "setup-auth", "--harness", "codex-cli"])
+    result = runner.invoke(main, ["agent", "setup-auth", "--agent", "codex"])
 
     assert result.exit_code != 0
     assert "no file-backed auth.json was found" in result.output
@@ -156,17 +158,18 @@ def test_harness_setup_auth_fails_when_login_does_not_create_auth_json(
 
 def test_generated_artifact_paths_filters_prefixes() -> None:
     paths = [
-        "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
-        "runs/smoke/20260930T000000Z/run.json",
+        "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
+        "jobs/smoke/20260930T000000Z/job.json",
         "problems/registry/scb/forge/38d627ecf668.json",
         "orchestrator/src/raidar/cli.py",
+        "experiments/ab-test/python__forge__guided-pilot/experiment.yaml",
     ]
 
     matches = generated_artifact_paths(paths)
 
     assert matches == [
-        "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
-        "runs/smoke/20260930T000000Z/run.json",
+        "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
+        "jobs/smoke/20260930T000000Z/job.json",
     ]
 
 
@@ -233,7 +236,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
         lambda _: [
             (
                 "D",
-                "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+                "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
             ),
         ],
     )
@@ -247,11 +250,11 @@ def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, mon
         lambda _: [
             (
                 "M",
-                "experiments/20260220-000000Z__hello-world-smoke__v001/runs/run-01/run.json",
+                "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
             ),
             (
                 "A",
-                "experiments/20260220-000000Z__hello-world-smoke__v001/report.md",
+                "experiments/operational_smoke/hello-world-smoke/report.md",
             ),
         ],
     )
@@ -294,22 +297,22 @@ def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -
 def test_harbor_cleanup_reports_removed_trial_environments(monkeypatch, tmp_path: Path) -> None:
     seen: dict[str, object] = {}
 
-    def fake_cleanup(run_dir, *, dry_run):
-        seen.update(run_dir=run_dir, dry_run=dry_run)
+    def fake_cleanup(job_dir, *, dry_run):
+        seen.update(job_dir=job_dir, dry_run=dry_run)
         return ["b00-p0-baseline__env-0123456789"]
 
     monkeypatch.setattr("raidar.commands.env_harbor.cleanup_trial_projects", fake_cleanup)
 
-    result = CliRunner().invoke(main, ["harbor", "cleanup", "--run", str(tmp_path), "--dry-run"])
+    result = CliRunner().invoke(main, ["harbor", "cleanup", "--job", str(tmp_path), "--dry-run"])
 
     assert result.exit_code == 0, result.output
-    assert seen == {"run_dir": tmp_path, "dry_run": True}
+    assert seen == {"job_dir": tmp_path, "dry_run": True}
     assert "would remove: b00-p0-baseline__env-0123456789" in result.output
     assert "1 trial environment(s) would remove" in result.output
 
 
 def test_harbor_cleanup_surfaces_docker_failures(monkeypatch) -> None:
-    def failing(run_dir, *, dry_run):
+    def failing(job_dir, *, dry_run):
         raise RuntimeError("docker ps failed: no daemon")
 
     monkeypatch.setattr("raidar.commands.env_harbor.cleanup_trial_projects", failing)
@@ -322,21 +325,22 @@ def test_harbor_cleanup_surfaces_docker_failures(monkeypatch) -> None:
 
 def test_cli_exposes_only_the_experiment_model_commands() -> None:
     assert set(main.commands) == {
+        "agent",
         "analyze",
         "assess",
         "env",
         "harbor",
-        "harness",
         "init",
         "jev",
         "lock",
-        "migrate-run-lock",
+        "migrate-job",
         "pack",
         "perf",
         "plan",
         "problem",
         "quality",
         "run",
+        "upgrade-spec",
         "validate",
     }
     problem = main.commands["problem"]
@@ -349,6 +353,10 @@ def test_run_refuses_the_removed_scenario_flag(tmp_path: Path) -> None:
 
     assert result.exit_code != 0
     assert "No such option: --scenario" in result.output
+
+
+SMOKE_PATH = "experiments/smoke/python__circuit_eval-cp1__harness-health/experiment.yaml"
+AGENTS_PATH = "experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml"
 
 
 def _make_dry_run(*args: str) -> subprocess.CompletedProcess[str]:
@@ -369,30 +377,30 @@ def _raidar_lines(output: str, command: str) -> list[str]:
 
 
 def test_orchestrator_smoke_locks_and_runs_the_smoke_experiment_with_the_same_overrides() -> None:
-    result = _make_dry_run("orchestrator-smoke", "SMOKE_BLOCKS=2", "SMOKE_CONCURRENCY=2")
+    result = _make_dry_run("orchestrator-smoke", "SMOKE_ATTEMPTS=2", "SMOKE_CONCURRENCY=2")
 
     assert result.returncode == 0, result.stderr
     lock_args = _raidar_lines(result.stdout, "lock")
     run_args = _raidar_lines(result.stdout, "run")
     assert len(lock_args) == len(run_args) == 1
-    assert lock_args[0].startswith('"examples/smoke/experiment.yaml" --output ')
-    assert '--set "analysis.blocks=2"' in lock_args[0]
-    assert run_args[0].startswith('"examples/smoke/experiment.yaml" --lock ')
-    assert '--set "analysis.blocks=2"' in run_args[0]
+    assert lock_args[0].startswith(f'"{SMOKE_PATH}" --output ')
+    assert '--set "analysis.attempts=2"' in lock_args[0]
+    assert run_args[0].startswith(f'"{SMOKE_PATH}" --lock ')
+    assert '--set "analysis.attempts=2"' in run_args[0]
     assert '--concurrency "2"' in run_args[0]
     assert "orchestrator-smoke.lock.json" in lock_args[0]
     assert "orchestrator-smoke.lock.json" in run_args[0]
 
 
 def test_agent_smoke_replaces_the_agent_and_pins_the_pack_version() -> None:
-    # HARNESS=claude-code alone defaults to claude-haiku-4-5 with the effort unset
+    # AGENT=claude-code alone defaults to claude-haiku-4-5 with the effort unset
     # (an empty --set value unsets the field; haiku has no effort levels).
-    result = _make_dry_run("agent-smoke", "HARNESS=claude-code", "TIMEOUT_SEC=300")
+    result = _make_dry_run("agent-smoke", "AGENT=claude-code", "TIMEOUT_SEC=300")
 
     assert result.returncode == 0, result.stderr
     (run_args,) = _raidar_lines(result.stdout, "run")
     for assignment in (
-        "agents.0.harness=claude-code",
+        "agents.0.name=claude-code",
         "agents.0.provider=anthropic",
         "agents.0.model=claude-haiku-4-5",
         "agents.0.reasoning_effort=",
@@ -407,10 +415,10 @@ def test_agent_smoke_replaces_the_agent_and_pins_the_pack_version() -> None:
     [
         ((), "low"),
         (("REASONING_EFFORT=",), ""),
-        (("HARNESS=claude-code", "REASONING_EFFORT=low"), "low"),
+        (("AGENT=claude-code", "REASONING_EFFORT=low"), "low"),
     ],
 )
-def test_agent_smoke_effort_defaults_per_harness_and_empty_means_unset(
+def test_agent_smoke_effort_defaults_per_agent_and_empty_means_unset(
     args: tuple[str, ...], effort: str
 ) -> None:
     result = _make_dry_run("agent-smoke", *args)
@@ -426,12 +434,12 @@ def test_smoke_agents_arm_runs_one_arm_of_the_agents_smoke(arm: str) -> None:
 
     assert result.returncode == 0, result.stderr
     (run_args,) = _raidar_lines(result.stdout, "run")
-    assert run_args.startswith('"examples/smoke/agents.experiment.yaml"')
+    assert run_args.startswith(f'"{AGENTS_PATH}"')
     assert f'--arm "{arm}"' in run_args
 
 
 def test_smoke_agents_arms_match_the_agents_smoke_experiment() -> None:
-    agents_smoke = REPO_ROOT / "examples" / "smoke" / "agents.experiment.yaml"
+    agents_smoke = REPO_ROOT / AGENTS_PATH
     spec = yaml.safe_load(agents_smoke.read_text(encoding="utf-8"))
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
     arms = " ".join(arm["id"] for arm in spec["arms"])
@@ -522,13 +530,13 @@ def test_review_surface_test_projects_both_fixture_roots_but_quality_only_one() 
     quality = next(line for line in joined.splitlines() if "raidar.review_quality " in line)
     assert "--legacy-root" not in review
     assert "/.tmp/review-fixture/review-only" in review
-    assert "/.tmp/review-fixture/runs" in review
+    assert "/.tmp/review-fixture/jobs" in review
     assert "/.tmp/review-fixture/review-only" not in quality
 
 
-def test_review_surface_data_requires_runs() -> None:
+def test_review_surface_data_requires_jobs() -> None:
     result = subprocess.run(
-        ["make", "--no-print-directory", "review-surface-data", "REVIEW_RUNS_ROOT="],
+        ["make", "--no-print-directory", "review-surface-data", "REVIEW_JOBS_ROOT="],
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
@@ -536,47 +544,61 @@ def test_review_surface_data_requires_runs() -> None:
     )
 
     assert result.returncode != 0
-    assert "Missing required variable: REVIEW_RUNS_ROOT" in result.stdout
+    assert "Missing required variable: REVIEW_JOBS_ROOT" in result.stdout
 
 
 def test_review_surface_test_applies_one_store_to_every_given_runs_root() -> None:
     result = _make_dry_run(
-        "review-surface-test", "REVIEW_RUNS_ROOT=runs/a runs/b", "REVIEW_STORE=store"
+        "review-surface-test", "REVIEW_JOBS_ROOT=runs/a runs/b", "REVIEW_STORE=store"
     )
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
     quality = next(line for line in joined.splitlines() if "raidar.review_quality " in line)
-    assert f'--runs-root "{REPO_ROOT / "runs/a"}"' in quality
-    assert f'--runs-root "{REPO_ROOT / "runs/b"}"' in quality
+    assert f'--jobs-root "{REPO_ROOT / "runs/a"}"' in quality
+    assert f'--jobs-root "{REPO_ROOT / "runs/b"}"' in quality
     assert quality.count(f'--store "{REPO_ROOT / "store"}"') == 2
 
 
 def test_review_surface_test_rejects_mismatched_runs_and_stores() -> None:
     result = _make_dry_run(
-        "review-surface-test", "REVIEW_RUNS_ROOT=runs/a runs/b runs/c", "REVIEW_STORE=s1 s2"
+        "review-surface-test", "REVIEW_JOBS_ROOT=runs/a runs/b runs/c", "REVIEW_STORE=s1 s2"
     )
 
     assert result.returncode != 0
     assert "one store for all roots or one store per root" in result.stderr
 
 
-def test_smoke_experiments_pin_the_pack_harness_versions() -> None:
-    pins = {harness: pin.version for harness, pin in load_pack_spec().image.harnesses.items()}
+def test_smoke_experiments_pin_the_pack_agent_versions() -> None:
+    pins = {
+        agent_name_for(cli).value: pin.version
+        for cli, pin in load_pack_spec().image.harnesses.items()
+    }
     makefile = (REPO_ROOT / "Makefile").read_text(encoding="utf-8")
-    for harness, version in pins.items():
-        assert f"AGENT_SMOKE_VERSION_{harness} := {version}" in makefile
-    for name in ("experiment.yaml", "agents.experiment.yaml"):
-        spec = yaml.safe_load((REPO_ROOT / "examples" / "smoke" / name).read_text())
+    for name, version in pins.items():
+        assert f"AGENT_SMOKE_VERSION_{name} := {version}" in makefile
+    for path in (SMOKE_PATH, AGENTS_PATH):
+        spec = yaml.safe_load((REPO_ROOT / path).read_text())
         for agent in spec["agents"]:
-            assert agent["version"] == pins[agent["harness"]]
+            assert agent["version"] == pins[agent["name"]]
+
+
+@pytest.mark.parametrize(
+    ("old", "new"),
+    [("RUN=x", "JOB="), ("HARNESS=codex", "AGENT="), ("BLOCK=0", "ATTEMPT="), ("RUNS=x", "JOBS=")],
+)
+def test_renamed_make_variables_fail_with_their_new_name(old: str, new: str) -> None:
+    result = _make_dry_run("help", old)
+
+    assert result.returncode != 0
+    assert f"was renamed {new}" in result.stderr
 
 
 def test_experiment_assess_rescores_the_run_trials_with_the_named_scorers(tmp_path: Path) -> None:
     (tmp_path / "trials").mkdir()
     result = _make_dry_run(
         "experiment-assess",
-        f"RUN={tmp_path}",
+        f"JOB={tmp_path}",
         "STORE=.tmp/store",
         "SCORERS=correctness@1 code-quality@1",
         "REPLAY=1",

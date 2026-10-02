@@ -1,8 +1,8 @@
 """The Harbor ``TrialConfig`` of one planned trial (plan D2).
 
-Wiring (ADR-001 Appendix A.1): the Raidar oracle verifier is selected per trial
+Wiring (ADR-001 Appendix A.1): the Raidar verifier is selected per trial
 through ``TrialConfig.verifier`` (it is not a ``task.toml`` setting in Harbor
-0.23), pointed at the problem's host-only oracle bundle, grading Harbor's host
+0.23), pointed at the problem's host-only verifier bundle, grading Harbor's host
 copy of ``/app`` (accepted N1 decision ``snapshot_source=artifact``) with the
 separate coverage pass on.
 """
@@ -17,7 +17,7 @@ from raidar.execution.agent_config import with_host_auth
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.execution.models import PlannedTrial
 from raidar.execution.plan import ExperimentPlan
-from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
+from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 
 # Harbor's verifier phase covers the grading run and the coverage run (each
 # bounded by grader_timeout_s) plus a grader-image presence check or build.
@@ -48,7 +48,7 @@ def harbor_trial_config(
             kwargs={SCOPE_KWARG: run_scope(trials_dir)},
         ),
         verifier=VerifierConfig(
-            import_path=ORACLE_VERIFIER_IMPORT_PATH,
+            import_path=VERIFIER_IMPORT_PATH,
             override_timeout_sec=2 * grader_timeout + VERIFIER_PHASE_MARGIN_S,
             kwargs={
                 "oracle_bundle": str(bundle_root),

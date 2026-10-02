@@ -1,10 +1,10 @@
-"""Synthetic trajectories with known effects for analysis tests."""
+"""Synthetic trials with known effects for analysis tests."""
 
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from raidar.analysis.outcomes import TrajectoryOutcome, Value
+from raidar.analysis.outcomes import TrialOutcome, Value
 from raidar.analysis.report import AnalysisInputs, PlannedTrial
 
 BASELINE = "baseline"
@@ -16,16 +16,16 @@ def gap(status: str = "ineligible", reason: str = "synthetic gap") -> Value:
     return Value.missing(status, reason)
 
 
-def trajectory(
+def trial(
     arm: str,
-    block: int,
+    attempt: int,
     metrics: Mapping[str, float | Value],
     *,
     problem: str = "toy@1",
     infra: bool = False,
     solved: Sequence[float | None] | None = None,
-) -> TrajectoryOutcome:
-    """One trajectory; plain floats become ``ok`` values, ``None`` checkpoints are gaps."""
+) -> TrialOutcome:
+    """One trial; plain floats become ``ok`` values, ``None`` checkpoints are gaps."""
     values = {
         name: value if isinstance(value, Value) else Value.ok(value)
         for name, value in metrics.items()
@@ -35,11 +35,11 @@ def trajectory(
         series["solved"] = tuple(
             Value.ok(v) if v is not None else gap("not_applicable", "not reached") for v in solved
         )
-    return TrajectoryOutcome(
-        trial_id=f"{problem}-{arm}-b{block}",
-        run_id="run-1",
+    return TrialOutcome(
+        trial_id=f"{problem}-{arm}-b{attempt}",
+        job_id="run-1",
         arm=arm,
-        block=block,
+        attempt=attempt,
         problem=problem,
         steps=STEPS,
         infra_error=infra,
@@ -56,41 +56,43 @@ def paired_arms(
     *,
     cost: tuple[float, float] = (1.0, 1.5),
     problem: str = "toy@1",
-) -> list[TrajectoryOutcome]:
-    """Block ``i`` pairs ``baseline[i]`` with ``treatment[i]``; each arm has a fixed cost."""
+) -> list[TrialOutcome]:
+    """Attempt ``i`` pairs ``baseline[i]`` with ``treatment[i]``; each arm has a fixed cost."""
     outcomes = []
-    for block, (left, right) in enumerate(zip(baseline, treatment, strict=True)):
+    for attempt, (left, right) in enumerate(zip(baseline, treatment, strict=True)):
         outcomes.append(
-            trajectory(BASELINE, block, {metric: left, "total_cost_usd": cost[0]}, problem=problem)
+            trial(BASELINE, attempt, {metric: left, "total_cost_usd": cost[0]}, problem=problem)
         )
         outcomes.append(
-            trajectory(GUIDED, block, {metric: right, "total_cost_usd": cost[1]}, problem=problem)
+            trial(GUIDED, attempt, {metric: right, "total_cost_usd": cost[1]}, problem=problem)
         )
     return outcomes
 
 
-def planned(blocks: int, problems: Sequence[str] = ("toy@1",)) -> tuple[PlannedTrial, ...]:
+def planned(attempts: int, problems: Sequence[str] = ("toy@1",)) -> tuple[PlannedTrial, ...]:
     return tuple(
-        PlannedTrial(trial_id=f"{problem}-{arm}-b{block}", arm=arm, block=block, problem=problem)
+        PlannedTrial(
+            trial_id=f"{problem}-{arm}-b{attempt}", arm=arm, attempt=attempt, problem=problem
+        )
         for problem in problems
-        for block in range(blocks)
+        for attempt in range(attempts)
         for arm in (BASELINE, GUIDED)
     )
 
 
 def inputs(
-    outcomes: Sequence[TrajectoryOutcome],
-    blocks: int,
+    outcomes: Sequence[TrialOutcome],
+    attempts: int,
     problems: Sequence[str] = ("toy@1",),
     progression: str = "continue",
 ) -> AnalysisInputs:
     return AnalysisInputs(
         experiment="synthetic",
         lock_sha256="0" * 64,
-        runs=("run-1",),
-        headline_policy={"ref": "scb-canonical@1", "selection": "default_by_k"},
+        jobs=("job-1",),
+        metric={"ref": "scb-canonical@1", "selection": "default_by_k"},
         baseline_arm=BASELINE,
         progression=progression,
-        planned=planned(blocks, problems),
+        planned=planned(attempts, problems),
         outcomes=tuple(outcomes),
     )

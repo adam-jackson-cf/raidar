@@ -2,7 +2,7 @@
 
 The surface compares every experiment record of one ``problem``: it ranks their
 composite means, plots them on one scatter and moves between arms. A composite
-is only comparable under one headline policy, so when a compared family mixes
+is only comparable under one headline metric, so when a compared family mixes
 policies every record in it carries a ``headline-policy-mismatch`` issue
 (shown in the comparison table's issue count and the row's findings) and every
 condition diff in it carries the same warning (shown on the arm-movement card).
@@ -16,7 +16,7 @@ from collections.abc import Sequence
 from raidar.review_projection.notes import EvidenceRef, Finding
 from raidar.schemas.review import ArmDiffArtifact, ReviewExperimentRecord
 
-UNKNOWN_POLICY = "unrecorded headline policy"
+UNKNOWN_POLICY = "unrecorded headline metric"
 MISMATCH_CATEGORY = "headline-policy-mismatch"
 
 
@@ -27,7 +27,7 @@ def headline_policy(record: ReviewExperimentRecord) -> str:
 
 def _warning(policies: dict[str, list[str]]) -> str:
     listed = ", ".join(f"{policy} ({len(ids)})" for policy, ids in sorted(policies.items()))
-    return f"headline policies differ across compared experiments: {listed}"
+    return f"headline metrics differ across compared experiments: {listed}"
 
 
 def _finding(policies: dict[str, list[str]]) -> dict[str, object]:
@@ -35,7 +35,7 @@ def _finding(policies: dict[str, list[str]]) -> dict[str, object]:
         id=MISMATCH_CATEGORY,
         kind="issue",
         category=MISMATCH_CATEGORY,
-        title="Headline policies differ in this comparison",
+        title="Headline metrics differ in this comparison",
         detail=(
             _warning(policies)
             + "; composite scores under different policies are not comparable, so compare "

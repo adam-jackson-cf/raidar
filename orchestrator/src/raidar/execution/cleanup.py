@@ -2,12 +2,12 @@
 
 Every Raidar trial environment is a Harbor Compose project named
 ``<trial id>__env-<run scope>`` (``raidar.execution.environment``), where the
-run scope is a 10-hex token of the run's ``trials/`` directory. Stopping
+run scope is a 10-hex token of the job's ``trials/`` directory. Stopping
 ``raidar run`` mid-trial skips Harbor's teardown, so those projects' containers
 and networks stay behind. Cleanup targets only projects with that shape:
 
-- with a run directory: every project of that run, running or not (the caller
-  names the run, so its live containers are known to be orphans);
+- with a job directory: every project of that run, running or not (the caller
+  names the job, so its live containers are known to be orphans);
 - without one: only projects with no running container, so concurrent runs on
   the same Docker host are never touched.
 
@@ -58,16 +58,16 @@ def trial_projects(listing: str) -> list[TrialProject]:
     ]
 
 
-def select_stale(projects: Sequence[TrialProject], run_dir: Path | None) -> list[TrialProject]:
+def select_stale(projects: Sequence[TrialProject], job_dir: Path | None) -> list[TrialProject]:
     """The projects to remove: a named run's, or every project with nothing running."""
-    if run_dir is not None:
-        scope = run_scope(run_dir / "trials")
+    if job_dir is not None:
+        scope = run_scope(job_dir / "trials")
         return [project for project in projects if project.scope == scope]
     return [project for project in projects if not project.running]
 
 
 def cleanup_trial_projects(
-    run_dir: Path | None = None, *, dry_run: bool = False, runner: Runner = _run
+    job_dir: Path | None = None, *, dry_run: bool = False, runner: Runner = _run
 ) -> list[str]:
     """Remove stale trial projects (``docker compose down``); return their names."""
     listed = runner(
@@ -83,7 +83,7 @@ def cleanup_trial_projects(
     )
     if listed.returncode != 0:
         raise RuntimeError(f"docker ps failed: {listed.stderr.strip()}")
-    stale = select_stale(trial_projects(listed.stdout), run_dir)
+    stale = select_stale(trial_projects(listed.stdout), job_dir)
     if not dry_run:
         for project in stale:
             runner(["docker", "compose", "-p", project.name, "down", "--remove-orphans"])

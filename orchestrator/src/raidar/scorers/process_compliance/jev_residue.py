@@ -15,7 +15,7 @@ question wording or policy of its own:
 The step's ``jev_ambiguous_compliance`` is the lowest ``noul`` probability over
 its ambiguous checks: the step complied only if it complied with each, and the
 least likely check bounds that from above. Shadow observations are tier
-``jev`` and never feed a ScorePolicy.
+``jev`` and never feed a Metric.
 """
 
 from __future__ import annotations

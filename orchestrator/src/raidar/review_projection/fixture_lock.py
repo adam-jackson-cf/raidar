@@ -1,7 +1,7 @@
 """The synthetic review fixture's experiment lock: sealed like a real lock.
 
 Only what the review projection reads from a lock is filled in: the spec, the
-locked conditions and problem (execution section), the headline policy chosen
+locked conditions and problem (execution section), the headline metric chosen
 by K (assessment section) and the analysis section. ``seal_lock`` adds the
 section digests, ``lock_sha256`` (the execution digest) and ``document_sha256``,
 so ``parse_lock`` accepts it exactly as it accepts a ``raidar lock`` output.
@@ -14,7 +14,7 @@ from typing import Any
 
 from raidar.spec.canonical import digest_json
 from raidar.spec.lock import LOCK_VERSION, analysis_section, seal_lock
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
 
 
 def fixture_lock(
@@ -36,8 +36,8 @@ def fixture_lock(
                 ],
             },
             "assessment": {
-                "headline_policy": {
-                    "ref": DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints).ref,
+                "metric": {
+                    "ref": DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints).ref,
                     "selection": "default_by_k",
                     "checkpoints": [checkpoints],
                 },

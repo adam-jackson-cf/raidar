@@ -146,7 +146,7 @@ test.describe('headline-policy mismatch notice', () => {
     await page.goto('/');
     const notice = page.locator(`[id="family-${FAMILY}"]`).getByTestId('policy-mismatch');
     await expect(notice).toBeVisible();
-    await expect(notice).toContainText('Headline policies differ in this comparison');
+    await expect(notice).toContainText('Headline metrics differ in this comparison');
     await expect(notice).toContainText('scb-canonical-oneshot@1');
     await expect(notice).toContainText(/scb-canonical@1/);
     await expect(page.locator('[id="family-synthetic/ledger-balance@1"]').getByTestId('policy-mismatch')).toHaveCount(0);
@@ -154,12 +154,12 @@ test.describe('headline-policy mismatch notice', () => {
 
   test('shows the same notice in run detail and on both quality views', async ({ page }) => {
     await openRun(page, POLICY_MIX_RUN);
-    await expect(page.getByTestId('policy-mismatch')).toContainText('Headline policies differ in this comparison');
+    await expect(page.getByTestId('policy-mismatch')).toContainText('Headline metrics differ in this comparison');
     await page.getByTestId('run-quality-panel').getByRole('link', { name: 'Compare arms' }).click();
     const problem = page.locator(`[data-testid="quality-problem"][aria-label="${FAMILY}"]`);
     await expect(problem.getByTestId('policy-mismatch')).toContainText('scb-canonical-oneshot@1');
     await page.goto(`/quality/runs/synthetic-policy-mix.synthetic-policy-mix.gpt-5.5-low-01`);
-    await expect(page.getByTestId('policy-mismatch')).toContainText('Headline policies differ in this comparison');
+    await expect(page.getByTestId('policy-mismatch')).toContainText('Headline metrics differ in this comparison');
   });
 
   test('a single-policy family shows no notice anywhere', async ({ page }) => {

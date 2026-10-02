@@ -282,7 +282,7 @@ export function RunsPage() {
           ))}
           {runs.data && filtered.length === 0 && (
             <div className="p-2 text-xs" style={{ color: C.fg0 }}>
-              No runs match the filter.
+              No trials match the filter.
             </div>
           )}
         </div>
@@ -294,7 +294,7 @@ export function RunsPage() {
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <span className="text-sm" style={{ color: C.fg2 }}>
-              Pick a run to see why it scored what it did
+              Pick a trial to see why it scored what it did
             </span>
             <span className="max-w-sm text-xs leading-relaxed" style={{ color: C.fg0 }}>
               Each run opens with a plain-language verdict, the scorecard behind it, the

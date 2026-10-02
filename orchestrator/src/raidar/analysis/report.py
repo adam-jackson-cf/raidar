@@ -1,22 +1,26 @@
 """The analysis report: every comparison against the baseline arm (F10, J1, J2).
 
-``analyse`` is pure: it takes the planned slots and the per-trajectory
-outcomes (``raidar.analysis.load`` reads them from runs and the Assessment
+``analyse`` is pure: it takes the planned slots and the per-trial
+outcomes (``raidar.analysis.load`` reads them from jobs and the Assessment
 store) and returns a deterministic ``AnalysisReport``, the machine-readable
 document the review surface projects (WS-K) and the gate packet includes.
-Runs and Assessments are only read, never written.
+Jobs and Assessments are only read, never written.
 
 Each treatment arm is compared with the experiment's baseline arm. Effects are
 listed per outcome metric: one per problem, plus an equal-weight aggregate when
 the experiment has several problems. Each comparison's ``primary`` effect is
 the pre-registered primary outcome of the experiment's progression (memo §2.3,
 §10.1: C under ``continue``, ``reached`` under ``halt_on_failure``); the
-composite S of the headline ScorePolicy is a secondary effect (F15 makes it
+composite S of the headline metric is a secondary effect (F15 makes it
 the review surface's score, not the primary outcome).
 
-The verdict thresholds come from the caller (``Settings``). The experiment
-spec does not pin them yet, so the report says where they came from and which
-of them differ from the documented defaults.
+The verdict thresholds come from the caller (``Settings``); the report says
+where they came from and which of them differ from the documented defaults.
+
+The experiment's kind shapes the report, never the verdicts: a ``benchmark``
+adds the ranking view (``raidar.analysis.ranking``) beside the paired verdicts
+against its reference agent, and a ``smoke`` report is stamped not citable
+(a single-arm smoke has no comparison).
 """
 
 from __future__ import annotations
@@ -41,9 +45,10 @@ from raidar.analysis.outcomes import (
     COST_METRICS,
     OUTCOME_METRICS,
     AnalysisModel,
-    TrajectoryOutcome,
+    TrialOutcome,
     primary_metric,
 )
+from raidar.analysis.ranking import Ranking, ranking
 from raidar.analysis.stats import POWER_CONSTANT, pairs_for_power
 from raidar.scorers.sdk.result import AssessResult
 
@@ -55,12 +60,15 @@ STANDARDIZED_EFFECTS = (1.0, 0.5, 0.25)
 class PlannedTrial:
     trial_id: str
     arm: str
-    block: int
+    attempt: int
     problem: str
 
 
+NOT_CITABLE_KINDS = ("smoke",)
+
+
 class DevRun(AnalysisModel):
-    """Development options the analysed runs were executed with (never arm evidence)."""
+    """Development options the analysed jobs were executed with (never arm evidence)."""
 
     max_checkpoints: int | None
     agent_override: str | None
@@ -71,15 +79,18 @@ class DevRun(AnalysisModel):
 class AnalysisInputs:
     experiment: str
     lock_sha256: str
-    runs: tuple[str, ...]
-    headline_policy: Mapping[str, object]
+    jobs: tuple[str, ...]
+    metric: Mapping[str, object]
     baseline_arm: str
     progression: str
     planned: tuple[PlannedTrial, ...]
-    outcomes: tuple[TrajectoryOutcome, ...]
+    outcomes: tuple[TrialOutcome, ...]
     replaced: tuple[str, ...] = ()
     process_results: Mapping[str, AssessResult | None] | None = field(default=None)
-    dev_run: DevRun | None = None
+    dev_job: DevRun | None = None
+    kind: str = "ab-test"
+    rank_by: str | None = None
+    attempts: int = 1
 
 
 class ArmSummary(AnalysisModel):
@@ -126,19 +137,22 @@ class ReportSettings(AnalysisModel):
 
 class AnalysisReport(AnalysisModel):
     kind: str = REPORT_KIND
-    schema_version: int = 1
+    schema_version: int = 2
     experiment: str
+    experiment_kind: str = "ab-test"
+    citable: bool = True
     lock_sha256: str
-    runs: tuple[str, ...]
-    headline_policy: dict[str, object]
+    jobs: tuple[str, ...]
+    metric: dict[str, object]
     primary_metric: str
     baseline_arm: str
     progression: str
-    dev_run: DevRun | None = None
+    dev_job: DevRun | None = None
     settings: ReportSettings
     arms: tuple[ArmSummary, ...]
-    replaced_trajectories: tuple[str, ...] = ()
+    replaced_trials: tuple[str, ...] = ()
     comparisons: tuple[Comparison, ...]
+    ranking: Ranking | None = None
     sample_size_basis: SampleSizeBasis = Field(
         default_factory=lambda: SampleSizeBasis(
             standardized={f"{d:g}": pairs_for_power(1.0, d) for d in STANDARDIZED_EFFECTS}
@@ -147,21 +161,21 @@ class AnalysisReport(AnalysisModel):
 
 
 def _slots(inputs: AnalysisInputs, treatment: str) -> dict[str, list[Slot]]:
-    """(problem, block) slots the plan scheduled for both arms, by problem."""
-    by_key = {(o.arm, o.problem, o.block): o for o in inputs.outcomes}
+    """(problem, attempt) slots the plan scheduled for both arms, by problem."""
+    by_key = {(o.arm, o.problem, o.attempt): o for o in inputs.outcomes}
 
     def scheduled(arm: str) -> set[tuple[str, int]]:
-        return {(t.problem, t.block) for t in inputs.planned if t.arm == arm}
+        return {(t.problem, t.attempt) for t in inputs.planned if t.arm == arm}
 
     keys = sorted(scheduled(inputs.baseline_arm) & scheduled(treatment))
     slots: dict[str, list[Slot]] = {}
-    for problem, block in keys:
+    for problem, attempt in keys:
         slots.setdefault(problem, []).append(
             Slot(
                 problem=problem,
-                block=block,
-                baseline=by_key.get((inputs.baseline_arm, problem, block)),
-                treatment=by_key.get((treatment, problem, block)),
+                attempt=attempt,
+                baseline=by_key.get((inputs.baseline_arm, problem, attempt)),
+                treatment=by_key.get((treatment, problem, attempt)),
             )
         )
     return slots
@@ -217,7 +231,7 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
     )
 
 
-def _reason_counts(outcomes: Sequence[TrajectoryOutcome]) -> dict[str, int]:
+def _reason_counts(outcomes: Sequence[TrialOutcome]) -> dict[str, int]:
     counts: dict[str, int] = {}
     for outcome in outcomes:
         for reason in outcome.infra_reasons:
@@ -225,7 +239,7 @@ def _reason_counts(outcomes: Sequence[TrajectoryOutcome]) -> dict[str, int]:
     return dict(sorted(counts.items()))
 
 
-def _cost_means(valid: Sequence[TrajectoryOutcome]) -> dict[str, float | None]:
+def _cost_means(valid: Sequence[TrialOutcome]) -> dict[str, float | None]:
     means: dict[str, float | None] = {}
     for name in COST_METRICS:
         values = [outcome.metric(name).value for outcome in valid]
@@ -269,16 +283,16 @@ def arms_of(planned: Sequence[PlannedTrial]) -> list[str]:
     return sorted({trial.arm for trial in planned})
 
 
-def check_steps(outcomes: Sequence[TrajectoryOutcome]) -> None:
-    """Every trajectory of one problem must cover the same checkpoints to be compared."""
+def check_steps(outcomes: Sequence[TrialOutcome]) -> None:
+    """Every trial of one problem must cover the same checkpoints to be compared."""
     steps: dict[str, set[tuple[str, ...]]] = {}
     for outcome in outcomes:
         steps.setdefault(outcome.problem, set()).add(outcome.steps)
     mixed = sorted(problem for problem, lists in steps.items() if len(lists) > 1)
     if mixed:
         raise ValueError(
-            f"trajectories of {', '.join(mixed)} cover different checkpoint lists "
-            "(truncated and full runs cannot be compared)"
+            f"trials of {', '.join(mixed)} cover different checkpoint lists "
+            "(truncated and full jobs cannot be compared)"
         )
 
 
@@ -289,19 +303,39 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
     if inputs.baseline_arm not in arms:
         raise ValueError(f"baseline arm {inputs.baseline_arm!r} is not in the plan ({arms})")
     treatments = [arm for arm in arms if arm != inputs.baseline_arm]
-    if not treatments:
+    if not treatments and inputs.kind != "smoke":
         raise ValueError("the plan has no treatment arm to compare with the baseline")
+    summaries = tuple(_arm_summary(arm, inputs) for arm in arms)
     return AnalysisReport(
         experiment=inputs.experiment,
+        experiment_kind=inputs.kind,
+        citable=inputs.kind not in NOT_CITABLE_KINDS,
         lock_sha256=inputs.lock_sha256,
-        runs=inputs.runs,
-        headline_policy=dict(inputs.headline_policy),
+        jobs=inputs.jobs,
+        metric=dict(inputs.metric),
         primary_metric=primary_metric(inputs.progression),
         baseline_arm=inputs.baseline_arm,
         progression=inputs.progression,
-        dev_run=inputs.dev_run,
+        dev_job=inputs.dev_job,
         settings=_settings_out(settings),
-        arms=tuple(_arm_summary(arm, inputs) for arm in arms),
-        replaced_trajectories=inputs.replaced,
+        arms=summaries,
+        replaced_trials=inputs.replaced,
         comparisons=tuple(_comparison(inputs, arm, settings) for arm in treatments),
+        ranking=_ranking(inputs, settings, summaries),
+    )
+
+
+def _ranking(
+    inputs: AnalysisInputs, settings: Settings, summaries: Sequence[ArmSummary]
+) -> Ranking | None:
+    if inputs.kind != "benchmark":
+        return None
+    return ranking(
+        inputs.outcomes,
+        [summary.arm for summary in summaries],
+        rank_by=inputs.rank_by or primary_metric(inputs.progression),
+        reference_arm=inputs.baseline_arm,
+        attempts=inputs.attempts,
+        settings=settings,
+        cost_means={summary.arm: summary.cost_means for summary in summaries},
     )

@@ -1,7 +1,7 @@
 """Assessments for the synthetic fixture, stored under the keys a real rescore uses.
 
 ``correctness@1`` and ``resource-usage@1`` run for real over the synthetic
-oracle records and ATIF traces. ``code-quality@1`` needs the provisioned
+verifier records and ATIF traces. ``code-quality@1`` needs the provisioned
 measurement tools and multi-checkpoint lineage a synthetic snapshot cannot give
 meaningful values for, so its result is composed from the fixture's declared
 component values, then validated against the scorer's manifest (every metric

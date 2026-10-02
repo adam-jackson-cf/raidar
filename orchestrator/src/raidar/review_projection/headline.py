@@ -1,6 +1,6 @@
-"""The experiment's headline ScorePolicy applied to one trajectory's Assessments.
+"""The experiment's headline metric applied to one trial's Assessments.
 
-``composite_score`` is S/100 under the headline policy (``scb-canonical@1`` or
+``composite_score`` is S/100 under the headline metric (``scb-canonical@1`` or
 its one-shot variant), so the review surface's delivery tiers keep their
 meaning: S is correctness-gated. ``quality_score`` is the policy's inertia I and
 ``diagnostic_score`` is correctness C. C is the policy's definition (the SCB
@@ -12,7 +12,7 @@ scorer's own reason, and a scorer with no stored Assessment makes it
 unassessed; neither is ever read as zero. Under a policy with the
 ``zero_correctness`` rule (``@2``), a measured C = 0 scores S = 0 regardless.
 
-Two trajectory states withhold the headline even when every component is
+Two trial states withhold the headline even when every component is
 measured, exactly as ``raidar analyze`` excludes them (``analysis.assessed``):
 an infra-invalid execution, and a ``max_checkpoints`` truncation, whose K is
 not the problem's K. Their components stay visible; S, C and I do not.
@@ -26,14 +26,14 @@ from decimal import Decimal
 
 from raidar.analysis.assessed import Observed, correctness_component, infra_reasons
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
-from raidar.execution.models import CheckpointState, TrajectoryRecord
+from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review_projection.assessments import TrialAssessments
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
-from raidar.spec.policies import (
+from raidar.spec.metrics import (
     CORRECTNESS,
-    DEFAULT_POLICY_REGISTRY,
-    PolicyScore,
-    ScorePolicy,
+    DEFAULT_METRIC_REGISTRY,
+    Metric,
+    MetricScore,
 )
 from raidar.spec.references import RegistryReferenceError
 
@@ -60,7 +60,7 @@ COMPONENT_NAMES = {
 class Headline:
     policy: str
     checkpoints: int
-    score: PolicyScore | None
+    score: MetricScore | None
     correctness: Decimal | None
     components: Mapping[str, Observation] = field(default_factory=dict)
     reasons: tuple[str, ...] = ()
@@ -83,18 +83,18 @@ class Headline:
         return None if self.withheld or self.correctness is None else float(self.correctness)
 
 
-def withheld_reasons(record: TrajectoryRecord) -> tuple[str, ...]:
-    """Why this trajectory has no headline even with every component measured."""
+def withheld_reasons(record: TrialRecord) -> tuple[str, ...]:
+    """Why this trial has no headline even with every component measured."""
     reasons = [
         f"Execution invalid: {check.name}: {check.detail or 'failed'}"
         for check in record.validity.checks
         if not check.passed
     ]
     reasons += [
-        f"Execution invalid: {attempt.step} infra error: "
-        + (", ".join(attempt.infra_reasons) or "infra_error")
-        for attempt in record.attempts
-        if attempt.checkpoint_state is CheckpointState.INFRA_ERROR
+        f"Execution invalid: {step_result.step} infra error: "
+        + (", ".join(step_result.infra_reasons) or "infra_error")
+        for step_result in record.step_results
+        if step_result.checkpoint_state is CheckpointState.INFRA_ERROR
     ]
     if not reasons and (infra_reasons(record) or not record.valid):
         reasons.append("Execution invalid: the trial raised an exception")
@@ -106,7 +106,7 @@ def withheld_reasons(record: TrajectoryRecord) -> tuple[str, ...]:
     return tuple(reasons)
 
 
-def trajectory_observation(
+def trial_observation(
     assessments: TrialAssessments, scorer: str, metric: str
 ) -> Observation | None:
     assessment = assessments.get(scorer)
@@ -133,7 +133,7 @@ def _correctness(
 ) -> tuple[Decimal | None, Observation | None, str | None]:
     """C over ``steps`` and the observation that stands for it in the panel.
 
-    The observation is a trajectory-level C built from the per-checkpoint pass
+    The observation is a trial-level C built from the per-checkpoint pass
     rates (status ``ok``), or the first per-checkpoint gap.
     """
     assessment = assessments.get(CORRECTNESS_SCORER)
@@ -158,14 +158,12 @@ def _correctness(
 
 
 def _quality_inputs(
-    policy: ScorePolicy, assessments: TrialAssessments
+    policy: Metric, assessments: TrialAssessments
 ) -> tuple[dict[str, ComponentInput], dict[str, Observation]]:
     inputs: dict[str, ComponentInput] = {}
     used: dict[str, Observation] = {}
     for component in policy.inertia_weights:
-        observation = trajectory_observation(
-            assessments, QUALITY_SCORER, COMPONENT_METRICS[component]
-        )
+        observation = trial_observation(assessments, QUALITY_SCORER, COMPONENT_METRICS[component])
         if observation is not None:
             used[component] = observation
         if observation is not None and observation.status is AssessStatus.OK:
@@ -184,16 +182,16 @@ def _reason_text(policy: str, component: str | None, detail: str) -> str:
 UNDECLARED_MARKER = "which the experiment does not declare"
 
 
-def needed_scorers(policy: ScorePolicy) -> tuple[str, ...]:
+def needed_scorers(policy: Metric) -> tuple[str, ...]:
     """The scorers whose Assessments the policy's components come from."""
     return (CORRECTNESS_SCORER, QUALITY_SCORER) if policy.inertia_weights else (CORRECTNESS_SCORER,)
 
 
-def _undeclared_reasons(policy: ScorePolicy, declared: Collection[str] | None) -> tuple[str, ...]:
+def _undeclared_reasons(policy: Metric, declared: Collection[str] | None) -> tuple[str, ...]:
     if declared is None:
         return ()
     return tuple(
-        f"{policy.ref} not computable: the headline policy needs {ref}, "
+        f"{policy.ref} not computable: the headline metric needs {ref}, "
         f"{UNDECLARED_MARKER} (add it to assessment.scorers and relock)"
         for ref in needed_scorers(policy)
         if ref not in declared
@@ -201,8 +199,8 @@ def _undeclared_reasons(policy: ScorePolicy, declared: Collection[str] | None) -
 
 
 def _policy_reasons(
-    policy: ScorePolicy,
-    score: PolicyScore,
+    policy: Metric,
+    score: MetricScore,
     assessments: TrialAssessments,
     declared: Collection[str] | None = None,
 ) -> tuple[str, ...]:
@@ -222,7 +220,7 @@ def _policy_reasons(
     )
 
 
-def policy_shares(policy: ScorePolicy) -> tuple[float, float]:
+def policy_shares(policy: Metric) -> tuple[float, float]:
     """The policy's (base, inertia) shares of S, read from the policy itself.
 
     S = 100·C·(base + inertia·I), so with C=1 the score at I=0 is 100·base and
@@ -234,7 +232,7 @@ def policy_shares(policy: ScorePolicy) -> tuple[float, float]:
     low = policy.score(checkpoints=k, components=zeros).score
     high = policy.score(checkpoints=k, components=ones).score
     if low is None or high is None:
-        raise ValueError(f"{policy.ref} does not score a fully measured trajectory")
+        raise ValueError(f"{policy.ref} does not score a fully measured trial")
     return float(low / 100), float((high - low) / 100)
 
 
@@ -245,17 +243,17 @@ def headline(
     withheld: tuple[str, ...] = (),
     declared: Collection[str] | None = None,
 ) -> Headline:
-    """Score one trajectory under the headline policy (the default by K when none is locked).
+    """Score one trial under the headline metric (the default by K when none is locked).
 
-    ``steps`` are the trajectory's planned checkpoints (K = their count).
+    ``steps`` are the trial's planned checkpoints (K = their count).
     ``withheld`` (``withheld_reasons``) keeps the components but suppresses S, C and I.
     """
     checkpoints = len(steps)
     try:
         policy = (
-            DEFAULT_POLICY_REGISTRY.get(policy_ref)
+            DEFAULT_METRIC_REGISTRY.get(policy_ref)
             if policy_ref is not None
-            else DEFAULT_POLICY_REGISTRY.default_for_checkpoints(checkpoints)
+            else DEFAULT_METRIC_REGISTRY.default_for_checkpoints(checkpoints)
         )
     except RegistryReferenceError as exc:
         ref = policy_ref or "default"

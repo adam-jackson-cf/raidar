@@ -5,18 +5,24 @@ experiment-relative paths, so relocking unchanged inputs is byte-identical.
 It holds the effective spec (file + CLI overrides) and four hashed sections,
 each with its own digest under ``sections``:
 
-- ``execution``: what a trial runs: the experiment design (problems, runtime,
-  agents, protocol, factors, conditions, arms, blocks, seed), every problem
-  and component file and reference digest, one digest per arm over its agent
-  and fully hashed condition, the Harbor and harness versions and any tools
-  those references pin. Its digest **is** ``lock_sha256``, the identity every
-  run records in ``run.json``: runs and baselines match a lock through it.
-- ``assessment``: how runs are scored: the declared scorers with their
+- ``execution``: what a trial runs: the experiment design (kind, problems,
+  runtime, environment, agents, protocol, factors, conditions, arms, attempts,
+  seed), every problem and component file and reference digest, one digest
+  per arm over its agent and fully hashed condition, the Harbor and agent
+  versions and any tools those references pin. Its digest **is**
+  ``lock_sha256``, the identity every job records in ``job.json``: jobs and
+  baselines match a lock through it. The kind is part of it, so relabelling an
+  experiment after data exists makes a new experiment.
+- ``assessment``: how jobs are scored: the declared scorers with their
   manifests, implementation digests and pinned tools, the scorer config and
-  the headline ScorePolicy (declared, or the default chosen by K). A change
-  here means "rescore into the Assessment store", never "the runs are stale".
+  the headline metric (declared, or the default chosen by K). A change
+  here means "rescore into the Assessment store", never "the jobs are stale".
 - ``analysis``: the baseline arm and the pinned verdict thresholds.
 - ``toolchain``: Python, Raidar, LiteLLM and the spec/lock rules digest.
+
+Before anything is written, the runtime-compatibility gate
+(``raidar.spec.compat``, ``RT0``-``RT6``) checks the effective spec against its
+runtime pack, so no lock exists for a design its runtime cannot run.
 
 ``document_sha256`` covers the whole document (sections, spec, overrides and
 the experiment file digest). ``raidar lock --check`` compares section by
@@ -44,8 +50,9 @@ from raidar.spec.canonical import (
     pretty_canonical_json_bytes,
     sha256_file,
 )
+from raidar.spec.compat import GateInputs, PackLoader, compatibility_issues
 from raidar.spec.loader import LoadedExperiment
-from raidar.spec.policies import DEFAULT_POLICY_REGISTRY, PolicyResolver, ScorePolicyRegistry
+from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry, MetricResolver
 from raidar.spec.references import (
     RefKind,
     RegistryRef,
@@ -57,18 +64,21 @@ from raidar.spec.schema import ComponentUse, ExperimentSpec, ProblemEntry
 from raidar.spec.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.spec.validation import FieldIssue
 
-LOCK_VERSION = 2
+LOCK_VERSION = 3
+"""3: schema v2 vocabulary (kind, runtime, environment, agent names, metric, attempts)."""
 LOCK_SUFFIX = ".lock.json"
 TOOLCHAIN_PACKAGES = ("litellm", "raidar")
 SECTIONS = ("execution", "assessment", "analysis", "toolchain")
 DOCUMENT = "document"
 """Pseudo-section: the lock version, experiment file digests, overrides and effective spec."""
 EXECUTION_REF_KINDS = (RefKind.PROBLEM, RefKind.COMPONENT)
-ASSESSMENT_REF_KINDS = (RefKind.SCORER, RefKind.POLICY)
+ASSESSMENT_REF_KINDS = (RefKind.SCORER, RefKind.METRIC)
 EXECUTION_SPEC_FIELDS = (
+    "kind",
     "id",
     "problems",
     "runtime",
+    "environment",
     "agents",
     "protocol",
     "factors",
@@ -76,14 +86,14 @@ EXECUTION_SPEC_FIELDS = (
     "conditions",
     "arms",
 )
-EXECUTION_ANALYSIS_FIELDS = ("blocks", "seed")
+EXECUTION_ANALYSIS_FIELDS = ("attempts", "seed")
 """The analysis fields that shape the plan; ``concurrency`` is per machine (PlanOptions)."""
 STALE_CONSEQUENCES = {
-    "execution": "execution inputs changed; runs under the old lock_sha256 are another experiment",
-    "assessment": "scorers or the headline policy changed; rescore runs (they still match)",
-    "analysis": "baseline arm or verdict thresholds changed; re-analyse (runs still match)",
-    "toolchain": "Python, Raidar, LiteLLM or the spec rules changed; relock (runs still match)",
-    DOCUMENT: "the experiment file or overrides changed; relock (runs still match)",
+    "execution": "execution inputs changed; jobs under the old lock_sha256 are another experiment",
+    "assessment": "scorers or the headline metric changed; rescore jobs (they still match)",
+    "analysis": "baseline arm or verdict thresholds changed; re-analyse (jobs still match)",
+    "toolchain": "Python, Raidar, LiteLLM or the spec rules changed; relock (jobs still match)",
+    DOCUMENT: "the experiment file or overrides changed; relock (jobs still match)",
 }
 
 
@@ -116,16 +126,16 @@ def default_lock_path(experiment_path: Path) -> Path:
     return experiment_path.with_name(f"{stem}{LOCK_SUFFIX}")
 
 
-def default_resolvers(policies: ScorePolicyRegistry = DEFAULT_POLICY_REGISTRY) -> ResolverSet:
-    """Built-in policy resolver plus entry-point resolvers for other kinds."""
-    return ResolverSet([PolicyResolver(policies)])
+def default_resolvers(metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY) -> ResolverSet:
+    """Built-in metric resolver plus entry-point resolvers for other kinds."""
+    return ResolverSet([MetricResolver(metrics)])
 
 
 def spec_source_digest() -> str:
-    """Digest of this package's code, so a change to the spec/policy/lock rules relocks.
+    """Digest of this package's code, so a change to the spec/metric/lock rules relocks.
 
     The installed ``raidar`` version is static between releases; this digest is
-    what ties a lock to the exact validation, policy and lock rules used. Each
+    what ties a lock to the exact validation, metric and lock rules used. Each
     module is hashed as its normalised syntax tree, so docstring and comment
     edits do not relock.
     """
@@ -148,7 +158,7 @@ def _package_version(package: str) -> str:
 
 
 def toolchain_versions() -> dict[str, str]:
-    """Versions that are recorded (N3) but are not part of any run's identity."""
+    """Versions that are recorded (N3) but are not part of any job's identity."""
     versions = {"python": platform.python_version(), "raidar_spec": spec_source_digest()}
     versions.update({package: _package_version(package) for package in TOOLCHAIN_PACKAGES})
     return versions
@@ -205,13 +215,14 @@ def task_checkpoint_count(task_dir: Path) -> int:
 class _LockBuilder:
     loaded: LoadedExperiment
     resolvers: ResolverSet
-    policies: ScorePolicyRegistry
+    metrics: MetricRegistry
     lock_path: Path
     issues: list[FieldIssue] = field(default_factory=list)
     files: dict[str, dict[str, object]] = field(default_factory=dict)
     references: dict[str, dict[str, dict[str, object]]] = field(default_factory=dict)
     tool_versions: dict[str, str] = field(default_factory=dict)
     tools_by_kind: dict[str, dict[str, str]] = field(default_factory=dict)
+    resolved: dict[str, ResolvedReference] = field(default_factory=dict)
 
     @property
     def spec(self) -> ExperimentSpec:
@@ -244,6 +255,7 @@ class _LockBuilder:
             self.issues.append(FieldIssue(loc, str(exc)))
             return None
         self._record(loc, resolved)
+        self.resolved[loc] = resolved
         return resolved
 
     def _record(self, loc: str, resolved: ResolvedReference) -> None:
@@ -282,13 +294,13 @@ class _LockBuilder:
             return None
         return {"label": entry.label, "checkpoints": reported, "digest": resolved.digest}
 
-    def headline_policy(self, problems: list[dict[str, object]]) -> dict[str, object] | None:
-        loc = "assessment.headline_policy"
+    def metric(self, problems: list[dict[str, object]]) -> dict[str, object] | None:
+        loc = "assessment.metric"
         counts = sorted({int(str(problem["checkpoints"])) for problem in problems})
-        declared = self.spec.assessment.headline_policy
+        declared = self.spec.assessment.metric
         if declared is not None:
-            policy = self.policies.get(declared)
-            unsupported = [k for k in counts if not policy.supports(k)]
+            metric = self.metrics.get(declared)
+            unsupported = [k for k in counts if not metric.supports(k)]
             if unsupported:
                 self.issues.append(
                     FieldIssue(loc, f"{declared} does not support problems with K={unsupported}")
@@ -300,16 +312,16 @@ class _LockBuilder:
                 FieldIssue(
                     loc,
                     f"problems have mixed checkpoint counts {counts}; "
-                    "declare a headline_policy that supports all of them",
+                    "declare a headline metric that supports all of them",
                 )
             )
             return None
         else:
-            policy = self.policies.default_for_checkpoints(counts[0])
+            metric = self.metrics.default_for_checkpoints(counts[0])
             selection = "default_by_k"
-        if self.resolve(loc, RefKind.POLICY, policy.ref) is None:
+        if self.resolve(loc, RefKind.METRIC, metric.ref) is None:
             return None
-        return {"ref": policy.ref, "selection": selection, "checkpoints": counts}
+        return {"ref": metric.ref, "selection": selection, "checkpoints": counts}
 
     def component(self, loc: str, component: ComponentUse) -> dict[str, object]:
         resolved = self.resolve(f"{loc}.use", RefKind.COMPONENT, component.use)
@@ -367,13 +379,18 @@ def build_lock(
     *,
     lock_path: Path,
     resolvers: ResolverSet | None = None,
-    policies: ScorePolicyRegistry = DEFAULT_POLICY_REGISTRY,
+    metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
+    pack_loader: PackLoader | None = None,
 ) -> dict[str, object]:
-    """Resolve the experiment into a lock document; raise ``LockError`` on any gap."""
+    """Resolve the experiment into a lock document; raise ``LockError`` on any gap.
+
+    Resolution gaps and the compatibility gate's ``RT*`` issues are reported
+    together. ``pack_loader`` replaces the runtime pack registry (tests).
+    """
     builder = _LockBuilder(
         loaded=loaded,
-        resolvers=resolvers or default_resolvers(policies),
-        policies=policies,
+        resolvers=resolvers or default_resolvers(metrics),
+        metrics=metrics,
         lock_path=lock_path,
     )
     spec = loaded.spec
@@ -383,9 +400,13 @@ def build_lock(
     conditions = builder.conditions()
     resolved_problems = [problem for problem in problems if problem is not None]
     headline = (
-        builder.headline_policy(resolved_problems)
-        if len(resolved_problems) == len(problems)
-        else None
+        builder.metric(resolved_problems) if len(resolved_problems) == len(problems) else None
+    )
+    gate = GateInputs(spec=spec, base_dir=loaded.base_dir, resolved=builder.resolved)
+    builder.issues.extend(
+        compatibility_issues(gate, pack_loader=pack_loader)
+        if pack_loader is not None
+        else compatibility_issues(gate)
     )
     if builder.issues:
         raise LockError(str(loaded.path), builder.issues)
@@ -411,8 +432,8 @@ def build_lock(
             arms=builder.arms(conditions),
             versions={
                 "harbor": harbor_version(),
-                "harnesses": {
-                    agent.id: {"harness": agent.harness.value, "version": agent.version}
+                "agents": {
+                    agent.id: {"name": agent.name.value, "version": agent.version}
                     for agent in spec.agents
                 },
             },
@@ -420,7 +441,7 @@ def build_lock(
         ),
         "assessment": {
             "spec": spec_json["assessment"],
-            "headline_policy": headline,
+            "metric": headline,
             "references": assessment_refs,
             "tools": assessment_tools,
         },
@@ -441,7 +462,7 @@ def execution_section(
     versions: object,
     tools: object,
 ) -> dict[str, object]:
-    """The ``execution`` section: everything a run's identity (``lock_sha256``) covers."""
+    """The ``execution`` section: everything a job's identity (``lock_sha256``) covers."""
     analysis = spec_json["analysis"]
     return {
         "design": {
@@ -476,16 +497,20 @@ def seal_lock(body: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
-def _shape_issues(lock: Mapping[str, Any]) -> list[str]:
-    if lock.get("lock_version") != LOCK_VERSION:
-        return [f"lock_version is {lock.get('lock_version')!r}, expected {LOCK_VERSION}; relock"]
+def _shape_issues(lock: Mapping[str, Any], version: int) -> list[str]:
+    if lock.get("lock_version") != version:
+        return [f"lock_version is {lock.get('lock_version')!r}, expected {version}; relock"]
     missing = [name for name in SECTIONS if name not in lock]
     return [f"missing section(s) {', '.join(missing)}"] if missing else []
 
 
-def lock_integrity_issues(lock: Mapping[str, Any]) -> list[str]:
-    """Why ``lock`` is not a sealed lock of this version (empty when it is)."""
-    shape = _shape_issues(lock)
+def lock_integrity_issues(lock: Mapping[str, Any], *, version: int = LOCK_VERSION) -> list[str]:
+    """Why ``lock`` is not a sealed lock of ``version`` (empty when it is).
+
+    Lock versions 2 and 3 share the sealing scheme, so ``raidar migrate-job``
+    verifies a job's executed version-2 lock with ``version=2``.
+    """
+    shape = _shape_issues(lock, version)
     if shape:
         return shape
     recorded = lock.get("sections") or {}

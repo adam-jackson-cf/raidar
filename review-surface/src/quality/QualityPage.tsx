@@ -35,7 +35,7 @@ function TrialList({ runs }: { runs: QualityRunSummary[] }) {
     <table className="w-full border-collapse text-left" data-testid="quality-trials">
       <thead>
         <tr style={{ borderBottom: `1px solid ${C.border}` }}>
-          {['Trial', 'Arm', 'Block', 'Run', 'S'].map((heading) => (
+          {['Trial', 'Arm', 'Attempt', 'Job', 'S'].map((heading) => (
             <th key={heading} className="px-2 py-1 text-[10px] font-medium" style={{ color: C.fg1 }}>
               {heading}
             </th>
@@ -60,10 +60,10 @@ function TrialList({ runs }: { runs: QualityRunSummary[] }) {
               {run.arm}
             </td>
             <td className="num px-2 py-1 text-[11px]" style={{ color: C.fg2 }}>
-              {run.block}
+              {run.attempt}
             </td>
             <td className="px-2 py-1 text-[11px]" style={{ color: C.fg1 }}>
-              {run.run}
+              {run.job}
             </td>
             <td className="px-2 py-1 text-[11px]" style={{ color: C.fg3 }}>
               {run.score.status === 'ok' ? fmtComponent('S', run.score.value) : <StatusBadge cell={run.score} />}
@@ -179,7 +179,7 @@ export function QualityPage() {
   } else if (!current) {
     body = (
       <p className="text-xs" style={{ color: C.fg1 }}>
-        No assessed runs yet. Rescore a run with code-quality@1 and correctness@1, then run make review-surface-quality-data.
+        No assessed trials yet. Rescore a job with code-quality@1 and correctness@1, then run make review-surface-quality-data.
       </p>
     );
   } else {

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 from pathlib import Path
@@ -18,18 +19,19 @@ from raidar.problems.content import content_digest, hidden_content_in_task
 from raidar.problems.importer import ProblemDriftError, import_problem
 from raidar.problems.models import ProblemId, ProblemManifest, ProblemMode
 from raidar.problems.resolver import ProblemResolver, resolver_factory
-from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
+from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.source import SourceError
 from raidar.problems.store import ROOT_ENV, ProblemStore, ProblemStoreError, find_store_root
 from raidar.spec.canonical import digest_json
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import build_lock
-from raidar.spec.policies import PolicyResolver
+from raidar.spec.metrics import MetricResolver
 from raidar.spec.references import (
     RESOLVER_ENTRY_POINT_GROUP,
     RefKind,
     RegistryRef,
     RegistryReferenceError,
+    ResolvedReference,
     ResolverSet,
 )
 from tests.experiment_spec_support import (
@@ -121,7 +123,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
     assert not list((content / "task").rglob("test_checkpoint_*"))
     assert not list((content / "task").rglob("solution"))
     bundle = loaded.bundle.manifest
-    assert bundle.entry_file == manifest.entry_file, "the entrypoint travels with the oracle"
+    assert bundle.entry_file == manifest.entry_file, "the entrypoint travels with the verifier"
     assert bundle.grader.base_image == manifest.pack.image
     assert bundle.grader.environment_dockerfile is None
     assert [step.test_files for step in bundle.steps] == [
@@ -133,7 +135,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
         "checkpoint_1",
         "checkpoint_2",
     ]
-    assert ORACLE_VERIFIER_IMPORT_PATH == "raidar.oracle.verifier:RaidarOracleVerifier"
+    assert VERIFIER_IMPORT_PATH == "raidar.verifier.verifier:RaidarVerifier"
 
 
 def test_reimport_reproduces_the_manifest_and_refuses_drift_unless_updating(
@@ -279,7 +281,7 @@ def test_loading_refuses_a_task_that_exposes_hidden_tests_even_with_matching_dig
     shutil.copy2(loaded.bundle.tests_dir / "test_checkpoint_2.py", leaked)
     manifest = loaded.manifest.model_copy(update={"task_sha256": content_digest(loaded.task_dir)})
     store.write_manifest(manifest)  # a manifest re-recorded over leaked content
-    with pytest.raises(ProblemStoreError, match="hidden oracle content"):
+    with pytest.raises(ProblemStoreError, match="hidden verifier content"):
         store.load(problem)
 
 
@@ -355,12 +357,12 @@ def test_lock_resolves_imported_problems_and_selects_the_policy_by_k(
     path = write_experiment(tmp_path / "exp", experiment_document(problems=[{"ref": ref}]))
     others = [r for r in fixture_resolvers() if r.kind is not RefKind.PROBLEM]
     resolvers = ResolverSet(
-        [ProblemResolver(store.root), *others, PolicyResolver()], entry_point_group=None
+        [ProblemResolver(store.root), *others, MetricResolver()], entry_point_group=None
     )
     lock: Any = build_lock(
         load_experiment(path), lock_path=path.with_name("experiment.lock.json"), resolvers=resolvers
     )
-    assert lock["assessment"]["headline_policy"] == {
+    assert lock["assessment"]["metric"] == {
         "ref": policy,
         "selection": "default_by_k",
         "checkpoints": [checkpoints],
@@ -387,35 +389,43 @@ def test_hidden_content_check_flags_renamed_copies_and_solutions(tmp_path: Path)
     ]
 
 
-def _resolve(store: ProblemStore, ref: str, tmp_path: Path) -> object:
+def _resolve(store: ProblemStore, ref: str, tmp_path: Path) -> ResolvedReference:
     return ProblemResolver(store.root).resolve(
         RegistryRef.parse(RefKind.PROBLEM, ref), base_dir=tmp_path
     )
 
 
+def _refused(store: ProblemStore, ref: str, tmp_path: Path, match: str) -> None:
+    """Unvalidated bindings reach the gate (``RT0``) instead of resolving silently."""
+    resolved = _resolve(store, ref, tmp_path)
+    assert resolved.binding["validated"] is False
+    assert re.search(match, str(resolved.binding["validation_issue"]))
+    assert "validation" not in resolved.metadata
+
+
 def test_only_a_usable_verdict_for_the_current_manifest_resolves(tmp_path: Path) -> None:
     store = build_fixture_store(tmp_path / "problems")
-    with pytest.raises(RegistryReferenceError, match="not oracle-validated"):
-        _resolve(store, POSITIVE_REF, tmp_path)
+    _refused(store, POSITIVE_REF, tmp_path, "not verifier-validated")
 
     excluded = record_validation(store, NEGATIVE_REF, tmp_path / "negative")
     assert excluded.verdict.value == "excluded"
-    with pytest.raises(RegistryReferenceError, match="verdict excluded"):
-        _resolve(store, NEGATIVE_REF, tmp_path)
+    _refused(store, NEGATIVE_REF, tmp_path, "verdict excluded")
 
     record_validation(store, POSITIVE_REF, tmp_path / "positive")
     report_path = store.validation_path(ProblemId.parse(POSITIVE_REF))
     report = json.loads(report_path.read_text())
     for verdict in ("infra_failure", "validated_without_native_parity"):
         report_path.write_text(json.dumps({**report, "verdict": verdict}))
-        with pytest.raises(RegistryReferenceError, match="not"):
-            _resolve(store, POSITIVE_REF, tmp_path)
+        _refused(store, POSITIVE_REF, tmp_path, "not")
 
     report_path.write_text(json.dumps({**report, "manifest_sha256": "0" * 64}))
-    with pytest.raises(RegistryReferenceError, match="re-validate"):
-        _resolve(store, POSITIVE_REF, tmp_path)
+    _refused(store, POSITIVE_REF, tmp_path, "re-validate")
     report_path.write_text(json.dumps(report))
-    assert _resolve(store, POSITIVE_REF, tmp_path) is not None
+    resolved = _resolve(store, POSITIVE_REF, tmp_path)
+    assert resolved.binding == {"runtime": "python", "pack_version": 1, "validated": True}
+    assert "validation" in resolved.metadata
+    with pytest.raises(RegistryReferenceError, match="not imported"):
+        _resolve(store, "fixture/missing@fefefefefefe", tmp_path)
 
 
 def test_manifests_without_an_entry_file_keep_their_recorded_bytes_and_digest() -> None:

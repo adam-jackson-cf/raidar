@@ -1,10 +1,10 @@
 """The Harbor ``AgentConfig`` for one arm (plan WS-D D1/D2).
 
-A real arm runs Harbor's installed agent for its harness (``codex`` or
+A real arm runs Harbor's installed agent for its name (``codex`` or
 ``claude-code``) pinned to the version the Python pack image bakes in, so no
 per-trial install happens (WS-I), with the arm's compiled condition applied
 (WS-C). A dev/perf run may replace the agent with Harbor's no-LLM ``oracle``
-or ``nop`` agent; the compiled per-step reset still runs, and the run records
+or ``nop`` agent; the compiled per-step reset still runs, and the job records
 the override so its results are never compared with real arms.
 """
 
@@ -64,11 +64,11 @@ def agent_digest(agent: AgentEntry, config: AgentConfig, override: AgentOverride
 
 
 def reported_harness_pin(config: AgentConfig) -> str | None:
-    """The harness version this agent must run: the pack pin of its native harness.
+    """The CLI version this agent must run: the pack pin of its native agent.
 
     A workflow wrapper (e.g. review-loop@1) carries the wrapped native agent
     in ``kwargs["inner_agent"]``; its pin is the inner agent's. ``None`` only
-    for a no-LLM override, which runs no harness.
+    for a no-LLM override, which runs no agent CLI.
     """
     name, kwargs = _native_agent(config)
     if name not in HARBOR_AGENT_NAMES.values():
@@ -78,7 +78,7 @@ def reported_harness_pin(config: AgentConfig) -> str | None:
 
 
 def _native_agent(config: AgentConfig) -> tuple[str | None, dict[str, object]]:
-    """(name, kwargs) of the native harness agent, looking inside a workflow wrapper."""
+    """(name, kwargs) of the native agent, looking inside a workflow wrapper."""
     name, kwargs = config.name, config.kwargs
     inner = kwargs.get("inner_agent")
     if name is None and isinstance(inner, dict):

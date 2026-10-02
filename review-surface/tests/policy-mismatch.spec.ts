@@ -14,7 +14,7 @@ test('a family mixing headline policies warns on each compared experiment', asyn
   const rows = family.locator('tbody tr');
   await expect(rows.first()).toBeVisible();
   await rows.first().click();
-  await expect(family.getByText('Headline policies differ in this comparison').first()).toBeVisible();
+  await expect(family.getByText('Headline metrics differ in this comparison').first()).toBeVisible();
   await expect(family.getByText(/scb-canonical-oneshot@1/).first()).toBeVisible();
 });
 

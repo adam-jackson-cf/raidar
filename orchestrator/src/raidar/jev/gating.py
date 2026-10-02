@@ -1,9 +1,9 @@
-"""Keep shadow Jev observations out of ScorePolicies and verdicts (plan H2).
+"""Keep shadow Jev observations out of Metrics and verdicts (plan H2).
 
 A scorer that emits a Jev-tier metric records, in
 ``AssessResult.provenance.policy_modes``, the mode of the policy that produced
 it, keyed by the metric id (``jev_policy_modes`` builds that map). Analysis and
-ScorePolicy inputs must read observations through ``verdict_observations``:
+Metric inputs must read observations through ``verdict_observations``:
 
 - deterministic and LLM-tier observations pass unchanged;
 - a Jev-tier observation passes only when its metric's recorded mode is
@@ -40,7 +40,7 @@ def counts_toward_verdicts(manifest: ScorerManifest, result: AssessResult, metri
 
 
 def verdict_observations(manifest: ScorerManifest, result: AssessResult) -> tuple[Observation, ...]:
-    """The observations that may feed ScorePolicies and verdicts."""
+    """The observations that may feed Metrics and verdicts."""
     return tuple(
         item
         for item in result.observations

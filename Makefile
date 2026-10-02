@@ -32,8 +32,16 @@ SECRETS_DETECT := secrets_cmd=""; \
 	else echo "secrets: orchestrator/.env (Infisical unavailable or SECRETS=dotenv)" >&2; fi;
 RAIDAR_SECRETS := $(SECRETS_DETECT) $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --project orchestrator raidar
 
+# Schema v2 adopted Harbor's vocabulary (requirements change log 2026-10-02). A variable
+# under its old name fails loudly instead of being ignored.
+RENAMED_VARS := RUN:JOB RUNS:JOBS RUN_ID:JOB_ID RUNS_DIR:JOBS_DIR HARNESS:AGENT \
+	HARNESS_VERSION:AGENT_VERSION BLOCK:ATTEMPT SMOKE_BLOCKS:SMOKE_ATTEMPTS \
+	ORACLE_BUNDLE:VERIFIER_BUNDLE REVIEW_RUNS_ROOT:REVIEW_JOBS_ROOT QUALITY_RUNS:QUALITY_JOBS \
+	ALLOW_DEV_RUNS:ALLOW_DEV_JOBS SMOKE_RUNS_DIR:SMOKE_JOBS_DIR
+$(foreach pair,$(RENAMED_VARS),$(if $(filter command line,$(origin $(firstword $(subst :, ,$(pair))))),$(error $(firstword $(subst :, ,$(pair)))= was renamed $(lastword $(subst :, ,$(pair)))= (schema v2 uses Harbor's vocabulary; see README Concepts))))
+
 # Shared public workflow defaults.
-HARNESS ?=
+AGENT ?=
 PROVIDER ?=
 MODEL ?=
 REASONING_EFFORT ?=
@@ -43,16 +51,17 @@ EXPERIMENT_SET ?=
 LOCK_CHECK ?=
 TIMEOUT_SEC ?=
 
-# Experiment-path smoke workflow: examples/smoke/*.yaml are locked under .tmp/smoke with
-# the target's overrides and run through Harbor (Docker; OrbStack by default).
-SMOKE_EXPERIMENT ?= examples/smoke/experiment.yaml
-SMOKE_AGENTS_EXPERIMENT ?= examples/smoke/agents.experiment.yaml
-SMOKE_RUNS_DIR ?= $(CURDIR)/runs
+# Experiment-path smoke workflow: the smoke experiment (kind smoke) and the agent benchmark
+# (kind benchmark) are locked under .tmp/smoke with the target's overrides and run through
+# Harbor (Docker; OrbStack by default).
+SMOKE_EXPERIMENT ?= experiments/smoke/python__circuit_eval-cp1__harness-health/experiment.yaml
+SMOKE_AGENTS_EXPERIMENT ?= experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml
+SMOKE_JOBS_DIR ?= $(CURDIR)/jobs
 SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
-SMOKE_BLOCKS ?= 1
+SMOKE_ATTEMPTS ?= 1
 SMOKE_CONCURRENCY ?= 1
-# smoke-agents arms: one per harness the Python pack bakes in (the arm ids of
-# examples/smoke/agents.experiment.yaml). SMOKE_ARM selects one of them.
+# smoke-agents arms: one per agent the Python pack bakes in (the arm ids of the
+# agent benchmark experiment). SMOKE_ARM selects one of them.
 SMOKE_ARM ?=
 SMOKE_ARMS := codex claude
 ifneq ($(strip $(SMOKE_ARM)),)
@@ -60,30 +69,31 @@ ifeq ($(filter $(SMOKE_ARM),$(SMOKE_ARMS)),)
 $(error Unknown SMOKE_ARM '$(SMOKE_ARM)'; expected one of: $(SMOKE_ARMS))
 endif
 endif
-# agent-smoke: the smoke experiment with its one agent replaced. Harness versions must equal
-# the Python pack pins (orchestrator/src/raidar/packs/python/pack.yaml); planning refuses others.
-# Provider/model/effort default per harness: codex-cli runs gpt-6-luna at low effort;
+# agent-smoke: the smoke experiment with its one agent replaced. AGENT is a Harbor agent name
+# (codex, claude-code). Versions must equal the Python pack pins
+# (orchestrator/src/raidar/packs/python/pack.yaml); the lock refuses others (RT5).
+# Provider/model/effort default per agent: codex runs gpt-6-luna at low effort;
 # claude-code runs claude-haiku-4-5, which has no effort levels, so its effort is unset.
 # REASONING_EFFORT given (even empty: `REASONING_EFFORT=`) wins; empty means unset.
-AGENT_SMOKE_HARNESS ?= codex-cli
-AGENT_SMOKE_PROVIDER_codex-cli := openai
-AGENT_SMOKE_MODEL_codex-cli := gpt-6-luna
-AGENT_SMOKE_REASONING_codex-cli := low
+AGENT_SMOKE_AGENT ?= codex
+AGENT_SMOKE_PROVIDER_codex := openai
+AGENT_SMOKE_MODEL_codex := gpt-6-luna
+AGENT_SMOKE_REASONING_codex := low
 AGENT_SMOKE_PROVIDER_claude-code := anthropic
 AGENT_SMOKE_MODEL_claude-code := claude-haiku-4-5
 AGENT_SMOKE_REASONING_claude-code :=
-AGENT_SMOKE_VERSION_codex-cli := 0.156.1
+AGENT_SMOKE_VERSION_codex := 0.156.1
 AGENT_SMOKE_VERSION_claude-code := 2.1.285
-AGENT_SMOKE_EFFECTIVE_HARNESS = $(or $(HARNESS),$(AGENT_SMOKE_HARNESS))
-AGENT_SMOKE_EFFECTIVE_PROVIDER = $(or $(PROVIDER),$(AGENT_SMOKE_PROVIDER_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
-AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
-AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origin REASONING_EFFORT)),$(strip $(REASONING_EFFORT)),$(AGENT_SMOKE_REASONING_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
-AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(HARNESS_VERSION),$(AGENT_SMOKE_VERSION_$(AGENT_SMOKE_EFFECTIVE_HARNESS)))
+AGENT_SMOKE_EFFECTIVE_AGENT = $(or $(AGENT),$(AGENT_SMOKE_AGENT))
+AGENT_SMOKE_EFFECTIVE_PROVIDER = $(or $(PROVIDER),$(AGENT_SMOKE_PROVIDER_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
+AGENT_SMOKE_EFFECTIVE_MODEL = $(or $(MODEL),$(AGENT_SMOKE_MODEL_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
+AGENT_SMOKE_EFFECTIVE_REASONING = $(if $(filter command line environment,$(origin REASONING_EFFORT)),$(strip $(REASONING_EFFORT)),$(AGENT_SMOKE_REASONING_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
+AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AGENT_SMOKE_EFFECTIVE_AGENT)))
 
 .PHONY: help \
-	env-setup harness-list harness-validate codex-auth-setup harbor-cleanup docker-check \
+	env-setup agent-list agent-validate codex-auth-setup harbor-cleanup docker-check \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
-	experiment-migrate-run-lock experiment-plan experiment-execute \
+	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute \
 	perf-check perf-fixture perf-gate \
 	problem-list problem-info problem-import problem-validate \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
@@ -105,56 +115,59 @@ define require_var
 endef
 
 help:
-	@echo "Public workflow surface (experiment -> lock -> run -> assess -> analyze -> review)"
+	@echo "Public workflow surface (experiment -> lock -> job -> assess -> analyze -> review)"
 	@echo ""
 	@echo "Environment:"
 	@echo "  make env-setup                                         Bootstrap the orchestrator environment"
-	@echo "  make harness-list                                      List supported harnesses and model coverage"
-	@echo "  make harness-validate HARNESS=codex-cli PROVIDER=openai MODEL=gpt-6-luna [REASONING_EFFORT=low]"
-	@echo "                                                        Check one harness/model pairing and its host credentials"
+	@echo "  make agent-list                                        List supported agents (Harbor names) and model coverage"
+	@echo "  make agent-validate AGENT=codex PROVIDER=openai MODEL=gpt-6-luna [REASONING_EFFORT=low]"
+	@echo "                                                        Check one agent/model pairing and its host credentials"
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
-	@echo "  make harbor-cleanup [RUN=<run-dir>] [DRY_RUN=1]        Remove trial environments a stopped run left behind"
+	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
-	@echo "  Secrets: run/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
+	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
 	@echo ""
 	@echo "Problems and runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
 	@echo "  make problem-list                                      List registered problems with validation and import state"
 	@echo "  make problem-info PROBLEM=scb/forge@38d627ecf668       Show one problem's steps, source pin, pack binding and validation"
 	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
-	@echo "                                                        Import a pinned problem (task + host-only oracle) into problems/"
+	@echo "                                                        Import a pinned problem binding (task + host-only verifier bundle) into problems/"
 	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3]"
-	@echo "                                                        Oracle-validate an imported problem and write its report"
+	@echo "                                                        Verifier-validate an imported problem and write its report"
 	@echo "  make pack-info [RUNTIME=python]                       Show the pack image tag, lock hashes and tool provisioning state"
 	@echo "  make pack-build [RUNTIME=python] [FORCE=1]            Build the agent image once per lock hash and assert no scorer tools"
-	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned harnesses, no scorer tools or browsers"
+	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
-	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex-cli/gpt-6-luna low trials proving every built-in component's discovery probe"
+	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
 	@echo ""
 	@echo "Experiments:"
-	@echo "  make experiment-init EXPERIMENT=my-exp/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
-	@echo "                                                        Start a new experiment: two-arm starter (baseline vs rules-file) plus stub rules file"
-	@echo "  make experiment-validate EXPERIMENT=examples/pilot/experiment.yaml [EXPERIMENT_SET='analysis.blocks=3']"
-	@echo "                                                        Validate an experiment.yaml (schema, references, factor guard)"
-	@echo "  make experiment-lock EXPERIMENT=examples/pilot/experiment.yaml [LOCK_CHECK=1]"
-	@echo "                                                        Write (or check, naming stale sections) <experiment>.lock.json; lock_sha256 covers execution inputs only"
-	@echo "  make experiment-locks-check                           Fail unless every examples/**/*.lock.json is current (host Python patch aside); part of make quality"
-	@echo "  make experiment-migrate-run-lock RUN=<run-dir> EXECUTED_LOCK=<v1 lock> LOCK=<current lock>"
-	@echo "                                                        Point a run executed under a version-1 lock at the current lock, once its execution section is proven identical"
-	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
+	@echo "  make experiment-init EXPERIMENT=experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
+	@echo "                                                        Start a new ab-test: two-arm starter (baseline vs rules-file) plus stub rules file"
+	@echo "  make experiment-validate EXPERIMENT=experiments/<kind>/<id>/experiment.yaml [EXPERIMENT_SET='analysis.attempts=3']"
+	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard); schema v1 read-only"
+	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
+	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
+	@echo "  make experiment-locks-check                           Fail unless every experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
+	@echo "  make experiment-upgrade EXPERIMENT=<v1 file> KIND=ab-test|benchmark|smoke EXPERIMENT_ID=<runtime>__<subject>__<intent> OUT=<file>"
+	@echo "                                                        Write the schema v2 form of a read-only schema v1 experiment"
+	@echo "  make experiment-migrate-job JOB=<legacy job dir> LOCK=<v2 lock> [EXECUTED_LOCK=<lock>]"
+	@echo "                                                        Move a pre-v2 job onto the v2 layout and lock, once its execution is proven identical"
+	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
-	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [BLOCK=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [RUNS_DIR=runs] [RUN_ID=]"
-	@echo "                                                        Run a locked experiment through Harbor; writes attempts, validity and N1 phases"
-	@echo "  make experiment-assess RUN=<run-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
-	@echo "                                                        Score a run's stored trials into an Assessment store (never re-runs agents)"
-	@echo "  make assess-regrade RUN=<trial-or-job-dir> [ORACLE_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
-	@echo "                                                        Rerun the oracle over stored step snapshots; fails if results differ"
-	@echo "  make experiment-analyze RUNS=\"<run-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_RUNS=1]"
-	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock; overrides are labelled)"
-	@echo "  make perf-check RUN=<run-dir> [MIN_SAMPLES=10] [PERF_STRICT=1]"
+	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=]"
+	@echo "                                                        Run a locked experiment through Harbor as one job; writes step results, validity and N1 phases"
+	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
+	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
+	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
+	@echo "                                                        Rerun the verifier over stored step snapshots; fails if results differ"
+	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1]"
+	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock;"
+	@echo "                                                        overrides are labelled); benchmarks add a ranking view, smoke reports are stamped not citable"
+	@echo "  make perf-check JOB=<job-dir> [MIN_SAMPLES=10] [PERF_STRICT=1]"
 	@echo "                                                        Report each N1 phase p95 vs its budget plus trial concurrency/contention; breaches are warnings (exit 0) unless PERF_STRICT=1"
 	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
-	@echo "                                                        No-LLM fixture experiment (5 blocks x 2 arms) then strict perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
+	@echo "                                                        No-LLM fixture experiment (5 attempts x 2 arms) then strict perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
 	@echo "  make perf-gate [PERF_GATE_DIR=.tmp/perf-gate]          Enforced N1 overhead gate: perf-fixture at concurrency 1 and 3, strict; fails on any breach (Docker; release/gate check, not in make quality)"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
 	@echo "                                                        Run the SCB rubric Jev question set in shadow; report coverage and input sufficiency"
@@ -172,29 +185,29 @@ help:
 	@echo "                                                        Fit and freeze the threshold on the calibration split; write mode: enforce + promotion only if it verifies"
 	@echo "                                                        (refused while the scorer's minor bump is pending unless ALLOW_SCORER_BUMP=1)"
 	@echo ""
-	@echo "Smoke (real agent trials of examples/smoke; locks under .tmp/smoke, runs under runs/):"
-	@echo "  make orchestrator-smoke [SMOKE_BLOCKS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
-	@echo "                                                        One one-shot trial with codex-cli + gpt-6-luna (low), correctness only"
-	@echo "  make agent-smoke [HARNESS=codex-cli PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [HARNESS_VERSION=] [TIMEOUT_SEC=]"
+	@echo "Smoke (real agent trials of experiments/smoke and the agent benchmark; locks under .tmp/smoke, jobs under jobs/):"
+	@echo "  make orchestrator-smoke [SMOKE_ATTEMPTS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
+	@echo "                                                        One one-shot trial with codex + gpt-6-luna (low), correctness only"
+	@echo "  make agent-smoke [AGENT=codex PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [AGENT_VERSION=] [TIMEOUT_SEC=]"
 	@echo "                                                        The same smoke with its agent replaced (versions default to the pack pins;"
-	@echo "                                                        HARNESS=claude-code defaults to claude-haiku-4-5, no effort; REASONING_EFFORT= unsets)"
-	@echo "  make smoke-agents [SMOKE_ARM=codex|claude]             One smoke trial per pack harness (codex: gpt-6-luna low; claude: claude-haiku-4-5)"
+	@echo "                                                        AGENT=claude-code defaults to claude-haiku-4-5, no effort; REASONING_EFFORT= unsets)"
+	@echo "  make smoke-agents [SMOKE_ARM=codex|claude]             One trial per pack agent (codex: gpt-6-luna low; claude: claude-haiku-4-5)"
 	@echo "  make smoke-dry-run-check                               Print the smoke command shapes (used by make quality)"
 	@echo ""
 	@echo "Review surface:"
 	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
-	@echo "                                                        Write the labelled synthetic review fixture (run roots + Assessment store)"
-	@echo "  make review-surface-data REVIEW_RUNS_ROOT=<runs-root>... [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
-	@echo "                                                        Project experiment runs into review-surface data"
+	@echo "                                                        Write the labelled synthetic review fixture (job roots + Assessment store)"
+	@echo "  make review-surface-data REVIEW_JOBS_ROOT=<jobs-root>... [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
+	@echo "                                                        Project experiment jobs into review-surface data"
 	@echo "  make review-surface-build                              Install and build the review-surface app"
 	@echo "  make review-surface-serve [REVIEW_SURFACE_PORT=5950]   Serve the review surface app and API locally"
-	@echo "  make review-surface-test [REVIEW_RUNS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=...]"
+	@echo "  make review-surface-test [REVIEW_JOBS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=...]"
 	@echo "                                                        Run the review-surface end-to-end suite (Playwright) on the experiment synthetic"
-	@echo "                                                        fixture plus any given runs (one REVIEW_STORE for all roots, or one per root)"
+	@echo "                                                        fixture plus any given jobs (one REVIEW_STORE for all roots, or one per root)"
 	@echo "  make quality-fixture-synthetic [QUALITY_FIXTURE_DIR=.tmp/quality-fixture]"
-	@echo "                                                        Write the labelled synthetic Quality fixture (runs + Assessment store)"
-	@echo "  make review-surface-quality-data [QUALITY_RUNS=\"<runs-root>...\" QUALITY_STORE=\"<store>...\"] [QUALITY_LOCK=<lock>...]"
-	@echo "                                                        Project Quality element data, each runs root against the store at the"
+	@echo "                                                        Write the labelled synthetic Quality fixture (jobs + Assessment store)"
+	@echo "  make review-surface-quality-data [QUALITY_JOBS=\"<jobs-root>...\" QUALITY_STORE=\"<store>...\"] [QUALITY_LOCK=<lock>...]"
+	@echo "                                                        Project Quality element data, each jobs root against the store at the"
 	@echo "                                                        same position (default: labelled synthetic fixture)"
 
 RUNTIME ?= python
@@ -223,16 +236,16 @@ pack-tool-provision:
 	$(call require_var,TOOL)
 	@$(RAIDAR) pack provision "$(RUNTIME)" "$(TOOL)"
 
-# The synthetic review fixture: run roots <dir>/runs and <dir>/review-only, store <dir>/store.
+# The synthetic review fixture: job roots <dir>/jobs and <dir>/review-only, store <dir>/store.
 REVIEW_FIXTURE_DIR ?= $(REPO_TMP_DIR)/review-fixture
-REVIEW_RUNS_ROOT ?=
+REVIEW_JOBS_ROOT ?=
 REVIEW_STORE ?=
 REVIEW_LOCK ?=
 
-# $(1) run roots, $(2) Assessment stores.
+# $(1) job roots, $(2) Assessment stores.
 define review_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection \
-		$(foreach root,$(1),--runs-root "$(abspath $(root))") \
+		$(foreach root,$(1),--jobs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(REVIEW_LOCK),--lock "$(abspath $(lock))") \
 		--output "$(REPO_TMP_DIR)/review-projection.json"
@@ -244,8 +257,8 @@ review-fixture-synthetic:
 	@cd orchestrator && uv run --project . python -m raidar.review_projection.fixture "$(abspath $(REVIEW_FIXTURE_DIR))"
 
 review-surface-data:
-	$(call require_var,REVIEW_RUNS_ROOT)
-	$(call review_projection,$(REVIEW_RUNS_ROOT),$(REVIEW_STORE))
+	$(call require_var,REVIEW_JOBS_ROOT)
+	$(call review_projection,$(REVIEW_JOBS_ROOT),$(REVIEW_STORE))
 
 review-surface-build:
 	@cd review-surface && npm install --no-fund --no-audit && npm run build
@@ -255,14 +268,14 @@ review-surface-serve: review-surface-data
 	@cd review-surface && node server.mjs
 
 QUALITY_FIXTURE_DIR ?= $(REPO_TMP_DIR)/quality-fixture
-QUALITY_RUNS ?=
+QUALITY_JOBS ?=
 QUALITY_STORE ?=
 QUALITY_LOCK ?=
 
-# $(1) run roots and $(2) Assessment stores, paired by position; $(3) --synthetic or empty.
+# $(1) job roots and $(2) Assessment stores, paired by position; $(3) --synthetic or empty.
 define quality_projection
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality \
-		$(foreach root,$(1),--runs-root "$(abspath $(root))") \
+		$(foreach root,$(1),--jobs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(QUALITY_LOCK) $(REVIEW_LOCK),--lock "$(abspath $(lock))") \
 		--output "$(REPO_TMP_DIR)/quality-projection.json" $(3)
@@ -274,57 +287,57 @@ quality-fixture-synthetic:
 	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality.synthetic "$(QUALITY_FIXTURE_DIR)"
 
 review-surface-quality-data:
-	$(if $(QUALITY_RUNS),$(if $(filter $(words $(QUALITY_RUNS)),$(words $(QUALITY_STORE))),,$(error QUALITY_RUNS and QUALITY_STORE need one store per runs root, in the same order)))
-ifeq ($(strip $(QUALITY_RUNS)),)
+	$(if $(QUALITY_JOBS),$(if $(filter $(words $(QUALITY_JOBS)),$(words $(QUALITY_STORE))),,$(error QUALITY_JOBS and QUALITY_STORE need one store per jobs root, in the same order)))
+ifeq ($(strip $(QUALITY_JOBS)),)
 	@$(MAKE) --no-print-directory quality-fixture-synthetic
-	$(call quality_projection,$(QUALITY_FIXTURE_DIR)/runs,$(QUALITY_FIXTURE_DIR)/store,--synthetic)
+	$(call quality_projection,$(QUALITY_FIXTURE_DIR)/jobs,$(QUALITY_FIXTURE_DIR)/store,--synthetic)
 else
-	$(call quality_projection,$(QUALITY_RUNS),$(QUALITY_STORE),)
+	$(call quality_projection,$(QUALITY_JOBS),$(QUALITY_STORE),)
 endif
 
-# The suite runs on the synthetic review fixture under REVIEW_FIXTURE_DIR plus any given runs.
-# Given runs and their stores: one REVIEW_STORE serves every REVIEW_RUNS_ROOT, otherwise there
+# The suite runs on the synthetic review fixture under REVIEW_FIXTURE_DIR plus any given jobs.
+# Given jobs and their stores: one REVIEW_STORE serves every REVIEW_JOBS_ROOT, otherwise there
 # must be one store per root in the same order (anything else fails loudly, never silently drops
-# runs from the Quality data).
-REVIEW_TEST_STORES = $(if $(filter 1,$(words $(REVIEW_STORE))),$(foreach root,$(REVIEW_RUNS_ROOT),$(REVIEW_STORE)),$(REVIEW_STORE))
-# Quality data for the suite: the labelled Quality fixture, the review fixture's runs (so run
-# detail shows its Quality panel) and any given runs, each against its own store. The review
-# fixture's review-only root is left out on purpose: it shows runs without Quality data.
-REVIEW_TEST_QUALITY_RUNS = $(QUALITY_FIXTURE_DIR)/runs $(REVIEW_FIXTURE_DIR)/runs $(REVIEW_RUNS_ROOT)
+# jobs from the Quality data).
+REVIEW_TEST_STORES = $(if $(filter 1,$(words $(REVIEW_STORE))),$(foreach root,$(REVIEW_JOBS_ROOT),$(REVIEW_STORE)),$(REVIEW_STORE))
+# Quality data for the suite: the labelled Quality fixture, the review fixture's jobs (so trial
+# detail shows its Quality panel) and any given jobs, each against its own store. The review
+# fixture's review-only root is left out on purpose: it shows trials without Quality data.
+REVIEW_TEST_QUALITY_JOBS = $(QUALITY_FIXTURE_DIR)/jobs $(REVIEW_FIXTURE_DIR)/jobs $(REVIEW_JOBS_ROOT)
 REVIEW_TEST_QUALITY_STORES = $(QUALITY_FIXTURE_DIR)/store $(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES)
 
 review-surface-test: quality-fixture-synthetic
-	$(if $(filter $(words $(REVIEW_RUNS_ROOT)),$(words $(REVIEW_TEST_STORES))),,$(error REVIEW_RUNS_ROOT and REVIEW_STORE need one store for all roots or one store per root, in the same order))
+	$(if $(filter $(words $(REVIEW_JOBS_ROOT)),$(words $(REVIEW_TEST_STORES))),,$(error REVIEW_JOBS_ROOT and REVIEW_STORE need one store for all roots or one store per root, in the same order))
 	@$(MAKE) --no-print-directory review-fixture-synthetic
-	$(call quality_projection,$(REVIEW_TEST_QUALITY_RUNS),$(REVIEW_TEST_QUALITY_STORES),--synthetic)
-	$(call review_projection,$(REVIEW_FIXTURE_DIR)/runs $(REVIEW_FIXTURE_DIR)/review-only $(REVIEW_RUNS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES))
+	$(call quality_projection,$(REVIEW_TEST_QUALITY_JOBS),$(REVIEW_TEST_QUALITY_STORES),--synthetic)
+	$(call review_projection,$(REVIEW_FIXTURE_DIR)/jobs $(REVIEW_FIXTURE_DIR)/review-only $(REVIEW_JOBS_ROOT),$(REVIEW_FIXTURE_DIR)/store $(REVIEW_TEST_STORES))
 	@cd review-surface && npm install --no-fund --no-audit && npm run build \
 		&& npx playwright install chromium && npm test
 
 env-setup:
 	@$(RAIDAR_DEV) env setup --sync-arg --extra --sync-arg dev
 
-harness-list:
-	@$(RAIDAR) harness list
+agent-list:
+	@$(RAIDAR) agent list
 
-harness-validate:
-	$(call require_var,HARNESS)
+agent-validate:
+	$(call require_var,AGENT)
 	$(call require_var,PROVIDER)
 	$(call require_var,MODEL)
-	@$(RAIDAR_SECRETS) harness validate \
-		--harness "$(HARNESS)" \
+	@$(RAIDAR_SECRETS) agent validate \
+		--agent "$(AGENT)" \
 		--provider "$(PROVIDER)" \
 		--model "$(MODEL)" \
 		$(if $(REASONING_EFFORT),--reasoning-effort "$(REASONING_EFFORT)",) \
 		$(if $(TIMEOUT_SEC),--timeout "$(TIMEOUT_SEC)",)
 
 codex-auth-setup:
-	@$(RAIDAR) harness setup-auth \
-		--harness "codex-cli" \
+	@$(RAIDAR) agent setup-auth \
+		--agent "codex" \
 		$(if $(filter 1 true yes on,$(DEVICE_AUTH)),--device-auth,)
 
 harbor-cleanup:
-	@$(PACK_DOCKER_ENV) $(RAIDAR) harbor cleanup $(if $(RUN),--run "$(RUN)",) $(if $(DRY_RUN),--dry-run,)
+	@$(PACK_DOCKER_ENV) $(RAIDAR) harbor cleanup $(if $(JOB),--job "$(JOB)",) $(if $(DRY_RUN),--dry-run,)
 
 docker-check:
 	@$(PACK_DOCKER_ENV) if ! docker info >/dev/null 2>&1; then \
@@ -344,21 +357,27 @@ experiment-lock:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
 
-# Every committed example lock must match a fresh lock of its experiment, section by section.
-EXAMPLE_LOCKS := $(sort $(wildcard examples/*/*.lock.json))
+# Every committed experiment lock must match a fresh lock of its experiment, section by section.
+EXPERIMENT_LOCKS := $(sort $(wildcard experiments/*/*/*.lock.json))
 
 experiment-locks-check:
-	@$(if $(EXAMPLE_LOCKS),,$(error no example locks found under examples/))
-	@$(foreach lock,$(EXAMPLE_LOCKS),$(RAIDAR) lock "$(patsubst %.lock.json,%.yaml,$(lock))" --check --ignore-host-python &&) true
+	@$(if $(EXPERIMENT_LOCKS),,$(error no experiment locks found under experiments/))
+	@$(foreach lock,$(EXPERIMENT_LOCKS),$(RAIDAR) lock "$(patsubst %.lock.json,%.yaml,$(lock))" --check --ignore-host-python &&) true
 
-experiment-migrate-run-lock:
-	$(call require_var,RUN)
-	$(call require_var,EXECUTED_LOCK)
+experiment-upgrade:
+	$(call require_var,EXPERIMENT)
+	$(call require_var,KIND)
+	$(call require_var,EXPERIMENT_ID)
+	$(call require_var,OUT)
+	@$(RAIDAR) upgrade-spec "$(EXPERIMENT)" --kind "$(KIND)" --id "$(EXPERIMENT_ID)" --output "$(OUT)"
+
+experiment-migrate-job:
+	$(call require_var,JOB)
 	$(call require_var,LOCK)
-	@$(RAIDAR) migrate-run-lock "$(RUN)" --executed-lock "$(EXECUTED_LOCK)" --lock "$(LOCK)"
+	@$(RAIDAR) migrate-job "$(JOB)" --lock "$(LOCK)" $(if $(EXECUTED_LOCK),--executed-lock "$(EXECUTED_LOCK)",)
 
 EXECUTION_SELECT = $(if $(LOCK),--lock "$(LOCK)",) $(foreach arm,$(ARM),--arm "$(arm)") \
-	$(foreach block,$(BLOCK),--block "$(block)") \
+	$(foreach attempt,$(ATTEMPT),--attempt "$(attempt)") \
 	$(if $(MAX_CHECKPOINTS),--max-checkpoints "$(MAX_CHECKPOINTS)",) \
 	$(if $(AGENT_OVERRIDE),--agent-override "$(AGENT_OVERRIDE)",) \
 	$(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
@@ -371,11 +390,11 @@ experiment-plan:
 experiment-execute: pack-build
 	$(call require_var,EXPERIMENT)
 	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
-		--runs-dir "$(if $(RUNS_DIR),$(abspath $(RUNS_DIR)),$(CURDIR)/runs)" $(if $(RUN_ID),--run-id "$(RUN_ID)",)
+		--jobs-dir "$(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(CURDIR)/jobs)" $(if $(JOB_ID),--job-id "$(JOB_ID)",)
 
 perf-check:
-	$(call require_var,RUN)
-	@$(RAIDAR) perf check $(RUN) $(if $(MIN_SAMPLES),--min-samples "$(MIN_SAMPLES)",) $(if $(filter 1,$(PERF_STRICT)),--strict,)
+	$(call require_var,JOB)
+	@$(RAIDAR) perf check $(JOB) $(if $(MIN_SAMPLES),--min-samples "$(MIN_SAMPLES)",) $(if $(filter 1,$(PERF_STRICT)),--strict,)
 
 PERF_FIXTURE_DIR ?=
 PERF_FIXTURE_CONCURRENCY ?=
@@ -417,28 +436,28 @@ problem-validate:
 		$(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) \
 		$(if $(PROBLEM_STORE),--store "$(PROBLEM_STORE)",)
 
-RUN ?=
-ORACLE_BUNDLE ?=
+JOB ?=
+VERIFIER_BUNDLE ?=
 REGRADE_OUT ?=
 
 experiment-assess:
-	$(call require_var,RUN)
+	$(call require_var,JOB)
 	$(call require_var,STORE)
 	$(call require_var,SCORERS)
-	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(RUN)/trials),$(RUN)/trials,$(RUN))" --store "$(STORE)" \
+	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(JOB)/trials),$(JOB)/trials,$(JOB))" --store "$(STORE)" \
 		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
 		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(LOCK),--lock "$(LOCK)",) $(if $(REPLAY),--replay,) \
 		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
 
 assess-regrade:
-	$(call require_var,RUN)
-	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(RUN)" --docker-context "$${DOCKER_CONTEXT}" $(if $(ORACLE_BUNDLE),--bundle "$(ORACLE_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+	$(call require_var,JOB)
+	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
 
 experiment-analyze:
-	$(call require_var,RUNS)
+	$(call require_var,JOBS)
 	$(call require_var,STORE)
 	$(call require_var,ANALYSIS_OUT)
-	@$(RAIDAR) analyze $(foreach run,$(RUNS),"$(run)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(foreach dir,$(BUNDLE_SEARCH),--bundle-search "$(dir)") $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_RUNS),--allow-dev-runs,)
+	@$(RAIDAR) analyze $(foreach job,$(JOBS),"$(job)") --store "$(STORE)" --output "$(ANALYSIS_OUT)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(ASSESSMENT_CONFIG),--assessment-config "$(ASSESSMENT_CONFIG)",) $(foreach dir,$(BUNDLE_SEARCH),--bundle-search "$(dir)") $(if $(MIN_PAIRS),--min-pairs "$(MIN_PAIRS)",) $(if $(MAX_EXCLUSION_FRACTION),--max-exclusion-fraction "$(MAX_EXCLUSION_FRACTION)",) $(if $(ALPHA),--alpha "$(ALPHA)",) $(if $(BOOTSTRAP_SAMPLES),--bootstrap-samples "$(BOOTSTRAP_SAMPLES)",) $(foreach effect,$(MIN_EFFECTS),--min-effect "$(effect)") $(if $(ALLOW_DEV_JOBS),--allow-dev-jobs,)
 
 jev-export-labels:
 	$(call require_var,POLICY)
@@ -479,38 +498,38 @@ jev-shadow-rubric:
 	@$(RAIDAR_SECRETS) jev shadow-rubric --snapshots "$(SNAPSHOTS)" --store "$(STORE)" $(if $(SPECS),--specs "$(SPECS)",) $(if $(REPLAY_ONLY),--replay-only,) $(if $(WITHIN),--within "$(WITHIN)",) $(if $(TRIAL),--trial "$(TRIAL)",) $(if $(OUT),--output "$(OUT)",)
 
 # $(1) experiment file, $(2) lock name under SMOKE_LOCK_DIR, $(3) spec overrides (--set),
-# $(4) trial selection (--arm). The lock and the run see the same overrides.
+# $(4) trial selection (--arm). The lock and the job see the same overrides.
 define smoke_run
 	@mkdir -p "$(SMOKE_LOCK_DIR)"
 	@$(RAIDAR) lock "$(1)" --output "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3)
 	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(1)" --lock "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3) $(4) \
-		--concurrency "$(SMOKE_CONCURRENCY)" --runs-dir "$(SMOKE_RUNS_DIR)"
+		--concurrency "$(SMOKE_CONCURRENCY)" --jobs-dir "$(SMOKE_JOBS_DIR)"
 endef
 
-SMOKE_SETS = --set "analysis.blocks=$(SMOKE_BLOCKS)" \
+SMOKE_SETS = --set "analysis.attempts=$(SMOKE_ATTEMPTS)" \
 	$(if $(TIMEOUT_SEC),--set "protocol.agent_timeout_sec=$(TIMEOUT_SEC)",)
 AGENT_SMOKE_SETS = $(SMOKE_SETS) \
-	--set "agents.0.harness=$(AGENT_SMOKE_EFFECTIVE_HARNESS)" \
+	--set "agents.0.name=$(AGENT_SMOKE_EFFECTIVE_AGENT)" \
 	--set "agents.0.provider=$(AGENT_SMOKE_EFFECTIVE_PROVIDER)" \
 	--set "agents.0.model=$(AGENT_SMOKE_EFFECTIVE_MODEL)" \
 	--set "agents.0.reasoning_effort=$(AGENT_SMOKE_EFFECTIVE_REASONING)" \
 	--set "agents.0.version='$(AGENT_SMOKE_EFFECTIVE_VERSION)'"
 
 smoke-dry-run-check:
-	@$(MAKE) --no-print-directory -n orchestrator-smoke SMOKE_BLOCKS="2" SMOKE_CONCURRENCY="2"
+	@$(MAKE) --no-print-directory -n orchestrator-smoke SMOKE_ATTEMPTS="2" SMOKE_CONCURRENCY="2"
 	@$(MAKE) --no-print-directory -n smoke-agents
 	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="codex"
 	@$(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="claude"
 	@! $(MAKE) --no-print-directory -n smoke-agents SMOKE_ARM="unknown" \
 		>/dev/null 2>&1
-	@$(MAKE) --no-print-directory -n agent-smoke HARNESS="claude-code" \
+	@$(MAKE) --no-print-directory -n agent-smoke AGENT="claude-code" \
 		| grep -q -- '--set "agents.0.model=claude-haiku-4-5" --set "agents.0.reasoning_effort="'
 	@$(MAKE) --no-print-directory -n agent-smoke REASONING_EFFORT= \
 		| grep -q -- '--set "agents.0.reasoning_effort="'
 	@$(MAKE) --no-print-directory -n agent-smoke \
 		| grep -q -- '--set "agents.0.reasoning_effort=low"'
 	@$(MAKE) --no-print-directory -n agent-smoke \
-		HARNESS="codex-cli" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
+		AGENT="codex" PROVIDER="openai" MODEL="gpt-6-luna" REASONING_EFFORT="low" \
 		TIMEOUT_SEC="300"
 
 # Smoke and execute targets build the pack image first: trials bind the prebuilt
@@ -520,7 +539,7 @@ orchestrator-smoke: docker-check pack-build
 
 agent-smoke: docker-check pack-build
 	@if [ -z "$(AGENT_SMOKE_EFFECTIVE_VERSION)" ]; then \
-		echo "No pack pin for harness '$(AGENT_SMOKE_EFFECTIVE_HARNESS)'; set HARNESS_VERSION"; \
+		echo "No pack pin for agent '$(AGENT_SMOKE_EFFECTIVE_AGENT)'; set AGENT_VERSION"; \
 		exit 1; \
 	fi
 	$(call smoke_run,$(SMOKE_EXPERIMENT),agent-smoke,$(AGENT_SMOKE_SETS),)

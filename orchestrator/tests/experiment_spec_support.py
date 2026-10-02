@@ -18,17 +18,30 @@ from raidar.spec.references import (
     ResolvedReference,
 )
 
-PILOT_EXPERIMENT = Path(__file__).resolve().parents[2] / "examples" / "pilot" / "experiment.yaml"
-PILOT_ONESHOT = PILOT_EXPERIMENT.with_name("oneshot.experiment.yaml")
+REPO_ROOT = Path(__file__).resolve().parents[2]
+EXPERIMENTS = REPO_ROOT / "experiments"
+PILOT_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guided-pilot" / "experiment.yaml"
+PILOT_ONESHOT = (
+    EXPERIMENTS / "ab-test" / "python__circuit_eval-cp1__guided-pilot" / "experiment.yaml"
+)
+SMOKE_EXPERIMENT = (
+    EXPERIMENTS / "smoke" / "python__circuit_eval-cp1__harness-health" / "experiment.yaml"
+)
+AGENTS_BENCHMARK = (
+    EXPERIMENTS / "benchmark" / "python__circuit_eval-cp1__agents" / "experiment.yaml"
+)
+LEGACY_V1 = Path(__file__).resolve().parent / "fixtures" / "legacy_v1"
 
 BASE_EXPERIMENT: dict[str, Any] = {
-    "schema_version": 1,
-    "id": "fixture",
+    "schema_version": 2,
+    "kind": "ab-test",
+    "id": "python__fixture__test",
     "problems": [{"ref": "scb/forge@abc123"}],
+    "runtime": "python",
     "agents": [
         {
             "id": "luna",
-            "harness": "codex-cli",
+            "name": "codex",
             "provider": "openai",
             "model": "gpt-6-luna",
             "reasoning_effort": "low",
@@ -48,7 +61,7 @@ BASE_EXPERIMENT: dict[str, Any] = {
         {"id": "guided", "condition": "guided", "agent": "luna"},
     ],
     "assessment": {"scorers": ["correctness@1"]},
-    "analysis": {"baseline_arm": "baseline", "blocks": 5, "seed": 7},
+    "analysis": {"baseline_arm": "baseline", "attempts": 5, "seed": 7},
 }
 
 
@@ -77,6 +90,15 @@ def write_experiment(root: Path, document: Mapping[str, Any]) -> Path:
     return path
 
 
+DEFAULT_BINDINGS: dict[RefKind, dict[str, object]] = {
+    RefKind.PROBLEM: {"runtime": "python", "pack_version": 1, "validated": True},
+    RefKind.COMPONENT: {"runtimes": ["*"], "supports": ["codex-cli", "claude-code"]},
+    RefKind.SCORER: {"runtimes": ["*"]},
+    RefKind.METRIC: {"runtimes": ["python"]},
+}
+"""Compatibility-gate facts an in-memory reference reports unless ``bindings`` overrides them."""
+
+
 @dataclass
 class InMemoryResolver:
     """Registry resolver over a fixed ``ref -> metadata`` table."""
@@ -84,6 +106,7 @@ class InMemoryResolver:
     resolver_kind: RefKind
     entries: dict[str, dict[str, object]] = field(default_factory=dict)
     tool_versions: dict[str, str] = field(default_factory=dict)
+    bindings: dict[str, dict[str, object]] = field(default_factory=dict)
 
     @property
     def kind(self) -> RefKind:
@@ -100,6 +123,7 @@ class InMemoryResolver:
             digest=digest_json({"ref": str(ref), **metadata}),
             metadata=metadata,
             tool_versions=self.tool_versions,
+            binding=self.bindings.get(str(ref), DEFAULT_BINDINGS.get(self.kind, {})),
         )
 
 

@@ -7,9 +7,17 @@ from pathlib import Path
 
 import click
 
-# Generated runtime output that must never show up as a tracked change: the retired
-# experiments/ directory, experiment runs, Assessment stores and analysis output.
-ARTIFACT_CHANGE_PREFIXES = ("experiments/", "runs/", "stores/", "analysis/")
+# Generated runtime output that must never show up as a tracked change: jobs (and the
+# pre-v2 runs/ root), Assessment stores, analysis output and the legacy data some
+# checkouts keep under experiments/. Experiment definitions (experiments/<kind>/) are tracked.
+ARTIFACT_CHANGE_PREFIXES = (
+    "jobs/",
+    "runs/",
+    "stores/",
+    "analysis/",
+    "experiments/research_loops/",
+    "experiments/operational_smoke/",
+)
 
 
 def repo_paths_from_git_cmd(args: list[str]) -> list[str]:

@@ -1,6 +1,6 @@
 """Builders for stored trials with Harbor usage, timing and ATIF trajectories.
 
-They extend ``tests.scorer_support.write_trial`` (oracle bundle, records and
+They extend ``tests.scorer_support.write_trial`` (verifier bundle, records and
 snapshots) with what the resource-usage and process-compliance scorers read.
 """
 
@@ -12,9 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.models import CaseStatus
 from raidar.scorers.sdk.context import AssessContext
 from raidar.scorers.trial_inputs import load_trial_context
+from raidar.verifier.models import CaseStatus
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 
 PASS = (CaseStatus.PASSED,)

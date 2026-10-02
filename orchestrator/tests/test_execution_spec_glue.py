@@ -21,7 +21,9 @@ from tests.experiment_spec_support import PILOT_EXPERIMENT, PILOT_ONESHOT
 
 def test_each_experiment_file_defaults_to_its_own_lock() -> None:
     assert default_lock_path(PILOT_EXPERIMENT).name == "experiment.lock.json"
-    assert default_lock_path(PILOT_ONESHOT).name == "oneshot.experiment.lock.json"
+    assert default_lock_path(Path("x/oneshot.experiment.yaml")).name == (
+        "oneshot.experiment.lock.json"
+    )
     assert default_lock_path(Path("a/b.yml")) == Path("a/b.lock.json")
     assert len({default_lock_path(PILOT_EXPERIMENT), default_lock_path(PILOT_ONESHOT)}) == 2
 
@@ -29,10 +31,10 @@ def test_each_experiment_file_defaults_to_its_own_lock() -> None:
 def test_lock_command_writes_the_keyed_default_path(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setenv(ROOT_ENV, str(PILOT_EXPERIMENT.parents[2] / "problems"))
+    monkeypatch.setenv(ROOT_ENV, str(PILOT_EXPERIMENT.parents[3] / "problems"))
     experiment = tmp_path / "oneshot.experiment.yaml"
     experiment.write_text(PILOT_ONESHOT.read_text())
-    shutil.copytree(PILOT_EXPERIMENT.parent / "components", tmp_path / "components")
+    shutil.copytree(PILOT_ONESHOT.parent / "components", tmp_path / "components")
     result = CliRunner().invoke(main, ["lock", str(experiment)])
     assert result.exit_code == 0, result.output
     assert (tmp_path / "oneshot.experiment.lock.json").is_file()

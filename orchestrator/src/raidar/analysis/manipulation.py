@@ -4,8 +4,8 @@ A process-guidance condition only means something if agents under it behave
 differently. This check takes ``process-compliance@1`` results per arm and
 reports, per check, whether the guided arm complied more than the baseline.
 
-The unit is the trajectory, not the checkpoint, because checkpoints of one
-attempt are not independent: each trajectory contributes its pass share over
+The unit is the trial, not the checkpoint, because checkpoints of one
+step_result are not independent: each trial contributes its pass share over
 its decided checkpoints for that check. The test is a one-sided exact
 permutation test on the difference of arm means (guided minus baseline),
 enumerating every relabelling when there are at most ``EXACT_LIMIT`` and
@@ -15,7 +15,7 @@ Verdicts per check:
 
 - ``separated``: guided mean > baseline mean and p <= alpha;
 - ``not_separated``: the data could have shown separation but did not;
-- ``insufficient_data``: an arm has no trajectory with a decided check, or
+- ``insufficient_data``: an arm has no trial with a decided check, or
   the arm sizes are too small for any data to reach alpha (``1 / C(n, k)``).
 
 ``min_p_value`` is the smallest p these data could give, counting ties (with
@@ -61,7 +61,7 @@ class Separation(StrEnum):
 
 class ArmSummary(SdkModel):
     arm: str
-    trajectories: int = Field(ge=0)
+    trials: int = Field(ge=0)
     mean: float | None
 
 
@@ -85,8 +85,8 @@ class ManipulationReport(SdkModel):
     verdict: Separation
 
 
-def trajectory_share(result: AssessResult, check: str) -> float | None:
-    """Pass share of ``check`` over one trajectory's decided checkpoints, or None."""
+def trial_share(result: AssessResult, check: str) -> float | None:
+    """Pass share of ``check`` over one trial's decided checkpoints, or None."""
     values = [
         observation.value
         for observation in result.observations
@@ -141,7 +141,7 @@ def _extreme_share(pooled: Sequence[float], k: int) -> float:
 
 
 def _summary(arm: str, shares: Sequence[float]) -> ArmSummary:
-    return ArmSummary(arm=arm, trajectories=len(shares), mean=_mean(shares) if shares else None)
+    return ArmSummary(arm=arm, trials=len(shares), mean=_mean(shares) if shares else None)
 
 
 def separate(
@@ -157,7 +157,7 @@ def separate(
             guided=guided_summary,
             baseline=baseline_summary,
             verdict=Separation.INSUFFICIENT_DATA,
-            reason="an arm has no trajectory with a decided check",
+            reason="an arm has no trial with a decided check",
         )
     difference = _mean(guided[1]) - _mean(baseline[1])
     p_value, min_p, method = permutation_p(guided[1], baseline[1])
@@ -214,7 +214,7 @@ def manipulation_check(
             arm: [
                 share
                 for result in results[arm]
-                if (share := trajectory_share(result, check)) is not None
+                if (share := trial_share(result, check)) is not None
             ]
             for arm in (guided, baseline)
         }

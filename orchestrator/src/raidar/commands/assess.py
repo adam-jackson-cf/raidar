@@ -1,24 +1,31 @@
-"""`raidar assess`: offline assessment over stored runs.
+"""`raidar assess`: offline assessment over stored jobs.
 
-``--regrade`` reruns the oracle over a trial's (or job's) stored per-step
+``--regrade`` reruns the verifier over a trial's (or job's) stored per-step
 snapshots and reports whether the results match the original run (plan E3).
 
 ``--rescore`` runs scorers over a trial's (or job's) stored snapshots, oracle
 records and traces, and adds content-addressed Assessments to ``--store``
-(plan F2). It never writes to the run. ``--replay`` reruns scorers whose
+(plan F2). It never writes to the job. ``--replay`` reruns scorers whose
 Assessment already exists and fails unless the bytes are identical.
 ``--config`` supplies the assessor inventory policy and per-scorer config.
-Without it, the settings come from the experiment lock of the run that holds
+Without it, the settings come from the experiment lock of the job that holds
 the target (found at the target or up to two levels above it:
-``<run>/trials/<trial>``): ``--lock`` if given, else the experiment's current
-lock when its ``lock_sha256`` is the run's, else the run's ``run.lock.json``.
+``<job>/trials/<trial>``): ``--lock`` if given, else the experiment's current
+lock when its ``lock_sha256`` is the job's, else the job's ``job.lock.json``.
 A relock that changes only assessment settings keeps ``lock_sha256``, so a
 plain rescore stores Assessments under the keys analysis looks up for that
-lock. Only a run with no findable lock falls back to its execution-time
+lock. Only a job with no findable lock falls back to its execution-time
 ``assessment-config.yaml``. The report names the config it used.
 Scorers that decide under Jev (``process-compliance@1``) get a runtime whose
 audit and cache live in ``--store``; ``--jev-replay-only`` answers from that
 cache alone and never calls the provider.
+
+``AS1`` (the assess-time half of the runtime-compatibility gate): CLI-supplied
+``--scorer`` values must cover the runtime of the job's lock, and a ``--bundle``
+(rescore or regrade) must be the verifier bundle of a problem that lock binds.
+A target outside any job has no recorded runtime, so only runtime-agnostic
+scorers are accepted there unless ``--lock`` names the lock. Legacy jobs are
+refused until ``raidar migrate-job`` moves them.
 """
 
 from __future__ import annotations
@@ -27,17 +34,19 @@ import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import click
 
-from raidar.analysis.sources import AnalysisInputError, RunDir, default_lock, read_lock
+from raidar.analysis.sources import AnalysisInputError, JobDir, default_lock, read_lock
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
-from raidar.oracle.bundle import BundleError
-from raidar.oracle.regrade import RegradeError, RegradeOptions, regrade_path
+from raidar.job_layout import JOB_MANIFEST, LegacyJobError, is_legacy_job, legacy_job_message
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
 from raidar.scorers.rescore import report_payload, rescore_path
 from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
+from raidar.verifier.bundle import BundleError, load_bundle
+from raidar.verifier.regrade import RegradeError, RegradeOptions, regrade_path
 
 
 def register(main: click.Group) -> None:
@@ -73,42 +82,107 @@ class _RescoreRequest:
     lock: Path | None = None
 
 
-# A trial dir sits at <run>/trials/<trial>; a job dir at <run>/trials.
-_RUN_CONFIG_DEPTH = 2
+# A trial dir sits at <job>/trials/<trial>; a job dir at <job>/trials.
+_JOB_CONFIG_DEPTH = 2
 
 
 def run_assessment_config(target: Path) -> Path | None:
-    """The ``assessment-config.yaml`` of the run that holds ``target``, if any."""
+    """The ``assessment-config.yaml`` of the job that holds ``target``, if any."""
     candidate = target.resolve()
-    for _ in range(_RUN_CONFIG_DEPTH + 1):
+    for _ in range(_JOB_CONFIG_DEPTH + 1):
         if (candidate / ASSESSMENT_CONFIG_FILE).is_file():
             return candidate / ASSESSMENT_CONFIG_FILE
         candidate = candidate.parent
     return None
 
 
-def _run_dir(target: Path) -> Path | None:
+def _job_dir(target: Path) -> Path | None:
     candidate = target.resolve()
-    for _ in range(_RUN_CONFIG_DEPTH + 1):
-        if (candidate / "run.json").is_file():
+    for _ in range(_JOB_CONFIG_DEPTH + 1):
+        if is_legacy_job(candidate):
+            raise LegacyJobError(legacy_job_message(candidate))
+        if (candidate / JOB_MANIFEST).is_file():
             return candidate
         candidate = candidate.parent
     return None
 
 
+ANY_RUNTIME = "*"
+
+
+def _scorer_issues(runtime: str | None, scorer_refs: tuple[str, ...]) -> list[str]:
+    registry = default_scorer_registry()
+    where = (
+        f"the job's runtime is {runtime}"
+        if runtime
+        else "the target is outside any job, so its runtime is unknown (pass --lock)"
+    )
+    issues = []
+    for ref in scorer_refs:
+        try:
+            runtimes = registry.get(ref).manifest.runtimes
+        except (KeyError, ValueError):
+            continue  # unknown scorers are reported by the rescore itself
+        if ANY_RUNTIME not in runtimes and runtime not in runtimes:
+            issues.append(f"[AS1] scorer {ref} supports runtimes [{', '.join(runtimes)}]; {where}")
+    return issues
+
+
+def _bundle_issues(lock: dict[str, Any], bundle: Path) -> list[str]:
+    problems = lock["execution"]["references"].get("problem", {})
+    bound = {str(record["metadata"].get("bundle_sha256")): ref for ref, record in problems.items()}
+    try:
+        digest = load_bundle(bundle).digest()
+    except BundleError as exc:
+        return [f"[AS1] --bundle {bundle} is not a verifier bundle: {exc}"]
+    if digest in bound:
+        return []
+    return [
+        f"[AS1] --bundle {bundle} (digest {digest[:12]}) is not the verifier bundle "
+        f"of any problem the job's lock binds ({', '.join(sorted(bound.values()))})"
+    ]
+
+
+def as1_issues(
+    lock: dict[str, Any] | None, scorer_refs: tuple[str, ...], bundle: Path | None
+) -> list[str]:
+    """``AS1``: scorers and a bundle override against the job lock's runtime and bindings."""
+    runtime = str(lock["spec"]["runtime"]) if lock is not None else None
+    issues = _scorer_issues(runtime, scorer_refs)
+    if bundle is not None and lock is not None:
+        issues.extend(_bundle_issues(lock, bundle))
+    return issues
+
+
+def _job_lock(target: Path, explicit: Path | None) -> dict[str, Any] | None:
+    try:
+        path = run_lock(target, explicit)
+    except (AnalysisInputError, LegacyJobError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    return read_lock(path) if path is not None else None
+
+
+def _check_as1(
+    target: Path, explicit: Path | None, refs: tuple[str, ...], bundle: Path | None
+) -> None:
+    issues = as1_issues(_job_lock(target, explicit), refs, bundle)
+    if issues:
+        raise click.ClickException("assess refused:\n  " + "\n  ".join(issues))
+
+
 def run_lock(target: Path, explicit: Path | None) -> Path | None:
     """The lock whose assessment settings a rescore of ``target`` uses, if one is found."""
-    run_dir = _run_dir(target)
-    if run_dir is None:
+    job_dir = _job_dir(target)
+    if job_dir is None:
         return explicit
-    manifest = json.loads((run_dir / "run.json").read_text())
-    path = explicit or default_lock(RunDir(path=run_dir, manifest=manifest, plan={}, records=()))
+    manifest = json.loads((job_dir / JOB_MANIFEST).read_text())
+    path = explicit or default_lock(JobDir(path=job_dir, manifest=manifest, plan={}, records=()))
     if not path.is_file():
         return None
     lock = read_lock(path)
     if lock["lock_sha256"] != manifest.get("lock_sha256"):
         raise ValueError(
-            f"lock {path} ({str(lock['lock_sha256'])[:12]}) is not the lock run {run_dir} "
+            f"lock {path} ({str(lock['lock_sha256'])[:12]}) is not the lock job {job_dir} "
             f"executed under ({str(manifest.get('lock_sha256'))[:12]})"
         )
     return path
@@ -120,7 +194,7 @@ def _narrowed(config: RescoreConfig, refs: tuple[str, ...]) -> RescoreConfig:
 
 
 def _settings(request: _RescoreRequest) -> tuple[RescoreConfig, Path | None]:
-    """``--config`` as given; else the run's lock, narrowed to the scorers run; else its file."""
+    """``--config`` as given; else the job's lock, narrowed to the scorers run; else its file."""
     if request.config is not None:
         return load_rescore_config(request.config), request.config
     try:
@@ -139,9 +213,10 @@ def _settings(request: _RescoreRequest) -> tuple[RescoreConfig, Path | None]:
 def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     store = request.store
     if store is None:
-        raise click.UsageError("--rescore needs --store DIR (kept outside the run directory)")
+        raise click.UsageError("--rescore needs --store DIR (kept outside the job directory)")
     if store.resolve().is_relative_to(request.target.resolve()):
-        raise click.UsageError("--store must not be inside the run being rescored")
+        raise click.UsageError("--store must not be inside the job being rescored")
+    _check_as1(request.target, request.lock, request.scorer_refs, request.bundle)
     try:
         settings, config_path = _settings(request)
         records = rescore_path(
@@ -166,7 +241,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "--regrade",
     "regrade_target",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Trial or job directory whose stored snapshots the oracle regrades.",
+    help="Trial or job directory whose stored snapshots the verifier regrades.",
 )
 @click.option(
     "--rescore",
@@ -183,7 +258,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
 @click.option(
     "--store",
     type=click.Path(file_okay=False, path_type=Path),
-    help="Assessment store directory for --rescore (outside the run).",
+    help="Assessment store directory for --rescore (outside the job).",
 )
 @click.option(
     "--config",
@@ -191,7 +266,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help=(
         "With --rescore, YAML with inventory_policy and per-scorer config (scorers: {ref: {}}); "
-        "default: the assessment settings of the run's experiment lock."
+        "default: the assessment settings of the job's experiment lock."
     ),
 )
 @click.option(
@@ -199,7 +274,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "lock_path",
     type=click.Path(exists=True, dir_okay=False, path_type=Path),
     help="With --rescore, the experiment lock whose assessment settings apply "
-    "(default: the run's experiment lock, else its run.lock.json).",
+    "(default: the job's experiment lock, else its job.lock.json).",
 )
 @click.option(
     "--replay",
@@ -215,7 +290,7 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     "--bundle",
     "bundle_override",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
-    help="Oracle bundle location if it moved (its digest must still match the records).",
+    help="Verifier bundle location if it moved (its digest must still match the records).",
 )
 @click.option("--docker-context", default="orbstack", show_default=True)
 @click.option(
@@ -234,8 +309,9 @@ def assess(
     docker_context: str,
     out: Path | None,
 ) -> None:
-    """Re-assess stored runs without re-running agents."""
+    """Re-assess stored jobs without re-running agents."""
     if regrade_target is not None and rescore_target is None:
+        _check_as1(regrade_target, lock_path, (), bundle_override)
         options = RegradeOptions(docker_context=docker_context, bundle_override=bundle_override)
         _regrade(regrade_target, options, out)
     elif rescore_target is not None and regrade_target is None:

@@ -2,8 +2,8 @@
 
 Each repeat of each variant is one Harbor trial of the imported agent-visible
 task with Harbor's ``oracle`` agent, which runs a per-step ``solve.sh`` that
-installs the variant's payload into ``/app``. Verification is the Raidar oracle
-verifier (``ORACLE_VERIFIER_IMPORT_PATH``) with the pre-agent leak guard
+installs the variant's payload into ``/app``. Verification is the Raidar verifier
+verifier (``VERIFIER_IMPORT_PATH``) with the pre-agent leak guard
 installed, exactly as an experiment trial is wired. Grades are read from the
 host-only ``raidar-oracle/steps/<step>/record.json`` records, never from
 Harbor's aggregated trial reward.
@@ -29,11 +29,11 @@ from harbor.models.trial.config import (
 )
 from harbor.trial.trial import Trial
 
-from raidar.oracle.guard import install_leak_guard
-from raidar.oracle.records import load_step_record, step_record_dir
-from raidar.problems.rewrite import ORACLE_VERIFIER_IMPORT_PATH
+from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ImportedProblem
 from raidar.problems.validation import Grade, StepGrades
+from raidar.verifier.guard import install_leak_guard
+from raidar.verifier.records import load_step_record, step_record_dir
 
 SOLVE_SH = """#!/bin/bash
 # Raidar validation: install this step's payload as the whole /app state.
@@ -72,7 +72,7 @@ def trial_config(
         agent=AgentConfig(name="oracle"),
         environment=EnvironmentConfig(type="docker", delete=True),
         verifier=VerifierConfig(
-            import_path=ORACLE_VERIFIER_IMPORT_PATH,
+            import_path=VERIFIER_IMPORT_PATH,
             kwargs={
                 "oracle_bundle": str(bundle_root),
                 "docker_context": docker_context,
@@ -86,20 +86,20 @@ def trial_config(
 def read_grades(
     trial_dir: Path, steps: list[str], trial_exception: str | None = None
 ) -> dict[str, Grade]:
-    """Per-step grades; a step without an oracle record is an infrastructure failure.
+    """Per-step grades; a step without a verifier record is an infrastructure failure.
 
     Harbor's ``Trial.run`` records exceptions instead of raising, so an
     environment outage surfaces here as missing records; its exception type is
     kept in the infra reason.
     """
-    missing = "no_oracle_record" + (f":{trial_exception}" if trial_exception else "")
+    missing = "no_verifier_record" + (f":{trial_exception}" if trial_exception else "")
     grades: dict[str, Grade] = {}
     for step in steps:
         record_dir = step_record_dir(trial_dir, step)
         if not (record_dir / "record.json").is_file():
             grades[step] = Grade("oracle", step, {}, {}, missing)
             continue
-        grades[step] = Grade.from_oracle(load_step_record(record_dir).grade)
+        grades[step] = Grade.from_verifier(load_step_record(record_dir).grade)
     return grades
 
 

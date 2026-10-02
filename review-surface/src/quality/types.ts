@@ -80,18 +80,18 @@ export interface JevDecisionItem {
 export interface QualityRunSummary {
   id: string;
   experiment: string;
-  run: string;
+  job: string;
   trial: string;
   arm: string;
   problem: string;
-  block: number;
+  attempt: number;
   valid: boolean;
   checkpoints: number;
   truncated_to: number | null;
   score: Cell;
   sources: Record<string, string | null>;
-  /** `<runs-root name>/<run dir>/trajectories/<trial>.json`: joins the run review's artifact_paths.run_json. */
-  trajectory: string;
+  /** `<jobs-root name>/<job dir>/trial-records/<trial>.json`: joins the run review's artifact_paths.run_json. */
+  trial_record: string;
 }
 
 export interface QualityRunDetail {
@@ -164,7 +164,7 @@ export interface HeadToHeadSignal {
 export interface HeadToHead {
   arm_a: string;
   arm_b: string;
-  aggregation: 'median_across_blocks';
+  aggregation: 'median_across_attempts';
   signals: HeadToHeadSignal[];
 }
 
@@ -202,7 +202,7 @@ export interface ProblemQuality {
 export interface QualityExperiment {
   experiment: string;
   lock_sha256: string | null;
-  runs: string[];
+  jobs: string[];
   problems: ProblemQuality[];
 }
 
