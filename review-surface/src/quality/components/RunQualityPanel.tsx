@@ -1,12 +1,14 @@
 // Run detail → Quality panel (under the scorecard): the run's per-checkpoint
 // C·V·E·H·R·G·I·S strip with eligibility badges. A V/E/H/R/G cell or column
-// opens its file:line evidence in the full Quality run view.
+// opens its file:line evidence in the full Quality run view. A gated trial also shows its
+// commit-gate effort per checkpoint (rounds, failure families, fix cost).
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ArrowUpRight, ChevronDown, ChevronRight } from 'lucide-react';
 import { C } from '@/utils/colors';
 import { qualityApi } from '@/quality/api';
+import { GatePanel } from '@/quality/components/GatePanel';
 import { QualityStrip, Ring, StatusBadge } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE, fmtComponent } from '@/quality/format';
 import { qualityExperimentHref, qualityRunHref, useQualityIndex } from '@/quality/links';
@@ -147,6 +149,9 @@ export function RunQualityPanel({ run }: { run: RunRecord }) {
                   {note}
                 </p>
               ))}
+              <div className="px-1 pt-1">
+                <GatePanel gate={data.gate} />
+              </div>
             </>
           )}
         </>

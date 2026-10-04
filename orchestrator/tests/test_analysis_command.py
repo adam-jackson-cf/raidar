@@ -509,3 +509,80 @@ def test_the_manipulation_check_reads_the_declared_process_compliance_version(
     # These trials carry no trajectory, so no check is decided in either arm.
     assert manipulation["verdict"] == "insufficient_data"
     assert manipulation["checks"][0]["reason"] == "an arm has no trial with a decided check"
+
+
+def _write_gate_record(agent_dir: Path, *, clean: bool) -> None:
+    """A guardrail-gate@1 record: one refused run, one fix, then the step's verdict."""
+    gate = agent_dir / "guardrail-gate"
+    gate.mkdir(parents=True, exist_ok=True)
+    refused = (
+        "guardrail-check: REFUSED (1 blocking, 0 warnings, 1 Python files)\n"
+        "Blocking (fix these) (1):\n  app/main.py:1:1: C901 too complex\n"
+    )
+    passed = "guardrail-check: PASSED (0 blocking, 0 warnings, 1 Python files)\n"
+    (gate / "gate_run_1.log").write_text(refused)
+    (gate / "gate_run_2.log").write_text(passed if clean else refused)
+    runs = [
+        {
+            "run": 1,
+            "after": "stage_1_work",
+            "passed": False,
+            "log": "guardrail-gate/gate_run_1.log",
+        },
+        {"run": 2, "after": "stage_2_fix", "passed": clean, "log": "guardrail-gate/gate_run_2.log"},
+    ]
+    stages = [
+        {"index": index, "stage": role, "round": index - 1, "n_input_tokens": 10,
+         "n_output_tokens": 1, "cost_usd": 0.001, "duration_sec": 5.0}
+        for index, role in ((1, "work"), (2, "fix"))
+    ]  # fmt: skip
+    record = {
+        "termination_reason": "gate_clean" if clean else "rounds_exhausted",
+        "rounds_configured": 1,
+        "gate_runs": runs,
+        "stages": stages,
+        "gate_clean_at_step_end": clean,
+    }
+    (gate / "guardrail-gate.json").write_text(json.dumps(record))
+
+
+def test_gate_effort_and_the_preregistered_gate_check_reach_the_report(tmp_path: Path) -> None:
+    scorers = ["correctness@1", "gate-effort@1"]
+    gate_check = [{"check": "gate_clean_at_step_end", "min_share": 0.8}]
+    lock = _lock(scorers, manipulation_checks=gate_check)
+    lock_path = tmp_path / "lock.json"
+    lock_path.write_text(json.dumps(lock))
+    job_dir = _write_run(tmp_path, lock)
+    for attempt in range(5):
+        for step in STEPS:
+            agent_dir = job_dir / "trials" / f"toy-guided-b{attempt}" / "steps" / step / "agent"
+            _write_gate_record(agent_dir, clean=True)
+    store = tmp_path / "store"
+    rescore_path(
+        job_dir / "trials",
+        tuple(scorers),
+        AssessmentStore(store),
+        default_scorer_registry(),
+        config=lock_rescore_config(lock).scorers,
+    )
+
+    output = tmp_path / "analysis"
+    result = _analyze(job_dir, store, lock_path, output)
+
+    assert result.exit_code == 0, result.output
+    report = json.loads((output / "analysis.json").read_text())
+    baseline, guided = report["arms"]
+    rate = "gate.first_pass_clean_rate"
+    assert baseline["gate_effort"][rate]["gaps"] == {"not_applicable": 5}
+    assert guided["gate_effort"][rate]["mean"] == 0.0
+    assert guided["gate_effort"]["gate.mean_rounds_to_clean"]["mean"] == 1.0
+    assert guided["gate_effort"]["gate.total_first_run_blocking.complexity"]["mean"] == 2.0
+    (comparison,) = report["comparisons"]
+    assert comparison["gate_effects"] == []
+    assert "baseline arm measured no gate-effort value" in comparison["gate_note"]
+    manipulation = comparison["manipulation"]
+    assert (manipulation["preregistered"], manipulation["verdict"]) == (True, "separated")
+    (check,) = manipulation["checks"]
+    assert (check["basis"], check["guided_steps"]["decided"]) == ("threshold", 10)
+    markdown = (output / "analysis.md").read_text()
+    assert "## Gate effort (gate-effort@1, per arm)" in markdown

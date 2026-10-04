@@ -2,6 +2,52 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - python-guardrails@1 and the guardrails experiment
+
+### Added
+
+- `python-guardrails@1` (`raidar.components.builtins.guardrails`, payload `raidar/components/payloads/python_guardrails_1/`): the Python guardrails pack. It installs `guardrail-check` once per trial, root-owned in `/opt/raidar-tools/python-guardrails` and linked to `/usr/local/bin/guardrail-check`:
+  - Ruff 0.8.6 and mypy 2.3.1 from hash-pinned per-platform locks, in the pack's own venv;
+  - protected configs and bespoke structure, source, fan-out and lockfile checks;
+  - byte-identical `ruff.toml` and `mypy.ini` copies placed in the workspace.
+- **Gate behaviour.** Check-only and cache-free. Exit 0 passes, 1 refuses, and 126 is a gate error, as is any crash. The JSON report (`python-guardrails.gate-report/1`) goes to `--json-out`, `--json-dir` or `$RAIDAR_GATE_REPORT_DIR`. It records whether the workspace copies still match the protected configs and is never printed.
+- **Discovery probe.** Before every step's agent: the pinned versions at the link, and a gate smoke (a clean file passes; an unused import is refused with `F401`). At step 1 also: the protected bytes, a tool tree the agent cannot write, and the overlay.
+- **Rule coverage.** All 92 Enaible rules are covered by the approved ledger (`orchestrator/tests/fixtures/python_guardrails/`):
+  - 73 are implemented.
+  - 16 are not applicable, with approval recorded.
+  - 3 are not enforced: `PRETTIER.version` and `SECURITY.dependency-audit` are deferred; `TEST.coverage-minimum` with pytest is planned for `python-guardrails@2`.
+- `make guardrails-verify` runs the bundled validator over every canary against the installed pack in the pack image, plus negative controls (OrbStack and PyPI; not in `make quality`).
+- Integrity flags (`raidar.components.integrity`, `ProbeSummary.flags` on each step result) record agent tampering without failing the step. The python-guardrails flags cover:
+  - edited workspace config copies (at step start or at any gate run);
+  - protected configs or the tool tree changing after step 1;
+  - refused suppression comments;
+  - trace evidence of hook bypass attempts.
+- Experiment `experiments/ab-test/python__forge__guardrails/`: r1 (shared framing) against r2 (`python-guardrails@1` plus `guardrail-gate@1` with the hook command `guardrail-check`, at most 3 fix rounds). It runs 4 attempts (explore) and declares `gate-effort@1` and the manipulation check `gate_clean_at_step_end` (`min_share` 0.8).
+  - `rationale.md` pre-registers the primary `solve_rate_errata` (raw `solve_rate` beside it), the secondary and gate-effort outcomes, and the smoke rule for the mypy strict annotation codes.
+  - Locked; not executed.
+
+### Removed
+
+- Experiments `python__forge__ruff-lint` and `python__forge__ruff-lint-r2`; their jobs stay on disk. `lint-tool@1` and `@2` stay registered because those jobs' locks reference them. Gate packet §14.4 and §14.12 are now short historical notes.
+
+### Documentation
+
+- `python__forge__guided-r3/rationale.md`: its `process-compliance@1` references are marked historical; the experiment and its rescored jobs use `@2`.
+
+## Unreleased - gate effort as a quality signal
+
+### Added
+
+- `gate-effort@1` (`raidar.scorers.gate_effort`): a deterministic scorer over each step's `guardrail-gate@1` record. Per checkpoint: gate runs, fix rounds, `first_pass_clean`, `gate_clean_at_step_end`, `unresolved` (fix rounds exhausted), `gate_error`, `rounds_to_clean` (clean steps only), blocking findings of the first run and over every run, in total and per rule family, and the fix sessions' input/output tokens, cost and wall time (the work session excluded), plus gate-run time. Per trajectory: rates over decided steps (numerator and denominator reported), mean rounds to clean and totals. Findings come from the run's `python-guardrails.gate-report/1` report when present, else from `guardrail-check`'s printed listing; family counts are `unavailable` when the listing was capped and no report names every finding. A trajectory with no gate record is `not_applicable` throughout, never 0.
+- `analysis.manipulation_checks` (optional; omitted from a lock when unset, so existing locks are unchanged): pre-registers the manipulation checks and an optional `min_share`. `gate_clean_at_step_end` (from `gate-effort@1`) joins `tests_run_before_finish` and `plan_written`. Against a baseline without the gate, the check is the treatment's pooled checkpoint share against `min_share` (`basis: threshold`); with both arms gated it must also separate. Validation refuses an unknown check or one whose scorer is not declared.
+- Analysis (report schema 3): with `gate-effort@1` declared, every arm carries descriptive `gate_effort` (n, mean, SD, interval and gaps by status per `gate.*` metric), every comparison carries paired `gate_effects` for the gate metrics both arms measured (else a `gate_note` saying why), and benchmark ranking rows carry `gate_means`. `gate.*` metrics are valid `min_effects` and `rank_by` ids.
+- Review surface: the Quality run page and run detail's Quality panel show a gated trial's commit-gate effort: totals, a per-checkpoint table (how the gate ended, runs, blocking first/all, findings per family, fix cost and time) and, per step, each gate round with its families and log. An ungated trial shows no gate section.
+
+### Changed
+
+- `guardrail-gate@1` records each session's start, end and duration and each gate run's duration and report dir, and exports `RAIDAR_GATE_RUN` and `RAIDAR_GATE_REPORT_DIR` (`guardrail-gate/gate_run_<n>`, kept with its run) to the gate command. No lock used the component yet.
+- The jobs whose experiment locks declare `process-compliance@2` were rescored under it (Assessments added only): pilot-v2 `forge-02`, `forge-03`, `oneshot-01`; guided-r3 `r3-01`, `r3-04`, `r3-05`, `r3-06`; `ruff-lint-r2-01`. `ruff-lint-02` was executed under lock `cc2a4b147487`, which declares `@1`, so it was left as is.
+
 ## Unreleased - Jev parked, process-compliance@2
 
 ### Breaking Changes
@@ -19,7 +65,7 @@ All notable changes to this project are documented in this file.
 
 ### Documentation
 
-- `docs/reboot/gate-packet.md` §14.8-§14.15: the spec-determinacy audit and forge errata (`9a6dec369dea`, 25 cases), verifier dependency parity (FCR-007), pilot v2 forge raw vs errata-applied, the r3 results (jobs `r3-01`/`r3-04`/`r3-05`/`r3-06`, lock `d4e2c9171a28`: primary and errata outcomes inconclusive, every pre-registered process criterion for FCR-003 to FCR-006 and FCR-008 met, E worse and R improved), the `lint-tool@2` ruff A/B (`ruff-lint-r2-01`: every invocation form provisioned, Ruff run in 1 of 40 steps), the Jev evaluation verdict, the first-pass labels and the decisions now open.
+- `docs/reboot/gate-packet.md` §14.8-§14.15: the spec-determinacy audit and forge errata (`9a6dec369dea`, 25 cases), verifier dependency parity (FCR-007), pilot v2 forge raw vs errata-applied, the r3 results (jobs `r3-01`/`r3-04`/`r3-05`/`r3-06`, lock `d4e2c9171a28`: primary and errata outcomes inconclusive, every pre-registered process criterion for FCR-003 to FCR-006 and FCR-008 met, E worse and R improved), the `lint-tool@2` ruff A/B (historical since 2026-10-04: §14.12 now points to the guardrails experiment), the Jev evaluation verdict, the first-pass labels and the decisions now open.
 - `docs/reboot/jev/labels/firstpass-2026-10-04.{jsonl,md}`: 68 first-pass agent labels (51 `code-quality.rubric-smells`, 17 `process-compliance.residue`) with their method, stances and blindness record. They are a proposal and are not in the Jev label store.
 
 ## Unreleased - pilot refinement: Jev relabel, fault catalog and r3 proposal, ruff A/B
@@ -41,10 +87,11 @@ All notable changes to this project are documented in this file.
 
 - `lint-tool@1`: a hash-pinned Ruff (0.8.6) installed once per trial, as root, in the agent container under `/opt/raidar-tools/<slug>/` and linked to `/usr/local/bin/ruff`, outside the agent image (the pack audit's "no scorer tools in the agent image" holds). Its probe checks, before every step, the version at the provisioned path and, at step 1, that Ruff resolves the workspace `ruff.toml`. Components opt into this through `raidar.components.provision` (`install` once, `check` per step, one evidence record per step).
 - `lint-tool@2` (`raidar/components/builtins/tools_v2.py`; `lint-tool@1` is unchanged, so its component digest does not move): @1's install plus a root-owned `.pth` in each image interpreter's site-packages pointing at the install, so the pinned Ruff runs as `ruff`, `python -m ruff`, `python3 -m ruff` and `uv run ruff` (through `PATH`), still outside the agent image. Its check runs every invocation's `--version` before each step's agent (`uv run` with `--no-sync` and a throwaway `UV_PROJECT_ENVIRONMENT`, so nothing is written to the workspace) and records whether the workspace is a uv project and whether a project `.venv` has its own Ruff. The probe `lint-tool-invocable` enforces, at step 1, that `ruff` on `PATH` is the provisioned link, that every invocation answers the pinned version and the configured `ruff.toml`; later steps enforce the install only and report which invocations still run the pin. `python -m ruff` inside a virtual environment the agent creates is not supported.
-- Experiment `experiments/ab-test/python__forge__ruff-lint-r2/`: `python__forge__ruff-lint` with r2's `lint-tool@1` replaced by `lint-tool@2`, nothing else changed; locked `5d4b2f59b74a`, relocked `bb4b7edf5996` for the forge errata, not executed.
+- Experiment `python__forge__ruff-lint-r2` (historical): removed 2026-10-04 and replaced by `experiments/ab-test/python__forge__guardrails/`. Its job `ruff-lint-r2-01` stays on disk (gate packet §14.12).
 - Jev calibration ledger (`raidar.jev.ledger`): `make jev-supersede-labels` takes labels out of calibration without deleting them (append-only), `make jev-record-split` records a calibration/evaluation split before labelling (`jev-promote` defaults to the latest), and `make jev-export-blind ... REQUEST_IDS=` exports chosen decisions. Promotion, calibration, blind export, label export and the Quality projection read labels through `current_labels`, so superseded labels never count.
 - Agent skills `fault-catalog` (analyse a job into conceptual fault categories and propose component changes as the next revision) and `experiment-observations` (report what a completed experiment observed, reconciling fault evidence through `fault-catalog`) under `.agents/skills/`. They are first versions and need refining.
-- Experiments `experiments/ab-test/python__forge__ruff-lint/` (r1 shared framing only vs r2 adding `lint-config@1` + `lint-tool@1`; executed as `ruff-lint-02`) and the proposed `experiments/ab-test/python__forge__guided-r3/` (pilot guided condition vs a candidate built from the pilot v2 fault catalog; locked `12f2b2fb05fc`, not executed; `rationale.md` beside it).
+- Experiment `python__forge__ruff-lint` (historical): removed 2026-10-04 and replaced by `experiments/ab-test/python__forge__guardrails/`. Its job `ruff-lint-02` stays on disk (gate packet §14.4).
+- The proposed `experiments/ab-test/python__forge__guided-r3/` (pilot guided condition vs a candidate built from the pilot v2 fault catalog; locked `12f2b2fb05fc`, not executed; `rationale.md` beside it).
 
 ### Fixes
 

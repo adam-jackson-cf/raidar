@@ -107,7 +107,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	jev-supersede-labels jev-record-split \
 	jev-verify-promotion jev-promote \
 	pack-info pack-build pack-audit pack-tool-provision \
-	component-probe-trials \
+	component-probe-trials guardrails-verify \
 	smoke-dry-run-check orchestrator-smoke smoke-agents agent-smoke \
 	review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
@@ -150,6 +150,8 @@ help:
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
+	@echo "  make guardrails-verify                                python-guardrails@1 rule coverage: every canary of the approved ledger against the"
+	@echo "                                                        installed pack in the pack image, plus negative controls (OrbStack, PyPI; not in make quality)"
 	@echo ""
 	@echo "Experiments:"
 	@echo "  make experiment-init EXPERIMENT=experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
@@ -248,6 +250,13 @@ component-probe-trials:
 
 pack-audit:
 	@$(PACK_DOCKER_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
+
+# The skill's rule-coverage validator over python-guardrails@1's approved ledger, run in the
+# pack image; only the user-deferred rules may fail (tests/test_component_python_guardrails_trial.py).
+guardrails-verify: docker-check pack-build
+	@$(PACK_DOCKER_ENV) export RAIDAR_GUARDRAILS_VERIFY=1 && cd orchestrator && $(REPO_RUNTIME_ENV) \
+		uv run --project . --extra dev python -m pytest tests/test_component_python_guardrails_trial.py \
+		-k proven -v -s
 
 pack-tool-provision:
 	$(call require_var,TOOL)

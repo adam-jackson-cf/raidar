@@ -1,6 +1,12 @@
 # python__forge__guided-r3: rationale
 
 - **Status:** proposed. Validated and locked (`experiment.lock.json`, lock `d4e2c9171a28`: `12f2b2fb05fc` relocked with the forge errata `9a6dec369dea` pinned, no other execution change); **not executed**.
+- **Update (2026-10-04).** The status line above is historical.
+  - **Run:** r3 was executed as jobs `r3-01`, `r3-04`, `r3-05` and `r3-06`; the results are in gate packet §14.11.
+  - **Scorer:** the experiment now declares `process-compliance@2` (deterministic trace checks only; Jev parked), and those jobs were rescored under it. This was an assessment-section relock; `lock_sha256` did not move.
+  - **Why `@1` still appears below:** every mention of `process-compliance@1` in this file is historical. `@1` is the scorer this file pre-registered, and the text is kept as written.
+  - **What `@2` decides:** `plan_written` (a plan tool or plan file before the first source edit) and `tests_run_before_finish` (a test run after every source edit), from the trace alone. A check the trace cannot decide is `insufficient_evidence`, never a Jev decision.
+  - **Commands:** the commands in section 7 now name `@2`.
 - **Iteration:** research loop, manual iteration 1, built from the pilot v2 fault catalog (`docs/reboot/pilot-v2-fault-catalog.md`, FCR-001 to FCR-008).
 - **Question:** on `scb/forge@38d627ecf668`, does the candidate guided condition (`guided-r3`) beat the incumbent pilot v2 guided condition (`guided-r2`)?
 
@@ -15,7 +21,7 @@
 | Turn-end hook | `stop-hook@1` byte-compile | removed (C5) |
 | Review loop | `review-loop@2`, 2 rounds | unchanged |
 
-Everything else is fixed at the pilot's values: problem pin, agent (`codex` 0.156.1, `gpt-6-luna`, effort low), protocol (`continue`, 1800 s agent and 900 s verifier timeouts, artifact snapshots), scorers (`correctness@1`, `code-quality@1`, `resource-usage@1`, `process-compliance@1`), headline metric `scb-canonical@2`, and the verdict thresholds (min pairs 5, max exclusion 20%, alpha 0.05). The run uses 16 attempts with seed 20261002.
+Everything else is fixed at the pilot's values: problem pin, agent (`codex` 0.156.1, `gpt-6-luna`, effort low), protocol (`continue`, 1800 s agent and 900 s verifier timeouts, artifact snapshots), scorers (`correctness@1`, `code-quality@1`, `resource-usage@1`, `process-compliance@1` as pre-registered; `@2` since 2026-10-04, see the update above), headline metric `scb-canonical@2`, and the verdict thresholds (min pairs 5, max exclusion 20%, alpha 0.05). The run uses 16 attempts with seed 20261002.
 
 **The incumbent is the pilot's guided condition exactly.** Its files are byte-identical copies, and `make experiment-plan` reports its condition digest as `73cc19faeeb0`, the same digest the pilot v2 guided trials carry. Only the arm digest differs, because the arm and condition ids differ.
 
@@ -25,7 +31,7 @@ Everything else is fixed at the pilot's values: problem pin, agent (`codex` 0.15
 
 | Change | Targets | What changes | Mechanism | Expected signal |
 |---|---|---|---|---|
-| **C1** plan file | FCR-008 | `AGENTS.md`: write `PLAN.md` at the workspace root as a separate first write, before any source edit, each checkpoint | `process-compliance@1` counts a write to `PLAN.md` before the first edit as a plan; Codex here exposes no plan tool | `plan_written` ≥ 0.8 in the candidate, ≈ 0 in the incumbent |
+| **C1** plan file | FCR-008 | `AGENTS.md`: write `PLAN.md` at the workspace root as a separate first write, before any source edit, each checkpoint | `process-compliance@1` (historical; `@2` also passes `plan_written` on it) counts a write to `PLAN.md` before the first edit as a plan; Codex here exposes no plan tool | `plan_written` ≥ 0.8 in the candidate, ≈ 0 in the incumbent |
 | **C2** error contract on every failure path | FCR-005 | `AGENTS.md`: bad or missing arguments, unknown commands and conflicting flags follow the specification's error contract; never the parser's own usage text or exit code | removes the argparse default path that produced most `cli_surface_missing` failures | `cli_surface_missing` new-at-checkpoint failures ≤ 50% of the incumbent's |
 | **C3** propagate cross-cutting changes | FCR-006 | `AGENTS.md`: a change to something every command shares (output shape, error format, global flag) is applied to every command, old and new | targets the checkpoint-7 envelope migration that broke earlier commands | checkpoint-7 regression breaks ≤ incumbent's |
 | **C4** available test tools | FCR-003 | `AGENTS.md`: pytest and ruff are not installed; write `unittest` tests and run `python3 -m unittest discover`; do not install test tools | removes failed pytest/ruff attempts and install detours; `unittest` is already what agents fall back to and what `tests_run_before_finish` counts | sessions with a pytest/ruff not-found error ≤ 5% of steps; `tests_run_before_finish` ≥ 0.9 |
@@ -67,13 +73,13 @@ C1-C5 ship together in one candidate, so an overall effect cannot be attributed 
 ## 7. Cost and running it
 
 - Pilot v2 guided trials averaged $0.158 nominal (Harbor token-priced, ChatGPT session auth). 32 guided trials come to about $5. Wall time is about 8 h at concurrency 3: 32 trials at about 2,400 agent-seconds each (pilot v2 guided mean), plus verifier time.
-- Not executed. When approved, run on OrbStack (`orbstack-data-status` reports `external_available=True`) through the public targets:
+- Not executed at the time of writing (executed since: see the update at the top). When approved, run on OrbStack (`orbstack-data-status` reports `external_available=True`) through the public targets:
 
 ```sh
 make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guided-r3/experiment.yaml LOCK_CHECK=1
 make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guided-r3/experiment.yaml CONCURRENCY=3 JOB_ID=r3-01
 make experiment-assess JOB=jobs/python__forge__guided-r3/r3-01 STORE=stores/python__forge__guided-r3 \
-  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@1"
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@2"
 make experiment-analyze JOBS="jobs/python__forge__guided-r3/r3-01" STORE=stores/python__forge__guided-r3 \
   ANALYSIS_OUT=analysis/python__forge__guided-r3
 ```

@@ -30,6 +30,22 @@
 - The review surface's user flow and the signals and persona questions it surfaces must not be lost (requirements F12). Layout and navigation may change; Playwright specs may be updated only where the flow legitimately changes, and every signal they assert must still be asserted. Run `make review-surface-test` after review-surface or projection changes; to include real jobs pass `REVIEW_JOBS_ROOT` with one `REVIEW_STORE` for all roots or one per root. Use problem/condition/arm/trial wording in the UI; the review projection (`schema_version=2`) keeps its JSON field names (`runs`, `run_json`, `harness`, `headline_policy`), and the surface its routes (`/runs/:runId`) and `data-run-id` attributes, as an internal contract.
 - Task completion requires `make quality` to pass.
 
+## Objectives
+
+Every use of Raidar's tools serves one of two objectives. Name the objective before designing or running a job, and work to its rules. If the user has not said which one applies, assume **explore**.
+
+- **Explore**: improving Raidar's process, or an early idea for an experiment revision (a new condition, component, scorer or gate). The goal is to validate that something works and look for early signals with the fewest runs.
+  - Check first with the smallest run that can fail: a no-LLM fixture, `make orchestrator-smoke`, or 1-2 trials of the arm under test. Then run at most 4 attempts per arm, on one problem and the default agent (`codex`, `gpt-6-luna`, low).
+  - Report signals, not conclusions. Report effect direction, process and component behaviour (probes, gate rounds, manipulation checks), fault categories, cost, and anything broken. Verdicts below `min_pairs` read `insufficient` by design. Call findings exploratory; never cite them as evidence of an effect.
+  - Stop when a process defect appears. Fix it, then rerun small. Do not add attempts while the process or the treatment is still changing.
+  - Still lock and pre-register, because both are cheap. A power target is not required.
+- **Confirm**: the system and the treatment are settled, and the goal is conclusive evidence or a comparison across agents.
+  - Enter only when nothing Raidar-side touching the experiment is pending: verifier, scorers, components, gate and errata are stable. An explore run of the exact design must have completed cleanly.
+  - Pre-register before the first job: the primary outcome (in `rationale.md` beside the experiment), the verdict thresholds (in the lock) and the attempts per arm. Size attempts from the `J2` sample-size projection of earlier explore jobs for the primary outcome.
+  - Run every arm under one lock with no changes mid-series. Hold at most 1 infra exclusion per arm. A Raidar or treatment change during the series starts a new experiment; it never patches the running one.
+  - Compare agents with one `benchmark` experiment (agents as the factor), and treatments with an `ab-test`. Report verdicts with CIs, cost beside every effect, and the gate-effort and quality signals. Only confirm results are citable.
+- Objectives are independent of kinds. An `ab-test` or a `benchmark` can be run to explore or to confirm. A `smoke` checks operational health and serves neither objective.
+
 ## Jev (parked)
 
 - Jev is parked (user decision 2026-10-04; requirements change log, F7): model judgement is used only when a needed measure cannot be made deterministically, and none qualifies today. Both policies (`code-quality.rubric-smells@3`, `process-compliance.residue@2`) are `mode: "off"`. Do not raise a mode, add a Jev metric to a scorer, or put Jev into analysis or the review surface's scores without a new user decision; un-parking is a new policy version.
@@ -41,6 +57,7 @@
 - `experiments/ab-test/python__forge__guided-pilot/experiment.yaml`: Phase 1 pilot on `scb/forge@38d627ecf668` (8 checkpoints), pilot v2: both arms share the `prompt-wrapper@1` starter framing; `baseline` vs `guided` (rules-file, skills, lint-config, stop-hook, review-loop@2) on `codex` `gpt-6-luna` low, 16 attempts, all four scorers (`process-compliance@2` since 2026-10-04), `scb-canonical@2`. Formerly `examples/pilot/experiment.yaml` (id `pilot-forge`); jobs forge-02/forge-03 are migrated under `jobs/pilot-v2/python__forge__guided-pilot/`.
 - `experiments/ab-test/python__circuit_eval-cp1__guided-pilot/experiment.yaml`: one-shot pilot on `scb/circuit_eval.checkpoint_1@38d627ecf668`, same arms, 5 attempts, `scb-canonical-oneshot@2`. Formerly `examples/pilot/oneshot.experiment.yaml` (id `pilot-circuit-eval-oneshot`); job oneshot-01 is migrated.
 - `experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml`: operational smoke (one `codex` `gpt-6-luna` low agent, correctness only); kind smoke, not citable.
+- `experiments/ab-test/python__forge__guardrails/experiment.yaml`: explore run on forge, r1 shared framing vs r2 `python-guardrails@1` + `guardrail-gate@1` (hook command `guardrail-check`, 3 fix rounds), 4 attempts, `gate-effort@1` declared, manipulation check `gate_clean_at_step_end`. `rationale.md` pre-registers `solve_rate_errata` primary (raw beside it) and the smoke rule (2 r2 trials before the main job) for the mypy strict annotation codes. It replaces the removed `python__forge__ruff-lint`/`-r2` (their jobs stay on disk; `lint-tool@1/@2` stay registered for those locks).
 - `experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml`: agent benchmark smoke, one arm per pack agent (`codex`: `gpt-6-luna` low, the reference; `claude`: `claude-haiku-4-5`, no reasoning effort), 1 attempt (validates with a below-5-attempts warning).
 
 ## Smoke Testing

@@ -28,9 +28,22 @@ sample size, prevented separation.
 
 The overall verdict is ``separated`` only when every requested check is.
 
+Available checks and the scorer each reads (``CHECK_SCORERS``):
+``tests_run_before_finish`` and ``plan_written`` (``process-compliance``), and
+``gate_clean_at_step_end`` (``gate-effort@1``: the step's last commit-gate run
+passed). The checks are the experiment's pre-registered
+``analysis.manipulation_checks`` when its lock declares them; otherwise the
+process-compliance defaults when that scorer is declared. A check may
+pre-register ``min_share``: the share of the treatment arm's decided
+checkpoints (pooled over its trials) that must pass. When the baseline arm has
+no decided checkpoint for the check (the condition is absent there, e.g. no
+commit gate), the threshold alone decides (``basis: threshold``): ``separated``
+when the share reaches ``min_share``. When both arms have decided checkpoints
+the check must also separate (``basis: threshold+separation``).
+
 Placement: this compares arms, which F6 keeps out of scorers, so it is
-analysis code over stored ``process-compliance`` results. ``raidar analyze``
-runs it for every treatment arm against the baseline arm.
+analysis code over stored ``process-compliance`` and ``gate-effort`` results.
+``raidar analyze`` runs it for every treatment arm against the baseline arm.
 """
 
 from __future__ import annotations
@@ -41,6 +54,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from enum import StrEnum
 from itertools import combinations
 from pathlib import Path
+from typing import Literal
 
 from pydantic import Field
 
@@ -54,6 +68,17 @@ EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
 PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
+GATE_EFFORT_REF = "gate-effort@1"
+GATE_CLEAN = "gate_clean_at_step_end"
+PROCESS_SOURCE = "process-compliance"
+GATE_SOURCE = "gate-effort"
+CHECK_SCORERS: dict[str, tuple[str, tuple[str, ...]]] = {
+    TESTS_RUN_BEFORE_FINISH: (PROCESS_SOURCE, PROCESS_COMPLIANCE_REFS),
+    PLAN_WRITTEN: (PROCESS_SOURCE, PROCESS_COMPLIANCE_REFS),
+    GATE_CLEAN: (GATE_SOURCE, (GATE_EFFORT_REF,)),
+}
+"""``{check: (result source, scorer refs that report it)}``."""
+Basis = Literal["separation", "threshold", "threshold+separation"]
 
 
 class Separation(StrEnum):
@@ -68,6 +93,21 @@ class ArmSummary(SdkModel):
     mean: float | None
 
 
+class CheckRequest(SdkModel):
+    """One pre-registered check; ``min_share`` adds a treatment-share threshold."""
+
+    check: str
+    min_share: float | None = Field(default=None, gt=0.0, le=1.0)
+
+
+class StepShare(SdkModel):
+    """Passed / decided checkpoints of one arm, pooled over its trials."""
+
+    passed: int = Field(ge=0)
+    decided: int = Field(ge=0)
+    share: float | None
+
+
 class CheckSeparation(SdkModel):
     check: str
     guided: ArmSummary
@@ -78,26 +118,44 @@ class CheckSeparation(SdkModel):
     p_value: float | None = None
     min_p_value: float | None = None
     method: str | None = None
+    basis: Basis = "separation"
+    min_share: float | None = None
+    guided_steps: StepShare | None = None
 
 
 class ManipulationReport(SdkModel):
     kind: str = "raidar-manipulation-check"
-    schema_version: int = 1
+    schema_version: int = 2
     alpha: float
     checks: tuple[CheckSeparation, ...]
     verdict: Separation
+    preregistered: bool = False
+    """True when the checks are the lock's ``analysis.manipulation_checks``."""
 
 
-def trial_share(result: AssessResult, check: str) -> float | None:
-    """Pass share of ``check`` over one trial's decided checkpoints, or None."""
-    values = [
+def _decided(result: AssessResult, check: str) -> list[float]:
+    return [
         observation.value
         for observation in result.observations
         if observation.metric == check
         and observation.status is AssessStatus.OK
         and observation.value is not None
     ]
+
+
+def trial_share(result: AssessResult, check: str) -> float | None:
+    """Pass share of ``check`` over one trial's decided checkpoints, or None."""
+    values = _decided(result, check)
     return sum(values) / len(values) if values else None
+
+
+def step_share(results: Sequence[AssessResult], check: str) -> StepShare:
+    """``check`` over every decided checkpoint of ``results`` (one arm), pooled."""
+    values = [value for result in results for value in _decided(result, check)]
+    passed = sum(1 for value in values if value >= 0.5)
+    return StepShare(
+        passed=passed, decided=len(values), share=passed / len(values) if values else None
+    )
 
 
 def _mean(values: Sequence[float]) -> float:
@@ -197,34 +255,112 @@ def _overall(checks: Sequence[CheckSeparation]) -> Separation:
     return Separation.INSUFFICIENT_DATA
 
 
+def _threshold(
+    separation: CheckSeparation, min_share: float, guided: Sequence[AssessResult]
+) -> CheckSeparation:
+    """Apply ``min_share`` to the guided arm's pooled checkpoint share."""
+    pooled = step_share(guided, separation.check)
+    update: dict[str, object] = {"min_share": min_share, "guided_steps": pooled}
+    if pooled.share is None:
+        reason = "the treatment arm has no decided checkpoint"
+        return separation.model_copy(
+            update=update | {"verdict": Separation.INSUFFICIENT_DATA, "reason": reason}
+        )
+    met = pooled.share >= min_share - 1e-12
+    share = f"{pooled.passed}/{pooled.decided} = {pooled.share:.4g}"
+    sign = ">=" if met else "<"
+    if separation.baseline.trials == 0:
+        verdict = Separation.SEPARATED if met else Separation.NOT_SEPARATED
+        reason = (
+            f"treatment share {share} {sign} pre-registered {min_share:g}; "
+            "the baseline has no decided checkpoint (the condition is absent there)"
+        )
+        return separation.model_copy(
+            update=update | {"basis": "threshold", "verdict": verdict, "reason": reason}
+        )
+    verdict = separation.verdict if met else Separation.NOT_SEPARATED
+    reason = f"treatment share {share} {sign} {min_share:g}; {separation.reason}"
+    return separation.model_copy(
+        update=update | {"basis": "threshold+separation", "verdict": verdict, "reason": reason}
+    )
+
+
+def _check(
+    request: CheckRequest,
+    results: Mapping[str, Sequence[AssessResult]],
+    guided: str,
+    baseline: str,
+    alpha: float,
+) -> CheckSeparation:
+    shares = {
+        arm: [
+            share
+            for result in results.get(arm, ())
+            if (share := trial_share(result, request.check)) is not None
+        ]
+        for arm in (guided, baseline)
+    }
+    separation = separate(
+        request.check, (guided, shares[guided]), (baseline, shares[baseline]), alpha
+    )
+    if request.min_share is None:
+        return separation
+    return _threshold(separation, request.min_share, results.get(guided, ()))
+
+
+def _requests(checks: Sequence[str | CheckRequest]) -> list[CheckRequest]:
+    if not checks:
+        raise ValueError("choose at least one check")
+    return [item if isinstance(item, CheckRequest) else CheckRequest(check=item) for item in checks]
+
+
+def check_report(
+    results: Mapping[str, Mapping[str, Sequence[AssessResult]]],
+    checks: Sequence[str | CheckRequest],
+    *,
+    guided: str,
+    baseline: str,
+    alpha: float = 0.05,
+    preregistered: bool = False,
+) -> ManipulationReport:
+    """Every requested check, each over the results of its own scorer.
+
+    ``results`` maps a check name to ``{arm: [AssessResult, ...]}`` of the
+    scorer that reports it (``CHECK_SCORERS``); an arm without results for a
+    check reads as having no decided checkpoint.
+    """
+    separations = [
+        _check(request, results.get(request.check, {}), guided, baseline, alpha)
+        for request in _requests(checks)
+    ]
+    return ManipulationReport(
+        alpha=alpha,
+        checks=tuple(separations),
+        verdict=_overall(separations),
+        preregistered=preregistered,
+    )
+
+
 def manipulation_check(
     results: Mapping[str, Sequence[AssessResult]],
     *,
     guided: str,
     baseline: str,
-    checks: Sequence[str] = DEFAULT_CHECKS,
+    checks: Sequence[str | CheckRequest] = DEFAULT_CHECKS,
     alpha: float = 0.05,
 ) -> ManipulationReport:
-    """Whether the guided arm's process-compliance results separate from the baseline's."""
+    """Whether the guided arm's results (one scorer, every check) separate from the baseline's."""
     missing = sorted({guided, baseline} - set(results))
     if missing:
         raise ValueError(f"no process-compliance results for arms {missing}")
-    if not checks:
-        raise ValueError("choose at least one check")
-    separations = []
-    for check in checks:
-        shares = {
-            arm: [
-                share
-                for result in results[arm]
-                if (share := trial_share(result, check)) is not None
-            ]
-            for arm in (guided, baseline)
-        }
-        separations.append(
-            separate(check, (guided, shares[guided]), (baseline, shares[baseline]), alpha)
-        )
-    return ManipulationReport(alpha=alpha, checks=tuple(separations), verdict=_overall(separations))
+    requests = _requests(checks)
+    return check_report(
+        {request.check: results for request in requests},
+        requests,
+        guided=guided,
+        baseline=baseline,
+        alpha=alpha,
+    )
 
 
 def load_arm_results(

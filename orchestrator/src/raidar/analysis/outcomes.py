@@ -30,6 +30,8 @@ from typing import Self
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE_USAGE
+from raidar.scorers.gate_effort.families import FAMILIES
+from raidar.scorers.gate_effort.manifest import GATE_EFFORT
 from raidar.scorers.sdk.manifest import Direction, ScorerManifest
 
 OK = "ok"
@@ -101,6 +103,7 @@ class View(StrEnum):
     CONTINUE = "continue"
     STRICT = "strict"
     QUALITY = "quality"
+    GATE = "gate"
 
 
 class Kind(StrEnum):
@@ -219,6 +222,44 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
     ),
 )
 
+GATE_PREFIX = "gate."
+"""Gate-effort outcomes are ``gate.<gate-effort@1 trajectory metric>``."""
+_GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
+    ("first_pass_clean_rate", "first-pass clean rate (decided steps)", 0.1),
+    ("clean_at_step_end_rate", "clean at step end rate (decided steps)", 0.1),
+    ("unresolved_rate", "unresolved rate (fix rounds exhausted)", 0.1),
+    ("gate_error_rate", "gate error rate (validity: expected 0)", 0.05),
+    ("mean_rounds_to_clean", "mean fix rounds to clean (clean steps)", 0.5),
+    ("total_fix_rounds", "fix rounds per trial", 1.0),
+    ("total_first_run_blocking", "first-run blocking findings per trial", 5.0),
+    *(
+        (f"total_first_run_blocking.{family}", f"first-run blocking findings: {family}", 2.0)
+        for family in FAMILIES
+    ),
+    ("total_blocking_findings", "blocking findings over every gate run per trial", 5.0),
+    *(
+        (f"total_blocking_findings.{family}", f"blocking findings over every run: {family}", 2.0)
+        for family in FAMILIES
+    ),
+    ("total_fix_input_tokens", "fix-session input tokens per trial", 10_000.0),
+    ("total_fix_output_tokens", "fix-session output tokens per trial", 1_000.0),
+    ("total_fix_cost_usd", "fix-session cost per trial (USD)", 0.01),
+    ("total_fix_wall_s", "fix-session wall time per trial (s)", 60.0),
+    ("total_gate_wall_s", "gate-run wall time per trial (s)", 5.0),
+)
+GATE_METRICS: tuple[MetricDef, ...] = tuple(
+    MetricDef(
+        f"{GATE_PREFIX}{metric}",
+        f"Gate effort: {label}",
+        View.GATE,
+        declared_direction(GATE_EFFORT, metric),
+        min_effect,
+    )
+    for metric, label, min_effect in _GATE_OUTCOMES
+)
+"""Gate-effort outcomes (``gate-effort@1``): compared only when the lock declares that scorer."""
+ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS)
+
 TOTAL_COST = "total_cost_usd"
 COST_METRICS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 
@@ -266,7 +307,7 @@ CHECKPOINT_SERIES: tuple[SeriesDef, ...] = (
 
 def outcome_metric(metric_id: str) -> MetricDef:
     try:
-        return next(metric for metric in OUTCOME_METRICS if metric.id == metric_id)
+        return next(metric for metric in ALL_METRICS if metric.id == metric_id)
     except StopIteration as exc:
-        known = ", ".join(metric.id for metric in OUTCOME_METRICS)
+        known = ", ".join(metric.id for metric in ALL_METRICS)
         raise ValueError(f"unknown outcome metric {metric_id!r}; known: {known}") from exc

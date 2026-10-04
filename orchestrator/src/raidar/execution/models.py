@@ -85,6 +85,14 @@ class SnapshotInfo(ExecutionModel):
 class ProbeSummary(ExecutionModel):
     passed: bool
     failures: tuple[str, ...] = ()
+    flags: tuple[str, ...] = Field(
+        default=(),
+        description=(
+            "Integrity flags (raidar.components.integrity): agent behaviour a component "
+            "records without failing the step, e.g. an edited protected-config copy or "
+            "an attempt to get round a commit hook"
+        ),
+    )
 
 
 class StepResult(ExecutionModel):

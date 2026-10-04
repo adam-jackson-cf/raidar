@@ -29,12 +29,19 @@ verifier paths. The agent's own tests may run if the pack's gate runs them.
 Recorded in ``/logs/agent/guardrail-gate/guardrail-gate.json`` and in the
 step's ``AgentContext.metadata["guardrail_gate"]``: every gate run (exit codes,
 checks failed and passed when the output's format is recognised, the output's
-sha256 and size, the full output log), the fix rounds used, the termination
+sha256 and size, the full output log, its duration and its report dir), every
+session's usage, start, end and duration, the fix rounds used, the termination
 reason, and the deterministic manipulation-check signal
 ``gate_clean_at_step_end`` (``True``/``False``; ``None`` when no gate run
 completed). Every session's tokens and cost are summed into the step's context,
 so the arm pays for its fix sessions, and every session's trajectory is embedded
 in the step's root ``trajectory.json`` (as review-loop does).
+
+Each gate run exports ``RAIDAR_GATE_RUN`` (its number) and
+``RAIDAR_GATE_REPORT_DIR`` (``/logs/agent/guardrail-gate/gate_run_<n>``, created
+empty) to the command, so a pack's gate can write a machine-readable report per
+run (``guardrail-check --json-dir "$RAIDAR_GATE_REPORT_DIR"``); ``gate-effort@1``
+reads it beside the run's output.
 
 Recognised check formats (``parse_checks``): pre-commit's
 ``<name>....Passed|Failed|Skipped`` lines, explicit ``gate-check <name> pass|fail``
@@ -46,7 +53,9 @@ from __future__ import annotations
 import asyncio
 import json
 import shlex
+import time
 from dataclasses import dataclass, field, replace
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, cast
 
@@ -69,6 +78,7 @@ from raidar.components.gate_run import (
     fix_prompt,
     gate_script,
     read_gate_run,
+    report_dir_for,
 )
 from raidar.components.review_loop import STEP_LEVEL_LOGS, USAGE_FIELDS, sum_usage
 
@@ -83,6 +93,9 @@ class _Session:
     context: AgentContext
     directory: Path
     error: str | None = None
+    started_at: str | None = None
+    finished_at: str | None = None
+    duration_sec: float | None = None
 
     @property
     def name(self) -> str:
@@ -96,8 +109,15 @@ class _Session:
             "round": self.round,
             "stage_dir": f"{GATE_DIR_NAME}/{self.name}",
             "error": self.error,
+            "started_at": self.started_at,
+            "finished_at": self.finished_at,
+            "duration_sec": self.duration_sec,
             **usage,
         }
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat()
 
 
 @dataclass
@@ -203,18 +223,24 @@ class GuardrailGateAgent(BaseAgent):
         run = len(state.runs) + 1
         relative = f"{GATE_DIR_NAME}/gate_run_{run}.log"
         container_log = PurePosixPath(str(self.environment_logs_dir)) / relative
+        reports = str(report_dir_for(PurePosixPath(relative)))
         options = self.gate_options
+        started = time.monotonic()
         result = await environment.exec(
             gate_script(options, run, container_log), timeout_sec=options.timeout_sec + 60
         )
         gate = read_gate_run(
             result.stdout or "", run=run, after=after.name, mode=options.mode, log=relative
         )
+        gate = replace(gate, report_dir=reports, duration_sec=round(time.monotonic() - started, 3))
         if gate.exit_code is None and gate.git_exit_code is None:
             stderr = (result.stderr or "")[-500:]
             gate = replace(gate, output=gate.output or stderr or "(gate script failed)")
         if not environment.capabilities.mounted:
             await environment.download_file(str(container_log), self.logs_dir / relative)
+            await environment.download_dir(
+                str(report_dir_for(container_log)), self.logs_dir / reports
+            )
         state.runs.append(gate)
         return gate
 
@@ -225,15 +251,18 @@ class GuardrailGateAgent(BaseAgent):
         session.directory = self.logs_dir / GATE_DIR_NAME / session.name
         state.sessions.append(session)
         inner = self._inner(session.directory)
+        session.started_at, started = _now(), time.monotonic()
         try:
             await inner.run(prompt, environment, session.context)
         except asyncio.CancelledError:
             session.error = "CancelledError: the agent phase was cancelled (agent timeout)"
+            _stop_clock(session, started)
             await asyncio.shield(self._settle(environment, session, inner))
             raise
         except Exception as exc:
             session.error = f"{type(exc).__name__}: {exc}"
             state.failure = state.failure or exc
+        _stop_clock(session, started)
         await self._settle(environment, session, inner)
         return session
 
@@ -312,6 +341,12 @@ class GuardrailGateAgent(BaseAgent):
                 "subagent_trajectories": subagents or None,
             }
         )
+
+
+def _stop_clock(session: _Session, started: float) -> None:
+    """The session's end and its monotonic duration (the inner agent's run only)."""
+    session.finished_at = _now()
+    session.duration_sec = round(time.monotonic() - started, 3)
 
 
 def _usage_gaps(sessions: list[_Session]) -> dict[str, list[str]]:

@@ -17,6 +17,11 @@ the review surface's score, not the primary outcome).
 The verdict thresholds come from the caller (``Settings``); the report says
 where they came from and which of them differ from the documented defaults.
 
+When the lock declares ``gate-effort@1``, every arm carries its gate-effort
+descriptives and every comparison the gate effects both arms measured
+(``raidar.analysis.gate_effort``). The manipulation check runs the lock's
+pre-registered ``analysis.manipulation_checks`` when it declares them.
+
 The experiment's kind shapes the report, never the verdicts: a ``benchmark``
 adds the ranking view (``raidar.analysis.ranking``) beside the paired verdicts
 against its reference agent, and a ``smoke`` report is stamped not citable
@@ -40,7 +45,16 @@ from raidar.analysis.effects import (
     metric_applies,
     problem_effect,
 )
-from raidar.analysis.manipulation import ManipulationReport, manipulation_check
+from raidar.analysis.gate_effort import GateDescriptive, arm_gate_effort, gate_effects, gate_means
+from raidar.analysis.manipulation import (
+    CHECK_SCORERS,
+    DEFAULT_CHECKS,
+    GATE_SOURCE,
+    PROCESS_SOURCE,
+    CheckRequest,
+    ManipulationReport,
+    check_report,
+)
 from raidar.analysis.outcomes import (
     COST_METRICS,
     OUTCOME_METRICS,
@@ -87,6 +101,10 @@ class AnalysisInputs:
     outcomes: tuple[TrialOutcome, ...]
     replaced: tuple[str, ...] = ()
     process_results: Mapping[str, AssessResult | None] | None = field(default=None)
+    gate_results: Mapping[str, AssessResult | None] | None = field(default=None)
+    """``gate-effort@1`` results per trial when the lock declares it (else None)."""
+    manipulation_checks: tuple[CheckRequest, ...] | None = None
+    """The lock's pre-registered manipulation checks (None: the process defaults)."""
     dev_job: DevRun | None = None
     kind: str = "ab-test"
     rank_by: str | None = None
@@ -103,6 +121,8 @@ class ArmSummary(AnalysisModel):
     not_run: int
     infra_reasons: dict[str, int]
     cost_means: dict[str, float | None]
+    gate_effort: dict[str, GateDescriptive] | None = None
+    """Per gate metric over the arm's valid trials; None when the lock declares no gate-effort."""
 
 
 class Comparison(AnalysisModel):
@@ -112,6 +132,8 @@ class Comparison(AnalysisModel):
     effects: tuple[Effect, ...]
     curves: tuple[Curve, ...]
     manipulation: ManipulationReport | None = None
+    gate_effects: tuple[Effect, ...] = ()
+    gate_note: str | None = None
 
 
 class SampleSizeBasis(AnalysisModel):
@@ -138,7 +160,7 @@ class ReportSettings(AnalysisModel):
 
 class AnalysisReport(AnalysisModel):
     kind: str = REPORT_KIND
-    schema_version: int = 2
+    schema_version: int = 3
     experiment: str
     experiment_kind: str = "ab-test"
     citable: bool = True
@@ -201,18 +223,40 @@ def _effects(slots: Mapping[str, list[Slot]], settings: Settings, label: str) ->
     return effects
 
 
+def _arm_results(
+    inputs: AnalysisInputs, by_trial: Mapping[str, AssessResult | None] | None, treatment: str
+) -> dict[str, list[AssessResult]]:
+    """One scorer's results of the two arms' valid trials."""
+    results: dict[str, list[AssessResult]] = {inputs.baseline_arm: [], treatment: []}
+    for outcome in inputs.outcomes:
+        result = (by_trial or {}).get(outcome.trial_id)
+        if outcome.arm in results and not outcome.infra_error and result is not None:
+            results[outcome.arm].append(result)
+    return results
+
+
 def _manipulation(
     inputs: AnalysisInputs, treatment: str, settings: Settings
 ) -> ManipulationReport | None:
-    if inputs.process_results is None:
-        return None
-    results: dict[str, list[AssessResult]] = {inputs.baseline_arm: [], treatment: []}
-    for outcome in inputs.outcomes:
-        result = inputs.process_results.get(outcome.trial_id)
-        if outcome.arm in results and not outcome.infra_error and result is not None:
-            results[outcome.arm].append(result)
-    return manipulation_check(
-        results, guided=treatment, baseline=inputs.baseline_arm, alpha=settings.alpha
+    requests = inputs.manipulation_checks
+    if requests is None:
+        if inputs.process_results is None:
+            return None
+        requests = tuple(CheckRequest(check=check) for check in DEFAULT_CHECKS)
+    sources = {PROCESS_SOURCE: inputs.process_results, GATE_SOURCE: inputs.gate_results}
+    per_check = {
+        request.check: _arm_results(
+            inputs, sources.get(CHECK_SCORERS.get(request.check, ("",))[0]), treatment
+        )
+        for request in requests
+    }
+    return check_report(
+        per_check,
+        requests,
+        guided=treatment,
+        baseline=inputs.baseline_arm,
+        alpha=settings.alpha,
+        preregistered=inputs.manipulation_checks is not None,
     )
 
 
@@ -221,6 +265,11 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
     slots = _slots(inputs, treatment)
     effects = _effects(slots, settings, label)
     primary = primary_metric(inputs.progression)
+    gated, note = (
+        gate_effects(slots, settings, label=label)
+        if inputs.gate_results is not None
+        else ((), None)
+    )
     return Comparison(
         baseline=inputs.baseline_arm,
         treatment=treatment,
@@ -232,6 +281,8 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
             for curve in problem_curves(problem, problem_slots, settings, label=label)
         ),
         manipulation=_manipulation(inputs, treatment, settings),
+        gate_effects=gated,
+        gate_note=note,
     )
 
 
@@ -251,7 +302,7 @@ def _cost_means(valid: Sequence[TrialOutcome]) -> dict[str, float | None]:
     return means
 
 
-def _arm_summary(arm: str, inputs: AnalysisInputs) -> ArmSummary:
+def _arm_summary(arm: str, inputs: AnalysisInputs, settings: Settings) -> ArmSummary:
     planned = [trial for trial in inputs.planned if trial.arm == arm]
     ran = [outcome for outcome in inputs.outcomes if outcome.arm == arm]
     valid = [outcome for outcome in ran if not outcome.infra_error]
@@ -264,6 +315,9 @@ def _arm_summary(arm: str, inputs: AnalysisInputs) -> ArmSummary:
         not_run=len(planned) - len(ran),
         infra_reasons=_reason_counts(ran),
         cost_means=_cost_means(valid),
+        gate_effort=(
+            arm_gate_effort(arm, valid, settings) if inputs.gate_results is not None else None
+        ),
     )
 
 
@@ -309,7 +363,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
     treatments = [arm for arm in arms if arm != inputs.baseline_arm]
     if not treatments and inputs.kind != "smoke":
         raise ValueError("the plan has no treatment arm to compare with the baseline")
-    summaries = tuple(_arm_summary(arm, inputs) for arm in arms)
+    summaries = tuple(_arm_summary(arm, inputs, settings) for arm in arms)
     return AnalysisReport(
         experiment=inputs.experiment,
         experiment_kind=inputs.kind,
@@ -345,4 +399,5 @@ def _ranking(
         attempts=inputs.attempts,
         settings=settings,
         cost_means={summary.arm: summary.cost_means for summary in summaries},
+        gate_means={summary.arm: gate_means(summary.gate_effort) for summary in summaries},
     )

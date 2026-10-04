@@ -1,6 +1,7 @@
 // Quality element, run detail: the per-checkpoint C·V·E·H·R·G·I·S strip with
 // eligibility badges, V/E/H/R/G drill-downs to file:line evidence, and (Jev
-// parked 2026-10-04) the run's audited Jev decisions as collapsed, read-only history.
+// parked 2026-10-04) the run's audited Jev decisions as collapsed, read-only history; a
+// gated trial adds its commit-gate effort per checkpoint.
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -9,6 +10,7 @@ import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
 import { C } from '@/utils/colors';
 import { qualityApi } from '@/quality/api';
 import { EvidenceDrilldown } from '@/quality/components/EvidenceDrilldown';
+import { GatePanel } from '@/quality/components/GatePanel';
 import { JevHistoryPanel } from '@/quality/components/JevHistoryPanel';
 import { QualityStrip, type Selection } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE } from '@/quality/format';
@@ -103,6 +105,11 @@ export function QualityRunPage() {
           </p>
         )}
       </div>
+      {data.gate && (
+        <div className="mt-4 rounded-md p-2" style={{ border: `1px solid ${C.border}`, background: C.surface }}>
+          <GatePanel gate={data.gate} />
+        </div>
+      )}
       <JevHistoryPanel decisions={data.jev_decisions} />
     </main>
   );

@@ -123,6 +123,45 @@ class QualityRunSummary(QualityModel):
     """``<jobs-root name>/<job dir>/trial-records/<trial>.json``: the join key to the run review."""
 
 
+GateVerdict = Literal["passed", "refused", "timed_out", "error"]
+
+
+class GateRound(QualityModel):
+    """One commit-gate run of a step, read from the step's guardrail-gate record."""
+
+    run: int
+    after: str
+    verdict: GateVerdict
+    blocking: int | None = None
+    listed: int = 0
+    families: dict[str, int] | None = None
+    """Blocking findings per rule family; None when the stored files do not name them all."""
+    source: str
+    summary: str
+    log_path: str | None = None
+    duration_s: float | None = None
+
+
+class GateStep(QualityModel):
+    """One checkpoint's gate effort: ``gate-effort@1`` cells and the gate's rounds."""
+
+    checkpoint: str
+    termination: str | None = None
+    cells: dict[str, Cell]
+    families: dict[str, Cell]
+    first_run_families: dict[str, Cell]
+    rounds: tuple[GateRound, ...] = ()
+
+
+class GateView(QualityModel):
+    """A gated trial's commit-gate effort (``gate-effort@1``); absent for an ungated trial."""
+
+    source: str | None
+    steps: tuple[GateStep, ...]
+    totals: dict[str, Cell]
+    notes: tuple[str, ...] = ()
+
+
 class QualityRunDetail(QualityModel):
     run: QualityRunSummary
     policy: PolicyInfo
@@ -133,6 +172,7 @@ class QualityRunDetail(QualityModel):
     exclusions: tuple[ExclusionItem, ...] = ()
     jev_decisions: tuple[JevDecisionItem, ...] = ()
     notes: tuple[str, ...] = ()
+    gate: GateView | None = None
 
 
 class CurvePoint(QualityModel):

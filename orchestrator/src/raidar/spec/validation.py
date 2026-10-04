@@ -313,9 +313,9 @@ def spec_warnings(spec: ExperimentSpec) -> list[FieldIssue]:
 
 def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     # Analysis owns the outcome metric ids; imported lazily like the scorer catalog.
-    from raidar.analysis.outcomes import OUTCOME_METRICS
+    from raidar.analysis.outcomes import ALL_METRICS
 
-    known = {metric.id for metric in OUTCOME_METRICS}
+    known = {metric.id for metric in ALL_METRICS}
     issues = [
         FieldIssue(
             f"analysis.min_effects.{name}",
@@ -332,6 +332,31 @@ def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
                 f"unknown outcome metric {rank_by!r}; known: {', '.join(sorted(known))}",
             )
         )
+    return issues
+
+
+def _manipulation_check_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """A pre-registered check must exist and a declared scorer must report it."""
+    # Analysis owns the checks and the scorers they read; imported lazily.
+    from raidar.analysis.manipulation import CHECK_SCORERS
+
+    declared = set(spec.assessment.scorers)
+    issues = []
+    for index, item in enumerate(spec.analysis.manipulation_checks or ()):
+        where = f"analysis.manipulation_checks.{index}.check"
+        if item.check not in CHECK_SCORERS:
+            known = ", ".join(sorted(CHECK_SCORERS))
+            issues.append(FieldIssue(where, f"unknown check {item.check!r}; known: {known}"))
+            continue
+        refs = CHECK_SCORERS[item.check][1]
+        if not declared & set(refs):
+            issues.append(
+                FieldIssue(
+                    where,
+                    f"{item.check} is reported by {' or '.join(refs)}; declare it in "
+                    "assessment.scorers",
+                )
+            )
     return issues
 
 
@@ -405,6 +430,7 @@ def semantic_issues(
         *_shared_component_issues(spec),
         *_metric_issues(spec, metrics),
         *_min_effect_issues(spec),
+        *_manipulation_check_issues(spec),
         *_protocol_config_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),

@@ -12,8 +12,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.analysis.assessed import ANALYSED_SCORERS, PROCESS_COMPLIANCE_REFS, build_outcome
+from raidar.analysis.assessed import (
+    ANALYSED_SCORERS,
+    GATE_EFFORT_REF,
+    PROCESS_COMPLIANCE_REFS,
+    build_outcome,
+)
 from raidar.analysis.lookup import AssessmentLookup, assessment_config
+from raidar.analysis.manipulation import CheckRequest
 from raidar.analysis.report import AnalysisInputs, DevRun
 from raidar.analysis.sources import (
     AnalysisInputError,
@@ -67,8 +73,16 @@ def _process_ref(declared: tuple[str, ...]) -> str | None:
 
 
 def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[str, ...]:
-    wanted = (*ANALYSED_SCORERS, *((process_ref,) if process_ref else ()))
+    wanted = (*ANALYSED_SCORERS, *((process_ref,) if process_ref else ()), GATE_EFFORT_REF)
     return tuple(ref for ref in wanted if ref in declared)
+
+
+def manipulation_requests(analysis: Mapping[str, Any]) -> tuple[CheckRequest, ...] | None:
+    """The lock's pre-registered manipulation checks, or None when it declares none."""
+    declared = analysis.get("manipulation_checks")
+    if not declared:
+        return None
+    return tuple(CheckRequest.model_validate(item) for item in declared)
 
 
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
@@ -90,7 +104,8 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         bundles=BundleCache(search=request.bundle_search),
     )
     chosen, replaced = select_records(jobs)
-    outcomes, process = [], {}
+    outcomes, process, gate = [], {}, {}
+    gated = GATE_EFFORT_REF in declared
     for trial_id, (job, record) in sorted(chosen.items()):
         config = assessment_config(job, request.assessment_config, lock)
         results = lookup.valid_results(
@@ -98,6 +113,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         )
         outcomes.append(build_outcome(record, results, policy=policy))
         process[trial_id] = results.get(process_ref or "")
+        gate[trial_id] = results.get(GATE_EFFORT_REF)
     inputs = AnalysisInputs(
         experiment=str(lock["experiment"]["id"]),
         lock_sha256=str(lock["lock_sha256"]),
@@ -113,6 +129,8 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         outcomes=tuple(outcomes),
         replaced=replaced,
         process_results=process if process_ref else None,
+        gate_results=gate if gated else None,
+        manipulation_checks=manipulation_requests(spec["analysis"]),
         dev_job=_dev_job(options),
     )
     return inputs, lock

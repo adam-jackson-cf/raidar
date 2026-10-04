@@ -1,0 +1,1856 @@
+{
+  "analysis": {
+    "alpha": 0.05,
+    "baseline_arm": "r1-baseline",
+    "manipulation_checks": [
+      {
+        "check": "gate_clean_at_step_end",
+        "min_share": 0.8
+      }
+    ],
+    "max_exclusion_fraction": 0.2,
+    "min_effects": {
+      "correctness": 0.02,
+      "headline_score": 2.0
+    },
+    "min_pairs": 5
+  },
+  "assessment": {
+    "metric": {
+      "checkpoints": [
+        8
+      ],
+      "ref": "scb-canonical@2",
+      "selection": "declared"
+    },
+    "references": {
+      "metric": {
+        "scb-canonical@2": {
+          "digest": "95c28b4207a52992e38808ebb45dda7b571d6c8abfc59fbf8963b5ca672a2e91",
+          "metadata": {
+            "component_places": "1E-12",
+            "correctness": "C=sum_k(passed_k/graded_k)/K over planned checkpoints; unreached checkpoint=0; reached checkpoint with graded_k=0 -> ineligible",
+            "formula": "S=100*C*(0.70+0.30*I)",
+            "inertia_weights": {
+              "E": "0.15",
+              "G": "0.20",
+              "H": "0.20",
+              "R": "0.30",
+              "V": "0.15"
+            },
+            "max_checkpoints": null,
+            "min_checkpoints": 2,
+            "not_applicable": [],
+            "ref": "scb-canonical@2",
+            "rounding": "ROUND_HALF_EVEN",
+            "score_places": "0.000001",
+            "zero_correctness": "C=0 -> S=0 even when a quality component is missing or ineligible"
+          }
+        }
+      },
+      "scorer": {
+        "code-quality@1": {
+          "digest": "411904325ac881d76447e7e94f0687fa8160c6778c8173f43b8e83b30717309a",
+          "metadata": {
+            "implementation": "raidar.scorers.code_quality:code_quality_scorer",
+            "implementation_digest": "09fe7aaee12c76ac2650006abf85de85ade5abb752f29d2f43829a3a334acd87",
+            "manifest": {
+              "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
+              "evidence_required": [
+                "snapshot.current",
+                "snapshot.prior",
+                "oracle.cases"
+              ],
+              "execution": "host-parse",
+              "id": "code-quality",
+              "metrics": [
+                {
+                  "description": "SCB verbosity (V) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "verbosity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB erosion (E) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "erosion",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB architecture (H) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "architecture",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB rework (R) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "rework",
+                  "inputs": [],
+                  "level": "transition",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB regression breadth (G) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "regression",
+                  "inputs": [],
+                  "level": "transition",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Ruff diagnostics under the SCB contract in production files.",
+                  "direction": "lower_better",
+                  "exactness": "scb-exact",
+                  "id": "lint_findings",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Production lines of code in the assessor-owned inventory.",
+                  "direction": "neutral",
+                  "exactness": "scb-exact",
+                  "id": "production_loc",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "lines"
+                },
+                {
+                  "description": "SCB problem-level verbosity mean (V) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_verbosity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level erosion mean (E) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_erosion",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level architecture mean (H) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_architecture",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level rework mean (R) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_rework",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level regression-breadth mean (G) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_regression",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "python"
+              ],
+              "tools": [
+                "scb-python-quality",
+                "scb-check"
+              ],
+              "version": "1"
+            },
+            "tool_lock": {
+              "python": {
+                "scb-check": {
+                  "executables": [
+                    "scb-check"
+                  ],
+                  "execution": "host-parse",
+                  "installer": "uv-tool",
+                  "modules": [
+                    "scb_check"
+                  ],
+                  "packages": [
+                    "scb-check==0.1.3"
+                  ]
+                },
+                "scb-python-quality": {
+                  "executables": [
+                    "ruff",
+                    "radon"
+                  ],
+                  "execution": "host-parse",
+                  "installer": "uv-env",
+                  "modules": [
+                    "ruff",
+                    "radon",
+                    "tree_sitter",
+                    "tree_sitter_language_pack",
+                    "networkx"
+                  ],
+                  "packages": [
+                    "ruff==0.8.6",
+                    "radon==6.0.1",
+                    "tree-sitter==0.25.2",
+                    "tree-sitter-language-pack==0.13.0",
+                    "networkx==3.6.1"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "correctness@1": {
+          "digest": "de2e67bd3d4e10cd7fda39536a91035d92e9fa75311fe6bd0ca80964c4627523",
+          "metadata": {
+            "implementation": "raidar.scorers.correctness:correctness_scorer",
+            "implementation_digest": "357ddba8d0496fe374fac912c04a6fb146b3a4ebf28c9a2334569ed9ff862a25",
+            "manifest": {
+              "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
+              "evidence_required": [
+                "oracle.cases"
+              ],
+              "execution": "host-parse",
+              "id": "correctness",
+              "metrics": [
+                {
+                  "description": "Strict solve: every graded case passed and grading had no infrastructure failure.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded cases across all groups at the checkpoint.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "strict_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded core cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "core_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded functionality cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "functionality_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded error cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "error_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded regression cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "regression_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Graded regression cases (from earlier checkpoints) that did not pass.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "regression_failures",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Checkpoints solved in the trajectory (continue view); C = this / K.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved_checkpoints",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solve: the strict rule over the graded cases the lock's pinned problem errata keeps (exclude-from-solved cases left out); not_applicable without an errata.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_errata",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        },
+        "gate-effort@1": {
+          "digest": "5550c8f0168326fc93ec305de711e0bd7a7df09d3967f3810da8ae4b45ebdd8e",
+          "metadata": {
+            "implementation": "raidar.scorers.gate_effort:gate_effort_scorer",
+            "implementation_digest": "ca26cbd53e7c2d562cbaef6c82811f0bb2bd37919fe2232d4f724d60381a0984",
+            "manifest": {
+              "description": "Effort a guardrail-gate@1 commit gate cost per step: rounds to clean, first-pass clean, unresolved and gate-error steps, blocking findings by rule family, and the fix sessions' tokens, cost and time. Not applicable to an arm without the gate.",
+              "evidence_required": [
+                "trace"
+              ],
+              "execution": "host-parse",
+              "id": "gate-effort",
+              "metrics": [
+                {
+                  "description": "Gate runs in the step (one after each session).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "gate_runs",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Fix sessions the gate's refusals started in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_rounds",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "The gate passed on its first run (after the work session).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The step's last gate run passed (manipulation-check signal).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "gate_clean_at_step_end",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The step used every fix round and the gate still refused.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "unresolved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "A gate run could not decide (infrastructure, never a fix round).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "gate_error",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Fix rounds before the gate passed; only for steps that ended clean.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "rounds_to_clean",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the step's first gate run.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: complexity rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.complexity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: typing rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.typing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: defects rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.defects",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: structure rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.structure",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: style rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.style",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: naming rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.naming",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: tests rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: suppressions rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.suppressions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the first gate run: other rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking.other",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings summed over the step's decided gate runs.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: complexity rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.complexity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: typing rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.typing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: defects rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.defects",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: structure rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.structure",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: style rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.style",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: naming rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.naming",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: tests rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: suppressions rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.suppressions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run: other rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "blocking_findings.other",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Input tokens of the step's fix sessions (work session excluded).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_input_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Output tokens of the step's fix sessions.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_output_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Cost of the step's fix sessions.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Wall time of the step's fix sessions.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Wall time of the step's gate runs.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "gate_wall_s",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Reached checkpoints whose step has a gate record.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "gated_steps",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose first gate run passed.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps that ended with the gate passing.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "clean_at_step_end_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps that exhausted their fix rounds.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "unresolved_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of steps with a gate run that a gate error ended.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "gate_error_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Mean fix rounds before the gate passed, over clean steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "mean_rounds_to_clean",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Fix sessions over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_rounds",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: complexity rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.complexity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: typing rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.typing",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: defects rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.defects",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: structure rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.structure",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: style rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.style",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: naming rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.naming",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: tests rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: suppressions rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.suppressions",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings: other rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_blocking.other",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every gate run of the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: complexity rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.complexity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: typing rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.typing",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: defects rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.defects",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: structure rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.structure",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: style rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.style",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: naming rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.naming",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: tests rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: suppressions rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.suppressions",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings over every run: other rules.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_blocking_findings.other",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Fix-session input tokens over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_input_tokens",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Fix-session output tokens over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_output_tokens",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Fix-session cost over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session wall time over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Gate-run wall time over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_gate_wall_s",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        },
+        "process-compliance@2": {
+          "digest": "f63e8ccfd45ea668f651c152bfb9572e2741a43f85bf6f14a0997ac1ddb9b645",
+          "metadata": {
+            "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
+            "implementation_digest": "3db116afd4c9db6684b5e3084b2cb7502fbea3ab87380b3dac589418d898fb56",
+            "manifest": {
+              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
+              "evidence_required": [
+                "trace",
+                "snapshot.current"
+              ],
+              "execution": "host-parse",
+              "id": "process-compliance",
+              "metrics": [
+                {
+                  "description": "The agent ran the project's tests after its last source edit in the step.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "tests_run_before_finish",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The agent wrote a plan before its first source edit in the step.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "plan_written",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of deterministic checks passed over the trajectory.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "compliance_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "2"
+            },
+            "tool_lock": {}
+          }
+        },
+        "resource-usage@1": {
+          "digest": "8d26a20690177b8d1ea3369c699e2cfff0f526fc212a524ffa0789407c9f71da",
+          "metadata": {
+            "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
+            "implementation_digest": "bf8b7e08ce1f284c27af931f133900aea4098c5f30be4a990e453b26c0626145",
+            "manifest": {
+              "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
+              "evidence_required": [
+                "trace"
+              ],
+              "execution": "host-parse",
+              "id": "resource-usage",
+              "metrics": [
+                {
+                  "description": "Input tokens used in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "input_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Output tokens used in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "output_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Model spend in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "cost_usd",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Agent turns in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "turns",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "turns"
+                },
+                {
+                  "description": "Agent execution wall time in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "agent_wall_s",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "seconds"
+                },
+                {
+                  "description": "Input plus output tokens over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_tokens",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Model spend over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_cost_usd",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Agent turns over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_turns",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "turns"
+                },
+                {
+                  "description": "Agent execution wall time over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_agent_wall_s",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "seconds"
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        }
+      }
+    },
+    "spec": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical@2",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@1",
+        "code-quality@1",
+        "resource-usage@1",
+        "process-compliance@2",
+        "gate-effort@1"
+      ]
+    },
+    "tools": {
+      "networkx": "3.6.1",
+      "radon": "6.0.1",
+      "ruff": "0.8.6",
+      "scb-check": "0.1.3",
+      "tree-sitter": "0.25.2",
+      "tree-sitter-language-pack": "0.13.0"
+    }
+  },
+  "document_sha256": "84297a3ba3839e419a6666a6f7e53fb65e357e2a59fb9babd5d7535daf7aec96",
+  "execution": {
+    "arms": {
+      "r1-baseline": {
+        "agent": "codex-luna",
+        "condition": "r1-baseline",
+        "digest": "3811d7966e6527cb258f5f25bd59fe34eb97ec2428e8c3a946b05eacd6d435bf"
+      },
+      "r2-guardrails": {
+        "agent": "codex-luna",
+        "condition": "r2-guardrails",
+        "digest": "5ba5a7f1ef996c257036b831c8282cd973f52fefefa85bd458c2eb81e4095e59"
+      }
+    },
+    "conditions": {
+      "r1-baseline": [
+        {
+          "files": {
+            "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
+          },
+          "use": "prompt-wrapper@1",
+          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "with": {}
+        }
+      ],
+      "r2-guardrails": [
+        {
+          "files": {
+            "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
+          },
+          "use": "prompt-wrapper@1",
+          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "with": {}
+        },
+        {
+          "files": {},
+          "use": "python-guardrails@1",
+          "use_digest": "b2e3691ff6bb999e62582efe4f7d40510783df059c37dd4de1f306378f369fa1",
+          "with": {}
+        },
+        {
+          "files": {},
+          "use": "guardrail-gate@1",
+          "use_digest": "06eb2faa1181556ff8d778ee26068f739812bd850f8e53691ac88621d0a6d0b6",
+          "with": {
+            "command": "guardrail-check",
+            "max_rounds": 3,
+            "mode": "commit",
+            "timeout_sec": 300
+          }
+        }
+      ]
+    },
+    "design": {
+      "agents": [
+        {
+          "id": "codex-luna",
+          "model": "gpt-6-luna",
+          "name": "codex",
+          "provider": "openai",
+          "reasoning_effort": "low",
+          "version": "0.156.1"
+        }
+      ],
+      "arms": [
+        {
+          "agent": "codex-luna",
+          "condition": "r1-baseline",
+          "id": "r1-baseline"
+        },
+        {
+          "agent": "codex-luna",
+          "condition": "r2-guardrails",
+          "id": "r2-guardrails"
+        }
+      ],
+      "attempts": 4,
+      "conditions": [
+        {
+          "components": [],
+          "id": "r1-baseline"
+        },
+        {
+          "components": [
+            {
+              "files": [],
+              "use": "python-guardrails@1",
+              "with": {}
+            },
+            {
+              "files": [],
+              "use": "guardrail-gate@1",
+              "with": {
+                "command": "guardrail-check",
+                "max_rounds": 3,
+                "mode": "commit",
+                "timeout_sec": 300
+              }
+            }
+          ],
+          "id": "r2-guardrails"
+        }
+      ],
+      "environment": {
+        "compose_init": true,
+        "type": "docker"
+      },
+      "factors": [
+        "condition"
+      ],
+      "id": "python__forge__guardrails",
+      "kind": "ab-test",
+      "problems": [
+        {
+          "path": null,
+          "ref": "scb/forge@38d627ecf668"
+        }
+      ],
+      "protocol": {
+        "agent_timeout_sec": 1800,
+        "min_reward": null,
+        "progression": "continue",
+        "snapshot_source": "artifact",
+        "verifier_timeout_sec": 900
+      },
+      "runtime": "python",
+      "seed": 20261004,
+      "shared_components": [
+        {
+          "files": [
+            "components/shared/starter-framing.md"
+          ],
+          "use": "prompt-wrapper@1",
+          "with": {}
+        }
+      ]
+    },
+    "files": {
+      "components/shared/starter-framing.md": {
+        "sha256": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c",
+        "size": 221
+      }
+    },
+    "problems": [
+      {
+        "checkpoints": 8,
+        "digest": "029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94",
+        "label": "scb/forge@38d627ecf668"
+      }
+    ],
+    "references": {
+      "component": {
+        "guardrail-gate@1": {
+          "digest": "06eb2faa1181556ff8d778ee26068f739812bd850f8e53691ac88621d0a6d0b6",
+          "metadata": {
+            "discovery_probe": "guardrail-gate-ran",
+            "kind": "workflow",
+            "network": {
+              "egress_hosts": []
+            },
+            "secrets": [],
+            "supports": [
+              "codex",
+              "claude-code"
+            ]
+          }
+        },
+        "prompt-wrapper@1": {
+          "digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "metadata": {
+            "discovery_probe": "prompt-wrapper-rendered",
+            "kind": "prompt",
+            "network": {
+              "egress_hosts": []
+            },
+            "secrets": [],
+            "supports": [
+              "codex",
+              "claude-code"
+            ]
+          }
+        },
+        "python-guardrails@1": {
+          "digest": "b2e3691ff6bb999e62582efe4f7d40510783df059c37dd4de1f306378f369fa1",
+          "metadata": {
+            "discovery_probe": "python-guardrails-gate-works",
+            "kind": "service",
+            "network": {
+              "egress_hosts": [
+                "files.pythonhosted.org",
+                "pypi.org"
+              ]
+            },
+            "secrets": [],
+            "supports": [
+              "codex",
+              "claude-code"
+            ]
+          }
+        }
+      },
+      "problem": {
+        "scb/forge@38d627ecf668": {
+          "digest": "029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94",
+          "metadata": {
+            "bundle_sha256": "6ab17bb4ebf36d44b488de06a5143d9d15388f8dacf7ac8a4875eeddc941c04b",
+            "checkpoints": 8,
+            "entry_file": "forge.py",
+            "errata": {
+              "exclude_from_solved": [
+                "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+                "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+                "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+                "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+                "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+                "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+                "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+                "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+                "test_checkpoint_6.py::test_create_invalid_firmware_image",
+                "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+                "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
+                "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
+                "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
+                "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+                "test_checkpoint_6.py::test_flash_requires_stored_image",
+                "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+                "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+                "test_checkpoint_6.py::test_tag_create_requires_module",
+                "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+                "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
+                "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
+                "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+                "test_checkpoint_7.py::test_revision_preserves_compact_json",
+                "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
+                "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
+              ],
+              "informational": [],
+              "sha256": "9a6dec369dea9c158ea93b6adbcb5db9a487078a7067dc75f967e5e1b3002d4e"
+            },
+            "mode": "multi_checkpoint",
+            "pack_image": "raidar/pack-python:2b91a52663e099f2",
+            "source": {
+              "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+              "dataset": "scb",
+              "problem": "forge",
+              "url": "https://github.com/gabeorlanski/scb-problems"
+            },
+            "steps": [
+              "checkpoint_1",
+              "checkpoint_2",
+              "checkpoint_3",
+              "checkpoint_4",
+              "checkpoint_5",
+              "checkpoint_6",
+              "checkpoint_7",
+              "checkpoint_8"
+            ],
+            "task_sha256": "596ae5b6af7e45c4b9a05dc8c495452042a21b9f7b23d6919516074ae5ada49f",
+            "validation": {
+              "not_run": [],
+              "verdict": "validated"
+            }
+          }
+        }
+      }
+    },
+    "tools": {},
+    "versions": {
+      "agents": {
+        "codex-luna": {
+          "name": "codex",
+          "version": "0.156.1"
+        }
+      },
+      "harbor": "0.23.0"
+    }
+  },
+  "experiment": {
+    "id": "python__forge__guardrails",
+    "source": "experiment.yaml",
+    "source_sha256": "4e480e08181dc2b6912512b840b2fe5478f09b888e624056fe7813b5d1ae6b34",
+    "spec_sha256": "7715b4f8666c4a9ae608dad777b762d7ebb7f80ceae5c550a796498668c9794b"
+  },
+  "lock_sha256": "20f0573fc970d2db31fbb7b7b618870a2e16a105333274fab40f161012d973c8",
+  "lock_version": 3,
+  "overrides": {
+    "flags": {},
+    "set": []
+  },
+  "sections": {
+    "analysis": "c04ba96a603d9e59dcb5e7ab9ce874c1021cb3bde44d09f8316f4a8660ae3cc7",
+    "assessment": "deefb49eedaa0748ddba36b31429988ccbbf6784a4cd819f4b623ece14c8eb2e",
+    "execution": "20f0573fc970d2db31fbb7b7b618870a2e16a105333274fab40f161012d973c8",
+    "toolchain": "124bc41438ab812b2ade309012ea305329b7ac507bab86b985b6096d1a65f6d0"
+  },
+  "spec": {
+    "agents": [
+      {
+        "id": "codex-luna",
+        "model": "gpt-6-luna",
+        "name": "codex",
+        "provider": "openai",
+        "reasoning_effort": "low",
+        "version": "0.156.1"
+      }
+    ],
+    "analysis": {
+      "alpha": 0.05,
+      "attempts": 4,
+      "baseline_arm": "r1-baseline",
+      "concurrency": 2,
+      "manipulation_checks": [
+        {
+          "check": "gate_clean_at_step_end",
+          "min_share": 0.8
+        }
+      ],
+      "max_exclusion_fraction": 0.2,
+      "min_effects": {
+        "correctness": 0.02,
+        "headline_score": 2.0
+      },
+      "min_pairs": 5,
+      "seed": 20261004
+    },
+    "arms": [
+      {
+        "agent": "codex-luna",
+        "condition": "r1-baseline",
+        "id": "r1-baseline"
+      },
+      {
+        "agent": "codex-luna",
+        "condition": "r2-guardrails",
+        "id": "r2-guardrails"
+      }
+    ],
+    "assessment": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical@2",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@1",
+        "code-quality@1",
+        "resource-usage@1",
+        "process-compliance@2",
+        "gate-effort@1"
+      ]
+    },
+    "conditions": [
+      {
+        "components": [],
+        "id": "r1-baseline"
+      },
+      {
+        "components": [
+          {
+            "files": [],
+            "use": "python-guardrails@1",
+            "with": {}
+          },
+          {
+            "files": [],
+            "use": "guardrail-gate@1",
+            "with": {
+              "command": "guardrail-check",
+              "max_rounds": 3,
+              "mode": "commit",
+              "timeout_sec": 300
+            }
+          }
+        ],
+        "id": "r2-guardrails"
+      }
+    ],
+    "description": "Does a commit gate enforcing the python-guardrails rule set change correctness and code quality on forge?",
+    "environment": {
+      "compose_init": true,
+      "type": "docker"
+    },
+    "factors": [
+      "condition"
+    ],
+    "id": "python__forge__guardrails",
+    "kind": "ab-test",
+    "problems": [
+      {
+        "path": null,
+        "ref": "scb/forge@38d627ecf668"
+      }
+    ],
+    "protocol": {
+      "agent_timeout_sec": 1800,
+      "min_reward": null,
+      "progression": "continue",
+      "snapshot_source": "artifact",
+      "verifier_timeout_sec": 900
+    },
+    "runtime": "python",
+    "schema_version": 2,
+    "shared_components": [
+      {
+        "files": [
+          "components/shared/starter-framing.md"
+        ],
+        "use": "prompt-wrapper@1",
+        "with": {}
+      }
+    ]
+  },
+  "toolchain": {
+    "litellm": "1.102.1",
+    "python": "3.13.7",
+    "raidar": "0.14.0",
+    "raidar_spec": "bb0f8268bb2de86a5fa72b1cb526bd6c4a11c6a5cb25182ce4814f33110a4dd6"
+  }
+}

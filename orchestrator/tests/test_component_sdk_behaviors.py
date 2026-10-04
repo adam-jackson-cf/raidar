@@ -50,6 +50,7 @@ BUILTIN_REFS = [
     "lint-tool@2",
     "mcp-server@1",
     "prompt-wrapper@1",
+    "python-guardrails@1",
     "review-loop@1",
     "review-loop@2",
     "rules-file@1",

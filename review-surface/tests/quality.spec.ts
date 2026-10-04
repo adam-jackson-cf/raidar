@@ -3,6 +3,8 @@ import { test, expect, type Page } from '@playwright/test';
 // Deterministic ids from the synthetic Quality fixture (make review-surface-quality-data).
 const INELIGIBLE_RUN = 'synthetic-quality.synthetic-run-1.b02-p0-baseline';
 const LABELLED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-baseline';
+// The fixture's guided arm runs behind a commit gate (gate-effort@1); baseline does not.
+const GATED_RUN = 'synthetic-quality.synthetic-run-1.b00-p0-guided';
 
 // The suite's Quality data also covers the experiment fixture's runs (run detail's Quality
 // panel), so the labelled Quality experiment is opened by its deep link.
@@ -143,5 +145,31 @@ test.describe('parked jev decisions', () => {
       data: { run_id: LABELLED_RUN, request_id: 'x', policy: 'code-quality.rubric-smells', label: 'correct', reviewer: 'model' },
     });
     expect(unnamedModel.status()).toBe(400);
+  });
+});
+
+test.describe('quality run detail: commit gate', () => {
+  test('a gated run shows its gate effort per checkpoint and each step expands to its rounds', async ({ page }) => {
+    await page.goto(`/quality/runs/${GATED_RUN}`);
+    const panel = page.getByTestId('gate-panel');
+    await expect(panel).toBeVisible();
+    await expect(panel.getByTestId('gate-totals')).toContainText('First-pass clean');
+    await expect(panel.getByTestId('gate-totals')).toContainText('Unresolved');
+    await expect(panel.getByTestId('gate-step')).toHaveCount(5);
+    const unresolved = panel.getByTestId('gate-step').nth(3);
+    await expect(unresolved.getByTestId('gate-ending')).toHaveText('unresolved');
+    await expect(panel.getByRole('columnheader', { name: 'typing' })).toBeVisible();
+    await unresolved.getByRole('button', { name: 'checkpoint_4 gate rounds' }).click();
+    const rounds = panel.getByTestId('gate-round');
+    await expect(rounds).toHaveCount(4);
+    await expect(rounds.first()).toHaveAttribute('data-verdict', 'refused');
+    await expect(rounds.first()).toContainText(/\d+ blocking/);
+    await expect(rounds.first()).toContainText('gate_run_1.log');
+  });
+
+  test('an ungated run has no gate panel, not a row of zeros', async ({ page }) => {
+    await page.goto(`/quality/runs/${LABELLED_RUN}`);
+    await expect(page.getByTestId('quality-strip')).toBeVisible();
+    await expect(page.getByTestId('gate-panel')).toHaveCount(0);
   });
 });

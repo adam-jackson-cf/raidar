@@ -186,6 +186,19 @@ VERDICT_THRESHOLDS = ("min_pairs", "max_exclusion_fraction", "alpha", "min_effec
 PositiveFiniteFloat = Annotated[float, Field(gt=0.0, allow_inf_nan=False)]
 
 
+class ManipulationCheckSpec(SpecModel):
+    """One pre-registered manipulation check (``raidar.analysis.manipulation``).
+
+    ``check`` names an available check (for example ``gate_clean_at_step_end``
+    from ``gate-effort@1``); ``min_share`` is the share of the treatment arm's
+    decided checkpoints that must pass. ``raidar.spec.validation`` checks the
+    name and that a scorer reporting it is declared.
+    """
+
+    check: str = Field(min_length=1)
+    min_share: float | None = Field(default=None, gt=0.0, le=1.0)
+
+
 class AnalysisSpec(SpecModel):
     """Arm design plus the pre-registered verdict thresholds ``raidar analyze`` reads.
 
@@ -196,6 +209,9 @@ class AnalysisSpec(SpecModel):
     smallest effect of interest for the sample-size projection;
     ``rank_by`` (benchmarks only) names the outcome metric the ranking view
     orders agents by. ``raidar.spec.validation`` checks both metric ids.
+    ``manipulation_checks`` pre-registers the manipulation checks (and any
+    threshold) analysis runs; unset, analysis runs the process-compliance
+    defaults when that scorer is declared.
     """
 
     baseline_arm: Identifier
@@ -207,6 +223,17 @@ class AnalysisSpec(SpecModel):
     alpha: float = Field(default=DEFAULT_ALPHA, gt=0.0, lt=1.0)
     min_effects: dict[str, PositiveFiniteFloat] = Field(default_factory=dict)
     rank_by: str | None = None
+    manipulation_checks: tuple[ManipulationCheckSpec, ...] | None = Field(
+        default=None, min_length=1
+    )
+
+    @model_validator(mode="after")
+    def _unique_manipulation_checks(self) -> AnalysisSpec:
+        names = [item.check for item in self.manipulation_checks or ()]
+        duplicates = sorted({name for name in names if names.count(name) > 1})
+        if duplicates:
+            raise ValueError(f"manipulation_checks repeats {duplicates}")
+        return self
 
 
 FactorNoun = Literal[
@@ -279,6 +306,11 @@ class ExperimentSpec(SpecModel):
         exclude: dict[str, object] = {}
         if not self.shared_components:
             exclude["shared_components"] = True
-        if self.analysis.rank_by is None:
-            exclude["analysis"] = {"rank_by"}
+        unset = {
+            name
+            for name in ("rank_by", "manipulation_checks")
+            if getattr(self.analysis, name) is None
+        }
+        if unset:
+            exclude["analysis"] = unset
         return self.model_dump(mode="json", by_alias=True, exclude=exclude or None)

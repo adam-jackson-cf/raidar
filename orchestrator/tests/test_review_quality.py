@@ -24,7 +24,7 @@ from raidar.review_quality.synthetic import (
 )
 from raidar.review_quality.synthetic_lock import write_synthetic_lock
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation, RunStats
-from raidar.scorers.store import AssessmentStore
+from raidar.scorers.store import OBJECTS_DIR, AssessmentStore
 from raidar.spec.metrics import SCB_CANONICAL
 
 RUN_PREFIX = f"{EXPERIMENT}.{RUN_ID}."
@@ -591,3 +591,55 @@ def test_a_baseline_with_no_counted_trials_is_named_in_the_notes(
     assert "baseline" not in problem.arms
     assert problem.paired == ()
     assert any("baseline arm baseline has no counted trials" in note for note in problem.notes)
+
+
+# ---- gate effort (gate-effort@1 + the guardrail-gate records) ---------------------------
+
+
+def test_a_gated_run_shows_its_gate_rounds_and_failure_families(
+    projection: QualityProjection,
+) -> None:
+    gated = projection.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
+    assert gated is not None
+    assert gated.source is not None
+    assert [step.checkpoint for step in gated.steps] == [f"checkpoint_{n}" for n in range(1, 6)]
+    unresolved = gated.steps[3]
+    assert unresolved.termination == "rounds_exhausted"
+    assert unresolved.cells["unresolved"].value == 1.0
+    assert unresolved.cells["rounds_to_clean"].status == "not_applicable"
+    assert [item.verdict for item in unresolved.rounds] == ["refused"] * 4
+    first = unresolved.rounds[0]
+    assert first.families is not None
+    assert first.blocking == sum(first.families.values())
+    assert first.log_path is not None
+    assert first.log_path.endswith("steps/checkpoint_4/agent/guardrail-gate/gate_run_1.log")
+    # The step cells are the stored Assessment's: the families sum over every run.
+    totals = {family: cell.value for family, cell in unresolved.families.items()}
+    assert sum(value or 0 for value in totals.values()) == sum(
+        item.blocking or 0 for item in unresolved.rounds
+    )
+    assert gated.totals["unresolved_rate"].value == pytest.approx(0.2)
+    # The ungated arm has no gate view at all (never zeros).
+    assert projection.run_details[f"{RUN_PREFIX}b00-p0-baseline"].gate is None
+
+
+def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    for path in sorted((target / "store" / OBJECTS_DIR).glob("*/*.json")):
+        if json.loads(path.read_text())["scorer"]["ref"] == "gate-effort@1":
+            path.unlink()
+    trace = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
+    (trace / "checkpoint_2" / "agent" / "guardrail-gate" / "guardrail-gate.json").write_text("[")
+
+    rebuilt = build_quality_projection(target / "jobs", target / "store", synthetic=True)
+
+    gate = rebuilt.run_details[f"{RUN_PREFIX}b01-p0-guided"].gate
+    assert gate is not None
+    assert gate.source is None
+    assert gate.steps[0].cells["gate_runs"].status == "unassessed"
+    assert gate.steps[1].rounds == ()
+    assert any("checkpoint_2: gate record unreadable" in note for note in gate.notes)
+    assert any("rescore its job with gate-effort@1" in note for note in gate.notes)
+    assert gate.steps[3].rounds[0].verdict == "refused"

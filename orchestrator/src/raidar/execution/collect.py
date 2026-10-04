@@ -19,6 +19,10 @@ Per planned checkpoint the state is decided from host-only evidence:
   in ``raidar-oracle/steps/<step>/record.json``. Harbor's aggregated trial
   reward is never read.
 
+Component integrity flags (``raidar.components.integrity``: agent tampering
+with a component's guardrails) are kept in the step's probe summary and never
+change its state or the trial's validity.
+
 The trial's execution-validity gate fails when any step is an infra
 error, the trial raised, a halt run did not execute exactly what its gate
 allows, or the agent CLI did not run at its pinned version.
@@ -35,6 +39,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.components import CompiledCondition
+from raidar.components.integrity import condition_step_flags
 from raidar.execution.models import (
     CheckpointState,
     ExecutionValidity,
@@ -144,11 +149,13 @@ def _instruction_sha(task_dir: Path, step: str) -> str | None:
 
 
 def _probe(ctx: TrialContext, trial_dir: Path, step: str, index: int) -> ProbeSummary:
-    report = ctx.compiled.probe_step(trial_dir / "steps" / step / "agent", index)
+    agent_dir = trial_dir / "steps" / step / "agent"
+    report = ctx.compiled.probe_step(agent_dir, index)
     failures = tuple(
         f"{r.component}{'/' + r.slug if r.slug else ''}: {r.detail}" for r in report.failures()
     )
-    return ProbeSummary(passed=report.passed, failures=failures)
+    flags = condition_step_flags(ctx.compiled, agent_dir, index)
+    return ProbeSummary(passed=report.passed, failures=failures, flags=flags)
 
 
 def _not_run(

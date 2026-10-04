@@ -17,8 +17,13 @@ The experiment id, job ids, problem and every snapshot digest carry a
 ``synthetic`` marker, and the projection built from it sets
 ``synthetic: true``. It is never benchmark evidence.
 
+- the gated arm's commit-gate records under each trial's step agent dirs
+  (``raidar.review_quality.synthetic_gate``) and every trial's ``gate-effort@1``
+  Assessment, made by the real scorer (``not_applicable`` for ``baseline``).
+
 Built-in shape (deterministic, seeded): two arms (``baseline``, ``guided``)
-x 6 attempts x one 5-checkpoint problem. ``guided`` is better on E and R;
+x 6 attempts x one 5-checkpoint problem. ``guided`` runs behind a commit gate
+and is better on E and R;
 attempt 4 of ``guided`` is an invalid trial (infra-excluded); attempt 2 of
 ``baseline`` has an ineligible H at checkpoint 3, so its headline S is
 ineligible with reasons.
@@ -54,6 +59,7 @@ from raidar.jev.audit import (
 )
 from raidar.jev.policies import PolicyMode
 from raidar.jev.rubric import RUBRIC_POLICY
+from raidar.review_quality.synthetic_gate import GATE_EFFORT, gate_result
 from raidar.review_quality.synthetic_lock import default_metric, write_synthetic_lock
 from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS
 from raidar.scorers.sdk.manifest import ScorerManifest
@@ -74,6 +80,7 @@ ARMS = ("baseline", "guided")
 BLOCKS = 6
 CHECKPOINTS = tuple(f"checkpoint_{index}" for index in range(1, 6))
 INVALID = ("guided", 4)
+GATED_ARM = "guided"
 INELIGIBLE_H = ("baseline", 2, "checkpoint_3")
 _SEED = 20260930
 _TIMESTAMP = "2026-09-30T00:00:00.000Z"
@@ -310,6 +317,7 @@ def _record(trial: _Trial) -> TrialRecord:
             snapshot=SnapshotInfo(
                 path=f"steps/{checkpoint}/artifacts/app", digest=trial.snapshot(checkpoint)
             ),
+            trace_dir=f"steps/{checkpoint}/agent",
         )
         for index, (checkpoint, observation) in enumerate(
             zip(
@@ -388,7 +396,7 @@ def generate_quality_fixture(dest: Path) -> Path:
     experiment_file.write_text(
         f"# synthetic fixture: not benchmark evidence\nid: {EXPERIMENT}\n"
         "analysis:\n  baseline_arm: baseline\n  attempts: 6\n  seed: 20260930\n"
-        "assessment:\n  scorers: [correctness@1, code-quality@1]\n",
+        "assessment:\n  scorers: [correctness@1, code-quality@1, gate-effort@1]\n",
         encoding="utf-8",
     )
     lock_sha256 = write_synthetic_lock(
@@ -437,6 +445,14 @@ def generate_quality_fixture(dest: Path) -> Path:
                     AssessResult(status=AssessStatus.OK, observations=tuple(trial.correctness)),
                 )
             )
+            gate = gate_result(
+                job_dir / "trials" / trial.trial_id,
+                CHECKPOINTS,
+                gated=arm == GATED_ARM,
+                seed=_digest("gate", trial.trial_id),
+                problem=PROBLEM,
+            )
+            store.put(_assessment(GATE_EFFORT, trial, gate))
             record = _record(trial)
             (job_dir / "trial-records" / f"{trial.trial_id}.json").write_text(
                 record.model_dump_json(indent=2), encoding="utf-8"

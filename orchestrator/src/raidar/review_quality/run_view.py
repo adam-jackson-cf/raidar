@@ -1,4 +1,5 @@
-"""One trial's Quality view: the C·V·E·H·R·G·I·S strip, drill-down evidence, Jev decisions.
+"""One trial's Quality view: the C·V·E·H·R·G·I·S strip, drill-down evidence, Jev decisions
+and, for a trial that ran behind a commit gate, its gate effort (``gate_view``).
 
 Checkpoint cells come straight from the stored observations:
 
@@ -32,6 +33,7 @@ from raidar.analysis.assessed import build_outcome
 from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE, QUALITY_COMPONENTS, Value
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.jev.audit import DecisionRecord, LabelRecord
+from raidar.review_quality.gate_view import build_gate_view
 from raidar.review_quality.models import (
     COMPONENTS,
     Cell,
@@ -393,6 +395,7 @@ def build_run_detail(
     decisions: Sequence[DecisionRecord] = (),
     labels: Mapping[str, LabelRecord] | None = None,
     jev_note: str | None = None,
+    gate: Assessment | None = None,
 ) -> QualityRunDetail:
     record = trial.record
     checkpoints = _checkpoints(trial, quality, correctness)
@@ -429,4 +432,5 @@ def build_run_detail(
         exclusions=_exclusions(quality),
         jev_decisions=_jev_items(decisions, labels or {}),
         notes=_notes(trial, jev_note),
+        gate=build_gate_view(trial, gate, checkpoints),
     )

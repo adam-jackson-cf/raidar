@@ -20,6 +20,9 @@ Two derivations are analysis-owned:
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
   ``final_solved`` over ``correctness@1``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
+- the ``gate.*`` outcomes (``gate-effort@1``, only when the lock declares it)
+  are the scorer's trajectory metrics as stored: an arm without the commit gate
+  reads ``not_applicable``;
 - a trial truncated by ``max_checkpoints`` has no trial-level
   outcome (S, C, reached, final solved, quality means): each is statused
   ``truncated``, because its last run checkpoint is not the problem's final
@@ -37,6 +40,8 @@ from raidar.analysis.outcomes import (
     CORRECTNESS_METRIC,
     FINAL_SOLVED,
     FINAL_SOLVED_ERRATA,
+    GATE_METRICS,
+    GATE_PREFIX,
     HEADLINE_SCORE,
     OUTCOME_METRICS,
     QUALITY_COMPONENTS,
@@ -75,6 +80,8 @@ RESOURCE_USAGE_REF = "resource-usage@1"
 # dormant ``@1`` stays readable for jobs whose lock declares it.
 PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
 ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
+# Read only when the lock declares it (its ``gate.*`` outcomes are then in every trial).
+GATE_EFFORT_REF = "gate-effort@1"
 _COST_TOTALS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 PASS_RATE = "strict_pass_rate"
 _CHECKPOINT_SOURCES = {
@@ -251,6 +258,17 @@ def _series(
     return series
 
 
+def gate_metrics(result: AssessResult | None) -> dict[str, Value]:
+    """The ``gate.*`` outcomes from a trial's ``gate-effort@1`` trajectory observations.
+
+    An arm without the gate reads ``not_applicable`` (the scorer's status), never 0.
+    """
+    observed = Observed(GATE_EFFORT_REF, result)
+    return {
+        metric.id: observed.value(metric.id.removeprefix(GATE_PREFIX)) for metric in GATE_METRICS
+    }
+
+
 def _truncated(record: TrialRecord) -> dict[str, Value]:
     reason = (
         f"run truncated to the first {record.truncated_to} checkpoint(s) (max_checkpoints); "
@@ -303,6 +321,9 @@ def build_outcome(
         **quality,
         **{name: observed[RESOURCE_USAGE_REF].value(name) for name in _COST_TOTALS},
     }
+    if GATE_EFFORT_REF in results:
+        # Like cost totals, gate effort describes what ran, truncated or not.
+        metrics |= gate_metrics(results[GATE_EFFORT_REF])
     if record.truncated_to is not None:
         metrics |= _truncated(record)
     reasons = infra_reasons(record)

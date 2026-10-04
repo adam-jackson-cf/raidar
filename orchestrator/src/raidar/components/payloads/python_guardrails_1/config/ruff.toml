@@ -1,0 +1,56 @@
+line-length = 88
+target-version = "py312"
+fix = false
+output-format = "concise"
+respect-gitignore = false
+preview = true
+exclude = [
+    ".venv", "venv", ".tox", ".nox", "__pycache__", ".pytest_cache", ".ruff_cache",
+    ".mypy_cache", ".git", "node_modules", "target", "dist", "build", "*.egg-info",
+]
+
+[lint]
+select = [
+    "E", "W", "F", "I", "B", "C4", "C901", "UP", "SIM", "PT", "PGH", "A", "D", "N",
+    "PLR0904", "PLR0911", "PLR0912", "PLR0913", "PLR0914", "PLR0915", "PLR0917",
+]
+ignore = [
+    "E501", "D100", "D101", "D102", "D103", "D104", "D105", "D107", "B006", "B008",
+    "A005",
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401", "F403", "D104"]
+"test_*.py" = ["D", "S101", "PLR2004"]
+"*_test.py" = ["D", "S101", "PLR2004"]
+"**/tests/**" = ["D", "S101", "PLR2004"]
+"**/test/**" = ["D", "S101", "PLR2004"]
+"conftest.py" = ["D"]
+"setup.py" = ["D"]
+
+[lint.isort]
+known-first-party = []
+force-single-line = false
+combine-as-imports = true
+split-on-trailing-comma = true
+
+[lint.mccabe]
+max-complexity = 10
+
+[lint.pylint]
+max-args = 5
+max-branches = 12
+max-locals = 15
+max-positional-args = 5
+max-public-methods = 20
+max-returns = 6
+max-statements = 50
+
+[lint.pydocstyle]
+convention = "numpy"
+
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = true

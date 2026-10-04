@@ -26,6 +26,12 @@ VERSION = "1"
 GATE_DIR_NAME = "guardrail-gate"
 GATE_RECORD = "guardrail-gate.json"
 SIGNAL = "gate_clean_at_step_end"
+# Exported to the gate command: the run number, and a fresh directory under the
+# gate's own log dir where the command may write machine-readable reports (for
+# example ``guardrail-check --json-dir "$RAIDAR_GATE_REPORT_DIR"``). The wrapper
+# never moves that dir into a session's stage dir, so a report stays with its run.
+RUN_ENV = "RAIDAR_GATE_RUN"
+REPORT_DIR_ENV = "RAIDAR_GATE_REPORT_DIR"
 PROMPT_TEMPLATE_KWARG = "prompt_template_path"
 # Under the workflow scratch dir the per-step reset owns (step_reset.sh
 # RAIDAR_WORKFLOW_DIR), so hooks from one step never survive into the next.
@@ -143,6 +149,8 @@ class GateRun:
     output_bytes: int
     log: str
     repo_created: bool = False
+    report_dir: str | None = None
+    duration_sec: float | None = None  # host-measured, the whole gate script
 
     @property
     def timed_out(self) -> bool:
@@ -188,6 +196,8 @@ class GateRun:
             "output_sha256": self.output_sha256,
             "output_bytes": self.output_bytes,
             "log": self.log,
+            "report_dir": self.report_dir,
+            "duration_sec": self.duration_sec,
             "repo_created": self.repo_created,
         }
 
@@ -212,15 +222,22 @@ def _hook_script(command: str, status_path: str) -> str:
     )
 
 
+def report_dir_for(log: PurePosixPath) -> PurePosixPath:
+    """The run's report directory: its log path without the suffix (``gate_run_<n>``)."""
+    return log.with_suffix("")
+
+
 def gate_script(options: GuardrailGateOptions, run: int, log: PurePosixPath) -> str:
     """The bash run in the workspace: the gate, then key=value lines and the output."""
     work = PurePosixPath(options.work_dir)
     q_log, q_work = shlex.quote(str(log)), shlex.quote(str(work))
+    q_reports = shlex.quote(str(report_dir_for(log)))
     timeout = f"timeout -k 10 {options.timeout_sec}"
     lines = [
         "set -u",
         f"log={q_log}; work={q_work}",
-        'mkdir -p "$(dirname "$log")" "$work" && rm -f "$work/hook-rc"',
+        f"export {RUN_ENV}={run} {REPORT_DIR_ENV}={q_reports}",
+        'mkdir -p "$(dirname "$log")" "$work" "$' + REPORT_DIR_ENV + '" && rm -f "$work/hook-rc"',
     ]
     if options.mode is GateMode.COMMIT:
         excludes = " ".join(shlex.quote(name) for name in (*SNAPSHOT_EXCLUDES, "*.pyc"))

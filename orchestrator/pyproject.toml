@@ -65,6 +65,7 @@ component = "raidar.components.registry:component_resolver"
 "review-loop@1" = "raidar.components.builtins.workflow:REVIEW_LOOP"
 "review-loop@2" = "raidar.components.builtins.workflow_v2:REVIEW_LOOP_V2"
 "guardrail-gate@1" = "raidar.components.builtins.gate:GUARDRAIL_GATE"
+"python-guardrails@1" = "raidar.components.builtins.guardrails:PYTHON_GUARDRAILS"
 
 [build-system]
 requires = ["hatchling"]
@@ -86,6 +87,8 @@ extend-exclude = [
     "**/node_modules",
     "**/*.tsbuildinfo",
     "**/*.lock",
+    # Vendored byte-identical from the setup-repository-guardrails skill (its bundled validator).
+    "tests/fixtures/python_guardrails/validate_rule_coverage.py",
 ]
 
 [tool.ruff.lint]
@@ -109,6 +112,8 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004"]
 "**/__init__.py" = ["F401"]
+# Canary fixture generator: each fixture is one literal source text, kept on one line.
+"tests/fixtures/python_guardrails/make_fixtures.py" = ["E501", "PLR0915"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10

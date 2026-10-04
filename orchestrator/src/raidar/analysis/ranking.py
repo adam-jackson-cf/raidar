@@ -12,7 +12,10 @@ per arm:
   unbiased estimator ``1 - C(n - c, k) / C(n, k)`` over the arm's ``n``
   measured trials, ``c`` of which solved the final checkpoint
   (``final_solved``), averaged over the problems with ``n >= k``;
-- the mean cost, tokens, turns and agent seconds of its valid trials.
+- the mean cost, tokens, turns and agent seconds of its valid trials;
+- when the lock declares ``gate-effort@1``, the arm's gate-effort means
+  (rounds to clean, first-pass clean, unresolved and gate-error rates, blocking
+  findings by family, fix-session cost): ``None`` for an arm without the gate.
 
 Rows are ordered by the metric's declared direction; arms without a measured
 value sort last. Invalid (infra-excluded) trials never count, and an
@@ -52,6 +55,7 @@ class RankingRow(AnalysisModel):
     interval: IntervalOut | None
     pass_at_k: tuple[PassAtK, ...]
     cost_means: dict[str, float | None]
+    gate_means: dict[str, float | None] | None = None
 
 
 class Ranking(AnalysisModel):
@@ -91,6 +95,10 @@ def _pass_rows(valid: Sequence[TrialOutcome], attempts: int) -> tuple[PassAtK, .
     return tuple(rows)
 
 
+def _gate_row(means: Mapping[str, float | None] | None) -> dict[str, float | None] | None:
+    return dict(means) if means is not None else None
+
+
 def _sort_key(row: RankingRow, direction: Direction) -> tuple[bool, float, str]:
     if row.mean is None:
         return (True, 0.0, row.arm)
@@ -106,6 +114,7 @@ def ranking(
     attempts: int,
     settings: Settings,
     cost_means: Mapping[str, Mapping[str, float | None]],
+    gate_means: Mapping[str, Mapping[str, float | None] | None] | None = None,
 ) -> Ranking:
     """The ranking view over every arm (reference included)."""
     metric = outcome_metric(rank_by)
@@ -132,6 +141,7 @@ def ranking(
                 interval=interval_out(summary.interval),
                 pass_at_k=_pass_rows(valid, attempts),
                 cost_means=dict(cost_means.get(arm, {})),
+                gate_means=_gate_row((gate_means or {}).get(arm)),
             )
         )
     ordered = sorted(unranked, key=lambda row: _sort_key(row, metric.direction))

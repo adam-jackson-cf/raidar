@@ -1014,30 +1014,16 @@ The `fault-catalog` skill (`.agents/skills/fault-catalog/`, a first version that
 - **Predicted:** `solve_rate` inconclusive (capped by FCR-001); any effect shows up in C and S at checkpoints 3-8. The overall manipulation check will be `not_separated` by construction, because both arms run tests.
 - **Cost:** about $5 and about 8 h at concurrency 3 for 16 attempts. **Not executed: it needs your approval.**
 
-### 14.4 Ruff A/B test (`experiments/ab-test/python__forge__ruff-lint/`, job `ruff-lint-02`)
+### 14.4 Ruff A/B test (historical; replaced by the guardrails experiment)
 
-This is a functional test of the component revision path and of `lint-tool@1`.
-- **Arms:** r1 has the shared framing only. r2 adds `lint-config@1` (the pilot's `ruff.toml`) and `lint-tool@1`, a hash-pinned Ruff 0.8.6 installed per trial outside the agent image. No text tells the agent that Ruff exists.
-- **Run:** forge, `codex` 0.156.1, `gpt-6-luna` low, 5 attempts. Lock `cc2a4b147487`.
-- **Validity:** 10/10 trials valid, 0 infra errors.
-- **Cost:** $0.0351 vs $0.0387 per trial, about $0.37 in total.
+`python__forge__ruff-lint` was a functional test of the component revision path:
+- **Treatment:** r2 added `lint-config@1` and `lint-tool@1`.
+- **Run:** job `ruff-lint-02`, lock `cc2a4b147487`.
+- **Result:** the provisioned Ruff was installed and probed in every r2 step, and agents never ran it.
 
-| Measure | r1 baseline | r2 ruff | Verdict |
-|---|---|---|---|
-| `solve_rate` (primary) | 0.20 | 0.05 | Δ −0.15 [−0.32, 0.02], inconclusive |
-| C (case pass rate) | 0.915 | 0.919 | inconclusive |
-| Headline S (`scb-canonical@2`) | 78.71 | 78.37 | insufficient (4 pairs) |
-| E, V, H, R, G | | | inconclusive or insufficient |
-| Manipulation check | | | `not_separated` (no plan or test signal in either arm) |
-
-**The tool worked; the agents did not use it** (observed, from the provision records and Codex sessions):
-- **Provisioning:** 40/40 r2 step records show install ok, check ok, `ruff 0.8.6`, the pinned target and resolved config `/app/ruff.toml`. The verification found the probe functional: it runs the binary and checks the resolved config.
-- **Config use:** r2 agents read `ruff.toml` in 16 of 40 steps.
-- **Tool use:** the provisioned `ruff` was invoked in 0 steps. One step (b04, checkpoint 6) tried `python -m ruff` and got `No module named ruff`, because the tool is a binary on `PATH`, not a Python module.
-
-**Exploratory lint density.** At checkpoint 8, with r2's `ruff.toml` rule set applied to both arms by the host's Ruff, findings per kLOC of production code are 96.2 for baseline and 56.2 for r2 (5 trials each, unpaired). The scorer's own isolated SIM-rule density is equal (0.22 vs 0.22). **Inference:** the drop comes from agents reading the config, mostly line length and style, not from running Ruff. With n = 5 and no pre-registered lint outcome, this is a lead, not a result.
-
-**Open hardening (not done).** The probe records `path_ruff` but does not assert it, and it does not probe `python -m ruff`. Either change alters `lint-tool@1`'s fingerprint. That would make `ruff-lint-02`'s lock stale for a component used only in this test, so it waits for your call (14.7).
+Its definition was removed on 2026-10-04 and replaced by `experiments/ab-test/python__forge__guardrails/` (`python-guardrails@1` with `guardrail-gate@1`; see its `rationale.md`).
+- **Job:** stays on disk under `jobs/python__forge__ruff-lint/`, analysable under its own `job.lock.json`.
+- **Components:** `lint-tool@1` and `@2` stay registered because those job locks reference them.
 
 ### 14.5 Skills for the research loop
 
@@ -1138,21 +1124,17 @@ E, R and H are `scb-canonical@2` component scores. Their direction (higher is be
 - **Short by 1 pair:** headline S needs 16 pairs, 1 more than the 15 eligible (about $5.1 projected for the full set).
 - **Short by more:** `solve_rate_errata` and `reached_errata` need 36 (20 more, about $11.5). E needs 60 (44 more), R 75 (59 more) and G 62 (47 more).
 
-### 14.12 Ruff A/B with `lint-tool@2` (job `ruff-lint-r2-01`, lock `bb4b7edf5996`)
+### 14.12 Ruff A/B with `lint-tool@2` (historical; replaced by the guardrails experiment)
 
-This answers decision 14.7.5: `lint-tool@2` was built, and `@1` is unchanged.
-- **`lint-tool@2`.** It reuses @1's install and adds a root-owned `.pth` per image interpreter, so the pinned Ruff 0.8.6 answers as `ruff`, `python -m ruff`, `python3 -m ruff` and `uv run ruff`. Nothing goes into the agent image. Step 1 enforces all four invocations plus the config. Later steps report without failing, so an agent's own actions cannot invalidate a trial.
-- **Run.** forge, 5 attempts at concurrency 2: 10/10 trials valid, 0 infra errors, about $0.36.
-- **Probes.** In 40/40 r2 step records all four forms answered `ruff 0.8.6`, `path_ruff` was `/usr/local/bin/ruff` and the config resolved to `/app/ruff.toml`.
-- **Use (ATIF, 589 exec calls).** Ruff was invoked in **1 of 40 r2 steps**: a bare `ruff check forge.py` at b02 cp5. It worked, and the agent fixed nothing. Every other form was used 0 times, and the baseline arm had 0. r2 agents read `ruff.toml` in 17/40 steps.
-- **Verdicts.**
-  - Raw `solve_rate`: 0.20 vs 0.05, Δ −0.15 [−0.32, 0.02], inconclusive. As in `ruff-lint-02`, the deficit comes from the two FCR-001 cp1 literals.
-  - C: 0.923 vs 0.903, inconclusive. S: insufficient (4 pairs).
-  - Manipulation check: `not_separated`.
-  - Errata-applied (secondary, not pre-registered): `solve_rate_errata` 0.225 vs 0.475, Δ +0.25 [0.06, 0.44], improved. This is n = 5, so it is a lead.
-- **Lint density (exploratory, host Ruff with r2's config on both arms):** r2 is lower at every checkpoint, for example cp8 at 101.2 vs 51.3 per kLOC, mostly from line length and B rules. The only trial that ran Ruff had r2's highest density. **Inference:** the drop comes from reading the config, not from running Ruff.
-- **Conclusion:** the tool path is closed. Agents do not run Ruff unprompted. A lint effect would need a condition that names the tool or the check, with a pre-registered lint outcome.
-- **Jev:** every residue decision (160) was settled by trace rules, Jev was asked 0 times, and the deterministic answers agree with an independent parse 160/160.
+`python__forge__ruff-lint-r2` answered decision 14.7.5:
+- **Treatment:** `lint-tool@2` made the pinned Ruff runnable as `ruff`, `python -m ruff` and `uv run ruff`.
+- **Run:** job `ruff-lint-r2-01`, lock `bb4b7edf5996`.
+- **Result:** every invocation form was provisioned, and Ruff was run in 1 of 40 r2 steps.
+- **Conclusion:** agents do not run a linter unprompted, so the tool path is closed.
+
+That finding led to the guardrails experiment (`experiments/ab-test/python__forge__guardrails/`). There, a commit gate refuses work until the python-guardrails rule set passes, instead of offering a tool.
+- **Definition:** removed on 2026-10-04.
+- **Job:** stays on disk under `jobs/python__forge__ruff-lint-r2/`.
 
 ### 14.13 Jev evaluation verdict (`docs/reboot/jev/evaluation-2026-10-02.md`, profiles under `docs/reboot/jev/profiles/`)
 
@@ -1216,5 +1198,5 @@ There are 68 agent labels (`claude-opus-5-5[1m]`): 51 rubric decisions and 17 re
    - Accept r3's process changes as the new guided incumbent? They met every pre-registered target, with neutral outcomes and E worse.
    - Run the fault-catalog pass on r3 first, to explain the E drop and the rise in `rejected_valid_input` failures.
    - Headline S needs 1 more pair. Errata outcomes need 20 more (about $11.5).
-6. **Lint.** Drop the ruff line, or design a condition that names the check and pre-register a lint outcome.
+6. **Lint.** Drop the ruff line, or design a condition that names the check and pre-register a lint outcome. *Decided 2026-10-04:* the ruff line is dropped. The ruff experiments are replaced by `python__forge__guardrails`, a commit gate with pre-registered outcomes (14.4, 14.12).
 7. **Labelling isolation** (carried over from 14.7.6).

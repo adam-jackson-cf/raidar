@@ -1,0 +1,105 @@
+# Guardrails A/B on forge: does a repository that refuses a commit until a mechanical
+# Python guardrail gate passes change correctness and quality, against the shared framing alone?
+# r2 adds python-guardrails@1 (pinned Ruff 0.8.6 and mypy 2.3.1 plus bespoke checks, installed
+# root-owned under /opt/raidar-tools/python-guardrails with protected configs; byte-identical
+# ruff.toml and mypy.ini copies at /app) and guardrail-gate@1 (after every session: git commit
+# with guardrail-check as the pre-commit hook; a refusal starts a fix session, at most 3).
+# No rules text tells the agent about the gate in advance (the mechanical rung only): it sees
+# ruff.toml and mypy.ini like in any repository and learns of the gate from its refusals.
+# Replaces python__forge__ruff-lint and python__forge__ruff-lint-r2 (removed 2026-10-04; their
+# jobs stay on disk under jobs/).
+# Objective: explore (4 attempts per arm while the process is still being iterated). Verdicts
+# below min_pairs read insufficient by design.
+# Pre-registration: rationale.md beside this file (written before any job): primary
+# solve_rate_errata with raw solve_rate beside it, secondary and gate-effort outcomes, the
+# manipulation check, and the smoke rule for the mypy strict annotation codes.
+# Validate: make experiment-validate EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
+# Lock:     make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
+schema_version: 2
+kind: ab-test
+id: python__forge__guardrails
+description: Does a commit gate enforcing the python-guardrails rule set change correctness and code quality on forge?
+
+problems:
+  # SCB Harbor dataset, pinned to scb-problems@38d627ecf668 (8 checkpoints); the lock pins
+  # the forge errata (sha256 9a6dec369dea).
+  - ref: scb/forge@38d627ecf668
+
+runtime: python
+environment:
+  type: docker
+  compose_init: true
+
+agents:
+  # Real-LLM policy: codex + gpt-6-luna at low effort.
+  - id: codex-luna
+    name: codex
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+
+factors: [condition]
+
+# Both arms get the same framing (pilot v2): where to work, that /app may start empty,
+# what to build, and that nobody answers questions.
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
+
+conditions:
+  - id: r1-baseline
+    components: []
+  - id: r2-guardrails
+    components:
+      # The pack: the gate entrypoint, its pinned tools and protected configs, and the
+      # workspace config copies. Its probe proves, before every step's agent, the pinned
+      # versions and a working gate (a clean file passes, an unused import is refused);
+      # its integrity flags record config-copy edits and hook-bypass attempts without
+      # failing the step.
+      - use: python-guardrails@1
+      # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
+      # real repository; the gate's JSON report goes to the run's report dir
+      # ($RAIDAR_GATE_REPORT_DIR), where gate-effort@1 reads it.
+      - use: guardrail-gate@1
+        with:
+          command: guardrail-check
+          mode: commit
+          max_rounds: 3
+          timeout_sec: 300
+
+arms:
+  - id: r1-baseline
+    condition: r1-baseline
+    agent: codex-luna
+  - id: r2-guardrails
+    condition: r2-guardrails
+    agent: codex-luna
+
+assessment:
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2, gate-effort@1]
+  metric: scb-canonical@2
+
+analysis:
+  baseline_arm: r1-baseline
+  # Explore: 4 attempts per arm (user decision 2026-10-04). min_pairs stays at the default
+  # (5), so paired verdicts read insufficient by design; the sample-size projection sizes a
+  # later confirm run.
+  attempts: 4
+  seed: 20261004
+  concurrency: 2
+  max_exclusion_fraction: 0.2
+  alpha: 0.05
+  min_effects:
+    correctness: 0.02
+    headline_score: 2.0
+  # The gate is absent from r1, so the check is decided by r2's share alone.
+  manipulation_checks:
+    - check: gate_clean_at_step_end
+      min_share: 0.8

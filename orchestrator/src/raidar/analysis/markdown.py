@@ -6,10 +6,13 @@ from collections.abc import Iterable, Sequence
 
 from raidar.analysis.curves import Band, Curve
 from raidar.analysis.effects import Effect, Exclusions, IntervalOut
-from raidar.analysis.manipulation import ManipulationReport
-from raidar.analysis.ranking import Ranking
+from raidar.analysis.gate_effort import GateDescriptive
+from raidar.analysis.manipulation import CheckSeparation, ManipulationReport
+from raidar.analysis.outcomes import GATE_METRICS, GATE_PREFIX
+from raidar.analysis.ranking import Ranking, RankingRow
 from raidar.analysis.report import AnalysisReport, ArmSummary, Comparison
 from raidar.analysis.stats import confidence_label
+from raidar.scorers.gate_effort.families import FAMILIES
 
 MISSING = "—"
 
@@ -83,6 +86,12 @@ def _curve(curve: Curve) -> list[str]:
     return lines + _table(("Checkpoint", "Baseline", "Treatment", "Δ"), rows)
 
 
+def _basis(check: CheckSeparation) -> str:
+    if check.min_share is None:
+        return check.basis
+    return f"{check.basis} (min share {check.min_share:g})"
+
+
 def _manipulation(report: ManipulationReport | None) -> list[str]:
     if report is None:
         return []
@@ -92,15 +101,95 @@ def _manipulation(report: ManipulationReport | None) -> list[str]:
             _num(check.baseline.mean),
             _num(check.guided.mean),
             _num(check.p_value),
+            _basis(check),
             check.verdict.value,
             check.reason,
         ]
         for check in report.checks
     )
+    source = "pre-registered by the lock" if report.preregistered else "process defaults"
+    header = ("Check", "Baseline", "Treatment", "p", "Basis", "Verdict", "Reason")
     return [
         f"### Manipulation check: **{report.verdict.value}**",
         "",
-        *_table(("Check", "Baseline", "Treatment", "p", "Verdict", "Reason"), rows),
+        f"Checks: {source}.",
+        "",
+        *_table(header, rows),
+    ]
+
+
+GATE_HEADLINE = tuple(
+    metric for metric in GATE_METRICS if "." not in metric.id.removeprefix(GATE_PREFIX)
+)
+GATE_RANKING = (
+    "gate.first_pass_clean_rate",
+    "gate.unresolved_rate",
+    "gate.mean_rounds_to_clean",
+    "gate.total_fix_cost_usd",
+)
+
+
+def _descriptive(item: GateDescriptive | None) -> str:
+    if item is None:
+        return MISSING
+    if item.n == 0:
+        gaps = ", ".join(f"{status} {count}" for status, count in item.gaps.items())
+        return f"{MISSING} ({gaps or 'no trials'})"
+    return f"{_num(item.mean)} {_ci(item.interval)} n={item.n}"
+
+
+def _gate_mean(arm: ArmSummary, metric: str) -> float | None:
+    item = (arm.gate_effort or {}).get(metric)
+    return item.mean if item is not None else None
+
+
+def _family_row(family: str, arms: Sequence[ArmSummary]) -> list[str]:
+    kinds = ("total_first_run_blocking", "total_blocking_findings")
+    return [
+        family,
+        *(
+            " / ".join(_num(_gate_mean(arm, f"gate.{kind}.{family}")) for kind in kinds)
+            for arm in arms
+        ),
+    ]
+
+
+def _gate_arms(report: AnalysisReport) -> list[str]:
+    arms = [arm for arm in report.arms if arm.gate_effort is not None]
+    if not arms:
+        return []
+    names = [arm.arm for arm in arms]
+    rows = [
+        [metric.id, *(_descriptive((arm.gate_effort or {}).get(metric.id)) for arm in arms)]
+        for metric in GATE_HEADLINE
+    ]
+    return [
+        "",
+        "## Gate effort (gate-effort@1, per arm)",
+        "",
+        "Mean [CI] n over valid trials; an arm without the commit gate has no value "
+        "(not applicable), never 0.",
+        "",
+        *_table(("Metric", *names), rows),
+        "Blocking findings per trial by rule family (mean first run / mean over every run):",
+        "",
+        *_table(("Family", *names), (_family_row(family, arms) for family in FAMILIES)),
+    ]
+
+
+def _gate_effects(comparison: Comparison) -> list[str]:
+    if comparison.gate_note:
+        return ["### Gate effort (paired)", "", comparison.gate_note + ".", ""]
+    if not comparison.gate_effects:
+        return []
+    header = (
+        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "CI",
+        "Verdict", "Excluded", "Cost Δ USD",
+    )  # fmt: skip
+    return [
+        "### Gate effort (paired)",
+        "",
+        *_table(header, (_effect_row(effect) for effect in comparison.gate_effects)),
     ]
 
 
@@ -143,6 +232,7 @@ def _comparison(comparison: Comparison, confidence: float) -> list[str]:
         *_table(header, (_effect_row(effect) for effect in comparison.effects)),
         *_mcnemar([e for e in comparison.effects if e.mcnemar is not None]),
         *_manipulation(comparison.manipulation),
+        *_gate_effects(comparison),
         "### Per-checkpoint curves",
         "",
     ]
@@ -225,28 +315,34 @@ def _settings_line(report: AnalysisReport) -> str:
     )
 
 
+def _ranking_row(row: RankingRow, reference_arm: str, gate_columns: Sequence[str]) -> list[str]:
+    gate = row.gate_means or {}
+    return [
+        str(row.rank),
+        row.arm + (" (reference)" if row.arm == reference_arm else ""),
+        str(row.n),
+        _num(row.mean),
+        _ci(row.interval),
+        *(_num(entry.value) for entry in row.pass_at_k),
+        _num(row.cost_means.get("total_cost_usd")),
+        _num(row.cost_means.get("total_tokens")),
+        _num(row.cost_means.get("total_agent_wall_s")),
+        *(_num(gate.get(column)) for column in gate_columns),
+    ]
+
+
 def _ranking(ranking: Ranking | None) -> list[str]:
     if ranking is None:
         return []
     ks = [entry.k for entry in ranking.rows[0].pass_at_k] if ranking.rows else []
+    gated = any(row.gate_means is not None for row in ranking.rows)
+    gate_columns = GATE_RANKING if gated else ()
     header = (
         "Rank", "Arm", "n", f"Mean {ranking.rank_by}", "95% CI",
         *(f"pass@{k}" for k in ks), "Mean cost USD", "Mean tokens", "Mean agent s",
+        *gate_columns,
     )  # fmt: skip
-    rows = [
-        [
-            str(row.rank),
-            row.arm + (" (reference)" if row.arm == ranking.reference_arm else ""),
-            str(row.n),
-            _num(row.mean),
-            _ci(row.interval),
-            *(_num(entry.value) for entry in row.pass_at_k),
-            _num(row.cost_means.get("total_cost_usd")),
-            _num(row.cost_means.get("total_tokens")),
-            _num(row.cost_means.get("total_agent_wall_s")),
-        ]
-        for row in ranking.rows
-    ]
+    rows = [_ranking_row(row, ranking.reference_arm, gate_columns) for row in ranking.rows]
     return [
         "",
         "## Ranking (benchmark)",
@@ -285,6 +381,7 @@ def render_markdown(report: AnalysisReport) -> str:
         "Mean cost USD", "Mean tokens", "Mean agent s",
     )  # fmt: skip
     lines += ["", "## Arms", "", *_table(header, (_arm_row(arm) for arm in report.arms))]
+    lines.extend(_gate_arms(report))
     lines.extend(_ranking(report.ranking))
     for comparison in report.comparisons:
         lines.extend(_comparison(comparison, report.settings.confidence))

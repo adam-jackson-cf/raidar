@@ -31,6 +31,19 @@ function validateDetail(detail, runId) {
     for (const key of COMPONENTS) validateCell(row.cells?.[key], `${runId}.${row.checkpoint}.${key}`);
   }
   for (const key of COMPONENTS) validateCell(detail.problem?.[key], `${runId}.problem.${key}`);
+  if (detail.gate != null) validateGate(detail.gate, runId);
+}
+
+function validateGate(gate, runId) {
+  invariant(Array.isArray(gate.steps), `${runId}.gate.steps must be an array`);
+  for (const [metric, cell] of Object.entries(gate.totals ?? {})) validateCell(cell, `${runId}.gate.totals.${metric}`);
+  for (const step of gate.steps) {
+    const where = `${runId}.gate.${step.checkpoint}`;
+    for (const group of ['cells', 'families', 'first_run_families']) {
+      for (const [metric, cell] of Object.entries(step[group] ?? {})) validateCell(cell, `${where}.${group}.${metric}`);
+    }
+    invariant(Array.isArray(step.rounds), `${where}.rounds must be an array`);
+  }
 }
 
 function loadProjection() {

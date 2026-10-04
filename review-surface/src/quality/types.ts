@@ -94,6 +94,51 @@ export interface QualityRunSummary {
   trial_record: string;
 }
 
+/** Rule families of the gate's blocking findings (raidar.scorers.gate_effort.families). */
+export const GATE_FAMILIES = [
+  'complexity',
+  'typing',
+  'defects',
+  'structure',
+  'style',
+  'naming',
+  'tests',
+  'suppressions',
+  'other',
+] as const;
+export type GateFamily = (typeof GATE_FAMILIES)[number];
+
+export interface GateRound {
+  run: number;
+  after: string;
+  verdict: 'passed' | 'refused' | 'timed_out' | 'error';
+  blocking: number | null;
+  listed: number;
+  /** Blocking findings per family; null when the stored files do not name them all. */
+  families: Record<GateFamily, number> | null;
+  source: string;
+  summary: string;
+  log_path: string | null;
+  duration_s: number | null;
+}
+
+export interface GateStep {
+  checkpoint: string;
+  termination: string | null;
+  cells: Record<string, Cell>;
+  families: Record<GateFamily, Cell>;
+  first_run_families: Record<GateFamily, Cell>;
+  rounds: GateRound[];
+}
+
+/** A gated trial's commit-gate effort (gate-effort@1); absent (null) for an ungated trial. */
+export interface GateView {
+  source: string | null;
+  steps: GateStep[];
+  totals: Record<string, Cell>;
+  notes: string[];
+}
+
 export interface QualityRunDetail {
   run: QualityRunSummary;
   policy: PolicyInfo;
@@ -104,6 +149,7 @@ export interface QualityRunDetail {
   exclusions: ExclusionItem[];
   jev_decisions: JevDecisionItem[];
   notes: string[];
+  gate?: GateView | null;
 }
 
 export interface CurvePoint {

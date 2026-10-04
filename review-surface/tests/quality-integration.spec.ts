@@ -182,3 +182,27 @@ test('no console or page errors across the quality entry points', async ({ page 
   await expect(page.getByTestId('evidence-drilldown')).toBeVisible();
   expect(errors).toEqual([]);
 });
+
+test('run detail Quality panel shows a gated trial\'s gate rounds and failure families', async ({ page }) => {
+  // The experiment fixture has no gated arm, so this run's Quality detail carries the gate
+  // view of the Quality fixture's gated trial (same contract, same component).
+  const gated = await (await page.request.get('/api/quality/runs/synthetic-quality.synthetic-run-1.b00-p0-guided')).json();
+  expect(gated.gate).toBeTruthy();
+  await page.route(`**/api/quality/runs/${encodeURIComponent(QUALITY_ID('gpt-5.5-medium-01'))}`, async (route) => {
+    const detail = await (await route.fetch()).json();
+    await route.fulfill({ json: { ...detail, gate: gated.gate } });
+  });
+  await openRun(page, PASSING_RUN);
+  const panel = page.getByTestId('run-quality-panel');
+  const gate = panel.getByTestId('gate-panel');
+  await expect(gate).toBeVisible();
+  await expect(gate.getByTestId('gate-step')).toHaveCount(5);
+  await gate.getByRole('button', { name: 'checkpoint_4 gate rounds' }).click();
+  await expect(gate.getByTestId('gate-round')).toHaveCount(4);
+});
+
+test('run detail Quality panel of an ungated trial has no gate section', async ({ page }) => {
+  await openRun(page, PASSING_RUN);
+  await expect(page.getByTestId('run-quality-panel').getByTestId('quality-strip')).toBeVisible();
+  await expect(page.getByTestId('gate-panel')).toHaveCount(0);
+});
