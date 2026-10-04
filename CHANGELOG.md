@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - r3 and ruff-r2 results, Jev first-pass labels
+
+### Documentation
+
+- `docs/reboot/gate-packet.md` §14.8-§14.15: the spec-determinacy audit and forge errata (`9a6dec369dea`, 25 cases), verifier dependency parity (FCR-007), pilot v2 forge raw vs errata-applied, the r3 results (jobs `r3-01`/`r3-04`/`r3-05`/`r3-06`, lock `d4e2c9171a28`: primary and errata outcomes inconclusive, every pre-registered process criterion for FCR-003 to FCR-006 and FCR-008 met, E worse and R improved), the `lint-tool@2` ruff A/B (`ruff-lint-r2-01`: every invocation form provisioned, Ruff run in 1 of 40 steps), the Jev evaluation verdict, the first-pass labels and the decisions now open.
+- `docs/reboot/jev/labels/firstpass-2026-10-04.{jsonl,md}`: 68 first-pass agent labels (51 `code-quality.rubric-smells`, 17 `process-compliance.residue`) with their method, stances and blindness record. They are a proposal and are not in the Jev label store.
+
 ## Unreleased - pilot refinement: Jev relabel, fault catalog and r3 proposal, ruff A/B
 
 ### Breaking Changes

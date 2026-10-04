@@ -1,6 +1,6 @@
 # Phase 1 gate packet (pause-and-review)
 
-- **Date:** 2026-09-30 (v1 record); updated 2026-10-02 with the N1 enforcement model (§5.2), the completed pilot v2 forge leg (§11.13), the current exit criteria (§11.14) the decisions now open (§11.15), the Jev calibration and promotion attempt (§11.17), the Phase 1 close-out (§12: Infisical secrets, Claude Haiku readiness, live Jev, labelling provenance, promotion, scoring alignment, cleanup) and schema v2 (§13: Harbor vocabulary, experiment kinds, runtime-compatibility gate, migrated pilot jobs).
+- **Date:** 2026-09-30 (v1 record); updated 2026-10-02 with the N1 enforcement model (§5.2), the completed pilot v2 forge leg (§11.13), the current exit criteria (§11.14) the decisions now open (§11.15), the Jev calibration and promotion attempt (§11.17), the Phase 1 close-out (§12: Infisical secrets, Claude Haiku readiness, live Jev, labelling provenance, promotion, scoring alignment, cleanup) and schema v2 (§13: Harbor vocabulary, experiment kinds, runtime-compatibility gate, migrated pilot jobs); updated 2026-10-04 with §14.8-§14.15 (errata and spec-determinacy audit, verifier dependency parity, pilot v2 under errata, r3 results, ruff r2 results, Jev evaluation verdict, first-pass labels, decisions).
 - **Plan reference:** `docs/reboot/implementation-plan.md` §3 (1.P pilot and the Phase 1 exit criteria) and §4 (this packet and the gate decisions).
 - **Branch:** `reboot-impl`. The wave 1-4 work is committed up to `6b8e44d`. The pilot's infra fixes, this packet, **and the WS-L scenario-era cutover** (251 tracked files, about −47k lines, including scorer package files) are committed together on top of it (see §9). The WS-L cutover landed after the pilot ran and after the pilot store and locks were built; its consequences for the pilot evidence are in §1.1.
 - **AgentSpec substitution (user directive):** plan 1.P names Claude Code as the pilot's single AgentSpec. By user directive (ADR-001 §2.7), every real-LLM trial in this pilot used **codex-cli 0.156.1 + `gpt-6-luna`, reasoning effort low**. No Claude Code trial has run, so the Claude mappings of the built-in components are unit-tested only.
@@ -1057,3 +1057,164 @@ This is a functional test of the component revision path and of `lint-tool@1`.
 4. **FCR-007 (PyYAML missing in the offline verifier).** Give the verifier dependency parity with native SCB grading. This changes the verifier bundle's environment, not any component.
 5. **`lint-tool@1` probe hardening** (14.4). Make it a `lint-tool@2`, or change `@1` in place before anything other than `ruff-lint-02` uses it.
 6. **Labelling isolation.** From the next round on, the labeller gets only the blind export, in a directory with nothing else (README Jev row). Model labellers' file access cannot be shown after the fact: the relabel rounds' `selector/selection.json` (which carries Jev scores) sat beside `blind/`, so "the labellers did not read it" rests on their own reports.
+
+### 14.8 Spec-determinacy audit and problem errata (FCR-001; 2026-10-02, commit `140603d`)
+
+This answers decision 14.7.3 on the measurement side. No problem file was changed.
+- **Audit.** `make problem-validate` now runs a spec-determinacy audit (`raidar.problems.determinacy`, `variants`, `audit`). Static rules classify each error-text and output-byte assertion against the specifications up to its origin checkpoint. The reference solution is also graded under two spec-conformant variants: neutral error text, and re-serialised JSON. A case is flagged when it breaks on a variant and its assertion is undetermined. The audit never changes the validation verdict, and forge is still `validated`.
+- **Forge result.** `scb/forge@38d627ecf668` has 25 flagged cases: 2 at cp1, 6 at cp3, 13 at cp6 and 4 at cp7. They are the fault catalog's 23 plus 2 `duplicate_assignment` cases at cp3. Each passes on the reference and fails on a variant. None is `unconfirmed` or `sensitive_unexplained`. `circuit_eval.checkpoint_1` has none, so it has no errata and its locks did not move.
+- **Errata.** `problems/registry/scb/forge/38d627ecf668.errata.yaml` (sha256 `9a6dec369dea`) lists the 25 cases as `exclude-from-solved`, each with a reason and evidence. The lock pins the errata's sha256, and the plan refuses an errata that changed after locking. The verifier records the errata-applied verdict beside the raw grade, and Harbor rewards are unchanged. `correctness@1` adds `solved_errata`, `solved_checkpoints_errata` and `reached_errata`. The analysis reports `solve_rate_errata`, `reached_errata` and `final_solved_errata` beside the raw outcomes. **The raw outcomes stay primary.** No experiment has pre-registered an errata outcome yet.
+- **Relocks.** guided-pilot `015c57e4f59c` → `15c1eb4e3a1b`, guided-r3 `12f2b2fb05fc` → `d4e2c9171a28`, ruff-lint `cc2a4b147487` → `f870d2c6ff73` and ruff-lint-r2 `5d4b2f59b74a` → `bb4b7edf5996`. Each execution section differs only by `metadata.errata`. Pilot jobs `forge-02` and `forge-03` adopted the errata through `raidar migrate-job`, and their executed lock is kept under `lock-history/`. `ruff-lint-02` was not migrated, so it is analysed raw under its own `job.lock.json`.
+- **Upstream.** A report is drafted at `docs/reboot/upstream/scb-forge-unspecified-assertions.md` but **not filed**. It lists each case with test and spec line references, against test files checked byte-identical to the pinned SCB source.
+
+### 14.9 Verifier dependency parity (FCR-007)
+
+This answers decision 14.7.4.
+- **Finding:** the SCB fork's environment config pins no PyYAML. Native grading gets packages from the network (`uv add -r requirements.txt`, then `uv run` syncs `pyproject.toml`).
+- **Fix:** the grader image carries a pinned offline `PyYAML==6.0.3` for problems whose SCB configuration lists it (`test_dependencies`). A snapshot sees it only when it declares the package. Grading stays `--network none`. Declared packages Raidar cannot provide are recorded as `unprovided`.
+- **Regrade** of the two FCR-007 checkpoint-8 snapshots: b06 guided 0.00 → 0.888 and b07 baseline 0.00 → 0.861. In r3 (14.11), 0 steps hit `ModuleNotFoundError`.
+
+### 14.10 Pilot v2 forge under the errata
+
+Same 16 pairs, guided vs baseline (`jobs/pilot-v2/gate-evidence/errata/`). The raw analysis reproduces `gate-evidence/schema-v2/analysis/forge` exactly: 0 JSON differences and identical markdown.
+
+| Outcome | Raw (primary, unchanged) | Errata-applied (secondary) |
+|---|---|---|
+| `solve_rate` | 0.156 vs 0.031, Δ −0.125 [−0.1875, −0.0625], **worse** | 0.352 vs 0.445, Δ +0.094 [−0.023, 0.211], **inconclusive** |
+| `reached` | 1.25 vs 0.25, **worse** | 2.81 vs 3.56, Δ +0.75 [−0.19, 1.69], **inconclusive** |
+| `final_solved` | 0 vs 0 | 0 vs 0 |
+
+**Reading (inference):** with the 25 cases the spec does not determine set aside, the pilot's "guided is worse" result disappears and leans the other way, but it is not significant.
+
+### 14.11 r3 results (`experiments/ab-test/python__forge__guided-r3/`, lock `d4e2c9171a28`)
+
+This answers decision 14.7.1: r3 was run.
+- **Execution.** codex + `gpt-6-luna` low. 16 attempts, so 32 trials (b00-b15 × incumbent/candidate). The trials span four jobs: `r3-01`, `r3-04`, `r3-05` and `r3-06`. `r3-05` and `r3-06` sit under `jobs/python__forge__guided-r3/python__forge__guided-r3/`.
+  - In `r3-01`, two trials failed on infra (`NonZeroAgentExitCodeError`): b06-incumbent at cp1 and b10-candidate at cp8.
+  - Those two were rerun as `r3-05` and `r3-06`. The interrupted b15 pair was rerun as `r3-04`.
+  - The analysis lists the 2 failed `r3-01` trials as `replaced_trials`.
+  - Interrupted attempts `r3-02` and `r3-03`, and the first b15 try, are under `_aborted/`, and nothing reads them.
+  - Each of the 32 trials has exactly one valid record, all on lock `d4e2c9171a28`.
+- **Assessment.** The store holds **136 Assessments**: 120 + 8 + 4 + 4 across the four jobs, all added and then replayed identical. That is 128 for the selected trials plus 8 for the 2 replaced `r3-01` trials, which were assessed too. The analysis was reproduced independently: `analysis.json` is equal and `analysis.md` has no diff (`jobs/python__forge__guided-r3/analysis/r3-final/`).
+- **Arms:** they share agent, shared components, protocol, scorers and metric. They differ only in condition: the condition hashes are `73cc19…` and `af671b…`, and the lock, problem, agent and protocol hashes are identical.
+
+| Measure | Incumbent (pilot guided) | Candidate (r3) | Δ [95% CI] | Verdict |
+|---|---|---|---|---|
+| `solve_rate` (primary, raw) | 0.039 | 0.031 | −0.008 [−0.070, 0.055] | inconclusive |
+| `reached` (raw) | 0.31 | 0.25 | −0.06 [−0.56, 0.44] | inconclusive |
+| `solve_rate_errata` (secondary) | 0.375 | 0.414 | +0.039 [−0.086, 0.164] | inconclusive |
+| `reached_errata` (secondary) | 3.00 | 3.31 | +0.31 [−0.69, 1.31] | inconclusive |
+| C (case pass rate) | 0.9247 | 0.9270 | +0.002 [−0.006, 0.011] | inconclusive |
+| Headline S (`scb-canonical@2`, 15 pairs) | 77.75 | 77.90 | +0.15 [−1.16, 1.54] | inconclusive |
+| E erosion component | 0.236 | 0.103 | −0.133 [−0.198, −0.070] | **worse** |
+| R rework component | 0.255 | 0.330 | +0.075 [0.004, 0.148] | **improved** |
+| H architecture component | 0.9995 | 1.000 | +0.0005 [0.00002, 0.0011] | improved (negligible size) |
+| V, G | | | | inconclusive |
+| `final_solved` (both views) | 0 | 0 | | inconclusive |
+
+E, R and H are `scb-canonical@2` component scores. Their direction (higher is better) comes from the scorer manifest. The E drop holds at every checkpoint, by −0.10 to −0.18.
+
+**Manipulation check: `not_separated` overall, as predicted** (rationale §6). `plan_written` separates: 0 vs 1.0, p = 5e-05. `tests_run_before_finish` ties: 0.967 vs 0.992, p = 0.11. Raidar's overall verdict needs every default check to separate.
+
+**Fault reconciliation against the pre-registered criteria** (scratchpad `r3/fcr-final.json`):
+
+| Fault | Criterion | Incumbent | Candidate | Met? |
+|---|---|---|---|---|
+| FCR-008 plan (C1) | `plan_written` ≥ 0.8 cand, ≈ 0 inc | 0 | 1.0; `PLAN.md` touched in 128/128 steps | yes |
+| FCR-005 error contract (C2) | `cli_surface_missing` new-at-checkpoint ≤ 50% of incumbent | 34 | 0 | yes |
+| FCR-006 propagation (C3) | cp7 regression breaks ≤ incumbent | 6 at cp7 (17 overall) | 0 at cp7 (1 overall, at cp6) | yes |
+| FCR-003 test tools (C4) | pytest/ruff not-found ≤ 5% of steps; `tests_run_before_finish` ≥ 0.9 | 80/128 impl steps not found | 0/128; unittest in 128/128; 0.992 | yes |
+| FCR-004 consumption (C5) | each candidate component used in ≥ 90% of steps | skill opened 5/128 | `AGENTS.md` 128/128, review stage 128/128 | yes |
+
+- **Unchanged, as designed (no hidden-test knowledge):**
+  - FCR-001 wall: 21 cases fail in every trial of both arms.
+  - FCR-002: the cp1 wording pair fails in 13/16 trials per arm.
+- **Not separately counted:** the candidate's new-at-checkpoint `rejected_valid_input` failures are 81, against 30 for the incumbent.
+- **Reading (inference):** every process target was hit, but none of it moved correctness or solve outcomes. The candidate's code scores lower on E and higher on R. Why E dropped is not yet explained. A fault-catalog pass on r3 is the next step.
+- **Cost:** mean $0.154 (candidate) vs $0.166 (incumbent) per trial, about $5.1 for the 32 selected trials. Mean agent time was 2,061 s vs 2,556 s.
+
+**Sample size (J2), δ at defaults or configured:**
+- **Already enough pairs at 16:** C (7), `solve_rate` (9), `reached` (9), V (1), H (1).
+- **Short by 1 pair:** headline S needs 16 pairs, 1 more than the 15 eligible (about $5.1 projected for the full set).
+- **Short by more:** `solve_rate_errata` and `reached_errata` need 36 (20 more, about $11.5). E needs 60 (44 more), R 75 (59 more) and G 62 (47 more).
+
+### 14.12 Ruff A/B with `lint-tool@2` (job `ruff-lint-r2-01`, lock `bb4b7edf5996`)
+
+This answers decision 14.7.5: `lint-tool@2` was built, and `@1` is unchanged.
+- **`lint-tool@2`.** It reuses @1's install and adds a root-owned `.pth` per image interpreter, so the pinned Ruff 0.8.6 answers as `ruff`, `python -m ruff`, `python3 -m ruff` and `uv run ruff`. Nothing goes into the agent image. Step 1 enforces all four invocations plus the config. Later steps report without failing, so an agent's own actions cannot invalidate a trial.
+- **Run.** forge, 5 attempts at concurrency 2: 10/10 trials valid, 0 infra errors, about $0.36.
+- **Probes.** In 40/40 r2 step records all four forms answered `ruff 0.8.6`, `path_ruff` was `/usr/local/bin/ruff` and the config resolved to `/app/ruff.toml`.
+- **Use (ATIF, 589 exec calls).** Ruff was invoked in **1 of 40 r2 steps**: a bare `ruff check forge.py` at b02 cp5. It worked, and the agent fixed nothing. Every other form was used 0 times, and the baseline arm had 0. r2 agents read `ruff.toml` in 17/40 steps.
+- **Verdicts.**
+  - Raw `solve_rate`: 0.20 vs 0.05, Δ −0.15 [−0.32, 0.02], inconclusive. As in `ruff-lint-02`, the deficit comes from the two FCR-001 cp1 literals.
+  - C: 0.923 vs 0.903, inconclusive. S: insufficient (4 pairs).
+  - Manipulation check: `not_separated`.
+  - Errata-applied (secondary, not pre-registered): `solve_rate_errata` 0.225 vs 0.475, Δ +0.25 [0.06, 0.44], improved. This is n = 5, so it is a lead.
+- **Lint density (exploratory, host Ruff with r2's config on both arms):** r2 is lower at every checkpoint, for example cp8 at 101.2 vs 51.3 per kLOC, mostly from line length and B rules. The only trial that ran Ruff had r2's highest density. **Inference:** the drop comes from reading the config, not from running Ruff.
+- **Conclusion:** the tool path is closed. Agents do not run Ruff unprompted. A lint effect would need a condition that names the tool or the check, with a pre-registered lint outcome.
+- **Jev:** every residue decision (160) was settled by trace rules, Jev was asked 0 times, and the deterministic answers agree with an independent parse 160/160.
+
+### 14.13 Jev evaluation verdict (`docs/reboot/jev/evaluation-2026-10-02.md`, profiles under `docs/reboot/jev/profiles/`)
+
+Both processes were evaluated against the evaluate-jev skill (R1-R5). The run was read-only, with no Jev calls and no label-store changes.
+- **`code-quality.rubric-smells` (`@2` / `scb-rubric@2`): next iteration. Do not promote, and do not refit a threshold on `@2`.**
+  - Of the 14 false positives at 0.75: 8 come from undecided policy (stance A, and near-twins labelled oppositely), 3 from question design (the CLI-boundary check) and 3 from Jev itself.
+  - Three criteria drive 1,020 of the 1,122 decisions flagged at 0.75. 26 of 45 criteria never reach 0.5. 80% of ΣP mass comes from answers below 0.5.
+  - Recall is unmeasured, because the label pool was enriched towards Jev positives.
+- **`process-compliance.residue` (`@1`): keep the test check with band routing, and redesign the plan check.**
+  - The plan check fails 0/3, because a generic "inspect, then implement" preamble passes as a plan.
+  - The deterministic router never sees an `edit` event, because Codex edits arrive as exec calls containing patch text.
+  - Recorded input sufficiency is 0/17, because any clipped event marks the case partial. That alone fails the promotion gate.
+- **Operational health:** coverage 17,248/17,248, $2.32 for 15,499 calls, p50 latency 298 ms.
+- **Recommended next step before new agent trials:** a Jev replay over the existing pilot v2 snapshots and traces under new versions (`scb-rubric@3` / policy 3, `process-residue@2`), at about $2.3. It is preceded by the user-written policy (14.15) and followed by per-criterion blind labels.
+
+### 14.14 First-pass labels (`docs/reboot/jev/labels/firstpass-2026-10-04.{jsonl,md}`)
+
+There are 68 agent labels (`claude-opus-5-5[1m]`): 51 rubric decisions and 17 residue states, all from `jobs/pilot-v2/assessment-store`. They are a proposal and **were not written to the label store**. The store still has 71 records (38 current), and nothing from 2026-10-04 is in it.
+- **What was labelled:** the 7 held-back decisions, the 12 store false positives, 6 contested-stance cases, 22 seeded-random fresh decisions, 4 seeded stance-B decisions and the 17 residue states.
+- **Blindness:**
+  - Only the 26 fresh decisions are blind to Jev's answers.
+  - The 25 evaluation cases and the 17 residue states were labelled after reading the evaluation doc, so they are informed relabels.
+  - Stances were written at 01:42:14Z, labels at 01:50:33Z, and Jev's answers were first opened at 01:51:06Z (self-recorded). The blind exports carry no answer or score fields.
+- **Positions applied (proposals for the user to confirm):**
+  - Stance A is rejected with a boundary rule: argv and spec wire values are clean, and internal kind or mode literals that drive domain branching are a smell.
+  - Stance B is rejected for the program's own storage on a write path.
+  - Residue readings P1-P3: every session counts; a suite that runs no tests does not count; a generic preamble is not a plan.
+
+| View | Threshold | TP | FP | FN | TN | Precision |
+|---|---|---|---|---|---|---|
+| Rubric, adopted labels | 0.75 | 6 | 16 | 1 | 28 | 0.27 |
+| Rubric, state-only labels (1 uncertain excluded) | 0.75 | 6 | 15 | 1 | 28 | 0.29 |
+| Rubric, literal stances A and B | 0.75 | 14 | 8 | 1 | 28 | 0.64 |
+| Residue (`complied` positive) | 0.5 | 7 | 4 | 0 | 6 | 0.64 |
+
+- **Literal-view caveat:** `literal_stance_label` is set only for multi-branch A1 dispatch (C25, C28, C39, C40), C44 and the stance-B rows. It is not set for the single argv checks C08, C16 and C18. Setting it there would give 14/25.
+- **Rubric false negative:** C19 at 0.63, a smell this labeller found by reading the snapshot.
+- **Residue at 0.75:** R09 and R14 become false negatives.
+- **Fresh blind sample, 22 random decisions:**
+  - 1 smell: F01, a TP.
+  - 1 FP at 0.75: F09.
+  - F17 and F22 are FPs only at 0.5.
+  - **Inference:** on unenriched decisions, flags are rare and about half are wrong. That is consistent with the evaluation.
+- **Stance-B sample:** 3 of 4 (B2-B4) are FPs under the B1 rule.
+- **Per-question agreement at 0.5:** 269 of 294 rubric questions and 13 of 17 residue questions (282 of 311 combined).
+- **Disagreements with earlier labels,** all from the same model family, are listed in the method note and not resolved: C07, C15, C17, C44 and C19 are smells here, and C25, C28, C33 and C39 are clean here.
+
+### 14.15 Decisions for you (supersedes 14.7)
+
+**Status of 14.7:**
+- Done: 14.7.1 (r3 was run, 14.11), 14.7.4 (FCR-007 fixed, 14.9) and 14.7.5 (`lint-tool@2`, 14.12).
+- Partly done: 14.7.3. The errata and the audit exist, but the upstream report is not filed.
+- Open: 14.7.2 and 14.7.6, which carry over below.
+
+**Open decisions:**
+1. **Jev policy.** Decide stances A and B and residue rules P1-P3. You can adopt the first-pass positions in 14.14, amend them or replace them. The `@3` / `process-residue@2` replay waits on this.
+2. **First-pass labels.** Import none, some (for example, only the 26 blind fresh rows) or all into the label store under a new split. Or keep them as a reference only. They are model-made and partly informed, and the store is unchanged until you decide.
+3. **FCR-001 upstream.** File `docs/reboot/upstream/scb-forge-unspecified-assertions.md` with SCB?
+4. **Errata as an outcome.** Pre-register `solve_rate_errata` (or make it primary) in the next forge lock? Raw `solve_rate` is capped by the 21-case wall. In pilot v2, r3 and ruff-lint-r2 it measures mostly the two cp1 literals.
+5. **r3 follow-up.**
+   - Accept r3's process changes as the new guided incumbent? They met every pre-registered target, with neutral outcomes and E worse.
+   - Run the fault-catalog pass on r3 first, to explain the E drop and the rise in `rejected_valid_input` failures.
+   - Headline S needs 1 more pair. Errata outcomes need 20 more (about $11.5).
+6. **Lint.** Drop the ruff line, or design a condition that names the check and pre-register a lint outcome.
+7. **Labelling isolation** (carried over from 14.7.6).
