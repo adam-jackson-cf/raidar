@@ -1193,10 +1193,73 @@ There are 68 agent labels (`claude-opus-5-5[1m]`): 51 rubric decisions and 17 re
 1. **Jev policy.** Decide stances A and B and residue rules P1-P3. You can adopt the first-pass positions in 14.14, amend them or replace them. The `@3` / `process-residue@2` replay waits on this.
 2. **First-pass labels.** Import none, some (for example, only the 26 blind fresh rows) or all into the label store under a new split. Or keep them as a reference only. They are model-made and partly informed, and the store is unchanged until you decide.
 3. **FCR-001 upstream.** File `docs/reboot/upstream/scb-forge-unspecified-assertions.md` with SCB?
-4. **Errata as an outcome.** Pre-register `solve_rate_errata` (or make it primary) in the next forge lock? Raw `solve_rate` is capped by the 21-case wall. In pilot v2, r3 and ruff-lint-r2 it measures mostly the two cp1 literals.
+4. **Errata as an outcome.** Pre-register `solve_rate_errata` (or make it primary) in the next forge lock? Raw `solve_rate` is capped by the 21-case wall. In pilot v2, r3 and ruff-lint-r2 it measures mostly the two cp1 literals. *Decided 2026-10-04:* `solve_rate_errata` is the pre-registered primary of `python__forge__guardrails` (§15).
 5. **r3 follow-up.**
    - Accept r3's process changes as the new guided incumbent? They met every pre-registered target, with neutral outcomes and E worse.
    - Run the fault-catalog pass on r3 first, to explain the E drop and the rise in `rejected_valid_input` failures.
    - Headline S needs 1 more pair. Errata outcomes need 20 more (about $11.5).
 6. **Lint.** Drop the ruff line, or design a condition that names the check and pre-register a lint outcome. *Decided 2026-10-04:* the ruff line is dropped. The ruff experiments are replaced by `python__forge__guardrails`, a commit gate with pre-registered outcomes (14.4, 14.12).
 7. **Labelling isolation** (carried over from 14.7.6).
+
+## 15. Guardrails iteration (2026-10-04)
+
+The ruff experiments (§14.4, §14.12) showed a provisioned linter is almost never run unprompted. This iteration replaces them with a commit gate: the repository refuses a commit until a mechanical Python guardrail check passes. Experiment: `experiments/ab-test/python__forge__guardrails/` (`rationale.md` holds the pre-registration and the appended outcomes).
+
+### 15.1 Pack and approvals (`python-guardrails@1`)
+
+- **Rule coverage.** All 92 Enaible rules are resolved in `orchestrator/tests/fixtures/python_guardrails/coverage-ledger.json`. 73 are implemented, each with a passing and a violating canary. 16 are not applicable, each with `user_approval: approved` (2026-10-04) and evidence in `not-applicable.md`. 3 are not enforced:
+  - `PRETTIER.version` and `SECURITY.dependency-audit`: deferred.
+  - `TEST.coverage-minimum` (with the pytest style rules): **planned for `python-guardrails@2`**, which will provision pytest and coverage. Not dropped.
+- The vendored rule validator reports exactly those 3 as not implemented (exit 1 by design); a test asserts that set exactly. The validator rejects an unapproved not-applicable rule.
+- **Tiers:** every code blocks except `D`, `PT`, `PYQ102` and `PARITY.lock-version` (warn) and `PT009`/`PT027` (off; the `@1` image is unittest-only). mypy strict annotation codes block, subject to the smoke rule (§15.3).
+- **Adaptations (approved):** check-only (`fix = false`), concise output, `respect-gitignore = false`, the snapshot's excludes, mypy on production files only, and protected config copies (the gate runs on root-owned configs, so editing the workspace `ruff.toml`/`mypy.ini` cannot loosen it).
+- **The agent is not told about the gate.** It sees `ruff.toml` and `mypy.ini` as in any repository and learns of the gate from a refusal.
+
+### 15.2 Gate mechanism (`guardrail-gate@1`)
+
+After every agent session the harness runs `git commit` with `guardrail-check` as the pre-commit hook. A refusal starts a fix session that receives the gate output; at most 3 fix rounds, 300 s per gate run, all inside the step's 1800 s agent phase. Fix sessions are billed to the r2 arm. `committed` is derived from both the hook exit code and the real `git commit` exit code. A gate crash or exit 126 is an infrastructure `gate_error`, never a fix round. Integrity flags (edited config copies, protected-tree changes, refused suppressions, hook-bypass attempts) are recorded per step and never exclude a trial.
+
+**Gate effort as a quality signal** (`gate-effort@1`, deterministic): rounds to clean, first-pass clean rate, unresolved (rounds exhausted) rate, blocking findings per round by rule family, fix-session cost/tokens/wall time, gate wall time and gate-error rate. An ungated trajectory scores `not_applicable`, never zero (checked on a real ungated r1 trial: all 288 observations `not_applicable`). These feed the paired between-arm comparisons when both arms are gated, the benchmark rankings and the review surface.
+
+### 15.3 Smoke outcome and the rule decision
+
+Pre-registered rule (rationale §6): move the five mypy annotation codes to WARN only if ≥ 50% of r2 steps exhaust their fix rounds AND those codes are the majority of the final-round blocking findings.
+
+Smoke `jobs/python__forge__guardrails/smoke-01`: 2 r2 trials (attempts 0 and 1, one job instead of the two shown in rationale §9), 16 gated steps.
+
+| Signal | Value |
+|---|---|
+| Rule evaluable | yes: both trials valid, all component probes passed, 0 gate errors, no `protected-*` flags |
+| Rounds exhausted | 0 of 16 (0.0) |
+| Final-round annotation share | 0 pooled findings (0.0) |
+| **Decision** | **keep BLOCK**; no policy change; main job under lock `20f0573fc970` |
+| Gate refused the first commit | 16 of 16 (first-pass clean 0 of 16) |
+| Rounds to clean | exactly 1 on every step |
+| First-run blocking findings | 103 in total (1 to 31 per step): style 38, complexity 32, typing 28, defects 3, suppressions 2 |
+| Steps with typing findings | 7 of 16 (b00 cp1, 2, 5, 6, 7, 8; b01 cp8) |
+| Integrity flags | `suppression-refused` at cp8 in each trial; nothing else |
+| Cost | $0.159 total; fix sessions $0.0853 (54%); 23-114 s of fix time per step; one gate run 0.64-1.04 s |
+| Correctness | b00 solved cp1-2; b01 solved none |
+
+The gate-effort observations in the store match an independent recomputation from the raw gate records (0 mismatches). Unlike the §7 expectation in the rationale, typing was not the main driver; style and complexity were, and every refusal was cleared in a single fix round.
+
+### 15.4 Main run
+
+**Not run yet.** `main-01` (both arms, 4 attempts each, the user's choice while the process is still iterating) was launched at 13:14:05 UTC and its `make` process was terminated (SIGTERM, exit 143) about 90 s later, before any trial finished: 0 trial records, no `finished_at`. It contributes no data. Its two started trials left idle containers on OrbStack (`b00-p0-r1-baseline__env-550419c8e3-main-1`, `b00-p0-r2-guardrails__env-550419c8e3-main-1`; only `sleep infinity` running). They were left in place for the user's decision; a rerun of the same trials would remove them, because Harbor's start runs `docker compose down --remove-orphans` on the same compose project.
+
+**Rerun plan:** after the containers are cleared, run a fresh job `main-02` under the unchanged lock from a detached process under `caffeinate`, then assess with all five scorers and analyse (commands in rationale §9). Expected cost about $0.5-1.
+
+**Reading the results.** The analysis labels raw `solve_rate` as "Primary outcome" (`outcomes.py` `primary_metric` for `continue` progression). The pre-registered primary is `solve_rate_errata`, read from its Effects-table row; raw `solve_rate` is reported beside it. With 4 pairs against `min_pairs` 5, every paired verdict will read `insufficient` by design; the direction, CIs, gate effort and cost are the explore signals. The rationale §9 smoke-outcome record is committed before the rerun, as §6 step 5 requires.
+
+### 15.5 What the next iteration should change
+
+1. **`python-guardrails@2`:** provision pytest and coverage in the image, enforce `TEST.coverage-minimum` and the pytest style rules, and turn `PT009`/`PT027` back on. This is a new component version and a new lock.
+2. **Primary-outcome label:** make the analysis primary configurable in the experiment schema (for example `analysis.primary: solve_rate_errata`) so the report heads with the pre-registered metric. Schema and lock change, so it goes in the next lock.
+3. **Commit evidence:** capture `git log --oneline` per step in the `guardrail-gate@1` record. Snapshots exclude `.git`, so today commit refusals are evidenced only by the recorded hook and git exit codes and the gate logs.
+4. **Gate both arms or shadow-gate r1.** With r1 ungated, gate effort describes r2 alone. A shadow `guardrail-check` run on r1 snapshots (a new scorer version) or a second gated arm would make the paired gate-effort comparison possible.
+5. **Long-running jobs:** launch real-LLM jobs detached under `caffeinate` from the start, so a session ending cannot terminate them.
+
+### 15.6 Decisions for you
+
+1. **Orphaned `main-01` containers:** approve removing the two idle containers above (no other containers are touched), which unblocks `main-02`.
+2. **Deferred rules:** `PRETTIER.version` and `SECURITY.dependency-audit` stay deferred until you say otherwise.

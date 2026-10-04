@@ -24,7 +24,8 @@ All notable changes to this project are documented in this file.
   - trace evidence of hook bypass attempts.
 - Experiment `experiments/ab-test/python__forge__guardrails/`: r1 (shared framing) against r2 (`python-guardrails@1` plus `guardrail-gate@1` with the hook command `guardrail-check`, at most 3 fix rounds). It runs 4 attempts (explore) and declares `gate-effort@1` and the manipulation check `gate_clean_at_step_end` (`min_share` 0.8).
   - `rationale.md` pre-registers the primary `solve_rate_errata` (raw `solve_rate` beside it), the secondary and gate-effort outcomes, and the smoke rule for the mypy strict annotation codes.
-  - Locked; not executed.
+  - Locked. Smoke `smoke-01` (2 r2 trials, 16 gated steps): rounds exhausted 0 of 16, so the pre-registered smoke rule keeps the mypy annotation codes at BLOCK; every step was refused once and cleared in one fix round (fix sessions $0.0853 of $0.159). Recorded in `rationale.md` §9.
+  - Main job not yet run: `main-01` was terminated before any trial finished and contributes no data; the rerun (`main-02`, same lock) waits on removing its two idle containers.
 
 ### Removed
 
@@ -32,6 +33,7 @@ All notable changes to this project are documented in this file.
 
 ### Documentation
 
+- Gate packet §15: the guardrails iteration (pack and approvals, gate mechanism, smoke outcome and rule decision, main-run status, next-iteration changes including `python-guardrails@2` with pytest and coverage). `rationale.md` §9 states that the pre-registered primary is the `solve_rate_errata` Effects row, although the analysis labels raw `solve_rate` as primary.
 - `python__forge__guided-r3/rationale.md`: its `process-compliance@1` references are marked historical; the experiment and its rescored jobs use `@2`.
 
 ## Unreleased - gate effort as a quality signal

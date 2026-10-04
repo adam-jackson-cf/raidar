@@ -1,6 +1,6 @@
 # python__forge__guardrails: rationale and pre-registration
 
-- **Status:** validated and locked (`experiment.lock.json`); **not executed**. This file was written before any job of this experiment. Sections 3 to 6 are the pre-registration. Later additions go in section 9 and never edit sections 3 to 6.
+- **Status:** validated and locked (`experiment.lock.json`). Smoke run (`smoke-01`, section 9); **main job not yet run** (`main-01` was aborted, section 9). This file was written before any job of this experiment. Sections 3 to 6 are the pre-registration. Later additions go in section 9 and never edit sections 3 to 6.
 - **Objective:** explore (AGENTS.md "Objectives"). The process is still being iterated, so the run is small: 4 attempts per arm (user decision, 2026-10-04). Results are exploratory signals, never cited as evidence of an effect.
 - **Question:** on `scb/forge@38d627ecf668`, does a repository that refuses a commit until a mechanical Python guardrail gate passes change correctness and code quality, against the shared framing alone?
 - **Replaces** `python__forge__ruff-lint` and `python__forge__ruff-lint-r2`. Those experiments showed the provisioned Ruff was available but almost never run unprompted (1 of 40 r2 steps). Their definitions were removed on 2026-10-04; their jobs stay on disk under `jobs/`.
@@ -139,4 +139,27 @@ make experiment-analyze JOBS="jobs/python__forge__guardrails/guardrails-01" \
 
 ### Smoke rule outcome
 
-Not run yet.
+Recorded 2026-10-04, before the main job. The smoke ran as one job, `jobs/python__forge__guardrails/smoke-01` (`ARM=r2-guardrails ATTEMPT="0 1" CONCURRENCY=2`), not the two jobs shown above; the trials and the rule computation are the same.
+
+- Rule evaluable: both trials valid, every component probe passed, 0 `gate_error`, no `protected-*` flags.
+- r2 steps with a gate record: 16 (2 trials x 8 checkpoints).
+- Rounds-exhausted share: 0 of 16 (0.0); condition 1 (>= 0.5) does not hold.
+- Annotation share: 0 final-round blocking findings pooled (0.0); condition 2 does not hold.
+- Decision: keep the mypy strict annotation codes at BLOCK. No policy change; the main job runs under lock `20f0573fc970`.
+- Observed beside the rule: every step ended `gate_clean` after exactly 1 fix round (first-pass clean 0 of 16). Typing (`MYPY.*`) findings appeared in 7 of 16 first gate runs (b00 checkpoints 1, 2, 5, 6, 7 and 8; b01 checkpoint 8); complexity and style dominated, unlike the section-7 expectation.
+
+Smoke cost: $0.159 in total, of which fix sessions were $0.0853. One gate run took 0.64-1.04 s (1.3-2.0 s per step across its two runs).
+
+### Main job status
+
+- **`main-01` did not run.** It was launched on 2026-10-04 at 13:14:05 UTC (both arms, attempts 0-3, `CONCURRENCY=2`). Its `make` process was terminated (SIGTERM, exit 143) about 90 s later, before any trial finished: 0 trial records, no `finished_at`. It contributes no data and is never analysed or pooled.
+- Its two started trials (`b00-p0-r1-baseline`, `b00-p0-r2-guardrails`) left idle containers on OrbStack. The rerun waits for the user's decision on removing them, because Harbor's start of the same trial (same compose project) runs `down --remove-orphans` on them.
+- **Rerun plan:** a fresh job id, `main-02`, under the unchanged lock `20f0573fc970`, from a detached process under `caffeinate` so that it survives the session. `main-01` stays on disk as an aborted job.
+
+### Reading the analysis: primary outcome label
+
+`make experiment-analyze` labels raw `solve_rate` as "Primary outcome" for `continue` progression (`outcomes.py` `primary_metric`); the label is not configurable in this lock. **The pre-registered primary is `solve_rate_errata` (section 3)**, read from its row in the Effects table. The results write-up states this explicitly; the lock is not changed to move the label.
+
+### Deferred to python-guardrails@2
+
+`TEST.coverage-minimum` and the pytest style rules are not dropped: python-guardrails@2 will provision pytest and coverage in the image and enforce them (user decision 2026-10-04). PT009/PT027 stay off in @1 because the @1 image is unittest-only.
