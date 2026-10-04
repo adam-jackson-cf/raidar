@@ -1,18 +1,25 @@
 # Guardrails A/B on forge: does a repository that refuses a commit until a mechanical
 # Python guardrail gate passes change correctness and quality, against the shared framing alone?
-# r2 adds python-guardrails@1 (pinned Ruff 0.8.6 and mypy 2.3.1 plus bespoke checks, installed
-# root-owned under /opt/raidar-tools/python-guardrails with protected configs; byte-identical
-# ruff.toml and mypy.ini copies at /app) and guardrail-gate@1 (after every session: git commit
-# with guardrail-check as the pre-commit hook; a refusal starts a fix session, at most 3).
-# No rules text tells the agent about the gate in advance (the mechanical rung only): it sees
+# r2 adds python-guardrails@2 (the @1 pack, byte for byte: pinned Ruff 0.8.6 and mypy 2.3.1
+# plus bespoke checks, installed root-owned under /opt/raidar-tools/python-guardrails with
+# protected configs; byte-identical ruff.toml and mypy.ini copies at /app) and guardrail-gate@2
+# in commit mode (after every session: git commit with guardrail-check as the pre-commit hook;
+# a refusal starts a fix session, at most 3; git log/status evidence in the gate record).
+# r1 (explore iteration 2, rationale.md section 10) gets the same pack without the workspace
+# copies and the same gate in shadow mode: the same commit check runs once at each step's end
+# against a git directory outside /app and is recorded, never enforced; nothing reaches /app
+# and no fix session starts, so r1's agent experience is unchanged and gate-effort@2's
+# first-run outcomes pair across arms.
+# No rules text tells the agent about the gate in advance (the mechanical rung only): r2 sees
 # ruff.toml and mypy.ini like in any repository and learns of the gate from its refusals.
 # Replaces python__forge__ruff-lint and python__forge__ruff-lint-r2 (removed 2026-10-04; their
 # jobs stay on disk under jobs/).
 # Objective: explore (4 attempts per arm while the process is still being iterated). Verdicts
 # below min_pairs read insufficient by design.
 # Pre-registration: rationale.md beside this file (written before any job): primary
-# solve_rate_errata with raw solve_rate beside it, secondary and gate-effort outcomes, the
-# manipulation check, and the smoke rule for the mypy strict annotation codes.
+# solve_rate_errata with raw solve_rate beside it (analysis.primary_outcome), secondary and
+# gate-effort outcomes, the manipulation check, and the smoke rule for the mypy strict
+# annotation codes; section 10 amends the design before main-02.
 # Validate: make experiment-validate EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
 # Lock:     make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
 schema_version: 2
@@ -55,7 +62,22 @@ shared_components:
 
 conditions:
   - id: r1-baseline
-    components: []
+    components:
+      # The same pack, installed outside /app, with nothing in the workspace: the agent sees
+      # no ruff.toml or mypy.ini. Its probe proves the pinned tools and a working gate before
+      # every step, and at step 1 that no config copy is in /app.
+      - use: python-guardrails@2
+        with:
+          workspace_configs: false
+      # The same commit check in shadow mode: run once at each step's end against a git
+      # directory outside /app (the workspace is never written), recorded in the gate record
+      # with its git evidence, never enforced (no refusal, no fix session).
+      - use: guardrail-gate@2
+        with:
+          command: guardrail-check
+          mode: shadow
+          max_rounds: 3
+          timeout_sec: 300
   - id: r2-guardrails
     components:
       # The pack: the gate entrypoint, its pinned tools and protected configs, and the
@@ -63,11 +85,14 @@ conditions:
       # versions and a working gate (a clean file passes, an unused import is refused);
       # its integrity flags record config-copy edits and hook-bypass attempts without
       # failing the step.
-      - use: python-guardrails@1
+      - use: python-guardrails@2
+        with:
+          workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
       # real repository; the gate's JSON report goes to the run's report dir
-      # ($RAIDAR_GATE_REPORT_DIR), where gate-effort@1 reads it.
-      - use: guardrail-gate@1
+      # ($RAIDAR_GATE_REPORT_DIR), where gate-effort@2 reads it; every commit attempt
+      # records git log/status evidence in the gate record.
+      - use: guardrail-gate@2
         with:
           command: guardrail-check
           mode: commit
@@ -83,11 +108,13 @@ arms:
     agent: codex-luna
 
 assessment:
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2, gate-effort@1]
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2, gate-effort@2]
   metric: scb-canonical@2
 
 analysis:
   baseline_arm: r1-baseline
+  # Pre-registered in rationale.md section 3; raw solve_rate is always reported beside it.
+  primary_outcome: solve_rate_errata
   # Explore: 4 attempts per arm (user decision 2026-10-04). min_pairs stays at the default
   # (5), so paired verdicts read insufficient by design; the sample-size projection sizes a
   # later confirm run.
@@ -99,7 +126,8 @@ analysis:
   min_effects:
     correctness: 0.02
     headline_score: 2.0
-  # The gate is absent from r1, so the check is decided by r2's share alone.
+  # r1's shadow gate never enforces, so it decides no checkpoint for this check: r2's share
+  # alone decides it.
   manipulation_checks:
     - check: gate_clean_at_step_end
       min_share: 0.8

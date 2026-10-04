@@ -29,6 +29,7 @@ from raidar.execution.trial_record import (
     write_record,
 )
 from raidar.job_layout import (
+    DETACH_DIR,
     JOB_KIND,
     JOB_LOCK_FILE,
     JOB_MANIFEST,
@@ -178,9 +179,21 @@ def _write_json(path: Path, payload: Mapping[str, object]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
 
 
+def create_job_dir(job_dir: Path) -> None:
+    """Create the job directory; a job directory is never reused.
+
+    The one exception is a detached launch (``raidar.execution.detach``), which
+    writes its ``detach/`` files (launch record, pid, log) before the job starts:
+    a directory holding exactly that is this job's own.
+    """
+    if job_dir.is_dir() and [path.name for path in job_dir.iterdir()] == [DETACH_DIR]:
+        return
+    job_dir.mkdir(parents=True, exist_ok=False)
+
+
 async def execute(ctx: JobContext) -> list[TrialRecord]:
     """Run the plan's selected trials and write the job directory."""
-    ctx.job_dir.mkdir(parents=True, exist_ok=False)
+    create_job_dir(ctx.job_dir)
     plan = ctx.plan
     _write_json(ctx.job_dir / PLAN_FILE, plan.to_json())
     if plan.lock:

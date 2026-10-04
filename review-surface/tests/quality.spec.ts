@@ -31,6 +31,30 @@ test.describe('quality navigation', () => {
     await expect(page.getByRole('heading', { name: 'synthetic/ledger@0' })).toBeVisible();
   });
 
+  test('the experiment view names its pre-registered primary outcome', async ({ page }) => {
+    await openQuality(page);
+    await expect(page.getByTestId('primary-outcome')).toContainText('Primary outcome: solve_rate');
+    await expect(page.getByTestId('primary-outcome')).toContainText('default for continue progression');
+    await expect(page.getByTestId('primary-raw')).toHaveCount(0);
+  });
+
+  test('an errata-applied primary names the raw outcome reported beside it', async ({ page }) => {
+    await page.route('**/api/quality/experiments', async (route) => {
+      const response = await route.fetch();
+      const body = await response.json();
+      for (const item of body.experiments) {
+        item.primary_outcome = 'solve_rate_errata';
+        item.primary_source = 'lock (analysis.primary_outcome)';
+        item.primary_raw = 'solve_rate';
+      }
+      await route.fulfill({ response, json: body });
+    });
+    await openQuality(page);
+    await expect(page.getByTestId('primary-outcome')).toContainText('Primary outcome: solve_rate_errata');
+    await expect(page.getByTestId('primary-outcome')).toContainText('lock (analysis.primary_outcome)');
+    await expect(page.getByTestId('primary-raw')).toContainText('raw solve_rate reported beside it');
+  });
+
   test('a trial link opens its run detail and back returns', async ({ page }) => {
     await openQuality(page);
     await page.getByTestId('quality-trials').getByRole('link', { name: 'b02-p0-baseline' }).click();
@@ -165,6 +189,24 @@ test.describe('quality run detail: commit gate', () => {
     await expect(rounds.first()).toHaveAttribute('data-verdict', 'refused');
     await expect(rounds.first()).toContainText(/\d+ blocking/);
     await expect(rounds.first()).toContainText('gate_run_1.log');
+  });
+
+  test('a shadow gate is labelled as never enforced and shows what it would have decided', async ({ page }) => {
+    // gate-effort@2 shadow records (guardrail-gate@2 mode shadow): the run detail is the
+    // fixture's gated run with its view marked shadow, as the projection writes it.
+    await page.route(`**/api/quality/runs/${GATED_RUN}`, async (route) => {
+      const response = await route.fetch();
+      const detail = await response.json();
+      detail.gate.shadow = true;
+      detail.gate.scorer = 'gate-effort@2';
+      for (const step of detail.gate.steps) step.termination = 'shadow_recorded';
+      await route.fulfill({ response, json: detail });
+    });
+    await page.goto(`/quality/runs/${GATED_RUN}`);
+    const panel = page.getByTestId('gate-panel');
+    await expect(panel.getByTestId('gate-shadow')).toHaveText('shadow gate · never enforced');
+    await expect(panel).toContainText('gate-effort@2');
+    await expect(panel.getByTestId('gate-ending').first()).toHaveText(/^shadow: would (pass|refuse)$/);
   });
 
   test('an ungated run has no gate panel, not a row of zeros', async ({ page }) => {

@@ -313,7 +313,7 @@ def spec_warnings(spec: ExperimentSpec) -> list[FieldIssue]:
 
 def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     # Analysis owns the outcome metric ids; imported lazily like the scorer catalog.
-    from raidar.analysis.outcomes import ALL_METRICS
+    from raidar.analysis.outcomes import ALL_METRICS, OUTCOME_METRICS
 
     known = {metric.id for metric in ALL_METRICS}
     issues = [
@@ -330,6 +330,16 @@ def _min_effect_issues(spec: ExperimentSpec) -> list[FieldIssue]:
             FieldIssue(
                 "analysis.rank_by",
                 f"unknown outcome metric {rank_by!r}; known: {', '.join(sorted(known))}",
+            )
+        )
+    # The primary is a trial outcome every arm has (gate effort describes one treatment).
+    outcomes = {metric.id for metric in OUTCOME_METRICS}
+    primary = spec.analysis.primary_outcome
+    if primary is not None and primary not in outcomes:
+        issues.append(
+            FieldIssue(
+                "analysis.primary_outcome",
+                f"unknown primary outcome {primary!r}; known: {', '.join(sorted(outcomes))}",
             )
         )
     return issues

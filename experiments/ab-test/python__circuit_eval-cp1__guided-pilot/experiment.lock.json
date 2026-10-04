@@ -634,7 +634,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "f0dd8104dc70cc29e0aab85362ed76dd1fefb586b75703992e9ae89be0cc4eaf",
+  "document_sha256": "501a2ccfaca157d42dfe3fe3d61def6d5241a9383749f46a8e36e523c5c94987",
   "execution": {
     "arms": {
       "baseline": {
@@ -986,7 +986,7 @@
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
     "assessment": "8174442f8290aa55be45cb1fd14028fb86a2eac3e27feac0f1023b2a8c5d9087",
     "execution": "b54c3605ced9fcc20c4abadca589bfe965b75bb280ee11924667d88b78011a65",
-    "toolchain": "124bc41438ab812b2ade309012ea305329b7ac507bab86b985b6096d1a65f6d0"
+    "toolchain": "657a87063f9d6ff78222aec39691aebf3f3288650739261e1702f6640b273471"
   },
   "spec": {
     "agents": [
@@ -1120,6 +1120,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "bb0f8268bb2de86a5fa72b1cb526bd6c4a11c6a5cb25182ce4814f33110a4dd6"
+    "raidar_spec": "2ac35d79752fea36fc78e2a2b55e1209226067aae0ca529f4d9476c522353ffb"
   }
 }

@@ -1,14 +1,15 @@
-"""Builders for python-guardrails@1 tests: a host gate home and the verification root.
+"""Builders for python-guardrails tests: a host gate home and the verification root.
 
 - ``host_home``: the payload's gate with this environment's Python, Ruff and
   mypy (not the pinned versions) as its venv, for behaviour that does not
   depend on a tool version (exit codes, reports, tiers, protection evidence).
-- ``assemble_verify_root``: the layout the rule-coverage ledger names (``pack/``
-  is the shipped payload, the canary harness and validator at the root, and
-  ``gate/guardrail-gate-commit.sh``, guardrail-gate@1's commit script rendered
-  for the guardrails experiment's own gate command). Fixtures are generated in
-  the pack image (``make guardrails-verify``), where the lock canary's
-  ``uv.lock`` is made by the uv the gate runs.
+- ``assemble_verify_root``: the rule tests' layout (``pack/`` is the shipped
+  payload; the canary harness ``canary.py``, the runner ``run_canaries.py``,
+  the fixture generator and ``specs.json`` at the root; and
+  ``gate/guardrail-gate-commit.sh``, guardrail-gate@2's commit script rendered
+  for the guardrails experiment's own enforced gate command). Fixtures are
+  generated in the pack image (``make guardrails-verify``), where the lock
+  canary's ``uv.lock`` is made by the uv the gate runs.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from typing import Any
 import yaml
 
 from raidar.components.builtins.guardrails import PAYLOAD_DIR, PAYLOAD_FILES
-from raidar.components.gate_run import GateMode, GuardrailGateOptions, gate_script
+from raidar.components.gate_run_v2 import GateModeV2, GuardrailGateOptionsV2, gate_script
 from raidar.components.review_loop import InnerAgent
 from tests.experiment_spec_support import GUARDRAILS_EXPERIMENT
 
@@ -44,23 +45,35 @@ def host_home(base: Path, *, tools: tuple[str, ...] = ("python", "ruff", "mypy")
     return home
 
 
-def experiment_gate_use() -> dict[str, Any]:
-    """The guardrails experiment's guardrail-gate@1 ``with`` (the r2 condition)."""
+GATE_REF = "guardrail-gate@2"
+
+
+def experiment_gate_uses() -> dict[str, dict[str, Any]]:
+    """The guardrails experiment's guardrail-gate@2 ``with`` per condition."""
     spec = yaml.safe_load(GUARDRAILS_EXPERIMENT.read_text())
-    for condition in spec["conditions"]:
-        for use in condition["components"]:
-            if use["use"] == "guardrail-gate@1":
-                return dict(use["with"])
-    raise AssertionError("the guardrails experiment declares no guardrail-gate@1 use")
+    return {
+        condition["id"]: dict(use["with"])
+        for condition in spec["conditions"]
+        for use in condition["components"]
+        if use["use"] == GATE_REF
+    }
+
+
+def experiment_gate_use(mode: str = "commit") -> dict[str, Any]:
+    """The experiment's guardrail-gate@2 ``with`` in ``mode`` (commit: the enforced r2 gate)."""
+    for gate in experiment_gate_uses().values():
+        if gate.get("mode", "commit") == mode:
+            return gate
+    raise AssertionError(f"the guardrails experiment declares no {GATE_REF} use in mode {mode}")
 
 
 def commit_gate_script() -> str:
-    """guardrail-gate@1's commit-mode script for the experiment's gate command."""
+    """guardrail-gate@2's commit-mode script for the experiment's enforced gate command."""
     gate = experiment_gate_use()
-    options = GuardrailGateOptions(
+    options = GuardrailGateOptionsV2(
         inner_agent=InnerAgent(name="nop"),
         command=gate["command"],
-        mode=GateMode(gate.get("mode", "commit")),
+        mode=GateModeV2(gate.get("mode", "commit")),
         max_rounds=gate.get("max_rounds", 3),
         timeout_sec=gate.get("timeout_sec", 600),
         work_dir=str(CANARY_GATE_DIR / "work"),

@@ -208,10 +208,15 @@ class AnalysisSpec(SpecModel):
     counterbalancing). ``min_effects`` maps an outcome metric id to its
     smallest effect of interest for the sample-size projection;
     ``rank_by`` (benchmarks only) names the outcome metric the ranking view
-    orders agents by. ``raidar.spec.validation`` checks both metric ids.
-    ``manipulation_checks`` pre-registers the manipulation checks (and any
-    threshold) analysis runs; unset, analysis runs the process-compliance
-    defaults when that scorer is declared.
+    orders agents by. ``primary_outcome`` names the pre-registered primary
+    outcome the report, its markdown and the review surface label as primary
+    (unset: the progression's default, ``solve_rate`` under ``continue`` and
+    ``reached`` under ``halt_on_failure``); it is analysis configuration, so
+    setting it relocks the ``analysis`` section only and keeps ``lock_sha256``.
+    ``raidar.spec.validation`` checks every metric id. ``manipulation_checks``
+    pre-registers the manipulation checks (and any threshold) analysis runs;
+    unset, analysis runs the process-compliance defaults when that scorer is
+    declared.
     """
 
     baseline_arm: Identifier
@@ -223,6 +228,7 @@ class AnalysisSpec(SpecModel):
     alpha: float = Field(default=DEFAULT_ALPHA, gt=0.0, lt=1.0)
     min_effects: dict[str, PositiveFiniteFloat] = Field(default_factory=dict)
     rank_by: str | None = None
+    primary_outcome: str | None = None
     manipulation_checks: tuple[ManipulationCheckSpec, ...] | None = Field(
         default=None, min_length=1
     )
@@ -308,7 +314,7 @@ class ExperimentSpec(SpecModel):
             exclude["shared_components"] = True
         unset = {
             name
-            for name in ("rank_by", "manipulation_checks")
+            for name in ("rank_by", "primary_outcome", "manipulation_checks")
             if getattr(self.analysis, name) is None
         }
         if unset:

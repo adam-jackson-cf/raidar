@@ -6,11 +6,13 @@
   ``git commit --no-verify``, then fixes the file when the gate refuses. It
   proves the install, the per-step probe, the commit refusal with the pinned
   tools, the per-run JSON reports and the integrity flags end to end.
-- The rule-coverage verification (``make guardrails-verify``; opt-in with
-  ``RAIDAR_GUARDRAILS_VERIFY=1`` because it runs 146 canary gate runs): the
-  skill's validator over the approved ledger, executing every canary against
-  the installed pack in the image, the parity canary through guardrail-gate@1's
-  rendered commit script. Exactly the three deferred rules may fail.
+- The rule tests (``make guardrails-verify``; opt-in with
+  ``RAIDAR_GUARDRAILS_VERIFY=1`` because it runs 146 canary gate runs): every
+  implemented rule's violating canary fires and its clean canary passes
+  (``run_canaries.py``) against the installed pack in the image, the parity
+  canary through guardrail-gate@2's rendered commit script; a mutant pack with
+  three checkers disabled must fail exactly those rules' violating canaries.
+  No file of the setup-repository-guardrails skill is involved.
 """
 
 from __future__ import annotations
@@ -45,7 +47,8 @@ from tests.component_trial_support import (
 from tests.python_guardrails_support import assemble_verify_root, experiment_gate_use
 
 INNER = "tests.test_component_python_guardrails_trial:TamperingInnerAgent"
-DEFERRED = ("PRETTIER.version", "SECURITY.dependency-audit", "TEST.coverage-minimum")
+SHADOW_INNER = "tests.test_component_python_guardrails_trial:ObservingInnerAgent"
+IMPLEMENTED_RULES = 73
 VERIFY_SLUG = "00-python-guardrails"
 
 docker_trial = pytest.mark.skipif(
@@ -161,6 +164,84 @@ def test_gate_refuses_with_the_pinned_pack_and_tampering_is_flagged_in_a_real_tr
     assert TamperingInnerAgent.sessions == ["work", "fix", "work"]
 
 
+class ObservingInnerAgent(BaseAgent):
+    """Lists what it can see in the workspace, and writes a refused file at step 1."""
+
+    sessions: ClassVar[list[str]] = []
+
+    @staticmethod
+    def name() -> str:
+        return "observing-inner"
+
+    def version(self) -> str | None:
+        return "1"
+
+    async def setup(self, environment: BaseEnvironment) -> None:
+        return None
+
+    async def run(
+        self, instruction: str, environment: BaseEnvironment, context: AgentContext
+    ) -> None:
+        cls = type(self)
+        cls.sessions.append(instruction)
+        write = "printf 'import os\\n' > bad.py && " if len(cls.sessions) == 1 else ""
+        trajectory = {
+            "schema_version": "ATIF-v1.6",
+            "session_id": f"s{len(cls.sessions)}",
+            "agent": {"name": "codex", "version": "1"},
+            "steps": [{"step_id": 1, "source": "agent", "message": "done"}],
+        }
+        await environment.exec(
+            f"{write}ls -A > {self.environment_logs_dir}/seen.txt; "
+            f"echo {shlex.quote(json.dumps(trajectory))} > "
+            f"{self.environment_logs_dir}/trajectory.json"
+        )
+        context.n_input_tokens, context.n_output_tokens, context.cost_usd = 10, 1, 0.0
+
+
+@docker_trial
+def test_the_shadow_baseline_records_the_gate_unseen_in_a_real_trial(tmp_path: Path) -> None:
+    """r1's condition: the pack without workspace copies and the gate in shadow mode."""
+    ObservingInnerAgent.sessions.clear()
+    gate = {**experiment_gate_use("shadow"), "timeout_sec": 120}
+    compiled = compile_uses(
+        use("python-guardrails@2", workspace_configs=False), use("guardrail-gate@2", **gate)
+    )
+    task = tmp_path / "python-guardrails-shadow"
+    build_task(task, compiled, {"checkpoint_1": "step one", "checkpoint_2": "step two"})
+    assert compiled.agent_wrapper is not None
+    agent = AgentConfig(
+        import_path=compiled.agent_wrapper.import_path,
+        kwargs={**dict(compiled.agent_wrapper.kwargs), "inner_agent": {"name": SHADOW_INNER}},
+    )
+
+    trial = run_trial_sync(
+        task, tmp_path / "trials", agent, task.name, condition_provisions(compiled)
+    )
+
+    steps = [trial / "steps" / step / "agent" for step in ("checkpoint_1", "checkpoint_2")]
+    for index, agent_dir in enumerate(steps):
+        report = compiled.probe_step(agent_dir, index)
+        assert report.passed, report.to_json()
+        record = json.loads((agent_dir / "guardrail-gate" / GATE_RECORD).read_text())
+        assert (record["mode"], record["termination_reason"]) == ("shadow", "shadow_recorded")
+        assert [stage["stage"] for stage in record["stages"]] == ["work"]
+        assert record["gate_clean_at_step_end"] is None
+        (run,) = record["gate_runs"]
+        assert (run["passed"], run["exit_code"], run["committed"]) == (False, 1, None)
+        assert run["git"]["repository"] == "shadow"
+        assert "A  bad.py" in run["git"]["status_porcelain"]
+        gate_report = json.loads(
+            next((agent_dir / "guardrail-gate").rglob("gate-*.json")).read_text()
+        )
+        assert gate_report["counts"]["block"] == {"F401": 1}
+        seen = set(next(agent_dir.rglob("seen.txt")).read_text().split())
+        assert not seen & {".git", "ruff.toml", "mypy.ini"}, seen
+        assert condition_step_flags(compiled, agent_dir, index) == ()
+    assert len(ObservingInnerAgent.sessions) == 2, "no fix session ever starts"
+    assert all("gate" not in prompt for prompt in ObservingInnerAgent.sessions)
+
+
 # ---- rule-coverage verification (opt-in) -------------------------------------------
 
 coverage_verification = pytest.mark.skipif(
@@ -184,31 +265,28 @@ demo="$(mktemp -d)" && cp /verify/demo-pyproject.toml "$demo/pyproject.toml" && 
 uv lock --offline --quiet && cp uv.lock /verify/demo-uv.lock
 cd /verify
 python3 make_fixtures.py canaries/fixtures demo-uv.lock specs.json
-python3 validate_rule_coverage.py --root /verify --catalog enaible-rules.json \\
-  --ledger coverage-ledger.json > validator.out 2>&1 || echo "validator_rc=$?" >> validator.out
+python3 run_canaries.py specs.json canaries/fixtures > canaries.out 2>&1 \\
+  || echo "canaries_rc=$?" >> canaries.out
 # Negative control: a copy of the pack with three checkers disabled must fail their canaries.
 cp -R /opt/raidar-tools/python-guardrails /tmp/mutant
 sed -i "s/^off = \\[/off = [\\n    \\"F401\\",/" /tmp/mutant/config/policy.toml
 sed -i "s/\\"C901\\", //" /tmp/mutant/config/ruff.toml
 sed -i "s/^CLASS_MAX_LINES = 700/CLASS_MAX_LINES = 100000/" \\
   /tmp/mutant/lib/guardrails/source_rules.py
-GUARDRAILS_HOME=/tmp/mutant python3 validate_rule_coverage.py --root /verify \\
-  --catalog enaible-rules.json --ledger mutant-ledger.json > mutant.out 2>&1 || true
+GUARDRAILS_HOME=/tmp/mutant python3 run_canaries.py specs.json canaries/fixtures \\
+  --rules {mutated} > mutant.out 2>&1 || true
 '
 """
 MUTATED = ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F")
 
 
 @coverage_verification
-def test_every_applicable_rule_is_proven_by_its_canaries_in_the_pack_image(
+def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
     tmp_path: Path,
 ) -> None:
     root = assemble_verify_root(tmp_path / "verify")
     (root / "install.sh").write_text(install_script(VERIFY_SLUG))
-    (root / "run.sh").write_text(VERIFY_SCRIPT.format(slug=VERIFY_SLUG))
-    ledger = json.loads((root / "coverage-ledger.json").read_text())
-    ledger["rules"] = [row for row in ledger["rules"] if row["id"] in MUTATED]
-    (root / "mutant-ledger.json").write_text(json.dumps(ledger))
+    (root / "run.sh").write_text(VERIFY_SCRIPT.format(slug=VERIFY_SLUG, mutated=",".join(MUTATED)))
     (root / "demo-pyproject.toml").write_text(DEMO_PYPROJECT)
     name = f"raidar-guardrails-verify-{uuid.uuid4().hex[:8]}"
 
@@ -222,14 +300,18 @@ def test_every_applicable_rule_is_proven_by_its_canaries_in_the_pack_image(
         timeout=1800,
     )
 
-    output = (root / "validator.out").read_text() if (root / "validator.out").exists() else ""
+    output = (root / "canaries.out").read_text() if (root / "canaries.out").exists() else ""
     print(output)
     assert done.returncode == 0, done.stdout + done.stderr
     assert (root / "specs.json").read_text() == (
         Path(__file__).parents[1] / "tests/fixtures/python_guardrails/specs.json"
     ).read_text(), "the image's fixture generator wrote different canary specs"
-    failures = sorted(line for line in output.splitlines() if line.startswith("rule coverage"))
-    assert failures == [f"rule coverage FAIL: {rule}: rule is not implemented" for rule in DEFERRED]
+    failures = [line for line in output.splitlines() if line.startswith("canary FAIL")]
+    assert failures == [], "\n".join(failures)
+    passed = [line for line in output.splitlines() if line.startswith("canary PASS ")]
+    assert len(passed) == IMPLEMENTED_RULES
+    assert f"canaries: {IMPLEMENTED_RULES} rule(s), 0 failed" in output
     mutant = (root / "mutant.out").read_text()
     for rule in MUTATED:
-        assert f"rule coverage FAIL: {rule}: violating canary passed" in mutant, mutant[-2000:]
+        assert f"canary FAIL {rule}: violating canary passed" in mutant, mutant[-2000:]
+    assert f"canaries: {len(MUTATED)} rule(s), {len(MUTATED)} failed" in mutant

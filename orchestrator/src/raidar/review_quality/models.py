@@ -154,9 +154,14 @@ class GateStep(QualityModel):
 
 
 class GateView(QualityModel):
-    """A gated trial's commit-gate effort (``gate-effort@1``); absent for an ungated trial."""
+    """A gated trial's commit-gate effort (gate-effort@1 or @2); absent for an ungated trial."""
 
     source: str | None
+    scorer: str | None = None
+    """The gate-effort version the cells come from (None: the trial is unassessed)."""
+    shadow: bool = False
+    """A shadow gate (guardrail-gate@2 ``mode: shadow``): recorded at each step's end, never
+    enforced; its fix outcomes are ``not_applicable`` and the families shown are first-run."""
     steps: tuple[GateStep, ...]
     totals: dict[str, Cell]
     notes: tuple[str, ...] = ()
@@ -277,6 +282,12 @@ class QualityExperiment(QualityModel):
     lock_sha256: str | None
     jobs: tuple[str, ...]
     problems: tuple[ProblemQuality, ...]
+    primary_outcome: str | None = None
+    """The pre-registered primary outcome (the lock's ``analysis.primary_outcome``, else the
+    progression's default), as the analysis report labels it."""
+    primary_source: str | None = None
+    primary_raw: str | None = None
+    """The raw SCB counterpart an errata-applied primary is always reported beside."""
 
 
 class QualityProjection(QualityModel):

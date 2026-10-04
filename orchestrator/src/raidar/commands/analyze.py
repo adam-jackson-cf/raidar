@@ -197,4 +197,7 @@ def analyze(
             f"{comparison.treatment} vs {comparison.baseline}: primary {primary.metric} "
             f"{primary.verdict.value} ({primary.verdict_reason})"
         )
+        raw = comparison.primary_raw
+        if raw is not None:
+            click.echo(f"  raw {raw.metric} beside it: {raw.verdict.value} ({raw.verdict_reason})")
     click.echo(f"wrote {output / REPORT_JSON} and {output / REPORT_MARKDOWN}")

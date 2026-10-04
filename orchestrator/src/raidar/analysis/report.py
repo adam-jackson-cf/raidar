@@ -9,7 +9,8 @@ Jobs and Assessments are only read, never written.
 Each treatment arm is compared with the experiment's baseline arm. Effects are
 listed per outcome metric: one per problem, plus an equal-weight aggregate when
 the experiment has several problems. Each comparison's ``primary`` effect is
-the pre-registered primary outcome of the experiment's progression (memo §2.3,
+the pre-registered primary outcome: the lock's ``analysis.primary_outcome``, else
+the one of the experiment's progression (memo §2.3,
 §10.1: C under ``continue``, ``reached`` under ``halt_on_failure``); the
 composite S of the headline metric is a secondary effect (F15 makes it
 the review surface's score, not the primary outcome).
@@ -58,9 +59,12 @@ from raidar.analysis.manipulation import (
 from raidar.analysis.outcomes import (
     COST_METRICS,
     OUTCOME_METRICS,
+    RAW_COUNTERPART,
     AnalysisModel,
     TrialOutcome,
+    outcome_metric,
     primary_metric,
+    primary_source,
 )
 from raidar.analysis.ranking import Ranking, ranking
 from raidar.analysis.stats import POWER_CONSTANT, pairs_for_power
@@ -102,7 +106,9 @@ class AnalysisInputs:
     replaced: tuple[str, ...] = ()
     process_results: Mapping[str, AssessResult | None] | None = field(default=None)
     gate_results: Mapping[str, AssessResult | None] | None = field(default=None)
-    """``gate-effort@1`` results per trial when the lock declares it (else None)."""
+    """gate-effort results per trial when the lock declares it (else None)."""
+    gate_scorer: str | None = None
+    """The gate-effort version the lock declares (``gate-effort@1`` or ``@2``)."""
     manipulation_checks: tuple[CheckRequest, ...] | None = None
     """The lock's pre-registered manipulation checks (None: the process defaults)."""
     dev_job: DevRun | None = None
@@ -110,6 +116,19 @@ class AnalysisInputs:
     rank_by: str | None = None
     attempts: int = 1
     errata: Mapping[str, Mapping[str, object]] | None = None
+    primary_outcome: str | None = None
+    """The lock's pre-registered ``analysis.primary_outcome`` (None: the progression's)."""
+
+    @property
+    def primary(self) -> str:
+        return primary_metric(self.progression, self.primary_outcome)
+
+    @property
+    def gate_label(self) -> str | None:
+        """The gate-effort version the report names (None: the lock declares none)."""
+        if self.gate_results is None:
+            return None
+        return self.gate_scorer or "gate-effort@1"
 
 
 class ArmSummary(AnalysisModel):
@@ -129,6 +148,8 @@ class Comparison(AnalysisModel):
     baseline: str
     treatment: str
     primary: Effect
+    primary_raw: Effect | None = None
+    """The raw SCB counterpart of an errata-applied primary, always reported beside it."""
     effects: tuple[Effect, ...]
     curves: tuple[Curve, ...]
     manipulation: ManipulationReport | None = None
@@ -168,6 +189,10 @@ class AnalysisReport(AnalysisModel):
     jobs: tuple[str, ...]
     metric: dict[str, object]
     primary_metric: str
+    primary_source: str = "default"
+    """``lock (analysis.primary_outcome)`` or the progression default it fell back to."""
+    gate_scorer: str | None = None
+    """The gate-effort version the gate outcomes come from, when the lock declares one."""
     baseline_arm: str
     progression: str
     dev_job: DevRun | None = None
@@ -260,11 +285,31 @@ def _manipulation(
     )
 
 
+def _primary_effect(
+    metric_id: str,
+    effects: Sequence[Effect],
+    slots: Mapping[str, list[Slot]],
+    settings: Settings,
+    label: str,
+) -> Effect:
+    """The outcome's aggregate (or only) effect; computed even when it applies to no problem."""
+    matching = [effect for effect in effects if effect.metric == metric_id]
+    if matching:
+        return matching[-1]
+    metric = outcome_metric(metric_id)
+    per_problem = [
+        problem_effect(metric, problem, problem_slots, settings, label=label)
+        for problem, problem_slots in slots.items()
+    ]
+    if len(per_problem) > 1:
+        return aggregate_effect(metric, per_problem, settings)
+    return per_problem[0]
+
+
 def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> Comparison:
     label = f"{inputs.baseline_arm}->{treatment}"
     slots = _slots(inputs, treatment)
     effects = _effects(slots, settings, label)
-    primary = primary_metric(inputs.progression)
     gated, note = (
         gate_effects(slots, settings, label=label)
         if inputs.gate_results is not None
@@ -273,7 +318,12 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
     return Comparison(
         baseline=inputs.baseline_arm,
         treatment=treatment,
-        primary=[effect for effect in effects if effect.metric == primary][-1],
+        primary=_primary_effect(inputs.primary, effects, slots, settings, label),
+        primary_raw=(
+            _primary_effect(RAW_COUNTERPART[inputs.primary], effects, slots, settings, label)
+            if inputs.primary in RAW_COUNTERPART
+            else None
+        ),
         effects=tuple(effects),
         curves=tuple(
             curve
@@ -371,7 +421,9 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         lock_sha256=inputs.lock_sha256,
         jobs=inputs.jobs,
         metric=dict(inputs.metric),
-        primary_metric=primary_metric(inputs.progression),
+        primary_metric=inputs.primary,
+        primary_source=primary_source(inputs.progression, inputs.primary_outcome),
+        gate_scorer=inputs.gate_label,
         baseline_arm=inputs.baseline_arm,
         progression=inputs.progression,
         dev_job=inputs.dev_job,
@@ -394,7 +446,7 @@ def _ranking(
     return ranking(
         inputs.outcomes,
         [summary.arm for summary in summaries],
-        rank_by=inputs.rank_by or primary_metric(inputs.progression),
+        rank_by=inputs.rank_by or inputs.primary,
         reference_arm=inputs.baseline_arm,
         attempts=inputs.attempts,
         settings=settings,

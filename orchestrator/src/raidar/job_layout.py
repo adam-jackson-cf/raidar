@@ -10,6 +10,9 @@ A job directory (``<jobs root>/<experiment id>/<job id>/``) holds::
     tasks/<trial>/           the materialised Harbor task of each trial
     trials/<trial>/          Harbor's trial directory (steps/, raidar-oracle/, result.json)
     trial-records/<trial>.json  TrialRecord: step results, validity, N1 phases
+    detach/                  a detached launch only (``raidar.execution.detach``): the
+                             launch record, the supervisor's pid, the job's log and
+                             its exit record; written before the job starts
 
 Inside each Harbor trial directory the verifier keeps its v1 evidence names
 (``raidar-oracle/steps/<step>/record.json``, reward key ``oracle_leak``,
@@ -33,6 +36,8 @@ TASKS_DIR = "tasks"
 TRIALS_DIR = "trials"
 TRIAL_RECORDS_DIR = "trial-records"
 TRIAL_RECORD_GLOB = f"{TRIAL_RECORDS_DIR}/*.json"
+DETACH_DIR = "detach"
+"""A detached launch's files; the only entry a job directory may hold before its job starts."""
 
 LEGACY_RUN_MANIFEST = "run.json"
 LEGACY_RUN_LOCK_FILE = "run.lock.json"

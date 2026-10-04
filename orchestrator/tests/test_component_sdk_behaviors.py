@@ -44,6 +44,7 @@ SDK_RUNTIME_SOURCES = [
 ]
 BUILTIN_REFS = [
     "guardrail-gate@1",
+    "guardrail-gate@2",
     "harness-settings@1",
     "lint-config@1",
     "lint-tool@1",
@@ -51,6 +52,7 @@ BUILTIN_REFS = [
     "mcp-server@1",
     "prompt-wrapper@1",
     "python-guardrails@1",
+    "python-guardrails@2",
     "review-loop@1",
     "review-loop@2",
     "rules-file@1",

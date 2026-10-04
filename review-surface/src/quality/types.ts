@@ -131,9 +131,13 @@ export interface GateStep {
   rounds: GateRound[];
 }
 
-/** A gated trial's commit-gate effort (gate-effort@1); absent (null) for an ungated trial. */
+/** A gated trial's commit-gate effort (gate-effort@1/@2); absent (null) for an ungated trial. */
 export interface GateView {
   source: string | null;
+  /** The gate-effort version the cells come from (null: unassessed). */
+  scorer?: string | null;
+  /** A shadow gate: recorded at each step's end, never enforced (fix outcomes not applicable). */
+  shadow?: boolean;
   steps: GateStep[];
   totals: Record<string, Cell>;
   notes: string[];
@@ -250,6 +254,11 @@ export interface QualityExperiment {
   lock_sha256: string | null;
   jobs: string[];
   problems: ProblemQuality[];
+  /** The pre-registered primary outcome, as the analysis report labels it. */
+  primary_outcome?: string | null;
+  primary_source?: string | null;
+  /** The raw SCB counterpart an errata-applied primary is reported beside. */
+  primary_raw?: string | null;
 }
 
 export interface QualityRunsResponse {

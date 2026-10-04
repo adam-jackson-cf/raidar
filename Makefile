@@ -99,7 +99,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 .PHONY: help \
 	env-setup agent-list agent-validate codex-auth-setup harbor-cleanup docker-check \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
-	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute \
+	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
@@ -150,8 +150,9 @@ help:
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
-	@echo "  make guardrails-verify                                python-guardrails@1 rule coverage: every canary of the approved ledger against the"
-	@echo "                                                        installed pack in the pack image, plus negative controls (OrbStack, PyPI; not in make quality)"
+	@echo "  make guardrails-verify                                python-guardrails rule tests: each of the 73 rules fires on its violating canary and passes"
+	@echo "                                                        its clean one against the installed pack in the pack image, plus a mutant-pack negative"
+	@echo "                                                        control (OrbStack, PyPI; not in make quality)"
 	@echo ""
 	@echo "Experiments:"
 	@echo "  make experiment-init EXPERIMENT=experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
@@ -167,8 +168,11 @@ help:
 	@echo "                                                        Move a pre-v2 job onto the v2 layout and lock, once its execution is proven identical"
 	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
-	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=]"
+	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=] [DETACH=1]"
 	@echo "                                                        Run a locked experiment through Harbor as one job; writes step results, validity and N1 phases"
+	@echo "                                                        DETACH=1: run it under a supervisor in its own session (survives the launching shell"
+	@echo "                                                        or agent session; pid, log and exit record in <job dir>/detach/); required for long jobs"
+	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@2 is deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1)"
@@ -251,8 +255,8 @@ component-probe-trials:
 pack-audit:
 	@$(PACK_DOCKER_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
 
-# The skill's rule-coverage validator over python-guardrails@1's approved ledger, run in the
-# pack image; only the user-deferred rules may fail (tests/test_component_python_guardrails_trial.py).
+# python-guardrails' own rule tests in the pack image: every implemented rule's violating canary
+# fires and its clean canary passes (run_canaries.py; tests/test_component_python_guardrails_trial.py).
 guardrails-verify: docker-check pack-build
 	@$(PACK_DOCKER_ENV) export RAIDAR_GUARDRAILS_VERIFY=1 && cd orchestrator && $(REPO_RUNTIME_ENV) \
 		uv run --project . --extra dev python -m pytest tests/test_component_python_guardrails_trial.py \
@@ -413,10 +417,29 @@ experiment-plan:
 	$(call require_var,EXPERIMENT)
 	@$(RAIDAR) plan "$(EXPERIMENT)" $(EXECUTION_SELECT) $(if $(PLAN_JSON),--json,)
 
+# DETACH=1: the job runs under a supervisor in its own session (raidar.execution.detach), so it
+# survives the launching shell or agent session; its launch record, pid and log are in
+# <job dir>/detach/. The supervisor reruns this target with DETACH=0 and the job id (the
+# caller's other variables travel in MAKEFLAGS). Poll with make experiment-status JOB=<job dir>.
+DETACH ?=
+LOG_LINES ?= 20
+EXECUTE_JOBS_DIR = $(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(CURDIR)/jobs)
+DETACH_TOOL := $(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.execution.detach
+
 experiment-execute: pack-build
 	$(call require_var,EXPERIMENT)
+ifeq ($(DETACH),1)
+	@$(DETACH_TOOL) launch --experiment "$(EXPERIMENT)" --jobs-dir "$(EXECUTE_JOBS_DIR)" \
+		$(if $(JOB_ID),--job-id "$(JOB_ID)",) -- $(MAKE) --no-print-directory -C "$(CURDIR)" \
+		experiment-execute DETACH=0
+else
 	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
-		--jobs-dir "$(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(CURDIR)/jobs)" $(if $(JOB_ID),--job-id "$(JOB_ID)",)
+		--jobs-dir "$(EXECUTE_JOBS_DIR)" $(if $(JOB_ID),--job-id "$(JOB_ID)",)
+endif
+
+experiment-status:
+	$(call require_var,JOB)
+	@$(DETACH_TOOL) status "$(JOB)" --lines "$(LOG_LINES)"
 
 perf-check:
 	$(call require_var,JOB)

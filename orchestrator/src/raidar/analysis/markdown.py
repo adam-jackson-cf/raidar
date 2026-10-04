@@ -165,10 +165,11 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
     ]
     return [
         "",
-        "## Gate effort (gate-effort@1, per arm)",
+        f"## Gate effort ({report.gate_scorer or 'gate-effort@1'}, per arm)",
         "",
         "Mean [CI] n over valid trials; an arm without the commit gate has no value "
-        "(not applicable), never 0.",
+        "(not applicable), never 0; an arm with a shadow gate (gate-effort@2) has its "
+        "first-run values only.",
         "",
         *_table(("Metric", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
@@ -212,8 +213,23 @@ def _mcnemar(effects: Sequence[Effect]) -> list[str]:
     return ["### Final checkpoint solved (paired 2×2, exact McNemar)", "", *_table(header, rows)]
 
 
+def _headline_effect(label: str, effect: Effect) -> str:
+    return (
+        f"**{label}** `{effect.metric}` ({effect.problem}): "
+        f"Δ {_num(effect.mean_delta)} {_ci(effect.ci)} "
+        f"→ **{effect.verdict.value}** ({effect.verdict_reason}); "
+        f"cost Δ {_num(effect.cost.delta_mean)} USD per trial."
+    )
+
+
+def _primary_lines(comparison: Comparison) -> list[str]:
+    lines = [_headline_effect("Primary outcome", comparison.primary)]
+    if comparison.primary_raw is not None:
+        lines += ["", _headline_effect("Raw (beside the primary)", comparison.primary_raw)]
+    return lines
+
+
 def _comparison(comparison: Comparison, confidence: float) -> list[str]:
-    primary = comparison.primary
     header = (
         "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ",
         f"{confidence_label(confidence)} CI",
@@ -222,10 +238,7 @@ def _comparison(comparison: Comparison, confidence: float) -> list[str]:
     lines = [
         f"## {comparison.treatment} vs {comparison.baseline}",
         "",
-        f"**Primary outcome** `{primary.metric}` ({primary.problem}): "
-        f"Δ {_num(primary.mean_delta)} {_ci(primary.ci)} "
-        f"→ **{primary.verdict.value}** ({primary.verdict_reason}); "
-        f"cost Δ {_num(primary.cost.delta_mean)} USD per trial.",
+        *_primary_lines(comparison),
         "",
         "### Effects",
         "",
@@ -368,8 +381,8 @@ def render_markdown(report: AnalysisReport) -> str:
     lines += [
         f"- Kind: `{report.experiment_kind}`; lock: `{report.lock_sha256[:12]}`; "
         f"jobs: {', '.join(report.jobs)}",
-        f"- Primary outcome: `{report.primary_metric}` (progression `{report.progression}`); "
-        f"baseline arm: `{report.baseline_arm}`",
+        f"- Primary outcome: `{report.primary_metric}` ({report.primary_source}; progression "
+        f"`{report.progression}`); baseline arm: `{report.baseline_arm}`",
         f"- Composite S: headline metric `{metric.get('ref')}` ({metric.get('selection')})",
         _settings_line(report),
     ]

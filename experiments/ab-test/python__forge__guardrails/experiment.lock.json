@@ -13,7 +13,8 @@
       "correctness": 0.02,
       "headline_score": 2.0
     },
-    "min_pairs": 5
+    "min_pairs": 5,
+    "primary_outcome": "solve_rate_errata"
   },
   "assessment": {
     "metric": {
@@ -426,13 +427,13 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@1": {
-          "digest": "5550c8f0168326fc93ec305de711e0bd7a7df09d3967f3810da8ae4b45ebdd8e",
+        "gate-effort@2": {
+          "digest": "3b7eb30c42d7719250f9d7e714ea09a19dcf7861373dd598e4266e6491e7a4f1",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort:gate_effort_scorer",
-            "implementation_digest": "ca26cbd53e7c2d562cbaef6c82811f0bb2bd37919fe2232d4f724d60381a0984",
+            "implementation": "raidar.scorers.gate_effort_v2:gate_effort_v2_scorer",
+            "implementation_digest": "e24c7270a3fbe1c025e88f78a65913315ea6c565b65aff8a7304bca71fbef93a",
             "manifest": {
-              "description": "Effort a guardrail-gate@1 commit gate cost per step: rounds to clean, first-pass clean, unresolved and gate-error steps, blocking findings by rule family, and the fix sessions' tokens, cost and time. Not applicable to an arm without the gate.",
+              "description": "Effort a guardrail-gate commit gate cost per step: rounds to clean, first-pass clean, unresolved and gate-error steps, blocking findings by rule family, and the fix sessions' tokens, cost and time. A shadow gate (guardrail-gate@2 mode shadow) reports its first-run outcomes only; its fix and enforcement outcomes are not applicable. Not applicable to an arm without a gate.",
               "evidence_required": [
                 "trace"
               ],
@@ -1212,7 +1213,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "1"
+              "version": "2"
             },
             "tool_lock": {}
           }
@@ -1422,7 +1423,7 @@
         "code-quality@1",
         "resource-usage@1",
         "process-compliance@2",
-        "gate-effort@1"
+        "gate-effort@2"
       ]
     },
     "tools": {
@@ -1434,18 +1435,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "84297a3ba3839e419a6666a6f7e53fb65e357e2a59fb9babd5d7535daf7aec96",
+  "document_sha256": "840e65b97173e7cf950cd1d9e10ccd996c495d13d7c965b5f2d77a8b6267b2ee",
   "execution": {
     "arms": {
       "r1-baseline": {
         "agent": "codex-luna",
         "condition": "r1-baseline",
-        "digest": "3811d7966e6527cb258f5f25bd59fe34eb97ec2428e8c3a946b05eacd6d435bf"
+        "digest": "35e555a2d58b2547255b302a93e665d79c7e70dd7c99270c5fbcc1b1e0a37c31"
       },
       "r2-guardrails": {
         "agent": "codex-luna",
         "condition": "r2-guardrails",
-        "digest": "5ba5a7f1ef996c257036b831c8282cd973f52fefefa85bd458c2eb81e4095e59"
+        "digest": "25885761ccc9a6f2497b7b36ce8cb7dd8609568a43a5722427e581b601aecb82"
       }
     },
     "conditions": {
@@ -1457,6 +1458,25 @@
           "use": "prompt-wrapper@1",
           "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
           "with": {}
+        },
+        {
+          "files": {},
+          "use": "python-guardrails@2",
+          "use_digest": "8e24b238e4bd6a31c040604b1a9db17ccaf73f2ff4a11d22520af1839335d397",
+          "with": {
+            "workspace_configs": false
+          }
+        },
+        {
+          "files": {},
+          "use": "guardrail-gate@2",
+          "use_digest": "2dd54d588927c484597fe4246097a1128554256abbac488e0252b08525d6d6be",
+          "with": {
+            "command": "guardrail-check",
+            "max_rounds": 3,
+            "mode": "shadow",
+            "timeout_sec": 300
+          }
         }
       ],
       "r2-guardrails": [
@@ -1470,14 +1490,16 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@1",
-          "use_digest": "b2e3691ff6bb999e62582efe4f7d40510783df059c37dd4de1f306378f369fa1",
-          "with": {}
+          "use": "python-guardrails@2",
+          "use_digest": "8e24b238e4bd6a31c040604b1a9db17ccaf73f2ff4a11d22520af1839335d397",
+          "with": {
+            "workspace_configs": true
+          }
         },
         {
           "files": {},
-          "use": "guardrail-gate@1",
-          "use_digest": "06eb2faa1181556ff8d778ee26068f739812bd850f8e53691ac88621d0a6d0b6",
+          "use": "guardrail-gate@2",
+          "use_digest": "2dd54d588927c484597fe4246097a1128554256abbac488e0252b08525d6d6be",
           "with": {
             "command": "guardrail-check",
             "max_rounds": 3,
@@ -1513,19 +1535,39 @@
       "attempts": 4,
       "conditions": [
         {
-          "components": [],
+          "components": [
+            {
+              "files": [],
+              "use": "python-guardrails@2",
+              "with": {
+                "workspace_configs": false
+              }
+            },
+            {
+              "files": [],
+              "use": "guardrail-gate@2",
+              "with": {
+                "command": "guardrail-check",
+                "max_rounds": 3,
+                "mode": "shadow",
+                "timeout_sec": 300
+              }
+            }
+          ],
           "id": "r1-baseline"
         },
         {
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@1",
-              "with": {}
+              "use": "python-guardrails@2",
+              "with": {
+                "workspace_configs": true
+              }
             },
             {
               "files": [],
-              "use": "guardrail-gate@1",
+              "use": "guardrail-gate@2",
               "with": {
                 "command": "guardrail-check",
                 "max_rounds": 3,
@@ -1586,8 +1628,8 @@
     ],
     "references": {
       "component": {
-        "guardrail-gate@1": {
-          "digest": "06eb2faa1181556ff8d778ee26068f739812bd850f8e53691ac88621d0a6d0b6",
+        "guardrail-gate@2": {
+          "digest": "2dd54d588927c484597fe4246097a1128554256abbac488e0252b08525d6d6be",
           "metadata": {
             "discovery_probe": "guardrail-gate-ran",
             "kind": "workflow",
@@ -1616,8 +1658,8 @@
             ]
           }
         },
-        "python-guardrails@1": {
-          "digest": "b2e3691ff6bb999e62582efe4f7d40510783df059c37dd4de1f306378f369fa1",
+        "python-guardrails@2": {
+          "digest": "8e24b238e4bd6a31c040604b1a9db17ccaf73f2ff4a11d22520af1839335d397",
           "metadata": {
             "discovery_probe": "python-guardrails-gate-works",
             "kind": "service",
@@ -1714,20 +1756,20 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "4e480e08181dc2b6912512b840b2fe5478f09b888e624056fe7813b5d1ae6b34",
-    "spec_sha256": "7715b4f8666c4a9ae608dad777b762d7ebb7f80ceae5c550a796498668c9794b"
+    "source_sha256": "2853fc0e67a8915791aeb8ec8ff721b1e7797d40756a2fad1d5d25491970527f",
+    "spec_sha256": "57c706f758367771fe1af85f9be809305f110df6056b7b3524b8cf77cade2b8e"
   },
-  "lock_sha256": "20f0573fc970d2db31fbb7b7b618870a2e16a105333274fab40f161012d973c8",
+  "lock_sha256": "28c51440f74abc92f88becaa43049c69a18d58b2be3c79b76d0cc5807e4dae7a",
   "lock_version": 3,
   "overrides": {
     "flags": {},
     "set": []
   },
   "sections": {
-    "analysis": "c04ba96a603d9e59dcb5e7ab9ce874c1021cb3bde44d09f8316f4a8660ae3cc7",
-    "assessment": "deefb49eedaa0748ddba36b31429988ccbbf6784a4cd819f4b623ece14c8eb2e",
-    "execution": "20f0573fc970d2db31fbb7b7b618870a2e16a105333274fab40f161012d973c8",
-    "toolchain": "124bc41438ab812b2ade309012ea305329b7ac507bab86b985b6096d1a65f6d0"
+    "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
+    "assessment": "0365c33e8db726b76c775644741b2bd3724241d99c21c390b44cece5d53bb499",
+    "execution": "28c51440f74abc92f88becaa43049c69a18d58b2be3c79b76d0cc5807e4dae7a",
+    "toolchain": "657a87063f9d6ff78222aec39691aebf3f3288650739261e1702f6640b273471"
   },
   "spec": {
     "agents": [
@@ -1757,6 +1799,7 @@
         "headline_score": 2.0
       },
       "min_pairs": 5,
+      "primary_outcome": "solve_rate_errata",
       "seed": 20261004
     },
     "arms": [
@@ -1783,24 +1826,44 @@
         "code-quality@1",
         "resource-usage@1",
         "process-compliance@2",
-        "gate-effort@1"
+        "gate-effort@2"
       ]
     },
     "conditions": [
       {
-        "components": [],
+        "components": [
+          {
+            "files": [],
+            "use": "python-guardrails@2",
+            "with": {
+              "workspace_configs": false
+            }
+          },
+          {
+            "files": [],
+            "use": "guardrail-gate@2",
+            "with": {
+              "command": "guardrail-check",
+              "max_rounds": 3,
+              "mode": "shadow",
+              "timeout_sec": 300
+            }
+          }
+        ],
         "id": "r1-baseline"
       },
       {
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@1",
-            "with": {}
+            "use": "python-guardrails@2",
+            "with": {
+              "workspace_configs": true
+            }
           },
           {
             "files": [],
-            "use": "guardrail-gate@1",
+            "use": "guardrail-gate@2",
             "with": {
               "command": "guardrail-check",
               "max_rounds": 3,
@@ -1851,6 +1914,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "bb0f8268bb2de86a5fa72b1cb526bd6c4a11c6a5cb25182ce4814f33110a4dd6"
+    "raidar_spec": "2ac35d79752fea36fc78e2a2b55e1209226067aae0ca529f4d9476c522353ffb"
   }
 }

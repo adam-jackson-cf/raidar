@@ -1259,6 +1259,14 @@ The gate-effort observations in the store match an independent recomputation fro
 4. **Gate both arms or shadow-gate r1.** With r1 ungated, gate effort describes r2 alone. A shadow `guardrail-check` run on r1 snapshots (a new scorer version) or a second gated arm would make the paired gate-effort comparison possible.
 5. **Long-running jobs:** launch real-LLM jobs detached under `caffeinate` from the start, so a session ending cannot terminate them.
 
+**Done in explore iteration 2 (2026-10-04, `rationale.md` §10, lock `28c51440f74a`):**
+- item 2: `analysis.primary_outcome`;
+- item 3: `guardrail-gate@2` records `git log --oneline`, `git status --porcelain`, `HEAD` before and after, and the hook and `git commit` exit codes for every commit attempt;
+- item 4: r1 gets `guardrail-gate@2` in shadow mode with `python-guardrails@2` and no workspace copies, and `gate-effort@2` pairs the first-run gate outcomes across arms;
+- item 5: `make experiment-execute ... DETACH=1` and `make experiment-status`.
+
+Item 1 is now planned as `python-guardrails@3`. The vendored skill files (ledger, catalog, validator, not-applicable evidence) were removed; `make guardrails-verify` runs the pack's own 73 rule canaries in the pack image.
+
 ### 15.6 Decisions for you
 
 1. **Orphaned `main-01` containers:** approve removing the two idle containers above (no other containers are touched), which unblocks `main-02`.

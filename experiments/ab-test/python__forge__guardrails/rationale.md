@@ -1,6 +1,6 @@
 # python__forge__guardrails: rationale and pre-registration
 
-- **Status:** validated and locked (`experiment.lock.json`). Smoke run (`smoke-01`, section 9); **main job not yet run** (`main-01` was aborted, section 9). This file was written before any job of this experiment. Sections 3 to 6 are the pre-registration. Later additions go in section 9 and never edit sections 3 to 6.
+- **Status:** validated and locked (`experiment.lock.json`). Smoke run (`smoke-01`, section 9); **main job not yet run** (`main-01` was aborted, section 9). This file was written before any job of this experiment. Sections 3 to 6 are the pre-registration. Later additions go in sections 9 and 10 and never edit sections 3 to 6. **Section 10 (explore iteration 2, 2026-10-04) amends the design before `main-02`:** r1 gets a shadow gate, the lock is `28c51440f74a`.
 - **Objective:** explore (AGENTS.md "Objectives"). The process is still being iterated, so the run is small: 4 attempts per arm (user decision, 2026-10-04). Results are exploratory signals, never cited as evidence of an effect.
 - **Question:** on `scb/forge@38d627ecf668`, does a repository that refuses a commit until a mechanical Python guardrail gate passes change correctness and code quality, against the shared framing alone?
 - **Replaces** `python__forge__ruff-lint` and `python__forge__ruff-lint-r2`. Those experiments showed the provisioned Ruff was available but almost never run unprompted (1 of 40 r2 steps). Their definitions were removed on 2026-10-04; their jobs stay on disk under `jobs/`.
@@ -163,3 +163,80 @@ Smoke cost: $0.159 in total, of which fix sessions were $0.0853. One gate run to
 ### Deferred to python-guardrails@2
 
 `TEST.coverage-minimum` and the pytest style rules are not dropped: python-guardrails@2 will provision pytest and coverage in the image and enforce them (user decision 2026-10-04). PT009/PT027 stay off in @1 because the @1 image is unittest-only.
+
+## 10. Amendment: explore iteration 2 (2026-10-04, pre-registered before `main-02`)
+
+Written and locked before any job under the new lock. No job has run under it; `smoke-01` and the aborted `main-01` stay under the old lock `20f0573fc970` and are never pooled with jobs under the new one. The objective stays **explore**. Sections 3 to 6 are unchanged except where this section says it supersedes a statement.
+
+### 10.1 What changed in the design
+
+| | r1-baseline (was) | r1-baseline (now) | r2-guardrails (now) |
+|---|---|---|---|
+| Pack | none | `python-guardrails@2`, `workspace_configs: false` | `python-guardrails@2`, `workspace_configs: true` |
+| Workspace at step 1 | empty | empty: no `ruff.toml`, no `mypy.ini` | the two config copies (as before) |
+| Gate | none | `guardrail-gate@2`, `mode: shadow` | `guardrail-gate@2`, `mode: commit`, 3 fix rounds, 300 s (as before) |
+| Fix sessions | none | none | as before |
+
+- **`python-guardrails@2`** installs the `@1` payload byte for byte (same gate, pins, protected configs, tiers and policy). `workspace_configs: true` is `@1` exactly; `false` puts nothing in `/app`. The smoke-rule decision of section 9 (annotation codes stay BLOCK) therefore carries over unchanged.
+- **`guardrail-gate@2`** is `@1`'s loop with two additions. **Shadow mode:** the same commit check (`git add -A`, `git commit` with `guardrail-check` as the pre-commit hook) runs once at each step's end, against a git directory outside `/app` (`/tmp/raidar-review/guardrail-gate/shadow/.git`, reset each step) with `/app` as its work tree. The gate run is recorded in full, but it never refuses, never starts a fix session and never writes `/app`. **Commit evidence:** every commit attempt, in both modes, records `HEAD` before and after, `git log --oneline` and `git status --porcelain` in the gate run's `git` block. The step's `git_evidence` adds every hook exit code and every `git commit` exit code. All of it is under `/logs/agent/guardrail-gate/`, outside `/app`. A refusal is verifiable from git itself: `HEAD` does not move and the staged paths are still in the status.
+- **r1's agent experience is unchanged.** It gets the same instruction and the same single work session, with nothing in `/app` before or after the gate. A no-LLM trial in the pack image proves this: the agent's `ls -A` of `/app` at both steps contains no `.git`, `ruff.toml` or `mypy.ini`, and no fix session starts (`test_the_shadow_baseline_records_the_gate_unseen_in_a_real_trial`). Three differences remain:
+  - the pack is installed root-owned under `/opt/raidar-tools/python-guardrails` and linked at `/usr/local/bin/guardrail-check`, so it is visible only by exploring system paths, as in r2;
+  - the agent is wrapped, so its step trajectory is a root trajectory embedding its one work session;
+  - each step's agent phase gains the shadow gate's run time (1-2 s at smoke).
+- **Factor guard:** the arms still differ only in `condition`.
+
+### 10.2 Outcomes (supersedes the "Comparing arms" bullet of section 5)
+
+- **Gate-effort scorer:** `gate-effort@2` replaces `gate-effort@1`. It keeps the same metrics and reads enforced records exactly as `@1`. For a shadow step it measures the following, and nothing else:
+  - `gate_runs`;
+  - `first_pass_clean`;
+  - `gate_error`;
+  - `first_run_blocking`, in total and per rule family.
+
+  Every fix and enforcement outcome of a shadow step is `not_applicable`, never 0. That covers `fix_rounds`, `gate_clean_at_step_end`, `unresolved`, `rounds_to_clean`, `blocking_findings` over every run, `fix_*` and `gate_wall_s`, together with their trajectory rates and totals.
+- **Paired gate outcomes (secondary, pre-registered):** `gate.first_pass_clean_rate`, `gate.gate_error_rate` and `gate.total_first_run_blocking` (total and per family) are now measured in both arms and paired by attempt. With 4 pairs the verdicts read `insufficient` by design; the direction and CIs are the signals. **What they compare:** r1's value is how its unconstrained code would have fared at each step's end. r2's is the first commit attempt after each work session, made with the configs visible and after the refusals of earlier steps. The difference is therefore the treatment's effect on first-pass compliance, learning across steps included, not a pure "same code" comparison.
+- **Unchanged:** fix rounds, unresolved, rounds to clean and fix-session cost still describe r2 alone.
+- **Manipulation check (unchanged):** `gate_clean_at_step_end` with `min_share` 0.8. r1's shadow gate never decides it, so r2's share alone decides it (`basis: threshold`), as before.
+- **Integrity flags in r1:** the protection flags only (`protected-config-modified`, `protected-tree-writable`). Config-copy, suppression and hook-bypass flags describe a gate the agent sees, so they do not apply to r1.
+- **Primary outcome label (supersedes "Reading the analysis: primary outcome label" in section 9):** the lock now carries `analysis.primary_outcome: solve_rate_errata`. The analysis report, its markdown and the review surface label it as the primary, and raw `solve_rate` is reported beside it with its own verdict. This is the pre-registered primary of section 3, unchanged.
+
+### 10.3 Rule verification is Raidar's own
+
+The rule set was derived from the user's `setup-repository-guardrails` skill on 2026-10-04. The skill was used once, to set the initial verification; it is not a continuous reference. Its vendored files were removed from the repository on 2026-10-04:
+- the validator;
+- the Enaible rule catalog;
+- the coverage ledger;
+- the not-applicable evidence.
+
+They stay in git history at `f61d81b`. Section 2's citation of the ledger is historical. The pack's verification is now its own rule tests. `make guardrails-verify` runs, in the pack image and with no skill file:
+- every implemented rule's violating canary must fire and its clean canary must pass (73 of 73 on 2026-10-04);
+- a negative control: a mutant pack with three checkers disabled must fail exactly those three rules.
+
+The pytest and coverage work that section 9 planned for `python-guardrails@2` is now planned for **`python-guardrails@3`**, because `@2` is the version above.
+
+### 10.4 Lock and running `main-02`
+
+- Lock `28c51440f74a`. Execution changed: r1's components and both arms' component versions. The analysis section adds `primary_outcome`.
+- Long jobs run detached (AGENTS.md Workflows). `main-02`:
+
+```sh
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  CONCURRENCY=2 JOB_ID=main-02 DETACH=1
+make experiment-status JOB=jobs/python__forge__guardrails/main-02   # poll until state: finished
+make experiment-assess JOB=jobs/python__forge__guardrails/main-02 STORE=stores/python__forge__guardrails \
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@2 gate-effort@2"
+make experiment-analyze JOBS="jobs/python__forge__guardrails/main-02" \
+  STORE=stores/python__forge__guardrails ANALYSIS_OUT=analysis/python__forge__guardrails
+```
+
+- **Expectation (stated before data):** r1's cost per trial is as before, plus the one-time pack install and 1-2 s of shadow gate per step. Every reference solution and every sampled agent snapshot would be refused (section 7), so r1's `first_pass_clean_rate` is expected near 0. r2's first-run rate is expected to rise above r1's at later checkpoints, if refusals at earlier steps teach the agent.
+
+
+### 10.5 Process check `smoke-02` (recorded after the run; not pooled, never cited)
+
+Before `main-02`, one trial per arm (attempt 0) ran under lock `28c51440f74a`, launched with `DETACH=1` and monitored with `make experiment-status` to `state: finished` (39 min, both trials valid, every probe passed, no integrity flags).
+- **Detached launch:** the supervisor ran as its own process-group leader under `caffeinate -i` and wrote `detach/exit.json` (exit 0).
+- **Shadow gate (r1):** 8 of 8 steps `shadow_recorded`, 0 fix sessions. Each run's `git` block shows the refusal in the shadow repository (`HEAD` unmoved, `A  forge.py` staged), and nothing reached `/app`. r1's work-session traces never mention the gate, `ruff.toml`, `mypy.ini`, `.git/` or `core.hooksPath`.
+- **Commit evidence (r2):** the refusal and the later commit are both visible in git: `HEAD` moves only on the passing run, e.g. checkpoint 1 refused (hook 1, `git commit` 1) and then committed `a5ee34d`.
+- **Paired first-run outcomes:** `first_pass_clean_rate` 0 vs 0. `total_first_run_blocking` 1,336 (r1) vs 30 (r2). r1's count is dominated by mypy strict's `no-untyped-call`, reported once per call site (202 of 294 findings at checkpoint 8). The total therefore scales with r1's call graph; read the binary `first_pass_clean_rate` and the per-family counts first.
+- **Signals (1 pair; `insufficient` by design):** `solve_rate_errata` Δ −0.25 (r1 solved checkpoints 1-2; r2 solved none). Cost per trial $0.034 (r1) vs $0.077 (r2), of which r2's fix sessions were $0.036. The manipulation check separated.

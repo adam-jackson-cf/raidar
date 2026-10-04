@@ -65,7 +65,9 @@ component = "raidar.components.registry:component_resolver"
 "review-loop@1" = "raidar.components.builtins.workflow:REVIEW_LOOP"
 "review-loop@2" = "raidar.components.builtins.workflow_v2:REVIEW_LOOP_V2"
 "guardrail-gate@1" = "raidar.components.builtins.gate:GUARDRAIL_GATE"
+"guardrail-gate@2" = "raidar.components.builtins.gate_v2:GUARDRAIL_GATE_V2"
 "python-guardrails@1" = "raidar.components.builtins.guardrails:PYTHON_GUARDRAILS"
+"python-guardrails@2" = "raidar.components.builtins.guardrails_v2:PYTHON_GUARDRAILS_V2"
 
 [build-system]
 requires = ["hatchling"]
@@ -87,8 +89,6 @@ extend-exclude = [
     "**/node_modules",
     "**/*.tsbuildinfo",
     "**/*.lock",
-    # Vendored byte-identical from the setup-repository-guardrails skill (its bundled validator).
-    "tests/fixtures/python_guardrails/validate_rule_coverage.py",
 ]
 
 [tool.ruff.lint]

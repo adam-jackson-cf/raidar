@@ -31,10 +31,9 @@ from typing import Any
 from raidar.jev.policies import POLICY_DIR, PolicyRegistry
 from raidar.packs.python.models import ToolLock, load_tool_lock
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS
-from raidar.scorers.gate_effort.manifest import GATE_EFFORT
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
 from raidar.scorers.sdk.context import Scorer
 from raidar.scorers.sdk.manifest import ANY_RUNTIME, ScorerManifest
+from raidar.scorers.versioned_manifests import VERSIONED_MANIFESTS
 from raidar.spec.canonical import digest_json
 from raidar.spec.references import (
     RefKind,
@@ -294,10 +293,10 @@ class ScorerRegistry:
             ) from exc
 
 
-# ``process-compliance@2`` and ``gate-effort@1`` keep their manifests beside their
+# ``process-compliance@2`` and ``gate-effort@1``/``@2`` keep their manifests beside their
 # implementations so the released scorers' digests (which cover
 # ``builtin_manifests``) stay unchanged.
-REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, PROCESS_COMPLIANCE_V2, GATE_EFFORT)
+REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, *VERSIONED_MANIFESTS)
 
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "correctness@1": "raidar.scorers.correctness:correctness_scorer",
@@ -308,6 +307,7 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
         "raidar.scorers.process_checks:deterministic_process_compliance_scorer"
     ),
     "gate-effort@1": "raidar.scorers.gate_effort:gate_effort_scorer",
+    "gate-effort@2": "raidar.scorers.gate_effort_v2:gate_effort_v2_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
 # that store-bound runtime decides under. Only the dormant process-compliance@1

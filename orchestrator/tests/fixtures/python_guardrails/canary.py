@@ -19,7 +19,7 @@ Modes:
   gate runs with that home and the canary exits 1 printing ``GATE-ERROR`` when
   the gate exits 126, 0 when it passes, 4 when an error was reported as a pass.
 - ``commit``: the step-end runner. ``gate/guardrail-gate-commit.sh`` (rendered
-  from guardrail-gate@1 for the experiment's command) commits the workspace in a
+  from guardrail-gate@2 for the experiment's enforced gate command) commits the workspace in a
   fresh git repository with the gate as the pre-commit hook. A refused commit
   that names one of CODES exits 1 printing ``CANARY-HIT``; a recorded commit
   exits 0; anything else exits 3.

@@ -2,7 +2,9 @@
 // per checkpoint, how the gate ended, the rounds it took, first-pass clean, the blocking
 // findings by rule family (a single-hue magnitude table, numbers always printed) and the
 // fix sessions' cost and time. A step expands to its gate rounds. An ungated trial has no
-// gate view, so nothing renders: never a row of zeros.
+// gate view, so nothing renders: never a row of zeros. A shadow gate (guardrail-gate@2
+// mode shadow, gate-effort@2) was recorded at each step's end and never enforced: it is
+// labelled as such, its families are the first run's and its fix outcomes read n/a.
 import { Fragment, useState } from 'react';
 import { ChevronDown, ChevronRight } from 'lucide-react';
 import { C } from '@/utils/colors';
@@ -35,6 +37,10 @@ const TOTALS: Array<[string, string, (value: number) => string]> = [
 function ending(step: GateStep): { label: string; color: string } {
   const fixes = step.cells.fix_rounds?.value ?? 0;
   switch (step.termination) {
+    case 'shadow_recorded':
+      return step.cells.first_pass_clean?.value === 1
+        ? { label: 'shadow: would pass', color: C.green }
+        : { label: 'shadow: would refuse', color: C.fg4 };
     case 'gate_clean':
       return fixes === 0
         ? { label: 'clean first pass', color: C.green }
@@ -109,9 +115,14 @@ function Rounds({ rounds }: { rounds: GateRound[] }) {
   );
 }
 
-function StepRows({ step, max }: { step: GateStep; max: number }) {
+function stepFamilies(step: GateStep, shadow: boolean): GateStep['families'] {
+  return shadow ? step.first_run_families : step.families;
+}
+
+function StepRows({ step, max, shadow }: { step: GateStep; max: number; shadow: boolean }) {
   const [open, setOpen] = useState(false);
   const end = ending(step);
+  const families = stepFamilies(step, shadow);
   return (
     <Fragment>
       <tr data-testid="gate-step" style={{ borderTop: `1px solid ${C.rowBorder}` }}>
@@ -139,8 +150,8 @@ function StepRows({ step, max }: { step: GateStep; max: number }) {
           <CellValue cell={step.cells.blocking_findings} format={count} />
         </td>
         {GATE_FAMILIES.map((family) => (
-          <td key={family} className="px-0.5 text-center" title={`${family}: ${step.families[family]?.status === 'ok' ? step.families[family].value : step.families[family]?.reason ?? ''}`}>
-            <FamilyCell cell={step.families[family]} max={max} />
+          <td key={family} className="px-0.5 text-center" title={`${family}: ${families[family]?.status === 'ok' ? families[family].value : families[family]?.reason ?? ''}`}>
+            <FamilyCell cell={families[family]} max={max} />
           </td>
         ))}
         <td className="pl-2 text-right">
@@ -163,9 +174,11 @@ function StepRows({ step, max }: { step: GateStep; max: number }) {
 
 export function GatePanel({ gate }: { gate: GateView | null | undefined }) {
   if (!gate) return null;
-  const values = gate.steps.flatMap((step) =>
-    GATE_FAMILIES.map((family) => (step.families[family]?.status === 'ok' ? step.families[family].value ?? 0 : 0)),
-  );
+  const shadow = gate.shadow === true;
+  const values = gate.steps.flatMap((step) => {
+    const families = stepFamilies(step, shadow);
+    return GATE_FAMILIES.map((family) => (families[family]?.status === 'ok' ? families[family].value ?? 0 : 0));
+  });
   const max = Math.max(0, ...values);
   return (
     <section aria-label="Commit gate" data-testid="gate-panel" className="flex flex-col gap-1.5 text-[10px]">
@@ -173,7 +186,14 @@ export function GatePanel({ gate }: { gate: GateView | null | undefined }) {
         <span className="text-[11px] font-medium" style={{ color: C.fg3 }}>
           Commit gate
         </span>
-        <span style={{ color: C.fg0 }}>gate-effort@1 · rounds, first-pass clean and blocking findings by rule family</span>
+        <span style={{ color: C.fg0 }}>
+          {gate.scorer ?? 'gate-effort@1'} · rounds, first-pass clean and blocking findings by rule family
+        </span>
+        {shadow && (
+          <span data-testid="gate-shadow" style={{ color: C.orange }} title="Recorded at each step's end, never enforced: no refusal, no fix session; the families shown are the first run's">
+            shadow gate · never enforced
+          </span>
+        )}
       </div>
       <dl data-testid="gate-totals" className="flex flex-wrap gap-x-4 gap-y-1">
         {TOTALS.map(([metric, label, format]) => (
@@ -196,7 +216,7 @@ export function GatePanel({ gate }: { gate: GateView | null | undefined }) {
                 Blocking 1st / all
               </th>
               {GATE_FAMILIES.map((family) => (
-                <th key={family} className="px-0.5 text-center font-normal" title={`Blocking ${family} findings over every run`}>
+                <th key={family} className="px-0.5 text-center font-normal" title={shadow ? `Blocking ${family} findings of the shadow run` : `Blocking ${family} findings over every run`}>
                   {family}
                 </th>
               ))}
@@ -206,7 +226,7 @@ export function GatePanel({ gate }: { gate: GateView | null | undefined }) {
           </thead>
           <tbody>
             {gate.steps.map((step) => (
-              <StepRows key={step.checkpoint} step={step} max={max} />
+              <StepRows key={step.checkpoint} step={step} max={max} shadow={shadow} />
             ))}
           </tbody>
         </table>

@@ -32,7 +32,7 @@ Two derivations are analysis-owned:
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -80,8 +80,10 @@ RESOURCE_USAGE_REF = "resource-usage@1"
 # dormant ``@1`` stays readable for jobs whose lock declares it.
 PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
 ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
-# Read only when the lock declares it (its ``gate.*`` outcomes are then in every trial).
+# Read only when the lock declares one (its ``gate.*`` outcomes are then in every trial),
+# in preference order: ``@2`` also reads a shadow gate's first-run outcomes.
 GATE_EFFORT_REF = "gate-effort@1"
+GATE_EFFORT_REFS = ("gate-effort@2", GATE_EFFORT_REF)
 _COST_TOTALS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 PASS_RATE = "strict_pass_rate"
 _CHECKPOINT_SOURCES = {
@@ -258,12 +260,19 @@ def _series(
     return series
 
 
-def gate_metrics(result: AssessResult | None) -> dict[str, Value]:
-    """The ``gate.*`` outcomes from a trial's ``gate-effort@1`` trajectory observations.
+def gate_effort_ref(declared: Iterable[str]) -> str | None:
+    """The gate-effort version a lock declares (``@2`` first), if any."""
+    names = set(declared)
+    return next((ref for ref in GATE_EFFORT_REFS if ref in names), None)
 
-    An arm without the gate reads ``not_applicable`` (the scorer's status), never 0.
+
+def gate_metrics(result: AssessResult | None, ref: str = GATE_EFFORT_REF) -> dict[str, Value]:
+    """The ``gate.*`` outcomes from a trial's gate-effort trajectory observations.
+
+    An arm without the gate reads ``not_applicable`` (the scorer's status), never 0;
+    under ``gate-effort@2`` a shadow gate's fix outcomes read ``not_applicable`` too.
     """
-    observed = Observed(GATE_EFFORT_REF, result)
+    observed = Observed(ref, result)
     return {
         metric.id: observed.value(metric.id.removeprefix(GATE_PREFIX)) for metric in GATE_METRICS
     }
@@ -321,9 +330,10 @@ def build_outcome(
         **quality,
         **{name: observed[RESOURCE_USAGE_REF].value(name) for name in _COST_TOTALS},
     }
-    if GATE_EFFORT_REF in results:
+    gate_ref = gate_effort_ref(results)
+    if gate_ref is not None:
         # Like cost totals, gate effort describes what ran, truncated or not.
-        metrics |= gate_metrics(results[GATE_EFFORT_REF])
+        metrics |= gate_metrics(results[gate_ref], gate_ref)
     if record.truncated_to is not None:
         metrics |= _truncated(record)
     reasons = infra_reasons(record)

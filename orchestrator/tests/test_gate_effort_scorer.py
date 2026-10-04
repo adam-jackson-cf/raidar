@@ -29,6 +29,7 @@ from raidar.scorers.sdk.context import AssessContext, StepInputs
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
 from raidar.scorers.sdk.validation import validate_result
 from tests.test_guardrail_gate_workflow import ScriptedInnerAgent, _agent, _run
+from tests.test_guardrail_gate_workflow import _reset_script as _reset_script  # noqa: F401
 from tests.test_guardrail_gate_workflow import shims as shims  # noqa: F401 (fixture)
 
 REFUSED = """\

@@ -41,8 +41,11 @@ from raidar.analysis.outcomes import (
     HEADLINE_SCORE,
     OUTCOME_METRICS,
     QUALITY_COMPONENTS,
+    RAW_COUNTERPART,
     MetricDef,
     View,
+    primary_metric,
+    primary_source,
 )
 from raidar.analysis.stats import seed_for, summarise
 from raidar.analysis.thresholds import settings_from_lock
@@ -520,6 +523,17 @@ def _lock_settings(members: Sequence[ReviewedTrial]) -> Settings:
     return settings_from_lock(members[0].source.experiment.analysis)
 
 
+def _primary(members: Sequence[ReviewedTrial]) -> tuple[str | None, str | None, str | None]:
+    """(primary outcome, its source, its raw counterpart) as the analysis report labels them."""
+    configured = (members[0].source.experiment.analysis or {}).get("primary_outcome")
+    progression = members[0].source.record.progression.mode
+    try:
+        primary = primary_metric(progression, configured)
+    except ValueError:
+        return None, None, None
+    return primary, primary_source(progression, configured), RAW_COUNTERPART.get(primary)
+
+
 def build_experiments(
     trials: Sequence[ReviewedTrial], settings: Settings | None = None
 ) -> tuple[QualityExperiment, ...]:
@@ -535,10 +549,14 @@ def build_experiments(
     ):
         problems = _grouped(members, lambda t: t.source.record.trial.problem)
         chosen = settings or _lock_settings(members)
+        primary, source, raw = _primary(members)
         experiments.append(
             QualityExperiment(
                 experiment=experiment,
                 lock_sha256=lock or None,
+                primary_outcome=primary,
+                primary_source=source,
+                primary_raw=raw,
                 jobs=tuple(sorted({trial.source.job_id for trial in members})),
                 problems=tuple(
                     _problem_quality(problem, group, chosen)

@@ -30,8 +30,9 @@ The overall verdict is ``separated`` only when every requested check is.
 
 Available checks and the scorer each reads (``CHECK_SCORERS``):
 ``tests_run_before_finish`` and ``plan_written`` (``process-compliance``), and
-``gate_clean_at_step_end`` (``gate-effort@1``: the step's last commit-gate run
-passed). The checks are the experiment's pre-registered
+``gate_clean_at_step_end`` (``gate-effort@1`` or ``@2``: the step's last
+commit-gate run passed; a shadow gate never decides it, so a baseline arm with a
+shadow gate has no decided checkpoint for it). The checks are the experiment's pre-registered
 ``analysis.manipulation_checks`` when its lock declares them; otherwise the
 process-compliance defaults when that scorer is declared. A check may
 pre-register ``min_share``: the share of the treatment arm's decided
@@ -68,14 +69,14 @@ EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
 PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
-GATE_EFFORT_REF = "gate-effort@1"
+GATE_EFFORT_REFS = ("gate-effort@2", "gate-effort@1")
 GATE_CLEAN = "gate_clean_at_step_end"
 PROCESS_SOURCE = "process-compliance"
 GATE_SOURCE = "gate-effort"
 CHECK_SCORERS: dict[str, tuple[str, tuple[str, ...]]] = {
     TESTS_RUN_BEFORE_FINISH: (PROCESS_SOURCE, PROCESS_COMPLIANCE_REFS),
     PLAN_WRITTEN: (PROCESS_SOURCE, PROCESS_COMPLIANCE_REFS),
-    GATE_CLEAN: (GATE_SOURCE, (GATE_EFFORT_REF,)),
+    GATE_CLEAN: (GATE_SOURCE, GATE_EFFORT_REFS),
 }
 """``{check: (result source, scorer refs that report it)}``."""
 Basis = Literal["separation", "threshold", "threshold+separation"]

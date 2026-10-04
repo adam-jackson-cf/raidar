@@ -6,12 +6,14 @@ import json
 import shutil
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from raidar.analysis.assessed import build_outcome
 from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.execution.models import TrialRecord
+from raidar.review_quality.experiment_view import _primary
 from raidar.review_quality.models import COMPONENTS, QualityProjection
 from raidar.review_quality.projection import build_quality_projection, main
 from raidar.review_quality.stats import pearson, quantiles
@@ -643,3 +645,49 @@ def test_gate_records_without_an_assessment_or_with_a_broken_record_say_so(
     assert any("checkpoint_2: gate record unreadable" in note for note in gate.notes)
     assert any("rescore its job with gate-effort@1" in note for note in gate.notes)
     assert gate.steps[3].rounds[0].verdict == "refused"
+
+
+def test_experiments_label_the_primary_outcome_as_the_analysis_report_does(
+    projection: QualityProjection,
+) -> None:
+    (experiment,) = [item for item in projection.experiments if item.experiment == EXPERIMENT]
+    assert (experiment.primary_outcome, experiment.primary_source, experiment.primary_raw) == (
+        "solve_rate",
+        "default for continue progression",
+        None,
+    )
+
+    def member(analysis: dict[str, object] | None) -> object:
+        source = SimpleNamespace(
+            experiment=SimpleNamespace(analysis=analysis),
+            record=SimpleNamespace(progression=SimpleNamespace(mode="continue")),
+        )
+        return SimpleNamespace(source=source)
+
+    assert _primary([member({"primary_outcome": "solve_rate_errata"})]) == (  # type: ignore[list-item]
+        "solve_rate_errata",
+        "lock (analysis.primary_outcome)",
+        "solve_rate",
+    )
+    assert _primary([member(None)])[0] == "solve_rate"  # type: ignore[list-item]
+
+
+def test_a_shadow_gate_is_labelled_and_a_v1_assessment_of_it_is_flagged(
+    fixture_dir: Path, tmp_path: Path
+) -> None:
+    target = _copy(fixture_dir, tmp_path)
+    steps = target / "jobs" / EXPERIMENT / RUN_ID / "trials" / "b01-p0-guided" / "steps"
+    for record_path in steps.glob("*/agent/guardrail-gate/guardrail-gate.json"):
+        record = json.loads(record_path.read_text())
+        record["mode"] = "shadow"
+        record_path.write_text(json.dumps(record))
+
+    rebuilt = build_quality_projection(target / "jobs", target / "store", synthetic=True)
+
+    gate = rebuilt.run_details[f"{RUN_PREFIX}b01-p0-guided"].gate
+    assert gate is not None
+    assert (gate.shadow, gate.scorer) == (True, "gate-effort@1")
+    assert any("rescore with gate-effort@2" in note for note in gate.notes)
+    enforced = rebuilt.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
+    assert enforced is not None
+    assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@1")

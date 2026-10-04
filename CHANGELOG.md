@@ -2,6 +2,38 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 2
+
+### Added
+
+- `guardrail-gate@2` (`raidar.components.builtins.gate_v2`, wrapper `raidar.components.guardrail_gate_v2`, run `raidar.components.gate_run_v2`): `@1`'s loop with:
+  - `mode: shadow`: the same commit check, run once at each step's end against a git directory outside the workspace. It is recorded in full and never enforced: no refusal, no fix session, nothing written to `/app`. The record's `shadow_verdict` holds what the gate decided, and `gate_clean_at_step_end` is `None`.
+  - Git evidence of every commit attempt: each gate run's `git` block (`HEAD` before and after, `git log --oneline`, `git status --porcelain`) and the step's `git_evidence` (hook and `git commit` exit codes, commits recorded), written outside the workspace.
+- `python-guardrails@2` (`raidar.components.builtins.guardrails_v2`): the `@1` payload byte for byte. `with.workspace_configs: false` puts no config copy in the workspace (probe: none at step 1; integrity: protection flags only).
+- `gate-effort@2` (`raidar.scorers.gate_effort_v2`): the same metrics; reads enforced records exactly as `@1`.
+  - A shadow step measures `gate_runs`, `first_pass_clean`, `gate_error` and `first_run_blocking` (with families); every fix and enforcement outcome is `not_applicable`.
+  - Analysis, the manipulation check and the review surface read `@2` before `@1`. The Quality run view labels a shadow gate and shows its first-run families.
+- `analysis.primary_outcome` (experiment schema v2): the pre-registered primary outcome, validated against the trial outcome ids. It defaults to the progression's (`solve_rate`/`reached`).
+  - The analysis report (`primary_source`), its markdown, `raidar analyze` and the review surface's Quality page label it as primary. An errata-applied primary is always reported with its raw counterpart beside it (`Comparison.primary_raw`).
+  - It is analysis configuration, so `lock_sha256` does not move when it is set.
+- Detached jobs: `make experiment-execute ... DETACH=1` (`raidar.execution.detach`) runs the job under a supervisor in its own session, kept awake with `caffeinate -i` where available, with its pid, log and exit record in `<job dir>/detach/`.
+  - `make experiment-status JOB=<job dir>` reports `running`, `finished`, `failed` or `died`, the trials recorded of those selected, and the log tail.
+  - `raidar run` accepts a job directory that holds only `detach/`.
+  - AGENTS.md now requires long jobs to be launched this way and monitored to completion.
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 2, `rationale.md` §10, lock `28c51440f74a`, before `main-02`):
+  - r1 gets `python-guardrails@2` without workspace copies and `guardrail-gate@2` in shadow mode, so its agent's experience is unchanged.
+  - r2 moves to `python-guardrails@2` (with copies) and `guardrail-gate@2` (commit mode).
+  - The experiment scores with `gate-effort@2` and pre-registers `analysis.primary_outcome: solve_rate_errata`.
+  - Every other experiment was relocked for the spec change, and its `lock_sha256` is unchanged.
+- The python-guardrails rule verification is Raidar's own. `make guardrails-verify` runs `run_canaries.py` over the 73 implemented rules' canaries in the pack image, plus the mutant-pack negative control. The planned pytest/coverage pack is now `python-guardrails@3`.
+
+### Removed
+
+- The vendored setup-repository-guardrails skill files under `orchestrator/tests/fixtures/python_guardrails/`: its validator (`validate_rule_coverage.py`), the Enaible rule catalog (`enaible-rules.json`), the coverage ledger and the not-applicable evidence. The skill was used once to set the initial verification; the files stay in git history (`f61d81b`).
+
 ## Unreleased - python-guardrails@1 and the guardrails experiment
 
 ### Added

@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from raidar.review_quality.experiment_view import ReviewedTrial, build_experiments
-from raidar.review_quality.gate_view import GATE_EFFORT_REF
+from raidar.review_quality.gate_view import GATE_EFFORT_REFS
 from raidar.review_quality.models import QualityProjection
 from raidar.review_quality.run_view import build_run_detail
 from raidar.review_quality.sources import (
@@ -48,7 +48,9 @@ def _reviewed(jobs_root: Path, store_root: Path, locks: Sequence[Path]) -> list[
             decisions=jev.decisions,
             labels=audit.labels,
             jev_note=jev.note,
-            gate=store.find(GATE_EFFORT_REF, trial),
+            gate=next(
+                (found for ref in GATE_EFFORT_REFS if (found := store.find(ref, trial))), None
+            ),
         )
         reviewed.append(ReviewedTrial(source=trial, detail=detail))
     return reviewed

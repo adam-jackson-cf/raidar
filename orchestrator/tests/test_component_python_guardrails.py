@@ -4,8 +4,8 @@ Covers the contract (manifest, configuration, overlay, payload and its locks,
 the install and check scripts), the discovery probe and the integrity flags
 over recorded evidence, the flags' path into a step result, the gate's own
 behaviour on the host (exit codes, report, tiers, protection evidence; with
-this environment's Ruff and mypy, not the pins) and the rule-coverage
-ledger's structure. Real-container proof is in
+this environment's Ruff and mypy, not the pins) and the rule tests' own
+runner and specs. Real-container proof is in
 ``test_component_python_guardrails_trial.py``.
 """
 
@@ -49,7 +49,6 @@ from tests.component_support import compile_uses, use, write_jsonl, write_step_r
 from tests.python_guardrails_support import (
     COMMIT_SCRIPT,
     VERIFY_DIR,
-    assemble_verify_root,
     commit_gate_script,
     experiment_gate_use,
     host_home,
@@ -58,7 +57,6 @@ from tests.python_guardrails_support import (
 GUARDRAILS = use("python-guardrails@1")
 SLUG = "00-python-guardrails"
 REF = "python-guardrails@1"
-DEFERRED = {"PRETTIER.version", "SECURITY.dependency-audit", "TEST.coverage-minimum"}
 ANNOTATION_CODES = (
     "MYPY.no-untyped-def",
     "MYPY.no-untyped-call",
@@ -636,64 +634,96 @@ def test_fix_is_explicit_and_rewrites_only_what_ruff_can_fix(
     assert (workspace / "calc.py").read_text() == "import os\nimport sys\n\nprint(os, sys)\n"
 
 
-# ---- the rule-coverage ledger ---------------------------------------------------------
+# ---- the rule tests (canaries) ---------------------------------------------------------
 
 
-def _ledger() -> dict[str, Any]:
-    return cast(dict[str, Any], json.loads((VERIFY_DIR / "coverage-ledger.json").read_text()))
+def _specs() -> dict[str, dict[str, str]]:
+    return cast(dict[str, dict[str, str]], json.loads((VERIFY_DIR / "specs.json").read_text()))
 
 
-def test_the_ledger_resolves_every_rule_with_approvals_and_named_deferrals() -> None:
-    catalog = json.loads((VERIFY_DIR / "enaible-rules.json").read_text())
-    rows = {row["id"]: row for row in _ledger()["rules"]}
+def test_every_implemented_rule_has_a_canary_spec_and_no_skill_file_is_vendored() -> None:
+    specs = _specs()
+    modes = [spec["mode"] for spec in specs.values()]
 
-    assert set(rows) == {rule["id"] for rule in catalog["rules"]}
-    statuses = [row["status"] for row in rows.values()]
-    assert (statuses.count("implemented"), statuses.count("not_applicable")) == (73, 16)
-    assert {rule for rule, row in rows.items() if row["status"] == "blocked"} == DEFERRED
-    assert rows["TEST.coverage-minimum"]["planned_for"] == "python-guardrails@2"
-    for row in rows.values():
-        if row["status"] == "not_applicable":
-            assert (row["user_approval"], row["approved_on"]) == ("approved", "2026-10-04")
-
-
-def test_every_implemented_rule_runs_its_canary_spec() -> None:
-    specs = json.loads((VERIFY_DIR / "specs.json").read_text())
-    for row in _ledger()["rules"]:
-        if row["status"] != "implemented":
-            continue
-        spec = specs[row["id"]]
-        command = row["canary"]["command"]
-        assert command[:3] == ["python3", "canary.py", spec["codes"] or "-"]
-        assert command[4:] == ([] if spec["mode"] == "rule" else ["--mode", spec["mode"]])
+    assert len(specs) == 73
+    assert {mode: modes.count(mode) for mode in set(modes)} == {
+        "rule": 70,
+        "unchanged": 1,
+        "commit": 1,
+        "propagation": 1,
+    }
+    assert sorted(path.name for path in VERIFY_DIR.iterdir() if path.is_file()) == [
+        "canary.py",
+        "make_fixtures.py",
+        "run_canaries.py",
+        "specs.json",
+    ]
 
 
-def test_the_ledger_structure_holds_except_the_three_deferred_rules(tmp_path: Path) -> None:
-    root = assemble_verify_root(tmp_path / "verify")
+def _fake_canaries(tmp_path: Path, behaviour: dict[str, tuple[int, str, int, str]]) -> Path:
+    """A verify root whose canary.py answers per (rule fixture) as ``behaviour`` says."""
+    root = tmp_path / "verify"
+    root.mkdir()
+    (root / "run_canaries.py").write_bytes((VERIFY_DIR / "run_canaries.py").read_bytes())
+    table = {rule: list(value) for rule, value in behaviour.items()}
+    (root / "canary.py").write_text(
+        "import json, sys\n"
+        f"TABLE = json.loads({json.dumps(json.dumps(table))})\n"
+        "fixture = sys.argv[2]\n"
+        "rule = fixture.split('/')[-2]\n"
+        "clean_rc, clean_out, bad_rc, bad_out = TABLE[rule]\n"
+        "rc, out = (clean_rc, clean_out) if fixture.endswith('pass.py') else (bad_rc, bad_out)\n"
+        "print(out)\n"
+        "raise SystemExit(rc)\n"
+    )
+    specs = {rule: {"codes": "X1", "mode": "rule"} for rule in behaviour}
+    (root / "specs.json").write_text(json.dumps(specs))
+    for rule in behaviour:
+        (root / "fx" / rule).mkdir(parents=True)
+        (root / "fx" / rule / "pass.py").write_text("ok = 1\n")
+        (root / "fx" / rule / "violate.py").write_text("bad = 1\n")
+    return root
 
-    done = subprocess.run(
-        [
-            sys.executable,
-            str(root / "validate_rule_coverage.py"),
-            "--root",
-            str(root),
-            "--catalog",
-            str(root / "enaible-rules.json"),
-            "--ledger",
-            str(root / "coverage-ledger.json"),
-            "--structure-only",
-        ],
+
+def _run_canaries(root: Path, *extra: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, str(root / "run_canaries.py"), str(root / "specs.json"), str(root / "fx")]
+        + list(extra),
         capture_output=True,
         text=True,
         check=False,
         timeout=60,
     )
 
-    errors = sorted(line for line in done.stderr.splitlines() if line.startswith("rule coverage"))
+
+def test_the_canary_runner_passes_only_rules_that_fire_and_pass_as_they_should(
+    tmp_path: Path,
+) -> None:
+    root = _fake_canaries(
+        tmp_path,
+        {
+            "GOOD": (0, "", 1, "CANARY-HIT X1"),
+            "SILENT": (0, "", 0, ""),
+            "NOISY": (1, "CANARY-HIT X1", 1, "CANARY-HIT X1"),
+            "UNMARKED": (0, "", 1, "something else"),
+        },
+    )
+
+    done = _run_canaries(root)
+
     assert done.returncode == 1
-    assert errors == [
-        f"rule coverage FAIL: {rule}: rule is not implemented" for rule in sorted(DEFERRED)
-    ]
+    lines = done.stdout.splitlines()
+    assert "canary PASS GOOD" in lines
+    assert "canary FAIL SILENT: violating canary passed" in lines
+    assert any(line.startswith("canary FAIL NOISY: passing fixture exited 1") for line in lines)
+    assert any(
+        line.startswith("canary FAIL UNMARKED: violating fixture exited 1 without CANARY-HIT")
+        for line in lines
+    )
+    assert lines[-1] == "canaries: 4 rule(s), 3 failed"
+    only = _run_canaries(root, "--rules", "GOOD")
+    assert (only.returncode, only.stdout.splitlines()[-1]) == (0, "canaries: 1 rule(s), 0 failed")
+    assert _run_canaries(root, "--rules", "MISSING").returncode == 2
 
 
 def test_the_canary_specs_are_what_the_fixture_generator_writes(tmp_path: Path) -> None:
@@ -727,6 +757,7 @@ def test_the_parity_canary_runs_the_experiments_own_commit_gate() -> None:
         "max_rounds": 3,
         "timeout_sec": 300,
     }
+    assert experiment_gate_use("shadow")["command"] == gate["command"]
     assert "bash -c guardrail-check </dev/null" in script
     assert "core.hooksPath=" in script
     assert "commit --allow-empty" in script

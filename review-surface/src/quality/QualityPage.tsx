@@ -150,6 +150,26 @@ function ProblemView({
   );
 }
 
+// The pre-registered primary outcome (analysis.primary_outcome in the lock, else the
+// progression's default), labelled as the analysis report labels it; an errata-applied
+// primary names the raw SCB outcome reported beside it.
+function PrimaryOutcome({ experiment }: { experiment: QualityExperiment }) {
+  if (!experiment.primary_outcome) return null;
+  return (
+    <p data-testid="primary-outcome" className="mb-3 text-xs" style={{ color: C.fg2 }}>
+      Primary outcome:{' '}
+      <code style={{ color: C.fg4 }}>{experiment.primary_outcome}</code>
+      {experiment.primary_source && <span style={{ color: C.fg1 }}> ({experiment.primary_source})</span>}
+      {experiment.primary_raw && (
+        <span data-testid="primary-raw">
+          {' '}
+          · raw <code style={{ color: C.fg4 }}>{experiment.primary_raw}</code> reported beside it
+        </span>
+      )}
+    </p>
+  );
+}
+
 export function QualityPage() {
   const experiments = useQuery({ queryKey: ['quality-experiments'], queryFn: qualityApi.experiments });
   const runs = useQuery({ queryKey: ['quality-runs'], queryFn: qualityApi.runs });
@@ -183,15 +203,20 @@ export function QualityPage() {
       </p>
     );
   } else {
-    body = current.problems.map((problem) => (
-      <ProblemView
-        key={problem.problem}
-        problem={problem}
-        runs={runs.data?.runs ?? []}
-        experiments={list}
-        focused={problem.problem === focusProblem}
-      />
-    ));
+    body = (
+      <>
+        <PrimaryOutcome experiment={current} />
+        {current.problems.map((problem) => (
+          <ProblemView
+            key={problem.problem}
+            problem={problem}
+            runs={runs.data?.runs ?? []}
+            experiments={list}
+            focused={problem.problem === focusProblem}
+          />
+        ))}
+      </>
+    );
   }
 
   return (

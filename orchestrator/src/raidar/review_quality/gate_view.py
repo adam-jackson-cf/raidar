@@ -36,10 +36,13 @@ from raidar.scorers.gate_effort.records import (
     read_step_gate,
 )
 from raidar.scorers.gate_effort.scorer import run_summary
+from raidar.scorers.gate_effort_v2.scorer import SHADOW_MODE, step_mode
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.scorers.store import Assessment
 
 GATE_EFFORT_REF = "gate-effort@1"
+GATE_EFFORT_REFS = ("gate-effort@2", GATE_EFFORT_REF)
+"""Read in preference order: a trial assessed with ``@2`` shows a shadow gate's cells."""
 STEP_CELLS = (
     "gate_runs",
     "fix_rounds",
@@ -69,7 +72,7 @@ TOTAL_CELLS = (
     "total_fix_wall_s",
     "total_gate_wall_s",
 )
-_UNASSESSED = f"no {GATE_EFFORT_REF} assessment matches this trial"
+_UNASSESSED = "no gate-effort assessment matches this trial"
 
 
 class _Cells:
@@ -159,6 +162,30 @@ def _step(
     )
 
 
+def _is_shadow(traces: dict[str, Path], gates: dict[str, StepGate | None]) -> bool:
+    """A step with a gate record names shadow mode (guardrail-gate@2)."""
+    return any(
+        step_mode(traces[checkpoint]) == SHADOW_MODE
+        for checkpoint, gate in gates.items()
+        if gate is not None
+    )
+
+
+def _assessment_notes(assessment: Assessment | None, shadow: bool) -> list[str]:
+    """Why the cells are missing, or why they misread a shadow gate."""
+    if assessment is None:
+        return [
+            f"{_UNASSESSED}: rescore its job with {GATE_EFFORT_REF} "
+            f"(or {GATE_EFFORT_REFS[0]} when its lock declares it)"
+        ]
+    if shadow and assessment.scorer.ref == GATE_EFFORT_REF:
+        return [
+            f"shadow gate assessed with {GATE_EFFORT_REF}, which reads it as an enforced gate; "
+            f"rescore with {GATE_EFFORT_REFS[0]}"
+        ]
+    return []
+
+
 def build_gate_view(
     trial: TrialSource, assessment: Assessment | None, checkpoints: Sequence[str]
 ) -> GateView | None:
@@ -169,10 +196,12 @@ def build_gate_view(
     gates = {checkpoint: _read(traces[checkpoint], notes, checkpoint) for checkpoint in checkpoints}
     if not cells.measured() and not notes and all(gate is None for gate in gates.values()):
         return None
-    if assessment is None:
-        notes.append(f"{_UNASSESSED}: rescore its job with {GATE_EFFORT_REF}")
+    shadow = _is_shadow(traces, gates)
+    notes.extend(_assessment_notes(assessment, shadow))
     return GateView(
         source=assessment.key if assessment is not None else None,
+        scorer=assessment.scorer.ref if assessment is not None else None,
+        shadow=shadow,
         steps=tuple(
             _step(trial, checkpoint, traces[checkpoint], gates[checkpoint], cells)
             for checkpoint in checkpoints

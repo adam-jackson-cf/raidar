@@ -1,0 +1,14 @@
+"""Manifests that live beside their implementations, not in ``builtin_manifests``.
+
+``process-compliance@2`` and ``gate-effort@1``/``@2`` keep their manifests next to
+their code so the released scorers' digests (which cover ``builtin_manifests``)
+stay unchanged; the catalog registers them from here.
+"""
+
+from __future__ import annotations
+
+from raidar.scorers.gate_effort.manifest import GATE_EFFORT
+from raidar.scorers.gate_effort_v2.scorer import GATE_EFFORT_V2
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
+
+VERSIONED_MANIFESTS = (PROCESS_COMPLIANCE_V2, GATE_EFFORT, GATE_EFFORT_V2)
