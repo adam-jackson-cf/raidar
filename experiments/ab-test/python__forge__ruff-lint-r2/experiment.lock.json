@@ -417,19 +417,13 @@
             "tool_lock": {}
           }
         },
-        "process-compliance@1": {
-          "digest": "63f895bd106c2381593dfb13e802cd61beb886b94d7a46c23830b21132e23925",
+        "process-compliance@2": {
+          "digest": "f63e8ccfd45ea668f651c152bfb9572e2741a43f85bf6f14a0997ac1ddb9b645",
           "metadata": {
-            "implementation": "raidar.scorers.process_compliance:process_compliance_scorer",
-            "implementation_digest": "ab434a2dd46fab6a3983c27c46f1ee4fb074ddd30f8c187a144a2f0ccdaf819c",
-            "jev_policies": {
-              "process-compliance.residue": {
-                "digest": "b2805ba4272ecfdf47d52f3e71a64cd6d633e689621eb62def8926ddb076a215",
-                "mode": "shadow"
-              }
-            },
+            "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
+            "implementation_digest": "3db116afd4c9db6684b5e3084b2cb7502fbea3ab87380b3dac589418d898fb56",
             "manifest": {
-              "description": "Deterministic trace checks of agent process, with a Jev shadow for ambiguity.",
+              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
               "evidence_required": [
                 "trace",
                 "snapshot.current"
@@ -472,25 +466,13 @@
                   "tier": "deterministic",
                   "type": "ratio",
                   "unit": null
-                },
-                {
-                  "description": "Jev probability that ambiguous steps complied (shadow; uncalibrated).",
-                  "direction": "higher_better",
-                  "exactness": "native",
-                  "id": "jev_ambiguous_compliance",
-                  "inputs": [],
-                  "level": "checkpoint",
-                  "range": null,
-                  "tier": "jev",
-                  "type": "probability",
-                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "1"
+              "version": "2"
             },
             "tool_lock": {}
           }
@@ -639,7 +621,7 @@
         "correctness@1",
         "code-quality@1",
         "resource-usage@1",
-        "process-compliance@1"
+        "process-compliance@2"
       ]
     },
     "tools": {
@@ -651,7 +633,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "3929776ccb904043246f250c8751020fc731065428c235a45eb2892bd860c379",
+  "document_sha256": "0d9f9ff4bce0d546e4bba836ed5cc337fddce1ae04a45596acefb3db2b7ef546",
   "execution": {
     "arms": {
       "r1-baseline": {
@@ -935,8 +917,8 @@
   "experiment": {
     "id": "python__forge__ruff-lint-r2",
     "source": "experiment.yaml",
-    "source_sha256": "23f234672516d5d4f584e315a7bedd967c8fc1b39a3cb239e56c225bc50634ac",
-    "spec_sha256": "bf6baf10116de428f769ef350a80c285c20851449d9a28da193c42d80dfec3d5"
+    "source_sha256": "daacdfc69ebd87ffa6a00eaad9c085639f15eb775c031022be29c8896246537e",
+    "spec_sha256": "552cd14d5288afd48822a66b13d129fd74c1946b91af8ae849aa5ab1b8cd41c6"
   },
   "lock_sha256": "bb4b7edf5996db89db3715c65aabb979d8d490c183bae1cc5c575eea4ece6324",
   "lock_version": 3,
@@ -946,7 +928,7 @@
   },
   "sections": {
     "analysis": "c089ce60e7cfb80f51def68b95dd9652bf0d3673a70a0c4e4bc32b0f05822f08",
-    "assessment": "875b3ca455c5012097e51a75f3028401d7d33e9cdb4b11f3aab889006f1991e0",
+    "assessment": "6890ce63cb9cd89e539e5a9751f57adabddd695a2359312fa351f35c862fa3aa",
     "execution": "bb4b7edf5996db89db3715c65aabb979d8d490c183bae1cc5c575eea4ece6324",
     "toolchain": "1ac701670acfa918d3b4b47df46826715896dfef29b4a2e7b566f3b8d4006344"
   },
@@ -994,7 +976,7 @@
         "correctness@1",
         "code-quality@1",
         "resource-usage@1",
-        "process-compliance@1"
+        "process-compliance@2"
       ]
     },
     "conditions": [

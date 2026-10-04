@@ -17,6 +17,7 @@ from raidar.jev.client import (
     TransportTimeoutError,
 )
 from raidar.jev.policies import (
+    POLICY_DIR,
     CalibrationSplit,
     JevPolicy,
     PolicyMode,
@@ -27,6 +28,24 @@ from raidar.jev.protocol import JEV_PINNED_MODEL
 from raidar.jev.runtime import JevRuntime
 
 TEST_KEY = "sk-or-v1-testkey-0123456789abcdef"
+PARKED_MODE = 'mode: "off"'
+
+
+def shadow_policy_dir(target: Path) -> Path:
+    """The repo policies with every parked (``off``) mode back at ``shadow``.
+
+    Jev is parked (2026-10-04): the repo policies are ``off``. The dormant
+    calibration and promotion workflow starts from shadow, so its tests run on
+    this copy; comments and every other field stay byte for byte.
+    """
+    target.mkdir(parents=True)
+    for source in sorted(POLICY_DIR.glob("*.yaml")):
+        text = source.read_text(encoding="utf-8")
+        assert PARKED_MODE in text, f"{source.name} is no longer parked"
+        (target / source.name).write_text(text.replace(PARKED_MODE, "mode: shadow"))
+    return target
+
+
 SUFFICIENT = InputSufficiency(level=SufficiencyLevel.SUFFICIENT)
 HEX = "a" * 64
 

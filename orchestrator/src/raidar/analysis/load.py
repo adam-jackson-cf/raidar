@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.analysis.assessed import ANALYSED_SCORERS, PROCESS_COMPLIANCE_REF, build_outcome
+from raidar.analysis.assessed import ANALYSED_SCORERS, PROCESS_COMPLIANCE_REFS, build_outcome
 from raidar.analysis.lookup import AssessmentLookup, assessment_config
 from raidar.analysis.report import AnalysisInputs, DevRun
 from raidar.analysis.sources import (
@@ -61,6 +61,16 @@ class LoadRequest:
     bundle_search: tuple[Path, ...] = ()
 
 
+def _process_ref(declared: tuple[str, ...]) -> str | None:
+    """The process-compliance version the lock declares (``@2`` first), if any."""
+    return next((ref for ref in PROCESS_COMPLIANCE_REFS if ref in declared), None)
+
+
+def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[str, ...]:
+    wanted = (*ANALYSED_SCORERS, *((process_ref,) if process_ref else ()))
+    return tuple(ref for ref in wanted if ref in declared)
+
+
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
     """The analysis inputs and the lock they were checked against."""
     if not request.job_dirs:
@@ -72,11 +82,11 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
     policy, policy_facts = headline(lock)
     spec = lock["spec"]
     declared = tuple(spec["assessment"]["scorers"])
-    wanted = (*ANALYSED_SCORERS, PROCESS_COMPLIANCE_REF)
+    process_ref = _process_ref(declared)
     lookup = AssessmentLookup(
         store=AssessmentStore(request.store_root),
         registry=request.registry,
-        scorer_refs=tuple(ref for ref in wanted if ref in declared),
+        scorer_refs=_scorer_refs(declared, process_ref),
         bundles=BundleCache(search=request.bundle_search),
     )
     chosen, replaced = select_records(jobs)
@@ -87,7 +97,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
             job.trial_dir(record), config, trial_id=record.trial.trial_id, valid=record.valid
         )
         outcomes.append(build_outcome(record, results, policy=policy))
-        process[trial_id] = results.get(PROCESS_COMPLIANCE_REF)
+        process[trial_id] = results.get(process_ref or "")
     inputs = AnalysisInputs(
         experiment=str(lock["experiment"]["id"]),
         lock_sha256=str(lock["lock_sha256"]),
@@ -102,7 +112,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         planned=planned_trials(jobs[0].plan),
         outcomes=tuple(outcomes),
         replaced=replaced,
-        process_results=process if PROCESS_COMPLIANCE_REF in declared else None,
+        process_results=process if process_ref else None,
         dev_job=_dev_job(options),
     )
     return inputs, lock

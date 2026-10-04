@@ -70,7 +70,10 @@ from raidar.spec.metrics import (
 CORRECTNESS_REF = "correctness@1"
 CODE_QUALITY_REF = "code-quality@1"
 RESOURCE_USAGE_REF = "resource-usage@1"
-PROCESS_COMPLIANCE_REF = "process-compliance@1"
+# Process compliance the analysis reads, in preference order: ``@2`` decides
+# only deterministically (the default since Jev was parked, 2026-10-04); the
+# dormant ``@1`` stays readable for jobs whose lock declares it.
+PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
 ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
 _COST_TOTALS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 PASS_RATE = "strict_pass_rate"

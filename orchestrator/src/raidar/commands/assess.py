@@ -16,9 +16,10 @@ A relock that changes only assessment settings keeps ``lock_sha256``, so a
 plain rescore stores Assessments under the keys analysis looks up for that
 lock. Only a job with no findable lock falls back to its execution-time
 ``assessment-config.yaml``. The report names the config it used.
-Scorers that decide under Jev (``process-compliance@1``) get a runtime whose
-audit and cache live in ``--store``; ``--jev-replay-only`` answers from that
-cache alone and never calls the provider.
+Scorers that decide under Jev (only the dormant ``process-compliance@1``; Jev
+is parked and its policy is off) get a runtime whose audit and cache live in
+``--store``; ``--jev-replay-only`` answers from that cache alone and never
+calls the provider. ``process-compliance@2`` binds no Jev runtime.
 
 ``AS1`` (the assess-time half of the runtime-compatibility gate): CLI-supplied
 ``--scorer`` values must cover the runtime of the job's lock, and a ``--bundle``

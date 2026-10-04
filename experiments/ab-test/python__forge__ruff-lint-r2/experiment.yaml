@@ -79,7 +79,7 @@ arms:
     agent: codex-luna
 
 assessment:
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@1]
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2]
   metric: scb-canonical@2
 
 analysis:

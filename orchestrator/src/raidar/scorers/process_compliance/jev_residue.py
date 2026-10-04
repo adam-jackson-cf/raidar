@@ -37,13 +37,13 @@ from raidar.jev.process import EventKind as ResidueKind
 from raidar.jev.process import TraceEvent as ResidueEvent
 from raidar.jev.runtime import DecisionOutcome, JevRuntime
 from raidar.jev.session import open_runtime
-from raidar.scorers.process_compliance.checks import (
+from raidar.scorers.process_checks.checks import (
     PLAN_WRITTEN,
     TESTS_RUN_BEFORE_FINISH,
     CheckOutcome,
     Verdict,
 )
-from raidar.scorers.process_compliance.trace_events import EDIT_TOOLS, call_view, step_calls
+from raidar.scorers.process_checks.trace_events import EDIT_TOOLS, call_view, step_calls
 from raidar.scorers.resource_usage.atif import AGENT_SOURCE, Trajectory
 
 JEV_METRIC = "jev_ambiguous_compliance"

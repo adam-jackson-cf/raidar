@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 from pathlib import Path
+from typing import Any
 
 import pytest
 from click.testing import CliRunner
@@ -36,8 +37,15 @@ from raidar.jev.rubric_questions import (
     Requirement,
     load_rubric_question_set,
 )
+from raidar.jev.session import open_runtime
 from raidar.jev.symbols import MODULE_QUALNAME, SymbolKind, SymbolParseError, extract_symbols
-from tests.jev_support import RecordedTransport, make_runtime, noul_answer, policy
+from tests.jev_support import (
+    RecordedTransport,
+    make_runtime,
+    noul_answer,
+    policy,
+    shadow_policy_dir,
+)
 
 PROCESS = "process-compliance.residue"
 
@@ -246,14 +254,8 @@ def test_shadow_report_gives_coverage_and_input_sufficiency_with_denominators(
     assert [error.split(":")[0] for error in checkpoint_2["parse_errors"]] == ["broken.py"]
 
 
-def test_shadow_rubric_cli_writes_the_report_for_a_trial_layout(tmp_path: Path) -> None:
-    for source in _trajectory(tmp_path / "flat"):
-        shutil.copytree(source.root, tmp_path / "steps" / source.name / "artifacts" / "app")
-    specs = tmp_path / "specs" / "checkpoint_1"
-    specs.mkdir(parents=True)
-    (specs / "instruction.md").write_text("Build app.")
-    output = tmp_path / "report.json"
-    result = CliRunner().invoke(
+def _shadow_rubric(tmp_path: Path, store: Path, output: Path) -> Any:
+    return CliRunner().invoke(
         main,
         [
             "jev",
@@ -267,12 +269,37 @@ def test_shadow_rubric_cli_writes_the_report_for_a_trial_layout(tmp_path: Path) 
             "--specs",
             str(tmp_path / "specs"),
             "--store",
-            str(tmp_path / "store"),
+            str(store),
             "--replay-only",
             "--output",
             str(output),
         ],
     )
+
+
+def test_shadow_rubric_cli_writes_the_report_for_a_trial_layout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    for source in _trajectory(tmp_path / "flat"):
+        shutil.copytree(source.root, tmp_path / "steps" / source.name / "artifacts" / "app")
+    specs = tmp_path / "specs" / "checkpoint_1"
+    specs.mkdir(parents=True)
+    (specs / "instruction.md").write_text("Build app.")
+    # Parked (repo policy off): every decision is audited as skipped, none is asked.
+    parked_out = tmp_path / "parked.json"
+    parked = _shadow_rubric(tmp_path, tmp_path / "parked-store", parked_out)
+    assert parked.exit_code == 0, parked.output
+    assert json.loads(parked_out.read_text())["totals"]["failure_reasons"] == {}
+    parked_audit = make_runtime(tmp_path / "parked-store").audit.decisions(RUBRIC_POLICY)
+    assert parked_audit
+    assert {record.stage for record in parked_audit} == {DecisionStage.SKIPPED}
+
+    # The dormant shadow path still works on a shadow copy of the policies.
+    monkeypatch.setitem(
+        open_runtime.__kwdefaults__, "policy_dir", shadow_policy_dir(tmp_path / "policies")
+    )
+    output = tmp_path / "report.json"
+    result = _shadow_rubric(tmp_path, tmp_path / "store", output)
     assert result.exit_code == 0, result.output
     report = json.loads(output.read_text())
     assert [c["checkpoint"] for c in report["checkpoints"]] == ["checkpoint_1", "checkpoint_2"]

@@ -7,13 +7,17 @@ from pathlib import Path
 import pytest
 
 from raidar.analysis.manipulation import (
+    DEFAULT_CHECKS,
+    PROCESS_COMPLIANCE_REFS,
     Separation,
     load_arm_results,
     manipulation_check,
     permutation_p,
 )
 from raidar.scorers.catalog import default_scorer_registry
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
 from raidar.scorers.rescore import assess
+from raidar.scorers.sdk.manifest import Tier
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
 from raidar.scorers.store import AssessmentStore
 from tests.trace_trial_support import (
@@ -147,7 +151,17 @@ def _trial_trace(tested: bool) -> dict:
     return trajectory(*calls)
 
 
-def test_arm_results_load_from_the_assessment_store(tmp_path: Path) -> None:
+def test_default_checks_are_deterministic_metrics_of_the_default_scorer() -> None:
+    # Jev parked (2026-10-04): the defaults read only deterministic process-compliance@2
+    # metrics; an undetermined check is never ``ok``, so it never enters a share.
+    metrics = {metric.id: metric for metric in PROCESS_COMPLIANCE_V2.metrics}
+    assert set(DEFAULT_CHECKS) <= set(metrics)
+    assert {metrics[check].tier for check in DEFAULT_CHECKS} == {Tier.DETERMINISTIC}
+    assert PROCESS_COMPLIANCE_REFS[0] == PROCESS_COMPLIANCE_V2.ref
+
+
+@pytest.mark.parametrize("ref", ["process-compliance@2", "process-compliance@1"])
+def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) -> None:
     registry = default_scorer_registry()
     store = AssessmentStore(tmp_path / "store")
     keys: dict[str, list[str]] = {"guided": [], "baseline": []}
@@ -157,9 +171,7 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path) -> None:
                 tmp_path / f"{arm}-{index}",
                 [TracedStep("checkpoint_1", trace=_trial_trace(tested))],
             )
-            record = assess(
-                store, registry.get("process-compliance@1"), ctx, trial=f"{arm}-{index}"
-            )
+            record = assess(store, registry.get(ref), ctx, trial=f"{arm}-{index}")
             keys[arm].append(record.key)
     results = load_arm_results(store.root, keys)
     report = manipulation_check(results, guided="guided", baseline="baseline", checks=[TESTS])
@@ -172,7 +184,7 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path) -> None:
         traced_context(tmp_path / "c", [TracedStep("checkpoint_1", trace=_trial_trace(True))]),
         trial="c",
     )
-    with pytest.raises(ValueError, match="not process-compliance@1"):
+    with pytest.raises(ValueError, match="not one of process-compliance@2"):
         load_arm_results(store.root, {"guided": [other.key]})
     with pytest.raises(ValueError, match="no assessment"):
         load_arm_results(store.root, {"guided": ["0" * 64]})

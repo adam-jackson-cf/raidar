@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - Jev parked, process-compliance@2
+
+### Breaking Changes
+
+- Jev is parked (user decision 2026-10-04; requirements change log, F7): `code-quality.rubric-smells@3` and `process-compliance.residue@2` are `mode: "off"`. The shadow versions' audits and labels stay on file.
+- `process-compliance@2` (`raidar.scorers.process_checks`) replaces `@1` in every experiment. It runs deterministic trace checks only: a check the trace cannot decide is `insufficient_evidence` with an `undetermined: ...` reason, never a value or a zero, and it has no `jev_ambiguous_compliance` metric and no Jev runtime. The five ab-test locks were relocked (assessment section only; `lock_sha256` unchanged); rescore their jobs under `@2`. `@1` stays registered, dormant, so its Assessments and locks stay readable.
+
+### Changed
+
+- Analysis reads `process-compliance@2` (or `@1` where a lock declares it) for the manipulation check, which counts deterministic checks only.
+- The review surface's Quality run page shows a trial's past Jev decisions as collapsed, read-only history that is part of no score. The labelling panel and label API stay, dormant.
+- `make help` marks the `jev-*` targets dormant. A new import-linter contract keeps `raidar.scorers.process_checks` free of `raidar.jev`.
+
 ## Unreleased - r3 and ruff-r2 results, Jev first-pass labels
 
 ### Documentation

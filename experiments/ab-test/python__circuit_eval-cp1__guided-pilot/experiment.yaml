@@ -68,7 +68,7 @@ arms:
     agent: codex-luna
 
 assessment:
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@1]
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2]
   # @2 adds zero_correctness to @1: C = 0 scores S = 0 even when a quality component is missing.
   metric: scb-canonical-oneshot@2
 

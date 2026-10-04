@@ -1,6 +1,6 @@
 // Quality element, run detail: the per-checkpoint C·V·E·H·R·G·I·S strip with
-// eligibility badges, V/E/H/R/G drill-downs to file:line evidence, and the
-// run's Jev decisions for calibration labelling.
+// eligibility badges, V/E/H/R/G drill-downs to file:line evidence, and (Jev
+// parked 2026-10-04) the run's audited Jev decisions as collapsed, read-only history.
 import { useState } from 'react';
 import { Link, useParams, useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -9,7 +9,7 @@ import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
 import { C } from '@/utils/colors';
 import { qualityApi } from '@/quality/api';
 import { EvidenceDrilldown } from '@/quality/components/EvidenceDrilldown';
-import { JevLabelPanel } from '@/quality/components/JevLabelPanel';
+import { JevHistoryPanel } from '@/quality/components/JevHistoryPanel';
 import { QualityStrip, type Selection } from '@/quality/components/QualityStrip';
 import { POLICY_SOURCE_TITLE } from '@/quality/format';
 import { qualityExperimentHref, selectionFromParams, useQualityIndex } from '@/quality/links';
@@ -103,12 +103,7 @@ export function QualityRunPage() {
           </p>
         )}
       </div>
-      <section className="mt-6" aria-label="Jev decisions">
-        <h2 className="mb-1 text-xs font-semibold" style={{ color: C.fg4 }}>
-          Jev decisions
-        </h2>
-        <JevLabelPanel runId={run.id} decisions={data.jev_decisions} />
-      </section>
+      <JevHistoryPanel decisions={data.jev_decisions} />
     </main>
   );
 }

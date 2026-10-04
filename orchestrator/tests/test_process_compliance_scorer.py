@@ -1,4 +1,4 @@
-"""process-compliance@1 behaviour: deterministic trace checks, Jev residue, eligibility."""
+"""process-compliance@1 (dormant since Jev was parked): trace checks, Jev residue, eligibility."""
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from raidar.jev.policies import PolicyMode
 from raidar.jev.process import PROCESS_POLICY
 from raidar.jev.protocol import JEV_PINNED_MODEL
 from raidar.jev.runtime import JevRuntime
+from raidar.jev.session import open_runtime
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.process_compliance import (
     ProcessComplianceScorer,
@@ -21,7 +22,13 @@ from raidar.scorers.process_compliance.jev_residue import UNANSWERED
 from raidar.scorers.sdk.context import AssessContext
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, EvidenceSource, Observation
 from raidar.scorers.sdk.validation import validate_result
-from tests.jev_support import RecordedTransport, make_runtime, noul_answer, policy
+from tests.jev_support import (
+    RecordedTransport,
+    make_runtime,
+    noul_answer,
+    policy,
+    shadow_policy_dir,
+)
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,
@@ -304,9 +311,28 @@ def test_jev_failures_leave_the_value_unavailable(
     assert result.provenance.policy_modes == {"jev_ambiguous_compliance": mode.value}
 
 
-def test_a_store_bound_scorer_uses_the_versioned_policy_and_audits_in_the_store(
+def test_a_store_bound_scorer_under_the_parked_repo_policy_never_asks_jev(
     tmp_path: Path,
 ) -> None:
+    # Jev parked (2026-10-04): the repo's process-compliance.residue policy is off, so
+    # the dormant @1 skips the residue even without replay-only; nothing awaits Jev.
+    ctx = _ctx(tmp_path / "trial", _ambiguous_trace())
+    scorer = process_compliance_scorer_for_store(tmp_path / "store")
+    result = validate_result(scorer.manifest, ctx, scorer.assess(ctx))
+    item = _by_key(result)["jev_ambiguous_compliance", "checkpoint_1"]
+    assert (item.status, item.value) == (AssessStatus.UNAVAILABLE, None)
+    assert "skipped under the off policy" in (item.reason or "")
+    assert scorer.awaiting_answers() is False
+    assert result.provenance.policy_modes == {"jev_ambiguous_compliance": "off"}
+    assert result.provenance.jev_model_resolved is None
+
+
+def test_a_store_bound_scorer_uses_the_versioned_policy_and_audits_in_the_store(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The dormant shadow path, on a shadow copy of the parked repo policies.
+    shadow = shadow_policy_dir(tmp_path / "policies")
+    monkeypatch.setitem(open_runtime.__kwdefaults__, "policy_dir", shadow)
     ctx = _ctx(tmp_path / "trial", _ambiguous_trace())
     scorer = process_compliance_scorer_for_store(tmp_path / "store", replay_only=True)
     result = validate_result(scorer.manifest, ctx, scorer.assess(ctx))

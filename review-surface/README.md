@@ -10,7 +10,9 @@ components.
 Raidar artifacts remain authoritative. Everything this surface shows is a
 regenerable projection of run directories (`runs/<experiment>/<run>/`) and the
 Assessment stores that score them. User annotations and Jev labels are the only
-data it owns (under `data/`).
+data it owns (under `data/`). Jev is parked (2026-10-04): `/quality/runs/:id`
+shows a trial's audited Jev decisions only as a collapsed, read-only history
+that is part of no score; the labelling panel and label API are kept, dormant.
 
 ## Personas and objectives
 

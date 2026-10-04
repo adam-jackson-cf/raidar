@@ -43,10 +43,13 @@ def _decide(runtime, policy_id: str, state: object, sufficiency=SUFFICIENT):
     )
 
 
-def test_repo_policies_load_and_ship_in_shadow() -> None:
+def test_repo_policies_load_and_ship_parked() -> None:
+    # Jev parked (2026-10-04): both policies are off at a new version; the shadow
+    # versions they replace stay in git history and their audits stay on file.
     registry = PolicyRegistry.from_dir()
     assert registry.ids() == (RUBRIC, PROCESS)
-    assert set(registry.modes().values()) == {PolicyMode.SHADOW.value}
+    assert set(registry.modes().values()) == {PolicyMode.OFF.value}
+    assert {registry.get(RUBRIC).version, registry.get(PROCESS).version} == {"3", "2"}
 
 
 def test_enforce_requires_a_promotion_that_meets_the_gate(tmp_path: Path) -> None:

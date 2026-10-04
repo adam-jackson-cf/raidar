@@ -1,9 +1,14 @@
 # Ambiguous process-compliance checks that deterministic trace rules could not
-# settle (plan, tests before finishing, tests first). Shadow until promoted;
-# its runtimes are named (not "*") so a promotion can cover them.
+# settle (plan, tests before finishing, tests first); its runtimes are named
+# (not "*") so a promotion could cover them.
+# PARKED (version 2, 2026-10-04, user decision): mode off. process-compliance@2
+# records these checks as undetermined and never asks Jev; the dormant
+# process-compliance@1 still binds this policy, so a rescore under it skips
+# every Jev call (docs/reboot/requirements.md change log, F7). History:
+# version 1 was shadow; its audit and labels stay as they were.
 id: process-compliance.residue
-version: "1"
+version: "2"
 description: Jev residue for process-compliance checks the trace rules leave ambiguous.
-mode: shadow
+mode: "off"
 question_set: process-residue@1
 runtimes: [python]

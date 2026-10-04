@@ -31,6 +31,7 @@ from typing import Any
 from raidar.jev.policies import POLICY_DIR, PolicyRegistry
 from raidar.packs.python.models import ToolLock, load_tool_lock
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
 from raidar.scorers.sdk.context import Scorer
 from raidar.scorers.sdk.manifest import ANY_RUNTIME, ScorerManifest
 from raidar.spec.canonical import digest_json
@@ -292,14 +293,22 @@ class ScorerRegistry:
             ) from exc
 
 
+# ``process-compliance@2`` keeps its manifest beside its implementation so the
+# released scorers' digests (which cover ``builtin_manifests``) stay unchanged.
+REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, PROCESS_COMPLIANCE_V2)
+
 BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "correctness@1": "raidar.scorers.correctness:correctness_scorer",
     "code-quality@1": "raidar.scorers.code_quality:code_quality_scorer",
     "resource-usage@1": "raidar.scorers.resource_usage:resource_usage_scorer",
     "process-compliance@1": "raidar.scorers.process_compliance:process_compliance_scorer",
+    "process-compliance@2": (
+        "raidar.scorers.process_checks:deterministic_process_compliance_scorer"
+    ),
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
-# that store-bound runtime decides under (process-compliance: shadow residue).
+# that store-bound runtime decides under. Only the dormant process-compliance@1
+# (Jev parked 2026-10-04; its residue policy is off); @2 needs no store binding.
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
     "process-compliance@1": (
         "raidar.scorers.process_compliance:process_compliance_scorer_for_store",
@@ -334,7 +343,7 @@ def _builtin(manifest: ScorerManifest) -> ScorerRegistration:
 
 def default_scorer_registry() -> ScorerRegistry:
     """Built-in scorers, with their store bindings and problem-derived config keys."""
-    return ScorerRegistry(_builtin(manifest) for manifest in BUILTIN_MANIFESTS)
+    return ScorerRegistry(_builtin(manifest) for manifest in REGISTERED_MANIFESTS)
 
 
 @dataclass(frozen=True)

@@ -113,34 +113,21 @@ test.describe('quality run detail', () => {
   });
 });
 
-test.describe('jev calibration labels', () => {
+test.describe('parked jev decisions', () => {
   test.afterEach(async ({ page }) => removeLabels(page, LABELLED_RUN));
 
-  test('labelling a decision persists one label per decision, and unlabelling removes it', async ({ page }) => {
-    await removeLabels(page, LABELLED_RUN);
+  test('decisions are collapsed, read-only history with no labelling controls', async ({ page }) => {
     await page.goto(`/quality/runs/${LABELLED_RUN}`);
-    const decision = page.getByTestId('jev-decision').first();
-    await decision.getByRole('button', { name: 'False positive' }).click();
-    await expect(decision.getByRole('button', { name: 'False positive' })).toHaveAttribute('aria-pressed', 'true');
-    await decision.getByRole('button', { name: 'Correct' }).click();
-    await expect(decision.getByRole('button', { name: 'Correct' })).toHaveAttribute('aria-pressed', 'true');
-
-    const saved = await (await page.request.get(`/api/quality/labels?run_id=${LABELLED_RUN}`)).json();
-    expect(saved).toHaveLength(1);
-    expect(saved[0]).toMatchObject({
-      label: 'correct',
-      policy: 'code-quality.rubric-smells',
-      run_id: LABELLED_RUN,
-      source: 'user',
-      reviewer: 'human',
-      reviewer_model: null,
-    });
-
-    await page.reload();
-    const reloaded = page.getByTestId('jev-decision').first();
-    await expect(reloaded.getByRole('button', { name: 'Correct' })).toHaveAttribute('aria-pressed', 'true');
-    await reloaded.getByRole('button', { name: 'Correct' }).click();
-    await expect(reloaded.getByRole('button', { name: 'Correct' })).toHaveAttribute('aria-pressed', 'false');
+    const history = page.getByTestId('jev-history');
+    await expect(history).toBeVisible();
+    await expect(history).toContainText('parked, read-only history; not part of any score');
+    const decision = history.getByTestId('jev-history-decision').first();
+    await expect(decision).toBeHidden();
+    await history.locator('summary').click();
+    await expect(decision).toBeVisible();
+    await expect(decision).toContainText('code-quality.rubric-smells');
+    await expect(history.getByRole('button')).toHaveCount(0);
+    await expect(page.getByTestId('jev-decision')).toHaveCount(0);
   });
 
   test('the label API refuses unknown decisions and labels outside the vocabulary', async ({ page }) => {

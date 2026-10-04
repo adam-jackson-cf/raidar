@@ -475,3 +475,37 @@ def test_a_moved_oracle_bundle_is_refused_or_found_by_digest_never_unassessed(
     assert found.exit_code == 0, found.output
     report = json.loads((tmp_path / "found" / "analysis.json").read_text())
     assert _effect(report, "solve_rate")["n_pairs"] == 5
+
+
+@pytest.mark.parametrize("process", ["process-compliance@2", "process-compliance@1", None])
+def test_the_manipulation_check_reads_the_declared_process_compliance_version(
+    tmp_path: Path, process: str | None
+) -> None:
+    # Jev parked (2026-10-04): @2 is the default; a lock declaring the dormant @1 stays
+    # readable; a lock declaring neither gets no manipulation check.
+    scorers = ["correctness@1", *([process] if process else [])]
+    lock = _lock(scorers)
+    lock_path = tmp_path / "lock.json"
+    lock_path.write_text(json.dumps(lock))
+    job_dir = _write_run(tmp_path, lock)
+    store = tmp_path / "store"
+    rescore_path(
+        job_dir / "trials",
+        tuple(scorers),
+        AssessmentStore(store),
+        default_scorer_registry(),
+        config=lock_rescore_config(lock).scorers,
+        jev_replay_only=True,
+    )
+    output = tmp_path / "analysis"
+    result = _analyze(job_dir, store, lock_path, output)
+    assert result.exit_code == 0, result.output
+    (comparison,) = json.loads((output / "analysis.json").read_text())["comparisons"]
+    if process is None:
+        assert comparison["manipulation"] is None
+        return
+    manipulation = comparison["manipulation"]
+    assert manipulation["kind"] == "raidar-manipulation-check"
+    # These trials carry no trajectory, so no check is decided in either arm.
+    assert manipulation["verdict"] == "insufficient_data"
+    assert manipulation["checks"][0]["reason"] == "an arm has no trial with a decided check"

@@ -20,7 +20,7 @@ from raidar.jev.calibration import (
     supersede_labels,
 )
 from raidar.jev.ledger import current_labels, label_history, superseded_request_ids
-from raidar.jev.policies import POLICY_DIR, CalibrationSplit, PolicyMode, load_policy
+from raidar.jev.policies import CalibrationSplit, PolicyMode, load_policy
 from raidar.jev.promotion import (
     PromotionError,
     default_split,
@@ -30,7 +30,13 @@ from raidar.jev.promotion import (
     split_metrics,
 )
 from raidar.jev.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
-from tests.jev_support import SUFFICIENT, RecordedTransport, make_runtime, noul_answer
+from tests.jev_support import (
+    SUFFICIENT,
+    RecordedTransport,
+    make_runtime,
+    noul_answer,
+    shadow_policy_dir,
+)
 
 RUBRIC = "code-quality.rubric-smells"
 HAIKU = "anthropic/claude-haiku-4-5"
@@ -234,8 +240,7 @@ def _promotable(root: Path):
 
 
 def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> None:
-    policies = tmp_path / "policies"
-    shutil.copytree(POLICY_DIR, policies)
+    policies = shadow_policy_dir(tmp_path / "policies")
     store = tmp_path / "store"
     runner = CliRunner()
     base = ["--store", str(store), "--policy", RUBRIC, "--policy-dir", str(policies)]
@@ -262,7 +267,7 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
 
     written = load_policy(policies / f"{RUBRIC}.yaml")
     promotion = written.promotion
-    assert (written.mode, written.version) == (PolicyMode.ENFORCE, "3")
+    assert (written.mode, written.version) == (PolicyMode.ENFORCE, "4")
     assert promotion is not None
     assert promotion.split == CalibrationSplit(calibration=("t1", "t2"), evaluation=("t3", "t4"))
     assert (promotion.labelled, promotion.minority) == (40, 11)
@@ -278,7 +283,7 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
     assert promotion.regression_corpus == regression_corpus(runtime.audit, RUBRIC, promotion.split)
     header = (policies / f"{RUBRIC}.yaml").read_text().splitlines()
     assert header[0].startswith("# SCB rubric")
-    assert "jev-promote" in header[5]
+    assert any("Promoted to enforce" in line and "jev-promote" in line for line in header)
     assert yaml.safe_load((policies / f"{RUBRIC}.yaml").read_text())["mode"] == "enforce"
 
     # Everything re-derives; only the scorer version the promotion ships with is missing.
@@ -298,8 +303,7 @@ def test_promote_writes_enforce_only_when_the_audit_verifies(tmp_path: Path) -> 
 def test_promote_refuses_to_write_while_the_scorer_bump_is_pending(tmp_path: Path) -> None:
     # The plan verifies, but code-quality@1.1 does not exist yet: writing enforce now would
     # leave a repo policy that `jev verify-promotion` rejects, so no write without the flag.
-    policies = tmp_path / "policies"
-    shutil.copytree(POLICY_DIR, policies)
+    policies = shadow_policy_dir(tmp_path / "policies")
     store = tmp_path / "store"
     _promotable(store)
     base = ["--store", str(store), "--policy", RUBRIC, "--policy-dir", str(policies)]
@@ -372,8 +376,7 @@ def test_blind_decisions_without_noul_questions_compare_choices_and_scores(
 def test_superseded_labels_leave_calibration_but_stay_on_file(tmp_path: Path) -> None:
     # A selector who also labelled cannot show blindness: its labels are superseded, not
     # deleted, and the decisions may be relabelled by a separate blind labeller.
-    policies = tmp_path / "policies"
-    shutil.copytree(POLICY_DIR, policies)
+    policies = shadow_policy_dir(tmp_path / "policies")
     store = tmp_path / "store"
     runtime, records = _promotable(store)
     before = promotion_readiness(runtime.audit, RUBRIC)

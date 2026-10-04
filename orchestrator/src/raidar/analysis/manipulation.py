@@ -1,8 +1,11 @@
 """Manipulation check: did the guided arm's process actually differ from baseline? (G5)
 
 A process-guidance condition only means something if agents under it behave
-differently. This check takes ``process-compliance@1`` results per arm and
-reports, per check, whether the guided arm complied more than the baseline.
+differently. This check takes ``process-compliance`` results per arm (``@2``,
+or the dormant ``@1`` for jobs that declare it) and reports, per check, whether
+the guided arm complied more than the baseline. The checks are deterministic
+trace checks: only ``ok`` observations count, so an undetermined check (and
+``@1``'s parked Jev metric) never enters a share.
 
 The unit is the trial, not the checkpoint, because checkpoints of one
 step_result are not independent: each trial contributes its pass share over
@@ -26,7 +29,7 @@ sample size, prevented separation.
 The overall verdict is ``separated`` only when every requested check is.
 
 Placement: this compares arms, which F6 keeps out of scorers, so it is
-analysis code over stored ``process-compliance@1`` results. ``raidar analyze``
+analysis code over stored ``process-compliance`` results. ``raidar analyze``
 runs it for every treatment arm against the baseline arm.
 """
 
@@ -41,7 +44,7 @@ from pathlib import Path
 
 from pydantic import Field
 
-from raidar.scorers.process_compliance.checks import PLAN_WRITTEN, TESTS_RUN_BEFORE_FINISH
+from raidar.scorers.process_checks.checks import PLAN_WRITTEN, TESTS_RUN_BEFORE_FINISH
 from raidar.scorers.sdk.manifest import SdkModel
 from raidar.scorers.sdk.result import AssessResult, AssessStatus
 from raidar.scorers.store import AssessmentStore
@@ -50,7 +53,7 @@ DEFAULT_CHECKS = (TESTS_RUN_BEFORE_FINISH, PLAN_WRITTEN)
 EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
-PROCESS_COMPLIANCE_REF = "process-compliance@1"
+PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
 
 
 class Separation(StrEnum):
@@ -227,7 +230,7 @@ def manipulation_check(
 def load_arm_results(
     store_root: Path, arm_keys: Mapping[str, Sequence[str]]
 ) -> dict[str, list[AssessResult]]:
-    """``process-compliance@1`` results per arm from Assessment keys in a store."""
+    """``process-compliance`` (``@2`` or ``@1``) results per arm from Assessment keys."""
     store = AssessmentStore(store_root)
     loaded: dict[str, list[AssessResult]] = {}
     for arm, keys in arm_keys.items():
@@ -236,10 +239,10 @@ def load_arm_results(
             assessment = store.get(key)
             if assessment is None:
                 raise ValueError(f"arm {arm}: no assessment {key} in {store_root}")
-            if assessment.scorer.ref != PROCESS_COMPLIANCE_REF:
+            if assessment.scorer.ref not in PROCESS_COMPLIANCE_REFS:
                 raise ValueError(
                     f"arm {arm}: assessment {key} is {assessment.scorer.ref}, "
-                    f"not {PROCESS_COMPLIANCE_REF}"
+                    f"not one of {', '.join(PROCESS_COMPLIANCE_REFS)}"
                 )
             loaded[arm].append(assessment.result)
     return loaded

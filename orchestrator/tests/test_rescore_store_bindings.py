@@ -16,6 +16,7 @@ from raidar.cli import main
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
 from raidar.jev.policies import POLICY_DIR, PolicyMode
 from raidar.jev.process import PROCESS_POLICY
+from raidar.jev.session import open_runtime
 from raidar.scorers import catalog
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, default_scorer_registry
 from raidar.scorers.keys import scorer_identity
@@ -26,6 +27,7 @@ from raidar.scorers.sdk.result import AssessResult, AssessStatus
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.spec.schema import ProtocolSpec
 from raidar.verifier.models import CaseStatus
+from tests.jev_support import shadow_policy_dir
 from tests.scorer_support import (
     APP_V1,
     FakeScorer,
@@ -44,7 +46,21 @@ from tests.trace_trial_support import (
 )
 
 PROCESS = "process-compliance@1"
+DETERMINISTIC = "process-compliance@2"
 FAKE = "fake-quality@1"
+
+
+@pytest.fixture
+def shadow_jev(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """The dormant process-compliance@1 Jev path as it ran before Jev was parked.
+
+    The repo policies are ``off`` (2026-10-04); this binds a shadow copy both
+    for the scorer identity and for the store runtime ``open_runtime`` opens.
+    """
+    policies = shadow_policy_dir(tmp_path / "shadow-policies")
+    monkeypatch.setattr(catalog, "JEV_POLICY_DIR", policies)
+    monkeypatch.setitem(open_runtime.__kwdefaults__, "policy_dir", policies)
+    return policies
 
 
 def _ambiguous_trial(trial_dir: Path) -> Path:
@@ -58,6 +74,7 @@ def _ambiguous_trial(trial_dir: Path) -> Path:
     return write_traced_trial(trial_dir, [TracedStep("checkpoint_1", trace=trace)])
 
 
+@pytest.mark.usefixtures("shadow_jev")
 def test_rescore_binds_process_compliance_to_a_shadow_jev_runtime_in_the_store(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -162,17 +179,18 @@ def test_the_jev_policy_mode_is_part_of_the_scorer_identity_and_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     registration = default_scorer_registry().get(PROCESS)
-    shadow = scorer_identity(registration)
-    assert shadow.jev_policies is not None
-
-    monkeypatch.setattr(catalog, "JEV_POLICY_DIR", _with_mode(tmp_path, PolicyMode.OFF))
     off = scorer_identity(registration)
     assert off.jev_policies is not None
-    assert off.jev_policies[PROCESS_POLICY].mode == "off"
+    assert off.jev_policies[PROCESS_POLICY].mode == "off", "the repo policy is parked"
+
+    monkeypatch.setattr(catalog, "JEV_POLICY_DIR", _with_mode(tmp_path, PolicyMode.SHADOW))
+    shadow = scorer_identity(registration)
+    assert shadow.jev_policies is not None
+    assert shadow.jev_policies[PROCESS_POLICY].mode == "shadow"
     assert off.payload() != shadow.payload()
 
     # Scorers without Jev policies serialise exactly as before the field existed.
-    for ref in ("correctness@1", "code-quality@1", "resource-usage@1"):
+    for ref in ("correctness@1", "code-quality@1", "resource-usage@1", DETERMINISTIC):
         plain = scorer_identity(default_scorer_registry().get(ref))
         assert plain.jev_policies is None
         assert "jev_policies" not in plain.payload()
@@ -320,6 +338,7 @@ def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) 
     assert rescore(loose, "correctness@1")["config"] is None
 
 
+@pytest.mark.usefixtures("shadow_jev")
 def test_rescore_records_run_qualified_trial_ids_so_shared_trial_ids_stay_apart(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

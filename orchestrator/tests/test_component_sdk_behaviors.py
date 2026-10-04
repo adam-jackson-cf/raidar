@@ -43,6 +43,7 @@ SDK_RUNTIME_SOURCES = [
     for name in ("compiler.py", "compiled.py", "setup_script.py", "step_reset.sh")
 ]
 BUILTIN_REFS = [
+    "guardrail-gate@1",
     "harness-settings@1",
     "lint-config@1",
     "lint-tool@1",

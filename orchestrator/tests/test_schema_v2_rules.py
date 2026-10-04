@@ -247,6 +247,18 @@ LEGACY = {
 }
 
 
+# Decisions taken after the v1 -> v2 translation that the committed v2 files carry:
+# 2026-10-04, Jev parked: experiments declare process-compliance@2, not @1.
+_LATER_DECISIONS = {"process-compliance@1": "process-compliance@2"}
+
+
+def _later_decisions(document: dict[str, Any]) -> dict[str, Any]:
+    assessment = document.get("assessment") or {}
+    if "scorers" in assessment:
+        assessment["scorers"] = [_LATER_DECISIONS.get(ref, ref) for ref in assessment["scorers"]]
+    return document
+
+
 @pytest.mark.parametrize("name", sorted(LEGACY))
 def test_v1_specs_stay_loadable_read_only(name: str, tmp_path: Path) -> None:
     kind, current = LEGACY[name]
@@ -271,9 +283,12 @@ def test_v1_specs_stay_loadable_read_only(name: str, tmp_path: Path) -> None:
     assert not (tmp_path / "x.json").exists()
     with pytest.raises(LegacySpecError):
         load_experiment(source)
-    # The committed v2 experiment is exactly the translation of the v1 file.
-    upgraded = upgrade_document(
-        yaml.safe_load(source.read_text()), kind=kind, experiment_id=current.parent.name
+    # The committed v2 experiment is exactly the translation of the v1 file, apart from
+    # later recorded decisions (_LATER_DECISIONS).
+    upgraded = _later_decisions(
+        upgrade_document(
+            yaml.safe_load(source.read_text()), kind=kind, experiment_id=current.parent.name
+        )
     )
     committed = yaml.safe_load(current.read_text())
     assert {k: v for k, v in upgraded.items() if k != "description"} == {

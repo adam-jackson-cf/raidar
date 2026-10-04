@@ -2,7 +2,8 @@
 
 Each check returns a ``CheckOutcome``: ``pass`` or ``fail`` when the trace
 decides it, ``ambiguous`` when an ambiguous event could change the answer
-(these go to the Jev shadow), and ``not_applicable`` when the step made no
+(``process-compliance@2`` records these as undetermined; the dormant ``@1``
+also hands them to its Jev residue), and ``not_applicable`` when the step made no
 source edit, so neither rule has anything to order against.
 
 Order is the position of an event in the classified sequence; one call can
@@ -15,7 +16,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from enum import StrEnum
 
-from raidar.scorers.process_compliance.trace_events import EventKind, TraceEvent
+from raidar.scorers.process_checks.trace_events import EventKind, TraceEvent
 
 TESTS_RUN_BEFORE_FINISH = "tests_run_before_finish"
 PLAN_WRITTEN = "plan_written"
