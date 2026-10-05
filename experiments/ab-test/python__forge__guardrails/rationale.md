@@ -240,3 +240,26 @@ Before `main-02`, one trial per arm (attempt 0) ran under lock `28c51440f74a`, l
 - **Commit evidence (r2):** the refusal and the later commit are both visible in git: `HEAD` moves only on the passing run, e.g. checkpoint 1 refused (hook 1, `git commit` 1) and then committed `a5ee34d`.
 - **Paired first-run outcomes:** `first_pass_clean_rate` 0 vs 0. `total_first_run_blocking` 1,336 (r1) vs 30 (r2). r1's count is dominated by mypy strict's `no-untyped-call`, reported once per call site (202 of 294 findings at checkpoint 8). The total therefore scales with r1's call graph; read the binary `first_pass_clean_rate` and the per-family counts first.
 - **Signals (1 pair; `insufficient` by design):** `solve_rate_errata` Δ −0.25 (r1 solved checkpoints 1-2; r2 solved none). Cost per trial $0.034 (r1) vs $0.077 (r2), of which r2's fix sessions were $0.036. The manipulation check separated.
+
+## 11. `main-02` outcome and the `gate-effort@3` amendment (2026-10-05, recorded after the run)
+
+Exploratory. 4 pairs against `min_pairs` 5, so every paired verdict reads `insufficient` by design. These are signals, never evidence of an effect.
+
+### 11.1 Run
+
+`main-02` ran detached under lock `28c51440f74a` at concurrency 2, 20:42:16-23:15:45 UTC on 2026-10-04: 8 of 8 trials valid, no infrastructure errors, every probe passed, no leftover containers, `detach/exit.json` exit 0. Total cost about $0.42.
+
+### 11.2 Signals (r1-baseline vs r2-guardrails, means per trial)
+
+- **Primary** `solve_rate_errata`: 0.344 vs 0.188, Δ −0.156 [−0.70, 0.39]. Raw `solve_rate` beside it: 0.219 vs 0.156, Δ −0.063. Same direction as `smoke-02` (Δ −0.25).
+- Correctness C 0.865 vs 0.753 (Δ −0.11); headline S 73.1 vs 66.3 (Δ −6.8); `final_solved` 0 in both arms.
+- Quality: erosion E 0.125 vs 0.608 (Δ +0.48) and verbosity V move by construction (the gate's C901 and SIM rules are what E and V count). Rework R 0.25 vs 0.42; architecture H and regression G flat.
+- **Gate effort (paired first-run outcomes):** `total_first_run_blocking` 609.8 vs 37.75 (Δ −572 [−1059, −85]); typing 478.5 vs 9.25, complexity 60.75 vs 13.25, style 56.5 vs 13.5, defects 13.5 vs 1. r2 is already lower at checkpoint 1, before any refusal (8.25 vs 24 findings per step), so seeing `ruff.toml` and `mypy.ini` alone changes first-pass output.
+- **First-pass clean:** 0 of 30 decided steps in r1 and 0 of 31 in r2 (`gate-effort@3`, below). The section 10.4 expectation that r2's first-run rate would rise at later checkpoints was **not met**: r2's first-run count per step fell to about 2-3 at checkpoints 2-5 and rose again to 5-8 at checkpoints 6-8.
+- **r2 rounds:** 31 of 32 steps refused their first commit. 30 were clean after 1 fix round and b00 checkpoint 7 after 2 (32 refused runs in all). Unresolved 0, gate errors 0. Manipulation check separated (`gate_clean_at_step_end` 32/32).
+- **Git evidence:** every refused run left `HEAD` unmoved with the code still staged; the passing run moved `HEAD`. r1's 32 shadow runs were all refused in the shadow repository, and nothing reached `/app`. r1's agent never saw the gate (0 mentions in its session traces).
+- **Cost:** $0.033 vs $0.072 per trial, of which r2's fix sessions were $0.037 (51%). Tokens 1.24M vs 2.97M. Agent time 516 s vs 1,004 s.
+
+### 11.3 Measurement defect and `gate-effort@3`
+
+At b03 r2 checkpoint 2 the agent changed nothing (an 11 s session ending in a question). The commit gate commits with `--allow-empty`, so the unchanged tree passed and `gate-effort@2` counted the step as first-pass clean (r2 rate 1/32). `gate-effort@3` keeps every `@2` rule and reports `first_pass_clean` as `not_applicable` when a step's production and test files equal the previous snapshot's. The experiment now declares `gate-effort@3`; the relock kept `lock_sha256` `28c51440f74a`. `main-02` was rescored with `@3`, and the replay was identical. The defect affects three steps: b03 r2 checkpoint 2, and b02 r1 checkpoints 2-3 (also no-edit steps). First-pass clean is now 0 in both arms.

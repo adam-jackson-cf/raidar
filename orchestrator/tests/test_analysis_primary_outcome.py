@@ -130,6 +130,9 @@ def test_a_preregistered_errata_primary_is_labelled_with_raw_beside_it() -> None
     assert "**Primary outcome** `solve_rate_errata`" in markdown
     assert "**Raw (beside the primary)** `solve_rate`" in markdown
     assert "- Primary outcome: `solve_rate_errata` (lock (analysis.primary_outcome)" in markdown
+    assert "| Outcome | Problem | Both | Baseline only |" in markdown
+    assert "| final_solved | toy@1 |" in markdown
+    assert "| final_solved_errata | toy@1 |" in markdown
     assert RAW_COUNTERPART[SOLVE_RATE_ERRATA] == SOLVE_RATE
     assert primary_source("continue", SOLVE_RATE_ERRATA) == PRIMARY_FROM_LOCK
 
@@ -149,7 +152,8 @@ def test_an_errata_primary_without_errata_still_has_a_primary_effect() -> None:
 
 
 def test_the_lock_declared_gate_effort_version_is_read_v2_first() -> None:
-    assert GATE_EFFORT_REFS == ("gate-effort@2", "gate-effort@1")
+    assert GATE_EFFORT_REFS == ("gate-effort@3", "gate-effort@2", "gate-effort@1")
     assert gate_effort_ref(["correctness@1", "gate-effort@1"]) == "gate-effort@1"
     assert gate_effort_ref(["gate-effort@2", "gate-effort@1"]) == "gate-effort@2"
+    assert gate_effort_ref(["gate-effort@3", "correctness@1"]) == "gate-effort@3"
     assert gate_effort_ref(["correctness@1"]) is None

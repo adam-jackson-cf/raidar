@@ -150,7 +150,7 @@ help:
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
-	@echo "  make guardrails-verify                                python-guardrails rule tests: each of the 73 rules fires on its violating canary and passes"
+	@echo "  make guardrails-verify                                python-guardrails rule tests: each rule the pack implements (derived from its config and codes; 73) fires on its violating canary and passes"
 	@echo "                                                        its clean one against the installed pack in the pack image, plus a mutant-pack negative"
 	@echo "                                                        control (OrbStack, PyPI; not in make quality)"
 	@echo ""

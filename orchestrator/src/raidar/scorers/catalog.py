@@ -293,7 +293,7 @@ class ScorerRegistry:
             ) from exc
 
 
-# ``process-compliance@2`` and ``gate-effort@1``/``@2`` keep their manifests beside their
+# ``process-compliance@2`` and ``gate-effort@1``/``@2``/``@3`` keep their manifests beside their
 # implementations so the released scorers' digests (which cover
 # ``builtin_manifests``) stay unchanged.
 REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, *VERSIONED_MANIFESTS)
@@ -308,6 +308,7 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     ),
     "gate-effort@1": "raidar.scorers.gate_effort:gate_effort_scorer",
     "gate-effort@2": "raidar.scorers.gate_effort_v2:gate_effort_v2_scorer",
+    "gate-effort@3": "raidar.scorers.gate_effort_v3:gate_effort_v3_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
 # that store-bound runtime decides under. Only the dormant process-compliance@1

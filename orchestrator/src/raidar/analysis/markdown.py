@@ -168,8 +168,9 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         f"## Gate effort ({report.gate_scorer or 'gate-effort@1'}, per arm)",
         "",
         "Mean [CI] n over valid trials; an arm without the commit gate has no value "
-        "(not applicable), never 0; an arm with a shadow gate (gate-effort@2) has its "
-        "first-run values only.",
+        "(not applicable), never 0; an arm with a shadow gate (gate-effort@2 and later) has its "
+        "first-run values only; under gate-effort@3 a step with no source change is not "
+        "applicable to first-pass clean.",
         "",
         *_table(("Metric", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
@@ -197,6 +198,7 @@ def _gate_effects(comparison: Comparison) -> list[str]:
 def _mcnemar(effects: Sequence[Effect]) -> list[str]:
     rows = [
         [
+            effect.metric,
             effect.problem,
             str(t.both_solved),
             str(t.baseline_only),
@@ -209,7 +211,7 @@ def _mcnemar(effects: Sequence[Effect]) -> list[str]:
     ]
     if not rows:
         return []
-    header = ("Problem", "Both", "Baseline only", "Treatment only", "Neither", "Exact p")
+    header = ("Outcome", "Problem", "Both", "Baseline only", "Treatment only", "Neither", "Exact p")
     return ["### Final checkpoint solved (paired 2×2, exact McNemar)", "", *_table(header, rows)]
 
 
@@ -306,10 +308,15 @@ def _errata_lines(report: AnalysisReport) -> list[str]:
         f"({_count(errata.get('exclude_from_solved'))} exclude-from-solved cases)"
         for ref, errata in sorted(report.errata.items())
     )
+    primary = str(report.primary_metric or "")
+    which = (
+        f"the primary (`{primary}`) is one of them and its raw counterpart is reported beside it"
+        if primary.endswith("_errata")
+        else "every other outcome, including the primary, is the raw SCB grade"
+    )
     return [
         f"- Problem errata: {pinned}. Only the `*_errata` outcomes (errata-applied solve, "
-        "reached, final solved) use it; every other outcome, including the primary, is the "
-        "raw SCB grade"
+        f"reached, final solved) use it; {which}"
     ]
 
 

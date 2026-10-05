@@ -44,11 +44,17 @@ from tests.component_trial_support import (
     pack_image_present,
     run_trial_sync,
 )
-from tests.python_guardrails_support import assemble_verify_root, experiment_gate_use
+from tests.python_guardrails_support import (
+    VERIFY_DIR,
+    assemble_verify_root,
+    experiment_gate_use,
+    implemented_rules,
+)
 
 INNER = "tests.test_component_python_guardrails_trial:TamperingInnerAgent"
 SHADOW_INNER = "tests.test_component_python_guardrails_trial:ObservingInnerAgent"
-IMPLEMENTED_RULES = 73
+IMPLEMENTED_RULES = len(implemented_rules(json.loads((VERIFY_DIR / "specs.json").read_text())))
+"""Derived from the shipped pack (``python_guardrails_support.pack_rule_entries``)."""
 VERIFY_SLUG = "00-python-guardrails"
 
 docker_trial = pytest.mark.skipif(
@@ -310,6 +316,8 @@ def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
     assert failures == [], "\n".join(failures)
     passed = [line for line in output.splitlines() if line.startswith("canary PASS ")]
     assert len(passed) == IMPLEMENTED_RULES
+    specs = json.loads((VERIFY_DIR / "specs.json").read_text())
+    assert {line.split()[2] for line in passed} == implemented_rules(specs)
     assert f"canaries: {IMPLEMENTED_RULES} rule(s), 0 failed" in output
     mutant = (root / "mutant.out").read_text()
     for rule in MUTATED:

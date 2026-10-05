@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails main-02 results
+
+### Added
+
+- `gate-effort@3` (`raidar.scorers.gate_effort_v3`): `@2` with one change. A step whose production and test files equal the previous snapshot's (or the starter's, for the first step) is `not_applicable` for `first_pass_clean` and is left out of `first_pass_clean_rate`. The commit gate commits with `--allow-empty`, so `@2` counted a no-edit step as clean. Analysis, the manipulation check and the review surface read `@3` before `@2`.
+
+### Changed
+
+- `python__forge__guardrails` declares `gate-effort@3`. The relock kept `lock_sha256` `28c51440f74a`. `main-02` was rescored and the replay was identical. `rationale.md` §11 records the `main-02` outcome; `docs/reboot/gate-packet.md` §15.7 has the signals and the next iteration.
+- Analysis markdown:
+  - The errata line says the primary is an errata outcome, with its raw counterpart beside it, whenever `analysis.primary_outcome` is an `*_errata` outcome.
+  - The McNemar table has an `Outcome` column.
+- `make guardrails-verify` and the canary-spec test derive the expected rule set from the shipped pack (`ruff.toml` entries, `mypy.ini` keys and the gate library's diagnostic codes) instead of a hard-coded 73. A pack rule without a canary now fails. Three config entries without their own canary are listed as known gaps (`lint.per-file-ignores`, `explicit_package_bases`, `disable_error_code`).
+
 ## Unreleased - guardrails explore iteration 2
 
 ### Added

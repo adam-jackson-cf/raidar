@@ -83,7 +83,7 @@ ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
 # Read only when the lock declares one (its ``gate.*`` outcomes are then in every trial),
 # in preference order: ``@2`` also reads a shadow gate's first-run outcomes.
 GATE_EFFORT_REF = "gate-effort@1"
-GATE_EFFORT_REFS = ("gate-effort@2", GATE_EFFORT_REF)
+GATE_EFFORT_REFS = ("gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
 _COST_TOTALS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 PASS_RATE = "strict_pass_rate"
 _CHECKPOINT_SOURCES = {
@@ -261,7 +261,7 @@ def _series(
 
 
 def gate_effort_ref(declared: Iterable[str]) -> str | None:
-    """The gate-effort version a lock declares (``@2`` first), if any."""
+    """The gate-effort version a lock declares (newest first), if any."""
     names = set(declared)
     return next((ref for ref in GATE_EFFORT_REFS if ref in names), None)
 
@@ -270,7 +270,7 @@ def gate_metrics(result: AssessResult | None, ref: str = GATE_EFFORT_REF) -> dic
     """The ``gate.*`` outcomes from a trial's gate-effort trajectory observations.
 
     An arm without the gate reads ``not_applicable`` (the scorer's status), never 0;
-    under ``gate-effort@2`` a shadow gate's fix outcomes read ``not_applicable`` too.
+    under ``gate-effort@2`` and ``@3`` a shadow gate's fix outcomes read ``not_applicable`` too.
     """
     observed = Observed(ref, result)
     return {

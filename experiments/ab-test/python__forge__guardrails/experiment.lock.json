@@ -427,13 +427,13 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@2": {
-          "digest": "3b7eb30c42d7719250f9d7e714ea09a19dcf7861373dd598e4266e6491e7a4f1",
+        "gate-effort@3": {
+          "digest": "4ca328ddea88d8a2b0e399073e1f0b02cb5b53235c2904ed90b13701fb640f9b",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort_v2:gate_effort_v2_scorer",
-            "implementation_digest": "e24c7270a3fbe1c025e88f78a65913315ea6c565b65aff8a7304bca71fbef93a",
+            "implementation": "raidar.scorers.gate_effort_v3:gate_effort_v3_scorer",
+            "implementation_digest": "4205203b55a94e056dd8f6600dc8fa9a4994ca6e6731380157eb907d4d14de66",
             "manifest": {
-              "description": "Effort a guardrail-gate commit gate cost per step: rounds to clean, first-pass clean, unresolved and gate-error steps, blocking findings by rule family, and the fix sessions' tokens, cost and time. A shadow gate (guardrail-gate@2 mode shadow) reports its first-run outcomes only; its fix and enforcement outcomes are not applicable. Not applicable to an arm without a gate.",
+              "description": "Effort a guardrail-gate commit gate cost per step: rounds to clean, first-pass clean, unresolved and gate-error steps, blocking findings by rule family, and the fix sessions' tokens, cost and time. A shadow gate (guardrail-gate@2 mode shadow) reports its first-run outcomes only. A step that changed no source file is not applicable to first-pass clean. Not applicable to an arm without a gate.",
               "evidence_required": [
                 "trace"
               ],
@@ -1213,7 +1213,7 @@
                 "*"
               ],
               "tools": [],
-              "version": "2"
+              "version": "3"
             },
             "tool_lock": {}
           }
@@ -1423,7 +1423,7 @@
         "code-quality@1",
         "resource-usage@1",
         "process-compliance@2",
-        "gate-effort@2"
+        "gate-effort@3"
       ]
     },
     "tools": {
@@ -1435,7 +1435,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "840e65b97173e7cf950cd1d9e10ccd996c495d13d7c965b5f2d77a8b6267b2ee",
+  "document_sha256": "6d2a6a8527c98d12d22004bd8ebd18fda8e38d549a3dbf5daeb794f9c7f51b46",
   "execution": {
     "arms": {
       "r1-baseline": {
@@ -1756,8 +1756,8 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "2853fc0e67a8915791aeb8ec8ff721b1e7797d40756a2fad1d5d25491970527f",
-    "spec_sha256": "57c706f758367771fe1af85f9be809305f110df6056b7b3524b8cf77cade2b8e"
+    "source_sha256": "e62edf3cfac222bdfa8e4c62d4389e5b8eff115984f3ec31e011be96fbd871c9",
+    "spec_sha256": "ad4b71c180ddc99914ef78e17d4f7099bb2e4297e49d286c8f83a12c14e8d5f2"
   },
   "lock_sha256": "28c51440f74abc92f88becaa43049c69a18d58b2be3c79b76d0cc5807e4dae7a",
   "lock_version": 3,
@@ -1767,7 +1767,7 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "0365c33e8db726b76c775644741b2bd3724241d99c21c390b44cece5d53bb499",
+    "assessment": "8c8ca047149b9df32b1e12cdf46cd383938176977840591e5f4915268bff5f7d",
     "execution": "28c51440f74abc92f88becaa43049c69a18d58b2be3c79b76d0cc5807e4dae7a",
     "toolchain": "657a87063f9d6ff78222aec39691aebf3f3288650739261e1702f6640b273471"
   },
@@ -1826,7 +1826,7 @@
         "code-quality@1",
         "resource-usage@1",
         "process-compliance@2",
-        "gate-effort@2"
+        "gate-effort@3"
       ]
     },
     "conditions": [

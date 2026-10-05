@@ -397,7 +397,14 @@ def test_the_analysis_report_names_the_errata_its_errata_outcomes_apply() -> Non
     pinned = {
         "scb/forge@x": {"sha256": "9a6dec369dea" + "0" * 52, "exclude_from_solved": ["a", "b"]}
     }
-    (line,) = _errata_lines(AnalysisReport.model_construct(errata=pinned))
+    (line,) = _errata_lines(
+        AnalysisReport.model_construct(errata=pinned, primary_metric="solve_rate")
+    )
     assert "`scb/forge@x` errata `9a6dec369dea` (2 exclude-from-solved cases)" in line
     assert "every other outcome, including the primary, is the raw SCB grade" in line
+    (errata_primary,) = _errata_lines(
+        AnalysisReport.model_construct(errata=pinned, primary_metric="solve_rate_errata")
+    )
+    assert "including the primary" not in errata_primary
+    assert "the primary (`solve_rate_errata`) is one of them" in errata_primary
     assert _errata_lines(AnalysisReport.model_construct(errata=None)) == []

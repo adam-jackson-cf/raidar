@@ -1245,7 +1245,7 @@ The gate-effort observations in the store match an independent recomputation fro
 
 ### 15.4 Main run
 
-**Not run yet.** `main-01` (both arms, 4 attempts each, the user's choice while the process is still iterating) was launched at 13:14:05 UTC and its `make` process was terminated (SIGTERM, exit 143) about 90 s later, before any trial finished: 0 trial records, no `finished_at`. It contributes no data. Its two started trials left idle containers on OrbStack (`b00-p0-r1-baseline__env-550419c8e3-main-1`, `b00-p0-r2-guardrails__env-550419c8e3-main-1`; only `sleep infinity` running). They were left in place for the user's decision; a rerun of the same trials would remove them, because Harbor's start runs `docker compose down --remove-orphans` on the same compose project.
+*(Historical: `main-02` ran on 2026-10-04 under the iteration-2 lock; results in §15.7.)* `main-01` (both arms, 4 attempts each, the user's choice while the process is still iterating) was launched at 13:14:05 UTC and its `make` process was terminated (SIGTERM, exit 143) about 90 s later, before any trial finished: 0 trial records, no `finished_at`. It contributes no data. Its two started trials left idle containers on OrbStack (`b00-p0-r1-baseline__env-550419c8e3-main-1`, `b00-p0-r2-guardrails__env-550419c8e3-main-1`; only `sleep infinity` running). They were left in place for the user's decision; a rerun of the same trials would remove them, because Harbor's start runs `docker compose down --remove-orphans` on the same compose project.
 
 **Rerun plan:** after the containers are cleared, run a fresh job `main-02` under the unchanged lock from a detached process under `caffeinate`, then assess with all five scorers and analyse (commands in rationale §9). Expected cost about $0.5-1.
 
@@ -1269,5 +1269,65 @@ Item 1 is now planned as `python-guardrails@3`. The vendored skill files (ledger
 
 ### 15.6 Decisions for you
 
-1. **Orphaned `main-01` containers:** approve removing the two idle containers above (no other containers are touched), which unblocks `main-02`.
+1. ~~**Orphaned `main-01` containers**~~: removed before `main-02`.
 2. **Deferred rules:** `PRETTIER.version` and `SECURITY.dependency-audit` stay deferred until you say otherwise.
+
+### 15.7 Explore iteration 2: `main-02` (2026-10-05)
+
+Exploratory signals only. With 4 pairs against `min_pairs` 5, every verdict reads `insufficient` by design. Full record: `rationale.md` §11. Analysis: `analysis/python__forge__guardrails/main-02/analysis.md`.
+
+**What changed for iteration 2** (lock `28c51440f74a`, `rationale.md` §10):
+- r1 gets a shadow gate the agent never sees: `python-guardrails@2` with no workspace copies, plus `guardrail-gate@2` `mode: shadow`.
+- r2 runs `guardrail-gate@2` in commit mode.
+- `gate-effort@2` pairs first-run gate outcomes across the arms.
+- Git evidence is recorded for every commit attempt.
+- `analysis.primary_outcome: solve_rate_errata`.
+- Jobs are launched detached.
+- The vendored skill files are removed; `make guardrails-verify` runs the pack's own canaries.
+
+**Run.** 8 of 8 trials valid, with no infrastructure errors, probe failures or orphaned containers. 2 h 33 min at concurrency 2, about $0.42.
+
+| Signal (mean per trial) | r1 (shadow) | r2 (gate) | Δ [95% CI] |
+|---|---|---|---|
+| Primary `solve_rate_errata` | 0.344 | 0.188 | −0.156 [−0.70, 0.39] |
+| Raw `solve_rate` (beside it) | 0.219 | 0.156 | −0.063 [−0.32, 0.19] |
+| Correctness C | 0.865 | 0.753 | −0.111 [−0.32, 0.10] |
+| Headline S | 73.1 | 66.3 | −6.8 [−23.5, 10.0] |
+| Erosion E (overlaps the gate's C901 by construction) | 0.125 | 0.608 | +0.48 [0.21, 0.76] |
+| Rework R | 0.247 | 0.422 | +0.17 [−0.28, 0.63] |
+| Gate: first-pass clean rate (`gate-effort@3`) | 0 of 30 steps | 0 of 31 steps | 0 |
+| Gate: first-run blocking findings | 609.8 | 37.75 | −572 [−1059, −85] |
+| ↳ typing / complexity / style / defects | 478.5 / 60.75 / 56.5 / 13.5 | 9.25 / 13.25 / 13.5 / 1 | |
+| Gate: fix rounds / unresolved / gate errors | n/a (shadow) | 8 / 0 / 0 | |
+| Cost USD (r2 fix sessions) | 0.0334 | 0.0723 (0.0367) | +0.039 [0.030, 0.048] |
+| Agent time s | 516 | 1,004 | |
+
+**Paired gate-effort signals:**
+- The gate cuts first-run findings by about 94%, with the largest drop in typing.
+- r2 is already lower at checkpoint 1, before any refusal (8.25 vs 24 findings per step). Seeing `ruff.toml` and `mypy.ini` alone changes first-pass output.
+- r2 never learned to commit clean the first time. It had 0 first-pass-clean steps. Its first-run findings per step fell to 2-3 at checkpoints 2-5 and rose again to 5-8 at checkpoints 6-8.
+- 30 of the 31 refused steps were clean after 1 fix round. b00 checkpoint 7 needed 2, so there were 32 refused runs in all.
+- The manipulation check separated, at 32/32.
+- Git confirms every refusal: `HEAD` did not move and the code stayed staged. Then `HEAD` moved on the passing run.
+- r1's shadow refusals never reached `/app`.
+- The correctness direction is negative, as in `smoke-02` (Δ −0.25).
+
+**Process defects found and fixed (no rerun needed; deterministic rescoring):**
+- **`gate-effort@3`.** The commit gate commits with `--allow-empty`, so a step with no source change (b03 r2 checkpoint 2, where the agent stopped to ask a question) passed vacuously, and `@2` counted it as first-pass clean.
+  - `@3` reports such steps as `not_applicable`.
+  - The experiment was relocked; `lock_sha256` is unchanged.
+  - `main-02` was rescored, and the replay was identical.
+  - r2's first-pass rate went from 1/32 to 0/31.
+- **Analysis markdown:**
+  - The errata line no longer says "including the primary, is the raw SCB grade" when the primary is an `*_errata` outcome.
+  - The McNemar table now names each row's outcome (`final_solved` and `final_solved_errata` used to print as two identical unlabelled rows).
+- **`make guardrails-verify`.** The expected rule set is now derived from the shipped pack (`ruff.toml` entries, `mypy.ini` keys and the gate library's diagnostic codes), not a hard-coded 73, so a rule added without a canary fails. The derivation surfaced three config entries with no canary of their own: `lint.per-file-ignores`, `explicit_package_bases` and `disable_error_code`. They are listed explicitly as known gaps.
+
+**What to change next (explore iteration 3):**
+1. **Find where the correctness cost comes from.** Have the gate record a snapshot of the tree from before the fix session, and grade it offline beside the final tree. This would show whether fix rounds (refactoring for C901 and typing) break behaviour, or whether the cost comes from the session itself. This is the main open question: the direction is negative in both jobs.
+2. **Separate "configs visible" from "enforcement".** Add an r3 arm to this experiment: `python-guardrails@2` with workspace copies plus a shadow gate. r2's lower checkpoint-1 count suggests the visible configs do part of the work.
+3. **First-run counts are dominated by repeats.** r1's typing count is mypy strict's `no-untyped-call` repeated at every call site. Report distinct rule codes per step beside the raw count (a scorer addition, `gate-effort@4`), so a large call graph does not drive the total.
+4. **Stop-and-ask steps.** Both arms had no-edit steps (3 of 64) where the agent asked about the CLI contract. Note this as an agent fault category; no change to Raidar.
+5. **`per_step_reset`.** p95 was 5.04 s against the 2 s budget, report-only. It breaches on every job of this experiment (smoke-01 5.41 s, smoke-02 5.62 s). This needs a decision on the per-step pack provision cost, not a re-baseline.
+
+Run iteration 3 small: 1 trial of each changed arm first, then at most 4 attempts per arm.

@@ -48,10 +48,13 @@ from raidar.spec.references import RefKind, RegistryRef
 from tests.component_support import compile_uses, use, write_jsonl, write_step_reports
 from tests.python_guardrails_support import (
     COMMIT_SCRIPT,
+    NO_CANARY,
     VERIFY_DIR,
     commit_gate_script,
     experiment_gate_use,
     host_home,
+    implemented_rules,
+    uncovered_pack_entries,
 )
 
 GUARDRAILS = use("python-guardrails@1")
@@ -645,6 +648,10 @@ def test_every_implemented_rule_has_a_canary_spec_and_no_skill_file_is_vendored(
     specs = _specs()
     modes = [spec["mode"] for spec in specs.values()]
 
+    assert set(specs) == implemented_rules(specs)
+    assert sorted(uncovered_pack_entries(specs)) == sorted(NO_CANARY)
+    without = {rule: spec for rule, spec in specs.items() if rule != "RUFF.SELECT.C901"}
+    assert "ruff.toml:lint.select.C901" in uncovered_pack_entries(without)
     assert len(specs) == 73
     assert {mode: modes.count(mode) for mode in set(modes)} == {
         "rule": 70,
@@ -744,7 +751,7 @@ def test_the_canary_specs_are_what_the_fixture_generator_writes(tmp_path: Path) 
     )
 
     assert specs.read_text() == (VERIFY_DIR / "specs.json").read_text()
-    assert len(list((tmp_path / "fx").iterdir())) == 73
+    assert len(list((tmp_path / "fx").iterdir())) == len(implemented_rules(_specs()))
 
 
 def test_the_parity_canary_runs_the_experiments_own_commit_gate() -> None:

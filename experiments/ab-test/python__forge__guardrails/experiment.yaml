@@ -8,7 +8,7 @@
 # r1 (explore iteration 2, rationale.md section 10) gets the same pack without the workspace
 # copies and the same gate in shadow mode: the same commit check runs once at each step's end
 # against a git directory outside /app and is recorded, never enforced; nothing reaches /app
-# and no fix session starts, so r1's agent experience is unchanged and gate-effort@2's
+# and no fix session starts, so r1's agent experience is unchanged and gate-effort's
 # first-run outcomes pair across arms.
 # No rules text tells the agent about the gate in advance (the mechanical rung only): r2 sees
 # ruff.toml and mypy.ini like in any repository and learns of the gate from its refusals.
@@ -90,7 +90,7 @@ conditions:
           workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
       # real repository; the gate's JSON report goes to the run's report dir
-      # ($RAIDAR_GATE_REPORT_DIR), where gate-effort@2 reads it; every commit attempt
+      # ($RAIDAR_GATE_REPORT_DIR), where gate-effort@3 reads it; every commit attempt
       # records git log/status evidence in the gate record.
       - use: guardrail-gate@2
         with:
@@ -108,7 +108,9 @@ arms:
     agent: codex-luna
 
 assessment:
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2, gate-effort@2]
+  # gate-effort@3 (rationale.md section 11, after main-02): @2, but a step with no source
+  # change is not_applicable for first_pass_clean (the gate commits with --allow-empty).
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2, gate-effort@3]
   metric: scb-canonical@2
 
 analysis:

@@ -687,7 +687,7 @@ def test_a_shadow_gate_is_labelled_and_a_v1_assessment_of_it_is_flagged(
     gate = rebuilt.run_details[f"{RUN_PREFIX}b01-p0-guided"].gate
     assert gate is not None
     assert (gate.shadow, gate.scorer) == (True, "gate-effort@1")
-    assert any("rescore with gate-effort@2" in note for note in gate.notes)
+    assert any("rescore with gate-effort@3" in note for note in gate.notes)
     enforced = rebuilt.run_details[f"{RUN_PREFIX}b00-p0-guided"].gate
     assert enforced is not None
     assert (enforced.shadow, enforced.scorer) == (False, "gate-effort@1")
