@@ -6,9 +6,10 @@
 Runs inside the pack image against the installed pack
 (``$GUARDRAILS_HOME``, default ``/opt/raidar-tools/python-guardrails``).
 FIXTURE is one file. Its first lines may be ``# canary-path: rel/path.py``
-(where to place it in the throwaway workspace) and ``# canary-extra:
-rel/path=<text with \\n escapes>`` (extra files). CODES is a comma list of gate
-codes (prefix match, e.g. ``MYPY.no-untyped-def`` or ``PLR0913``).
+(where to place it in the throwaway workspace), ``# canary-extra:
+rel/path=<text with \\n escapes>`` (extra files) and ``# canary-after-commit:
+rel/path=<text>`` (files written after the ``since-commit`` baseline commit).
+CODES is a comma list of gate codes (prefix match, e.g. ``MYPY.no-untyped-def`` or ``PLR0913``).
 
 Modes:
 - ``rule`` (default): exit 1 and print ``CANARY-HIT <code>`` when any of CODES is
@@ -18,6 +19,11 @@ Modes:
 - ``propagation``: the fixture names a scenario (``ok`` or ``missing-mypy``); the
   gate runs with that home and the canary exits 1 printing ``GATE-ERROR`` when
   the gate exits 126, 0 when it passes, 4 when an error was reported as a pass.
+- ``since-commit``: as ``rule``, in a git repository whose baseline commit holds
+  the fixture and its extras; the after-commit files are then written
+  uncommitted (the tests check's "no Python change since the last commit").
+- ``workspace-clean``: as ``rule``, and the gate (its test run included) must
+  leave the workspace's file set unchanged; a new file exits 5.
 - ``commit``: the step-end runner. ``gate/guardrail-gate-commit.sh`` (rendered
   from guardrail-gate@2 for the experiment's enforced gate command) commits the workspace in a
   fresh git repository with the gate as the pre-commit hook. A refused commit
@@ -43,24 +49,51 @@ GATE_SCRIPT = HERE / "gate" / "guardrail-gate-commit.sh"
 TIMEOUT_SEC = 110
 
 
+HEADER_LINES = 6
+
+
+def _header_files(raw: bytes, prefix: str) -> list[tuple[str, str]]:
+    found = []
+    for line in raw.decode("utf-8", errors="replace").splitlines()[:HEADER_LINES]:
+        if line.startswith(prefix):
+            path, _, text = line.split(":", 1)[1].strip().partition("=")
+            found.append((path, text.encode().decode("unicode_escape")))
+    return found
+
+
+def _write(workspace: Path, files: list[tuple[str, str]]) -> None:
+    for path, text in files:
+        (workspace / path).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / path).write_text(text, encoding="utf-8")
+
+
 def _layout(fixture: Path, workspace: Path) -> Path:
     raw = fixture.read_bytes()
     rel = fixture.name
-    extras: list[tuple[str, str]] = []
-    for line in raw.decode("utf-8", errors="replace").splitlines()[:6]:
+    for line in raw.decode("utf-8", errors="replace").splitlines()[:HEADER_LINES]:
         if line.startswith("# canary-path:"):
             rel = line.split(":", 1)[1].strip()
-        elif line.startswith("# canary-extra:"):
-            spec = line.split(":", 1)[1].strip()
-            path, _, text = spec.partition("=")
-            extras.append((path, text.encode().decode("unicode_escape")))
     target = workspace / rel
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(raw)
-    for path, text in extras:
-        (workspace / path).parent.mkdir(parents=True, exist_ok=True)
-        (workspace / path).write_text(text, encoding="utf-8")
+    _write(workspace, _header_files(raw, "# canary-extra:"))
     return target
+
+
+def _commit_baseline(fixture: Path, workspace: Path) -> None:
+    """Commit the laid-out fixture (no hooks), then write its after-commit files."""
+    git = ["git", "-c", "user.name=canary", "-c", "user.email=canary@invalid"]
+    for argv in (["init", "-q"], ["add", "-A"], ["commit", "-q", "--no-verify", "-m", "base"]):
+        subprocess.run([*git, *argv], cwd=workspace, check=True, capture_output=True, timeout=60)
+    _write(workspace, _header_files(fixture.read_bytes(), "# canary-after-commit:"))
+
+
+def _files(workspace: Path) -> set[str]:
+    return {
+        path.relative_to(workspace).as_posix()
+        for path in workspace.rglob("*")
+        if ".git" not in path.relative_to(workspace).parts
+    }
 
 
 def _gate(workspace: Path, home: Path) -> tuple[int, dict[str, Any]]:
@@ -92,9 +125,19 @@ def _broken_home(base: Path) -> Path:
     return home
 
 
+OK_TEST = (
+    "import unittest\n\nfrom ok import one\n\n\n"
+    "class OneTest(unittest.TestCase):\n"
+    "    def test_one(self) -> None:\n"
+    "        self.assertEqual(one(), 1)\n"
+)
+
+
 def _propagation(fixture: Path, base: Path, workspace: Path) -> int:
     scenario = fixture.read_text().strip().splitlines()[-1].strip()
     (workspace / "ok.py").write_text("def one() -> int:\n    return 1\n")
+    # A tested workspace, so a pack whose gate runs the tests (@3) passes it too.
+    (workspace / "test_ok.py").write_text(OK_TEST)
     home = _broken_home(base) if scenario == "missing-mypy" else HOME
     rc, _ = _gate(workspace, home)
     if rc == 126:
@@ -147,13 +190,18 @@ def main(argv: list[str]) -> int:
         if mode == "commit":
             return _commit(codes, fixture, workspace)
         target = _layout(fixture, workspace)
-        before = target.read_bytes()
+        if mode == "since-commit":
+            _commit_baseline(fixture, workspace)
+        before, files = target.read_bytes(), _files(workspace)
         rc, report = _gate(workspace, HOME)
         if rc == 126:
             print(f"gate error: {report.get('error')}")
             return 3
         if mode == "unchanged" and target.read_bytes() != before:
             print("CANARY-MODIFIED the gate rewrote the workspace")
+            return 5
+        if mode == "workspace-clean" and _files(workspace) != files:
+            print(f"CANARY-WROTE the gate wrote {sorted(_files(workspace) - files)}")
             return 5
         hits = _hits(report, codes)
         for hit in hits[:5]:

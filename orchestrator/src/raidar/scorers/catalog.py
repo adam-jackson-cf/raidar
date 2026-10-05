@@ -293,7 +293,7 @@ class ScorerRegistry:
             ) from exc
 
 
-# ``process-compliance@2`` and ``gate-effort@1``/``@2``/``@3`` keep their manifests beside their
+# ``process-compliance@2``/``@3`` and ``gate-effort@1``-``@4`` keep their manifests beside their
 # implementations so the released scorers' digests (which cover
 # ``builtin_manifests``) stay unchanged.
 REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, *VERSIONED_MANIFESTS)
@@ -309,15 +309,21 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "gate-effort@1": "raidar.scorers.gate_effort:gate_effort_scorer",
     "gate-effort@2": "raidar.scorers.gate_effort_v2:gate_effort_v2_scorer",
     "gate-effort@3": "raidar.scorers.gate_effort_v3:gate_effort_v3_scorer",
+    "gate-effort@4": "raidar.scorers.gate_effort_v4:gate_effort_v4_scorer",
+    "process-compliance@3": "raidar.scorers.process_checks_v3:process_compliance_v3_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
-# that store-bound runtime decides under. Only the dormant process-compliance@1
-# (Jev parked 2026-10-04; its residue policy is off); @2 needs no store binding.
+# that store-bound runtime decides under: the dormant process-compliance@1 (Jev
+# parked 2026-10-04; its residue policy is off; @2 needs no store binding), and
+# gate-effort@4, which decides under no Jev policy.
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
     "process-compliance@1": (
         "raidar.scorers.process_compliance:process_compliance_scorer_for_store",
         ("process-compliance.residue",),
     ),
+    # gate-effort@4 reads the offline grades of guardrail-gate@3's pre-fix snapshots,
+    # which ``raidar assess --rescore`` writes to the store (raidar.verifier.prefix_grade).
+    "gate-effort@4": ("raidar.scorers.gate_effort_v4:gate_effort_v4_scorer_for_store", ()),
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.
 BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {

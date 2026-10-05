@@ -6,6 +6,11 @@ per-trial install happens (WS-I), with the arm's compiled condition applied
 (WS-C). A dev/perf run may replace the agent with Harbor's no-LLM ``oracle``
 or ``nop`` agent; the compiled per-step reset still runs, and the job records
 the override so its results are never compared with real arms.
+
+A condition's session wrappers (``continue-on-stall@1``) are nested around the
+native agent, inside the condition's workflow wrapper when it has one
+(``raidar.components.session_chain``); the native agent's pin and auth are read
+through every level of wrapping.
 """
 
 from __future__ import annotations
@@ -17,6 +22,7 @@ from harbor.models.trial.config import AgentConfig
 from raidar.agents.config import Harness
 from raidar.codex_auth import resolve_codex_auth
 from raidar.components import HARBOR_AGENT_NAMES, CompiledCondition
+from raidar.components.session_chain import apply_session_wrappers, condition_session_wrappers
 from raidar.packs.python import PackSpec, harbor_agent_kwargs
 from raidar.spec.canonical import digest_json
 from raidar.spec.schema import AgentEntry
@@ -48,7 +54,8 @@ def arm_agent_config(
         kwargs=kwargs,
         override_timeout_sec=float(agent_timeout_sec),
     )
-    return compiled.apply_to_agent_config(base)
+    wrapped = compiled.apply_to_agent_config(base)
+    return apply_session_wrappers(wrapped, condition_session_wrappers(compiled))
 
 
 def agent_digest(agent: AgentEntry, config: AgentConfig, override: AgentOverride | None) -> str:
@@ -78,11 +85,12 @@ def reported_harness_pin(config: AgentConfig) -> str | None:
 
 
 def _native_agent(config: AgentConfig) -> tuple[str | None, dict[str, object]]:
-    """(name, kwargs) of the native agent, looking inside a workflow wrapper."""
+    """(name, kwargs) of the native agent, looking inside every wrapper around it."""
     name, kwargs = config.name, config.kwargs
     inner = kwargs.get("inner_agent")
-    if name is None and isinstance(inner, dict):
+    while name is None and isinstance(inner, dict):
         name, kwargs = inner.get("name"), inner.get("kwargs") or {}
+        inner = kwargs.get("inner_agent")
     return name, kwargs
 
 

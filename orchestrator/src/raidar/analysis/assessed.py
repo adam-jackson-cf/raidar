@@ -20,8 +20,11 @@ Two derivations are analysis-owned:
 - the ``*_errata`` outcomes repeat ``solve_rate``, ``reached`` and
   ``final_solved`` over ``correctness@1``'s errata-applied metrics (the problem's
   pinned errata); they are labelled as such and never replace the raw ones;
-- the ``gate.*`` outcomes (``gate-effort@1``, only when the lock declares it)
-  are the scorer's trajectory metrics as stored: an arm without the commit gate
+- the ``gate.*`` outcomes (a gate-effort scorer, only when the lock declares
+  one) are the scorer's trajectory metrics as stored: an arm without the commit
+  gate reads ``not_applicable``; only the metrics that version reports are read;
+- the ``process.*`` outcomes (``process.stall_rate``; ``process-compliance@3``,
+  only when the lock declares it) likewise: an arm without the stall wrapper
   reads ``not_applicable``;
 - a trial truncated by ``max_checkpoints`` has no trial-level
   outcome (S, C, reached, final solved, quality means): each is statused
@@ -40,10 +43,12 @@ from raidar.analysis.outcomes import (
     CORRECTNESS_METRIC,
     FINAL_SOLVED,
     FINAL_SOLVED_ERRATA,
-    GATE_METRICS,
     GATE_PREFIX,
     HEADLINE_SCORE,
     OUTCOME_METRICS,
+    PROCESS_METRICS,
+    PROCESS_OUTCOME_SCORER,
+    PROCESS_PREFIX,
     QUALITY_COMPONENTS,
     REACHED,
     REACHED_ERRATA,
@@ -55,6 +60,7 @@ from raidar.analysis.outcomes import (
     UNASSESSED,
     TrialOutcome,
     Value,
+    gate_metrics_for,
 )
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrialRecord
@@ -78,12 +84,13 @@ RESOURCE_USAGE_REF = "resource-usage@1"
 # Process compliance the analysis reads, in preference order: ``@2`` decides
 # only deterministically (the default since Jev was parked, 2026-10-04); the
 # dormant ``@1`` stays readable for jobs whose lock declares it.
-PROCESS_COMPLIANCE_REFS = ("process-compliance@2", "process-compliance@1")
+PROCESS_COMPLIANCE_REFS = ("process-compliance@3", "process-compliance@2", "process-compliance@1")
 ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
 # Read only when the lock declares one (its ``gate.*`` outcomes are then in every trial),
-# in preference order: ``@2`` also reads a shadow gate's first-run outcomes.
+# in preference order: ``@2`` also reads a shadow gate's first-run outcomes, ``@4`` the
+# tests check and the fix rounds' correctness.
 GATE_EFFORT_REF = "gate-effort@1"
-GATE_EFFORT_REFS = ("gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
+GATE_EFFORT_REFS = ("gate-effort@4", "gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
 _COST_TOTALS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 PASS_RATE = "strict_pass_rate"
 _CHECKPOINT_SOURCES = {
@@ -274,7 +281,17 @@ def gate_metrics(result: AssessResult | None, ref: str = GATE_EFFORT_REF) -> dic
     """
     observed = Observed(ref, result)
     return {
-        metric.id: observed.value(metric.id.removeprefix(GATE_PREFIX)) for metric in GATE_METRICS
+        metric.id: observed.value(metric.id.removeprefix(GATE_PREFIX))
+        for metric in gate_metrics_for(ref)
+    }
+
+
+def process_metrics(result: AssessResult | None) -> dict[str, Value]:
+    """The ``process.*`` outcomes from a trial's ``process-compliance@3`` result."""
+    observed = Observed(PROCESS_OUTCOME_SCORER, result)
+    return {
+        metric.id: observed.value(metric.id.removeprefix(PROCESS_PREFIX))
+        for metric in PROCESS_METRICS
     }
 
 
@@ -334,6 +351,8 @@ def build_outcome(
     if gate_ref is not None:
         # Like cost totals, gate effort describes what ran, truncated or not.
         metrics |= gate_metrics(results[gate_ref], gate_ref)
+    if PROCESS_OUTCOME_SCORER in results:
+        metrics |= process_metrics(results[PROCESS_OUTCOME_SCORER])
     if record.truncated_to is not None:
         metrics |= _truncated(record)
     reasons = infra_reasons(record)

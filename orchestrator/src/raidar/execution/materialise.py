@@ -25,7 +25,8 @@ from pathlib import Path
 import yaml
 from harbor.models.task.config import TaskConfig
 
-from raidar.components import CompiledCondition, Provision, compile_arm, condition_provisions
+from raidar.components import CompiledCondition, compile_arm
+from raidar.components.provision_v2 import AnyProvision, trial_provisions
 from raidar.execution.models import ProgressionRule
 from raidar.packs.python import image_present
 from raidar.problems.content import content_digest
@@ -48,9 +49,9 @@ class MaterialisedTask:
     component_apply_s: float
 
     @property
-    def provisions(self) -> tuple[Provision, ...]:
-        """Per-trial tool installs the arm's components need (``raidar.components.provision``)."""
-        return condition_provisions(self.compiled)
+    def provisions(self) -> tuple[AnyProvision, ...]:
+        """Per-trial tool installs the arm's components need (``provision``, ``provision_v2``)."""
+        return trial_provisions(self.compiled)
 
 
 def compose_init(task_dir: Path) -> bool:

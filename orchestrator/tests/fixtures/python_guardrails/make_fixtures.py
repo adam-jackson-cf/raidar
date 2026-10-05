@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 """Write one passing and one violating fixture per applicable rule, plus specs.json.
 
-    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE
+    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE [--pack 3]
+
+``--pack 3`` writes python-guardrails@3's set (``specs-3.json``): every @1
+canary, the tests check's canaries (``TEST.*``), and a commit canary whose
+clean workspace has a test (the @3 gate refuses a change with none).
 
 LOCK_FILE is a ``uv.lock`` for the canary's demo project (``name = "demo"``, no
 dependencies), produced by the uv that the gate will run, so the lockfile
@@ -354,9 +358,143 @@ def main(argv: list[str]) -> None:
         "scenario\nmissing-mypy\n",
         mode="propagation",
     )
-    add("RUNNER.local-ci-parity", "F401", ok, "import os\n", mode="commit")
+    add_config_entries()
+    pack = argv[4] if len(argv) > 4 and argv[3] == "--pack" else "1"
+    commit_ok = ok if pack == "1" else with_test("mod.py", MODULE, UNIT_TEST)
+    add("RUNNER.local-ci-parity", "F401", commit_ok, "import os\n", mode="commit")
     add("TEST.tiers", "F401", ok, "import os\n")
+    if pack == "3":
+        add_tests_check()
     Path(argv[2]).write_text(json.dumps(SPECS, indent=2, sort_keys=True) + "\n")
+
+
+def add_config_entries() -> None:
+    """Pack config entries that had no canary of their own (both packs ship them)."""
+    add(
+        "RUFF.LINT.per-file-ignores",
+        "F401",
+        CANARY_PATH.format("pkg/__init__.py") + "import os\n",
+        CANARY_PATH.format("pkg/mod.py") + "import os\n",
+    )
+    twin = "# canary-extra: b/util.py=VALUE: int = 1\\n\n"
+    add(
+        "MYPY.explicit_package_bases",
+        "MYPY",
+        CANARY_PATH.format("a/util.py") + twin + "from b.util import VALUE\n\nTOTAL: int = VALUE\n",
+        CANARY_PATH.format("a/util.py") + twin + "from b.util import VALUE\n\nTEXT: str = VALUE\n",
+    )
+    add(
+        "MYPY.disable_error_code",
+        "MYPY.import-untyped,MYPY.import-not-found",
+        "import yaml\n\nLOADER: object = yaml\n",
+        "import canary_module_that_does_not_exist\n\nLOADER: object = canary_module_that_does_not_exist\n",
+    )
+
+
+# ---- python-guardrails@3: the tests check -------------------------------------------------
+
+MODULE = 'def double(x: int) -> int:\n    """Double x."""\n    return 2 * x\n'
+UNIT_TEST = (
+    "import unittest\\n\\nfrom mod import double\\n\\n\\n"
+    "class DoubleTest(unittest.TestCase):\\n"
+    "    def test_double(self) -> None:\\n"
+    "        self.assertEqual(double(2), {expected})\\n"
+)
+PYTEST_TEST = (
+    "from mod import double\\n\\n\\n"
+    "def test_double() -> None:\\n"
+    "    assert double(2) == {expected}\\n"
+)
+WRITING_TEST = (
+    "import unittest\\n\\nfrom mod import double\\n\\n\\n"
+    "class DoubleTest(unittest.TestCase):\\n"
+    "    def test_double(self) -> None:\\n"
+    '        with open("written.txt", "w", encoding="utf-8") as out:\\n'
+    '            out.write("x")\\n'
+    "        self.assertEqual(double(2), {expected})\\n"
+)
+UNCOVERED = (
+    'def triple(x: int) -> int:\n    """Triple x."""\n    return 3 * x\n\n\n'
+    'def quad(x: int) -> int:\n    """Quadruple x."""\n    return 4 * x\n'
+)
+CLI_IMPORTS = "import sys\n\n\n"
+CLI = CLI_IMPORTS + (
+    'def main() -> int:\n    """Print the sum of two integers."""\n'
+    "    print(int(sys.argv[1]) + int(sys.argv[2]))\n    return 0\n\n\n"
+    'if __name__ == "__main__":\n    raise SystemExit(main())\n'
+)
+CLI_UNCOVERED = (
+    'def spare(x: int) -> int:\n    """Not run by any test."""\n    if x > 1:\n'
+    "        return x\n    return -x\n\n\n"
+)
+CLI_TEST = (
+    "import subprocess\\nimport sys\\nimport unittest\\n\\n\\n"
+    "class CliTest(unittest.TestCase):\\n"
+    "    def test_cli(self) -> None:\\n"
+    '        done = subprocess.run([sys.executable, "cli.py", "2", "3"], '
+    "capture_output=True, text=True, check=True, timeout=60)\\n"
+    '        self.assertEqual(done.stdout.strip(), "5")\\n'
+)
+
+
+def with_test(
+    path: str, body: str, test: str, *, expected: int = 4, test_path: str = "test_mod.py"
+) -> str:
+    """``body`` at ``path`` with one test file beside it."""
+    return (
+        CANARY_PATH.format(path)
+        + f"# canary-extra: {test_path}={test.format(expected=expected)}\n"
+        + body
+    )
+
+
+def add_tests_check() -> None:
+    """The tests check's rules and behaviour (python-guardrails@3)."""
+    untested = CANARY_PATH.format("mod.py") + MODULE
+    add("TEST.missing", "TEST.missing", with_test("mod.py", MODULE, UNIT_TEST), untested)
+    add(
+        "TEST.no-change-exempt",
+        "TEST.missing",
+        untested,
+        CANARY_PATH.format("mod.py") + "# canary-after-commit: extra.py=X: int = 1\\n\n" + MODULE,
+        mode="since-commit",
+    )
+    add(
+        "TEST.failed",
+        "TEST.failed",
+        with_test("mod.py", MODULE, UNIT_TEST),
+        with_test("mod.py", MODULE, UNIT_TEST, expected=5),
+    )
+    add(
+        "TEST.pytest-runner",
+        "TEST.failed",
+        with_test("mod.py", MODULE, PYTEST_TEST),
+        with_test("mod.py", MODULE, PYTEST_TEST, expected=5),
+    )
+    add(
+        "TEST.coverage-minimum",
+        "TEST.coverage-minimum",
+        with_test("mod.py", MODULE, UNIT_TEST),
+        with_test("mod.py", MODULE + "\n\n" + UNCOVERED, UNIT_TEST),
+    )
+    add(
+        "TEST.subprocess-coverage",
+        "TEST.coverage-minimum",
+        with_test("cli.py", CLI, CLI_TEST, test_path="test_cli.py"),
+        with_test(
+            "cli.py",
+            CLI_IMPORTS + CLI_UNCOVERED + CLI.removeprefix(CLI_IMPORTS),
+            CLI_TEST,
+            test_path="test_cli.py",
+        ),
+    )
+    add(
+        "TEST.isolated-run",
+        "TEST.failed",
+        with_test("mod.py", MODULE, WRITING_TEST),
+        with_test("mod.py", MODULE, WRITING_TEST, expected=5),
+        mode="workspace-clean",
+    )
 
 
 if __name__ == "__main__":

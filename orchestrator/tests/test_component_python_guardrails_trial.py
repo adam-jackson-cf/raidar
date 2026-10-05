@@ -7,12 +7,14 @@
   proves the install, the per-step probe, the commit refusal with the pinned
   tools, the per-run JSON reports and the integrity flags end to end.
 - The rule tests (``make guardrails-verify``; opt-in with
-  ``RAIDAR_GUARDRAILS_VERIFY=1`` because it runs 146 canary gate runs): every
-  implemented rule's violating canary fires and its clean canary passes
-  (``run_canaries.py``) against the installed pack in the image, the parity
-  canary through guardrail-gate@2's rendered commit script; a mutant pack with
-  three checkers disabled must fail exactly those rules' violating canaries.
-  No file of the setup-repository-guardrails skill is involved.
+  ``RAIDAR_GUARDRAILS_VERIFY=1`` because it runs two canary gate runs per rule),
+  for each pack under verification (python-guardrails@1, whose payload @2
+  installs, and @3): every implemented rule's violating canary fires and its
+  clean canary passes (``run_canaries.py``) against the pack installed in the
+  image by its own install script, the parity canary through the experiment's
+  guardrail-gate commit script; a mutant pack with checkers disabled (three,
+  and @3's coverage minimum) must fail exactly those rules' violating
+  canaries. No file of the setup-repository-guardrails skill is involved.
 """
 
 from __future__ import annotations
@@ -31,6 +33,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
+from raidar.components.builtins import guardrails_v3
 from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
 from raidar.components.integrity import condition_step_flags
@@ -45,7 +48,8 @@ from tests.component_trial_support import (
     run_trial_sync,
 )
 from tests.python_guardrails_support import (
-    VERIFY_DIR,
+    PACKS,
+    PackUnderTest,
     assemble_verify_root,
     experiment_gate_use,
     implemented_rules,
@@ -53,8 +57,6 @@ from tests.python_guardrails_support import (
 
 INNER = "tests.test_component_python_guardrails_trial:TamperingInnerAgent"
 SHADOW_INNER = "tests.test_component_python_guardrails_trial:ObservingInnerAgent"
-IMPLEMENTED_RULES = len(implemented_rules(json.loads((VERIFY_DIR / "specs.json").read_text())))
-"""Derived from the shipped pack (``python_guardrails_support.pack_rule_entries``)."""
 VERIFY_SLUG = "00-python-guardrails"
 
 docker_trial = pytest.mark.skipif(
@@ -135,6 +137,7 @@ def test_gate_refuses_with_the_pinned_pack_and_tampering_is_flagged_in_a_real_tr
     TamperingInnerAgent.sessions.clear()
     gate = {**experiment_gate_use(), "max_rounds": 1, "timeout_sec": 120}
     compiled = compile_uses(use("python-guardrails@1"), use("guardrail-gate@1", **gate))
+    # Released @1/@2 behaviour is proven as released: no tests check, install at step 1.
     task = tmp_path / "python-guardrails"
     build_task(task, compiled, {"checkpoint_1": "step one", "checkpoint_2": "step two"})
     assert compiled.agent_wrapper is not None
@@ -262,37 +265,73 @@ DEMO_PYPROJECT = (
 )
 VERIFY_SCRIPT = """
 set -euo pipefail
-mkdir -p /tmp/raidar-components/{slug} && cp -R /verify/pack /tmp/raidar-components/{slug}/
-bash /verify/install.sh >/dev/null
+{install}
 chown -R agent:agent /verify
 su agent -s /bin/bash -c '
 set -euo pipefail
 demo="$(mktemp -d)" && cp /verify/demo-pyproject.toml "$demo/pyproject.toml" && cd "$demo"
 uv lock --offline --quiet && cp uv.lock /verify/demo-uv.lock
 cd /verify
-python3 make_fixtures.py canaries/fixtures demo-uv.lock specs.json
+python3 make_fixtures.py canaries/fixtures demo-uv.lock specs.json {pack_args}
 python3 run_canaries.py specs.json canaries/fixtures > canaries.out 2>&1 \\
   || echo "canaries_rc=$?" >> canaries.out
-# Negative control: a copy of the pack with three checkers disabled must fail their canaries.
+# Negative control: a copy of the pack with checkers disabled must fail their canaries.
 cp -R /opt/raidar-tools/python-guardrails /tmp/mutant
 sed -i "s/^off = \\[/off = [\\n    \\"F401\\",/" /tmp/mutant/config/policy.toml
 sed -i "s/\\"C901\\", //" /tmp/mutant/config/ruff.toml
 sed -i "s/^CLASS_MAX_LINES = 700/CLASS_MAX_LINES = 100000/" \\
   /tmp/mutant/lib/guardrails/source_rules.py
+{mutate}
 GUARDRAILS_HOME=/tmp/mutant python3 run_canaries.py specs.json canaries/fixtures \\
   --rules {mutated} > mutant.out 2>&1 || true
 '
 """
-MUTATED = ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F")
+INSTALL = {
+    1: (
+        "mkdir -p /tmp/raidar-components/{slug} && "
+        "cp -R /verify/pack /tmp/raidar-components/{slug}/"
+        "\nbash /verify/install.sh >/dev/null"
+    ),
+    3: (
+        "cp -R /verify/pack /tmp/raidar-stage"
+        "\nRAIDAR_PAYLOAD_DIR=/tmp/raidar-stage RAIDAR_AGENT_USER=agent bash /verify/install.sh"
+        " >/dev/null"
+    ),
+}
+MUTATED = {
+    1: ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F"),
+    3: ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F", "TEST.coverage-minimum"),
+}
+MUTATE = {
+    1: "",
+    3: (
+        'sed -i "s/^COVERAGE_MINIMUM_PERCENT = 85.0/COVERAGE_MINIMUM_PERCENT = 0.0/" '
+        "/tmp/mutant/lib/guardrails/tests_check.py"
+    ),
+}
+
+
+def _install(pack: PackUnderTest) -> str:
+    return install_script(VERIFY_SLUG) if pack.version == 1 else guardrails_v3.install_script()
 
 
 @coverage_verification
+@pytest.mark.parametrize("version", sorted(PACKS))
 def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
-    tmp_path: Path,
+    tmp_path: Path, version: int
 ) -> None:
-    root = assemble_verify_root(tmp_path / "verify")
-    (root / "install.sh").write_text(install_script(VERIFY_SLUG))
-    (root / "run.sh").write_text(VERIFY_SCRIPT.format(slug=VERIFY_SLUG, mutated=",".join(MUTATED)))
+    pack = PACKS[version]
+    mutated = MUTATED[version]
+    root = assemble_verify_root(tmp_path / "verify", pack)
+    (root / "install.sh").write_text(_install(pack))
+    (root / "run.sh").write_text(
+        VERIFY_SCRIPT.format(
+            install=INSTALL[version].format(slug=VERIFY_SLUG),
+            pack_args="" if version == 1 else f"--pack {version}",
+            mutate=MUTATE[version],
+            mutated=",".join(mutated),
+        )
+    )
     (root / "demo-pyproject.toml").write_text(DEMO_PYPROJECT)
     name = f"raidar-guardrails-verify-{uuid.uuid4().hex[:8]}"
 
@@ -309,17 +348,16 @@ def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
     output = (root / "canaries.out").read_text() if (root / "canaries.out").exists() else ""
     print(output)
     assert done.returncode == 0, done.stdout + done.stderr
-    assert (root / "specs.json").read_text() == (
-        Path(__file__).parents[1] / "tests/fixtures/python_guardrails/specs.json"
-    ).read_text(), "the image's fixture generator wrote different canary specs"
+    assert (root / "specs.json").read_text() == pack.specs_path.read_text(), (
+        "the image's fixture generator wrote different canary specs"
+    )
     failures = [line for line in output.splitlines() if line.startswith("canary FAIL")]
     assert failures == [], "\n".join(failures)
     passed = [line for line in output.splitlines() if line.startswith("canary PASS ")]
-    assert len(passed) == IMPLEMENTED_RULES
-    specs = json.loads((VERIFY_DIR / "specs.json").read_text())
-    assert {line.split()[2] for line in passed} == implemented_rules(specs)
-    assert f"canaries: {IMPLEMENTED_RULES} rule(s), 0 failed" in output
+    expected = implemented_rules(json.loads(pack.specs_path.read_text()), pack)
+    assert {line.split()[2] for line in passed} == expected
+    assert f"canaries: {len(expected)} rule(s), 0 failed" in output
     mutant = (root / "mutant.out").read_text()
-    for rule in MUTATED:
+    for rule in mutated:
         assert f"canary FAIL {rule}: violating canary passed" in mutant, mutant[-2000:]
-    assert f"canaries: {len(MUTATED)} rule(s), {len(MUTATED)} failed" in mutant
+    assert f"canaries: {len(mutated)} rule(s), {len(mutated)} failed" in mutant

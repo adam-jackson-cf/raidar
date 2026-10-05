@@ -1,25 +1,26 @@
 # Guardrails A/B on forge: does a repository that refuses a commit until a mechanical
 # Python guardrail gate passes change correctness and quality, against the shared framing alone?
-# r2 adds python-guardrails@2 (the @1 pack, byte for byte: pinned Ruff 0.8.6 and mypy 2.3.1
-# plus bespoke checks, installed root-owned under /opt/raidar-tools/python-guardrails with
-# protected configs; byte-identical ruff.toml and mypy.ini copies at /app) and guardrail-gate@2
-# in commit mode (after every session: git commit with guardrail-check as the pre-commit hook;
-# a refusal starts a fix session, at most 3; git log/status evidence in the gate record).
-# r1 (explore iteration 2, rationale.md section 10) gets the same pack without the workspace
-# copies and the same gate in shadow mode: the same commit check runs once at each step's end
-# against a git directory outside /app and is recorded, never enforced; nothing reaches /app
-# and no fix session starts, so r1's agent experience is unchanged and gate-effort's
-# first-run outcomes pair across arms.
-# No rules text tells the agent about the gate in advance (the mechanical rung only): r2 sees
-# ruff.toml and mypy.ini like in any repository and learns of the gate from its refusals.
-# Replaces python__forge__ruff-lint and python__forge__ruff-lint-r2 (removed 2026-10-04; their
-# jobs stay on disk under jobs/).
-# Objective: explore (4 attempts per arm while the process is still being iterated). Verdicts
-# below min_pairs read insufficient by design.
-# Pre-registration: rationale.md beside this file (written before any job): primary
-# solve_rate_errata with raw solve_rate beside it (analysis.primary_outcome), secondary and
-# gate-effort outcomes, the manipulation check, and the smoke rule for the mypy strict
-# annotation codes; section 10 amends the design before main-02.
+# Explore iteration 3 (rationale.md section 12): the gate also runs the agent's OWN tests.
+# r2 gets python-guardrails@3 (the @1 rule set and pins byte for byte, plus the tests check:
+# unittest always, pytest for pytest-style tests, both under coverage; a Python change with no
+# test that ran is refused, so are failing tests and owned line coverage below 85%), installed
+# once per trial at environment start (root-owned under /opt/raidar-tools/python-guardrails,
+# hash-pinned pytest 9.1.1 and coverage 7.16.2 beside Ruff and mypy; nothing in the agent
+# image), with ruff.toml and mypy.ini copies in /app, and guardrail-gate@3 in commit mode (as
+# @2, plus a snapshot of /app before each fix session, graded offline beside the step's final
+# snapshot). r1 gets the same pack without the workspace copies and the same gate in shadow
+# mode (recorded at each step's end outside /app, never enforced; its test run happens in a
+# throwaway copy, so nothing reaches /app).
+# Both arms share the starter framing and continue-on-stall@1: a session that changes nothing
+# and ends asking a question gets one continuation (no human is available; proceed on the spec
+# and reasonable assumptions recorded in ASSUMPTIONS.md), before the gate runs.
+# No rules text tells the agent about the gate in advance (the mechanical rung only).
+# Objective: explore (smallest runs: 1 trial per arm first, then at most 4 attempts per arm).
+# Verdicts below min_pairs read insufficient by design.
+# Pre-registration: rationale.md beside this file. Section 12 (iteration 3) pre-registers the
+# hypothesis (enforcing the agent's own tests prevents fix-round regressions) and the secondary
+# outcomes (gate.fix_round_correctness_delta, process.stall_rate, coverage, gate effort); the
+# primary stays solve_rate_errata with raw solve_rate beside it.
 # Validate: make experiment-validate EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
 # Lock:     make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
 schema_version: 2
@@ -55,24 +56,28 @@ protocol:
 factors: [condition]
 
 # Both arms get the same framing (pilot v2): where to work, that /app may start empty,
-# what to build, and that nobody answers questions.
+# what to build, and that nobody answers questions; and the same stall continuation
+# (continue-on-stall@1, a session wrapper: it runs inside the gate, before the gate runs).
 shared_components:
   - use: prompt-wrapper@1
     files: [components/shared/starter-framing.md]
+  - use: continue-on-stall@1
 
 conditions:
   - id: r1-baseline
     components:
-      # The same pack, installed outside /app, with nothing in the workspace: the agent sees
-      # no ruff.toml or mypy.ini. Its probe proves the pinned tools and a working gate before
-      # every step, and at step 1 that no config copy is in /app.
-      - use: python-guardrails@2
+      # The same pack, installed outside /app at environment start, with nothing in the
+      # workspace: the agent sees no ruff.toml or mypy.ini. Its probe proves at every step the
+      # pinned tools, the install-time smoke and an unchanged tool tree, and at step 1 that no
+      # config copy is in /app.
+      - use: python-guardrails@3
         with:
           workspace_configs: false
       # The same commit check in shadow mode: run once at each step's end against a git
-      # directory outside /app (the workspace is never written), recorded in the gate record
-      # with its git evidence, never enforced (no refusal, no fix session).
-      - use: guardrail-gate@2
+      # directory outside /app, its tests in a throwaway copy (the workspace is never
+      # written), recorded with its git evidence, never enforced (no refusal, no fix session,
+      # so no pre-fix snapshot).
+      - use: guardrail-gate@3
         with:
           command: guardrail-check
           mode: shadow
@@ -80,19 +85,19 @@ conditions:
           timeout_sec: 300
   - id: r2-guardrails
     components:
-      # The pack: the gate entrypoint, its pinned tools and protected configs, and the
-      # workspace config copies. Its probe proves, before every step's agent, the pinned
-      # versions and a working gate (a clean file passes, an unused import is refused);
-      # its integrity flags record config-copy edits and hook-bypass attempts without
-      # failing the step.
-      - use: python-guardrails@2
+      # The pack: the gate entrypoint (the agent's own tests included), its pinned tools and
+      # protected configs, and the workspace config copies. Its probe proves at every step
+      # the pinned versions, the install-time smoke (a clean file with its test passes, an
+      # unused import is refused) and an unchanged tool tree; its integrity flags record
+      # config-copy edits, tree changes and hook-bypass attempts without failing the step.
+      - use: python-guardrails@3
         with:
           workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
-      # real repository; the gate's JSON report goes to the run's report dir
-      # ($RAIDAR_GATE_REPORT_DIR), where gate-effort@3 reads it; every commit attempt
-      # records git log/status evidence in the gate record.
-      - use: guardrail-gate@2
+      # real repository; the gate's JSON report (tests block included) goes to the run's
+      # report dir, where gate-effort@4 reads it; every commit attempt records git evidence,
+      # and /app is snapshotted before each fix session for the offline pre-fix grade.
+      - use: guardrail-gate@3
         with:
           command: guardrail-check
           mode: commit
@@ -108,16 +113,18 @@ arms:
     agent: codex-luna
 
 assessment:
-  # gate-effort@3 (rationale.md section 11, after main-02): @2, but a step with no source
-  # change is not_applicable for first_pass_clean (the gate commits with --allow-empty).
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2, gate-effort@3]
+  # Iteration 3 (rationale.md section 12): gate-effort@4 is @3 plus the tests check
+  # (first run and step end, owned coverage) and fix_round_correctness_delta (final minus
+  # pre-fix case pass rate; make experiment-assess grades the pre-fix snapshots into the
+  # store first); process-compliance@3 is @2 plus stall_rate (continue-on-stall@1 records).
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@3, gate-effort@4]
   metric: scb-canonical@2
 
 analysis:
   baseline_arm: r1-baseline
   # Pre-registered in rationale.md section 3; raw solve_rate is always reported beside it.
   primary_outcome: solve_rate_errata
-  # Explore: 4 attempts per arm (user decision 2026-10-04). min_pairs stays at the default
+  # Explore: at most 4 attempts per arm (user decision 2026-10-04). min_pairs stays at the default
   # (5), so paired verdicts read insufficient by design; the sample-size projection sizes a
   # later confirm run.
   attempts: 4

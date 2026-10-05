@@ -60,6 +60,7 @@ def _bare_env(container: str | None) -> RunScopedDockerEnvironment:
     env = object.__new__(RunScopedDockerEnvironment)
     env._main_container = container  # noqa: SLF001
     env._is_windows_container = False  # noqa: SLF001
+    env._post_start = []  # noqa: SLF001  (as the constructor leaves it)
 
     async def resolve() -> str | None:
         return container

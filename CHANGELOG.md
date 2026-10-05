@@ -2,6 +2,26 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 3
+
+### Added
+
+- `python-guardrails@3` (`raidar.components.builtins.guardrails_v3`, payload `payloads/python_guardrails_3`): `@1`'s gate, rules, pins and protected configs byte for byte, plus the `tests` check (`guardrails.tests_check`): the agent's own tests run like a repository's commit check, `unittest` always and pytest 9.1.1 for pytest-style tests, under coverage 7.16.2 (Python subprocesses included) with the project's interpreter, in a throwaway copy of the workspace.
+  - Blocking findings: `TEST.missing` (a production Python change and no test ran; no Python change since the last commit is exempt), `TEST.failed`, and `TEST.coverage-minimum` (owned line coverage below 85%, the original rule catalogue's threshold, `f61d81b` `enaible-rules.json`). A root under a verifier path is a gate error (F4).
+  - Installed once per trial at environment start (`raidar.components.provision_v2`, `RunScopedDockerEnvironment.add_post_start_hook`): uploaded payload, root-owned hash-pinned tree, an install record with the version, a smoke run as the agent user and a digest of the whole tree. Each step's check runs no tool; it compares the tree digest with the install's (`protected-tree-modified` flag after step 1).
+- `guardrail-gate@3` (`raidar.components.guardrail_gate_v3`): `@2` plus a snapshot of `/app` before each fix session (the verifier's artifact mechanism and excludes), recorded with its tree digest in `pre_fix_snapshots`; its inner agent may be a session wrapper (`raidar.components.session_chain`).
+- `continue-on-stall@1` (`raidar.components.builtins.stall`, wrapper `raidar.components.continue_on_stall`): a session that changed no workspace file and ended asking a question or for clarification gets one continuation session (no human is available; proceed on the specification and record assumptions in `ASSUMPTIONS.md`). Deterministic detection, recorded per session. A session wrapper: the execution layer nests it around the native agent, inside the condition's workflow wrapper (`apply_session_wrappers`), so it composes with `guardrail-gate@3` without a second workflow wrapper.
+- Offline pre-fix grading (`raidar.verifier.prefix_grade`, store contract `raidar.verifier.prefix_store`): `raidar assess --rescore` grades every not-yet-graded pre-fix snapshot into `<store>/pre-fix-grades/` with the step's own bundle, sandbox and timeout when a declared scorer reads them; `make assess-regrade ... STORE=` regrades them beside the final snapshots.
+- `gate-effort@4` (store-bound): `@3` plus the tests check (`first_run_tests_passed`, `first_run_tests_missing`, `first_run_coverage`, `tests_passed_at_step_end`, `tests_run_at_step_end`, `coverage_at_step_end` and their trajectory rates and means), `pre_fix_pass_rate`, `correctness_delta` and the trajectory `fix_round_correctness_delta` (not applicable to a shadow gate; an ungraded snapshot is unavailable and the Assessment provisional). `TEST.*` findings count in the `tests` family.
+- `process-compliance@3`: `@2` plus `stalled`, `stall_resolved`, `stall_rate` and `stalled_steps` from the stall records.
+- Analysis: `gate.*` outcomes are read per declared gate-effort version (`@4` adds the tests check and `gate.fix_round_correctness_delta`); `process.stall_rate` is a new outcome group (per-arm descriptives and paired effects) when the lock declares `process-compliance@3`.
+- Canaries: `lint.per-file-ignores`, `explicit_package_bases` and `disable_error_code` now have their own (no pack config entry is uncovered); `@3` adds seven tests-check canaries. `make guardrails-verify` proves both payloads (`@1`, which `@2` installs, and `@3`) in the pack image, with a coverage-minimum mutant for `@3`.
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 3, `rationale.md` §12, lock `bbefb1c79a7c`): both arms share `continue-on-stall@1`; r1 and r2 use `python-guardrails@3` and `guardrail-gate@3`; the scorers are `process-compliance@3` and `gate-effort@4`. No job has run under this lock.
+- The Quality run view reads `gate-effort@4` first.
+
 ## Unreleased - guardrails main-02 results
 
 ### Added

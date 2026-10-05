@@ -21,6 +21,13 @@ is parked and its policy is off) get a runtime whose audit and cache live in
 ``--store``; ``--jev-replay-only`` answers from that cache alone and never
 calls the provider. ``process-compliance@2`` binds no Jev runtime.
 
+Pre-fix grades: when a scorer run reads them (``gate-effort@4``), ``--rescore``
+first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
+yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
+bundle, sandbox and timeout, on ``--docker-context``), never into the job, and
+reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
+``--store`` also regrades the stored pre-fix grades beside the final snapshots.
+
 ``AS1`` (the assess-time half of the runtime-compatibility gate): CLI-supplied
 ``--scorer`` values must cover the runtime of the job's lock, and a ``--bundle``
 (rescore or regrade) must be the verifier bundle of a problem that lock binds.
@@ -31,7 +38,6 @@ refused until ``raidar migrate-job`` moves them.
 
 from __future__ import annotations
 
-import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +46,7 @@ from typing import Any
 import click
 
 from raidar.analysis.sources import AnalysisInputError, JobDir, default_lock, read_lock
+from raidar.commands.assess_grading import RegradeOptions, grade_pre_fix, regrade
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.job_layout import JOB_MANIFEST, LegacyJobError, is_legacy_job, legacy_job_message
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
@@ -47,7 +54,6 @@ from raidar.scorers.rescore import report_payload, rescore_path
 from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.verifier.bundle import BundleError, load_bundle
-from raidar.verifier.regrade import RegradeError, RegradeOptions, regrade_path
 
 
 def register(main: click.Group) -> None:
@@ -61,11 +67,10 @@ def _emit(report: dict[str, object], out: Path | None) -> None:
     click.echo(text)
 
 
-def _regrade(target: Path, options: RegradeOptions, out: Path | None) -> None:
-    try:
-        report = asyncio.run(regrade_path(target, options))
-    except (RegradeError, BundleError) as exc:
-        raise click.ClickException(str(exc)) from exc
+def _regrade(
+    target: Path, options: RegradeOptions, out: Path | None, store: Path | None = None
+) -> None:
+    report = regrade(target, options, store)
     _emit(report, out)
     if not report["match"]:
         raise click.exceptions.Exit(1)
@@ -81,6 +86,7 @@ class _RescoreRequest:
     replay: bool
     jev_replay_only: bool = False
     lock: Path | None = None
+    docker_context: str = "orbstack"
 
 
 # A trial dir sits at <job>/trials/<trial>; a job dir at <job>/trials.
@@ -218,6 +224,13 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     if store.resolve().is_relative_to(request.target.resolve()):
         raise click.UsageError("--store must not be inside the job being rescored")
     _check_as1(request.target, request.lock, request.scorer_refs, request.bundle)
+    graded = grade_pre_fix(
+        request.target,
+        store,
+        request.scorer_refs,
+        RegradeOptions(docker_context=request.docker_context, bundle_override=request.bundle),
+        replay=request.replay,
+    )
     try:
         settings, config_path = _settings(request)
         records = rescore_path(
@@ -234,7 +247,8 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     except (ValueError, ScorerUnavailableError, AssessmentConflictError) as exc:
         # ValueError covers unknown references, invalid run inputs and rejected scorer output.
         raise click.ClickException(str(exc)) from exc
-    _emit({"config": str(config_path) if config_path else None, **report_payload(records)}, out)
+    report = {"config": str(config_path) if config_path else None, **report_payload(records)}
+    _emit({**report, **({"pre_fix_grading": graded} if graded is not None else {})}, out)
 
 
 @click.command()
@@ -259,7 +273,10 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
 @click.option(
     "--store",
     type=click.Path(file_okay=False, path_type=Path),
-    help="Assessment store directory for --rescore (outside the job).",
+    help=(
+        "Assessment store directory for --rescore (outside the job); with --regrade, also "
+        "regrade its stored pre-fix grades."
+    ),
 )
 @click.option(
     "--config",
@@ -314,7 +331,7 @@ def assess(
     if regrade_target is not None and rescore_target is None:
         _check_as1(regrade_target, lock_path, (), bundle_override)
         options = RegradeOptions(docker_context=docker_context, bundle_override=bundle_override)
-        _regrade(regrade_target, options, out)
+        _regrade(regrade_target, options, out, store)
     elif rescore_target is not None and regrade_target is None:
         request = _RescoreRequest(
             rescore_target,
@@ -325,6 +342,7 @@ def assess(
             replay,
             jev_replay_only,
             lock_path,
+            docker_context,
         )
         _rescore(request, out)
     else:

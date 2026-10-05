@@ -1,4 +1,4 @@
-"""Gate-effort outcomes in the analysis report (``gate-effort@1``, when the lock declares it).
+"""Gate-effort (and process) outcomes in the analysis report, when the lock declares the scorer.
 
 A commit gate's effort (rounds to clean, first-pass clean, unresolved and
 gate-error rates, blocking findings by rule family, fix-session tokens, cost
@@ -12,6 +12,10 @@ and time) is a quality signal of its own. It is reported two ways:
   other outcome, for each gate metric that both arms of the comparison measured
   in at least one valid trial. A baseline without the gate therefore yields no
   paired gate effect, and the comparison says why (``gate_note``).
+
+The same two views serve the ``process.*`` outcomes (``process-compliance@3``:
+the stall rate) when the lock declares that scorer: an arm without the stall
+wrapper has no value.
 
 Nothing here gets a verdict that the primary outcome does not already have:
 gate effects carry the usual paired verdict for the metric's declared
@@ -45,6 +49,10 @@ NO_GATE_NOTE = (
     "no paired gate effect: the {arm} arm measured no gate-effort value (it ran without "
     "the commit gate); see the arms' gate_effort descriptives"
 )
+NO_PROCESS_NOTE = (
+    "no paired process effect: the {arm} arm measured no process outcome (it ran without "
+    "the stall wrapper); see the arms' process_outcomes descriptives"
+)
 
 
 class GateDescriptive(AnalysisModel):
@@ -68,11 +76,14 @@ def _gaps(valid: Sequence[TrialOutcome], metric: str) -> dict[str, int]:
 
 
 def arm_gate_effort(
-    arm: str, valid: Sequence[TrialOutcome], settings: Settings
+    arm: str,
+    valid: Sequence[TrialOutcome],
+    settings: Settings,
+    metrics: Sequence[MetricDef] = GATE_METRICS,
 ) -> dict[str, GateDescriptive]:
-    """Every gate metric's descriptive summary over one arm's valid trials."""
+    """Every gate (or process) metric's descriptive summary over one arm's valid trials."""
     described = {}
-    for metric in GATE_METRICS:
+    for metric in metrics:
         values = [
             value.value
             for outcome in valid
@@ -122,21 +133,26 @@ def _metric_effects(
 
 
 def gate_effects(
-    slots: Mapping[str, Sequence[Slot]], settings: Settings, *, label: str
+    slots: Mapping[str, Sequence[Slot]],
+    settings: Settings,
+    *,
+    label: str,
+    metrics: Sequence[MetricDef] = GATE_METRICS,
+    note: str = NO_GATE_NOTE,
 ) -> tuple[tuple[Effect, ...], str | None]:
-    """Paired gate effects both arms measured, and a note when none could be paired."""
+    """Paired effects both arms measured, and a note when none could be paired."""
     every = [slot for problem_slots in slots.values() for slot in problem_slots]
     effects = [
         effect
-        for metric in GATE_METRICS
+        for metric in metrics
         if _both_measured(every, metric)
         for effect in _metric_effects(metric, slots, settings, label)
     ]
     if effects:
         return tuple(effects), None
-    baseline_measured = _measured_in([slot.baseline for slot in every], GATE_METRICS[0].id)
+    baseline_measured = _measured_in([slot.baseline for slot in every], metrics[0].id)
     arm = "treatment" if baseline_measured else "baseline"
-    return (), NO_GATE_NOTE.format(arm=arm)
+    return (), note.format(arm=arm)
 
 
 def gate_means(described: Mapping[str, GateDescriptive] | None) -> dict[str, float | None] | None:

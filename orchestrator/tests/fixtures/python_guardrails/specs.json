@@ -23,6 +23,14 @@
     "codes": "MYPY.no-untyped-def",
     "mode": "rule"
   },
+  "MYPY.disable_error_code": {
+    "codes": "MYPY.import-untyped,MYPY.import-not-found",
+    "mode": "rule"
+  },
+  "MYPY.explicit_package_bases": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
   "MYPY.follow_imports": {
     "codes": "MYPY",
     "mode": "rule"
@@ -153,6 +161,10 @@
   },
   "RUFF.LIMIT.max-statements": {
     "codes": "PLR0915",
+    "mode": "rule"
+  },
+  "RUFF.LINT.per-file-ignores": {
+    "codes": "F401",
     "mode": "rule"
   },
   "RUFF.PYDOCSTYLE.convention": {

@@ -161,6 +161,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         process_results=process if process_ref else None,
         gate_results=gate if gate_ref else None,
         gate_scorer=gate_ref,
+        process_scorer=process_ref,
         manipulation_checks=manipulation_requests(spec["analysis"]),
         dev_job=_dev_job(options),
     )

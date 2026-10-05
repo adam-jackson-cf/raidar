@@ -1331,3 +1331,14 @@ Exploratory signals only. With 4 pairs against `min_pairs` 5, every verdict read
 5. **`per_step_reset`.** p95 was 5.04 s against the 2 s budget, report-only. It breaches on every job of this experiment (smoke-01 5.41 s, smoke-02 5.62 s). This needs a decision on the per-step pack provision cost, not a re-baseline.
 
 Run iteration 3 small: 1 trial of each changed arm first, then at most 4 attempts per arm.
+
+### 15.8 Explore iteration 3: implemented and locked, not yet run (2026-10-05)
+
+Full record: `rationale.md` §12 (pre-registration, verification, limits). Lock `bbefb1c79a7c`; no real-LLM job has run under it.
+
+- **The gate runs the agent's own tests** (`python-guardrails@3`): `unittest` always, pytest for pytest-style tests, under coverage, in a throwaway copy of the workspace. `TEST.missing` (a Python change with no test that ran), `TEST.failed` and `TEST.coverage-minimum` at 85% (the original catalogue's threshold, `f61d81b`) block. pytest 9.1.1 and coverage 7.16.2 are hash-pinned beside Ruff and mypy, outside the agent image.
+- **Install once per trial at environment start** (§15.7 item 5): `per_step_reset` p95 7.32 s → 1.44 s on `nop` jobs of this experiment (budget 2 s); `environment_start` 3.8 s → 11.5 s (budget 20 s). The tool tree is digest-checked at every step.
+- **Pre-fix snapshots** (§15.7 item 1): `guardrail-gate@3` snapshots `/app` before each fix session; `make experiment-assess` grades them offline into the store; `gate-effort@4` reports `fix_round_correctness_delta` (final minus pre-fix case pass rate; r2 only).
+- **No-stall rule (K3)**: `continue-on-stall@1`, shared by both arms, continues once a session that changed nothing and ended asking; `process-compliance@3` reports `stall_rate`.
+- **Canaries**: the three config entries without one (§15.7) now have one; `make guardrails-verify` proves `@1` (76 rules) and `@3` (83) in the pack image.
+- **Not done in this iteration** (§15.7 items 2 and 3): the r3 "configs visible, shadow gate" arm and distinct-code counts per step.

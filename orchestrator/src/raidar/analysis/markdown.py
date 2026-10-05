@@ -154,15 +154,25 @@ def _family_row(family: str, arms: Sequence[ArmSummary]) -> list[str]:
     ]
 
 
+def _descriptive_rows(
+    columns: Sequence[dict[str, GateDescriptive]], metrics: Sequence[str]
+) -> list[list[str]]:
+    """One row per metric any column reports: the metric, then each column's descriptive."""
+    reported = {metric for column in columns for metric in column}
+    return [
+        [metric, *(_descriptive(column.get(metric)) for column in columns)]
+        for metric in metrics
+        if metric in reported
+    ]
+
+
 def _gate_arms(report: AnalysisReport) -> list[str]:
     arms = [arm for arm in report.arms if arm.gate_effort is not None]
     if not arms:
         return []
     names = [arm.arm for arm in arms]
-    rows = [
-        [metric.id, *(_descriptive((arm.gate_effort or {}).get(metric.id)) for arm in arms)]
-        for metric in GATE_HEADLINE
-    ]
+    columns = [arm.gate_effort or {} for arm in arms]
+    rows = _descriptive_rows(columns, [metric.id for metric in GATE_HEADLINE])
     return [
         "",
         f"## Gate effort ({report.gate_scorer or 'gate-effort@1'}, per arm)",
@@ -170,12 +180,48 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         "Mean [CI] n over valid trials; an arm without the commit gate has no value "
         "(not applicable), never 0; an arm with a shadow gate (gate-effort@2 and later) has its "
         "first-run values only; under gate-effort@3 a step with no source change is not "
-        "applicable to first-pass clean.",
+        "applicable to first-pass clean; gate-effort@4 adds the tests check and "
+        "fix_round_correctness_delta (final minus pre-fix case pass rate over steps with a fix "
+        "round; not applicable to a shadow gate).",
         "",
         *_table(("Metric", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
         "",
         *_table(("Family", *names), (_family_row(family, arms) for family in FAMILIES)),
+    ]
+
+
+def _process_arms(report: AnalysisReport) -> list[str]:
+    arms = [arm for arm in report.arms if arm.process_outcomes is not None]
+    if not arms:
+        return []
+    columns = [arm.process_outcomes or {} for arm in arms]
+    rows = _descriptive_rows(columns, sorted({metric for column in columns for metric in column}))
+    return [
+        "",
+        "## Process outcomes (process-compliance@3, per arm)",
+        "",
+        "Mean [CI] n over valid trials; stall_rate is the share of reached steps in which a "
+        "session changed nothing and ended asking a question (continue-on-stall@1); an arm "
+        "without the stall wrapper has no value (not applicable), never 0.",
+        "",
+        *_table(("Metric", *[arm.arm for arm in arms]), rows),
+    ]
+
+
+def _process_effects(comparison: Comparison) -> list[str]:
+    if comparison.process_note:
+        return ["### Process outcomes (paired)", "", comparison.process_note + ".", ""]
+    if not comparison.process_effects:
+        return []
+    header = (
+        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "CI",
+        "Verdict", "Excluded", "Cost Δ USD",
+    )  # fmt: skip
+    return [
+        "### Process outcomes (paired)",
+        "",
+        *_table(header, (_effect_row(effect) for effect in comparison.process_effects)),
     ]
 
 
@@ -248,6 +294,7 @@ def _comparison(comparison: Comparison, confidence: float) -> list[str]:
         *_mcnemar([e for e in comparison.effects if e.mcnemar is not None]),
         *_manipulation(comparison.manipulation),
         *_gate_effects(comparison),
+        *_process_effects(comparison),
         "### Per-checkpoint curves",
         "",
     ]
@@ -402,6 +449,7 @@ def render_markdown(report: AnalysisReport) -> str:
     )  # fmt: skip
     lines += ["", "## Arms", "", *_table(header, (_arm_row(arm) for arm in report.arms))]
     lines.extend(_gate_arms(report))
+    lines.extend(_process_arms(report))
     lines.extend(_ranking(report.ranking))
     for comparison in report.comparisons:
         lines.extend(_comparison(comparison, report.settings.confidence))

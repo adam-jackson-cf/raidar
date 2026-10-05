@@ -46,7 +46,13 @@ from raidar.analysis.effects import (
     metric_applies,
     problem_effect,
 )
-from raidar.analysis.gate_effort import GateDescriptive, arm_gate_effort, gate_effects, gate_means
+from raidar.analysis.gate_effort import (
+    NO_PROCESS_NOTE,
+    GateDescriptive,
+    arm_gate_effort,
+    gate_effects,
+    gate_means,
+)
 from raidar.analysis.manipulation import (
     CHECK_SCORERS,
     DEFAULT_CHECKS,
@@ -59,9 +65,13 @@ from raidar.analysis.manipulation import (
 from raidar.analysis.outcomes import (
     COST_METRICS,
     OUTCOME_METRICS,
+    PROCESS_METRICS,
+    PROCESS_OUTCOME_SCORER,
     RAW_COUNTERPART,
     AnalysisModel,
+    MetricDef,
     TrialOutcome,
+    gate_metrics_for,
     outcome_metric,
     primary_metric,
     primary_source,
@@ -108,7 +118,9 @@ class AnalysisInputs:
     gate_results: Mapping[str, AssessResult | None] | None = field(default=None)
     """gate-effort results per trial when the lock declares it (else None)."""
     gate_scorer: str | None = None
-    """The gate-effort version the lock declares (``gate-effort@1`` or ``@2``)."""
+    """The gate-effort version the lock declares (``gate-effort@1`` to ``@4``)."""
+    process_scorer: str | None = None
+    """The process-compliance version the lock declares; ``@3`` adds the process outcomes."""
     manipulation_checks: tuple[CheckRequest, ...] | None = None
     """The lock's pre-registered manipulation checks (None: the process defaults)."""
     dev_job: DevRun | None = None
@@ -122,6 +134,16 @@ class AnalysisInputs:
     @property
     def primary(self) -> str:
         return primary_metric(self.progression, self.primary_outcome)
+
+    @property
+    def gate_metrics(self) -> tuple[MetricDef, ...]:
+        """The gate outcomes the lock's gate-effort version reports."""
+        return gate_metrics_for(self.gate_scorer or "gate-effort@1")
+
+    @property
+    def process_outcomes(self) -> bool:
+        """Whether the lock declares the scorer of the ``process.*`` outcomes."""
+        return self.process_scorer == PROCESS_OUTCOME_SCORER
 
     @property
     def gate_label(self) -> str | None:
@@ -142,6 +164,8 @@ class ArmSummary(AnalysisModel):
     cost_means: dict[str, float | None]
     gate_effort: dict[str, GateDescriptive] | None = None
     """Per gate metric over the arm's valid trials; None when the lock declares no gate-effort."""
+    process_outcomes: dict[str, GateDescriptive] | None = None
+    """Per process metric (stall rate); None when the lock declares no process-compliance@3."""
 
 
 class Comparison(AnalysisModel):
@@ -155,6 +179,8 @@ class Comparison(AnalysisModel):
     manipulation: ManipulationReport | None = None
     gate_effects: tuple[Effect, ...] = ()
     gate_note: str | None = None
+    process_effects: tuple[Effect, ...] = ()
+    process_note: str | None = None
 
 
 class SampleSizeBasis(AnalysisModel):
@@ -311,8 +337,13 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
     slots = _slots(inputs, treatment)
     effects = _effects(slots, settings, label)
     gated, note = (
-        gate_effects(slots, settings, label=label)
+        gate_effects(slots, settings, label=label, metrics=inputs.gate_metrics)
         if inputs.gate_results is not None
+        else ((), None)
+    )
+    processed, process_note = (
+        gate_effects(slots, settings, label=label, metrics=PROCESS_METRICS, note=NO_PROCESS_NOTE)
+        if inputs.process_outcomes
         else ((), None)
     )
     return Comparison(
@@ -333,6 +364,8 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
         manipulation=_manipulation(inputs, treatment, settings),
         gate_effects=gated,
         gate_note=note,
+        process_effects=processed,
+        process_note=process_note,
     )
 
 
@@ -366,7 +399,14 @@ def _arm_summary(arm: str, inputs: AnalysisInputs, settings: Settings) -> ArmSum
         infra_reasons=_reason_counts(ran),
         cost_means=_cost_means(valid),
         gate_effort=(
-            arm_gate_effort(arm, valid, settings) if inputs.gate_results is not None else None
+            arm_gate_effort(arm, valid, settings, inputs.gate_metrics)
+            if inputs.gate_results is not None
+            else None
+        ),
+        process_outcomes=(
+            arm_gate_effort(arm, valid, settings, PROCESS_METRICS)
+            if inputs.process_outcomes
+            else None
         ),
     )
 

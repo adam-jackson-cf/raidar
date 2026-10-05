@@ -36,6 +36,13 @@ Name-based removal of a name the host does not have only drops the stale entry
 (the host answers "not found"), and directories use ``rmdir``, so an archived
 file or directory is never touched. It changes no component, setup script or
 digest.
+
+**Per-trial installs at start.** ``add_post_start_hook`` registers work that
+must run once per trial in the started container before any step (a
+component's tool install, ``raidar.components.provision_v2``). It runs inside
+``start``, so its time is the trial's ``environment_start`` (a per-trial
+cost), never a step's ``per_step_reset``. A hook records its own failure; it
+must not raise.
 """
 
 from __future__ import annotations
@@ -49,7 +56,7 @@ import shlex
 import sys
 import tarfile
 import tempfile
-from collections.abc import Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -175,10 +182,18 @@ async def warm_agent_imports() -> None:
                 await asyncio.to_thread(importlib.import_module, name)
 
 
+PostStartHook = Callable[[], Awaitable[None]]
+
+
 class RunScopedDockerEnvironment(DockerEnvironment):
     def __init__(self, *args: Any, session_id: str, run_scope: str, **kwargs: Any) -> None:
         super().__init__(*args, session_id=f"{session_id}-{run_scope}", **kwargs)
         self._main_container: str | None = None
+        self._post_start: list[PostStartHook] = []
+
+    def add_post_start_hook(self, hook: PostStartHook) -> None:
+        """Run ``hook`` once the container has started, inside ``start`` (module doc)."""
+        self._post_start.append(hook)
 
     async def _resolve_main_container(self) -> str | None:
         """The running main container's id for this project (cached), or None."""
@@ -219,6 +234,8 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         await asyncio.gather(
             super().start(force_build), self._is_rootless_docker(), warm_agent_imports()
         )
+        for hook in self._post_start:
+            await hook()
 
     async def exec(
         self,

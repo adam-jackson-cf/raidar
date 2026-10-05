@@ -24,7 +24,13 @@ from raidar.analysis.manipulation import (
     step_share,
 )
 from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import GATE_METRICS, TrialOutcome, Value, outcome_metric
+from raidar.analysis.outcomes import (
+    GATE_METRICS,
+    TrialOutcome,
+    Value,
+    gate_metrics_for,
+    outcome_metric,
+)
 from raidar.analysis.report import AnalysisReport, analyse
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
 from raidar.spec.loader import load_experiment
@@ -112,7 +118,8 @@ def test_two_gated_arms_get_paired_gate_effects_with_verdicts() -> None:
     (comparison,) = report.comparisons
     effects = {effect.metric: effect for effect in comparison.gate_effects}
     assert comparison.gate_note is None
-    assert set(effects) == {metric.id for metric in GATE_METRICS}
+    # The lock declares gate-effort@1 (the default label): exactly the outcomes it reports.
+    assert set(effects) == {metric.id for metric in gate_metrics_for("gate-effort@1")}
     first_pass = effects[FIRST_PASS]
     assert (first_pass.n_pairs, first_pass.verdict.value) == (5, "improved")
     assert effects[UNRESOLVED].verdict.value == "worse"
@@ -269,3 +276,70 @@ def test_lock_manipulation_checks_are_read_and_validated(tmp_path: Path) -> None
     document["analysis"]["manipulation_checks"] = [{"check": GATE_CLEAN}, {"check": GATE_CLEAN}]
     with pytest.raises(SpecValidationError, match="repeats"):
         load_experiment(write_experiment(tmp_path / "twice", document))
+
+
+# ---- gate-effort@4 and the process outcomes ---------------------------------------------
+
+DELTA = "gate.fix_round_correctness_delta"
+STALL = "process.stall_rate"
+
+
+def _iteration_three(attempt: int, *, shadow: bool) -> dict[str, float | Value]:
+    metrics = _gated(0.0) | {STALL: 0.25 if shadow else 0.125 * (attempt % 2)}
+    if shadow:
+        metrics[DELTA] = Value.missing("not_applicable", "shadow gate")
+    else:
+        metrics[DELTA] = -0.05 * attempt
+    return metrics
+
+
+def test_a_v4_lock_reports_the_fix_round_delta_and_the_process_stall_rate() -> None:
+    outcomes = [
+        item
+        for attempt in range(5)
+        for item in (
+            trial(BASELINE, attempt, _iteration_three(attempt, shadow=True)),
+            trial(GUIDED, attempt, _iteration_three(attempt, shadow=False)),
+        )
+    ]
+
+    report = _analyse(outcomes, gate_scorer="gate-effort@4", process_scorer="process-compliance@3")
+
+    baseline, guided = report.arms
+    assert baseline.gate_effort is not None
+    assert guided.gate_effort is not None
+    assert baseline.gate_effort[DELTA].gaps == {"not_applicable": 5}
+    assert guided.gate_effort[DELTA].mean == pytest.approx(-0.1)
+    assert set(guided.gate_effort) == {metric.id for metric in gate_metrics_for("gate-effort@4")}
+    (comparison,) = report.comparisons
+    assert DELTA not in {effect.metric for effect in comparison.gate_effects}, "r1 has none"
+    (stall,) = comparison.process_effects
+    assert (stall.metric, stall.n_pairs) == (STALL, 5)
+    assert baseline.process_outcomes is not None
+    assert baseline.process_outcomes[STALL].mean == pytest.approx(0.25)
+    markdown = render_markdown(report)
+    assert "## Process outcomes (process-compliance@3, per arm)" in markdown
+    assert "### Process outcomes (paired)" in markdown
+    assert f"| {DELTA} |" in markdown
+
+
+def test_a_lock_without_process_compliance_v3_has_no_process_section() -> None:
+    report = _analyse(_outcomes(baseline_gated=True), process_scorer="process-compliance@2")
+
+    assert all(arm.process_outcomes is None for arm in report.arms)
+    assert report.comparisons[0].process_effects == ()
+    assert "Process outcomes" not in render_markdown(report)
+
+
+def test_a_trial_reads_only_the_outcomes_its_scorer_versions_report() -> None:
+    from raidar.analysis.assessed import process_metrics
+
+    stall = Observation(
+        metric="stall_rate", subject=TRAJECTORY_SUBJECT, status=AssessStatus.OK, value=0.5
+    )
+    result = AssessResult(status=AssessStatus.OK, observations=(stall,))
+
+    assert DELTA not in gate_metrics(None, "gate-effort@3")
+    assert DELTA in gate_metrics(None, "gate-effort@4")
+    assert process_metrics(result) == {STALL: Value.ok(0.5)}
+    assert process_metrics(None)[STALL].status == "unassessed"

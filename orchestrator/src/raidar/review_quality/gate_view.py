@@ -41,8 +41,8 @@ from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observat
 from raidar.scorers.store import Assessment
 
 GATE_EFFORT_REF = "gate-effort@1"
-GATE_EFFORT_REFS = ("gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
-"""Read in preference order: a trial assessed with ``@2`` or ``@3`` shows a shadow gate's cells."""
+GATE_EFFORT_REFS = ("gate-effort@4", "gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
+"""Read in preference order: a trial assessed with ``@2`` or later shows a shadow gate's cells."""
 STEP_CELLS = (
     "gate_runs",
     "fix_rounds",
@@ -181,7 +181,7 @@ def _assessment_notes(assessment: Assessment | None, shadow: bool) -> list[str]:
     if shadow and assessment.scorer.ref == GATE_EFFORT_REF:
         return [
             f"shadow gate assessed with {GATE_EFFORT_REF}, which reads it as an enforced gate; "
-            f"rescore with {GATE_EFFORT_REFS[0]}"
+            f"rescore with {GATE_EFFORT_REFS[-2]} or later (the version its lock declares)"
         ]
     return []
 

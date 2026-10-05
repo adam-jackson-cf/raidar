@@ -118,7 +118,7 @@ def test_the_leak_guard_is_installed_before_the_trial_runs(
     )
     monkeypatch.setattr(
         driver,
-        "install_provisioning",
+        "install_trial_provisioning",
         lambda trial, provisions: events.append(f"provision:{len(provisions)}"),
     )
     provisions = (Provision("00-lint-tool", "lint-tool@1", "true", "true"),)

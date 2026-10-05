@@ -427,15 +427,18 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@3": {
-          "digest": "4ca328ddea88d8a2b0e399073e1f0b02cb5b53235c2904ed90b13701fb640f9b",
+        "gate-effort@4": {
+          "digest": "08b5f76466cc986486214be8b04c4ec4fea83f9eb35c1cc5ecd68a20f0acd818",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort_v3:gate_effort_v3_scorer",
-            "implementation_digest": "4205203b55a94e056dd8f6600dc8fa9a4994ca6e6731380157eb907d4d14de66",
+            "implementation": "raidar.scorers.gate_effort_v4:gate_effort_v4_scorer",
+            "implementation_digest": "3f2c11baaa55e4a08a95175972fcfe37dfe64741da2741d348d7c291e2cbe847",
             "manifest": {
-              "description": "Effort a guardrail-gate commit gate cost per step: rounds to clean, first-pass clean, unresolved and gate-error steps, blocking findings by rule family, and the fix sessions' tokens, cost and time. A shadow gate (guardrail-gate@2 mode shadow) reports its first-run outcomes only. A step that changed no source file is not applicable to first-pass clean. Not applicable to an arm without a gate.",
+              "description": "Effort a guardrail-gate commit gate cost per step (gate-effort@3), the gate's tests check (first run and step end: passed, missing tests, owned coverage) and the fix rounds' correctness (final minus pre-fix case pass rate, the pre-fix snapshot graded offline). A shadow gate reports its first-run and code outcomes only. Not applicable to an arm without a gate.",
               "evidence_required": [
-                "trace"
+                "trace",
+                "oracle.cases",
+                "snapshot.current",
+                "snapshot.prior"
               ],
               "execution": "host-parse",
               "id": "gate-effort",
@@ -1207,24 +1210,192 @@
                   "tier": "deterministic",
                   "type": "real",
                   "unit": "s"
+                },
+                {
+                  "description": "The first gate run's tests check passed (the agent's own tests ran, passed, covered).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_run_tests_passed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The first gate run refused the change for having no test that ran.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_tests_missing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Owned line coverage of the first gate run's test run.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_run_coverage",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "percent"
+                },
+                {
+                  "description": "The step's last decided gate run's tests check passed.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "tests_passed_at_step_end",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Tests the step's last decided gate run ran.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "tests_run_at_step_end",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Owned line coverage of the step's last decided gate run.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "coverage_at_step_end",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "percent"
+                },
+                {
+                  "description": "Case pass rate of the workspace the step's first fix session started from.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "pre_fix_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "The step's final case pass rate minus its pre-fix pass rate.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "correctness_delta",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose first gate run's tests check passed.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_run_tests_pass_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose first gate run found no test that ran.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "tests_missing_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose last gate run's tests check passed.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "tests_pass_at_step_end_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Mean owned line coverage of the first gate runs that ran tests.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "mean_first_run_coverage",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "percent"
+                },
+                {
+                  "description": "Mean owned line coverage at step end, over steps whose tests ran.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "mean_coverage_at_step_end",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "percent"
+                },
+                {
+                  "description": "Mean over steps with a fix round of final minus pre-fix case pass rate.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "fix_round_correctness_delta",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "3"
+              "version": "4"
             },
             "tool_lock": {}
           }
         },
-        "process-compliance@2": {
-          "digest": "f63e8ccfd45ea668f651c152bfb9572e2741a43f85bf6f14a0997ac1ddb9b645",
+        "process-compliance@3": {
+          "digest": "1553ee1a16c462aca7a307feac54f1b1ee27023ce97cc58d9ed732959ac105cf",
           "metadata": {
-            "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "3db116afd4c9db6684b5e3084b2cb7502fbea3ab87380b3dac589418d898fb56",
+            "implementation": "raidar.scorers.process_checks_v3:process_compliance_v3_scorer",
+            "implementation_digest": "eefe18b6f8dd0b212e79ad457dd91e90dd62bfb6435984f77834880e93c8ea3c",
             "manifest": {
-              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
+              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model. Adds whether a session stalled on a question (continue-on-stall@1 records) and the stall rate.",
               "evidence_required": [
                 "trace",
                 "snapshot.current"
@@ -1267,13 +1438,61 @@
                   "tier": "deterministic",
                   "type": "ratio",
                   "unit": null
+                },
+                {
+                  "description": "A session of the step changed no workspace file and ended asking a question (continue-on-stall@1 detection).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "stalled",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Every continuation a stall started changed the workspace.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "stall_resolved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of reached steps with a stall record in which a session stalled.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "stall_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Reached steps in which a session stalled.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "stalled_steps",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "2"
+              "version": "3"
             },
             "tool_lock": {}
           }
@@ -1422,8 +1641,8 @@
         "correctness@1",
         "code-quality@1",
         "resource-usage@1",
-        "process-compliance@2",
-        "gate-effort@3"
+        "process-compliance@3",
+        "gate-effort@4"
       ]
     },
     "tools": {
@@ -1435,18 +1654,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "6d2a6a8527c98d12d22004bd8ebd18fda8e38d549a3dbf5daeb794f9c7f51b46",
+  "document_sha256": "e4ae776e0a8d620b7e06543f88c506f0ba5bd6870e0031e1f537ce6c6de7404a",
   "execution": {
     "arms": {
       "r1-baseline": {
         "agent": "codex-luna",
         "condition": "r1-baseline",
-        "digest": "35e555a2d58b2547255b302a93e665d79c7e70dd7c99270c5fbcc1b1e0a37c31"
+        "digest": "2dd425fa3dd041ee116b73022fab42ef0c4731cb061f2db3da93428a8c0d9bbb"
       },
       "r2-guardrails": {
         "agent": "codex-luna",
         "condition": "r2-guardrails",
-        "digest": "25885761ccc9a6f2497b7b36ce8cb7dd8609568a43a5722427e581b601aecb82"
+        "digest": "125745bc82997bead8b129b8ec1f1df022b50f521f72df21008510bf1e4eebf4"
       }
     },
     "conditions": {
@@ -1461,16 +1680,22 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@2",
-          "use_digest": "8e24b238e4bd6a31c040604b1a9db17ccaf73f2ff4a11d22520af1839335d397",
+          "use": "continue-on-stall@1",
+          "use_digest": "facc59c7a6e704cc9d48e7fae0a6b1433e8cdc7b8d8fde28b3431a2ccc82ecf5",
+          "with": {}
+        },
+        {
+          "files": {},
+          "use": "python-guardrails@3",
+          "use_digest": "550d0f0f47c38dbaeb9dce81357cf4ba15cabf075cbb76debbbd682bb1484d37",
           "with": {
             "workspace_configs": false
           }
         },
         {
           "files": {},
-          "use": "guardrail-gate@2",
-          "use_digest": "2dd54d588927c484597fe4246097a1128554256abbac488e0252b08525d6d6be",
+          "use": "guardrail-gate@3",
+          "use_digest": "b8a90ff7a7db371744d925c049b3edff432718568c28e76339f66a42a69b550e",
           "with": {
             "command": "guardrail-check",
             "max_rounds": 3,
@@ -1490,16 +1715,22 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@2",
-          "use_digest": "8e24b238e4bd6a31c040604b1a9db17ccaf73f2ff4a11d22520af1839335d397",
+          "use": "continue-on-stall@1",
+          "use_digest": "facc59c7a6e704cc9d48e7fae0a6b1433e8cdc7b8d8fde28b3431a2ccc82ecf5",
+          "with": {}
+        },
+        {
+          "files": {},
+          "use": "python-guardrails@3",
+          "use_digest": "550d0f0f47c38dbaeb9dce81357cf4ba15cabf075cbb76debbbd682bb1484d37",
           "with": {
             "workspace_configs": true
           }
         },
         {
           "files": {},
-          "use": "guardrail-gate@2",
-          "use_digest": "2dd54d588927c484597fe4246097a1128554256abbac488e0252b08525d6d6be",
+          "use": "guardrail-gate@3",
+          "use_digest": "b8a90ff7a7db371744d925c049b3edff432718568c28e76339f66a42a69b550e",
           "with": {
             "command": "guardrail-check",
             "max_rounds": 3,
@@ -1538,14 +1769,14 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@2",
+              "use": "python-guardrails@3",
               "with": {
                 "workspace_configs": false
               }
             },
             {
               "files": [],
-              "use": "guardrail-gate@2",
+              "use": "guardrail-gate@3",
               "with": {
                 "command": "guardrail-check",
                 "max_rounds": 3,
@@ -1560,14 +1791,14 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@2",
+              "use": "python-guardrails@3",
               "with": {
                 "workspace_configs": true
               }
             },
             {
               "files": [],
-              "use": "guardrail-gate@2",
+              "use": "guardrail-gate@3",
               "with": {
                 "command": "guardrail-check",
                 "max_rounds": 3,
@@ -1610,6 +1841,11 @@
           ],
           "use": "prompt-wrapper@1",
           "with": {}
+        },
+        {
+          "files": [],
+          "use": "continue-on-stall@1",
+          "with": {}
         }
       ]
     },
@@ -1628,8 +1864,23 @@
     ],
     "references": {
       "component": {
-        "guardrail-gate@2": {
-          "digest": "2dd54d588927c484597fe4246097a1128554256abbac488e0252b08525d6d6be",
+        "continue-on-stall@1": {
+          "digest": "facc59c7a6e704cc9d48e7fae0a6b1433e8cdc7b8d8fde28b3431a2ccc82ecf5",
+          "metadata": {
+            "discovery_probe": "continue-on-stall-recorded",
+            "kind": "workflow",
+            "network": {
+              "egress_hosts": []
+            },
+            "secrets": [],
+            "supports": [
+              "codex",
+              "claude-code"
+            ]
+          }
+        },
+        "guardrail-gate@3": {
+          "digest": "b8a90ff7a7db371744d925c049b3edff432718568c28e76339f66a42a69b550e",
           "metadata": {
             "discovery_probe": "guardrail-gate-ran",
             "kind": "workflow",
@@ -1658,8 +1909,8 @@
             ]
           }
         },
-        "python-guardrails@2": {
-          "digest": "8e24b238e4bd6a31c040604b1a9db17ccaf73f2ff4a11d22520af1839335d397",
+        "python-guardrails@3": {
+          "digest": "550d0f0f47c38dbaeb9dce81357cf4ba15cabf075cbb76debbbd682bb1484d37",
           "metadata": {
             "discovery_probe": "python-guardrails-gate-works",
             "kind": "service",
@@ -1756,10 +2007,10 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "e62edf3cfac222bdfa8e4c62d4389e5b8eff115984f3ec31e011be96fbd871c9",
-    "spec_sha256": "ad4b71c180ddc99914ef78e17d4f7099bb2e4297e49d286c8f83a12c14e8d5f2"
+    "source_sha256": "36f6641558e5049aebf01786f588000ec3b43e5ee24f2870c4877b28d00cce7c",
+    "spec_sha256": "c4e725d7a91e9096ae4ca02232b9691e9281c998cc78a9438119fcf48fd1d7f3"
   },
-  "lock_sha256": "28c51440f74abc92f88becaa43049c69a18d58b2be3c79b76d0cc5807e4dae7a",
+  "lock_sha256": "bbefb1c79a7c7a5040c4ca0f766a8421de7cc6213408ba2a285c8362819873e8",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -1767,8 +2018,8 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "8c8ca047149b9df32b1e12cdf46cd383938176977840591e5f4915268bff5f7d",
-    "execution": "28c51440f74abc92f88becaa43049c69a18d58b2be3c79b76d0cc5807e4dae7a",
+    "assessment": "b97e80c8121cfb0b36d3343c1e0e7668615767100c569bdc663ef31e2cfdb3cc",
+    "execution": "bbefb1c79a7c7a5040c4ca0f766a8421de7cc6213408ba2a285c8362819873e8",
     "toolchain": "657a87063f9d6ff78222aec39691aebf3f3288650739261e1702f6640b273471"
   },
   "spec": {
@@ -1825,8 +2076,8 @@
         "correctness@1",
         "code-quality@1",
         "resource-usage@1",
-        "process-compliance@2",
-        "gate-effort@3"
+        "process-compliance@3",
+        "gate-effort@4"
       ]
     },
     "conditions": [
@@ -1834,14 +2085,14 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@2",
+            "use": "python-guardrails@3",
             "with": {
               "workspace_configs": false
             }
           },
           {
             "files": [],
-            "use": "guardrail-gate@2",
+            "use": "guardrail-gate@3",
             "with": {
               "command": "guardrail-check",
               "max_rounds": 3,
@@ -1856,14 +2107,14 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@2",
+            "use": "python-guardrails@3",
             "with": {
               "workspace_configs": true
             }
           },
           {
             "files": [],
-            "use": "guardrail-gate@2",
+            "use": "guardrail-gate@3",
             "with": {
               "command": "guardrail-check",
               "max_rounds": 3,
@@ -1906,6 +2157,11 @@
           "components/shared/starter-framing.md"
         ],
         "use": "prompt-wrapper@1",
+        "with": {}
+      },
+      {
+        "files": [],
+        "use": "continue-on-stall@1",
         "with": {}
       }
     ]

@@ -151,8 +151,9 @@ def test_an_errata_primary_without_errata_still_has_a_primary_effect() -> None:
     assert comparison.primary_raw.metric == SOLVE_RATE
 
 
-def test_the_lock_declared_gate_effort_version_is_read_v2_first() -> None:
-    assert GATE_EFFORT_REFS == ("gate-effort@3", "gate-effort@2", "gate-effort@1")
+def test_the_lock_declared_gate_effort_version_is_read_newest_first() -> None:
+    assert GATE_EFFORT_REFS == ("gate-effort@4", "gate-effort@3", "gate-effort@2", "gate-effort@1")
+    assert gate_effort_ref(["gate-effort@4", "gate-effort@3"]) == "gate-effort@4"
     assert gate_effort_ref(["correctness@1", "gate-effort@1"]) == "gate-effort@1"
     assert gate_effort_ref(["gate-effort@2", "gate-effort@1"]) == "gate-effort@2"
     assert gate_effort_ref(["gate-effort@3", "correctness@1"]) == "gate-effort@3"

@@ -48,7 +48,7 @@ from raidar.spec.references import RefKind, RegistryRef
 from tests.component_support import compile_uses, use, write_jsonl, write_step_reports
 from tests.python_guardrails_support import (
     COMMIT_SCRIPT,
-    NO_CANARY,
+    PACKS,
     VERIFY_DIR,
     commit_gate_script,
     experiment_gate_use,
@@ -649,12 +649,12 @@ def test_every_implemented_rule_has_a_canary_spec_and_no_skill_file_is_vendored(
     modes = [spec["mode"] for spec in specs.values()]
 
     assert set(specs) == implemented_rules(specs)
-    assert sorted(uncovered_pack_entries(specs)) == sorted(NO_CANARY)
+    assert uncovered_pack_entries(specs) == [], "every pack config entry has its own canary"
     without = {rule: spec for rule, spec in specs.items() if rule != "RUFF.SELECT.C901"}
     assert "ruff.toml:lint.select.C901" in uncovered_pack_entries(without)
-    assert len(specs) == 73
+    assert len(specs) == 76
     assert {mode: modes.count(mode) for mode in set(modes)} == {
-        "rule": 70,
+        "rule": 73,
         "unchanged": 1,
         "commit": 1,
         "propagation": 1,
@@ -663,6 +663,7 @@ def test_every_implemented_rule_has_a_canary_spec_and_no_skill_file_is_vendored(
         "canary.py",
         "make_fixtures.py",
         "run_canaries.py",
+        "specs-3.json",
         "specs.json",
     ]
 
@@ -733,7 +734,11 @@ def test_the_canary_runner_passes_only_rules_that_fire_and_pass_as_they_should(
     assert _run_canaries(root, "--rules", "MISSING").returncode == 2
 
 
-def test_the_canary_specs_are_what_the_fixture_generator_writes(tmp_path: Path) -> None:
+@pytest.mark.parametrize("version", sorted(PACKS))
+def test_the_canary_specs_are_what_the_fixture_generator_writes(
+    tmp_path: Path, version: int
+) -> None:
+    pack = PACKS[version]
     lock = tmp_path / "uv.lock"
     lock.write_text('version = 1\nrequires-python = ">=3.12"\n')
     specs = tmp_path / "specs.json"
@@ -745,13 +750,15 @@ def test_the_canary_specs_are_what_the_fixture_generator_writes(tmp_path: Path) 
             str(tmp_path / "fx"),
             str(lock),
             str(specs),
+            *(["--pack", str(version)] if version != 1 else []),
         ],
         check=True,
         timeout=60,
     )
 
-    assert specs.read_text() == (VERIFY_DIR / "specs.json").read_text()
-    assert len(list((tmp_path / "fx").iterdir())) == len(implemented_rules(_specs()))
+    assert specs.read_text() == pack.specs_path.read_text()
+    committed = json.loads(pack.specs_path.read_text())
+    assert len(list((tmp_path / "fx").iterdir())) == len(implemented_rules(committed, pack))
 
 
 def test_the_parity_canary_runs_the_experiments_own_commit_gate() -> None:

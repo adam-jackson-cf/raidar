@@ -150,8 +150,9 @@ help:
 	@echo "  make pack-audit [RUNTIME=python]                      Assert the built agent image has pinned agents, no scorer tools or browsers"
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
-	@echo "  make guardrails-verify                                python-guardrails rule tests: each rule the pack implements (derived from its config and codes; 73) fires on its violating canary and passes"
-	@echo "                                                        its clean one against the installed pack in the pack image, plus a mutant-pack negative"
+	@echo "  make guardrails-verify                                python-guardrails rule tests for each pack (@1, which @2 installs: 76 rules; @3: 83, its tests check"
+	@echo "                                                        included): every rule (derived from the pack's config and codes) fires on its violating canary and"
+	@echo "                                                        passes its clean one against the pack installed in the pack image, plus a mutant-pack negative"
 	@echo "                                                        control (OrbStack, PyPI; not in make quality)"
 	@echo ""
 	@echo "Experiments:"
@@ -175,9 +176,10 @@ help:
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
-	@echo "                                                        (process-compliance@2 is deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1)"
-	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [REGRADE_OUT=report.json]"
-	@echo "                                                        Rerun the verifier over stored step snapshots; fails if results differ"
+	@echo "                                                        (process-compliance@2/@3 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
+	@echo "                                                        with gate-effort@4 it first grades guardrail-gate@3 pre-fix snapshots into STORE: OrbStack)"
+	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [REGRADE_OUT=report.json]"
+	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ"
 	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock;"
 	@echo "                                                        overrides are labelled); benchmarks add a ranking view, smoke reports are stamped not citable"
@@ -509,7 +511,7 @@ experiment-assess:
 
 assess-regrade:
 	$(call require_var,JOB)
-	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
 
 experiment-analyze:
 	$(call require_var,JOBS)

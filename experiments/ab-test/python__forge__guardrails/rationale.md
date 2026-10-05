@@ -1,6 +1,6 @@
 # python__forge__guardrails: rationale and pre-registration
 
-- **Status:** validated and locked (`experiment.lock.json`). Smoke run (`smoke-01`, section 9); **main job not yet run** (`main-01` was aborted, section 9). This file was written before any job of this experiment. Sections 3 to 6 are the pre-registration. Later additions go in sections 9 and 10 and never edit sections 3 to 6. **Section 10 (explore iteration 2, 2026-10-04) amends the design before `main-02`:** r1 gets a shadow gate, the lock is `28c51440f74a`.
+- **Status:** validated and locked (`experiment.lock.json`). Smoke run (`smoke-01`, section 9); **main job not yet run** (`main-01` was aborted, section 9). This file was written before any job of this experiment. Sections 3 to 6 are the pre-registration. Later additions go in sections 9 and 10 and never edit sections 3 to 6. **Section 10 (explore iteration 2, 2026-10-04) amends the design before `main-02`:** r1 gets a shadow gate, the lock is `28c51440f74a`. **Section 12 (explore iteration 3, 2026-10-05) amends it again before any iteration-3 job:** the gate runs the agent's own tests (`python-guardrails@3`), snapshots each fix's starting tree (`guardrail-gate@3`), and both arms share `continue-on-stall@1`; the lock is `bbefb1c79a7c`.
 - **Objective:** explore (AGENTS.md "Objectives"). The process is still being iterated, so the run is small: 4 attempts per arm (user decision, 2026-10-04). Results are exploratory signals, never cited as evidence of an effect.
 - **Question:** on `scb/forge@38d627ecf668`, does a repository that refuses a commit until a mechanical Python guardrail gate passes change correctness and code quality, against the shared framing alone?
 - **Replaces** `python__forge__ruff-lint` and `python__forge__ruff-lint-r2`. Those experiments showed the provisioned Ruff was available but almost never run unprompted (1 of 40 r2 steps). Their definitions were removed on 2026-10-04; their jobs stay on disk under `jobs/`.
@@ -263,3 +263,82 @@ Exploratory. 4 pairs against `min_pairs` 5, so every paired verdict reads `insuf
 ### 11.3 Measurement defect and `gate-effort@3`
 
 At b03 r2 checkpoint 2 the agent changed nothing (an 11 s session ending in a question). The commit gate commits with `--allow-empty`, so the unchanged tree passed and `gate-effort@2` counted the step as first-pass clean (r2 rate 1/32). `gate-effort@3` keeps every `@2` rule and reports `first_pass_clean` as `not_applicable` when a step's production and test files equal the previous snapshot's. The experiment now declares `gate-effort@3`; the relock kept `lock_sha256` `28c51440f74a`. `main-02` was rescored with `@3`, and the replay was identical. The defect affects three steps: b03 r2 checkpoint 2, and b02 r1 checkpoints 2-3 (also no-edit steps). First-pass clean is now 0 in both arms.
+
+## 12. Amendment: explore iteration 3 (2026-10-05, pre-registered before any job under its lock)
+
+Written before the lock of this iteration and before any job under it. `smoke-01`, `smoke-02` and `main-02` stay under their locks and are never pooled with jobs under this one. The objective stays **explore**: 1 trial per arm first, then at most 4 attempts per arm, signals not conclusions. Sections 3 to 6 are unchanged except where this section says it supersedes a statement.
+
+### 12.1 What changed in the design
+
+| | r1-baseline | r2-guardrails |
+|---|---|---|
+| Shared | `prompt-wrapper@1` starter framing **and `continue-on-stall@1`** | same |
+| Pack | **`python-guardrails@3`**, `workspace_configs: false` | **`python-guardrails@3`**, `workspace_configs: true` |
+| Gate | **`guardrail-gate@3`**, `mode: shadow` | **`guardrail-gate@3`**, `mode: commit`, 3 fix rounds, 300 s |
+| Scorers | `process-compliance@3`, `gate-effort@4` (both arms) | same |
+
+- **`python-guardrails@3`: the gate also runs the agent's own tests**, like a real repository's commit check. It is `@1`'s gate, rules, pins (Ruff 0.8.6, mypy 2.3.1) and protected configs byte for byte, plus a `tests` check:
+  - `unittest` loads every test file, always; pytest (9.1.1) runs the files with pytest-style tests (module-level `test_*` functions, non-`TestCase` `Test*` classes, a `pytest` import or a `conftest.py`) with its unittest plugin off, so no test runs twice;
+  - both run under coverage (7.16.2), Python subprocesses included, with the project's interpreter, in a throwaway copy of the workspace: nothing the tests write reaches `/app`, so r1's shadow gate stays invisible;
+  - `TEST.missing` (block): the change touches production Python and no test ran. "Touches" is git's view when the root is a git work tree with a commit (`git diff HEAD` plus untracked Python files); otherwise every production file counts as changed. A step with no Python change and no tests passes the check. This is what forces tests;
+  - `TEST.failed` (block): a test failed or errored, or the run exceeded 180 s;
+  - `TEST.coverage-minimum` (block): owned line coverage below **85%**. The threshold is the original rule catalogue's (`git show f61d81b:orchestrator/tests/fixtures/python_guardrails/enaible-rules.json`, rule `TEST.coverage-minimum`: `threshold_percent: 85`, `owned_slice_required: true`). The owned slice is the workspace's production files; test files are not measured. Evaluated when at least one test ran;
+  - never the hidden verifier's tests (F4): the gate reads only its root, the hidden tests are never in the container during the agent phase, and a root under `/tests` or `/logs/verifier` is a gate error.
+  - `PT009`/`PT027` stay **off** (a decision of this iteration, not the `@2` plan of section 9): unittest is still a first-class runner (discovery always runs), so unittest-style assertions are not a defect. The other `PT` rules stay warn.
+- **Per-trial install** (`raidar.components.provision_v2`): the pack installs once per trial **at environment start** (uploaded payload, root-owned tree, hash-pinned locks; the install also records the gate's version, a smoke as the agent user and a digest of the whole installed tree). Each step's check runs no tool: it verifies the link, ownership, writability, protected configs and the tree digest against the install's. Nothing is materialised per step. A changed tree after step 1 is the integrity flag `protected-tree-modified`.
+- **`guardrail-gate@3`**: `@2`'s loop, modes, prompts and git evidence, plus a snapshot of `/app` before each fix session (the verifier's artifact mechanism and excludes), recorded with its tree digest in the gate record. The snapshots are graded offline beside the step's final snapshot (`make experiment-assess` grades them into the store before scoring). A shadow gate starts no fix session and takes none.
+- **`continue-on-stall@1`** (shared, identical in both arms; the K3 no-stall rule): when a session changes no file in `/app` and its final message asks a question or for clarification or confirmation (fixed patterns: a sentence ending in `?`, "please clarify/confirm", "let me know", "need your input", "before I proceed", "should I", "would you like"...), one continuation session of the same agent starts: no human is available, proceed with the specification and reasonable assumptions, record them in `ASSUMPTIONS.md`. It is a session wrapper, so it runs inside the gate: a stalled work session is continued before the gate runs. Every session's detection is recorded. Nothing in it names a problem.
+- **Factor guard:** the arms still differ only in `condition`; the shared components are identical.
+
+### 12.2 Hypothesis and outcomes (pre-registered)
+
+- **Primary (unchanged):** `solve_rate_errata`, raw `solve_rate` beside it. With at most 4 pairs against `min_pairs` 5, it reads `insufficient` by design.
+- **Hypothesis of this iteration:** enforcing the agent's own tests in the gate prevents fix-round regressions: in r2, fix rounds do not lower the case pass rate the round started from.
+- **Secondary (pre-registered):**
+  - **`gate.fix_round_correctness_delta`** (`gate-effort@4`): per step with a fix round, the final case pass rate minus the pass rate of the tree the first fix session started from; per trial, the mean over such steps. r2 only: r1's shadow gate has no fix round, so it is `not_applicable` and there is no paired comparison. The signal is its sign and size against 0, read beside iteration 2's unexplained negative correctness direction (section 11).
+  - **`process.stall_rate`** (`process-compliance@3`): the share of reached steps in which a session stalled; paired across arms. Expected low in both arms (main-02: 3 no-edit, question-ending steps of 64), with the continuation resolving them (`stall_resolved`).
+  - **Coverage and tests:** `gate.mean_coverage_at_step_end`, `gate.mean_first_run_coverage`, `gate.first_run_tests_pass_rate`, `gate.tests_missing_rate`, `gate.tests_pass_at_step_end_rate` (paired; r1's are what its unconstrained code would have scored).
+  - **Gate effort:** every `gate-effort@3` outcome, now under `gate-effort@4` (`TEST.*` findings count in the `tests` family).
+  - **Cost:** $ per trial, tokens, agent seconds; fix sessions and continuations are billed to their arm.
+- **Manipulation check (unchanged):** `gate_clean_at_step_end`, `min_share` 0.8, decided by r2's share alone.
+- **Expectations (stated before data):** r2's first commit is refused at step 1 for `TEST.missing` in nearly every trial (no forge job so far wrote a test); fix sessions then add tests, and later steps may fail `TEST.failed` or `TEST.coverage-minimum` (forge is a CLI; tests that run it as a subprocess are measured). r2's cost per trial rises above iteration 2's ($0.072). r1's shadow `tests_missing_rate` is expected near 1.0. The sign of `fix_round_correctness_delta` is not predicted.
+
+### 12.3 Rule verification (`make guardrails-verify`)
+
+`make guardrails-verify` now proves both payloads in the pack image, each with its own install script: `python-guardrails@1` (the payload `@1` and `@2` install) and `@3`. The three config entries that had no canary now have one in both: `lint.per-file-ignores` (`RUFF.LINT.per-file-ignores`), `explicit_package_bases` and `disable_error_code` (`MYPY.*`); no pack config entry is uncovered. `@3` adds seven tests-check canaries: `TEST.missing`, `TEST.no-change-exempt`, `TEST.failed`, `TEST.pytest-runner`, `TEST.coverage-minimum`, `TEST.subprocess-coverage` and `TEST.isolated-run` (the test run writes nothing to the workspace). The negative control adds a mutant with the coverage minimum at 0 for `@3`. Results are recorded in 12.5.
+
+### 12.4 Running iteration 3
+
+```sh
+make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
+# Process check first: 1 trial per arm (attempt 0), detached.
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  ATTEMPT=0 CONCURRENCY=2 JOB_ID=smoke-03 DETACH=1
+make experiment-status JOB=jobs/python__forge__guardrails/smoke-03   # poll until state: finished
+# Grades the pre-fix snapshots into the store, then scores.
+make experiment-assess JOB=jobs/python__forge__guardrails/smoke-03 STORE=stores/python__forge__guardrails \
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@3 gate-effort@4"
+# Then, if the process is clean: main-03 with at most 4 attempts per arm, detached.
+```
+
+### 12.5 Verification before any job (recorded at lock time)
+
+Lock `bbefb1c79a7c` (earlier locks of this iteration, `81186f03517f`, `e061cd8ff363`, `4257867a05bd` and `6a15e04580e6`, were replaced before any real-LLM job: behaviour-preserving refactors of the tests check for the complexity gate, and two fixes found by `make quality`: the tests check consults git only when the workspace is the top of its own work tree, never a folder of an outer repository, and its coverage steps ignore a caller's own `COVERAGE_*`/`COV_CORE_*` settings). No real-LLM job has run under it.
+
+- **Rule tests** (`make guardrails-verify`, OrbStack, 2026-10-05): `python-guardrails@1` 76 of 76 rules proven (73 plus the three new config canaries); `@3` 83 of 83 (76 plus the seven tests-check canaries); each pack's mutant fails exactly its disabled rules (`@3`'s includes the coverage minimum set to 0).
+- **Real two-step trials, no LLM** (`tests/test_guardrails_v3_trial.py`, pack image on OrbStack): r2's condition refused step 1 for `TEST.missing`, then for `TEST.coverage-minimum` (75%), then passed (two pre-fix snapshots, digests matching the trees); step 2's work session stalled on a question, was continued, and the gate then passed first time, with both sessions billed. r1's condition ran the agent's tests in the shadow gate without writing `/app` and continued its stalled step.
+- **`per_step_reset`** (no-LLM `nop` jobs of this experiment, attempt 0, both arms, concurrency 2, OrbStack; jobs under `.tmp/perf-jobs/`):
+
+| Job | Lock | `per_step_reset` p95 (n=16) | Step 1 | Steps 2-8 | `environment_start` |
+|---|---|---|---|---|---|
+| `perf-before-nop` | `28c51440f74a` (`python-guardrails@2`) | **7.32 s (fail)** | 7.14, 7.84 s | 2.22-2.46 s | 3.7-3.8 s |
+| `perf-after-nop` | `81186f03517f` (`python-guardrails@3`) | **1.44 s (pass)** | 1.13, 1.00 s | 1.11-1.45 s | 10.9-11.5 s |
+
+The install now runs at environment start (budget 20 s) and no tool runs per step, so every step is inside the 2 s budget, including step 1. The pack's probe passed at all 16 steps of both jobs with no integrity flag (the `nop` agent runs no wrapper, so the prompt-wrapper, gate and stall probes fail by construction in both jobs). `main-02`'s real-LLM `per_step_reset` was p95 5.04 s (step 1 about 5 s, steps 2-8 about 2.2 s).
+
+### 12.6 Known limits of iteration 3
+
+- **r1's shadow repository has no commit.** It is fresh at each step, so the tests check's "no Python change since the last commit" exemption never applies in r1; a no-edit r1 step without tests reads `TEST.missing`. `gate-effort@4` reports the first-run tests outcomes of a no-edit step as `not_applicable` (as `first_pass_clean`), so the pairing is unaffected.
+- **`fix_round_correctness_delta` describes r2 only** (a shadow gate has no fix round). It uses the tree the first fix session started from; later rounds' snapshots are recorded but not scored.
+- **The test run's interpreter** is the project's (`.venv/bin/python`, else `python3`); the gate's pytest and coverage are appended to its `PYTHONPATH`, after the project's own packages. Subprocess coverage relies on a start-up hook on that path; a test that clears the environment of its subprocess is not measured there.
+- **Stall detection is pattern-based and needs no file change.** A stall that edits a scratch file, or asks without a recognised pattern, is not continued; a no-edit session that ends with a question it does not need answered is continued once. Both are recorded.

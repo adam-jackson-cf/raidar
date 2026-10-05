@@ -33,6 +33,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE_USAGE
 from raidar.scorers.gate_effort.families import FAMILIES
 from raidar.scorers.gate_effort.manifest import GATE_EFFORT
+from raidar.scorers.gate_effort_v4.scorer import GATE_EFFORT_V4
+from raidar.scorers.process_checks_v3.scorer import PROCESS_COMPLIANCE_V3
 from raidar.scorers.sdk.manifest import Direction, ScorerManifest
 
 OK = "ok"
@@ -105,6 +107,7 @@ class View(StrEnum):
     STRICT = "strict"
     QUALITY = "quality"
     GATE = "gate"
+    PROCESS = "process"
 
 
 class Kind(StrEnum):
@@ -225,7 +228,7 @@ OUTCOME_METRICS: tuple[MetricDef, ...] = (
 )
 
 GATE_PREFIX = "gate."
-"""Gate-effort outcomes are ``gate.<gate-effort@1 trajectory metric>``."""
+"""Gate-effort outcomes are ``gate.<gate-effort trajectory metric>``."""
 _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
     ("first_pass_clean_rate", "first-pass clean rate (decided steps)", 0.1),
     ("clean_at_step_end_rate", "clean at step end rate (decided steps)", 0.1),
@@ -248,19 +251,57 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
     ("total_fix_cost_usd", "fix-session cost per trial (USD)", 0.01),
     ("total_fix_wall_s", "fix-session wall time per trial (s)", 60.0),
     ("total_gate_wall_s", "gate-run wall time per trial (s)", 5.0),
+    # gate-effort@4: the gate's tests check and the fix rounds' correctness.
+    ("first_run_tests_pass_rate", "first-run tests check pass rate (decided steps)", 0.1),
+    ("tests_missing_rate", "first runs refused for missing tests (decided steps)", 0.1),
+    ("tests_pass_at_step_end_rate", "tests check passed at step end (decided steps)", 0.1),
+    ("mean_first_run_coverage", "owned line coverage of the first run (percent)", 5.0),
+    ("mean_coverage_at_step_end", "owned line coverage at step end (percent)", 5.0),
+    (
+        "fix_round_correctness_delta",
+        "fix-round correctness delta: final minus pre-fix case pass rate",
+        0.05,
+    ),
 )
 GATE_METRICS: tuple[MetricDef, ...] = tuple(
     MetricDef(
         f"{GATE_PREFIX}{metric}",
         f"Gate effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT, metric),
+        declared_direction(GATE_EFFORT_V4, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
 )
-"""Gate-effort outcomes (``gate-effort@1``): compared only when the lock declares that scorer."""
-ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS)
+"""Gate-effort outcomes: compared only when the lock declares a gate-effort scorer."""
+_GATE_V4_ONLY = frozenset(
+    f"{GATE_PREFIX}{metric.id}"
+    for metric in GATE_EFFORT_V4.metrics
+    if metric.id not in {m.id for m in GATE_EFFORT.metrics}
+)
+
+
+def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
+    """The gate outcomes a gate-effort version reports (``@4`` adds the tests check)."""
+    if ref == "gate-effort@4":
+        return GATE_METRICS
+    return tuple(metric for metric in GATE_METRICS if metric.id not in _GATE_V4_ONLY)
+
+
+PROCESS_PREFIX = "process."
+"""Process outcomes are ``process.<process-compliance@3 trajectory metric>``."""
+PROCESS_METRICS: tuple[MetricDef, ...] = (
+    MetricDef(
+        f"{PROCESS_PREFIX}stall_rate",
+        "Process: stall rate (steps in which a session stopped to ask, changing nothing)",
+        View.PROCESS,
+        declared_direction(PROCESS_COMPLIANCE_V3, "stall_rate"),
+        0.1,
+    ),
+)
+"""Process outcomes (``process-compliance@3``): compared only when the lock declares it."""
+PROCESS_OUTCOME_SCORER = "process-compliance@3"
+ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_METRICS)
 
 TOTAL_COST = "total_cost_usd"
 COST_METRICS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")

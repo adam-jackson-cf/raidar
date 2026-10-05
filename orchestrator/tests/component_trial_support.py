@@ -32,7 +32,7 @@ from harbor.models.trial.config import (
 )
 
 from raidar.components import CompiledCondition
-from raidar.components.provision import Provision, install_provisioning
+from raidar.components.provision_v2 import AnyProvision, install_trial_provisioning
 from raidar.execution.cleanup import cleanup_trial_projects
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.packs.python import bind_task_environment, image_tag, load_pack_spec
@@ -126,7 +126,7 @@ async def run_trial(
     agent: AgentConfig,
     *,
     trial_name: str,
-    provisions: Sequence[Provision] = (),
+    provisions: Sequence[AnyProvision] = (),
 ) -> Path:
     """Run one trial in its own Compose project and always remove that project.
 
@@ -156,7 +156,7 @@ async def run_trial(
     )
     try:
         trial = await Trial.create(config)
-        install_provisioning(trial, provisions)
+        install_trial_provisioning(trial, provisions)
         await trial.run()
     finally:
         cleanup_trial_projects(trials_dir.parent)
@@ -168,7 +168,7 @@ def run_trial_sync(
     trials_dir: Path,
     agent: AgentConfig,
     name: str,
-    provisions: Sequence[Provision] = (),
+    provisions: Sequence[AnyProvision] = (),
 ) -> Path:
     return asyncio.run(
         run_trial(task_dir, trials_dir, agent, trial_name=name, provisions=provisions)
