@@ -1332,9 +1332,9 @@ Exploratory signals only. With 4 pairs against `min_pairs` 5, every verdict read
 
 Run iteration 3 small: 1 trial of each changed arm first, then at most 4 attempts per arm.
 
-### 15.8 Explore iteration 3: implemented and locked, not yet run (2026-10-05)
+### 15.8 Explore iteration 3: implemented and locked (2026-10-05)
 
-Full record: `rationale.md` §12 (pre-registration, verification, limits). Lock `bbefb1c79a7c`; no real-LLM job has run under it.
+*(Historical: the process check `smoke-03` ran on 2026-10-05/06; results and the iteration 3b design in §16.)* Full record: `rationale.md` §12 (pre-registration, verification, limits). Lock `bbefb1c79a7c`; at the time this subsection was written no real-LLM job had run under it.
 
 - **The gate runs the agent's own tests** (`python-guardrails@3`): `unittest` always, pytest for pytest-style tests, under coverage, in a throwaway copy of the workspace. `TEST.missing` (a Python change with no test that ran), `TEST.failed` and `TEST.coverage-minimum` at 85% (the original catalogue's threshold, `f61d81b`) block. pytest 9.1.1 and coverage 7.16.2 are hash-pinned beside Ruff and mypy, outside the agent image.
 - **Install once per trial at environment start** (§15.7 item 5): `per_step_reset` p95 7.32 s → 1.44 s on `nop` jobs of this experiment (budget 2 s); `environment_start` 3.8 s → 11.5 s (budget 20 s). The tool tree is digest-checked at every step.
@@ -1342,3 +1342,66 @@ Full record: `rationale.md` §12 (pre-registration, verification, limits). Lock 
 - **No-stall rule (K3)**: `continue-on-stall@1`, shared by both arms, continues once a session that changed nothing and ended asking; `process-compliance@3` reports `stall_rate`.
 - **Canaries**: the three config entries without one (§15.7) now have one; `make guardrails-verify` proves `@1` (76 rules) and `@3` (83) in the pack image.
 - **Not done in this iteration** (§15.7 items 2 and 3): the r3 "configs visible, shadow gate" arm and distinct-code counts per step.
+
+## 16. Explore iteration 3: `smoke-03` and the iteration 3b design (2026-10-06)
+
+Exploratory signals only; no main job ran under the iteration-3 lock. Full record: `experiments/ab-test/python__forge__guardrails/rationale.md` §12 (pre-registration, verification, limits), §12.7 (the process check below) and §13 (the 3b pre-registration). Commits: `634b33e` (iteration 3 code, lock `bbefb1c79a7c`), `c7cd7db` (iteration 3b design, lock `8d8ad43b53d8`).
+
+### 16.1 What iteration 3 changed (§15.8)
+
+- **`python-guardrails@3`: the gate runs the agent's own tests.** `TEST.missing`, `TEST.failed` and `TEST.coverage-minimum` (85% owned line coverage, the original catalogue's threshold) block. pytest 9.1.1 and coverage 7.16.2 are hash-pinned in the root-owned tool venv, outside the agent image. The hidden verifier's tests are never read (a root under `/tests` or `/logs/verifier` is a gate error).
+- **Install once per trial, at environment start.** `per_step_reset` p95 7.32 s → 1.44 s on `nop` jobs; `environment_start` 3.8 s → 8.4-11.5 s (budget 20 s). Part of the gain is re-accounting: per-trial overhead fell from about 27 s to about 21 s.
+- **`guardrail-gate@3`** snapshots `/app` before each fix session; `make experiment-assess` grades the snapshots offline; `gate-effort@4` reports `fix_round_correctness_delta`.
+- **`continue-on-stall@1`** (shared by both arms, K3): a no-edit session ending in a question gets one continuation; `process-compliance@3` reports `stall_rate`.
+
+### 16.2 `smoke-03` and `smoke-03-r2` (process check, 1 trial per arm)
+
+`smoke-03` ran both arms (attempt 0) 30 s after rationale §12 was committed; `smoke-03-r2` reran r2 alone after `smoke-03` r2 failed. Assessed into the scratch store `.tmp/stores/smoke-03`; analysis in `.tmp/analysis/smoke-03/analysis.md`.
+
+| Trial | Valid | Result |
+|---|---|---|
+| `smoke-03` r1 | yes | solved cp1-2 (`solve_rate` 0.25); case pass rate 1.0, 1.0, 0.94, 0.96, 0.96, 0.89, 0.88, 0.85; $0.041 |
+| `smoke-03` r2 | **no** | `ApiOverloadedError` at cp1, cp4 and cp6; cp1's failure left `/app` empty; about $0.031 (not in the store: a failed session reported no usage, so `total_cost_usd` is null) |
+| `smoke-03-r2` r2 | **no** | `ApiOverloadedError` at cp4 only; the other 7 steps exercised every iteration-3 mechanism; $0.130 (fix sessions 64%) |
+
+Across the three trials: 0 gate errors, 0 timeouts (longest step 382 s of 1800 s), 0 probe failures, 0 unparseable records, no orphaned containers. **`main-03` was blocked and never started.**
+
+**Signals (`smoke-03-r2` r2, 7 gated steps; the trial is invalid, so these describe the mechanism, not an arm):**
+- The tests check refused every first commit: `TEST.missing` at cp1, `TEST.coverage-minimum` at 72.7-76.7% at cp2, cp3 and cp5-8, `TEST.failed` at cp3 (1 of 10) and cp7 (10 of 18). Every refusal was clean after exactly 1 fix round; coverage at step end 87.6-92.1%; tests grew from 7 to 22 (all pytest-style).
+- `gate-effort@4`: `mean_first_run_coverage` 74.1, `mean_coverage_at_step_end` 90.3, `tests_missing_rate` 0.14, `tests_pass_at_step_end_rate` 1.0.
+- **Pre-fix vs final case pass rate** (7 snapshots, all graded, every digest matching its grade):
+
+| Step | cp1 | cp2 | cp3 | cp5 | cp6 | cp7 | cp8 |
+|---|---|---|---|---|---|---|---|
+| Δ (final − pre-fix) | 0 | 0 | −0.010 | 0 | +0.005 | +0.020 | −0.027 |
+
+  `fix_round_correctness_delta` −0.0018 (recomputed by hand from the grades: matches). In this one trial, fix rounds neither clearly helped nor hurt correctness; it does not yet explain iteration 2's negative direction.
+- r1's shadow gate: all 8 steps would have been refused, `TEST.missing` at every step (`tests_missing_rate` 1.0, as pre-registered); 14 blocking findings at cp1; the shadow test runs never wrote to `/app`.
+- The agent never reached the gate's tools: the r2 agent reported "pytest is not installed" at cp3 and cp6-8. The tool venv is world-readable, but no session invoked it.
+- `per_step_reset` 1.0-1.84 s per step; one breach (2.17 s, `smoke-03-r2` cp8). Integrity flags: only `suppression-refused` at `smoke-03-r2` cp8.
+
+### 16.3 Process defects found
+
+1. **Provider-capacity voids.** "Selected model is at capacity" (Harbor's `ApiOverloadedError`) hit 4 of 16 r2 steps and 0 of 8 r1 steps. Raidar classified each correctly as an infrastructure failure (`agent_infra` validity check fails, trial excluded), but nothing retried the session, so one 6-second drop voided a whole trial. r2 runs about twice as many sessions per step (work plus fix sessions), so exclusions would fall mostly on r2 and `main-03` would probably exceed `max_exclusion_fraction` 0.2.
+2. **Symlink scope hole (C1).** In `smoke-03` r2 the agent wrote the CLI as an extensionless `/app/forge` (`#!/usr/bin/env python3`) with `/app/forge.py` a symlink to it. The gate's scope (byte-identical in `@1` and `@3`) counts only regular `*.py` files and skips symlinks, so every gate run of that trial checked **0 files**: no finding, no test required, every commit passed, and `gate-effort@4` counted those steps first-pass clean. A re-scan of `smoke-01`, `smoke-02`, `main-02`, `smoke-03` r1 and `smoke-03-r2` found no other extensionless script or `.py` symlink, so earlier data is unaffected.
+3. **Stall-detector miss (K3).** `smoke-03` r2 cp2 and cp3 were no-edit sessions that ended in a refusal, not a question ("I can't build a compatible `forge` CLI without that context"; "I can't implement blueprint lookup and allocation persistence without making those choices up"). `@1`'s patterns matched neither, so neither was continued. Likely triggered by the empty `/app` after cp1's failure, but the pattern gap is real.
+4. **Unequal stall exposure.** `continue-on-stall@1` wraps every session the gate starts, so it continues at most once per *session*, not per step: an r2 step had up to 4 chances (work plus 3 fix sessions) against r1's 1. 0 stalls occurred in any trial, so no data is affected, but paired `stall_rate` was not equal-exposure.
+5. **Cosmetic (C2).** `gate-effort@4`'s evidence text labelled `TEST.*` findings "other"; stored values were correct.
+
+### 16.4 Iteration 3b (pre-registered, lock `8d8ad43b53d8`, rationale §13)
+
+Each defect is fixed as a new version; released versions are untouched.
+
+| Defect | Fix |
+|---|---|
+| 1. Capacity voids | **`transient-retry@1`** (shared, innermost session wrapper): reruns a session that raised a transient provider error after 60 s, then 180 s, at most twice; every attempt's logs, error and usage recorded and billed to the arm |
+| 2. Scope hole | **`python-guardrails@4`**: also scopes extensionless `#!...python` files and in-workspace targets of `*.py` symlinks (once, at the target); canaries `SCOPE.shebang-script` and `SCOPE.py-symlink`; the `smoke-03` layout now yields 1 checked file, `F401` and `TEST.missing` |
+| 3. Refusal miss | **`continue-on-stall@2`**: problem-agnostic refusal patterns beside the question patterns; both `smoke-03` messages match |
+| 4. Exposure | **`continue-on-stall@2`**: only a step's first session is eligible (at most one continuation per step in every arm); later sessions recorded as `would_stall` |
+| 5. Evidence text | **`gate-effort@5`** |
+
+Verified before any job: `make guardrails-verify` `@1` 76/76, `@3` 83/83, `@4` 85/85; a no-LLM two-step trial (`tests/test_guardrails_v4_trial.py`) recovers a retried `ApiOverloadedError`, checks the `smoke-03` layout, records but does not continue a fix-session stall and continues a step-2 refusal; `make quality` passed.
+
+**Pre-registered `smoke-04` criteria (§13.3):** both trials valid; every probe passes; r2's gate checks a non-zero file count at every step with Python files; no step lost to an unrecovered transient error; no step with more than one continuation. Only then `main-03` (at most 4 attempts per arm).
+
+**State at the time of writing:** `jobs/python__forge__guardrails/smoke-04` exists under lock `8d8ad43b53d8` and reports `finished` (2026-10-06 02:21 UTC, 2 of 2 trials valid, both solved cp1-2). It has not been assessed or checked against §13.3 here; its outcome belongs in rationale §13 and a later section of this packet. `main-03` has not run.

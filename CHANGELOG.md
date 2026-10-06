@@ -14,6 +14,7 @@ All notable changes to this project are documented in this file.
 ### Changed
 
 - `python__forge__guardrails` (explore iteration 3b, `rationale.md` §13, lock `8d8ad43b53d8`): both arms use `python-guardrails@4` and share `continue-on-stall@2` and `transient-retry@1`; scorer `gate-effort@5`. `rationale.md` §12.7 records the `smoke-03`/`smoke-03-r2` process check (no valid r2 trial; the C1 scope hole; per-session stall exposure; missed refusals).
+- `docs/reboot/gate-packet.md` §16: explore iteration 3 write-up (the iteration 3 changes, `smoke-03`/`smoke-03-r2` signals including the provider-capacity voids, the stall-detector miss, unequal stall exposure and the symlink scope hole, and the iteration 3b design); §15.8 now points to it.
 
 ### Removed
 
