@@ -6,16 +6,25 @@
 # (no-edit refusals stall too; one continuation per step, for its first session only) and
 # transient-retry@1 (a session the provider drops is retried, at most twice), both shared;
 # scorer gate-effort@5 (@4 with v4-family evidence text).
-# r2 gets python-guardrails@4 (the @1 rule set and pins byte for byte, plus the tests check:
+# Iteration 3b.2 (rationale.md section 14, after smoke-04): python-guardrails@5 (@4 with the
+# pack's pinned pytest, coverage, ruff and mypy on the agent's PATH, in both arms),
+# process-compliance@4 (a test command counts only when it ran; the pack's gate command counts
+# as a test run through scorer_config) and gate-effort@6 (a failed tests check counted once;
+# blocking counts comparable across gate modes; the no-untyped-call cascade apart; failing
+# tests and missed coverage split). The analysis tables now name each metric's better direction.
+# The verifier's per-test coverage pass moves off the trial's critical path
+# (protocol.verifier_coverage: offline; scorer code-quality@2 reads the offline run).
+# r2 gets python-guardrails@5 (the @1 rule set and pins byte for byte, plus the tests check:
 # unittest always, pytest for pytest-style tests, both under coverage; a Python change with no
 # test that ran is refused, so are failing tests and owned line coverage below 85%), installed
 # once per trial at environment start (root-owned under /opt/raidar-tools/python-guardrails,
 # hash-pinned pytest 9.1.1 and coverage 7.16.2 beside Ruff and mypy; nothing in the agent
-# image), with ruff.toml and mypy.ini copies in /app, and guardrail-gate@3 in commit mode (as
-# @2, plus a snapshot of /app before each fix session, graded offline beside the step's final
-# snapshot). r1 gets the same pack without the workspace copies and the same gate in shadow
-# mode (recorded at each step's end outside /app, never enforced; its test run happens in a
-# throwaway copy, so nothing reaches /app).
+# image; the pack's pytest, coverage, ruff and mypy are linked on the agent's PATH, as a
+# repository's dev environment would provide them), with ruff.toml and mypy.ini copies in /app,
+# and guardrail-gate@3 in commit mode (as @2, plus a snapshot of /app before each fix session,
+# graded offline beside the step's final snapshot). r1 gets the same pack without the
+# workspace copies and the same gate in shadow mode (recorded at each step's end outside /app,
+# never enforced; its test run happens in a throwaway copy, so nothing reaches /app).
 # Both arms share the starter framing, continue-on-stall@2 (a step whose first session changes
 # nothing and ends asking a question or saying it cannot proceed without more information gets
 # one continuation: no human is available; proceed on the spec and reasonable assumptions
@@ -23,11 +32,11 @@
 # No rules text tells the agent about the gate in advance (the mechanical rung only).
 # Objective: explore (smallest runs: 1 trial per arm first, then at most 4 attempts per arm).
 # Verdicts below min_pairs read insufficient by design.
-# Pre-registration: rationale.md beside this file. Section 13 (iteration 3b) amends section 12,
-# which pre-registers the
-# hypothesis (enforcing the agent's own tests prevents fix-round regressions) and the secondary
-# outcomes (gate.fix_round_correctness_delta, process.stall_rate, coverage, gate effort); the
-# primary stays solve_rate_errata with raw solve_rate beside it.
+# Pre-registration: rationale.md beside this file. Section 14 (iteration 3b.2) amends section 13,
+# which amends section 12, which pre-registers the hypothesis (enforcing the agent's own tests
+# prevents fix-round regressions) and the secondary outcomes (gate.fix_round_correctness_delta,
+# process.stall_rate, coverage, gate effort); the primary stays solve_rate_errata with raw
+# solve_rate beside it.
 # Validate: make experiment-validate EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
 # Lock:     make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml
 schema_version: 2
@@ -59,6 +68,11 @@ protocol:
   agent_timeout_sec: 1800
   verifier_timeout_sec: 900
   snapshot_source: artifact
+  # Iteration 3b.2 (user decision 2026-10-06; rationale.md section 14): the verifier's per-test
+  # coverage pass (G's evidence; about 1077 s of each smoke-04 trial) runs offline at
+  # assessment from the stored step snapshots, not after every step. The verdict run is
+  # unchanged; code-quality@2 reads the offline run.
+  verifier_coverage: offline
 
 factors: [condition]
 
@@ -80,7 +94,7 @@ conditions:
       # workspace: the agent sees no ruff.toml or mypy.ini. Its probe proves at every step the
       # pinned tools, the install-time smoke and an unchanged tool tree, and at step 1 that no
       # config copy is in /app.
-      - use: python-guardrails@4
+      - use: python-guardrails@5
         with:
           workspace_configs: false
       # The same commit check in shadow mode: run once at each step's end against a git
@@ -100,7 +114,7 @@ conditions:
       # the pinned versions, the install-time smoke (a clean file with its test passes, an
       # unused import is refused) and an unchanged tool tree; its integrity flags record
       # config-copy edits, tree changes and hook-bypass attempts without failing the step.
-      - use: python-guardrails@4
+      - use: python-guardrails@5
         with:
           workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
@@ -129,7 +143,18 @@ assessment:
   # store first); process-compliance@3 is @2 plus stall_rate (continue-on-stall@1 records).
   # Iteration 3b: gate-effort@5 is @4 with the gate runs' evidence summaries counting TEST.*
   # findings in the tests family (values unchanged).
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@3, gate-effort@5]
+  # Iteration 3b.2: process-compliance@4 is @3 counting a test command only when its output does
+  # not say its runner was not found, plus test_commands_not_run; the pack's gate runs the
+  # project's tests, so it counts as a test run (the same pattern in both arms).
+  # gate-effort@6 is @5 with a failed tests check counted once, step-end/new/final blocking
+  # counts, the MYPY.no-untyped-call cascade apart and the first-run tests outcomes split.
+  # code-quality@2 is @1 whose G reads the offline coverage run (protocol.verifier_coverage:
+  # offline) that make experiment-assess makes into the store first.
+  scorers: [correctness@1, code-quality@2, resource-usage@1, process-compliance@4, gate-effort@6]
+  scorer_config:
+    process-compliance@4:
+      extra_test_patterns:
+        - 'guardrail-check(?![\w.-])(?!\s+--(?:version|help)\b)'
   metric: scb-canonical@2
 
 analysis:

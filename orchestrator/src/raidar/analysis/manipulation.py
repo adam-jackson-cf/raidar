@@ -68,8 +68,14 @@ DEFAULT_CHECKS = (TESTS_RUN_BEFORE_FINISH, PLAN_WRITTEN)
 EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
-PROCESS_COMPLIANCE_REFS = ("process-compliance@3", "process-compliance@2", "process-compliance@1")
+PROCESS_COMPLIANCE_REFS = (
+    "process-compliance@4",
+    "process-compliance@3",
+    "process-compliance@2",
+    "process-compliance@1",
+)
 GATE_EFFORT_REFS = (
+    "gate-effort@6",
     "gate-effort@5",
     "gate-effort@4",
     "gate-effort@3",

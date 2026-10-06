@@ -74,6 +74,7 @@ component = "raidar.components.registry:component_resolver"
 "python-guardrails@4" = "raidar.components.builtins.guardrails_v4:PYTHON_GUARDRAILS_V4"
 "continue-on-stall@2" = "raidar.components.builtins.stall_v2:CONTINUE_ON_STALL_V2"
 "transient-retry@1" = "raidar.components.builtins.retry:TRANSIENT_RETRY"
+"python-guardrails@5" = "raidar.components.builtins.guardrails_v5:PYTHON_GUARDRAILS_V5"
 
 [build-system]
 requires = ["hatchling"]

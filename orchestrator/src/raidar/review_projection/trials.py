@@ -24,13 +24,13 @@ from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review_projection.assessments import TrialAssessments
 from raidar.review_projection.atif import project_trajectory
 from raidar.review_projection.gates import GateContext, failed_gates, project_gates
-from raidar.review_projection.headline import CORRECTNESS_SCORER, QUALITY_SCORER, Headline
+from raidar.review_projection.headline import CORRECTNESS_SCORER, QUALITY_SCORERS, Headline
 from raidar.review_projection.notes import Finding, finding_counts, to_annotations
 from raidar.review_projection.scoring import ScoringContext, project_scoring
 from raidar.review_projection.spans import SpanBuilder, repo_path, to_ms
 from raidar.schemas.review import ReviewRunDetail, ReviewRunRecord, ReviewStatus
 
-_POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, QUALITY_SCORER})
+_POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, *QUALITY_SCORERS})
 
 
 @dataclass(frozen=True)

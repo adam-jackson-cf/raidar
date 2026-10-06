@@ -19,9 +19,18 @@ from __future__ import annotations
 
 import math
 from pathlib import PurePosixPath
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, JsonValue, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    JsonValue,
+    SerializerFunctionWrapHandler,
+    model_serializer,
+    model_validator,
+)
 
 from raidar.agents.config import AgentName, Harness, agent_cli
 from raidar.spec.references import REFERENCE_PATTERN
@@ -125,6 +134,19 @@ class ProtocolSpec(SpecModel):
     verifier_timeout_sec: int = Field(default=900, gt=0)
     # Overhead-baseline decision: grade Harbor's host copy of /app by default.
     snapshot_source: Literal["artifact", "download"] = "artifact"
+    # Where the verifier's per-test coverage pass (G's evidence) runs: ``trial`` after each
+    # step's grading run, on the trial's critical path; ``offline`` from the stored step
+    # snapshots when an assessment needs it (raidar.verifier.coverage_offline, read by
+    # code-quality@2). Left at ``trial`` it is omitted from every dump, so the locks, plans
+    # and hashes of experiments that do not set it keep their bytes.
+    verifier_coverage: Literal["trial", "offline"] = "trial"
+
+    @model_serializer(mode="wrap")
+    def _omit_default_coverage(self, handler: SerializerFunctionWrapHandler) -> Any:
+        data = handler(self)
+        if isinstance(data, dict) and self.verifier_coverage == "trial":
+            data.pop("verifier_coverage", None)
+        return data
 
     @model_validator(mode="after")
     def _halt_needs_threshold(self) -> ProtocolSpec:

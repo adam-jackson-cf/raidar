@@ -12,7 +12,9 @@
   guardrails-verify``), where the lock canary's ``uv.lock`` is made by the uv
   the gate runs.
 - ``PACKS``: the packs under verification: python-guardrails@1 (the payload of
-  @1 and @2, ``specs.json``), @3 (``specs-3.json``) and @4 (``specs-4.json``).
+  @1 and @2, ``specs.json``), @3 (``specs-3.json``), @4 (``specs-4.json``) and
+  @5 (@4's rules byte for byte, so ``specs-4.json``; its install adds the
+  agent's tool links and their smokes).
 """
 
 from __future__ import annotations
@@ -26,7 +28,7 @@ from typing import Any
 
 import yaml
 
-from raidar.components.builtins import guardrails, guardrails_v3, guardrails_v4
+from raidar.components.builtins import guardrails, guardrails_v3, guardrails_v4, guardrails_v5
 from raidar.components.gate_run_v2 import GateModeV2, gate_script
 from raidar.components.guardrail_gate_v3 import GuardrailGateOptionsV3
 from raidar.components.session_chain import InnerAgentSpec
@@ -99,7 +101,16 @@ PACKS = {
         "specs-4.json",
         NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR,
     ),
+    5: PackUnderTest(
+        5,
+        guardrails_v5.PAYLOAD_DIR,
+        guardrails_v5.PAYLOAD_FILES,
+        "specs-4.json",
+        NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR,
+    ),
 }
+CANARY_PACK = {5: 4}
+"""The fixture generator's ``--pack`` for a pack whose rules are another's byte for byte."""
 PACK_1 = PACKS[1]
 
 

@@ -123,7 +123,7 @@ def test_two_gated_arms_get_paired_gate_effects_with_verdicts() -> None:
     first_pass = effects[FIRST_PASS]
     assert (first_pass.n_pairs, first_pass.verdict.value) == (5, "improved")
     assert effects[UNRESOLVED].verdict.value == "worse"
-    assert "| gate.first_pass_clean_rate | gate |" in render_markdown(report)
+    assert "| gate.first_pass_clean_rate | ↑ higher | gate |" in render_markdown(report)
 
 
 def test_without_gate_effort_declared_the_report_has_no_gate_section() -> None:

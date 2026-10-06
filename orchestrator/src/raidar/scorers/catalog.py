@@ -293,8 +293,8 @@ class ScorerRegistry:
             ) from exc
 
 
-# ``process-compliance@2``/``@3`` and ``gate-effort@1``-``@5`` keep their manifests beside their
-# implementations so the released scorers' digests (which cover
+# ``code-quality@2``, ``process-compliance@2``-``@4`` and ``gate-effort@1``-``@6`` keep their
+# manifests beside their implementations so the released scorers' digests (which cover
 # ``builtin_manifests``) stay unchanged.
 REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, *VERSIONED_MANIFESTS)
 
@@ -312,6 +312,9 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "gate-effort@4": "raidar.scorers.gate_effort_v4:gate_effort_v4_scorer",
     "gate-effort@5": "raidar.scorers.gate_effort_v5:gate_effort_v5_scorer",
     "process-compliance@3": "raidar.scorers.process_checks_v3:process_compliance_v3_scorer",
+    "gate-effort@6": "raidar.scorers.gate_effort_v6:gate_effort_v6_scorer",
+    "process-compliance@4": "raidar.scorers.process_checks_v4:process_compliance_v4_scorer",
+    "code-quality@2": "raidar.scorers.code_quality_v2:code_quality_v2_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
 # that store-bound runtime decides under: the dormant process-compliance@1 (Jev
@@ -326,10 +329,16 @@ BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
     # which ``raidar assess --rescore`` writes to the store (raidar.verifier.prefix_grade).
     "gate-effort@4": ("raidar.scorers.gate_effort_v4:gate_effort_v4_scorer_for_store", ()),
     "gate-effort@5": ("raidar.scorers.gate_effort_v5:gate_effort_v5_scorer_for_store", ()),
+    "gate-effort@6": ("raidar.scorers.gate_effort_v6:gate_effort_v6_scorer_for_store", ()),
+    # code-quality@2 reads the offline coverage runs of steps whose trial deferred the
+    # coverage pass, which ``raidar assess --rescore`` makes into the store
+    # (raidar.verifier.coverage_offline).
+    "code-quality@2": ("raidar.scorers.code_quality_v2:code_quality_v2_scorer_for_store", ()),
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.
 BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
     "code-quality@1": ("entry_file",),
+    "code-quality@2": ("entry_file",),
 }
 # Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
 BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {

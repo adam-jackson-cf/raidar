@@ -65,8 +65,7 @@ from raidar.analysis.manipulation import (
 from raidar.analysis.outcomes import (
     COST_METRICS,
     OUTCOME_METRICS,
-    PROCESS_METRICS,
-    PROCESS_OUTCOME_SCORER,
+    PROCESS_OUTCOME_SCORERS,
     RAW_COUNTERPART,
     AnalysisModel,
     MetricDef,
@@ -75,6 +74,7 @@ from raidar.analysis.outcomes import (
     outcome_metric,
     primary_metric,
     primary_source,
+    process_metrics_for,
 )
 from raidar.analysis.ranking import Ranking, ranking
 from raidar.analysis.stats import POWER_CONSTANT, pairs_for_power
@@ -142,8 +142,18 @@ class AnalysisInputs:
 
     @property
     def process_outcomes(self) -> bool:
-        """Whether the lock declares the scorer of the ``process.*`` outcomes."""
-        return self.process_scorer == PROCESS_OUTCOME_SCORER
+        """Whether the lock declares a scorer of the ``process.*`` outcomes."""
+        return self.process_scorer in PROCESS_OUTCOME_SCORERS
+
+    @property
+    def process_label(self) -> str | None:
+        """The process-compliance version the process outcomes come from, when compared."""
+        return self.process_scorer if self.process_outcomes else None
+
+    @property
+    def process_metrics(self) -> tuple[MetricDef, ...]:
+        """The process outcomes the lock's process-compliance version reports."""
+        return process_metrics_for(self.process_scorer)
 
     @property
     def gate_label(self) -> str | None:
@@ -219,6 +229,8 @@ class AnalysisReport(AnalysisModel):
     """``lock (analysis.primary_outcome)`` or the progression default it fell back to."""
     gate_scorer: str | None = None
     """The gate-effort version the gate outcomes come from, when the lock declares one."""
+    process_scorer: str | None = None
+    """The process-compliance version the process outcomes come from (``@3`` or ``@4``)."""
     baseline_arm: str
     progression: str
     dev_job: DevRun | None = None
@@ -342,7 +354,9 @@ def _comparison(inputs: AnalysisInputs, treatment: str, settings: Settings) -> C
         else ((), None)
     )
     processed, process_note = (
-        gate_effects(slots, settings, label=label, metrics=PROCESS_METRICS, note=NO_PROCESS_NOTE)
+        gate_effects(
+            slots, settings, label=label, metrics=inputs.process_metrics, note=NO_PROCESS_NOTE
+        )
         if inputs.process_outcomes
         else ((), None)
     )
@@ -404,7 +418,7 @@ def _arm_summary(arm: str, inputs: AnalysisInputs, settings: Settings) -> ArmSum
             else None
         ),
         process_outcomes=(
-            arm_gate_effort(arm, valid, settings, PROCESS_METRICS)
+            arm_gate_effort(arm, valid, settings, inputs.process_metrics)
             if inputs.process_outcomes
             else None
         ),
@@ -464,6 +478,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         primary_metric=inputs.primary,
         primary_source=primary_source(inputs.progression, inputs.primary_outcome),
         gate_scorer=inputs.gate_label,
+        process_scorer=inputs.process_label,
         baseline_arm=inputs.baseline_arm,
         progression=inputs.progression,
         dev_job=inputs.dev_job,
@@ -472,10 +487,14 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         replaced_trials=inputs.replaced,
         comparisons=tuple(_comparison(inputs, arm, settings) for arm in treatments),
         ranking=_ranking(inputs, settings, summaries),
-        errata={ref: dict(pinned) for ref, pinned in inputs.errata.items()}
-        if inputs.errata
-        else None,
+        errata=_errata(inputs),
     )
+
+
+def _errata(inputs: AnalysisInputs) -> dict[str, dict[str, object]] | None:
+    if not inputs.errata:
+        return None
+    return {ref: dict(pinned) for ref, pinned in inputs.errata.items()}
 
 
 def _ranking(

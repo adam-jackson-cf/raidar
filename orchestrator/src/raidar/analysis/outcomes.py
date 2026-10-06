@@ -34,7 +34,9 @@ from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE
 from raidar.scorers.gate_effort.families import FAMILIES
 from raidar.scorers.gate_effort.manifest import GATE_EFFORT
 from raidar.scorers.gate_effort_v4.scorer import GATE_EFFORT_V4
+from raidar.scorers.gate_effort_v6.scorer import GATE_EFFORT_V6
 from raidar.scorers.process_checks_v3.scorer import PROCESS_COMPLIANCE_V3
+from raidar.scorers.process_checks_v4.scorer import PROCESS_COMPLIANCE_V4
 from raidar.scorers.sdk.manifest import Direction, ScorerManifest
 
 OK = "ok"
@@ -262,13 +264,38 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
         "fix-round correctness delta: final minus pre-fix case pass rate",
         0.05,
     ),
+    # gate-effort@6: blocking counts that compare across gate modes, the typing cascade
+    # apart, and failing tests and missed coverage as separate first-run outcomes.
+    (
+        "total_new_first_run_blocking",
+        "blocking findings each step's own work added before any fix, per trial",
+        5.0,
+    ),
+    ("final_step_end_blocking", "blocking findings at the end of the last gated step", 5.0),
+    (
+        "total_first_run_untyped_call",
+        "first-run mypy no-untyped-call findings (call-site cascade) per trial",
+        5.0,
+    ),
+    (
+        "final_step_end_untyped_call",
+        "mypy no-untyped-call findings at the end of the last gated step",
+        5.0,
+    ),
+    ("first_run_tests_failed_rate", "first runs whose own tests failed (steps with tests)", 0.1),
+    (
+        "first_run_coverage_met_rate",
+        "first runs meeting the coverage minimum (steps with coverage)",
+        0.1,
+    ),
+    ("total_first_run_failed_tests", "failing tests in first gate runs per trial", 1.0),
 )
 GATE_METRICS: tuple[MetricDef, ...] = tuple(
     MetricDef(
         f"{GATE_PREFIX}{metric}",
         f"Gate effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT_V4, metric),
+        declared_direction(GATE_EFFORT_V6, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
@@ -281,15 +308,32 @@ _GATE_V4_ONLY = frozenset(
 )
 
 
+_GATE_V6_ONLY = frozenset(
+    f"{GATE_PREFIX}{metric.id}"
+    for metric in GATE_EFFORT_V6.metrics
+    if metric.id not in {m.id for m in GATE_EFFORT_V4.metrics}
+)
+
+
 def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
-    """The gate outcomes a gate-effort version reports (``@4`` and ``@5`` add the tests check)."""
-    if ref in {"gate-effort@4", "gate-effort@5"}:
+    """The gate outcomes a gate-effort version reports.
+
+    ``@4`` and ``@5`` add the tests check; ``@6`` adds the mode-comparable blocking counts,
+    the typing cascade and the split first-run tests outcomes.
+    """
+    if ref == "gate-effort@6":
         return GATE_METRICS
-    return tuple(metric for metric in GATE_METRICS if metric.id not in _GATE_V4_ONLY)
+    if ref in {"gate-effort@4", "gate-effort@5"}:
+        return tuple(metric for metric in GATE_METRICS if metric.id not in _GATE_V6_ONLY)
+    return tuple(
+        metric
+        for metric in GATE_METRICS
+        if metric.id not in _GATE_V4_ONLY and metric.id not in _GATE_V6_ONLY
+    )
 
 
 PROCESS_PREFIX = "process."
-"""Process outcomes are ``process.<process-compliance@3 trajectory metric>``."""
+"""Process outcomes are ``process.<process-compliance@3 or @4 trajectory metric>``."""
 PROCESS_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         f"{PROCESS_PREFIX}stall_rate",
@@ -300,8 +344,37 @@ PROCESS_METRICS: tuple[MetricDef, ...] = (
     ),
 )
 """Process outcomes (``process-compliance@3``): compared only when the lock declares it."""
+PROCESS_V4_METRICS: tuple[MetricDef, ...] = (
+    *PROCESS_METRICS,
+    MetricDef(
+        f"{PROCESS_PREFIX}compliance_rate",
+        "Process: compliance rate (decided checks passed; a test command counts only if it ran)",
+        View.PROCESS,
+        declared_direction(PROCESS_COMPLIANCE_V4, "compliance_rate"),
+        0.1,
+    ),
+    MetricDef(
+        f"{PROCESS_PREFIX}total_test_commands_not_run",
+        "Process: test commands whose runner was not found, per trial",
+        View.PROCESS,
+        declared_direction(PROCESS_COMPLIANCE_V4, "total_test_commands_not_run"),
+        1.0,
+    ),
+)
+"""Process outcomes of ``process-compliance@4``: @3's plus the compliance rate and not-run tests."""
 PROCESS_OUTCOME_SCORER = "process-compliance@3"
-ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_METRICS)
+PROCESS_OUTCOME_SCORERS = ("process-compliance@4", PROCESS_OUTCOME_SCORER)
+"""The process-compliance versions with ``process.*`` outcomes, newest first."""
+
+
+def process_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
+    """The process outcomes a process-compliance version reports (none before ``@3``)."""
+    if ref == "process-compliance@4":
+        return PROCESS_V4_METRICS
+    return PROCESS_METRICS if ref == PROCESS_OUTCOME_SCORER else ()
+
+
+ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_V4_METRICS)
 
 TOTAL_COST = "total_cost_usd"
 COST_METRICS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")

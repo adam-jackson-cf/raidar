@@ -410,3 +410,76 @@ make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails
 - A first session that stalls by editing a scratch file, or refuses in words outside the fixed patterns, is still not continued. Later sessions of a step are never continued, even when they would stall (recorded as `would_stall`).
 - `transient-retry@1` retries after the session's own partial work; the retry sees the workspace as the failed attempt left it. A provider outage longer than about 4 minutes still fails the step (an infra exclusion, as before). A failed attempt that reported no usage makes the session's cost unknown (never a partial sum).
 - Ruff given `.` still follows a `*.py` symlink that leaves the workspace (as in `@1`-`@3`); the scope (mypy, bespoke checks, tests check) does not.
+
+### 13.7 Process check `smoke-04` (recorded 2026-10-06, after the run; not pooled, never cited)
+
+`smoke-04` ran under `8d8ad43b53d8` (1 trial per arm, attempt 0, detached; finished 2026-10-06 02:21 UTC, 2 of 2 trials valid) and meets all five criteria of 13.3: both trials valid, every probe passed at all 16 steps, r2's gate checked 1-2 files at every step (C1 fixed), 0 transient errors and 0 retries, 0 continuations. Signals (n=1, exploratory): `solve_rate_errata` r1 0.25, r2 0.5 (raw `solve_rate` 0.25 both); headline score 78.3 vs 82.6; cost $0.039 vs $0.203 per trial, of which r2's fix sessions were $0.153 (the cp7 fix session alone 1563 s, 114 tool calls, $0.090). The review found six measurement or design defects, fixed in section 14 before any further job:
+
+- **O1** the gate demands tests, coverage and formatting, but `pytest`, `coverage`, `ruff` and `mypy` were not on the agent's PATH in either arm ("pytest: command not found", "No module named pytest" at cp1, cp3, cp6, cp7 of r2); FORMAT refused every first gate run, so `gate.first_pass_clean_rate` could not rise above 0 (also seen in `smoke-03-r2`, 12.7).
+- **O2** `process-compliance@3`'s `tests_run_before_finish` counted a test command that never ran (r2 cp6, `python -m pytest -q` → "No module named pytest") and did not count `guardrail-check`, which ran 15 tests.
+- **O3** `gate.total_first_run_blocking` is not comparable across gate modes: r1's shadow gate re-counts the accumulated tree at every step (31, 49, 58, 79, 84, 134, 187, 225: sum 847, final tree 225); r2's starts each step clean (sum 47).
+- **O4** the typing family counts call sites: one untyped `def` gives `MYPY.no-untyped-call` at every call (r1 cp8: 139 of 225 blocking).
+- **O5** `first_run_tests_pass_rate` mixes failing tests with missed coverage, and `TEST.failed` counts once per failing test (r2: 9 at cp7) while a coverage miss counts once.
+- **O6** the analysis tables did not say which direction is better (erosion E is 1 minus the complex-function mass share: higher is better; r1's single `run()` with cc 75 is the worse arm).
+
+The verifier's per-test coverage pass (G's evidence) took about 1077 s of each trial (8 steps), more than r1's whole agent time (611 s), on the trial's critical path.
+
+## 14. Amendment: explore iteration 3b.2 (2026-10-06, pre-registered before any job under its lock)
+
+Written after `smoke-04` (13.7) and before any job under lock `2b4c23f42ac9`. Jobs under `8d8ad43b53d8` are never pooled with jobs under this lock. The objective stays **explore**: `smoke-05` (1 trial per arm) first, then `main-03` with at most 4 attempts per arm only if `smoke-05` is clean. Sections 12 and 13 stand except where this section says otherwise. The agent stays `codex` with `gpt-6-luna` at low effort (user decision 2026-10-06).
+
+### 14.1 What changed (new versions; released versions untouched)
+
+| | Iteration 3b (`8d8ad43b53d8`) | Iteration 3b.2 (`2b4c23f42ac9`) |
+|---|---|---|
+| Pack (both arms) | `python-guardrails@4` | **`python-guardrails@5`** |
+| Verifier coverage pass | after every step, in the trial | **offline, at assessment** (`protocol.verifier_coverage: offline`) |
+| Code-quality scorer | `code-quality@1` | **`code-quality@2`** |
+| Process scorer | `process-compliance@3` | **`process-compliance@4`** (+ `extra_test_patterns` for `guardrail-check`) |
+| Gate-effort scorer | `gate-effort@5` | **`gate-effort@6`** |
+| Shared wrappers, gate | `continue-on-stall@2`, `transient-retry@1`, `guardrail-gate@3` | unchanged |
+
+- **`python-guardrails@5`** (O1; mechanical rung): `@4`'s gate, rules, pins, scope and tests check byte for byte except the version strings, plus the pack's own tools on the agent's PATH in **both** arms: `/usr/local/bin/pytest` and `/usr/local/bin/coverage` (wrappers that run `python -m <tool>` with the project's interpreter, `./.venv/bin/python` else `python3`, and the pack's site-packages appended to the end of `sys.path`, as the gate's tests check runs them) and `/usr/local/bin/ruff` and `/usr/local/bin/mypy` (the pinned binaries). The tools read the configuration they discover (r2: the workspace copies; r1: their defaults); the gate itself still runs only with the protected configs. The install records the four versions and an agent-user smoke of each (pytest, `coverage run -m pytest`, `ruff format --check`); the probe requires them and checks every step where each name resolves on the agent's PATH and where each link points. No rules text names the tools. Factor-neutral: the same component in both conditions.
+- **`protocol.verifier_coverage: offline`** (user decision 2026-10-06): the verifier grades each step without its coverage pass (`record.json` `coverage.enabled: false`; the verdict run is unchanged; Harbor's verifier phase timeout drops from 2 × 900 + 600 s to 900 + 600 s). `make experiment-assess` with `code-quality@2` first makes each step's coverage run from the stored step snapshot (snapshot and bundle digests checked; the step's own bundle, grader timeout and grader image), checks its parity against the trial's own grading run (read back from `evidence.json`) and writes the parity verdict and the fork-shaped G input (the same payload the in-trial pass writes as `g-kernel-input.json`) to the Assessment store, never the job (`raidar.verifier.coverage_offline`). A parity failure (for example a rebuilt grader image: `environment_mismatch`) makes G `ineligible`, never 0. Left at its default (`trial`) the field is omitted from every dump, so no other experiment's lock moved (toolchain relocks only).
+- **`code-quality@2`**: `code-quality@1` in every metric, status, reason and evidence item, except that a step whose trial deferred the coverage pass reads G's two run evidences from the store's offline run; a run not produced yet is `unavailable` and the Assessment provisional (completed by a later rescore). Validation refuses `code-quality@1` under `verifier_coverage: offline`. Analysis and the review surfaces read `@2` in the quality slot where a lock declares it.
+- **`process-compliance@4`** (O2): `@3` except that a test command counts as a test run only when its recorded output does not say its runner was not found (`<runner>: command not found`/`not found`, `No such file or directory`, uv's `Failed to spawn`, `No module named <module>` for `python -m`); a call without recorded output keeps `@3`'s reading. Adds `test_commands_not_run`/`total_test_commands_not_run`. The experiment's `scorer_config` counts `guardrail-check` (not `--version`/`--help`) as a test run in both arms (the gate runs the project's tests). `process.compliance_rate` and `process.total_test_commands_not_run` join the process outcomes.
+- **`gate-effort@6`** (O3-O5): `@5` with a failed tests check counted once in every blocking count (`first_run_failed_tests` keeps the number of failing tests); per-step `step_end_blocking` and `new_first_run_blocking` (first-run blocking minus the previous gated step's end; a shadow gate's sum telescopes to its final tree) with `total_new_first_run_blocking` and `final_step_end_blocking`, comparable across modes; the `MYPY.no-untyped-call` cascade reported beside the typing family (`total_first_run_untyped_call`, `final_step_end_untyped_call`); and `first_run_tests_failed_rate` and `first_run_coverage_met_rate` separately. `total_first_run_blocking` is still reported, unchanged in meaning.
+- **Analysis presentation** (O6): every effect and arm table has a `Better` column (the direction the metric's scorer declares) and a legend; erosion is stated as higher-is-better.
+
+### 14.2 Hypothesis and outcomes
+
+Unchanged from 12.2 and 13.2 (primary `solve_rate_errata` with raw `solve_rate` beside it; secondary `gate.fix_round_correctness_delta`, `process.stall_rate`, coverage and tests, gate effort, cost). Gate-effort comparisons across arms read `gate.total_new_first_run_blocking` and `gate.final_step_end_blocking`; `gate.total_first_run_blocking` stays reported but is not compared across modes. Exposing the tools changes what both arms can do; it is part of the shared environment, not the treatment, so iteration 3b.2's arms are not pooled with 3b's.
+
+### 14.3 Pre-registered process criteria for `smoke-05` (before `main-03`)
+
+`smoke-05` is clean when 13.3 holds and also: every step's probe shows the agent's `pytest`, `coverage`, `ruff` and `mypy` linked to the pack's in both arms; no `pytest`, `coverage`, `ruff` or `mypy` command in either arm fails with "command not found"; every verifier record has `coverage.enabled: false`; and `make experiment-assess` makes all 16 offline coverage runs with 0 errors, each parity verdict eligible or `ineligible` with typed reasons. A `python -m pytest` that fails with "No module named pytest" (the system interpreter has no pytest; 14.6) is reported with `process.total_test_commands_not_run`, not a defect. A failed criterion is a process defect: fix it and rerun small; do not start `main-03`.
+
+### 14.4 Running iteration 3b.2
+
+```sh
+make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml   # 2b4c23f42ac9
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  ATTEMPT=0 CONCURRENCY=2 JOB_ID=smoke-05 DETACH=1
+make experiment-status JOB=jobs/python__forge__guardrails/smoke-05
+make experiment-assess JOB=jobs/python__forge__guardrails/smoke-05 STORE=stores/python__forge__guardrails \
+  SCORERS="correctness@1 code-quality@2 resource-usage@1 process-compliance@4 gate-effort@6"
+# If 14.3 holds: main-03, 4 attempts per arm, detached, then assess and analyse as above.
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  CONCURRENCY=2 JOB_ID=main-03 DETACH=1
+```
+
+### 14.5 Verification before any job (recorded at lock time)
+
+- Host and fixture tests: `tests/test_component_python_guardrails_v5.py` (`@4`'s payload byte for byte except version strings, plus the two wrappers and their runner; the probe fails when a tool is missing from the PATH or its smoke failed; the wrappers run the pack's pytest and coverage with the project's interpreter), `tests/test_process_compliance_v4.py`, `tests/test_gate_effort_v6_scorer.py`, `tests/test_code_quality_v2.py` (on the fork's golden `synthetic_shop` case: a deferred trial whose offline runs are in the store gives every observation `code-quality@1` gives over the same trial with the in-trial pass; an unproduced run is `unavailable` and the Assessment provisional until a rescore completes it), `tests/test_coverage_offline.py` (a deferred pass is made into the store, never the job; the offline run reproduces a trial's own pass, parity verdict and `g-kernel-input.json`, exactly), `tests/test_verifier_coverage_protocol.py`, `tests/test_iteration_3b2_consumers.py`.
+- `tests/test_guardrails_v5_trial.py` (pack image on OrbStack, no LLM; r1 and r2): a scripted agent writes a module and its test in `/app` and runs `pytest`, `coverage run -m pytest`, `ruff format --check` and `mypy --version` there; all pass with the pinned versions (`/usr/local/bin/pytest`; pytest 9.1.1, coverage 7.16.2, ruff 0.8.6, mypy 2.3.1) and the probe passes on `@5`'s pin.
+- `make guardrails-verify` (OrbStack, 2026-10-06): `@1` 76 of 76 rules, `@3` 83 of 83, `@4` 85 of 85 and `@5` 85 of 85 (`@4`'s canaries, run against `@5`'s payload and its install, agent tool links and smokes included); each mutant fails exactly its disabled rules.
+- `make quality` passes (1562 tests, coverage 96.5%).
+- Released identities: every registered scorer's manifest and implementation digest and every component's fingerprint is unchanged from `0e82446`; only `python-guardrails@5`, `code-quality@2`, `process-compliance@4` and `gate-effort@6` are new. Only this experiment's `lock_sha256` moved (`8d8ad43b53d8` → `2b4c23f42ac9`); the other five locks are toolchain relocks.
+- **Offline coverage reproduces the in-trial pass on `smoke-04`** (2026-10-06, `make assess-regrade JOB=<trial> COVERAGE_CHECK=1`, both trials concurrently on OrbStack, grader image `874d2b90b9ad` as recorded): 16 of 16 steps `match` against the trial's own pass (same parity verdict, eligible at every step; same parity differences; `g-kernel-input.json` equal). `code-quality@2` reads exactly that payload and applies `@1`'s rules to it, so its G values over a deferred trial equal `@1`'s over the in-trial pass (shown value for value on the golden fixture above). The offline runs took 1108 s (r1) and 1132 s (r2) per trial against about 1077 s and 1095 s in the trial.
+
+### 14.6 Known limits of iteration 3b.2
+
+- The coverage work is moved, not removed: about 18 minutes per trial of grader time now runs at `make experiment-assess` (once per step snapshot, kept in the store) instead of inside the trial. Trial wall time and the agent's step-to-step wait drop by that amount; the job's verifier phase is the grading run alone.
+- Offline parity needs the trial's grader image: a rebuilt or pruned grader image makes every offline parity check `environment_mismatch` and G `ineligible` (never 0). Keep the image until the job's offline runs are made.
+- `python -m pytest` with the system interpreter still fails with "No module named pytest": `@5` puts the tools on the PATH and does not change the agent image's interpreter. `process-compliance@4` reports such commands as not run. Making `python3 -m pytest` work would mean installing into the image's interpreter (a broader change to what the agent's own code can import) and is not done here.
+- The tools on the PATH read the configuration they discover; in r1 (no workspace copies) `ruff format --check` uses Ruff's defaults, which can differ from the gate's protected `ruff.toml`. r1's gate is a shadow and never refuses, so this changes nothing r1 is scored on.

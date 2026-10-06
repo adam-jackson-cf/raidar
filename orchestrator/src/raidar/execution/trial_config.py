@@ -4,7 +4,9 @@ Wiring (ADR-001 Appendix A.1): the Raidar verifier is selected per trial
 through ``TrialConfig.verifier`` (it is not a ``task.toml`` setting in Harbor
 0.23), pointed at the problem's host-only verifier bundle, grading Harbor's host
 copy of ``/app`` (accepted N1 decision ``snapshot_source=artifact``) with the
-separate coverage pass on. A problem whose lock pins an errata passes it to the
+separate coverage pass on, unless the protocol defers it
+(``verifier_coverage: offline``: assessment makes it from the stored snapshots,
+``raidar.verifier.coverage_offline``). A problem whose lock pins an errata passes it to the
 verifier, which records the errata-applied verdict beside the raw grade.
 """
 
@@ -40,6 +42,8 @@ def harbor_trial_config(
     spec = plan.loaded.spec
     harness = spec.agent(next(a.agent for a in spec.arms if a.id == trial.arm)).harness
     grader_timeout = float(spec.protocol.verifier_timeout_sec)
+    coverage = spec.protocol.verifier_coverage == "trial"
+    runs = 2 if coverage else 1
     return TrialConfig(
         task=TaskConfig(path=task),
         trial_name=trial.trial_id,
@@ -53,12 +57,12 @@ def harbor_trial_config(
         ),
         verifier=VerifierConfig(
             import_path=VERIFIER_IMPORT_PATH,
-            override_timeout_sec=2 * grader_timeout + VERIFIER_PHASE_MARGIN_S,
+            override_timeout_sec=runs * grader_timeout + VERIFIER_PHASE_MARGIN_S,
             kwargs={
                 "oracle_bundle": str(bundle_root),
                 "docker_context": docker_context,
                 "snapshot_source": spec.protocol.snapshot_source,
-                "coverage": True,
+                "coverage": coverage,
                 "grader_timeout_s": grader_timeout,
                 **({"errata": dict(errata)} if errata is not None else {}),
             },

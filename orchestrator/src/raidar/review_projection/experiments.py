@@ -17,7 +17,7 @@ from typing import Any
 
 from raidar.review_projection.headline import (
     CORRECTNESS_SCORER,
-    QUALITY_SCORER,
+    QUALITY_SCORERS,
     UNDECLARED_MARKER,
     policy_shares,
 )
@@ -41,7 +41,10 @@ from raidar.spec.schema import ExperimentSpec
 MINIMUM_SCORED_RUNS = 3
 PREFERRED_SCORED_RUNS = 5
 REPEAT_VARIANCE_STDDEV = 0.1
-_POLICY_CATEGORIES = {CORRECTNESS_SCORER: "correctness", QUALITY_SCORER: "quality"}
+_POLICY_CATEGORIES = {
+    CORRECTNESS_SCORER: "correctness",
+    **dict.fromkeys(QUALITY_SCORERS, "quality"),
+}
 
 
 @dataclass(frozen=True)
@@ -257,7 +260,7 @@ def _shares(policy_ref: str) -> dict[str, float]:
         base, inertia = policy_shares(DEFAULT_METRIC_REGISTRY.get(policy_ref))
     except RegistryReferenceError:
         return {}
-    return {CORRECTNESS_SCORER: base, QUALITY_SCORER: inertia}
+    return {CORRECTNESS_SCORER: base, **dict.fromkeys(QUALITY_SCORERS, inertia)}
 
 
 def _scorer(ref: str, shares: Mapping[str, float]) -> ResolvedScorerReviewConfig:

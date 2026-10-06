@@ -3,7 +3,7 @@
 Inputs are the job's ``TrialRecord`` (validity and identity) and the
 stored ``AssessResult`` of each scorer (``None`` when the store has no
 Assessment for this trial). Nothing is recomputed from raw run files:
-correctness comes from ``correctness@1``, quality from ``code-quality@1``,
+correctness comes from ``correctness@1``, quality from ``code-quality@1`` (or ``@2``),
 cost from ``resource-usage@1``, and the headline score from the experiment's
 Metric applied to those components.
 
@@ -24,7 +24,8 @@ Two derivations are analysis-owned:
   one) are the scorer's trajectory metrics as stored: an arm without the commit
   gate reads ``not_applicable``; only the metrics that version reports are read;
 - the ``process.*`` outcomes (``process.stall_rate``; ``process-compliance@3``,
-  only when the lock declares it) likewise: an arm without the stall wrapper
+  only when the lock declares it; ``@4`` adds ``process.compliance_rate`` and
+  ``process.total_test_commands_not_run``) likewise: an arm without the stall wrapper
   reads ``not_applicable``;
 - a trial truncated by ``max_checkpoints`` has no trial-level
   outcome (S, C, reached, final solved, quality means): each is statused
@@ -46,8 +47,7 @@ from raidar.analysis.outcomes import (
     GATE_PREFIX,
     HEADLINE_SCORE,
     OUTCOME_METRICS,
-    PROCESS_METRICS,
-    PROCESS_OUTCOME_SCORER,
+    PROCESS_OUTCOME_SCORERS,
     PROCESS_PREFIX,
     QUALITY_COMPONENTS,
     REACHED,
@@ -61,9 +61,11 @@ from raidar.analysis.outcomes import (
     TrialOutcome,
     Value,
     gate_metrics_for,
+    process_metrics_for,
 )
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrialRecord
+from raidar.scorers.code_quality_refs import CODE_QUALITY_REFS, code_quality_ref
 from raidar.scorers.sdk.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
@@ -84,13 +86,21 @@ RESOURCE_USAGE_REF = "resource-usage@1"
 # Process compliance the analysis reads, in preference order: ``@2`` decides
 # only deterministically (the default since Jev was parked, 2026-10-04); the
 # dormant ``@1`` stays readable for jobs whose lock declares it.
-PROCESS_COMPLIANCE_REFS = ("process-compliance@3", "process-compliance@2", "process-compliance@1")
+PROCESS_COMPLIANCE_REFS = (
+    "process-compliance@4",
+    "process-compliance@3",
+    "process-compliance@2",
+    "process-compliance@1",
+)
 ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
+# The quality slot reads ``code-quality@2`` (offline G input) or ``@1``: whichever was declared.
+QUALITY_SCORERS = CODE_QUALITY_REFS
 # Read only when the lock declares one (its ``gate.*`` outcomes are then in every trial),
 # in preference order: ``@2`` also reads a shadow gate's first-run outcomes, ``@4`` the
 # tests check and the fix rounds' correctness.
 GATE_EFFORT_REF = "gate-effort@1"
 GATE_EFFORT_REFS = (
+    "gate-effort@6",
     "gate-effort@5",
     "gate-effort@4",
     "gate-effort@3",
@@ -292,12 +302,14 @@ def gate_metrics(result: AssessResult | None, ref: str = GATE_EFFORT_REF) -> dic
     }
 
 
-def process_metrics(result: AssessResult | None) -> dict[str, Value]:
-    """The ``process.*`` outcomes from a trial's ``process-compliance@3`` result."""
-    observed = Observed(PROCESS_OUTCOME_SCORER, result)
+def process_metrics(
+    result: AssessResult | None, ref: str = PROCESS_OUTCOME_SCORERS[-1]
+) -> dict[str, Value]:
+    """The ``process.*`` outcomes from a trial's ``process-compliance@3`` or ``@4`` result."""
+    observed = Observed(ref, result)
     return {
         metric.id: observed.value(metric.id.removeprefix(PROCESS_PREFIX))
-        for metric in PROCESS_METRICS
+        for metric in process_metrics_for(ref)
     }
 
 
@@ -309,6 +321,29 @@ def _truncated(record: TrialRecord) -> dict[str, Value]:
     return {metric.id: Value.missing(TRUNCATED, reason) for metric in OUTCOME_METRICS}
 
 
+def _observed(results: Mapping[str, AssessResult | None]) -> dict[str, Observed]:
+    """The analysed scorers' results; the quality slot reads the code-quality version used."""
+    observed = {ref: Observed(ref, results.get(ref)) for ref in ANALYSED_SCORERS}
+    quality_ref = code_quality_ref(ref for ref in results if results.get(ref) is not None)
+    observed[CODE_QUALITY_REF] = Observed(quality_ref, results.get(quality_ref))
+    return observed
+
+
+def _effort_metrics(results: Mapping[str, AssessResult | None]) -> dict[str, Value]:
+    """Gate and process outcomes, when the lock declares their scorers.
+
+    Like cost totals, they describe what ran, truncated or not.
+    """
+    metrics: dict[str, Value] = {}
+    gate_ref = gate_effort_ref(results)
+    if gate_ref is not None:
+        metrics |= gate_metrics(results[gate_ref], gate_ref)
+    process_ref = next((ref for ref in PROCESS_OUTCOME_SCORERS if ref in results), None)
+    if process_ref is not None:
+        metrics |= process_metrics(results[process_ref], process_ref)
+    return metrics
+
+
 def build_outcome(
     record: TrialRecord,
     results: Mapping[str, AssessResult | None],
@@ -316,7 +351,7 @@ def build_outcome(
     policy: Metric,
 ) -> TrialOutcome:
     """One trial's statused metrics and per-checkpoint series."""
-    observed = {ref: Observed(ref, results.get(ref)) for ref in ANALYSED_SCORERS}
+    observed = _observed(results)
     correctness = observed[CORRECTNESS_REF]
     steps = record.trial.steps
     checkpoints = len(steps)
@@ -353,12 +388,7 @@ def build_outcome(
         **quality,
         **{name: observed[RESOURCE_USAGE_REF].value(name) for name in _COST_TOTALS},
     }
-    gate_ref = gate_effort_ref(results)
-    if gate_ref is not None:
-        # Like cost totals, gate effort describes what ran, truncated or not.
-        metrics |= gate_metrics(results[gate_ref], gate_ref)
-    if PROCESS_OUTCOME_SCORER in results:
-        metrics |= process_metrics(results[PROCESS_OUTCOME_SCORER])
+    metrics |= _effort_metrics(results)
     if record.truncated_to is not None:
         metrics |= _truncated(record)
     reasons = infra_reasons(record)

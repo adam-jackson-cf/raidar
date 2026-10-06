@@ -50,13 +50,13 @@
         }
       },
       "scorer": {
-        "code-quality@1": {
-          "digest": "411904325ac881d76447e7e94f0687fa8160c6778c8173f43b8e83b30717309a",
+        "code-quality@2": {
+          "digest": "a9dd9767c23c97feaef950b717a04a6310c60cc60eb4eff4b2b0fa4c9b14c6c7",
           "metadata": {
-            "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "09fe7aaee12c76ac2650006abf85de85ade5abb752f29d2f43829a3a334acd87",
+            "implementation": "raidar.scorers.code_quality_v2:code_quality_v2_scorer",
+            "implementation_digest": "30e583a1dfb8ea2743452727d06dc6bd1d8b5808ec1c052a32edcdbf8a23fff7",
             "manifest": {
-              "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
+              "description": "SCB-fork code-quality and inertia components over the per-step snapshots (code-quality@1); a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store.",
               "evidence_required": [
                 "snapshot.current",
                 "snapshot.prior",
@@ -217,7 +217,7 @@
                 "scb-python-quality",
                 "scb-check"
               ],
-              "version": "1"
+              "version": "2"
             },
             "tool_lock": {
               "python": {
@@ -427,13 +427,13 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@5": {
-          "digest": "8df6f6ded29c28856111a2369459dab5fd089828566aac7a96672c1ea3ce68d8",
+        "gate-effort@6": {
+          "digest": "a5d4c11952d960069303dedc92877ef71dcde624071aa2173324dfa6ce841063",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort_v5:gate_effort_v5_scorer",
-            "implementation_digest": "9cddc18df2b872191b02a3c7867efc614f56949acfe6f7838d776385e366c523",
+            "implementation": "raidar.scorers.gate_effort_v6:gate_effort_v6_scorer",
+            "implementation_digest": "e28fdc2f766431c206667aa534e9907003b8786d4a7dc198503e3a865ef30d6e",
             "manifest": {
-              "description": "Effort a guardrail-gate commit gate cost per step (gate-effort@3), the gate's tests check (first run and step end: passed, missing tests, owned coverage) and the fix rounds' correctness (final minus pre-fix case pass rate, the pre-fix snapshot graded offline), as gate-effort@4, with each gate run's evidence summary counting TEST.* findings in the tests family. A shadow gate reports its first-run and code outcomes only. Not applicable to an arm without a gate.",
+              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@5), with a failed tests check counted once in every blocking count, blocking counts that compare across gate modes (step-end, new per step, final), the mypy no-untyped-call cascade reported separately, and failing tests and missed coverage as separate first-run outcomes. A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate.",
               "evidence_required": [
                 "trace",
                 "oracle.cases",
@@ -1378,24 +1378,192 @@
                   "tier": "deterministic",
                   "type": "real",
                   "unit": null
+                },
+                {
+                  "description": "Blocking findings of the step's last decided gate run (a failed tests check once).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "step_end_blocking",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings minus the previous gated step's step-end count.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "new_first_run_blocking",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "First-run MYPY.no-untyped-call findings (the call-site cascade of untyped defs).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_untyped_call",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "MYPY.no-untyped-call findings of the step's last decided gate run.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "step_end_untyped_call",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "The first gate run's own tests failed or timed out (not applicable: no test ran).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_tests_failed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The first gate run's owned line coverage met the minimum (when measured).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_run_coverage_met",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Failing tests in the first gate run's tests check.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_failed_tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings the steps' own work added before any fix, over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_new_first_run_blocking",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings at the end of the last gated step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "final_step_end_blocking",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run MYPY.no-untyped-call findings over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_untyped_call",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "MYPY.no-untyped-call findings at the end of the last gated step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "final_step_end_untyped_call",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Share of steps whose first gate run ran tests in which they failed.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_tests_failed_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of steps whose first gate run measured coverage in which it met the minimum.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_run_coverage_met_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Failing tests in the first gate runs over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_first_run_failed_tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "5"
+              "version": "6"
             },
             "tool_lock": {}
           }
         },
-        "process-compliance@3": {
-          "digest": "1553ee1a16c462aca7a307feac54f1b1ee27023ce97cc58d9ed732959ac105cf",
+        "process-compliance@4": {
+          "digest": "2ea82de2720f73e724b4a050de7d380690ce0eac16ecacb36b6c617ccc35b82a",
           "metadata": {
-            "implementation": "raidar.scorers.process_checks_v3:process_compliance_v3_scorer",
-            "implementation_digest": "eefe18b6f8dd0b212e79ad457dd91e90dd62bfb6435984f77834880e93c8ea3c",
+            "implementation": "raidar.scorers.process_checks_v4:process_compliance_v4_scorer",
+            "implementation_digest": "3002bd789b975c05e2b59e727745057a24b1235e7f86c17f43c2da0e9ea77fb3",
             "manifest": {
-              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model. Adds whether a session stalled on a question (continue-on-stall@1 records) and the stall rate.",
+              "description": "Deterministic trace checks of agent process (process-compliance@3, stall outcomes included); a check the trace cannot decide is undetermined, never judged by a model. A test command counts as a test run only when its recorded output does not say its runner was not found; such commands are counted separately.",
               "evidence_required": [
                 "trace",
                 "snapshot.current"
@@ -1486,13 +1654,37 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "Test commands in the step whose runner was not found (they never ran).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "test_commands_not_run",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Test commands whose runner was not found, over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_test_commands_not_run",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "3"
+              "version": "4"
             },
             "tool_lock": {}
           }
@@ -1636,13 +1828,19 @@
         "test_globs": []
       },
       "metric": "scb-canonical@2",
-      "scorer_config": {},
+      "scorer_config": {
+        "process-compliance@4": {
+          "extra_test_patterns": [
+            "guardrail-check(?![\\w.-])(?!\\s+--(?:version|help)\\b)"
+          ]
+        }
+      },
       "scorers": [
         "correctness@1",
-        "code-quality@1",
+        "code-quality@2",
         "resource-usage@1",
-        "process-compliance@3",
-        "gate-effort@5"
+        "process-compliance@4",
+        "gate-effort@6"
       ]
     },
     "tools": {
@@ -1654,18 +1852,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "ae0c113aba24f56eebfb0050e08dea1e1f5be9944f90e722c64acde6d78a0f4a",
+  "document_sha256": "ef43e7281169d9cbea95759c872bc7194786268e8f6a53ecee25b4bfc36be5b5",
   "execution": {
     "arms": {
       "r1-baseline": {
         "agent": "codex-luna",
         "condition": "r1-baseline",
-        "digest": "ba30d4c6ec33ac5fba1dfdfaf66c2cbd63164d426eafc4841bc4425b031d7eb9"
+        "digest": "0c5ec51bded3f5060f1db411f55c8dffd3b3f058311f81f332f10a200237637c"
       },
       "r2-guardrails": {
         "agent": "codex-luna",
         "condition": "r2-guardrails",
-        "digest": "8682be69543995167ba48256b2a88b7abf67dd9625ab85e0ab6b1f3c8c9d4afc"
+        "digest": "a9e308193c099e769aba5dfbdf98071459410e9c69bc7be8de50300d46e6a805"
       }
     },
     "conditions": {
@@ -1692,8 +1890,8 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@4",
-          "use_digest": "d358a6f2cd46894d1b6acbb5ffbf666dccc763f7b91b37ff6d33e105a4552dce",
+          "use": "python-guardrails@5",
+          "use_digest": "6f747f46431d180240bf97a2a56cd73c7e17fcf90ced7733d48704b4db356bf6",
           "with": {
             "workspace_configs": false
           }
@@ -1733,8 +1931,8 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@4",
-          "use_digest": "d358a6f2cd46894d1b6acbb5ffbf666dccc763f7b91b37ff6d33e105a4552dce",
+          "use": "python-guardrails@5",
+          "use_digest": "6f747f46431d180240bf97a2a56cd73c7e17fcf90ced7733d48704b4db356bf6",
           "with": {
             "workspace_configs": true
           }
@@ -1781,7 +1979,7 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@4",
+              "use": "python-guardrails@5",
               "with": {
                 "workspace_configs": false
               }
@@ -1803,7 +2001,7 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@4",
+              "use": "python-guardrails@5",
               "with": {
                 "workspace_configs": true
               }
@@ -1842,6 +2040,7 @@
         "min_reward": null,
         "progression": "continue",
         "snapshot_source": "artifact",
+        "verifier_coverage": "offline",
         "verifier_timeout_sec": 900
       },
       "runtime": "python",
@@ -1926,8 +2125,8 @@
             ]
           }
         },
-        "python-guardrails@4": {
-          "digest": "d358a6f2cd46894d1b6acbb5ffbf666dccc763f7b91b37ff6d33e105a4552dce",
+        "python-guardrails@5": {
+          "digest": "6f747f46431d180240bf97a2a56cd73c7e17fcf90ced7733d48704b4db356bf6",
           "metadata": {
             "discovery_probe": "python-guardrails-gate-works",
             "kind": "service",
@@ -2039,10 +2238,10 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "2571ee4830c54e88735056c1806c0b8d3397be5fcaeb4a7bc49561b1ab95f726",
-    "spec_sha256": "6c9e4f625fe279b747b144740435e95ad6735f825f7048f6891dc72f63600f89"
+    "source_sha256": "a8cc7ea7439e18b165857a5217b3465fe6bb6ab8abea89482818a357e2b28e5f",
+    "spec_sha256": "ac7f540d851f2f37a2dbd163a781491a2a6b610de4e3417c64bf3ed192769288"
   },
-  "lock_sha256": "8d8ad43b53d8a1fcdbb915d4e8cfa62bc17a390a87cf2afbb075299c956f3cd6",
+  "lock_sha256": "2b4c23f42ac92e1aee8f1143be75a186db39c4b04b2f96932cde92c3390489fa",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -2050,9 +2249,9 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "c2abf0350f928615f2543c44db732fb87d17ac6256c10927f8c5f8b0cb674ae4",
-    "execution": "8d8ad43b53d8a1fcdbb915d4e8cfa62bc17a390a87cf2afbb075299c956f3cd6",
-    "toolchain": "657a87063f9d6ff78222aec39691aebf3f3288650739261e1702f6640b273471"
+    "assessment": "eca6036fe22583fee9589e95b79df05586011a6622c95c0bf31e28d35dac8cfc",
+    "execution": "2b4c23f42ac92e1aee8f1143be75a186db39c4b04b2f96932cde92c3390489fa",
+    "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },
   "spec": {
     "agents": [
@@ -2103,13 +2302,19 @@
         "test_globs": []
       },
       "metric": "scb-canonical@2",
-      "scorer_config": {},
+      "scorer_config": {
+        "process-compliance@4": {
+          "extra_test_patterns": [
+            "guardrail-check(?![\\w.-])(?!\\s+--(?:version|help)\\b)"
+          ]
+        }
+      },
       "scorers": [
         "correctness@1",
-        "code-quality@1",
+        "code-quality@2",
         "resource-usage@1",
-        "process-compliance@3",
-        "gate-effort@5"
+        "process-compliance@4",
+        "gate-effort@6"
       ]
     },
     "conditions": [
@@ -2117,7 +2322,7 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@4",
+            "use": "python-guardrails@5",
             "with": {
               "workspace_configs": false
             }
@@ -2139,7 +2344,7 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@4",
+            "use": "python-guardrails@5",
             "with": {
               "workspace_configs": true
             }
@@ -2179,6 +2384,7 @@
       "min_reward": null,
       "progression": "continue",
       "snapshot_source": "artifact",
+      "verifier_coverage": "offline",
       "verifier_timeout_sec": 900
     },
     "runtime": "python",
@@ -2207,6 +2413,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "2ac35d79752fea36fc78e2a2b55e1209226067aae0ca529f4d9476c522353ffb"
+    "raidar_spec": "0ccae92e58924fe66e1e46e5954d66d1fcac1ec67a6c6564ae4116ca1fd4bab7"
   }
 }

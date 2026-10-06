@@ -15,6 +15,7 @@ from typing import Any
 from raidar.analysis.assessed import (
     ANALYSED_SCORERS,
     PROCESS_COMPLIANCE_REFS,
+    QUALITY_SCORERS,
     build_outcome,
     gate_effort_ref,
 )
@@ -76,10 +77,11 @@ def _scorer_refs(declared: tuple[str, ...], process_ref: str | None) -> tuple[st
     gate_ref = gate_effort_ref(declared)
     wanted = (
         *ANALYSED_SCORERS,
+        *QUALITY_SCORERS,
         *((process_ref,) if process_ref else ()),
         *((gate_ref,) if gate_ref else ()),
     )
-    return tuple(ref for ref in wanted if ref in declared)
+    return tuple(dict.fromkeys(ref for ref in wanted if ref in declared))
 
 
 def manipulation_requests(analysis: Mapping[str, Any]) -> tuple[CheckRequest, ...] | None:

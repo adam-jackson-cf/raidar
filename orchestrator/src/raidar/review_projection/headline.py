@@ -28,6 +28,7 @@ from raidar.analysis.assessed import Observed, correctness_component, infra_reas
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review_projection.assessments import TrialAssessments
+from raidar.scorers.code_quality_refs import CODE_QUALITY_REFS, code_quality_ref
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.spec.metrics import (
     CORRECTNESS,
@@ -38,7 +39,15 @@ from raidar.spec.metrics import (
 from raidar.spec.references import RegistryReferenceError
 
 CORRECTNESS_SCORER = "correctness@1"
-QUALITY_SCORER = "code-quality@1"
+QUALITY_SCORERS = CODE_QUALITY_REFS
+"""The code-quality versions I can come from; a trial reads the one it was assessed with."""
+
+
+def quality_scorer(assessments: TrialAssessments) -> str:
+    """The code-quality version this trial's lookup covered (``@2`` first)."""
+    return code_quality_ref([*assessments.found, *assessments.missing])
+
+
 COMPONENT_METRICS = {
     "V": "problem_verbosity",
     "E": "problem_erosion",
@@ -162,14 +171,15 @@ def _quality_inputs(
 ) -> tuple[dict[str, ComponentInput], dict[str, Observation]]:
     inputs: dict[str, ComponentInput] = {}
     used: dict[str, Observation] = {}
+    quality = quality_scorer(assessments)
     for component in policy.inertia_weights:
-        observation = trial_observation(assessments, QUALITY_SCORER, COMPONENT_METRICS[component])
+        observation = trial_observation(assessments, quality, COMPONENT_METRICS[component])
         if observation is not None:
             used[component] = observation
         if observation is not None and observation.status is AssessStatus.OK:
             inputs[component] = ComponentInput(value=float(observation.value or 0.0))
         else:
-            missing = assessments.missing.get(QUALITY_SCORER)
+            missing = assessments.missing.get(quality)
             inputs[component] = ComponentInput(gap=_unmeasured(observation, missing))
     return inputs, used
 
@@ -182,9 +192,11 @@ def _reason_text(policy: str, component: str | None, detail: str) -> str:
 UNDECLARED_MARKER = "which the experiment does not declare"
 
 
-def needed_scorers(policy: Metric) -> tuple[str, ...]:
+def needed_scorers(policy: Metric, declared: Collection[str] = ()) -> tuple[str, ...]:
     """The scorers whose Assessments the policy's components come from."""
-    return (CORRECTNESS_SCORER, QUALITY_SCORER) if policy.inertia_weights else (CORRECTNESS_SCORER,)
+    if not policy.inertia_weights:
+        return (CORRECTNESS_SCORER,)
+    return (CORRECTNESS_SCORER, code_quality_ref(declared))
 
 
 def _undeclared_reasons(policy: Metric, declared: Collection[str] | None) -> tuple[str, ...]:
@@ -193,7 +205,7 @@ def _undeclared_reasons(policy: Metric, declared: Collection[str] | None) -> tup
     return tuple(
         f"{policy.ref} not computable: the headline metric needs {ref}, "
         f"{UNDECLARED_MARKER} (add it to assessment.scorers and relock)"
-        for ref in needed_scorers(policy)
+        for ref in needed_scorers(policy, declared)
         if ref not in declared
     )
 
@@ -210,7 +222,11 @@ def _policy_reasons(
     undeclared = _undeclared_reasons(policy, declared)
     if undeclared:
         return undeclared
-    unassessed = [ref for ref in (CORRECTNESS_SCORER, QUALITY_SCORER) if ref in assessments.missing]
+    unassessed = [
+        ref
+        for ref in (CORRECTNESS_SCORER, quality_scorer(assessments))
+        if ref in assessments.missing
+    ]
     if unassessed:
         return tuple(
             f"{policy.ref} unassessed: {ref}: {assessments.missing[ref]}" for ref in unassessed

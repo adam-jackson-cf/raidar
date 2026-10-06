@@ -21,12 +21,21 @@ is parked and its policy is off) get a runtime whose audit and cache live in
 ``--store``; ``--jev-replay-only`` answers from that cache alone and never
 calls the provider. ``process-compliance@2`` binds no Jev runtime.
 
-Pre-fix grades: when a scorer run reads them (``gate-effort@4``/``@5``), ``--rescore``
+Pre-fix grades: when a scorer run reads them (``gate-effort@4`` to ``@6``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
 yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
 bundle, sandbox and timeout, on ``--docker-context``), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
+
+Offline coverage: when a scorer run reads it (``code-quality@2``), ``--rescore``
+first makes, into ``--store``, the verifier's coverage run of every step whose
+trial deferred it (``protocol.verifier_coverage: offline``;
+``raidar.verifier.coverage_offline``), never into the job, and reports what it
+made. ``--replay`` makes nothing. ``--regrade --coverage-check`` instead makes
+every step's coverage run offline and compares it with the trial's own coverage
+pass (parity verdict and G input) or, for a deferred step, the run stored in
+``--store``; it writes nothing and fails on any difference.
 
 ``AS1`` (the assess-time half of the runtime-compatibility gate): CLI-supplied
 ``--scorer`` values must cover the runtime of the job's lock, and a ``--bundle``
@@ -46,7 +55,13 @@ from typing import Any
 import click
 
 from raidar.analysis.sources import AnalysisInputError, JobDir, default_lock, read_lock
-from raidar.commands.assess_grading import RegradeOptions, grade_pre_fix, regrade
+from raidar.commands.assess_grading import (
+    RegradeOptions,
+    check_coverage,
+    grade_pre_fix,
+    produce_coverage,
+    regrade,
+)
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.job_layout import JOB_MANIFEST, LegacyJobError, is_legacy_job, legacy_job_message
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
@@ -68,9 +83,18 @@ def _emit(report: dict[str, object], out: Path | None) -> None:
 
 
 def _regrade(
-    target: Path, options: RegradeOptions, out: Path | None, store: Path | None = None
+    target: Path,
+    options: RegradeOptions,
+    out: Path | None,
+    store: Path | None = None,
+    *,
+    coverage_check: bool = False,
 ) -> None:
-    report = regrade(target, options, store)
+    report = (
+        check_coverage(target, options, store)
+        if coverage_check
+        else regrade(target, options, store)
+    )
     _emit(report, out)
     if not report["match"]:
         raise click.exceptions.Exit(1)
@@ -224,12 +248,12 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     if store.resolve().is_relative_to(request.target.resolve()):
         raise click.UsageError("--store must not be inside the job being rescored")
     _check_as1(request.target, request.lock, request.scorer_refs, request.bundle)
+    options = RegradeOptions(docker_context=request.docker_context, bundle_override=request.bundle)
     graded = grade_pre_fix(
-        request.target,
-        store,
-        request.scorer_refs,
-        RegradeOptions(docker_context=request.docker_context, bundle_override=request.bundle),
-        replay=request.replay,
+        request.target, store, request.scorer_refs, options, replay=request.replay
+    )
+    covered = produce_coverage(
+        request.target, store, request.scorer_refs, options, replay=request.replay
     )
     try:
         settings, config_path = _settings(request)
@@ -248,7 +272,14 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
         # ValueError covers unknown references, invalid run inputs and rejected scorer output.
         raise click.ClickException(str(exc)) from exc
     report = {"config": str(config_path) if config_path else None, **report_payload(records)}
-    _emit({**report, **({"pre_fix_grading": graded} if graded is not None else {})}, out)
+    _emit(
+        {
+            **report,
+            **({"pre_fix_grading": graded} if graded is not None else {}),
+            **({"offline_coverage": covered} if covered is not None else {}),
+        },
+        out,
+    )
 
 
 @click.command()
@@ -310,6 +341,15 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     help="Verifier bundle location if it moved (its digest must still match the records).",
 )
+@click.option(
+    "--coverage-check",
+    is_flag=True,
+    help=(
+        "With --regrade, instead check the offline coverage pass: make every step's coverage "
+        "run from its stored snapshot and compare it with the trial's own coverage pass (or "
+        "the --store run of a deferred step); writes nothing."
+    ),
+)
 @click.option("--docker-context", default="orbstack", show_default=True)
 @click.option(
     "--out", type=click.Path(dir_okay=False, path_type=Path), help="Write the report here."
@@ -324,14 +364,17 @@ def assess(
     replay: bool,
     jev_replay_only: bool,
     bundle_override: Path | None,
+    coverage_check: bool,
     docker_context: str,
     out: Path | None,
 ) -> None:
     """Re-assess stored jobs without re-running agents."""
+    if coverage_check and regrade_target is None:
+        raise click.UsageError("--coverage-check applies to --regrade only")
     if regrade_target is not None and rescore_target is None:
         _check_as1(regrade_target, lock_path, (), bundle_override)
         options = RegradeOptions(docker_context=docker_context, bundle_override=bundle_override)
-        _regrade(regrade_target, options, out, store)
+        _regrade(regrade_target, options, out, store, coverage_check=coverage_check)
     elif rescore_target is not None and regrade_target is None:
         request = _RescoreRequest(
             rescore_target,

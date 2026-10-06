@@ -34,7 +34,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins import guardrails_v3, guardrails_v4
+from raidar.components.builtins import guardrails_v3, guardrails_v4, guardrails_v5
 from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
 from raidar.components.integrity import condition_step_flags
@@ -49,6 +49,7 @@ from tests.component_trial_support import (
     run_trial_sync,
 )
 from tests.python_guardrails_support import (
+    CANARY_PACK,
     PACKS,
     PackUnderTest,
     assemble_verify_root,
@@ -300,6 +301,7 @@ INSTALL = {
     ),
 }
 INSTALL[4] = INSTALL[3]
+INSTALL[5] = INSTALL[3]
 MUTATED = {
     1: ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F"),
     3: ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F", "TEST.coverage-minimum"),
@@ -327,11 +329,14 @@ MUTATE[4] = MUTATE[3] + (
     "/tmp/mutant/lib/guardrails/scope.py"
 )
 
+MUTATED[5], MUTATE[5] = MUTATED[4], MUTATE[4]
+INSTALLERS = {3: guardrails_v3, 4: guardrails_v4, 5: guardrails_v5}
+
 
 def _install(pack: PackUnderTest) -> str:
     if pack.version == 1:
         return install_script(VERIFY_SLUG)
-    return (guardrails_v3 if pack.version == 3 else guardrails_v4).install_script()
+    return INSTALLERS[pack.version].install_script()
 
 
 @coverage_verification
@@ -346,7 +351,7 @@ def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
     (root / "run.sh").write_text(
         VERIFY_SCRIPT.format(
             install=INSTALL[version].format(slug=VERIFY_SLUG),
-            pack_args="" if version == 1 else f"--pack {version}",
+            pack_args="" if version == 1 else f"--pack {CANARY_PACK.get(version, version)}",
             mutate=MUTATE[version],
             mutated=",".join(mutated),
         )

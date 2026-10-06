@@ -414,6 +414,25 @@ def _errata_config_issues(spec: ExperimentSpec) -> list[FieldIssue]:
     ]
 
 
+# Scorers whose G reads only the trial's own coverage pass (``g-kernel-input.json``).
+IN_TRIAL_COVERAGE_SCORERS = frozenset({"code-quality@1"})
+
+
+def _verifier_coverage_issues(spec: ExperimentSpec) -> list[FieldIssue]:
+    """A deferred coverage pass needs a scorer that reads the offline run."""
+    if spec.protocol.verifier_coverage != "offline":
+        return []
+    return [
+        FieldIssue(
+            "assessment.scorers",
+            f"{ref} reads G only from the trial's coverage pass, which "
+            "protocol.verifier_coverage 'offline' defers; declare code-quality@2",
+        )
+        for ref in spec.assessment.scorers
+        if ref in IN_TRIAL_COVERAGE_SCORERS
+    ]
+
+
 def semantic_issues(
     spec: ExperimentSpec,
     metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
@@ -445,6 +464,7 @@ def semantic_issues(
             spec, _default_protocol_config() if protocol_config is None else protocol_config
         ),
         *_errata_config_issues(spec),
+        *_verifier_coverage_issues(spec),
     ]
     labels = [*kind_issues(spec), *(name_issues(spec, path) if naming else [])]
     if structural:

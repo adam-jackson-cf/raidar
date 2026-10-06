@@ -30,6 +30,7 @@ from raidar.execution.environment import (
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
 from raidar.execution.run import JobContext, execute, load_problems
+from raidar.execution.trial_config import harbor_trial_config
 from raidar.packs.python import load_pack_spec
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
@@ -152,6 +153,37 @@ def _plan(tmp_path: Path, fixture: ImportedFixture, **changes: Any) -> Any:
         pack=load_pack_spec(),
         options=PlanOptions(attempts=(0,)),
     )
+
+
+@pytest.mark.parametrize(
+    ("protocol", "coverage", "timeout"),
+    [({}, True, 2 * 900 + 600), ({"verifier_coverage": "offline"}, False, 900 + 600)],
+)
+def test_the_verifier_runs_the_coverage_pass_unless_the_protocol_defers_it(
+    tmp_path: Path,
+    fixture_problem: ImportedFixture,
+    monkeypatch: pytest.MonkeyPatch,
+    protocol: dict[str, str],
+    coverage: bool,
+    timeout: int,
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    monkeypatch.setattr(
+        "raidar.execution.trial_config.with_host_auth", lambda config, harness: config
+    )
+    plan = _plan(tmp_path, fixture_problem, protocol=protocol)
+
+    config = harbor_trial_config(
+        plan,
+        plan.selected_trials()[0],
+        tmp_path / "task",
+        trials_dir=tmp_path / "trials",
+        bundle_root=tmp_path / "bundle",
+        docker_context="orbstack",
+    )
+
+    assert config.verifier.kwargs["coverage"] is coverage
+    assert config.verifier.override_timeout_sec == timeout
 
 
 def test_a_run_materialises_each_trial_and_writes_step_results(

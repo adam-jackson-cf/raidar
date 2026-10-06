@@ -8,13 +8,32 @@ from raidar.analysis.curves import Band, Curve
 from raidar.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.analysis.gate_effort import GateDescriptive
 from raidar.analysis.manipulation import CheckSeparation, ManipulationReport
-from raidar.analysis.outcomes import GATE_METRICS, GATE_PREFIX
+from raidar.analysis.outcomes import ALL_METRICS, GATE_METRICS, GATE_PREFIX
 from raidar.analysis.ranking import Ranking, RankingRow
 from raidar.analysis.report import AnalysisReport, ArmSummary, Comparison
 from raidar.analysis.stats import confidence_label
 from raidar.scorers.gate_effort.families import FAMILIES
+from raidar.scorers.sdk.manifest import Direction
 
 MISSING = "—"
+BETTER = {
+    Direction.HIGHER_BETTER: "↑ higher",
+    Direction.LOWER_BETTER: "↓ lower",
+    Direction.NEUTRAL: "neutral",
+}
+"""How each compared metric's ``Better`` cell reads (the direction its scorer declares)."""
+DIRECTIONS = {metric.id: metric.direction for metric in ALL_METRICS}
+BETTER_LEGEND = (
+    "Better: the direction the metric's scorer declares (↑ higher is better, ↓ lower is "
+    "better); Δ is treatment minus baseline, so whether a Δ is an improvement depends on it. "
+    "Every quality component (V, E, H, R, G) is a score where higher is better (erosion E is 1 "
+    "minus the share of code mass in complex functions)."
+)
+
+
+def _better(metric: str, direction: Direction | None = None) -> str:
+    found = direction if direction is not None else DIRECTIONS.get(metric)
+    return BETTER[found] if found is not None else MISSING
 
 
 def _num(value: float | None) -> str:
@@ -60,6 +79,7 @@ def _arm_row(arm: ArmSummary) -> list[str]:
 def _effect_row(effect: Effect) -> list[str]:
     return [
         effect.metric,
+        _better(effect.metric, effect.direction),
         effect.view,
         effect.problem,
         str(effect.n_pairs),
@@ -78,7 +98,12 @@ def _band(band: Band) -> str:
 
 
 def _curve(curve: Curve) -> list[str]:
-    lines = [f"#### {curve.label} (`{curve.series}`, {curve.view} view, {curve.problem})", ""]
+    direction = DIRECTIONS.get(curve.series)
+    better = "" if direction is None else f"; better: {BETTER[direction]}"
+    lines = [
+        f"#### {curve.label} (`{curve.series}`, {curve.view} view, {curve.problem}{better})",
+        "",
+    ]
     rows = (
         [point.step, _band(point.baseline), _band(point.treatment), _band(point.delta)]
         for point in curve.points
@@ -143,6 +168,17 @@ def _gate_mean(arm: ArmSummary, metric: str) -> float | None:
     return item.mean if item is not None else None
 
 
+UNTYPED_CALL_ROW = "typing: of which no-untyped-call (call-site cascade)"
+"""gate-effort@6 reports the mypy ``no-untyped-call`` cascade apart from the typing family."""
+
+
+def _cascade_row(arms: Sequence[ArmSummary]) -> list[list[str]]:
+    metric = f"{GATE_PREFIX}total_first_run_untyped_call"
+    if not any(metric in (arm.gate_effort or {}) for arm in arms):
+        return []
+    return [[UNTYPED_CALL_ROW, *(f"{_num(_gate_mean(arm, metric))} / —" for arm in arms)]]
+
+
 def _family_row(family: str, arms: Sequence[ArmSummary]) -> list[str]:
     kinds = ("total_first_run_blocking", "total_blocking_findings")
     return [
@@ -160,7 +196,7 @@ def _descriptive_rows(
     """One row per metric any column reports: the metric, then each column's descriptive."""
     reported = {metric for column in columns for metric in column}
     return [
-        [metric, *(_descriptive(column.get(metric)) for column in columns)]
+        [metric, _better(metric), *(_descriptive(column.get(metric)) for column in columns)]
         for metric in metrics
         if metric in reported
     ]
@@ -182,12 +218,21 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         "first-run values only; under gate-effort@3 a step with no source change is not "
         "applicable to first-pass clean; gate-effort@4 and @5 add the tests check and "
         "fix_round_correctness_delta (final minus pre-fix case pass rate over steps with a fix "
-        "round; not applicable to a shadow gate).",
+        "round; not applicable to a shadow gate); gate-effort@6 counts a failed tests check "
+        "once in every blocking count and adds blocking counts that compare across gate "
+        "modes (total_new_first_run_blocking: what each step's own work added before any "
+        "fix; final_step_end_blocking: the tree the last step handed on; a shadow gate's "
+        "total_first_run_blocking re-counts the accumulated tree at every step), the mypy "
+        "no-untyped-call cascade apart, and failing tests and missed coverage as separate "
+        "first-run outcomes.",
         "",
-        *_table(("Metric", *names), rows),
+        *_table(("Metric", "Better", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
         "",
-        *_table(("Family", *names), (_family_row(family, arms) for family in FAMILIES)),
+        *_table(
+            ("Family", *names),
+            [*(_family_row(family, arms) for family in FAMILIES), *_cascade_row(arms)],
+        ),
     ]
 
 
@@ -199,14 +244,16 @@ def _process_arms(report: AnalysisReport) -> list[str]:
     rows = _descriptive_rows(columns, sorted({metric for column in columns for metric in column}))
     return [
         "",
-        "## Process outcomes (process-compliance@3, per arm)",
+        f"## Process outcomes ({report.process_scorer or 'process-compliance@3'}, per arm)",
         "",
         "Mean [CI] n over valid trials; stall_rate is the share of reached steps in which a "
         "session changed nothing and ended asking a question (continue-on-stall@1; @2 also "
         "counts a no-edit refusal, and only each step's first session); an arm "
-        "without the stall wrapper has no value (not applicable), never 0.",
+        "without the stall wrapper has no value (not applicable), never 0. "
+        "process-compliance@4 counts a test command as a test run only when its output does "
+        "not say its runner was not found (total_test_commands_not_run counts those).",
         "",
-        *_table(("Metric", *[arm.arm for arm in arms]), rows),
+        *_table(("Metric", "Better", *[arm.arm for arm in arms]), rows),
     ]
 
 
@@ -216,7 +263,7 @@ def _process_effects(comparison: Comparison) -> list[str]:
     if not comparison.process_effects:
         return []
     header = (
-        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "CI",
+        "Metric", "Better", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "CI",
         "Verdict", "Excluded", "Cost Δ USD",
     )  # fmt: skip
     return [
@@ -232,7 +279,7 @@ def _gate_effects(comparison: Comparison) -> list[str]:
     if not comparison.gate_effects:
         return []
     header = (
-        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "CI",
+        "Metric", "Better", "View", "Problem", "n", "Baseline", "Treatment", "Δ", "CI",
         "Verdict", "Excluded", "Cost Δ USD",
     )  # fmt: skip
     return [
@@ -280,7 +327,7 @@ def _primary_lines(comparison: Comparison) -> list[str]:
 
 def _comparison(comparison: Comparison, confidence: float) -> list[str]:
     header = (
-        "Metric", "View", "Problem", "n", "Baseline", "Treatment", "Δ",
+        "Metric", "Better", "View", "Problem", "n", "Baseline", "Treatment", "Δ",
         f"{confidence_label(confidence)} CI",
         "Verdict", "Excluded", "Cost Δ USD",
     )  # fmt: skip
@@ -290,6 +337,8 @@ def _comparison(comparison: Comparison, confidence: float) -> list[str]:
         *_primary_lines(comparison),
         "",
         "### Effects",
+        "",
+        BETTER_LEGEND,
         "",
         *_table(header, (_effect_row(effect) for effect in comparison.effects)),
         *_mcnemar([e for e in comparison.effects if e.mcnemar is not None]),

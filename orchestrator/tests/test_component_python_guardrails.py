@@ -47,6 +47,7 @@ from raidar.execution.models import ProbeSummary
 from raidar.spec.references import RefKind, RegistryRef
 from tests.component_support import compile_uses, use, write_jsonl, write_step_reports
 from tests.python_guardrails_support import (
+    CANARY_PACK,
     COMMIT_SCRIPT,
     PACKS,
     VERIFY_DIR,
@@ -751,7 +752,7 @@ def test_the_canary_specs_are_what_the_fixture_generator_writes(
             str(tmp_path / "fx"),
             str(lock),
             str(specs),
-            *(["--pack", str(version)] if version != 1 else []),
+            *(["--pack", str(CANARY_PACK.get(version, version))] if version != 1 else []),
         ],
         check=True,
         timeout=60,

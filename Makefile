@@ -176,10 +176,12 @@ help:
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
-	@echo "                                                        (process-compliance@2/@3 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
-	@echo "                                                        with gate-effort@4/@5 it first grades guardrail-gate@3 pre-fix snapshots into STORE: OrbStack)"
-	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [REGRADE_OUT=report.json]"
-	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ"
+	@echo "                                                        (process-compliance@2-@4 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
+	@echo "                                                        with gate-effort@4-@6 it first grades guardrail-gate@3 pre-fix snapshots into STORE, and with"
+	@echo "                                                        code-quality@2 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: OrbStack)"
+	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1] [REGRADE_OUT=report.json]"
+	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
+	@echo "                                                        COVERAGE_CHECK=1 instead makes each step's coverage run offline and compares it with the trial's own (or STORE's)"
 	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1]"
 	@echo "                                                        Paired deltas, CIs, curves, verdicts and sample size vs the baseline arm (thresholds from the lock;"
 	@echo "                                                        overrides are labelled); benchmarks add a ranking view, smoke reports are stamped not citable"
@@ -511,7 +513,7 @@ experiment-assess:
 
 assess-regrade:
 	$(call require_var,JOB)
-	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(COVERAGE_CHECK),--coverage-check,) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
 
 experiment-analyze:
 	$(call require_var,JOBS)

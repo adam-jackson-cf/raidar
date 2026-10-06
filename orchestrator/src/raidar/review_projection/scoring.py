@@ -21,9 +21,9 @@ from raidar.review_projection.assessments import TrialAssessments
 from raidar.review_projection.headline import (
     COMPONENT_METRICS,
     CORRECTNESS_SCORER,
-    QUALITY_SCORER,
     Headline,
     policy_shares,
+    quality_scorer,
 )
 from raidar.review_projection.notes import EvidenceRef, Finding
 from raidar.review_projection.spans import SpanBuilder
@@ -124,7 +124,7 @@ def _component_payload(component: str, observation: Observation | None, weight: 
         "evidence": (
             f"problem-level mean {observation.value:.3f}"
             if measured and observation and observation.value is not None
-            else (observation.reason if observation else "no code-quality@1 Assessment")
+            else (observation.reason if observation else "no code-quality Assessment")
         ),
     }
 
@@ -132,18 +132,19 @@ def _component_payload(component: str, observation: Observation | None, weight: 
 def _quality(ctx: ScoringContext, scoring: str) -> None:
     policy = DEFAULT_METRIC_REGISTRY.get(ctx.headline.policy)
     weights = policy.inertia_weights
+    quality = quality_scorer(ctx.assessments)
     area = None
     if ctx.headline.quality is not None:
         _, inertia = policy_shares(policy)
         area = ctx.builder.add(
-            name=f"scorer:{QUALITY_SCORER}",
+            name=f"scorer:{quality}",
             span_type="INTERNAL",
             status="OK",
             parent=scoring,
             start=ctx.start,
             output_value={
-                "scorer_id": QUALITY_SCORER,
-                "version": 1,
+                "scorer_id": quality,
+                "version": int(quality.rsplit("@", 1)[1]),
                 "weight": inertia,
                 "score": ctx.headline.quality,
                 "category": "quality",
@@ -191,14 +192,15 @@ def _scoring_summary(ctx: ScoringContext) -> dict[str, object]:
 
 
 def _evidence_findings(ctx: ScoringContext) -> list[Finding]:
-    assessment = ctx.assessments.get(QUALITY_SCORER)
+    quality = quality_scorer(ctx.assessments)
+    assessment = ctx.assessments.get(quality)
     if assessment is None:
         return []
     by_metric: dict[str, list[EvidenceRef]] = {}
     for item in assessment.result.evidence:
         refs = by_metric.setdefault(item.metric, [])
         refs.extend(
-            EvidenceRef(f"{QUALITY_SCORER} {item.subject}", location, item.message or item.kind)
+            EvidenceRef(f"{quality} {item.subject}", location, item.message or item.kind)
             for location in item.locations()
         )
     components = {metric: key for key, metric in COMPONENT_METRICS.items()}
