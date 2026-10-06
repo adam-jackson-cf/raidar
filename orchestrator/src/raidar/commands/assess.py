@@ -21,7 +21,7 @@ is parked and its policy is off) get a runtime whose audit and cache live in
 ``--store``; ``--jev-replay-only`` answers from that cache alone and never
 calls the provider. ``process-compliance@2`` binds no Jev runtime.
 
-Pre-fix grades: when a scorer run reads them (``gate-effort@4``), ``--rescore``
+Pre-fix grades: when a scorer run reads them (``gate-effort@4``/``@5``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
 yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
 bundle, sandbox and timeout, on ``--docker-context``), never into the job, and

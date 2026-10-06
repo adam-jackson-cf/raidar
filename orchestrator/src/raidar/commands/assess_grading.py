@@ -23,7 +23,7 @@ from raidar.verifier.prefix_grade import grade_pre_fix_path, regrade_pre_fix_pat
 from raidar.verifier.regrade import RegradeError, RegradeOptions, regrade_path
 
 # Scorers that read the offline grades of guardrail-gate@3's pre-fix snapshots.
-PRE_FIX_GRADE_SCORERS = frozenset({"gate-effort@4"})
+PRE_FIX_GRADE_SCORERS = frozenset({"gate-effort@4", "gate-effort@5"})
 
 
 def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[str, Any]:

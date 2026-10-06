@@ -90,7 +90,13 @@ ANALYSED_SCORERS = (CORRECTNESS_REF, CODE_QUALITY_REF, RESOURCE_USAGE_REF)
 # in preference order: ``@2`` also reads a shadow gate's first-run outcomes, ``@4`` the
 # tests check and the fix rounds' correctness.
 GATE_EFFORT_REF = "gate-effort@1"
-GATE_EFFORT_REFS = ("gate-effort@4", "gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
+GATE_EFFORT_REFS = (
+    "gate-effort@5",
+    "gate-effort@4",
+    "gate-effort@3",
+    "gate-effort@2",
+    GATE_EFFORT_REF,
+)
 _COST_TOTALS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")
 PASS_RATE = "strict_pass_rate"
 _CHECKPOINT_SOURCES = {

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Write one passing and one violating fixture per applicable rule, plus specs.json.
 
-    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE [--pack 3]
+    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE [--pack 3|4]
 
 ``--pack 3`` writes python-guardrails@3's set (``specs-3.json``): every @1
 canary, the tests check's canaries (``TEST.*``), and a commit canary whose
 clean workspace has a test (the @3 gate refuses a change with none).
+``--pack 4`` writes python-guardrails@4's (``specs-4.json``): @3's plus the
+scope canaries (``SCOPE.*``: an extensionless python script, and the target of
+a ``.py`` symlink, are checked).
 
 LOCK_FILE is a ``uv.lock`` for the canary's demo project (``name = "demo"``, no
 dependencies), produced by the uv that the gate will run, so the lockfile
@@ -363,8 +366,10 @@ def main(argv: list[str]) -> None:
     commit_ok = ok if pack == "1" else with_test("mod.py", MODULE, UNIT_TEST)
     add("RUNNER.local-ci-parity", "F401", commit_ok, "import os\n", mode="commit")
     add("TEST.tiers", "F401", ok, "import os\n")
-    if pack == "3":
+    if pack in ("3", "4"):
         add_tests_check()
+    if pack == "4":
+        add_scope()
     Path(argv[2]).write_text(json.dumps(SPECS, indent=2, sort_keys=True) + "\n")
 
 
@@ -495,6 +500,19 @@ def add_tests_check() -> None:
         with_test("mod.py", MODULE, WRITING_TEST, expected=5),
         mode="workspace-clean",
     )
+
+
+# ---- python-guardrails@4: the gate's scope ----------------------------------------------
+
+SHEBANG = "#!/usr/bin/env python3\n"
+
+
+def add_scope() -> None:
+    """Python files without a ``.py`` name are checked (python-guardrails@4)."""
+    script = SHEBANG + CANARY_PATH.format("tool")
+    add("SCOPE.shebang-script", "F401", script + "VALUE: int = 1\n", script + "import os\n")
+    linked = CANARY_PATH.format("tool") + "# canary-symlink: tool.py=tool\n"
+    add("SCOPE.py-symlink", "F401", linked + "VALUE: int = 1\n", linked + "import os\n")
 
 
 if __name__ == "__main__":

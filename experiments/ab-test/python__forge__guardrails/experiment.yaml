@@ -1,7 +1,12 @@
 # Guardrails A/B on forge: does a repository that refuses a commit until a mechanical
 # Python guardrail gate passes change correctness and quality, against the shared framing alone?
 # Explore iteration 3 (rationale.md section 12): the gate also runs the agent's OWN tests.
-# r2 gets python-guardrails@3 (the @1 rule set and pins byte for byte, plus the tests check:
+# Iteration 3b (rationale.md section 13, after smoke-03): python-guardrails@4 (@3 whose gate also
+# checks extensionless python scripts and the targets of .py symlinks), continue-on-stall@2
+# (no-edit refusals stall too; one continuation per step, for its first session only) and
+# transient-retry@1 (a session the provider drops is retried, at most twice), both shared;
+# scorer gate-effort@5 (@4 with v4-family evidence text).
+# r2 gets python-guardrails@4 (the @1 rule set and pins byte for byte, plus the tests check:
 # unittest always, pytest for pytest-style tests, both under coverage; a Python change with no
 # test that ran is refused, so are failing tests and owned line coverage below 85%), installed
 # once per trial at environment start (root-owned under /opt/raidar-tools/python-guardrails,
@@ -11,13 +16,15 @@
 # snapshot). r1 gets the same pack without the workspace copies and the same gate in shadow
 # mode (recorded at each step's end outside /app, never enforced; its test run happens in a
 # throwaway copy, so nothing reaches /app).
-# Both arms share the starter framing and continue-on-stall@1: a session that changes nothing
-# and ends asking a question gets one continuation (no human is available; proceed on the spec
-# and reasonable assumptions recorded in ASSUMPTIONS.md), before the gate runs.
+# Both arms share the starter framing, continue-on-stall@2 (a step whose first session changes
+# nothing and ends asking a question or saying it cannot proceed without more information gets
+# one continuation: no human is available; proceed on the spec and reasonable assumptions
+# recorded in ASSUMPTIONS.md, before the gate runs) and transient-retry@1.
 # No rules text tells the agent about the gate in advance (the mechanical rung only).
 # Objective: explore (smallest runs: 1 trial per arm first, then at most 4 attempts per arm).
 # Verdicts below min_pairs read insufficient by design.
-# Pre-registration: rationale.md beside this file. Section 12 (iteration 3) pre-registers the
+# Pre-registration: rationale.md beside this file. Section 13 (iteration 3b) amends section 12,
+# which pre-registers the
 # hypothesis (enforcing the agent's own tests prevents fix-round regressions) and the secondary
 # outcomes (gate.fix_round_correctness_delta, process.stall_rate, coverage, gate effort); the
 # primary stays solve_rate_errata with raw solve_rate beside it.
@@ -56,12 +63,15 @@ protocol:
 factors: [condition]
 
 # Both arms get the same framing (pilot v2): where to work, that /app may start empty,
-# what to build, and that nobody answers questions; and the same stall continuation
-# (continue-on-stall@1, a session wrapper: it runs inside the gate, before the gate runs).
+# what to build, and that nobody answers questions; the same stall continuation
+# (continue-on-stall@2, a session wrapper: it runs inside the gate, before the gate runs, and
+# only a step's first session can be continued); and the same retry of a session the model
+# provider drops (transient-retry@1, innermost: at most 2 retries, 60 s then 180 s apart).
 shared_components:
   - use: prompt-wrapper@1
     files: [components/shared/starter-framing.md]
-  - use: continue-on-stall@1
+  - use: continue-on-stall@2
+  - use: transient-retry@1
 
 conditions:
   - id: r1-baseline
@@ -70,7 +80,7 @@ conditions:
       # workspace: the agent sees no ruff.toml or mypy.ini. Its probe proves at every step the
       # pinned tools, the install-time smoke and an unchanged tool tree, and at step 1 that no
       # config copy is in /app.
-      - use: python-guardrails@3
+      - use: python-guardrails@4
         with:
           workspace_configs: false
       # The same commit check in shadow mode: run once at each step's end against a git
@@ -90,7 +100,7 @@ conditions:
       # the pinned versions, the install-time smoke (a clean file with its test passes, an
       # unused import is refused) and an unchanged tool tree; its integrity flags record
       # config-copy edits, tree changes and hook-bypass attempts without failing the step.
-      - use: python-guardrails@3
+      - use: python-guardrails@4
         with:
           workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
@@ -117,7 +127,9 @@ assessment:
   # (first run and step end, owned coverage) and fix_round_correctness_delta (final minus
   # pre-fix case pass rate; make experiment-assess grades the pre-fix snapshots into the
   # store first); process-compliance@3 is @2 plus stall_rate (continue-on-stall@1 records).
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@3, gate-effort@4]
+  # Iteration 3b: gate-effort@5 is @4 with the gate runs' evidence summaries counting TEST.*
+  # findings in the tests family (values unchanged).
+  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@3, gate-effort@5]
   metric: scb-canonical@2
 
 analysis:

@@ -69,7 +69,13 @@ EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
 PROCESS_COMPLIANCE_REFS = ("process-compliance@3", "process-compliance@2", "process-compliance@1")
-GATE_EFFORT_REFS = ("gate-effort@4", "gate-effort@3", "gate-effort@2", "gate-effort@1")
+GATE_EFFORT_REFS = (
+    "gate-effort@5",
+    "gate-effort@4",
+    "gate-effort@3",
+    "gate-effort@2",
+    "gate-effort@1",
+)
 GATE_CLEAN = "gate_clean_at_step_end"
 PROCESS_SOURCE = "process-compliance"
 GATE_SOURCE = "gate-effort"

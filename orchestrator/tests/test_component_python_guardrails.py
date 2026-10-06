@@ -664,6 +664,7 @@ def test_every_implemented_rule_has_a_canary_spec_and_no_skill_file_is_vendored(
         "make_fixtures.py",
         "run_canaries.py",
         "specs-3.json",
+        "specs-4.json",
         "specs.json",
     ]
 

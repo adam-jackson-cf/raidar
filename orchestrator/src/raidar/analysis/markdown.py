@@ -180,7 +180,7 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         "Mean [CI] n over valid trials; an arm without the commit gate has no value "
         "(not applicable), never 0; an arm with a shadow gate (gate-effort@2 and later) has its "
         "first-run values only; under gate-effort@3 a step with no source change is not "
-        "applicable to first-pass clean; gate-effort@4 adds the tests check and "
+        "applicable to first-pass clean; gate-effort@4 and @5 add the tests check and "
         "fix_round_correctness_delta (final minus pre-fix case pass rate over steps with a fix "
         "round; not applicable to a shadow gate).",
         "",
@@ -202,7 +202,8 @@ def _process_arms(report: AnalysisReport) -> list[str]:
         "## Process outcomes (process-compliance@3, per arm)",
         "",
         "Mean [CI] n over valid trials; stall_rate is the share of reached steps in which a "
-        "session changed nothing and ended asking a question (continue-on-stall@1); an arm "
+        "session changed nothing and ended asking a question (continue-on-stall@1; @2 also "
+        "counts a no-edit refusal, and only each step's first session); an arm "
         "without the stall wrapper has no value (not applicable), never 0.",
         "",
         *_table(("Metric", *[arm.arm for arm in arms]), rows),

@@ -41,7 +41,13 @@ from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observat
 from raidar.scorers.store import Assessment
 
 GATE_EFFORT_REF = "gate-effort@1"
-GATE_EFFORT_REFS = ("gate-effort@4", "gate-effort@3", "gate-effort@2", GATE_EFFORT_REF)
+GATE_EFFORT_REFS = (
+    "gate-effort@5",
+    "gate-effort@4",
+    "gate-effort@3",
+    "gate-effort@2",
+    GATE_EFFORT_REF,
+)
 """Read in preference order: a trial assessed with ``@2`` or later shows a shadow gate's cells."""
 STEP_CELLS = (
     "gate_runs",

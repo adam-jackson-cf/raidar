@@ -7,8 +7,9 @@ Runs inside the pack image against the installed pack
 (``$GUARDRAILS_HOME``, default ``/opt/raidar-tools/python-guardrails``).
 FIXTURE is one file. Its first lines may be ``# canary-path: rel/path.py``
 (where to place it in the throwaway workspace), ``# canary-extra:
-rel/path=<text with \\n escapes>`` (extra files) and ``# canary-after-commit:
-rel/path=<text>`` (files written after the ``since-commit`` baseline commit).
+rel/path=<text with \\n escapes>`` (extra files), ``# canary-after-commit:
+rel/path=<text>`` (files written after the ``since-commit`` baseline commit) and
+``# canary-symlink: rel/link=target`` (a symlink to ``target``, relative to the link).
 CODES is a comma list of gate codes (prefix match, e.g. ``MYPY.no-untyped-def`` or ``PLR0913``).
 
 Modes:
@@ -77,6 +78,9 @@ def _layout(fixture: Path, workspace: Path) -> Path:
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_bytes(raw)
     _write(workspace, _header_files(raw, "# canary-extra:"))
+    for link, points_to in _header_files(raw, "# canary-symlink:"):
+        (workspace / link).parent.mkdir(parents=True, exist_ok=True)
+        (workspace / link).symlink_to(points_to)
     return target
 
 

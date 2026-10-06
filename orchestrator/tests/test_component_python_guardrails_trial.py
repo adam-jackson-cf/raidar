@@ -9,12 +9,13 @@
 - The rule tests (``make guardrails-verify``; opt-in with
   ``RAIDAR_GUARDRAILS_VERIFY=1`` because it runs two canary gate runs per rule),
   for each pack under verification (python-guardrails@1, whose payload @2
-  installs, and @3): every implemented rule's violating canary fires and its
+  installs, @3 and @4): every implemented rule's violating canary fires and its
   clean canary passes (``run_canaries.py``) against the pack installed in the
   image by its own install script, the parity canary through the experiment's
   guardrail-gate commit script; a mutant pack with checkers disabled (three,
-  and @3's coverage minimum) must fail exactly those rules' violating
-  canaries. No file of the setup-repository-guardrails skill is involved.
+  and @3's and @4's coverage minimum) must fail exactly those rules' violating
+  canaries (@4's mutant also has its scope reduced to @3's, so both ``SCOPE.*``
+  canaries must fail). No file of the setup-repository-guardrails skill is involved.
 """
 
 from __future__ import annotations
@@ -33,7 +34,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins import guardrails_v3
+from raidar.components.builtins import guardrails_v3, guardrails_v4
 from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
 from raidar.components.integrity import condition_step_flags
@@ -298,9 +299,18 @@ INSTALL = {
         " >/dev/null"
     ),
 }
+INSTALL[4] = INSTALL[3]
 MUTATED = {
     1: ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F"),
     3: ("PYQ200", "RUFF.SELECT.C901", "RUFF.SELECT.F", "TEST.coverage-minimum"),
+    4: (
+        "PYQ200",
+        "RUFF.SELECT.C901",
+        "RUFF.SELECT.F",
+        "TEST.coverage-minimum",
+        "SCOPE.shebang-script",
+        "SCOPE.py-symlink",
+    ),
 }
 MUTATE = {
     1: "",
@@ -309,10 +319,19 @@ MUTATE = {
         "/tmp/mutant/lib/guardrails/tests_check.py"
     ),
 }
+MUTATE[4] = MUTATE[3] + (
+    "\n"
+    'sed -i "s/^SHEBANG_PREFIX = b\\"#!\\"/SHEBANG_PREFIX = b\\"#!never\\"/" '
+    "/tmp/mutant/lib/guardrails/scope.py\n"
+    'sed -i "s/if target is not None and target.resolve() not in seen:/if False:/" '
+    "/tmp/mutant/lib/guardrails/scope.py"
+)
 
 
 def _install(pack: PackUnderTest) -> str:
-    return install_script(VERIFY_SLUG) if pack.version == 1 else guardrails_v3.install_script()
+    if pack.version == 1:
+        return install_script(VERIFY_SLUG)
+    return (guardrails_v3 if pack.version == 3 else guardrails_v4).install_script()
 
 
 @coverage_verification

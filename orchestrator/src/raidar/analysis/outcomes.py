@@ -282,8 +282,8 @@ _GATE_V4_ONLY = frozenset(
 
 
 def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
-    """The gate outcomes a gate-effort version reports (``@4`` adds the tests check)."""
-    if ref == "gate-effort@4":
+    """The gate outcomes a gate-effort version reports (``@4`` and ``@5`` add the tests check)."""
+    if ref in {"gate-effort@4", "gate-effort@5"}:
         return GATE_METRICS
     return tuple(metric for metric in GATE_METRICS if metric.id not in _GATE_V4_ONLY)
 

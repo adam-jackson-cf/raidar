@@ -44,6 +44,7 @@ SDK_RUNTIME_SOURCES = [
 ]
 BUILTIN_REFS = [
     "continue-on-stall@1",
+    "continue-on-stall@2",
     "guardrail-gate@1",
     "guardrail-gate@2",
     "guardrail-gate@3",
@@ -56,11 +57,13 @@ BUILTIN_REFS = [
     "python-guardrails@1",
     "python-guardrails@2",
     "python-guardrails@3",
+    "python-guardrails@4",
     "review-loop@1",
     "review-loop@2",
     "rules-file@1",
     "skills@1",
     "stop-hook@1",
+    "transient-retry@1",
     "workspace-files@1",
 ]
 

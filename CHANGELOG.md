@@ -2,6 +2,23 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 3 results (iteration 3b)
+
+### Added
+
+- `python-guardrails@4` (`raidar.components.builtins.guardrails_v4`, payload `payloads/python_guardrails_4`): `@3` byte for byte except the gate's scope and its consumers. A Python file is also an extensionless regular file whose first line is a `#!` line naming `python`, or the in-workspace target of a `*.py` symlink (once, at the target's path). Ruff gets the extensionless files explicitly beside `.`, findings reported through a link are deduplicated, and the tests check's change detection sees the same files. Fixes `smoke-03` r2, where an extensionless `forge` script with a `forge.py` symlink was checked as 0 files. Two canaries (`SCOPE.shebang-script`, `SCOPE.py-symlink`; `specs-4.json`, `# canary-symlink:` fixture header) and a scope mutant in `make guardrails-verify`.
+- `continue-on-stall@2` (`raidar.components.builtins.stall_v2`, wrapper `raidar.components.continue_on_stall_v2`): `@1` plus problem-agnostic refusal patterns (first-person "can't/cannot/unable to ... without", "not enough/missing context or information", "... isn't defined/present", "doesn't define/specify") and at most one continuation per step: only the step's first session (no earlier record in the step's logs) is eligible; later sessions are recorded with `eligible: false` and `would_stall`.
+- `transient-retry@1` (`raidar.components.builtins.retry`, wrapper `raidar.components.transient_retry`): a session wrapper that reruns a session Harbor classified as a transient provider error (`ApiOverloadedError`, `ApiConnectionClosedError`, `ApiResponseStalledError`, `ApiInternalServerError`, `ApiRateLimitError`) after 60 s and then 180 s, at most twice, with a fixed preface; other errors pass through unchanged. Every attempt's logs (`transient-retry/attempt_<n>`), error class, wait and usage are recorded and summed; an outer wrapper can read the usage through a fresh instance from the record.
+- `gate-effort@5` (`raidar.scorers.gate_effort_v5`, store-bound): `@4`'s values with each gate run's evidence summary counting `TEST.*` in the `tests` family. Analysis, the manipulation check, the review surface and pre-fix grading accept `@5`.
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 3b, `rationale.md` §13, lock `8d8ad43b53d8`): both arms use `python-guardrails@4` and share `continue-on-stall@2` and `transient-retry@1`; scorer `gate-effort@5`. `rationale.md` §12.7 records the `smoke-03`/`smoke-03-r2` process check (no valid r2 trial; the C1 scope hole; per-session stall exposure; missed refusals).
+
+### Removed
+
+- The stale `isolation__env-6e9a50ac38-main-1` container (a 2026-10-02 pytest leftover of this worktree) from OrbStack.
+
 ## Unreleased - guardrails explore iteration 3
 
 ### Added

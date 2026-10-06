@@ -12,7 +12,7 @@
   guardrails-verify``), where the lock canary's ``uv.lock`` is made by the uv
   the gate runs.
 - ``PACKS``: the packs under verification: python-guardrails@1 (the payload of
-  @1 and @2, ``specs.json``) and @3 (``specs-3.json``).
+  @1 and @2, ``specs.json``), @3 (``specs-3.json``) and @4 (``specs-4.json``).
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ from typing import Any
 
 import yaml
 
-from raidar.components.builtins import guardrails, guardrails_v3
+from raidar.components.builtins import guardrails, guardrails_v3, guardrails_v4
 from raidar.components.gate_run_v2 import GateModeV2, gate_script
 from raidar.components.guardrail_gate_v3 import GuardrailGateOptionsV3
 from raidar.components.session_chain import InnerAgentSpec
@@ -35,7 +35,7 @@ from tests.experiment_spec_support import GUARDRAILS_EXPERIMENT
 VERIFY_DIR = Path(__file__).resolve().parent / "fixtures" / "python_guardrails"
 COMMIT_SCRIPT = "gate/guardrail-gate-commit.sh"
 CANARY_GATE_DIR = PurePosixPath("/tmp/guardrails-canary-gate")
-SPEC_FILES = ("specs.json", "specs-3.json")
+SPEC_FILES = ("specs.json", "specs-3.json", "specs-4.json")
 
 
 @dataclass(frozen=True)
@@ -74,6 +74,8 @@ TESTS_CHECK_BEHAVIOUR = frozenset(
     }
 )
 """python-guardrails@3's tests check behaviour (its codes are derived from the library)."""
+SCOPE_BEHAVIOUR = frozenset({"SCOPE.shebang-script", "SCOPE.py-symlink"})
+"""python-guardrails@4's scope: Python files without a ``.py`` name are checked."""
 
 PACKS = {
     1: PackUnderTest(
@@ -89,6 +91,13 @@ PACKS = {
         guardrails_v3.PAYLOAD_FILES,
         "specs-3.json",
         NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR,
+    ),
+    4: PackUnderTest(
+        4,
+        guardrails_v4.PAYLOAD_DIR,
+        guardrails_v4.PAYLOAD_FILES,
+        "specs-4.json",
+        NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR,
     ),
 }
 PACK_1 = PACKS[1]

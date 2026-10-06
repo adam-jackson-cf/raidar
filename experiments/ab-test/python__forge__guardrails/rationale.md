@@ -342,3 +342,71 @@ The install now runs at environment start (budget 20 s) and no tool runs per ste
 - **`fix_round_correctness_delta` describes r2 only** (a shadow gate has no fix round). It uses the tree the first fix session started from; later rounds' snapshots are recorded but not scored.
 - **The test run's interpreter** is the project's (`.venv/bin/python`, else `python3`); the gate's pytest and coverage are appended to its `PYTHONPATH`, after the project's own packages. Subprocess coverage relies on a start-up hook on that path; a test that clears the environment of its subprocess is not measured there.
 - **Stall detection is pattern-based and needs no file change.** A stall that edits a scratch file, or asks without a recognised pattern, is not continued; a no-edit session that ends with a question it does not need answered is continued once. Both are recorded.
+
+### 12.7 Process check: `smoke-03` and `smoke-03-r2` (recorded 2026-10-06, after the runs)
+
+Process check only (1 trial per arm under lock `bbefb1c79a7c`). Signals, not conclusions.
+
+- **Runs.** `smoke-03` (both arms, attempt 0, launched 22:19:20 UTC on 2026-10-05, 30 s after this section's commit) and `smoke-03-r2` (r2 only, a rerun after `smoke-03` r2 failed). r1 was valid. **No r2 trial was valid**: `smoke-03` r2 failed checkpoints 1, 4 and 6, and `smoke-03-r2` failed checkpoint 4, each with `stage_failed ApiOverloadedError` (Codex: "Selected model is at capacity"; one of them after the session had edited `/app`). Both r2 trial records fail the `agent_infra` validity check. `main-03` was **not started**.
+- **Process defect C1 (gate scope).** In `smoke-03` r2 the agent wrote the program as an extensionless `/app/forge` (a `#!/usr/bin/env python3` script) with `/app/forge.py` a symlink to it. `python-guardrails@3`'s scope (byte-identical to `@1`'s) counts only regular `*.py` files and skips symlinks, so every gate run of that trial checked **0 files**: no finding, no test required, every commit passed. A re-scan of every earlier job of this experiment (`smoke-01`, `smoke-02`, `main-02`, `smoke-03` r1, `smoke-03-r2`) found no other extensionless script or `.py` symlink, so earlier data is unaffected.
+- **Process defect (stall exposure).** `continue-on-stall@1` wraps every session the gate starts, so it continues **at most once per session, not once per step** (this section said "one continuation" per stalled session; with `max_rounds` 3 an r2 step had up to 4 chances against r1's 1). No step stalled in either job (0 continuations), so the data is unaffected, but `stall_rate` exposure was not equal across arms.
+- **Detection gap (K3).** `smoke-03` r2 checkpoints 2 and 3 were no-edit sessions that ended in a refusal, not a question ("I can't build a compatible `forge` CLI without that context"; "I can't implement blueprint lookup and allocation persistence without making those choices up"). `@1`'s patterns matched neither, so neither was continued.
+- **What worked (`smoke-03-r2` r2, 7 gated steps).** The tests check refused every first commit (7 of 7: `TEST.missing` at checkpoint 1, `TEST.coverage-minimum` at 72.7-76.7% owned coverage at checkpoints 2, 3 and 5-8, plus style and complexity findings); every refusal was clean after 1 fix round, coverage at step end 87.6-92.1%, tests grew from 7 to 22. The 7 pre-fix snapshots were graded, each digest matching its grade. `fix_round_correctness_delta` was **−0.0018** (per step: 0, 0, −0.0099, 0, +0.0047, +0.0199, −0.0271): fix rounds neither clearly helped nor hurt case pass rate. The pytest and coverage tools never reached the agent ("pytest is not installed", r2 at checkpoints 3 and 6-8). `per_step_reset` stayed at 1.0-1.3 s (one breach, 2.17 s at checkpoint 8).
+- **r1 (`smoke-03`, valid).** Solved checkpoints 1-2 (`solve_rate` 0.25); case pass rate 1.0, 1.0, then 0.94, 0.96, 0.96, 0.89, 0.88, 0.85. Shadow gate: 243 first-run blocking findings (typing 88, complexity 73, style 67, tests 8, defects 7), `tests_missing_rate` 1.0 (r1 wrote no test, as expected in 12.2). $0.041 per trial.
+- **Cost.** r2's `smoke-03-r2` session costs sum to about $0.130 (fix sessions included); the invalid trial's `resource-usage` total is null because a failed session reported no usage.
+
+Decision: fix the scope, the stall exposure and detection, and the provider drops as new versions under a new lock (section 13), then rerun the 1-trial-per-arm process check before any main job.
+
+## 13. Amendment: explore iteration 3b (2026-10-06, pre-registered before any job under its lock)
+
+Written after `smoke-03`/`smoke-03-r2` (12.7) and before any job under lock `8d8ad43b53d8`. Jobs under `bbefb1c79a7c` are never pooled with jobs under this lock. The objective stays **explore**: `smoke-04` (1 trial per arm) first, then `main-03` with at most 4 attempts per arm only if `smoke-04` is clean. Section 12's design, hypothesis and outcomes stand except where this section says otherwise.
+
+### 13.1 What changed (new versions; released versions untouched)
+
+| | Iteration 3 (`bbefb1c79a7c`) | Iteration 3b (`8d8ad43b53d8`) |
+|---|---|---|
+| Pack (both arms) | `python-guardrails@3` | **`python-guardrails@4`** |
+| Shared stall wrapper | `continue-on-stall@1` | **`continue-on-stall@2`** |
+| Shared retry wrapper | none | **`transient-retry@1`** |
+| Gate | `guardrail-gate@3` | unchanged |
+| Gate-effort scorer | `gate-effort@4` | **`gate-effort@5`** |
+
+- **`python-guardrails@4`** (fixes C1): `@3` byte for byte except the scope and its consumers. A Python file is a regular `*.py` file, an extensionless regular file whose first line is a `#!` line naming `python`, or the in-workspace target of a `*.py` symlink (counted once, at the target's path; links leaving the workspace and symlinked directories stay out). Ruff is given the extensionless files explicitly beside `.`; findings reported through a link are deduplicated; the tests check's change detection sees the same files. Two new canaries (`SCOPE.shebang-script`, `SCOPE.py-symlink`) prove it in the pack image; the `smoke-03` r2 layout now yields 1 checked file, `F401` at `forge` and `TEST.missing`.
+- **`continue-on-stall@2`** (fixes the exposure; K3): only the **step's first session** is eligible, decided from the step's own logs (no earlier continue-on-stall record under the step's agent logs dir), so a step gets at most one continuation in every arm; later sessions (r2's fix sessions) are recorded (`eligible: false`, `would_stall`) and never continued. A no-edit session also stalls when its final message refuses: first-person "can't/cannot/unable to ... without", "not enough/insufficient/missing context/information/details/requirements/specification", or "... isn't/is not defined/present/specified/provided/available" and "doesn't define/specify/say" (curly apostrophes included). Both `smoke-03` messages match. The continuation prompt names both cases.
+- **`transient-retry@1`** (new, shared, innermost: gate → stall → retry → native): a session that raises Harbor's `ApiOverloadedError`, `ApiConnectionClosedError`, `ApiResponseStalledError`, `ApiInternalServerError` or `ApiRateLimitError` is run again after 60 s, then 180 s, at most twice, with a fixed preface ("cut off by the model provider ... the workspace keeps every change"); any other error, and the last retry's, is raised unchanged (still an infra failure). Every attempt's logs, error class, wait and usage are recorded; the session's cost sums every attempt.
+- **`gate-effort@5`** (C2, text only): `@4`'s values and statuses, with each gate run's evidence summary counting `TEST.*` findings in the `tests` family (`@4` printed them as `other`).
+- **Factor guard:** the arms still differ only in `condition`; the pack, both wrappers and the scorers are identical in both arms.
+
+### 13.2 Hypothesis and outcomes
+
+Unchanged from 12.2 (primary `solve_rate_errata` with raw `solve_rate` beside it; secondary `gate.fix_round_correctness_delta`, `process.stall_rate`, coverage and tests, gate effort, cost). `process.stall_rate` now has equal exposure across arms (one eligible session per step) and counts refusals as well as questions. **Added, descriptive only:** retries per trial and recovered sessions (from `transient-retry@1` records), reported beside cost; a retried session's tokens and cost stay in its arm.
+
+### 13.3 Pre-registered process criteria for `smoke-04` (before `main-03`)
+
+`smoke-04` is clean when: both trials are valid; every component probe passes; r2's gate checks a non-zero file count at every step that has Python files; no step is lost to a transient provider error that `transient-retry@1` did not recover (at most 2 retries per session); and no step has more than one continuation. A failed criterion is a process defect: fix it and rerun small; do not start `main-03`.
+
+### 13.4 Running iteration 3b
+
+```sh
+make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml   # 8d8ad43b53d8
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  ATTEMPT=0 CONCURRENCY=2 JOB_ID=smoke-04 DETACH=1
+make experiment-status JOB=jobs/python__forge__guardrails/smoke-04
+make experiment-assess JOB=jobs/python__forge__guardrails/smoke-04 STORE=stores/python__forge__guardrails \
+  SCORERS="correctness@1 code-quality@1 resource-usage@1 process-compliance@3 gate-effort@5"
+# If 13.3 holds: main-03, 4 attempts per arm, detached, then assess and analyse as above.
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  CONCURRENCY=2 JOB_ID=main-03 DETACH=1
+```
+
+### 13.5 Verification before any job (recorded at lock time)
+
+- `tests/test_guardrails_v4_trial.py` (pack image on OrbStack, no LLM): an r2 trial whose step-1 work session raises `ApiOverloadedError` once is retried and recovers (both attempts billed); the retry writes the `smoke-03` layout, which `@4` checks (1 file, `F401` at `forge`, `TEST.missing`); the first fix session asks without editing and is recorded, not continued; the second fix passes; step 2's no-edit refusal is continued and the gate passes.
+- Host tests: `tests/test_component_python_guardrails_v4.py` (`@3` checks the `smoke-03` layout as 0 files, `@4` as 1; an extensionless script is measured through its subprocess test; out-of-workspace links stay out), `tests/test_session_wrappers_v2.py`, `tests/test_gate_effort_v5_scorer.py`.
+- `make guardrails-verify` (OrbStack, 2026-10-06): `@1` 76 of 76 rules, `@3` 83 of 83, `@4` 85 of 85 (`@3`'s plus `SCOPE.shebang-script` and `SCOPE.py-symlink`); each pack's mutant fails exactly its disabled rules (`@4`'s mutant has `@3`'s scope, so both `SCOPE.*` canaries fail).
+
+### 13.6 Known limits of iteration 3b
+
+- A first session that stalls by editing a scratch file, or refuses in words outside the fixed patterns, is still not continued. Later sessions of a step are never continued, even when they would stall (recorded as `would_stall`).
+- `transient-retry@1` retries after the session's own partial work; the retry sees the workspace as the failed attempt left it. A provider outage longer than about 4 minutes still fails the step (an infra exclusion, as before). A failed attempt that reported no usage makes the session's cost unknown (never a partial sum).
+- Ruff given `.` still follows a `*.py` symlink that leaves the workspace (as in `@1`-`@3`); the scope (mypy, bespoke checks, tests check) does not.
