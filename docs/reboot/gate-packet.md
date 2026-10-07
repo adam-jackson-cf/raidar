@@ -1405,3 +1405,62 @@ Verified before any job: `make guardrails-verify` `@1` 76/76, `@3` 83/83, `@4` 8
 **Pre-registered `smoke-04` criteria (§13.3):** both trials valid; every probe passes; r2's gate checks a non-zero file count at every step with Python files; no step lost to an unrecovered transient error; no step with more than one continuation. Only then `main-03` (at most 4 attempts per arm).
 
 **State at the time of writing:** `jobs/python__forge__guardrails/smoke-04` exists under lock `8d8ad43b53d8` and reports `finished` (2026-10-06 02:21 UTC, 2 of 2 trials valid, both solved cp1-2). It has not been assessed or checked against §13.3 here; its outcome belongs in rationale §13 and a later section of this packet. `main-03` has not run.
+
+## 17. Explore iterations 3b to 3b.5 and `main-03` (2026-10-06 to 2026-10-07)
+
+Exploratory signals only (4 pairs < `min_pairs` 5: every verdict `insufficient` by design). Agent throughout: `codex` 0.156.1 with `gpt-6-luna` at low effort; containers on OrbStack only; the verifier's per-test coverage pass runs offline at assessment from iteration 3b.2 on (user: "do the coverage change and stick with luna"). Full record: `experiments/ab-test/python__forge__guardrails/rationale.md` §13 to §17. `main-03` analysis: `analysis/python__forge__guardrails/main-03/analysis.md`.
+
+### 17.1 Iterations and smokes
+
+Each iteration was pre-registered (rationale amendment and relock committed) before its job; every change is a new version, released versions untouched; each smoke is 1 trial per arm, both valid, never pooled.
+
+| Iteration (lock) | Smoke | What the smoke found | What the next iteration changed |
+|---|---|---|---|
+| 3b (`8d8ad43b53d8`, §13) | `smoke-04` | §13.3 criteria met (scope fix works: r2's gate checked 1-2 files per step; 0 retries, 0 continuations). Agent could not run pytest/ruff (fix-session cost: cp7 alone 1563 s, $0.090); a not-run test command counted as a test run; cross-mode blocking sums compared different quantities; `no-untyped-call` cascade inflated typing; a coverage miss counted as a test failure; no "better" direction in tables | 3b.2: `python-guardrails@5` (pack tools on PATH, both arms), `process-compliance@4`, `gate-effort@6`, direction column, verifier coverage offline + `code-quality@2` |
+| 3b.2 (`2b4c23f42ac9`, §14) | `smoke-3b-2` | Clean. `PLR0904` fired on unittest classes (a fix session hid every test from pytest); assessment serial (~44 min / 2 trials); `first_pass_clean_rate` structurally 0; `compliance_rate` measured the gate's presence; cascade still in cross-mode counts | 3b.3: `python-guardrails@6` (PLR0904 off in tests), `assess CONCURRENCY`, `gate-effort@7`, `process-compliance@5` |
+| 3b.3 (`f600b96bc7db`, §15) | `smoke-3b-3` | Clean. `python -m pytest` failed ("No module named pytest"); work-session test metric could not tell "never tested" from "tested then edited"; one refused suppression counted twice. A claimed primary ceiling (four cp3 cases) was checked and rejected: they are already errata (§16.1) | 3b.4: `python-guardrails@7` (pytest/coverage importable by the image's python), `process-compliance@6`, `gate-effort@8`; errata and primary unchanged |
+| 3b.4 (`c15512778075`, §16) | `smoke-3b-4` | Clean against §16.4. One timing-sensitive grader case (`test_blueprint_list_orders_by_created_at_name_uuid`) passed in grading and failed under coverage at 4 r2 steps, so `code-quality@2` read G, and the trial's headline, as ineligible on one arm only | 3b.5: `code-quality@3` |
+| 3b.5 (`c15512778075`, assessment section only; document `bab09ca20ed3`, then `27bc858c3ee5` after a no-value-change module split, §17.8) | rescore of `smoke-3b-4` | Execution identity unchanged, so the process check was a rescore: r2's G `ok` at all 7 transitions with 1 excluded case at the 4 affected steps, r1 identical to `@2`, headline read for the pair | `main-03` |
+
+`code-quality@3`: when parity failed only through outcome flips (environment, corpus, invocation, process ledger and collected cases equal) of at most 3 cases, those cases leave both runs and G is computed on the rest; anything else stays `ineligible`; `regression_parity_excluded_cases` reports the cases per transition.
+
+### 17.2 `main-03` run
+
+- 8 of 8 trials valid; 05:09-06:50 UTC (1 h 40 min at concurrency 2), about $0.71 in all; 0 retries, 0 stalls, 0 continuations over 98 sessions; probes passed at 64 of 64 steps; `per_step_reset` max 1.38 s (no breach); gate errors 0; r2 clean at step end 32/32.
+- Assessment: 34 pre-fix grades, 64 offline coverage runs, 0 errors, all 64 parity-eligible (0 cases excluded by `@3`); 94 min at `CONCURRENCY=2`.
+- `make quality` was not run before `main-03` (a process miss); afterwards it failed only on import fan-out in `code-quality@3`. The modules were split without behaviour change, the lock's assessment section relocked, and both scored jobs rescored with identical observations and a byte-identical analysis (rationale §17.8).
+
+### 17.3 `main-03` signals against `main-02`
+
+`main-02` ran iteration 2 (lock `28c51440f74a`: no tests check, no shared stall/retry wrappers, per-step pack install, in-trial coverage). The two jobs are different experiments and are never pooled; the table sets their directions side by side.
+
+| Signal (mean per trial) | `main-02` r1 / r2 | `main-03` r1 / r2 | `main-03` Δ [95% CI] |
+|---|---|---|---|
+| Primary `solve_rate_errata` | 0.344 / 0.188 | 0.313 / 0.406 | +0.094 [−0.20, 0.39] |
+| Raw `solve_rate` | 0.219 / 0.156 | 0.125 / 0.281 | +0.156 [−0.14, 0.45] |
+| Correctness C | 0.865 / 0.753 | 0.918 / 0.937 | +0.019 [−0.046, 0.084] |
+| Headline S | 73.1 / 66.3 | 77.2 / 83.8 | +6.6 [−1.8, 15.0] |
+| Erosion E (higher better) | 0.125 / 0.608 | 0.132 / 0.674 | +0.54 [0.34, 0.74] |
+| Rework R | 0.247 / 0.422 | 0.238 / 0.437 | +0.20 [0.08, 0.32] |
+| Gate first-pass clean | 0 / 0 | 0 / 0 | 0 |
+| Cost USD | 0.033 / 0.072 | 0.035 / 0.144 | +0.109 |
+| Agent time s | 516 / 1,004 | 416 / 1,358 | |
+
+- **Correctness direction flipped** from negative (`main-02`, and `smoke-02`) to slightly positive. With 4 pairs this is not an effect: b00 to b02 have equal `solve_rate_errata`; b03 carries the primary gap (r2 errata-solved cp1-cp5) and most of the correctness and headline gap (r1's cp8 fell to 0.471); in b02 r2's C is lower. What can be said is that iteration 3's design no longer shows the iteration-2 cost signal.
+- **Fix rounds do not hurt correctness here**: `gate.fix_round_correctness_delta` +0.012 [−0.022, 0.046] (pre-fix vs final grade), answering iteration 2's main open question in the direction of "no measurable fix-round damage" at this sample size.
+- **Quality**: E and R favour r2 with intervals excluding 0 in this job (E overlaps the gate's C901 by construction); step-end blocking findings (`_net`) 61.5 vs 0.
+- **Process**: r2's work sessions ran tests in 69% of steps (after the last code edit in 56%), r1 in 0%; no test command failed to run in either arm.
+- **Cost**: r2 costs 4.1x r1 per trial; fix sessions are 68% of r2's cost (coverage misses at first run, 74.6% mean against the 85% threshold, and `FORMAT` drive most refusals).
+
+### 17.4 Open needs-more-data questions
+
+1. **Primary effect size.** Signals favour r2 (primary +0.09, C +0.02, S +6.6) but hinge on one pair. The analysis's sample-size projection (pilot SD from these 4 pairs) needs about 18 pairs for `solve_rate_errata` at the default minimum effect 0.125 and about 33 for correctness at the configured 0.02.
+2. **Fix cost vs value.** 68% of r2's cost buys a fix-round correctness delta near 0; how much is the coverage threshold and `FORMAT` alone (16.8 I4; cp5-style FORMAT-only rounds) is open.
+3. **Timing-dependent grader case** (16.8 I2): `test_blueprint_list_orders_by_created_at_name_uuid` passes a wrong sort order when creates land in one second. It did not flip in `main-03`; whether it needs an erratum must be decided by the audit rule, not outcomes.
+4. **Heredoc writes to temp dirs** made one work-session test metric undetermined in `smoke-3b-4` (16.8 I3); frequency in `main-03` not yet counted.
+5. **Coverage-aiming.** r2's step-end coverage sits just above 85% (88.2% mean), consistent with aiming at the threshold.
+6. **Erosion vs the gate's own C901** remains confounded by construction.
+
+### 17.5 Recommended next step
+
+The process is stable: four consecutive clean smokes, a valid 8-trial main job with no voids, retries or budget breaches, and no `ineligible` quality reads. The next step is a decision for you: (a) move this experiment from explore to a **confirm** run sized from `main-03`'s sample-size projection (about 18 to 33 pairs per arm, roughly $3 to $6 of model spend and 7.5 to 14 hours of trials at concurrency 2, plus assessment) under the unchanged lock (no further design change), or (b) first run one more explore iteration on fix cost (question 2), for example a separate arm that applies the formatter before the gate, which would be a new condition and lock. Option (a) is the smaller step and answers question 1; (b) changes the treatment and would restart the smoke-then-main cycle.

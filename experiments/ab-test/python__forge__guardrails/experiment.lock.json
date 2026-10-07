@@ -51,10 +51,10 @@
       },
       "scorer": {
         "code-quality@3": {
-          "digest": "739e8c83da1817ba6e9440b0bfcfcb76b964549e284393c8e48e2c7ab9bf84bd",
+          "digest": "79bfa3e3ca543b12091e2270da8e24e86d5e20582310f23488dc7126690bd99d",
           "metadata": {
             "implementation": "raidar.scorers.code_quality_v3:code_quality_v3_scorer",
-            "implementation_digest": "8cf388221c5d1098b115d12d4315576e67570ef27d46e4c2037c3d07a2e0d682",
+            "implementation_digest": "a833f41bb0f87c641536b307aab50e6ffe7f8b4cc85361b6096fa1d6b8327b5b",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots (code-quality@2); G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -2128,7 +2128,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "67db491689dd15ca4bcc6eaa425e9bf39f95f9691b558250021fc747db7d2a19",
+  "document_sha256": "b96c25b5c29c9e22aeed089b7b8db718af3472b43e2d682bca65f72efa82d559",
   "execution": {
     "arms": {
       "r1-baseline": {
@@ -2525,7 +2525,7 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "5e0de59add6d53f6c753e6f5bcc802e866a26013d49c161e0d3a0e6021689750",
+    "assessment": "3731f3a767861051736508398cc394c357a9bab66150fb8d83c6391f1e1de1b9",
     "execution": "c155127780753e00421d8077df55752b32d26de87d73590c2e07daced5a91938",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },

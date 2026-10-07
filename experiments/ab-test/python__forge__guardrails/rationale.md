@@ -688,3 +688,37 @@ make experiment-analyze JOBS=jobs/python__forge__guardrails/main-03 STORE=stores
 - Host tests: `orchestrator/tests/test_code_quality_v3.py` (one flipped case leaves the case out and gives the clean trial's G; parity that held gives `@2`'s observations plus the 0 count; `environment_mismatch`, `coverage_outside_outcomes` and `process_ledger_mismatch` stay `ineligible`; the in-trial pass is reconciled the same way; a case collected by one run only, a changed invocation or an inconsistent ledger is not a flip; more than 3 flips stay `ineligible`; registration), `orchestrator/tests/test_iteration_3b2_consumers.py` (`@3` is read before `@2`).
 - **17.3 on `smoke-3b-4`** (2026-10-07, `make experiment-assess ... CONCURRENCY=2` into a scratch copy of the `smoke-3b-4` store, which reused its 16 offline coverage runs, then `make experiment-analyze`): 10 of 10 assessments complete, 0 offline coverage errors. r1's `code-quality@3` G equals `@2`'s at every transition (`problem_regression` 0.2995) with 0 excluded cases. r2's G is `ok` at all 7 transitions (`problem_regression` 0.2857, was `ineligible`), with `regression_parity_excluded_cases` 1 at cp2→cp3, cp5→cp6, cp6→cp7 and cp7→cp8, each naming `test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_name_uuid`, and 0 elsewhere. The analysis reads `headline_score` for the pair (r1 81.62, r2 83.34, n=1) and `regression` (0.2995 vs 0.2857), with 0 ineligible. 17.3 holds.
 - Released identities: `code-quality@1` and `@2` are untouched (their modules are unchanged); only `code-quality@3` is new. `make experiment-locks-check` passes with only this experiment's lock document changed.
+
+### 17.7 `main-03` (recorded 2026-10-07, after the run; explore signals, never cited)
+
+`main-03` ran under `c15512778075` (lock document `bab09ca20ed3`; pre-registration commit `50fbf1b` at 05:09:29 UTC, 22 s before the job started) with 4 attempts per arm at concurrency 2, detached: 2026-10-07 05:09:51 to 06:50:22 UTC (1 h 40 min), **8 of 8 trials valid**, every validity check passed, `trial_exception` null in all 8, no void arm, nothing rerun. Across 98 sessions: 0 transient retries, 0 stalls, 0 `would_stall`, 0 continuations. Every probe passed at all 64 steps; the only integrity flags are `suppression-refused` (1 comment) in three r2 trials. `per_step_reset` 0.99 to 1.38 s at all 64 steps (p95 1.32 s; no breach of the 2 s budget, so 16.8 I5 did not recur). Gate error rate 0 in both arms; r2 clean at step end at 32 of 32 steps (manipulation check separated, 32/32), 8.5 fix rounds per trial, 0 unresolved.
+
+Assessment (`make experiment-assess ... CONCURRENCY=2` into `stores/python__forge__guardrails`, 07:50 to 09:25 UTC): 34 of 34 pre-fix snapshots graded, 64 of 64 offline coverage runs (0 errors, **all 64 parity-eligible**; runs sum to 8944 s), 40 assessments added, none provisional. `code-quality@3`'s `regression_parity_excluded_cases` is 0 at all 56 transitions, so its G equals `@2`'s on this job; the 16.8 flip did not recur. Analysis: `analysis/python__forge__guardrails/main-03/analysis.md`.
+
+Paired signals (r1 shadow gate vs r2 commit gate; mean per trial; 4 pairs below `min_pairs` 5, so every verdict is `insufficient` by design):
+
+| Signal | r1 | r2 | Δ [95% CI] |
+|---|---|---|---|
+| Primary `solve_rate_errata` | 0.3125 | 0.4062 | +0.094 [−0.20, 0.39] |
+| Raw `solve_rate` | 0.125 | 0.281 | +0.156 [−0.14, 0.45] |
+| Correctness C | 0.9175 | 0.9365 | +0.019 [−0.046, 0.084] |
+| Headline S | 77.18 | 83.77 | +6.6 [−1.8, 15.0] |
+| Erosion E (higher is better) | 0.132 | 0.674 | +0.54 [0.34, 0.74] |
+| Rework R | 0.238 | 0.437 | +0.20 [0.08, 0.32] |
+| Regression G | 0.148 | 0.325 | +0.18 [−0.16, 0.52] |
+| `gate.total_new_first_run_blocking_net` | 61.5 | 43.5 | −18 [−59, 23] |
+| `gate.final_step_end_blocking_net` | 61.5 | 0 | −61.5 [−106.5, −16.5] |
+| `process.work_session_tests_run_any_rate` | 0 | 0.6875 | +0.69 |
+| `process.work_session_tests_after_last_code_edit_rate` | 0 | 0.5625 | +0.56 |
+| Cost USD per trial | 0.0348 | 0.1437 | +0.109 |
+| Agent time s | 416 | 1358 | |
+
+- Per pair, `solve_rate_errata` is equal in b00, b01 and b02 (0.25/0.25, 0.5/0.5, 0.25/0.25); the whole primary difference is b03 (0.25 vs 0.625, r2 errata-solving cp1 to cp5). Correctness and the headline are also driven by b03, where r1's cp8 case pass rate fell to 0.471 (C 0.884 vs 0.961); in b02 r2 is lower (C 0.920 vs 0.901).
+- r2's gate: first-run coverage 74.6% mean, 88.2% at step end; `gate.fix_round_correctness_delta` +0.012 [−0.022, 0.046]; fix sessions $0.098 per trial (68% of r2's cost) and 826 s; `gate.first_pass_clean_rate` 0 in both arms, `first_pass_clean_except_autofix_tests_rate` 0.125 in r2; `gate.tests_missing_rate` 1 vs 0.125.
+- `process.total_test_commands_not_run` 0 in both arms (16.3's expectation holds).
+
+### 17.8 Relock after `main-03`: `code-quality@3` split into modules (recorded 2026-10-07; no value changed)
+
+`make quality` was not run between the pre-registration commit (`50fbf1b`) and `main-03`; that was a process miss. Run afterwards, it failed only on the architectural fan-out check: `code_quality_v3/transition.py` (12 imports) and `scorer.py` (11) exceed the limit of 10. The fix moves code without changing behaviour: the G input parser `fork_runs` joins `parity.py`, the parity source lookup moves to `sources.py`, and the manifest and the exclusion-count observation move to `observe.py`. The source digest covers code, so `code-quality@3`'s implementation digest changed (`8cf388221c5d` → `a833f41bb0f8`; manifest unchanged) and this experiment's lock was relocked: assessment section only, `lock_sha256` still `c15512778075`, document `bab09ca20ed3` → `27bc858c3ee5`, no other lock moved. Because `@3` had already scored jobs, the change was checked rather than assumed: `main-03` (8 trials) and the scratch `smoke-3b-4` store were rescored under the new lock, and every `code-quality@3` observation (metric, subject, status, value, reason) and evidence item equals the pre-split assessment's for all 10 trials; `make experiment-analyze` on `main-03` writes a byte-identical `analysis.md`. The 17.7 numbers stand. The `@3` identity in the lock is now `a833f41bb0f8`; the pre-split identity scored only these two jobs and is superseded, not a separate version.
+
+`make quality` then passed (1666 tests, 9 skipped, coverage 96.33%, no lizard warnings, fan-out OK, every lock current); the dormant Jev promotion test now expects the bump from `code-quality@3`, the highest registered version, as it did for `@2` in 3b.2.

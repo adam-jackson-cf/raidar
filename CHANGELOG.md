@@ -2,6 +2,16 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 3b.5 and main-03
+
+### Added
+
+- `code-quality@3` (`raidar.scorers.code_quality_v3`, store-bound): `@2` whose G, when a step's coverage parity failed only because at most 3 grader cases changed outcome between the grading run and the coverage run (reasons `ledger_mismatch`/`outcome_mismatch` only; environment, corpus, invocation, process ledger and collected cases equal), leaves those cases out of both runs instead of reading the step, and through `problem_regression` the trial's headline score, as `ineligible`. Every other parity failure stays `ineligible`. New transition metric `regression_parity_excluded_cases` (count; node ids in the reason). In `smoke-3b-4` one timing-sensitive case removed r2's headline; under `@3` r2's G is `ok` at every transition and r1's equals `@2`'s. `make experiment-assess` makes offline coverage runs for `@3`; analysis and the review surfaces read `@3` before `@2` and `@1`.
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 3b.5, `rationale.md` §17): scorer `code-quality@3`. Only the lock's assessment section moved (document `bab09ca20ed3`, then `27bc858c3ee5` after `code-quality@3` was split into `parity`, `sources`, `observe` and `transition` modules for the fan-out limit with identical rescored values, §17.8); the execution identity stays `c15512778075`. `rationale.md` §16.8 records the `smoke-3b-4` process check, §17.6 its rescore under `@3`, and §17.7 `main-03` (4 attempts per arm, 8 of 8 valid). `docs/reboot/gate-packet.md` §17 summarises iterations 3b to 3b.5 and `main-03` against `main-02`.
+
 ## Unreleased - guardrails explore iteration 3b.4
 
 ### Added

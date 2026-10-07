@@ -20,6 +20,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections.abc import Iterable
+from typing import Any
+
+from pydantic import ValidationError
 
 from raidar.scorers.code_quality.lineage_models import RegressionRunEvidence
 
@@ -81,6 +84,19 @@ def _without(run: RegressionRunEvidence, nodes: Iterable[str]) -> RegressionRunE
     )
 
 
+def fork_runs(
+    fork: dict[str, Any],
+) -> tuple[RegressionRunEvidence, RegressionRunEvidence] | None:
+    """The G input's two runs (baseline, produced), or None when it does not parse."""
+    try:
+        return (
+            RegressionRunEvidence.model_validate(fork["baseline"]),
+            RegressionRunEvidence.model_validate(fork["produced"]),
+        )
+    except (KeyError, TypeError, ValueError, ValidationError):
+        return None
+
+
 def reconcile(
     reasons: Iterable[str], baseline: RegressionRunEvidence, produced: RegressionRunEvidence
 ) -> tuple[RegressionRunEvidence, RegressionRunEvidence, tuple[str, ...]] | None:
@@ -99,5 +115,6 @@ __all__ = [
     "CASE_LEVEL_REASONS",
     "MAX_EXCLUDED_CASES",
     "flipped_cases",
+    "fork_runs",
     "reconcile",
 ]
