@@ -1,6 +1,6 @@
 """Manifests that live beside their implementations, not in ``builtin_manifests``.
 
-``code-quality@2``, ``process-compliance@2`` to ``@5`` and ``gate-effort@1`` to ``@7`` keep
+``code-quality@2``, ``process-compliance@2`` to ``@6`` and ``gate-effort@1`` to ``@8`` keep
 their manifests next to their code so the released scorers' digests (which cover
 ``builtin_manifests``) stay unchanged; the catalog registers them from here.
 """

@@ -1,0 +1,77 @@
+"""python-guardrails@7: make the pack's pytest and coverage importable by the system Python.
+
+Run once at environment start, as root, by the install with the pack's own venv
+Python: ``python expose-test-tools AGENT_SITE``. It fills ``AGENT_SITE`` with
+symlinks to the top-level modules and the metadata of the pack's pinned pytest,
+coverage and pytest's runtime dependencies (``EXPOSED``, checked against their
+declared requirements so a missing dependency fails the install), and nothing
+else: mypy, ruff and the gate library stay out of reach of the agent's code. The
+install then names ``AGENT_SITE`` in a ``.pth`` file in the system interpreter's
+site-packages, so ``python -m pytest`` and ``python3 -m coverage`` work with the
+image's Python, as they would in a repository whose dev environment installs
+them. A ``.pth`` path line is appended to the END of ``sys.path``: a package the
+project or the image installs itself still wins.
+"""
+
+from __future__ import annotations
+
+import importlib.metadata as metadata
+import sys
+from pathlib import Path
+
+from packaging.requirements import Requirement
+
+EXPOSED = ("pytest", "iniconfig", "packaging", "pluggy", "pygments", "coverage")
+SKIPPED_TOP_LEVEL = ("..", "__pycache__")
+
+
+def _canonical(name: str) -> str:
+    return name.lower().replace("_", "-").replace(".", "-")
+
+
+def _runtime_requirements(dist: metadata.Distribution) -> list[str]:
+    """The distribution's requirements that apply without extras on this interpreter."""
+    found = []
+    for line in dist.requires or ():
+        requirement = Requirement(line)
+        if requirement.marker is None or requirement.marker.evaluate({"extra": ""}):
+            found.append(_canonical(requirement.name))
+    return found
+
+
+def _top_level(dist: metadata.Distribution) -> set[str]:
+    """The distribution's top-level entries in its site-packages (modules and metadata)."""
+    names = set()
+    for item in dist.files or ():
+        first = item.parts[0]
+        if first in SKIPPED_TOP_LEVEL or first.endswith(".pth"):
+            continue
+        names.add(first)
+    return names
+
+
+def main(argv: list[str]) -> int:
+    if len(argv) != 1:
+        print("usage: expose-test-tools AGENT_SITE", file=sys.stderr)
+        return 2
+    target = Path(argv[0])
+    exposed = {_canonical(name) for name in EXPOSED}
+    dists = {name: metadata.distribution(name) for name in EXPOSED}
+    missing = sorted(
+        {need for dist in dists.values() for need in _runtime_requirements(dist)} - exposed
+    )
+    if missing:
+        print(f"expose-test-tools: unexposed runtime requirements {missing}", file=sys.stderr)
+        return 1
+    target.mkdir(parents=True, exist_ok=False)
+    for dist in dists.values():
+        site = Path(str(dist.locate_file("")))
+        for name in sorted(_top_level(dist)):
+            link = target / name
+            if not link.exists():
+                link.symlink_to(site / name)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

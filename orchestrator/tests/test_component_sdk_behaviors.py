@@ -60,6 +60,7 @@ BUILTIN_REFS = [
     "python-guardrails@4",
     "python-guardrails@5",
     "python-guardrails@6",
+    "python-guardrails@7",
     "review-loop@1",
     "review-loop@2",
     "rules-file@1",

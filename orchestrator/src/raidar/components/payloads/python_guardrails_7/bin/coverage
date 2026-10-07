@@ -1,0 +1,7 @@
+#!/bin/sh
+# python-guardrails@7: the pack's pinned coverage for contributors, linked at
+# /usr/local/bin/coverage. Runs `python -m coverage` with the project's interpreter and the
+# pack's site-packages after the project's own (lib/agent_tools/run-module).
+set -u
+SELF="$(readlink -f -- "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0")"
+exec "$(dirname -- "$SELF")/../lib/agent_tools/run-module" coverage "$@"

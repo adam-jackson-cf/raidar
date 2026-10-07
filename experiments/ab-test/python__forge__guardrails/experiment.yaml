@@ -20,13 +20,20 @@
 # codes, the tests check or both, and the cross-mode blocking counts without the
 # no-untyped-call cascade) and process-compliance@5 (@4 plus the work session's own test runs;
 # plan_written leaves compliance_rate, since no condition asks for a plan).
-# r2 gets python-guardrails@6 (the @1 rule set and pins, PLR0904 off in test files, plus the tests check:
+# Iteration 3b.4 (rationale.md section 16, after smoke-3b-3): python-guardrails@7 (@6 whose
+# pinned pytest and coverage, and only those, the image's own python imports: python -m pytest
+# works in both arms), process-compliance@6 (@5 plus whether the work session ran the tests at
+# all, and after its last edit to a non-test file) and gate-effort@8 (@7 plus the cross-mode
+# counts with a refused suppression comment counted once: mypy's unused-ignore at a SUPPRESS
+# line folded into it). The primary outcome and the errata are unchanged (16.1, I1).
+# r2 gets python-guardrails@7 (the @1 rule set and pins, PLR0904 off in test files, plus the tests check:
 # unittest always, pytest for pytest-style tests, both under coverage; a Python change with no
 # test that ran is refused, so are failing tests and owned line coverage below 85%), installed
 # once per trial at environment start (root-owned under /opt/raidar-tools/python-guardrails,
 # hash-pinned pytest 9.1.1 and coverage 7.16.2 beside Ruff and mypy; nothing in the agent
-# image; the pack's pytest, coverage, ruff and mypy are linked on the agent's PATH, as a
-# repository's dev environment would provide them), with ruff.toml and mypy.ini copies in /app,
+# image; the pack's pytest, coverage, ruff and mypy are linked on the agent's PATH, and its
+# pytest and coverage are importable by the image's python, as a repository's dev environment
+# would provide them), with ruff.toml and mypy.ini copies in /app,
 # and guardrail-gate@3 in commit mode (as @2, plus a snapshot of /app before each fix session,
 # graded offline beside the step's final snapshot). r1 gets the same pack without the
 # workspace copies and the same gate in shadow mode (recorded at each step's end outside /app,
@@ -38,7 +45,8 @@
 # No rules text tells the agent about the gate in advance (the mechanical rung only).
 # Objective: explore (smallest runs: 1 trial per arm first, then at most 4 attempts per arm).
 # Verdicts below min_pairs read insufficient by design.
-# Pre-registration: rationale.md beside this file. Section 15 (iteration 3b.3) amends section 14
+# Pre-registration: rationale.md beside this file. Section 16 (iteration 3b.4) amends section 15
+# (iteration 3b.3), which amends section 14
 # (iteration 3b.2), which amends section 13,
 # which amends section 12, which pre-registers the hypothesis (enforcing the agent's own tests
 # prevents fix-round regressions) and the secondary outcomes (gate.fix_round_correctness_delta,
@@ -101,7 +109,7 @@ conditions:
       # workspace: the agent sees no ruff.toml or mypy.ini. Its probe proves at every step the
       # pinned tools, the install-time smoke and an unchanged tool tree, and at step 1 that no
       # config copy is in /app.
-      - use: python-guardrails@6
+      - use: python-guardrails@7
         with:
           workspace_configs: false
       # The same commit check in shadow mode: run once at each step's end against a git
@@ -121,7 +129,7 @@ conditions:
       # the pinned versions, the install-time smoke (a clean file with its test passes, an
       # unused import is refused) and an unchanged tool tree; its integrity flags record
       # config-copy edits, tree changes and hook-bypass attempts without failing the step.
-      - use: python-guardrails@6
+      - use: python-guardrails@7
         with:
           workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
@@ -162,9 +170,13 @@ assessment:
   # work_session_tests_run_before_finish (the gate's fix sessions do not count), with
   # plan_written out of compliance_rate (plan_in_compliance_rate stays false: no condition asks
   # for a plan).
-  scorers: [correctness@1, code-quality@2, resource-usage@1, process-compliance@5, gate-effort@7]
+  # Iteration 3b.4: process-compliance@6 is @5 plus work_session_tests_run_any and
+  # work_session_tests_after_last_code_edit (test-file edits after the run do not fail it);
+  # gate-effort@8 is @7 plus the *_net cross-mode counts (no cascade; a refused suppression
+  # comment's MYPY.unused-ignore folded into its SUPPRESS).
+  scorers: [correctness@1, code-quality@2, resource-usage@1, process-compliance@6, gate-effort@8]
   scorer_config:
-    process-compliance@5:
+    process-compliance@6:
       extra_test_patterns:
         - 'guardrail-check(?![\w.-])(?!\s+--(?:version|help)\b)'
   metric: scb-canonical@2

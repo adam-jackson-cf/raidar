@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 3b.4
+
+### Added
+
+- `python-guardrails@7` (`raidar.components.builtins.guardrails_v7`, payload `payloads/python_guardrails_7`): `@6` byte for byte except the version strings, plus `lib/agent_tools/expose-test-tools`. The install links the pack's pinned pytest, coverage and pytest's runtime dependencies (only those) into `/opt/raidar-tools/python-guardrails/agent-site` and names it in a root-owned `.pth` file in the system `python3`'s site-packages, so `python -m pytest` and `python3 -m coverage` work with the image's Python in both arms (in `smoke-3b-3` all four of r2's `python -m pytest` commands failed with "No module named pytest"); the probe also requires the `python -m` smokes, a failing `import mypy`, the `.pth` file and an unchanged agent-site listing. Its integrity flags compare with `@7`'s own bytes. `make guardrails-verify` runs `@6`'s canaries against `@7`'s install; pack-image trial `tests/test_guardrails_v7_trial.py`.
+- `process-compliance@6` (`raidar.scorers.process_checks_v6`): `@5` plus `work_session_tests_run_any` and `work_session_tests_after_last_code_edit` (edits to test files after the last run do not fail it), with their rates; analysis compares `process.work_session_tests_run_any_rate` and `process.work_session_tests_after_last_code_edit_rate`.
+- `gate-effort@8` (`raidar.scorers.gate_effort_v8`, store-bound): `@7` plus `first_run_blocking_net`, `step_end_blocking_net`, `new_first_run_blocking_net`, `total_new_first_run_blocking_net` and `final_step_end_blocking_net`: the cross-mode counts without the `no-untyped-call` cascade and with a refused suppression comment's `MYPY.unused-ignore` at its `SUPPRESS` line folded into it.
+- Analysis, the manipulation check, the review surface's gate view and pre-fix grading read `gate-effort@8` and `process-compliance@6` (newest first).
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 3b.4, `rationale.md` §16, lock `c15512778075`): both arms use `python-guardrails@7`; scorers `process-compliance@6` and `gate-effort@8`. `rationale.md` §15.7 records the `smoke-3b-3` process check; §16.1 records that the four cp3 cases its review blamed for a capped primary are already errata (errata, pin and primary unchanged). No job has run under this lock.
+
 ## Unreleased - guardrails explore iteration 3b.3
 
 ### Added

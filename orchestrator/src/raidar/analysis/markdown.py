@@ -227,7 +227,8 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         "first-run outcomes; gate-effort@7 adds first-pass clean rates that ignore the "
         "auto-fixable layout codes (FORMAT, I001, W291-W293), the tests check (TEST.*), or "
         "both, and the cross-mode counts without the no-untyped-call cascade "
-        "(*_ex_cascade).",
+        "(*_ex_cascade); gate-effort@8 adds those counts with a refused suppression comment "
+        "counted once (mypy's unused-ignore at a SUPPRESS line folded into it; *_net).",
         "",
         *_table(("Metric", "Better", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
@@ -257,7 +258,10 @@ def _process_arms(report: AnalysisReport) -> list[str]:
         "not say its runner was not found (total_test_commands_not_run counts those). "
         "process-compliance@5 adds work_session_tests_run_rate (the step's work session "
         "itself ran tests after its last edit; a gate's fix sessions do not count) and counts "
-        "plan_written in compliance_rate only when the condition asks for a plan.",
+        "plan_written in compliance_rate only when the condition asks for a plan. "
+        "process-compliance@6 adds work_session_tests_run_any_rate (the work session ran the "
+        "tests at all) and work_session_tests_after_last_code_edit_rate (it ran them after its "
+        "last edit to a non-test file).",
         "",
         *_table(("Metric", "Better", *[arm.arm for arm in arms]), rows),
     ]

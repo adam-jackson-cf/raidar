@@ -36,7 +36,13 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins import guardrails_v3, guardrails_v4, guardrails_v5, guardrails_v6
+from raidar.components.builtins import (
+    guardrails_v3,
+    guardrails_v4,
+    guardrails_v5,
+    guardrails_v6,
+    guardrails_v7,
+)
 from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
 from raidar.components.integrity import condition_step_flags
@@ -341,7 +347,16 @@ MUTATE[6] = MUTATE[4] + (
 )
 MUTANT_FAILURE = {TEST_CLASS_CANARY: "passing fixture exited 1"}
 """How a mutant fails a canary whose clean fixture (not its violating one) the mutant breaks."""
-INSTALLERS = {3: guardrails_v3, 4: guardrails_v4, 5: guardrails_v5, 6: guardrails_v6}
+# @7's rules are @6's byte for byte; its install also exposes pytest and coverage to the
+# image's Python, so its canaries run with that .pth file in place.
+INSTALL[7], MUTATED[7], MUTATE[7] = INSTALL[6], MUTATED[6], MUTATE[6]
+INSTALLERS = {
+    3: guardrails_v3,
+    4: guardrails_v4,
+    5: guardrails_v5,
+    6: guardrails_v6,
+    7: guardrails_v7,
+}
 
 
 def _install(pack: PackUnderTest) -> str:

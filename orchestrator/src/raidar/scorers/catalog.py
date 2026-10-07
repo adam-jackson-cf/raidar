@@ -293,7 +293,7 @@ class ScorerRegistry:
             ) from exc
 
 
-# ``code-quality@2``, ``process-compliance@2``-``@5`` and ``gate-effort@1``-``@7`` keep their
+# ``code-quality@2``, ``process-compliance@2``-``@6`` and ``gate-effort@1``-``@8`` keep their
 # manifests beside their implementations so the released scorers' digests (which cover
 # ``builtin_manifests``) stay unchanged.
 REGISTERED_MANIFESTS = (*BUILTIN_MANIFESTS, *VERSIONED_MANIFESTS)
@@ -317,6 +317,8 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "code-quality@2": "raidar.scorers.code_quality_v2:code_quality_v2_scorer",
     "gate-effort@7": "raidar.scorers.gate_effort_v7:gate_effort_v7_scorer",
     "process-compliance@5": "raidar.scorers.process_checks_v5:process_compliance_v5_scorer",
+    "gate-effort@8": "raidar.scorers.gate_effort_v8:gate_effort_v8_scorer",
+    "process-compliance@6": "raidar.scorers.process_checks_v6:process_compliance_v6_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
 # that store-bound runtime decides under: the dormant process-compliance@1 (Jev
@@ -333,6 +335,7 @@ BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
     "gate-effort@5": ("raidar.scorers.gate_effort_v5:gate_effort_v5_scorer_for_store", ()),
     "gate-effort@6": ("raidar.scorers.gate_effort_v6:gate_effort_v6_scorer_for_store", ()),
     "gate-effort@7": ("raidar.scorers.gate_effort_v7:gate_effort_v7_scorer_for_store", ()),
+    "gate-effort@8": ("raidar.scorers.gate_effort_v8:gate_effort_v8_scorer_for_store", ()),
     # code-quality@2 reads the offline coverage runs of steps whose trial deferred the
     # coverage pass, which ``raidar assess --rescore`` makes into the store
     # (raidar.verifier.coverage_offline).

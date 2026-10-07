@@ -69,6 +69,7 @@ EXACT_LIMIT = 50_000
 SAMPLES = 20_000
 SEED = 0
 PROCESS_COMPLIANCE_REFS = (
+    "process-compliance@6",
     "process-compliance@5",
     "process-compliance@4",
     "process-compliance@3",
@@ -76,6 +77,7 @@ PROCESS_COMPLIANCE_REFS = (
     "process-compliance@1",
 )
 GATE_EFFORT_REFS = (
+    "gate-effort@8",
     "gate-effort@7",
     "gate-effort@6",
     "gate-effort@5",

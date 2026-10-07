@@ -14,8 +14,10 @@
 - ``PACKS``: the packs under verification: python-guardrails@1 (the payload of
   @1 and @2, ``specs.json``), @3 (``specs-3.json``), @4 (``specs-4.json``),
   @5 (@4's rules byte for byte, so ``specs-4.json``; its install adds the
-  agent's tool links and their smokes) and @6 (``specs-6.json``: @5's plus the
-  test-class canary, ``PLR0904`` being off in test files).
+  agent's tool links and their smokes), @6 (``specs-6.json``: @5's plus the
+  test-class canary, ``PLR0904`` being off in test files) and @7 (@6's rules byte
+  for byte, so ``specs-6.json``; its install also makes the pack's pytest and
+  coverage importable by the image's Python).
 """
 
 from __future__ import annotations
@@ -35,6 +37,7 @@ from raidar.components.builtins import (
     guardrails_v4,
     guardrails_v5,
     guardrails_v6,
+    guardrails_v7,
 )
 from raidar.components.gate_run_v2 import GateModeV2, gate_script
 from raidar.components.guardrail_gate_v3 import GuardrailGateOptionsV3
@@ -124,8 +127,15 @@ PACKS = {
         "specs-6.json",
         NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR | TEST_CLASS_BEHAVIOUR,
     ),
+    7: PackUnderTest(
+        7,
+        guardrails_v7.PAYLOAD_DIR,
+        guardrails_v7.PAYLOAD_FILES,
+        "specs-6.json",
+        NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR | TEST_CLASS_BEHAVIOUR,
+    ),
 }
-CANARY_PACK = {5: 4}
+CANARY_PACK = {5: 4, 7: 6}
 """The fixture generator's ``--pack`` for a pack whose rules are another's byte for byte."""
 PACK_1 = PACKS[1]
 

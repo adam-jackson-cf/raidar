@@ -1,0 +1,41 @@
+#!/bin/sh
+# python-guardrails@7: run one of the pack's Python tools (pytest, coverage) for a
+# contributor, the way the gate's tests check runs it: with the project's interpreter
+# (./.venv/bin/python when the working directory has one, else python3) and the pack's
+# site-packages appended to the END of sys.path, so the project's own packages (its own
+# pytest included) win. Used by bin/pytest and bin/coverage, which are linked at
+# /usr/local/bin. Nothing is installed into the project or its interpreter.
+set -u
+if [ "$#" -lt 1 ]; then
+  echo "run-module: usage: run-module MODULE [ARG...]" >&2
+  exit 2
+fi
+module="$1"
+shift
+SELF="$(readlink -f -- "$0" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "$0")"
+GUARDRAILS_HOME="$(CDPATH= cd -- "$(dirname -- "$SELF")/../.." && pwd -P)"
+site=""
+for candidate in "$GUARDRAILS_HOME"/venv/lib/python*/site-packages; do
+  if [ -d "$candidate" ]; then
+    site="$candidate"
+    break
+  fi
+done
+if [ -z "$site" ]; then
+  echo "$module: ERROR, the pack's site-packages are missing under $GUARDRAILS_HOME/venv" >&2
+  exit 126
+fi
+if [ -x ./.venv/bin/python ]; then
+  py=./.venv/bin/python
+else
+  py=python3
+fi
+exec "$py" -c '
+import runpy
+import sys
+
+sys.path.append(sys.argv.pop(1))
+module = sys.argv.pop(1)
+sys.argv[0] = module
+runpy.run_module(module, run_name="__main__", alter_sys=True)
+' "$site" "$module" "$@"

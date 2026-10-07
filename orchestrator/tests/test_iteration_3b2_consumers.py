@@ -107,3 +107,32 @@ def test_process_compliance_v5_adds_the_work_session_rate() -> None:
 
     assert v5 - v4 == {"work_session_tests_run_rate"}
     assert _better("process.work_session_tests_run_rate") == "↑ higher"
+
+
+# ---- iteration 3b.4: gate-effort@8 and process-compliance@6 ------------------------------
+
+V8_ONLY = {"total_new_first_run_blocking_net", "final_step_end_blocking_net"}
+
+
+def test_gate_effort_v8_outcomes_are_compared_only_for_v8() -> None:
+    v8 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@8")}
+    v7 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@7")}
+    v6 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@6")}
+
+    assert v8 - v7 == V8_ONLY
+    assert v7 - v6 == V7_ONLY
+    assert not V8_ONLY & v6
+    assert _better("gate.total_new_first_run_blocking_net") == "↓ lower"
+    assert _better("gate.final_step_end_blocking_net") == "↓ lower"
+
+
+def test_process_compliance_v6_adds_the_any_and_after_code_edit_rates() -> None:
+    v6 = {m.id.removeprefix(PROCESS_PREFIX) for m in process_metrics_for("process-compliance@6")}
+    v5 = {m.id.removeprefix(PROCESS_PREFIX) for m in process_metrics_for("process-compliance@5")}
+
+    assert v6 - v5 == {
+        "work_session_tests_run_any_rate",
+        "work_session_tests_after_last_code_edit_rate",
+    }
+    assert _better("process.work_session_tests_run_any_rate") == "↑ higher"
+    assert _better("process.work_session_tests_after_last_code_edit_rate") == "↑ higher"

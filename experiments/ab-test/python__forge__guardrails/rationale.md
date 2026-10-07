@@ -555,3 +555,81 @@ make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails
 - `AUTOFIX_CODES` is a fixed, deliberately small set (layout and import order). Other codes Ruff can fix (for example `UP017`, `F401`) count as design findings in `first_pass_clean_except_autofix`; the set is part of `gate-effort@7`'s identity, so changing it is a new version.
 - The work session is the session that received the step's first user prompt. A `continue-on-stall@2` continuation or a `transient-retry@1` retry runs inside that session and so counts as work; a trajectory with no user prompt is read as one session (the step-wide check).
 - Offline assessment at `CONCURRENCY` above 1 shares the Docker host between grader containers; a grader timeout under contention would show as an infra failure on that run and a parity difference as `ineligible` (never a 0). `smoke-04`'s coverage check at 2 trials at once matched 16 of 16 steps; 2 is the pre-registered setting.
+
+### 15.7 Process check `smoke-3b-3` (recorded 2026-10-07, after the run; not pooled, never cited)
+
+`smoke-3b-3` ran under `f600b96bc7db` (1 trial per arm, attempt 0, concurrency 2, detached; 2026-10-07 01:27 to 02:04 UTC, 2 of 2 trials valid, no void arm). It meets every criterion of 13.3, 14.3 and 15.3: every probe passed at all 16 steps and answered `python-guardrails@6`; `PLR0904` appears in no gate run; no `workspace-config-modified` flag; every verifier record has `coverage.enabled: false`; `make experiment-assess ... CONCURRENCY=2` made 9 of 9 pre-fix grades and 16 of 16 offline coverage runs (0 errors, every parity verdict eligible; 27 min 21 s); 0 `error` observations in `gate-effort@7` or `process-compliance@5`; 0 transient errors, retries, stalls or continuations; gate error rate 0. The one integrity flag is r2 cp8 `suppression-refused` (one `# type: ignore`, refused and gone at step end). Signals (n=1, exploratory): `solve_rate_errata` 0.25 in both arms (raw `solve_rate` 0.25 both); headline 78.3 vs 83.6; erosion (higher is better) 0.043 vs 0.757; `final_step_end_blocking_ex_cascade` 70 vs 0; cost $0.040 vs $0.155 per trial, of which r2's fix sessions were $0.100 (64%); `gate.fix_round_correctness_delta` +0.0009; `process.work_session_tests_run_rate` 0 vs 0; `process.total_test_commands_not_run` 0 vs 4. The review raised four items, settled in section 16 before any further job:
+
+- **I1** the review read raw `solved` never passing cp2 in any forge trial, because four cp3 `invalid_operation` cases fail in all 21 trials, as a ceiling on the primary.
+- **I2** `python -m pytest` failed with "/usr/local/bin/python: No module named pytest" in all four of r2's attempts (cp3's work session, the cp6, cp7 and cp8 fix sessions); cp3's work session tried to test after its last edit and could not.
+- **I3** `work_session_tests_run_before_finish` counts a test run only after the work session's last edit, so it read 0 for both "never tested" (r1, every step) and "tested, then edited" (r2 at cp4, cp7 and cp8).
+- **I4** one refused `# type: ignore` (r2 cp8, `forge.py:359`) counted as two blocking findings, `SUPPRESS` and `MYPY.unused-ignore`, in the cross-mode counts.
+
+## 16. Amendment: explore iteration 3b.4 (2026-10-07, pre-registered before any job under its lock)
+
+Written after `smoke-3b-3` (15.7) and before any job under lock `c15512778075`. Jobs under `f600b96bc7db` are never pooled with jobs under this lock. The objective stays **explore**: `smoke-3b-4` (1 trial per arm) first, then `main-03` with at most 4 attempts per arm only if `smoke-3b-4` is clean. Sections 12 to 15 stand except where this section says otherwise. The agent stays `codex` with `gpt-6-luna` at low effort and the verifier's coverage pass stays offline (14.1) (user, restated for this run: "do the coverage change and stick with luna").
+
+### 16.1 I1: the primary is not capped by those four cases; no errata change, no primary change
+
+Checked against the pinned errata and every forge trial on disk before deciding:
+
+- The four cases I1 names (`test_invalid_op_precedes_duplicate`, `test_bind_invalid_op_reports_bad_value`, `test_invalid_op_no_remove_side_effects`, `test_bind_invalid_op_precedes_not_found`) **are already errata**: `exclude-from-solved`, rule `content-unstated`, in `problems/registry/scb/forge/38d627ecf668.errata.yaml` (registered 2026-10-02, sha256 `9a6dec369dea`, pinned by every lock of this experiment). They cap raw `solve_rate`, which is why section 3 made the errata-applied rate primary; they do not cap `solve_rate_errata`.
+- With the errata applied, cp3 is solved in 6 of 21 forge trials (main-02 to smoke-3b-3; cp1 19, cp2 17, cp4 5, cp5 1, cp6 to cp8 0). Per-trial `solve_rate_errata` ranged 0 to 0.5 (0: 2 trials, 0.125: 2, 0.25: 10, 0.375: 2, 0.5: 5), and r2 read 0.5 against r1's 0.25 in both `smoke-04` and `smoke-3b-2`. The primary moves.
+- What held cp3 in `smoke-3b-3` (both arms) and in 13 of 21 trials is `test_delete_requires_exactly_one_mode_flag[no_flag]` and `[both_flags]`. These are spec-determined: checkpoint 3 says "specifying neither or both produces a `validation_error`" (`task/steps/checkpoint_3/instruction.md:44`, `:68`) and "Errors produce exit code `1` with a JSON error object on stdout" (`:52`). Both `smoke-3b-3` arms used argparse's mutually exclusive group, which exits 2 with a usage message on stderr. That is an agent defect, not an ambiguity, so it is not an erratum; the errata are registered by the audit rule alone (their `basis`), and adding a case because agents fail it would be outcome-driven.
+- **Decision:** the errata file, its pin and the primary outcome (`solve_rate_errata`, raw `solve_rate` beside it) are unchanged. Correctness C (case pass rate) stays a pre-registered secondary (section 4). Late checkpoints are rarely errata-solved (cp6 to cp8: 0 of 21), so the primary is coarse at 4 attempts per arm; that is expected under explore and is read with C beside it, never instead of it.
+
+### 16.2 What changed (new versions; released versions untouched)
+
+| | Iteration 3b.3 (`f600b96bc7db`) | Iteration 3b.4 (`c15512778075`) |
+|---|---|---|
+| Pack (both arms) | `python-guardrails@6` | **`python-guardrails@7`** |
+| Process scorer | `process-compliance@5` | **`process-compliance@6`** (same `extra_test_patterns`) |
+| Gate-effort scorer | `gate-effort@7` | **`gate-effort@8`** |
+| Shared wrappers, gate, verifier coverage, `code-quality@2`, errata, primary | as 15.1 | unchanged |
+
+- **`python-guardrails@7`** (I2; mechanical rung, generic): `@6`'s payload byte for byte except the version strings, plus `lib/agent_tools/expose-test-tools`. The install (environment start, root) fills `/opt/raidar-tools/python-guardrails/agent-site` with symlinks to the top-level modules and metadata of the pack's pinned pytest, coverage and pytest's runtime dependencies (`iniconfig`, `packaging`, `pluggy`, `pygments`) and nothing else (the install fails if a runtime requirement of those distributions is missing from the set), and names that directory in `raidar-python-guardrails-test-tools.pth` (root-owned, 644) in the system `python3`'s site-packages. A `.pth` path line is appended to the end of `sys.path`, so a package the project or the image installs itself still wins; mypy, ruff and the gate library stay out of the agent code's reach. The install records, as the agent user, `python3 -m pytest --version`/`python3 -m coverage --version` (`pytest 9.1.1, coverage 7.16.2`) and four smokes: `python3 -m pytest` and `python -m pytest` pass on the clean smoke project, `python3 -m coverage run -m pytest` passes, `python3 -c 'import mypy'` fails. Each step's check records the `.pth` file's content and owner and a digest of the agent-site link listing; the probe requires all of it at every step beside `@6`'s requirements. A project virtual environment (`.venv`, `uv run`) does not read the system site-packages and is unchanged. Its integrity flags compare with `@7`'s own bytes (`@7`'s `policy.toml` differs from `@6`'s in its version comment). Factor-neutral: the same component in both conditions.
+- **`process-compliance@6`** (I3): every `@5` metric, value, status, reason and evidence item, plus two checks over the same work-session events (a test command counts only if it ran; the gate's fix sessions never count): `work_session_tests_run_any` (the work session ran the tests at all) and `work_session_tests_after_last_code_edit` (a test run follows its last edit to a non-test file: `test_*.py`, `*_test.py`, `conftest.py`, or under a `tests`/`test` directory; an unparsed write after the last run is undetermined, as in `@5`), each `not_applicable` without a source edit (the second also when only test files were edited), with `work_session_tests_run_any_rate` and `work_session_tests_after_last_code_edit_rate`.
+- **`gate-effort@8`** (I4): every `@7` metric, value, status, reason and evidence item, plus the cross-mode counts with both corrections: the `no-untyped-call` cascade left out (`@7`'s `*_ex_cascade`) and each block-tier `MYPY.unused-ignore` at a `(path, line)` that also has a block-tier `SUPPRESS` folded into it (located from the run's report, else its complete output log; a pair that cannot be located makes the count `unavailable`): per step `first_run_blocking_net`, `step_end_blocking_net`, `new_first_run_blocking_net`, and `total_new_first_run_blocking_net`, `final_step_end_blocking_net`.
+
+### 16.3 Hypothesis and outcomes
+
+Unchanged from 12.2 to 15.2 (primary `solve_rate_errata` with raw `solve_rate` beside it; secondary `gate.fix_round_correctness_delta`, `process.stall_rate`, coverage and tests, gate effort, cost), with these readings from this iteration on:
+
+- Gate-effort comparisons across arms read `gate.total_new_first_run_blocking_net` and `gate.final_step_end_blocking_net`; `@7`'s `*_ex_cascade` and `@6`'s cascade-inclusive counts stay reported beside them.
+- The process-behaviour signal is `process.work_session_tests_run_any_rate`, with `process.work_session_tests_after_last_code_edit_rate` and `@5`'s `process.work_session_tests_run_rate` beside it.
+- `process.total_test_commands_not_run` is expected to drop to 0 for `python -m pytest`/`python3 -m coverage` (16.6 names what still counts).
+- Exposing pytest and coverage to the image's Python changes what both arms can run, so iteration 3b.4's arms are not pooled with 3b.3's.
+
+### 16.4 Pre-registered process criteria for `smoke-3b-4` (before `main-03`)
+
+`smoke-3b-4` is clean when 13.3, 14.3 and 15.3 hold (with `python-guardrails@7` in place of `@6`) and also: every probe answers `python-guardrails@7`'s pinned version and shows the `.pth` file naming the agent-site and an unchanged agent-site listing at every step in both arms; no `python -m pytest`, `python3 -m pytest` or `python -m coverage` command in either arm fails with "No module named pytest" or "No module named coverage"; `make experiment-assess ... CONCURRENCY=2` grades every pre-fix snapshot and makes all 16 offline coverage runs with 0 errors; and every new `gate-effort@8` and `process-compliance@6` observation is `ok` or carries a typed status and reason (no `error`). A failed criterion is a process defect: fix it and rerun small; do not start `main-03`.
+
+### 16.5 Running iteration 3b.4
+
+```sh
+make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml   # c15512778075
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  ATTEMPT=0 CONCURRENCY=2 JOB_ID=smoke-3b-4 DETACH=1
+make experiment-status JOB=jobs/python__forge__guardrails/smoke-3b-4
+make experiment-assess JOB=jobs/python__forge__guardrails/smoke-3b-4 STORE=stores/python__forge__guardrails \
+  SCORERS="correctness@1 code-quality@2 resource-usage@1 process-compliance@6 gate-effort@8" CONCURRENCY=2
+# If 16.4 holds: main-03, 4 attempts per arm, detached, then assess (CONCURRENCY=2) and analyse as above.
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  CONCURRENCY=2 JOB_ID=main-03 DETACH=1
+```
+
+### 16.6 Known limits of iteration 3b.4
+
+- Only the system interpreter (`python3`, and `python` where it is the same interpreter) reads the `.pth` file. `uv run python -m pytest` or `./.venv/bin/python -m pytest` in a project with its own virtual environment still needs the project to install pytest, as in any repository; `process-compliance@4`'s not-run rule still reports such a command.
+- The agent's own code can now `import pytest`, `pluggy`, `packaging`, `iniconfig`, `pygments` and `coverage` with the image's Python (not mypy, ruff or the gate library). The verifier grades in its own container and never sees them; a production module that imports one of them would fail there as it would in a repository whose dev dependencies are not installed at run time.
+- `FOLDED_CODES` is `MYPY.unused-ignore` only (Ruff's unused-`noqa` code `RUF100` is not selected by the pack); the set is part of `gate-effort@8`'s identity.
+- `work_session_tests_after_last_code_edit` uses the gate's test-file globs; a test helper outside them (for example `helpers_for_tests.py` at the root) counts as code.
+
+### 16.7 Verification before any job (recorded at lock time)
+
+- Host tests: `tests/test_component_python_guardrails_v7.py` (`@6`'s payload byte for byte except the version strings, plus `expose-test-tools`; `@6`'s canaries; the install is `@5`/`@6`'s plus the agent-site, the `.pth` file and the `python -m` smokes, ordered after the venv and before the tree is protected; the probe fails on `@6`'s pin, a failed `python -m` smoke, an importable mypy, a missing or non-root `.pth` file or a changed agent-site listing; `@7`'s own bytes raise no flag where `@6`'s comparison would flag `policy.toml`; `expose-test-tools` against a fake site-packages links exactly the six distributions, skips `..`, `__pycache__` and `.pth` entries, and refuses an unexposed runtime requirement), `tests/test_process_compliance_v6.py`, `tests/test_gate_effort_v8_scorer.py`, `tests/test_iteration_3b2_consumers.py` (analysis compares `@8`'s and `@6`'s new outcomes only for those versions, each with its better direction).
+- `tests/test_guardrails_v7_trial.py` (pack image on OrbStack, no LLM): a scripted agent writes a module and a pytest-style test under `tests/unit` and runs `python -m pytest`, `python3 -m pytest`, `python3 -m coverage run -m pytest` and `python3 -c 'import mypy'` in `/app`. Under `@6` (r2) the three tool commands fail with "No module named ..."; under `@7` in r1's condition (no copies, shadow gate) and r2's (copies, commit gate) all three pass ("1 passed"), `import mypy` fails, the probe passes on `@7`'s pin and the step has no integrity flag (3 passed, 40 s).
+- `make guardrails-verify` (OrbStack, 2026-10-07): `@1` 76 of 76 rules, `@3` 83 of 83, `@4` 85 of 85, `@5` 85 of 85, `@6` 86 of 86 and `@7` 86 of 86 (`@6`'s canaries, run against `@7`'s install with the `.pth` file in place); each mutant fails exactly its disabled rules.
+- `make quality` passes (1656 tests, coverage 96.37%).
+- Released identities: `python-guardrails@1`-`@6`, `gate-effort@1`-`@7` and `process-compliance@1`-`@5` are untouched; only `python-guardrails@7`, `gate-effort@8` and `process-compliance@6` are new. Only this experiment's lock moved (`f600b96bc7db` → `c15512778075`); the other five locks are unchanged.
+- **The new scorers on `smoke-3b-3`** (2026-10-07, `make experiment-assess ... CONCURRENCY=2` into a scratch copy of the `smoke-3b-3` store with a scratch lock of the same `lock_sha256`, `f600b96bc7db`; a check of the scorers, not 3b.4 data): 0 error observations. `process-compliance@6`: `work_session_tests_run_any` r2 1 at cp4, cp7 and cp8 (cp3's only attempt was the unrun `python -m pytest`), r1 0 at every step: `work_session_tests_run_any_rate` r1 0, r2 0.375, where `@5`'s `work_session_tests_run_rate` read 0 vs 0; `work_session_tests_after_last_code_edit_rate` 0 vs 0 (r2's last edits at cp4, cp7 and cp8 were to `forge.py`, not tests). `gate-effort@8`: r2 cp8 `first_run_blocking_net` 11 against `*_ex_cascade` 12 (the `SUPPRESS`/`MYPY.unused-ignore` pair at `forge.py:359` counted once); `total_new_first_run_blocking_net` r1 70, r2 51 (`@7`: 70, 52); `final_step_end_blocking_net` 70 vs 0.
