@@ -38,7 +38,9 @@ from raidar.scorers.gate_effort_manifests import (
     GATE_EFFORT_V6,
     GATE_EFFORT_V7,
     GATE_EFFORT_V8,
+    GATE_EFFORT_V9,
 )
+from raidar.scorers.gate_effort_v9.manifest import REFUSAL_KINDS
 from raidar.scorers.process_manifests import (
     PROCESS_COMPLIANCE_V3,
     PROCESS_COMPLIANCE_V4,
@@ -336,13 +338,71 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
         "blocking findings at the last gated step's end, no cascade, a suppression counted once",
         5.0,
     ),
+    # gate-effort@9: guardrail-gate@4's autofix step, the counts after and before it, and the
+    # fix sessions' cost and wall time by the kind of refusal that started them.
+    ("total_autofix_rounds", "completed autofix passes per trial", 1.0),
+    ("total_autofix_errors", "autofix passes that failed per trial (validity: expected 0)", 0.5),
+    ("total_autofix_files_changed", "files the autofix passes changed per trial", 1.0),
+    ("total_autofix_lines_changed", "lines the autofix passes changed per trial", 5.0),
+    ("total_autofix_removed_blocking", "block-tier findings autofix fixed per trial", 2.0),
+    *(
+        (
+            f"total_autofix_removed_blocking.{family}",
+            f"block-tier findings autofix fixed: {family}",
+            1.0,
+        )
+        for family in FAMILIES
+    ),
+    (
+        "first_pass_clean_post_autofix_rate",
+        "first checks after autofix that passed (decided steps)",
+        0.1,
+    ),
+    (
+        "total_new_first_run_blocking_post_autofix_net",
+        "blocking findings each step's own work added, after autofix (net)",
+        5.0,
+    ),
+    (
+        "final_step_end_blocking_post_autofix_net",
+        "blocking findings at the last gated step's end, after autofix (net)",
+        5.0,
+    ),
+    (
+        "total_new_first_run_blocking_raw_net",
+        "blocking findings each step's own work added, before autofix (net)",
+        5.0,
+    ),
+    *(
+        (f"total_fix_cost_usd_by_refusal.{kind}", f"fix-session cost: {kind} refusals", 0.01)
+        for kind in REFUSAL_KINDS
+    ),
+    *(
+        (f"total_fix_wall_s_by_refusal.{kind}", f"fix-session wall time: {kind} refusals", 60.0)
+        for kind in REFUSAL_KINDS
+    ),
+    (
+        "total_fix_sessions_with_coverage_minimum",
+        "fix sessions whose refusal included the coverage minimum per trial",
+        1.0,
+    ),
+    (
+        "total_fix_cost_usd_with_coverage_minimum",
+        "cost of the fix sessions whose refusal included the coverage minimum",
+        0.01,
+    ),
+    (
+        "total_fix_wall_s_with_coverage_minimum",
+        "wall time of the fix sessions whose refusal included the coverage minimum",
+        60.0,
+    ),
 )
 GATE_METRICS: tuple[MetricDef, ...] = tuple(
     MetricDef(
         f"{GATE_PREFIX}{metric}",
         f"Gate effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT_V8, metric),
+        declared_direction(GATE_EFFORT_V9, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
@@ -376,24 +436,34 @@ _GATE_V8_ONLY = frozenset(
 )
 
 
+_GATE_V9_ONLY = frozenset(
+    f"{GATE_PREFIX}{metric.id}"
+    for metric in GATE_EFFORT_V9.metrics
+    if metric.id not in {m.id for m in GATE_EFFORT_V8.metrics}
+)
+
+
 def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
     """The gate outcomes a gate-effort version reports.
 
     ``@4`` and ``@5`` add the tests check; ``@6`` adds the mode-comparable blocking counts,
     the typing cascade and the split first-run tests outcomes; ``@7`` the first-pass rates
     that ignore auto-fixable codes or the tests check, and the cascade-free counts; ``@8``
-    the counts that also count a refused suppression comment once (``*_net``).
+    the counts that also count a refused suppression comment once (``*_net``); ``@9`` the
+    autofix step, the counts after and before it, and the fix cost by refusal kind.
     """
-    if ref == "gate-effort@8":
+    if ref == "gate-effort@9":
         return GATE_METRICS
-    if ref == "gate-effort@7":
-        left_out = _GATE_V8_ONLY
+    if ref == "gate-effort@8":
+        left_out = _GATE_V9_ONLY
+    elif ref == "gate-effort@7":
+        left_out = _GATE_V8_ONLY | _GATE_V9_ONLY
     elif ref == "gate-effort@6":
-        left_out = _GATE_V7_ONLY | _GATE_V8_ONLY
+        left_out = _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY
     elif ref in {"gate-effort@4", "gate-effort@5"}:
-        left_out = _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY
+        left_out = _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY
     else:
-        left_out = _GATE_V4_ONLY | _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY
+        left_out = _GATE_V4_ONLY | _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY
     return tuple(metric for metric in GATE_METRICS if metric.id not in left_out)
 
 
@@ -480,6 +550,22 @@ def process_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
 
 
 ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_V6_METRICS)
+
+VERIFIER_PREFIX = "verifier."
+"""Verifier diagnostics: described per arm, never compared (no verdict, no effect)."""
+VERIFIER_DISAGREEMENTS = f"{VERIFIER_PREFIX}grading_coverage_disagreements"
+VERIFIER_DISAGREEMENT_SOURCE = "code-quality@3"
+VERIFIER_METRICS: tuple[MetricDef, ...] = (
+    MetricDef(
+        VERIFIER_DISAGREEMENTS,
+        "Verifier: grader cases whose outcome differed between the grading run and the "
+        "coverage run, summed over a trial's transitions (code-quality@3 "
+        "regression_parity_excluded_cases; diagnostic, never an outcome)",
+        View.QUALITY,
+        Direction.NEUTRAL,
+        1.0,
+    ),
+)
 
 TOTAL_COST = "total_cost_usd"
 COST_METRICS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")

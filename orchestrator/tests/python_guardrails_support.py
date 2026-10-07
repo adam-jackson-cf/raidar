@@ -17,7 +17,9 @@
   agent's tool links and their smokes), @6 (``specs-6.json``: @5's plus the
   test-class canary, ``PLR0904`` being off in test files) and @7 (@6's rules byte
   for byte, so ``specs-6.json``; its install also makes the pack's pytest and
-  coverage importable by the image's Python).
+  coverage importable by the image's Python) and @8 (@7's rules byte for byte, so
+  ``specs-6.json``; it adds ``guardrail-check --autofix``, whose own canaries run
+  beside the rule canaries in ``make guardrails-verify``).
 """
 
 from __future__ import annotations
@@ -38,7 +40,9 @@ from raidar.components.builtins import (
     guardrails_v5,
     guardrails_v6,
     guardrails_v7,
+    guardrails_v8,
 )
+from raidar.components.builtins.gate import WITH_KEYS as GATE_V1_KEYS
 from raidar.components.gate_run_v2 import GateModeV2, gate_script
 from raidar.components.guardrail_gate_v3 import GuardrailGateOptionsV3
 from raidar.components.session_chain import InnerAgentSpec
@@ -134,8 +138,15 @@ PACKS = {
         "specs-6.json",
         NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR | TEST_CLASS_BEHAVIOUR,
     ),
+    8: PackUnderTest(
+        8,
+        guardrails_v8.PAYLOAD_DIR,
+        guardrails_v8.PAYLOAD_FILES,
+        "specs-6.json",
+        NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR | TEST_CLASS_BEHAVIOUR,
+    ),
 }
-CANARY_PACK = {5: 4, 7: 6}
+CANARY_PACK = {5: 4, 7: 6, 8: 6}
 """The fixture generator's ``--pack`` for a pack whose rules are another's byte for byte."""
 PACK_1 = PACKS[1]
 
@@ -187,6 +198,16 @@ def experiment_gate_use(mode: str = "commit") -> dict[str, Any]:
         if gate.get("mode", "commit") == mode:
             return gate
     raise AssertionError(f"the guardrails experiment declares no guardrail-gate in mode {mode}")
+
+
+def released_gate_use(mode: str = "commit") -> dict[str, Any]:
+    """The experiment's gate ``with`` in ``mode``, cut to guardrail-gate@1's keys.
+
+    For the tests that prove a released gate version (@1, @2) with the experiment's own
+    hook command; @4's autofix keys do not exist there.
+    """
+    gate = experiment_gate_use(mode)
+    return {key: value for key, value in gate.items() if key in GATE_V1_KEYS}
 
 
 def commit_gate_script() -> str:

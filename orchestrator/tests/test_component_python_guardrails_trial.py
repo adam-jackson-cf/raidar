@@ -25,6 +25,7 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import uuid
 from pathlib import Path
@@ -42,6 +43,7 @@ from raidar.components.builtins import (
     guardrails_v5,
     guardrails_v6,
     guardrails_v7,
+    guardrails_v8,
 )
 from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
@@ -61,8 +63,8 @@ from tests.python_guardrails_support import (
     PACKS,
     PackUnderTest,
     assemble_verify_root,
-    experiment_gate_use,
     implemented_rules,
+    released_gate_use,
 )
 
 INNER = "tests.test_component_python_guardrails_trial:TamperingInnerAgent"
@@ -145,7 +147,7 @@ def test_gate_refuses_with_the_pinned_pack_and_tampering_is_flagged_in_a_real_tr
     tmp_path: Path,
 ) -> None:
     TamperingInnerAgent.sessions.clear()
-    gate = {**experiment_gate_use(), "max_rounds": 1, "timeout_sec": 120}
+    gate = {**released_gate_use(), "max_rounds": 1, "timeout_sec": 120}
     compiled = compile_uses(use("python-guardrails@1"), use("guardrail-gate@1", **gate))
     # Released @1/@2 behaviour is proven as released: no tests check, install at step 1.
     task = tmp_path / "python-guardrails"
@@ -222,7 +224,7 @@ class ObservingInnerAgent(BaseAgent):
 def test_the_shadow_baseline_records_the_gate_unseen_in_a_real_trial(tmp_path: Path) -> None:
     """r1's condition: the pack without workspace copies and the gate in shadow mode."""
     ObservingInnerAgent.sessions.clear()
-    gate = {**experiment_gate_use("shadow"), "timeout_sec": 120}
+    gate = {**released_gate_use("shadow"), "timeout_sec": 120}
     compiled = compile_uses(
         use("python-guardrails@2", workspace_configs=False), use("guardrail-gate@2", **gate)
     )
@@ -350,12 +352,16 @@ MUTANT_FAILURE = {TEST_CLASS_CANARY: "passing fixture exited 1"}
 # @7's rules are @6's byte for byte; its install also exposes pytest and coverage to the
 # image's Python, so its canaries run with that .pth file in place.
 INSTALL[7], MUTATED[7], MUTATE[7] = INSTALL[6], MUTATED[6], MUTATE[6]
+# @8's rules are @7's byte for byte; its install adds the autofix smoke, and its
+# --autofix has its own canaries (test_v8_autofix_is_proven_...).
+INSTALL[8], MUTATED[8], MUTATE[8] = INSTALL[7], MUTATED[7], MUTATE[7]
 INSTALLERS = {
     3: guardrails_v3,
     4: guardrails_v4,
     5: guardrails_v5,
     6: guardrails_v6,
     7: guardrails_v7,
+    8: guardrails_v8,
 }
 
 
@@ -412,3 +418,80 @@ def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
         why = MUTANT_FAILURE.get(rule, "violating canary passed")
         assert f"canary FAIL {rule}: {why}" in mutant, mutant[-2000:]
     assert f"canaries: {len(mutated)} rule(s), {len(mutated)} failed" in mutant
+
+
+# ---- python-guardrails@8: --autofix canaries with the pinned Ruff (opt-in) ------------------
+
+AUTOFIX_CANARIES = {
+    "calc.py": "def add(a,b) :\n    return  a+b\n",
+    "main.py": "import sys\nimport os\n\nprint(os.sep, sys.platform)\n",
+    "tests/test_unsafe.py": "def test_f() -> None:\n    unused = 1\n    assert True\n",
+    "notes.txt": "x  =  1\n",
+}
+AUTOFIX_VERIFY = """
+set -euo pipefail
+{install}
+chown -R agent:agent /verify
+su agent -s /bin/bash -c '
+set -euo pipefail
+for home in /opt/raidar-tools/python-guardrails /tmp/mutant; do
+  name="$(basename "$home")"
+  if [ "$name" = mutant ]; then
+    cp -R /opt/raidar-tools/python-guardrails /tmp/mutant
+    sed -i "s/\"--no-unsafe-fixes\"/\"--unsafe-fixes\"/" /tmp/mutant/lib/guardrails/autofix.py
+  fi
+  rm -rf "/tmp/ws-$name" && cp -R /verify/workspace "/tmp/ws-$name"
+  GUARDRAILS_HOME="$home" guardrail-check --autofix --root "/tmp/ws-$name" \
+    --json-out "/verify/autofix-$name.json" > "/verify/autofix-$name.out" 2>&1 \
+    || echo "rc=$?" >> "/verify/autofix-$name.out"
+  cp -R "/tmp/ws-$name" "/verify/after-$name"
+done
+'
+"""
+
+
+@coverage_verification
+def test_v8_autofix_is_proven_by_its_canaries_in_the_pack_image(tmp_path: Path) -> None:
+    """Pinned Ruff: FORMAT and I001 fixed, F841 kept, notes.txt untouched; the mutant fails."""
+    root = tmp_path / "verify"
+    pack = PACKS[8]
+    for relative in pack.payload_files:
+        target = root / "pack" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(pack.payload_dir / relative, target)  # keeps the executable bits
+    for relative, text in AUTOFIX_CANARIES.items():
+        target = root / "workspace" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text)
+    (root / "install.sh").write_text(guardrails_v8.install_script())
+    (root / "run.sh").write_text(AUTOFIX_VERIFY.format(install=INSTALL[8].format(slug=VERIFY_SLUG)))
+    name = f"raidar-guardrails-autofix-{uuid.uuid4().hex[:8]}"
+
+    done = subprocess.run(
+        ["docker", "--context", DOCKER_CONTEXT, "run", "--rm", "--name", name]
+        + ["-v", f"{root}:/verify", "--user", "root", image_tag(load_pack_spec())]
+        + ["bash", "/verify/run.sh"],
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=900,
+    )
+
+    assert done.returncode == 0, done.stdout + done.stderr
+    report = json.loads((root / "autofix-python-guardrails.json").read_text())
+    print(json.dumps(report, indent=2))
+    assert (report["pack"], report["verdict"]) == ("python-guardrails@8", "fixed")
+    assert {"FORMAT", "I001"} <= set(report["codes_fixed"])
+    assert "F841" not in report["codes_fixed"]
+    assert report["codes_after"] == {"F841": 1}
+    assert report["files_changed"] == ["calc.py", "main.py"]
+    after = root / "after-python-guardrails"
+    assert (after / "calc.py").read_text() == "def add(a, b):\n    return a + b\n"
+    assert (after / "tests" / "test_unsafe.py").read_text() == AUTOFIX_CANARIES[
+        "tests/test_unsafe.py"
+    ]
+    assert (after / "notes.txt").read_text() == AUTOFIX_CANARIES["notes.txt"]
+    # Negative control: a pack that allowed unsafe fixes fails the F841 canary.
+    mutant = json.loads((root / "autofix-mutant.json").read_text())
+    assert "F841" in mutant["codes_fixed"], mutant
+    assert "unused = 1" not in (root / "after-mutant" / "tests" / "test_unsafe.py").read_text()

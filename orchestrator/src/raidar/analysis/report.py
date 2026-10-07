@@ -67,6 +67,8 @@ from raidar.analysis.outcomes import (
     OUTCOME_METRICS,
     PROCESS_OUTCOME_SCORERS,
     RAW_COUNTERPART,
+    VERIFIER_DISAGREEMENTS,
+    VERIFIER_METRICS,
     AnalysisModel,
     MetricDef,
     TrialOutcome,
@@ -78,6 +80,7 @@ from raidar.analysis.outcomes import (
 )
 from raidar.analysis.ranking import Ranking, ranking
 from raidar.analysis.stats import POWER_CONSTANT, pairs_for_power
+from raidar.problems.sensitivities import known_sensitivities
 from raidar.scorers.sdk.result import AssessResult
 
 REPORT_KIND = "raidar-analysis-report"
@@ -176,6 +179,8 @@ class ArmSummary(AnalysisModel):
     """Per gate metric over the arm's valid trials; None when the lock declares no gate-effort."""
     process_outcomes: dict[str, GateDescriptive] | None = None
     """Per process metric (stall rate); None when the lock declares no process-compliance@3."""
+    verifier_diagnostics: dict[str, GateDescriptive] | None = None
+    """Verifier diagnostics (grading-vs-coverage disagreements); None when none was measured."""
 
 
 class Comparison(AnalysisModel):
@@ -242,6 +247,10 @@ class AnalysisReport(AnalysisModel):
     errata: dict[str, dict[str, object]] | None = None
     """``{problem ref: {sha256, exclude_from_solved}}`` the lock pins; only the ``*_errata``
     outcomes apply it. Absent (not written) when the lock pins no errata."""
+    verifier_sensitivities: dict[str, list[dict[str, object]]] | None = None
+    """``{problem ref: [known sensitivity]}`` from the problems registry
+    (``raidar.problems.sensitivities``): spec-determined cases whose verdict can depend on
+    timing. A note beside the disagreement counts; it changes no value."""
     sample_size_basis: SampleSizeBasis = Field(
         default_factory=lambda: SampleSizeBasis(
             standardized={f"{d:g}": pairs_for_power(1.0, d) for d in STANDARDIZED_EFFECTS}
@@ -422,7 +431,24 @@ def _arm_summary(arm: str, inputs: AnalysisInputs, settings: Settings) -> ArmSum
             if inputs.process_outcomes
             else None
         ),
+        verifier_diagnostics=_verifier_diagnostics(arm, valid, settings),
     )
+
+
+def _verifier_diagnostics(
+    arm: str, valid: Sequence[TrialOutcome], settings: Settings
+) -> dict[str, GateDescriptive] | None:
+    """The verifier diagnostics, when some valid trial reports them."""
+    if not any(VERIFIER_DISAGREEMENTS in outcome.metrics for outcome in valid):
+        return None
+    return arm_gate_effort(arm, valid, settings, VERIFIER_METRICS)
+
+
+def _sensitivities(inputs: AnalysisInputs) -> dict[str, list[dict[str, object]]] | None:
+    found = known_sensitivities(outcome.problem for outcome in inputs.outcomes)
+    if not found:
+        return None
+    return {ref: [note.model_dump(mode="json") for note in notes] for ref, notes in found.items()}
 
 
 def _settings_out(settings: Settings) -> ReportSettings:
@@ -488,6 +514,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         comparisons=tuple(_comparison(inputs, arm, settings) for arm in treatments),
         ranking=_ranking(inputs, settings, summaries),
         errata=_errata(inputs),
+        verifier_sensitivities=_sensitivities(inputs),
     )
 
 

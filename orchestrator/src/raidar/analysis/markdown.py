@@ -8,7 +8,14 @@ from raidar.analysis.curves import Band, Curve
 from raidar.analysis.effects import Effect, Exclusions, IntervalOut
 from raidar.analysis.gate_effort import GateDescriptive
 from raidar.analysis.manipulation import CheckSeparation, ManipulationReport
-from raidar.analysis.outcomes import ALL_METRICS, GATE_METRICS, GATE_PREFIX
+from raidar.analysis.outcomes import (
+    ALL_METRICS,
+    GATE_METRICS,
+    GATE_PREFIX,
+    REFUSAL_KINDS,
+    VERIFIER_DISAGREEMENTS,
+    VERIFIER_METRICS,
+)
 from raidar.analysis.ranking import Ranking, RankingRow
 from raidar.analysis.report import AnalysisReport, ArmSummary, Comparison
 from raidar.analysis.stats import confidence_label
@@ -22,7 +29,7 @@ BETTER = {
     Direction.NEUTRAL: "neutral",
 }
 """How each compared metric's ``Better`` cell reads (the direction its scorer declares)."""
-DIRECTIONS = {metric.id: metric.direction for metric in ALL_METRICS}
+DIRECTIONS = {metric.id: metric.direction for metric in (*ALL_METRICS, *VERIFIER_METRICS)}
 BETTER_LEGEND = (
     "Better: the direction the metric's scorer declares (↑ higher is better, ↓ lower is "
     "better); Δ is treatment minus baseline, so whether a Δ is an improvement depends on it. "
@@ -228,7 +235,12 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         "auto-fixable layout codes (FORMAT, I001, W291-W293), the tests check (TEST.*), or "
         "both, and the cross-mode counts without the no-untyped-call cascade "
         "(*_ex_cascade); gate-effort@8 adds those counts with a refused suppression comment "
-        "counted once (mypy's unused-ignore at a SUPPRESS line folded into it; *_net).",
+        "counted once (mypy's unused-ignore at a SUPPRESS line folded into it; *_net); "
+        "gate-effort@9 adds guardrail-gate@4's autofix step (passes, errors, files and lines "
+        "changed, block-tier findings fixed), the counts after autofix and before it "
+        "(*_post_autofix_net, *_raw_net: an enforced gate's runs see the fixed tree, a shadow "
+        "gate's check the raw one, so the arms compare like for like) and the fix sessions' "
+        "cost and wall time by the kind of refusal that started them.",
         "",
         *_table(("Metric", "Better", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
@@ -237,6 +249,85 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
             ("Family", *names),
             [*(_family_row(family, arms) for family in FAMILIES), *_cascade_row(arms)],
         ),
+        *_autofix_family_table(arms, names),
+        *_refusal_table(arms, names),
+    ]
+
+
+def _autofix_family_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str]:
+    """gate-effort@9: block-tier findings the autofix passes fixed, per family."""
+    metric = f"{GATE_PREFIX}total_autofix_removed_blocking"
+    if not any(metric in (arm.gate_effort or {}) for arm in arms):
+        return []
+    rows = [
+        [family, *(_num(_gate_mean(arm, f"{metric}.{family}")) for arm in arms)]
+        for family in FAMILIES
+    ]
+    return [
+        "Block-tier findings the autofix passes fixed per trial by rule family (mean):",
+        "",
+        *_table(("Family", *names), rows),
+    ]
+
+
+def _refusal_table(arms: Sequence[ArmSummary], names: Sequence[str]) -> list[str]:
+    """gate-effort@9: fix-session cost and wall time by the kind of refusal that started it."""
+    cost, wall = (
+        f"{GATE_PREFIX}total_fix_cost_usd_by_refusal",
+        f"{GATE_PREFIX}total_fix_wall_s_by_refusal",
+    )
+    if not any(f"{cost}.mixed" in (arm.gate_effort or {}) for arm in arms):
+        return []
+    rows = [
+        [
+            kind,
+            *(
+                f"{_num(_gate_mean(arm, f'{cost}.{kind}'))} / "
+                f"{_num(_gate_mean(arm, f'{wall}.{kind}'))}"
+                for arm in arms
+            ),
+        ]
+        for kind in REFUSAL_KINDS
+    ]
+    return [
+        "Fix sessions per trial by the refusal that started them (mean cost USD / wall s; "
+        "coverage_minimum: TEST.coverage-minimum was the only blocking code):",
+        "",
+        *_table(("Refusal", *names), rows),
+    ]
+
+
+def _sensitivity_notes(report: AnalysisReport) -> list[str]:
+    """The known verifier sensitivities of the report's problems, one line each."""
+    notes = [
+        f"- `{note['case']}` ({ref}, {note['kind']}, spec-determined: {note['spec_determined']})"
+        f": {note['mechanism']}"
+        for ref, found in (report.verifier_sensitivities or {}).items()
+        for note in found
+    ]
+    if not notes:
+        return []
+    heading = "Known verifier sensitivities (not errata; the specification determines them):"
+    return [heading, "", *notes, ""]
+
+
+def _verifier_arms(report: AnalysisReport) -> list[str]:
+    """Grading-vs-coverage disagreements per arm, and the known sensitivities beside them."""
+    arms = [arm for arm in report.arms if arm.verifier_diagnostics is not None]
+    if not arms:
+        return []
+    columns = [arm.verifier_diagnostics or {} for arm in arms]
+    rows = _descriptive_rows(columns, [VERIFIER_DISAGREEMENTS])
+    return [
+        "",
+        "## Verifier sensitivity (diagnostic; never an outcome)",
+        "",
+        "Grader cases whose outcome differed between the grading run and the coverage run, "
+        "per trial (code-quality@3 regression_parity_excluded_cases, summed). Correctness "
+        "and the solve rates read the grading run's verdict; G leaves such cases out.",
+        "",
+        *_table(("Metric", "Better", *(arm.arm for arm in arms)), rows),
+        *_sensitivity_notes(report),
     ]
 
 
@@ -510,6 +601,7 @@ def render_markdown(report: AnalysisReport) -> str:
     lines += ["", "## Arms", "", *_table(header, (_arm_row(arm) for arm in report.arms))]
     lines.extend(_gate_arms(report))
     lines.extend(_process_arms(report))
+    lines.extend(_verifier_arms(report))
     lines.extend(_ranking(report.ranking))
     for comparison in report.comparisons:
         lines.extend(_comparison(comparison, report.settings.confidence))

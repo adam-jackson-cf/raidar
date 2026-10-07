@@ -31,6 +31,16 @@
 # instead of reading the whole step, and so the trial's headline, as ineligible; it reports how
 # many cases it left out per transition). Agent, pack, gate, wrappers and the offline coverage
 # pass are unchanged.
+# Iteration 4 (rationale.md section 18, after main-03; user decision 2026-10-07, option b: one
+# more explore iteration on fix-session cost): python-guardrails@8 (@7 plus its safe auto-fixers
+# as 'guardrail-check --autofix': ruff format and ruff's safe fixes only, protected config, scope
+# files only, atomic, reported) in both arms; guardrail-gate@4 (@3 plus autofix_before_check):
+# r2 runs the autofix before every commit check (re-staged, then the real commit with
+# guardrail-check as the pre-commit hook, exactly as @3), r1's shadow gate runs it on a throwaway
+# copy and records the fixed copy's check beside the raw one (the workspace stays byte-identical
+# and the agent sees nothing); scorer gate-effort@9 (@8 plus the autofix step, the counts after
+# and before it, and the fix cost by refusal kind). Correctness, quality, process scorers,
+# agent, wrappers, verifier coverage, errata and primary unchanged.
 # r2 gets python-guardrails@7 (the @1 rule set and pins, PLR0904 off in test files, plus the tests check:
 # unittest always, pytest for pytest-style tests, both under coverage; a Python change with no
 # test that ran is refused, so are failing tests and owned line coverage below 85%), installed
@@ -50,7 +60,8 @@
 # No rules text tells the agent about the gate in advance (the mechanical rung only).
 # Objective: explore (smallest runs: 1 trial per arm first, then at most 4 attempts per arm).
 # Verdicts below min_pairs read insufficient by design.
-# Pre-registration: rationale.md beside this file. Section 17 (iteration 3b.5) amends section 16
+# Pre-registration: rationale.md beside this file. Section 18 (iteration 4) amends section 17,
+# section 17 (iteration 3b.5) amends section 16
 # (iteration 3b.4), which amends section 15
 # (iteration 3b.3), which amends section 14
 # (iteration 3b.2), which amends section 13,
@@ -115,19 +126,23 @@ conditions:
       # workspace: the agent sees no ruff.toml or mypy.ini. Its probe proves at every step the
       # pinned tools, the install-time smoke and an unchanged tool tree, and at step 1 that no
       # config copy is in /app.
-      - use: python-guardrails@7
+      - use: python-guardrails@8
         with:
           workspace_configs: false
       # The same commit check in shadow mode: run once at each step's end against a git
       # directory outside /app, its tests in a throwaway copy (the workspace is never
       # written), recorded with its git evidence, never enforced (no refusal, no fix session,
-      # so no pre-fix snapshot).
-      - use: guardrail-gate@3
+      # so no pre-fix snapshot). Iteration 4: the pack's autofix then runs on a throwaway copy
+      # of /app outside it and the same shadow check runs on the fixed copy (post-autofix
+      # findings beside the raw ones); /app stays byte-identical and the agent sees nothing.
+      - use: guardrail-gate@4
         with:
           command: guardrail-check
           mode: shadow
           max_rounds: 3
           timeout_sec: 300
+          autofix_before_check: true
+          autofix_command: guardrail-check --autofix
   - id: r2-guardrails
     components:
       # The pack: the gate entrypoint (the agent's own tests included), its pinned tools and
@@ -135,19 +150,25 @@ conditions:
       # the pinned versions, the install-time smoke (a clean file with its test passes, an
       # unused import is refused) and an unchanged tool tree; its integrity flags record
       # config-copy edits, tree changes and hook-bypass attempts without failing the step.
-      - use: python-guardrails@7
+      - use: python-guardrails@8
         with:
           workspace_configs: true
       # The repository's commit gate. The hook command is plain `guardrail-check`, as in a
       # real repository; the gate's JSON report (tests block included) goes to the run's
       # report dir, where gate-effort@4 reads it; every commit attempt records git evidence,
       # and /app is snapshotted before each fix session for the offline pre-fix grade.
-      - use: guardrail-gate@3
+      # Iteration 4: before every commit check (the step-end one and each re-check after a fix
+      # session) the pack's safe auto-fixers run on /app and the result is re-staged, as a
+      # repository's pre-commit autofix hooks do; a failed autofix is typed and that check runs
+      # as guardrail-gate@3's.
+      - use: guardrail-gate@4
         with:
           command: guardrail-check
           mode: commit
           max_rounds: 3
           timeout_sec: 300
+          autofix_before_check: true
+          autofix_command: guardrail-check --autofix
 
 arms:
   - id: r1-baseline
@@ -183,7 +204,11 @@ assessment:
   # Iteration 3b.5: code-quality@3 is @2 whose G, when parity failed only because at most 3
   # cases changed outcome between the grading and coverage runs, leaves those cases out of both
   # runs instead of the step; regression_parity_excluded_cases reports them.
-  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6, gate-effort@8]
+  # Iteration 4: gate-effort@9 is @8 plus guardrail-gate@4's autofix step (passes, errors, files
+  # and lines changed, block-tier findings fixed by family), first-pass clean and blocking
+  # counts after autofix and before it (comparable across the enforced and the shadow arm), and
+  # the fix sessions' cost and wall time by the kind of refusal that started them.
+  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6, gate-effort@9]
   scorer_config:
     process-compliance@6:
       extra_test_patterns:

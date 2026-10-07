@@ -2,6 +2,19 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 4
+
+### Added
+
+- `python-guardrails@8` (`raidar.components.builtins.guardrails_v8`, payload `payloads/python_guardrails_8`): `@7` byte for byte except the version strings, plus `lib/guardrails/autofix.py` and `guardrail-check --autofix`, the pack's safe auto-fixers only (`ruff format`, `ruff check --fix --no-unsafe-fixes`, `ruff format`; protected config; the scope's Python files only; run in a throwaway copy and written back only when every fixer succeeded, never through a symlink; exit 0 done, 126 error) with a report (`python-guardrails.autofix-report/1`: files and lines changed, codes fixed, all and block-tier). Config files are `@7`'s bytes. The install adds an autofix smoke (`I001` and `FORMAT` fixed, the unsafe `F841` kept); the probe requires it. Host tests run `--autofix` with this environment's Ruff; `make guardrails-verify` runs `@7`'s rule canaries against `@8`'s install plus `--autofix` canaries with the pinned Ruff and a mutant allowing unsafe fixes as the negative control.
+- `guardrail-gate@4` (`raidar.components.builtins.gate_v4`, wrapper `raidar.components.guardrail_gate_v4`, script `raidar.components.autofix_run`): `@3` plus `autofix_before_check` (default false) and `autofix_command`. Enforced: the command runs in `/app` before every commit check, then `git add -A` and the commit with the gate as the pre-commit hook as in `@3`; a failed pass is typed (`ERROR_TYPES`) and that check falls back to `@3`. Shadow: the command runs on a throwaway copy outside `/app` and the same shadow check runs on the fixed copy (`post_check`); `/app` stays byte-identical. Every pass is recorded under `autofix` in the gate record. Pack-image trial `tests/test_guardrails_v8_trial.py`.
+- `gate-effort@9` (`raidar.scorers.gate_effort_v9`, store-bound): `@8` plus the autofix passes (rounds, errors, files and lines changed, block-tier findings fixed by family), first-pass clean and blocking counts after autofix and before it (comparable across an enforced and a shadow gate), and each fix session's cost and wall time by the kind of refusal that started it, with the coverage-minimum share. Analysis (new tables: autofix removals by family, fix cost by refusal kind), the manipulation check, the review gate view and pre-fix grading read `@9` first.
+- Known verifier sensitivities (`raidar.problems.sensitivities`, `problems/registry/<dataset>/<problem>/<version>.sensitivities.yaml`): spec-determined cases whose verdict can depend on timing, a typed note that changes no value. `scb/forge@38d627ecf668` records `test_blueprint_list_orders_by_created_at_name_uuid`. The analysis describes each arm's `verifier.grading_coverage_disagreements` (code-quality@3's `regression_parity_excluded_cases` summed per trial; never compared) with the known sensitivities beside it. Upstream draft note (not filed) in `docs/reboot/upstream/scb-forge-unspecified-assertions.md`.
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 4, `rationale.md` §18): both arms use `python-guardrails@8` and `guardrail-gate@4` with `autofix_before_check: true` (r2 commit, r1 shadow); scorer `gate-effort@9`. Errata, pin, primary and every other component and scorer unchanged; `code-quality@3`'s digest is left as recorded in §17.8 (§18.6). No job has run under this lock.
+
 ## Unreleased - guardrails explore iteration 3b.5 and main-03
 
 ### Added

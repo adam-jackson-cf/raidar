@@ -773,6 +773,10 @@ def test_the_parity_canary_runs_the_experiments_own_commit_gate() -> None:
         "mode": "commit",
         "max_rounds": 3,
         "timeout_sec": 300,
+        # Iteration 4 (rationale 18.1): the pack's safe auto-fixers run before the commit; the
+        # commit script the rule canaries run is the hook's, unchanged.
+        "autofix_before_check": True,
+        "autofix_command": "guardrail-check --autofix",
     }
     assert experiment_gate_use("shadow")["command"] == gate["command"]
     assert "bash -c guardrail-check </dev/null" in script

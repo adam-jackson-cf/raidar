@@ -1,0 +1,27 @@
+# Known verifier sensitivities of scb/forge@38d627ecf668 (raidar.problems.sensitivities).
+# Not errata: the specification determines each behaviour below, so no outcome changes.
+# A typed note the analysis shows beside the grading-vs-coverage disagreement count
+# (code-quality@3 regression_parity_excluded_cases). Judged by the spec-determinacy audit
+# rule (rationale.md section 18.5), never by outcomes. Upstream draft (not filed):
+# docs/reboot/upstream/scb-forge-unspecified-assertions.md, "Timing-dependent ordering test".
+schema: raidar.problem-sensitivities/1
+problem: scb/forge@38d627ecf668
+sensitivities:
+  - case: test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_name_uuid
+    checkpoint: checkpoint_1
+    kind: timing
+    spec_determined: true
+    spec: >-
+      task/steps/checkpoint_1/instruction.md:64 ("Ordering: created_at ascending, then name
+      ascending lexicographic, then uuid ascending lexicographic as final tie-breaker") and
+      :24/:103 (created_at is ISO 8601 UTC with second precision)
+    mechanism: >-
+      The test creates zeta, alpha and mango in that order and asserts the listed
+      (created_at, name, uuid) tuples are sorted. When all three creates land in the same
+      second, the correct order is the name order, so a program that ignores created_at
+      (for example one that sorts by name only) also passes; when the creates straddle a
+      second boundary the same program fails. Its verdict on such a program depends on
+      wall-clock timing (a slower run, such as the coverage pass, is more likely to straddle).
+    recorded: >-
+      2026-10-07, guardrails experiment smoke-3b-4 (rationale.md 16.8 I1/I2): passed in
+      grading and failed under coverage at 4 r2 steps; did not flip in main-03 (17.7)

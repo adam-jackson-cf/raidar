@@ -77,6 +77,8 @@ component = "raidar.components.registry:component_resolver"
 "python-guardrails@5" = "raidar.components.builtins.guardrails_v5:PYTHON_GUARDRAILS_V5"
 "python-guardrails@6" = "raidar.components.builtins.guardrails_v6:PYTHON_GUARDRAILS_V6"
 "python-guardrails@7" = "raidar.components.builtins.guardrails_v7:PYTHON_GUARDRAILS_V7"
+"python-guardrails@8" = "raidar.components.builtins.guardrails_v8:PYTHON_GUARDRAILS_V8"
+"guardrail-gate@4" = "raidar.components.builtins.gate_v4:GUARDRAIL_GATE_V4"
 
 [build-system]
 requires = ["hatchling"]

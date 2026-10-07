@@ -439,13 +439,13 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@8": {
-          "digest": "c1d459275f6f123978b3604b2d68201931fc37a25acb14e4fb712b6c0db0dac0",
+        "gate-effort@9": {
+          "digest": "7c73d88091d497a145dd3e4eb084c9963789185b73fc3c8eccf3d2b30a6897cd",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort_v8:gate_effort_v8_scorer",
-            "implementation_digest": "63be913f322efef4fe1002a774e01e18eb42022c5bedcb7342a37a8a3aad11d8",
+            "implementation": "raidar.scorers.gate_effort_v9:gate_effort_v9_scorer",
+            "implementation_digest": "c8819a4e80069120cc150fb75c2b2f99bae425e2e2a50524f51cd8fe8e5e7821",
             "manifest": {
-              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@7: a failed tests check counted once, blocking counts that compare across gate modes with and without the mypy no-untyped-call cascade, failing tests and missed coverage apart, first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both), plus the cross-mode blocking counts without the cascade and with a refused suppression comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate.",
+              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@7: a failed tests check counted once, blocking counts that compare across gate modes with and without the mypy no-untyped-call cascade, failing tests and missed coverage apart, first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both), plus the cross-mode blocking counts without the cascade and with a refused suppression comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate. Plus a guardrail-gate@4 autofix step's effect: passes, errors, files and lines changed, block-tier findings fixed by family, first-pass clean and blocking counts after autofix (and before, comparable across an enforced and a shadow gate), and the fix sessions' cost and wall time split by the kind of refusal that started them (coverage minimum apart).",
               "evidence_required": [
                 "trace",
                 "oracle.cases",
@@ -1750,13 +1750,1117 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "Autofix passes the gate completed in the step (enforced: one before each gate run; shadow: one on the copy).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_rounds",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Autofix passes that could not complete (typed in the record; an enforced gate then ran that check as guardrail-gate@3).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "autofix_errors",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Files the step's autofix passes changed (a shadow pass: would have).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_files_changed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Lines the step's autofix passes changed (added plus removed).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_lines_changed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed (Ruff code counts before minus after, FORMAT per file).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the complexity family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.complexity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the typing family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.typing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the defects family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.defects",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the structure family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.structure",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the style family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.style",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the naming family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.naming",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the tests family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the suppressions family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.suppressions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the other family.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "autofix_removed_blocking.other",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "The first check after autofix passed (enforced: the first gate run; shadow: the check of the fixed copy).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_post_autofix",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings after autofix (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking_post_autofix_net",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings before autofix (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net) (enforced: the post-autofix count plus the first pass's removed block-tier findings; shadow: the raw check).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking_raw_net",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings at the step's end after autofix (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net) (enforced: the last decided gate run; shadow: the fixed copy's check).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "step_end_blocking_post_autofix_net",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings after autofix minus the previous gated step's step-end count after autofix (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "new_first_run_blocking_post_autofix_net",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings before autofix minus the previous gated step's step-end count (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "new_first_run_blocking_raw_net",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Fix-session cost, complexity refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.complexity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, typing refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.typing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, defects refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.defects",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, structure refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.structure",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, style refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.style",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, naming refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.naming",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, tests refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, suppressions refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.suppressions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, other refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.other",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, coverage_minimum refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.coverage_minimum",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, mixed refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.mixed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, unknown refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_by_refusal.unknown",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session wall time, complexity refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.complexity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, typing refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.typing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, defects refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.defects",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, structure refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.structure",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, style refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.style",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, naming refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.naming",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, tests refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, suppressions refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.suppressions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, other refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.other",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, coverage_minimum refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.coverage_minimum",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, mixed refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.mixed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, unknown refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_by_refusal.unknown",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix sessions whose refusal included TEST.coverage-minimum.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_sessions_with_coverage_minimum",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Cost of the fix sessions whose refusal included TEST.coverage-minimum (with any other code).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_cost_usd_with_coverage_minimum",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Wall time of the fix sessions whose refusal included TEST.coverage-minimum (with any other code).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "fix_wall_s_with_coverage_minimum",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Autofix passes the gate completed in the step (enforced: one before each gate run; shadow: one on the copy). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_rounds",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Autofix passes that could not complete (typed in the record; an enforced gate then ran that check as guardrail-gate@3). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_autofix_errors",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Files the step's autofix passes changed (a shadow pass: would have). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_files_changed",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Lines the step's autofix passes changed (added plus removed). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_lines_changed",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed (Ruff code counts before minus after, FORMAT per file). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the complexity family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.complexity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the typing family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.typing",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the defects family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.defects",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the structure family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.structure",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the style family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.style",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the naming family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.naming",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the tests family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the suppressions family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.suppressions",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the step's autofix passes fixed in the other family. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_autofix_removed_blocking.other",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings after autofix minus the previous gated step's step-end count after autofix (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_new_first_run_blocking_post_autofix_net",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings before autofix minus the previous gated step's step-end count (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_new_first_run_blocking_raw_net",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Fix-session cost, complexity refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.complexity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, typing refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.typing",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, defects refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.defects",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, structure refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.structure",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, style refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.style",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, naming refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.naming",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, tests refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, suppressions refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.suppressions",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, other refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.other",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, coverage_minimum refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.coverage_minimum",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, mixed refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.mixed",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session cost, unknown refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_by_refusal.unknown",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Fix-session wall time, complexity refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.complexity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, typing refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.typing",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, defects refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.defects",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, structure refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.structure",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, style refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.style",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, naming refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.naming",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, tests refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, suppressions refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.suppressions",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, other refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.other",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, coverage_minimum refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.coverage_minimum",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, mixed refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.mixed",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix-session wall time, unknown refusals (split by the kind of refusal that started each session: its one rule family, coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to the step's fix sessions). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_by_refusal.unknown",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Fix sessions whose refusal included TEST.coverage-minimum. Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_sessions_with_coverage_minimum",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Cost of the fix sessions whose refusal included TEST.coverage-minimum (with any other code). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_cost_usd_with_coverage_minimum",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Wall time of the fix sessions whose refusal included TEST.coverage-minimum (with any other code). Summed over the gated steps.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_fix_wall_s_with_coverage_minimum",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "s"
+                },
+                {
+                  "description": "Share of decided steps whose first check after autofix passed.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_post_autofix_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings after autofix at the end of the last gated step (no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net).",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "final_step_end_blocking_post_autofix_net",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "8"
+              "version": "9"
             },
             "tool_lock": {}
           }
@@ -2116,7 +3220,7 @@
         "code-quality@3",
         "resource-usage@1",
         "process-compliance@6",
-        "gate-effort@8"
+        "gate-effort@9"
       ]
     },
     "tools": {
@@ -2128,18 +3232,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "b96c25b5c29c9e22aeed089b7b8db718af3472b43e2d682bca65f72efa82d559",
+  "document_sha256": "c19711ac463ef012171944cfe866d186f1741b99dbfbbf0370eff211f403aa60",
   "execution": {
     "arms": {
       "r1-baseline": {
         "agent": "codex-luna",
         "condition": "r1-baseline",
-        "digest": "9a91b4d64c39d905b9558d4cd2cbc107b139c62b494eb6420979bf5cadb764bd"
+        "digest": "c4358eac92690f9665664e05d655cdc8ac81ea8d8eab0eda0fbbd20a2db01042"
       },
       "r2-guardrails": {
         "agent": "codex-luna",
         "condition": "r2-guardrails",
-        "digest": "bdff569550a0ac5e9de6661e0ce9b42e3c90a0cafba16eaafff4d40791a4ce13"
+        "digest": "8a40c86fb3fb2e8e6231d2843081f23a6adf7e82ab09e3382aa6615ec2beac5e"
       }
     },
     "conditions": {
@@ -2166,17 +3270,19 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@7",
-          "use_digest": "b7c972f4f6c673abb46d737ddf103402257ae3af581dad19a69f686906b93999",
+          "use": "python-guardrails@8",
+          "use_digest": "8b4ed79f57772d5e681bead54a186870e4792cd2eed391907d6b4e54fb58864b",
           "with": {
             "workspace_configs": false
           }
         },
         {
           "files": {},
-          "use": "guardrail-gate@3",
-          "use_digest": "b8a90ff7a7db371744d925c049b3edff432718568c28e76339f66a42a69b550e",
+          "use": "guardrail-gate@4",
+          "use_digest": "4263f4c6f6fae019ddfda1f0f60f5479898135f8f08b85c2a08528b0c0bb6600",
           "with": {
+            "autofix_before_check": true,
+            "autofix_command": "guardrail-check --autofix",
             "command": "guardrail-check",
             "max_rounds": 3,
             "mode": "shadow",
@@ -2207,17 +3313,19 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@7",
-          "use_digest": "b7c972f4f6c673abb46d737ddf103402257ae3af581dad19a69f686906b93999",
+          "use": "python-guardrails@8",
+          "use_digest": "8b4ed79f57772d5e681bead54a186870e4792cd2eed391907d6b4e54fb58864b",
           "with": {
             "workspace_configs": true
           }
         },
         {
           "files": {},
-          "use": "guardrail-gate@3",
-          "use_digest": "b8a90ff7a7db371744d925c049b3edff432718568c28e76339f66a42a69b550e",
+          "use": "guardrail-gate@4",
+          "use_digest": "4263f4c6f6fae019ddfda1f0f60f5479898135f8f08b85c2a08528b0c0bb6600",
           "with": {
+            "autofix_before_check": true,
+            "autofix_command": "guardrail-check --autofix",
             "command": "guardrail-check",
             "max_rounds": 3,
             "mode": "commit",
@@ -2255,15 +3363,17 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@7",
+              "use": "python-guardrails@8",
               "with": {
                 "workspace_configs": false
               }
             },
             {
               "files": [],
-              "use": "guardrail-gate@3",
+              "use": "guardrail-gate@4",
               "with": {
+                "autofix_before_check": true,
+                "autofix_command": "guardrail-check --autofix",
                 "command": "guardrail-check",
                 "max_rounds": 3,
                 "mode": "shadow",
@@ -2277,15 +3387,17 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@7",
+              "use": "python-guardrails@8",
               "with": {
                 "workspace_configs": true
               }
             },
             {
               "files": [],
-              "use": "guardrail-gate@3",
+              "use": "guardrail-gate@4",
               "with": {
+                "autofix_before_check": true,
+                "autofix_command": "guardrail-check --autofix",
                 "command": "guardrail-check",
                 "max_rounds": 3,
                 "mode": "commit",
@@ -2371,8 +3483,8 @@
             ]
           }
         },
-        "guardrail-gate@3": {
-          "digest": "b8a90ff7a7db371744d925c049b3edff432718568c28e76339f66a42a69b550e",
+        "guardrail-gate@4": {
+          "digest": "4263f4c6f6fae019ddfda1f0f60f5479898135f8f08b85c2a08528b0c0bb6600",
           "metadata": {
             "discovery_probe": "guardrail-gate-ran",
             "kind": "workflow",
@@ -2401,8 +3513,8 @@
             ]
           }
         },
-        "python-guardrails@7": {
-          "digest": "b7c972f4f6c673abb46d737ddf103402257ae3af581dad19a69f686906b93999",
+        "python-guardrails@8": {
+          "digest": "8b4ed79f57772d5e681bead54a186870e4792cd2eed391907d6b4e54fb58864b",
           "metadata": {
             "discovery_probe": "python-guardrails-gate-works",
             "kind": "service",
@@ -2514,10 +3626,10 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "e4fdf4cbfe72df0124b14014593a78abb75a94398d62c627e0dc38970ca23bc5",
-    "spec_sha256": "89e3afd31246b3eafffbc12518e45f0432e56e8c4776b400a7b31055e6575273"
+    "source_sha256": "4155a467534acc34794eaf17b74bc9484eace6bbcae712c7c5d5d3b2c7f0179f",
+    "spec_sha256": "30543f93411272877e6c940c731043486200e64cfa87de8577d0ea3bf77581fe"
   },
-  "lock_sha256": "c155127780753e00421d8077df55752b32d26de87d73590c2e07daced5a91938",
+  "lock_sha256": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -2525,8 +3637,8 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "3731f3a767861051736508398cc394c357a9bab66150fb8d83c6391f1e1de1b9",
-    "execution": "c155127780753e00421d8077df55752b32d26de87d73590c2e07daced5a91938",
+    "assessment": "07e337bcdd06e5ca68234a198e6a927ff2cb840eb48b42434433fa75a309d7a6",
+    "execution": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },
   "spec": {
@@ -2590,7 +3702,7 @@
         "code-quality@3",
         "resource-usage@1",
         "process-compliance@6",
-        "gate-effort@8"
+        "gate-effort@9"
       ]
     },
     "conditions": [
@@ -2598,15 +3710,17 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@7",
+            "use": "python-guardrails@8",
             "with": {
               "workspace_configs": false
             }
           },
           {
             "files": [],
-            "use": "guardrail-gate@3",
+            "use": "guardrail-gate@4",
             "with": {
+              "autofix_before_check": true,
+              "autofix_command": "guardrail-check --autofix",
               "command": "guardrail-check",
               "max_rounds": 3,
               "mode": "shadow",
@@ -2620,15 +3734,17 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@7",
+            "use": "python-guardrails@8",
             "with": {
               "workspace_configs": true
             }
           },
           {
             "files": [],
-            "use": "guardrail-gate@3",
+            "use": "guardrail-gate@4",
             "with": {
+              "autofix_before_check": true,
+              "autofix_command": "guardrail-check --autofix",
               "command": "guardrail-check",
               "max_rounds": 3,
               "mode": "commit",

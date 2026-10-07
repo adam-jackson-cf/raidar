@@ -77,6 +77,7 @@ PROCESS_COMPLIANCE_REFS = (
     "process-compliance@1",
 )
 GATE_EFFORT_REFS = (
+    "gate-effort@9",
     "gate-effort@8",
     "gate-effort@7",
     "gate-effort@6",

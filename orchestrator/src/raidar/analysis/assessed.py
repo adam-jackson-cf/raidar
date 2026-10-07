@@ -58,6 +58,8 @@ from raidar.analysis.outcomes import (
     STRICT_SOLVED,
     TRUNCATED,
     UNASSESSED,
+    VERIFIER_DISAGREEMENT_SOURCE,
+    VERIFIER_DISAGREEMENTS,
     TrialOutcome,
     Value,
     gate_metrics_for,
@@ -102,6 +104,7 @@ QUALITY_SCORERS = CODE_QUALITY_REFS
 # tests check and the fix rounds' correctness.
 GATE_EFFORT_REF = "gate-effort@1"
 GATE_EFFORT_REFS = (
+    "gate-effort@9",
     "gate-effort@8",
     "gate-effort@7",
     "gate-effort@6",
@@ -345,7 +348,31 @@ def _effort_metrics(results: Mapping[str, AssessResult | None]) -> dict[str, Val
     process_ref = next((ref for ref in PROCESS_OUTCOME_SCORERS if ref in results), None)
     if process_ref is not None:
         metrics |= process_metrics(results[process_ref], process_ref)
+    if VERIFIER_DISAGREEMENT_SOURCE in results:
+        metrics[VERIFIER_DISAGREEMENTS] = disagreements(results[VERIFIER_DISAGREEMENT_SOURCE])
     return metrics
+
+
+EXCLUDED_CASES = "regression_parity_excluded_cases"
+
+
+def disagreements(result: AssessResult | None) -> Value:
+    """Grader cases whose outcome differed between grading and coverage, over a trial.
+
+    The sum of code-quality@3's per-transition ``regression_parity_excluded_cases``
+    over the transitions that measured it (a transition whose G read no run is not
+    applicable and adds nothing). A diagnostic of the verifier, described, never compared.
+    """
+    if result is None:
+        return Value.missing(UNASSESSED, f"no {VERIFIER_DISAGREEMENT_SOURCE} Assessment")
+    counted = [
+        item.value
+        for item in result.observations
+        if item.metric == EXCLUDED_CASES and item.status is AssessStatus.OK
+    ]
+    if not counted:
+        return Value.missing(AssessStatus.NOT_APPLICABLE.value, "no transition measured it")
+    return Value.ok(float(sum(value or 0.0 for value in counted)))
 
 
 def build_outcome(

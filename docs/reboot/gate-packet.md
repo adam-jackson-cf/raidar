@@ -1464,3 +1464,19 @@ Each iteration was pre-registered (rationale amendment and relock committed) bef
 ### 17.5 Recommended next step
 
 The process is stable: four consecutive clean smokes, a valid 8-trial main job with no voids, retries or budget breaches, and no `ineligible` quality reads. The next step is a decision for you: (a) move this experiment from explore to a **confirm** run sized from `main-03`'s sample-size projection (about 18 to 33 pairs per arm, roughly $3 to $6 of model spend and 7.5 to 14 hours of trials at concurrency 2, plus assessment) under the unchanged lock (no further design change), or (b) first run one more explore iteration on fix cost (question 2), for example a separate arm that applies the formatter before the gate, which would be a new condition and lock. Option (a) is the smaller step and answers question 1; (b) changes the treatment and would restart the smoke-then-main cycle.
+
+## 18. Explore iteration 4: implemented and locked (2026-10-07; no job yet)
+
+Your decision (2026-10-07): option (b) of 17.5, one more explore iteration on fix-session cost before any confirm job. Full pre-registration: `experiments/ab-test/python__forge__guardrails/rationale.md` §18 (lock `0e597e33e8b4`).
+
+| Piece | Iteration 3b.5 (`main-03`) | Iteration 4 |
+|---|---|---|
+| Pack (both arms) | `python-guardrails@7` | `python-guardrails@8`: `@7` plus `guardrail-check --autofix` (ruff format and Ruff's safe fixes only, protected config, scope files only, atomic, reported) |
+| r2 gate (enforced) | `guardrail-gate@3` commit | `guardrail-gate@4` commit with `autofix_before_check`: autofix before every commit check, re-staged, then `@3`'s commit and hook; a failed pass is typed and falls back to `@3` |
+| r1 gate (shadow) | `guardrail-gate@3` shadow | `guardrail-gate@4` shadow with autofix on a throwaway copy; the fixed copy's check recorded beside the raw one; `/app` byte-identical |
+| Gate-effort scorer | `gate-effort@8` | `gate-effort@9`: autofix passes, counts after and before autofix, fix cost and wall by refusal kind |
+
+- **Question (pre-registered):** does r2's fix-session cost (USD, wall, rounds) fall against `main-03` with no loss in correctness or quality? r1 against `main-03`'s r1 is a reproducibility check, side by side, never pooled. Primary unchanged (`solve_rate_errata`, raw beside it).
+- **Measured before any run** (`gate-effort@9` on `main-03`'s records in a scratch store; rationale §18.8): of r2's 8.5 fix sessions per trial, 7 started from a refusal that included `TEST.coverage-minimum`, about $0.087 of the $0.098 and 687 of the 826 s; most refusals mixed families (no refusal was the coverage minimum alone). The autofix removes `FORMAT`/`I001` from those refusals but not the coverage minimum, so a large drop in fix cost is not expected from autofix alone; the iteration will show how much it removes.
+- **Verifier timing case** (`test_blueprint_list_orders_by_created_at_name_uuid`): the specification determines the order, so it is not an erratum; it is recorded as a known verifier sensitivity, shown in the analysis beside the grading-vs-coverage disagreement count, with an upstream draft note (not filed). Errata, pin and primary unchanged.
+- **Next:** `smoke-4` (1 trial per arm) against rationale §18.3, then `main-04` (4 attempts per arm) only if clean.
