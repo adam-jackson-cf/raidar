@@ -35,6 +35,7 @@ from typing import Any
 from raidar.oracle.snapshot import tree_digest
 from raidar.verifier.grader import grade_step
 from raidar.verifier.models import VerifierGrade
+from raidar.verifier.per_trial import per_trial
 from raidar.verifier.prefix_store import (
     GRADE_KIND,
     SCHEMA_VERSION,
@@ -167,14 +168,20 @@ async def grade_pre_fix_snapshot(
 
 
 async def grade_pre_fix_path(
-    path: Path, store_root: Path, options: RegradeOptions
+    path: Path, store_root: Path, options: RegradeOptions, concurrency: int = 1
 ) -> dict[str, Any]:
-    """Grade every pre-fix snapshot under a trial or job dir into the store."""
-    entries = [
-        await grade_pre_fix_snapshot(snapshot, store_root, options)
-        for trial in _trials(path)
-        for snapshot in pre_fix_snapshots(trial)
-    ]
+    """Grade every pre-fix snapshot under a trial or job dir into the store.
+
+    Up to ``concurrency`` trials are graded at once; each trial's snapshots in order.
+    """
+
+    async def trial_grades(trial: Path) -> list[dict[str, Any]]:
+        return [
+            await grade_pre_fix_snapshot(snapshot, store_root, options)
+            for snapshot in pre_fix_snapshots(trial)
+        ]
+
+    entries = await per_trial(_trials(path), trial_grades, concurrency)
     return {
         "kind": "raidar-pre-fix-grading",
         "snapshots": entries,

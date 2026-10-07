@@ -32,11 +32,17 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from raidar.scorers.builtin_manifests import CODE_QUALITY, CORRECTNESS, RESOURCE_USAGE
 from raidar.scorers.gate_effort.families import FAMILIES
-from raidar.scorers.gate_effort.manifest import GATE_EFFORT
-from raidar.scorers.gate_effort_v4.scorer import GATE_EFFORT_V4
-from raidar.scorers.gate_effort_v6.scorer import GATE_EFFORT_V6
-from raidar.scorers.process_checks_v3.scorer import PROCESS_COMPLIANCE_V3
-from raidar.scorers.process_checks_v4.scorer import PROCESS_COMPLIANCE_V4
+from raidar.scorers.gate_effort_manifests import (
+    GATE_EFFORT,
+    GATE_EFFORT_V4,
+    GATE_EFFORT_V6,
+    GATE_EFFORT_V7,
+)
+from raidar.scorers.process_manifests import (
+    PROCESS_COMPLIANCE_V3,
+    PROCESS_COMPLIANCE_V4,
+    PROCESS_COMPLIANCE_V5,
+)
 from raidar.scorers.sdk.manifest import Direction, ScorerManifest
 
 OK = "ok"
@@ -289,13 +295,40 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
         0.1,
     ),
     ("total_first_run_failed_tests", "failing tests in first gate runs per trial", 1.0),
+    # gate-effort@7: first-pass clean rates that ignore auto-fixable layout codes, the tests
+    # check, or both, and the cross-mode counts without the no-untyped-call cascade.
+    (
+        "first_pass_clean_except_autofix_rate",
+        "first runs refusing only auto-fixable layout codes, or nothing (decided steps)",
+        0.1,
+    ),
+    (
+        "first_pass_clean_except_tests_rate",
+        "first runs refusing only tests-check codes, or nothing (decided steps)",
+        0.1,
+    ),
+    (
+        "first_pass_clean_except_autofix_tests_rate",
+        "first runs with no code-design finding (decided steps)",
+        0.1,
+    ),
+    (
+        "total_new_first_run_blocking_ex_cascade",
+        "blocking findings each step's own work added, without the no-untyped-call cascade",
+        5.0,
+    ),
+    (
+        "final_step_end_blocking_ex_cascade",
+        "blocking findings at the last gated step's end, without the no-untyped-call cascade",
+        5.0,
+    ),
 )
 GATE_METRICS: tuple[MetricDef, ...] = tuple(
     MetricDef(
         f"{GATE_PREFIX}{metric}",
         f"Gate effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT_V6, metric),
+        declared_direction(GATE_EFFORT_V7, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
@@ -315,25 +348,33 @@ _GATE_V6_ONLY = frozenset(
 )
 
 
+_GATE_V7_ONLY = frozenset(
+    f"{GATE_PREFIX}{metric.id}"
+    for metric in GATE_EFFORT_V7.metrics
+    if metric.id not in {m.id for m in GATE_EFFORT_V6.metrics}
+)
+
+
 def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
     """The gate outcomes a gate-effort version reports.
 
     ``@4`` and ``@5`` add the tests check; ``@6`` adds the mode-comparable blocking counts,
-    the typing cascade and the split first-run tests outcomes.
+    the typing cascade and the split first-run tests outcomes; ``@7`` the first-pass rates
+    that ignore auto-fixable codes or the tests check, and the cascade-free counts.
     """
-    if ref == "gate-effort@6":
+    if ref == "gate-effort@7":
         return GATE_METRICS
-    if ref in {"gate-effort@4", "gate-effort@5"}:
-        return tuple(metric for metric in GATE_METRICS if metric.id not in _GATE_V6_ONLY)
-    return tuple(
-        metric
-        for metric in GATE_METRICS
-        if metric.id not in _GATE_V4_ONLY and metric.id not in _GATE_V6_ONLY
-    )
+    if ref == "gate-effort@6":
+        left_out = _GATE_V7_ONLY
+    elif ref in {"gate-effort@4", "gate-effort@5"}:
+        left_out = _GATE_V6_ONLY | _GATE_V7_ONLY
+    else:
+        left_out = _GATE_V4_ONLY | _GATE_V6_ONLY | _GATE_V7_ONLY
+    return tuple(metric for metric in GATE_METRICS if metric.id not in left_out)
 
 
 PROCESS_PREFIX = "process."
-"""Process outcomes are ``process.<process-compliance@3 or @4 trajectory metric>``."""
+"""Process outcomes are ``process.<process-compliance@3 to @5 trajectory metric>``."""
 PROCESS_METRICS: tuple[MetricDef, ...] = (
     MetricDef(
         f"{PROCESS_PREFIX}stall_rate",
@@ -362,19 +403,33 @@ PROCESS_V4_METRICS: tuple[MetricDef, ...] = (
     ),
 )
 """Process outcomes of ``process-compliance@4``: @3's plus the compliance rate and not-run tests."""
+PROCESS_V5_METRICS: tuple[MetricDef, ...] = (
+    *PROCESS_V4_METRICS,
+    MetricDef(
+        f"{PROCESS_PREFIX}work_session_tests_run_rate",
+        "Process: work sessions that ran tests after their last edit (decided steps)",
+        View.PROCESS,
+        declared_direction(PROCESS_COMPLIANCE_V5, "work_session_tests_run_rate"),
+        0.1,
+    ),
+)
+"""Process outcomes of ``process-compliance@5``: @4's plus the work session's own test runs
+(its ``compliance_rate`` counts the plan check only when the condition asks for a plan)."""
 PROCESS_OUTCOME_SCORER = "process-compliance@3"
-PROCESS_OUTCOME_SCORERS = ("process-compliance@4", PROCESS_OUTCOME_SCORER)
+PROCESS_OUTCOME_SCORERS = ("process-compliance@5", "process-compliance@4", PROCESS_OUTCOME_SCORER)
 """The process-compliance versions with ``process.*`` outcomes, newest first."""
 
 
 def process_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
     """The process outcomes a process-compliance version reports (none before ``@3``)."""
+    if ref == "process-compliance@5":
+        return PROCESS_V5_METRICS
     if ref == "process-compliance@4":
         return PROCESS_V4_METRICS
     return PROCESS_METRICS if ref == PROCESS_OUTCOME_SCORER else ()
 
 
-ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_V4_METRICS)
+ALL_METRICS = (*OUTCOME_METRICS, *GATE_METRICS, *PROCESS_V5_METRICS)
 
 TOTAL_COST = "total_cost_usd"
 COST_METRICS = ("total_cost_usd", "total_tokens", "total_turns", "total_agent_wall_s")

@@ -119,6 +119,7 @@ async def test_a_trial_without_pre_fix_snapshots_grades_nothing(tmp_path: Path) 
     ("scorers", "replay", "grades"),
     [
         (("gate-effort@4",), False, True),
+        (("gate-effort@7",), False, True),
         (("gate-effort@4", "correctness@1"), True, False),
         (("gate-effort@3", "correctness@1"), False, False),
     ],
@@ -132,16 +133,18 @@ def test_rescore_grades_first_only_for_a_scorer_that_reads_the_grades(
 ) -> None:
     called: list[Any] = []
 
-    async def fake(path: Path, store: Path, options: RegradeOptions) -> dict[str, Any]:
-        called.append((path, store, options.docker_context))
+    async def fake(
+        path: Path, store: Path, options: RegradeOptions, concurrency: int = 1
+    ) -> dict[str, Any]:
+        called.append((path, store, options.docker_context, concurrency))
         return {"snapshots": [], "errors": 0}
 
     monkeypatch.setattr(assess_grading, "grade_pre_fix_path", fake)
     options = RegradeOptions(docker_context="orbstack")
 
     result = assess_grading.grade_pre_fix(
-        tmp_path / "job", tmp_path / "store", scorers, options, replay=replay
+        tmp_path / "job", tmp_path / "store", scorers, options, replay=replay, concurrency=3
     )
 
     assert (result is not None) is grades
-    assert called == ([(tmp_path / "job", tmp_path / "store", "orbstack")] if grades else [])
+    assert called == ([(tmp_path / "job", tmp_path / "store", "orbstack", 3)] if grades else [])

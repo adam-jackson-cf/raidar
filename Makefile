@@ -151,7 +151,7 @@ help:
 	@echo "  make pack-tool-provision TOOL=<tool> [RUNTIME=python] Provision one host-parse measurement tool into the lock-keyed cache"
 	@echo "  make component-probe-trials [PROBE_EVIDENCE_DIR=<dir>] Real codex/gpt-6-luna low trials proving every built-in component's discovery probe"
 	@echo "  make guardrails-verify                                python-guardrails rule tests for each pack (@1, which @2 installs: 76 rules; @3: 83, its tests check"
-	@echo "                                                        included; @4: 85, its scope canaries included): every rule (derived from the pack's config and codes) fires on its violating canary and"
+	@echo "                                                        included; @4 and @5: 85, the scope canaries included; @6: 86, the test-class canary included): every rule (derived from the pack's config and codes) fires on its violating canary and"
 	@echo "                                                        passes its clean one against the pack installed in the pack image, plus a mutant-pack negative"
 	@echo "                                                        control (OrbStack, PyPI; not in make quality)"
 	@echo ""
@@ -174,12 +174,13 @@ help:
 	@echo "                                                        DETACH=1: run it under a supervisor in its own session (survives the launching shell"
 	@echo "                                                        or agent session; pid, log and exit record in <job dir>/detach/); required for long jobs"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
-	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [ASSESS_OUT=report.json]"
+	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@2-@4 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
-	@echo "                                                        with gate-effort@4-@6 it first grades guardrail-gate@3 pre-fix snapshots into STORE, and with"
-	@echo "                                                        code-quality@2 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: OrbStack)"
-	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1] [REGRADE_OUT=report.json]"
+	@echo "                                                        with gate-effort@4-@7 it first grades guardrail-gate@3 pre-fix snapshots into STORE, and with"
+	@echo "                                                        code-quality@2 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: OrbStack;"
+	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
+	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
 	@echo "                                                        COVERAGE_CHECK=1 instead makes each step's coverage run offline and compares it with the trial's own (or STORE's)"
 	@echo "  make experiment-analyze JOBS=\"<job-dir> ...\" STORE=<assessment-store> ANALYSIS_OUT=<dir> [LOCK=] [ASSESSMENT_CONFIG=] [BUNDLE_SEARCH=<dir>...] [MIN_PAIRS=] [MAX_EXCLUSION_FRACTION=] [ALPHA=] [BOOTSTRAP_SAMPLES=10000] [MIN_EFFECTS=\"metric=delta ...\"] [ALLOW_DEV_JOBS=1]"
@@ -509,11 +510,12 @@ experiment-assess:
 	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(JOB)/trials),$(JOB)/trials,$(JOB))" --store "$(STORE)" \
 		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
 		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(LOCK),--lock "$(LOCK)",) $(if $(REPLAY),--replay,) \
-		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
+		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
+		$(if $(ASSESS_OUT),--out "$(ASSESS_OUT)",)
 
 assess-regrade:
 	$(call require_var,JOB)
-	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(COVERAGE_CHECK),--coverage-check,) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(COVERAGE_CHECK),--coverage-check,) $(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
 
 experiment-analyze:
 	$(call require_var,JOBS)

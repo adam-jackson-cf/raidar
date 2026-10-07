@@ -35,7 +35,10 @@ trial deferred it (``protocol.verifier_coverage: offline``;
 made. ``--replay`` makes nothing. ``--regrade --coverage-check`` instead makes
 every step's coverage run offline and compares it with the trial's own coverage
 pass (parity verdict and G input) or, for a deferred step, the run stored in
-``--store``; it writes nothing and fails on any difference.
+``--store``; it writes nothing and fails on any difference. ``--concurrency N``
+works on up to N trials at once for the pre-fix grades, the offline coverage
+runs and the coverage check (default 1: one trial after another); each trial's
+own steps stay in order and the report lists entries in trial order.
 
 ``AS1`` (the assess-time half of the runtime-compatibility gate): CLI-supplied
 ``--scorer`` values must cover the runtime of the job's lock, and a ``--bundle``
@@ -89,9 +92,10 @@ def _regrade(
     store: Path | None = None,
     *,
     coverage_check: bool = False,
+    concurrency: int = 1,
 ) -> None:
     report = (
-        check_coverage(target, options, store)
+        check_coverage(target, options, store, concurrency)
         if coverage_check
         else regrade(target, options, store)
     )
@@ -111,6 +115,7 @@ class _RescoreRequest:
     jev_replay_only: bool = False
     lock: Path | None = None
     docker_context: str = "orbstack"
+    concurrency: int = 1
 
 
 # A trial dir sits at <job>/trials/<trial>; a job dir at <job>/trials.
@@ -250,10 +255,20 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     _check_as1(request.target, request.lock, request.scorer_refs, request.bundle)
     options = RegradeOptions(docker_context=request.docker_context, bundle_override=request.bundle)
     graded = grade_pre_fix(
-        request.target, store, request.scorer_refs, options, replay=request.replay
+        request.target,
+        store,
+        request.scorer_refs,
+        options,
+        replay=request.replay,
+        concurrency=request.concurrency,
     )
     covered = produce_coverage(
-        request.target, store, request.scorer_refs, options, replay=request.replay
+        request.target,
+        store,
+        request.scorer_refs,
+        options,
+        replay=request.replay,
+        concurrency=request.concurrency,
     )
     try:
         settings, config_path = _settings(request)
@@ -350,6 +365,16 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
         "the --store run of a deferred step); writes nothing."
     ),
 )
+@click.option(
+    "--concurrency",
+    type=click.IntRange(min=1),
+    default=1,
+    show_default=True,
+    help=(
+        "Trials whose pre-fix grades, offline coverage runs or coverage checks are made at "
+        "once (each trial's steps stay in order)."
+    ),
+)
 @click.option("--docker-context", default="orbstack", show_default=True)
 @click.option(
     "--out", type=click.Path(dir_okay=False, path_type=Path), help="Write the report here."
@@ -365,6 +390,7 @@ def assess(
     jev_replay_only: bool,
     bundle_override: Path | None,
     coverage_check: bool,
+    concurrency: int,
     docker_context: str,
     out: Path | None,
 ) -> None:
@@ -374,7 +400,14 @@ def assess(
     if regrade_target is not None and rescore_target is None:
         _check_as1(regrade_target, lock_path, (), bundle_override)
         options = RegradeOptions(docker_context=docker_context, bundle_override=bundle_override)
-        _regrade(regrade_target, options, out, store, coverage_check=coverage_check)
+        _regrade(
+            regrade_target,
+            options,
+            out,
+            store,
+            coverage_check=coverage_check,
+            concurrency=concurrency,
+        )
     elif rescore_target is not None and regrade_target is None:
         request = _RescoreRequest(
             rescore_target,
@@ -386,6 +419,7 @@ def assess(
             jev_replay_only,
             lock_path,
             docker_context,
+            concurrency,
         )
         _rescore(request, out)
     else:

@@ -14,6 +14,10 @@
 - ``check_coverage`` (``--regrade --coverage-check``): every step's coverage run
   made offline and compared with the trial's own coverage pass or the stored
   offline run; nothing is written.
+
+``concurrency`` (``--concurrency``, default 1) is how many trials' pre-fix grades,
+offline coverage runs or coverage checks are made at once
+(``raidar.verifier.per_trial``); a trial's own steps stay in order.
 """
 
 from __future__ import annotations
@@ -31,7 +35,9 @@ from raidar.verifier.prefix_grade import grade_pre_fix_path, regrade_pre_fix_pat
 from raidar.verifier.regrade import RegradeError, RegradeOptions, regrade_path
 
 # Scorers that read the offline grades of guardrail-gate@3's pre-fix snapshots.
-PRE_FIX_GRADE_SCORERS = frozenset({"gate-effort@4", "gate-effort@5", "gate-effort@6"})
+PRE_FIX_GRADE_SCORERS = frozenset(
+    {"gate-effort@4", "gate-effort@5", "gate-effort@6", "gate-effort@7"}
+)
 # Scorers that read the offline coverage runs of steps whose trial deferred the coverage pass.
 OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@2"})
 
@@ -55,12 +61,13 @@ def grade_pre_fix(
     options: RegradeOptions,
     *,
     replay: bool,
+    concurrency: int = 1,
 ) -> dict[str, Any] | None:
     """Grade the target's ungraded pre-fix snapshots into the store, when a scorer reads them."""
     if replay or not PRE_FIX_GRADE_SCORERS.intersection(scorer_refs):
         return None
     try:
-        return asyncio.run(grade_pre_fix_path(target, store, options))
+        return asyncio.run(grade_pre_fix_path(target, store, options, concurrency))
     except (RegradeError, BundleError) as exc:
         raise click.ClickException(f"pre-fix grading: {exc}") from exc
 
@@ -72,20 +79,23 @@ def produce_coverage(
     options: RegradeOptions,
     *,
     replay: bool,
+    concurrency: int = 1,
 ) -> dict[str, Any] | None:
     """Make the target's deferred coverage runs into the store, when a scorer reads them."""
     if replay or not OFFLINE_COVERAGE_SCORERS.intersection(scorer_refs):
         return None
     try:
-        return asyncio.run(produce_coverage_path(target, store, options))
+        return asyncio.run(produce_coverage_path(target, store, options, concurrency))
     except (RegradeError, BundleError) as exc:
         raise click.ClickException(f"offline coverage: {exc}") from exc
 
 
-def check_coverage(target: Path, options: RegradeOptions, store: Path | None) -> dict[str, Any]:
+def check_coverage(
+    target: Path, options: RegradeOptions, store: Path | None, concurrency: int = 1
+) -> dict[str, Any]:
     """The offline coverage check report; a check that cannot run is a click error."""
     try:
-        return asyncio.run(check_coverage_path(target, store, options))
+        return asyncio.run(check_coverage_path(target, store, options, concurrency))
     except (RegradeError, BundleError) as exc:
         raise click.ClickException(str(exc)) from exc
 

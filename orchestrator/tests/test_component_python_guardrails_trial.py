@@ -9,13 +9,15 @@
 - The rule tests (``make guardrails-verify``; opt-in with
   ``RAIDAR_GUARDRAILS_VERIFY=1`` because it runs two canary gate runs per rule),
   for each pack under verification (python-guardrails@1, whose payload @2
-  installs, @3 and @4): every implemented rule's violating canary fires and its
+  installs, and @3 to @6): every implemented rule's violating canary fires and its
   clean canary passes (``run_canaries.py``) against the pack installed in the
   image by its own install script, the parity canary through the experiment's
   guardrail-gate commit script; a mutant pack with checkers disabled (three,
   and @3's and @4's coverage minimum) must fail exactly those rules' violating
   canaries (@4's mutant also has its scope reduced to @3's, so both ``SCOPE.*``
-  canaries must fail). No file of the setup-repository-guardrails skill is involved.
+  canaries must fail; @6's mutant also has @5's test-file ignores, so the
+  test-class canary's clean fixture is refused). No file of the
+  setup-repository-guardrails skill is involved.
 """
 
 from __future__ import annotations
@@ -34,7 +36,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins import guardrails_v3, guardrails_v4, guardrails_v5
+from raidar.components.builtins import guardrails_v3, guardrails_v4, guardrails_v5, guardrails_v6
 from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
 from raidar.components.integrity import condition_step_flags
@@ -330,7 +332,16 @@ MUTATE[4] = MUTATE[3] + (
 )
 
 MUTATED[5], MUTATE[5] = MUTATED[4], MUTATE[4]
-INSTALLERS = {3: guardrails_v3, 4: guardrails_v4, 5: guardrails_v5}
+TEST_CLASS_CANARY = "RUFF.LINT.per-file-ignores.test-public-methods"
+INSTALL[6] = INSTALL[3]
+MUTATED[6] = (*MUTATED[4], TEST_CLASS_CANARY)
+# @6's mutant has @5's test-file ignores: its 21-method test classes are refused again.
+MUTATE[6] = MUTATE[4] + (
+    '\nsed -i "s/\\"PLR2004\\", \\"PLR0904\\"]/\\"PLR2004\\"]/" /tmp/mutant/config/ruff.toml'
+)
+MUTANT_FAILURE = {TEST_CLASS_CANARY: "passing fixture exited 1"}
+"""How a mutant fails a canary whose clean fixture (not its violating one) the mutant breaks."""
+INSTALLERS = {3: guardrails_v3, 4: guardrails_v4, 5: guardrails_v5, 6: guardrails_v6}
 
 
 def _install(pack: PackUnderTest) -> str:
@@ -383,5 +394,6 @@ def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
     assert f"canaries: {len(expected)} rule(s), 0 failed" in output
     mutant = (root / "mutant.out").read_text()
     for rule in mutated:
-        assert f"canary FAIL {rule}: violating canary passed" in mutant, mutant[-2000:]
+        why = MUTANT_FAILURE.get(rule, "violating canary passed")
+        assert f"canary FAIL {rule}: {why}" in mutant, mutant[-2000:]
     assert f"canaries: {len(mutated)} rule(s), {len(mutated)} failed" in mutant

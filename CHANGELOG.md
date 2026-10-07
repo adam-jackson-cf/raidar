@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails explore iteration 3b.3
+
+### Added
+
+- `python-guardrails@6` (`raidar.components.builtins.guardrails_v6`, payload `payloads/python_guardrails_6`): `@5` byte for byte except the version strings and `config/ruff.toml`, where `PLR0904` (too-many-public-methods) joins the per-file-ignores of `test_*.py`, `*_test.py`, `**/tests/**` and `**/test/**`. In `smoke-3b-2` the rule refused r2's `unittest` class at three steps and a fix session hid every test from pytest to get under it. Its config-copy integrity flags compare with `@6`'s own bytes. New canary `RUFF.LINT.per-file-ignores.test-public-methods` (`specs-6.json`, `make_fixtures.py --pack 6`) and a mutant with `@5`'s ignores in `make guardrails-verify`; pack-image trial `tests/test_guardrails_v6_trial.py`.
+- `gate-effort@7` (`raidar.scorers.gate_effort_v7`, store-bound): `@6` plus `first_pass_clean_except_autofix`, `first_pass_clean_except_tests` and `first_pass_clean_except_autofix_tests` (per step and as rates; auto-fixable codes `FORMAT`, `I001`, `W291`-`W293`) and the cross-mode counts without the `MYPY.no-untyped-call` cascade (`first_run_blocking_ex_cascade`, `step_end_blocking_ex_cascade`, `new_first_run_blocking_ex_cascade`, `total_new_first_run_blocking_ex_cascade`, `final_step_end_blocking_ex_cascade`).
+- `process-compliance@5` (`raidar.scorers.process_checks_v5`): `@4` plus `work_session_tests_run_before_finish` and `work_session_tests_run_rate` (the session given the step's first prompt; a gate's fix sessions do not count); `compliance_rate` counts `plan_written` only with `plan_in_compliance_rate: true`.
+- `raidar assess --concurrency N` (`make experiment-assess ... CONCURRENCY=N`, `make assess-regrade ... COVERAGE_CHECK=1 CONCURRENCY=N`; `raidar.verifier.per_trial`): pre-fix grades, offline coverage runs and coverage checks of up to N trials at once, each trial's steps in order, entries in trial order. Default 1.
+- Analysis, the manipulation check, the review surface's gate view and pre-fix grading read `gate-effort@7` and `process-compliance@5` (newest first); `process.work_session_tests_run_rate` joins the process outcomes.
+
+### Changed
+
+- `python__forge__guardrails` (explore iteration 3b.3, `rationale.md` §15, lock `f600b96bc7db`): both arms use `python-guardrails@6`; scorers `process-compliance@5` and `gate-effort@7`. `rationale.md` §14.7 records the `smoke-3b-2` process check. No job has run under this lock.
+
 ## Unreleased - guardrails explore iteration 3 results (iteration 3b)
 
 ### Added

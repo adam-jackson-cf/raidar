@@ -55,6 +55,7 @@ from raidar.verifier.models import (
     RunEvidence,
 )
 from raidar.verifier.parity import ineligible
+from raidar.verifier.per_trial import per_trial
 from raidar.verifier.records import (
     EVIDENCE_FILE,
     FORK_EVIDENCE_FILE,
@@ -238,15 +239,21 @@ def _trials(path: Path) -> list[Path]:
 
 
 async def produce_coverage_path(
-    path: Path, store_root: Path, options: RegradeOptions
+    path: Path, store_root: Path, options: RegradeOptions, concurrency: int = 1
 ) -> dict[str, Any]:
-    """Make every deferred coverage run under a trial or job dir into the store."""
-    entries = [
-        await produce_offline_coverage(target, store_root, options)
-        for trial in _trials(path)
-        for target in coverage_targets(trial)
-        if target.deferred
-    ]
+    """Make every deferred coverage run under a trial or job dir into the store.
+
+    Up to ``concurrency`` trials are worked on at once; each trial's steps run in order.
+    """
+
+    async def trial_runs(trial: Path) -> list[dict[str, Any]]:
+        return [
+            await produce_offline_coverage(target, store_root, options)
+            for target in coverage_targets(trial)
+            if target.deferred
+        ]
+
+    entries = await per_trial(_trials(path), trial_runs, concurrency)
     return {
         "kind": PRODUCTION_KIND,
         "steps": entries,
@@ -328,14 +335,20 @@ async def check_offline_coverage(
 
 
 async def check_coverage_path(
-    path: Path, store_root: Path | None, options: RegradeOptions
+    path: Path, store_root: Path | None, options: RegradeOptions, concurrency: int = 1
 ) -> dict[str, Any]:
-    """Check every graded step's offline coverage run under a trial or job dir."""
-    entries = [
-        await check_offline_coverage(target, store_root, options)
-        for trial in trial_dirs(path)
-        for target in coverage_targets(trial)
-    ]
+    """Check every graded step's offline coverage run under a trial or job dir.
+
+    Up to ``concurrency`` trials are checked at once; each trial's steps run in order.
+    """
+
+    async def trial_checks(trial: Path) -> list[dict[str, Any]]:
+        return [
+            await check_offline_coverage(target, store_root, options)
+            for target in coverage_targets(trial)
+        ]
+
+    entries = await per_trial(trial_dirs(path), trial_checks, concurrency)
     return {
         "kind": CHECK_KIND,
         "match": bool(entries) and all(entry["status"] == "match" for entry in entries),

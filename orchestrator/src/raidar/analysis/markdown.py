@@ -224,7 +224,10 @@ def _gate_arms(report: AnalysisReport) -> list[str]:
         "fix; final_step_end_blocking: the tree the last step handed on; a shadow gate's "
         "total_first_run_blocking re-counts the accumulated tree at every step), the mypy "
         "no-untyped-call cascade apart, and failing tests and missed coverage as separate "
-        "first-run outcomes.",
+        "first-run outcomes; gate-effort@7 adds first-pass clean rates that ignore the "
+        "auto-fixable layout codes (FORMAT, I001, W291-W293), the tests check (TEST.*), or "
+        "both, and the cross-mode counts without the no-untyped-call cascade "
+        "(*_ex_cascade).",
         "",
         *_table(("Metric", "Better", *names), rows),
         "Blocking findings per trial by rule family (mean first run / mean over every run):",
@@ -251,7 +254,10 @@ def _process_arms(report: AnalysisReport) -> list[str]:
         "counts a no-edit refusal, and only each step's first session); an arm "
         "without the stall wrapper has no value (not applicable), never 0. "
         "process-compliance@4 counts a test command as a test run only when its output does "
-        "not say its runner was not found (total_test_commands_not_run counts those).",
+        "not say its runner was not found (total_test_commands_not_run counts those). "
+        "process-compliance@5 adds work_session_tests_run_rate (the step's work session "
+        "itself ran tests after its last edit; a gate's fix sessions do not count) and counts "
+        "plan_written in compliance_rate only when the condition asks for a plan.",
         "",
         *_table(("Metric", "Better", *[arm.arm for arm in arms]), rows),
     ]

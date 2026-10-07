@@ -18,6 +18,7 @@ from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
 from raidar.scorers.process_checks_v3 import PROCESS_COMPLIANCE_V3
 from raidar.scorers.process_checks_v4 import PROCESS_COMPLIANCE_V4
+from raidar.scorers.process_checks_v5 import PROCESS_COMPLIANCE_V5
 from raidar.scorers.rescore import assess
 from raidar.scorers.sdk.manifest import Tier
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
@@ -156,13 +157,19 @@ def _trial_trace(tested: bool) -> dict:
 def test_default_checks_are_deterministic_metrics_of_the_default_scorer() -> None:
     # Jev parked (2026-10-04): the defaults read only deterministic process-compliance@2
     # metrics; an undetermined check is never ``ok``, so it never enters a share.
-    # process-compliance@4 (read first) and @3 keep every @2 check (@3 adds the stall
-    # outcomes, @4 counts only test commands that ran).
-    for manifest in (PROCESS_COMPLIANCE_V4, PROCESS_COMPLIANCE_V3, PROCESS_COMPLIANCE_V2):
+    # process-compliance@5 (read first), @4 and @3 keep every @2 check (@3 adds the stall
+    # outcomes, @4 counts only test commands that ran, @5 adds the work session's own).
+    for manifest in (
+        PROCESS_COMPLIANCE_V5,
+        PROCESS_COMPLIANCE_V4,
+        PROCESS_COMPLIANCE_V3,
+        PROCESS_COMPLIANCE_V2,
+    ):
         metrics = {metric.id: metric for metric in manifest.metrics}
         assert set(DEFAULT_CHECKS) <= set(metrics)
         assert {metrics[check].tier for check in DEFAULT_CHECKS} == {Tier.DETERMINISTIC}
-    assert PROCESS_COMPLIANCE_REFS[:3] == (
+    assert PROCESS_COMPLIANCE_REFS[:4] == (
+        PROCESS_COMPLIANCE_V5.ref,
         PROCESS_COMPLIANCE_V4.ref,
         PROCESS_COMPLIANCE_V3.ref,
         PROCESS_COMPLIANCE_V2.ref,
@@ -172,6 +179,7 @@ def test_default_checks_are_deterministic_metrics_of_the_default_scorer() -> Non
 @pytest.mark.parametrize(
     "ref",
     [
+        "process-compliance@5",
         "process-compliance@4",
         "process-compliance@3",
         "process-compliance@2",
@@ -203,7 +211,7 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) ->
     )
     with pytest.raises(
         ValueError,
-        match="not one of process-compliance@4, process-compliance@3, process-compliance@2",
+        match="not one of process-compliance@5, process-compliance@4, process-compliance@3",
     ):
         load_arm_results(store.root, {"guided": [other.key]})
     with pytest.raises(ValueError, match="no assessment"):

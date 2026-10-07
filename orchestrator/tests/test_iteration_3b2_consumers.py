@@ -76,3 +76,34 @@ def test_every_compared_metric_names_its_better_direction() -> None:
     assert _better("erosion") == "↑ higher"
     assert _better("process.total_test_commands_not_run") == "↓ lower"
     assert "erosion E is 1 minus the share of code mass in complex functions" in BETTER_LEGEND
+
+
+# ---- iteration 3b.3: gate-effort@7 and process-compliance@5 ------------------------------
+
+V7_ONLY = {
+    "first_pass_clean_except_autofix_rate",
+    "first_pass_clean_except_tests_rate",
+    "first_pass_clean_except_autofix_tests_rate",
+    "total_new_first_run_blocking_ex_cascade",
+    "final_step_end_blocking_ex_cascade",
+}
+
+
+def test_gate_effort_v7_outcomes_are_compared_only_for_v7() -> None:
+    v7 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@7")}
+    v6 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@6")}
+    v5 = {metric.id.removeprefix(GATE_PREFIX) for metric in gate_metrics_for("gate-effort@5")}
+
+    assert v7 - v6 == V7_ONLY
+    assert v6 - v5 == V6_ONLY
+    assert not V7_ONLY & v5
+    assert _better("gate.first_pass_clean_except_autofix_tests_rate") == "↑ higher"
+    assert _better("gate.final_step_end_blocking_ex_cascade") == "↓ lower"
+
+
+def test_process_compliance_v5_adds_the_work_session_rate() -> None:
+    v5 = {m.id.removeprefix(PROCESS_PREFIX) for m in process_metrics_for("process-compliance@5")}
+    v4 = {m.id.removeprefix(PROCESS_PREFIX) for m in process_metrics_for("process-compliance@4")}
+
+    assert v5 - v4 == {"work_session_tests_run_rate"}
+    assert _better("process.work_session_tests_run_rate") == "↑ higher"

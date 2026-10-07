@@ -37,10 +37,12 @@ from tests.verifier_support import LocalProcessSandbox, make_bundle
 STEP = "checkpoint_2"
 
 
-async def _graded(root: Path, *, coverage: bool) -> Path:
+async def _graded(root: Path, *, coverage: bool, note: str | None = None) -> Path:
     """A trial whose checkpoint_2 was graded with or without the in-trial coverage pass."""
     bundle = make_bundle(root / "fixture")
-    place_step_artifact(root, STEP, mul=True)
+    app = place_step_artifact(root, STEP, mul=True)
+    if note is not None:
+        (app / "NOTE.txt").write_text(note)  # a snapshot of its own (its own digest)
     verifier = await make_verifier(
         root, FakeAgentEnvironment(), step=STEP, bundle_root=bundle.root, coverage=coverage
     )
@@ -151,18 +153,25 @@ def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(
 ) -> None:
     called: list[Any] = []
 
-    async def fake(path: Path, store: Path, options: RegradeOptions) -> dict[str, Any]:
-        called.append((path, store, options.docker_context))
+    async def fake(
+        path: Path, store: Path, options: RegradeOptions, concurrency: int = 1
+    ) -> dict[str, Any]:
+        called.append((path, store, options.docker_context, concurrency))
         return {"steps": [], "errors": 0}
 
     monkeypatch.setattr(assess_grading, "produce_coverage_path", fake)
 
     result = assess_grading.produce_coverage(
-        tmp_path / "job", tmp_path / "store", scorers, RegradeOptions(), replay=replay
+        tmp_path / "job",
+        tmp_path / "store",
+        scorers,
+        RegradeOptions(),
+        replay=replay,
+        concurrency=2,
     )
 
     assert (result is not None) is makes
-    assert called == ([(tmp_path / "job", tmp_path / "store", "orbstack")] if makes else [])
+    assert called == ([(tmp_path / "job", tmp_path / "store", "orbstack", 2)] if makes else [])
 
 
 def test_coverage_check_needs_regrade(tmp_path: Path) -> None:
@@ -172,3 +181,40 @@ def test_coverage_check_needs_regrade(tmp_path: Path) -> None:
 
     assert done.exit_code == 2
     assert "--coverage-check applies to --regrade only" in done.output
+
+
+async def test_trials_made_concurrently_give_the_report_made_one_after_another(
+    tmp_path: Path,
+) -> None:
+    """``--concurrency``: trials side by side, each one's steps in order, entries in trial order."""
+    job = tmp_path / "job"
+    job.mkdir()
+    for name in ("t1", "t2", "t3"):
+        (job / name).symlink_to(await _graded(tmp_path / name, coverage=False, note=name))
+
+    async def build(bundle: Any) -> GradingSandbox:
+        # Each trial was graded in its own root's sandbox (the bundle sits at <root>/fixture).
+        return LocalProcessSandbox(Path(bundle.root).parent.parent / "sandbox")
+
+    options = RegradeOptions(sandbox_factory=build)
+    one = await produce_coverage_path(job, tmp_path / "one", options)
+    many = await produce_coverage_path(job, tmp_path / "many", options, concurrency=3)
+
+    def shape(report: dict[str, Any]) -> list[tuple[Any, ...]]:
+        return [
+            (Path(e["trial_dir"]).name, e["step"], e["status"], e["eligible"])
+            for e in report["steps"]
+        ]
+
+    assert shape(one) == shape(many) == [(f"t{i}", STEP, "produced", True) for i in (1, 2, 3)]
+    assert (one["errors"], many["errors"]) == (0, 0)
+    for entry in many["steps"]:
+        stored = json.loads(Path(entry["path"]).read_text())
+        twin = json.loads(
+            (tmp_path / "one" / Path(entry["path"]).relative_to(tmp_path / "many")).read_text()
+        )
+        assert {k: v for k, v in stored.items() if k not in ("produced_at", "coverage_run_s")} == {
+            k: v for k, v in twin.items() if k not in ("produced_at", "coverage_run_s")
+        }
+    checked = await check_coverage_path(job, tmp_path / "many", options, concurrency=2)
+    assert checked["match"], checked

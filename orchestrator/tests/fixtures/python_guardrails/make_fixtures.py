@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Write one passing and one violating fixture per applicable rule, plus specs.json.
 
-    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE [--pack 3|4]
+    make_fixtures.py OUT_DIR LOCK_FILE SPECS_FILE [--pack 3|4|6]
 
 ``--pack 3`` writes python-guardrails@3's set (``specs-3.json``): every @1
 canary, the tests check's canaries (``TEST.*``), and a commit canary whose
@@ -9,6 +9,10 @@ clean workspace has a test (the @3 gate refuses a change with none).
 ``--pack 4`` writes python-guardrails@4's (``specs-4.json``): @3's plus the
 scope canaries (``SCOPE.*``: an extensionless python script, and the target of
 a ``.py`` symlink, are checked).
+``--pack 6`` writes python-guardrails@6's (``specs-6.json``): @4's plus the
+test-class canary (``RUFF.LINT.per-file-ignores.test-public-methods``: a
+21-method test class is quiet under each test-file glob, the same class size in
+production code is refused). python-guardrails@5 ships @4's rules byte for byte.
 
 LOCK_FILE is a ``uv.lock`` for the canary's demo project (``name = "demo"``, no
 dependencies), produced by the uv that the gate will run, so the lockfile
@@ -366,10 +370,12 @@ def main(argv: list[str]) -> None:
     commit_ok = ok if pack == "1" else with_test("mod.py", MODULE, UNIT_TEST)
     add("RUNNER.local-ci-parity", "F401", commit_ok, "import os\n", mode="commit")
     add("TEST.tiers", "F401", ok, "import os\n")
-    if pack in ("3", "4"):
+    if pack in ("3", "4", "6"):
         add_tests_check()
-    if pack == "4":
+    if pack in ("4", "6"):
         add_scope()
+    if pack == "6":
+        add_test_classes()
     Path(argv[2]).write_text(json.dumps(SPECS, indent=2, sort_keys=True) + "\n")
 
 
@@ -513,6 +519,32 @@ def add_scope() -> None:
     add("SCOPE.shebang-script", "F401", script + "VALUE: int = 1\n", script + "import os\n")
     linked = CANARY_PATH.format("tool") + "# canary-symlink: tool.py=tool\n"
     add("SCOPE.py-symlink", "F401", linked + "VALUE: int = 1\n", linked + "import os\n")
+
+
+# ---- python-guardrails@6: a test class's size is not a design limit ----------------------
+
+
+def unittest_class(n: int, escaped: bool = False) -> str:
+    """A ``unittest.TestCase`` with ``n`` public test methods."""
+    methods = "".join(
+        f"    def test_{i}(self) -> None:\n        self.assertEqual({i}, {i})\n\n" for i in range(n)
+    )
+    text = f"import unittest\n\n\nclass ManyTest(unittest.TestCase):\n{methods}"
+    return text.replace("\n", "\\n") if escaped else text
+
+
+def add_test_classes() -> None:
+    """PLR0904 is off under each test-file glob and on everywhere else (python-guardrails@6)."""
+    extras = "".join(
+        f"# canary-extra: {path}={unittest_class(21, escaped=True)}\n"
+        for path in ("test_top.py", "pkg/many_test.py", "pkg/test/cases.py")
+    )
+    add(
+        "RUFF.LINT.per-file-ignores.test-public-methods",
+        "PLR0904",
+        CANARY_PATH.format("tests/unit/many_cases.py") + extras + unittest_class(21),
+        CANARY_PATH.format("pkg/service.py") + public_methods(21),
+    )
 
 
 if __name__ == "__main__":

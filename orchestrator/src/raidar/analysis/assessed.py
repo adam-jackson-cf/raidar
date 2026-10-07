@@ -87,6 +87,7 @@ RESOURCE_USAGE_REF = "resource-usage@1"
 # only deterministically (the default since Jev was parked, 2026-10-04); the
 # dormant ``@1`` stays readable for jobs whose lock declares it.
 PROCESS_COMPLIANCE_REFS = (
+    "process-compliance@5",
     "process-compliance@4",
     "process-compliance@3",
     "process-compliance@2",
@@ -100,6 +101,7 @@ QUALITY_SCORERS = CODE_QUALITY_REFS
 # tests check and the fix rounds' correctness.
 GATE_EFFORT_REF = "gate-effort@1"
 GATE_EFFORT_REFS = (
+    "gate-effort@7",
     "gate-effort@6",
     "gate-effort@5",
     "gate-effort@4",

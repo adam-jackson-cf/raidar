@@ -427,13 +427,13 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@6": {
-          "digest": "a5d4c11952d960069303dedc92877ef71dcde624071aa2173324dfa6ce841063",
+        "gate-effort@7": {
+          "digest": "f4b4842d06ef539fc90fb2181d3f7458726376a53d42402a4f77b27527ec4887",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort_v6:gate_effort_v6_scorer",
-            "implementation_digest": "e28fdc2f766431c206667aa534e9907003b8786d4a7dc198503e3a865ef30d6e",
+            "implementation": "raidar.scorers.gate_effort_v7:gate_effort_v7_scorer",
+            "implementation_digest": "937c704979ed7643ab1c20871af09773eb619a413cf18449aefce281e19c15f8",
             "manifest": {
-              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@5), with a failed tests check counted once in every blocking count, blocking counts that compare across gate modes (step-end, new per step, final), the mypy no-untyped-call cascade reported separately, and failing tests and missed coverage as separate first-run outcomes. A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate.",
+              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@6: a failed tests check counted once, blocking counts that compare across gate modes, the mypy no-untyped-call cascade reported separately, failing tests and missed coverage apart), plus first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both, and the cross-mode blocking counts without the no-untyped-call cascade. A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate.",
               "evidence_required": [
                 "trace",
                 "oracle.cases",
@@ -1546,24 +1546,156 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "The first gate run refused nothing but auto-fixable layout codes (FORMAT, I001, W291, W292, W293 are the auto-fixable codes).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_except_autofix",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The first gate run refused nothing but tests-check codes (FORMAT, I001, W291, W292, W293 are the auto-fixable codes).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_except_tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The first gate run refused nothing but auto-fixable layout or tests-check codes (FORMAT, I001, W291, W292, W293 are the auto-fixable codes).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_except_autofix_tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings without the MYPY.no-untyped-call cascade.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "first_run_blocking_ex_cascade",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings of the step's last decided gate run without the MYPY.no-untyped-call cascade.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "step_end_blocking_ex_cascade",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "First-run blocking findings minus the previous gated step's step-end count, both without the MYPY.no-untyped-call cascade.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "new_first_run_blocking_ex_cascade",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose first gate run refused nothing but auto-fixable layout codes.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_except_autofix_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose first gate run refused nothing but tests-check codes.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_except_tests_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose first gate run refused nothing but auto-fixable layout or tests-check codes.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "first_pass_clean_except_autofix_tests_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings the steps' own work added before any fix, over the trajectory, without the MYPY.no-untyped-call cascade.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_new_first_run_blocking_ex_cascade",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Blocking findings at the end of the last gated step without the MYPY.no-untyped-call cascade.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "final_step_end_blocking_ex_cascade",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "6"
+              "version": "7"
             },
             "tool_lock": {}
           }
         },
-        "process-compliance@4": {
-          "digest": "2ea82de2720f73e724b4a050de7d380690ce0eac16ecacb36b6c617ccc35b82a",
+        "process-compliance@5": {
+          "digest": "0eecfe4a7f8618e38da39d1afa28876b919688088886c34bd0d210cb53700008",
           "metadata": {
-            "implementation": "raidar.scorers.process_checks_v4:process_compliance_v4_scorer",
-            "implementation_digest": "3002bd789b975c05e2b59e727745057a24b1235e7f86c17f43c2da0e9ea77fb3",
+            "implementation": "raidar.scorers.process_checks_v5:process_compliance_v5_scorer",
+            "implementation_digest": "39761f2511474d28b238a9907af00df1c4cd3eff63935031a62e823d007ebe0b",
             "manifest": {
-              "description": "Deterministic trace checks of agent process (process-compliance@3, stall outcomes included); a check the trace cannot decide is undetermined, never judged by a model. A test command counts as a test run only when its recorded output does not say its runner was not found; such commands are counted separately.",
+              "description": "Deterministic trace checks of agent process (process-compliance@4: stall outcomes, a test command counts only when it ran); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the step's work session itself ran tests after its last edit; the compliance rate counts the test-run check, and the plan check only when the condition asks for a plan.",
               "evidence_required": [
                 "trace",
                 "snapshot.current"
@@ -1678,13 +1810,37 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "The step's work session (the one given the step's first prompt) ran the project's tests after its last source edit; a test command counts only if it ran.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_run_before_finish",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of decided steps whose work session ran tests after its last edit.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "work_session_tests_run_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "4"
+              "version": "5"
             },
             "tool_lock": {}
           }
@@ -1829,7 +1985,7 @@
       },
       "metric": "scb-canonical@2",
       "scorer_config": {
-        "process-compliance@4": {
+        "process-compliance@5": {
           "extra_test_patterns": [
             "guardrail-check(?![\\w.-])(?!\\s+--(?:version|help)\\b)"
           ]
@@ -1839,8 +1995,8 @@
         "correctness@1",
         "code-quality@2",
         "resource-usage@1",
-        "process-compliance@4",
-        "gate-effort@6"
+        "process-compliance@5",
+        "gate-effort@7"
       ]
     },
     "tools": {
@@ -1852,18 +2008,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "ef43e7281169d9cbea95759c872bc7194786268e8f6a53ecee25b4bfc36be5b5",
+  "document_sha256": "01e640cfd0894e662672a5863894e9deb2ee32d6f096ff17bfafd47d5e62aee9",
   "execution": {
     "arms": {
       "r1-baseline": {
         "agent": "codex-luna",
         "condition": "r1-baseline",
-        "digest": "0c5ec51bded3f5060f1db411f55c8dffd3b3f058311f81f332f10a200237637c"
+        "digest": "f5f0dae5ac69de9eadaca6551b8a5f628e3eb6d216fd6c7ac9ecd87427926cf0"
       },
       "r2-guardrails": {
         "agent": "codex-luna",
         "condition": "r2-guardrails",
-        "digest": "a9e308193c099e769aba5dfbdf98071459410e9c69bc7be8de50300d46e6a805"
+        "digest": "12ab49596c9bc2e44608862f96d1bf52e97c2a783d3a9c02bd700a49a9e2bae8"
       }
     },
     "conditions": {
@@ -1890,8 +2046,8 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@5",
-          "use_digest": "6f747f46431d180240bf97a2a56cd73c7e17fcf90ced7733d48704b4db356bf6",
+          "use": "python-guardrails@6",
+          "use_digest": "91185d6a07350de52a60f88d5fad031c44087ffc2f8bef9aea36b2bf323d0ec8",
           "with": {
             "workspace_configs": false
           }
@@ -1931,8 +2087,8 @@
         },
         {
           "files": {},
-          "use": "python-guardrails@5",
-          "use_digest": "6f747f46431d180240bf97a2a56cd73c7e17fcf90ced7733d48704b4db356bf6",
+          "use": "python-guardrails@6",
+          "use_digest": "91185d6a07350de52a60f88d5fad031c44087ffc2f8bef9aea36b2bf323d0ec8",
           "with": {
             "workspace_configs": true
           }
@@ -1979,7 +2135,7 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@5",
+              "use": "python-guardrails@6",
               "with": {
                 "workspace_configs": false
               }
@@ -2001,7 +2157,7 @@
           "components": [
             {
               "files": [],
-              "use": "python-guardrails@5",
+              "use": "python-guardrails@6",
               "with": {
                 "workspace_configs": true
               }
@@ -2125,8 +2281,8 @@
             ]
           }
         },
-        "python-guardrails@5": {
-          "digest": "6f747f46431d180240bf97a2a56cd73c7e17fcf90ced7733d48704b4db356bf6",
+        "python-guardrails@6": {
+          "digest": "91185d6a07350de52a60f88d5fad031c44087ffc2f8bef9aea36b2bf323d0ec8",
           "metadata": {
             "discovery_probe": "python-guardrails-gate-works",
             "kind": "service",
@@ -2238,10 +2394,10 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "a8cc7ea7439e18b165857a5217b3465fe6bb6ab8abea89482818a357e2b28e5f",
-    "spec_sha256": "ac7f540d851f2f37a2dbd163a781491a2a6b610de4e3417c64bf3ed192769288"
+    "source_sha256": "72a67f04ce535c2fb176980ad7616702ea0fc1d975e1c06cd5e25a19334179c2",
+    "spec_sha256": "6f7888cb912d0ae425365d42a94722ca2ea2f65dea2f64f2a77435a015acfacb"
   },
-  "lock_sha256": "2b4c23f42ac92e1aee8f1143be75a186db39c4b04b2f96932cde92c3390489fa",
+  "lock_sha256": "f600b96bc7dbc9a78b58a62e8f51514c40a06b8cb6f54f0ce29ce7d22a9bb26a",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -2249,8 +2405,8 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "eca6036fe22583fee9589e95b79df05586011a6622c95c0bf31e28d35dac8cfc",
-    "execution": "2b4c23f42ac92e1aee8f1143be75a186db39c4b04b2f96932cde92c3390489fa",
+    "assessment": "6d927cd2c2bbbc2f18b345ed4763999e06e5566d90ee02b993754c3ab3433fbe",
+    "execution": "f600b96bc7dbc9a78b58a62e8f51514c40a06b8cb6f54f0ce29ce7d22a9bb26a",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },
   "spec": {
@@ -2303,7 +2459,7 @@
       },
       "metric": "scb-canonical@2",
       "scorer_config": {
-        "process-compliance@4": {
+        "process-compliance@5": {
           "extra_test_patterns": [
             "guardrail-check(?![\\w.-])(?!\\s+--(?:version|help)\\b)"
           ]
@@ -2313,8 +2469,8 @@
         "correctness@1",
         "code-quality@2",
         "resource-usage@1",
-        "process-compliance@4",
-        "gate-effort@6"
+        "process-compliance@5",
+        "gate-effort@7"
       ]
     },
     "conditions": [
@@ -2322,7 +2478,7 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@5",
+            "use": "python-guardrails@6",
             "with": {
               "workspace_configs": false
             }
@@ -2344,7 +2500,7 @@
         "components": [
           {
             "files": [],
-            "use": "python-guardrails@5",
+            "use": "python-guardrails@6",
             "with": {
               "workspace_configs": true
             }

@@ -12,9 +12,10 @@
   guardrails-verify``), where the lock canary's ``uv.lock`` is made by the uv
   the gate runs.
 - ``PACKS``: the packs under verification: python-guardrails@1 (the payload of
-  @1 and @2, ``specs.json``), @3 (``specs-3.json``), @4 (``specs-4.json``) and
+  @1 and @2, ``specs.json``), @3 (``specs-3.json``), @4 (``specs-4.json``),
   @5 (@4's rules byte for byte, so ``specs-4.json``; its install adds the
-  agent's tool links and their smokes).
+  agent's tool links and their smokes) and @6 (``specs-6.json``: @5's plus the
+  test-class canary, ``PLR0904`` being off in test files).
 """
 
 from __future__ import annotations
@@ -28,7 +29,13 @@ from typing import Any
 
 import yaml
 
-from raidar.components.builtins import guardrails, guardrails_v3, guardrails_v4, guardrails_v5
+from raidar.components.builtins import (
+    guardrails,
+    guardrails_v3,
+    guardrails_v4,
+    guardrails_v5,
+    guardrails_v6,
+)
 from raidar.components.gate_run_v2 import GateModeV2, gate_script
 from raidar.components.guardrail_gate_v3 import GuardrailGateOptionsV3
 from raidar.components.session_chain import InnerAgentSpec
@@ -37,7 +44,7 @@ from tests.experiment_spec_support import GUARDRAILS_EXPERIMENT
 VERIFY_DIR = Path(__file__).resolve().parent / "fixtures" / "python_guardrails"
 COMMIT_SCRIPT = "gate/guardrail-gate-commit.sh"
 CANARY_GATE_DIR = PurePosixPath("/tmp/guardrails-canary-gate")
-SPEC_FILES = ("specs.json", "specs-3.json", "specs-4.json")
+SPEC_FILES = ("specs.json", "specs-3.json", "specs-4.json", "specs-6.json")
 
 
 @dataclass(frozen=True)
@@ -78,6 +85,8 @@ TESTS_CHECK_BEHAVIOUR = frozenset(
 """python-guardrails@3's tests check behaviour (its codes are derived from the library)."""
 SCOPE_BEHAVIOUR = frozenset({"SCOPE.shebang-script", "SCOPE.py-symlink"})
 """python-guardrails@4's scope: Python files without a ``.py`` name are checked."""
+TEST_CLASS_BEHAVIOUR = frozenset({"RUFF.LINT.per-file-ignores.test-public-methods"})
+"""python-guardrails@6: ``PLR0904`` is off under each test-file glob, on everywhere else."""
 
 PACKS = {
     1: PackUnderTest(
@@ -107,6 +116,13 @@ PACKS = {
         guardrails_v5.PAYLOAD_FILES,
         "specs-4.json",
         NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR,
+    ),
+    6: PackUnderTest(
+        6,
+        guardrails_v6.PAYLOAD_DIR,
+        guardrails_v6.PAYLOAD_FILES,
+        "specs-6.json",
+        NON_CONFIG_RULES | TESTS_CHECK_BEHAVIOUR | SCOPE_BEHAVIOUR | TEST_CLASS_BEHAVIOUR,
     ),
 }
 CANARY_PACK = {5: 4}

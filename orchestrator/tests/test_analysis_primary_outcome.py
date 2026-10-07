@@ -153,6 +153,7 @@ def test_an_errata_primary_without_errata_still_has_a_primary_effect() -> None:
 
 def test_the_lock_declared_gate_effort_version_is_read_newest_first() -> None:
     assert GATE_EFFORT_REFS == (
+        "gate-effort@7",
         "gate-effort@6",
         "gate-effort@5",
         "gate-effort@4",
@@ -164,4 +165,5 @@ def test_the_lock_declared_gate_effort_version_is_read_newest_first() -> None:
     assert gate_effort_ref(["correctness@1", "gate-effort@1"]) == "gate-effort@1"
     assert gate_effort_ref(["gate-effort@2", "gate-effort@1"]) == "gate-effort@2"
     assert gate_effort_ref(["gate-effort@3", "correctness@1"]) == "gate-effort@3"
+    assert gate_effort_ref(["gate-effort@7", "gate-effort@6"]) == "gate-effort@7"
     assert gate_effort_ref(["correctness@1"]) is None
