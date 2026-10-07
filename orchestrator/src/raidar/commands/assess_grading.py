@@ -39,7 +39,7 @@ PRE_FIX_GRADE_SCORERS = frozenset(
     {"gate-effort@4", "gate-effort@5", "gate-effort@6", "gate-effort@7", "gate-effort@8"}
 )
 # Scorers that read the offline coverage runs of steps whose trial deferred the coverage pass.
-OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@2"})
+OFFLINE_COVERAGE_SCORERS = frozenset({"code-quality@2", "code-quality@3"})
 
 
 def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[str, Any]:

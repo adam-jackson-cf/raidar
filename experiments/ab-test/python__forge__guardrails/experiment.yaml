@@ -26,6 +26,11 @@
 # all, and after its last edit to a non-test file) and gate-effort@8 (@7 plus the cross-mode
 # counts with a refused suppression comment counted once: mypy's unused-ignore at a SUPPRESS
 # line folded into it). The primary outcome and the errata are unchanged (16.1, I1).
+# Iteration 3b.5 (rationale.md section 17, after smoke-3b-4): code-quality@3 (@2 whose G leaves
+# out at most 3 grader cases whose outcome differs between the grading run and the coverage run,
+# instead of reading the whole step, and so the trial's headline, as ineligible; it reports how
+# many cases it left out per transition). Agent, pack, gate, wrappers and the offline coverage
+# pass are unchanged.
 # r2 gets python-guardrails@7 (the @1 rule set and pins, PLR0904 off in test files, plus the tests check:
 # unittest always, pytest for pytest-style tests, both under coverage; a Python change with no
 # test that ran is refused, so are failing tests and owned line coverage below 85%), installed
@@ -45,7 +50,8 @@
 # No rules text tells the agent about the gate in advance (the mechanical rung only).
 # Objective: explore (smallest runs: 1 trial per arm first, then at most 4 attempts per arm).
 # Verdicts below min_pairs read insufficient by design.
-# Pre-registration: rationale.md beside this file. Section 16 (iteration 3b.4) amends section 15
+# Pre-registration: rationale.md beside this file. Section 17 (iteration 3b.5) amends section 16
+# (iteration 3b.4), which amends section 15
 # (iteration 3b.3), which amends section 14
 # (iteration 3b.2), which amends section 13,
 # which amends section 12, which pre-registers the hypothesis (enforcing the agent's own tests
@@ -174,7 +180,10 @@ assessment:
   # work_session_tests_after_last_code_edit (test-file edits after the run do not fail it);
   # gate-effort@8 is @7 plus the *_net cross-mode counts (no cascade; a refused suppression
   # comment's MYPY.unused-ignore folded into its SUPPRESS).
-  scorers: [correctness@1, code-quality@2, resource-usage@1, process-compliance@6, gate-effort@8]
+  # Iteration 3b.5: code-quality@3 is @2 whose G, when parity failed only because at most 3
+  # cases changed outcome between the grading and coverage runs, leaves those cases out of both
+  # runs instead of the step; regression_parity_excluded_cases reports them.
+  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6, gate-effort@8]
   scorer_config:
     process-compliance@6:
       extra_test_patterns:

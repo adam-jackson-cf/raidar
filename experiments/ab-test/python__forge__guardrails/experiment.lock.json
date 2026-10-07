@@ -50,13 +50,13 @@
         }
       },
       "scorer": {
-        "code-quality@2": {
-          "digest": "a9dd9767c23c97feaef950b717a04a6310c60cc60eb4eff4b2b0fa4c9b14c6c7",
+        "code-quality@3": {
+          "digest": "739e8c83da1817ba6e9440b0bfcfcb76b964549e284393c8e48e2c7ab9bf84bd",
           "metadata": {
-            "implementation": "raidar.scorers.code_quality_v2:code_quality_v2_scorer",
-            "implementation_digest": "30e583a1dfb8ea2743452727d06dc6bd1d8b5808ec1c052a32edcdbf8a23fff7",
+            "implementation": "raidar.scorers.code_quality_v3:code_quality_v3_scorer",
+            "implementation_digest": "8cf388221c5d1098b115d12d4315576e67570ef27d46e4c2037c3d07a2e0d682",
             "manifest": {
-              "description": "SCB-fork code-quality and inertia components over the per-step snapshots (code-quality@1); a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store.",
+              "description": "SCB-fork code-quality and inertia components over the per-step snapshots (code-quality@2); G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
                 "snapshot.current",
                 "snapshot.prior",
@@ -208,6 +208,18 @@
                   "tier": "deterministic",
                   "type": "ratio",
                   "unit": null
+                },
+                {
+                  "description": "Grader cases G left out at the transition because their outcome differed between the grading run and the coverage run (0 when parity held).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "regression_parity_excluded_cases",
+                  "inputs": [],
+                  "level": "transition",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "cases"
                 }
               ],
               "runtimes": [
@@ -217,7 +229,7 @@
                 "scb-python-quality",
                 "scb-check"
               ],
-              "version": "2"
+              "version": "3"
             },
             "tool_lock": {
               "python": {
@@ -2101,7 +2113,7 @@
       },
       "scorers": [
         "correctness@1",
-        "code-quality@2",
+        "code-quality@3",
         "resource-usage@1",
         "process-compliance@6",
         "gate-effort@8"
@@ -2116,7 +2128,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "090a0488f6c808db9157aff37dcc52686acd41e2e3e29b5b51c23f5006b765b7",
+  "document_sha256": "67db491689dd15ca4bcc6eaa425e9bf39f95f9691b558250021fc747db7d2a19",
   "execution": {
     "arms": {
       "r1-baseline": {
@@ -2502,8 +2514,8 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "2c3de1f3e04be7c5e3248ff2bba834d6b44483ef6970a4539f1d06d2a9993732",
-    "spec_sha256": "8982988ccc8fb98425614c591bd182c1a892e7ad76f344437b5344fe7098b733"
+    "source_sha256": "e4fdf4cbfe72df0124b14014593a78abb75a94398d62c627e0dc38970ca23bc5",
+    "spec_sha256": "89e3afd31246b3eafffbc12518e45f0432e56e8c4776b400a7b31055e6575273"
   },
   "lock_sha256": "c155127780753e00421d8077df55752b32d26de87d73590c2e07daced5a91938",
   "lock_version": 3,
@@ -2513,7 +2525,7 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "1985b35e6db0a51938bc1b442552c7c0a4388d0ff0fba0cfb727648677b5ab39",
+    "assessment": "5e0de59add6d53f6c753e6f5bcc802e866a26013d49c161e0d3a0e6021689750",
     "execution": "c155127780753e00421d8077df55752b32d26de87d73590c2e07daced5a91938",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },
@@ -2575,7 +2587,7 @@
       },
       "scorers": [
         "correctness@1",
-        "code-quality@2",
+        "code-quality@3",
         "resource-usage@1",
         "process-compliance@6",
         "gate-effort@8"

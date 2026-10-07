@@ -33,7 +33,8 @@ V6_ONLY = {
 
 
 def test_the_newest_declared_code_quality_version_is_read() -> None:
-    assert CODE_QUALITY_REFS == ("code-quality@2", "code-quality@1")
+    assert CODE_QUALITY_REFS == ("code-quality@3", "code-quality@2", "code-quality@1")
+    assert code_quality_ref(["code-quality@2", "code-quality@3"]) == "code-quality@3"
     assert code_quality_ref(["correctness@1", "code-quality@2"]) == "code-quality@2"
     assert code_quality_ref(["correctness@1", "code-quality@1"]) == "code-quality@1"
     assert code_quality_ref(["correctness@1"]) == "code-quality@1"

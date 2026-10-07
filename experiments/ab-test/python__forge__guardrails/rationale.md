@@ -633,3 +633,58 @@ make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails
 - `make quality` passes (1656 tests, coverage 96.37%).
 - Released identities: `python-guardrails@1`-`@6`, `gate-effort@1`-`@7` and `process-compliance@1`-`@5` are untouched; only `python-guardrails@7`, `gate-effort@8` and `process-compliance@6` are new. Only this experiment's lock moved (`f600b96bc7db` → `c15512778075`); the other five locks are unchanged.
 - **The new scorers on `smoke-3b-3`** (2026-10-07, `make experiment-assess ... CONCURRENCY=2` into a scratch copy of the `smoke-3b-3` store with a scratch lock of the same `lock_sha256`, `f600b96bc7db`; a check of the scorers, not 3b.4 data): 0 error observations. `process-compliance@6`: `work_session_tests_run_any` r2 1 at cp4, cp7 and cp8 (cp3's only attempt was the unrun `python -m pytest`), r1 0 at every step: `work_session_tests_run_any_rate` r1 0, r2 0.375, where `@5`'s `work_session_tests_run_rate` read 0 vs 0; `work_session_tests_after_last_code_edit_rate` 0 vs 0 (r2's last edits at cp4, cp7 and cp8 were to `forge.py`, not tests). `gate-effort@8`: r2 cp8 `first_run_blocking_net` 11 against `*_ex_cascade` 12 (the `SUPPRESS`/`MYPY.unused-ignore` pair at `forge.py:359` counted once); `total_new_first_run_blocking_net` r1 70, r2 51 (`@7`: 70, 52); `final_step_end_blocking_net` 70 vs 0.
+
+### 16.8 Process check `smoke-3b-4` (recorded 2026-10-07, after the run; not pooled, never cited)
+
+`smoke-3b-4` ran under `c15512778075` (1 trial per arm, attempt 0, concurrency 2, detached; 2026-10-07 03:31:48 to 04:02:46 UTC, 2 of 2 trials valid, no void arm). It meets every criterion of 13.3, 14.3, 15.3 and 16.4: every probe passed at all 16 steps and answered `python-guardrails@7` with the `.pth` file naming the agent-site (root-owned) and one agent-site digest across all 16 steps; no "No module named pytest/coverage", no "command not found" and no `PLR0904` anywhere (`python -m pytest` ran in r2's cp3 fix session and cp5 work session); r2's gate checked 1 to 2 files per step; every verifier record has `coverage.enabled: false`; `make experiment-assess ... CONCURRENCY=2` graded 9 of 9 pre-fix snapshots and made 16 of 16 offline coverage runs with 0 errors (about 28 min; the runs sum to 2305 s); 0 `error` observations in `gate-effort@8` or `process-compliance@6`; 0 transient errors, retries, stalls or continuations; gate error rate 0. The one integrity flag is r2 cp8 `suppression-refused` (one comment). Signals (n=1, exploratory): `solve_rate_errata` r1 0.5 vs r2 0.375 (raw 0.25 both); C 0.947 vs 0.946; erosion (higher is better) 0.240 vs 0.527; `gate.total_new_first_run_blocking_net` 83 vs 36; `gate.final_step_end_blocking_net` 83 vs 0; `gate.fix_round_correctness_delta` +0.0046; `process.work_session_tests_run_any_rate` 0 vs 0.5, `work_session_tests_after_last_code_edit_rate` 0 vs 0.286; cost $0.034 vs $0.139 per trial (r2's fix sessions 62%); `per_step_reset` 1.02 to 1.40 s except r2 cp8 at 2.013 s. The review raised one obvious item, settled in section 17 before any further job:
+
+- **I1** 4 of r2's 16 offline coverage runs (cp3, cp6, cp7, cp8) were parity-ineligible (`ledger_mismatch`, `outcome_mismatch`), each because of the same single grader case, `test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_name_uuid` (passed in grading, failed under coverage; every other field of the two runs equal). `code-quality@2` therefore read G `ineligible` at those steps and `problem_regression` `ineligible` for the trial, so the analysis had `headline_score` and `regression` at n=0 ("ineligible 1"), on one arm only. Needs-more-data items: I2 the case passes r2's wrong sort order whenever every create lands in the same second (`created_at` has one-second resolution), so its verdict depends on timing; I3 a heredoc that wrote only to a temporary directory made r2 cp3's work-session test metrics undetermined; I4 `FORMAT` blocked all 8 of r2's first gate runs (cp5's round existed only for it); I5 `per_step_reset` crept just over 2 s at r2 cp8.
+
+## 17. Amendment: explore iteration 3b.5 (2026-10-07, pre-registered before `main-03`)
+
+Written after `smoke-3b-4` (16.8) and before `main-03`. Sections 12 to 16 stand except where this section says otherwise. The agent stays `codex` with `gpt-6-luna` at low effort and the verifier's coverage pass stays offline (14.1) (user, for this run: "do the coverage change and stick with luna").
+
+### 17.1 What changed (a new scorer version; released versions untouched)
+
+| | Iteration 3b.4 | Iteration 3b.5 |
+|---|---|---|
+| Quality scorer | `code-quality@2` | **`code-quality@3`** |
+| Agent, pack, gate, wrappers, verifier coverage (offline), other scorers, errata, primary | as 16.2 | unchanged |
+
+- **`code-quality@3`** (I1; a measurement change, nothing problem-specific): `@2` in every metric, status, reason and evidence item, except where a step's G run evidence (the trial's own coverage pass or the store's offline run) failed parity. If the only parity reasons are `ledger_mismatch` and/or `outcome_mismatch`, and the two runs are otherwise the same run (environment, corpus, invocation, process ledger and the set of collected cases all equal, each run's outcome list equal to its ledger), the cases whose rows differ, **at most 3** (`MAX_EXCLUDED_CASES`), are left out of both runs' outcomes, ledgers, coverage contexts and process events, and the unchanged G kernel runs on the rest. Any other parity failure, or more than 3 flipped cases, stays `ineligible` (`coverage_parity_failed`) exactly as in `@2`. `@3` adds one transition-level diagnostic, `regression_parity_excluded_cases` (count, neutral direction, native exactness): 0 when parity held, the count with the node ids as the reason (`coverage_parity_cases_excluded: ...`) when cases were left out, `not_applicable` when G read no run evidence. Rerunning the flipped cases was rejected: it costs another coverage run per affected step and would still need a rule for a case that flips again.
+- Registered as `raidar.scorers.code_quality_v3` (store-bound, same problem config `entry_file`); `make experiment-assess` makes the offline coverage runs for `@3` as for `@2`; the analysis and review surfaces read `@3` before `@2` and `@1` (`CODE_QUALITY_REFS`).
+- **Lock.** The change is in the lock's `assessment` section only. The execution identity `lock_sha256` stays **`c15512778075`** (the same trial inputs as `smoke-3b-4`, so jobs still match and only need a rescore); the lock document's sha256 moves to `bab09ca20ed3`. No other experiment's lock moved.
+
+### 17.2 Hypothesis and outcomes
+
+Unchanged from 12.2 to 16.3. `regression` and `problem_regression` (and so `headline_score`) are read from `code-quality@3`. A step with excluded cases is G on the remaining cases; `regression_parity_excluded_cases` is reported beside it and its per-arm total is read in the review, never as an outcome.
+
+### 17.3 Process check (before `main-03`)
+
+Because the execution identity is unchanged, `smoke-3b-4` is a smoke under this lock; the process check for 3b.5 is its rescore with `code-quality@3`, not a new agent run. It is clean when: every `code-quality@3` assessment is complete (not provisional) with 0 `error` observations; r1's observations equal `@2`'s; r2's cp3, cp6, cp7 and cp8 G are `ok` with `regression_parity_excluded_cases` 1 naming the one case; and the analysis reports `headline_score` and `regression` for the pair (no "ineligible"). A failed criterion is a process defect: fix and recheck; do not start `main-03`.
+
+### 17.4 Running `main-03`
+
+```sh
+make experiment-lock EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml   # c15512778075 (document bab09ca20ed3)
+make experiment-execute EXPERIMENT=experiments/ab-test/python__forge__guardrails/experiment.yaml \
+  CONCURRENCY=2 JOB_ID=main-03 DETACH=1
+make experiment-status JOB=jobs/python__forge__guardrails/main-03
+make experiment-assess JOB=jobs/python__forge__guardrails/main-03 STORE=stores/python__forge__guardrails \
+  SCORERS="correctness@1 code-quality@3 resource-usage@1 process-compliance@6 gate-effort@8" CONCURRENCY=2
+make experiment-analyze JOBS=jobs/python__forge__guardrails/main-03 STORE=stores/python__forge__guardrails ANALYSIS_OUT=<dir>
+```
+
+`main-03` is 4 attempts per arm (8 trials). It is never pooled with `main-02` (different lock) or with any smoke. An arm voided for provider credit or quota is rerun, nothing else.
+
+### 17.5 Known limits of iteration 3b.5
+
+- Leaving a flipped case out of G drops it whatever its true outcome: a case that failed under coverage (and so would have pointed G at a changed symbol) cannot lower G at that step. With at most 3 cases out of hundreds per forge step (1004 at cp7), and only cases whose graded verdict passed in the cases seen so far, the effect is small, and it is visible per step in `regression_parity_excluded_cases`.
+- The timing dependence of `test_blueprint_list_orders_by_created_at_name_uuid` (16.8 I2) is not fixed: correctness and the solve rates still read the grading run's verdict. It is a needs-more-data item for `main-03`, to be judged by the audit rule, never by outcomes.
+- `@3`'s cap (3 cases) and its reason set are part of its identity; changing either is a new version.
+
+### 17.6 Verification before `main-03` (recorded at lock time)
+
+- Host tests: `orchestrator/tests/test_code_quality_v3.py` (one flipped case leaves the case out and gives the clean trial's G; parity that held gives `@2`'s observations plus the 0 count; `environment_mismatch`, `coverage_outside_outcomes` and `process_ledger_mismatch` stay `ineligible`; the in-trial pass is reconciled the same way; a case collected by one run only, a changed invocation or an inconsistent ledger is not a flip; more than 3 flips stay `ineligible`; registration), `orchestrator/tests/test_iteration_3b2_consumers.py` (`@3` is read before `@2`).
+- **17.3 on `smoke-3b-4`** (2026-10-07, `make experiment-assess ... CONCURRENCY=2` into a scratch copy of the `smoke-3b-4` store, which reused its 16 offline coverage runs, then `make experiment-analyze`): 10 of 10 assessments complete, 0 offline coverage errors. r1's `code-quality@3` G equals `@2`'s at every transition (`problem_regression` 0.2995) with 0 excluded cases. r2's G is `ok` at all 7 transitions (`problem_regression` 0.2857, was `ineligible`), with `regression_parity_excluded_cases` 1 at cp2→cp3, cp5→cp6, cp6→cp7 and cp7→cp8, each naming `test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_name_uuid`, and 0 elsewhere. The analysis reads `headline_score` for the pair (r1 81.62, r2 83.34, n=1) and `regression` (0.2995 vs 0.2857), with 0 ineligible. 17.3 holds.
+- Released identities: `code-quality@1` and `@2` are untouched (their modules are unchanged); only `code-quality@3` is new. `make experiment-locks-check` passes with only this experiment's lock document changed.

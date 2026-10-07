@@ -319,6 +319,7 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "process-compliance@5": "raidar.scorers.process_checks_v5:process_compliance_v5_scorer",
     "gate-effort@8": "raidar.scorers.gate_effort_v8:gate_effort_v8_scorer",
     "process-compliance@6": "raidar.scorers.process_checks_v6:process_compliance_v6_scorer",
+    "code-quality@3": "raidar.scorers.code_quality_v3:code_quality_v3_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
 # that store-bound runtime decides under: the dormant process-compliance@1 (Jev
@@ -340,11 +341,14 @@ BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
     # coverage pass, which ``raidar assess --rescore`` makes into the store
     # (raidar.verifier.coverage_offline).
     "code-quality@2": ("raidar.scorers.code_quality_v2:code_quality_v2_scorer_for_store", ()),
+    # code-quality@3 reads the same offline runs (G leaves out a few flipped cases, not the step).
+    "code-quality@3": ("raidar.scorers.code_quality_v3:code_quality_v3_scorer_for_store", ()),
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.
 BUILTIN_PROBLEM_CONFIG: dict[str, tuple[str, ...]] = {
     "code-quality@1": ("entry_file",),
     "code-quality@2": ("entry_file",),
+    "code-quality@3": ("entry_file",),
 }
 # Config keys the experiment's protocol sets (``ProtocolSpec`` field names).
 BUILTIN_PROTOCOL_CONFIG: dict[str, tuple[str, ...]] = {
