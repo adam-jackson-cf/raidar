@@ -2,7 +2,7 @@
 # Not errata: the specification determines each behaviour below, so no outcome changes.
 # A typed note the analysis shows beside the grading-vs-coverage disagreement count
 # (code-quality@3 regression_parity_excluded_cases). Judged by the spec-determinacy audit
-# rule (rationale.md section 18.5), never by outcomes. Upstream draft (not filed):
+# rule (rationale.md sections 18.5 and 18.11), never by outcomes. Upstream draft (not filed):
 # docs/reboot/upstream/scb-forge-unspecified-assertions.md, "Timing-dependent ordering test".
 schema: raidar.problem-sensitivities/1
 problem: scb/forge@38d627ecf668
@@ -25,3 +25,42 @@ sensitivities:
     recorded: >-
       2026-10-07, guardrails experiment smoke-3b-4 (rationale.md 16.8 I1/I2): passed in
       grading and failed under coverage at 4 r2 steps; did not flip in main-03 (17.7)
+  - case: test_checkpoint_1.py::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide
+    checkpoint: checkpoint_1
+    kind: randomness
+    spec_determined: true
+    spec: >-
+      task/steps/checkpoint_1/instruction.md:64 ("Ordering: created_at ascending, then name
+      ascending lexicographic, then uuid ascending lexicographic as final tie-breaker")
+    mechanism: >-
+      The test creates two blueprints, rewrites both stored rows to the same created_at and
+      name, lists, and asserts the two tied rows are in uuid order. Timing plays no part (the
+      stored values are rewritten). A program that does not break the tie by uuid (for
+      example one that sorts by name only) keeps them in insertion order, so it passes
+      exactly when the first random uuid4 sorts below the second: about half the time, on
+      any run. A correct program always passes.
+    recorded: >-
+      2026-10-08, guardrails experiment main-04 (rationale.md 18.10): flipped between grading
+      and coverage at 4 steps of one r2 trial (b02, whose list sorted by name only), in both
+      directions; audited against the specification (18.11), not the outcomes
+  - case: test_checkpoint_2.py::test_allocation_list_ordering
+    checkpoint: checkpoint_2
+    kind: randomness
+    spec_determined: true
+    spec: >-
+      task/steps/checkpoint_2/instruction.md:58 ("List output: ordered by created_at
+      ascending; ties broken by uuid ascending lexicographic"), :18 and :28 (created_at at
+      second precision; allocations from one create share it)
+    mechanism: >-
+      The test makes two allocations with two separate creates and asserts the listed
+      (created_at, uuid) pairs are sorted. Whether the two share a created_at depends on
+      wall-clock timing (both creates in the same second); when they do, a program that
+      does not break the tie by uuid passes only when the first random uuid4 sorts below
+      the second, and when they do not, a program that orders by uuid alone passes only
+      when the uuids happen to be in creation order. Its verdict on such a program depends
+      on timing and on the random uuids; recorded under randomness, the factor that decides
+      a tie. A correct program always passes.
+    recorded: >-
+      2026-10-08, guardrails experiment smoke-4 (rationale.md 18.9, I2): flipped between
+      grading and coverage at 4 r1 steps in both directions; did not flip in main-04;
+      audited against the specification (18.11), not the outcomes

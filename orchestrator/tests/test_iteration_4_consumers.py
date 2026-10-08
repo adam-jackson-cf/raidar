@@ -4,7 +4,7 @@
   direction), and @8 reads none of them;
 - the markdown shows the autofix-by-family and fix-cost-by-refusal tables only when an arm
   reports them;
-- the manipulation check, the review gate view and the pre-fix grading read @9;
+- the manipulation check, the review gate view and the pre-fix grading read @9 (before @8);
 - forge's ordering case is a known, spec-determined timing sensitivity (not an erratum),
   shown beside the grading-vs-coverage disagreement count.
 """
@@ -71,9 +71,9 @@ def test_gate_effort_v9_outcomes_are_compared_only_for_v9() -> None:
     assert _better("gate.total_fix_cost_usd_by_refusal.coverage_minimum") == "↓ lower"
 
 
-def test_every_consumer_reads_v9_first() -> None:
-    assert MANIPULATION_REFS[0] == "gate-effort@9"
-    assert REVIEW_REFS[0] == "gate-effort@9"
+def test_every_consumer_reads_v9_before_v8() -> None:
+    for refs in (MANIPULATION_REFS, REVIEW_REFS):
+        assert refs.index("gate-effort@9") < refs.index("gate-effort@8")
     assert "gate-effort@9" in PRE_FIX_GRADE_SCORERS
 
 
@@ -125,7 +125,7 @@ TIMING_CASE = "test_checkpoint_1.py::test_blueprint_list_orders_by_created_at_na
 def test_the_forge_ordering_case_is_a_spec_determined_timing_sensitivity_not_an_erratum() -> None:
     found = known_sensitivities([FORGE, "toy@1"], start=REPO)
 
-    (note,) = found[FORGE]
+    note = next(note for note in found[FORGE] if note.case == TIMING_CASE)
     assert (note.case, note.kind, note.spec_determined) == (
         TIMING_CASE,
         SensitivityKind.TIMING,

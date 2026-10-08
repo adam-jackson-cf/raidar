@@ -1,4 +1,4 @@
-"""Every ``gate-effort`` manifest, ``@1`` to ``@9``, from beside its implementation.
+"""Every ``gate-effort`` manifest, ``@1`` to ``@10``, from beside its implementation.
 
 Collected here so the catalog's registration and the analysis read them through one
 module (the released scorers' digests do not cover this file).
@@ -15,6 +15,7 @@ from raidar.scorers.gate_effort_v6.scorer import GATE_EFFORT_V6
 from raidar.scorers.gate_effort_v7.scorer import GATE_EFFORT_V7
 from raidar.scorers.gate_effort_v8.scorer import GATE_EFFORT_V8
 from raidar.scorers.gate_effort_v9.manifest import GATE_EFFORT_V9
+from raidar.scorers.gate_effort_v10.manifest import GATE_EFFORT_V10
 
 GATE_EFFORT_MANIFESTS = (
     GATE_EFFORT,
@@ -26,6 +27,7 @@ GATE_EFFORT_MANIFESTS = (
     GATE_EFFORT_V7,
     GATE_EFFORT_V8,
     GATE_EFFORT_V9,
+    GATE_EFFORT_V10,
 )
 
 __all__ = [
@@ -39,4 +41,5 @@ __all__ = [
     "GATE_EFFORT_V7",
     "GATE_EFFORT_V8",
     "GATE_EFFORT_V9",
+    "GATE_EFFORT_V10",
 ]

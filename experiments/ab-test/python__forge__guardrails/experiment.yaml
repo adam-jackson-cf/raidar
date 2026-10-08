@@ -208,7 +208,11 @@ assessment:
   # and lines changed, block-tier findings fixed by family), first-pass clean and blocking
   # counts after autofix and before it (comparable across the enforced and the shadow arm), and
   # the fix sessions' cost and wall time by the kind of refusal that started them.
-  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6, gate-effort@9]
+  # Iteration 4 record (rationale.md section 18.11, 2026-10-08; assessment only, after main-04):
+  # gate-effort@10 is @9 plus new_autofix_lines_changed and new_autofix_removed_blocking (by
+  # family): each step's first autofix pass minus what the previous step left for autofix, so
+  # the shadow arm's never-fixed tree is not re-counted at every step (smoke-4 I5).
+  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6, gate-effort@10]
   scorer_config:
     process-compliance@6:
       extra_test_patterns:

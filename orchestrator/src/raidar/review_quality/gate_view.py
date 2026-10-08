@@ -42,6 +42,7 @@ from raidar.scorers.store import Assessment
 
 GATE_EFFORT_REF = "gate-effort@1"
 GATE_EFFORT_REFS = (
+    "gate-effort@10",
     "gate-effort@9",
     "gate-effort@8",
     "gate-effort@7",

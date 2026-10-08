@@ -804,3 +804,92 @@ Judged by the spec-determinacy audit rule, not by outcomes. `test_checkpoint_1.p
 - **`gate-effort@9` on real records** (`main-03`, gate `@3`, no autofix; scored into a scratch copy of the store under a scratch lock with `main-03`'s `lock_sha256` `c15512778075` and `gate-effort@9` in place of `@8`; a check of the scorer and a baseline for 18.2, not iteration-4 data): 8 of 8 assessments, 0 `error` observations, the autofix values `not_applicable` and `*_raw_net` equal to `@8`'s `*_net` (r1 61.5, r2 43.5 per trial). r2's fix sessions by the refusal that started them: `mixed` $0.094 / 788 s, `tests` $0.003 / 31 s, `style` $0.0005 / 7 s, `coverage_minimum` alone 0; **7.0 of 8.5 fix sessions per trial were started by a refusal that included `TEST.coverage-minimum`, $0.087 of $0.098 (89%) and 687 of 826 s.** Autofix removes `FORMAT`/`I001` from those refusals but not the coverage minimum, so most of r2's fix cost is not expected to go away with autofix alone; 18.2's readings will show how much does. The analysis's verifier section read 0 grading-vs-coverage disagreements in both arms of `main-03`, with the forge sensitivity listed beside it.
 - **Released identities:** `python-guardrails@1`-`@7`, `guardrail-gate@1`-`@3`, `gate-effort@1`-`@8` and `code-quality@1`-`@3` (implementation digest still `a833f41bb0f8`) are untouched; only `python-guardrails@8`, `guardrail-gate@4` and `gate-effort@9` are new. Only this experiment's lock moved (`c15512778075` → `0e597e33e8b4`, document `c19711ac463e`); the other five locks are unchanged.
 - `make quality` passes at the commit this lock is pre-registered in (1739 tests passed, 11 skipped, coverage 96.18%, no lizard warnings, fan-out OK, every lock current).
+
+### 18.9 `smoke-4`: the 18.3 process check (recorded 2026-10-08, after the run)
+
+`smoke-4` ran under `0e597e33e8b4` (document `c19711ac463e`; pre-registration commit `477b083` at 22:54 UTC, `make quality` passed there) with attempt 0 of each arm at concurrency 2, detached: 2026-10-07 23:20:41 to 23:52:53 UTC, **2 of 2 trials valid**, all 9 validity checks passed in both, `exception_info` null, nothing voided or rerun. Assessment: `make experiment-assess ... CONCURRENCY=2` with all five scorers into a scratch store (`.tmp/smoke-4/store`), then `make experiment-analyze` (`.tmp/smoke-4/analysis/analysis.md`).
+
+- **18.3 holds; 13.3 to 16.4 hold.** Every probe passed at all 16 steps on `python-guardrails@8`'s pin with the autofix smoke (rc 0) at every step. Every gate record has an enabled autofix block. r2 ran exactly one `apply` pass before each of its 17 gate runs; r1 ran one `dry_run` pass with a decided post-check at each of its 8 steps. `gate.total_autofix_errors` 0 in both arms, no fallback. No r2 gate run refused `FORMAT` or `I001`. 10 of 10 assessments, 0 `error` and 0 `unavailable` observations; 9 of 9 pre-fix snapshots graded; 16 of 16 offline coverage runs made (0 errors; 12 parity-eligible, 4 r1 steps ineligible with typed reasons). 0 transient retries, continuations and stalls in 25 sessions; no "command not found", no "No module named pytest/coverage".
+- **Shadow r1 untouched.** `ruff format --check` (0.8.6, the pack config) on r1's step-end snapshots still reports unformatted code, and r1's raw check finds `FORMAT`/`UP017` again at every step.
+- **r2's autofix** changed only `FORMAT` (8 steps), `UP017` (cp1) and `I001` (cp8); every second pass found nothing.
+- **Review items** (none `obvious_execution`, so `main-04` ran under the same lock): I1 coverage-minimum drives r2's fix cost (8 of 9 fix sessions, $0.182 of $0.195, 93%); I2 `test_checkpoint_2.py::test_allocation_list_ordering` flipped between grading and coverage at 4 r1 steps (audited in 18.11); I3 `python -m ruff` is not resolvable (once; the pack exposes only pytest and coverage as modules); I4 r2 keeps no pre-autofix tree, so its "safe fixes only" rests on the report's codes (an r1 replay of cp8 confirmed the fixers' behaviour); I5 the autofix totals are not comparable across arms (addressed in 18.11).
+- Signals (n=1, never cited): `solve_rate_errata` r1 0.125, r2 0.75; C 0.701 vs 0.949; S 59.7 vs 83.9; r2's fix sessions $0.195 / 1116 s, 81% of its $0.241; `gate.first_pass_clean_post_autofix_rate` 0 (every r2 first run refused, mostly for the coverage minimum).
+- **Record gap.** This section and 18.10 were written on 2026-10-08, after `main-04`, not between the two jobs as 14.7 to 17.7 were. Nothing changed between `smoke-4` and `main-04` (`main-04`'s `job.lock.json` is byte-identical to `smoke-4`'s), so no rule was broken, but the record was late.
+
+### 18.10 `main-04` and the answer to 18.2 (recorded 2026-10-08, after the run; explore signals, never cited)
+
+`main-04` ran under `0e597e33e8b4` (the same lock bytes as `smoke-4`) with 4 attempts per arm at concurrency 2, detached: 2026-10-08 00:48:10 to 02:11:16 UTC (1 h 23 min), **8 of 8 trials valid**, `trial_exception` null in all 8, no void arm, nothing rerun. Across 98 sessions: 0 transient retries, 0 continuations, 0 stalls, `total_test_commands_not_run` 0. Every probe passed at all 64 steps; the only integrity flag is `suppression-refused` (1 comment) in b00 r2. `per_step_reset` 0.99 to 1.67 s (p95 1.38 s), within the 2 s budget; `make perf-check` passes every phase with enough samples (5 phases `insufficient` at 8 samples). Assessment (`make experiment-assess ... CONCURRENCY=2` with `gate-effort@9` into `stores/python__forge__guardrails`, 02:14 to 03:46 UTC): 40 assessments, 0 provisional; 34 of 34 pre-fix snapshots graded; 64 of 64 offline coverage runs (0 errors, 59 parity-eligible). Analysis: `analysis/python__forge__guardrails/main-04/analysis.md`. The `main-03` side is `main-03` rescored with `gate-effort@9` (18.8).
+
+**18.2's answer: no.** r2's fix-session cost did not fall against `main-03`. A fall needed a lower mean on all three readings; only wall time is lower.
+
+| r2, mean per trial | `main-03` | `main-04` |
+|---|---|---|
+| `gate.total_fix_cost_usd` | 0.0977 | 0.0980 |
+| `gate.total_fix_wall_s` | 826 | 732 |
+| `gate.total_fix_rounds` | 8.5 | 8.5 |
+| Fix share of r2's cost | 68% | 70% |
+| r2 cost per trial (USD) | 0.1437 | 0.1392 |
+
+- Per trial, fix cost was $0.1005/0.1392/0.0750/0.0761 (`main-03`) and $0.0946/0.1481/0.0769/0.0723 (`main-04`), with 8/10/8/8 and 9/10/7/8 rounds. Most of the wall-time fall is b00 (1067 s to 668 s).
+- **Where the cost goes.** Refusals that included `TEST.coverage-minimum` started 6.0 fix sessions per trial (`main-03` 7.0), $0.0834 of $0.0980 (85%; `main-03` 89%, `smoke-4` 93%) and 615 of 732 s. By kind: `mixed` $0.0834 / 602 s (`main-03` $0.0941 / 788 s), `coverage_minimum` alone $0.0086 / 74 s (0), `tests` $0.0041 / 35 s ($0.0031 / 31 s), `complexity` $0.0019 / 21 s (0), `style` 0 ($0.0005 / 7 s). Autofix took `FORMAT` out of the mixed refusals, but the same sessions still start for the coverage minimum, failing tests and complexity. First-run coverage 75.8% (`main-03` 74.6%), step end 89.1% (88.2%).
+- **Possible losses** (direction only, read against 18.2's minimum effects; unpaired across jobs, and r1 also moved, so between-job variance confounds them): C 0.9365 to 0.9121 (−0.024, beyond 0.02); S 83.77 to 79.77 (−4.0, beyond 2.0); `solve_rate_errata` 0.4062 to 0.2812 (−0.125, equal to the minimum, not beyond), raw `solve_rate` 0.281 to 0.156; E 0.674 to 0.582, R 0.437 to 0.386, G 0.325 to 0.146. `gate.fix_round_correctness_delta` +0.012 to +0.018.
+- **Autofix and manipulation checks.** r2: one pass before each of its 66 gate runs, 32 passes changed code, every non-first pass changed nothing, 0 errors or fallbacks; codes fixed `FORMAT` 32, `I001` 5, `UP017` 3, `E306` 2, `F401` 1 (the safe fixes only, so I4 is not triggered); 0 `FORMAT`/`I001` refusals. `gate.first_pass_clean_post_autofix_rate` 0.031 (1 of 32 steps, b02 cp5): above 0 as 18.2 expected, barely. `first_pass_clean_except_tests_rate` 0 to 0.25. `gate.total_new_first_run_blocking_post_autofix_net` 31.5 (`main-03` `*_net` 43.5; raw 42.25: autofix removed 10.75 block-tier findings per trial, 10.5 of them style). Manipulation check separated, 32 of 32 steps clean at step end. r1: one dry run with a decided post-check at all 32 steps; every post-check still refused (r1 writes no tests).
+- **Reproducibility (r1 against `main-03`'s r1, never pooled).** `solve_rate_errata` 0.3125 to 0.25 (raw 0.125 to 0.25); C 0.9175 to 0.751; S 77.18 to 64.68; E 0.132 to 0.175; R 0.238 to 0.301; G 0.148 to 0.288; `gate.total_new_first_run_blocking_net` 61.5 to 74.5; cost $0.0348 to $0.0372; agent time 416 s to 258 s (not explained). One trial drives the C and S drop: b02's r1 agent broke the CLI argument order at cp3 and said in its final message that it had not fixed it (case pass rate 0 at cp3 to cp6; C 0.249, S 20.9). That is an agent fault, not a process defect (the stall wrapper correctly did not fire: the session changed files). Without b02, r1's C is 0.919 and S 79.3, in line with `main-03`.
+- **Verifier diagnostics.** r1 0 grading-vs-coverage disagreements, r2 7, all in b02 r2 at 5 parity-ineligible steps (`code-quality@3` left them out of G; G `ok` at every step). The known timing case flipped at cp2, cp4 and cp6 (grading passed, coverage failed). A new case, `test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide`, flipped at cp2, cp4, cp7 and cp8 in both directions; b02 r2's blueprint list sorts by name only (audited in 18.11). `smoke-4`'s I2 case did not flip.
+- **Other observations.** `python -m ruff` did not recur (I3: once in `main-03`, once in `smoke-4`). "No module named yaml" at cp8 in two trials (as in `main-03`; the agents fell back to their own parser). r2's gate wall time rose from 48 s to 124.5 s per trial, about 4 s of it autofix and the rest the gate's own test runs (inference: slower agent test suites).
+
+### 18.11 Amendment: the iteration 4 record (2026-10-08; assessment and report only, no job)
+
+Written after `main-04` (18.10) and before any further job. The execution identity stays **`0e597e33e8b4`**, so `smoke-4` and `main-04` still match the lock and are rescored, not rerun. No component, pack, gate, agent or primary changes.
+
+| | Iteration 4 (18.1) | Iteration 4 record |
+|---|---|---|
+| Gate-effort scorer | `gate-effort@9` | **`gate-effort@10`** |
+| Everything else, including the execution section of the lock | as 18.1 | unchanged |
+
+- **`gate-effort@10`** (smoke-4 I5; a measurement change, nothing problem-specific): every `@9` metric, value, status, reason and evidence item, plus per step `new_autofix_lines_changed`, `new_autofix_removed_blocking` and `new_autofix_removed_blocking.<family>`, with `total_*` sums. Each is the step's first autofix pass on its own work (enforced: the pass before gate run 1; shadow: the dry run) minus what the previous gated step left for autofix (enforced: 0 when the step's last pass completed, because the tree it handed on is the fixed one; shadow: its dry run, because the shadow tree is never fixed). The values are signed, as `gate-effort@6`'s `new_first_run_blocking`. A shadow arm's sum therefore telescopes to its last dry run's count, which compares with an enforced arm's sum of first passes. `@9`'s `total_autofix_*` re-count a shadow arm's never-fixed tree at every step. A failed pass makes its step, and an enforced step's successor, `unavailable` with its error type. A gate without autofix is `not_applicable`. Registered as `raidar.scorers.gate_effort_v10` (store-bound, like `@9`). The analysis, manipulation check, review gate view and pre-fix grading read `@10` first.
+- **Analysis (report only, not versioned by the lock).** The gate tables mark the totals that a shadow gate sums over its never-fixed tree (`total_first_run_blocking`, `total_autofix_rounds`, `_files_changed`, `_lines_changed`, `_removed_blocking` and its families) with "†", with a legend that names the cross-mode forms. The autofix family table shows "sum / new" under `@10`.
+- **Two more verifier sensitivities** (smoke-4 I2; main-04's new case). These were judged by the spec-determinacy audit rule (18.5), not by outcomes. `test_checkpoint_1.py::test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide`: the spec names `uuid` ascending as the final tie-breaker (`checkpoint_1/instruction.md:64`). The test rewrites both rows to the same `created_at` and `name`, so a program without the tie-break passes only when the random `uuid4`s happen to be in insertion order. `test_checkpoint_2.py::test_allocation_list_ordering`: the spec gives `created_at` ascending with ties broken by `uuid` ascending (`checkpoint_2/instruction.md:58`) at second precision (`:18`). Whether the two creates tie depends on timing, and the order within a tie depends on the random `uuid`s. Both are spec-determined, so neither is an erratum. They are added to `problems/registry/scb/forge/38d627ecf668.sensitivities.yaml` with a new kind, `randomness` (`raidar.problems.sensitivities.SensitivityKind`). The analysis lists them beside the disagreement count. Errata, pin and primary are unchanged, and no value changes.
+- **Upstream draft note.** `main-04`'s review (C1) said the sibling test that 18.5's draft points to is not deterministic either. That is not quite right. The sibling it names, `test_blueprint_list_name_tiebreak_when_created_at_collides`, is deterministic: it rewrites `created_at` and asserts on distinct names. The uuid tie-break test uses the same rewriting but leaves a tie that only random `uuid`s break. The draft now carries that qualification and a separate note for the two `uuid` cases (`docs/reboot/upstream/scb-forge-unspecified-assertions.md`).
+- **Launch provenance (the `main-04` review's process hardening).** A detached launch's `detach/launch.json` now records `git: {commit, dirty, error}` (`raidar.execution.detach.git_state`). From the next detached job on, "`make quality` passed at the job's commit" can be checked against the record rather than inferred from the reflog. This is runtime launcher code, outside the lock's execution identity and the spec digest; `job.json` is unchanged.
+- **Lock.** Only the `assessment` section moves (`gate-effort@9` → `@10`). `lock_sha256` stays `0e597e33e8b4`; the document moves `c19711ac463e` → `5f8405fa0a79`. No other lock moved. Released identities are untouched: `gate-effort@1`-`@9`, every component and the other scorers keep their digests.
+- **Rescore.** `main-04` (into `stores/python__forge__guardrails`) and `smoke-4` (into its scratch store) are rescored with `gate-effort@10` and reanalysed; 18.12 records the check. `main-03` is not rescored: its gate ran without autofix, so `@10`'s added values are `not_applicable` there.
+- **Not done here (needs a run or a design decision).** I3 (`python -m ruff`) changes the pack, which moves both arms' execution. I4 (a pre-autofix tree snapshot) is a new `guardrail-gate` version. The next lever on fix cost (the coverage minimum) is a new design. All three wait for a user decision and a new lock.
+
+### 18.12 Verification of the iteration 4 record (recorded 2026-10-08)
+
+- **Host tests:** `orchestrator/tests/test_gate_effort_v10_scorer.py` covers these cases:
+  - `@9`'s observations are kept, value for value, both with an autofix gate and without one.
+  - Enforced: the new counts are the first passes.
+  - Shadow: the new counts telescope to the last dry run.
+  - A failed shadow pass leaves its step and the next `unavailable`, and so does a failed last enforced pass.
+  - A gate without autofix is `not_applicable`.
+  - The analysis compares the new totals only for `@10`, marks the cumulative totals and shows "sum / new" in the family table.
+  - Every consumer reads `@10` first.
+  - Forge's two `uuid` cases are spec-determined `randomness` sensitivities, not errata.
+
+  `orchestrator/tests/test_detach_job.py` checks that `launch.json` names the commit and the dirty flag, and that a launch without git records why. The iteration 4 tests now find the timing case among three notes and check that `@9` is read before `@8`.
+- **Rescore** (`make experiment-assess ... SCORERS="correctness@1 code-quality@3 resource-usage@1 process-compliance@6 gate-effort@10" CONCURRENCY=2`, OrbStack):
+  - `main-04` into `stores/python__forge__guardrails`: 8 assessments added and 32 existing; 34 pre-fix grades and 64 offline coverage runs reused, 0 errors.
+  - `smoke-4` into `.tmp/smoke-4/store`: 2 added and 8 existing, 0 errors.
+  - In all 10 trials, every `gate-effort@9` observation (metric, subject, status, value, reason) equals `@10`'s. Each `@10` assessment adds 99 observations, all `ok`.
+- **Values** (mean per trial; `@9`'s summed counts in brackets):
+
+  | Job, arm | `total_new_autofix_lines_changed` | `total_new_autofix_removed_blocking` |
+  |---|---|---|
+  | `main-04` r1 | 396.25 (1604.25) | 9.0 (44.25) |
+  | `main-04` r2 | 379.75 (379.75) | 10.75 (10.75) |
+  | `smoke-4` r1 | 355 (1325) | 11 (45) |
+  | `smoke-4` r2 | 374 (374) | 10 (10) |
+
+  `smoke-4` r1's 355 equals its cp8 dry run, the telescoped value. In r2 the new counts equal the summed ones because every later pass changed nothing.
+- **Reanalysis.** Both analyses were re-run; `main-04`'s is at `analysis/python__forge__guardrails/main-04/analysis.md`. Compared with the `@9` analyses, the only differences are:
+  - the gate scorer named;
+  - the "†" marks and their legend;
+  - the new `total_new_autofix_*` rows (paired in `main-04`: lines −16.5 [−145, 112], findings +1.75 [−0.97, 4.47]; `insufficient`);
+  - the family table's "sum / new" cells;
+  - the two new sensitivity notes.
+
+  Every other line is identical, so every number in 18.9 and 18.10 stands.
+- **Released identities.** `gate-effort@1`-`@9` and every component are untouched; their modules are unchanged. `gate-effort@10` is new. Only this experiment's lock document moved (`c19711ac463e` → `5f8405fa0a79`; `lock_sha256` `0e597e33e8b4`). `make experiment-locks-check` passes.
+- `make quality` passes at the commit this record is in: 1752 tests passed and 11 skipped; coverage 96.17%; no lizard warnings; fan-out OK; every lock current; the second suite passed 84 tests.

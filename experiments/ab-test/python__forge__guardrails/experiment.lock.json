@@ -439,13 +439,13 @@
             "tool_lock": {}
           }
         },
-        "gate-effort@9": {
-          "digest": "7c73d88091d497a145dd3e4eb084c9963789185b73fc3c8eccf3d2b30a6897cd",
+        "gate-effort@10": {
+          "digest": "a74701e6cfd8067a8bf52a839f18533ef1a9b06765e7a0aa0ffc152c5872f9e3",
           "metadata": {
-            "implementation": "raidar.scorers.gate_effort_v9:gate_effort_v9_scorer",
-            "implementation_digest": "c8819a4e80069120cc150fb75c2b2f99bae425e2e2a50524f51cd8fe8e5e7821",
+            "implementation": "raidar.scorers.gate_effort_v10:gate_effort_v10_scorer",
+            "implementation_digest": "056d932cd9e19fb2b878682d0c18d5e3e5788c359b876e57ca9b3ceeac924dfc",
             "manifest": {
-              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@7: a failed tests check counted once, blocking counts that compare across gate modes with and without the mypy no-untyped-call cascade, failing tests and missed coverage apart, first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both), plus the cross-mode blocking counts without the cascade and with a refused suppression comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate. Plus a guardrail-gate@4 autofix step's effect: passes, errors, files and lines changed, block-tier findings fixed by family, first-pass clean and blocking counts after autofix (and before, comparable across an enforced and a shadow gate), and the fix sessions' cost and wall time split by the kind of refusal that started them (coverage minimum apart).",
+              "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@7: a failed tests check counted once, blocking counts that compare across gate modes with and without the mypy no-untyped-call cascade, failing tests and missed coverage apart, first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both), plus the cross-mode blocking counts without the cascade and with a refused suppression comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate. Plus a guardrail-gate@4 autofix step's effect: passes, errors, files and lines changed, block-tier findings fixed by family, first-pass clean and blocking counts after autofix (and before, comparable across an enforced and a shadow gate), and the fix sessions' cost and wall time split by the kind of refusal that started them (coverage minimum apart). Plus the autofix lines and block-tier findings that each step's own work added (new_autofix_*), which compare across an enforced and a shadow gate where the per-step autofix sums do not.",
               "evidence_required": [
                 "trace",
                 "oracle.cases",
@@ -2854,13 +2854,277 @@
                   "tier": "deterministic",
                   "type": "count",
                   "unit": null
+                },
+                {
+                  "description": "Lines the autofix changed that the step's own work added: the step's first autofix pass on its own work (enforced: the pass before gate run 1; shadow: the dry run on the copy) minus what the previous gated step left for autofix (enforced: 0 when the pass before its last gate run completed, the tree it handed on being already fixed; shadow: its dry run, since the shadow tree is never fixed); signed, as gate-effort@6's new_first_run_blocking. A shadow gate's per-step autofix counts re-count the whole never-fixed tree at every step, so their sums are cumulative; this form's sum telescopes to the final tree's count and compares with an enforced gate's.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_lines_changed",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added: the step's first autofix pass on its own work (enforced: the pass before gate run 1; shadow: the dry run on the copy) minus what the previous gated step left for autofix (enforced: 0 when the pass before its last gate run completed, the tree it handed on being already fixed; shadow: its dry run, since the shadow tree is never fixed); signed, as gate-effort@6's new_first_run_blocking. A shadow gate's per-step autofix counts re-count the whole never-fixed tree at every step, so their sums are cumulative; this form's sum telescopes to the final tree's count and compares with an enforced gate's.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the complexity family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.complexity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the typing family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.typing",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the defects family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.defects",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the structure family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.structure",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the style family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.style",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the naming family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.naming",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the tests family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.tests",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the suppressions family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.suppressions",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the other family (new_autofix_removed_blocking's rule).",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "new_autofix_removed_blocking.other",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Lines the autofix changed that the step's own work added: the step's first autofix pass on its own work (enforced: the pass before gate run 1; shadow: the dry run on the copy) minus what the previous gated step left for autofix (enforced: 0 when the pass before its last gate run completed, the tree it handed on being already fixed; shadow: its dry run, since the shadow tree is never fixed); signed, as gate-effort@6's new_first_run_blocking. A shadow gate's per-step autofix counts re-count the whole never-fixed tree at every step, so their sums are cumulative; this form's sum telescopes to the final tree's count and compares with an enforced gate's. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_lines_changed",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added: the step's first autofix pass on its own work (enforced: the pass before gate run 1; shadow: the dry run on the copy) minus what the previous gated step left for autofix (enforced: 0 when the pass before its last gate run completed, the tree it handed on being already fixed; shadow: its dry run, since the shadow tree is never fixed); signed, as gate-effort@6's new_first_run_blocking. A shadow gate's per-step autofix counts re-count the whole never-fixed tree at every step, so their sums are cumulative; this form's sum telescopes to the final tree's count and compares with an enforced gate's. Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the complexity family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.complexity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the typing family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.typing",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the defects family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.defects",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the structure family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.structure",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the style family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.style",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the naming family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.naming",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the tests family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.tests",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the suppressions family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.suppressions",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
+                },
+                {
+                  "description": "Block-tier findings the autofix fixed that the step's own work added, in the other family (new_autofix_removed_blocking's rule). Summed over the gated steps.",
+                  "direction": "neutral",
+                  "exactness": "native",
+                  "id": "total_new_autofix_removed_blocking.other",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": null
                 }
               ],
               "runtimes": [
                 "*"
               ],
               "tools": [],
-              "version": "9"
+              "version": "10"
             },
             "tool_lock": {}
           }
@@ -3220,7 +3484,7 @@
         "code-quality@3",
         "resource-usage@1",
         "process-compliance@6",
-        "gate-effort@9"
+        "gate-effort@10"
       ]
     },
     "tools": {
@@ -3232,7 +3496,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "c19711ac463ef012171944cfe866d186f1741b99dbfbbf0370eff211f403aa60",
+  "document_sha256": "5f8405fa0a796e89ec94383f279ecbdd013b5dbfa6f3d3ed923c769e1932802e",
   "execution": {
     "arms": {
       "r1-baseline": {
@@ -3626,8 +3890,8 @@
   "experiment": {
     "id": "python__forge__guardrails",
     "source": "experiment.yaml",
-    "source_sha256": "4155a467534acc34794eaf17b74bc9484eace6bbcae712c7c5d5d3b2c7f0179f",
-    "spec_sha256": "30543f93411272877e6c940c731043486200e64cfa87de8577d0ea3bf77581fe"
+    "source_sha256": "085a0d3afaadbc655297c7a2f103f13ccc907b012353a136c2efc7b10b2bfc5a",
+    "spec_sha256": "22f831db018918f8533dbf0ccdcb267f8d617b35baf7dea2bd2715096f0c2f7d"
   },
   "lock_sha256": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
   "lock_version": 3,
@@ -3637,7 +3901,7 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "07e337bcdd06e5ca68234a198e6a927ff2cb840eb48b42434433fa75a309d7a6",
+    "assessment": "1e1a58a95f88ce90450fc55dac8a7f2e30cb0228f16f889f98a9017a19b99ccf",
     "execution": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },
@@ -3702,7 +3966,7 @@
         "code-quality@3",
         "resource-usage@1",
         "process-compliance@6",
-        "gate-effort@9"
+        "gate-effort@10"
       ]
     },
     "conditions": [

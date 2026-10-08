@@ -8,7 +8,9 @@ about 90 s after launch that way). ``make experiment-execute DETACH=1`` runs
 1. resolves the job directory (``<jobs dir>/<experiment id>/<job id>``; a job
    id is generated when none is given) and refuses one that already exists;
 2. writes ``<job dir>/detach/launch.json`` (command, working directory, job id,
-   start time) and starts a supervisor in a new session (``setsid``
+   start time, and the git commit the job runs from with whether the tree was
+   dirty, so "``make quality`` passed at the job's commit" can be checked from
+   the record rather than inferred) and starts a supervisor in a new session (``setsid``
    semantics: no controlling terminal, its own process group), so a hang-up or
    the end of the launching session does not reach it;
 3. returns at once, printing the job directory, the supervisor's pid and how
@@ -87,6 +89,27 @@ class Launched:
     log: Path
 
 
+def git_state(cwd: Path) -> dict[str, Any]:
+    """The checkout's HEAD commit and whether its tree is dirty (provenance only).
+
+    Never fails a launch: outside a git checkout, or without git, the fields are null
+    and ``error`` says why.
+    """
+    git = shutil.which("git")
+    if git is None:
+        return {"commit": None, "dirty": None, "error": "git not found"}
+    try:
+        head = subprocess.run(  # noqa: S603 - fixed git arguments
+            [git, "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, check=True
+        )
+        status = subprocess.run(  # noqa: S603 - fixed git arguments
+            [git, "status", "--porcelain"], cwd=cwd, capture_output=True, text=True, check=True
+        )
+    except (OSError, subprocess.CalledProcessError) as exc:
+        return {"commit": None, "dirty": None, "error": f"{type(exc).__name__}: {exc}"}
+    return {"commit": head.stdout.strip(), "dirty": bool(status.stdout.strip()), "error": None}
+
+
 def _write_json(path: Path, payload: dict[str, Any]) -> None:
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
 
@@ -120,6 +143,7 @@ def launch(
             "cwd": str(workdir),
             "launched_at": _now(),
             "log": str(detach / LOG_FILE),
+            "git": git_state(workdir),
         },
     )
     supervisor = [sys.executable, "-m", "raidar.execution.detach", "supervise", str(detach), "--"]

@@ -104,6 +104,7 @@ QUALITY_SCORERS = CODE_QUALITY_REFS
 # tests check and the fix rounds' correctness.
 GATE_EFFORT_REF = "gate-effort@1"
 GATE_EFFORT_REFS = (
+    "gate-effort@10",
     "gate-effort@9",
     "gate-effort@8",
     "gate-effort@7",

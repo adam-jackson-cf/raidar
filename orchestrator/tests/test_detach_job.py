@@ -11,6 +11,8 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -24,6 +26,7 @@ from raidar.execution.detach import (
     PID_FILE,
     DetachError,
     experiment_id,
+    git_state,
     launch,
     main,
     status,
@@ -85,6 +88,7 @@ def test_a_detached_job_runs_in_its_own_session_and_records_how_it_ended(
     assert launched.job_dir == (tmp_path / "jobs" / EXPERIMENT_ID / "main-02").resolve()
     record = json.loads((detach / LAUNCH_FILE).read_text())
     assert record["command"][-1] == "JOB_ID=main-02"
+    assert set(record["git"]) == {"commit", "dirty", "error"}
     assert record["job_dir"] == str(launched.job_dir)
     _wait_for(detach / PID_FILE)
     running = status(launched.job_dir)
@@ -180,3 +184,38 @@ def test_the_experiment_id_names_the_job_dir_and_the_cli_reports_errors(
 
     assert code == 2
     assert "not a job directory" in capsys.readouterr().err
+
+
+def test_the_launch_record_names_the_commit_and_whether_the_tree_was_dirty(
+    tmp_path: Path,
+) -> None:
+    git = shutil.which("git")
+    if git is None:
+        pytest.skip("git is not installed")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    identity = {"NAME": "t", "EMAIL": "t@t"}
+    env = os.environ | {
+        f"GIT_{who}_{key}": v for who in ("AUTHOR", "COMMITTER") for key, v in identity.items()
+    }
+    for args in (["init", "-q"], ["commit", "-q", "--allow-empty", "-m", "c"]):
+        subprocess.run([git, *args], cwd=repo, check=True, env=env)  # noqa: S603
+    head = subprocess.run(  # noqa: S603
+        [git, "rev-parse", "HEAD"], cwd=repo, check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+    assert git_state(repo) == {"commit": head, "dirty": False, "error": None}
+    (repo / "new.txt").write_text("x")
+    assert git_state(repo) == {"commit": head, "dirty": True, "error": None}
+
+
+def test_a_launch_without_git_records_why_instead_of_failing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("raidar.execution.detach.shutil.which", lambda _name: None)
+    assert git_state(tmp_path) == {"commit": None, "dirty": None, "error": "git not found"}
+    monkeypatch.undo()
+    monkeypatch.setattr("raidar.execution.detach.shutil.which", lambda _name: "/nonexistent/git")
+    failed = git_state(tmp_path)
+    assert (failed["commit"], failed["dirty"]) == (None, None)
+    assert "FileNotFoundError" in failed["error"]

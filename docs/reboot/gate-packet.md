@@ -1465,18 +1465,76 @@ Each iteration was pre-registered (rationale amendment and relock committed) bef
 
 The process is stable: four consecutive clean smokes, a valid 8-trial main job with no voids, retries or budget breaches, and no `ineligible` quality reads. The next step is a decision for you: (a) move this experiment from explore to a **confirm** run sized from `main-03`'s sample-size projection (about 18 to 33 pairs per arm, roughly $3 to $6 of model spend and 7.5 to 14 hours of trials at concurrency 2, plus assessment) under the unchanged lock (no further design change), or (b) first run one more explore iteration on fix cost (question 2), for example a separate arm that applies the formatter before the gate, which would be a new condition and lock. Option (a) is the smaller step and answers question 1; (b) changes the treatment and would restart the smoke-then-main cycle.
 
-## 18. Explore iteration 4: implemented and locked (2026-10-07; no job yet)
+## 18. Explore iteration 4: gate autofix, `smoke-4` and `main-04` (2026-10-07 to 2026-10-08)
 
-Your decision (2026-10-07): option (b) of 17.5, one more explore iteration on fix-session cost before any confirm job. Full pre-registration: `experiments/ab-test/python__forge__guardrails/rationale.md` §18 (lock `0e597e33e8b4`).
+Your decision (2026-10-07): option (b) of 17.5, one more explore iteration on fix-session cost before any confirm job. These are exploratory signals only: 4 pairs is below `min_pairs` 5, so every verdict reads `insufficient` by design. The agent was `codex` 0.156.1 with `gpt-6-luna` at low effort, on OrbStack only. Full record: `experiments/ab-test/python__forge__guardrails/rationale.md` §18. Pre-registration is in §18.1 to §18.8 (lock `0e597e33e8b4`, commit `477b083`). `smoke-4` is in §18.9, `main-04` and the answer in §18.10, and the post-run assessment record in §18.11 and §18.12. `main-04` analysis: `analysis/python__forge__guardrails/main-04/analysis.md`.
 
-| Piece | Iteration 3b.5 (`main-03`) | Iteration 4 |
+### 18.1 Design
+
+| Piece | Iteration 3b.5 (`main-03`) | Iteration 4 (`smoke-4`, `main-04`) |
 |---|---|---|
-| Pack (both arms) | `python-guardrails@7` | `python-guardrails@8`: `@7` plus `guardrail-check --autofix` (ruff format and Ruff's safe fixes only, protected config, scope files only, atomic, reported) |
-| r2 gate (enforced) | `guardrail-gate@3` commit | `guardrail-gate@4` commit with `autofix_before_check`: autofix before every commit check, re-staged, then `@3`'s commit and hook; a failed pass is typed and falls back to `@3` |
-| r1 gate (shadow) | `guardrail-gate@3` shadow | `guardrail-gate@4` shadow with autofix on a throwaway copy; the fixed copy's check recorded beside the raw one; `/app` byte-identical |
-| Gate-effort scorer | `gate-effort@8` | `gate-effort@9`: autofix passes, counts after and before autofix, fix cost and wall by refusal kind |
+| Pack (both arms) | `python-guardrails@7` | `python-guardrails@8`: `@7` plus `guardrail-check --autofix`. It runs ruff format and Ruff's safe fixes only, with the protected config, on scope files only. It is atomic and reported. |
+| r2 gate (enforced) | `guardrail-gate@3` commit | `guardrail-gate@4` commit with `autofix_before_check`. Autofix runs before every commit check and the result is re-staged; then come `@3`'s commit and hook. A failed pass is typed and falls back to `@3`. |
+| r1 gate (shadow) | `guardrail-gate@3` shadow | `guardrail-gate@4` shadow, with autofix on a throwaway copy. The fixed copy's check is recorded beside the raw one, and `/app` stays byte-identical. |
+| Gate-effort scorer | `gate-effort@8` | `gate-effort@9`, then `gate-effort@10` after the runs (assessment only; 18.5) |
 
-- **Question (pre-registered):** does r2's fix-session cost (USD, wall, rounds) fall against `main-03` with no loss in correctness or quality? r1 against `main-03`'s r1 is a reproducibility check, side by side, never pooled. Primary unchanged (`solve_rate_errata`, raw beside it).
-- **Measured before any run** (`gate-effort@9` on `main-03`'s records in a scratch store; rationale §18.8): of r2's 8.5 fix sessions per trial, 7 started from a refusal that included `TEST.coverage-minimum`, about $0.087 of the $0.098 and 687 of the 826 s; most refusals mixed families (no refusal was the coverage minimum alone). The autofix removes `FORMAT`/`I001` from those refusals but not the coverage minimum, so a large drop in fix cost is not expected from autofix alone; the iteration will show how much it removes.
-- **Verifier timing case** (`test_blueprint_list_orders_by_created_at_name_uuid`): the specification determines the order, so it is not an erratum; it is recorded as a known verifier sensitivity, shown in the analysis beside the grading-vs-coverage disagreement count, with an upstream draft note (not filed). Errata, pin and primary unchanged.
-- **Next:** `smoke-4` (1 trial per arm) against rationale §18.3, then `main-04` (4 attempts per arm) only if clean.
+Pre-registered question: does r2's fix-session cost (USD, wall time and rounds) fall against `main-03`, with no loss in correctness or quality? A fall counts only when all three means are lower. r1 against `main-03`'s r1 is a reproducibility check. Neither comparison is ever pooled. Primary: `solve_rate_errata`, with raw `solve_rate` beside it.
+
+### 18.2 `smoke-4` (1 trial per arm; the 18.3 process check)
+
+- **Clean against every pre-registered criterion** (rationale 13.3 to 16.4 and 18.3). 2 of 2 trials valid. Probes passed at 16 of 16 steps, with the autofix smoke run each time. r2 ran one `apply` pass before each of its 17 gate runs; r1 ran one `dry_run` with a decided post-check at each step. There were 0 autofix errors and 0 `FORMAT`/`I001` refusals. r1's `/app` was untouched. The assessment had 0 errors.
+- **Signal:** autofix removed the formatting refusals, but every r2 first run was still refused, mostly for the coverage minimum. Coverage-minimum refusals drove 93% of r2's fix cost ($0.182 of $0.195).
+- No item needed an execution change, so `main-04` ran under the same lock bytes.
+
+### 18.3 `main-04` against `main-03`: the answer is no
+
+`main-04` produced 8 of 8 valid trials, from 00:48 to 02:11 UTC (1 h 23 min at concurrency 2). Across 98 sessions there were 0 retries, 0 stalls and 0 continuations. Probes passed at 64 of 64 steps, `per_step_reset` p95 was 1.38 s and there were 0 gate errors. r2 was clean at step end at 32 of 32 steps (manipulation check separated). Assessment: 34 pre-fix grades and 64 offline coverage runs, with 0 errors.
+
+| r2, mean per trial | `main-03` | `main-04` |
+|---|---|---|
+| Fix cost USD | 0.0977 | 0.0980 |
+| Fix wall s | 826 | 732 (mostly one trial: b00 1067 → 668) |
+| Fix rounds | 8.5 | 8.5 |
+| Fix share of r2's cost | 68% | 70% |
+| Fix cost from refusals including `TEST.coverage-minimum` | $0.087 (89%) | $0.083 (85%) |
+| `gate.first_pass_clean_post_autofix_rate` | 0 (`first_pass_clean_rate`) | 0.031 (1 of 32 steps) |
+| Correctness C | 0.9365 | 0.9121 |
+| Headline S | 83.77 | 79.77 |
+| `solve_rate_errata` (raw) | 0.406 (0.281) | 0.281 (0.156) |
+| E / R / G | 0.674 / 0.437 / 0.325 | 0.582 / 0.386 / 0.146 |
+| `gate.fix_round_correctness_delta` | +0.012 | +0.018 |
+
+- **Answer to the pre-registered question: no.** Fix USD and fix rounds did not fall; only wall time fell. Autofix did what it was built to do: it fixed only the expected safe codes (`FORMAT` 32, `I001` 5, `UP017` 3, `E306` 2, `F401` 1), never errored, and left 0 `FORMAT`/`I001` refusals. It removed 10.75 block-tier findings per trial, almost all style. But the same fix sessions still start, for the coverage minimum, for failing tests and for complexity. First-run coverage is 75.8% against the 85% minimum.
+- **Possible losses** (direction only, read against the pre-registered minimum effects). C fell by 0.024 (the minimum is 0.02), S by 4.0 (minimum 2.0), and `solve_rate_errata` by 0.125 (equal to its minimum, not beyond it). These are unpaired readings across two jobs. r1 also moved a lot between the jobs, so between-job variance confounds them, and they are not evidence that autofix caused a loss.
+- **r1 reproducibility.** C went from 0.918 to 0.751 and S from 77.2 to 64.7. One trial drives both: b02's agent broke the CLI argument order at cp3 and left it broken, an agent fault rather than a process defect. Without b02, r1's C is 0.919 and S is 79.3, as in `main-03`. Cost per trial was $0.035 in `main-03` and $0.037 in `main-04`.
+- **Within `main-04` (paired, r2 vs r1).** `solve_rate_errata` 0.281 vs 0.25; C 0.912 vs 0.751; S 79.8 vs 64.7. Cost per trial is $0.139 vs $0.037.
+- **Autofix volume across modes** (`gate-effort@10`, 18.5). Each step's own work needed about the same amount of autofixing in both arms: 380 lines and 10.75 block-tier findings per trial in r2, against 396 and 9.0 in r1. `@9`'s summed counts showed 1604 and 44.25 for r1, because they re-counted r1's never-fixed tree at every step.
+
+### 18.4 Process and verifier findings
+
+- **Every process check held** in both jobs (above). The only record gap: the `smoke-4` check and the `main-04` results were written into rationale §18 after `main-04`, not between the jobs. Nothing changed between the jobs (byte-identical `job.lock.json`), so no rule was broken. They are now recorded in §18.9 and §18.10.
+- **Two more grader cases depend on chance.** `test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide` flipped at 4 steps of `main-04`'s b02 r2, whose blueprint list sorted by name only. `test_allocation_list_ordering` flipped at 4 steps of `smoke-4`'s r1. By the spec-determinacy audit rule, the specification determines both orders, with `uuid` as the tie-breaker. Neither is an erratum. On a program without the `uuid` tie-break, their verdict depends on the random `uuid4` values, and for the allocation test on timing as well. They are recorded as known verifier sensitivities of a new kind, `randomness`. No value changes, `code-quality@3` already leaves flipped cases out of G, and correctness and the solve rates read the grading run.
+- `python -m ruff` (smoke-4 I3) did not recur in `main-04`. "No module named yaml" at cp8 appeared in two trials, as in `main-03`; the agents fell back to their own parser.
+
+### 18.5 Applied after the runs (assessment and report only; no job; rationale §18.11 and §18.12)
+
+- **`gate-effort@10`** (smoke-4 I5) adds `new_autofix_lines_changed` and `new_autofix_removed_blocking` (by family): each step's first autofix pass minus what the previous step left for autofix. These compare across a shadow and an enforced gate. The analysis now marks the summed totals that a shadow gate re-counts with "†", including `total_first_run_blocking`. The lock's assessment section moved (document `c19711ac463e` → `5f8405fa0a79`); execution `0e597e33e8b4` is unchanged. `main-04` and `smoke-4` were rescored, with every `@9` observation identical in `@10`.
+- **Sensitivities and upstream note.** The two cases above were added to `problems/registry/scb/forge/38d627ecf668.sensitivities.yaml`. The upstream draft (not filed) gains a qualification of its timing suggestion and a note on the two `uuid` cases.
+- **Launch provenance.** A detached launch now records the git commit and a dirty-tree flag in `detach/launch.json`. "`make quality` passed at the job's commit" can then be checked from the record rather than inferred.
+
+### 18.6 Open needs-more-data questions
+
+1. **Coverage minimum and fix cost.** Coverage-minimum refusals drive 85 to 93% of r2's fix cost in three jobs (`main-03`, `smoke-4`, `main-04`). The agent first learns of the 85% minimum from a refusal. Any lever here is a new design: telling the work session (guidance rung), or changing the minimum (a treatment change).
+2. **Did autofix cost correctness or quality?** The possible losses in 18.3 are unpaired across jobs and confounded by r1's own movement. Only a paired design can answer this, for example an arm with `guardrail-gate@3` beside `@4` under one lock.
+3. **`python -m ruff`** (I3): seen once in `main-03`, once in `smoke-4` and 0 times in `main-04`. Fixing it changes the pack, and so both arms' execution.
+4. **Pre-autofix tree for r2** (I4): `main-04` showed only the expected codes, so nothing calls for it now.
+5. **Primary effect size.** `main-04`'s sample-size projection needs about 23 pairs for `solve_rate_errata` at δ 0.125. Its correctness and headline projections are inflated by b02's r1 outlier (SD 0.35). `main-03`'s projection was 18 pairs (`solve_rate_errata`), 33 (C) and 55 (S).
+
+### 18.7 Recommended next step, and whether the process is ready for CONFIRM
+
+- **The process is ready.** Iteration 4's exact design (execution `0e597e33e8b4`, assessment with `gate-effort@10`) has a clean smoke and a clean 8-trial explore job. It has had no voids, retries, stalls, budget breaches, assessment errors or `ineligible` quality reads. Nothing Raidar-side touching the experiment is pending unless you choose to act on 18.6 items 1 to 3. The `gate-effort@10` change is assessment-only, and both jobs have been rescored under it.
+- **The treatment question is not settled.** Iteration 4 did not reduce fix cost (the pre-registered answer is no). Autofix is neutral on cost and its effect on correctness is unknown (18.6 item 2). A confirm run now would test iteration 4's r2 against r1 as it stands.
+- **Options:**
+  - **(a) Confirm iteration 4 as it stands.** Pre-register in the rationale the primary, the thresholds and about 23 pairs per arm, from `main-04`'s projection. Run it under the unchanged lock. Rough cost: about $4 of model spend for the 19 additional pairs (the projection's figure), and at `main-04`'s pace about 6.5 hours of trials at concurrency 2 (about 8 hours for all 23 pairs), plus assessment.
+  - **(b) One more explore iteration on the coverage minimum** (18.6 item 1). For example, a guidance-rung component version that states the minimum to the work session in both arms or in r2 only, as you prefer. This is a new lock, `smoke-5`, then `main-05`, at about the cost of `main-04` (about $0.71 and 1.5 hours plus assessment).
+- **Recommendation: (b), then confirm.** Fix-session cost is still 70% of r2's cost and is driven by a rule the agent cannot see until it is refused, so the treatment is likely to change again. Confirming iteration 4 now would spend a confirm budget on a design that is about to change. If you would rather have conclusive evidence on the current design first, (a) is ready to pre-register.

@@ -39,6 +39,7 @@ from raidar.scorers.gate_effort_manifests import (
     GATE_EFFORT_V7,
     GATE_EFFORT_V8,
     GATE_EFFORT_V9,
+    GATE_EFFORT_V10,
 )
 from raidar.scorers.gate_effort_v9.manifest import REFUSAL_KINDS
 from raidar.scorers.process_manifests import (
@@ -396,13 +397,33 @@ _GATE_OUTCOMES: tuple[tuple[str, str, float], ...] = (
         "wall time of the fix sessions whose refusal included the coverage minimum",
         60.0,
     ),
+    # gate-effort@10: the autofix counts each step's own work added (they compare across gate
+    # modes; a shadow gate's total_autofix_* re-count its never-fixed tree at every step).
+    (
+        "total_new_autofix_lines_changed",
+        "autofix lines each step's own work added per trial (cross-mode)",
+        5.0,
+    ),
+    (
+        "total_new_autofix_removed_blocking",
+        "autofix block-tier findings each step's own work added per trial (cross-mode)",
+        2.0,
+    ),
+    *(
+        (
+            f"total_new_autofix_removed_blocking.{family}",
+            f"autofix block-tier findings each step's own work added: {family}",
+            1.0,
+        )
+        for family in FAMILIES
+    ),
 )
 GATE_METRICS: tuple[MetricDef, ...] = tuple(
     MetricDef(
         f"{GATE_PREFIX}{metric}",
         f"Gate effort: {label}",
         View.GATE,
-        declared_direction(GATE_EFFORT_V9, metric),
+        declared_direction(GATE_EFFORT_V10, metric),
         min_effect,
     )
     for metric, label, min_effect in _GATE_OUTCOMES
@@ -443,6 +464,27 @@ _GATE_V9_ONLY = frozenset(
 )
 
 
+_GATE_V10_ONLY = frozenset(
+    f"{GATE_PREFIX}{metric.id}"
+    for metric in GATE_EFFORT_V10.metrics
+    if metric.id not in {m.id for m in GATE_EFFORT_V9.metrics}
+)
+CROSS_MODE_CUMULATIVE = frozenset(
+    f"{GATE_PREFIX}{metric}"
+    for metric in (
+        "total_first_run_blocking",
+        "total_autofix_rounds",
+        "total_autofix_files_changed",
+        "total_autofix_lines_changed",
+        "total_autofix_removed_blocking",
+        *(f"total_autofix_removed_blocking.{family}" for family in FAMILIES),
+    )
+)
+"""Gate totals a shadow gate sums over its never-fixed tree at every step (an enforced gate's
+over each step's new work), so a shadow arm's value is not comparable with an enforced arm's.
+The analysis keeps them but marks them; the cross-mode forms are ``total_new_*``."""
+
+
 def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
     """The gate outcomes a gate-effort version reports.
 
@@ -450,20 +492,30 @@ def gate_metrics_for(ref: str | None) -> tuple[MetricDef, ...]:
     the typing cascade and the split first-run tests outcomes; ``@7`` the first-pass rates
     that ignore auto-fixable codes or the tests check, and the cascade-free counts; ``@8``
     the counts that also count a refused suppression comment once (``*_net``); ``@9`` the
-    autofix step, the counts after and before it, and the fix cost by refusal kind.
+    autofix step, the counts after and before it, and the fix cost by refusal kind; ``@10``
+    the autofix counts each step's own work added (``total_new_autofix_*``).
     """
-    if ref == "gate-effort@9":
+    if ref == "gate-effort@10":
         return GATE_METRICS
-    if ref == "gate-effort@8":
-        left_out = _GATE_V9_ONLY
+    if ref == "gate-effort@9":
+        left_out = _GATE_V10_ONLY
+    elif ref == "gate-effort@8":
+        left_out = _GATE_V9_ONLY | _GATE_V10_ONLY
     elif ref == "gate-effort@7":
-        left_out = _GATE_V8_ONLY | _GATE_V9_ONLY
+        left_out = _GATE_V8_ONLY | _GATE_V9_ONLY | _GATE_V10_ONLY
     elif ref == "gate-effort@6":
-        left_out = _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY
+        left_out = _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY | _GATE_V10_ONLY
     elif ref in {"gate-effort@4", "gate-effort@5"}:
-        left_out = _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY
+        left_out = _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY | _GATE_V10_ONLY
     else:
-        left_out = _GATE_V4_ONLY | _GATE_V6_ONLY | _GATE_V7_ONLY | _GATE_V8_ONLY | _GATE_V9_ONLY
+        left_out = (
+            _GATE_V4_ONLY
+            | _GATE_V6_ONLY
+            | _GATE_V7_ONLY
+            | _GATE_V8_ONLY
+            | _GATE_V9_ONLY
+            | _GATE_V10_ONLY
+        )
     return tuple(metric for metric in GATE_METRICS if metric.id not in left_out)
 
 

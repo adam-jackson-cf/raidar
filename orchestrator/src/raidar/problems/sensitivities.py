@@ -3,12 +3,13 @@
 An erratum (``raidar.problems.errata``) is a case the specification does not
 determine; it changes what ``*_errata`` outcomes count. A *sensitivity* is the
 opposite kind of note: the specification does determine the behaviour, but the
-hidden test's verdict can depend on something besides the program, such as
-wall-clock timing, so it may pass a wrong program (or fail a right one) by
-chance. It is never an erratum and never changes a value: it is a typed note the
-analysis shows beside the grading-vs-coverage disagreement count (code-quality@3's
-``regression_parity_excluded_cases``), so a reader can tell a flipped case that is
-a known timing sensitivity from an unexplained one.
+hidden test's verdict can depend on something besides the program's
+behaviour, such as wall-clock timing or the random values it generates, so it
+may pass a wrong program (or fail a right one) by chance. It is never an
+erratum and never changes a value: it is a typed note the analysis shows beside
+the grading-vs-coverage disagreement count (code-quality@3's
+``regression_parity_excluded_cases``), so a reader can tell a flipped case that
+is a known sensitivity from an unexplained one.
 
 The file is committed beside the problem's manifest; it is not pinned by a lock
 because nothing it says enters a value.
@@ -31,7 +32,12 @@ SCHEMA = "raidar.problem-sensitivities/1"
 
 
 class SensitivityKind(StrEnum):
+    """What besides the program the verdict can depend on."""
+
     TIMING = "timing"
+    """Wall-clock timing (for example whether calls land in the same second)."""
+    RANDOMNESS = "randomness"
+    """Random values the program itself generates (for example uuid4 order on a tie)."""
 
 
 class SensitivityError(ValueError):

@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased - guardrails iteration 4 record: smoke-4, main-04 and gate-effort@10
+
+### Added
+
+- `gate-effort@10` (`raidar.scorers.gate_effort_v10`, store-bound) is `@9` plus `new_autofix_lines_changed` and `new_autofix_removed_blocking` (in total and by family), with `total_*` sums. Each value is the step's first autofix pass minus what the previous gated step left for autofix: 0 for an enforced gate, whose tree was fixed, and the previous dry run for a shadow gate. Unlike `@9`'s summed autofix counts, which re-count a shadow gate's never-fixed tree at every step, these compare across gate modes. The analysis, manipulation check, review gate view and pre-fix grading read `@10` first.
+- Verifier sensitivity kind `randomness`. `scb/forge@38d627ecf668` adds `test_blueprint_list_uuid_tiebreak_when_created_at_and_name_collide` and `test_allocation_list_ordering`. Both are spec-determined, so not errata; on a program without the `uuid` tie-break, their verdict depends on random `uuid4` order. The upstream draft note gains a qualification and a note on these two cases.
+- A detached launch's `detach/launch.json` records `git: {commit, dirty, error}`, so the commit a job ran from, and whether its tree was clean, are on record.
+
+### Changed
+
+- The analysis marks the gate totals that a shadow gate sums over its never-fixed tree with "†" and a legend: `total_first_run_blocking` and `total_autofix_rounds`/`_files_changed`/`_lines_changed`/`_removed_blocking`. Under `@10` the autofix family table shows "sum / new".
+- `python__forge__guardrails` now uses scorer `gate-effort@10`. Only the lock's assessment section moved (document `c19711ac463e` → `5f8405fa0a79`); execution `0e597e33e8b4` is unchanged. `smoke-4` and `main-04` were rescored with every `@9` observation unchanged.
+- `rationale.md` gains four sections. §18.9 records the `smoke-4` process check, which was clean. §18.10 records `main-04` (8 of 8 valid) and the answer to §18.2: no. r2's fix cost was $0.098 against `main-03`'s $0.098, with 8.5 rounds in both; only wall time fell, from 826 s to 732 s. The coverage minimum drives 85% of fix cost. §18.11 and §18.12 record this amendment and its verification. `docs/reboot/gate-packet.md` §18 summarises the iteration and gives the recommended next step.
+
 ## Unreleased - guardrails explore iteration 4
 
 ### Added

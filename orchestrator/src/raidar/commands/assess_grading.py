@@ -43,6 +43,7 @@ PRE_FIX_GRADE_SCORERS = frozenset(
         "gate-effort@7",
         "gate-effort@8",
         "gate-effort@9",
+        "gate-effort@10",
     }
 )
 # Scorers that read the offline coverage runs of steps whose trial deferred the coverage pass.
