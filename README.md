@@ -192,15 +192,26 @@ make smoke-agents                                         # one trial per pack a
 make smoke-agents SMOKE_ARM=codex                         # one arm only
 ```
 
+Before a non-smoke job runs, `make experiment-execute` looks for a clean smoke job on the same code, pack, agents and target, and refuses without one (`ALLOW_UNSMOKED=1` overrides; recorded in `job.json`). `experiments/smoke/python__forge__mechanics-v1/` is the multi-checkpoint forge smoke for that purpose.
+
+## Run health, pooling and the fault ledger
+
+Every trial writes `health.json`: verdict, record, limit, liveness, contention and tamper checks, each `pass`, `violation` or `unmeasured`. A verdict, record/limit or tamper violation invalidates the trial; `make health JOB=<job dir>` recomputes it, and violations land as provisional lines in `<job>/fault-candidates.jsonl`. A host-side liveness monitor (`RAIDAR_LIVENESS=observe` by default) records whether the agent produced output, CPU or network in each phase; it never kills a trial unless set to `enforce`.
+
+`job.json` records the runner commit and toolchain hash, pack and grader recipe digests, effective limits and the execution target. `make experiment-analyze` pools several jobs only when these match (`POOL_OVERRIDE=<field>[,<field>]` lifts a named refusal, recorded in the analysis; a records-manifest mismatch never lifts).
+
+`ledger/` tracks fault categories (`faults/FCR-NNN.md`) and remedies (`remedies/M-NNN.md`); `make ledger-index` regenerates `ledger/README.md` and `make ledger-check` (part of `make quality`) validates the records.
+
 Make variables follow the vocabulary: `JOB`, `JOBS`, `JOB_ID`, `JOBS_DIR`, `AGENT`, `AGENT_VERSION`, `ATTEMPT`, `SMOKE_ATTEMPTS`, `VERIFIER_BUNDLE`, `REVIEW_JOBS_ROOT`, `QUALITY_JOBS`, `ALLOW_DEV_JOBS`. A variable under its old name (`RUN=`, `HARNESS=`, `BLOCK=`, ...) fails with its new name.
 
 ## Repository layout
 
-- `orchestrator/`: the `raidar` CLI and library (`spec`, `problems`, `packs`, `components`, `execution`, `verifier`, `scorers`, `jev`, `analysis`, `review_projection`, `review_quality`). `raidar/oracle/` holds only `snapshot.py`, a frozen fingerprint source of the released review-loop components.
+- `orchestrator/`: the `raidar` CLI and library (`spec`, `problems`, `packs`, `components`, `targets`, `execution`, `verifier`, `scorers`, `ledger`, `jev`, `analysis`, `review_projection`, `review_quality`). `raidar/oracle/` holds only `snapshot.py`, a frozen fingerprint source of the released review-loop components.
+- `ledger/`: the tracked fault and remedy ledger.
 - `experiments/<kind>/<id>/`: experiment definitions with their locks and component files (the Phase 1 pilot ab-tests, the smoke experiment and the agent benchmark). Files under `experiments/**/components/` are treatment content delivered to agents. Legacy data some checkouts keep under `experiments/` (`research_loops/`, `operational_smoke/`) is git-ignored.
 - `problems/`: the pinned problem registry (tracked), plus the imported store and source cache (local).
 - `review-surface/`: the review UI, its frozen projection contract and its Playwright suite.
 - `jobs/`, `stores/`, `analysis/`: local job directories, Assessment stores and analysis output, ignored by git.
 - `docs/reboot/`: the requirements, plan, ADR, overhead baseline, design memo, the Phase 1 gate packet, and the tracked Phase 0 spike evidence (`evidence/`).
 
-`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `experiments/*/*/*.lock.json` is current), then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`. Docker-backed tests stay opt-in and are skipped there; the N1 overhead gate (`make perf-gate`) is run separately as a release/gate check.
+`make quality` is the repository gate: `make smoke-dry-run-check` (the smoke command shapes), `make experiment-locks-check` (every `experiments/*/*/*.lock.json` is current), `make ledger-check`, then ruff, import contracts, lizard, mypy over `orchestrator/src/raidar`, fan-out, and the full test suite with coverage. The pre-push hook runs `make quality`. Docker-backed tests run when a Docker target is ready; the N1 overhead gate (`make perf-gate`) is run separately as a release/gate check.
