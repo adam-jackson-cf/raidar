@@ -335,6 +335,7 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "harbor",
         "init",
         "jev",
+        "ledger",
         "lock",
         "migrate-job",
         "pack",

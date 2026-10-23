@@ -108,6 +108,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate \
+	ledger-check ledger-index \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
 	jev-export-labels jev-import-labels jev-export-blind jev-import-blind \
@@ -178,6 +179,8 @@ help:
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
 	@echo "  make experiment-locks-check                           Fail unless every experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
+	@echo "  make ledger-check                                     Check ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
+	@echo "  make ledger-index                                     Regenerate ledger/README.md from the records"
 	@echo "  make experiment-upgrade EXPERIMENT=<v1 file> KIND=ab-test|benchmark|smoke EXPERIMENT_ID=<runtime>__<subject>__<intent> OUT=<file>"
 	@echo "                                                        Write the schema v2 form of a read-only schema v1 experiment"
 	@echo "  make experiment-migrate-job JOB=<legacy job dir> LOCK=<v2 lock> [EXECUTED_LOCK=<lock>]"
@@ -429,6 +432,12 @@ experiment-locks-check:
 	@$(if $(EXPERIMENT_LOCKS),,$(error no experiment locks found under experiments/))
 	@$(foreach lock,$(EXPERIMENT_LOCKS),$(RAIDAR) lock "$(patsubst %.lock.json,%.yaml,$(lock))" --check --ignore-host-python &&) true
 
+ledger-check:
+	@$(RAIDAR) ledger check
+
+ledger-index:
+	@$(RAIDAR) ledger index
+
 experiment-upgrade:
 	$(call require_var,EXPERIMENT)
 	$(call require_var,KIND)
@@ -659,5 +668,6 @@ smoke-agents: docker-check pack-build
 quality:
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory experiment-locks-check
+	@$(MAKE) --no-print-directory ledger-check
 	@$(RAIDAR_DEV) quality gates
 	@cd orchestrator && uv run --project . --extra dev python -m lizard -C 10 -l python src

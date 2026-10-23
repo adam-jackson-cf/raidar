@@ -130,6 +130,21 @@ forbidden_modules =
     raidar.commands
     raidar.cli
 
+[importlinter:contract:ledger-boundary]
+name = Ledger stays independent of every other raidar layer
+type = forbidden
+source_modules =
+    raidar.ledger
+forbidden_modules =
+    raidar.agents
+    raidar.analysis
+    raidar.commands
+    raidar.components
+    raidar.execution
+    raidar.scorers
+    raidar.spec
+    raidar.cli
+
 [importlinter:contract:deterministic-process-checks]
 name = process-compliance@2 decides only deterministically: no Jev import, direct or indirect
 type = forbidden

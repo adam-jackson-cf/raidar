@@ -45,5 +45,7 @@ locked but not executed.
 5. `make experiment-validate`, `make experiment-lock`, then
    `make experiment-lock LOCK_CHECK=1` and `make experiment-plan` with the same
    `EXPERIMENT=`. Confirm the incumbent's condition digest.
-6. Move the targeted records to `targeted`, naming the experiment.
+6. Record the proposal as an `M-NNN` remedy (`faults`, `lever`, `home`, `proof_plan`,
+   `experiment` = the locked path), then move the targeted faults to `targeted`,
+   naming the experiment, and run `make ledger-index && make ledger-check`.
 7. Do not run `make experiment-execute`; execution is a separate decision.

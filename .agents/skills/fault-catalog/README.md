@@ -56,11 +56,11 @@ Refined in the port:
 
 Still needs refining:
 
-- **Catalog location.** SCB keeps the catalog in `experiment_analysis/`. Raidar
-  has no tracked home for it: `analysis/` is gitignored and `docs/` needs user
-  consent to read. Iteration 1 wrote a single-document catalog to
-  `docs/reboot/pilot-v2-fault-catalog.md`. A tracked location (and whether
-  records are files or sections) is a user decision.
+- **Catalog location.** The tracked home is `ledger/` (`ledger/faults/`,
+  `ledger/remedies/`, generated `ledger/README.md`), checked by
+  `make ledger-check`. Iteration 1's single-document catalog,
+  `docs/reboot/pilot-v2-fault-catalog.md`, predates it and is not migrated
+  except for the faults still open, which are seeded in the ledger.
 - **Tooling.** The failure classification and the per-arm counts were done with
   ad hoc scripts over `raidar-oracle/steps/*/record.json` and `grading.log`. A
   `make` target that emits a per-case failure matrix (case, origin checkpoint,

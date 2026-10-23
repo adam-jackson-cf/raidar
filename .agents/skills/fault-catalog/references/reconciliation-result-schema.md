@@ -46,7 +46,7 @@ reconciled_faults:
         reasoning_effort: low
         checkpoints: [checkpoint_1, checkpoint_2]
     concise_measured_evidence: "pytest missing in 65/128 guided implementer sessions."
-    record_link: "docs/reboot/pilot-v2-fault-catalog.md#fcr-003"
+    record_link: "ledger/faults/FCR-003.md"
     changed_record_ids: [FCR-003]
 
 unresolved_candidates:

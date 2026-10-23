@@ -2,57 +2,74 @@
 
 ## Objective
 
-Define the catalog index, the Fault Category Record shape, the statuses and the
-integrity rules every action uses.
+Define the ledger's record shapes, the statuses and the integrity rules every
+action uses.
 
 ## Catalog location
 
-- The requester names the catalog document. Raidar has no default tracked home
-  yet (`analysis/` is gitignored; `docs/` needs user consent). Do not create a
-  parallel catalog when one exists.
-- Single-document form (the default): an index table followed by one
-  `## FCR-NNN — <fault category>` section per record.
-- Directory form (when the requester asks): `<root>/fault-catalog.md` plus
-  `<root>/fault-category-records/FCR-NNN-<slug>.md`.
-- Never reuse an identifier.
+- The catalogue is the tracked `ledger/` directory: `ledger/faults/FCR-NNN.md`
+  (fault categories), `ledger/remedies/M-NNN.md` (remedies) and a generated
+  `ledger/README.md` index. One file per record; never reuse an identifier.
+- After every edit run `make ledger-index && make ledger-check`. The check fails
+  on unknown keys, missing fields, id/filename mismatch, broken remedy→fault
+  links, illegal status transitions, backwards dates and a stale index. Never
+  edit `ledger/README.md` by hand.
+- A requester may name another location; otherwise use `ledger/`.
 
-## Index
+## Fault record
 
-```markdown
-| ID | Fault category | Category | Owner | Status | First observed | Current target |
-|---|---|---|---|---|---|---|
-| [FCR-NNN](#fcr-nnn) | Canonical fault category | Category | component / verifier / problem / harness / analysis | `status` | experiment / job | experiment or — |
-```
-
-## Record
+Markdown with YAML frontmatter (unknown keys are refused); free prose goes in the body.
 
 ```markdown
-## FCR-NNN — Canonical fault category
-
-- **Category:** Behavioral | Integration | Recovery | Structural | Process | Measurement
-- **Owner:** component | verifier | problem | harness | analysis
-- **Status:** `open`
-- **Description:** the recurring failure mode.
-- **Detection signal:** an observable pattern in verifier records, trajectories or Assessments.
-- **Arm differential:** per-arm occurrence over paired attempts, or "none".
-- **Example evidence:** one trial, checkpoint and measurement, cited as `path:line`.
-- **Observed configurations:**
-
-  | Experiment / job | Arm (condition digest) | Checkpoints | Agent + version | Model | Effort | Evidence |
-  |---|---|---|---|---|---|---|
-
-- **Impact:** the consequence for the headline outcome and for cumulative work.
-- **Working hypothesis:** the suspected cause, labelled as a hypothesis.
-- **Resolution criterion:** a measurable condition on the broader behaviour, set before targeting.
-- **Target experiment:** experiment id or `—`.
-- **Solution:** intervention or `—`.
-- **Validation evidence:** artifact and measurement or `—`.
-- **History:**
-  - YYYY-MM-DD — event, experiment and job.
+---
+id: FCR-NNN
+title: Canonical fault category
+category: Behavioral | Integration | Recovery | Structural | Process | Measurement
+owner: raidar:<area> | subject:<repo>
+status: open
+evidence: [jobs/<group>/<experiment>/<job>/...:line]   # relative paths, `:line[-line]` optional
+configurations: ["experiment/job, arm (condition digest), checkpoints, agent+version, model, effort, measured result"]
+impact: consequence for the headline outcome and cumulative work
+hypothesis: suspected cause, labelled [HYPOTHESIS]
+criterion: measurable condition set before targeting, or null
+target: experiment id or null
+solution: intervention or null
+validation: artifact and measurement or null
+status_history:
+  - {status: open, date: YYYY-MM-DD, evidence: [path], reason: why}
+---
+Description and detection signal (an observable pattern later jobs can evaluate).
 ```
 
-An observed-configuration row proves that configuration showed the fault; its
-absence does not prove another configuration is immune.
+`status` equals the last `status_history` status; the first is `open`. Append one
+history entry per status change (status, date, evidence refs, reason); never
+rewrite earlier entries. `jobs/...` refs need not exist (jobs are machine-local)
+but must be well-formed relative paths. An observed configuration proves that
+configuration showed the fault; its absence does not prove another is immune.
+Mark anything uncertain in the record.
+
+## Remedy record (M)
+
+```markdown
+---
+id: M-NNN
+title: Remedy
+faults: [FCR-NNN]
+lever: free string
+placement: where the change goes
+home: raidar | subject:<repo>@<version>
+rationale: why it should move the fault's signal
+proof_plan: experiment that would decide it
+experiment: experiments/.../experiment.yaml or the lock path, or null
+status: proposed
+status_history: [{status: proposed, date: YYYY-MM-DD, evidence: [], reason: why}]
+outcome: result or null
+---
+```
+
+Remedy status: `proposed → locked → executed → measured → adopted`; `rejected`
+from any non-terminal status. Link a fault to its remedy by `faults`; move the
+fault to `targeted` only when a locked experiment names it.
 
 ## Categories
 
@@ -85,14 +102,13 @@ open → not-reproducible
 open → routed
 ```
 
-A lower failure count alone is not resolution.
+A lower failure count alone is not resolution. `ledger check` enforces exactly these edges.
 
 ## Integrity rules
 
 - Preserve IDs and canonical wording; allocate IDs sequentially; never renumber.
-- Keep the index and records synchronised in the same change.
 - Never delete records, history, unsuccessful interventions or resolved records.
-- Keep procedure in this skill, not in the catalog.
+- Keep procedure in this skill, not in the ledger.
 - Keep every number traceable to persisted job artifacts.
 - Never include credentials or secret values.
 - Distinguish nominal token-priced cost from billed cost.

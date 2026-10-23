@@ -7,9 +7,10 @@ description: "Use when extracting, recording, reconciling or targeting conceptua
 
 ## Inputs
 
-- The catalog document the requester names. Read it, and every Fault Category
-  Record in it, before changing it. If none is named, ask; do not invent a
-  location (see [the record schema](references/fault-category-record-schema.md#catalog-location)).
+- The ledger: `ledger/faults/FCR-NNN.md` and `ledger/remedies/M-NNN.md` (see
+  [the record schema](references/fault-category-record-schema.md#catalog-location)).
+  Read the ledger and every record you may change before changing it. A
+  requester may name another location.
 - The job(s) to analyse, as `jobs/<group>/<experiment-id>/<job-id>` directories,
   plus their Assessment store and `analysis.json`. Persisted job artifacts are the
   authority; reports and summaries are projections.
@@ -31,7 +32,8 @@ description: "Use when extracting, recording, reconciling or targeting conceptua
 
 ## Catalog integrity
 
-- Preserve canonical record IDs and wording; keep the index and records in sync.
+- Preserve canonical record IDs and wording. After any ledger edit run
+  `make ledger-index && make ledger-check` and fix what it reports.
 - One record per reusable failure mode, never one per failed verifier case.
 - Every occurrence names its job, trial, checkpoint, agent and version, model,
   reasoning effort, arm and condition digest.

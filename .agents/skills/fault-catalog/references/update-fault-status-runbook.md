@@ -8,7 +8,7 @@ a resolved record, or make no catalog change.
 
 ## Preconditions
 
-- Read the catalog, every potentially matching record and the
+- Read the ledger (`ledger/`), every potentially matching record and the
   [Fault Category Record schema](fault-category-record-schema.md).
 - Use persisted job artifacts as evidence ([evidence map](raidar-evidence-map.md)).
   An observations report may point to candidates but cannot justify a creation
@@ -32,11 +32,11 @@ remediation target. A different model, arm, condition, checkpoint, severity or
 failed case is a new occurrence of the same category unless the invariant and
 the remediation target differ materially.
 
-1. Append one observed-configuration row per newly evidenced configuration.
-2. Add the exact artifact paths and measured result, per arm.
-3. Append a dated history entry.
-4. Apply the status rules below.
-5. Update the index row only when its status or current target changes.
+1. Append one `configurations` entry per newly evidenced configuration.
+2. Add the exact artifact paths to `evidence`, with the measured result per arm.
+3. Append a `status_history` entry (status, date, evidence refs, reason).
+4. Apply the status rules below; keep `status` equal to the last history entry.
+5. Run `make ledger-index && make ledger-check`.
 
 ### Create a record
 
@@ -87,8 +87,9 @@ Status describes the evidence about the category, not whether one case passes.
 
 1. Preserve prior evidence, unsuccessful interventions and history.
 2. Record exact artifact paths, not only a report.
-3. Record prior status, resulting status, experiment, decision and reason.
-4. Update the index and the record together.
+3. Record prior status, resulting status, experiment, decision and reason in the
+   `status_history` entry.
+4. Run `make ledger-index && make ledger-check`; the index is generated.
 5. Keep Harbor's token-priced `cost_usd` (nominal under ChatGPT session auth)
    distinct from billed cost.
 6. Never include credentials or secret values.
@@ -98,5 +99,5 @@ Status describes the evidence about the category, not whether one case passes.
 - Every candidate has a `create`, `update`, `reopen` or `no change` decision.
 - Every new record passes all seven gates and duplicates no invariant and target.
 - Every transition is allowed and meets its conditions.
-- Index and records agree on ID, wording, category, status and target.
+- `make ledger-check` passes: records, history transitions and index agree.
 - Every number points to persisted job artifacts.

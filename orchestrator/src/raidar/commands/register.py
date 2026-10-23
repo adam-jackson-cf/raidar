@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import click
 
-from raidar.commands import agent, env_harbor, quality, target, workflow
+from raidar.commands import agent, env_harbor, ledger, quality, target, workflow
 
 
 def register_commands(main: click.Group) -> None:
@@ -13,4 +13,5 @@ def register_commands(main: click.Group) -> None:
     agent.register(main)
     env_harbor.register(main)
     quality.register(main)
+    ledger.register(main)
     target.register(main)
