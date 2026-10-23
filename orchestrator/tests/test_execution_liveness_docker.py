@@ -17,7 +17,14 @@ from typing import Any
 
 import pytest
 
-from raidar.execution.liveness import LIVENESS_REPORT, LivenessConfig, PhaseMonitor
+from raidar.execution.collect import _infra_reasons
+from raidar.execution.liveness import (
+    LIVENESS_REPORT,
+    LivenessConfig,
+    PhaseMonitor,
+    idle_killed_steps,
+)
+from raidar.execution.models import ProbeSummary
 from raidar.execution.tool_tree import hash_tool_tree
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
@@ -85,6 +92,28 @@ def test_enforce_kills_a_hung_agent_and_a_detached_sleeper(
     leftovers = [line.split() for line in after["ps"].splitlines() if line.strip()]
     assert all(fields[1] == "0" for fields in leftovers), after["ps"]
     assert DETACHED_MARKER not in after["ps"]
+
+
+def test_an_enforce_kill_ends_the_step_like_a_timeout_and_the_trial_goes_on(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Harbor records the kill as a non-zero agent exit, runs the verifier and the next step."""
+    monkeypatch.setenv("RAIDAR_LIVENESS", "enforce")
+    trial_dir = asyncio.run(run_probe_trial(tmp_path, "hung", 300, steps=2, verify=True))
+    report = json.loads((trial_dir / LIVENESS_REPORT).read_text())
+    assert [p["decision"] for p in report["phases"]] == ["idle_killed", "idle_killed"]
+    assert [p["step"] for p in report["phases"]] == ["checkpoint_1", "checkpoint_2"]
+    killed = idle_killed_steps(trial_dir)
+    assert killed == {"checkpoint_1", "checkpoint_2"}
+    result = json.loads((trial_dir / "result.json").read_text())
+    assert result.get("exception_info") is None  # the trial itself did not fail
+    probes = ProbeSummary(passed=True, failures=())
+    for item in result["step_results"]:
+        kind = item["exception_info"]["exception_type"]
+        assert kind == "NonZeroAgentExitCodeError"
+        assert item["verifier_result"]["rewards"]["reward"] == 1  # verified despite the kill
+        reasons = _infra_reasons(None, kind, probes, None, item["step_name"] in killed)
+        assert not [r for r in reasons if r.startswith("step_exception")]
 
 
 class DockerExecEnv:

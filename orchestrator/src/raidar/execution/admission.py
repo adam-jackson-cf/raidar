@@ -3,14 +3,17 @@
 ``raidar run`` of any experiment kind except ``smoke`` is refused unless the jobs root holds a
 clean smoke job of the same setup: the same Raidar toolchain digest, runtime pack recipe,
 every arm's agent name/model/effort and the same execution target (name and Docker facts).
-*Clean* means the job finished, every selected trial has a valid record, and every trial's
-``health.json`` exists with no violation. ``--allow-unsmoked`` (``ALLOW_UNSMOKED=1``) admits
-without one; ``job.json`` records the decision under ``admission``. Smoke kinds are always
-admitted.
+*Clean* means the job finished, every selected trial has a valid record, every trial's
+``health.json`` exists with no violation, and in every trial every executed step's agent changed
+``/app`` (the step's recorded snapshot digest differs from its parent's; the first step's parent
+is the empty tree), so a smoke where the agent only asked a question cannot clear a run.
+``--allow-unsmoked`` (``ALLOW_UNSMOKED=1``) admits without one; ``job.json`` records the
+decision under ``admission``. Smoke kinds are always admitted.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 from collections.abc import Mapping
 from pathlib import Path
@@ -99,6 +102,23 @@ def _trial_problem(job_dir: Path, trial_id: str) -> str | None:
         return f"trial {trial_id} has no health.json"
     if health.violations:
         return f"trial {trial_id} health violation(s) {[c.id for c in health.violations]}"
+    return _no_work_problem(record)
+
+
+EMPTY_TREE_DIGEST = hashlib.sha256().hexdigest()
+
+
+def _no_work_problem(record: TrialRecord) -> str | None:
+    """The first executed step whose agent left ``/app`` as it found it, or ``None``."""
+    for result in record.step_results:
+        digest = result.snapshot.digest if result.snapshot else None
+        if digest is None:
+            return f"trial {record.trial.trial_id} step {result.step} recorded no /app snapshot"
+        if digest == (result.parent_snapshot_digest or EMPTY_TREE_DIGEST):
+            return (
+                f"trial {record.trial.trial_id} step {result.step}: the agent changed nothing "
+                "in /app"
+            )
     return None
 
 

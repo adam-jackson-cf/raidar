@@ -62,32 +62,50 @@ def _blind(phase: dict[str, Any]) -> bool:
 
 def _finding(phase: dict[str, Any]) -> dict[str, Any]:
     keys = ("step", "decision", "reason", "first_idle_at_s")
-    return {key: phase.get(key) for key in keys}
+    finding = {key: phase.get(key) for key in keys}
+    if phase.get("decision") == "idle_killed":
+        killed = (phase.get("kill") or {}).get("killed") or []
+        finding["idle_for_s"] = phase.get("idle_for_s")
+        finding["killed_pids"] = [str(line).split()[0] for line in killed if str(line).split()]
+    return finding
 
 
-def _l2_killed(phases: list[dict[str, Any]]) -> HealthCheck | None:
-    killed = [_finding(p) for p in phases if p.get("decision") in {"idle_killed", "kill_failed"}]
-    if not killed:
+def _l2_kill_failed(phases: list[dict[str, Any]]) -> HealthCheck | None:
+    failed = [_finding(p) for p in phases if p.get("decision") == "kill_failed"]
+    if not failed:
         return None
-    steps = [str(f["step"]) for f in killed]
-    detail = f"agent_idle: the agent uid was killed in {steps}"
-    return make_check("L2", VIOLATION, detail, steps=steps, findings=killed)
+    steps = [str(f["step"]) for f in failed]
+    return make_check(
+        "L2", VIOLATION, f"the idle agent uid could not be killed in {steps}", steps=steps,
+        findings=failed,
+    )  # fmt: skip
+
+
+def _l2_detail(observed: list[dict[str, Any]], killed: list[dict[str, Any]]) -> str:
+    if killed:
+        parts = [
+            f"{f['step']}: idle {f['idle_for_s']} s, killed pids {f['killed_pids']}" for f in killed
+        ]
+        return "idle_killed (the step is verified and graded as after an agent timeout): " + (
+            "; ".join(parts)
+        )
+    steps = [f["step"] for f in observed]
+    return f"idle observed (not enforced) in {steps}" if observed else "agent active throughout"
 
 
 def check_l2(a: Audit) -> HealthCheck:
     phases = _phases(a)
     if phases is None:
         return make_check("L2", UNMEASURED, _NO_LIVENESS)
-    if (killed := _l2_killed(phases)) is not None:
-        return killed
+    if (failed := _l2_kill_failed(phases)) is not None:
+        return failed
     blind = [p.get("step") for p in phases if _blind(p)]
     observed = [_finding(p) for p in phases if p.get("decision") == "idle_observed"]
+    killed = [_finding(p) for p in phases if p.get("decision") == "idle_killed"]
     if blind:
         detail = f"every liveness sample was unmeasured in {blind}"
-        return make_check("L2", UNMEASURED, detail, steps=blind, findings=observed)
-    steps = [f["step"] for f in observed]
-    detail = f"idle observed (not enforced) in {steps}" if observed else "agent active throughout"
-    return make_check("L2", PASS, detail, findings=observed)
+        return make_check("L2", UNMEASURED, detail, steps=blind, findings=observed + killed)
+    return make_check("L2", PASS, _l2_detail(observed, killed), findings=observed + killed)
 
 
 def _own_peak(a: Audit) -> int | None:

@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import ClassVar
 
 from harbor.agents.base import BaseAgent
+from harbor.agents.installed.base import NonZeroAgentExitCodeError
 from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
@@ -39,6 +40,7 @@ from tests.component_trial_support import build_task, docker_target
 
 AFTER_PHASE_REPORT = "liveness-after-phase.json"
 DETACHED_MARKER = "raidar-liveness-detached"
+PASSING_TEST_SH = "#!/bin/bash\nmkdir -p /logs/verifier\necho 1 > /logs/verifier/reward.txt\n"
 MODES = ("hung", "busy", "chatty", "hung_detached")
 
 
@@ -93,6 +95,9 @@ class LivenessProbeAgent(BaseAgent):
             json.dumps({"main_return_code": result.return_code, "ps": alive.stdout or ""})
         )
         context.metadata = {"mode": self.options.mode}
+        if result.return_code != 0:
+            # What Harbor's installed agents do (``exec_as_agent``): a failed command raises.
+            raise NonZeroAgentExitCodeError(f"Command failed (exit {result.return_code})")
 
 
 def probe_config(mode: str, hold_s: int) -> AgentConfig:
@@ -102,12 +107,21 @@ def probe_config(mode: str, hold_s: int) -> AgentConfig:
     )
 
 
-async def run_probe_trial(root: Path, mode: str, hold_s: int) -> Path:
-    """One single-step trial of ``mode`` with the liveness monitor armed; returns its trial dir."""
+async def run_probe_trial(
+    root: Path, mode: str, hold_s: int, *, steps: int = 1, verify: bool = False
+) -> Path:
+    """One trial of ``mode`` (``steps`` steps) with the liveness monitor armed; its trial dir.
+
+    ``verify`` runs Harbor's verifier after every step (a ``test.sh`` that writes reward 1), so
+    a step the agent phase ended abnormally still reaches verification as in a real run.
+    """
     task_dir, trials_dir = root / f"task-{mode}", root / "trials"
     if trials_dir.exists():
         shutil.rmtree(trials_dir)
-    build_task(task_dir, None, {"checkpoint_1": "checkpoint_1"}, agent_timeout_sec=hold_s + 300)
+    names = {f"checkpoint_{n}": f"checkpoint_{n}" for n in range(1, steps + 1)}
+    build_task(task_dir, None, names, agent_timeout_sec=hold_s + 300)
+    if verify:
+        (task_dir / "tests" / "test.sh").write_text(PASSING_TEST_SH)
     activate(docker_target())
     from harbor.trial.trial import Trial
 
@@ -122,7 +136,7 @@ async def run_probe_trial(root: Path, mode: str, hold_s: int) -> Path:
             delete=True,
             kwargs={SCOPE_KWARG: run_scope(trials_dir)},
         ),
-        verifier=VerifierConfig(disable=True),
+        verifier=VerifierConfig(disable=not verify),
     )
     try:
         trial = await Trial.create(config)

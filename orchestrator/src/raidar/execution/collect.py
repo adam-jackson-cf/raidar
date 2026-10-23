@@ -41,6 +41,7 @@ from typing import Any
 from raidar.components import CompiledCondition
 from raidar.components.integrity import condition_step_flags
 from raidar.execution.health_model import VIOLATION, HealthReport, load_health
+from raidar.execution.liveness import idle_killed_steps
 from raidar.execution.models import (
     CheckpointState,
     ExecutionValidity,
@@ -122,6 +123,7 @@ def _infra_reasons(
     exception: str | None,
     probes: ProbeSummary,
     reap: str | None = None,
+    idle_killed: bool = False,
 ) -> list[str]:
     reasons = [reap] if reap else []
     if record is None:
@@ -131,7 +133,9 @@ def _infra_reasons(
             reasons.append(f"verifier_infra:{record.grade.infra_failure.code}")
         if record.rewards.get(LEAK_REWARD_KEY, 0.0) > 0:
             reasons.append("verifier_leak")
-    if exception is not None and exception not in AGENT_FAILURE_EXCEPTIONS:
+    # An enforce-mode idle kill reaches Harbor as a non-zero agent exit recorded on the step
+    # like AgentTimeoutError: the agent's own outcome, so the step is graded on what exists.
+    if exception is not None and exception not in AGENT_FAILURE_EXCEPTIONS and not idle_killed:
         reasons.append(f"step_exception:{exception}")
     reasons.extend(f"component_probe:{failure}" for failure in probes.failures)
     return reasons
@@ -205,7 +209,7 @@ def _step_result(
     exception = _exception_type(item)
     probes = _probe(ctx, trial_dir, step, index)
     reap = reap_infra_reason(load_reap_report(step_record_dir(trial_dir, step)))
-    reasons = _infra_reasons(record, exception, probes, reap)
+    reasons = _infra_reasons(record, exception, probes, reap, step in idle_killed_steps(trial_dir))
     if reasons:
         state = CheckpointState.INFRA_ERROR
     else:
@@ -369,12 +373,12 @@ def execution_validity(
 
 # Health checks that make a trial invalid, grouped under one validity check each. ``H-target``
 # is absent on purpose (the target guard already adds ``target_reachable``), as are the L and
-# P families and ``unmeasured`` results; only an enforce-mode idle kill (``L2``) is classified.
+# P families and ``unmeasured`` results: an enforce-mode idle kill (``L2`` ``idle_killed``) is
+# classified like an agent timeout, so it is a pass with a finding, never a validity failure.
 HEALTH_VALIDITY: Mapping[str, tuple[str, ...]] = {
     "health_verdicts": ("V1", "V2", "V3"),
     "health_budgets": ("H1", "H3", "H4", "H5", "H6"),
     "health_tamper": ("T1", "T2", "T3"),
-    "agent_idle": ("L2",),
 }
 
 

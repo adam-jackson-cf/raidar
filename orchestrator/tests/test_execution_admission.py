@@ -8,10 +8,18 @@ from typing import Any
 
 import pytest
 
-from raidar.execution.admission import AdmissionError, admit, experiment_kind, identity, mismatches
+from raidar.execution.admission import (
+    EMPTY_TREE_DIGEST,
+    AdmissionError,
+    admit,
+    experiment_kind,
+    identity,
+    mismatches,
+    smoke_problem,
+)
 from raidar.execution.health import audit_trial
 from raidar.execution.health_model import HealthCheck, HealthReport, write_health
-from raidar.execution.models import ExecutionValidity, ValidityCheck
+from raidar.execution.models import ExecutionValidity, TrialRecord, ValidityCheck
 from tests.health_support import TRIAL_ID, HealthyTrial, healthy_trial
 
 RUNNER = {"commit": "abc", "dirty": False, "toolchain_sha256": "t" * 64}
@@ -149,6 +157,43 @@ def test_an_invalid_trial_or_a_health_violation_is_not_clean(tmp_path: Path) -> 
         decide(tmp_path)
     assert "is invalid" in str(raised.value)
     assert "health violation" in str(raised.value)
+
+
+def _steps(t: HealthyTrial, *digests: tuple[str | None, str | None]) -> TrialRecord:
+    """The trial's record with one step per ``(parent, own)`` snapshot digest pair."""
+    template = t.record.step_results[0]
+    assert template.snapshot is not None
+    results = tuple(
+        template.model_copy(
+            update={
+                "step": f"checkpoint_{n}",
+                "snapshot": template.snapshot.model_copy(update={"digest": own}),
+                "parent_snapshot_digest": parent,
+            }
+        )
+        for n, (parent, own) in enumerate(digests, 1)
+    )
+    record = t.record.model_copy(update={"step_results": results})
+    (t.job_dir / "trial-records" / f"{TRIAL_ID}.json").write_text(record.model_dump_json())
+    return record
+
+
+def test_a_smoke_whose_agent_wrote_nothing_in_any_step_is_not_clean(tmp_path: Path) -> None:
+    a, b = "a" * 64, "b" * 64
+    for name, digests, why in [
+        ("asked", [(None, EMPTY_TREE_DIGEST)], "checkpoint_1: the agent changed nothing"),
+        ("stalled", [(None, a), (a, b), (b, b)], "checkpoint_3: the agent changed nothing"),
+        ("worked", [(None, a), (a, b)], None),
+    ]:
+        t = smoke_job(tmp_path, name)
+        _steps(t, *digests)
+        problem = smoke_problem(t.job_dir, json.loads(t.job_file.read_text()))
+        assert (problem is None) if why is None else (why in str(problem)), (name, problem)
+    assert decide(tmp_path)["smoke_job"] == "exp/worked"
+    only_asked = smoke_job(tmp_path / "other", "asked")
+    _steps(only_asked, (None, EMPTY_TREE_DIGEST))
+    with pytest.raises(AdmissionError, match="exp/asked.*checkpoint_1: the agent changed nothing"):
+        decide(tmp_path / "other")
 
 
 def test_no_smoke_refuses_with_the_way_forward_and_the_override_is_recorded(

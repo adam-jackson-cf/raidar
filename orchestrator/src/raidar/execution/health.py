@@ -10,7 +10,8 @@ result can be trusted, and returns one ``HealthReport`` (``health.json``). Famil
   limits are recorded; ``H4``-``H6`` agent, agent-setup and verifier wall times stay within
   them; ``H-target`` the Docker target stayed reachable (step 1's ``target_reachable``).
 - **L** liveness: ``L1`` a liveness record exists per agent phase; ``L2`` the idle decision
-  (observe mode records ``idle_observed`` as a finding; an enforce kill is a violation).
+  (``idle_observed`` and an enforce ``idle_killed`` are a pass with a finding: the kill is
+  classified like an agent timeout; ``kill_failed`` is a violation).
 - **P** comparability: ``P2`` batch concurrency is recorded; ``P3`` job-level comparison warnings.
 - **T** tamper: ``T1`` the tool tree is unchanged since the first hash; ``T2`` the records
   manifest verifies; ``T3`` the reaper left no residual process.

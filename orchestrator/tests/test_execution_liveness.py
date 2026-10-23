@@ -217,12 +217,12 @@ def test_sample_history_is_bounded() -> None:
     assert m.as_json()["samples_dropped"] == 4
 
 
-def test_config_from_env_observes_by_default_and_enforce_is_opt_in() -> None:
+def test_config_from_env_enforces_by_default_and_observe_and_off_are_opt_outs() -> None:
     default = LivenessConfig.from_env({})
-    assert (default.mode, default.idle_s, default.interval_s) == ("observe", 600.0, 15.0)
+    assert (default.mode, default.idle_s, default.interval_s) == ("enforce", 600.0, 15.0)
     assert LivenessConfig.from_env({"RAIDAR_LIVENESS": "off"}).mode == "off"
-    config = LivenessConfig.from_env({"RAIDAR_LIVENESS": "enforce", "RAIDAR_LIVENESS_IDLE_S": "20"})
-    assert (config.mode, config.idle_s, config.interval_s) == ("enforce", 20.0, 15.0)
+    config = LivenessConfig.from_env({"RAIDAR_LIVENESS": "observe", "RAIDAR_LIVENESS_IDLE_S": "20"})
+    assert (config.mode, config.idle_s, config.interval_s) == ("observe", 20.0, 15.0)
     with pytest.raises(ValueError, match="observe or enforce"):
         LivenessConfig.from_env({"RAIDAR_LIVENESS": "maybe"})
 

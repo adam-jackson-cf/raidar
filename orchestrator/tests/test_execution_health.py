@@ -160,16 +160,25 @@ def _phase(decision: str, **extra: Any) -> dict[str, Any]:
     return {**base, "reason": "no output, agent CPU or network for 60s", **extra}
 
 
-def test_l2_observe_idle_is_a_finding_and_an_enforce_kill_is_a_violation(tmp_path: Path) -> None:
+KILL = {"killed": ["42 1000 S node codex", "43 1000 S sleep 9999"], "residual": [], "error": None}
+
+
+def test_l2_idle_observed_and_idle_killed_are_passes_with_findings(tmp_path: Path) -> None:
     t = healthy_trial(tmp_path)
     t.write("raidar-liveness.json", {"phases": [_phase("idle_observed", first_idle_at_s=61.0)]})
     observed = audit(t)["L2"]
     assert observed.status == "pass"
     assert [f["decision"] for f in observed.evidence["findings"]] == ["idle_observed"]
-    t.write("raidar-liveness.json", {"phases": [_phase("idle_killed", first_idle_at_s=61.0)]})
+    killed_phase = _phase("idle_killed", first_idle_at_s=61.0, idle_for_s=600.0, kill=KILL)
+    t.write("raidar-liveness.json", {"phases": [killed_phase]})
     killed = audit(t)["L2"]
-    assert killed.status == "violation"
-    assert "agent_idle" in killed.detail
+    assert killed.status == "pass"
+    (finding,) = killed.evidence["findings"]
+    assert (finding["decision"], finding["idle_for_s"]) == ("idle_killed", 600.0)
+    assert finding["killed_pids"] == ["42", "43"]
+    assert "600.0 s" in killed.detail
+    t.write("raidar-liveness.json", {"phases": [_phase("kill_failed", kill=KILL)]})
+    assert status(t, "L2") == "violation"
     blind = _phase("active", sample_count=3, unmeasured_samples=3)
     t.write("raidar-liveness.json", {"phases": [blind]})
     assert status(t, "L2") == "unmeasured"
@@ -267,6 +276,17 @@ def test_fault_candidates_record_violations_and_idle_findings_once(tmp_path: Pat
     assert len((t.job_dir / FAULT_CANDIDATES).read_text().splitlines()) == 2
 
 
+def test_an_idle_kill_is_a_fault_candidate_with_its_reason_and_pids(tmp_path: Path) -> None:
+    t = healthy_trial(tmp_path)
+    killed = _phase("idle_killed", first_idle_at_s=61.0, idle_for_s=600.0, kill=KILL)
+    t.write("raidar-liveness.json", {"phases": [killed]})
+    report = audit_trial(t.job_dir, t.trial_dir, t.record, t.job())
+    (line,) = append_fault_candidates(t.job_dir, report)
+    assert (line["check_id"], line["status"], line["step"]) == ("L2", "idle_killed", STEP)
+    assert "killed pids ['42', '43']" in line["detail"]
+    assert append_fault_candidates(t.job_dir, report) == []
+
+
 def _report(*checks: tuple[str, str]) -> HealthReport:
     items = [
         HealthCheck(id=i, family=cast(Any, i[0]), status=cast(Any, s), detail=f"{i} {s}")
@@ -280,7 +300,7 @@ def test_violations_map_to_validity_checks_and_nothing_else_invalidates() -> Non
         _report(("L2", "pass"), ("P3", "pass"), ("T1", "unmeasured"), ("H-target", "violation"))
     )
     assert [c.name for c in clean] == [
-        "health_verdicts", "health_budgets", "health_tamper", "agent_idle",
+        "health_verdicts", "health_budgets", "health_tamper",
     ]  # fmt: skip
     assert all(c.passed for c in clean)  # H-target is the guard's own target_reachable
     failed = {
@@ -305,7 +325,6 @@ def test_collect_reads_the_trials_health_json(tmp_path: Path) -> None:
         "health_verdicts": True,
         "health_budgets": True,
         "health_tamper": False,
-        "agent_idle": True,
     }
     assert load_health(tmp_path) == _report(("T1", "violation"))
 
@@ -348,7 +367,7 @@ def test_raidar_health_recomputes_and_exits_nonzero_on_a_violation(tmp_path: Pat
     assert stored is not None
     assert next(c for c in stored.checks if c.id == "T2").status == "pass"
     (t.trial_dir / "raidar-liveness.json").write_text(
-        json.dumps({"phases": [_phase("idle_killed")]})
+        json.dumps({"phases": [_phase("kill_failed")]})
     )
     bad = runner.invoke(main, ["health", str(t.job_dir)])
     assert bad.exit_code == 1

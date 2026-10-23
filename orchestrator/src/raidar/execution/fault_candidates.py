@@ -1,6 +1,7 @@
 """Provisional fault occurrences from run-health (``<job>/fault-candidates.jsonl``).
 
-Every health ``violation`` and every observe-mode ``idle_observed`` finding appends one
+Every health ``violation`` and every idle finding (``idle_observed`` in observe mode,
+``idle_killed`` in enforce mode) appends one
 line ``{trial, step?, check_id, status, detail, evidence, state: "provisional"}``. They are
 candidates only: the ledger reconciles them into fault categories later. Appending is
 idempotent per ``(trial, step, check_id, status)``, so re-running ``raidar health`` on a
@@ -17,6 +18,8 @@ from raidar.execution.health_model import VIOLATION, HealthCheck, HealthReport
 
 FAULT_CANDIDATES = "fault-candidates.jsonl"
 IDLE_OBSERVED = "idle_observed"
+IDLE_KILLED = "idle_killed"
+IDLE_DECISIONS = (IDLE_OBSERVED, IDLE_KILLED)
 
 
 def _steps(check: HealthCheck) -> list[str | None]:
@@ -26,7 +29,14 @@ def _steps(check: HealthCheck) -> list[str | None]:
 
 def _idle_findings(check: HealthCheck) -> list[dict[str, Any]]:
     findings = check.evidence.get("findings") or []
-    return [f for f in findings if f.get("decision") == IDLE_OBSERVED]
+    return [f for f in findings if f.get("decision") in IDLE_DECISIONS]
+
+
+def _reason(finding: dict[str, Any]) -> str:
+    reason = str(finding.get("reason"))
+    if finding.get("decision") != IDLE_KILLED:
+        return reason
+    return f"{reason}; killed pids {finding.get('killed_pids')}"
 
 
 def _candidate(
@@ -52,9 +62,7 @@ def candidates(report: HealthReport) -> list[dict[str, Any]]:
         if check.status == VIOLATION:
             lines += [_candidate(report.trial_id, s, check, VIOLATION) for s in _steps(check)]
         lines += [
-            _candidate(
-                report.trial_id, str(f.get("step")), check, IDLE_OBSERVED, str(f.get("reason"))
-            )
+            _candidate(report.trial_id, str(f.get("step")), check, str(f["decision"]), _reason(f))
             for f in _idle_findings(check)
         ]
     return lines

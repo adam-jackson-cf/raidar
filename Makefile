@@ -191,7 +191,7 @@ help:
 	@echo "                                                        Run a locked experiment through Harbor as one job; writes step results, validity and N1 phases"
 	@echo "                                                        DETACH=1: run it under a supervisor in its own session (survives the launching shell"
 	@echo "                                                        or agent session; pid, log and exit record in <job dir>/detach/); required for long jobs"
-	@echo "                                                        Non-smoke kinds are refused without a clean matching smoke job (same code, pack, agents, target);"
+	@echo "                                                        Non-smoke kinds are refused without a clean matching smoke job (same code, pack, agents, target; the agent changed /app in every step);"
 	@echo "                                                        ALLOW_UNSMOKED=1 overrides and records it in job.json (admission)"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
 	@echo "  make health JOB=<job-dir>                             Recompute every trial's health.json (V/H/L/P/T checks) and append fault-candidates.jsonl; exit 1 on a violation"

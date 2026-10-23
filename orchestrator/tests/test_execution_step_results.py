@@ -7,6 +7,7 @@ same agent behaviour, with Harbor's own ``min_reward`` gate deciding the halt.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from harbor.trial.multi_step import MultiStepTrial
 
 from raidar.components import CompiledCondition, compile_condition
 from raidar.execution.collect import TrialContext, classify_trial, execution_validity
+from raidar.execution.liveness import LIVENESS_REPORT, idle_killed_steps
 from raidar.execution.models import CheckpointState, PlannedTrial, ProgressionRule, TrialHashes
 from raidar.execution.progression import derive_reached, executed_reached, progression_rule
 from raidar.execution.trial_record import reached
@@ -117,6 +119,27 @@ def test_agent_outcomes_are_graded_and_keep_the_trial_valid(
     assert step_results[1].parent_snapshot_digest == step_results[0].snapshot.digest
     assert step_results[0].verifier_record == "raidar-oracle/steps/checkpoint_1/record.json"
     assert execution_validity(trial_dir, step_results, "0.156.1", CONTINUE, runnable=3).passed
+
+
+def test_an_idle_killed_agent_is_graded_like_an_agent_timeout(
+    tmp_path: Path, compiled: CompiledCondition
+) -> None:
+    """Harbor records the kill as a non-zero agent exit; only the liveness record excuses it."""
+    exit_error = "NonZeroAgentExitCodeError"
+    trial_dir = write_trial(
+        tmp_path / "trial",
+        [
+            StepOutcome("checkpoint_1", passed=False, exception=exit_error),
+            StepOutcome("checkpoint_2", passed=False, exception=exit_error),
+        ],
+    )
+    phases = [{"step": "checkpoint_1", "decision": "idle_killed"}]
+    (trial_dir / LIVENESS_REPORT).write_text(json.dumps({"phases": phases}))
+    step_results = classify_trial(trial_dir, _context(tmp_path, compiled, STEPS[:2]))
+    assert _states(step_results)[:2] == ["failed", "infra_error"]
+    assert step_results[0].termination == exit_error
+    assert step_results[1].infra_reasons == (f"step_exception:{exit_error}",)
+    assert idle_killed_steps(trial_dir) == {"checkpoint_1"}
 
 
 def test_trial_level_failures_fail_the_validity_gate(

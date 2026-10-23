@@ -192,11 +192,11 @@ make smoke-agents                                         # one trial per pack a
 make smoke-agents SMOKE_ARM=codex                         # one arm only
 ```
 
-Before a non-smoke job runs, `make experiment-execute` looks for a clean smoke job on the same code, pack, agents and target, and refuses without one (`ALLOW_UNSMOKED=1` overrides; recorded in `job.json`). `experiments/smoke/python__forge__mechanics-v1/` is the multi-checkpoint forge smoke for that purpose.
+Before a non-smoke job runs, `make experiment-execute` looks for a clean smoke job on the same code, pack, agents and target, and refuses without one (`ALLOW_UNSMOKED=1` overrides; recorded in `job.json`). Clean includes that the agent changed `/app` in every executed step of every trial, so a smoke where the agent wrote nothing does not count. `experiments/smoke/python__forge__mechanics-v1/` is the multi-checkpoint forge smoke for that purpose.
 
 ## Run health, pooling and the fault ledger
 
-Every trial writes `health.json`: verdict, record, limit, liveness, contention and tamper checks, each `pass`, `violation` or `unmeasured`. A verdict, record/limit or tamper violation invalidates the trial; `make health JOB=<job dir>` recomputes it, and violations land as provisional lines in `<job>/fault-candidates.jsonl`. A host-side liveness monitor (`RAIDAR_LIVENESS=observe` by default) records whether the agent produced output, CPU or network in each phase; it never kills a trial unless set to `enforce`.
+Every trial writes `health.json`: verdict, record, limit, liveness, contention and tamper checks, each `pass`, `violation` or `unmeasured`. A verdict, record/limit or tamper violation invalidates the trial; `make health JOB=<job dir>` recomputes it, and violations land as provisional lines in `<job>/fault-candidates.jsonl`. A host-side liveness monitor (`RAIDAR_LIVENESS=enforce` by default; `observe` and `off` opt out) watches each agent phase for output, CPU or network: an agent quiet for 600 s is killed and the step is verified and graded on what exists, like an agent timeout, so the trial stays valid and the kill is a provisional fault candidate (calibration: ADR-002 A.9).
 
 `job.json` records the runner commit and toolchain hash, pack and grader recipe digests, effective limits and the execution target. `make experiment-analyze` pools several jobs only when these match (`POOL_OVERRIDE=<field>[,<field>]` lifts a named refusal, recorded in the analysis; a records-manifest mismatch never lifts).
 

@@ -386,7 +386,7 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
     stored = json.loads((ctx.job_dir / "trial-records" / f"{first}.json").read_text())
     checks = {check["name"]: check for check in stored["validity"]["checks"]}
     assert checks["target_reachable"]["passed"] is False
-    assert checks["agent_idle"]["passed"] is True  # the health checks follow the guard's finding
+    assert "agent_idle" not in checks  # an idle kill is classified like an agent timeout
     assert json.loads((ctx.trials_dir / first / REAP_FILE).read_text())["reconnected"] is False
     assert not (ctx.job_dir / "trial-records" / f"{second}.json").exists()
     assert json.loads((ctx.job_dir / "job.json").read_text())["aborted"] == "TargetLostError"

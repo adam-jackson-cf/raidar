@@ -1,9 +1,9 @@
 """Host-side agent liveness monitor (mechanics-v1 design r2 §3.2).
 
 ``install_liveness_monitor`` arms one monitor per agent phase (Harbor's
-``AGENT_START`` .. ``AGENT_END``) on every trial. ``RAIDAR_LIVENESS`` selects the
-mode: ``observe`` (the default: record only), ``enforce`` (opt in: kill the agent
-uid on the first idle decision) or ``off``. An agent is *idle* only when all three
+``AGENT_START`` .. ``AGENT_END``) on every trial. ``RAIDAR_LIVENESS`` selects the mode:
+``enforce`` (the default: kill the agent uid on the first idle decision),
+``observe`` (record only) or ``off``. An agent is *idle* only when all three
 signals are quiet for ``RAIDAR_LIVENESS_IDLE_S`` (default 600 s):
 
 1. no output chunk from any exec the agent phase streams (Harbor's log callback);
@@ -80,7 +80,7 @@ class LivenessConfig:
     @classmethod
     def from_env(cls, env: Mapping[str, str] | None = None) -> LivenessConfig:
         env = os.environ if env is None else env
-        mode = (env.get(MODE_ENV) or "observe").strip().lower()
+        mode = (env.get(MODE_ENV) or "enforce").strip().lower()
         if mode not in {"off", "observe", "enforce"}:
             raise ValueError(f"{MODE_ENV} must be off, observe or enforce, not {mode!r}")
         defaults = cls(mode)
@@ -191,6 +191,7 @@ class Verdict:
     reason: str = "no idle window reached"
     first_idle_at_s: float | None = None
     kill: dict[str, Any] | None = None
+    idle_for_s: float | None = None
 
 
 class PhaseMonitor:
@@ -302,6 +303,7 @@ class PhaseMonitor:
         if verdict.first_idle_at_s is not None:
             return  # observe mode: the first decision stands; sampling continues
         verdict.first_idle_at_s = round(now - self._started, 3)
+        verdict.idle_for_s = idle_for
         verdict.reason = (
             f"no output, agent CPU or network for {idle_for}s (threshold {self.config.idle_s}s)"
         )
@@ -319,6 +321,7 @@ class PhaseMonitor:
             "reason": self.verdict.reason,
             "first_idle_at_s": self.verdict.first_idle_at_s,
             "duration_s": round(self._clock() - self._started, 3),
+            "idle_for_s": self.verdict.idle_for_s,
             "kill": self.verdict.kill,
             "sample_count": self.sample_count,
             "samples_dropped": max(0, self.sample_count - len(self.samples)),
@@ -404,3 +407,16 @@ def install_liveness_monitor(trial: Trial, config: LivenessConfig | None = None)
     trial.add_log_callback(state.on_output)
     trial.add_hook(TrialEvent.AGENT_START, state.on_start)
     trial.add_hook(TrialEvent.AGENT_END, state.on_end)
+
+
+def idle_killed_steps(trial_dir: Path) -> frozenset[str]:
+    """Steps whose agent phase ended in an enforce-mode idle kill (``idle_killed``)."""
+    try:
+        phases = json.loads((trial_dir / LIVENESS_REPORT).read_text()).get("phases", [])
+    except (OSError, ValueError, AttributeError):
+        return frozenset()
+    return frozenset(
+        str(p["step"])
+        for p in phases
+        if isinstance(p, dict) and p.get("decision") == "idle_killed" and p.get("step")
+    )
