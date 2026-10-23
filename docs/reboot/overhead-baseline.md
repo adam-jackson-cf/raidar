@@ -138,6 +138,41 @@ A check fails when the p95 over ≥10 samples exceeds the budget. Budgets apply 
 3. Adopt finding 2 (artifact-source snapshots), which sets the 0.5 s snapshot budget.
 4. Accept that cold is record-only plus a tripwire until WS-I I1.
 
+### 5.1 Budgets per execution target (ADR-002 §2.5; user decision 2026-10-23)
+
+The §5 budgets were measured on the work Mac's OrbStack. They stay the **N1 reference** and are not re-baselined.
+
+**Policy.**
+- A Docker target (`~/.config/raidar/targets.toml`) is gated strictly only against budgets the user has accepted for it.
+- Until a target has its own accepted set, `make perf-gate` on that target checks strictly against the N1 reference, which is today's code path unchanged. The target's proposed set is recorded here for review only; no code reads it.
+- Timing and cost are never pooled across targets.
+
+**Proposed: `mbp`** (`adams-macbook-pro`, M1 Max, OrbStack, shared with other projects). **Status: report-only, not accepted.**
+- **Source:** the step 0 spike's copy-path arms (`evidence/mechanics-v1-spike.md`). Arm B drives Docker on mbp itself; arm C drives it from the work Mac over the forwarded socket. Each arm ran at concurrency 1 and 3, 10 trials × 2 steps.
+- **Rule:** as §5. Take the worst p95 over B and C at concurrency 1 and 3, multiply by 1.5, and round up to 0.5 s, with at least 0.5 s.
+
+| Phase | N1 reference | Worst p95 (B, C) | Proposed `mbp` |
+|---|---|---|---|
+| Environment start, warm | 20 s | 3.26 | 5 s |
+| Grader image, warm | 1 s | 0.40 | 1 s |
+| Component apply | 2.5 s | 0.05 | 0.5 s |
+| Per-step reset | 2.0 s | 1.56 | 2.5 s |
+| Artifact collection | 3.5 s | 1.60 | 2.5 s |
+| Snapshot transfer (artifact) | 0.5 s | 0.00 | 0.5 s |
+| Verifier plumbing | 1.5 s | 0.01 | 0.5 s |
+| Step archive gap | 2.5 s | 1.27 | 2 s |
+| Teardown + result write (init) | 4 s | 1.42 | 2.5 s |
+| Raidar result write | 0.5 s | 0.00 | 0.5 s |
+| Aggregate per-step overhead | 10 s | 4.08 | 6.5 s |
+| Aggregate per-trial fixed overhead (init) | 27 s | 4.04 | 6.5 s |
+
+**Caveats.**
+- The proposal exceeds N1 for per-step reset (2.5 against 2.0 s). Driving Docker over the forwarded socket costs about 1 s per step.
+- Every other proposed budget is tighter than N1, because mbp's environment start is far faster.
+- The fixture's `/app` is small; the §6 size-term gap still applies.
+- The samples are n = 10 (trial phases) and n = 20 (step phases) per cell.
+- Accepting this set is a user decision. When it is accepted, record it here with the date.
+
 ## 6. Gaps to close before `raidar perf check` gates on these (plan D4)
 
 - **Size scaling.** Re-measure collection, snapshot and archive with a realistic `/app`: a real gpt-6-luna-low agent tree of 1–50 MB with `.venv` excluded. Then express those budgets as `a + b·MB`.
