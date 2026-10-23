@@ -102,7 +102,7 @@ class RaidarVerifier(BaseVerifier):
         self,
         *,
         oracle_bundle: str,
-        docker_context: str = "orbstack",
+        docker_context: str,
         snapshot_source: SnapshotSource = "artifact",
         coverage: bool = True,
         grader_timeout_s: float = DEFAULT_RUN_TIMEOUT_S,

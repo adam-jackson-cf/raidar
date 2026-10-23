@@ -29,12 +29,17 @@ from raidar.execution.environment import (
 )
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
-from raidar.execution.run import JobContext, execute, load_problems
+from raidar.execution.run import execute, load_problems
 from raidar.execution.trial_config import harbor_trial_config
+from raidar.execution.trial_run import JobContext
 from raidar.packs.python.models import load_pack_spec
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
 from raidar.spec.lock import lock_integrity_issues
+from raidar.targets.config import Selection, implicit_target
+from raidar.targets.guard import REAP_FILE, TargetGuard, TargetLostError
+from raidar.targets.health import TargetUnavailableError
+from raidar.targets.job import JobTarget
 from raidar.verifier.verifier import RaidarVerifier
 from tests.execution_support import (
     ImportedFixture,
@@ -43,6 +48,12 @@ from tests.execution_support import (
     validated_fixture,
     write_trial,
 )
+
+SELECTION = Selection.of(implicit_target("orbstack"))
+
+
+def _no_reap(trial_id: str, trials_dir: Path) -> dict[str, Any]:
+    return {}
 
 
 def test_trials_start_in_plan_order_and_never_exceed_concurrency() -> None:
@@ -210,8 +221,8 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
         job_dir=tmp_path / "jobs" / plan.experiment_id / "r1",
         job_id="r1",
         problems=load_problems(plan, fixture_problem.store),
+        target=JobTarget(SELECTION),
         runner=fake_runner,
-        docker_context="orbstack",
     )
     records = asyncio.run(execute(ctx))
     assert [r.trial.trial_id for r in records] == [t.trial_id for t in plan.selected_trials()]
@@ -255,10 +266,91 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     manifest = json.loads((job_dir / "job.json").read_text())
     assert manifest["partial"]
     assert manifest["summary"]["valid"] == 1
+    _assert_provenance(manifest, plan.concurrency)
     assert json.loads((job_dir / "plan.json").read_text())["lock_sha256"] == plan.lock_sha256
     _assert_run_keeps_its_lock_and_settings(job_dir, plan.lock_sha256)
     with pytest.raises(FileExistsError):
         asyncio.run(execute(ctx))
+
+
+def _assert_provenance(manifest: dict[str, Any], concurrency: int) -> None:
+    assert manifest["mechanics_epoch"] == "mechanics-v1"
+    assert "docker_context" not in manifest
+    assert manifest["execution_target"] == {
+        "name": "default",
+        "kind": "docker",
+        "docker_context": "orbstack",
+        "trusted": True,
+        "transport": None,
+        "max_concurrency": None,
+        "effective_concurrency": concurrency,
+        "docker": None,
+        "grader": {"name": "default", "docker_context": "orbstack"},
+    }
+
+
+def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
+    tmp_path: Path, fixture_problem: ImportedFixture, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(ROOT_ENV, str(fixture_problem.store.root))
+    monkeypatch.setattr("raidar.execution.materialise.image_present", lambda tag: True)
+    monkeypatch.setattr(
+        "raidar.execution.trial_config.with_host_auth", lambda config, harness: config
+    )
+    loaded, lock, _ = locked_experiment(
+        tmp_path / "exp",
+        fixture_problem.ref,
+        environment={"compose_init": False},
+        analysis={"baseline_arm": "baseline", "attempts": 2, "seed": 1, "concurrency": 1},
+    )
+    plan = build_plan(
+        loaded,
+        lock,
+        store=fixture_problem.store,
+        pack=load_pack_spec(),
+        options=PlanOptions(arms=("baseline",), max_checkpoints=1),
+    )
+    first, second = (t.trial_id for t in plan.selected_trials())
+    up = [True]
+    started: list[str] = []
+
+    def ensure() -> None:
+        if not up[0]:
+            raise TargetUnavailableError("daemon down")
+
+    async def fake_runner(
+        config: TrialConfig, bundle_root: Path, provisions: Sequence[Provision] = ()
+    ) -> TrialRun:
+        started.append(config.trial_name)
+        up[0] = False  # the daemon goes away during the first trial
+        raise RuntimeError("compose up failed: cannot connect to the Docker daemon")
+
+    guard = TargetGuard(
+        target=SELECTION.trial,
+        healthy=lambda: up[0],
+        ensure=ensure,
+        reap=_no_reap,
+        reconnect_s=0.0,
+    )
+    ctx = JobContext(
+        plan=plan,
+        job_dir=tmp_path / "run",
+        job_id="r",
+        problems=load_problems(plan, fixture_problem.store),
+        target=JobTarget(SELECTION, None, guard),
+        runner=fake_runner,
+    )
+
+    with pytest.raises(TargetLostError):
+        asyncio.run(execute(ctx))
+
+    assert started == [first]  # nothing more was scheduled
+    stored = json.loads((ctx.job_dir / "trial-records" / f"{first}.json").read_text())
+    assert stored["validity"]["checks"][-1]["name"] == "target_reachable"
+    assert stored["validity"]["checks"][-1]["passed"] is False
+    assert json.loads((ctx.trials_dir / first / REAP_FILE).read_text())["reconnected"] is False
+    assert not (ctx.job_dir / "trial-records" / f"{second}.json").exists()
+    assert json.loads((ctx.job_dir / "job.json").read_text())["aborted"] == "TargetLostError"
 
 
 def _assert_run_keeps_its_lock_and_settings(job_dir: Path, lock_sha256: str) -> None:
@@ -308,6 +400,7 @@ def test_a_trial_that_raises_is_recorded_as_infra_and_the_run_completes(
         job_dir=tmp_path / "run",
         job_id="r",
         problems=load_problems(plan, fixture_problem.store),
+        target=JobTarget(SELECTION),
         runner=fake_runner,
     )
     records = {r.trial.trial_id: r for r in asyncio.run(execute(ctx))}
@@ -366,6 +459,7 @@ def test_verifier_override_carries_reference_solutions_only_then(
         job_dir=tmp_path / "run",
         job_id="r",
         problems=load_problems(plan, fixture_problem.store),
+        target=JobTarget(SELECTION),
         runner=fake_runner,
     )
     (record,) = asyncio.run(execute(ctx))
@@ -448,14 +542,23 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
         contexts.append(ctx)
         return []
 
-    monkeypatch.setattr("raidar.commands.execution.execute", fake_execute)
+    seen_names: list[str | None] = []
+
+    def fake_job_target(name: str | None) -> JobTarget:
+        seen_names.append(name)
+        return JobTarget(SELECTION, None, TargetGuard.for_target(SELECTION.trial, reap=_no_reap))
+
+    monkeypatch.setattr("raidar.execution.run.execute", fake_execute)
+    monkeypatch.setattr("raidar.commands.execution.job_target", fake_job_target)
     runner = CliRunner()
-    arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1"]
+    arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1", "--target", "t"]
     result = runner.invoke(
         main, [*arguments, "--jobs-dir", str(tmp_path / "jobs"), "--job-id", "x"]
     )
     assert result.exit_code == 0, result.output
     (ctx,) = contexts
+    assert seen_names == ["t"]
+    assert ctx.target.selection is SELECTION
     assert ctx.job_dir == (tmp_path / "jobs" / loaded.spec.id / "x").resolve()
     assert [t.trial_id for t in ctx.plan.selected_trials()] == ["b01-p0-baseline"]
     assert set(ctx.problems) == {0}

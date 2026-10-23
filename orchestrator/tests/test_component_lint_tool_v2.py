@@ -22,8 +22,7 @@ from raidar.components.provision import PROVISION_CHANNEL, condition_provisions
 from tests.component_support import PROBE_DIR, compile_uses, use, write_jsonl
 from tests.component_trial_support import (
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_target_ready,
     run_trial_sync,
 )
 
@@ -203,8 +202,8 @@ def test_probe_without_a_record_or_with_a_failed_check_fails(tmp_path: Path) -> 
 
 
 docker_trial = pytest.mark.skipif(
-    not (orbstack_available() and pack_image_present()),
-    reason="needs OrbStack (external data dir) and the built python pack image",
+    not (docker_target_ready()),
+    reason="needs a ready Docker target (data check passing) and the built python pack image",
 )
 
 

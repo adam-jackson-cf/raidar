@@ -49,11 +49,11 @@ ENGINES = ("direct", "harbor")
 
 @dataclass(frozen=True)
 class ValidateOptions:
+    docker_context: str
     engine: str = "direct"
     repeats: int = 3
     concurrency: int = direct.DEFAULT_CONCURRENCY
     timeout_s: float = direct.DEFAULT_RUN_TIMEOUT_S
-    docker_context: str = "orbstack"
     native_runner: Path | None = None
     source_checkout: Path | None = None
     audit: bool = True
@@ -155,7 +155,9 @@ async def validate_problem(
         native = None
         if options.native_runner is not None:
             native = await asyncio.to_thread(_native_runs, store, problem, options, work)
-            environment["native_runner"] = NativeRunner(options.native_runner).revision()
+            environment["native_runner"] = NativeRunner(
+                options.native_runner, options.docker_context
+            ).revision()
         audit = (
             await _audit(problem, options, sandbox=sandbox, work_root=work)
             if options.audit

@@ -101,7 +101,7 @@ async def test_grader_image_build_failure_is_reported(fake_docker: Path) -> None
 async def test_sandbox_reports_exit_code_output_and_environment_id(
     tmp_path: Path, fake_docker: Path
 ) -> None:
-    sandbox = DockerSandbox(image="grader:1")
+    sandbox = DockerSandbox(image="grader:1", docker_context="orbstack")
     with pytest.raises(RuntimeError, match="not available"):
         await sandbox.environment_id()
     (fake_docker / "image_present").touch()
@@ -115,7 +115,9 @@ async def test_sandbox_reports_exit_code_output_and_environment_id(
 async def test_sandbox_timeout_kills_the_named_container(tmp_path: Path, fake_docker: Path) -> None:
     (fake_docker / "run_hangs").touch()
 
-    result = await DockerSandbox(image="grader:1").run(sandbox_run(tmp_path, timeout_s=0.5))
+    result = await DockerSandbox(image="grader:1", docker_context="orbstack").run(
+        sandbox_run(tmp_path, timeout_s=0.5)
+    )
 
     assert result.timed_out
     assert result.exit_code is None
@@ -131,6 +133,7 @@ async def test_verifier_and_regrade_prepare_the_same_docker_grader(
     bundle = make_bundle(tmp_path / "fixture")
     verifier = RaidarVerifier(
         oracle_bundle=str(bundle.root),
+        docker_context="orbstack",
         task=cast(Any, None),
         trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
         environment=cast(Any, FakeAgentEnvironment()),
@@ -143,4 +146,6 @@ async def test_verifier_and_regrade_prepare_the_same_docker_grader(
     assert grader.image == grader_image_tag(bundle.manifest.grader)
     assert grader.environment_id == "sha256:fakeimageid"
     assert grader.image_built
-    assert sandbox == regrade_sandbox == DockerSandbox(image=grader.image)
+    assert (
+        sandbox == regrade_sandbox == DockerSandbox(image=grader.image, docker_context="orbstack")
+    )

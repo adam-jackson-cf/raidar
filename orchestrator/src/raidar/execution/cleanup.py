@@ -2,9 +2,11 @@
 
 Every Raidar trial environment is a Harbor Compose project named
 ``<trial id>__env-<run scope>`` (``raidar.execution.environment``), where the
-run scope is a 10-hex token of the job's ``trials/`` directory. Stopping
+run scope is a 10-hex token of the orchestrator host name and the job's
+``trials/`` directory. Stopping
 ``raidar run`` mid-trial skips Harbor's teardown, so those projects' containers
-and networks stay behind. Cleanup targets only projects with that shape:
+and networks stay behind. Cleanup targets only projects with that shape, on the
+Docker context of the selected target:
 
 - with a job directory: every project of that run, running or not (the caller
   names the job, so its live containers are known to be orphans);
@@ -66,25 +68,41 @@ def select_stale(projects: Sequence[TrialProject], job_dir: Path | None) -> list
     return [project for project in projects if not project.running]
 
 
+def _docker(docker_context: str, *args: str) -> list[str]:
+    return ["docker", "--context", docker_context, *args]
+
+
 def cleanup_trial_projects(
-    job_dir: Path | None = None, *, dry_run: bool = False, runner: Runner = _run
+    job_dir: Path | None = None,
+    *,
+    docker_context: str,
+    dry_run: bool = False,
+    runner: Runner = _run,
 ) -> list[str]:
-    """Remove stale trial projects (``docker compose down``); return their names."""
+    """Remove stale trial projects (``docker compose down``) on ``docker_context``; their names."""
     listed = runner(
-        [
-            "docker",
+        _docker(
+            docker_context,
             "ps",
             "-a",
             "--filter",
             f"label={PROJECT_LABEL}",
             "--format",
             f'{{{{.Label "{PROJECT_LABEL}"}}}}\t{{{{.State}}}}',
-        ]
+        )
     )
     if listed.returncode != 0:
         raise RuntimeError(f"docker ps failed: {listed.stderr.strip()}")
     stale = select_stale(trial_projects(listed.stdout), job_dir)
     if not dry_run:
         for project in stale:
-            runner(["docker", "compose", "-p", project.name, "down", "--remove-orphans"])
+            runner(
+                _docker(docker_context, "compose", "-p", project.name, "down", "--remove-orphans")
+            )
     return [project.name for project in stale]
+
+
+def reap_project(project: str, *, docker_context: str, runner: Runner = _run) -> dict[str, object]:
+    """Remove one trial's Compose project (containers, networks); what docker answered."""
+    done = runner(_docker(docker_context, "compose", "-p", project, "down", "--remove-orphans"))
+    return {"returncode": done.returncode, "stderr": done.stderr.strip()[-2000:]}

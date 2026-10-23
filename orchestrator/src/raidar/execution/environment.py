@@ -5,9 +5,10 @@ Raidar's trial names are plan trial ids (``b00-p0-baseline``), which repeat
 across jobs and experiments, so two runs on one Docker host (two pilot legs,
 or a replacement run beside the original) shared a Compose project: the second
 ``compose up`` recreated the first job's container, which exited 143 and was
-recorded as an infra error. The scope suffix makes the project unique per run
-directory while the trial directory stays ``trials/<trial id>`` and no plan
-hash changes.
+recorded as an infra error. The scope suffix makes the project unique per
+orchestrator host and run directory (the hash covers the hostname and the
+resolved trials path) while the trial directory stays ``trials/<trial id>``
+and no plan hash changes.
 
 **Engine fast path (N1).** Harbor routes every main-container ``exec`` and
 ``cp`` through ``docker compose``, which loads the project's compose files on
@@ -26,7 +27,7 @@ unchanged.
 
 **Stale log names (step evidence).** Between steps Harbor *moves* the mounted
 ``/logs/agent`` contents into ``steps/<step>/agent`` on the host. On a
-macOS bind mount (OrbStack) the container can keep a cached entry for a moved
+macOS bind mount the container can keep a cached entry for a moved
 name for a short while; a write to that name in the next step then lands in
 the moved file, so step k+1's ``raidar-reset.json`` overwrites step k's
 archived copy and is missing from step k+1 (seen under concurrent trials).
@@ -53,6 +54,7 @@ import hashlib
 import importlib
 import os
 import shlex
+import socket
 import sys
 import tarfile
 import tempfile
@@ -81,8 +83,18 @@ LAZY_AGENT_IMPORTS: tuple[str, ...] = ("litellm",)
 
 
 def run_scope(trials_dir: Path) -> str:
-    """A short, stable token for one job directory."""
-    return hashlib.sha256(str(trials_dir.resolve()).encode()).hexdigest()[:10]
+    """A short, stable token for one job directory on this host.
+
+    The hostname is part of the hash: two orchestrator hosts sharing one Docker
+    daemon can run jobs with the same trials path without sharing a project.
+    """
+    identity = f"{socket.gethostname()}:{trials_dir.resolve()}"
+    return hashlib.sha256(identity.encode()).hexdigest()[:10]
+
+
+def trial_project_name(trial_id: str, trials_dir: Path) -> str:
+    """The Compose project Harbor names for a trial run under ``trials_dir``."""
+    return _sanitize_docker_compose_project_name(f"{trial_id}__env-{run_scope(trials_dir)}")
 
 
 def _engine_cp(rest: Sequence[str], container: str) -> list[str] | None:

@@ -60,7 +60,7 @@ class TrialRegrade:
 
 @dataclass
 class RegradeOptions:
-    docker_context: str = "orbstack"
+    docker_context: str
     bundle_override: Path | None = None
     work_root: Path | None = None
     sandbox_factory: SandboxFactory | None = None

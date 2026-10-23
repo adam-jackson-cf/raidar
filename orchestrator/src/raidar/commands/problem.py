@@ -8,6 +8,7 @@ from pathlib import Path
 
 import click
 
+from raidar.commands.target_options import docker_selection, target_option
 from raidar.problems.errata import Disposition, draft_errata, report_entries
 from raidar.problems.importer import import_problem
 from raidar.problems.models import ProblemId, ProblemManifest
@@ -191,7 +192,7 @@ def import_command(
 @click.option("--engine", type=click.Choice(ENGINES), default="direct", show_default=True)
 @click.option("--repeats", type=click.IntRange(min=1), default=3, show_default=True)
 @click.option("--concurrency", type=click.IntRange(min=1), default=4, show_default=True)
-@click.option("--docker-context", default="orbstack", show_default=True)
+@target_option
 @click.option(
     "--native-runner",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
@@ -226,7 +227,7 @@ def validate_command(
     engine: str,
     repeats: int,
     concurrency: int,
-    docker_context: str,
+    target_name: str | None,
     native_runner: Path | None,
     audit: bool,
     audit_only: bool,
@@ -241,11 +242,16 @@ def validate_command(
     """
     store = _store(store_root)
     problem_id = _problem_id(ref)
+    selection = docker_selection(
+        target_name,
+        trial_purpose="problem validation (hidden tests)",
+        grader_purpose="problem validation (hidden tests)",
+    )
     options = ValidateOptions(
         engine=engine,
         repeats=repeats,
-        concurrency=concurrency,
-        docker_context=docker_context,
+        concurrency=selection.trial.effective_concurrency(concurrency),
+        docker_context=selection.grader.docker_context,
         native_runner=native_runner,
         source_checkout=source_checkout,
         audit=audit or audit_only,

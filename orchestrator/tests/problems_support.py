@@ -168,7 +168,7 @@ def record_validation(
         validate_problem(
             store,
             ProblemId.parse(ref),
-            ValidateOptions(repeats=repeats, concurrency=1),
+            ValidateOptions(docker_context="test-ctx", repeats=repeats, concurrency=1),
             sandbox=LocalProcessSandbox(work / "sandbox"),
             work_root=work,
         )

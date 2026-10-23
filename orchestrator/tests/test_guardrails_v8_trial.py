@@ -38,14 +38,13 @@ from raidar.components.session_chain import apply_session_wrappers, condition_se
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_target_ready,
     run_trial_sync,
 )
 
 docker_trial = pytest.mark.skipif(
-    not (orbstack_available() and pack_image_present()),
-    reason="needs OrbStack (external data dir) and the built python pack image",
+    not (docker_target_ready()),
+    reason="needs a ready Docker target (data check passing) and the built python pack image",
 )
 AUTOFIX = {"autofix_before_check": True, "autofix_command": guardrails_v8.AUTOFIX_COMMAND}
 GATES = {

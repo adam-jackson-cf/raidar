@@ -17,6 +17,7 @@ from raidar.commands import (
     experiment_spec,
     jev,
     pack,
+    perf,
     problem,
 )
 
@@ -28,6 +29,7 @@ def register(main: click.Group) -> None:
     problem.register(main)
     pack.register(main)
     execution.register(main)
+    perf.register(main)
     assess.register(main)
     jev.register(main)
     analyze.register(main)

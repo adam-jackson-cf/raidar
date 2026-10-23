@@ -13,6 +13,11 @@ REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
 RAIDAR := $(REPO_RUNTIME_ENV) uv run --project orchestrator raidar
 RAIDAR_DEV := $(REPO_RUNTIME_ENV) uv run --project orchestrator --extra dev raidar
 
+# Docker target (raidar.targets): TARGET=<name> selects an entry of ~/.config/raidar/targets.toml
+# (else $RAIDAR_TARGET, the file's `default`, then the current Docker context).
+TARGET ?=
+TARGET_ENV := $(if $(TARGET),export RAIDAR_TARGET="$(TARGET)" &&,)
+
 # Secrets: targets that call model providers run under `infisical run` (project bound by
 # orchestrator/.infisical.json, env INFISICAL_ENV) when the infisical CLI is installed and
 # logged in; otherwise they fall back to orchestrator/.env. SECRETS=infisical fails instead
@@ -59,7 +64,7 @@ TIMEOUT_SEC ?=
 
 # Experiment-path smoke workflow: the smoke experiment (kind smoke) and the agent benchmark
 # (kind benchmark) are locked under .tmp/smoke with the target's overrides and run through
-# Harbor (Docker; OrbStack by default).
+# Harbor (Docker; the TARGET target).
 SMOKE_EXPERIMENT ?= experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
 SMOKE_AGENTS_EXPERIMENT ?= experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml
 SMOKE_JOBS_DIR ?= $(CURDIR)/jobs
@@ -98,6 +103,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 
 .PHONY: help \
 	env-setup agent-list agent-validate codex-auth-setup harbor-cleanup docker-check \
+	target-list target-status target-up target-down target-init target-prune \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate \
@@ -135,7 +141,15 @@ help:
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
 	@echo ""
-	@echo "Problems and runtime packs (OrbStack; DOCKER_CONTEXT defaults to orbstack):"
+	@echo "Docker target (TARGET=<name> from ~/.config/raidar/targets.toml, else \$$RAIDAR_TARGET, its default, then the current Docker context):"
+	@echo "  make target-init                                       Write a commented ~/.config/raidar/targets.toml template (never overwrites)"
+	@echo "  make target-list                                       List defined targets and the selected one"
+	@echo "  make target-status [TARGET=name]                       Print the target's Docker facts; non-zero when unreachable or its data check fails"
+	@echo "  make target-up|target-down [TARGET=name]               Start/stop a target's SSH-forwarded Docker socket (context raidar-<name>)"
+	@echo "  make target-prune [TARGET=name] [DRY_RUN=1]            Remove stale Raidar trial Compose projects (nothing running) on the target"
+	@echo "  make docker-check [TARGET=name]                        Make the target reachable (restart its transport) and run its data check"
+	@echo ""
+	@echo "Problems and runtime packs (Docker target as above):"
 	@echo "  make problem-list                                      List registered problems with validation and import state"
 	@echo "  make problem-info PROBLEM=scb/forge@38d627ecf668       Show one problem's steps, source pin, pack binding and validation"
 	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
@@ -153,7 +167,7 @@ help:
 	@echo "  make guardrails-verify                                python-guardrails rule tests for each pack (@1, which @2 installs: 76 rules; @3: 83, its tests check"
 	@echo "                                                        included; @4 and @5: 85, the scope canaries included; @6, @7 and @8: 86, the test-class canary included; @8 also its --autofix canaries): every rule (derived from the pack's config and codes) fires on its violating canary and"
 	@echo "                                                        passes its clean one against the pack installed in the pack image, plus a mutant-pack negative"
-	@echo "                                                        control (OrbStack, PyPI; not in make quality)"
+	@echo "                                                        control (Docker target, PyPI; not in make quality)"
 	@echo ""
 	@echo "Experiments:"
 	@echo "  make experiment-init EXPERIMENT=experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
@@ -178,7 +192,7 @@ help:
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@2-@6 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
 	@echo "                                                        with gate-effort@4-@9 it first grades guardrail-gate@3/@4 pre-fix snapshots into STORE, and with"
-	@echo "                                                        code-quality@2 or @3 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: OrbStack;"
+	@echo "                                                        code-quality@2 or @3 it first makes deferred coverage runs (verifier_coverage: offline) into STORE: Docker target;"
 	@echo "                                                        CONCURRENCY=N works on N trials at once, each trial's steps in order; default 1)"
 	@echo "  make assess-regrade JOB=<trial-or-job-dir> [VERIFIER_BUNDLE=<dir>] [STORE=<assessment-store>] [COVERAGE_CHECK=1 [CONCURRENCY=N]] [REGRADE_OUT=report.json]"
 	@echo "                                                        Rerun the verifier over stored step snapshots (and, with STORE, the stored pre-fix grades); fails if results differ;"
@@ -241,29 +255,28 @@ help:
 RUNTIME ?= python
 TOOL ?=
 FORCE ?=
-PACK_DOCKER_ENV := export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" &&
 
 pack-info:
-	@$(PACK_DOCKER_ENV) $(RAIDAR) pack info "$(RUNTIME)"
+	@$(TARGET_ENV) $(RAIDAR) pack info "$(RUNTIME)"
 
 pack-build:
-	@$(PACK_DOCKER_ENV) $(RAIDAR) pack build "$(RUNTIME)" $(if $(FORCE),--force,)
+	@$(TARGET_ENV) $(RAIDAR) pack build "$(RUNTIME)" $(if $(FORCE),--force,)
 
 PROBE_EVIDENCE_DIR ?=
 
 component-probe-trials:
-	@$(PACK_DOCKER_ENV) export RAIDAR_REAL_LLM_PROBES=1 && \
+	@$(TARGET_ENV) export RAIDAR_REAL_LLM_PROBES=1 && \
 		$(if $(PROBE_EVIDENCE_DIR),export RAIDAR_PROBE_EVIDENCE_DIR="$(abspath $(PROBE_EVIDENCE_DIR))" &&,) \
 		$(SECRETS_DETECT) cd orchestrator && $(REPO_RUNTIME_ENV) $$secrets_cmd uv run --project . --extra dev \
 		python -m pytest tests/test_component_real_trial_probes.py -v
 
 pack-audit:
-	@$(PACK_DOCKER_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
+	@$(TARGET_ENV) $(RAIDAR) pack audit "$(RUNTIME)"
 
 # python-guardrails' own rule tests in the pack image: every implemented rule's violating canary
 # fires and its clean canary passes (run_canaries.py; tests/test_component_python_guardrails_trial.py).
 guardrails-verify: docker-check pack-build
-	@$(PACK_DOCKER_ENV) export RAIDAR_GUARDRAILS_VERIFY=1 && cd orchestrator && $(REPO_RUNTIME_ENV) \
+	@$(TARGET_ENV) export RAIDAR_GUARDRAILS_VERIFY=1 && cd orchestrator && $(REPO_RUNTIME_ENV) \
 		uv run --project . --extra dev python -m pytest tests/test_component_python_guardrails_trial.py \
 		-k proven -v -s
 
@@ -372,13 +385,28 @@ codex-auth-setup:
 		$(if $(filter 1 true yes on,$(DEVICE_AUTH)),--device-auth,)
 
 harbor-cleanup:
-	@$(PACK_DOCKER_ENV) $(RAIDAR) harbor cleanup $(if $(JOB),--job "$(JOB)",) $(if $(DRY_RUN),--dry-run,)
+	@$(TARGET_ENV) $(RAIDAR) harbor cleanup $(if $(JOB),--job "$(JOB)",) $(if $(DRY_RUN),--dry-run,)
 
 docker-check:
-	@$(PACK_DOCKER_ENV) if ! docker info >/dev/null 2>&1; then \
-		echo "Docker (context $${DOCKER_CONTEXT}) is required for smoke workflows that use Harbor. Start it and retry."; \
-		exit 1; \
-	fi
+	@$(TARGET_ENV) $(RAIDAR) target ensure
+
+target-list:
+	@$(RAIDAR) target list
+
+target-status:
+	@$(TARGET_ENV) $(RAIDAR) target status
+
+target-up:
+	@$(TARGET_ENV) $(RAIDAR) target up
+
+target-down:
+	@$(TARGET_ENV) $(RAIDAR) target down
+
+target-init:
+	@$(RAIDAR) target init
+
+target-prune:
+	@$(TARGET_ENV) $(RAIDAR) target prune $(if $(DRY_RUN),--dry-run,)
 
 experiment-init:
 	$(call require_var,EXPERIMENT)
@@ -438,7 +466,7 @@ ifeq ($(DETACH),1)
 		$(if $(JOB_ID),--job-id "$(JOB_ID)",) -- $(MAKE) --no-print-directory -C "$(CURDIR)" \
 		experiment-execute DETACH=0
 else
-	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
+	@$(TARGET_ENV) $(RAIDAR_SECRETS) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
 		--jobs-dir "$(EXECUTE_JOBS_DIR)" $(if $(JOB_ID),--job-id "$(JOB_ID)",)
 endif
 
@@ -454,8 +482,8 @@ PERF_FIXTURE_DIR ?=
 PERF_FIXTURE_CONCURRENCY ?=
 
 perf-fixture:
-	@$(PACK_DOCKER_ENV) $(RAIDAR) pack build python
-	@$(PACK_DOCKER_ENV) export RAIDAR_EXECUTION_DOCKER=1 && \
+	@$(TARGET_ENV) $(RAIDAR) pack build python
+	@$(TARGET_ENV) export RAIDAR_EXECUTION_DOCKER=1 && \
 		$(if $(PERF_FIXTURE_DIR),export RAIDAR_PERF_FIXTURE_DIR="$(abspath $(PERF_FIXTURE_DIR))" &&,) \
 		$(if $(PERF_FIXTURE_CONCURRENCY),export RAIDAR_PERF_FIXTURE_CONCURRENCY="$(PERF_FIXTURE_CONCURRENCY)" &&,) \
 		cd orchestrator && $(REPO_RUNTIME_ENV) uv run --project . --extra dev \
@@ -484,7 +512,7 @@ problem-import:
 
 problem-validate:
 	$(call require_var,PROBLEM)
-	@$(PACK_DOCKER_ENV) $(RAIDAR) problem validate "$(PROBLEM)" \
+	@$(TARGET_ENV) $(RAIDAR) problem validate "$(PROBLEM)" \
 		$(if $(ENGINE),--engine "$(ENGINE)",) $(if $(REPEATS),--repeats "$(REPEATS)",) \
 		$(if $(NATIVE_RUNNER),--native-runner "$(NATIVE_RUNNER)",) \
 		$(if $(SOURCE_CHECKOUT),--source-checkout "$(SOURCE_CHECKOUT)",) \
@@ -507,7 +535,7 @@ experiment-assess:
 	$(call require_var,JOB)
 	$(call require_var,STORE)
 	$(call require_var,SCORERS)
-	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(JOB)/trials),$(JOB)/trials,$(JOB))" --store "$(STORE)" \
+	@$(TARGET_ENV) $(RAIDAR_SECRETS) assess --rescore "$(if $(wildcard $(JOB)/trials),$(JOB)/trials,$(JOB))" --store "$(STORE)" \
 		$(foreach scorer,$(SCORERS),--scorer "$(scorer)") \
 		$(if $(ASSESSMENT_CONFIG),--config "$(ASSESSMENT_CONFIG)",) $(if $(LOCK),--lock "$(LOCK)",) $(if $(REPLAY),--replay,) \
 		$(if $(JEV_REPLAY_ONLY),--jev-replay-only,) $(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) \
@@ -515,7 +543,7 @@ experiment-assess:
 
 assess-regrade:
 	$(call require_var,JOB)
-	@export DOCKER_CONTEXT="$${DOCKER_CONTEXT:-orbstack}" && $(RAIDAR) assess --regrade "$(JOB)" --docker-context "$${DOCKER_CONTEXT}" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(COVERAGE_CHECK),--coverage-check,) $(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
+	@$(TARGET_ENV) $(RAIDAR) assess --regrade "$(JOB)" $(if $(LOCK),--lock "$(LOCK)",) $(if $(VERIFIER_BUNDLE),--bundle "$(VERIFIER_BUNDLE)",) $(if $(STORE),--store "$(STORE)",) $(if $(COVERAGE_CHECK),--coverage-check,) $(if $(CONCURRENCY),--concurrency "$(CONCURRENCY)",) $(if $(REGRADE_OUT),--out "$(REGRADE_OUT)",)
 
 experiment-analyze:
 	$(call require_var,JOBS)
@@ -581,7 +609,7 @@ jev-shadow-rubric:
 define smoke_run
 	@mkdir -p "$(SMOKE_LOCK_DIR)"
 	@$(RAIDAR) lock "$(1)" --output "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3)
-	@$(PACK_DOCKER_ENV) $(RAIDAR_SECRETS) run "$(1)" --lock "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3) $(4) \
+	@$(TARGET_ENV) $(RAIDAR_SECRETS) run "$(1)" --lock "$(SMOKE_LOCK_DIR)/$(2).lock.json" $(3) $(4) \
 		--concurrency "$(SMOKE_CONCURRENCY)" --jobs-dir "$(SMOKE_JOBS_DIR)"
 endef
 

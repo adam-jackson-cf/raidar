@@ -53,10 +53,9 @@ from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
-    DOCKER_CONTEXT,
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_context,
+    docker_target_ready,
     run_trial_sync,
 )
 from tests.python_guardrails_support import (
@@ -73,8 +72,8 @@ SHADOW_INNER = "tests.test_component_python_guardrails_trial:ObservingInnerAgent
 VERIFY_SLUG = "00-python-guardrails"
 
 docker_trial = pytest.mark.skipif(
-    not (orbstack_available() and pack_image_present()),
-    reason="needs OrbStack (external data dir) and the built python pack image",
+    not (docker_target_ready()),
+    reason="needs a ready Docker target (data check passing) and the built python pack image",
 )
 
 
@@ -267,8 +266,7 @@ def test_the_shadow_baseline_records_the_gate_unseen_in_a_real_trial(tmp_path: P
 # ---- rule-coverage verification (opt-in) -------------------------------------------
 
 coverage_verification = pytest.mark.skipif(
-    os.environ.get("RAIDAR_GUARDRAILS_VERIFY") != "1"
-    or not (orbstack_available() and pack_image_present()),
+    os.environ.get("RAIDAR_GUARDRAILS_VERIFY") != "1" or not (docker_target_ready()),
     reason="opt-in (make guardrails-verify): OrbStack, the pack image and PyPI egress",
 )
 
@@ -393,7 +391,7 @@ def test_every_implemented_rule_is_proven_by_its_canaries_in_the_pack_image(
     name = f"raidar-guardrails-verify-{uuid.uuid4().hex[:8]}"
 
     done = subprocess.run(
-        ["docker", "--context", DOCKER_CONTEXT, "run", "--rm", "--name", name]
+        ["docker", "--context", docker_context(), "run", "--rm", "--name", name]
         + ["-v", f"{root}:/verify", "--user", "root", image_tag(load_pack_spec())]
         + ["bash", "/verify/run.sh"],
         capture_output=True,
@@ -469,7 +467,7 @@ def test_v8_autofix_is_proven_by_its_canaries_in_the_pack_image(tmp_path: Path) 
     name = f"raidar-guardrails-autofix-{uuid.uuid4().hex[:8]}"
 
     done = subprocess.run(
-        ["docker", "--context", DOCKER_CONTEXT, "run", "--rm", "--name", name]
+        ["docker", "--context", docker_context(), "run", "--rm", "--name", name]
         + ["-v", f"{root}:/verify", "--user", "root", image_tag(load_pack_spec())]
         + ["bash", "/verify/run.sh"],
         capture_output=True,

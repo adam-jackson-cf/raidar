@@ -41,8 +41,7 @@ from raidar.spec.references import RefKind, RegistryRef
 from tests.component_support import PROBE_DIR, compile_uses, use, write_jsonl
 from tests.component_trial_support import (
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_target_ready,
     run_trial_sync,
 )
 
@@ -292,8 +291,8 @@ def test_no_provisions_adds_no_hook() -> None:
 
 
 docker_trial = pytest.mark.skipif(
-    not (orbstack_available() and pack_image_present()),
-    reason="needs OrbStack (external data dir) and the built python pack image",
+    not (docker_target_ready()),
+    reason="needs a ready Docker target (data check passing) and the built python pack image",
 )
 
 

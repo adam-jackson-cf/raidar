@@ -24,7 +24,7 @@ calls the provider. ``process-compliance@2`` binds no Jev runtime.
 Pre-fix grades: when a scorer run reads them (``gate-effort@4`` to ``@6``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
 yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
-bundle, sandbox and timeout, on ``--docker-context``), never into the job, and
+bundle, sandbox and timeout, on ``--target``'s grader target), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
 
@@ -62,7 +62,9 @@ from raidar.commands.assess_grading import (
     RegradeOptions,
     check_coverage,
     grade_pre_fix,
+    grading_options,
     produce_coverage,
+    reads_docker_grades,
     regrade,
 )
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
@@ -114,7 +116,7 @@ class _RescoreRequest:
     replay: bool
     jev_replay_only: bool = False
     lock: Path | None = None
-    docker_context: str = "orbstack"
+    target_name: str | None = None
     concurrency: int = 1
 
 
@@ -253,23 +255,25 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
     if store.resolve().is_relative_to(request.target.resolve()):
         raise click.UsageError("--store must not be inside the job being rescored")
     _check_as1(request.target, request.lock, request.scorer_refs, request.bundle)
-    options = RegradeOptions(docker_context=request.docker_context, bundle_override=request.bundle)
-    graded = grade_pre_fix(
-        request.target,
-        store,
-        request.scorer_refs,
-        options,
-        replay=request.replay,
-        concurrency=request.concurrency,
-    )
-    covered = produce_coverage(
-        request.target,
-        store,
-        request.scorer_refs,
-        options,
-        replay=request.replay,
-        concurrency=request.concurrency,
-    )
+    graded = covered = None
+    if reads_docker_grades(request.scorer_refs, request.replay):
+        options = grading_options(request.target_name, request.bundle)
+        graded = grade_pre_fix(
+            request.target,
+            store,
+            request.scorer_refs,
+            options,
+            replay=request.replay,
+            concurrency=request.concurrency,
+        )
+        covered = produce_coverage(
+            request.target,
+            store,
+            request.scorer_refs,
+            options,
+            replay=request.replay,
+            concurrency=request.concurrency,
+        )
     try:
         settings, config_path = _settings(request)
         records = rescore_path(
@@ -375,7 +379,13 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
         "once (each trial's steps stay in order)."
     ),
 )
-@click.option("--docker-context", default="orbstack", show_default=True)
+@click.option(
+    "--target",
+    "target_name",
+    default=None,
+    help="Docker target for hidden-test grading (default: $RAIDAR_TARGET, targets.toml `default`, "
+    "then the current Docker context); its grader target must be trusted.",
+)
 @click.option(
     "--out", type=click.Path(dir_okay=False, path_type=Path), help="Write the report here."
 )
@@ -391,7 +401,7 @@ def assess(
     bundle_override: Path | None,
     coverage_check: bool,
     concurrency: int,
-    docker_context: str,
+    target_name: str | None,
     out: Path | None,
 ) -> None:
     """Re-assess stored jobs without re-running agents."""
@@ -399,7 +409,7 @@ def assess(
         raise click.UsageError("--coverage-check applies to --regrade only")
     if regrade_target is not None and rescore_target is None:
         _check_as1(regrade_target, lock_path, (), bundle_override)
-        options = RegradeOptions(docker_context=docker_context, bundle_override=bundle_override)
+        options = grading_options(target_name, bundle_override)
         _regrade(
             regrade_target,
             options,
@@ -418,7 +428,7 @@ def assess(
             replay,
             jev_replay_only,
             lock_path,
-            docker_context,
+            target_name,
             concurrency,
         )
         _rescore(request, out)

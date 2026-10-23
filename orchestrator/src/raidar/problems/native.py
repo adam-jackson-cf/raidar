@@ -102,7 +102,7 @@ class NativeRunner:
     """An SCB fork checkout with its ``.venv`` (``slop-code`` CLI) installed."""
 
     root: Path
-    docker_context: str = "orbstack"
+    docker_context: str
 
     def revision(self) -> dict[str, object]:
         """The fork's git commit and whether it has local changes (recorded, N3).

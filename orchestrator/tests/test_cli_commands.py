@@ -295,11 +295,13 @@ def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -
     assert env_harbor.compose_preflight_reason() is None
 
 
-def test_harbor_cleanup_reports_removed_trial_environments(monkeypatch, tmp_path: Path) -> None:
+def test_harbor_cleanup_reports_removed_trial_environments(
+    monkeypatch, tmp_path: Path, docker_target_offline: None
+) -> None:
     seen: dict[str, object] = {}
 
-    def fake_cleanup(job_dir, *, dry_run):
-        seen.update(job_dir=job_dir, dry_run=dry_run)
+    def fake_cleanup(job_dir, *, docker_context, dry_run):
+        seen.update(job_dir=job_dir, docker_context=docker_context, dry_run=dry_run)
         return ["b00-p0-baseline__env-0123456789"]
 
     monkeypatch.setattr("raidar.commands.env_harbor.cleanup_trial_projects", fake_cleanup)
@@ -307,13 +309,13 @@ def test_harbor_cleanup_reports_removed_trial_environments(monkeypatch, tmp_path
     result = CliRunner().invoke(main, ["harbor", "cleanup", "--job", str(tmp_path), "--dry-run"])
 
     assert result.exit_code == 0, result.output
-    assert seen == {"job_dir": tmp_path, "dry_run": True}
+    assert seen == {"job_dir": tmp_path, "docker_context": "test-ctx", "dry_run": True}
     assert "would remove: b00-p0-baseline__env-0123456789" in result.output
     assert "1 trial environment(s) would remove" in result.output
 
 
-def test_harbor_cleanup_surfaces_docker_failures(monkeypatch) -> None:
-    def failing(job_dir, *, dry_run):
+def test_harbor_cleanup_surfaces_docker_failures(monkeypatch, docker_target_offline: None) -> None:
+    def failing(job_dir, *, docker_context, dry_run):
         raise RuntimeError("docker ps failed: no daemon")
 
     monkeypatch.setattr("raidar.commands.env_harbor.cleanup_trial_projects", failing)
@@ -341,6 +343,7 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "problem",
         "quality",
         "run",
+        "target",
         "upgrade-spec",
         "validate",
     }

@@ -239,7 +239,9 @@ def test_docker_sandbox_is_offline_unprivileged_and_mounts_tests_read_only(tmp_p
         cpus=1.5,
         memory_mb=2048,
     )
-    docker = DockerSandbox(image="grader:tag").run_argv(run, "raidar-oracle-x")
+    docker = DockerSandbox(image="grader:tag", docker_context="orbstack").run_argv(
+        run, "raidar-oracle-x"
+    )
     joined = " ".join(docker)
     assert docker[:4] == ["docker", "--context", "orbstack", "run"]
     assert "--rm" in docker

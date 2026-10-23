@@ -58,7 +58,7 @@ def _options(root: Path) -> RegradeOptions:
         del bundle
         return LocalProcessSandbox(root / "sandbox")
 
-    return RegradeOptions(sandbox_factory=build)
+    return RegradeOptions(docker_context="test-ctx", sandbox_factory=build)
 
 
 async def test_a_deferred_coverage_pass_is_made_into_the_store_never_the_job(
@@ -165,7 +165,7 @@ def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(
         tmp_path / "job",
         tmp_path / "store",
         scorers,
-        RegradeOptions(),
+        RegradeOptions(docker_context="orbstack"),
         replay=replay,
         concurrency=2,
     )
@@ -196,7 +196,7 @@ async def test_trials_made_concurrently_give_the_report_made_one_after_another(
         # Each trial was graded in its own root's sandbox (the bundle sits at <root>/fixture).
         return LocalProcessSandbox(Path(bundle.root).parent.parent / "sandbox")
 
-    options = RegradeOptions(sandbox_factory=build)
+    options = RegradeOptions(docker_context="test-ctx", sandbox_factory=build)
     one = await produce_coverage_path(job, tmp_path / "one", options)
     many = await produce_coverage_path(job, tmp_path / "many", options, concurrency=3)
 

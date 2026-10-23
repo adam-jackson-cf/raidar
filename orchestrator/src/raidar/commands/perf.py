@@ -107,6 +107,10 @@ def _payload(report: PerfReport, trials: int, min_samples: int, strict: bool) ->
     }
 
 
+def register(main: click.Group) -> None:
+    main.add_command(perf_group)
+
+
 @click.group("perf")
 def perf_group() -> None:
     """N1 framework-overhead budgets."""

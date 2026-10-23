@@ -8,6 +8,7 @@ from dataclasses import asdict
 
 import click
 
+from raidar.commands.target_options import docker_selection, target_option
 from raidar.packs import available_runtimes, load_runtime_pack
 from raidar.packs.python.image import (
     ImageAuditError,
@@ -50,8 +51,10 @@ def pack() -> None:
 
 @pack.command("info")
 @click.argument("runtime", type=RUNTIME_CHOICE)
-def pack_info(runtime: str) -> None:
+@target_option
+def pack_info(runtime: str, target_name: str | None) -> None:
     """Show the pack image tag, lock hashes and tool classes."""
+    docker_selection(target_name)
     spec, lock = load_runtime_pack(runtime), load_tool_lock()
     provisioner = ToolProvisioner(lock)
     record = inspect_image(image_tag(spec))
@@ -76,8 +79,10 @@ def pack_info(runtime: str) -> None:
 @pack.command("build")
 @click.argument("runtime", type=RUNTIME_CHOICE)
 @click.option("--force", is_flag=True, help="Rebuild even if the lock-hash tag exists.")
-def pack_build(runtime: str, force: bool) -> None:
+@target_option
+def pack_build(runtime: str, force: bool, target_name: str | None) -> None:
     """Build the agent image once per lock hash and assert it has no scorer tools."""
+    docker_selection(target_name)
     try:
         result = build_image(load_runtime_pack(runtime), load_tool_lock(), force=force)
     except ImageAuditError as error:
@@ -90,8 +95,10 @@ def pack_build(runtime: str, force: bool) -> None:
 
 @pack.command("audit")
 @click.argument("runtime", type=RUNTIME_CHOICE)
-def pack_audit(runtime: str) -> None:
+@target_option
+def pack_audit(runtime: str, target_name: str | None) -> None:
     """Assert the built agent image has the pinned agent CLIs and no scorer tools or browsers."""
+    docker_selection(target_name)
     spec = load_runtime_pack(runtime)
     try:
         audit = audit_image(image_tag(spec), spec, load_tool_lock())

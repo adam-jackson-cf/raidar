@@ -35,6 +35,7 @@ from raidar.problems.validation import (
 )
 from raidar.problems.validator import ValidateOptions, validate_problem, write_report
 from raidar.verifier.sandbox import SandboxResult, SandboxRun
+from tests.component_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import (
     NEGATIVE_REF,
     ONESHOT_REF,
@@ -68,7 +69,9 @@ async def _validate(
     return await validate_problem(
         store,
         ProblemId.parse(ref),
-        ValidateOptions(repeats=repeats, concurrency=1),  # one local sandbox root
+        ValidateOptions(
+            docker_context="test-ctx", repeats=repeats, concurrency=1
+        ),  # one local sandbox root
         sandbox=LocalProcessSandbox(tmp_path / "sandbox"),
         work_root=tmp_path,
     )
@@ -300,7 +303,10 @@ def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
 
 
 def test_validate_command_exit_codes_follow_the_verdict(
-    store: ProblemStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    store: ProblemStore,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    docker_target_offline: None,
 ) -> None:
     async def local_sandbox(problem: Any, docker_context: str) -> tuple[Any, dict[str, object]]:
         return LocalProcessSandbox(tmp_path / "sandbox"), {"sandbox": "local"}
@@ -393,6 +399,10 @@ evaluation = {
 """
 
 
+@pytest.mark.skipif(
+    not docker_target_reachable(),
+    reason="builds the grader image: needs a reachable Docker target (make target-status)",
+)
 async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     store: ProblemStore, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -424,7 +434,12 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     report = await validate_problem(
         store,
         ProblemId.parse(POSITIVE_REF),
-        ValidateOptions(engine="harbor", repeats=1, native_runner=runner_root),
+        ValidateOptions(
+            docker_context=docker_context(),
+            engine="harbor",
+            repeats=1,
+            native_runner=runner_root,
+        ),
         work_root=tmp_path,
     )
     assert harbor_calls == [(POSITIVE, 1), (NEGATIVE, 1)]
@@ -439,7 +454,11 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     assert report.verdict is Verdict.EXCLUDED
     assert problem.manifest == store.load(ProblemId.parse(POSITIVE_REF)).manifest
     with pytest.raises(ValueError, match="engine"):
-        await validate_problem(store, ProblemId.parse(POSITIVE_REF), ValidateOptions(engine="x"))
+        await validate_problem(
+            store,
+            ProblemId.parse(POSITIVE_REF),
+            ValidateOptions(docker_context="test-ctx", engine="x"),
+        )
 
 
 def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None:

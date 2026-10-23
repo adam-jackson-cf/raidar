@@ -358,7 +358,7 @@ def test_audit_only_merges_into_the_committed_report_and_drafts_errata(kv, tmp_p
         audit_problem(
             store,
             problem_id,
-            ValidateOptions(concurrency=1),
+            ValidateOptions(docker_context="test-ctx", concurrency=1),
             sandbox=LocalProcessSandbox(tmp_path / "sandbox"),
             work_root=tmp_path,
         )

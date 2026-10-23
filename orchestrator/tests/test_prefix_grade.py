@@ -64,7 +64,7 @@ async def _graded_trial(tmp_path: Path) -> Path:
 
 
 def _options(tmp_path: Path) -> RegradeOptions:
-    return RegradeOptions(sandbox_factory=local_factory(tmp_path))
+    return RegradeOptions(docker_context="test-ctx", sandbox_factory=local_factory(tmp_path))
 
 
 async def test_a_pre_fix_snapshot_is_graded_into_the_store_never_the_job(tmp_path: Path) -> None:

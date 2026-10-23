@@ -438,7 +438,7 @@ def test_binding_rejects_an_environment_that_still_builds_its_own_image(tmp_path
 
 
 def test_pack_commands_report_the_audit_and_fail_cleanly(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, docker_target_offline: None
 ) -> None:
     spec = load_pack_spec()
     monkeypatch.setenv("RAIDAR_TOOL_CACHE", str(tmp_path / "cache"))

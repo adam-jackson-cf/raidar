@@ -1,4 +1,4 @@
-"""Real Harbor trials on the Python pack image for component tests (OrbStack only).
+"""Real Harbor trials on the Python pack image for component tests (a ready Docker target only).
 
 Builds a multi-step Harbor task whose steps carry the compiled per-step
 ``setup.sh`` (and the first step's overlay), then runs it through Harbor's
@@ -9,8 +9,8 @@ test (no LLM) and the C2/C4 real-trial probe run (codex-cli + gpt-6-luna low).
 from __future__ import annotations
 
 import asyncio
+import functools
 import json
-import os
 import shlex
 import shutil
 import subprocess
@@ -38,8 +38,9 @@ from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KW
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
 from raidar.packs.python.task_environment import bind_task_environment
+from raidar.targets.config import Target, TargetError, activate, resolve_target
+from raidar.targets.health import ensure_target
 
-DOCKER_CONTEXT = "orbstack"
 PLANT_MARKER = "raidar-planted-sentinel"
 AGENT_HOME = load_pack_spec().image.agent_home
 # Every harness-state location the reset owns (step_reset.sh STATE_TARGETS).
@@ -56,27 +57,41 @@ PROBE_EXCLUDES = ("proc", "sys", "dev", "usr", "lib", "lib64", "bin", "sbin", "b
 STUB_TEST_SH = "#!/bin/bash\n# Verifier disabled in component trials.\nexit 1\n"
 
 
-def orbstack_available() -> bool:
-    try:
-        status = subprocess.run(
-            ["orbstack-data-status"], capture_output=True, text=True, timeout=20
-        )
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return "external_available=True" in status.stdout
+def docker_target() -> Target:
+    """The target tests run on: ``RAIDAR_TARGET``, the targets file, else the current context."""
+    return resolve_target()
 
 
-def pack_image_present() -> bool:
+def docker_context() -> str:
+    return docker_target().docker_context
+
+
+def pack_image_present(target: Target) -> bool:
     try:
         tag = image_tag(load_pack_spec())
         found = subprocess.run(
-            ["docker", "--context", DOCKER_CONTEXT, "image", "inspect", tag],
+            ["docker", "--context", target.docker_context, "image", "inspect", tag],
             capture_output=True,
             timeout=30,
         )
     except (OSError, subprocess.TimeoutExpired):
         return False
     return found.returncode == 0
+
+
+@functools.cache
+def docker_target_reachable() -> bool:
+    """The current target resolves and is reachable (its data check included)."""
+    try:
+        ensure_target(docker_target())
+    except TargetError:
+        return False
+    return True
+
+
+def docker_target_ready() -> bool:
+    """A reachable current target that also holds the pack image."""
+    return docker_target_reachable() and pack_image_present(docker_target())
 
 
 def build_task(
@@ -142,7 +157,7 @@ async def run_trial(
 
     if trials_dir.name != "trials":
         raise ValueError(f"trials_dir must be named 'trials' (run scope): {trials_dir}")
-    os.environ["DOCKER_CONTEXT"] = DOCKER_CONTEXT
+    activate(docker_target())
     config = TrialConfig(
         task=TaskConfig(path=task_dir),
         trial_name=trial_name,
@@ -161,7 +176,7 @@ async def run_trial(
         install_trial_provisioning(trial, provisions)
         await trial.run()
     finally:
-        cleanup_trial_projects(trials_dir.parent)
+        cleanup_trial_projects(trials_dir.parent, docker_context=docker_target().docker_context)
     return trials_dir / trial_name
 
 

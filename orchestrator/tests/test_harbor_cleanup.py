@@ -8,8 +8,15 @@ from pathlib import Path
 
 import pytest
 
-from raidar.execution.cleanup import cleanup_trial_projects, select_stale, trial_projects
+from raidar.execution.cleanup import (
+    cleanup_trial_projects,
+    reap_project,
+    select_stale,
+    trial_projects,
+)
 from raidar.execution.environment import run_scope
+
+CONTEXT = "remote-ctx"
 
 
 def _listing(*rows: tuple[str, str]) -> str:
@@ -23,6 +30,8 @@ class FakeDocker:
         self.calls: list[list[str]] = []
 
     def __call__(self, command: Sequence[str]) -> subprocess.CompletedProcess[str]:
+        assert list(command[1:3]) == ["--context", CONTEXT], command
+        command = [command[0], *command[3:]]
         self.calls.append(list(command))
         if command[:2] == ["docker", "ps"]:
             return subprocess.CompletedProcess(
@@ -61,7 +70,7 @@ def test_without_a_run_only_projects_with_nothing_running_are_removed() -> None:
         )
     )
 
-    removed = cleanup_trial_projects(runner=docker)
+    removed = cleanup_trial_projects(docker_context=CONTEXT, runner=docker)
 
     assert removed == ["b01-p0-guided__env-abcdefabcd"]
     assert docker.downs() == ["b01-p0-guided__env-abcdefabcd"]
@@ -77,7 +86,7 @@ def test_a_named_run_removes_its_projects_even_when_running(tmp_path: Path) -> N
         )
     )
 
-    removed = cleanup_trial_projects(tmp_path, runner=docker)
+    removed = cleanup_trial_projects(tmp_path, docker_context=CONTEXT, runner=docker)
 
     assert removed == [f"b00-p0-baseline__env-{scope}"]
     assert docker.downs() == [f"b00-p0-baseline__env-{scope}"]
@@ -86,15 +95,26 @@ def test_a_named_run_removes_its_projects_even_when_running(tmp_path: Path) -> N
 def test_dry_run_lists_without_removing() -> None:
     docker = FakeDocker(_listing(("b01-p0-guided__env-abcdefabcd", "exited")))
 
-    assert cleanup_trial_projects(dry_run=True, runner=docker) == ["b01-p0-guided__env-abcdefabcd"]
+    assert cleanup_trial_projects(docker_context=CONTEXT, dry_run=True, runner=docker) == [
+        "b01-p0-guided__env-abcdefabcd"
+    ]
     assert docker.downs() == []
 
 
 def test_a_failed_listing_is_an_error() -> None:
     with pytest.raises(RuntimeError, match="docker ps failed: no daemon"):
-        cleanup_trial_projects(runner=FakeDocker("", returncode=1))
+        cleanup_trial_projects(docker_context=CONTEXT, runner=FakeDocker("", returncode=1))
 
 
 def test_select_stale_is_empty_without_trial_projects(tmp_path: Path) -> None:
     assert select_stale([], None) == []
     assert select_stale([], tmp_path) == []
+
+
+def test_reaping_one_project_runs_compose_down_on_the_given_context() -> None:
+    docker = FakeDocker("")
+
+    outcome = reap_project("t0__env-abcdefabcd", docker_context=CONTEXT, runner=docker)
+
+    assert docker.downs() == ["t0__env-abcdefabcd"]
+    assert outcome == {"returncode": 0, "stderr": ""}

@@ -75,6 +75,7 @@ async def run_in_order(
     worker: Callable[[JobT], Awaitable[ResultT]],
     *,
     concurrency: int,
+    admit: Callable[[JobT], Awaitable[None]] | None = None,
 ) -> list[ResultT]:
     """Run ``worker`` over ``jobs``: started in order, at most ``concurrency`` at a time.
 
@@ -82,6 +83,11 @@ async def run_in_order(
     records one as an infra error). If one raises anyway, no further job is
     started, every job still running is cancelled and awaited, and the first
     exception propagates: nothing is left running behind the caller.
+
+    ``admit`` runs before each job starts. If it raises, no further job is
+    started, but jobs already running are left to finish on their own before
+    the exception propagates (a lost Docker target: running trials fail or
+    complete by themselves).
     """
     if concurrency < 1:
         raise ValueError("concurrency must be >= 1")
@@ -98,6 +104,13 @@ async def run_in_order(
         for job in jobs:
             await slots.acquire()
             _raise_first_failure(tasks)
+            if admit is not None:
+                try:
+                    await admit(job)
+                except Exception:
+                    slots.release()
+                    await asyncio.gather(*tasks, return_exceptions=True)
+                    raise
             tasks.append(asyncio.create_task(guarded(job)))
         return list(await asyncio.gather(*tasks))
     finally:

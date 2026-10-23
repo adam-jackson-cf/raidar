@@ -88,6 +88,7 @@ async def make_verifier(
         await start_agent_behind_guard(tmp_path, FakeAgentEnvironment(), bundle, step)
     verifier = LocalVerifier(
         oracle_bundle=str(bundle),
+        docker_context="test-ctx",
         task=cast(Any, None),
         trial_paths=TrialPaths(trial_dir=tmp_path / "trial"),
         environment=cast(Any, env),
@@ -293,7 +294,9 @@ async def test_regrade_over_stored_snapshots_reproduces_the_original_results(
     trial = tmp_path / "trial"
     before = {p: p.read_bytes() for p in trial.rglob("*") if p.is_file()}
 
-    report = await regrade_path(trial, RegradeOptions(sandbox_factory=local_factory(tmp_path)))
+    report = await regrade_path(
+        trial, RegradeOptions(docker_context="test-ctx", sandbox_factory=local_factory(tmp_path))
+    )
 
     assert report["match"] is True
     steps = report["trials"][0]["steps"]  # type: ignore[index]
@@ -311,7 +314,8 @@ async def test_regrade_reports_a_mismatch_against_a_different_record(tmp_path: P
     record_path.write_text(json.dumps(record))
 
     report = await regrade_path(
-        tmp_path / "trial", RegradeOptions(sandbox_factory=local_factory(tmp_path))
+        tmp_path / "trial",
+        RegradeOptions(docker_context="test-ctx", sandbox_factory=local_factory(tmp_path)),
     )
 
     assert report["match"] is False
@@ -326,14 +330,16 @@ async def test_regrade_refuses_a_snapshot_or_bundle_changed_since_grading(tmp_pa
         tmp_path, FakeAgentEnvironment(), bundle_root=bundle.root, coverage=False
     )
     await verifier.verify()
-    options = RegradeOptions(sandbox_factory=local_factory(tmp_path))
+    options = RegradeOptions(docker_context="test-ctx", sandbox_factory=local_factory(tmp_path))
 
     (bundle.tests_dir / "conftest.py").write_text("# edited\n")
     with pytest.raises(RegradeError, match="bundle"):
         await regrade_path(tmp_path / "trial", options)
 
     options = RegradeOptions(
-        sandbox_factory=local_factory(tmp_path), bundle_override=make_bundle(tmp_path / "b2").root
+        docker_context="test-ctx",
+        sandbox_factory=local_factory(tmp_path),
+        bundle_override=make_bundle(tmp_path / "b2").root,
     )
     (app / "app.py").write_text("print('changed')\n")
     with pytest.raises(RegradeError):
@@ -358,7 +364,9 @@ async def test_regrade_uses_the_recorded_timeout_and_attributes_a_different_grad
     async def other_image(bundle: Any) -> GradingSandbox:
         return sandbox
 
-    report = await regrade_path(tmp_path / "trial", RegradeOptions(sandbox_factory=other_image))
+    report = await regrade_path(
+        tmp_path / "trial", RegradeOptions(docker_context="test-ctx", sandbox_factory=other_image)
+    )
 
     assert [run.timeout_s for run in sandbox.runs] == [123.0]
     assert report["match"] is False
@@ -381,7 +389,7 @@ async def _verify(tmp_path: Path, **kwargs: Any) -> None:
 
 
 def test_assess_regrade_cli_exit_code_follows_the_match(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, docker_target_offline: None
 ) -> None:
     place_step_artifact(tmp_path, "checkpoint_1")
     asyncio.run(_verify(tmp_path, coverage=False))
@@ -404,7 +412,9 @@ def test_assess_regrade_cli_exit_code_follows_the_match(
     assert '"match": false' in mismatch.output
 
 
-def test_assess_requires_a_mode_and_reports_regrade_errors(tmp_path: Path) -> None:
+def test_assess_requires_a_mode_and_reports_regrade_errors(
+    tmp_path: Path, docker_target_offline: None
+) -> None:
     runner = CliRunner()
     usage = runner.invoke(main, ["assess"])
     assert usage.exit_code == 2

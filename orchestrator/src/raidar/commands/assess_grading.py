@@ -29,6 +29,7 @@ from typing import Any
 
 import click
 
+from raidar.commands.target_options import docker_selection
 from raidar.verifier.bundle import BundleError
 from raidar.verifier.coverage_offline import check_coverage_path, produce_coverage_path
 from raidar.verifier.prefix_grade import grade_pre_fix_path, regrade_pre_fix_path
@@ -108,12 +109,28 @@ def check_coverage(
         raise click.ClickException(str(exc)) from exc
 
 
+def grading_options(target_name: str | None, bundle_override: Path | None) -> RegradeOptions:
+    """Options on the selected target's grader target (trusted with hidden tests, ensured)."""
+    selection = docker_selection(target_name, grader_purpose="hidden-test grading")
+    return RegradeOptions(
+        docker_context=selection.grader.docker_context, bundle_override=bundle_override
+    )
+
+
+def reads_docker_grades(scorer_refs: Iterable[str], replay: bool) -> bool:
+    """Whether a rescore first makes pre-fix grades or offline coverage (hidden tests, Docker)."""
+    refs = set(scorer_refs)
+    return not replay and bool((PRE_FIX_GRADE_SCORERS | OFFLINE_COVERAGE_SCORERS) & refs)
+
+
 __all__ = [
     "OFFLINE_COVERAGE_SCORERS",
     "PRE_FIX_GRADE_SCORERS",
     "RegradeOptions",
     "check_coverage",
     "grade_pre_fix",
+    "grading_options",
     "produce_coverage",
+    "reads_docker_grades",
     "regrade",
 ]

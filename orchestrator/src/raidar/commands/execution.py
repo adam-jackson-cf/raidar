@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 from collections.abc import Callable
 from pathlib import Path
@@ -11,11 +10,11 @@ from typing import Any
 import click
 
 from raidar.commands.experiment_spec import _load
-from raidar.commands.perf import perf_group
+from raidar.commands.target_options import job_target, run_guarded, target_option
 from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
 from raidar.execution.credentials import CredentialPreflightError, preflight_credentials
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
-from raidar.execution.run import JobContext, default_job_id, execute, load_problems
+from raidar.execution.run import default_job_id, load_problems, run_job
 from raidar.packs.drift import LockedPackError, lock_runtime_pack
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
 from raidar.spec.lock import (
@@ -31,7 +30,6 @@ from raidar.spec.lock import (
 def register(main: click.Group) -> None:
     main.add_command(plan_command)
     main.add_command(run_command)
-    main.add_command(perf_group)
 
 
 def _plan_options(command: Callable[..., Any]) -> Callable[..., Any]:
@@ -183,11 +181,15 @@ def plan_command(as_json: bool, **options: Any) -> None:
     help="Root for job directories (<jobs-dir>/<experiment id>/<job id>/).",
 )
 @click.option("--job-id", default=None, help="Job directory name (default: UTC timestamp).")
-def run_command(jobs_dir: Path, job_id: str | None, **options: Any) -> None:
+@target_option
+def run_command(
+    jobs_dir: Path, job_id: str | None, target_name: str | None, **options: Any
+) -> None:
     """Run a locked experiment.yaml: every selected trial through Harbor."""
     plan, store = _build(options)
     if not plan.selected:
         raise click.ClickException("the selection matches no trial")
+    jt = job_target(target_name)
     try:
         preflight_credentials(plan)
     except CredentialPreflightError as exc:
@@ -197,14 +199,11 @@ def run_command(jobs_dir: Path, job_id: str | None, **options: Any) -> None:
         problems = load_problems(plan, store)
     except ProblemStoreError as exc:
         raise click.ClickException(str(exc)) from exc
-    ctx = JobContext(
-        plan=plan,
-        job_dir=jobs_dir.resolve() / plan.experiment_id / job_id,
-        job_id=job_id,
-        problems=problems,
+    job_dir = jobs_dir.resolve() / plan.experiment_id / job_id
+    records = run_guarded(
+        job_dir, run_job(plan, problems, job_dir=job_dir, job_id=job_id, target=jt)
     )
-    records = asyncio.run(execute(ctx))
-    click.echo(f"Job {ctx.job_dir}")
+    click.echo(f"Job {job_dir}")
     for record in records:
         states = " ".join(a.checkpoint_state.value for a in record.step_results)
         click.echo(

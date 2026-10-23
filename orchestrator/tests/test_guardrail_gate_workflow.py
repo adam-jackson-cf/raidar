@@ -47,8 +47,7 @@ from raidar.components.review_loop import PROMPT_ARG_BUDGET
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_target_ready,
     run_trial_sync,
 )
 
@@ -410,8 +409,8 @@ def test_the_gate_and_another_workflow_cannot_both_wrap_the_agent() -> None:
 
 
 docker_trial = pytest.mark.skipif(
-    not (orbstack_available() and pack_image_present()),
-    reason="needs OrbStack (external data dir) and the built python pack image",
+    not (docker_target_ready()),
+    reason="needs a ready Docker target (data check passing) and the built python pack image",
 )
 
 

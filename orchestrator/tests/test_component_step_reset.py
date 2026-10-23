@@ -24,11 +24,9 @@ from raidar.components.setup_script import render_setup_script
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
 from tests.component_support import PILOT_DIR, agent, all_builtin_uses, compile_uses, condition, use
 from tests.component_trial_support import (
-    DOCKER_CONTEXT,
     IsolationProbeAgent,
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_target_ready,
     run_trial_sync,
 )
 
@@ -183,8 +181,13 @@ def test_component_trials_get_a_per_run_compose_project_and_always_clean_it_up(
         raise RuntimeError("compose up failed")
 
     monkeypatch.setattr(Trial, "create", staticmethod(failing_create))
-    monkeypatch.setattr("tests.component_trial_support.cleanup_trial_projects", cleaned.append)
-    monkeypatch.setenv("DOCKER_CONTEXT", DOCKER_CONTEXT)
+    monkeypatch.setattr(
+        "tests.component_trial_support.cleanup_trial_projects",
+        lambda job_dir, **_: cleaned.append(job_dir),
+    )
+    monkeypatch.setenv("RAIDAR_TARGETS_FILE", str(tmp_path / "no-targets.toml"))
+    monkeypatch.delenv("RAIDAR_TARGET", raising=False)
+    monkeypatch.setenv("DOCKER_CONTEXT", "test-ctx")
     agent_config = AgentConfig(import_path="tests.component_trial_support:IsolationProbeAgent")
     with pytest.raises(RuntimeError, match="compose up failed"):
         run_trial_sync(tmp_path / "task", tmp_path / "trials", agent_config, "isolation")
@@ -199,8 +202,8 @@ def test_component_trials_get_a_per_run_compose_project_and_always_clean_it_up(
 
 
 docker_trial = pytest.mark.skipif(
-    not (orbstack_available() and pack_image_present()),
-    reason="needs OrbStack (external data dir) and the built python pack image",
+    not (docker_target_ready()),
+    reason="needs a ready Docker target (data check passing) and the built python pack image",
 )
 
 

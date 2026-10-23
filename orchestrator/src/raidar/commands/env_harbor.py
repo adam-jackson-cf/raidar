@@ -11,6 +11,7 @@ import click
 
 from raidar.agents.adapters.base import harbor_executable
 from raidar.commands.shared import ORCHESTRATOR_ROOT, run_or_raise
+from raidar.commands.target_options import docker_selection, target_option
 from raidar.execution.cleanup import cleanup_trial_projects
 
 COMPOSE_MINIMUM_VERSION = (2, 40, 1)
@@ -65,14 +66,18 @@ def harbor() -> None:
     help="Remove every trial environment of this job directory, running or not.",
 )
 @click.option("--dry-run", is_flag=True, help="List the trial environments without removing.")
-def harbor_cleanup(job_dir: Path | None, dry_run: bool) -> None:
+@target_option
+def harbor_cleanup(job_dir: Path | None, dry_run: bool, target_name: str | None) -> None:
     """Remove trial environments a stopped `raidar run` left behind.
 
     Without --job, only trial environments with no running container are removed,
     so a concurrent job on the same Docker host is never touched.
     """
+    selection = docker_selection(target_name, ensure=False)
     try:
-        removed = cleanup_trial_projects(job_dir, dry_run=dry_run)
+        removed = cleanup_trial_projects(
+            job_dir, docker_context=selection.trial.docker_context, dry_run=dry_run
+        )
     except (OSError, RuntimeError, subprocess.TimeoutExpired) as exc:
         raise click.ClickException(str(exc)) from exc
     verb = "would remove" if dry_run else "removed"

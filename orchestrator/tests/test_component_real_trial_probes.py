@@ -29,8 +29,7 @@ from raidar.components.provision import condition_provisions
 from tests.component_support import PILOT_DIR, all_builtin_uses, compile_uses, use
 from tests.component_trial_support import (
     build_task,
-    orbstack_available,
-    pack_image_present,
+    docker_target_ready,
     run_trial_sync,
 )
 
@@ -43,8 +42,7 @@ INSTRUCTION = (
 )
 
 pytestmark = pytest.mark.skipif(
-    os.environ.get("RAIDAR_REAL_LLM_PROBES") != "1"
-    or not (orbstack_available() and pack_image_present()),
+    os.environ.get("RAIDAR_REAL_LLM_PROBES") != "1" or not (docker_target_ready()),
     reason="real-LLM probe trials run only with RAIDAR_REAL_LLM_PROBES=1 on OrbStack",
 )
 

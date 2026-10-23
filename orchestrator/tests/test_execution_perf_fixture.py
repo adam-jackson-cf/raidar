@@ -17,8 +17,8 @@ report is written to ``<fixture dir>/perf-check.json``.
 
 Opted in, a missing prerequisite fails the test instead of skipping it, so a
 CI job or ``make perf-fixture`` can never pass without running the fixture.
-``DOCKER_CONTEXT`` selects the engine (default ``orbstack``; on OrbStack the
-data-volume check must also pass).
+The Docker target is the one ``TARGET=`` / ``RAIDAR_TARGET`` / the targets file selects
+(else the current Docker context); its configured data check must pass.
 """
 
 from __future__ import annotations
@@ -35,7 +35,9 @@ from raidar.cli import main
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
 from raidar.problems.store import ROOT_ENV
-from tests.component_trial_support import DOCKER_CONTEXT, orbstack_available
+from raidar.targets.config import Target, TargetError
+from raidar.targets.health import ensure_target
+from tests.component_trial_support import docker_target
 from tests.execution_support import imported_pack_fixture, locked_experiment
 
 OPT_IN = "RAIDAR_EXECUTION_DOCKER"
@@ -49,30 +51,37 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-def _docker_context() -> str:
-    return os.environ.get("DOCKER_CONTEXT") or DOCKER_CONTEXT
+def _require_target() -> Target:
+    """Opted in: every prerequisite must hold, or the fixture fails (never skips).
 
-
-def _require_docker(context: str) -> None:
-    """Opted in: every prerequisite must hold, or the fixture fails (never skips)."""
-    if context == DOCKER_CONTEXT and not orbstack_available():
-        pytest.fail("OrbStack data volume unavailable (orbstack-data-status external_available)")
+    The target is the one ``RAIDAR_TARGET`` / the targets file / the current Docker
+    context selects; its reachability and configured data check must pass.
+    """
+    try:
+        target = docker_target()
+        ensure_target(target)
+    except TargetError as error:
+        pytest.fail(str(error))
     tag = image_tag(load_pack_spec())
     found = subprocess.run(
-        ["docker", "--context", context, "image", "inspect", tag],
+        ["docker", "--context", target.docker_context, "image", "inspect", tag],
         capture_output=True,
         timeout=60,
         check=False,
     )
     if found.returncode != 0:
-        pytest.fail(f"pack image {tag} not present on docker context {context!r}; make pack-build")
+        pytest.fail(
+            f"pack image {tag} not present on docker context {target.docker_context!r}; "
+            "make pack-build"
+        )
+    return target
 
 
 def test_fixture_experiment_runs_and_holds_the_n1_budgets(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    context = _docker_context()
-    _require_docker(context)
+    target = _require_target()
+    context = target.docker_context
     root = Path(os.environ.get("RAIDAR_PERF_FIXTURE_DIR") or tmp_path)
     concurrency = int(os.environ.get(CONCURRENCY_ENV) or 1)
     monkeypatch.setenv("DOCKER_CONTEXT", context)

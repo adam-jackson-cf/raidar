@@ -182,10 +182,10 @@ def docker_cli_env() -> dict[str, str]:
 
 @dataclass(frozen=True)
 class DockerSandbox:
-    """Fresh, no-network grader container per run (OrbStack context by default)."""
+    """Fresh, no-network grader container per run on an explicit Docker context."""
 
     image: str
-    docker_context: str = "orbstack"
+    docker_context: str
     docker_bin: str = "docker"
 
     @property
