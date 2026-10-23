@@ -7,24 +7,21 @@ layout is ``raidar.job_layout``. One trial is ``raidar.execution.trial_run``.
 from __future__ import annotations
 
 import asyncio
-import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
-from raidar.execution.assessment import lock_errata, write_assessment_config
 from raidar.execution.driver import run_in_order
+from raidar.execution.job_context import JobContext
+from raidar.execution.job_manifest import start_job, write_json
 from raidar.execution.models import PlannedTrial, TrialRecord
 from raidar.execution.plan import ExperimentPlan
-from raidar.execution.provenance import effective_limits, recipe_digests, runner_provenance
 from raidar.execution.records_manifest import seal_trial
-from raidar.execution.trial_run import JobContext, run_trial
+from raidar.execution.trial_run import run_trial
 from raidar.job_layout import (
     DETACH_DIR,
-    JOB_KIND,
-    JOB_LOCK_FILE,
     JOB_MANIFEST,
-    PLAN_FILE,
     TRIAL_RECORDS_DIR,
 )
 from raidar.problems.store import ImportedProblem, ProblemStore
@@ -59,10 +56,6 @@ def default_job_id() -> str:
     return datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
 
 
-def _write_json(path: Path, payload: Mapping[str, object]) -> None:
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
-
-
 def create_job_dir(job_dir: Path) -> None:
     """Create the job directory; a job directory is never reused.
 
@@ -78,32 +71,8 @@ def create_job_dir(job_dir: Path) -> None:
 async def execute(ctx: JobContext) -> list[TrialRecord]:
     """Run the plan's selected trials and write the job directory."""
     create_job_dir(ctx.job_dir)
+    manifest = start_job(ctx)
     plan = ctx.plan
-    _write_json(ctx.job_dir / PLAN_FILE, plan.to_json())
-    if plan.lock:
-        _write_json(ctx.job_dir / JOB_LOCK_FILE, plan.lock)
-    write_assessment_config(
-        plan.loaded.spec.assessment,
-        plan.loaded.spec.protocol,
-        ctx.job_dir,
-        lock_errata(plan.lock),
-    )
-    manifest: dict[str, object] = {
-        "kind": JOB_KIND,
-        "experiment": plan.experiment_id,
-        "job_id": ctx.job_id,
-        "lock_sha256": plan.lock_sha256,
-        "experiment_file": str(plan.loaded.path),
-        **ctx.target.manifest_fields(plan.concurrency),
-        "runner": runner_provenance(),
-        "recipes": recipe_digests(plan, ctx.problems),
-        "effective_limits": effective_limits(plan),
-        "concurrency": plan.concurrency,
-        "selected": [trial.trial_id for trial in plan.selected_trials()],
-        "partial": len(plan.selected) != len(plan.trials),
-        "started_at": datetime.now(UTC).isoformat(),
-    }
-    _write_json(ctx.job_dir / JOB_MANIFEST, manifest)
     finished: list[TrialRecord] = []
     sealed: dict[str, str] = {}
     guard = ctx.target.guard
@@ -140,7 +109,7 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
             "summary": _summary(finished),
             "records_manifests": dict(sorted(sealed.items())),
         }
-        _write_json(ctx.job_dir / JOB_MANIFEST, manifest)
+        write_json(ctx.job_dir / JOB_MANIFEST, manifest)
 
 
 async def run_job(
@@ -150,7 +119,15 @@ async def run_job(
     job_dir: Path,
     job_id: str,
     target: JobTarget,
+    admission: Mapping[str, Any] | None = None,
 ) -> list[TrialRecord]:
     """``execute`` a new job context for ``plan`` (what ``raidar run`` calls)."""
-    ctx = JobContext(plan=plan, job_dir=job_dir, job_id=job_id, problems=problems, target=target)
+    ctx = JobContext(
+        plan=plan,
+        job_dir=job_dir,
+        job_id=job_id,
+        problems=problems,
+        target=target,
+        admission=admission,
+    )
     return await execute(ctx)

@@ -10,11 +10,11 @@ from typing import Any
 import click
 
 from raidar.commands.experiment_spec import _load
+from raidar.commands.run_checks import prepare_run
 from raidar.commands.target_options import job_target, run_guarded, target_option
 from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
-from raidar.execution.credentials import CredentialPreflightError, preflight_credentials
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
-from raidar.execution.run import default_job_id, load_problems, run_job
+from raidar.execution.run import default_job_id, run_job
 from raidar.packs.drift import LockedPackError, lock_runtime_pack
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
 from raidar.spec.lock import (
@@ -181,27 +181,30 @@ def plan_command(as_json: bool, **options: Any) -> None:
     help="Root for job directories (<jobs-dir>/<experiment id>/<job id>/).",
 )
 @click.option("--job-id", default=None, help="Job directory name (default: UTC timestamp).")
+@click.option(
+    "--allow-unsmoked",
+    is_flag=True,
+    help="Run a non-smoke experiment without a clean matching smoke job (recorded in job.json).",
+)
 @target_option
 def run_command(
-    jobs_dir: Path, job_id: str | None, target_name: str | None, **options: Any
+    jobs_dir: Path,
+    job_id: str | None,
+    target_name: str | None,
+    allow_unsmoked: bool,
+    **options: Any,
 ) -> None:
     """Run a locked experiment.yaml: every selected trial through Harbor."""
     plan, store = _build(options)
     if not plan.selected:
         raise click.ClickException("the selection matches no trial")
     jt = job_target(target_name)
-    try:
-        preflight_credentials(plan)
-    except CredentialPreflightError as exc:
-        raise click.ClickException(str(exc)) from exc
     job_id = job_id or default_job_id()
-    try:
-        problems = load_problems(plan, store)
-    except ProblemStoreError as exc:
-        raise click.ClickException(str(exc)) from exc
+    problems, admission = prepare_run(plan, store, jt, jobs_dir, allow_unsmoked=allow_unsmoked)
     job_dir = jobs_dir.resolve() / plan.experiment_id / job_id
     records = run_guarded(
-        job_dir, run_job(plan, problems, job_dir=job_dir, job_id=job_id, target=jt)
+        job_dir,
+        run_job(plan, problems, job_dir=job_dir, job_id=job_id, target=jt, admission=admission),
     )
     click.echo(f"Job {job_dir}")
     for record in records:

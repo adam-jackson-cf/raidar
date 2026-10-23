@@ -115,6 +115,7 @@ def test_fixture_experiment_runs_and_holds_the_n1_budgets(
             str(loaded.path),
             "--agent-override",
             "oracle",
+            "--allow-unsmoked",  # the no-LLM fixture is its own check, not a measured experiment
             "--jobs-dir",
             str(runs),
             "--job-id",

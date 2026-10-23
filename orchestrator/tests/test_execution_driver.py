@@ -28,12 +28,12 @@ from raidar.execution.environment import (
     RunScopedDockerEnvironment,
     run_scope,
 )
+from raidar.execution.job_context import JobContext
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
 from raidar.execution.records_manifest import RECORDS_MANIFEST, tamper_findings
 from raidar.execution.run import execute, load_problems
 from raidar.execution.trial_config import harbor_trial_config
-from raidar.execution.trial_run import JobContext
 from raidar.packs.python.models import load_pack_spec
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
@@ -135,11 +135,23 @@ def test_the_leak_guard_is_installed_before_the_trial_runs(
         "install_trial_provisioning",
         lambda trial, provisions: events.append(f"provision:{len(provisions)}"),
     )
+    monkeypatch.setattr(
+        driver, "install_tool_tree_watch", lambda trial, bundle: events.append("tool-tree")
+    )
+    monkeypatch.setattr(driver, "install_liveness_monitor", lambda trial: events.append("liveness"))
     provisions = (Provision("00-lint-tool", "lint-tool@1", "true", "true"),)
     outcome = asyncio.run(
         run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle", provisions)
     )
-    assert events == ["create", f"guard:{tmp_path / 'bundle'}", "reaper", "provision:1", "run"]
+    assert events == [
+        "create",
+        f"guard:{tmp_path / 'bundle'}",
+        "reaper",
+        "provision:1",
+        "tool-tree",
+        "liveness",
+        "run",
+    ]
     assert outcome == TrialRun(tmp_path / "t", None)
 
 
@@ -372,8 +384,9 @@ def test_a_lost_target_marks_the_trial_and_aborts_the_job_before_the_next_trial(
 
     assert started == [first]  # nothing more was scheduled
     stored = json.loads((ctx.job_dir / "trial-records" / f"{first}.json").read_text())
-    assert stored["validity"]["checks"][-1]["name"] == "target_reachable"
-    assert stored["validity"]["checks"][-1]["passed"] is False
+    checks = {check["name"]: check for check in stored["validity"]["checks"]}
+    assert checks["target_reachable"]["passed"] is False
+    assert checks["agent_idle"]["passed"] is True  # the health checks follow the guard's finding
     assert json.loads((ctx.trials_dir / first / REAP_FILE).read_text())["reconnected"] is False
     assert not (ctx.job_dir / "trial-records" / f"{second}.json").exists()
     assert json.loads((ctx.job_dir / "job.json").read_text())["aborted"] == "TargetLostError"
@@ -578,12 +591,17 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
     monkeypatch.setattr("raidar.commands.execution.job_target", fake_job_target)
     runner = CliRunner()
     arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1", "--target", "t"]
-    result = runner.invoke(
-        main, [*arguments, "--jobs-dir", str(tmp_path / "jobs"), "--job-id", "x"]
-    )
+    jobs = ["--jobs-dir", str(tmp_path / "jobs"), "--job-id", "x"]
+    refused = runner.invoke(main, [*arguments, *jobs])
+    assert refused.exit_code != 0
+    assert "no clean smoke job matches this ab-test experiment" in refused.output
+    assert not contexts
+    result = runner.invoke(main, [*arguments, *jobs, "--allow-unsmoked"])
     assert result.exit_code == 0, result.output
     (ctx,) = contexts
-    assert seen_names == ["t"]
+    assert ctx.admission is not None
+    assert ctx.admission["overridden"] is True
+    assert seen_names == ["t", "t"]
     assert ctx.target.selection is SELECTION
     assert ctx.job_dir == (tmp_path / "jobs" / loaded.spec.id / "x").resolve()
     assert [t.trial_id for t in ctx.plan.selected_trials()] == ["b01-p0-baseline"]

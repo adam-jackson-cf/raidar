@@ -8,7 +8,8 @@ without it), together with the agent-end reaper (``execution.reaper``) that
 kills agent processes before artifacts are collected and graded, and the
 provisioning hooks of any component that installs a tool in the trial
 container (``raidar.components.provision``; ``provision_v2`` installs at
-environment start).
+environment start), then the T1 tool-tree hash (``execution.tool_tree``) and the
+host-side liveness monitor (``execution.liveness``, observe by default).
 
 Decision (deviates from plan section 1 "Harbor JobConfigs", N4 "Harbor owns
 concurrency"): Raidar builds one Harbor ``TrialConfig`` per planned trial and
@@ -39,7 +40,9 @@ from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
 from raidar.components.provision_v2 import AnyProvision, install_trial_provisioning
+from raidar.execution.liveness import install_liveness_monitor
 from raidar.execution.reaper import install_agent_reaper
+from raidar.execution.tool_tree import install_tool_tree_watch
 from raidar.verifier.guard import install_leak_guard
 
 JobT = TypeVar("JobT")
@@ -65,6 +68,8 @@ async def run_harbor_trial(
     install_leak_guard(trial, bundle_root)
     install_agent_reaper(trial, bundle_root)
     install_trial_provisioning(trial, provisions)
+    install_tool_tree_watch(trial, bundle_root)
+    install_liveness_monitor(trial)
     result = await trial.run()
     error = result.exception_info.exception_type if result.exception_info else None
     return TrialRun(trial.paths.trial_dir, error)

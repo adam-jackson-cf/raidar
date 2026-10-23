@@ -40,6 +40,7 @@ from typing import Any
 
 from raidar.components import CompiledCondition
 from raidar.components.integrity import condition_step_flags
+from raidar.execution.health_model import VIOLATION, HealthReport, load_health
 from raidar.execution.models import (
     CheckpointState,
     ExecutionValidity,
@@ -364,6 +365,33 @@ def execution_validity(
         _harness_check(result, pinned, trial_dir),
     ]
     return ExecutionValidity(checks=tuple(checks))
+
+
+# Health checks that make a trial invalid, grouped under one validity check each. ``H-target``
+# is absent on purpose (the target guard already adds ``target_reachable``), as are the L and
+# P families and ``unmeasured`` results; only an enforce-mode idle kill (``L2``) is classified.
+HEALTH_VALIDITY: Mapping[str, tuple[str, ...]] = {
+    "health_verdicts": ("V1", "V2", "V3"),
+    "health_budgets": ("H1", "H3", "H4", "H5", "H6"),
+    "health_tamper": ("T1", "T2", "T3"),
+    "agent_idle": ("L2",),
+}
+
+
+def health_validity(report: HealthReport) -> tuple[ValidityCheck, ...]:
+    """One validity check per group: failed when any of its health checks is a violation."""
+    checks = []
+    for name, ids in HEALTH_VALIDITY.items():
+        hits = [c for c in report.checks if c.id in ids and c.status == VIOLATION]
+        detail = "; ".join(f"{c.id}: {c.detail}" for c in hits)
+        checks.append(ValidityCheck(name=name, passed=not hits, detail=detail))
+    return tuple(checks)
+
+
+def recorded_health_validity(trial_dir: Path) -> tuple[ValidityCheck, ...]:
+    """The validity checks of the trial's ``health.json``; none when it has not been written."""
+    report = load_health(trial_dir)
+    return health_validity(report) if report is not None else ()
 
 
 def trial_exception(trial_dir: Path) -> str | None:

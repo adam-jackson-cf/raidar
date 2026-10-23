@@ -333,6 +333,7 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "assess",
         "env",
         "harbor",
+        "health",
         "init",
         "jev",
         "ledger",

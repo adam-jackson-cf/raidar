@@ -3,7 +3,9 @@
 Written once the trial record exists (``raidar-records-manifest.json`` in the trial
 directory); ``job.json`` keeps each manifest's own sha256. ``raidar analyze`` recomputes
 both, so an edited, added or removed evidence file or record is a tamper finding.
-Paths are relative to the job directory; the manifest does not list itself.
+Paths are relative to the job directory; the manifest does not list itself, nor the
+trial's ``health.json``: the audit is derived from the sealed files and is recomputed by
+``raidar health`` (whose own check ``T2`` is this manifest's verification).
 """
 
 from __future__ import annotations
@@ -12,6 +14,8 @@ import hashlib
 import json
 import os
 from pathlib import Path
+
+from raidar.execution.health_model import HEALTH_FILE
 
 RECORDS_MANIFEST = "raidar-records-manifest.json"
 
@@ -32,7 +36,7 @@ def current_files(trial_dir: Path, record_file: Path, job_dir: Path) -> dict[str
     for current, _, names in os.walk(trial_dir):
         for name in names:
             path = Path(current, name)
-            if name == RECORDS_MANIFEST and path.parent == trial_dir:
+            if name in (RECORDS_MANIFEST, HEALTH_FILE) and path.parent == trial_dir:
                 continue
             files[path.relative_to(job_dir).as_posix()] = _file_digest(path)
     if record_file.is_file():

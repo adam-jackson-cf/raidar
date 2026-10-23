@@ -107,7 +107,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	target-list target-status target-up target-down target-init target-prune \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
 	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute experiment-status \
-	perf-check perf-fixture perf-gate \
+	perf-check perf-fixture perf-gate health \
 	ledger-check ledger-index \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
 	experiment-assess assess-regrade experiment-analyze jev-shadow-rubric \
@@ -187,11 +187,14 @@ help:
 	@echo "                                                        Move a pre-v2 job onto the v2 layout and lock, once its execution is proven identical"
 	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
-	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=] [DETACH=1]"
+	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=] [DETACH=1] [ALLOW_UNSMOKED=1]"
 	@echo "                                                        Run a locked experiment through Harbor as one job; writes step results, validity and N1 phases"
 	@echo "                                                        DETACH=1: run it under a supervisor in its own session (survives the launching shell"
 	@echo "                                                        or agent session; pid, log and exit record in <job dir>/detach/); required for long jobs"
+	@echo "                                                        Non-smoke kinds are refused without a clean matching smoke job (same code, pack, agents, target);"
+	@echo "                                                        ALLOW_UNSMOKED=1 overrides and records it in job.json (admission)"
 	@echo "  make experiment-status JOB=<job-dir> [LOG_LINES=20]   A job's state (running, finished, failed, died), trials recorded of selected, log tail"
+	@echo "  make health JOB=<job-dir>                             Recompute every trial's health.json (V/H/L/P/T checks) and append fault-candidates.jsonl; exit 1 on a violation"
 	@echo "  make experiment-assess JOB=<job-dir> STORE=<assessment-store> SCORERS=\"correctness@1 ...\" [LOCK=] [ASSESSMENT_CONFIG=] [REPLAY=1] [JEV_REPLAY_ONLY=1] [CONCURRENCY=N] [ASSESS_OUT=report.json]"
 	@echo "                                                        Score a job's stored trials into an Assessment store (never re-runs agents; AS1-gated)"
 	@echo "                                                        (process-compliance@2-@6 are deterministic only; JEV_REPLAY_ONLY matters only for the dormant @1;"
@@ -478,12 +481,16 @@ ifeq ($(DETACH),1)
 		experiment-execute DETACH=0
 else
 	@$(TARGET_ENV) $(RAIDAR_SECRETS) run "$(EXPERIMENT)" $(EXECUTION_SELECT) \
-		--jobs-dir "$(EXECUTE_JOBS_DIR)" $(if $(JOB_ID),--job-id "$(JOB_ID)",)
+		--jobs-dir "$(EXECUTE_JOBS_DIR)" $(if $(JOB_ID),--job-id "$(JOB_ID)",) $(if $(filter 1,$(ALLOW_UNSMOKED)),--allow-unsmoked,)
 endif
 
 experiment-status:
 	$(call require_var,JOB)
 	@$(DETACH_TOOL) status "$(JOB)" --lines "$(LOG_LINES)"
+
+health:
+	$(call require_var,JOB)
+	@$(RAIDAR) health "$(JOB)"
 
 perf-check:
 	$(call require_var,JOB)

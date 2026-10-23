@@ -1,53 +1,28 @@
-"""One trial of a job: materialise, run through Harbor, classify, time and record it.
+"""One trial of a job: materialise, run through Harbor, classify and record it.
 
-``JobContext`` is what a job's trials share (plan, directories, problems, the
-execution target and its guard); ``raidar.execution.run`` schedules the trials.
+``raidar.execution.job_context.JobContext`` is what a job's trials share;
+``raidar.execution.run`` schedules the trials and ``raidar.execution.trial_finish`` audits
+and writes each record.
 """
 
 from __future__ import annotations
 
 import traceback
-from collections.abc import Mapping
-from dataclasses import dataclass
-from pathlib import Path
 
 from raidar.execution.agent_config import reported_harness_pin
-from raidar.execution.driver import TrialRunner, run_harbor_trial
+from raidar.execution.job_context import JobContext
 from raidar.execution.materialise import MaterialisedTask, environment_cold, materialise_task
 from raidar.execution.models import PlannedTrial, TrialRecord
-from raidar.execution.plan import ExperimentPlan
 from raidar.execution.trial_config import harbor_trial_config
+from raidar.execution.trial_finish import finish_trial
 from raidar.execution.trial_record import (
     RunnerFailure,
     TrialEvidence,
     build_record,
     runner_failure_record,
-    write_record,
 )
-from raidar.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
-from raidar.problems.store import ImportedProblem
-from raidar.targets.job import JobTarget
 
 RUNNER_ERROR_FILE = "raidar-runner-error.txt"
-
-
-@dataclass
-class JobContext:
-    plan: ExperimentPlan
-    job_dir: Path
-    job_id: str
-    problems: Mapping[int, ImportedProblem]
-    target: JobTarget
-    runner: TrialRunner = run_harbor_trial
-
-    @property
-    def docker_context(self) -> str:
-        """The grader target's context: where the verifier's hidden-test grader runs."""
-        return self.target.selection.grader.docker_context
-
-    @property
-    def trials_dir(self) -> Path:
-        return self.job_dir / TRIALS_DIR
 
 
 def _materialise(ctx: JobContext, trial: PlannedTrial) -> MaterialisedTask:
@@ -135,10 +110,4 @@ async def run_trial(ctx: JobContext, trial: PlannedTrial) -> TrialRecord:
         record = await _run_and_classify(ctx, trial)
     except Exception as error:  # noqa: BLE001 - contained and recorded as infra, never lost
         record = _failure_record(ctx, trial, error)
-    if ctx.target.guard is not None:
-        record = await ctx.target.guard.review(
-            record,
-            trial_dir=ctx.trials_dir / trial.trial_id,
-            trials_dir=ctx.trials_dir,
-        )
-    return write_record(ctx.job_dir / TRIAL_RECORDS_DIR / f"{trial.trial_id}.json", record)
+    return await finish_trial(ctx, trial, record)

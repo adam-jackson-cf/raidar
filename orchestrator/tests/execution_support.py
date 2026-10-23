@@ -21,6 +21,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from raidar.execution.reaper import ReapReport, write_reap_report
 from raidar.problems.importer import import_problem
 from raidar.problems.models import ProblemId
 from raidar.problems.store import ProblemStore
@@ -216,6 +217,7 @@ def write_trial(
         _write_reset(trial_dir, outcome.name, outcome.reset_ok)
         record_dir = step_record_dir(trial_dir, outcome.name)
         write_pre_agent_leak(record_dir, LeakReport(clean=True, seconds=0.5))
+        write_reap_report(record_dir, ReapReport("agent", (), (), None))
         if outcome.passed is not None:
             write_step_record(record_dir, _record(outcome.name, outcome, trial_dir))
         clock = v_end
