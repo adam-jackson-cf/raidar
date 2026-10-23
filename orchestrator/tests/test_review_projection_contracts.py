@@ -10,10 +10,10 @@ from pathlib import Path
 
 import pytest
 
-from raidar.review_projection import main, merge_review_projections
-from raidar.review_projection.fixture import JOBS_DIR, REVIEW_ONLY_DIR, generate_review_fixture
-from raidar.review_projection.spans import PAYLOAD_CAP, payload, to_ms
-from raidar.schemas.review import ReviewProjectionArtifact
+from raidar.core.review_contract import ReviewProjectionArtifact
+from raidar.review.projection import main, merge_review_projections
+from raidar.review.projection.fixture import JOBS_DIR, REVIEW_ONLY_DIR, generate_review_fixture
+from raidar.review.projection.spans import PAYLOAD_CAP, payload, to_ms
 
 
 @pytest.fixture(scope="module")
@@ -84,7 +84,7 @@ def test_review_projection_cli_writes_the_artifact(
     assert "Projected 3 run(s) across 1 experiment(s)" in capsys.readouterr().out
 
     output.unlink()
-    runpy.run_module("raidar.review_projection", run_name="__main__")
+    runpy.run_module("raidar.review.projection", run_name="__main__")
     assert output.is_file()
 
 

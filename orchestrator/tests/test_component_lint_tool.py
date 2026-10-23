@@ -27,16 +27,16 @@ from raidar.components import (
     ComponentResolver,
     StepEvidence,
 )
-from raidar.components.builtins.tools import LINT_TOOL, RUFF_WHEEL_SHA256, resolved_config
-from raidar.components.contribution import evidence_log
-from raidar.components.provision import (
+from raidar.components.catalog.tools import LINT_TOOL, RUFF_WHEEL_SHA256, resolved_config
+from raidar.components.definition.contribution import evidence_log
+from raidar.components.definition.registry import component_runtimes
+from raidar.components.runtime.provision import (
     PROVISION_CHANNEL,
     Provision,
     condition_provisions,
     install_provisioning,
     parse_check_output,
 )
-from raidar.components.registry import component_runtimes
 from raidar.spec.references import RefKind, RegistryRef
 from tests.component_support import PROBE_DIR, compile_uses, use, write_jsonl
 from tests.component_trial_support import (
@@ -92,7 +92,7 @@ def test_lint_tool_is_a_python_service_component_with_declared_egress() -> None:
     assert manifest.kind is ComponentKind.SERVICE
     assert component_runtimes(definition) == ("python",)
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
-    assert "raidar/components/provision.py" in manifest.fingerprint
+    assert "raidar/components/runtime/provision.py" in manifest.fingerprint
     ref = RegistryRef.parse(RefKind.COMPONENT, "lint-tool@1")
     resolved = ComponentResolver().resolve(ref, base_dir=Path("."))
     assert resolved.binding["runtimes"] == ["python"]

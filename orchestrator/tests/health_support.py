@@ -8,7 +8,9 @@ from pathlib import Path
 from typing import Any
 
 from raidar.components import compile_condition
+from raidar.core.snapshot import tree_digest
 from raidar.execution.collect import TrialContext, classify_trial
+from raidar.execution.health.records_manifest import seal_trial
 from raidar.execution.models import (
     ExecutionValidity,
     PlannedTrial,
@@ -17,8 +19,6 @@ from raidar.execution.models import (
     ValidityCheck,
 )
 from raidar.execution.progression import progression_rule
-from raidar.execution.records_manifest import seal_trial
-from raidar.oracle.snapshot import tree_digest
 from raidar.spec.schema import AgentEntry, ConditionSpec, ProtocolSpec
 from raidar.verifier.records import (
     SnapshotRef,

@@ -37,7 +37,7 @@ that is not byte-for-byte what an earlier download left there (``_synced``).
 
 **Per-trial installs at start.** ``add_post_start_hook`` registers work that
 must run once per trial in the started container before any step (a
-component's tool install, ``raidar.components.provision_v2``). It runs inside
+component's tool install, ``raidar.components.runtime.provision_v2``). It runs inside
 ``start``, so its time is the trial's ``environment_start`` (a per-trial
 cost), never a step's ``per_step_reset``. A hook records its own failure; it
 must not raise.

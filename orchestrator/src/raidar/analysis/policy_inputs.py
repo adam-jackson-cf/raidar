@@ -1,8 +1,8 @@
 """Headline S from statused components: the one place a Metric is applied (F6, F15).
 
 Analysis (``assessed.headline_score``), the frozen review projection
-(``review_projection.headline``) and the Quality projection
-(``review_quality.run_view``) all weigh components through ``score_inputs``: a
+(``review.projection.headline``) and the Quality projection
+(``review.quality.run_view``) all weigh components through ``score_inputs``: a
 measured component is weighed, an unmeasured one makes S ineligible with its
 reason, and a not-applicable one is left out. Each caller keeps its own reason
 text; the policy call and the partition are shared.

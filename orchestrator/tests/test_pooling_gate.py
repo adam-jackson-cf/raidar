@@ -9,7 +9,7 @@ import pytest
 
 from raidar.analysis.pooling import PoolingError, check_pooling
 from raidar.analysis.sources import JobDir
-from raidar.execution.records_manifest import RECORDS_MANIFEST, seal_trial
+from raidar.execution.health.records_manifest import RECORDS_MANIFEST, seal_trial
 
 TRIAL = "t1"
 

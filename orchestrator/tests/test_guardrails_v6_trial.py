@@ -22,10 +22,13 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins import guardrails_v5, guardrails_v6
-from raidar.components.integrity import condition_step_flags
-from raidar.components.provision_v2 import trial_provisions
-from raidar.components.session_chain import apply_session_wrappers, condition_session_wrappers
+from raidar.components.catalog import guardrails_v5, guardrails_v6
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.runtime.provision_v2 import trial_provisions
+from raidar.components.runtime.session_chain import (
+    apply_session_wrappers,
+    condition_session_wrappers,
+)
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,

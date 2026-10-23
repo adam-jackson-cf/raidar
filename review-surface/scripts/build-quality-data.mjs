@@ -1,5 +1,5 @@
 // Validates and copies the Quality projection emitted by the Python
-// orchestrator (python -m raidar.review_quality). Like build-review-data.mjs,
+// orchestrator (python -m raidar.review.quality). Like build-review-data.mjs,
 // it owns no scoring or status interpretation.
 import fs from 'node:fs';
 import path from 'node:path';

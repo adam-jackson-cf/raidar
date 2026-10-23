@@ -24,7 +24,7 @@ from raidar.execution.models import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.execution.phases import trial_phases
+from raidar.execution.perf.phases import trial_phases
 from raidar.execution.progression import derive_reached, strict_rule
 
 

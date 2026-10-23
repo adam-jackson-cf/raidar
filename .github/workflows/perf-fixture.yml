@@ -11,7 +11,7 @@ on:
     branches: [main, master]
     paths:
       - "orchestrator/src/raidar/execution/**"
-      - "orchestrator/src/raidar/oracle/**"
+      - "orchestrator/src/raidar/core/**"
       - "orchestrator/src/raidar/components/**"
       - "orchestrator/src/raidar/packs/**"
       - "orchestrator/tests/test_execution_perf_fixture.py"

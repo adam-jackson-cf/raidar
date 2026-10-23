@@ -1,15 +1,19 @@
 """Component SDK (plan WS-C): manifests, registry, compiler, per-step reset, probes."""
 
-from raidar.components.compiled import (
+from raidar.components.definition.compiled import (
     HARBOR_AGENT_NAMES,
     CompiledCondition,
     ProbeReport,
     ProbeResult,
 )
-from raidar.components.compiler import ComponentRejectedError, compile_arm, compile_condition
-from raidar.components.contribution import AgentWrapper, Contribution, SupportFile
-from raidar.components.evidence import StepEvidence
-from raidar.components.manifest import (
+from raidar.components.definition.compiler import (
+    ComponentRejectedError,
+    compile_arm,
+    compile_condition,
+)
+from raidar.components.definition.contribution import AgentWrapper, Contribution, SupportFile
+from raidar.components.definition.evidence import StepEvidence
+from raidar.components.definition.manifest import (
     ComponentConfigError,
     ComponentDefinition,
     ComponentKind,
@@ -19,8 +23,7 @@ from raidar.components.manifest import (
     NetworkNeeds,
     ProbeOutcome,
 )
-from raidar.components.provision import Provision, condition_provisions
-from raidar.components.registry import (
+from raidar.components.definition.registry import (
     COMPONENT_ENTRY_POINT_GROUP,
     ComponentRegistry,
     ComponentResolver,
@@ -28,6 +31,7 @@ from raidar.components.registry import (
     component_resolver,
     fingerprint,
 )
+from raidar.components.runtime.provision import Provision, condition_provisions
 
 __all__ = [
     "COMPONENT_ENTRY_POINT_GROUP",

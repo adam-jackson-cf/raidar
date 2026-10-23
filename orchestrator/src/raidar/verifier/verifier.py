@@ -33,7 +33,7 @@ from typing import Any, Literal
 from harbor.models.verifier.result import VerifierResult
 from harbor.verifier.base import BaseVerifier
 
-from raidar.oracle.snapshot import (
+from raidar.core.snapshot import (
     APP_ARTIFACT_DESTINATION,
     APP_SOURCE,
     SNAPSHOT_EXCLUDES,

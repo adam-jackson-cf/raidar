@@ -18,4 +18,4 @@ def docker_target_offline(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> No
     monkeypatch.delenv("RAIDAR_TARGET", raising=False)
     monkeypatch.delenv("DOCKER_HOST", raising=False)
     monkeypatch.setenv("DOCKER_CONTEXT", "test-ctx")
-    monkeypatch.setattr("raidar.commands.target_options.ensure_target", lambda target: None)
+    monkeypatch.setattr("raidar.cli.target_options.ensure_target", lambda target: None)

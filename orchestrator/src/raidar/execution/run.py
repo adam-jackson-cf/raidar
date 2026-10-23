@@ -1,7 +1,7 @@
 """Execute a plan (plan D2-D4): schedule the trials of a job and write the job directory.
 
 Writes one job directory (``<jobs_root>/<experiment id>/<job id>/``); the
-layout is ``raidar.job_layout``. One trial is ``raidar.execution.trial_run``.
+layout is ``raidar.core.job_layout``. One trial is ``raidar.execution.trial_run``.
 """
 
 from __future__ import annotations
@@ -12,18 +12,18 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.execution.driver import run_in_order
-from raidar.execution.job_context import JobContext
-from raidar.execution.job_manifest import start_job, write_json
-from raidar.execution.models import PlannedTrial, TrialRecord
-from raidar.execution.plan import ExperimentPlan
-from raidar.execution.records_manifest import seal_trial
-from raidar.execution.trial_run import run_trial
-from raidar.job_layout import (
+from raidar.core.job_layout import (
     DETACH_DIR,
     JOB_MANIFEST,
     TRIAL_RECORDS_DIR,
 )
+from raidar.execution.driver import run_in_order
+from raidar.execution.health.records_manifest import seal_trial
+from raidar.execution.job_context import JobContext
+from raidar.execution.job_manifest import start_job, write_json
+from raidar.execution.models import PlannedTrial, TrialRecord
+from raidar.execution.plan import ExperimentPlan
+from raidar.execution.trial_run import run_trial
 from raidar.problems.store import ImportedProblem, ProblemStore
 from raidar.targets.job import JobTarget
 

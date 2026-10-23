@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.codex_auth import ResolvedCodexAuth, resolve_codex_auth
+from raidar.agents.codex_auth import ResolvedCodexAuth, resolve_codex_auth
 
 from ..config import AgentSpec
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile

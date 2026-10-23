@@ -13,18 +13,18 @@ import pytest
 from raidar.analysis.assessed import build_outcome
 from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
 from raidar.execution.models import TrialRecord
-from raidar.review_quality.experiment_view import _primary
-from raidar.review_quality.models import COMPONENTS, QualityProjection
-from raidar.review_quality.projection import build_quality_projection, main
-from raidar.review_quality.stats import pearson, quantiles
-from raidar.review_quality.synthetic import (
+from raidar.review.quality.experiment_view import _primary
+from raidar.review.quality.models import COMPONENTS, QualityProjection
+from raidar.review.quality.projection import build_quality_projection, main
+from raidar.review.quality.stats import pearson, quantiles
+from raidar.review.quality.synthetic import (
     EXPERIMENT,
     INELIGIBLE_H,
     INVALID,
     RUN_ID,
     generate_quality_fixture,
 )
-from raidar.review_quality.synthetic_lock import write_synthetic_lock
+from raidar.review.quality.synthetic_lock import write_synthetic_lock
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation, RunStats
 from raidar.scorers.store import OBJECTS_DIR, AssessmentStore
 from raidar.spec.metrics import SCB_CANONICAL

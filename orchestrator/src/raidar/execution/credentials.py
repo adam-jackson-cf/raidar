@@ -14,9 +14,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from raidar.agents.codex_auth import CODEX_AUTH_MODE_ENV, resolve_codex_auth
 from raidar.agents.config import Harness
-from raidar.codex_auth import CODEX_AUTH_MODE_ENV, resolve_codex_auth
-from raidar.harness import harness_definition
+from raidar.agents.harness import harness_definition
 
 if TYPE_CHECKING:
     from raidar.execution.plan import ExperimentPlan

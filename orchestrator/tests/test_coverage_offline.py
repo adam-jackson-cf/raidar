@@ -20,7 +20,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.commands import assess_grading
+from raidar.verifier import offline_grading
 from raidar.verifier.coverage_offline import check_coverage_path, produce_coverage_path
 from raidar.verifier.coverage_store import read_offline_coverage
 from raidar.verifier.records import FORK_EVIDENCE_FILE, load_step_record, step_record_dir
@@ -159,9 +159,9 @@ def test_rescore_makes_coverage_first_only_for_a_scorer_that_reads_it(
         called.append((path, store, options.docker_context, concurrency))
         return {"steps": [], "errors": 0}
 
-    monkeypatch.setattr(assess_grading, "produce_coverage_path", fake)
+    monkeypatch.setattr(offline_grading, "produce_coverage_path", fake)
 
-    result = assess_grading.produce_coverage(
+    result = offline_grading.produce_coverage(
         tmp_path / "job",
         tmp_path / "store",
         scorers,

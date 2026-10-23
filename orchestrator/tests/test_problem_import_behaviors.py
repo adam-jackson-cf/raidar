@@ -13,7 +13,7 @@ import pytest
 import yaml
 from harbor.models.task.task import Task
 
-from raidar.oracle.snapshot import APP_SOURCE
+from raidar.core.snapshot import APP_SOURCE
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
 from raidar.problems.content import content_digest, hidden_content_in_task

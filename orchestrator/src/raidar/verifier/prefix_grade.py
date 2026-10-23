@@ -32,7 +32,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.snapshot import tree_digest
+from raidar.core.snapshot import tree_digest
 from raidar.verifier.grader import grade_step
 from raidar.verifier.models import VerifierGrade
 from raidar.verifier.per_trial import per_trial

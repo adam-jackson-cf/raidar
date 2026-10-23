@@ -21,17 +21,17 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 
 from raidar.components import ComponentRegistry, ComponentRejectedError, StepEvidence
-from raidar.components.builtins.gate import GUARDRAIL_GATE, gate_signal
-from raidar.components.builtins.gate_v2 import GUARDRAIL_GATE_V2, GUARDRAIL_GATE_V2_IMPORT_PATH
-from raidar.components.gate_run import GATE_RECORD, SIGNAL
-from raidar.components.gate_run_v2 import (
+from raidar.components.catalog.gate import GUARDRAIL_GATE, gate_signal
+from raidar.components.catalog.gate_v2 import GUARDRAIL_GATE_V2, GUARDRAIL_GATE_V2_IMPORT_PATH
+from raidar.components.definition.registry import fingerprint
+from raidar.components.runtime.gate_run import GATE_RECORD, SIGNAL
+from raidar.components.runtime.gate_run_v2 import (
     GIT_LOG_MARK,
     GIT_STATUS_MARK,
     GateModeV2,
     read_gate_run,
 )
-from raidar.components.guardrail_gate_v2 import GuardrailGateV2Agent
-from raidar.components.registry import fingerprint
+from raidar.components.runtime.guardrail_gate_v2 import GuardrailGateV2Agent
 from tests.component_support import compile_uses, use
 from tests.test_guardrail_gate_workflow import (
     INNER,
@@ -285,7 +285,9 @@ def test_v2_is_a_new_version_and_v1_stays_frozen() -> None:
     v1, v2 = registry.get("guardrail-gate@1"), registry.get(REF)
 
     assert fingerprint(v1) != fingerprint(v2)
-    assert "raidar/components/guardrail_gate_v2.py" not in GUARDRAIL_GATE.manifest.fingerprint
+    assert (
+        "raidar/components/runtime/guardrail_gate_v2.py" not in GUARDRAIL_GATE.manifest.fingerprint
+    )
     assert set(GUARDRAIL_GATE.manifest.fingerprint) < set(v2.manifest.fingerprint)
     wrapper = compile_uses(use(REF, command="make check", mode="shadow")).agent_wrapper
     assert wrapper is not None

@@ -17,8 +17,8 @@ from harbor.models.trial.config import AgentConfig
 from pydantic import JsonValue
 
 from raidar.agents.config import Harness
-from raidar.components.compiled import RESET_PROBE
-from raidar.components.mcp_shim import parse_args, run
+from raidar.components.definition.compiled import RESET_PROBE
+from raidar.components.runtime.mcp_shim import parse_args, run
 from tests.component_support import (
     CLAUDE_SETTINGS,
     CODEX_SETTINGS,
@@ -96,7 +96,7 @@ def test_workflow_wraps_the_agent_and_keeps_its_inputs() -> None:
     )
 
     assert config.name is None
-    assert config.import_path == "raidar.components.review_loop:ReviewLoopAgent"
+    assert config.import_path == "raidar.components.runtime.review_loop:ReviewLoopAgent"
     assert config.model_name == "openai/gpt-6-luna"
     assert config.kwargs["max_review_rounds"] == 2
     inner = config.kwargs["inner_agent"]
@@ -315,7 +315,10 @@ def test_invalid_prompt_templates_are_rejected(tmp_path: Path) -> None:
 
 
 def test_native_config_merge_appends_entry_lists_only_and_refuses_clashes() -> None:
-    from raidar.components.contribution import ContributionConflictError, merge_native_config
+    from raidar.components.definition.contribution import (
+        ContributionConflictError,
+        merge_native_config,
+    )
 
     merged = merge_native_config(
         {"a": {"x": 1}, "hooks": {"Stop": [1]}}, {"a": {"y": 2}, "hooks": {"Stop": [2]}, "b": 3}
@@ -334,7 +337,7 @@ def test_native_config_merge_appends_entry_lists_only_and_refuses_clashes() -> N
 def test_skill_name_falls_back_to_the_directory_and_probe_errors_fail_closed(
     tmp_path: Path,
 ) -> None:
-    from raidar.components.builtins.harness import skill_name
+    from raidar.components.catalog.harness import skill_name
 
     assert skill_name("---\nname: from-front\n---\nbody", "dir") == "from-front"
     assert skill_name("# no front matter", "dir") == "dir"
@@ -352,7 +355,7 @@ def test_skill_name_falls_back_to_the_directory_and_probe_errors_fail_closed(
 
 
 def test_evidence_reader_tolerates_malformed_logs(tmp_path: Path) -> None:
-    from raidar.components.evidence import StepEvidence
+    from raidar.components.definition.evidence import StepEvidence
 
     (tmp_path / "raidar-components.json").write_text("not json")
     (tmp_path / "nested").mkdir()
@@ -370,7 +373,7 @@ def test_evidence_reader_tolerates_malformed_logs(tmp_path: Path) -> None:
 
 
 def test_mcp_recorder_marks_errors_and_ignores_non_objects() -> None:
-    from raidar.components.mcp_shim import Recorder
+    from raidar.components.runtime.mcp_shim import Recorder
 
     log = io.StringIO()
     recorder = Recorder(log)
@@ -418,9 +421,9 @@ def test_stop_hook_body_can_come_from_a_component_file() -> None:
 def test_mcp_probe_fails_on_error_replies_or_an_empty_tool_list(
     tmp_path: Path, records: list[dict[str, object]], detail: str
 ) -> None:
-    from raidar.components.builtins.harness import MCP_SERVER
-    from raidar.components.evidence import StepEvidence
-    from raidar.components.manifest import ComponentUseContext
+    from raidar.components.catalog.harness import MCP_SERVER
+    from raidar.components.definition.evidence import StepEvidence
+    from raidar.components.definition.manifest import ComponentUseContext
 
     write_jsonl(tmp_path / "raidar-components" / "06-mcp-server.mcp.jsonl", records)
     use = ComponentUseContext("06-mcp-server", Harness.CODEX_CLI, tmp_path)
@@ -435,9 +438,9 @@ def test_stop_hook_probe_reads_the_body_exit_status(
 ) -> None:
     import subprocess
 
-    from raidar.components.builtins.harness import STOP_HOOK, _hook_wrapper
-    from raidar.components.evidence import StepEvidence
-    from raidar.components.manifest import ComponentUseContext
+    from raidar.components.catalog.harness import STOP_HOOK, _hook_wrapper
+    from raidar.components.definition.evidence import StepEvidence
+    from raidar.components.definition.manifest import ComponentUseContext
 
     logs, components = tmp_path / "logs", tmp_path / "components"
     script = (

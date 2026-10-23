@@ -14,13 +14,12 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.agents.config import agent_name_for
-from raidar.cli import main
-from raidar.commands import env_harbor
-from raidar.commands.repo_state import (
+from raidar.cli import env_harbor, main
+from raidar.cli.shared import ORCHESTRATOR_ROOT, REPO_ROOT
+from raidar.core.repo_state import (
     assert_no_generated_artifact_changes,
     generated_artifact_paths,
 )
-from raidar.commands.shared import ORCHESTRATOR_ROOT, REPO_ROOT
 from raidar.packs.python.models import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
@@ -124,7 +123,7 @@ def test_agent_setup_auth_runs_codex_login_with_device_auth(
         auth_path.write_text('{"access_token":"token"}', encoding="utf-8")
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("raidar.commands.agent.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.cli.agent.subprocess.run", fake_run)
 
     result = runner.invoke(
         main,
@@ -149,7 +148,7 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
         del check
         return subprocess.CompletedProcess(command, 0)
 
-    monkeypatch.setattr("raidar.commands.agent.subprocess.run", fake_run)
+    monkeypatch.setattr("raidar.cli.agent.subprocess.run", fake_run)
 
     result = runner.invoke(main, ["agent", "setup-auth", "--agent", "codex"])
 
@@ -178,18 +177,18 @@ def test_quality_gates_writes_coverage_to_pytest_cache(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
 
     monkeypatch.setattr(
-        "raidar.commands.quality.repo_state.assert_no_generated_artifact_changes",
+        "raidar.cli.quality.repo_state.assert_no_generated_artifact_changes",
         lambda repo_root: None,
     )
     monkeypatch.setattr(
-        "raidar.commands.quality.repo_state.has_unstaged_changes", lambda repo_root: False
+        "raidar.cli.quality.repo_state.has_unstaged_changes", lambda repo_root: False
     )
-    monkeypatch.setattr("raidar.commands.quality.shutil.which", lambda command: "/usr/bin/lizard")
+    monkeypatch.setattr("raidar.cli.quality.shutil.which", lambda command: "/usr/bin/lizard")
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
         calls.append({"cmd": cmd, "cwd": cwd, "env": env})
 
-    monkeypatch.setattr("raidar.commands.quality.run_or_raise", fake_run_or_raise)
+    monkeypatch.setattr("raidar.cli.quality.run_or_raise", fake_run_or_raise)
 
     quality_gates.callback(fix=False, stage=False)
 
@@ -205,14 +204,14 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
     runner = CliRunner()
     calls: list[dict[str, object]] = []
 
-    monkeypatch.setattr("raidar.commands.env_harbor.compose_preflight_reason", lambda: None)
+    monkeypatch.setattr("raidar.cli.env_harbor.compose_preflight_reason", lambda: None)
 
     def fake_run_or_raise(cmd, cwd, *, env=None):
         calls.append({"cmd": cmd, "cwd": cwd, "env": env})
 
-    monkeypatch.setattr("raidar.commands.env_harbor.run_or_raise", fake_run_or_raise)
+    monkeypatch.setattr("raidar.cli.env_harbor.run_or_raise", fake_run_or_raise)
     monkeypatch.setattr(
-        "raidar.commands.env_harbor.subprocess.run",
+        "raidar.cli.env_harbor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(
             args[0],
             0,
@@ -233,7 +232,7 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
 
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.commands.repo_state.changed_repo_entries",
+        "raidar.core.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "D",
@@ -247,7 +246,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
 
 def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.commands.repo_state.changed_repo_entries",
+        "raidar.core.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "M",
@@ -269,7 +268,7 @@ def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, mon
 
 def test_env_setup_refuses_an_old_docker_compose(monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.commands.env_harbor.subprocess.run",
+        "raidar.cli.env_harbor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, stdout="2.30.0\n"),
     )
 
@@ -282,7 +281,7 @@ def test_env_setup_refuses_an_old_docker_compose(monkeypatch) -> None:
 def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -> None:
     outputs = iter(["v2.40.1\n", "not a version\n"])
     monkeypatch.setattr(
-        "raidar.commands.env_harbor.subprocess.run",
+        "raidar.cli.env_harbor.subprocess.run",
         lambda *args, **kwargs: subprocess.CompletedProcess(args[0], 0, stdout=next(outputs)),
     )
     assert env_harbor.compose_preflight_reason() is None
@@ -291,7 +290,7 @@ def test_compose_preflight_accepts_new_unknown_or_missing_compose(monkeypatch) -
     def missing(*_args, **_kwargs):
         raise FileNotFoundError("docker")
 
-    monkeypatch.setattr("raidar.commands.env_harbor.subprocess.run", missing)
+    monkeypatch.setattr("raidar.cli.env_harbor.subprocess.run", missing)
     assert env_harbor.compose_preflight_reason() is None
 
 
@@ -304,7 +303,7 @@ def test_harbor_cleanup_reports_removed_trial_environments(
         seen.update(job_dir=job_dir, docker_context=docker_context, dry_run=dry_run)
         return ["b00-p0-baseline__env-0123456789"]
 
-    monkeypatch.setattr("raidar.commands.env_harbor.cleanup_trial_projects", fake_cleanup)
+    monkeypatch.setattr("raidar.cli.env_harbor.cleanup_trial_projects", fake_cleanup)
 
     result = CliRunner().invoke(main, ["harbor", "cleanup", "--job", str(tmp_path), "--dry-run"])
 
@@ -318,7 +317,7 @@ def test_harbor_cleanup_surfaces_docker_failures(monkeypatch, docker_target_offl
     def failing(job_dir, *, docker_context, dry_run):
         raise RuntimeError("docker ps failed: no daemon")
 
-    monkeypatch.setattr("raidar.commands.env_harbor.cleanup_trial_projects", failing)
+    monkeypatch.setattr("raidar.cli.env_harbor.cleanup_trial_projects", failing)
 
     result = CliRunner().invoke(main, ["harbor", "cleanup"])
 
@@ -520,7 +519,7 @@ def test_review_fixture_is_written_under_the_fixture_dir() -> None:
     result = _make_dry_run("review-fixture-synthetic")
 
     assert result.returncode == 0, result.stderr
-    assert "raidar.review_projection.fixture" in result.stdout
+    assert "raidar.review.projection.fixture" in result.stdout
     assert "/.tmp/review-fixture" in result.stdout
     assert "experiments/" not in result.stdout
 
@@ -530,8 +529,8 @@ def test_review_surface_test_projects_both_fixture_roots_but_quality_only_one() 
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
-    review = next(line for line in joined.splitlines() if "raidar.review_projection " in line)
-    quality = next(line for line in joined.splitlines() if "raidar.review_quality " in line)
+    review = next(line for line in joined.splitlines() if "raidar.review.projection " in line)
+    quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
     assert "--legacy-root" not in review
     assert "/.tmp/review-fixture/review-only" in review
     assert "/.tmp/review-fixture/jobs" in review
@@ -558,7 +557,7 @@ def test_review_surface_test_applies_one_store_to_every_given_runs_root() -> Non
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
-    quality = next(line for line in joined.splitlines() if "raidar.review_quality " in line)
+    quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
     assert f'--jobs-root "{REPO_ROOT / "runs/a"}"' in quality
     assert f'--jobs-root "{REPO_ROOT / "runs/b"}"' in quality
     assert quality.count(f'--store "{REPO_ROOT / "store"}"') == 2

@@ -20,9 +20,9 @@ from typing import Any
 import pytest
 
 from raidar.components import ComponentKind, ComponentRegistry, ComponentRejectedError
-from raidar.components.builtins import guardrails as guardrails_v1
-from raidar.components.builtins._common import sha256_bytes
-from raidar.components.builtins.guardrails_v3 import (
+from raidar.components.catalog import guardrails as guardrails_v1
+from raidar.components.catalog._common import sha256_bytes
+from raidar.components.catalog.guardrails_v3 import (
     ENTRYPOINT,
     INSTALL_RECORD,
     LINK_PATH,
@@ -36,9 +36,9 @@ from raidar.components.builtins.guardrails_v3 import (
     install_script,
     payload_bytes,
 )
-from raidar.components.integrity import condition_step_flags
-from raidar.components.provision import PROVISION_CHANNEL
-from raidar.components.provision_v2 import (
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.runtime.provision import PROVISION_CHANNEL
+from raidar.components.runtime.provision_v2 import (
     AGENT_USER_ENV,
     PAYLOAD_ENV,
     TrialProvision,
@@ -125,7 +125,7 @@ def test_v3_is_a_python_service_that_fingerprints_its_whole_payload_and_installe
     assert set(manifest.network.egress_hosts) == {"files.pythonhosted.org", "pypi.org"}
     for relative in PAYLOAD_FILES:
         assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/components/provision_v2.py" in manifest.fingerprint
+    assert "raidar/components/runtime/provision_v2.py" in manifest.fingerprint
     shipped = {
         path.relative_to(PAYLOAD_DIR).as_posix()
         for path in PAYLOAD_DIR.rglob("*")

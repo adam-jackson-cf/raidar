@@ -17,9 +17,8 @@ from pathlib import Path
 from raidar.analysis.manipulation import GATE_EFFORT_REFS as MANIPULATION_REFS
 from raidar.analysis.markdown import CUMULATIVE_LEGEND, _autofix_family_table, _better, _legend
 from raidar.analysis.outcomes import GATE_PREFIX, gate_metrics_for
-from raidar.commands.assess_grading import PRE_FIX_GRADE_SCORERS
 from raidar.problems.sensitivities import SensitivityKind, known_sensitivities
-from raidar.review_quality.gate_view import GATE_EFFORT_REFS as REVIEW_REFS
+from raidar.review.quality.gate_view import GATE_EFFORT_REFS as REVIEW_REFS
 from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.gate_effort.families import FAMILIES
 from raidar.scorers.gate_effort_v9 import gate_effort_v9_scorer_for_store
@@ -32,6 +31,7 @@ from raidar.scorers.gate_effort_v10 import (
 from raidar.scorers.sdk.context import AssessContext, StepInputs
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus
 from raidar.scorers.sdk.validation import validate_result
+from raidar.verifier.offline_grading import PRE_FIX_GRADE_SCORERS
 from tests.test_gate_effort_scorer import REFUSED, _step, _trace, _value, _values
 from tests.test_gate_effort_v2_scorer import _shadow
 from tests.test_gate_effort_v4_scorer import CP1, CP2, _enforced, _store_grade

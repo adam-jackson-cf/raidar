@@ -19,8 +19,8 @@ from harbor.models.trial.config import AgentConfig
 from harbor.trial.trial import Trial
 
 from raidar.components import compile_condition
-from raidar.components.contribution import SupportFile
-from raidar.components.setup_script import render_setup_script
+from raidar.components.definition.contribution import SupportFile
+from raidar.components.runtime.setup_script import render_setup_script
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, run_scope
 from tests.component_support import PILOT_DIR, agent, all_builtin_uses, compile_uses, condition, use
 from tests.component_trial_support import (
@@ -109,8 +109,8 @@ def test_setup_script_resets_state_materialises_support_and_records_workspace(
 
 @pytest.mark.skipif(BASH5 is None, reason="needs bash >= 4 (associative arrays)")
 def test_root_agent_user_is_refused_not_killed_and_fails_the_reset_probe(tmp_path: Path) -> None:
-    from raidar.components.compiled import reset_probe
-    from raidar.components.evidence import StepEvidence
+    from raidar.components.definition.compiled import reset_probe
+    from raidar.components.definition.evidence import StepEvidence
 
     logs, workspace = tmp_path / "logs", tmp_path / "app"
     workspace.mkdir()

@@ -28,24 +28,20 @@ from harbor.agents.installed.base import ApiOverloadedError, NonZeroAgentExitCod
 from harbor.environments.base import BaseEnvironment, ExecResult
 from harbor.models.agent.context import AgentContext
 
-from raidar.components import (
-    ComponentKind,
-    ComponentRegistry,
-    ComponentRejectedError,
-    transient_retry,
-)
-from raidar.components.builtins.gate_v3 import GUARDRAIL_GATE_V3_IMPORT_PATH
-from raidar.components.builtins.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
-from raidar.components.builtins.stall_v2 import CONTINUE_ON_STALL_V2_IMPORT_PATH
-from raidar.components.continue_on_stall import STALL_DIR, STALL_RECORD
-from raidar.components.continue_on_stall_v2 import (
+from raidar.components import ComponentKind, ComponentRegistry, ComponentRejectedError
+from raidar.components.catalog.gate_v3 import GUARDRAIL_GATE_V3_IMPORT_PATH
+from raidar.components.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
+from raidar.components.catalog.stall_v2 import CONTINUE_ON_STALL_V2_IMPORT_PATH
+from raidar.components.definition.evidence import StepEvidence
+from raidar.components.runtime import transient_retry
+from raidar.components.runtime.continue_on_stall import STALL_DIR, STALL_RECORD
+from raidar.components.runtime.continue_on_stall_v2 import (
     ContinueOnStallV2Agent,
     continuation_prompt,
     detect_stall_message,
 )
-from raidar.components.evidence import StepEvidence
-from raidar.components.session_chain import InnerAgentSpec
-from raidar.components.transient_retry import (
+from raidar.components.runtime.session_chain import InnerAgentSpec
+from raidar.components.runtime.transient_retry import (
     RETRY_DIR,
     RETRY_RECORD,
     TransientRetryAgent,
@@ -122,10 +118,10 @@ def test_both_are_workflow_session_wrappers_without_with_keys() -> None:
         assert registry.get(ref).manifest.kind is ComponentKind.WORKFLOW
         with pytest.raises(ComponentRejectedError):
             compile_uses(use(ref, retries=3))
-    assert "raidar/components/continue_on_stall_v2.py" in (
+    assert "raidar/components/runtime/continue_on_stall_v2.py" in (
         registry.get("continue-on-stall@2").manifest.fingerprint
     )
-    assert "raidar/components/transient_retry.py" in (
+    assert "raidar/components/runtime/transient_retry.py" in (
         registry.get("transient-retry@1").manifest.fingerprint
     )
 

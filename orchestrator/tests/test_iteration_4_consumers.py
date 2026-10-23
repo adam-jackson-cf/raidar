@@ -27,17 +27,17 @@ from raidar.analysis.markdown import (
 )
 from raidar.analysis.outcomes import GATE_PREFIX, VERIFIER_DISAGREEMENTS, gate_metrics_for
 from raidar.analysis.report import ArmSummary
-from raidar.commands.assess_grading import PRE_FIX_GRADE_SCORERS
 from raidar.problems.sensitivities import (
     SensitivityError,
     SensitivityKind,
     known_sensitivities,
     load_sensitivities,
 )
-from raidar.review_quality.gate_view import GATE_EFFORT_REFS as REVIEW_REFS
+from raidar.review.quality.gate_view import GATE_EFFORT_REFS as REVIEW_REFS
 from raidar.scorers.gate_effort.families import FAMILIES
 from raidar.scorers.gate_effort_v9.manifest import REFUSAL_KINDS
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
+from raidar.verifier.offline_grading import PRE_FIX_GRADE_SCORERS
 
 REPO = Path(__file__).resolve().parents[2]
 

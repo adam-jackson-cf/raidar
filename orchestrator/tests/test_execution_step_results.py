@@ -15,7 +15,7 @@ from harbor.trial.multi_step import MultiStepTrial
 
 from raidar.components import CompiledCondition, compile_condition
 from raidar.execution.collect import TrialContext, classify_trial, execution_validity
-from raidar.execution.liveness import LIVENESS_REPORT, idle_killed_steps
+from raidar.execution.health.liveness import LIVENESS_REPORT, idle_killed_steps
 from raidar.execution.models import CheckpointState, PlannedTrial, ProgressionRule, TrialHashes
 from raidar.execution.progression import derive_reached, executed_reached, progression_rule
 from raidar.execution.trial_record import reached

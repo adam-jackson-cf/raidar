@@ -23,9 +23,9 @@ from pathlib import Path
 import pytest
 
 from raidar.components import ComponentKind, ComponentRegistry
-from raidar.components.builtins import guardrails_v5
-from raidar.components.builtins._common import sha256_bytes
-from raidar.components.builtins.guardrails_v6 import (
+from raidar.components.catalog import guardrails_v5
+from raidar.components.catalog._common import sha256_bytes
+from raidar.components.catalog.guardrails_v6 import (
     ENTRYPOINT,
     PAYLOAD_DIR,
     PAYLOAD_FILES,
@@ -39,9 +39,9 @@ from raidar.components.builtins.guardrails_v6 import (
     install_script,
     payload_bytes,
 )
-from raidar.components.integrity import condition_step_flags
-from raidar.components.provision import PROVISION_CHANNEL
-from raidar.components.provision_v2 import trial_provisions
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.runtime.provision import PROVISION_CHANNEL
+from raidar.components.runtime.provision_v2 import trial_provisions
 from tests.component_support import compile_uses, use, write_jsonl, write_step_reports
 from tests.python_guardrails_support import PACKS, implemented_rules, uncovered_pack_entries
 
@@ -65,7 +65,7 @@ def test_v6_is_a_python_service_that_fingerprints_its_whole_payload() -> None:
     assert (manifest.kind, definition.runtimes) == (ComponentKind.SERVICE, ("python",))
     for relative in PAYLOAD_FILES:
         assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/components/builtins/guardrails_v6.py" in manifest.fingerprint
+    assert "raidar/components/catalog/guardrails_v6.py" in manifest.fingerprint
     shipped = {
         path.relative_to(PAYLOAD_DIR).as_posix()
         for path in PAYLOAD_DIR.rglob("*")

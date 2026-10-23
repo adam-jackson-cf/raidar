@@ -9,7 +9,7 @@ the override so its results are never compared with real arms.
 
 A condition's session wrappers (``continue-on-stall@1``) are nested around the
 native agent, inside the condition's workflow wrapper when it has one
-(``raidar.components.session_chain``); the native agent's pin and auth are read
+(``raidar.components.runtime.session_chain``); the native agent's pin and auth are read
 through every level of wrapping.
 """
 
@@ -19,10 +19,13 @@ from typing import Literal
 
 from harbor.models.trial.config import AgentConfig
 
+from raidar.agents.codex_auth import resolve_codex_auth
 from raidar.agents.config import Harness
-from raidar.codex_auth import resolve_codex_auth
 from raidar.components import HARBOR_AGENT_NAMES, CompiledCondition
-from raidar.components.session_chain import apply_session_wrappers, condition_session_wrappers
+from raidar.components.runtime.session_chain import (
+    apply_session_wrappers,
+    condition_session_wrappers,
+)
 from raidar.packs.python.harness import harbor_agent_kwargs
 from raidar.packs.python.models import PackSpec
 from raidar.spec.canonical import digest_json

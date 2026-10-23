@@ -296,7 +296,7 @@ REVIEW_LOCK ?=
 
 # $(1) job roots, $(2) Assessment stores.
 define review_projection
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_projection \
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review.projection \
 		$(foreach root,$(1),--jobs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(REVIEW_LOCK),--lock "$(abspath $(lock))") \
@@ -306,7 +306,7 @@ define review_projection
 endef
 
 review-fixture-synthetic:
-	@cd orchestrator && uv run --project . python -m raidar.review_projection.fixture "$(abspath $(REVIEW_FIXTURE_DIR))"
+	@cd orchestrator && uv run --project . python -m raidar.review.projection.fixture "$(abspath $(REVIEW_FIXTURE_DIR))"
 
 review-surface-data:
 	$(call require_var,REVIEW_JOBS_ROOT)
@@ -326,7 +326,7 @@ QUALITY_LOCK ?=
 
 # $(1) job roots and $(2) Assessment stores, paired by position; $(3) --synthetic or empty.
 define quality_projection
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality \
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review.quality \
 		$(foreach root,$(1),--jobs-root "$(abspath $(root))") \
 		$(foreach store,$(2),--store "$(abspath $(store))") \
 		$(foreach lock,$(QUALITY_LOCK) $(REVIEW_LOCK),--lock "$(abspath $(lock))") \
@@ -336,7 +336,7 @@ define quality_projection
 endef
 
 quality-fixture-synthetic:
-	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review_quality.synthetic "$(QUALITY_FIXTURE_DIR)"
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.review.quality.synthetic "$(QUALITY_FIXTURE_DIR)"
 
 review-surface-quality-data:
 	$(if $(QUALITY_JOBS),$(if $(filter $(words $(QUALITY_JOBS)),$(words $(QUALITY_STORE))),,$(error QUALITY_JOBS and QUALITY_STORE need one store per jobs root, in the same order)))

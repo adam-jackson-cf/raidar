@@ -18,7 +18,7 @@ from raidar.jev.label_export import (
     load_review_labels,
 )
 from raidar.jev.rubric import RUBRIC_POLICY
-from raidar.review_quality.synthetic import generate_quality_fixture
+from raidar.review.quality.synthetic import generate_quality_fixture
 
 RUN = "synthetic-quality.synthetic-run-1.b00-p0-baseline"
 

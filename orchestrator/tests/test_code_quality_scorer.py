@@ -16,7 +16,7 @@ from typing import Any
 
 import pytest
 
-from raidar.oracle.snapshot import tree_digest
+from raidar.core.snapshot import tree_digest
 from raidar.packs.python.models import load_tool_lock
 from raidar.packs.python.provisioner import ToolProvisioningError
 from raidar.scorers.builtin_manifests import CODE_QUALITY

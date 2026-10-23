@@ -16,8 +16,8 @@ from raidar.analysis.outcomes import (
     gate_metrics_for,
     process_metrics_for,
 )
-from raidar.review_projection.assessments import TrialAssessments
-from raidar.review_projection.headline import needed_scorers, quality_scorer
+from raidar.review.projection.assessments import TrialAssessments
+from raidar.review.projection.headline import needed_scorers, quality_scorer
 from raidar.scorers.code_quality_refs import CODE_QUALITY_REFS, code_quality_ref
 from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
 

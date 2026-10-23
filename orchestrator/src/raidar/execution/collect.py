@@ -19,7 +19,7 @@ Per planned checkpoint the state is decided from host-only evidence:
   in ``raidar-oracle/steps/<step>/record.json``. Harbor's aggregated trial
   reward is never read.
 
-Component integrity flags (``raidar.components.integrity``: agent tampering
+Component integrity flags (``raidar.components.definition.integrity``: agent tampering
 with a component's guardrails) are kept in the step's probe summary and never
 change its state or the trial's validity.
 
@@ -39,9 +39,9 @@ from pathlib import Path
 from typing import Any
 
 from raidar.components import CompiledCondition
-from raidar.components.integrity import condition_step_flags
-from raidar.execution.health_model import VIOLATION, HealthReport, load_health
-from raidar.execution.liveness import idle_killed_steps
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.execution.health.liveness import idle_killed_steps
+from raidar.execution.health.model import VIOLATION, HealthReport, load_health
 from raidar.execution.models import (
     CheckpointState,
     ExecutionValidity,

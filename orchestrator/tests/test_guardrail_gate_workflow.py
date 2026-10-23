@@ -28,12 +28,12 @@ from harbor.models.trial.config import AgentConfig
 
 from raidar.agents.config import Harness
 from raidar.components import ComponentRejectedError, StepEvidence
-from raidar.components.builtins.gate import (
+from raidar.components.catalog.gate import (
     GUARDRAIL_GATE,
     GUARDRAIL_GATE_IMPORT_PATH,
     gate_signal,
 )
-from raidar.components.gate_run import (
+from raidar.components.runtime.gate_run import (
     GATE_RECORD,
     MAX_OUTPUT_CHARS,
     SIGNAL,
@@ -42,8 +42,8 @@ from raidar.components.gate_run import (
     parse_checks,
     read_gate_run,
 )
-from raidar.components.guardrail_gate import GuardrailGateAgent
-from raidar.components.review_loop import PROMPT_ARG_BUDGET
+from raidar.components.runtime.guardrail_gate import GuardrailGateAgent
+from raidar.components.runtime.review_loop import PROMPT_ARG_BUDGET
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,

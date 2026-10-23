@@ -8,7 +8,7 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.oracle.snapshot import tree_digest
+from raidar.core.snapshot import tree_digest
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry
 from raidar.scorers.inventory import FileRole
 from raidar.scorers.sdk.context import AssessContext

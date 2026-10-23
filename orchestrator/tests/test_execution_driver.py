@@ -16,10 +16,10 @@ import yaml
 from click.testing import CliRunner
 from harbor.models.trial.config import AgentConfig, TrialConfig
 
+from raidar.agents.codex_auth import ResolvedCodexAuth
 from raidar.agents.config import Harness
 from raidar.cli import main
-from raidar.codex_auth import ResolvedCodexAuth
-from raidar.components.provision import Provision
+from raidar.components.runtime.provision import Provision
 from raidar.execution import driver
 from raidar.execution.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
 from raidar.execution.driver import TrialRun, run_harbor_trial, run_in_order
@@ -28,10 +28,10 @@ from raidar.execution.environment import (
     RunScopedDockerEnvironment,
     run_scope,
 )
+from raidar.execution.health.records_manifest import RECORDS_MANIFEST, tamper_findings
 from raidar.execution.job_context import JobContext
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
-from raidar.execution.records_manifest import RECORDS_MANIFEST, tamper_findings
 from raidar.execution.run import execute, load_problems
 from raidar.execution.trial_config import harbor_trial_config
 from raidar.packs.python.models import load_pack_spec
@@ -551,7 +551,7 @@ def test_codex_gets_the_host_session_file_path_only(
     assert with_host_auth(codex, Harness.CODEX_CLI).env == {CODEX_AUTH_ENV: str(auth)}
     assert with_host_auth(AgentConfig(name="oracle"), Harness.CODEX_CLI).env == {}
     wrapper = AgentConfig(
-        import_path="raidar.components.review_loop:ReviewLoopAgent",
+        import_path="raidar.components.runtime.review_loop:ReviewLoopAgent",
         kwargs={"inner_agent": {"name": "codex", "kwargs": {"version": "0.156.1"}}},
     )
     # A workflow wrapper is held to its wrapped harness's pin; a no-LLM override has none.
@@ -588,7 +588,7 @@ def test_run_command_runs_the_selection_into_the_runs_dir(
         return JobTarget(SELECTION, None, TargetGuard.for_target(SELECTION.trial, reap=_no_reap))
 
     monkeypatch.setattr("raidar.execution.run.execute", fake_execute)
-    monkeypatch.setattr("raidar.commands.execution.job_target", fake_job_target)
+    monkeypatch.setattr("raidar.cli.execution.job_target", fake_job_target)
     runner = CliRunner()
     arguments = ["run", str(loaded.path), "--arm", "baseline", "--attempt", "1", "--target", "t"]
     jobs = ["--jobs-dir", str(tmp_path / "jobs"), "--job-id", "x"]

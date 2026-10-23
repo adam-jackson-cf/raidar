@@ -14,8 +14,8 @@ from collections.abc import Callable, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 from raidar.analysis.outcomes import PoolFinding, PoolingReport
-from raidar.execution.records_manifest import tamper_findings
-from raidar.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
+from raidar.core.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
+from raidar.execution.health.records_manifest import tamper_findings
 
 if TYPE_CHECKING:
     from raidar.analysis.sources import JobDir

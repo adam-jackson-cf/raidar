@@ -6,7 +6,7 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from raidar.commands.ledger import ledger_group
+from raidar.cli.ledger import ledger_group
 from raidar.ledger.check import check_ledger, load_ledger
 from raidar.ledger.index import README_NAME, render_index
 

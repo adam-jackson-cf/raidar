@@ -11,7 +11,7 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
-from raidar.execution.liveness import (
+from raidar.execution.health.liveness import (
     LIVENESS_REPORT,
     LivenessConfig,
     PhaseMonitor,

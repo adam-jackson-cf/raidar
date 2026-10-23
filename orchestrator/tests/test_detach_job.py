@@ -19,6 +19,7 @@ from pathlib import Path
 
 import pytest
 
+from raidar.core.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.execution.detach import (
     EXIT_FILE,
     LAUNCH_FILE,
@@ -32,7 +33,6 @@ from raidar.execution.detach import (
     status,
 )
 from raidar.execution.run import create_job_dir
-from raidar.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
 
 EXPERIMENT_ID = "python__toy__detach"
 # Stands in for `make experiment-execute DETACH=0 ...`: writes the job like raidar run does.

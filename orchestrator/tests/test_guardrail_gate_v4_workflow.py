@@ -27,17 +27,17 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 
 from raidar.components import ComponentRejectedError, StepEvidence
-from raidar.components.autofix_run import (
+from raidar.components.catalog.gate_v4 import GUARDRAIL_GATE_V4, GUARDRAIL_GATE_V4_IMPORT_PATH
+from raidar.components.definition.registry import fingerprint
+from raidar.components.runtime.autofix_run import (
     ERROR_TYPES,
     REPORT_MARK,
     AutofixMode,
     AutofixRun,
     read_autofix_run,
 )
-from raidar.components.builtins.gate_v4 import GUARDRAIL_GATE_V4, GUARDRAIL_GATE_V4_IMPORT_PATH
-from raidar.components.gate_run import GATE_RECORD, SIGNAL
-from raidar.components.guardrail_gate_v4 import GuardrailGateV4Agent
-from raidar.components.registry import fingerprint
+from raidar.components.runtime.gate_run import GATE_RECORD, SIGNAL
+from raidar.components.runtime.guardrail_gate_v4 import GuardrailGateV4Agent
 from tests.component_support import compile_uses, use
 from tests.test_guardrail_gate_workflow import LocalEnvironment
 
@@ -467,9 +467,9 @@ def test_the_probe_fails_when_autofix_was_asked_for_but_not_recorded(tmp_path: P
 
 def test_the_fingerprint_covers_the_autofix_modules_and_v3_stays_frozen() -> None:
     files = GUARDRAIL_GATE_V4.manifest.fingerprint
-    assert "raidar/components/autofix_run.py" in files
-    assert "raidar/components/guardrail_gate_v4.py" in files
+    assert "raidar/components/runtime/autofix_run.py" in files
+    assert "raidar/components/runtime/guardrail_gate_v4.py" in files
     assert fingerprint(GUARDRAIL_GATE_V4) != ""
-    from raidar.components.builtins.gate_v3 import GUARDRAIL_GATE_V3
+    from raidar.components.catalog.gate_v3 import GUARDRAIL_GATE_V3
 
-    assert "raidar/components/autofix_run.py" not in GUARDRAIL_GATE_V3.manifest.fingerprint
+    assert "raidar/components/runtime/autofix_run.py" not in GUARDRAIL_GATE_V3.manifest.fingerprint

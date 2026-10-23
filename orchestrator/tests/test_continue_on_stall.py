@@ -24,9 +24,10 @@ from harbor.models.trial.config import AgentConfig
 
 from raidar.agents.config import Harness
 from raidar.components import ComponentKind, ComponentRegistry
-from raidar.components.builtins.gate_v3 import GUARDRAIL_GATE_V3_IMPORT_PATH
-from raidar.components.builtins.stall import CONTINUE_ON_STALL_IMPORT_PATH, stall_records
-from raidar.components.continue_on_stall import (
+from raidar.components.catalog.gate_v3 import GUARDRAIL_GATE_V3_IMPORT_PATH
+from raidar.components.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH, stall_records
+from raidar.components.definition.evidence import StepEvidence
+from raidar.components.runtime.continue_on_stall import (
     ASSUMPTIONS_FILE,
     STALL_DIR,
     STALL_RECORD,
@@ -34,22 +35,21 @@ from raidar.components.continue_on_stall import (
     detect_request,
     fingerprint_script,
 )
-from raidar.components.evidence import StepEvidence
-from raidar.components.guardrail_gate_v3 import (
+from raidar.components.runtime.guardrail_gate_v3 import (
     GuardrailGateOptionsV3,
     GuardrailGateV3Agent,
     PreFixSnapshot,
     _GateStateV3,
     gate_record_v3,
 )
-from raidar.components.session_chain import (
+from raidar.components.runtime.session_chain import (
     InnerAgentSpec,
     apply_session_wrappers,
     condition_session_wrappers,
     render_task,
 )
+from raidar.core.snapshot import SNAPSHOT_EXCLUDES
 from raidar.execution.agent_config import arm_agent_config, reported_harness_pin, with_host_auth
-from raidar.oracle.snapshot import SNAPSHOT_EXCLUDES
 from raidar.packs.python.models import load_pack_spec
 from raidar.spec.schema import AgentEntry
 from tests.component_support import compile_uses, use
@@ -105,7 +105,7 @@ def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> Non
     compiled = compile_uses(use("continue-on-stall@1"), use("guardrail-gate@3", **GATE))
 
     assert definition.manifest.kind is ComponentKind.WORKFLOW
-    assert "raidar/components/continue_on_stall.py" in definition.manifest.fingerprint
+    assert "raidar/components/runtime/continue_on_stall.py" in definition.manifest.fingerprint
     assert compiled.agent_wrapper is not None
     assert compiled.agent_wrapper.import_path == GUARDRAIL_GATE_V3_IMPORT_PATH
     (wrapper,) = condition_session_wrappers(compiled)
@@ -221,7 +221,7 @@ def test_the_task_is_rendered_once_with_the_chains_template(tmp_path: Path) -> N
 
 
 def test_apply_nests_the_first_wrapper_outermost() -> None:
-    from raidar.components.contribution import AgentWrapper
+    from raidar.components.definition.contribution import AgentWrapper
 
     base = AgentConfig(name="codex", kwargs={"version": "1"})
     config = apply_session_wrappers(
@@ -243,7 +243,7 @@ def test_gate_v3_keeps_v2s_options_and_probe_with_its_own_wrapper() -> None:
     compiled = compile_uses(use("guardrail-gate@3", **GATE))
 
     assert v3.manifest.discovery_probe == v2.manifest.discovery_probe
-    assert "raidar/components/guardrail_gate_v3.py" in v3.manifest.fingerprint
+    assert "raidar/components/runtime/guardrail_gate_v3.py" in v3.manifest.fingerprint
     assert compiled.agent_wrapper is not None
     assert dict(compiled.agent_wrapper.kwargs) == {**GATE, "component": "guardrail-gate@3"}
     shadow = compile_uses(use("guardrail-gate@3", **{**GATE, "mode": "shadow"}))

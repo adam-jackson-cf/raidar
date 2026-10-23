@@ -1,6 +1,6 @@
 """One step's ``guardrail-gate@4`` autofix passes, read back from its gate record.
 
-The wrapper (``raidar.components.guardrail_gate_v4``) records every autofix
+The wrapper (``raidar.components.runtime.guardrail_gate_v4``) records every autofix
 pass under ``autofix.runs`` of ``guardrail-gate/guardrail-gate.json``: its
 mode (``apply`` before an enforced commit check, ``dry_run`` on a shadow
 gate's throwaway copy), its typed error if it could not complete, what the

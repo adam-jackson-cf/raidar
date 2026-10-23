@@ -28,7 +28,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.snapshot import tree_digest
+from raidar.core.snapshot import tree_digest
 from raidar.scorers.inventory import InventoryPolicy
 from raidar.scorers.sdk.context import AssessContext, StepInputs
 from raidar.spec.canonical import digest_json

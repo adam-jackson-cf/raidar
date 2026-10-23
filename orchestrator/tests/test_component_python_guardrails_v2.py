@@ -13,17 +13,17 @@ from pathlib import Path
 import pytest
 
 from raidar.components import ComponentRegistry, ComponentRejectedError
-from raidar.components.builtins.guardrails import (
+from raidar.components.catalog.guardrails import (
     PAYLOAD_FILES,
     PAYLOAD_PACKAGE_DIR,
     PYTHON_GUARDRAILS,
     WORKSPACE_CONFIGS,
     payload_bytes,
 )
-from raidar.components.builtins.guardrails_v2 import PYTHON_GUARDRAILS_V2
-from raidar.components.evidence import StepEvidence
-from raidar.components.provision import condition_provisions
-from raidar.components.registry import fingerprint
+from raidar.components.catalog.guardrails_v2 import PYTHON_GUARDRAILS_V2
+from raidar.components.definition.evidence import StepEvidence
+from raidar.components.definition.registry import fingerprint
+from raidar.components.runtime.provision import condition_provisions
 from tests.component_support import compile_uses, use
 from tests.test_component_python_guardrails import (
     SLUG,
@@ -48,9 +48,9 @@ def test_v2_fingerprints_the_same_untouched_payload_and_leaves_v1_frozen() -> No
 
     for relative in PAYLOAD_FILES:
         assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/components/builtins/guardrails.py" in manifest.fingerprint
-    assert "raidar/components/builtins/guardrails_v2.py" in manifest.fingerprint
-    assert "raidar/components/builtins/guardrails_v2.py" not in (
+    assert "raidar/components/catalog/guardrails.py" in manifest.fingerprint
+    assert "raidar/components/catalog/guardrails_v2.py" in manifest.fingerprint
+    assert "raidar/components/catalog/guardrails_v2.py" not in (
         PYTHON_GUARDRAILS.manifest.fingerprint
     )
     assert fingerprint(registry.get(REF)) != fingerprint(registry.get("python-guardrails@1"))

@@ -16,20 +16,20 @@ from typing import Any
 import pytest
 from harbor.models.trajectories import ToolCall
 
-from raidar.review_projection import main, merge_review_projections
-from raidar.review_projection.assessments import TrialAssessments
-from raidar.review_projection.atif import tool_label
-from raidar.review_projection.comparability import (
+from raidar.core.review_contract import ReviewProjectionArtifact, ReviewRunDetail
+from raidar.review.projection import main, merge_review_projections
+from raidar.review.projection.assessments import TrialAssessments
+from raidar.review.projection.atif import tool_label
+from raidar.review.projection.comparability import (
     MISMATCH_CATEGORY,
     UNKNOWN_POLICY,
     mark_policy_mismatches,
 )
-from raidar.review_projection.conditions import ArmSide, condition_diff
-from raidar.review_projection.fixture import REVIEW_ONLY_DIR, generate_review_fixture
-from raidar.review_projection.headline import COMPONENT_METRICS, headline, policy_shares
-from raidar.review_projection.merge import project_experiment_epoch
-from raidar.review_projection.sources import JobSourceError, LockIndex, load_job
-from raidar.schemas.review import ReviewProjectionArtifact, ReviewRunDetail
+from raidar.review.projection.conditions import ArmSide, condition_diff
+from raidar.review.projection.fixture import REVIEW_ONLY_DIR, generate_review_fixture
+from raidar.review.projection.headline import COMPONENT_METRICS, headline, policy_shares
+from raidar.review.projection.merge import project_experiment_epoch
+from raidar.review.projection.sources import JobSourceError, LockIndex, load_job
 from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
 from raidar.spec.schema import ExperimentSpec
 
@@ -547,7 +547,7 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
 ) -> None:
     from click.testing import CliRunner
 
-    from raidar.commands.assess import assess
+    from raidar.cli.assess import assess
 
     job_dir = _copy_run(fixture_root, tmp_path, "synthetic-bugfix")
     config = job_dir / "assessment-config.yaml"
@@ -573,8 +573,8 @@ def test_following_the_unassessed_hint_stores_the_assessment_the_review_finds(
 
 
 def test_a_headline_scorer_the_experiment_never_declared_is_named_not_unassessed() -> None:
-    from raidar.review_projection.assessments import TrialAssessments
-    from raidar.review_projection.headline import UNDECLARED_MARKER, headline
+    from raidar.review.projection.assessments import TrialAssessments
+    from raidar.review.projection.headline import UNDECLARED_MARKER, headline
 
     missing = TrialAssessments(missing={"correctness@1": "no stored Assessment"})
     one = ("checkpoint_1",)
@@ -600,7 +600,7 @@ CODEX_FAILED = (
 
 
 def test_codex_tool_results_are_decoded_and_statused_by_their_header() -> None:
-    from raidar.review_projection.atif import _text, _tool_status
+    from raidar.review.projection.atif import _text, _tool_status
 
     ok = _text(CODEX_OK)
     assert ok.splitlines()[:4] == [

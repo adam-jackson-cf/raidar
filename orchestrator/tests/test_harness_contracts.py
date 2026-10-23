@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from raidar.agents.config import Harness
-from raidar.harness import (
+from raidar.agents.harness import (
     CredentialSourceType,
     CredentialTransport,
     HarnessDefinitionError,

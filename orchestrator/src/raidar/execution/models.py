@@ -88,7 +88,7 @@ class ProbeSummary(ExecutionModel):
     flags: tuple[str, ...] = Field(
         default=(),
         description=(
-            "Integrity flags (raidar.components.integrity): agent behaviour a component "
+            "Integrity flags (raidar.components.definition.integrity): agent behaviour a component "
             "records without failing the step, e.g. an edited protected-config copy or "
             "an attempt to get round a commit hook"
         ),

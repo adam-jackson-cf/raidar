@@ -23,8 +23,8 @@ from typing import Any, cast
 import pytest
 
 from raidar.components import ComponentKind, ComponentRegistry, ComponentRejectedError
-from raidar.components.builtins._common import sha256_bytes
-from raidar.components.builtins.guardrails import (
+from raidar.components.catalog._common import sha256_bytes
+from raidar.components.catalog.guardrails import (
     BYPASS_PATTERNS,
     LINK_PATH,
     PAYLOAD_DIR,
@@ -37,11 +37,15 @@ from raidar.components.builtins.guardrails import (
     WORKSPACE_CONFIGS,
     payload_bytes,
 )
-from raidar.components.evidence import StepEvidence
-from raidar.components.integrity import condition_step_flags
-from raidar.components.manifest import ComponentUseContext
-from raidar.components.provision import PROVISION_CHANNEL, condition_provisions, parse_check_output
-from raidar.components.registry import ComponentResolver, component_runtimes
+from raidar.components.definition.evidence import StepEvidence
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.definition.manifest import ComponentUseContext
+from raidar.components.definition.registry import ComponentResolver, component_runtimes
+from raidar.components.runtime.provision import (
+    PROVISION_CHANNEL,
+    condition_provisions,
+    parse_check_output,
+)
 from raidar.execution import collect
 from raidar.execution.models import ProbeSummary
 from raidar.spec.references import RefKind, RegistryRef
@@ -158,8 +162,8 @@ def test_python_guardrails_is_a_python_service_that_fingerprints_its_whole_paylo
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
     for relative in PAYLOAD_FILES:
         assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/components/provision.py" in manifest.fingerprint
-    assert "raidar/components/integrity.py" in manifest.fingerprint
+    assert "raidar/components/runtime/provision.py" in manifest.fingerprint
+    assert "raidar/components/definition/integrity.py" in manifest.fingerprint
     resolved = ComponentResolver().resolve(
         RegistryRef.parse(RefKind.COMPONENT, REF), base_dir=Path(".")
     )

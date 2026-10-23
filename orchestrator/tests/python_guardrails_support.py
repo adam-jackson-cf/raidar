@@ -33,7 +33,7 @@ from typing import Any
 
 import yaml
 
-from raidar.components.builtins import (
+from raidar.components.catalog import (
     guardrails,
     guardrails_v3,
     guardrails_v4,
@@ -42,10 +42,10 @@ from raidar.components.builtins import (
     guardrails_v7,
     guardrails_v8,
 )
-from raidar.components.builtins.gate import WITH_KEYS as GATE_V1_KEYS
-from raidar.components.gate_run_v2 import GateModeV2, gate_script
-from raidar.components.guardrail_gate_v3 import GuardrailGateOptionsV3
-from raidar.components.session_chain import InnerAgentSpec
+from raidar.components.catalog.gate import WITH_KEYS as GATE_V1_KEYS
+from raidar.components.runtime.gate_run_v2 import GateModeV2, gate_script
+from raidar.components.runtime.guardrail_gate_v3 import GuardrailGateOptionsV3
+from raidar.components.runtime.session_chain import InnerAgentSpec
 from tests.experiment_spec_support import GUARDRAILS_EXPERIMENT
 
 VERIFY_DIR = Path(__file__).resolve().parent / "fixtures" / "python_guardrails"

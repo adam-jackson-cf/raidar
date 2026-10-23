@@ -16,9 +16,9 @@ import pytest
 from harbor.models.trial.config import AgentConfig
 
 from raidar.components import ComponentRegistry, ComponentRejectedError, StepEvidence
-from raidar.components.builtins.tools import LINT_TOOL
-from raidar.components.builtins.tools_v2 import INVOCATIONS, LINT_TOOL_V2, invocation_results
-from raidar.components.provision import PROVISION_CHANNEL, condition_provisions
+from raidar.components.catalog.tools import LINT_TOOL
+from raidar.components.catalog.tools_v2 import INVOCATIONS, LINT_TOOL_V2, invocation_results
+from raidar.components.runtime.provision import PROVISION_CHANNEL, condition_provisions
 from tests.component_support import PROBE_DIR, compile_uses, use, write_jsonl
 from tests.component_trial_support import (
     build_task,
@@ -77,7 +77,7 @@ def test_lint_tool_v2_registers_beside_an_unchanged_v1() -> None:
     assert v2.manifest.network == v1.manifest.network
     assert v2.manifest.discovery_probe.id == "lint-tool-invocable"
     assert set(v1.manifest.fingerprint) < set(v2.manifest.fingerprint)
-    assert "raidar/components/builtins/tools_v2.py" not in v1.manifest.fingerprint
+    assert "raidar/components/catalog/tools_v2.py" not in v1.manifest.fingerprint
     assert (
         compile_uses(*WITH_CONFIG).digest
         != compile_uses(WITH_CONFIG[0], use("lint-tool@1", config="ruff.toml")).digest

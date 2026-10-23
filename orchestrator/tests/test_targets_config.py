@@ -11,7 +11,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.commands.target_options import job_target
+from raidar.cli.target_options import job_target
 from raidar.execution.environment import run_scope
 from raidar.targets.config import (
     TARGETS_TEMPLATE,

@@ -19,9 +19,9 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
-from raidar.components.contribution import SupportFile, evidence_log
-from raidar.components.provision import PROVISION_CHANNEL, Provision
-from raidar.components.provision_v2 import (
+from raidar.components.definition.contribution import SupportFile, evidence_log
+from raidar.components.runtime.provision import PROVISION_CHANNEL, Provision
+from raidar.components.runtime.provision_v2 import (
     AGENT_USER_ENV,
     INSTALL_PHASE,
     PAYLOAD_ENV,

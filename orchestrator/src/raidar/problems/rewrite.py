@@ -27,7 +27,7 @@ from pathlib import Path
 from harbor.models.task.config import ArtifactConfig, TaskConfig, VerifierEnvironmentMode
 from harbor.models.task.task import Task
 
-from raidar.oracle.snapshot import app_artifact_config
+from raidar.core.snapshot import app_artifact_config
 from raidar.packs.python.models import PackSpec
 from raidar.packs.python.task_environment import bind_task_environment
 from raidar.problems.models import ProblemId

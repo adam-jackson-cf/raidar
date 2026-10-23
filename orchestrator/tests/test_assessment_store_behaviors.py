@@ -200,7 +200,7 @@ def test_a_snapshot_changed_after_grading_cannot_be_assessed(tmp_path: Path) -> 
 def test_assess_rescore_cli_reports_added_existing_and_replayed(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.commands.assess.default_scorer_registry", fake_registry)
+    monkeypatch.setattr("raidar.cli.assess.default_scorer_registry", fake_registry)
     trial = two_step_trial(tmp_path / "trial")
     store = tmp_path / "store"
     runner = CliRunner()
@@ -228,7 +228,7 @@ def test_assess_rescore_cli_reports_added_existing_and_replayed(
 def test_assess_rescore_cli_config_sets_the_inventory_policy_and_scorer_config(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.commands.assess.default_scorer_registry", fake_registry)
+    monkeypatch.setattr("raidar.cli.assess.default_scorer_registry", fake_registry)
     trial = two_step_trial(tmp_path / "trial")
     store = AssessmentStore(tmp_path / "store")
     config = tmp_path / "assess.yaml"
@@ -289,7 +289,7 @@ def test_assess_rescore_cli_refuses_scorers_that_cannot_run(
 def test_assess_rescore_cli_reports_malformed_trials_cleanly(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.commands.assess.default_scorer_registry", fake_registry)
+    monkeypatch.setattr("raidar.cli.assess.default_scorer_registry", fake_registry)
     runner = CliRunner()
     for index, (corrupt, message) in enumerate(
         (

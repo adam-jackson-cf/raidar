@@ -37,7 +37,7 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins import (
+from raidar.components.catalog import (
     guardrails_v3,
     guardrails_v4,
     guardrails_v5,
@@ -45,10 +45,10 @@ from raidar.components.builtins import (
     guardrails_v7,
     guardrails_v8,
 )
-from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
-from raidar.components.gate_run import GATE_RECORD
-from raidar.components.integrity import condition_step_flags
-from raidar.components.provision import condition_provisions
+from raidar.components.catalog.guardrails import PINNED_VERSION, install_script
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.runtime.gate_run import GATE_RECORD
+from raidar.components.runtime.provision import condition_provisions
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
 from tests.component_support import compile_uses, use

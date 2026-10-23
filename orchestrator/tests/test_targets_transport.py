@@ -270,9 +270,9 @@ def test_status_prints_facts_and_exits_non_zero_when_unreachable(
     monkeypatch.setenv("RAIDAR_STATE_DIR", str(tmp_path / "run"))
     monkeypatch.delenv("RAIDAR_TARGET", raising=False)
     docker = FakeDocker(healthy=True)
-    monkeypatch.setattr("raidar.commands.target.docker_facts", lambda t: docker_facts(t, docker))
+    monkeypatch.setattr("raidar.cli.target.docker_facts", lambda t: docker_facts(t, docker))
     monkeypatch.setattr(
-        "raidar.commands.target.data_check_failure", lambda t: data_check_failure(t, docker)
+        "raidar.cli.target.data_check_failure", lambda t: data_check_failure(t, docker)
     )
 
     up = CliRunner().invoke(main, ["target", "status", "--target", "plain"])

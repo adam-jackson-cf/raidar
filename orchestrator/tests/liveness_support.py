@@ -34,7 +34,7 @@ from harbor.models.trial.config import (
 
 from raidar.execution.cleanup import cleanup_trial_projects
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.execution.liveness import install_liveness_monitor
+from raidar.execution.health.liveness import install_liveness_monitor
 from raidar.targets.config import activate
 from tests.component_trial_support import build_task, docker_target
 

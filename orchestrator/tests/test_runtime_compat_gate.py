@@ -16,7 +16,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.components.registry import ComponentResolver
+from raidar.components.definition.registry import ComponentResolver
 from raidar.packs import UnknownPackError, load_runtime_pack
 from raidar.packs.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
 from raidar.packs.python.image import image_tag

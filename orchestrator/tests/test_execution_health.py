@@ -13,9 +13,9 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.execution.collect import health_validity, recorded_health_validity
-from raidar.execution.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
-from raidar.execution.health import audit_trial
-from raidar.execution.health_model import HealthCheck, HealthReport, load_health, write_health
+from raidar.execution.health.audit import audit_trial
+from raidar.execution.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
+from raidar.execution.health.model import HealthCheck, HealthReport, load_health, write_health
 from raidar.execution.models import CheckpointState, ValidityCheck
 from raidar.execution.reaper import REAP_REPORT
 from raidar.execution.trial_finish import HEALTH_ERROR_FILE, audit_and_write

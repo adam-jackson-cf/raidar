@@ -24,7 +24,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from raidar.oracle.snapshot import tree_digest
+from raidar.core.snapshot import tree_digest
 from raidar.verifier.bundle import VerifierBundle, load_bundle
 from raidar.verifier.grader import grade_step
 from raidar.verifier.grader_image import ensure_grader_image

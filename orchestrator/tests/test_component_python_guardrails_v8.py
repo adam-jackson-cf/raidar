@@ -24,8 +24,8 @@ from typing import Any
 import pytest
 
 from raidar.components import ComponentKind, ComponentRegistry
-from raidar.components.builtins import guardrails_v7
-from raidar.components.builtins.guardrails_v8 import (
+from raidar.components.catalog import guardrails_v7
+from raidar.components.catalog.guardrails_v8 import (
     AUTOFIX_COMMAND,
     AUTOFIX_FIXED,
     AUTOFIX_KEPT,
@@ -41,8 +41,8 @@ from raidar.components.builtins.guardrails_v8 import (
     install_script,
     payload_bytes,
 )
-from raidar.components.integrity import condition_step_flags
-from raidar.components.provision_v2 import trial_provisions
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.runtime.provision_v2 import trial_provisions
 from tests.component_support import compile_uses, use
 from tests.python_guardrails_support import PACKS, host_home, implemented_rules
 from tests.test_component_python_guardrails_v7 import _agent_dir
@@ -64,7 +64,7 @@ def test_v8_is_a_python_service_that_fingerprints_its_whole_payload() -> None:
     assert (manifest.kind, definition.runtimes) == (ComponentKind.SERVICE, ("python",))
     for relative in PAYLOAD_FILES:
         assert f"{PAYLOAD_PACKAGE_DIR}/{relative}" in manifest.fingerprint
-    assert "raidar/components/builtins/guardrails_v8.py" in manifest.fingerprint
+    assert "raidar/components/catalog/guardrails_v8.py" in manifest.fingerprint
     shipped = {
         path.relative_to(PAYLOAD_DIR).as_posix()
         for path in PAYLOAD_DIR.rglob("*")

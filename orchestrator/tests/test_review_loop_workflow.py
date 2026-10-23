@@ -22,12 +22,12 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 
 from raidar.agents.config import Harness
-from raidar.components.builtins.workflow import REVIEW_LOOP
-from raidar.components.builtins.workflow_v2 import REVIEW_LOOP_V2
-from raidar.components.evidence import StepEvidence
-from raidar.components.manifest import ComponentUseContext
-from raidar.components.registry import fingerprint
-from raidar.components.review_loop import (
+from raidar.components.catalog.workflow import REVIEW_LOOP
+from raidar.components.catalog.workflow_v2 import REVIEW_LOOP_V2
+from raidar.components.definition.evidence import StepEvidence
+from raidar.components.definition.manifest import ComponentUseContext
+from raidar.components.definition.registry import fingerprint
+from raidar.components.runtime.review_loop import (
     APPROVE,
     CHANGES,
     EMPTY_FEEDBACK,
@@ -40,7 +40,7 @@ from raidar.components.review_loop import (
     parse_verdict,
     render,
 )
-from raidar.components.review_loop_v2 import ReviewLoopV2Agent, ReviewParse, parse_review
+from raidar.components.runtime.review_loop_v2 import ReviewLoopV2Agent, ReviewParse, parse_review
 from tests.component_support import PILOT_DIR, write_jsonl
 
 
@@ -297,7 +297,7 @@ def test_failed_implement_stage_skips_the_review(tmp_path: Path) -> None:
 def test_large_diffs_are_truncated_for_the_reviewer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.components.review_loop.MAX_DIFF_CHARS", 40)
+    monkeypatch.setattr("raidar.components.runtime.review_loop.MAX_DIFF_CHARS", 40)
     agent, environment = _agent(tmp_path)
     ScriptedInnerAgent.replies[:] = ["VERDICT: APPROVE"]
     asyncio.run(agent.setup(cast(BaseEnvironment, environment)))
@@ -519,11 +519,13 @@ def test_v2_component_wraps_with_its_own_agent_and_leaves_v1_alone() -> None:
 
     assert v2.agent_wrapper is not None
     assert v1.agent_wrapper is not None
-    assert v2.agent_wrapper.import_path == "raidar.components.review_loop_v2:ReviewLoopV2Agent"
+    assert (
+        v2.agent_wrapper.import_path == "raidar.components.runtime.review_loop_v2:ReviewLoopV2Agent"
+    )
     assert dict(v2.agent_wrapper.kwargs) == {"max_review_rounds": 2, "component": "review-loop@2"}
-    assert v1.agent_wrapper.import_path == "raidar.components.review_loop:ReviewLoopAgent"
+    assert v1.agent_wrapper.import_path == "raidar.components.runtime.review_loop:ReviewLoopAgent"
     assert fingerprint(REVIEW_LOOP_V2) != fingerprint(REVIEW_LOOP)
-    assert "raidar/components/review_loop_v2.py" not in REVIEW_LOOP.manifest.fingerprint
+    assert "raidar/components/runtime/review_loop_v2.py" not in REVIEW_LOOP.manifest.fingerprint
 
 
 def test_v2_reraises_a_failed_stage_so_both_arms_classify_it_alike(tmp_path: Path) -> None:

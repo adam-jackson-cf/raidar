@@ -7,9 +7,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.core.job_layout import TRIALS_DIR
 from raidar.execution.driver import TrialRunner, run_harbor_trial
 from raidar.execution.plan import ExperimentPlan
-from raidar.job_layout import TRIALS_DIR
 from raidar.problems.store import ImportedProblem
 from raidar.targets.job import JobTarget
 
@@ -23,7 +23,7 @@ class JobContext:
     target: JobTarget
     runner: TrialRunner = run_harbor_trial
     admission: Mapping[str, Any] | None = None
-    """The smoke-before-measure decision (``raidar.execution.admission``) ``job.json`` records."""
+    """The smoke-before-measure decision (``execution.health.admission``) ``job.json`` records."""
 
     @property
     def docker_context(self) -> str:

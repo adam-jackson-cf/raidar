@@ -2,7 +2,7 @@ import click
 import pytest
 from click.testing import CliRunner
 
-from raidar.commands import quality, shared
+from raidar.cli import quality, shared
 
 
 def test_shared_command_helpers_raise_on_failure(monkeypatch, tmp_path) -> None:

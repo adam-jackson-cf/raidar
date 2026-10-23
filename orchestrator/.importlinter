@@ -1,133 +1,112 @@
 [importlinter]
 root_package = raidar
 
-[importlinter:contract:schema-boundary]
-name = Review schemas stay independent of every other raidar layer
+[importlinter:contract:core-boundary]
+name = Core value types stay independent of every other raidar layer
 type = forbidden
 source_modules =
-    raidar.schemas
+    raidar.core
 forbidden_modules =
     raidar.agents
     raidar.analysis
-    raidar.commands
+    raidar.cli
     raidar.components
     raidar.execution
     raidar.jev
-    raidar.review_projection
-    raidar.review_quality
+    raidar.review
     raidar.scorers
     raidar.spec
-    raidar.cli
 
 [importlinter:contract:scorers-boundary]
-name = Scorers stay independent of execution, agents, commands, and CLI layers
+name = Scorers stay independent of execution, agents, and the CLI layer
 type = forbidden
 source_modules =
     raidar.scorers
 forbidden_modules =
     raidar.execution
     raidar.agents
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:spec-boundary]
-name = Experiment spec stays independent of execution, commands, and CLI layers
+name = Experiment spec stays independent of execution and the CLI layer
 type = forbidden
 source_modules =
     raidar.spec
 forbidden_modules =
     raidar.execution
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:packs-boundary]
-name = Runtime packs stay independent of execution, agents, commands, and CLI layers
+name = Runtime packs stay independent of execution, agents, and the CLI layer
 type = forbidden
 source_modules =
     raidar.packs
 forbidden_modules =
     raidar.execution
     raidar.agents
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:verifier-boundary]
-name = Verifier stays independent of execution, agents, commands, and CLI layers
+name = Verifier stays independent of execution, agents, and the CLI layer
 type = forbidden
 source_modules =
     raidar.verifier
 forbidden_modules =
     raidar.execution
     raidar.agents
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:problems-boundary]
-name = Problems stay independent of execution, agents, commands, and CLI layers
+name = Problems stay independent of execution, agents, and the CLI layer
 type = forbidden
 source_modules =
     raidar.problems
 forbidden_modules =
     raidar.execution
     raidar.agents
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:components-boundary]
-name = Components stay independent of execution, commands, and CLI layers
+name = Components stay independent of execution and the CLI layer
 type = forbidden
 source_modules =
     raidar.components
 forbidden_modules =
     raidar.execution
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:jev-boundary]
-name = Jev stays independent of execution, agents, commands, and CLI layers
+name = Jev stays independent of execution, agents, and the CLI layer
 type = forbidden
 source_modules =
     raidar.jev
 forbidden_modules =
     raidar.execution
     raidar.agents
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:execution-boundary]
-name = Execution stays independent of the commands and CLI layers
+name = Execution stays independent of the CLI layer
 type = forbidden
 source_modules =
     raidar.execution
 forbidden_modules =
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:analysis-boundary]
-name = Analysis stays independent of the commands and CLI layers
+name = Analysis stays independent of the CLI layer
 type = forbidden
 source_modules =
     raidar.analysis
 forbidden_modules =
-    raidar.commands
     raidar.cli
 
-[importlinter:contract:review-projection-boundary]
-name = Review projection stays independent of the commands and CLI layers
+[importlinter:contract:review-boundary]
+name = Review projection and quality stay independent of the CLI layer
 type = forbidden
 source_modules =
-    raidar.review_projection
+    raidar.review
 forbidden_modules =
-    raidar.commands
-    raidar.cli
-
-[importlinter:contract:review-quality-boundary]
-name = Quality projection stays independent of the commands and CLI layers
-type = forbidden
-source_modules =
-    raidar.review_quality
-forbidden_modules =
-    raidar.commands
     raidar.cli
 
 [importlinter:contract:ledger-boundary]
@@ -138,12 +117,11 @@ source_modules =
 forbidden_modules =
     raidar.agents
     raidar.analysis
-    raidar.commands
+    raidar.cli
     raidar.components
     raidar.execution
     raidar.scorers
     raidar.spec
-    raidar.cli
 
 [importlinter:contract:deterministic-process-checks]
 name = process-compliance@2 decides only deterministically: no Jev import, direct or indirect

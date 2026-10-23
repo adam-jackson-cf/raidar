@@ -16,7 +16,7 @@ never sees either. Every excluded or ignored path is listed with a reason.
 
 ``.venv`` and the other snapshot excludes differ from the fork's inventory,
 which has no directory excludes, but never observably: Harbor's ``/app``
-artifact is collected with the same list (``oracle.snapshot.app_artifact_config``),
+artifact is collected with the same list (``core.snapshot.app_artifact_config``),
 so a graded snapshot cannot contain them. Other environment directories
 (``venv``, ``.tox``, ``.nox``) stay in the inventory as production, exactly as
 in the fork, even though the fork's measurement producer skips them (fork
@@ -48,7 +48,7 @@ from pathlib import Path, PurePosixPath
 
 from pydantic import Field
 
-from raidar.oracle.snapshot import SNAPSHOT_EXCLUDES
+from raidar.core.snapshot import SNAPSHOT_EXCLUDES
 from raidar.scorers.sdk.manifest import SdkModel
 from raidar.spec.canonical import digest_json
 

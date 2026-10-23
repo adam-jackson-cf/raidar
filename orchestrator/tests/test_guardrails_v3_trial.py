@@ -29,13 +29,16 @@ from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trial.config import AgentConfig
 
-from raidar.components.builtins.guardrails_v3 import PINNED_VERSION
-from raidar.components.continue_on_stall import STALL_DIR, STALL_RECORD
-from raidar.components.gate_run import GATE_RECORD
-from raidar.components.integrity import condition_step_flags
-from raidar.components.provision_v2 import INSTALL_PHASE, trial_provisions
-from raidar.components.session_chain import apply_session_wrappers, condition_session_wrappers
-from raidar.oracle.snapshot import tree_digest
+from raidar.components.catalog.guardrails_v3 import PINNED_VERSION
+from raidar.components.definition.integrity import condition_step_flags
+from raidar.components.runtime.continue_on_stall import STALL_DIR, STALL_RECORD
+from raidar.components.runtime.gate_run import GATE_RECORD
+from raidar.components.runtime.provision_v2 import INSTALL_PHASE, trial_provisions
+from raidar.components.runtime.session_chain import (
+    apply_session_wrappers,
+    condition_session_wrappers,
+)
+from raidar.core.snapshot import tree_digest
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     build_task,

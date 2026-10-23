@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-from raidar.harness.definitions import (
+from raidar.agents.harness import (
     CredentialSourceType,
     CredentialSpec,
     HarnessDefinition,

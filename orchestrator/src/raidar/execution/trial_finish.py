@@ -13,15 +13,15 @@ import asyncio
 import traceback
 from pathlib import Path
 
+from raidar.core.job_layout import TRIAL_RECORDS_DIR
 from raidar.execution.collect import health_validity
-from raidar.execution.contention import read_manifest
-from raidar.execution.fault_candidates import append_fault_candidates
-from raidar.execution.health import audit_trial
-from raidar.execution.health_model import write_health
+from raidar.execution.health.audit import audit_trial
+from raidar.execution.health.fault_candidates import append_fault_candidates
+from raidar.execution.health.model import write_health
 from raidar.execution.job_context import JobContext
 from raidar.execution.models import ExecutionValidity, PlannedTrial, TrialRecord, ValidityCheck
+from raidar.execution.perf.contention import read_manifest
 from raidar.execution.trial_record import write_record
-from raidar.job_layout import TRIAL_RECORDS_DIR
 
 HEALTH_ERROR_FILE = "raidar-health-error.txt"
 

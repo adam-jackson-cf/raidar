@@ -48,7 +48,7 @@ from typing import Any
 
 import yaml
 
-from raidar.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.core.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
 
 LAUNCH_FILE = "launch.json"
 PID_FILE = "pid"

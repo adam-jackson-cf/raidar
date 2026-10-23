@@ -1,5 +1,5 @@
 // Quality projection contract (raidar-quality-projection, schema_version 1),
-// emitted by orchestrator/src/raidar/review_quality/models.py.
+// emitted by orchestrator/src/raidar/review/quality/models.py.
 
 export const COMPONENTS = ['C', 'V', 'E', 'H', 'R', 'G', 'I', 'S'] as const;
 export type Component = (typeof COMPONENTS)[number];

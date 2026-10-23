@@ -1,7 +1,7 @@
 """Content identity and leak checks for imported problem content.
 
 ``content_digest`` hashes every file under a root. Unlike the workspace
-snapshot digest (``raidar.oracle.snapshot.tree_digest``) it has no exclude
+snapshot digest (``raidar.core.snapshot.tree_digest``) it has no exclude
 list: a task, verifier bundle or reference payload is input content (N3), so a
 file under ``build/``, ``dist/`` or ``__pycache__/`` is part of its identity.
 The encoding is otherwise the same, so trees without such directories hash

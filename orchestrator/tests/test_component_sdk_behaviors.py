@@ -21,8 +21,8 @@ from raidar.components import (
     component_resolver,
     fingerprint,
 )
-from raidar.components.builtins.workspace import RULES_FILE, RulesFile
-from raidar.components.manifest import ComponentManifest, DiscoveryProbe
+from raidar.components.catalog.workspace import RULES_FILE, RulesFile
+from raidar.components.definition.manifest import ComponentManifest, DiscoveryProbe
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import build_lock
 from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY, MetricResolver
@@ -39,8 +39,10 @@ from tests.component_support import (
 from tests.experiment_spec_support import experiment_document, fixture_resolvers, write_experiment
 
 SDK_RUNTIME_SOURCES = [
-    f"raidar/components/{name}"
-    for name in ("compiler.py", "compiled.py", "setup_script.py", "step_reset.sh")
+    "raidar/components/definition/compiler.py",
+    "raidar/components/definition/compiled.py",
+    "raidar/components/runtime/setup_script.py",
+    "raidar/components/runtime/step_reset.sh",
 ]
 BUILTIN_REFS = [
     "continue-on-stall@1",
@@ -252,7 +254,7 @@ def test_registry_refuses_mismatched_or_duplicate_definitions(
         ComponentRegistry().get("lint-config@1")
     monkeypatch.undo()
     doubled = [*registry._entry_points.values(), entry]
-    monkeypatch.setattr("raidar.components.registry.entry_points", lambda group: doubled)
+    monkeypatch.setattr("raidar.components.definition.registry.entry_points", lambda group: doubled)
     with pytest.raises(RegistryReferenceError, match="more than one entry point"):
         ComponentRegistry()
     with pytest.raises(RegistryReferenceError, match="duplicate"):
@@ -345,7 +347,7 @@ def test_pilot_arms_share_the_framing_and_guided_adds_the_review_loop_workflow()
 
 
 def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) -> None:
-    from raidar.components.builtins._common import tree_files
+    from raidar.components.catalog._common import tree_files
     from raidar.spec.lock import _hash_tree
 
     skill = tmp_path / "skills" / "discipline"
@@ -364,14 +366,14 @@ def test_component_trees_ship_exactly_the_files_the_lock_hashes(tmp_path: Path) 
 # lookup machinery, not component behaviour.
 _UNFINGERPRINTED_OK = {
     "raidar/agents/config.py",
-    "raidar/components/registry.py",
+    "raidar/components/definition/registry.py",
 }
 
 
 def test_every_raidar_module_a_builtin_imports_is_fingerprinted() -> None:
     import ast
 
-    from raidar.components.registry import ComponentRegistry
+    from raidar.components.definition.registry import ComponentRegistry
 
     src = Path(__file__).resolve().parents[1] / "src"
     registry = ComponentRegistry()
