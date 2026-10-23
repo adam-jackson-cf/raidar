@@ -59,6 +59,22 @@ class AnalysisModel(BaseModel):
     model_config = ConfigDict(frozen=True, extra="forbid")
 
 
+class PoolFinding(AnalysisModel):
+    field: str
+    message: str
+
+
+class PoolingReport(AnalysisModel):
+    unmeasured: tuple[str, ...] = ()
+    """Jobs without ``mechanics_epoch``: no records manifest, integrity not measured."""
+    overrides_used: tuple[str, ...] = ()
+    findings: tuple[PoolFinding, ...] = ()
+    """The refusals lifted by ``--pool-override`` (every one is recorded)."""
+    timing_cost_comparable: bool = True
+    """False when the jobs ran on different execution-target hardware: timing and cost
+    metrics are then not comparable across them (correctness and quality still pool)."""
+
+
 class Value(AnalysisModel):
     """A measured value (status ``ok``) or why there is none."""
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import inspect
 import json
 import tomllib
@@ -29,13 +30,14 @@ from raidar.execution.environment import (
 )
 from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
+from raidar.execution.records_manifest import RECORDS_MANIFEST, tamper_findings
 from raidar.execution.run import execute, load_problems
 from raidar.execution.trial_config import harbor_trial_config
 from raidar.execution.trial_run import JobContext
 from raidar.packs.python.models import load_pack_spec
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
-from raidar.spec.lock import lock_integrity_issues
+from raidar.spec.lock import lock_integrity_issues, spec_source_digest
 from raidar.targets.config import Selection, implicit_target
 from raidar.targets.guard import REAP_FILE, TargetGuard, TargetLostError
 from raidar.targets.health import TargetUnavailableError
@@ -264,13 +266,37 @@ def test_a_run_materialises_each_trial_and_writes_step_results(
     stored = json.loads((job_dir / "trial-records" / f"{record.trial.trial_id}.json").read_text())
     assert stored["step_results"][0]["checkpoint_state"] == "failed"
     manifest = json.loads((job_dir / "job.json").read_text())
-    assert manifest["partial"]
-    assert manifest["summary"]["valid"] == 1
+    assert (manifest["partial"], manifest["summary"]["valid"]) == (True, 1)
     _assert_provenance(manifest, plan.concurrency)
+    _assert_job_provenance(manifest, job_dir)
     assert json.loads((job_dir / "plan.json").read_text())["lock_sha256"] == plan.lock_sha256
     _assert_run_keeps_its_lock_and_settings(job_dir, plan.lock_sha256)
     with pytest.raises(FileExistsError):
         asyncio.run(execute(ctx))
+
+
+def _assert_job_provenance(manifest: dict[str, Any], job_dir: Path) -> None:
+    runner = manifest["runner"]
+    assert set(runner) == {"commit", "dirty", "toolchain_sha256"}
+    assert runner["toolchain_sha256"] == spec_source_digest()
+    assert set(manifest["recipes"]) == {"pack", "graders"}
+    assert all(len(digest) == 16 for digest in manifest["recipes"]["graders"].values())
+    limits = manifest["effective_limits"]
+    assert limits["agent_s"] == {"baseline": 1800.0, "guided": 1800.0}
+    assert limits["verifier_s"] == 2 * 900 + 600
+    assert limits["multipliers"]["timeout_multiplier"] == 1.0
+    sealed = manifest["records_manifests"]
+    assert set(sealed) == set(manifest["selected"])
+    for trial, digest in sealed.items():
+        trial_dir = job_dir / "trials" / trial
+        assert hashlib.sha256((trial_dir / RECORDS_MANIFEST).read_bytes()).hexdigest() == digest
+        files = json.loads((trial_dir / RECORDS_MANIFEST).read_text())["files"]
+        assert f"trial-records/{trial}.json" in files
+        assert all(not name.endswith(RECORDS_MANIFEST) for name in files)
+        assert (
+            tamper_findings(trial_dir, job_dir / "trial-records" / f"{trial}.json", job_dir, digest)
+            == []
+        )
 
 
 def _assert_provenance(manifest: dict[str, Any], concurrency: int) -> None:

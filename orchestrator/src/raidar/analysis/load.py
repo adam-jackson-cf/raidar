@@ -66,6 +66,7 @@ class LoadRequest:
     assessment_config: Path | None = None
     allow_dev_jobs: bool = False
     bundle_search: tuple[Path, ...] = ()
+    pool_overrides: tuple[str, ...] = ()
 
 
 def _process_ref(declared: tuple[str, ...]) -> str | None:
@@ -127,7 +128,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         raise AnalysisInputError("choose at least one job directory")
     jobs = [read_job(path) for path in request.job_dirs]
     lock = read_lock(request.lock_path or default_lock(jobs[0]))
-    check_jobs(jobs, lock)
+    pooling = check_jobs(jobs, lock, request.pool_overrides)
     options = job_options(jobs, allow_dev_jobs=request.allow_dev_jobs)
     policy, policy_facts = headline(lock)
     spec = lock["spec"]
@@ -166,5 +167,6 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
         process_scorer=process_ref,
         manipulation_checks=manipulation_requests(spec["analysis"]),
         dev_job=_dev_job(options),
+        pooling=pooling,
     )
     return inputs, lock

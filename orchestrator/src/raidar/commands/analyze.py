@@ -25,7 +25,7 @@ import click
 from raidar.analysis.load import LoadRequest, load_inputs
 from raidar.analysis.markdown import render_markdown
 from raidar.analysis.outcomes import outcome_metric
-from raidar.analysis.report import analyse
+from raidar.analysis.report import AnalysisReport, analyse
 from raidar.analysis.sources import AnalysisInputError
 from raidar.analysis.thresholds import settings_from_lock
 from raidar.scorers.catalog import default_scorer_registry
@@ -59,6 +59,19 @@ def _check_output(output: Path, protected: list[Path]) -> None:
     for path in protected:
         if resolved.is_relative_to(path.resolve()):
             raise click.UsageError(f"--output must lie outside {path} (analysis never writes runs)")
+
+
+def _echo_pooling(report: AnalysisReport) -> None:
+    pooling = report.pooling
+    if pooling is None:
+        return
+    if pooling.unmeasured:
+        unmeasured = ", ".join(pooling.unmeasured)
+        click.echo(
+            f"warning: records integrity unmeasured (pre-epoch jobs): {unmeasured}", err=True
+        )
+    for finding in pooling.findings:
+        click.echo(f"warning: pooling override {finding.field}: {finding.message}", err=True)
 
 
 @click.command()
@@ -133,6 +146,14 @@ def _check_output(output: Path, protected: list[Path]) -> None:
     help="Analyse jobs executed with max_checkpoints or agent_override, labelled as a "
     "development job (not arm evidence).",
 )
+@click.option(
+    "--pool-override",
+    "pool_overrides",
+    multiple=True,
+    metavar="FIELD",
+    help="Lift one pooling refusal between jobs (repeatable; recorded in the report). "
+    "A records-manifest violation is never overridable.",
+)
 def analyze(
     jobs: tuple[Path, ...],
     store: Path,
@@ -146,6 +167,7 @@ def analyze(
     bootstrap_samples: int,
     min_effects: tuple[str, ...],
     allow_dev_jobs: bool,
+    pool_overrides: tuple[str, ...],
 ) -> None:
     """Paired deltas, CIs, curves and verdicts for every arm against the baseline."""
     _check_output(output, [*jobs, store])
@@ -158,6 +180,7 @@ def analyze(
         assessment_config=assessment_config,
         allow_dev_jobs=allow_dev_jobs,
         bundle_search=bundle_search,
+        pool_overrides=pool_overrides,
     )
     try:
         inputs, lock = load_inputs(request)
@@ -191,6 +214,7 @@ def analyze(
     if report.settings.changed_from_defaults:
         changed = ", ".join(report.settings.changed_from_defaults)
         click.echo(f"warning: verdict settings changed from defaults: {changed}", err=True)
+    _echo_pooling(report)
     for comparison in report.comparisons:
         primary = comparison.primary
         click.echo(

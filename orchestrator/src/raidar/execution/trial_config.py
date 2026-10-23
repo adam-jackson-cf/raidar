@@ -23,10 +23,17 @@ from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KW
 from raidar.execution.models import PlannedTrial
 from raidar.execution.plan import ExperimentPlan
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
+from raidar.spec.schema import ProtocolSpec
 
 # Harbor's verifier phase covers the grading run and the coverage run (each
 # bounded by grader_timeout_s) plus a grader-image presence check or build.
 VERIFIER_PHASE_MARGIN_S = 600
+
+
+def verifier_timeout_s(protocol: ProtocolSpec) -> float:
+    """Harbor's verifier phase: the grading run (and the coverage run) plus the margin."""
+    runs = 2 if protocol.verifier_coverage == "trial" else 1
+    return runs * float(protocol.verifier_timeout_sec) + VERIFIER_PHASE_MARGIN_S
 
 
 def harbor_trial_config(
@@ -43,7 +50,6 @@ def harbor_trial_config(
     harness = spec.agent(next(a.agent for a in spec.arms if a.id == trial.arm)).harness
     grader_timeout = float(spec.protocol.verifier_timeout_sec)
     coverage = spec.protocol.verifier_coverage == "trial"
-    runs = 2 if coverage else 1
     return TrialConfig(
         task=TaskConfig(path=task),
         trial_name=trial.trial_id,
@@ -57,7 +63,7 @@ def harbor_trial_config(
         ),
         verifier=VerifierConfig(
             import_path=VERIFIER_IMPORT_PATH,
-            override_timeout_sec=runs * grader_timeout + VERIFIER_PHASE_MARGIN_S,
+            override_timeout_sec=verifier_timeout_s(spec.protocol),
             kwargs={
                 "oracle_bundle": str(bundle_root),
                 "docker_context": docker_context,

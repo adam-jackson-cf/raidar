@@ -71,6 +71,7 @@ from raidar.analysis.outcomes import (
     VERIFIER_METRICS,
     AnalysisModel,
     MetricDef,
+    PoolingReport,
     TrialOutcome,
     gate_metrics_for,
     outcome_metric,
@@ -133,6 +134,7 @@ class AnalysisInputs:
     errata: Mapping[str, Mapping[str, object]] | None = None
     primary_outcome: str | None = None
     """The lock's pre-registered ``analysis.primary_outcome`` (None: the progression's)."""
+    pooling: PoolingReport | None = None
 
     @property
     def primary(self) -> str:
@@ -247,6 +249,8 @@ class AnalysisReport(AnalysisModel):
     errata: dict[str, dict[str, object]] | None = None
     """``{problem ref: {sha256, exclude_from_solved}}`` the lock pins; only the ``*_errata``
     outcomes apply it. Absent (not written) when the lock pins no errata."""
+    pooling: PoolingReport | None = None
+    """The pooling gate's outcome: unmeasured jobs, lifted refusals, timing/cost comparability."""
     verifier_sensitivities: dict[str, list[dict[str, object]]] | None = None
     """``{problem ref: [known sensitivity]}`` from the problems registry
     (``raidar.problems.sensitivities``): spec-determined cases whose verdict can depend on
@@ -515,6 +519,7 @@ def analyse(inputs: AnalysisInputs, settings: Settings) -> AnalysisReport:
         ranking=_ranking(inputs, settings, summaries),
         errata=_errata(inputs),
         verifier_sensitivities=_sensitivities(inputs),
+        pooling=inputs.pooling,
     )
 
 

@@ -24,6 +24,8 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from raidar.analysis.outcomes import PoolingReport
+from raidar.analysis.pooling import PoolingError, check_pooling
 from raidar.analysis.report import PlannedTrial
 from raidar.execution.models import TrialRecord
 from raidar.job_layout import is_legacy_job, legacy_job_message
@@ -184,7 +186,10 @@ def job_options(jobs: Sequence[JobDir], *, allow_dev_jobs: bool) -> DevOptions:
     return shared
 
 
-def check_jobs(jobs: Sequence[JobDir], lock: Mapping[str, Any]) -> None:
+def check_jobs(
+    jobs: Sequence[JobDir], lock: Mapping[str, Any], pool_overrides: Sequence[str] = ()
+) -> PoolingReport:
+    """Refuse jobs of another lock or plan, then apply the pooling gate (``check_pooling``)."""
     for job in jobs:
         if job.manifest.get("lock_sha256") != lock["lock_sha256"]:
             raise AnalysisInputError(
@@ -195,6 +200,10 @@ def check_jobs(jobs: Sequence[JobDir], lock: Mapping[str, Any]) -> None:
     trial_sets = {tuple(t["trial_id"] for t in job.plan.get("trials", ())) for job in jobs}
     if len(trial_sets) != 1:
         raise AnalysisInputError("the jobs' plans list different trials; analyse them apart")
+    try:
+        return check_pooling(jobs, pool_overrides)
+    except PoolingError as error:
+        raise AnalysisInputError(str(error)) from error
 
 
 def planned_trials(plan: Mapping[str, Any]) -> tuple[PlannedTrial, ...]:

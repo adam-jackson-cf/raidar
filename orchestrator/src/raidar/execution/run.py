@@ -6,6 +6,7 @@ layout is ``raidar.job_layout``. One trial is ``raidar.execution.trial_run``.
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import Mapping
 from datetime import UTC, datetime
@@ -15,6 +16,8 @@ from raidar.execution.assessment import lock_errata, write_assessment_config
 from raidar.execution.driver import run_in_order
 from raidar.execution.models import PlannedTrial, TrialRecord
 from raidar.execution.plan import ExperimentPlan
+from raidar.execution.provenance import effective_limits, recipe_digests, runner_provenance
+from raidar.execution.records_manifest import seal_trial
 from raidar.execution.trial_run import JobContext, run_trial
 from raidar.job_layout import (
     DETACH_DIR,
@@ -22,6 +25,7 @@ from raidar.job_layout import (
     JOB_LOCK_FILE,
     JOB_MANIFEST,
     PLAN_FILE,
+    TRIAL_RECORDS_DIR,
 )
 from raidar.problems.store import ImportedProblem, ProblemStore
 from raidar.targets.job import JobTarget
@@ -91,6 +95,9 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
         "lock_sha256": plan.lock_sha256,
         "experiment_file": str(plan.loaded.path),
         **ctx.target.manifest_fields(plan.concurrency),
+        "runner": runner_provenance(),
+        "recipes": recipe_digests(plan, ctx.problems),
+        "effective_limits": effective_limits(plan),
         "concurrency": plan.concurrency,
         "selected": [trial.trial_id for trial in plan.selected_trials()],
         "partial": len(plan.selected) != len(plan.trials),
@@ -98,6 +105,7 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
     }
     _write_json(ctx.job_dir / JOB_MANIFEST, manifest)
     finished: list[TrialRecord] = []
+    sealed: dict[str, str] = {}
     guard = ctx.target.guard
 
     async def admit(trial: PlannedTrial) -> None:
@@ -106,6 +114,13 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
 
     async def run_one(trial: PlannedTrial) -> TrialRecord:
         record = await run_trial(ctx, trial)
+        trial_id = trial.trial_id
+        sealed[trial_id] = await asyncio.to_thread(
+            seal_trial,
+            ctx.trials_dir / trial_id,
+            ctx.job_dir / TRIAL_RECORDS_DIR / f"{trial_id}.json",
+            ctx.job_dir,
+        )
         finished.append(record)
         return record
 
@@ -120,7 +135,11 @@ async def execute(ctx: JobContext) -> list[TrialRecord]:
         manifest["aborted"] = type(error).__name__
         raise
     finally:
-        manifest |= {"finished_at": datetime.now(UTC).isoformat(), "summary": _summary(finished)}
+        manifest |= {
+            "finished_at": datetime.now(UTC).isoformat(),
+            "summary": _summary(finished),
+            "records_manifests": dict(sorted(sealed.items())),
+        }
         _write_json(ctx.job_dir / JOB_MANIFEST, manifest)
 
 

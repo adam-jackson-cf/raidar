@@ -599,6 +599,28 @@ def _ranking(ranking: Ranking | None) -> list[str]:
     ]
 
 
+def _pooling_lines(report: AnalysisReport) -> list[str]:
+    pooling = report.pooling
+    if pooling is None:
+        return []
+    lines = []
+    if pooling.unmeasured:
+        lines.append(
+            "- Records integrity: **unmeasured** (no mechanics epoch, so no records manifest): "
+            + ", ".join(pooling.unmeasured)
+        )
+    lines.extend(
+        f"- **Pooling override `{finding.field}`:** {finding.message}"
+        for finding in pooling.findings
+    )
+    if not pooling.timing_cost_comparable:
+        lines.append(
+            "- **Timing and cost are not comparable:** the jobs ran on different "
+            "execution-target hardware; only correctness and quality pool."
+        )
+    return lines
+
+
 def render_markdown(report: AnalysisReport) -> str:
     metric = report.metric
     lines = [f"# Analysis: {report.experiment}", ""]
@@ -621,6 +643,7 @@ def render_markdown(report: AnalysisReport) -> str:
     if report.replaced_trials:
         lines.append(f"- Replaced invalid trials: {', '.join(report.replaced_trials)}")
     lines.extend(_errata_lines(report))
+    lines.extend(_pooling_lines(report))
     header = (
         "Arm", "Planned", "Run", "Valid", "Infra error", "Not run",
         "Mean cost USD", "Mean tokens", "Mean agent s",
