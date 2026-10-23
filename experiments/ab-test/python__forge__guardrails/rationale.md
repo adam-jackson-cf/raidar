@@ -893,3 +893,13 @@ Written after `main-04` (18.10) and before any further job. The execution identi
   Every other line is identical, so every number in 18.9 and 18.10 stands.
 - **Released identities.** `gate-effort@1`-`@9` and every component are untouched; their modules are unchanged. `gate-effort@10` is new. Only this experiment's lock document moved (`c19711ac463e` → `5f8405fa0a79`; `lock_sha256` `0e597e33e8b4`). `make experiment-locks-check` passes.
 - `make quality` passes at the commit this record is in: 1752 tests passed and 11 skipped; coverage 96.17%; no lizard warnings; fan-out OK; every lock current; the second suite passed 84 tests.
+
+## 19. Series closed as explore evidence (2026-10-23)
+
+User decision 2026-10-23 (ADR-002 §2.6; `docs/reboot/mechanics-v1-design.md` r2 §3.5): the series is **closed**, not paused. Neither option of gate packet §18.7 runs: no confirm job (a) and no coverage-minimum iteration (b).
+
+- **Why.** The question under test, the cost and effect of Raidar's commit gate with a fixed 85% coverage minimum, is superseded. factory-x-loops' verify gate (ported from `python-guardrails@1`) now measures coverage of changed lines and refuses hollow tests. Here, refusals that included `TEST.coverage-minimum` drove 85–93% of r2's fix cost (18.10), and autofix did not reduce it (`main-04`: $0.0977 → $0.0980 per trial).
+- **Standing of the evidence.** Every job here (`smoke-*`, `main-02` to `main-04`) is explore evidence: 4 pairs at most, every paired verdict `insufficient`. These are signals, never citable effects.
+- **What is kept.** Jobs, locks, Assessments, analyses and this rationale. `python-guardrails@1`–`@8`, `guardrail-gate@1`–`@4` and `gate-effort@1`–`@10` stay registered, so the locks and Assessments stay readable and rescorable.
+- **What comes next is a new experiment.** A comparison of verify gates (for example factory-x-loops workflow versions as subjects, with neutral changed-line and hollow-test scorers) is a new estimand, with a new rationale, a new lock and a new experiment id. It never patches this one.
+- **Mechanics epoch.** This experiment is relocked during the mechanics-v1 scorer re-key (ADR-002 §2.5). Only its assessment and toolchain sections change; its jobs stay readable under their own `job.lock.json`.
