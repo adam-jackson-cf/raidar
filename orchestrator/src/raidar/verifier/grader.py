@@ -131,13 +131,14 @@ def grading_budget(step: VerifierStepSpec, timeout_s: float) -> float | None:
     return budget if budget > 0 else None
 
 
-def _stage(snapshot: Path, run_dir: Path) -> tuple[Path, Path]:
+def _stage(snapshot: Path, run_dir: Path, *, bind_mounted: bool = True) -> tuple[Path, Path]:
     if run_dir.exists():
         shutil.rmtree(run_dir)
     app, out = run_dir / "app", run_dir / "out"
     app.mkdir(parents=True)
     copy_snapshot(snapshot, app)
-    make_world_writable(app)
+    if bind_mounted:  # a copy-in sandbox sets ownership in its own tar instead
+        make_world_writable(app)
     out.mkdir()
     out.chmod(0o777)
     return app, out
@@ -155,7 +156,7 @@ async def run_oracle(
 ) -> RunOutcome:
     role = "coverage" if coverage else "grading"
     started = time.perf_counter()
-    app, out = _stage(snapshot, run_dir)
+    app, out = _stage(snapshot, run_dir, bind_mounted=not getattr(sandbox, "stages_by_copy", False))
     dependencies = resolve_dependencies(
         app, provisioned_pins(bundle.manifest.grader.test_dependencies)
     )

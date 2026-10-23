@@ -62,6 +62,8 @@ from typing import Any
 
 from harbor.constants import MAIN_SERVICE_NAME
 from harbor.environments.base import ExecResult
+from harbor.environments.capabilities import EnvironmentCapabilities
+from harbor.environments.docker import write_mounts_compose_file
 from harbor.environments.docker.docker import (
     DockerEnvironment,
     _sanitize_docker_compose_project_name,
@@ -78,6 +80,14 @@ _MAIN_PREFIX = f"{MAIN_SERVICE_NAME}:"
 # step, i.e. inside the first step's post-agent gap (about 1.6-2 s, once per
 # process). Imported while the environment starts instead.
 LAZY_AGENT_IMPORTS: tuple[str, ...] = ("litellm",)
+# Spike (mechanics-v1 step 0): a Docker daemon on another host cannot bind-mount
+# this host's log directories, so evidence must be copied out instead.
+COPY_MODE_ENV = "RAIDAR_COPY_MODE"
+
+
+def copy_mode() -> bool:
+    """Whether the copy-only path (no host bind mounts) is selected."""
+    return os.environ.get(COPY_MODE_ENV) == "1"
 
 
 def run_scope(trials_dir: Path) -> str:
@@ -186,10 +196,30 @@ PostStartHook = Callable[[], Awaitable[None]]
 
 
 class RunScopedDockerEnvironment(DockerEnvironment):
+    _copy_mode = False  # set from RAIDAR_COPY_MODE in __init__
+
     def __init__(self, *args: Any, session_id: str, run_scope: str, **kwargs: Any) -> None:
         super().__init__(*args, session_id=f"{session_id}-{run_scope}", **kwargs)
         self._main_container: str | None = None
         self._post_start: list[PostStartHook] = []
+        self._copy_mode = copy_mode()
+
+    @property
+    def capabilities(self) -> EnvironmentCapabilities:
+        caps = super().capabilities
+        if self._copy_mode:
+            # Harbor then downloads /logs/agent and /logs/verifier itself.
+            return caps.model_copy(update={"mounted": False})
+        return caps
+
+    def _write_mounts_compose_file(self) -> Path:
+        """Copy mode declares no volumes; the in-container dirs come from ``ensure_dirs``."""
+        if not self._copy_mode:
+            return super()._write_mounts_compose_file()
+        self._cleanup_mounts_compose_file()
+        self._mounts_compose_temp_dir = tempfile.TemporaryDirectory()
+        path = Path(self._mounts_compose_temp_dir.name) / "docker-compose-mounts.json"
+        return write_mounts_compose_file(path, [])
 
     def add_post_start_hook(self, hook: PostStartHook) -> None:
         """Run ``hook`` once the container has started, inside ``start`` (module doc)."""
@@ -245,7 +275,7 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         timeout_sec: int | None = None,
         user: str | int | None = None,
     ) -> ExecResult:
-        if is_step_setup(command):
+        if is_step_setup(command) and not self._copy_mode:
             await self._forget_archived_log_names()
         return await super().exec(command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user)
 
@@ -393,7 +423,7 @@ class RunScopedDockerEnvironment(DockerEnvironment):
     async def prepare_logs_for_host(self) -> None:
         """Harbor's recursive ``chown`` of each writable mount to the host user, as one exec."""
         targets = self._mount_targets(writable_only=True)
-        if not targets or not hasattr(os, "getuid"):
+        if self._copy_mode or not targets or not hasattr(os, "getuid"):
             return
         try:
             if await self._is_rootless_docker():

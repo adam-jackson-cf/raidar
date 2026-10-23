@@ -74,7 +74,15 @@ def imported_pack_fixture(root: Path, docker_context: str) -> ImportedFixture:
             store,
             problem,
             # Two repeats: a usable verdict needs the repeat_identical checks (dab09a0).
-            ValidateOptions(repeats=2, concurrency=2, docker_context=docker_context),
+            ValidateOptions(
+                repeats=2,
+                concurrency=2,
+                docker_context=docker_context,
+                # The fake dataset's entry_file (adder.py) is not in its references (app.py),
+                # which the spec-determinacy audit's variant shim needs; the audit is not
+                # what this fixture measures.
+                audit=False,
+            ),
             work_root=root,
         )
     )

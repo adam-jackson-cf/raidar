@@ -55,7 +55,8 @@ def _docker_context() -> str:
 
 def _require_docker(context: str) -> None:
     """Opted in: every prerequisite must hold, or the fixture fails (never skips)."""
-    if context == DOCKER_CONTEXT and not orbstack_available():
+    data_check = os.environ.get("RAIDAR_DATA_CHECK") != "0"  # off for engines on another host
+    if data_check and context == DOCKER_CONTEXT and not orbstack_available():
         pytest.fail("OrbStack data volume unavailable (orbstack-data-status external_available)")
     tag = image_tag(load_pack_spec())
     found = subprocess.run(
