@@ -507,8 +507,7 @@ def _shape_issues(lock: Mapping[str, Any], version: int) -> list[str]:
 def lock_integrity_issues(lock: Mapping[str, Any], *, version: int = LOCK_VERSION) -> list[str]:
     """Why ``lock`` is not a sealed lock of ``version`` (empty when it is).
 
-    Lock versions 2 and 3 share the sealing scheme, so ``raidar migrate-job``
-    verifies a job's executed version-2 lock with ``version=2``.
+    Lock versions 2 and 3 share the sealing scheme.
     """
     shape = _shape_issues(lock, version)
     if shape:

@@ -12,7 +12,7 @@ those inputs through its ported producers and kernels:
   them (V/E's unhashed eligible symbols and snapshot diffs);
 - the G attribution kernel over run evidence and the fork's live changed-symbol
   scope (hashed diff owners united with R's changed accepted lineages);
-- the problem arithmetic (with ``scb-canonical@1``) and sensitivity.
+- the problem arithmetic (with ``scb-canonical@1``).
 """
 
 from __future__ import annotations
@@ -23,7 +23,7 @@ from typing import Any
 
 import pytest
 
-from raidar.scorers.code_quality import arithmetic, sensitivity
+from raidar.scorers.code_quality import arithmetic
 from raidar.scorers.code_quality.architecture import produce_production_graph
 from raidar.scorers.code_quality.checkpoint import eligibility_code
 from raidar.scorers.code_quality.diffs import (
@@ -43,7 +43,7 @@ from raidar.scorers.code_quality.lineage_models import (
     SymbolIdentity,
     TransitionReworkEvidence,
 )
-from raidar.scorers.code_quality.models import CheckpointCorrectnessEvidence, ProblemScore
+from raidar.scorers.code_quality.models import CheckpointCorrectnessEvidence
 from raidar.scorers.code_quality.quality import ProductionQualityError, produce_production_quality
 from raidar.scorers.code_quality.regression import calculate_regression_breadth
 from raidar.scorers.code_quality.tool_env.snapshot_tool.cli import measure
@@ -338,21 +338,3 @@ def test_problem_arithmetic_through_the_canonical_policy_equals_the_fork_scores(
         )
         assert score.model_dump(mode="json") == case["result"], case["name"]
         assert str(score.score) == case["score"]
-
-
-def test_sensitivity_fixtures_ablations_and_correlations_equal_the_fork() -> None:
-    formulas = fork_goldens()["formulas"]
-    controlled = sensitivity.controlled_fixture_scores(Decimal(formulas["controlled_decrement"]))
-    assert {name: score.model_dump(mode="json") for name, score in controlled.items()} == formulas[
-        "controlled"
-    ]
-    scores = [ProblemScore.model_validate(item) for item in formulas["correlation_scores"]]
-    ablations = sensitivity.weight_ablations(controlled.values(), scores)
-    assert {name: format(value, "f") for name, value in ablations.items()} == formulas["ablations"]
-    expected = formulas["correlations"]
-    if isinstance(expected, str):
-        with pytest.raises(sensitivity.SensitivityError):
-            sensitivity.component_correlations(scores)
-    else:
-        found = sensitivity.component_correlations(scores)
-        assert {f"{a}|{b}": format(v, "f") for (a, b), v in found.items()} == expected

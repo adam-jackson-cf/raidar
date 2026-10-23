@@ -1,6 +1,6 @@
 """process-compliance@2: deterministic-only process checks (Jev parked 2026-10-04, F7).
 
-A check the trace decides is ``ok`` exactly as under ``@1``; a check it cannot
+A check the trace decides is ``ok``; a check it cannot
 decide is undetermined (``insufficient_evidence`` with a reason, never a
 value, never a zero); nothing asks, binds or audits Jev.
 """
@@ -20,7 +20,6 @@ from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.keys import scorer_identity
 from raidar.scorers.process_checks import DeterministicProcessComplianceScorer
 from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
-from raidar.scorers.process_compliance import ProcessComplianceScorer
 from raidar.scorers.sdk.context import AssessContext
 from raidar.scorers.sdk.manifest import Tier
 from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation, Provenance
@@ -142,23 +141,13 @@ def test_a_trajectory_with_only_undetermined_checks_has_no_rate_not_a_zero(
     assert result.status is AssessStatus.UNAVAILABLE
 
 
-def test_decided_checks_match_the_dormant_version_exactly(tmp_path: Path) -> None:
+def test_decided_checks_are_ok_and_undetermined_ones_are_not(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path, _decided_pass(), _decided_fail(), _no_edit(), _ambiguous())
     current = _by_key(_assess(ctx))
-    legacy = ProcessComplianceScorer()
-    dormant = _by_key(validate_result(legacy.manifest, ctx, legacy.assess(ctx)))
-    for key, item in current.items():
-        before = dormant[key]
-        assert (item.status, item.value, item.numerator, item.denominator) == (
-            before.status,
-            before.value,
-            before.numerator,
-            before.denominator,
-        ), key
-        if item.status is not UNDETERMINED:
-            assert item.reason == before.reason, key
+    assert current["tests_run_before_finish", "checkpoint_1"].value == 1.0
     assert current["tests_run_before_finish", "checkpoint_2"].value == 0.0
     assert current["plan_written", "checkpoint_3"].status is AssessStatus.NOT_APPLICABLE
+    assert current["plan_written", "checkpoint_4"].status is UNDETERMINED
 
 
 def test_invalid_config_is_an_error(tmp_path: Path) -> None:

@@ -36,7 +36,6 @@ EXCLUDED_PREFIXES = (
     "orchestrator/.venv/",
     "problems/cache/",
     "problems/store/",
-    "runs/",
     "stores/",
     "analysis/",
 )

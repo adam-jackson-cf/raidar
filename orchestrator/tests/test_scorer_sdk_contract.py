@@ -364,7 +364,7 @@ def _pilot_scorer_refs() -> list[str]:
 def test_pilot_scorer_references_resolve_through_the_entry_point(tmp_path: Path) -> None:
     resolver = ResolverSet().resolver_for(RefKind.SCORER)
     assert resolver is not None
-    refs = [*_pilot_scorer_refs(), "process-compliance@1"]
+    refs = _pilot_scorer_refs()
     resolved = {
         ref: resolver.resolve(RegistryRef.parse(RefKind.SCORER, ref), base_dir=tmp_path)
         for ref in refs

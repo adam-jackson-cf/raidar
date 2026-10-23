@@ -338,7 +338,6 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "jev",
         "ledger",
         "lock",
-        "migrate-job",
         "pack",
         "perf",
         "plan",
@@ -346,7 +345,6 @@ def test_cli_exposes_only_the_experiment_model_commands() -> None:
         "quality",
         "run",
         "target",
-        "upgrade-spec",
         "validate",
     }
     problem = main.commands["problem"]

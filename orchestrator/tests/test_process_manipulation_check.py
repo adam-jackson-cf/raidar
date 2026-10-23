@@ -188,7 +188,6 @@ def test_default_checks_are_deterministic_metrics_of_the_default_scorer() -> Non
         "process-compliance@4",
         "process-compliance@3",
         "process-compliance@2",
-        "process-compliance@1",
     ],
 )
 def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) -> None:

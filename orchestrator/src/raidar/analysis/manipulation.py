@@ -1,11 +1,11 @@
 """Manipulation check: did the guided arm's process actually differ from baseline? (G5)
 
 A process-guidance condition only means something if agents under it behave
-differently. This check takes ``process-compliance`` results per arm (``@2``,
-or the dormant ``@1`` for jobs that declare it) and reports, per check, whether
+differently. This check takes ``process-compliance`` results per arm (``@2`` to ``@6``)
+and reports, per check, whether
 the guided arm complied more than the baseline. The checks are deterministic
-trace checks: only ``ok`` observations count, so an undetermined check (and
-``@1``'s parked Jev metric) never enters a share.
+trace checks: only ``ok`` observations count, so an undetermined check never
+enters a share.
 
 The unit is the trial, not the checkpoint, because checkpoints of one
 step_result are not independent: each trial contributes its pass share over
@@ -74,7 +74,6 @@ PROCESS_COMPLIANCE_REFS = (
     "process-compliance@4",
     "process-compliance@3",
     "process-compliance@2",
-    "process-compliance@1",
 )
 GATE_EFFORT_REFS = (
     "gate-effort@10",
@@ -385,7 +384,7 @@ def manipulation_check(
 def load_arm_results(
     store_root: Path, arm_keys: Mapping[str, Sequence[str]]
 ) -> dict[str, list[AssessResult]]:
-    """``process-compliance`` (``@2`` or ``@1``) results per arm from Assessment keys."""
+    """``process-compliance`` results per arm from Assessment keys."""
     store = AssessmentStore(store_root)
     loaded: dict[str, list[AssessResult]] = {}
     for arm, keys in arm_keys.items():

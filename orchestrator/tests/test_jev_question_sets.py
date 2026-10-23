@@ -1,4 +1,4 @@
-"""H3: SCB rubric per changed symbol with carry-forward, and the process residue interface."""
+"""H3: SCB rubric per changed symbol with carry-forward."""
 
 from __future__ import annotations
 
@@ -14,16 +14,6 @@ from raidar.cli import main
 from raidar.jev.audit import DecisionStage, SufficiencyLevel
 from raidar.jev.carry_forward import is_span_unchanged, parse_diff_hunks, unified_diff_text
 from raidar.jev.codebase import CodebaseIndex
-from raidar.jev.process import (
-    EVENTS_BUDGET_CHARS,
-    EventKind,
-    ProcessCheck,
-    ResidueCase,
-    TraceEvent,
-    ask_residue,
-    record_settled,
-    residue_state,
-)
 from raidar.jev.report import rubric_shadow_report
 from raidar.jev.rubric import (
     RUBRIC_POLICY,
@@ -46,8 +36,6 @@ from tests.jev_support import (
     policy,
     shadow_policy_dir,
 )
-
-PROCESS = "process-compliance.residue"
 
 
 def test_rubric_question_set_is_the_pinned_scb_criteria_as_noul_questions(tmp_path: Path) -> None:
@@ -307,52 +295,6 @@ def test_shadow_rubric_cli_writes_the_report_for_a_trial_layout(
     assert report["totals"]["failure_reasons"].keys() == {"cache_miss"}
     audit = make_runtime(tmp_path / "store").audit
     assert {record.trial for record in audit.decisions(RUBRIC_POLICY)} == {"luna-1"}
-
-
-def _events(count: int, size: int) -> tuple[TraceEvent, ...]:
-    return tuple(
-        TraceEvent(index=i, kind=EventKind.COMMAND, text=f"{i}:" + "x" * size) for i in range(count)
-    )
-
-
-def test_process_residue_state_sufficiency_and_audit(tmp_path: Path) -> None:
-    transport = RecordedTransport(answer_for=lambda _id, _q: noul_answer(0.3))
-    runtime = make_runtime(tmp_path, transport=transport, policies=(policy(PROCESS),))
-    case = ResidueCase(
-        step="checkpoint_2",
-        check=ProcessCheck.TESTS_RUN_BEFORE_FINISH,
-        events=_events(3, 10),
-        ambiguity="test command is a custom script",
-    )
-    outcome = ask_residue(runtime, case)
-    assert outcome.noul("tests_run_before_finish") == pytest.approx(0.3)
-    assert outcome.counts_toward_verdicts is False
-    assert outcome.record.input_sufficiency is not None
-    assert outcome.record.input_sufficiency.level is SufficiencyLevel.SUFFICIENT
-    assert list(transport.calls[0]["body"]["questions"]) == ["tests_run_before_finish"]
-
-    long_state, long_sufficiency = residue_state(
-        ResidueCase("checkpoint_2", ProcessCheck.PLAN_BEFORE_EDIT, _events(60, 1_900), "long")
-    )
-    kept = [event for event in long_state["events"] if "index" in event]
-    assert (kept[0]["index"], kept[-1]["index"]) == (0, 59)
-    assert sum(len(event["text"]) for event in kept) <= EVENTS_BUDGET_CHARS
-    assert long_sufficiency.level is SufficiencyLevel.PARTIAL
-
-    empty = ask_residue(
-        runtime, ResidueCase("checkpoint_3", ProcessCheck.TESTS_FIRST, (), "no trace")
-    )
-    assert (empty.ok, empty.record.stage) == (False, DecisionStage.SKIPPED)
-    settled = record_settled(
-        runtime,
-        step="checkpoint_1",
-        check=ProcessCheck.PLAN_BEFORE_EDIT,
-        rule="plan_file",
-        complied=True,
-    )
-    assert (settled.stage, settled.verdict) == (DecisionStage.DETERMINISTIC, "complied")
-    assert len(runtime.audit.decisions(PROCESS)) == 3
-    assert len(transport.calls) == 1
 
 
 CODEBASE_APP = """from abc import ABC, abstractmethod

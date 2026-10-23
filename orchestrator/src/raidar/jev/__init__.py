@@ -4,7 +4,6 @@ Entry points for scorers:
 
 - ``open_runtime(store_root, ...)`` builds the policy-bound ``JevRuntime``.
 - ``JevRuntime.decide`` / ``record_deterministic``: every decision is audited.
-- ``raidar.jev.process``: the process-compliance residue interface.
 - ``raidar.jev.rubric.RubricRunner``: SCB rubric criteria per changed symbol.
 - ``raidar.jev.gating.verdict_observations``: keeps shadow Jev observations
   out of Metrics and verdicts.

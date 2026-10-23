@@ -66,7 +66,7 @@ def test_exported_labels_load_into_the_calibration_workflow(store: Path, tmp_pat
                 _surface_label(first, "false_positive", 1),
                 _surface_label(first, "correct", 2, note="checked the span"),
                 _surface_label(second, "false_negative", 1),
-                _surface_label(third, "correct", 1, policy="process-compliance.residue"),
+                _surface_label(third, "correct", 1, policy="synthetic.second-policy"),
             ],
         )
     )

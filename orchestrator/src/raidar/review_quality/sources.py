@@ -32,7 +32,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import sys
 from collections import defaultdict
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -43,7 +42,6 @@ from raidar.analysis.sources import AnalysisInputError, read_lock
 from raidar.execution.models import TrialRecord
 from raidar.jev.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
 from raidar.jev.ledger import current_labels
-from raidar.job_layout import LEGACY_RUN_MANIFEST, is_legacy_job, legacy_job_message
 from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.spec.lock import LOCK_SUFFIX, default_lock_path
 
@@ -163,9 +161,6 @@ def _experiment_info(
 
 
 def _job_dirs(jobs_root: Path) -> Iterator[Path]:
-    for legacy in sorted(jobs_root.rglob(LEGACY_RUN_MANIFEST)):
-        if is_legacy_job(legacy.parent):
-            print(f"Skipping {legacy_job_message(legacy.parent)}", file=sys.stderr)
     for manifest in sorted(jobs_root.rglob("job.json")):
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))

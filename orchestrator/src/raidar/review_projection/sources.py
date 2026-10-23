@@ -29,7 +29,6 @@ from pydantic import ValidationError
 
 from raidar.execution.assessment import lock_errata, rescore_config
 from raidar.execution.models import TrialRecord
-from raidar.job_layout import is_legacy_job, legacy_job_message
 from raidar.scorers.rescore_config import RescoreConfig
 from raidar.spec.canonical import digest_json
 from raidar.spec.lock import LOCK_SUFFIX, lock_integrity_issues
@@ -118,9 +117,6 @@ def discover_job_dirs(roots: Iterable[Path]) -> list[Path]:
     found: set[Path] = set()
     for root in roots:
         candidates = [root, *root.glob("*"), *root.glob("*/*")]
-        for path in candidates:
-            if path.is_dir() and is_legacy_job(path):
-                print(f"Skipping {legacy_job_message(path)}", file=sys.stderr)
         found.update(path.resolve() for path in candidates if path.is_dir() and _is_job_dir(path))
     return sorted(found)
 

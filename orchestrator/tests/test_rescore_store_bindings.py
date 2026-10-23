@@ -15,19 +15,15 @@ from click.testing import CliRunner
 from raidar.cli import main
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
 from raidar.jev.policies import POLICY_DIR, PolicyMode
-from raidar.jev.process import PROCESS_POLICY
-from raidar.jev.session import open_runtime
 from raidar.scorers import catalog
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, default_scorer_registry
 from raidar.scorers.keys import scorer_identity
-from raidar.scorers.process_compliance.jev_residue import UNANSWERED
 from raidar.scorers.rescore import RescoreOutcome, rescore_path
 from raidar.scorers.sdk.context import AssessContext, statused_result
 from raidar.scorers.sdk.result import AssessResult, AssessStatus
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.spec.schema import ProtocolSpec
 from raidar.verifier.models import CaseStatus
-from tests.jev_support import shadow_policy_dir
 from tests.scorer_support import (
     APP_V1,
     FakeScorer,
@@ -45,26 +41,13 @@ from tests.trace_trial_support import (
     write_traced_trial,
 )
 
-PROCESS = "process-compliance@1"
+RUBRIC_POLICY = "code-quality.rubric-smells"
 DETERMINISTIC = "process-compliance@2"
 FAKE = "fake-quality@1"
 
 
-@pytest.fixture
-def shadow_jev(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """The dormant process-compliance@1 Jev path as it ran before Jev was parked.
-
-    The repo policies are ``off`` (2026-10-04); this binds a shadow copy both
-    for the scorer identity and for the store runtime ``open_runtime`` opens.
-    """
-    policies = shadow_policy_dir(tmp_path / "shadow-policies")
-    monkeypatch.setattr(catalog, "JEV_POLICY_DIR", policies)
-    monkeypatch.setitem(open_runtime.__kwdefaults__, "policy_dir", policies)
-    return policies
-
-
 def _ambiguous_trial(trial_dir: Path) -> Path:
-    """One step whose shell edit after the test run leaves both checks to Jev."""
+    """One step whose shell edit after the test run leaves both checks undetermined."""
     trace = trajectory(
         agent_step(1, message="Plan:\n1. edit main\n2. run tests"),
         agent_step(2, codex_patch("e1", "/app/app/main.py")),
@@ -72,40 +55,6 @@ def _ambiguous_trial(trial_dir: Path) -> Path:
         agent_step(4, codex_exec("s1", "sed -i 's/a/b/' app/main.py")),
     )
     return write_traced_trial(trial_dir, [TracedStep("checkpoint_1", trace=trace)])
-
-
-@pytest.mark.usefixtures("shadow_jev")
-def test_rescore_binds_process_compliance_to_a_shadow_jev_runtime_in_the_store(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
-    trial = _ambiguous_trial(tmp_path / "jobs" / "trial")
-    store = tmp_path / "store"
-    args = ["assess", "--rescore", str(trial), "--scorer", PROCESS, "--store", str(store)]
-
-    result = CliRunner().invoke(main, [*args, "--jev-replay-only"])
-    assert result.exit_code == 0, result.output
-    (entry,) = json.loads(result.output)["assessments"]
-    stored = AssessmentStore(store).get(entry["key"])
-    assert stored is not None
-    jev = next(o for o in stored.result.observations if o.metric == "jev_ambiguous_compliance")
-    # A bound runtime answered from the (empty) cache; the unbound factory says "no runtime".
-    assert jev.status is AssessStatus.UNAVAILABLE
-    assert jev.reason == UNANSWERED, "one reason whatever kept Jev from answering"
-    assert stored.provisional is True
-    assert stored.result.provenance.policy_modes == {"jev_ambiguous_compliance": "shadow"}
-    assert stored.scorer.jev_policies is not None
-    assert stored.scorer.jev_policies[PROCESS_POLICY].mode == PolicyMode.SHADOW.value
-    audit = list((store / "jev-audit").rglob("*.jsonl"))
-    assert audit, "decisions are audited in the store"
-    assert "cache_miss" in "".join(path.read_text() for path in audit), "the audit keeps why"
-
-    # Without replay-only the runtime tries the provider: no key -> missing_key. The
-    # Assessment bytes do not depend on that, so the replay is identical, not a conflict.
-    replay = CliRunner().invoke(main, [*args, "--replay"])
-    assert replay.exit_code == 0, replay.output
-    assert json.loads(replay.output)["counts"]["replayed_identical"] == 1
-    assert "missing_key" in "".join(path.read_text() for path in audit)
 
 
 class Awaiting(FakeScorer):
@@ -168,7 +117,7 @@ def test_a_provisional_assessment_is_rerun_and_superseded_once_answered(
 def _with_mode(tmp_path: Path, mode: PolicyMode) -> Path:
     policies = tmp_path / f"policies-{mode.value}"
     shutil.copytree(POLICY_DIR, policies)
-    path = policies / f"{PROCESS_POLICY}.yaml"
+    path = policies / f"{RUBRIC_POLICY}.yaml"
     document = yaml.safe_load(path.read_text())
     document["mode"] = mode.value
     path.write_text(yaml.safe_dump(document))
@@ -178,15 +127,15 @@ def _with_mode(tmp_path: Path, mode: PolicyMode) -> Path:
 def test_the_jev_policy_mode_is_part_of_the_scorer_identity_and_key(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    registration = default_scorer_registry().get(PROCESS)
+    registration = ScorerRegistration(fake_manifest("1"), jev_policies=(RUBRIC_POLICY,))
     off = scorer_identity(registration)
     assert off.jev_policies is not None
-    assert off.jev_policies[PROCESS_POLICY].mode == "off", "the repo policy is parked"
+    assert off.jev_policies[RUBRIC_POLICY].mode == "off", "the repo policy is parked"
 
     monkeypatch.setattr(catalog, "JEV_POLICY_DIR", _with_mode(tmp_path, PolicyMode.SHADOW))
     shadow = scorer_identity(registration)
     assert shadow.jev_policies is not None
-    assert shadow.jev_policies[PROCESS_POLICY].mode == "shadow"
+    assert shadow.jev_policies[RUBRIC_POLICY].mode == "shadow"
     assert off.payload() != shadow.payload()
 
     # Scorers without Jev policies serialise exactly as before the field existed.
@@ -297,10 +246,9 @@ def test_builtin_registrations_declare_their_store_protocol_and_problem_bindings
     tmp_path: Path,
 ) -> None:
     registry = default_scorer_registry()
-    process = registry.get(PROCESS)
-    assert process.jev_policies == (PROCESS_POLICY,)
-    bound = process.load_for_store(tmp_path / "store", replay_only=True)
-    assert bound.manifest == process.manifest
+    assert registry.get(DETERMINISTIC).jev_policies == ()
+    bound = registry.get(DETERMINISTIC).load_for_store(tmp_path / "store", replay_only=True)
+    assert bound.manifest == registry.get(DETERMINISTIC).manifest
     assert registry.get("code-quality@1").problem_config == ("entry_file",)
     assert registry.get("correctness@1").protocol_config == ("progression",)
     declared = {name for ref in registry.refs() for name in registry.get(ref).protocol_config}
@@ -338,36 +286,19 @@ def test_a_plain_rescore_uses_the_runs_locked_assessment_config(tmp_path: Path) 
     assert rescore(loose, "correctness@1")["config"] is None
 
 
-@pytest.mark.usefixtures("shadow_jev")
 def test_rescore_records_run_qualified_trial_ids_so_shared_trial_ids_stay_apart(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path,
 ) -> None:
     """Gate packet F10: two runs of one experiment share bare trial ids."""
-    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
     store = AssessmentStore(tmp_path / "store")
     registry = default_scorer_registry()
     for job_id in ("run-a", "run-b"):
         run = tmp_path / "jobs" / "pilot" / job_id
         _ambiguous_trial(run / "trials" / "b01-p0-guided")
         (run / "job.json").write_text(json.dumps({"experiment": "pilot", "job_id": job_id}))
-        (record,) = rescore_path(run / "trials", [PROCESS], store, registry, jev_replay_only=True)
+        (record,) = rescore_path(run / "trials", [DETERMINISTIC], store, registry)
         assert record.trial == f"pilot.{job_id}.b01-p0-guided"
-
-    decisions = [
-        json.loads(line)
-        for path in (store.root / "jev-audit").rglob("*.jsonl")
-        for line in path.read_text().splitlines()
-    ]
-    assert {record["trial"] for record in decisions} == {
-        "pilot.run-a.b01-p0-guided",
-        "pilot.run-b.b01-p0-guided",
-    }
-    logged = {entry["trial"] for entry in store.read_log()}
-    assert logged == {"pilot.run-a.b01-p0-guided", "pilot.run-b.b01-p0-guided"}
-
     # A trial outside any run keeps its directory name.
     loose = _ambiguous_trial(tmp_path / "loose" / "b01-p0-guided")
-    (record,) = rescore_path(
-        loose, [PROCESS], AssessmentStore(tmp_path / "s2"), registry, jev_replay_only=True
-    )
+    (record,) = rescore_path(loose, [DETERMINISTIC], AssessmentStore(tmp_path / "s2"), registry)
     assert record.trial == "b01-p0-guided"

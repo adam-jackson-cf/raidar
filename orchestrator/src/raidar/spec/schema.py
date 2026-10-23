@@ -11,8 +11,7 @@ a ``kind`` (``ab-test``, ``benchmark``, ``smoke``; ``research-loop`` is
 reserved), one ``runtime`` (a runtime pack id), a Harbor ``environment``
 (``type: docker``), agents named by Harbor ``AgentName`` (``codex``,
 ``claude-code``), a headline ``metric`` and ``analysis.attempts``: the
-paired, counterbalanced replicates of every arm. Schema v1 files stay
-loadable read-only (``raidar.spec.schema_v1``).
+paired, counterbalanced replicates of every arm.
 """
 
 from __future__ import annotations

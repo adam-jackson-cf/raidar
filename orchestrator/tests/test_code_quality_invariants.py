@@ -14,7 +14,7 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from raidar.scorers.code_quality import arithmetic, sensitivity
+from raidar.scorers.code_quality import arithmetic
 from raidar.scorers.code_quality.lineage import (
     calculate_problem_rework,
     calculate_transition_rework,
@@ -328,48 +328,3 @@ def test_problem_arithmetic_refuses_incomplete_or_out_of_range_components(
         arithmetic.calculate_problem_score("p", correctness, *series)
     with pytest.raises(ValueError, match="empty"):
         arithmetic.mean(())
-
-
-def test_sensitivity_refuses_unidentifiable_inputs() -> None:
-    controlled = sensitivity.controlled_fixture_scores()
-    assert sensitivity.exact_score_delta("rework", Decimal("0.5")) == Decimal("4.5")
-    for call, message in (
-        (lambda: sensitivity.controlled_fixture_scores(Decimal(0)), r"\(0, 1\]"),
-        (lambda: sensitivity.exact_score_delta("inertia", Decimal(1)), "unknown component"),
-        (lambda: sensitivity.exact_score_delta("rework", Decimal(2)), r"\[0, 1\]"),
-        (
-            lambda: sensitivity.weight_ablations([controlled["baseline"]] * 2),
-            "must be unique",
-        ),
-        (lambda: sensitivity.component_correlations([controlled["baseline"]]), "at least two"),
-        (
-            lambda: sensitivity.component_correlations(list(controlled.values())[:2]),
-            "constant components",
-        ),
-        (
-            lambda: sensitivity.require_independent_components([controlled["baseline"]]),
-            "redundant or unidentifiable",
-        ),
-    ):
-        with pytest.raises(sensitivity.SensitivityError, match=message):
-            call()
-    patterns = {
-        "verbosity": ("0.2", "0.5", "0.9"),
-        "erosion": ("0.2", "0.5", "0.9"),
-        "architecture": ("0.9", "0.1", "0.4"),
-        "rework": ("0.3", "0.8", "0.6"),
-        "regression": ("0.7", "0.6", "0.1"),
-    }
-    correlated = [
-        arithmetic.calculate_problem_score(
-            f"p{index}",
-            _correctness(2),
-            *(
-                (Decimal(patterns[name][index]),) * (1 if name in {"rework", "regression"} else 2)
-                for name in arithmetic.COMPONENT_NAMES
-            ),
-        )
-        for index in range(3)
-    ]
-    with pytest.raises(sensitivity.SensitivityError, match="verbosity', 'erosion"):
-        sensitivity.require_independent_components(correlated)

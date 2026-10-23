@@ -22,13 +22,7 @@ from pydantic import ValidationError
 
 from raidar.spec.canonical import sha256_hex
 from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY, MetricRegistry
-from raidar.spec.schema import SCHEMA_VERSION, ExperimentSpec
-from raidar.spec.schema_v1 import (
-    LEGACY_SCHEMA_VERSION,
-    ExperimentSpecV1,
-    infer_kind,
-    upgrade_document,
-)
+from raidar.spec.schema import ExperimentSpec
 from raidar.spec.validation import (
     FieldIssue,
     SpecValidationError,
@@ -214,28 +208,6 @@ def _most_specific(issues: list[FieldIssue]) -> list[FieldIssue]:
     ]
 
 
-def is_legacy_file(path: Path) -> bool:
-    """True for a readable ``schema_version: 1`` experiment file."""
-    try:
-        document, _ = _read_document(path.resolve())
-    except SpecValidationError:
-        return False
-    return document.get("schema_version") == LEGACY_SCHEMA_VERSION
-
-
-class LegacySpecError(SpecValidationError):
-    """A ``schema_version: 1`` file: loadable read-only, never locked, planned or run."""
-
-
-def legacy_issue(path: Path) -> FieldIssue:
-    return FieldIssue(
-        "schema_version",
-        f"schema_version {LEGACY_SCHEMA_VERSION} is read-only: it validates but cannot be "
-        f"locked, planned or run; write schema_version {SCHEMA_VERSION} with "
-        f"`make experiment-upgrade EXPERIMENT={path} KIND=<kind> EXPERIMENT_ID=<id> OUT=<file>`",
-    )
-
-
 def _validated(path: Path, document: dict[str, Any], **checks: Any) -> ExperimentSpec:
     try:
         spec = ExperimentSpec.model_validate(document)
@@ -253,67 +225,15 @@ def load_experiment(
     *,
     metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY,
 ) -> LoadedExperiment:
-    """Load, override, schema-validate and cross-check a schema v2 experiment file.
-
-    A schema v1 file raises ``LegacySpecError`` (read it with
-    ``load_legacy_experiment``): lock, plan and run take schema v2 only.
-    """
+    """Load, override, schema-validate and cross-check a schema v2 experiment file."""
     overrides = overrides or CliOverrides()
     path = path.resolve()
     document, source_sha256 = _read_document(path)
-    if document.get("schema_version") == LEGACY_SCHEMA_VERSION:
-        raise LegacySpecError(str(path), [legacy_issue(path)])
     override_issues = _apply_overrides(document, overrides)
     if override_issues:
         raise SpecValidationError(str(path), override_issues)
     spec = _validated(path, document, metrics=metrics)
     return LoadedExperiment(spec=spec, path=path, source_sha256=source_sha256, overrides=overrides)
-
-
-@dataclass(frozen=True)
-class LegacyExperiment:
-    """A schema v1 file and its schema v2 translation (kind inferred, id unchanged)."""
-
-    spec_v1: ExperimentSpecV1
-    upgraded: ExperimentSpec
-    path: Path
-    source_sha256: str
-
-
-def load_legacy_experiment(
-    path: Path, *, metrics: MetricRegistry = DEFAULT_METRIC_REGISTRY
-) -> LegacyExperiment:
-    """Read a schema v1 file read-only: its v1 schema, then every v2 rule but naming.
-
-    The kind is inferred from the design and the v1 id is kept, so the naming
-    rules (``NAME1``/``NAME2``) are not applied until the file is upgraded.
-    """
-    path = path.resolve()
-    document, source_sha256 = _read_document(path)
-    try:
-        spec_v1 = ExperimentSpecV1.model_validate(document)
-    except ValidationError as exc:
-        raise SpecValidationError(str(path), _most_specific(issues_from_pydantic(exc))) from exc
-    upgraded = upgrade_document(document, kind=infer_kind(document), experiment_id=spec_v1.id)
-    spec = _validated(path, upgraded, metrics=metrics, naming=False)
-    return LegacyExperiment(spec_v1, spec, path, source_sha256)
-
-
-def upgrade_experiment_file(path: Path, *, kind: str, experiment_id: str, output: Path) -> str:
-    """The schema v2 YAML of a schema v1 file, validated as if written at ``output``."""
-    path = path.resolve()
-    document, _ = _read_document(path)
-    if document.get("schema_version") != LEGACY_SCHEMA_VERSION:
-        raise SpecValidationError(
-            str(path), [FieldIssue("schema_version", "only schema_version 1 files are upgraded")]
-        )
-    try:
-        ExperimentSpecV1.model_validate(document)
-    except ValidationError as exc:
-        raise SpecValidationError(str(path), _most_specific(issues_from_pydantic(exc))) from exc
-    upgraded = upgrade_document(document, kind=kind, experiment_id=experiment_id)
-    _validated(output.resolve(), upgraded)
-    return yaml.safe_dump(upgraded, sort_keys=False, allow_unicode=True)
 
 
 def overrides_from_cli(

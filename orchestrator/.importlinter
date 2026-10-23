@@ -152,4 +152,3 @@ source_modules =
     raidar.scorers.process_checks
 forbidden_modules =
     raidar.jev
-    raidar.scorers.process_compliance

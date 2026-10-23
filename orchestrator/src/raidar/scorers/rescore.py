@@ -9,11 +9,10 @@ scorer version (or config, tool lock or input) gives a new key, so rescoring
 only ever adds Assessments (or completes a provisional one). Trial
 directories are read, never written.
 
-Scorers load through their store-aware factory when they have one, so
-the dormant ``process-compliance@1`` gets a ``JevRuntime`` whose audit and cache
-live in the store (its repo policy mode, ``off`` since Jev was parked on
-2026-10-04; ``jev_replay_only`` never calls the provider). ``process-compliance@2``
-has no store binding. A scorer's problem-derived config keys (``entry_file``) default
+Scorers load through their store-aware factory when they have one (a scorer that
+decides under Jev gets a ``JevRuntime`` whose audit and cache live in the store;
+``jev_replay_only`` never calls the provider; no built-in scorer does today).
+A scorer's problem-derived config keys (``entry_file``) default
 from ``AssessContext.problem_config``; explicit config wins. The key hashes the
 explicit config only: the defaults are a function of the problem reference and
 oracle records already in the key's inputs, and analysis recomputes keys from

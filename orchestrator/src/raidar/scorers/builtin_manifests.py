@@ -229,6 +229,8 @@ RESOURCE_USAGE = ScorerManifest(
     ),
 )
 
+# Not registered: the metric base ``process-compliance@2`` derives its deterministic metrics
+# from (``process_checks.manifest``); the Jev-tier metric is the fixture of the Jev gating tests.
 PROCESS_COMPLIANCE = ScorerManifest(
     id="process-compliance",
     version="1",
@@ -276,5 +278,4 @@ BUILTIN_MANIFESTS: tuple[ScorerManifest, ...] = (
     CORRECTNESS,
     CODE_QUALITY,
     RESOURCE_USAGE,
-    PROCESS_COMPLIANCE,
 )

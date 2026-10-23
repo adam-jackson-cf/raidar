@@ -302,7 +302,6 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "correctness@1": "raidar.scorers.correctness:correctness_scorer",
     "code-quality@1": "raidar.scorers.code_quality:code_quality_scorer",
     "resource-usage@1": "raidar.scorers.resource_usage:resource_usage_scorer",
-    "process-compliance@1": "raidar.scorers.process_compliance:process_compliance_scorer",
     "process-compliance@2": (
         "raidar.scorers.process_checks:deterministic_process_compliance_scorer"
     ),
@@ -324,14 +323,9 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
     "gate-effort@10": "raidar.scorers.gate_effort_v10:gate_effort_v10_scorer",
 }
 # Scorers bound to the assessment store at rescore time, with the Jev policies
-# that store-bound runtime decides under: the dormant process-compliance@1 (Jev
-# parked 2026-10-04; its residue policy is off; @2 needs no store binding), and
-# gate-effort@4, which decides under no Jev policy.
+# that store-bound runtime decides under (none today: gate-effort@4 and later and
+# code-quality@2 and later decide under no Jev policy).
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, tuple[str, tuple[str, ...]]] = {
-    "process-compliance@1": (
-        "raidar.scorers.process_compliance:process_compliance_scorer_for_store",
-        ("process-compliance.residue",),
-    ),
     # gate-effort@4 reads the offline grades of guardrail-gate@3's pre-fix snapshots,
     # which ``raidar assess --rescore`` writes to the store (raidar.verifier.prefix_grade).
     "gate-effort@4": ("raidar.scorers.gate_effort_v4:gate_effort_v4_scorer_for_store", ()),

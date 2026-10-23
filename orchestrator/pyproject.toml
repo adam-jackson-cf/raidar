@@ -92,10 +92,6 @@ line-length = 100
 target-version = "py312"
 extend-exclude = [
     "experiments",
-    "runs",
-    "workspace",
-    "workspace-*",
-    "results",
     "jobs",
     "**/node_modules",
     "**/*.tsbuildinfo",

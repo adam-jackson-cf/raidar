@@ -30,7 +30,7 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from raidar.execution.models import PhaseSample, TrialRecord
-from raidar.job_layout import TRIAL_RECORD_GLOB, is_legacy_job, legacy_job_message
+from raidar.job_layout import TRIAL_RECORD_GLOB
 
 MIN_SAMPLES = 10
 
@@ -290,8 +290,6 @@ def load_job_samples(job_dirs: Sequence[Path]) -> JobSamples:
     trials: list[TrialSamples] = []
     multi_step = False
     for job_dir in job_dirs:
-        if is_legacy_job(job_dir):
-            raise PerfInputError(legacy_job_message(job_dir))
         for path in sorted(job_dir.glob(TRIAL_RECORD_GLOB)):
             record = _read_record(path)
             samples.extend(record.phases)

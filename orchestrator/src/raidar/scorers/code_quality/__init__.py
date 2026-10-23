@@ -3,8 +3,7 @@
 - Ported kernels (pure, golden-tested against the fork): ``models`` and
   ``lineage_models`` (typed evidence), ``quality`` (V/E), ``architecture``
   (H), ``lineage`` (R kernel and ledger), ``regression`` (G attribution),
-  ``arithmetic`` (problem-level means, composed with ``scb-canonical@1``) and
-  ``sensitivity``.
+  ``arithmetic`` (problem-level means, composed with ``scb-canonical@1``).
 - Python measurement adapters (G3): ``tool_env/snapshot_tool`` runs inside
   the pinned ``scb-python-quality`` tool env (tree-sitter symbols and hashes,
   call graph, import tracing, radon file rows, evaluator token/AST/clone

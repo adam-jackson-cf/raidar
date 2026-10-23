@@ -1,29 +1,21 @@
-"""Schema v2: experiment kinds (KIND*), naming (NAME1, NAME2) and read-only schema v1 files."""
+"""Schema v2: experiment kinds (KIND*) and naming (NAME1, NAME2)."""
 
 from __future__ import annotations
 
-import shutil
 from pathlib import Path
 from typing import Any
 
 import pytest
-import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.spec.loader import (
-    LegacySpecError,
-    load_experiment,
-    load_legacy_experiment,
-)
-from raidar.spec.schema_v1 import infer_kind, upgrade_document
+from raidar.spec.loader import load_experiment
 from raidar.spec.validation import SpecValidationError, spec_warnings
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     EXPERIMENTS,
     GUARDRAILS_EXPERIMENT,
     GUIDED_R3_EXPERIMENT,
-    LEGACY_V1,
     MECHANICS_SMOKE,
     PILOT_EXPERIMENT,
     PILOT_ONESHOT,
@@ -234,97 +226,3 @@ def test_naming_and_kind_issues_are_reported_with_the_others_at_once(tmp_path: P
     issues = _issues(write_experiment(tmp_path, document))
 
     assert {"id", "factors", "analysis.baseline_arm"} <= set(issues)
-
-
-# ---- schema v1 -------------------------------------------------------------------
-
-
-LEGACY = {
-    "pilot-forge": ("ab-test", PILOT_EXPERIMENT),
-    "pilot-circuit-eval-oneshot": ("ab-test", PILOT_ONESHOT),
-    "smoke": ("smoke", SMOKE_EXPERIMENT),
-    "smoke-agents": ("benchmark", AGENTS_BENCHMARK),
-}
-
-
-# Decisions taken after the v1 -> v2 translation that the committed v2 files carry:
-# 2026-10-04, Jev parked: experiments declare process-compliance@2, not @1.
-_LATER_DECISIONS = {"process-compliance@1": "process-compliance@2"}
-
-
-def _later_decisions(document: dict[str, Any]) -> dict[str, Any]:
-    assessment = document.get("assessment") or {}
-    if "scorers" in assessment:
-        assessment["scorers"] = [_LATER_DECISIONS.get(ref, ref) for ref in assessment["scorers"]]
-    return document
-
-
-@pytest.mark.parametrize("name", sorted(LEGACY))
-def test_v1_specs_stay_loadable_read_only(name: str, tmp_path: Path) -> None:
-    kind, current = LEGACY[name]
-    source = LEGACY_V1 / f"{name}.experiment.yaml"
-    legacy = load_legacy_experiment(source)
-    runner = CliRunner()
-
-    validated = runner.invoke(main, ["validate", str(source)])
-    overridden = runner.invoke(main, ["validate", str(source), "--set", "analysis.blocks=2"])
-    locked = runner.invoke(main, ["lock", str(source), "--output", str(tmp_path / "x.json")])
-    planned = runner.invoke(main, ["plan", str(source)])
-
-    assert legacy.spec_v1.id == name
-    assert legacy.upgraded.kind == kind == infer_kind(yaml.safe_load(source.read_text()))
-    assert validated.exit_code == 0, validated.output
-    assert "schema_version 1, read-only" in validated.output
-    assert overridden.exit_code != 0
-    assert "read-only" in overridden.output
-    for refused in (locked, planned):
-        assert refused.exit_code != 0
-        assert "schema_version 1 is read-only" in refused.output
-    assert not (tmp_path / "x.json").exists()
-    with pytest.raises(LegacySpecError):
-        load_experiment(source)
-    # The committed v2 experiment is exactly the translation of the v1 file, apart from
-    # later recorded decisions (_LATER_DECISIONS).
-    upgraded = _later_decisions(
-        upgrade_document(
-            yaml.safe_load(source.read_text()), kind=kind, experiment_id=current.parent.name
-        )
-    )
-    committed = yaml.safe_load(current.read_text())
-    assert {k: v for k, v in upgraded.items() if k != "description"} == {
-        k: v for k, v in committed.items() if k != "description"
-    }
-
-
-def test_upgrade_spec_writes_a_valid_v2_file_into_the_kind_layout(tmp_path: Path) -> None:
-    source = LEGACY_V1 / "pilot-forge.experiment.yaml"
-    experiment_id = "python__forge__guided-pilot"
-    output = tmp_path / "experiments" / "ab-test" / experiment_id / "experiment.yaml"
-    runner = CliRunner()
-
-    result = runner.invoke(
-        main,
-        ["upgrade-spec", str(source), "--kind", "ab-test", "--id", experiment_id]
-        + ["--output", str(output)],
-    )
-    wrong_kind = runner.invoke(
-        main,
-        ["upgrade-spec", str(source), "--kind", "benchmark", "--id", experiment_id]
-        + ["--output", str(tmp_path / "experiments" / "benchmark" / experiment_id / "e.yaml")],
-    )
-    not_v1 = runner.invoke(
-        main,
-        ["upgrade-spec", str(PILOT_EXPERIMENT), "--kind", "ab-test", "--id", experiment_id]
-        + ["--output", str(tmp_path / "other.yaml")],
-    )
-
-    assert result.exit_code == 0, result.output
-    shutil.copytree(PILOT_EXPERIMENT.parent / "components", output.parent / "components")
-    spec = load_experiment(output).spec
-    assert (spec.schema_version, spec.kind, spec.id) == (2, "ab-test", experiment_id)
-    assert spec.agents[0].name.value == "codex"
-    assert spec.analysis.attempts == 16
-    assert wrong_kind.exit_code != 0
-    assert "[KIND2]" in wrong_kind.output
-    assert not_v1.exit_code != 0
-    assert "only schema_version 1" in not_v1.output

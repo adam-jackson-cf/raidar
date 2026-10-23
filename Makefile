@@ -106,7 +106,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	env-setup agent-list agent-validate codex-auth-setup harbor-cleanup docker-check \
 	target-list target-status target-up target-down target-init target-prune \
 	experiment-init experiment-validate experiment-lock experiment-locks-check \
-	experiment-upgrade experiment-migrate-job experiment-plan experiment-execute experiment-status \
+	experiment-plan experiment-execute experiment-status \
 	perf-check perf-fixture perf-gate health \
 	ledger-check ledger-index \
 	problem-list problem-info problem-import problem-validate problem-errata-draft \
@@ -175,16 +175,12 @@ help:
 	@echo "  make experiment-init EXPERIMENT=experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
 	@echo "                                                        Start a new ab-test: two-arm starter (baseline vs rules-file) plus stub rules file"
 	@echo "  make experiment-validate EXPERIMENT=experiments/<kind>/<id>/experiment.yaml [EXPERIMENT_SET='analysis.attempts=3']"
-	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard); schema v1 read-only"
+	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
 	@echo "  make experiment-locks-check                           Fail unless every experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
 	@echo "  make ledger-check                                     Check ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
 	@echo "  make ledger-index                                     Regenerate ledger/README.md from the records"
-	@echo "  make experiment-upgrade EXPERIMENT=<v1 file> KIND=ab-test|benchmark|smoke EXPERIMENT_ID=<runtime>__<subject>__<intent> OUT=<file>"
-	@echo "                                                        Write the schema v2 form of a read-only schema v1 experiment"
-	@echo "  make experiment-migrate-job JOB=<legacy job dir> LOCK=<v2 lock> [EXECUTED_LOCK=<lock>]"
-	@echo "                                                        Move a pre-v2 job onto the v2 layout and lock, once its execution is proven identical"
 	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
 	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=] [DETACH=1] [ALLOW_UNSMOKED=1]"
@@ -440,18 +436,6 @@ ledger-check:
 
 ledger-index:
 	@$(RAIDAR) ledger index
-
-experiment-upgrade:
-	$(call require_var,EXPERIMENT)
-	$(call require_var,KIND)
-	$(call require_var,EXPERIMENT_ID)
-	$(call require_var,OUT)
-	@$(RAIDAR) upgrade-spec "$(EXPERIMENT)" --kind "$(KIND)" --id "$(EXPERIMENT_ID)" --output "$(OUT)"
-
-experiment-migrate-job:
-	$(call require_var,JOB)
-	$(call require_var,LOCK)
-	@$(RAIDAR) migrate-job "$(JOB)" --lock "$(LOCK)" $(if $(EXECUTED_LOCK),--executed-lock "$(EXECUTED_LOCK)",)
 
 EXECUTION_SELECT = $(if $(LOCK),--lock "$(LOCK)",) $(foreach arm,$(ARM),--arm "$(arm)") \
 	$(foreach attempt,$(ATTEMPT),--attempt "$(attempt)") \

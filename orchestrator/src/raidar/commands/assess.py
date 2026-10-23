@@ -16,10 +16,9 @@ A relock that changes only assessment settings keeps ``lock_sha256``, so a
 plain rescore stores Assessments under the keys analysis looks up for that
 lock. Only a job with no findable lock falls back to its execution-time
 ``assessment-config.yaml``. The report names the config it used.
-Scorers that decide under Jev (only the dormant ``process-compliance@1``; Jev
-is parked and its policy is off) get a runtime whose audit and cache live in
-``--store``; ``--jev-replay-only`` answers from that cache alone and never
-calls the provider. ``process-compliance@2`` binds no Jev runtime.
+No built-in scorer decides under Jev today (Jev is parked); a scorer that does
+gets a runtime whose audit and cache live in ``--store``, and
+``--jev-replay-only`` answers from that cache alone and never calls the provider.
 
 Pre-fix grades: when a scorer run reads them (``gate-effort@4`` to ``@6``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
@@ -44,8 +43,7 @@ own steps stay in order and the report lists entries in trial order.
 ``--scorer`` values must cover the runtime of the job's lock, and a ``--bundle``
 (rescore or regrade) must be the verifier bundle of a problem that lock binds.
 A target outside any job has no recorded runtime, so only runtime-agnostic
-scorers are accepted there unless ``--lock`` names the lock. Legacy jobs are
-refused until ``raidar migrate-job`` moves them.
+scorers are accepted there unless ``--lock`` names the lock.
 """
 
 from __future__ import annotations
@@ -68,7 +66,7 @@ from raidar.commands.assess_grading import (
     regrade,
 )
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
-from raidar.job_layout import JOB_MANIFEST, LegacyJobError, is_legacy_job, legacy_job_message
+from raidar.job_layout import JOB_MANIFEST
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
 from raidar.scorers.rescore import report_payload, rescore_path
 from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
@@ -137,8 +135,6 @@ def run_assessment_config(target: Path) -> Path | None:
 def _job_dir(target: Path) -> Path | None:
     candidate = target.resolve()
     for _ in range(_JOB_CONFIG_DEPTH + 1):
-        if is_legacy_job(candidate):
-            raise LegacyJobError(legacy_job_message(candidate))
         if (candidate / JOB_MANIFEST).is_file():
             return candidate
         candidate = candidate.parent
@@ -195,7 +191,7 @@ def as1_issues(
 def _job_lock(target: Path, explicit: Path | None) -> dict[str, Any] | None:
     try:
         path = run_lock(target, explicit)
-    except (AnalysisInputError, LegacyJobError, ValueError) as exc:
+    except (AnalysisInputError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     return read_lock(path) if path is not None else None
 

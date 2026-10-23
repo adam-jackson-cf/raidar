@@ -28,7 +28,6 @@ from raidar.analysis.outcomes import PoolingReport
 from raidar.analysis.pooling import PoolingError, check_pooling
 from raidar.analysis.report import PlannedTrial
 from raidar.execution.models import TrialRecord
-from raidar.job_layout import is_legacy_job, legacy_job_message
 from raidar.spec.lock import default_lock_path, lock_integrity_issues
 
 
@@ -92,8 +91,6 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 
 def read_job(job_dir: Path) -> JobDir:
-    if is_legacy_job(job_dir):
-        raise AnalysisInputError(legacy_job_message(job_dir))
     records = []
     for path in sorted((job_dir / "trial-records").glob("*.json")):
         try:

@@ -15,7 +15,7 @@ import click
 from raidar.execution.fault_candidates import append_fault_candidates
 from raidar.execution.health import audit_recorded_trial
 from raidar.execution.health_model import HealthReport, write_health
-from raidar.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR, require_v2_job
+from raidar.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR
 
 
 def register(main: click.Group) -> None:
@@ -40,7 +40,6 @@ def _echo(report: HealthReport) -> None:
 @click.argument("job_dir", type=click.Path(exists=True, file_okay=False, path_type=Path))
 def health_command(job_dir: Path) -> None:
     """Recompute each trial's health.json and record fault candidates."""
-    require_v2_job(job_dir)
     failed = 0
     for trial_id in _trial_ids(job_dir):
         report = audit_recorded_trial(job_dir, trial_id)

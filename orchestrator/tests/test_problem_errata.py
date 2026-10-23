@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import hashlib
-import json
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +11,6 @@ import yaml
 
 from raidar.analysis.assessed import CORRECTNESS_REF, build_outcome
 from raidar.execution.assessment import lock_errata, lock_rescore_config
-from raidar.execution.job_migration import JobMigrationError, migrate_job
 from raidar.execution.plan import PlanError, PlanOptions, build_plan
 from raidar.execution.trial_config import harbor_trial_config
 from raidar.packs.python.models import load_pack_spec
@@ -327,67 +325,6 @@ def test_analysis_labels_errata_outcomes_beside_the_raw_ones() -> None:
     assert outcome.metrics["reached_errata"].value == 3.0
     assert outcome.metrics["final_solved"].value == 0.0
     assert outcome.metrics["final_solved_errata"].value == 1.0
-
-
-# ---- moving executed jobs onto an errata relock -------------------------------------------
-
-
-def _job(tmp_path: Path, lock_path: Path, lock: dict[str, Any]) -> Path:
-    job = tmp_path / "jobs" / "e" / "job-01"
-    job.mkdir(parents=True)
-    (job / "job.lock.json").write_bytes(lock_path.read_bytes())
-    (job / "job.json").write_text(
-        json.dumps({"job_id": "job-01", "lock_sha256": lock["lock_sha256"]})
-    )
-    (job / "plan.json").write_text(json.dumps({"lock_sha256": lock["lock_sha256"]}))
-    return job
-
-
-def test_jobs_move_onto_an_errata_relock_only_when_nothing_else_changed(
-    fixture: ImportedFixture, tmp_path: Path
-) -> None:
-    _, executed, executed_path = locked_experiment(
-        tmp_path / "exp", fixture.ref, environment={"compose_init": False}
-    )
-    job = _job(tmp_path, executed_path, executed)
-    executed_bytes = executed_path.read_bytes()
-    write_errata(fixture)
-    _, target, target_path = locked_experiment(
-        tmp_path / "exp", fixture.ref, environment={"compose_init": False}
-    )
-    moved = migrate_job(job, target_path)
-    assert (moved.executed_lock_sha256, moved.lock_sha256, moved.migrated) == (
-        executed["lock_sha256"],
-        target["lock_sha256"],
-        True,
-    )
-    manifest = json.loads((job / "job.json").read_text())
-    entry = manifest["lock_migrations"][0]
-    assert manifest["lock_sha256"] == target["lock_sha256"]
-    assert entry["kind"] == "errata_adoption"
-    assert entry["errata"] == {
-        fixture.ref: {"from": None, "to": lock_errata(target)[fixture.ref].sha256}
-    }
-    assert (job / entry["executed_lock"]).read_bytes() == executed_bytes
-    assert (job / "job.lock.json").read_bytes() == target_path.read_bytes()
-    plan = json.loads((job / "plan.json").read_text())
-    assert (plan["lock_sha256"], plan["executed_lock_sha256"]) == (
-        target["lock_sha256"],
-        executed["lock_sha256"],
-    )
-    again = migrate_job(job, target_path)
-    assert not again.migrated
-    assert again.executed_lock_sha256 == executed["lock_sha256"]
-
-    _, other, other_path = locked_experiment(
-        tmp_path / "other",
-        fixture.ref,
-        environment={"compose_init": False},
-        analysis={"baseline_arm": "baseline", "attempts": 5, "seed": 8},
-    )
-    with pytest.raises(JobMigrationError, match="more than problem errata"):
-        migrate_job(job, other_path)
-    assert other["lock_sha256"] != target["lock_sha256"]
 
 
 def test_the_analysis_report_names_the_errata_its_errata_outcomes_apply() -> None:
