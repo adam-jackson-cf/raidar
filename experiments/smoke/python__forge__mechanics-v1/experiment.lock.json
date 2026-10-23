@@ -1,0 +1,878 @@
+{
+  "analysis": {
+    "alpha": 0.05,
+    "baseline_arm": "baseline",
+    "max_exclusion_fraction": 0.2,
+    "min_effects": {},
+    "min_pairs": 5
+  },
+  "assessment": {
+    "metric": {
+      "checkpoints": [
+        8
+      ],
+      "ref": "scb-canonical@2",
+      "selection": "declared"
+    },
+    "references": {
+      "metric": {
+        "scb-canonical@2": {
+          "digest": "95c28b4207a52992e38808ebb45dda7b571d6c8abfc59fbf8963b5ca672a2e91",
+          "metadata": {
+            "component_places": "1E-12",
+            "correctness": "C=sum_k(passed_k/graded_k)/K over planned checkpoints; unreached checkpoint=0; reached checkpoint with graded_k=0 -> ineligible",
+            "formula": "S=100*C*(0.70+0.30*I)",
+            "inertia_weights": {
+              "E": "0.15",
+              "G": "0.20",
+              "H": "0.20",
+              "R": "0.30",
+              "V": "0.15"
+            },
+            "max_checkpoints": null,
+            "min_checkpoints": 2,
+            "not_applicable": [],
+            "ref": "scb-canonical@2",
+            "rounding": "ROUND_HALF_EVEN",
+            "score_places": "0.000001",
+            "zero_correctness": "C=0 -> S=0 even when a quality component is missing or ineligible"
+          }
+        }
+      },
+      "scorer": {
+        "code-quality@1": {
+          "digest": "e26b54641878765e8e27dd65f5901a40645e5a3ff9353b3ff2479be4469969b1",
+          "metadata": {
+            "implementation": "raidar.scorers.code_quality:code_quality_scorer",
+            "implementation_digest": "ff7de03a454887cbace1ec83fd37f6ead9216bc5e9f3ae5a2e6d7cbe0a1235df",
+            "manifest": {
+              "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
+              "evidence_required": [
+                "snapshot.current",
+                "snapshot.prior",
+                "oracle.cases"
+              ],
+              "execution": "host-parse",
+              "id": "code-quality",
+              "metrics": [
+                {
+                  "description": "SCB verbosity (V) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "verbosity",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB erosion (E) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "erosion",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB architecture (H) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "architecture",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB rework (R) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "rework",
+                  "inputs": [],
+                  "level": "transition",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB regression breadth (G) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "regression",
+                  "inputs": [],
+                  "level": "transition",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Ruff diagnostics under the SCB contract in production files.",
+                  "direction": "lower_better",
+                  "exactness": "scb-exact",
+                  "id": "lint_findings",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Production lines of code in the assessor-owned inventory.",
+                  "direction": "neutral",
+                  "exactness": "scb-exact",
+                  "id": "production_loc",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "lines"
+                },
+                {
+                  "description": "SCB problem-level verbosity mean (V) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_verbosity",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level erosion mean (E) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_erosion",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level architecture mean (H) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_architecture",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level rework mean (R) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_rework",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "SCB problem-level regression-breadth mean (G) component in [0, 1] (1 is best).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "problem_regression",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "python"
+              ],
+              "tools": [
+                "scb-python-quality",
+                "scb-check"
+              ],
+              "version": "1"
+            },
+            "tool_lock": {
+              "python": {
+                "scb-check": {
+                  "executables": [
+                    "scb-check"
+                  ],
+                  "execution": "host-parse",
+                  "installer": "uv-tool",
+                  "modules": [
+                    "scb_check"
+                  ],
+                  "packages": [
+                    "scb-check==0.1.3"
+                  ]
+                },
+                "scb-python-quality": {
+                  "executables": [
+                    "ruff",
+                    "radon"
+                  ],
+                  "execution": "host-parse",
+                  "installer": "uv-env",
+                  "modules": [
+                    "ruff",
+                    "radon",
+                    "tree_sitter",
+                    "tree_sitter_language_pack",
+                    "networkx"
+                  ],
+                  "packages": [
+                    "ruff==0.8.6",
+                    "radon==6.0.1",
+                    "tree-sitter==0.25.2",
+                    "tree-sitter-language-pack==0.13.0",
+                    "networkx==3.6.1"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "correctness@1": {
+          "digest": "31fa2f2e6cad064ec39df105bcfd9df5f96f837cd1c369b41db9587fccbe7286",
+          "metadata": {
+            "implementation": "raidar.scorers.correctness:correctness_scorer",
+            "implementation_digest": "69da6597236462d2f7da95f875afdc410ed69d23c89ec8c05e46183cecbc592d",
+            "manifest": {
+              "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
+              "evidence_required": [
+                "oracle.cases"
+              ],
+              "execution": "host-parse",
+              "id": "correctness",
+              "metrics": [
+                {
+                  "description": "Strict solve: every graded case passed and grading had no infrastructure failure.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded cases across all groups at the checkpoint.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "strict_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded core cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "core_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded functionality cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "functionality_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded error cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "error_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded regression cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "regression_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Graded regression cases (from earlier checkpoints) that did not pass.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "regression_failures",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Checkpoints solved in the trajectory (continue view); C = this / K.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved_checkpoints",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solve: the strict rule over the graded cases the lock's pinned problem errata keeps (exclude-from-solved cases left out); not_applicable without an errata.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_errata",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        },
+        "process-compliance@2": {
+          "digest": "e9477bdddccc76f77176745a28c5f26c9b842d3f69e62fde25c771d0a48e563c",
+          "metadata": {
+            "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
+            "implementation_digest": "245d173e514e4e25eb3853cfa448192e43b3e9344f4c31cba84f96792dcf6b97",
+            "manifest": {
+              "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
+              "evidence_required": [
+                "trace",
+                "snapshot.current"
+              ],
+              "execution": "host-parse",
+              "id": "process-compliance",
+              "metrics": [
+                {
+                  "description": "The agent ran the project's tests after its last source edit in the step.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "tests_run_before_finish",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "The agent wrote a plan before its first source edit in the step.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "plan_written",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Share of deterministic checks passed over the trajectory.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "compliance_rate",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "2"
+            },
+            "tool_lock": {}
+          }
+        },
+        "resource-usage@1": {
+          "digest": "c88c54f17cade31835b3a75fd9ec3282a1a0bf7c2bc1121aba8c369f513e9608",
+          "metadata": {
+            "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
+            "implementation_digest": "56e18c7803982706d823f2646ac3ab0214755de82344588d0cedac38f6aa74f6",
+            "manifest": {
+              "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
+              "evidence_required": [
+                "trace"
+              ],
+              "execution": "host-parse",
+              "id": "resource-usage",
+              "metrics": [
+                {
+                  "description": "Input tokens used in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "input_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Output tokens used in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "output_tokens",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Model spend in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "cost_usd",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Agent turns in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "turns",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "turns"
+                },
+                {
+                  "description": "Agent execution wall time in the step.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "agent_wall_s",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "seconds"
+                },
+                {
+                  "description": "Input plus output tokens over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_tokens",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "tokens"
+                },
+                {
+                  "description": "Model spend over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_cost_usd",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "usd"
+                },
+                {
+                  "description": "Agent turns over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_turns",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": "turns"
+                },
+                {
+                  "description": "Agent execution wall time over the trajectory.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "total_agent_wall_s",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "real",
+                  "unit": "seconds"
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        }
+      }
+    },
+    "spec": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical@2",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@1",
+        "code-quality@1",
+        "resource-usage@1",
+        "process-compliance@2"
+      ]
+    },
+    "tools": {
+      "networkx": "3.6.1",
+      "radon": "6.0.1",
+      "ruff": "0.8.6",
+      "scb-check": "0.1.3",
+      "tree-sitter": "0.25.2",
+      "tree-sitter-language-pack": "0.13.0"
+    }
+  },
+  "document_sha256": "67b90704274f77e6f027302df5f702fbae19ce990b17a5a779f9f508804f6144",
+  "execution": {
+    "arms": {
+      "baseline": {
+        "agent": "agent",
+        "condition": "baseline",
+        "digest": "31b80df56f756fd04ca0c4786f76a98b8217511c8962fef518c44d1a6bf95b1b"
+      }
+    },
+    "conditions": {
+      "baseline": []
+    },
+    "design": {
+      "agents": [
+        {
+          "id": "agent",
+          "model": "gpt-6-luna",
+          "name": "codex",
+          "provider": "openai",
+          "reasoning_effort": "low",
+          "version": "0.156.1"
+        }
+      ],
+      "arms": [
+        {
+          "agent": "agent",
+          "condition": "baseline",
+          "id": "baseline"
+        }
+      ],
+      "attempts": 1,
+      "conditions": [
+        {
+          "components": [],
+          "id": "baseline"
+        }
+      ],
+      "environment": {
+        "compose_init": true,
+        "type": "docker"
+      },
+      "factors": [],
+      "id": "python__forge__mechanics-v1",
+      "kind": "smoke",
+      "problems": [
+        {
+          "path": null,
+          "ref": "scb/forge@38d627ecf668"
+        }
+      ],
+      "protocol": {
+        "agent_timeout_sec": 1800,
+        "min_reward": null,
+        "progression": "continue",
+        "snapshot_source": "artifact",
+        "verifier_timeout_sec": 900
+      },
+      "runtime": "python",
+      "seed": 20261023
+    },
+    "files": {},
+    "problems": [
+      {
+        "checkpoints": 8,
+        "digest": "029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94",
+        "label": "scb/forge@38d627ecf668"
+      }
+    ],
+    "references": {
+      "component": {},
+      "problem": {
+        "scb/forge@38d627ecf668": {
+          "digest": "029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94",
+          "metadata": {
+            "bundle_sha256": "6ab17bb4ebf36d44b488de06a5143d9d15388f8dacf7ac8a4875eeddc941c04b",
+            "checkpoints": 8,
+            "entry_file": "forge.py",
+            "errata": {
+              "exclude_from_solved": [
+                "test_checkpoint_1.py::test_create_rejects_empty_name_string",
+                "test_checkpoint_1.py::test_create_rejects_empty_requirement_sets",
+                "test_checkpoint_3.py::test_bind_duplicate_assignment_guard",
+                "test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found",
+                "test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value",
+                "test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops",
+                "test_checkpoint_3.py::test_invalid_op_no_remove_side_effects",
+                "test_checkpoint_3.py::test_invalid_op_precedes_duplicate",
+                "test_checkpoint_6.py::test_create_invalid_firmware_image",
+                "test_checkpoint_6.py::test_create_unknown_unit_not_found",
+                "test_checkpoint_6.py::test_flash_bad_image[invalid-format]",
+                "test_checkpoint_6.py::test_flash_bad_image[unknown-image]",
+                "test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]",
+                "test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found",
+                "test_checkpoint_6.py::test_flash_requires_stored_image",
+                "test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently",
+                "test_checkpoint_6.py::test_get_flash_nonexistent_not_found",
+                "test_checkpoint_6.py::test_tag_create_requires_module",
+                "test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list",
+                "test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]",
+                "test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]",
+                "test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup",
+                "test_checkpoint_7.py::test_revision_preserves_compact_json",
+                "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]",
+                "test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]"
+              ],
+              "informational": [],
+              "sha256": "9a6dec369dea9c158ea93b6adbcb5db9a487078a7067dc75f967e5e1b3002d4e"
+            },
+            "mode": "multi_checkpoint",
+            "pack_image": "raidar/pack-python:2b91a52663e099f2",
+            "source": {
+              "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+              "dataset": "scb",
+              "problem": "forge",
+              "url": "https://github.com/gabeorlanski/scb-problems"
+            },
+            "steps": [
+              "checkpoint_1",
+              "checkpoint_2",
+              "checkpoint_3",
+              "checkpoint_4",
+              "checkpoint_5",
+              "checkpoint_6",
+              "checkpoint_7",
+              "checkpoint_8"
+            ],
+            "task_sha256": "596ae5b6af7e45c4b9a05dc8c495452042a21b9f7b23d6919516074ae5ada49f",
+            "validation": {
+              "not_run": [],
+              "verdict": "validated"
+            }
+          }
+        }
+      }
+    },
+    "tools": {},
+    "versions": {
+      "agents": {
+        "agent": {
+          "name": "codex",
+          "version": "0.156.1"
+        }
+      },
+      "harbor": "0.23.0"
+    }
+  },
+  "experiment": {
+    "id": "python__forge__mechanics-v1",
+    "source": "experiment.yaml",
+    "source_sha256": "5e4eed0b1b9e28b316a68404a4df0934723c76b8550a70d6aa75ac173ccde6be",
+    "spec_sha256": "6b9aa598fce40199d66e6f452a3f7b341758b14677e96f0aeef71b635307f2e1"
+  },
+  "lock_sha256": "4cbbd8f7d738c1ffbcd8ad674a5ff435357a8135cfe078b016fa134d714c43c5",
+  "lock_version": 3,
+  "overrides": {
+    "flags": {},
+    "set": []
+  },
+  "sections": {
+    "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
+    "assessment": "b0f63ea126725255e085a0fa8c71f5ab00064e242450c06246b3cb7dd5f6266c",
+    "execution": "4cbbd8f7d738c1ffbcd8ad674a5ff435357a8135cfe078b016fa134d714c43c5",
+    "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
+  },
+  "spec": {
+    "agents": [
+      {
+        "id": "agent",
+        "model": "gpt-6-luna",
+        "name": "codex",
+        "provider": "openai",
+        "reasoning_effort": "low",
+        "version": "0.156.1"
+      }
+    ],
+    "analysis": {
+      "alpha": 0.05,
+      "attempts": 1,
+      "baseline_arm": "baseline",
+      "concurrency": 1,
+      "max_exclusion_fraction": 0.2,
+      "min_effects": {},
+      "min_pairs": 5,
+      "seed": 20261023
+    },
+    "arms": [
+      {
+        "agent": "agent",
+        "condition": "baseline",
+        "id": "baseline"
+      }
+    ],
+    "assessment": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical@2",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@1",
+        "code-quality@1",
+        "resource-usage@1",
+        "process-compliance@2"
+      ]
+    },
+    "conditions": [
+      {
+        "components": [],
+        "id": "baseline"
+      }
+    ],
+    "description": "Mechanics-v1 declaration smoke on forge (8 checkpoints); not citable.",
+    "environment": {
+      "compose_init": true,
+      "type": "docker"
+    },
+    "factors": [],
+    "id": "python__forge__mechanics-v1",
+    "kind": "smoke",
+    "problems": [
+      {
+        "path": null,
+        "ref": "scb/forge@38d627ecf668"
+      }
+    ],
+    "protocol": {
+      "agent_timeout_sec": 1800,
+      "min_reward": null,
+      "progression": "continue",
+      "snapshot_source": "artifact",
+      "verifier_timeout_sec": 900
+    },
+    "runtime": "python",
+    "schema_version": 2
+  },
+  "toolchain": {
+    "litellm": "1.102.1",
+    "python": "3.13.7",
+    "raidar": "0.14.0",
+    "raidar_spec": "0ccae92e58924fe66e1e46e5954d66d1fcac1ec67a6c6564ae4116ca1fd4bab7"
+  }
+}

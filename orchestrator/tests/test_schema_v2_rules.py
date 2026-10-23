@@ -23,6 +23,7 @@ from tests.experiment_spec_support import (
     EXPERIMENTS,
     GUARDRAILS_EXPERIMENT,
     GUIDED_R3_EXPERIMENT,
+    MECHANICS_SMOKE,
     LEGACY_V1,
     PILOT_EXPERIMENT,
     PILOT_ONESHOT,
@@ -71,6 +72,7 @@ def test_every_committed_experiment_is_schema_v2_in_its_kind_directory() -> None
             AGENTS_BENCHMARK,
             GUIDED_R3_EXPERIMENT,
             GUARDRAILS_EXPERIMENT,
+            MECHANICS_SMOKE,
         ]
     )
     for path in files:

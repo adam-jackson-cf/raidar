@@ -32,6 +32,7 @@ AGENTS_BENCHMARK = (
 )
 GUIDED_R3_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guided-r3" / "experiment.yaml"
 GUARDRAILS_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guardrails" / "experiment.yaml"
+MECHANICS_SMOKE = EXPERIMENTS / "smoke" / "python__forge__mechanics-v1" / "experiment.yaml"
 LEGACY_V1 = Path(__file__).resolve().parent / "fixtures" / "legacy_v1"
 
 BASE_EXPERIMENT: dict[str, Any] = {
