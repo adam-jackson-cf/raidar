@@ -111,7 +111,9 @@ def check_coverage(
 
 def grading_options(target_name: str | None, bundle_override: Path | None) -> RegradeOptions:
     """Options on the selected target's grader target (trusted with hidden tests, ensured)."""
-    selection = docker_selection(target_name, grader_purpose="hidden-test grading")
+    selection = docker_selection(
+        target_name, grader_purpose="hidden-test grading", bind_mounts=True
+    )
     return RegradeOptions(
         docker_context=selection.grader.docker_context, bundle_override=bundle_override
     )

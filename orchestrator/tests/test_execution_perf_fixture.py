@@ -35,7 +35,7 @@ from raidar.cli import main
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
 from raidar.problems.store import ROOT_ENV
-from raidar.targets.config import Target, TargetError
+from raidar.targets.config import Target, TargetError, require_bind_mounts
 from raidar.targets.health import ensure_target
 from tests.component_trial_support import docker_target
 from tests.execution_support import imported_pack_fixture, locked_experiment
@@ -59,6 +59,7 @@ def _require_target() -> Target:
     """
     try:
         target = docker_target()
+        require_bind_mounts(target, "the perf fixture")
         ensure_target(target)
     except TargetError as error:
         pytest.fail(str(error))

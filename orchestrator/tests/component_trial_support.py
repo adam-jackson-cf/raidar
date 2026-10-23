@@ -90,8 +90,12 @@ def docker_target_reachable() -> bool:
 
 
 def docker_target_ready() -> bool:
-    """A reachable current target that also holds the pack image."""
-    return docker_target_reachable() and pack_image_present(docker_target())
+    """A local, reachable current target that also holds the pack image (bind mounts)."""
+    return (
+        docker_target().supports_bind_mounts
+        and docker_target_reachable()
+        and pack_image_present(docker_target())
+    )
 
 
 def build_task(

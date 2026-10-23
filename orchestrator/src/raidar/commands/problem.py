@@ -246,6 +246,7 @@ def validate_command(
         target_name,
         trial_purpose="problem validation (hidden tests)",
         grader_purpose="problem validation (hidden tests)",
+        bind_mounts=True,
     )
     options = ValidateOptions(
         engine=engine,

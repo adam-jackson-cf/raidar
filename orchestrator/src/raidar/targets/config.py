@@ -108,6 +108,14 @@ class Target:
     data_check_expect: str | None
     transport: Transport | None
 
+    @property
+    def supports_bind_mounts(self) -> bool:
+        """Host bind mounts resolve on the daemon's host: true only for a local daemon.
+
+        Temporary guard until the copy-only path (mechanics-v1 steps 2-3) lands.
+        """
+        return self.transport is None
+
     def effective_concurrency(self, requested: int) -> int:
         return requested if self.max_concurrency is None else min(requested, self.max_concurrency)
 
@@ -265,6 +273,16 @@ def activate(target: Target) -> None:
     """Point this process's Docker CLI (and Harbor's Compose children) at ``target``."""
     os.environ["DOCKER_CONTEXT"] = target.docker_context
     os.environ.pop("DOCKER_HOST", None)
+
+
+def require_bind_mounts(target: Target, purpose: str) -> None:
+    """Refuse work that bind-mounts host paths on a remote daemon (they would resolve there)."""
+    if not target.supports_bind_mounts:
+        raise TargetError(
+            f"target {target.name!r} is a remote daemon; host bind mounts would resolve on the "
+            f"remote host, so it cannot be used for {purpose}. Remote targets need the "
+            "copy-only path (mechanics-v1 steps 2-3)"
+        )
 
 
 def require_trusted(target: Target, purpose: str) -> None:

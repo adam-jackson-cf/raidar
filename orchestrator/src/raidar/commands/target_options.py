@@ -15,6 +15,7 @@ from raidar.targets.config import (
     Selection,
     TargetError,
     activate,
+    require_bind_mounts,
     require_trusted,
     resolve_selection,
 )
@@ -39,6 +40,7 @@ def docker_selection(
     trial_purpose: str | None = None,
     grader_purpose: str | None = None,
     ensure: bool = True,
+    bind_mounts: bool = False,
 ) -> Selection:
     """Resolve the target (lazily, only commands that use Docker call this).
 
@@ -53,6 +55,11 @@ def docker_selection(
             require_trusted(selection.trial, trial_purpose)
         if grader_purpose:
             require_trusted(selection.grader, grader_purpose)
+        if bind_mounts:
+            if trial_purpose:
+                require_bind_mounts(selection.trial, trial_purpose)
+            if grader_purpose:
+                require_bind_mounts(selection.grader, grader_purpose)
         if ensure:
             ensure_target(selection.trial)
             if selection.grader is not selection.trial:
@@ -69,6 +76,7 @@ def job_target(target_name: str | None) -> JobTarget:
         target_name,
         trial_purpose="trials (agent credentials and hidden tests)",
         grader_purpose="hidden-test grading",
+        bind_mounts=True,
     )
     context = selection.trial.docker_context
 
