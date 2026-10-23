@@ -9,8 +9,8 @@ agent environment and reports a leak when:
   hidden file (content match, so an agent's own ``conftest.py`` or
   ``test_checkpoint_1.py`` is not a false positive).
 
-The scan walks the whole filesystem tree including bind mounts (``/logs/*``,
-``config.environment.mounts``); only ``/proc``, ``/sys`` and ``/dev`` are
+The scan walks the container's whole filesystem tree, including ``/logs/*``;
+only ``/proc``, ``/sys`` and ``/dev`` are
 pruned. Empty hidden files (e.g. ``__init__.py``) are not fingerprints.
 
 It runs twice per step (``raidar.verifier.guard``): before the agent starts,
@@ -58,7 +58,7 @@ def leak_scan_command(names: list[str]) -> str:
         f" || {{ echo {_UNAVAILABLE}; exit 0; }}; "
         f"if [ -d {TESTS_DIR} ]; then find {TESTS_DIR} -mindepth 1 -maxdepth 2 2>/dev/null"
         f" | head -n 20 | sed 's/^/{_TESTS_TAG}/'; fi; "
-        # No -xdev: bind mounts are where a leaked copy is most likely to sit.
+        # No -xdev: a leaked copy may sit on any filesystem in the container.
         f"find / \\( {pruned} \\) -prune -o -type f"
         f" \\( {name_expr} \\) -print0 2>/dev/null"
         " | xargs -0 -r sha256sum 2>/dev/null | sort -u; "

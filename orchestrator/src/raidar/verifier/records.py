@@ -1,10 +1,10 @@
 """Host-only verifier records for a trial.
 
-Records are written under ``<trial_dir>/raidar-oracle/steps/<step>/``, which is
-**not** mounted into the agent environment. Harbor bind-mounts
-``<trial_dir>/verifier`` at ``/logs/verifier`` inside the agent container, so
-nothing about verifier outcomes is written there: the agent (or a process it left
-running) must never see verifier results (F4). Harbor receives only the reward.
+Records are written under ``<trial_dir>/raidar-oracle/steps/<step>/`` on the
+host, which is never copied into the agent environment. Harbor downloads the
+container's ``/logs/verifier`` into ``<trial_dir>/verifier``, so nothing about
+verifier outcomes is written there: the agent (or a process it left running)
+must never see verifier results (F4). Harbor receives only the reward.
 """
 
 from __future__ import annotations

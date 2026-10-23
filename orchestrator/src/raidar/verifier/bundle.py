@@ -7,7 +7,7 @@ A bundle is a directory that never enters an agent environment::
 
 Step ``pytest_args`` keep the exact order of the source runner's pytest
 invocation, with two placeholders rendered per sandbox layout: ``{tests}``
-(the mounted corpus) and ``{app}`` (the mounted submission copy).
+(the copied-in corpus) and ``{app}`` (the copied-in submission).
 
 ``build_bundle_from_scb_harbor_task`` derives a bundle from a task produced by
 the SCB Harbor converter (``scb-problems/scripts/scb_to_harbor.py``), reusing
