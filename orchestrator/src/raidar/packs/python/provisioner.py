@@ -35,6 +35,9 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from raidar.packs.python.models import (
+    REASON_DRIFT,
+    REASON_FIRST_USE,
+    ProvisioningTiming,
     ToolExecution,
     ToolInstaller,
     ToolLock,
@@ -44,9 +47,6 @@ from raidar.packs.python.models import (
 
 MARKER_NAME = ".raidar-provisioned.json"
 TOOL_CACHE_ENV = "RAIDAR_TOOL_CACHE"
-PROVISIONING_PHASE = "tool_provisioning"
-REASON_FIRST_USE = "first_use"
-REASON_DRIFT = "environment_drift"
 
 # Imports the declared modules, then reports what the environment resolved to.
 _ENV_PROBE = """
@@ -86,28 +86,6 @@ class ToolProvisioningError(RuntimeError):
 
 class EvalSandboxToolError(ValueError):
     """An eval-sandbox tool was requested for host provisioning."""
-
-
-@dataclass(frozen=True)
-class ProvisioningTiming:
-    """First-use provisioning cost, kept out of arm efficiency metrics."""
-
-    tool: str
-    lock_hash: str
-    seconds: float
-    reason: str = REASON_FIRST_USE
-    phase: str = PROVISIONING_PHASE
-    excluded_from_arm_efficiency: bool = True
-
-    def as_record(self) -> dict[str, object]:
-        return {
-            "phase": self.phase,
-            "tool": self.tool,
-            "lock_hash": self.lock_hash,
-            "seconds": self.seconds,
-            "reason": self.reason,
-            "excluded_from_arm_efficiency": self.excluded_from_arm_efficiency,
-        }
 
 
 @dataclass(frozen=True)

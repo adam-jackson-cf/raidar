@@ -6,6 +6,7 @@ import hashlib
 import json
 import posixpath
 import re
+from dataclasses import dataclass
 from enum import StrEnum
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -169,6 +170,33 @@ class ToolLock(_Strict):
                 }
             )
         )
+
+
+PROVISIONING_PHASE = "tool_provisioning"
+REASON_FIRST_USE = "first_use"
+REASON_DRIFT = "environment_drift"
+
+
+@dataclass(frozen=True)
+class ProvisioningTiming:
+    """First-use provisioning cost, kept out of arm efficiency metrics."""
+
+    tool: str
+    lock_hash: str
+    seconds: float
+    reason: str = REASON_FIRST_USE
+    phase: str = PROVISIONING_PHASE
+    excluded_from_arm_efficiency: bool = True
+
+    def as_record(self) -> dict[str, object]:
+        return {
+            "phase": self.phase,
+            "tool": self.tool,
+            "lock_hash": self.lock_hash,
+            "seconds": self.seconds,
+            "reason": self.reason,
+            "excluded_from_arm_efficiency": self.excluded_from_arm_efficiency,
+        }
 
 
 def _canonical_hash(payload: object) -> str:

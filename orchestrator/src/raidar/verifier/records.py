@@ -17,9 +17,9 @@ from typing import Any, Literal
 from pydantic import Field
 
 from raidar.verifier.errata import ErrataOutcome, ErrataRef, errata_outcome
-from raidar.verifier.grader import RunOutcome, StepGrade
 from raidar.verifier.leak import LeakReport
 from raidar.verifier.models import CaseResult, ParityVerdict, VerifierGrade, VerifierModel
+from raidar.verifier.outcomes import RunOutcome, StepGrade
 from raidar.verifier.parity import fork_regression_run_evidence
 from raidar.verifier.submission_deps import SubmissionDependencies
 
@@ -119,6 +119,40 @@ def parse_errata(errata: Mapping[str, Any] | None) -> ErrataRef | None:
 def errata_for(grade: VerifierGrade, errata: ErrataRef | None) -> ErrataOutcome | None:
     """The record's errata section: the errata-applied verdict, when an errata is pinned."""
     return errata_outcome(grade, errata) if errata is not None else None
+
+
+def build_step_record(
+    result: StepGrade,
+    *,
+    bundle: BundleRef,
+    snapshot: SnapshotRef,
+    grader: GraderRef,
+    coverage_enabled: bool,
+    leaks: tuple[LeakReport, LeakReport | None],
+    rewards: dict[str, float],
+    timings: dict[str, float],
+    errata: ErrataRef | None,
+) -> StepRecord:
+    """The host-only record of one graded step (``leaks``: final, then pre-agent scan)."""
+    return StepRecord(
+        step=result.grade.step,
+        checkpoint=result.grade.checkpoint,
+        bundle=bundle,
+        snapshot=snapshot,
+        grader=grader,
+        grade=result.grade,
+        summary=result.grade.summary(),
+        timing_sensitive_cases=result.grading.timing_sensitive,
+        coverage=CoverageRef(
+            enabled=coverage_enabled, parity=result.parity, differences=result.parity_differences
+        ),
+        leak_check=leaks[0],
+        pre_agent_leak_check=leaks[1],
+        rewards=rewards,
+        timings=dict(timings),
+        errata=errata_for(result.grade, errata),
+        submission_dependencies=result.grading.dependencies,
+    )
 
 
 def write_step_evidence(record_dir: Path, result: StepGrade) -> None:

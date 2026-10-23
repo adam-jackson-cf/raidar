@@ -17,7 +17,8 @@ from pathlib import Path
 import yaml
 
 from raidar.packs import UnknownPackError, load_runtime_pack
-from raidar.packs.python import PackSpec, image_tag
+from raidar.packs.python.image import image_tag
+from raidar.packs.python.models import PackSpec
 from raidar.problems.content import content_digest, hidden_content_in_task
 from raidar.problems.models import (
     PackBinding,

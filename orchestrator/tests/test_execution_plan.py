@@ -12,7 +12,8 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.execution.plan import PlanError, PlanOptions, arm_order, build_plan
-from raidar.packs.python import HarnessPinError, load_pack_spec
+from raidar.packs.python.harness import HarnessPinError
+from raidar.packs.python.models import load_pack_spec
 from raidar.problems.store import ROOT_ENV
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import LockError

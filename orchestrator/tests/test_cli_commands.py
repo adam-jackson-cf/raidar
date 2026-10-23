@@ -21,7 +21,7 @@ from raidar.commands.repo_state import (
     generated_artifact_paths,
 )
 from raidar.commands.shared import ORCHESTRATOR_ROOT, REPO_ROOT
-from raidar.packs.python import load_pack_spec
+from raidar.packs.python.models import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
 

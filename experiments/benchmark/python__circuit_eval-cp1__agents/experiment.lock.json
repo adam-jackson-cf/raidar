@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@1": {
-          "digest": "de2e67bd3d4e10cd7fda39536a91035d92e9fa75311fe6bd0ca80964c4627523",
+          "digest": "31fa2f2e6cad064ec39df105bcfd9df5f96f837cd1c369b41db9587fccbe7286",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "357ddba8d0496fe374fac912c04a6fb146b3a4ebf28c9a2334569ed9ff862a25",
+            "implementation_digest": "69da6597236462d2f7da95f875afdc410ed69d23c89ec8c05e46183cecbc592d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -223,7 +223,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "29760f282824edca7e6998f319a82524f0f32df060159b974b029b324c2f9eaf",
+  "document_sha256": "b3d0996e6dee8e828c76406b5df7a294630fb7e187efc45d3bb2451951abc72a",
   "execution": {
     "arms": {
       "claude": {
@@ -369,7 +369,7 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "6be68c3511af4365c8e11039950508df13cd651f105efbfcadfa325d66e5d2e2",
+    "assessment": "fdf32deff09c2ee82b9ac47230608a30f9cad3f95655e69fcc23697556043e78",
     "execution": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },

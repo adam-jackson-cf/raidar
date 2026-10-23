@@ -50,7 +50,7 @@ from raidar.components.session_chain import (
 )
 from raidar.execution.agent_config import arm_agent_config, reported_harness_pin, with_host_auth
 from raidar.oracle.snapshot import SNAPSHOT_EXCLUDES
-from raidar.packs.python import load_pack_spec
+from raidar.packs.python.models import load_pack_spec
 from raidar.spec.schema import AgentEntry
 from tests.component_support import compile_uses, use
 

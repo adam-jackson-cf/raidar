@@ -12,15 +12,15 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
-import click
 import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.commands.execution import lock_runtime_pack
 from raidar.components.registry import ComponentResolver
-from raidar.packs import UnknownPackError, load_runtime_pack, pack_drift_issues
-from raidar.packs.python import PackSpec, image_tag
+from raidar.packs import UnknownPackError, load_runtime_pack
+from raidar.packs.drift import LockedPackError, lock_runtime_pack, pack_drift_issues
+from raidar.packs.python.image import image_tag
+from raidar.packs.python.models import PackSpec
 from raidar.problems.importer import _runtime_pack
 from raidar.problems.resolver import ProblemResolver
 from raidar.problems.store import ProblemStoreError
@@ -298,10 +298,10 @@ def test_rt6_plan_loads_the_pack_of_the_lock_runtime_and_refuses_drift(experimen
     references[FORGE]["metadata"]["pack_image"] = current
     assert lock_runtime_pack(lock).id == "python"
     references[FORGE]["metadata"]["pack_image"] = "raidar/pack-python:0123456789abcdef"
-    with pytest.raises(click.ClickException, match=r"\[RT6\] pack drift: scb/forge@abc123"):
+    with pytest.raises(LockedPackError, match=r"\[RT6\] pack drift: scb/forge@abc123"):
         lock_runtime_pack(lock)
     lock["spec"]["runtime"] = "rust"
-    with pytest.raises(click.ClickException, match=r"\[RT6\] no runtime pack for 'rust'"):
+    with pytest.raises(LockedPackError, match=r"\[RT6\] no runtime pack for 'rust'"):
         lock_runtime_pack(lock)
 
 

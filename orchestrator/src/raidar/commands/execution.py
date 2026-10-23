@@ -16,8 +16,7 @@ from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
 from raidar.execution.credentials import CredentialPreflightError, preflight_credentials
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.execution.run import JobContext, default_job_id, execute, load_problems
-from raidar.packs import PackDriftError, PackSpec, UnknownPackError
-from raidar.packs import lock_runtime_pack as locked_pack
+from raidar.packs.drift import LockedPackError, lock_runtime_pack
 from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
 from raidar.spec.lock import (
     LockError,
@@ -106,16 +105,6 @@ def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
     return dict(json.loads(render_lock(current)))
 
 
-def lock_runtime_pack(lock: dict[str, Any]) -> PackSpec:
-    """The pack of the lock's runtime (``RT6``: refused when missing or drifted)."""
-    try:
-        return locked_pack(lock)
-    except UnknownPackError as exc:
-        raise click.ClickException(f"[RT6] {exc}") from exc
-    except PackDriftError as exc:
-        raise click.ClickException(str(exc)) from exc
-
-
 def _build(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
     loaded = _load(
         options["experiment"],
@@ -140,7 +129,7 @@ def _build(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
                 concurrency=options["concurrency"],
             ),
         )
-    except (PlanError, ProblemStoreError, ValueError) as exc:
+    except (LockedPackError, PlanError, ProblemStoreError, ValueError) as exc:
         raise click.ClickException(str(exc)) from exc
     return plan, store
 

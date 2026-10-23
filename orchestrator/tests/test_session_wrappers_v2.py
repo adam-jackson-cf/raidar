@@ -53,7 +53,7 @@ from raidar.components.transient_retry import (
     retry_prompt,
 )
 from raidar.execution.agent_config import arm_agent_config, reported_harness_pin
-from raidar.packs.python import load_pack_spec
+from raidar.packs.python.models import load_pack_spec
 from raidar.spec.schema import AgentEntry
 from tests.component_support import compile_uses, use
 

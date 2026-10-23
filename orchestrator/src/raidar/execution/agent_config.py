@@ -23,7 +23,8 @@ from raidar.agents.config import Harness
 from raidar.codex_auth import resolve_codex_auth
 from raidar.components import HARBOR_AGENT_NAMES, CompiledCondition
 from raidar.components.session_chain import apply_session_wrappers, condition_session_wrappers
-from raidar.packs.python import PackSpec, harbor_agent_kwargs
+from raidar.packs.python.harness import harbor_agent_kwargs
+from raidar.packs.python.models import PackSpec
 from raidar.spec.canonical import digest_json
 from raidar.spec.schema import AgentEntry
 

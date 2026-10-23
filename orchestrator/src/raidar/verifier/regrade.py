@@ -26,8 +26,9 @@ from pathlib import Path
 
 from raidar.oracle.snapshot import tree_digest
 from raidar.verifier.bundle import VerifierBundle, load_bundle
-from raidar.verifier.grader import StepGrade, grade_step
+from raidar.verifier.grader import grade_step
 from raidar.verifier.grader_image import ensure_grader_image
+from raidar.verifier.outcomes import StepGrade
 from raidar.verifier.records import RECORD_FILE, VERIFIER_RECORD_DIR, StepRecord, load_step_record
 from raidar.verifier.sandbox import DockerSandbox, GradingSandbox
 

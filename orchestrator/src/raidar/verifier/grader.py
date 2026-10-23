@@ -19,14 +19,12 @@ import json
 import shutil
 import time
 from collections import defaultdict
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
 from raidar.oracle.snapshot import copy_snapshot, make_world_writable, tree_digest
 from raidar.verifier.bundle import VerifierBundle, VerifierStepSpec
 from raidar.verifier.models import (
-    CaseResult,
     CorpusEvidence,
     CoverageContext,
     EnvironmentEvidence,
@@ -45,6 +43,7 @@ from raidar.verifier.normalise import (
     no_graded_cases,
     timing_sensitive,
 )
+from raidar.verifier.outcomes import RunOutcome, StepGrade
 from raidar.verifier.parity import check_parity, ineligible, outcome_differences
 from raidar.verifier.sandbox import (
     LEDGER_NAME,
@@ -57,7 +56,6 @@ from raidar.verifier.sandbox import (
     sandbox_env,
 )
 from raidar.verifier.submission_deps import (
-    SubmissionDependencies,
     provisioned_pins,
     python_path_entries,
     resolve_dependencies,
@@ -66,27 +64,6 @@ from raidar.verifier.submission_deps import (
 DEFAULT_RUN_TIMEOUT_S = 900.0
 BUDGET_MARGIN_S = 60.0
 _LOG_TAIL = 2000
-
-
-@dataclass(frozen=True)
-class RunOutcome:
-    role: str
-    cases: tuple[CaseResult, ...]
-    infra_failure: InfraFailure | None
-    evidence: RunEvidence | None
-    timing_sensitive: tuple[str, ...]
-    seconds: float
-    dependencies: SubmissionDependencies | None = None
-
-
-@dataclass(frozen=True)
-class StepGrade:
-    grade: VerifierGrade
-    grading: RunOutcome
-    coverage: RunOutcome | None
-    parity: ParityVerdict | None
-    parity_differences: tuple[str, ...] = ()
-    timings: dict[str, float] = field(default_factory=dict)
 
 
 def _sha256_hex(value: str) -> str:

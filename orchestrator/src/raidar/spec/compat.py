@@ -19,7 +19,7 @@ every issue at once as field-level errors with a stable code:
   pack bakes no such agent).
 - ``RT6``: no runtime pack is registered for the runtime. ``plan``/``run`` also
   load the pack from the lock's runtime and refuse pack drift (a built image
-  other than the locked one; ``raidar.packs.lock_runtime_pack``), and
+  other than the locked one; ``raidar.packs.drift.lock_runtime_pack``), and
   ``assess`` checks ``AS1`` against the job's lock (``raidar.commands.assess``).
 
 The facts come from each resolved reference's ``binding`` and are never

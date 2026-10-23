@@ -49,7 +49,8 @@ from raidar.components.builtins.guardrails import PINNED_VERSION, install_script
 from raidar.components.gate_run import GATE_RECORD
 from raidar.components.integrity import condition_step_flags
 from raidar.components.provision import condition_provisions
-from raidar.packs.python import image_tag, load_pack_spec
+from raidar.packs.python.image import image_tag
+from raidar.packs.python.models import load_pack_spec
 from tests.component_support import compile_uses, use
 from tests.component_trial_support import (
     DOCKER_CONTEXT,

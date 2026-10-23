@@ -40,17 +40,15 @@ from raidar.oracle.snapshot import (
     tree_digest,
 )
 from raidar.verifier.bundle import VerifierBundle, load_bundle
-from raidar.verifier.grader import DEFAULT_RUN_TIMEOUT_S, StepGrade, grade_step
+from raidar.verifier.grader import DEFAULT_RUN_TIMEOUT_S, grade_step
 from raidar.verifier.grader_image import ensure_grader_image
 from raidar.verifier.leak import LeakReport, LeakScanError, scan_agent_environment
 from raidar.verifier.models import INFRA_REWARD_KEY
 from raidar.verifier.records import (
     BundleRef,
-    CoverageRef,
     GraderRef,
     SnapshotRef,
-    StepRecord,
-    errata_for,
+    build_step_record,
     load_pre_agent_leak,
     parse_errata,
     step_record_dir,
@@ -236,7 +234,21 @@ class RaidarVerifier(BaseVerifier):
             shutil.rmtree(work, ignore_errors=True)  # cleanup: counted as plumbing
         leaked = not leak.clean or (pre_agent is not None and not pre_agent.clean)
         rewards = step_rewards(result.grade.rewards(), leaked=leaked)
-        record = self._record(result, snapshot_ref, grader, (leak, pre_agent), rewards, timings)
+        record = build_step_record(
+            result,
+            bundle=BundleRef(
+                root=str(self.bundle.root),
+                digest=self.bundle.digest(),
+                problem=self.bundle.manifest.problem,
+            ),
+            snapshot=snapshot_ref,
+            grader=grader,
+            coverage_enabled=self.coverage,
+            leaks=(leak, pre_agent),
+            rewards=rewards,
+            timings=timings,
+            errata=self.errata,
+        )
         mark = time.perf_counter()
         write_step_record(record_dir, record)
         # result_write_s (evidence, logs, record.json) is a component of plumbing, as in
@@ -247,39 +259,6 @@ class RaidarVerifier(BaseVerifier):
         timings["verifier_plumbing_s"] = _plumbing(timings)
         write_step_record(record_dir, record.model_copy(update={"timings": dict(timings)}))
         return VerifierResult(rewards=rewards)
-
-    def _record(
-        self,
-        result: StepGrade,
-        snapshot: SnapshotRef,
-        grader: GraderRef,
-        leaks: tuple[LeakReport, LeakReport | None],
-        rewards: dict[str, float],
-        timings: dict[str, float],
-    ) -> StepRecord:
-        return StepRecord(
-            step=result.grade.step,
-            checkpoint=result.grade.checkpoint,
-            bundle=BundleRef(
-                root=str(self.bundle.root),
-                digest=self.bundle.digest(),
-                problem=self.bundle.manifest.problem,
-            ),
-            snapshot=snapshot,
-            grader=grader,
-            grade=result.grade,
-            summary=result.grade.summary(),
-            timing_sensitive_cases=result.grading.timing_sensitive,
-            coverage=CoverageRef(
-                enabled=self.coverage, parity=result.parity, differences=result.parity_differences
-            ),
-            leak_check=leaks[0],
-            pre_agent_leak_check=leaks[1],
-            rewards=rewards,
-            timings=dict(timings),
-            errata=errata_for(result.grade, self.errata),
-            submission_dependencies=result.grading.dependencies,
-        )
 
 
 def _keep_logs(runs: Path, record_dir: Path) -> None:

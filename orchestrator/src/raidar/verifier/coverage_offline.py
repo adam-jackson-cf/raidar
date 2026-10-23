@@ -47,13 +47,14 @@ from raidar.verifier.coverage_store import (
     coverage_path,
     read_offline_coverage,
 )
-from raidar.verifier.grader import RunOutcome, StepGrade, _parity, run_oracle
+from raidar.verifier.grader import _parity, run_oracle
 from raidar.verifier.models import (
     CaseResult,
     InfraFailure,
     ParityVerdict,
     RunEvidence,
 )
+from raidar.verifier.outcomes import RunOutcome, StepGrade
 from raidar.verifier.parity import ineligible
 from raidar.verifier.per_trial import per_trial
 from raidar.verifier.records import (

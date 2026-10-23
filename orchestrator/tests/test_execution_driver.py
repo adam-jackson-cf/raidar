@@ -31,7 +31,7 @@ from raidar.execution.materialise import MaterialiseError, materialise_task
 from raidar.execution.plan import PlanOptions, build_plan
 from raidar.execution.run import JobContext, execute, load_problems
 from raidar.execution.trial_config import harbor_trial_config
-from raidar.packs.python import load_pack_spec
+from raidar.packs.python.models import load_pack_spec
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.store import ROOT_ENV
 from raidar.spec.lock import lock_integrity_issues

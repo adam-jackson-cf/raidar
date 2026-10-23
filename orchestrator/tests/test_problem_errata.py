@@ -15,7 +15,7 @@ from raidar.execution.assessment import lock_errata, lock_rescore_config
 from raidar.execution.job_migration import JobMigrationError, migrate_job
 from raidar.execution.plan import PlanError, PlanOptions, build_plan
 from raidar.execution.trial_config import harbor_trial_config
-from raidar.packs.python import load_pack_spec
+from raidar.packs.python.models import load_pack_spec
 from raidar.problems.errata import (
     Disposition,
     ErrataError,

@@ -13,22 +13,22 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.packs.python import (
-    EvalSandboxToolError,
-    ToolExecution,
-    ToolLock,
-    ToolProvisioner,
-    ToolProvisioningError,
-    load_tool_lock,
-)
 from raidar.packs.python import provisioner as provisioner_module
-from raidar.packs.python.models import TOOL_LOCK_PATH
-from raidar.packs.python.provisioner import (
-    MARKER_NAME,
+from raidar.packs.python.models import (
     PROVISIONING_PHASE,
     REASON_DRIFT,
     REASON_FIRST_USE,
+    TOOL_LOCK_PATH,
+    ToolExecution,
+    ToolLock,
+    load_tool_lock,
+)
+from raidar.packs.python.provisioner import (
+    MARKER_NAME,
     TOOL_CACHE_ENV,
+    EvalSandboxToolError,
+    ToolProvisioner,
+    ToolProvisioningError,
     default_cache_root,
 )
 from raidar.verifier.grader_image import GRADER_TOOLS

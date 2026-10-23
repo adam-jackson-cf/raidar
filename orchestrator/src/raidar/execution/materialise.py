@@ -28,7 +28,7 @@ from harbor.models.task.config import TaskConfig
 from raidar.components import CompiledCondition, compile_arm
 from raidar.components.provision_v2 import AnyProvision, trial_provisions
 from raidar.execution.models import ProgressionRule
-from raidar.packs.python import image_present
+from raidar.packs.python.image import image_present
 from raidar.problems.content import content_digest
 from raidar.problems.harbor_engine import SOLVE_SH
 from raidar.spec.loader import LoadedExperiment

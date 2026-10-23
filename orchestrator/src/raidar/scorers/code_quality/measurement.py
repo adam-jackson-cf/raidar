@@ -11,16 +11,28 @@ fork. Nothing is written into the measured snapshot (Ruff's cache is off).
 
 from __future__ import annotations
 
+import importlib
 import json
 import os
 import subprocess
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from raidar.packs.python.models import load_tool_lock
-from raidar.packs.python.provisioner import ProvisioningTiming, ToolProvisioner
+from raidar.packs.python.models import ProvisioningTiming, load_tool_lock
+
+
+class _ProvisionedTool(Protocol):
+    @property
+    def python(self) -> Path: ...
+    @property
+    def first_use(self) -> ProvisioningTiming | None: ...
+
+
+class _Provisioner(Protocol):
+    def ensure(self, name: str) -> _ProvisionedTool: ...
+
 
 QUALITY_TOOL = "scb-python-quality"
 DEFAULT_DEADLINE_S = 300.0
@@ -115,7 +127,15 @@ class ToolEnvironment:
         return measured
 
 
-def provisioned_environment(provisioner: ToolProvisioner | None = None) -> ToolEnvironment:
-    """The ``scb-python-quality`` interpreter, provisioned on first use."""
-    tool = (provisioner or ToolProvisioner(load_tool_lock())).ensure(QUALITY_TOOL)
+def provisioned_environment(provisioner: _Provisioner | None = None) -> ToolEnvironment:
+    """The ``scb-python-quality`` interpreter, provisioned on first use.
+
+    The provisioner is loaded by name, deliberately outside the scorer's static
+    import closure: provisioning mechanics are not part of the scorer's
+    implementation digest.
+    """
+    if provisioner is None:
+        module = importlib.import_module("raidar.packs.python.provisioner")
+        provisioner = module.ToolProvisioner(load_tool_lock())
+    tool = provisioner.ensure(QUALITY_TOOL)
     return ToolEnvironment(python=tool.python, provisioning=tool.first_use)

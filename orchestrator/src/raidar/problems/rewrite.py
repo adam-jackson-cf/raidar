@@ -28,7 +28,8 @@ from harbor.models.task.config import ArtifactConfig, TaskConfig, VerifierEnviro
 from harbor.models.task.task import Task
 
 from raidar.oracle.snapshot import app_artifact_config
-from raidar.packs.python import PackSpec, bind_task_environment
+from raidar.packs.python.models import PackSpec
+from raidar.packs.python.task_environment import bind_task_environment
 from raidar.problems.models import ProblemId
 from raidar.verifier.bundle import (
     BundleManifest,

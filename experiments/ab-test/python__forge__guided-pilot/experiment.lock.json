@@ -41,10 +41,10 @@
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "411904325ac881d76447e7e94f0687fa8160c6778c8173f43b8e83b30717309a",
+          "digest": "e26b54641878765e8e27dd65f5901a40645e5a3ff9353b3ff2479be4469969b1",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "09fe7aaee12c76ac2650006abf85de85ade5abb752f29d2f43829a3a334acd87",
+            "implementation_digest": "ff7de03a454887cbace1ec83fd37f6ead9216bc5e9f3ae5a2e6d7cbe0a1235df",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -251,10 +251,10 @@
           }
         },
         "correctness@1": {
-          "digest": "de2e67bd3d4e10cd7fda39536a91035d92e9fa75311fe6bd0ca80964c4627523",
+          "digest": "31fa2f2e6cad064ec39df105bcfd9df5f96f837cd1c369b41db9587fccbe7286",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "357ddba8d0496fe374fac912c04a6fb146b3a4ebf28c9a2334569ed9ff862a25",
+            "implementation_digest": "69da6597236462d2f7da95f875afdc410ed69d23c89ec8c05e46183cecbc592d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -418,10 +418,10 @@
           }
         },
         "process-compliance@2": {
-          "digest": "f63e8ccfd45ea668f651c152bfb9572e2741a43f85bf6f14a0997ac1ddb9b645",
+          "digest": "e9477bdddccc76f77176745a28c5f26c9b842d3f69e62fde25c771d0a48e563c",
           "metadata": {
             "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "3db116afd4c9db6684b5e3084b2cb7502fbea3ab87380b3dac589418d898fb56",
+            "implementation_digest": "245d173e514e4e25eb3853cfa448192e43b3e9344f4c31cba84f96792dcf6b97",
             "manifest": {
               "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
               "evidence_required": [
@@ -478,10 +478,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "8d26a20690177b8d1ea3369c699e2cfff0f526fc212a524ffa0789407c9f71da",
+          "digest": "c88c54f17cade31835b3a75fd9ec3282a1a0bf7c2bc1121aba8c369f513e9608",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "bf8b7e08ce1f284c27af931f133900aea4098c5f30be4a990e453b26c0626145",
+            "implementation_digest": "56e18c7803982706d823f2646ac3ab0214755de82344588d0cedac38f6aa74f6",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -633,7 +633,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "79fd61be943dfdc45d16f06902a2197c5431bafa11c238d29e7999fd5fd56324",
+  "document_sha256": "4268669c2d3911e77c160a6c57128b146d345a0a0450e547cb6b1780647bf287",
   "execution": {
     "arms": {
       "baseline": {
@@ -1021,7 +1021,7 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "6890ce63cb9cd89e539e5a9751f57adabddd695a2359312fa351f35c862fa3aa",
+    "assessment": "b0f63ea126725255e085a0fa8c71f5ab00064e242450c06246b3cb7dd5f6266c",
     "execution": "15c1eb4e3a1b243ce47090737a04cc9dc06a14a40b6621ab59f220123e38b901",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },

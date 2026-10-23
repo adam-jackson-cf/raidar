@@ -26,7 +26,7 @@ from raidar.components import CompiledCondition, compile_arm
 from raidar.execution.agent_config import AgentOverride, agent_digest, arm_agent_config
 from raidar.execution.models import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.execution.progression import progression_rule
-from raidar.packs.python import PackSpec
+from raidar.packs.python.models import PackSpec
 from raidar.problems.models import ProblemId
 from raidar.problems.store import ProblemStore, ProblemStoreError
 from raidar.spec.canonical import digest_json

@@ -14,7 +14,8 @@ import yaml
 from harbor.models.task.task import Task
 
 from raidar.oracle.snapshot import APP_SOURCE
-from raidar.packs.python import image_tag, load_pack_spec
+from raidar.packs.python.image import image_tag
+from raidar.packs.python.models import load_pack_spec
 from raidar.problems.content import content_digest, hidden_content_in_task
 from raidar.problems.importer import ProblemDriftError, import_problem
 from raidar.problems.models import ProblemId, ProblemManifest, ProblemMode

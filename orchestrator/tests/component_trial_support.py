@@ -35,7 +35,9 @@ from raidar.components import CompiledCondition
 from raidar.components.provision_v2 import AnyProvision, install_trial_provisioning
 from raidar.execution.cleanup import cleanup_trial_projects
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.packs.python import bind_task_environment, image_tag, load_pack_spec
+from raidar.packs.python.image import image_tag
+from raidar.packs.python.models import load_pack_spec
+from raidar.packs.python.task_environment import bind_task_environment
 
 DOCKER_CONTEXT = "orbstack"
 PLANT_MARKER = "raidar-planted-sentinel"

@@ -51,10 +51,10 @@
       },
       "scorer": {
         "code-quality@3": {
-          "digest": "79bfa3e3ca543b12091e2270da8e24e86d5e20582310f23488dc7126690bd99d",
+          "digest": "eb8e9213a6a75adc371192a73f5949db910e259ef28591508d49d0e87a03ace2",
           "metadata": {
             "implementation": "raidar.scorers.code_quality_v3:code_quality_v3_scorer",
-            "implementation_digest": "a833f41bb0f87c641536b307aab50e6ffe7f8b4cc85361b6096fa1d6b8327b5b",
+            "implementation_digest": "539e596124d0c5cecb3cc10b3a1c951314237c64438b3596fd13a86b99969320",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots (code-quality@2); G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -273,10 +273,10 @@
           }
         },
         "correctness@1": {
-          "digest": "de2e67bd3d4e10cd7fda39536a91035d92e9fa75311fe6bd0ca80964c4627523",
+          "digest": "31fa2f2e6cad064ec39df105bcfd9df5f96f837cd1c369b41db9587fccbe7286",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "357ddba8d0496fe374fac912c04a6fb146b3a4ebf28c9a2334569ed9ff862a25",
+            "implementation_digest": "69da6597236462d2f7da95f875afdc410ed69d23c89ec8c05e46183cecbc592d",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -440,10 +440,10 @@
           }
         },
         "gate-effort@10": {
-          "digest": "a74701e6cfd8067a8bf52a839f18533ef1a9b06765e7a0aa0ffc152c5872f9e3",
+          "digest": "306375c47f62b8f4481e1ab6f4ee3fe434fb548e943293b5f7d75ca2a6f1b047",
           "metadata": {
             "implementation": "raidar.scorers.gate_effort_v10:gate_effort_v10_scorer",
-            "implementation_digest": "056d932cd9e19fb2b878682d0c18d5e3e5788c359b876e57ca9b3ceeac924dfc",
+            "implementation_digest": "b3c5cbbc884b4e324ef68b841153c5e629db548c8c1ecf089ec31869cab7abd1",
             "manifest": {
               "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@7: a failed tests check counted once, blocking counts that compare across gate modes with and without the mypy no-untyped-call cascade, failing tests and missed coverage apart, first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both), plus the cross-mode blocking counts without the cascade and with a refused suppression comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate. Plus a guardrail-gate@4 autofix step's effect: passes, errors, files and lines changed, block-tier findings fixed by family, first-pass clean and blocking counts after autofix (and before, comparable across an enforced and a shadow gate), and the fix sessions' cost and wall time split by the kind of refusal that started them (coverage minimum apart). Plus the autofix lines and block-tier findings that each step's own work added (new_autofix_*), which compare across an enforced and a shadow gate where the per-step autofix sums do not.",
               "evidence_required": [
@@ -3130,10 +3130,10 @@
           }
         },
         "process-compliance@6": {
-          "digest": "077525f32f9f77e5c7255ea4610a525a95c74a9c569661bab9f2ee20c643164c",
+          "digest": "6fa73bf60bb314a84ba8d364cbe73d914b2d7dcafc029ab02a592727e17817a9",
           "metadata": {
             "implementation": "raidar.scorers.process_checks_v6:process_compliance_v6_scorer",
-            "implementation_digest": "470f00e7a7d326a2d1c673d9300510b129d325922bab14032f5b09f45e699e4b",
+            "implementation_digest": "8482f12a3fd4d419eeb1cedf0043e3a4b835f95f6b2d7fcb2bc831fbdd931cc3",
             "manifest": {
               "description": "Deterministic trace checks of agent process (process-compliance@5: stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -3334,10 +3334,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "8d26a20690177b8d1ea3369c699e2cfff0f526fc212a524ffa0789407c9f71da",
+          "digest": "c88c54f17cade31835b3a75fd9ec3282a1a0bf7c2bc1121aba8c369f513e9608",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "bf8b7e08ce1f284c27af931f133900aea4098c5f30be4a990e453b26c0626145",
+            "implementation_digest": "56e18c7803982706d823f2646ac3ab0214755de82344588d0cedac38f6aa74f6",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -3496,7 +3496,7 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "5f8405fa0a796e89ec94383f279ecbdd013b5dbfa6f3d3ed923c769e1932802e",
+  "document_sha256": "4b021c7897efa44ee14edc30b5e45afff8dbeddf8ed3abf481718b6026d701c1",
   "execution": {
     "arms": {
       "r1-baseline": {
@@ -3901,7 +3901,7 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "1e1a58a95f88ce90450fc55dac8a7f2e30cb0228f16f889f98a9017a19b99ccf",
+    "assessment": "1cc9f3e39af15baf7257109fb1ec4bbfa64a23c1ac5ecbeaa7cf6d22f723e05f",
     "execution": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },

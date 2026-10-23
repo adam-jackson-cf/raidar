@@ -32,7 +32,8 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.packs.python import image_tag, load_pack_spec
+from raidar.packs.python.image import image_tag
+from raidar.packs.python.models import load_pack_spec
 from raidar.problems.store import ROOT_ENV
 from tests.component_trial_support import DOCKER_CONTEXT, orbstack_available
 from tests.execution_support import imported_pack_fixture, locked_experiment
