@@ -25,7 +25,6 @@ from raidar.problems.store import ImportedProblem
 from raidar.spec.lock import spec_source_digest
 from raidar.verifier.grader_image import grader_image_tag
 
-
 # Changes here never reach a trial, so they do not make the runner dirty (the
 # user keeps untracked notes under docs/).
 RUNNER_DIRTY_EXCLUDES = ("docs",)
