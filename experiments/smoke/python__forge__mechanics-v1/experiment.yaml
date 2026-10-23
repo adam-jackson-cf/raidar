@@ -2,6 +2,9 @@
 # problem x one vanilla codex arm x one attempt, through the copy-only path on the
 # configured Docker target, with run-health and liveness (observe) recorded.
 # It proves the multi-checkpoint path end to end on the v1 mechanics; kind smoke, not citable.
+# The pilot-v2 starter framing (prompt-wrapper@1, byte-identical copy) is required: without it
+# vanilla codex sees an empty /app, asks a question and writes nothing (pilot F1; observed again
+# in job mechanics-v1-01).
 # Run detached: make experiment-execute EXPERIMENT=experiments/smoke/python__forge__mechanics-v1/experiment.yaml JOB_ID=<id> DETACH=1
 schema_version: 2
 kind: smoke
@@ -26,6 +29,10 @@ protocol:
   agent_timeout_sec: 1800
   verifier_timeout_sec: 900
   snapshot_source: artifact
+
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
 
 conditions:
   - id: baseline

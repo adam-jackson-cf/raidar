@@ -207,6 +207,12 @@ def test_the_launch_record_names_the_commit_and_whether_the_tree_was_dirty(
     assert git_state(repo) == {"commit": head, "dirty": False, "error": None}
     (repo / "new.txt").write_text("x")
     assert git_state(repo) == {"commit": head, "dirty": True, "error": None}
+    (repo / "new.txt").unlink()
+    (repo / "docs").mkdir()
+    (repo / "docs" / "note.md").write_text("x")
+    assert git_state(repo, exclude=("docs",))["dirty"] is False
+    (repo / "code.py").write_text("x")
+    assert git_state(repo, exclude=("docs",))["dirty"] is True
 
 
 def test_a_launch_without_git_records_why_instead_of_failing(

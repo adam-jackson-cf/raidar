@@ -89,11 +89,12 @@ class Launched:
     log: Path
 
 
-def git_state(cwd: Path) -> dict[str, Any]:
+def git_state(cwd: Path, *, exclude: Sequence[str] = ()) -> dict[str, Any]:
     """The checkout's HEAD commit and whether its tree is dirty (provenance only).
 
-    Never fails a launch: outside a git checkout, or without git, the fields are null
-    and ``error`` says why.
+    ``exclude`` names repo-root paths whose changes (tracked or untracked) do not
+    count as dirty. Never fails a launch: outside a git checkout, or without git,
+    the fields are null and ``error`` says why.
     """
     git = shutil.which("git")
     if git is None:
@@ -102,8 +103,13 @@ def git_state(cwd: Path) -> dict[str, Any]:
         head = subprocess.run(  # noqa: S603 - fixed git arguments
             [git, "rev-parse", "HEAD"], cwd=cwd, capture_output=True, text=True, check=True
         )
+        pathspec = [":(top)", *(f":(top,exclude){path}" for path in exclude)]
         status = subprocess.run(  # noqa: S603 - fixed git arguments
-            [git, "status", "--porcelain"], cwd=cwd, capture_output=True, text=True, check=True
+            [git, "status", "--porcelain", "--", *pathspec],
+            cwd=cwd,
+            capture_output=True,
+            text=True,
+            check=True,
         )
     except (OSError, subprocess.CalledProcessError) as exc:
         return {"commit": None, "dirty": None, "error": f"{type(exc).__name__}: {exc}"}

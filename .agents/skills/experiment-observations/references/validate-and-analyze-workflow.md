@@ -34,9 +34,9 @@
 8. Build the per-case failure matrix and the mechanism classes described in
    `fault-catalog`'s evidence map, per arm and checkpoint. Keep it as candidate
    evidence; do not name a fault before Step 2. When present, read
-   `<job>/health.json` (run-health checks: pass, violation or unmeasured; also
-   each trial's own `health.json` if it has one) and the job's
-   `<job>/fault-candidates.jsonl` (provisional
+   each trial's `<job>/trials/<trial>/health.json` (run-health checks: pass,
+   violation or unmeasured; `make health JOB=<job>` recomputes them) and the
+   job's `<job>/fault-candidates.jsonl` (provisional
    candidate fault occurrences). Candidates are leads to confirm or reject
    against the artifacts, never findings; a `violation` or `unmeasured` health
    check is reported as such.

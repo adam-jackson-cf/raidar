@@ -633,17 +633,26 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "67b90704274f77e6f027302df5f702fbae19ce990b17a5a779f9f508804f6144",
+  "document_sha256": "aa3d8b52d97b48f84b9030ae50ac58f51c96b995beea8a1efa0aa0c780185d72",
   "execution": {
     "arms": {
       "baseline": {
         "agent": "agent",
         "condition": "baseline",
-        "digest": "31b80df56f756fd04ca0c4786f76a98b8217511c8962fef518c44d1a6bf95b1b"
+        "digest": "3811d7966e6527cb258f5f25bd59fe34eb97ec2428e8c3a946b05eacd6d435bf"
       }
     },
     "conditions": {
-      "baseline": []
+      "baseline": [
+        {
+          "files": {
+            "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
+          },
+          "use": "prompt-wrapper@1",
+          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "with": {}
+        }
+      ]
     },
     "design": {
       "agents": [
@@ -691,9 +700,23 @@
         "verifier_timeout_sec": 900
       },
       "runtime": "python",
-      "seed": 20261023
+      "seed": 20261023,
+      "shared_components": [
+        {
+          "files": [
+            "components/shared/starter-framing.md"
+          ],
+          "use": "prompt-wrapper@1",
+          "with": {}
+        }
+      ]
     },
-    "files": {},
+    "files": {
+      "components/shared/starter-framing.md": {
+        "sha256": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c",
+        "size": 221
+      }
+    },
     "problems": [
       {
         "checkpoints": 8,
@@ -702,7 +725,23 @@
       }
     ],
     "references": {
-      "component": {},
+      "component": {
+        "prompt-wrapper@1": {
+          "digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "metadata": {
+            "discovery_probe": "prompt-wrapper-rendered",
+            "kind": "prompt",
+            "network": {
+              "egress_hosts": []
+            },
+            "secrets": [],
+            "supports": [
+              "codex",
+              "claude-code"
+            ]
+          }
+        }
+      },
       "problem": {
         "scb/forge@38d627ecf668": {
           "digest": "029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94",
@@ -782,10 +821,10 @@
   "experiment": {
     "id": "python__forge__mechanics-v1",
     "source": "experiment.yaml",
-    "source_sha256": "5e4eed0b1b9e28b316a68404a4df0934723c76b8550a70d6aa75ac173ccde6be",
-    "spec_sha256": "6b9aa598fce40199d66e6f452a3f7b341758b14677e96f0aeef71b635307f2e1"
+    "source_sha256": "5be7db544db26b2313b8c34d35248d38511cc0fe82f384ae628cbbc3f78a09c8",
+    "spec_sha256": "9e649694681626dfdc73660dfcaca488bdae5e9c69c28576f30ab495af50d8aa"
   },
-  "lock_sha256": "4cbbd8f7d738c1ffbcd8ad674a5ff435357a8135cfe078b016fa134d714c43c5",
+  "lock_sha256": "ed459b411177b463d46233f86aba9a3bab01c3b039a53a3345315d98a711d82d",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -794,7 +833,7 @@
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
     "assessment": "b0f63ea126725255e085a0fa8c71f5ab00064e242450c06246b3cb7dd5f6266c",
-    "execution": "4cbbd8f7d738c1ffbcd8ad674a5ff435357a8135cfe078b016fa134d714c43c5",
+    "execution": "ed459b411177b463d46233f86aba9a3bab01c3b039a53a3345315d98a711d82d",
     "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
   },
   "spec": {
@@ -867,7 +906,16 @@
       "verifier_timeout_sec": 900
     },
     "runtime": "python",
-    "schema_version": 2
+    "schema_version": 2,
+    "shared_components": [
+      {
+        "files": [
+          "components/shared/starter-framing.md"
+        ],
+        "use": "prompt-wrapper@1",
+        "with": {}
+      }
+    ]
   },
   "toolchain": {
     "litellm": "1.102.1",

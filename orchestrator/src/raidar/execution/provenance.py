@@ -26,9 +26,14 @@ from raidar.spec.lock import spec_source_digest
 from raidar.verifier.grader_image import grader_image_tag
 
 
+# Changes here never reach a trial, so they do not make the runner dirty (the
+# user keeps untracked notes under docs/).
+RUNNER_DIRTY_EXCLUDES = ("docs",)
+
+
 def runner_provenance() -> dict[str, Any]:
     """The running Raidar code: git commit, dirty flag and the lock's toolchain digest."""
-    state = git_state(Path(__file__).resolve().parents[1])
+    state = git_state(Path(__file__).resolve().parents[1], exclude=RUNNER_DIRTY_EXCLUDES)
     return {
         "commit": state["commit"],
         "dirty": state["dirty"],
