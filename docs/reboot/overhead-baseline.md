@@ -138,20 +138,20 @@ A check fails when the p95 over ≥10 samples exceeds the budget. Budgets apply 
 3. Adopt finding 2 (artifact-source snapshots), which sets the 0.5 s snapshot budget.
 4. Accept that cold is record-only plus a tripwire until WS-I I1.
 
-### 5.1 Budgets per execution target (ADR-002 §2.5; user decision 2026-10-23)
+### 5.1 Budgets per execution target (ADR-002 §2.5; user decisions 2026-10-23 and 2026-10-24)
 
 The §5 budgets were measured on the work Mac's OrbStack. They stay the **N1 reference** and are not re-baselined.
 
 **Policy.**
 - A Docker target (`~/.config/raidar/targets.toml`) is gated strictly only against budgets the user has accepted for it.
-- Until a target has its own accepted set, `make perf-gate` on that target checks strictly against the N1 reference, which is today's code path unchanged. The target's proposed set is recorded here for review only; no code reads it.
+- A target with its own accepted set below is judged against it automatically: `raidar perf check` reads the target name recorded in each job's `job.json` (`execution_target.name`). A job with no recorded target, or a target with no accepted set, is checked against the N1 reference. Jobs checked together must share a target or the check refuses. The report names the set used (`budgets: mbp (accepted 2026-10-24)` or `budgets: N1 reference`).
 - Timing and cost are never pooled across targets.
 
-**Proposed: `mbp`** (`adams-macbook-pro`, M1 Max, OrbStack, shared with other projects). **Status: report-only, not accepted.**
+**Accepted: `mbp`** (`adams-macbook-pro`, M1 Max, OrbStack, shared with other projects). **Status: accepted (user decision 2026-10-24).** Code: `TARGET_BUDGETS["mbp"]` in `execution/budgets.py`.
 - **Source:** the step 0 spike's copy-path arms (`evidence/mechanics-v1-spike.md`). Arm B drives Docker on mbp itself; arm C drives it from the work Mac over the forwarded socket. Each arm ran at concurrency 1 and 3, 10 trials × 2 steps.
 - **Rule:** as §5. Take the worst p95 over B and C at concurrency 1 and 3, multiply by 1.5, and round up to 0.5 s, with at least 0.5 s.
 
-| Phase | N1 reference | Worst p95 (B, C) | Proposed `mbp` |
+| Phase | N1 reference | Worst p95 (B, C) | Accepted `mbp` |
 |---|---|---|---|
 | Environment start, warm | 20 s | 3.26 | 5 s |
 | Grader image, warm | 1 s | 0.40 | 1 s |
@@ -166,12 +166,18 @@ The §5 budgets were measured on the work Mac's OrbStack. They stay the **N1 ref
 | Aggregate per-step overhead | 10 s | 4.08 | 6.5 s |
 | Aggregate per-trial fixed overhead (init) | 27 s | 4.04 | 6.5 s |
 
+Budgets with no mbp-specific value keep the N1 reference value on mbp: cold environment start (420 s tripwire), cold grader image (180 s tripwire), snapshot transfer (download) 2 s, teardown + result write (no-init) 15 s and per-trial fixed overhead (no-init) 38 s.
+
+**Confirming evidence (2026-10-24, after the spike, with liveness observing and T1 hashing on every trial).**
+- `make perf-gate TARGET=mbp`, p95 at concurrency 1 / 3: per-step overhead 2.85 / 2.99 s, per-trial fixed overhead 2.61 / 2.83 s, per-step reset 1.01 / 1.04 s, artifact collection 1.04 / 1.11 s. All sit inside the set (full numbers in `.tmp/perf-gate-v1.log`).
+- Real forge smoke `jobs/python__forge__mechanics-v1/mechanics-v1-02`, `make perf-check` (n < 10, so reported `insufficient`): environment start 1.84 s, per-step reset 0.92 s, artifact collection 1.22 s, per-step overhead 2.96 s, per-trial fixed overhead 2.60 s.
+
 **Caveats.**
-- The proposal exceeds N1 for per-step reset (2.5 against 2.0 s). Driving Docker over the forwarded socket costs about 1 s per step.
-- Every other proposed budget is tighter than N1, because mbp's environment start is far faster.
+- The set exceeds N1 for per-step reset (2.5 against 2.0 s). Driving Docker over the forwarded socket costs about 1 s per step.
+- Every other budget is tighter than N1, because mbp's environment start is far faster.
 - The fixture's `/app` is small; the §6 size-term gap still applies.
-- The samples are n = 10 (trial phases) and n = 20 (step phases) per cell.
-- Accepting this set is a user decision. When it is accepted, record it here with the date.
+- The spike samples are n = 10 (trial phases) and n = 20 (step phases) per cell; the real-job samples are n < 10.
+- As in §5, the set is not re-baselined to make a run pass.
 
 ## 6. Gaps to close before `raidar perf check` gates on these (plan D4)
 

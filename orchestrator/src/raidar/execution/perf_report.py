@@ -53,6 +53,7 @@ class PerfReport:
     checks: list[PhaseCheck]
     contention: Contention
     splits: dict[int, list[SplitCheck]]  # index into ``checks``
+    budgets: str = "N1 reference"  # which accepted budget set judged the checks
 
     @property
     def breaches(self) -> list[PhaseCheck]:
@@ -94,7 +95,13 @@ def _split(
 
 def build_report(job_dirs: Sequence[Path], loaded: JobSamples, *, min_samples: int) -> PerfReport:
     """Checks, contention and per-contention splits of each breached p95 budget."""
-    checks = check_budgets(loaded.samples, min_samples=min_samples, multi_step=loaded.multi_step)
+    budget_set = loaded.budget_set
+    checks = check_budgets(
+        loaded.samples,
+        budgets=budget_set.budgets,
+        min_samples=min_samples,
+        multi_step=loaded.multi_step,
+    )
     try:
         windows, untimed = _windows(loaded)
         contention = measure_contention(job_dirs, windows, untimed)
@@ -105,4 +112,4 @@ def build_report(job_dirs: Sequence[Path], loaded: JobSamples, *, min_samples: i
         for index, check in enumerate(checks)
         if check.verdict is Verdict.FAIL and not check.budget.tripwire
     }
-    return PerfReport(checks, contention, splits)
+    return PerfReport(checks, contention, splits, budget_set.label)

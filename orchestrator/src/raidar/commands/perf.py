@@ -73,6 +73,7 @@ def _warning_lines(report: PerfReport) -> list[str]:
 def _echo_text(report: PerfReport, trials: int, min_samples: int, strict: bool) -> None:
     mode = "strict" if strict else "report-only"
     click.echo(f"N1 budget check ({mode}) over {trials} trials (min samples {min_samples})")
+    click.echo(f"budgets: {report.budgets}")
     for check in report.checks:
         click.echo(_check_line(check))
     for phase, reason in NOT_RECORDED_BY_RUNS.items():
@@ -91,6 +92,7 @@ def _payload(report: PerfReport, trials: int, min_samples: int, strict: bool) ->
     return {
         "passed": report.passed,
         "strict": strict,
+        "budgets": report.budgets,
         "trials": trials,
         "min_samples": min_samples,
         "checks": [check.to_json() for check in report.checks],

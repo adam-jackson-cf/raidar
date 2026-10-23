@@ -10,7 +10,8 @@ from click.testing import CliRunner
 
 from raidar.cli import main
 from raidar.execution.budgets import (
-    ACCEPTED_BUDGETS,
+    N1_REFERENCE_BUDGETS,
+    TARGET_BUDGETS,
     Budget,
     Verdict,
     check_budgets,
@@ -89,7 +90,7 @@ def test_conditions_select_budgets_and_cold_is_a_tripwire() -> None:
     )
     checks = {
         (c.budget.phase, c.budget.condition): c
-        for c in check_budgets(samples, budgets=ACCEPTED_BUDGETS)
+        for c in check_budgets(samples, budgets=N1_REFERENCE_BUDGETS)
     }
     assert checks[("snapshot_transfer", "download")].verdict is Verdict.PASS
     assert ("snapshot_transfer", "artifact") not in checks
@@ -179,3 +180,51 @@ def test_perf_check_command_passes_and_fails_on_recorded_runs(tmp_path: Path) ->
     empty = tmp_path / "empty"
     empty.mkdir()
     assert runner.invoke(main, ["perf", "check", str(empty)]).exit_code != 0
+
+
+def _recorded(job: Path, target: str | None) -> Path:
+    manifest = {} if target is None else {"execution_target": {"name": target}}
+    (job / "job.json").write_text(json.dumps(manifest))
+    return job
+
+
+def _check(*jobs: Path) -> tuple[int, str]:
+    result = CliRunner().invoke(main, ["perf", "check", "--strict", "--json", *map(str, jobs)])
+    return result.exit_code, result.output
+
+
+def test_budgets_follow_the_target_the_job_recorded(tmp_path: Path) -> None:
+    # The synthetic /app collection takes 3.0 s: inside N1's 3.5 s, over mbp's 2.5 s.
+    mbp = _recorded(_job_dir(tmp_path / "mbp", 10), "mbp")
+    exit_code, output = _check(mbp)
+    payload = json.loads(output)
+    verdicts = {(c["phase"], c["condition"]): c["verdict"] for c in payload["checks"]}
+    assert (exit_code, payload["budgets"]) == (1, "mbp (accepted 2026-10-24)")
+    assert verdicts[("artifact_collection", None)] == "fail"
+    for target in (None, "no-such-target"):  # unrecorded or unaccepted: the N1 reference
+        job = _recorded(_job_dir(tmp_path / f"n1-{target}", 10), target)
+        exit_code, output = _check(job)
+        assert (exit_code, json.loads(output)["budgets"]) == (0, "N1 reference"), output
+    assert "budgets: mbp (accepted" in CliRunner().invoke(main, ["perf", "check", str(mbp)]).output
+
+
+def test_mbp_set_changes_only_the_phases_it_accepts() -> None:
+    reference = {(b.phase, b.condition): b for b in N1_REFERENCE_BUDGETS}
+    mbp = {(b.phase, b.condition): b for b in TARGET_BUDGETS["mbp"].budgets}
+    assert mbp.keys() == reference.keys()
+    assert mbp[("per_step_overhead", None)].seconds == 6.5
+    assert mbp[("per_trial_fixed_overhead", "init")].seconds == 6.5
+    assert mbp[("per_step_reset", None)].seconds == 2.5
+    for key in (("per_trial_fixed_overhead", "no-init"), ("environment_start", "cold")):
+        assert mbp[key] == reference[key]
+
+
+def test_jobs_from_different_targets_are_not_checked_together(tmp_path: Path) -> None:
+    mbp = _recorded(_job_dir(tmp_path / "mbp", 10), "mbp")
+    other = _recorded(_job_dir(tmp_path / "other", 10), "laptop")
+    unrecorded = _recorded(_job_dir(tmp_path / "old", 10), None)
+    for pair in ((mbp, other), (mbp, unrecorded)):
+        exit_code, output = _check(*pair)
+        assert exit_code != 0
+        assert "different execution targets" in output
+    assert _check(mbp, _recorded(_job_dir(tmp_path / "mbp2", 10), "mbp"))[0] == 1

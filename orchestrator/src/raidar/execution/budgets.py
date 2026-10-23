@@ -1,9 +1,12 @@
-"""N1 overhead budgets and ``raidar perf check`` (plan D4; requirements N1).
+"""Per-target N1 overhead budgets and ``raidar perf check`` (plan D4; requirements N1).
 
-Budgets are the ACCEPTED table in docs/reboot/overhead-baseline.md §5
-(user, 2026-09-29), keyed by the Phase 0 phase names and, where the table
-splits a budget, by condition. The rule: a budgeted phase fails when the p95
-over at least ``min_samples`` (10) samples exceeds its budget. Cold
+Budgets are the accepted tables in docs/reboot/overhead-baseline.md §5 (N1 reference, user,
+2026-09-29) and §5.1 (per execution target; ``mbp`` accepted 2026-10-24), keyed by the Phase 0
+phase names and, where a table splits a budget, by condition. A job is judged against the set
+of the target its ``job.json`` recorded; a job with no recorded target, or a target with no
+accepted set, uses the N1 reference, and jobs checked together must share a target. The rule:
+a budgeted phase fails when the p95 over at least ``min_samples`` (10) samples exceeds its
+budget. Cold
 environment starts and cold grader-image builds are record-only with a
 tripwire: any single cold sample above it fails. Percentiles interpolate
 linearly between order statistics, as in the baseline.
@@ -16,10 +19,11 @@ which passes, rather than ``missing``.
 
 from __future__ import annotations
 
+import json
 import math
 from collections import defaultdict
 from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from pathlib import Path
 
@@ -42,7 +46,7 @@ class Budget:
 
 
 # docs/reboot/overhead-baseline.md §5 (accepted). ``condition`` None matches any.
-ACCEPTED_BUDGETS: tuple[Budget, ...] = (
+N1_REFERENCE_BUDGETS: tuple[Budget, ...] = (
     Budget("environment_start", 20.0, "warm"),
     Budget("environment_start", 420.0, "cold", tripwire=True, note="record-only; tripwire"),
     Budget("grader_image", 1.0, "warm", note="presence check"),
@@ -65,6 +69,50 @@ ACCEPTED_BUDGETS: tuple[Budget, ...] = (
     Budget("per_trial_fixed_overhead", 27.0, "init"),
     Budget("per_trial_fixed_overhead", 38.0, "no-init"),
 )
+
+# overhead-baseline.md §5.1, accepted by the user 2026-10-24. Only the phases listed here
+# differ from the N1 reference; every other budget (cold tripwires, download snapshots,
+# no-init teardown and per-trial fixed) keeps its N1 value on that target.
+_MBP_OVERRIDES: dict[tuple[str, str | None], float] = {
+    ("environment_start", "warm"): 5.0,
+    ("grader_image", "warm"): 1.0,
+    ("component_apply", None): 0.5,
+    ("per_step_reset", None): 2.5,
+    ("artifact_collection", None): 2.5,
+    ("snapshot_transfer", "artifact"): 0.5,
+    ("verifier_plumbing", None): 0.5,
+    ("step_archive_gap", None): 2.0,
+    ("teardown_result_write", "init"): 2.5,
+    ("raidar_result_write", None): 0.5,
+    ("per_step_overhead", None): 6.5,
+    ("per_trial_fixed_overhead", "init"): 6.5,
+}
+
+
+@dataclass(frozen=True)
+class BudgetSet:
+    label: str
+    budgets: tuple[Budget, ...]
+
+
+N1_REFERENCE = BudgetSet("N1 reference", N1_REFERENCE_BUDGETS)
+# Accepted per-target sets, keyed by the target name recorded in job.json.
+TARGET_BUDGETS: dict[str, BudgetSet] = {
+    "mbp": BudgetSet(
+        "mbp (accepted 2026-10-24)",
+        tuple(
+            replace(b, seconds=_MBP_OVERRIDES.get((b.phase, b.condition), b.seconds))
+            for b in N1_REFERENCE_BUDGETS
+        ),
+    ),
+}
+
+
+def budget_set_for(target: str | None) -> BudgetSet:
+    """The target's accepted set; the N1 reference for an unrecorded or unaccepted target."""
+    return TARGET_BUDGETS.get(target, N1_REFERENCE) if target else N1_REFERENCE
+
+
 # Budgeted in N1 but not produced by an execution run.
 NOT_RECORDED_BY_RUNS = {
     "scorer_orchestration": "scorers run in `raidar assess`, not in `raidar run` (6 s/scorer)",
@@ -139,7 +187,7 @@ def _budget_values(
 def check_budgets(
     samples: Iterable[PhaseSample],
     *,
-    budgets: Sequence[Budget] = ACCEPTED_BUDGETS,
+    budgets: Sequence[Budget] = N1_REFERENCE_BUDGETS,
     min_samples: int = MIN_SAMPLES,
     multi_step: bool = True,
 ) -> list[PhaseCheck]:
@@ -197,6 +245,36 @@ class JobSamples:
     trial_count: int
     multi_step: bool  # some trial ran two or more checkpoints
     trials: tuple[TrialSamples, ...] = ()
+    target: str | None = None  # the jobs' shared recorded execution target name
+
+    @property
+    def budget_set(self) -> BudgetSet:
+        return budget_set_for(self.target)
+
+
+def _recorded_target(job_dir: Path) -> str | None:
+    """The execution target name ``job.json`` recorded, or None when it recorded none."""
+    path = job_dir / "job.json"
+    if not path.is_file():
+        return None
+    try:
+        manifest = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        raise PerfInputError(f"{path}: not a readable job manifest ({error})") from error
+    target = manifest.get("execution_target") if isinstance(manifest, dict) else None
+    name = target.get("name") if isinstance(target, dict) else None
+    return name if isinstance(name, str) and name else None
+
+
+def _shared_target(job_dirs: Sequence[Path]) -> str | None:
+    targets = {job_dir: _recorded_target(job_dir) for job_dir in job_dirs}
+    if len(set(targets.values())) > 1:
+        detail = ", ".join(f"{path}: {name or 'no target'}" for path, name in targets.items())
+        raise PerfInputError(
+            f"jobs ran on different execution targets ({detail}); budgets are per target, "
+            "check each target's jobs separately"
+        )
+    return next(iter(targets.values()))
 
 
 def _read_record(path: Path) -> TrialRecord:
@@ -207,7 +285,7 @@ def _read_record(path: Path) -> TrialRecord:
 
 
 def load_job_samples(job_dirs: Sequence[Path]) -> JobSamples:
-    """Every phase sample recorded under the jobs' trial records."""
+    """Every phase sample recorded under the jobs' trial records, with their shared target."""
     samples: list[PhaseSample] = []
     trials: list[TrialSamples] = []
     multi_step = False
@@ -223,7 +301,7 @@ def load_job_samples(job_dirs: Sequence[Path]) -> JobSamples:
                 )
             )
             multi_step = multi_step or len(record.trial.steps) >= 2
-    return JobSamples(samples, len(trials), multi_step, tuple(trials))
+    return JobSamples(samples, len(trials), multi_step, tuple(trials), _shared_target(job_dirs))
 
 
 def checks_pass(checks: Sequence[PhaseCheck]) -> bool:
