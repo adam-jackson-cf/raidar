@@ -299,7 +299,7 @@ def build_fake_scb_repo(root: Path) -> tuple[Path, str]:
     repo = root / "scb-problems"
     (repo / "adder").mkdir(parents=True)
     (repo / "adder" / "config.yaml").write_text(
-        "entry_file: adder\ncheckpoints:\n  checkpoint_1: {}\n  checkpoint_2: {}\n"
+        "entry_file: app\ncheckpoints:\n  checkpoint_1: {}\n  checkpoint_2: {}\n"
     )
     lib = repo / "scripts" / "scb_to_harbor_lib"
     lib.mkdir(parents=True)

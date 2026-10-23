@@ -1,9 +1,10 @@
 """Grading sandbox: where hidden tests run against a copy of the snapshot.
 
-The canonical sandbox is a fresh ``docker run --rm`` of the grader image with
-``--network none``, a non-root user, all capabilities dropped, the hidden tests
-mounted read-only, and a throwaway copy of the snapshot as ``/app``. Nothing is
-ever uploaded to, or executed in, the agent's environment.
+The sandbox is a fresh grader container (``DockerCopySandbox``) with
+``--network none``, a non-root user, all capabilities dropped, and a tar copy
+of the snapshot as ``/app`` plus the read-only hidden tests, copied in with
+``docker cp``: no host path is mounted, so the Docker daemon may be on another
+host. Nothing is ever uploaded to, or executed in, the agent's environment.
 
 The pytest invocation is rendered against a ``SandboxLayout``. The rendered
 argument list (without the interpreter and the coverage wrapper) is the
@@ -20,12 +21,18 @@ submission processes the black-box tests start.
 from __future__ import annotations
 
 import asyncio
-import os
+import contextlib
+import socket
+import stat
+import subprocess
+import tarfile
+import tempfile
+import time
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Protocol
+from typing import IO, Protocol
 
 from raidar.verifier.bundle import (
     APP_PLACEHOLDER,
@@ -41,6 +48,13 @@ LEDGER_NAME = "ledger.json"
 SANDBOX_USER = "1000:1000"
 PIDS_LIMIT = "1024"
 KILL_TIMEOUT_S = 30.0
+TRANSFER_TIMEOUT_S = 600.0
+SWEEP_TIMEOUT_S = 120.0
+ORPHAN_AGE = "1h"
+GRADER_ROLE_LABEL = "raidar.role=grader"
+HOST_LABEL = "raidar.host"
+SCOPE_LABEL = "raidar.run_scope"
+COPY_TIMINGS_PREFIX = "[raidar-copy]"
 SAFE_PATH_FLAG = "-P"
 
 
@@ -175,18 +189,22 @@ def sandbox_env(
     return env
 
 
-def docker_cli_env() -> dict[str, str]:
-    """Host env for the docker CLI; an explicit --context must not fight DOCKER_HOST."""
-    return {k: v for k, v in os.environ.items() if k not in {"DOCKER_HOST", "DOCKER_CONTEXT"}}
-
-
 @dataclass(frozen=True)
-class DockerSandbox:
-    """Fresh, no-network grader container per run on an explicit Docker context."""
+class DockerCopySandbox:
+    """Fresh, no-network grader container per run, fed and read back by ``docker cp``.
+
+    No host path is mounted, so the daemon may be on another host. The container
+    is created with the lockdown flags and Raidar labels, receives one tar
+    (``/app`` owned by the sandbox user; tests and runtime root-owned and
+    read-only), runs under ``start -a`` with a timeout, and its out directory is
+    copied back. The container is always force-removed afterwards. Timings of the
+    three phases are appended to the output as a ``[raidar-copy]`` line.
+    """
 
     image: str
     docker_context: str
     docker_bin: str = "docker"
+    run_scope: str = ""
 
     @property
     def layout(self) -> SandboxLayout:
@@ -195,11 +213,12 @@ class DockerSandbox:
     def _docker(self, *args: str) -> list[str]:
         return [self.docker_bin, "--context", self.docker_context, *args]
 
-    def run_argv(self, run: SandboxRun, name: str) -> list[str]:
-        layout = self.layout
+    def create_argv(self, run: SandboxRun, name: str) -> list[str]:
+        labels = [GRADER_ROLE_LABEL, f"{HOST_LABEL}={socket.gethostname()}"]
+        if self.run_scope:
+            labels.append(f"{SCOPE_LABEL}={self.run_scope}")
         argv = self._docker(
-            "run",
-            "--rm",
+            "create",
             "--name",
             name,
             "--network",
@@ -216,56 +235,191 @@ class DockerSandbox:
             str(run.cpus),
             "--memory",
             f"{run.memory_mb}m",
-            "-v",
-            f"{run.app_dir}:{layout.app}",
-            "-v",
-            f"{run.tests_dir}:{layout.tests}:ro",
-            "-v",
-            f"{RUNTIME_DIR}:{layout.runtime}:ro",
-            "-v",
-            f"{run.out_dir}:{layout.out}",
-            "-w",
-            layout.app,
         )
+        for label in labels:
+            argv += ["--label", label]
+        argv += ["-w", self.layout.app]
         for key, value in sorted(run.env.items()):
             argv += ["-e", f"{key}={value}"]
         return [*argv, self.image, *run.argv]
 
     async def environment_id(self) -> str:
-        proc = await asyncio.create_subprocess_exec(
-            *self._docker("image", "inspect", "--format", "{{.Id}}", self.image),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            env=docker_cli_env(),
+        code, output = await self._exec(
+            self._docker("image", "inspect", "--format", "{{.Id}}", self.image)
         )
-        stdout, _ = await proc.communicate()
-        text = stdout.decode(errors="replace").strip()
-        if proc.returncode != 0 or not text:
+        text = output.decode(errors="replace").strip()
+        if code != 0 or not text:
             raise RuntimeError(f"grader image {self.image} is not available: {text}")
         return text
 
-    async def run(self, run: SandboxRun) -> SandboxResult:
-        name = f"raidar-oracle-{uuid.uuid4().hex[:12]}"
+    async def _exec(
+        self, argv: list[str], *, stdin: IO[bytes] | None = None, stdout: IO[bytes] | None = None
+    ) -> tuple[int | None, bytes]:
+        """Run a docker command to completion; (exit code, stdout+stderr or just stderr)."""
         proc = await asyncio.create_subprocess_exec(
-            *self.run_argv(run, name),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
-            env=docker_cli_env(),
+            *argv,
+            stdin=stdin if stdin is not None else asyncio.subprocess.DEVNULL,
+            stdout=stdout if stdout is not None else asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT if stdout is None else asyncio.subprocess.PIPE,
         )
         try:
-            stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
+            data, err = await asyncio.wait_for(proc.communicate(), timeout=TRANSFER_TIMEOUT_S)
         except TimeoutError:
-            await self._kill(name)
             proc.kill()
-            stdout, _ = await proc.communicate()
-            return SandboxResult(None, True, stdout.decode(errors="replace"))
-        return SandboxResult(proc.returncode, False, stdout.decode(errors="replace"))
+            await proc.communicate()
+            return None, f"{argv[3]} timed out after {TRANSFER_TIMEOUT_S:.0f} s".encode()
+        return proc.returncode, (data if stdout is None else err) or b""
+
+    async def run(self, run: SandboxRun) -> SandboxResult:
+        name = f"raidar-oracle-{uuid.uuid4().hex[:12]}"
+        try:
+            return await self._run(run, name)
+        finally:
+            with contextlib.suppress(Exception):  # the orphan sweep catches what this misses
+                await self._exec(self._docker("rm", "-f", name))
+
+    async def _run(self, run: SandboxRun, name: str) -> SandboxResult:
+        layout = self.layout
+        timings: dict[str, float] = {}
+        with tempfile.TemporaryDirectory(prefix="raidar-copy-") as tmp:
+            archive, back = Path(tmp) / "in.tar", Path(tmp) / "out.tar"
+            code, output = await self._exec(self.create_argv(run, name))
+            if code != 0:
+                return SandboxResult(code, False, output.decode(errors="replace"))
+            mark = time.perf_counter()
+            await asyncio.to_thread(build_copy_in_tar, run, layout, archive)
+            with archive.open("rb") as source:
+                code, output = await self._exec(self._docker("cp", "-", f"{name}:/"), stdin=source)
+            timings["copy_in_s"] = time.perf_counter() - mark
+            if code != 0:
+                return SandboxResult(code, False, output.decode(errors="replace"))
+
+            mark = time.perf_counter()
+            proc = await asyncio.create_subprocess_exec(
+                *self._docker("start", "-a", name),
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.STDOUT,
+            )
+            timed_out = False
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
+            except TimeoutError:
+                timed_out = True
+                await self._kill(name)
+                proc.kill()
+                stdout, _ = await proc.communicate()
+            timings["run_s"] = time.perf_counter() - mark
+
+            mark = time.perf_counter()
+            with back.open("wb") as sink:
+                copied, err = await self._exec(
+                    self._docker("cp", f"{name}:{layout.out}", "-"), stdout=sink
+                )
+            failure = err.decode(errors="replace") if copied != 0 else ""
+            if copied == 0:
+                try:
+                    await asyncio.to_thread(extract_out_tar, back, run.out_dir)
+                except (tarfile.TarError, OSError) as error:
+                    failure = f"unpacking the out directory failed: {error}"
+            timings["copy_out_s"] = time.perf_counter() - mark
+        text = stdout.decode(errors="replace")
+        if failure:
+            text += f"\n{COPY_TIMINGS_PREFIX} copy-out failed: {failure}"
+        text += f"\n{COPY_TIMINGS_PREFIX} " + " ".join(f"{k}={v:.3f}" for k, v in timings.items())
+        return SandboxResult(None if timed_out else proc.returncode, timed_out, text)
 
     async def _kill(self, name: str) -> None:
-        killer = await asyncio.create_subprocess_exec(
-            *self._docker("kill", name),
-            stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.DEVNULL,
-            env=docker_cli_env(),
+        await asyncio.wait_for(self._exec(self._docker("kill", name)), timeout=KILL_TIMEOUT_S)
+
+
+def sweep_grader_orphans(docker_context: str, docker_bin: str = "docker") -> None:
+    """Remove stopped Raidar grader containers a crashed run left on ``docker_context``.
+
+    Only containers labelled ``raidar.role=grader`` and older than ``ORPHAN_AGE``
+    are removed, so a concurrent job's grader between ``start`` and copy-out is safe.
+    Best effort: a failure here never blocks the work it precedes.
+    """
+    with contextlib.suppress(OSError, subprocess.SubprocessError):
+        subprocess.run(
+            [
+                docker_bin,
+                "--context",
+                docker_context,
+                "container",
+                "prune",
+                "--force",
+                "--filter",
+                f"label={GRADER_ROLE_LABEL}",
+                "--filter",
+                f"until={ORPHAN_AGE}",
+            ],
+            stdin=subprocess.DEVNULL,
+            capture_output=True,
+            timeout=SWEEP_TIMEOUT_S,
+            check=False,
         )
-        await asyncio.wait_for(killer.wait(), timeout=KILL_TIMEOUT_S)
+
+
+def _stamp(
+    owner: tuple[int, int], *, writable: bool
+) -> Callable[[tarfile.TarInfo], tarfile.TarInfo]:
+    """tarfile filter: fixed ownership; owner-writable, or readable with no write bits."""
+
+    def apply(info: tarfile.TarInfo) -> tarfile.TarInfo:
+        info.uid, info.gid, info.uname, info.gname = owner[0], owner[1], "", ""
+        if info.issym():
+            return info
+        if writable:
+            info.mode |= stat.S_IRWXU if info.isdir() else stat.S_IRUSR | stat.S_IWUSR
+        else:
+            info.mode &= ~(stat.S_IWGRP | stat.S_IWOTH | stat.S_IWUSR)
+            info.mode |= 0o555 if info.isdir() else 0o444
+        return info
+
+    return apply
+
+
+def _add_tree(
+    bundle: tarfile.TarFile, source: Path, arcname: str, owner: tuple[int, int], *, writable: bool
+) -> None:
+    bundle.add(source, arcname=arcname, recursive=True, filter=_stamp(owner, writable=writable))
+
+
+def _add_dir(bundle: tarfile.TarFile, arcname: str, owner: tuple[int, int], mode: int) -> None:
+    info = tarfile.TarInfo(arcname)
+    info.type = tarfile.DIRTYPE
+    info.mode, info.uid, info.gid = mode, owner[0], owner[1]
+    info.mtime = int(time.time())
+    bundle.addfile(info)
+
+
+def build_copy_in_tar(run: SandboxRun, layout: SandboxLayout, archive: Path) -> None:
+    """The grader's whole filesystem delta as one tar rooted at ``/``.
+
+    ``/app`` belongs to the sandbox user and stays writable; tests and runtime are
+    root-owned without write bits; the out directory is empty and owned by the
+    sandbox user. Symlinks are stored as symlinks.
+    """
+    uid, gid = (int(part) for part in SANDBOX_USER.split(":"))
+    owner, root = (uid, gid), (0, 0)
+    with tarfile.open(archive, "w", format=tarfile.GNU_FORMAT) as bundle:
+        _add_tree(bundle, run.app_dir, layout.app.lstrip("/"), owner, writable=True)
+        _add_tree(bundle, run.tests_dir, layout.tests.lstrip("/"), root, writable=False)
+        parent = layout.runtime.lstrip("/").rsplit("/", 1)[0]
+        _add_dir(bundle, parent, root, 0o755)
+        _add_tree(bundle, RUNTIME_DIR, layout.runtime.lstrip("/"), root, writable=False)
+        _add_dir(bundle, layout.out.lstrip("/"), owner, 0o755)
+
+
+def extract_out_tar(archive: Path, out_dir: Path) -> None:
+    """Unpack ``docker cp <ctr>:<out> -`` (members prefixed ``out/``) into ``out_dir``."""
+    out_dir.mkdir(parents=True, exist_ok=True)
+    with tarfile.open(archive, "r:") as bundle:
+        members = []
+        for member in bundle.getmembers():
+            _, _, rest = member.name.partition("/")
+            if not rest:
+                continue
+            member.name = rest
+            members.append(member)
+        bundle.extractall(out_dir, members=members, filter="data")

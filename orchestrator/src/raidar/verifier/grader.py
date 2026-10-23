@@ -22,7 +22,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from raidar.oracle.snapshot import copy_snapshot, make_world_writable, tree_digest
+from raidar.oracle.snapshot import copy_snapshot, tree_digest
 from raidar.verifier.bundle import VerifierBundle, VerifierStepSpec
 from raidar.verifier.models import (
     CorpusEvidence,
@@ -137,9 +137,7 @@ def _stage(snapshot: Path, run_dir: Path) -> tuple[Path, Path]:
     app, out = run_dir / "app", run_dir / "out"
     app.mkdir(parents=True)
     copy_snapshot(snapshot, app)
-    make_world_writable(app)
     out.mkdir()
-    out.chmod(0o777)
     return app, out
 
 

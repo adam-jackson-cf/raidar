@@ -255,23 +255,6 @@ def test_hidden_test_commands_refuse_an_untrusted_target_before_touching_docker(
     assert "targets.lab.trusted" in result.output
 
 
-def test_remote_targets_are_refused_for_bind_mount_work(tmp_path: Path) -> None:
-    text = FILE.replace("max_concurrency = 2\n", "max_concurrency = 2\ntrusted = true\n")
-    write_targets(tmp_path, text.replace('grader = "local"', 'grader = "mbp"'))
-    assert resolve_target("local").supports_bind_mounts
-    assert not resolve_target("mbp").supports_bind_mounts
-
-    with pytest.raises(click.ClickException, match=r"target 'mbp' is a remote daemon"):
-        job_target("mbp")
-    result = CliRunner().invoke(
-        main, ["problem", "validate", "scb/forge@38d627ecf668", "--target", "mbp"]
-    )
-    assert result.exit_code != 0
-    assert "copy-only path" in result.output
-    regrade = CliRunner().invoke(main, ["assess", "--regrade", str(tmp_path), "--target", "mbp"])
-    assert "remote daemon" in regrade.output
-
-
 def test_a_run_needs_trusted_trial_and_grader_targets(tmp_path: Path) -> None:
     write_targets(tmp_path)
 

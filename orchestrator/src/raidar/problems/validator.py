@@ -42,7 +42,7 @@ from raidar.problems.validation import (
     run_checks,
 )
 from raidar.verifier.grader_image import ensure_grader_image, grader_image_tag
-from raidar.verifier.sandbox import DockerSandbox, GradingSandbox
+from raidar.verifier.sandbox import DockerCopySandbox, GradingSandbox
 
 ENGINES = ("direct", "harbor")
 
@@ -61,9 +61,9 @@ class ValidateOptions:
 
 async def _docker_sandbox(
     problem: ImportedProblem, docker_context: str
-) -> tuple[DockerSandbox, dict[str, object]]:
+) -> tuple[DockerCopySandbox, dict[str, object]]:
     image = await ensure_grader_image(problem.bundle.manifest.grader, docker_context=docker_context)
-    sandbox = DockerSandbox(image=image.tag, docker_context=docker_context)
+    sandbox = DockerCopySandbox(image=image.tag, docker_context=docker_context)
     return sandbox, {
         "grader_image": image.tag,
         "grader_environment_id": await sandbox.environment_id(),

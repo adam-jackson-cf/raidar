@@ -56,7 +56,7 @@ from raidar.verifier.records import (
     write_step_evidence,
     write_step_record,
 )
-from raidar.verifier.sandbox import DockerSandbox, GradingSandbox
+from raidar.verifier.sandbox import DockerCopySandbox, GradingSandbox
 
 SnapshotSource = Literal["artifact", "download"]
 LEAK_REWARD_KEY = "oracle_leak"
@@ -128,7 +128,12 @@ class RaidarVerifier(BaseVerifier):
         image = await ensure_grader_image(
             self.bundle.manifest.grader, docker_context=self.docker_context
         )
-        sandbox = DockerSandbox(image=image.tag, docker_context=self.docker_context)
+        sandbox = DockerCopySandbox(
+            image=image.tag,
+            docker_context=self.docker_context,
+            # The run-scoped environment names its job directory's scope (a label for sweeps).
+            run_scope=getattr(self.environment, "run_scope", ""),
+        )
         environment_id = await sandbox.environment_id()
         return sandbox, GraderRef(
             image=image.tag,

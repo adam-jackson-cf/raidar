@@ -33,7 +33,7 @@ from raidar.verifier.leak import LeakScanError, leak_scan_command, parse_leak_ou
 from raidar.verifier.sandbox import (
     CONTAINER_LAYOUT,
     RUNTIME_DIR,
-    DockerSandbox,
+    DockerCopySandbox,
     SandboxLayout,
     SandboxRun,
     render_pytest_args,
@@ -226,7 +226,7 @@ def test_app_artifact_uses_the_same_exclude_list_as_the_digest() -> None:
 
 
 # ------------------------------------------------------------------ sandbox
-def test_docker_sandbox_is_offline_unprivileged_and_mounts_tests_read_only(tmp_path: Path) -> None:
+def test_docker_sandbox_is_offline_unprivileged_and_mounts_nothing(tmp_path: Path) -> None:
     bundle = make_bundle(tmp_path)
     argv, _ = sandbox_argv(bundle.step("checkpoint_2"), CONTAINER_LAYOUT, coverage=False)
     run = SandboxRun(
@@ -239,17 +239,18 @@ def test_docker_sandbox_is_offline_unprivileged_and_mounts_tests_read_only(tmp_p
         cpus=1.5,
         memory_mb=2048,
     )
-    docker = DockerSandbox(image="grader:tag", docker_context="orbstack").run_argv(
+    docker = DockerCopySandbox(image="grader:tag", docker_context="orbstack").create_argv(
         run, "raidar-oracle-x"
     )
     joined = " ".join(docker)
-    assert docker[:4] == ["docker", "--context", "orbstack", "run"]
-    assert "--rm" in docker
+    assert docker[:4] == ["docker", "--context", "orbstack", "create"]
+    assert "--rm" not in docker
+    assert "-v" not in docker
+    assert str(tmp_path) not in joined
+    assert "raidar.role=grader" in docker
     assert docker[docker.index("--network") + 1] == "none"
     assert docker[docker.index("--user") + 1] == "1000:1000"
     assert docker[docker.index("--cap-drop") + 1] == "ALL"
-    assert f"{bundle.tests_dir}:/tests:ro" in joined
-    assert f"{RUNTIME_DIR}:/oracle/runtime:ro" in joined
     assert docker[docker.index("--memory") + 1] == "2048m"
     assert docker[-len(argv) :] == list(argv)
 

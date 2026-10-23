@@ -15,13 +15,13 @@ from raidar.targets.config import (
     Selection,
     TargetError,
     activate,
-    require_bind_mounts,
     require_trusted,
     resolve_selection,
 )
 from raidar.targets.guard import TargetGuard, TargetLostError
 from raidar.targets.health import docker_facts, ensure_target
 from raidar.targets.job import JobTarget
+from raidar.verifier.sandbox import sweep_grader_orphans
 
 
 def target_option(command: Callable[..., Any]) -> Callable[..., Any]:
@@ -40,7 +40,6 @@ def docker_selection(
     trial_purpose: str | None = None,
     grader_purpose: str | None = None,
     ensure: bool = True,
-    bind_mounts: bool = False,
 ) -> Selection:
     """Resolve the target (lazily, only commands that use Docker call this).
 
@@ -55,15 +54,12 @@ def docker_selection(
             require_trusted(selection.trial, trial_purpose)
         if grader_purpose:
             require_trusted(selection.grader, grader_purpose)
-        if bind_mounts:
-            if trial_purpose:
-                require_bind_mounts(selection.trial, trial_purpose)
-            if grader_purpose:
-                require_bind_mounts(selection.grader, grader_purpose)
         if ensure:
             ensure_target(selection.trial)
             if selection.grader is not selection.trial:
                 ensure_target(selection.grader)
+            if grader_purpose:
+                sweep_grader_orphans(selection.grader.docker_context)
     except TargetError as error:
         raise click.ClickException(str(error)) from error
     activate(selection.trial)
@@ -76,7 +72,6 @@ def job_target(target_name: str | None) -> JobTarget:
         target_name,
         trial_purpose="trials (agent credentials and hidden tests)",
         grader_purpose="hidden-test grading",
-        bind_mounts=True,
     )
     context = selection.trial.docker_context
 

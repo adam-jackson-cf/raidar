@@ -30,7 +30,7 @@ from raidar.verifier.grader import grade_step
 from raidar.verifier.grader_image import ensure_grader_image
 from raidar.verifier.outcomes import StepGrade
 from raidar.verifier.records import RECORD_FILE, VERIFIER_RECORD_DIR, StepRecord, load_step_record
-from raidar.verifier.sandbox import DockerSandbox, GradingSandbox
+from raidar.verifier.sandbox import DockerCopySandbox, GradingSandbox
 
 SandboxFactory = Callable[[VerifierBundle], Awaitable[GradingSandbox]]
 
@@ -70,7 +70,7 @@ class RegradeOptions:
 def docker_sandbox_factory(docker_context: str) -> SandboxFactory:
     async def build(bundle: VerifierBundle) -> GradingSandbox:
         image = await ensure_grader_image(bundle.manifest.grader, docker_context=docker_context)
-        return DockerSandbox(image=image.tag, docker_context=docker_context)
+        return DockerCopySandbox(image=image.tag, docker_context=docker_context)
 
     return build
 

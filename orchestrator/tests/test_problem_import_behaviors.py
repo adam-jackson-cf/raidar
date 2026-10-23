@@ -103,9 +103,9 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
         ).stdout.strip()
     )
     assert manifest.pack.image == image_tag(load_pack_spec())
-    # SCB config ``entry_file: adder`` in the Python pack's snapshot-file format.
-    assert manifest.entry_file == "adder.py"
-    assert manifest.lock_metadata()["entry_file"] == "adder.py"
+    # SCB config ``entry_file: app`` in the Python pack's snapshot-file format.
+    assert manifest.entry_file == "app.py"
+    assert manifest.lock_metadata()["entry_file"] == "app.py"
 
     task = Task(content / "task")
     assert task.config.environment.docker_image == manifest.pack.image

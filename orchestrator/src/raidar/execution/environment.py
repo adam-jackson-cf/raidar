@@ -14,29 +14,26 @@ and no plan hash changes.
 ``cp`` through ``docker compose``, which loads the project's compose files on
 every call before the command even starts. The budgeted gaps of each step make
 about a dozen such calls: the workdir upload, ``pwd``, ``setup.sh``, the leak
-scan, the per-mount ``chown`` before logs are read, and a four-call artifact
-collection (``test -d``, ``tar czf`` to a temp file, ``compose cp``, ``rm``).
+scan, and a four-call artifact collection (``test -d``, ``tar czf`` to a temp file,
+``compose cp``, ``rm``).
 Once the main container is known, this class sends the same ``exec``/``cp``
 to ``docker`` directly (same flags, user, workdir, env, output and exit
 status), and collects an excluded directory with one streamed ``tar cf -``
 (no gzip, no archive left in the container), extracted with Harbor's exclude
-patterns and ``tarfile`` ``data`` filter. The mounted-log ``chown`` covers
-every writable mount in one exec instead of one per mount. Anything it cannot
-translate, or a main container it cannot resolve, takes Harbor's compose path
-unchanged.
+patterns and ``tarfile`` ``data`` filter. Anything it cannot translate, or a
+main container it cannot resolve, takes Harbor's compose path unchanged.
 
-**Stale log names (step evidence).** Between steps Harbor *moves* the mounted
-``/logs/agent`` contents into ``steps/<step>/agent`` on the host. On a
-macOS bind mount the container can keep a cached entry for a moved
-name for a short while; a write to that name in the next step then lands in
-the moved file, so step k+1's ``raidar-reset.json`` overwrites step k's
-archived copy and is missing from step k+1 (seen under concurrent trials).
-Before each step's ``setup.sh`` this class removes, by name and as root, every
-top-level name an earlier step archived that the host mount no longer holds.
-Name-based removal of a name the host does not have only drops the stale entry
-(the host answers "not found"), and directories use ``rmdir``, so an archived
-file or directory is never touched. It changes no component, setup script or
-digest.
+**Data path.** Nothing is bind-mounted: ``capabilities.mounted`` is False, the
+mounts compose file declares no volumes, and Harbor copies ``/logs/agent`` and
+``/logs/verifier`` out of the container after each phase. A Docker daemon on
+another host therefore sees the same flow as a local one.
+
+**Host edits survive the log download.** A component may download a stage's logs
+mid-run and then rewrite them on the host (a root ``trajectory.json``, a usage
+update). Harbor's final download of ``/logs/agent`` would overwrite those files
+with the container's older copies, which a bind mount never did (host and
+container were one file). The final download therefore keeps every host file
+that is not byte-for-byte what an earlier download left there (``_synced``).
 
 **Per-trial installs at start.** ``add_post_start_hook`` registers work that
 must run once per trial in the started container before any step (a
@@ -52,8 +49,7 @@ import asyncio
 import contextlib
 import hashlib
 import importlib
-import os
-import shlex
+import shutil
 import socket
 import sys
 import tarfile
@@ -64,6 +60,8 @@ from typing import Any
 
 from harbor.constants import MAIN_SERVICE_NAME
 from harbor.environments.base import ExecResult
+from harbor.environments.capabilities import EnvironmentCapabilities
+from harbor.environments.docker import write_mounts_compose_file
 from harbor.environments.docker.docker import (
     DockerEnvironment,
     _sanitize_docker_compose_project_name,
@@ -143,47 +141,10 @@ def engine_command(compose_args: Sequence[str], container: str, *, stdin: bool) 
     return None
 
 
-def is_step_setup(command: str) -> bool:
-    """Whether ``command`` is Harbor's per-step ``bash <workdir>/setup.sh``."""
-    try:
-        argv = shlex.split(command)
-    except ValueError:
-        return False
-    return len(argv) == 2 and argv[0] == "bash" and PurePosixPath(argv[1]).name == "setup.sh"
-
-
-def _archived_kinds(steps_dir: Path) -> dict[str, bool]:
-    """Every top-level name in earlier steps' archived agent logs -> whether it is a directory."""
-    kinds: dict[str, bool] = {}
-    archives = sorted(steps_dir.glob("*/agent")) if steps_dir.is_dir() else []
-    for archived in (path for path in archives if path.is_dir()):
-        for entry in archived.iterdir():
-            kinds.setdefault(entry.name, entry.is_dir() and not entry.is_symlink())
-    return kinds
-
-
-def _present(path: Path) -> bool:
-    return path.exists() or path.is_symlink()
-
-
-def archived_log_names(steps_dir: Path, live_dir: Path) -> tuple[list[str], list[str]]:
-    """Top-level (files, directories) archived from earlier steps' agent logs and absent live."""
-    kinds = _archived_kinds(steps_dir)
-    gone = sorted(name for name in kinds if not _present(live_dir / name))
-    return [name for name in gone if not kinds[name]], [name for name in gone if kinds[name]]
-
-
-def forget_names_script(
-    container_dir: PurePosixPath, files: Sequence[str], dirs: Sequence[str]
-) -> str:
-    """Shell that drops the container's entries for names the host mount no longer has."""
-    parts = [f"cd {shlex.quote(str(container_dir))} 2>/dev/null || exit 0"]
-    if files:
-        parts.append("rm -f -- " + " ".join(shlex.quote(name) for name in files))
-    if dirs:
-        parts.append("rmdir -- " + " ".join(shlex.quote(name) for name in dirs) + " 2>/dev/null")
-    parts.append("exit 0")
-    return "; ".join(parts)
+def _signature(path: Path) -> tuple[int, int]:
+    """(mtime_ns, size) of ``path`` itself, a symlink not followed."""
+    info = path.lstat()
+    return info.st_mtime_ns, info.st_size
 
 
 async def warm_agent_imports() -> None:
@@ -200,8 +161,22 @@ PostStartHook = Callable[[], Awaitable[None]]
 class RunScopedDockerEnvironment(DockerEnvironment):
     def __init__(self, *args: Any, session_id: str, run_scope: str, **kwargs: Any) -> None:
         super().__init__(*args, session_id=f"{session_id}-{run_scope}", **kwargs)
+        self.run_scope = run_scope
+        self._synced: dict[Path, tuple[int, int]] = {}
         self._main_container: str | None = None
         self._post_start: list[PostStartHook] = []
+
+    @property
+    def capabilities(self) -> EnvironmentCapabilities:
+        """Not mounted: Harbor then downloads ``/logs/agent`` and ``/logs/verifier`` itself."""
+        return super().capabilities.model_copy(update={"mounted": False})
+
+    def _write_mounts_compose_file(self) -> Path:
+        """Declare no volumes; Harbor's ``ensure_dirs`` creates the in-container log dirs."""
+        self._cleanup_mounts_compose_file()
+        self._mounts_compose_temp_dir = tempfile.TemporaryDirectory()
+        path = Path(self._mounts_compose_temp_dir.name) / "docker-compose-mounts.json"
+        return write_mounts_compose_file(path, [])
 
     def add_post_start_hook(self, hook: PostStartHook) -> None:
         """Run ``hook`` once the container has started, inside ``start`` (module doc)."""
@@ -235,44 +210,15 @@ class RunScopedDockerEnvironment(DockerEnvironment):
         return self._main_container
 
     async def start(self, force_build: bool) -> None:
-        """Start, doing two first-step costs alongside without adding wall time.
+        """Start, importing an installed agent's lazy modules alongside ``compose up``.
 
-        Harbor first asks ``docker info`` (rootless mode, then cached) inside
-        the first step's artifact collection, for the log ``chown``; and an
-        installed agent first imports LiteLLM in the same gap. Both are done
-        here, concurrently with ``compose up``.
+        An installed agent first imports LiteLLM inside the first step's artifact
+        gap; it is done here, concurrently with ``compose up``.
         """
         self._main_container = None
-        await asyncio.gather(
-            super().start(force_build), self._is_rootless_docker(), warm_agent_imports()
-        )
+        await asyncio.gather(super().start(force_build), warm_agent_imports())
         for hook in self._post_start:
             await hook()
-
-    async def exec(
-        self,
-        command: str,
-        cwd: str | None = None,
-        env: dict[str, str] | None = None,
-        timeout_sec: int | None = None,
-        user: str | int | None = None,
-    ) -> ExecResult:
-        if is_step_setup(command):
-            await self._forget_archived_log_names()
-        return await super().exec(command, cwd=cwd, env=env, timeout_sec=timeout_sec, user=user)
-
-    async def _forget_archived_log_names(self) -> None:
-        """Drop stale container entries for agent-log names Harbor archived (module doc)."""
-        if self._is_windows_container:
-            return
-        files, dirs = archived_log_names(self.trial_paths.steps_dir, self.trial_paths.agent_dir)
-        if not files and not dirs:
-            return
-        script = forget_names_script(EnvironmentPaths.agent_dir, files, dirs)
-        try:
-            await super().exec(script, user="root")
-        except Exception as error:  # best effort: the probes still catch missing evidence
-            self.logger.warning(f"Failed to drop archived log names: {error}")
 
     async def stop(self, delete: bool) -> None:
         try:
@@ -402,17 +348,41 @@ class RunScopedDockerEnvironment(DockerEnvironment):
             with tarfile.open(archive, "r:") as bundle:
                 bundle.extractall(path=target, filter="data")
 
-    async def prepare_logs_for_host(self) -> None:
-        """Harbor's recursive ``chown`` of each writable mount to the host user, as one exec."""
-        targets = self._mount_targets(writable_only=True)
-        if not targets or not hasattr(os, "getuid"):
+    async def download_dir(self, source_dir: str, target_dir: Path | str) -> None:
+        """Harbor's directory download; the whole agent log directory keeps host edits."""
+        target = Path(target_dir)
+        if PurePosixPath(source_dir) == EnvironmentPaths.agent_dir:
+            with tempfile.TemporaryDirectory() as staging:
+                await super().download_dir(source_dir, staging)
+                await asyncio.to_thread(self._merge_keeping_host_edits, Path(staging), target)
             return
-        try:
-            if await self._is_rootless_docker():
-                uid, gid = 0, 0
-            else:
-                uid, gid = os.getuid(), os.getgid()
-            paths = " ".join(shlex.quote(target) for target in targets)
-            await self.exec(f"chown -R {uid}:{gid} {paths}", user="root")
-        except Exception as error:  # best effort, as in Harbor
-            self.logger.warning(f"Failed to chown logs directory: {error}")
+        await super().download_dir(source_dir, target)
+        await asyncio.to_thread(self._record_synced, target)
+
+    def _merge_keeping_host_edits(self, staged: Path, target: Path) -> None:
+        for source in sorted(staged.rglob("*")):
+            destination = target / source.relative_to(staged)
+            if source.is_dir() and not source.is_symlink():
+                destination.mkdir(parents=True, exist_ok=True)
+                continue
+            if self._edited_on_host(destination):
+                continue
+            if destination.is_symlink() or destination.exists():
+                destination.unlink()
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(source, destination)
+            self._record_synced(destination)
+
+    def _edited_on_host(self, path: Path) -> bool:
+        if not (path.exists() or path.is_symlink()):
+            return False
+        return self._synced.get(path) != _signature(path)
+
+    def _record_synced(self, target: Path) -> None:
+        files = [target] if target.is_file() or target.is_symlink() else target.rglob("*")
+        for path in files:
+            if path.is_file() or path.is_symlink():
+                self._synced[path] = _signature(path)
+
+    async def prepare_logs_for_host(self) -> None:
+        """No-op: nothing is bind-mounted, so there is no host-owned log directory to fix."""

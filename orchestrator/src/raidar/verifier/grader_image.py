@@ -29,7 +29,7 @@ import time
 from dataclasses import dataclass
 
 from raidar.verifier.bundle import GraderSpec
-from raidar.verifier.sandbox import CONTAINER_LAYOUT, docker_cli_env
+from raidar.verifier.sandbox import CONTAINER_LAYOUT
 from raidar.verifier.submission_deps import dockerfile_layer, provisioned_pins
 
 GRADER_TOOLS: tuple[str, ...] = (
@@ -79,7 +79,6 @@ async def _docker(
         stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
-        env=docker_cli_env(),
     )
     stdout, _ = await asyncio.wait_for(proc.communicate(stdin), timeout=BUILD_TIMEOUT_S)
     return int(proc.returncode or 0), stdout.decode(errors="replace")

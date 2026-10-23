@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import sys
 import tarfile
 from pathlib import Path
@@ -61,6 +62,7 @@ def _bare_env(container: str | None) -> RunScopedDockerEnvironment:
     env._main_container = container  # noqa: SLF001
     env._is_windows_container = False  # noqa: SLF001
     env._post_start = []  # noqa: SLF001  (as the constructor leaves it)
+    env._synced = {}  # noqa: SLF001
 
     async def resolve() -> str | None:
         return container
@@ -176,34 +178,32 @@ async def test_a_failed_stream_raises_like_harbors_transfer(
         )
 
 
-async def test_mount_chown_is_one_exec_over_every_writable_mount(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    commands: list[tuple[str, Any]] = []
+def test_the_environment_is_not_mounted_and_declares_no_volumes() -> None:
     env = _bare_env("cid")
-    monkeypatch.setattr(
-        env,
-        "_mount_targets",
-        lambda writable_only=False: ["/logs/agent", "/logs/verifier"],
-        raising=False,
-    )
+    env._enable_egress_control = False  # noqa: SLF001
+    env._mounts = [  # noqa: SLF001
+        {"type": "bind", "source": "/host/agent", "target": "/logs/agent"}  # type: ignore[list-item]
+    ]
+    assert env.capabilities.mounted is False
+    env._mounts_compose_temp_dir = None  # noqa: SLF001
+    path = env._write_mounts_compose_file()  # noqa: SLF001
+    try:
+        assert json.loads(path.read_text()) == {"services": {"main": {"volumes": []}}}
+    finally:
+        env._cleanup_mounts_compose_file()  # noqa: SLF001
 
-    async def rootless() -> bool:
-        return False
 
-    async def fake_exec(command: str, user: Any = None, **_: Any) -> ExecResult:
-        commands.append((command, user))
-        return ExecResult(return_code=0)
+async def test_preparing_logs_for_the_host_runs_nothing(monkeypatch: pytest.MonkeyPatch) -> None:
+    env = _bare_env("cid")
 
-    monkeypatch.setattr(env, "_is_rootless_docker", rootless, raising=False)
-    monkeypatch.setattr(env, "exec", fake_exec, raising=False)
-    monkeypatch.setattr(env_module.os, "getuid", lambda: 501)
-    monkeypatch.setattr(env_module.os, "getgid", lambda: 20)
+    async def forbidden(*_: Any, **__: Any) -> ExecResult:
+        raise AssertionError("no exec: nothing is mounted")
+
+    monkeypatch.setattr(env, "exec", forbidden, raising=False)
     await env.prepare_logs_for_host()
-    assert commands == [("chown -R 501:20 /logs/agent /logs/verifier", "root")]
 
 
-async def test_start_probes_rootless_mode_and_warms_agent_imports_alongside(
+async def test_start_warms_agent_imports_alongside(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     calls: list[str] = []
@@ -211,19 +211,14 @@ async def test_start_probes_rootless_mode_and_warms_agent_imports_alongside(
     async def compose_start(self: Any, force_build: bool) -> None:
         calls.append(f"start:{force_build}")
 
-    async def rootless() -> bool:
-        calls.append("rootless")
-        return False
-
     async def warm() -> None:
         calls.append("warm")
 
     monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.start", compose_start)
     monkeypatch.setattr(env_module, "warm_agent_imports", warm)
     env = _bare_env("stale")
-    monkeypatch.setattr(env, "_is_rootless_docker", rootless, raising=False)
     await env.start(False)
-    assert sorted(calls) == ["rootless", "start:False", "warm"]
+    assert sorted(calls) == ["start:False", "warm"]
     assert env._main_container is None  # noqa: SLF001  (a new container is resolved again)
 
 
@@ -325,109 +320,33 @@ async def test_stopping_the_environment_or_main_service_forgets_the_container(
     assert env._main_container is None  # noqa: SLF001
 
 
-@pytest.mark.parametrize(
-    ("command", "expected"),
-    [
-        ("bash /app/setup.sh", True),
-        ("bash '/work dir/setup.sh'", True),
-        ("bash /app/setup.sh.bak", False),
-        ("sh /app/setup.sh", False),
-        ("bash -c /app/setup.sh", False),
-        ("bash 'unterminated", False),
-    ],
-)
-def test_only_harbors_step_setup_command_is_recognised(command: str, expected: bool) -> None:
-    assert env_module.is_step_setup(command) is expected
-
-
-def test_archived_log_names_are_the_earlier_steps_names_the_live_mount_lacks(
-    tmp_path: Path,
-) -> None:
-    steps, live = tmp_path / "steps", tmp_path / "agent"
-    (steps / "checkpoint_1" / "agent" / "raidar-components").mkdir(parents=True)
-    (steps / "checkpoint_1" / "agent" / "raidar-reset.json").write_text("{}")
-    (steps / "checkpoint_1" / "agent" / "codex.txt").write_text("")
-    (steps / "checkpoint_2" / "verifier").mkdir(parents=True)
-    live.mkdir()
-    (live / "codex.txt").write_text("kept: the live mount still has it (resumed step)")
-
-    assert env_module.archived_log_names(steps, live) == (
-        ["raidar-reset.json"],
-        ["raidar-components"],
-    )
-    assert env_module.archived_log_names(tmp_path / "no-steps", live) == ([], [])
-
-
-def test_forget_script_removes_files_by_name_and_only_rmdirs_directories() -> None:
-    script = env_module.forget_names_script(
-        env_module.EnvironmentPaths.agent_dir,
-        ["raidar-reset.json", "a b.json"],
-        ["raidar-components"],
-    )
-    assert script == (
-        "cd /logs/agent 2>/dev/null || exit 0; rm -f -- raidar-reset.json 'a b.json'; "
-        "rmdir -- raidar-components 2>/dev/null; exit 0"
-    )
-    assert "rm -rf" not in script
-    assert env_module.forget_names_script(env_module.EnvironmentPaths.agent_dir, [], []) == (
-        "cd /logs/agent 2>/dev/null || exit 0; exit 0"
-    )
-
-
-async def test_step_setup_first_drops_stale_names_of_archived_logs(
+async def test_the_final_agent_log_download_keeps_files_the_host_rewrote(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    calls: list[tuple[str, Any]] = []
+    container = {
+        "/logs/agent/stage": {"trajectory.json": "container"},
+        "/logs/agent": {"stage/trajectory.json": "container", "codex.txt": "v1"},
+    }
 
-    async def harbor_exec(self: Any, command: str, user: Any = None, **_: Any) -> ExecResult:
-        calls.append((command, user))
-        return ExecResult(return_code=0)
+    async def harbor_download(self: Any, source_dir: str, target_dir: Path | str) -> None:
+        for name, text in container[source_dir].items():
+            path = Path(target_dir) / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
 
-    monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.exec", harbor_exec)
+    monkeypatch.setattr(
+        "harbor.environments.docker.docker.DockerEnvironment.download_dir", harbor_download
+    )
     env = _bare_env("cid")
-    paths = type("Paths", (), {"steps_dir": tmp_path / "steps", "agent_dir": tmp_path / "agent"})
-    env.trial_paths = paths  # type: ignore[assignment]
-    (tmp_path / "agent").mkdir()
+    host = tmp_path / "agent"
+    await env.download_dir("/logs/agent/stage", host / "stage")  # a component's mid-run sync
+    (host / "stage" / "trajectory.json").write_text("host root trajectory, longer")
+    container["/logs/agent"]["codex.txt"] = "v2"
 
-    await env.exec("bash /app/setup.sh", user="agent")
-    (tmp_path / "steps" / "checkpoint_1" / "agent").mkdir(parents=True)
-    (tmp_path / "steps" / "checkpoint_1" / "agent" / "raidar-reset.json").write_text("{}")
-    await env.exec("pwd")
-    await env.exec("bash /app/setup.sh", user="agent")
+    await env.download_dir("/logs/agent", host)  # Harbor's final download
 
-    assert calls == [
-        ("bash /app/setup.sh", "agent"),
-        ("pwd", None),
-        ("cd /logs/agent 2>/dev/null || exit 0; rm -f -- raidar-reset.json; exit 0", "root"),
-        ("bash /app/setup.sh", "agent"),
-    ]
-
-
-async def test_a_failed_name_drop_is_logged_and_the_setup_still_runs(
-    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
-) -> None:
-    calls: list[str] = []
-    warnings: list[str] = []
-
-    async def harbor_exec(self: Any, command: str, user: Any = None, **_: Any) -> ExecResult:
-        calls.append(command)
-        if user == "root":
-            raise RuntimeError("exec failed")
-        return ExecResult(return_code=0)
-
-    monkeypatch.setattr("harbor.environments.docker.docker.DockerEnvironment.exec", harbor_exec)
-    env = _bare_env("cid")
-    env.logger = type("L", (), {"warning": staticmethod(warnings.append)})()  # type: ignore[assignment]
-    archived = tmp_path / "steps" / "checkpoint_1" / "agent"
-    archived.mkdir(parents=True)
-    (archived / "raidar-reset.json").write_text("{}")
-    paths = type("Paths", (), {"steps_dir": tmp_path / "steps", "agent_dir": tmp_path / "agent"})
-    env.trial_paths = paths  # type: ignore[assignment]
-
-    await env.exec("bash /app/setup.sh")
-    assert calls[-1] == "bash /app/setup.sh"
-    assert warnings == ["Failed to drop archived log names: exec failed"]
-    env._is_windows_container = True  # noqa: SLF001
-    await env.exec("bash /app/setup.sh")
-    assert calls[-1] == "bash /app/setup.sh"
-    assert len(calls) == 3
+    assert (host / "stage" / "trajectory.json").read_text() == "host root trajectory, longer"
+    assert (host / "codex.txt").read_text() == "v2"  # untouched on the host: the container wins
+    container["/logs/agent"]["codex.txt"] = "v3"
+    await env.download_dir("/logs/agent", host)
+    assert (host / "codex.txt").read_text() == "v3"
