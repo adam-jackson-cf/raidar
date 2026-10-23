@@ -51,10 +51,10 @@
       },
       "scorer": {
         "code-quality@3": {
-          "digest": "eb8e9213a6a75adc371192a73f5949db910e259ef28591508d49d0e87a03ace2",
+          "digest": "eff189c7fd9c7ece998d7a345bd9ff3eb373a1ba033e81900f088ad1ffa442b2",
           "metadata": {
             "implementation": "raidar.scorers.code_quality_v3:code_quality_v3_scorer",
-            "implementation_digest": "539e596124d0c5cecb3cc10b3a1c951314237c64438b3596fd13a86b99969320",
+            "implementation_digest": "b8996cf87252d2901e8bb50ddf103546d17383f2e25ecbac3e1aadd77dce3d02",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots (code-quality@2); G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -273,10 +273,10 @@
           }
         },
         "correctness@1": {
-          "digest": "31fa2f2e6cad064ec39df105bcfd9df5f96f837cd1c369b41db9587fccbe7286",
+          "digest": "4be940aff5a1e111061505e02963b54c373825ea85cc2ef0cac0ba33099ee3c0",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "69da6597236462d2f7da95f875afdc410ed69d23c89ec8c05e46183cecbc592d",
+            "implementation_digest": "30bad4c6f5461c6a39578e64f0c484ca9074dec1ed36981f9c383ce3b06dc733",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -440,10 +440,10 @@
           }
         },
         "gate-effort@10": {
-          "digest": "306375c47f62b8f4481e1ab6f4ee3fe434fb548e943293b5f7d75ca2a6f1b047",
+          "digest": "b57f249fda1bc7b607f1372e1bb89ff59cb39a11b7f598d456530e613af2c9c9",
           "metadata": {
             "implementation": "raidar.scorers.gate_effort_v10:gate_effort_v10_scorer",
-            "implementation_digest": "b3c5cbbc884b4e324ef68b841153c5e629db548c8c1ecf089ec31869cab7abd1",
+            "implementation_digest": "4f392d1e5b15f0483b135caf785ee04632a0bb8129ca936908875429668b4270",
             "manifest": {
               "description": "Effort a guardrail-gate commit gate cost per step, the gate's tests check and the fix rounds' correctness (gate-effort@7: a failed tests check counted once, blocking counts that compare across gate modes with and without the mypy no-untyped-call cascade, failing tests and missed coverage apart, first-pass clean rates that ignore auto-fixable layout codes, the tests check, or both), plus the cross-mode blocking counts without the cascade and with a refused suppression comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A shadow gate reports its first-run, step-end and code outcomes only. Not applicable to an arm without a gate. Plus a guardrail-gate@4 autofix step's effect: passes, errors, files and lines changed, block-tier findings fixed by family, first-pass clean and blocking counts after autofix (and before, comparable across an enforced and a shadow gate), and the fix sessions' cost and wall time split by the kind of refusal that started them (coverage minimum apart). Plus the autofix lines and block-tier findings that each step's own work added (new_autofix_*), which compare across an enforced and a shadow gate where the per-step autofix sums do not.",
               "evidence_required": [
@@ -3130,10 +3130,10 @@
           }
         },
         "process-compliance@6": {
-          "digest": "6fa73bf60bb314a84ba8d364cbe73d914b2d7dcafc029ab02a592727e17817a9",
+          "digest": "ac175092f4628e70487f9a8c4b6889763c746b0c931fc675226f92b7ac69ce9e",
           "metadata": {
             "implementation": "raidar.scorers.process_checks_v6:process_compliance_v6_scorer",
-            "implementation_digest": "8482f12a3fd4d419eeb1cedf0043e3a4b835f95f6b2d7fcb2bc831fbdd931cc3",
+            "implementation_digest": "f4e7a56a4696e9c4594f4dd104852323d4561a02b2035a026ac7f511448b5479",
             "manifest": {
               "description": "Deterministic trace checks of agent process (process-compliance@5: stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -3334,10 +3334,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "c88c54f17cade31835b3a75fd9ec3282a1a0bf7c2bc1121aba8c369f513e9608",
+          "digest": "f3c72ab636efd5be83bff09e357d9f578450e3382bab9fd8485fd6645e354b6d",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "56e18c7803982706d823f2646ac3ab0214755de82344588d0cedac38f6aa74f6",
+            "implementation_digest": "a4e91a68b90ce43a9cc515ece436be4d7242dc72861459cfa0aae4c03218130b",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -3496,18 +3496,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "4b021c7897efa44ee14edc30b5e45afff8dbeddf8ed3abf481718b6026d701c1",
+  "document_sha256": "ec255240747b55b97898323b9bb0a9488eaaaeb49195e5a021034bae36ca979b",
   "execution": {
     "arms": {
       "r1-baseline": {
         "agent": "codex-luna",
         "condition": "r1-baseline",
-        "digest": "c4358eac92690f9665664e05d655cdc8ac81ea8d8eab0eda0fbbd20a2db01042"
+        "digest": "a4bb629b4977c07de5eec0b33b15965619927fe6c836dcffbecf6da96c8cb7a9"
       },
       "r2-guardrails": {
         "agent": "codex-luna",
         "condition": "r2-guardrails",
-        "digest": "8a40c86fb3fb2e8e6231d2843081f23a6adf7e82ab09e3382aa6615ec2beac5e"
+        "digest": "353e97db086cbc4c33857a10b4f8df468223a79f2d7c11da9790c5abc9368b98"
       }
     },
     "conditions": {
@@ -3517,25 +3517,25 @@
             "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
           },
           "use": "prompt-wrapper@1",
-          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "use_digest": "95c6e9fb31c1439b6e00f4006b9ffb78584634bb8372abc694d1088ebfc4f5db",
           "with": {}
         },
         {
           "files": {},
           "use": "continue-on-stall@2",
-          "use_digest": "fbc7dbd799bcebac912a64a9dab68d5eec739150daccab9a6415ca8f2a921f06",
+          "use_digest": "8e410dbbcaa76745011fdc9fe1a9098b2ea5c12f29a73da87ce69cf30010a1ae",
           "with": {}
         },
         {
           "files": {},
           "use": "transient-retry@1",
-          "use_digest": "6197a226e383566c9c7e1e280b62623ff8b2024feab214f24b0d735a072cf8b5",
+          "use_digest": "40d4fee8c094f5acf2ed96832b8c2ac5d7693ddd42b28cf72277485653cff520",
           "with": {}
         },
         {
           "files": {},
           "use": "python-guardrails@8",
-          "use_digest": "8b4ed79f57772d5e681bead54a186870e4792cd2eed391907d6b4e54fb58864b",
+          "use_digest": "193328bb9926210a84e3e822e4f28eb36d25f30f3e7027f992f124e05f7ab4dd",
           "with": {
             "workspace_configs": false
           }
@@ -3543,7 +3543,7 @@
         {
           "files": {},
           "use": "guardrail-gate@4",
-          "use_digest": "4263f4c6f6fae019ddfda1f0f60f5479898135f8f08b85c2a08528b0c0bb6600",
+          "use_digest": "8e2ef5a43656ee11eb3f75cd9066451bca6004c6d511a43e540a61136fc484bf",
           "with": {
             "autofix_before_check": true,
             "autofix_command": "guardrail-check --autofix",
@@ -3560,25 +3560,25 @@
             "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
           },
           "use": "prompt-wrapper@1",
-          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "use_digest": "95c6e9fb31c1439b6e00f4006b9ffb78584634bb8372abc694d1088ebfc4f5db",
           "with": {}
         },
         {
           "files": {},
           "use": "continue-on-stall@2",
-          "use_digest": "fbc7dbd799bcebac912a64a9dab68d5eec739150daccab9a6415ca8f2a921f06",
+          "use_digest": "8e410dbbcaa76745011fdc9fe1a9098b2ea5c12f29a73da87ce69cf30010a1ae",
           "with": {}
         },
         {
           "files": {},
           "use": "transient-retry@1",
-          "use_digest": "6197a226e383566c9c7e1e280b62623ff8b2024feab214f24b0d735a072cf8b5",
+          "use_digest": "40d4fee8c094f5acf2ed96832b8c2ac5d7693ddd42b28cf72277485653cff520",
           "with": {}
         },
         {
           "files": {},
           "use": "python-guardrails@8",
-          "use_digest": "8b4ed79f57772d5e681bead54a186870e4792cd2eed391907d6b4e54fb58864b",
+          "use_digest": "193328bb9926210a84e3e822e4f28eb36d25f30f3e7027f992f124e05f7ab4dd",
           "with": {
             "workspace_configs": true
           }
@@ -3586,7 +3586,7 @@
         {
           "files": {},
           "use": "guardrail-gate@4",
-          "use_digest": "4263f4c6f6fae019ddfda1f0f60f5479898135f8f08b85c2a08528b0c0bb6600",
+          "use_digest": "8e2ef5a43656ee11eb3f75cd9066451bca6004c6d511a43e540a61136fc484bf",
           "with": {
             "autofix_before_check": true,
             "autofix_command": "guardrail-check --autofix",
@@ -3733,7 +3733,7 @@
     "references": {
       "component": {
         "continue-on-stall@2": {
-          "digest": "fbc7dbd799bcebac912a64a9dab68d5eec739150daccab9a6415ca8f2a921f06",
+          "digest": "8e410dbbcaa76745011fdc9fe1a9098b2ea5c12f29a73da87ce69cf30010a1ae",
           "metadata": {
             "discovery_probe": "continue-on-stall-recorded",
             "kind": "workflow",
@@ -3748,7 +3748,7 @@
           }
         },
         "guardrail-gate@4": {
-          "digest": "4263f4c6f6fae019ddfda1f0f60f5479898135f8f08b85c2a08528b0c0bb6600",
+          "digest": "8e2ef5a43656ee11eb3f75cd9066451bca6004c6d511a43e540a61136fc484bf",
           "metadata": {
             "discovery_probe": "guardrail-gate-ran",
             "kind": "workflow",
@@ -3763,7 +3763,7 @@
           }
         },
         "prompt-wrapper@1": {
-          "digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "digest": "95c6e9fb31c1439b6e00f4006b9ffb78584634bb8372abc694d1088ebfc4f5db",
           "metadata": {
             "discovery_probe": "prompt-wrapper-rendered",
             "kind": "prompt",
@@ -3778,7 +3778,7 @@
           }
         },
         "python-guardrails@8": {
-          "digest": "8b4ed79f57772d5e681bead54a186870e4792cd2eed391907d6b4e54fb58864b",
+          "digest": "193328bb9926210a84e3e822e4f28eb36d25f30f3e7027f992f124e05f7ab4dd",
           "metadata": {
             "discovery_probe": "python-guardrails-gate-works",
             "kind": "service",
@@ -3796,7 +3796,7 @@
           }
         },
         "transient-retry@1": {
-          "digest": "6197a226e383566c9c7e1e280b62623ff8b2024feab214f24b0d735a072cf8b5",
+          "digest": "40d4fee8c094f5acf2ed96832b8c2ac5d7693ddd42b28cf72277485653cff520",
           "metadata": {
             "discovery_probe": "transient-retry-recorded",
             "kind": "workflow",
@@ -3893,7 +3893,7 @@
     "source_sha256": "085a0d3afaadbc655297c7a2f103f13ccc907b012353a136c2efc7b10b2bfc5a",
     "spec_sha256": "22f831db018918f8533dbf0ccdcb267f8d617b35baf7dea2bd2715096f0c2f7d"
   },
-  "lock_sha256": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
+  "lock_sha256": "6e0ab7753b94069a391eae1ce4a37dc84c7b5476da546951da1170c3cda62d41",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -3901,9 +3901,9 @@
   },
   "sections": {
     "analysis": "7734255d85620b71752a2fc8516c62d6e54c2483d9e7b5086a0f6c51b81dc943",
-    "assessment": "1cc9f3e39af15baf7257109fb1ec4bbfa64a23c1ac5ecbeaa7cf6d22f723e05f",
-    "execution": "0e597e33e8b4747f0ace16130ed2913a97253368626a1e4a84285b200fef2219",
-    "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
+    "assessment": "9937da193d6ae49da1ef3717d839eb23fa74fc89acb7a6b1f40a853002272cea",
+    "execution": "6e0ab7753b94069a391eae1ce4a37dc84c7b5476da546951da1170c3cda62d41",
+    "toolchain": "f4764cb89419a1078037ab9653100edad8097d38af85ab3024226f1879fb437d"
   },
   "spec": {
     "agents": [
@@ -4069,6 +4069,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "0ccae92e58924fe66e1e46e5954d66d1fcac1ec67a6c6564ae4116ca1fd4bab7"
+    "raidar_spec": "8517990a49c15a5d143c2572dd78f1d56b8859ffc580654715ecbc114045e5d9"
   }
 }

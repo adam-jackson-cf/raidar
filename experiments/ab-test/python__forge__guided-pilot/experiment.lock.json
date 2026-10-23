@@ -41,10 +41,10 @@
       },
       "scorer": {
         "code-quality@1": {
-          "digest": "e26b54641878765e8e27dd65f5901a40645e5a3ff9353b3ff2479be4469969b1",
+          "digest": "177e2bf8912f1c63ce536097a8222c0e12c4317508439d94dc27246d953613cf",
           "metadata": {
             "implementation": "raidar.scorers.code_quality:code_quality_scorer",
-            "implementation_digest": "ff7de03a454887cbace1ec83fd37f6ead9216bc5e9f3ae5a2e6d7cbe0a1235df",
+            "implementation_digest": "736cd68366d63a638ec8d961cc7499a540f47d972f748a6fcadd09d159c75c01",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots.",
               "evidence_required": [
@@ -251,10 +251,10 @@
           }
         },
         "correctness@1": {
-          "digest": "31fa2f2e6cad064ec39df105bcfd9df5f96f837cd1c369b41db9587fccbe7286",
+          "digest": "4be940aff5a1e111061505e02963b54c373825ea85cc2ef0cac0ba33099ee3c0",
           "metadata": {
             "implementation": "raidar.scorers.correctness:correctness_scorer",
-            "implementation_digest": "69da6597236462d2f7da95f875afdc410ed69d23c89ec8c05e46183cecbc592d",
+            "implementation_digest": "30bad4c6f5461c6a39578e64f0c484ca9074dec1ed36981f9c383ce3b06dc733",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -418,10 +418,10 @@
           }
         },
         "process-compliance@2": {
-          "digest": "e9477bdddccc76f77176745a28c5f26c9b842d3f69e62fde25c771d0a48e563c",
+          "digest": "0df8979b10a49acc20e00f840d0f470535b423e8563f99debb12cb80f744039d",
           "metadata": {
             "implementation": "raidar.scorers.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "245d173e514e4e25eb3853cfa448192e43b3e9344f4c31cba84f96792dcf6b97",
+            "implementation_digest": "3632b8f5b963593a27adb85cab243f326eb9187c5e6683e8392f464841b8f5d4",
             "manifest": {
               "description": "Deterministic trace checks of agent process; a check the trace cannot decide is undetermined, never judged by a model.",
               "evidence_required": [
@@ -478,10 +478,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "c88c54f17cade31835b3a75fd9ec3282a1a0bf7c2bc1121aba8c369f513e9608",
+          "digest": "f3c72ab636efd5be83bff09e357d9f578450e3382bab9fd8485fd6645e354b6d",
           "metadata": {
             "implementation": "raidar.scorers.resource_usage:resource_usage_scorer",
-            "implementation_digest": "56e18c7803982706d823f2646ac3ab0214755de82344588d0cedac38f6aa74f6",
+            "implementation_digest": "a4e91a68b90ce43a9cc515ece436be4d7242dc72861459cfa0aae4c03218130b",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -633,18 +633,18 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "4268669c2d3911e77c160a6c57128b146d345a0a0450e547cb6b1780647bf287",
+  "document_sha256": "8cd36a1fcf89f5d6b13d1e4f64e7554f2e88294e5726d97c6c47d1d70e84087e",
   "execution": {
     "arms": {
       "baseline": {
         "agent": "codex-luna",
         "condition": "baseline",
-        "digest": "3811d7966e6527cb258f5f25bd59fe34eb97ec2428e8c3a946b05eacd6d435bf"
+        "digest": "24135abb02ec61be93d9ea48864f013c6de494f2328469bee016706431cd3df1"
       },
       "guided": {
         "agent": "codex-luna",
         "condition": "guided",
-        "digest": "a5000e7d6800dd08ccf67a84362eff6d8ee77573fa445d9a08c83329dcdf4fd1"
+        "digest": "85586fd39b20f30f35cfa1c6dcffaf75d31136b7e0abdc611b862d779581c58e"
       }
     },
     "conditions": {
@@ -654,7 +654,7 @@
             "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
           },
           "use": "prompt-wrapper@1",
-          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "use_digest": "95c6e9fb31c1439b6e00f4006b9ffb78584634bb8372abc694d1088ebfc4f5db",
           "with": {}
         }
       ],
@@ -664,7 +664,7 @@
             "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
           },
           "use": "prompt-wrapper@1",
-          "use_digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "use_digest": "95c6e9fb31c1439b6e00f4006b9ffb78584634bb8372abc694d1088ebfc4f5db",
           "with": {}
         },
         {
@@ -672,7 +672,7 @@
             "components/guided/AGENTS.md": "f1b2d66fbb0b1be823d213d97295e898d51ab3c4190218ea6281a23b44060b06"
           },
           "use": "rules-file@1",
-          "use_digest": "fc88c9b397e6c1798fe6b15f71a91e00037a7faa70b790183f788ef405e5d116",
+          "use_digest": "56c313090c48e759b9cae1515a8d89e9a1a4273c749a0e5eb61e2e8c2b2f7915",
           "with": {}
         },
         {
@@ -680,7 +680,7 @@
             "components/guided/skills/checkpoint-discipline/SKILL.md": "b862bf15a19d4e189b0c70cea73ce3c7989ff58bf60bbfaddd2a5030be8a9d43"
           },
           "use": "skills@1",
-          "use_digest": "a1b393af693f122e1e0ef1e04b168aa9c1402a7d9251e50510d3dfc0e70c66b4",
+          "use_digest": "137a017b58bd09b297a8e52d6dbcd0713d60ca4a3d3f063c9d1ebf6d63c1760f",
           "with": {}
         },
         {
@@ -688,13 +688,13 @@
             "components/guided/ruff.toml": "f716b4083856f7b9976b969b4431d17d4df6c6c71ee6839174cfa363069fef7f"
           },
           "use": "lint-config@1",
-          "use_digest": "c826d0ba066708860bf2c00d4ab9fef88ced35d553f6e612c7f80d09650f0f78",
+          "use_digest": "e66ec8de17e80b9dcc11b8e7371ec9e73c90fe859d60aba7dd2f67d1cfb0f401",
           "with": {}
         },
         {
           "files": {},
           "use": "stop-hook@1",
-          "use_digest": "26a4ec63b43d49785806da8f849e342563a1b05365e12fc6b83afa7577f9af05",
+          "use_digest": "bea09941cc5d5ec48e0c80c5b7529e13ef76fdfb3d7ee1e7a57f2520504b5610",
           "with": {
             "command": "python3 -m compileall -q . >/dev/null 2>&1 || true"
           }
@@ -702,7 +702,7 @@
         {
           "files": {},
           "use": "review-loop@2",
-          "use_digest": "a6954fd777dbed455c391b7f236115a85666dbfa238ffcaad349ad84ba53b5bf",
+          "use_digest": "e7b4c3da6b68bed4a0527c440fcf1663be8b4cbb7e6a5fb38550c437b72d8270",
           "with": {
             "max_review_rounds": 2
           }
@@ -841,7 +841,7 @@
     "references": {
       "component": {
         "lint-config@1": {
-          "digest": "c826d0ba066708860bf2c00d4ab9fef88ced35d553f6e612c7f80d09650f0f78",
+          "digest": "e66ec8de17e80b9dcc11b8e7371ec9e73c90fe859d60aba7dd2f67d1cfb0f401",
           "metadata": {
             "discovery_probe": "lint-config-present",
             "kind": "workspace",
@@ -856,7 +856,7 @@
           }
         },
         "prompt-wrapper@1": {
-          "digest": "a0c2f93b86f82c61ee4fe624d8f4e8049ae8e1504bc1717505c015cb02e77a65",
+          "digest": "95c6e9fb31c1439b6e00f4006b9ffb78584634bb8372abc694d1088ebfc4f5db",
           "metadata": {
             "discovery_probe": "prompt-wrapper-rendered",
             "kind": "prompt",
@@ -871,7 +871,7 @@
           }
         },
         "review-loop@2": {
-          "digest": "a6954fd777dbed455c391b7f236115a85666dbfa238ffcaad349ad84ba53b5bf",
+          "digest": "e7b4c3da6b68bed4a0527c440fcf1663be8b4cbb7e6a5fb38550c437b72d8270",
           "metadata": {
             "discovery_probe": "review-loop-reviewed",
             "kind": "workflow",
@@ -886,7 +886,7 @@
           }
         },
         "rules-file@1": {
-          "digest": "fc88c9b397e6c1798fe6b15f71a91e00037a7faa70b790183f788ef405e5d116",
+          "digest": "56c313090c48e759b9cae1515a8d89e9a1a4273c749a0e5eb61e2e8c2b2f7915",
           "metadata": {
             "discovery_probe": "rules-file-loaded",
             "kind": "workspace",
@@ -901,7 +901,7 @@
           }
         },
         "skills@1": {
-          "digest": "a1b393af693f122e1e0ef1e04b168aa9c1402a7d9251e50510d3dfc0e70c66b4",
+          "digest": "137a017b58bd09b297a8e52d6dbcd0713d60ca4a3d3f063c9d1ebf6d63c1760f",
           "metadata": {
             "discovery_probe": "skills-listed",
             "kind": "harness",
@@ -916,7 +916,7 @@
           }
         },
         "stop-hook@1": {
-          "digest": "26a4ec63b43d49785806da8f849e342563a1b05365e12fc6b83afa7577f9af05",
+          "digest": "bea09941cc5d5ec48e0c80c5b7529e13ef76fdfb3d7ee1e7a57f2520504b5610",
           "metadata": {
             "discovery_probe": "stop-hook-fired",
             "kind": "harness",
@@ -1013,7 +1013,7 @@
     "source_sha256": "5f9bf1b4beda95db1d8c45c47177ef64b8c9ee4b305550af78f71d83fda8b413",
     "spec_sha256": "21fb023fc79afe659bdbbb4c260d779f7ca7c5daebf083d94163eb149de9513d"
   },
-  "lock_sha256": "15c1eb4e3a1b243ce47090737a04cc9dc06a14a40b6621ab59f220123e38b901",
+  "lock_sha256": "c5e7930cce9569a770fe35461d61ce5b1de28874cdf188233b9d967813148269",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -1021,9 +1021,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "b0f63ea126725255e085a0fa8c71f5ab00064e242450c06246b3cb7dd5f6266c",
-    "execution": "15c1eb4e3a1b243ce47090737a04cc9dc06a14a40b6621ab59f220123e38b901",
-    "toolchain": "8b238434744ffcc2aa06d7a1cd1f950f0f9a812d419d346a8e2a5f10f715afd8"
+    "assessment": "74e11fc5a38325dd957ec0580a392de55d54c776b6c7a336d3052632cfbfe486",
+    "execution": "c5e7930cce9569a770fe35461d61ce5b1de28874cdf188233b9d967813148269",
+    "toolchain": "f4764cb89419a1078037ab9653100edad8097d38af85ab3024226f1879fb437d"
   },
   "spec": {
     "agents": [
@@ -1157,6 +1157,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.14.0",
-    "raidar_spec": "0ccae92e58924fe66e1e46e5954d66d1fcac1ec67a6c6564ae4116ca1fd4bab7"
+    "raidar_spec": "8517990a49c15a5d143c2572dd78f1d56b8859ffc580654715ecbc114045e5d9"
   }
 }
