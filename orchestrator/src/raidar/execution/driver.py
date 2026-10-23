@@ -39,6 +39,7 @@ from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
 from raidar.components.provision_v2 import AnyProvision, install_trial_provisioning
+from raidar.execution.liveness import install_liveness_monitor
 from raidar.execution.reaper import install_agent_reaper
 from raidar.verifier.guard import install_leak_guard
 
@@ -64,6 +65,7 @@ async def run_harbor_trial(
     trial = await Trial.create(config)
     install_leak_guard(trial, bundle_root)
     install_agent_reaper(trial, bundle_root)
+    install_liveness_monitor(trial)
     install_trial_provisioning(trial, provisions)
     result = await trial.run()
     error = result.exception_info.exception_type if result.exception_info else None
