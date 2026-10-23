@@ -56,7 +56,15 @@ from typing import Any
 import click
 
 from raidar.analysis.sources import AnalysisInputError, JobDir, default_lock, read_lock
-from raidar.cli.target_options import docker_selection
+from raidar.cli.grading import (
+    RegradeOptions,
+    check_coverage,
+    grade_pre_fix,
+    grading_options,
+    produce_coverage,
+    reads_docker_grades,
+    regrade,
+)
 from raidar.core.job_layout import JOB_MANIFEST
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
@@ -64,15 +72,6 @@ from raidar.scorers.rescore import report_payload, rescore_path
 from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
 from raidar.scorers.store import AssessmentConflictError, AssessmentStore
 from raidar.verifier.bundle import BundleError, load_bundle
-from raidar.verifier.offline_grading import (
-    OfflineGradingError,
-    check_coverage,
-    grade_pre_fix,
-    produce_coverage,
-    reads_docker_grades,
-    regrade,
-)
-from raidar.verifier.regrade import RegradeOptions
 
 
 def register(main: click.Group) -> None:
@@ -86,14 +85,6 @@ def _emit(report: dict[str, object], out: Path | None) -> None:
     click.echo(text)
 
 
-def grading_options(target_name: str | None, bundle_override: Path | None) -> RegradeOptions:
-    """Options on the selected target's grader target (trusted with hidden tests, ensured)."""
-    selection = docker_selection(target_name, grader_purpose="hidden-test grading")
-    return RegradeOptions(
-        docker_context=selection.grader.docker_context, bundle_override=bundle_override
-    )
-
-
 def _regrade(
     target: Path,
     options: RegradeOptions,
@@ -103,14 +94,11 @@ def _regrade(
     coverage_check: bool = False,
     concurrency: int = 1,
 ) -> None:
-    try:
-        report = (
-            check_coverage(target, options, store, concurrency)
-            if coverage_check
-            else regrade(target, options, store)
-        )
-    except OfflineGradingError as exc:
-        raise click.ClickException(str(exc)) from exc
+    report = (
+        check_coverage(target, options, store, concurrency)
+        if coverage_check
+        else regrade(target, options, store)
+    )
     _emit(report, out)
     if not report["match"]:
         raise click.exceptions.Exit(1)
@@ -264,27 +252,24 @@ def _rescore(request: _RescoreRequest, out: Path | None) -> None:
         raise click.UsageError("--store must not be inside the job being rescored")
     _check_as1(request.target, request.lock, request.scorer_refs, request.bundle)
     graded = covered = None
-    try:
-        if reads_docker_grades(request.scorer_refs, request.replay):
-            options = grading_options(request.target_name, request.bundle)
-            graded = grade_pre_fix(
-                request.target,
-                store,
-                request.scorer_refs,
-                options,
-                replay=request.replay,
-                concurrency=request.concurrency,
-            )
-            covered = produce_coverage(
-                request.target,
-                store,
-                request.scorer_refs,
-                options,
-                replay=request.replay,
-                concurrency=request.concurrency,
-            )
-    except OfflineGradingError as exc:
-        raise click.ClickException(str(exc)) from exc
+    if reads_docker_grades(request.scorer_refs, request.replay):
+        options = grading_options(request.target_name, request.bundle)
+        graded = grade_pre_fix(
+            request.target,
+            store,
+            request.scorer_refs,
+            options,
+            replay=request.replay,
+            concurrency=request.concurrency,
+        )
+        covered = produce_coverage(
+            request.target,
+            store,
+            request.scorer_refs,
+            options,
+            replay=request.replay,
+            concurrency=request.concurrency,
+        )
     try:
         settings, config_path = _settings(request)
         records = rescore_path(
