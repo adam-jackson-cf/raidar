@@ -1,0 +1,346 @@
+{
+  "FANOUT.general": {
+    "codes": "FANOUT.general",
+    "mode": "rule"
+  },
+  "FANOUT.large-module": {
+    "codes": "FANOUT.large-module",
+    "mode": "rule"
+  },
+  "MYPY.SETTING.exclude": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
+  "MYPY.SETTING.mypy_path": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
+  "MYPY.SETTING.python_version": {
+    "codes": "MYPY.attr-defined",
+    "mode": "rule"
+  },
+  "MYPY.SETTING.show_error_codes": {
+    "codes": "MYPY.no-untyped-def",
+    "mode": "rule"
+  },
+  "MYPY.disable_error_code": {
+    "codes": "MYPY.import-untyped,MYPY.import-not-found",
+    "mode": "rule"
+  },
+  "MYPY.explicit_package_bases": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
+  "MYPY.follow_imports": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
+  "MYPY.module-overrides": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
+  "MYPY.package-coverage": {
+    "codes": "MYPY",
+    "mode": "rule"
+  },
+  "MYPY.strict": {
+    "codes": "MYPY.no-untyped-def",
+    "mode": "rule"
+  },
+  "MYPY.warn_unused_ignores": {
+    "codes": "MYPY.unused-ignore",
+    "mode": "rule"
+  },
+  "PARITY.lock-version": {
+    "codes": "PARITY.lock-version",
+    "mode": "rule"
+  },
+  "PYQ102": {
+    "codes": "PYQ102",
+    "mode": "rule"
+  },
+  "PYQ103": {
+    "codes": "PYQ103",
+    "mode": "rule"
+  },
+  "PYQ104": {
+    "codes": "PYQ104",
+    "mode": "rule"
+  },
+  "PYQ105": {
+    "codes": "PYQ105",
+    "mode": "rule"
+  },
+  "PYQ107": {
+    "codes": "PYQ107",
+    "mode": "rule"
+  },
+  "PYQ200": {
+    "codes": "PYQ200",
+    "mode": "rule"
+  },
+  "PYQ202": {
+    "codes": "PYQ202",
+    "mode": "rule"
+  },
+  "PYQ203": {
+    "codes": "PYQ203",
+    "mode": "rule"
+  },
+  "PYQ299": {
+    "codes": "PYQ299",
+    "mode": "rule"
+  },
+  "PYS000": {
+    "codes": "PYS000",
+    "mode": "rule"
+  },
+  "PYS250": {
+    "codes": "PYS250",
+    "mode": "rule"
+  },
+  "RUFF.FORMAT.docstring-code-format": {
+    "codes": "FORMAT",
+    "mode": "rule"
+  },
+  "RUFF.FORMAT.indent-style": {
+    "codes": "FORMAT",
+    "mode": "rule"
+  },
+  "RUFF.FORMAT.line-ending": {
+    "codes": "FORMAT",
+    "mode": "rule"
+  },
+  "RUFF.FORMAT.quote-style": {
+    "codes": "FORMAT",
+    "mode": "rule"
+  },
+  "RUFF.IGNORES": {
+    "codes": "SUPPRESS,E501,D103,D100",
+    "mode": "rule"
+  },
+  "RUFF.ISORT.combine-as-imports": {
+    "codes": "I001",
+    "mode": "rule"
+  },
+  "RUFF.ISORT.force-single-line": {
+    "codes": "I001",
+    "mode": "rule"
+  },
+  "RUFF.ISORT.known-first-party": {
+    "codes": "I001",
+    "mode": "rule"
+  },
+  "RUFF.ISORT.split-on-trailing-comma": {
+    "codes": "I001",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-args": {
+    "codes": "PLR0913",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-branches": {
+    "codes": "PLR0912",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-locals": {
+    "codes": "PLR0914",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-positional-args": {
+    "codes": "PLR0917",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-public-methods": {
+    "codes": "PLR0904",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-returns": {
+    "codes": "PLR0911",
+    "mode": "rule"
+  },
+  "RUFF.LIMIT.max-statements": {
+    "codes": "PLR0915",
+    "mode": "rule"
+  },
+  "RUFF.LINT.per-file-ignores": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "RUFF.LINT.per-file-ignores.test-public-methods": {
+    "codes": "PLR0904",
+    "mode": "rule"
+  },
+  "RUFF.PYDOCSTYLE.convention": {
+    "codes": "D",
+    "mode": "rule"
+  },
+  "RUFF.ROOT.exclude": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "RUFF.ROOT.fix": {
+    "codes": "F401",
+    "mode": "unchanged"
+  },
+  "RUFF.ROOT.output-format": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "RUFF.ROOT.preview": {
+    "codes": "PLR0917",
+    "mode": "rule"
+  },
+  "RUFF.ROOT.respect-gitignore": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.A": {
+    "codes": "A001",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.B": {
+    "codes": "B009",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.C4": {
+    "codes": "C408",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.C901": {
+    "codes": "C901",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.D": {
+    "codes": "D",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.E": {
+    "codes": "E711",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.F": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.I": {
+    "codes": "I001",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.N": {
+    "codes": "N802",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PGH": {
+    "codes": "PGH003",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0904": {
+    "codes": "PLR0904",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0911": {
+    "codes": "PLR0911",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0912": {
+    "codes": "PLR0912",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0913": {
+    "codes": "PLR0913",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0914": {
+    "codes": "PLR0914",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0915": {
+    "codes": "PLR0915",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PLR0917": {
+    "codes": "PLR0917",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.PT": {
+    "codes": "PT018",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.SIM": {
+    "codes": "SIM108",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.UP": {
+    "codes": "UP035",
+    "mode": "rule"
+  },
+  "RUFF.SELECT.W": {
+    "codes": "W291",
+    "mode": "rule"
+  },
+  "RUFF.SETTING.line-length": {
+    "codes": "FORMAT",
+    "mode": "rule"
+  },
+  "RUFF.SETTING.mccabe.max-complexity": {
+    "codes": "C901",
+    "mode": "rule"
+  },
+  "RUFF.SETTING.target-version": {
+    "codes": "UP040",
+    "mode": "rule"
+  },
+  "RUNNER.local-ci-parity": {
+    "codes": "F401",
+    "mode": "commit"
+  },
+  "SCOPE.py-symlink": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "SCOPE.shebang-script": {
+    "codes": "F401",
+    "mode": "rule"
+  },
+  "TEST.coverage-minimum": {
+    "codes": "TEST.coverage-minimum",
+    "mode": "rule"
+  },
+  "TEST.failed": {
+    "codes": "TEST.failed",
+    "mode": "rule"
+  },
+  "TEST.failure-propagation": {
+    "codes": "",
+    "mode": "propagation"
+  },
+  "TEST.isolated-run": {
+    "codes": "TEST.failed",
+    "mode": "workspace-clean"
+  },
+  "TEST.missing": {
+    "codes": "TEST.missing",
+    "mode": "rule"
+  },
+  "TEST.no-change-exempt": {
+    "codes": "TEST.missing",
+    "mode": "since-commit"
+  },
+  "TEST.pytest-runner": {
+    "codes": "TEST.failed",
+    "mode": "rule"
+  },
+  "TEST.subprocess-coverage": {
+    "codes": "TEST.coverage-minimum",
+    "mode": "rule"
+  },
+  "TEST.subprocess-timeouts": {
+    "codes": "TST001",
+    "mode": "rule"
+  },
+  "TEST.tiers": {
+    "codes": "F401",
+    "mode": "rule"
+  }
+}

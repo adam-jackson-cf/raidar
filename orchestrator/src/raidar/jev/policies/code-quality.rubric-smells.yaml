@@ -1,0 +1,27 @@
+# SCB rubric criteria asked per changed symbol (question set scb-rubric@2).
+# PARKED (version 3, 2026-10-04, user decision): mode off. Jev is out of the
+# scoring and analysis paths; model judgement is used only when a needed
+# measure cannot be made deterministically, and none qualifies today
+# (docs/reboot/requirements.md change log, F7). History: version 2 was shadow
+# (decisions audited as uncalibrated, never feeding metrics or verdicts); its
+# audit, labels and calibration notes below stay as they were. Raising the
+# mode again is a new policy version and a new user decision. Promotion to
+# enforce needs a recorded promotion (>=30 labels, >=5 minority, input
+# sufficiency >=0.8, frozen threshold) and a code-quality scorer minor bump.
+id: code-quality.rubric-smells
+version: "3"
+description: SCB rubric smells per changed Python symbol, with carry-forward.
+mode: "off"
+question_set: scb-rubric@2
+runtimes: [python]
+
+# Calibration status of version 2 (2026-10-02; NOT promoted, see gate packet
+# §11.17). This trailing note is dropped by `make jev-promote`, whose promotion block records
+# reviewers itself:
+# - Labels: 33 blind labels in runs/pilot-v2/assessment-store, all
+#   model-made (reviewer kind "model", model id "claude-opus-5-5"); 0 human.
+# - Candidate on the fixed split (21/21 trials): threshold 0.65, regression
+#   corpus da2c672734c84be0623ea6c3de47d0ae693c6da9956a2a2ecfa02bcb32b5dc21,
+#   evaluation precision 0.2 / recall 0.3333 / agreement 0.6 (n=15, 3 positives).
+# - Held in shadow: jev-verify-promotion fails until a code-quality@1.1 exists,
+#   and code-quality@1 does not consume this policy's decisions.

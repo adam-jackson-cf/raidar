@@ -16,16 +16,15 @@ DEFAULT_EXCLUDED_PREFIXES = (
     ".mypy_cache/",
     ".pytest_cache/",
     ".ruff_cache/",
-    ".tmp/",
     ".venv/",
     "build/",
     "dist/",
     "docs/",
-    "experiments/",
+    "lab/experiments/",
     "node_modules/",
     "orchestrator/.cache/",
     "orchestrator/.venv/",
-    "scenarios/",
+    "var/",
     "venv/",
 )
 

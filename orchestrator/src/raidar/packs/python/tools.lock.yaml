@@ -1,0 +1,46 @@
+# Python pack measurement tool lock (reboot plan WS-I I2, design memo §4.1).
+# host-parse tools are provisioned lazily into the host cache keyed by this
+# lock's hash. eval-sandbox tools build or execute candidate code, so they run
+# in the eval container and are never provisioned on the host.
+# Versions overlap the SCB fork where it pins them (slop-code-bench
+# metrics/scoring/contract.py, metrics/checkpoint/driver.py, uv.lock).
+# scb-python-quality carries the analysers (ruff, radon, tree-sitter, networkx)
+# only. It cannot import SCB's own evaluator package (slop_code.metrics), whose
+# import graph also needs pyyaml, structlog, pydantic, rich, gitpython and more;
+# a measurement adapter must port the evaluator or add those pins here.
+version: 1
+runtime: python
+python: "3.12"
+# Transitive dependencies resolve as of this instant (uv --exclude-newer).
+exclude_newer: "2026-09-29T00:00:00Z"
+tools:
+  scb-python-quality:
+    execution: host-parse
+    installer: uv-env
+    packages:
+      - ruff==0.8.6
+      - radon==6.0.1
+      - tree-sitter==0.25.2
+      - tree-sitter-language-pack==0.13.0
+      - networkx==3.6.1
+    executables: [ruff, radon]
+    modules: [ruff, radon, tree_sitter, tree_sitter_language_pack, networkx]
+  scb-check:
+    execution: host-parse
+    installer: uv-tool
+    packages:
+      - scb-check==0.1.3
+    executables: [scb-check]
+    modules: [scb_check]
+  # The eval container installs these from raidar.oracle.grader_image
+  # GRADER_TOOLS (WS-E); this entry mirrors that set so the agent-image audit
+  # forbids it and host provisioning refuses it. A test fails if they diverge.
+  scb-oracle-pytest:
+    execution: eval-sandbox
+    installer: uv-env
+    packages:
+      - pytest==9.0.3
+      - pytest-timeout==2.4.0
+      - coverage==7.13.4
+    executables: [pytest, py.test, coverage]
+    modules: [pytest, pytest_timeout, coverage]

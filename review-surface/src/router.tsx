@@ -5,6 +5,8 @@ import { ExperimentsPage } from '@/pages/ExperimentsPage';
 import { RunsPage } from '@/pages/RunsPage';
 import { WireframeExperimentsPage } from '@/pages/WireframeExperimentsPage';
 import { WireframeRunsPage } from '@/pages/WireframeRunsPage';
+import { QualityPage } from '@/quality/QualityPage';
+import { QualityRunPage } from '@/quality/QualityRunPage';
 import { C } from '@/utils/colors';
 
 function Layout() {
@@ -45,7 +47,14 @@ function Layout() {
               className="text-xs transition"
               style={({ isActive }) => ({ color: isActive ? C.accent : C.fg1 })}
             >
-              Runs
+              Trials
+            </NavLink>
+            <NavLink
+              to="/quality"
+              className="text-xs transition"
+              style={({ isActive }) => ({ color: isActive ? C.accent : C.fg1 })}
+            >
+              Quality
             </NavLink>
           </nav>
           <button
@@ -78,6 +87,8 @@ export function AppRouter() {
           <Route path="/" element={<ExperimentsPage />} />
           <Route path="/runs" element={<RunsPage />} />
           <Route path="/runs/:runId" element={<RunsPage />} />
+          <Route path="/quality" element={<QualityPage />} />
+          <Route path="/quality/runs/:runId" element={<QualityRunPage />} />
           <Route path="wireframe" element={<WireframeExperimentsPage />} />
           <Route path="wireframe/runs" element={<WireframeRunsPage />} />
           <Route path="wireframe/runs/:runId" element={<WireframeRunsPage />} />

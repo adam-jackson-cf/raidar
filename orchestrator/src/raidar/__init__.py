@@ -1,1 +1,1 @@
-"""Scenario orchestrator for testing AgentSpecs with Harbor."""
+"""Raidar: controlled experiments on coding agents, run through Harbor."""

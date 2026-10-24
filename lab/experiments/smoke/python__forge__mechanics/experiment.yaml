@@ -1,0 +1,53 @@
+# Mechanics declaration smoke (ADR-002, design r2 §5 step 7): the 8-checkpoint forge
+# problem x one vanilla codex arm x one attempt, through the copy-only path on the
+# configured Docker target, with run-health and liveness (observe) recorded.
+# It proves the multi-checkpoint path end to end on the current run mechanics; kind smoke, not citable.
+# The pilot-v2 starter framing (prompt-wrapper@1, byte-identical copy) is required: without it
+# vanilla codex sees an empty /app, asks a question and writes nothing (pilot F1; observed again
+# in the first mechanics smoke job).
+# Run detached: make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__mechanics/experiment.yaml JOB_ID=<id> DETACH=1
+schema_version: 2
+kind: smoke
+id: python__forge__mechanics
+description: Mechanics declaration smoke on forge (8 checkpoints); not citable.
+
+problems:
+  - ref: scb/forge@38d627ecf668
+
+runtime: python
+
+agents:
+  - id: agent
+    name: codex
+    provider: openai
+    model: gpt-6-luna
+    reasoning_effort: low
+    version: 0.156.1
+
+protocol:
+  progression: continue
+  agent_timeout_sec: 1800
+  verifier_timeout_sec: 900
+  snapshot_source: artifact
+
+shared_components:
+  - use: prompt-wrapper@1
+    files: [components/shared/starter-framing.md]
+
+conditions:
+  - id: baseline
+    components: []
+
+arms:
+  - id: baseline
+    condition: baseline
+    agent: agent
+
+assessment:
+  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6]
+  metric: scb-canonical@2
+
+analysis:
+  baseline_arm: baseline
+  attempts: 1
+  seed: 20261023

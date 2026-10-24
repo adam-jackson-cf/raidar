@@ -8,7 +8,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 PYPROJECT_PATH = REPO_ROOT / "orchestrator" / "pyproject.toml"
-CLI_PATH = REPO_ROOT / "orchestrator" / "src" / "raidar" / "cli.py"
+CLI_PATH = REPO_ROOT / "orchestrator" / "src" / "raidar" / "cli" / "__init__.py"
 
 
 def _current_project_version() -> str:

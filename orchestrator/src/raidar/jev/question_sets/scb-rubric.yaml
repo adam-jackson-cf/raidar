@@ -1,0 +1,51 @@
+# SCB rubric criteria asked as Jev noul questions per changed Python symbol (plan H3).
+# The criteria are the SCB fork's configs/rubrics/llm_judge.jsonl, vendored byte-for-byte;
+# the loader refuses the file if its sha256 differs from source.sha256.
+#
+# requires: the state each criterion needs to be answerable.
+#   symbol   - the symbol's own source (always sent)
+#   file     - the whole file around the symbol
+#   spec     - the cumulative checkpoint specification
+#   codebase - usages across the codebase: a bounded whole-codebase state
+#              (raidar.jev.codebase: inventory, inheritance/interface graph and the
+#              symbol's call and access sites) of at most codebase_chars.
+# kinds: which symbol kinds a criterion applies to (default: function, method, module).
+id: scb-rubric
+version: "2"
+source:
+  file: scb_rubric_llm_judge.jsonl
+  upstream: slop-code-bench configs/rubrics/llm_judge.jsonl
+  upstream_commit: 6b31994d0b22010172bf11f909fa9b6e774b3315
+  sha256: 79bcf007267eef64607445c2032fed70b4805bc474b44bd1c11e92c063cdd1ac
+# Not verified against the live API (no key was available when this was written).
+max_questions_per_request: 12
+symbol_chars: 24000
+file_chars: 60000
+spec_chars: 40000
+# symbol (24k) + codebase (48k) + task stay under Jev's 96k-character state cap.
+codebase_chars: 48000
+criteria:
+  echo_docstrings: {kinds: [function, method]}
+  entry_exit_logging: {kinds: [function, method]}
+  class_prefix_in_members: {kinds: [class]}
+  delegation_only_class: {kinds: [class]}
+  lonely_interface: {kinds: [class], requires: codebase}
+  one_subclass_hierarchy: {kinds: [class], requires: codebase}
+  single_entry_registry: {kinds: [module, class, function, method], requires: file}
+  factory_returns_constant: {kinds: [function, method, class]}
+  strategy_never_varies: {kinds: [class], requires: codebase}
+  interface_per_class: {kinds: [class], requires: codebase}
+  cache_for_literals: {kinds: [function, method]}
+  parallel_small_collection: {requires: codebase}
+  lazy_always_accessed: {kinds: [class], requires: codebase}
+  default_on_required_field: {requires: file}
+  unrequested_features: {requires: spec}
+  handling_excluded_cases: {requires: spec}
+  stub_implementations: {kinds: [function, method]}
+  unnecessary_type_wrappers: {kinds: [class]}
+  boolean_success_flags: {kinds: [function, method]}
+  correlation_id_absence: {requires: file}
+  implicit_default_parameters: {kinds: [function, method], requires: codebase}
+  null_coalescing_abuse: {requires: file}
+  validation_mismatch: {requires: spec}
+  domain_blind_normalization: {requires: spec}

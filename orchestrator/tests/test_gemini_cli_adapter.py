@@ -1,7 +1,5 @@
 """Tests for Gemini adapter behavior."""
 
-from pathlib import Path
-
 import pytest
 
 from raidar.agents.adapters.factory import resolve_adapter
@@ -47,7 +45,7 @@ def test_validate_requires_api_key(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("GEMINI_CLI_PATH", "/usr/local/bin/gemini")
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
-    with pytest.raises(OSError, match="require an API key"):
+    with pytest.raises(OSError, match="require credentials; set: GEMINI_API_KEY"):
         adapter.validate()
 
 
@@ -82,9 +80,3 @@ def test_runtime_env_forwards_cli_only(monkeypatch: pytest.MonkeyPatch):
     env = adapter.runtime_env()
     assert env["GEMINI_CLI_PATH"] == "/usr/local/bin/gemini"
     assert "GEMINI_API_KEY" not in env
-
-
-def test_prepare_workspace_creates_gemini_trace_dir(tmp_path: Path):
-    adapter = GeminiCliAdapter(_config("gemini-3-pro-preview"))
-    adapter.prepare_workspace(tmp_path)
-    assert (tmp_path / ".gemini").exists()

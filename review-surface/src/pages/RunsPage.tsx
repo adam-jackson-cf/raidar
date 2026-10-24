@@ -8,12 +8,14 @@ import { AnnotationCards } from '@/components/AnnotationCards';
 import { AnnotationCreateForm } from '@/components/AnnotationCreateForm';
 import { FindingChips } from '@/components/FindingChips';
 import { GateChips } from '@/components/GateChips';
+import { FamilyPolicyMismatch } from '@/components/PolicyMismatchNotice';
 import { RunHeader } from '@/components/RunHeader';
 import { ScorecardPanel } from '@/components/ScorecardPanel';
 import { RunListItem } from '@/components/RunListItem';
 import { SearchPanel } from '@/components/SearchPanel';
 import { SpanDetail } from '@/components/SpanDetail';
 import { SpanTree } from '@/components/SpanTree';
+import { RunQualityPanel } from '@/quality/components/RunQualityPanel';
 import { C } from '@/utils/colors';
 import type { Annotation, AnnotationKind, RunDetail as RunDetailData } from '@/utils/types';
 
@@ -68,7 +70,7 @@ function RunDetailView({ runId }: { runId: string }) {
   if (detail.isLoading) {
     return (
       <div className="flex h-full items-center justify-center text-xs" style={{ color: C.fg1 }}>
-        Loading run…
+        Loading trial…
       </div>
     );
   }
@@ -78,11 +80,11 @@ function RunDetailView({ runId }: { runId: string }) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-1.5">
         <span className="text-sm" style={{ color: notFound ? C.fg3 : C.red }}>
-          {notFound ? 'Run not found' : `Failed to load run: ${message}`}
+          {notFound ? 'Trial not found' : `Failed to load trial: ${message}`}
         </span>
         <span className="text-xs" style={{ color: C.fg0 }}>
           {notFound
-            ? `No projected run with id “${runId}”. Re-run make review-surface-data if the benchmark exists.`
+            ? `No projected trial with id “${runId}”. Re-run make review-surface-data if the job exists.`
             : 'Check that the review-surface server is running.'}
         </span>
       </div>
@@ -107,11 +109,15 @@ function RunDetailView({ runId }: { runId: string }) {
         <GateChips spans={data.spans} onSelect={(spanId) => selectSpan(spanId)} />
       </RunHeader>
 
+      <FamilyPolicyMismatch problem={data.run.problem} />
+
       <ScorecardPanel
         spans={data.spans}
         selectedSpanId={selectedSpanId}
         onSelect={(spanId) => selectSpan(spanId)}
       />
+
+      <RunQualityPanel run={data.run} />
 
       <div
         className="flex flex-col gap-2 rounded-lg p-2.5"
@@ -204,18 +210,18 @@ export function RunsPage() {
     if (!q) return list;
     return list.filter(
       (r) =>
-        r.scenario.toLowerCase().includes(q) ||
+        r.problem.toLowerCase().includes(q) ||
         r.agent_spec.toLowerCase().includes(q) ||
         r.id.toLowerCase().includes(q),
     );
   }, [runs.data, filter]);
 
   const grouped = useMemo(() => {
-    const groups = new Map<string, { scenario: string; spec: string; experimentId: string; runs: typeof filtered }>();
+    const groups = new Map<string, { problem: string; spec: string; experimentId: string; runs: typeof filtered }>();
     for (const run of filtered) {
       const key = run.experiment_id;
       const entry = groups.get(key) ?? {
-        scenario: `${run.scenario}@${run.revision}`,
+        problem: `${run.problem}@${run.arm}`,
         spec: run.agent_spec,
         experimentId: run.experiment_id,
         runs: [],
@@ -235,7 +241,7 @@ export function RunsPage() {
         <input
           value={filter}
           onChange={(e) => setFilter(e.target.value)}
-          placeholder="Filter scenario / agent spec / id…"
+          placeholder="Filter problem / agent spec / id…"
           className="rounded-md px-2 py-1.5 text-xs outline-none"
           style={{ border: `1px solid ${C.border}`, background: 'rgba(0,0,0,0.45)', color: C.fg4 }}
         />
@@ -247,7 +253,7 @@ export function RunsPage() {
           )}
           {runs.isError && (
             <div className="p-2 text-xs" style={{ color: C.red }}>
-              Failed to load runs.
+              Failed to load trials.
             </div>
           )}
           {grouped.map((group) => (
@@ -258,7 +264,7 @@ export function RunsPage() {
                 title={group.experimentId}
               >
                 <span className="truncate text-[10px] font-medium" style={{ color: C.fg2 }}>
-                  {group.scenario}
+                  {group.problem}
                 </span>
                 <span className="num truncate text-[9px]" style={{ color: C.cyan }}>
                   {group.spec}
@@ -276,7 +282,7 @@ export function RunsPage() {
           ))}
           {runs.data && filtered.length === 0 && (
             <div className="p-2 text-xs" style={{ color: C.fg0 }}>
-              No runs match the filter.
+              No trials match the filter.
             </div>
           )}
         </div>
@@ -288,7 +294,7 @@ export function RunsPage() {
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-2 px-6 text-center">
             <span className="text-sm" style={{ color: C.fg2 }}>
-              Pick a run to see why it scored what it did
+              Pick a trial to see why it scored what it did
             </span>
             <span className="max-w-sm text-xs leading-relaxed" style={{ color: C.fg0 }}>
               Each run opens with a plain-language verdict, the scorecard behind it, the

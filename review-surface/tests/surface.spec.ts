@@ -1,6 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// Deterministic ids from the synthetic fixture (make benchmark-fixture-synthetic).
+// Deterministic ids from the synthetic fixture (make review-fixture-synthetic).
 const FAILING_RUN = 'synthetic-bugfix-gpt-5.5-low-04';
 const UNSCORED_RUN = 'synthetic-bugfix-gpt-5.5-low-05';
 const PASSING_RUN = 'synthetic-bugfix-gpt-5.5-medium-01';
@@ -11,17 +11,17 @@ async function openExperiments(page: Page) {
 }
 
 test.describe('navigation', () => {
-  test('moves between Experiments and Runs', async ({ page }) => {
+  test('moves between Experiments and Trials', async ({ page }) => {
     await openExperiments(page);
-    await page.getByRole('navigation').getByText('Runs').click();
+    await page.getByRole('navigation').getByText('Trials').click();
     await expect(page).toHaveURL(/\/runs$/);
     await page.getByRole('navigation').getByText('Experiments').click();
     await expect(page).toHaveURL(/\/$/);
   });
 
-  test('scenario anchors jump to a family', async ({ page }) => {
+  test('problem anchors jump to a family', async ({ page }) => {
     await openExperiments(page);
-    const anchors = page.locator('nav[aria-label="Scenario families"] a');
+    const anchors = page.locator('nav[aria-label="Problem families"] a');
     await expect(anchors.first()).toBeVisible();
     expect(await anchors.count()).toBeGreaterThanOrEqual(2);
     await anchors.first().click();
@@ -71,8 +71,8 @@ test.describe('run detail — failing run', () => {
   });
 
   test('verdict banner, gates and compare-specs link', async ({ page }) => {
-    await expect(page.getByText('Failing').first()).toBeVisible();
-    await expect(page.getByText(/Did not deliver/)).toBeVisible();
+    await expect(page.getByText('Shaky').first()).toBeVisible();
+    await expect(page.getByText(/Delivered with significant gaps/)).toBeVisible();
     const gate = page.locator('button[title*="evidence"]').first();
     await expect(gate).toBeVisible();
     await gate.click();
@@ -81,9 +81,9 @@ test.describe('run detail — failing run', () => {
     await expect(page).toHaveURL(/#family-/);
   });
 
-  test('technical details disclosure reveals the run id', async ({ page }) => {
+  test('technical details disclosure reveals the trial id', async ({ page }) => {
     await page.getByText('Technical details').click();
-    await expect(page.getByText('run id')).toBeVisible();
+    await expect(page.getByText('trial id')).toBeVisible();
     await expect(page.getByText(FAILING_RUN).first()).toBeVisible();
   });
 
@@ -112,10 +112,10 @@ test.describe('run detail — failing run', () => {
 test.describe('run detail — unscored run', () => {
   test('shows the unscored verdict and reason banner', async ({ page }) => {
     await page.goto(`/runs/${UNSCORED_RUN}`);
-    await expect(page.getByText('This run was not scored')).toBeVisible();
+    await expect(page.getByText('This trial was not scored')).toBeVisible();
     await expect(page.getByText('Unscored').first()).toBeVisible();
-    await expect(page.getByText('Why this run is unscored')).toBeVisible();
-    await expect(page.getByText(/harness exited before verification/)).toBeVisible();
+    await expect(page.getByText('Why this trial is unscored')).toBeVisible();
+    await expect(page.getByText(/agent exited before verification/)).toBeVisible();
   });
 });
 
@@ -135,7 +135,7 @@ test.describe('per-run evidence search', () => {
   });
 
   test('plain search returns matches and a result selects its span', async ({ page }) => {
-    await page.getByPlaceholder(/Search this run/).fill('ledger');
+    await page.getByPlaceholder(/Search this trial/).fill('ledger');
     await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByText(/\d+ match/)).toBeVisible();
     await page.locator('button:has(span:has-text("ledger"))').last().click();
@@ -143,7 +143,7 @@ test.describe('per-run evidence search', () => {
   });
 
   test('regex search returns matches', async ({ page }) => {
-    await page.getByPlaceholder(/Search this run/).fill('bun run (test|lint)');
+    await page.getByPlaceholder(/Search this trial/).fill('bun run (test|lint)');
     await page.getByLabel('regex').check();
     await page.getByRole('button', { name: 'Search', exact: true }).click();
     await expect(page.getByText(/\d+ match/)).toBeVisible();
@@ -182,7 +182,7 @@ test.describe('span tree', () => {
   });
 
   test('payload copy button is present on a selected span', async ({ page }) => {
-    await page.locator('[data-span-row]').first().click();
+    await page.locator('[data-span-row]', { hasText: 'user prompt' }).click();
     await expect(page.locator('button[title="Copy payload"]').first()).toBeVisible();
   });
 });
@@ -200,7 +200,7 @@ test.describe('annotations', () => {
     const note = `E2E-${Date.now()}`;
     await form.getByRole('button', { name: 'note' }).click();
     await page.getByPlaceholder('What did you notice?').fill(note);
-    await page.getByRole('button', { name: /Annotate run/ }).click();
+    await page.getByRole('button', { name: /Annotate trial/ }).click();
     await expect(page.getByText(note)).toBeVisible();
     await page.locator('button[title="Delete annotation"]').last().click();
     await expect(page.getByText(note)).toHaveCount(0);
@@ -209,7 +209,7 @@ test.describe('annotations', () => {
   test('kind toggle switches the submit affordance', async ({ page }) => {
     await page.goto(`/runs/${PASSING_RUN}`);
     await formOf(page).getByRole('button', { name: 'issue' }).click();
-    await expect(page.getByRole('button', { name: /Annotate run/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Annotate trial/ })).toBeVisible();
   });
 });
 
@@ -222,7 +222,7 @@ test.describe('runs sidebar', () => {
     await page.locator('aside input').fill('skill');
     await expect(async () => expect(await items.count()).toBeLessThan(before)).toPass();
     await page.locator('aside input').fill('zzzznomatch');
-    await expect(page.getByText('No runs match the filter')).toBeVisible();
+    await expect(page.getByText('No trials match the filter')).toBeVisible();
   });
 
   test('selecting a run navigates to it', async ({ page }) => {
@@ -235,7 +235,7 @@ test.describe('runs sidebar', () => {
 
   test('empty state links back to Experiments', async ({ page }) => {
     await page.goto('/runs');
-    await expect(page.getByText('Pick a run to see why')).toBeVisible();
+    await expect(page.getByText('Pick a trial to see why')).toBeVisible();
     await page.locator('main').getByRole('link', { name: 'Experiments' }).click();
     await expect(page).toHaveURL(/\/$/);
   });
@@ -244,7 +244,10 @@ test.describe('runs sidebar', () => {
 test.describe('comparison visualisations', () => {
   test('scatter point opens a run', async ({ page }) => {
     await openExperiments(page);
-    const point = page.locator('svg circle').first();
+    const point = page
+      .getByRole('img', { name: 'Composite score against trial duration' })
+      .locator('circle')
+      .first();
     await expect(point).toBeVisible();
     await point.click();
     await expect(page).toHaveURL(/\/runs\/.+/);
@@ -255,12 +258,12 @@ test.describe('comparison visualisations', () => {
     await expect(page.getByText('Failure patterns').first()).toBeVisible();
   });
 
-  test('revision movement diff expands with tabs', async ({ page }) => {
+  test('arm movement diff expands with tabs', async ({ page }) => {
     await openExperiments(page);
     const card = page.getByRole('button', { name: /contract changes/ }).first();
     await card.scrollIntoViewIfNeeded();
     await card.click();
-    await expect(page.getByRole('button', { name: /scenario \(/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /contract \(/ })).toBeVisible();
   });
 });
 
@@ -273,6 +276,6 @@ test('no console or page errors across the core surfaces', async ({ page }) => {
   await page.goto(`/runs/${FAILING_RUN}`);
   await expect(page.getByText('Why it scored this')).toBeVisible();
   await page.goto(`/runs/${UNSCORED_RUN}`);
-  await expect(page.getByText('This run was not scored')).toBeVisible();
+  await expect(page.getByText('This trial was not scored')).toBeVisible();
   expect(errors).toEqual([]);
 });

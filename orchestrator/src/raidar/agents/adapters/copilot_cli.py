@@ -10,5 +10,4 @@ class CopilotCliAdapter(ExternalCliAdapter):
 
     CLI_ENV_VAR = "COPILOT_CLI_PATH"
     DEFAULT_BINARY = "copilot"
-    REQUIRED_ENV_VARS = ("COPILOT_API_KEY",)
     ALLOWED_PROVIDERS = ("github",)

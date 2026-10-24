@@ -16,8 +16,8 @@ repos:
         always_run: true
         stages: [pre-commit]
       - id: ci-quality-gates-check
-        name: Run CI quality gates (check mode)
-        entry: bash -lc "cd orchestrator && uv sync --all-extras --locked && uv run raidar quality gates"
+        name: Run the repository gate (make quality, incl. smoke shapes and example locks)
+        entry: bash -lc "cd orchestrator && uv sync --all-extras --locked && cd .. && make quality"
         language: system
         pass_filenames: false
         always_run: true

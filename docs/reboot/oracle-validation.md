@@ -1,0 +1,222 @@
+# Oracle validation of pilot problems (Phase 0, task 0.5)
+
+- **Date:** 2026-09-29
+- **Plan reference:** `docs/reboot/implementation-plan.md` §2, task 0.5 (F4, F13). Design gate: `docs/reboot/design-memo.md` §6.1.
+- **Harness:** `spikes/oracle-validation/validate.py` (retired from the tree at the Phase 1 cutover; read it at commit `2b66568`). The production validator `make problem-validate` (`raidar.problems.validator`, `raidar.problems.native`) supersedes it; the results below were recorded with the spike.
+- **Evidence roots:** raw outputs are in `spikes/oracle-validation/_work/<label>/`, which was never tracked. Each label has a `summary.json` plus the Harbor job directories and native evaluation directories.
+
+## Verdict
+
+| Problem | Mode | Steps | Verdict |
+|---|---|---|---|
+| `forge` | multi-checkpoint | 8 (`include_prior_tests: true` from checkpoint 2) | **VALIDATED** |
+| `circuit_eval` | one-shot (`checkpoint_1` as a single-step task) | 1 | **VALIDATED** |
+| `circuit_eval` | multi-checkpoint (replication candidate, extra) | 8 | **EXCLUDED** under the strict gate: native parity failed on 1 test at checkpoints 6–8. The cause is the SCB fork's coverage instrumentation, not the oracle (§4) |
+
+Neither required pilot problem was excluded. The Phase 0 exit criterion "≥1 validated 8-checkpoint problem and ≥1 validated one-shot problem" is met by `forge` and by `circuit_eval/checkpoint_1`.
+
+**Why `circuit_eval/checkpoint_1` is the one-shot.** No SCB problem has a single checkpoint: the smallest have 3 (`dag_execution`, `eve_jump_planner`, `eve_route_planner`). The plan allows "a single checkpoint treated as one-shot". I chose `circuit_eval` for three reasons:
+
+- it is the memo's replication candidate, with a language-neutral spec;
+- it is a different problem from the multi-checkpoint pilot;
+- the third-party audit sweep reports its gold as clean (see §5).
+
+The one-shot task has an empty starter (SCB problems ship no `files/`), the `checkpoint_1.md` spec, and only `test_checkpoint_1.py` graded.
+
+## 1. Method
+
+### Pinned inputs
+
+| Input | Pin |
+|---|---|
+| SCB problems | `gabeorlanski/scb-problems@38d627ecf668a88f88f8d260f8df8df6116e9b03` (upstream HEAD) |
+| Harbor | `harbor==0.23.0`, from the orchestrator venv |
+| SCB native runner | SCB fork at `/Users/adamjackson/Projects/inflight/slop-code-bench`, HEAD `25069ba` |
+| Native environment | `configs/environments/docker-python3.12-uv.yaml` (image `ghcr.io/astral-sh/uv:python3.12-trixie-slim`) |
+| Container runtime | OrbStack only (`DOCKER_CONTEXT=orbstack`; `DOCKER_HOST` set to the OrbStack socket for docker-py) |
+
+Notes on the SCB problems pin:
+- `38d627e` is the merge of upstream PR #27, which closes the held-out test leak (SCB issue #30) and pins scb-check.
+- `forge/` and `circuit_eval/` are byte-identical to the local P checkout (`ef6a9dd`), and to the commit the third-party audit pinned. Only the converter differs.
+
+### Harness pipeline
+
+The harness does the following per problem:
+
+1. Converts the problem with the pinned `scripts/scb_to_harbor.py` (`--no-build`).
+2. Derives two Harbor task variants from the converted task. Both run in continue mode (`min_reward = { strict_pass_rate = 0.0 }`, so every step runs):
+   - **positive:** step k installs `solutions/checkpoint_k`. This is the converter's own `solve.sh`, which wipes `/app` and copies the payload.
+   - **negative:** step k installs reference k−1. Step 1, and a one-shot task, installs the empty starter.
+3. Runs each variant with Harbor's `oracle` agent, `-k 3 -n 3`: three independent trials, run concurrently.
+4. Grades the same snapshots (reference k and reference k−1, against checkpoint k) with SCB's native `slop-code eval-snapshot`.
+
+The only change the harness makes to the generated task is an observation hook. One line added after `PYTEST_RC=$?` in each step's `test.sh` copies `/tmp/pytest-report.json` into `/logs/verifier/`. Without it, the converter's EXIT trap deletes the per-test report. Grading, test selection and the reward shim are unchanged.
+
+### Native runner prerequisite
+
+The SCB fork's native runner requires a locked evaluator project (`pyproject.toml` + `uv.lock`) in each problem directory. The upstream problems do not ship one: only an untracked `mocked_http` copy exists locally.
+
+The harness therefore stages a copy of the problem into `_work/<label>/native_catalog/`. It writes an evaluator project there using the fork's documented pins (`docs/evaluation/configuration.md`: coverage 7.15.4, pytest 8.4.1, pytest-json-ctrf 0.3.5, pytest-json-report 1.5.0, pytest-timeout 2.4.0, ruff 0.8.6, plus the problem's `test_dependencies`) and runs `uv lock`. The problem sources themselves are not modified.
+
+### Checks
+
+A step "passes" when strict all-cases holds: every collected, non-skipped test passes and there is no infrastructure failure.
+
+| Check | Passes when |
+|---|---|
+| `reference_k_passes_1..k` | every trial and step of the positive variant passes all tests |
+| `reference_k-1_fails_k` | every trial and step of the negative variant has at least one failure |
+| `repeat_identical_{positive,negative}` | the three trials have identical per-test outcomes (keyed by checkpoint file and pytest node id, parameters included) and identical group counts |
+| `native_parity_{positive,negative}` | for every step, the native runner's per-test outcomes and core/functionality/error/regression pass and total counts equal Harbor's |
+
+## 2. `forge` (8 checkpoints): VALIDATED
+
+Every check passed. Harbor and native agree on every one of the 8 × 2 snapshots, test by test and group by group. The three Harbor trials of each variant are identical.
+
+| Checkpoint | Tests graded (1..k) | Reference k, 3 Harbor trials | Reference k, native | Reference k−1, 3 Harbor trials | Reference k−1, native |
+|---|---|---|---|---|---|
+| 1 | 40 | 40/40 ×3 | 40/40 | 0/40 ×3 (empty starter) | 0/40 |
+| 2 | 70 | 70/70 ×3 | 70/70 | 44/70 ×3 | 44/70 |
+| 3 | 101 | 101/101 ×3 | 101/101 | 71/101 ×3 | 71/101 |
+| 4 | 142 | 142/142 ×3 | 142/142 | 109/142 ×3 | 109/142 |
+| 5 | 166 | 166/166 ×3 | 166/166 | 160/166 ×3 | 160/166 |
+| 6 | 214 | 214/214 ×3 | 214/214 | 167/214 ×3 | 167/214 |
+| 7 | 251 | 251/251 ×3 | 251/251 | 105/251 ×3 | 105/251 |
+| 8 | 295 | 295/295 ×3 | 295/295 | 257/295 ×3 | 257/295 |
+
+- **Group breakdown, reference k, Harbor = native** (core / functionality / error / regression):
+
+  | Checkpoint | Core | Functionality | Error | Regression |
+  |---|---|---|---|---|
+  | 1 | 3 | 21 | 16 | 0 |
+  | 2 | 3 | 21 | 6 | 40 |
+  | 3 | 3 | 17 | 11 | 70 |
+  | 4 | 3 | 17 | 21 | 101 |
+  | 5 | 3 | 16 | 5 | 142 |
+  | 6 | 3 | 23 | 22 | 166 |
+  | 7 | 5 | 16 | 14 | 216 |
+  | 8 | 3 | 21 | 20 | 251 |
+
+- **The checkpoint-7 negative is expected.** Reference 6 scores only 105/251 at checkpoint 7, and 90 of its 216 regression tests fail. This is by design: `forge/tests/_helpers.py:203-204` switches the shared response expectations when `FORGE_TEST_CHECKPOINT >= 7`, because checkpoint 7 adds the `revision` response field. Prior-checkpoint tests are therefore re-graded against the evolved contract, as the spec intends. It is not a key defect.
+- **Snapshots and timing.** Checkpoint k's snapshot is the converter-emitted reference payload, which is `solutions/checkpoint_k` with the canary stripped.
+  - Harbor: about 4 minutes per variant for three concurrent 8-step trials.
+  - Native: about 2.6 minutes per snapshot. The native runner syncs the locked evaluator and runs coverage and quality analysis on every call.
+
+## 3. `circuit_eval/checkpoint_1` as one-shot: VALIDATED
+
+Every check passed.
+
+| Snapshot | Harbor, 3 trials | Native | Groups (core / functionality / error / regression), Harbor = native |
+|---|---|---|---|
+| Reference `checkpoint_1` | 36/36 ×3 | 36/36 | 9/9, 15/15, 12/12, 0/0 |
+| Empty starter | 0/36 ×3 | 0/36 | 0/9, 0/15, 0/12, 0/0 |
+
+The derived Harbor task keeps only the `checkpoint_1` step. Harbor ran each variant in about 1 minute.
+
+## 4. `circuit_eval` (8 checkpoints, replication candidate): extra
+
+This run is beyond the task's minimum. It checks the memo's replication candidate before Phase 1 relies on it.
+
+### Harbor checks
+
+All four Harbor checks passed:
+- reference k passes 1..k;
+- reference k−1 fails k;
+- 3 trials identical for both variants.
+
+Timing: about 5 minutes per variant. The 16 native evals took about 50 minutes.
+
+| Checkpoint | Tests graded (1..k) | Reference k, Harbor ×3 | Reference k, native | Reference k−1, Harbor ×3 | Reference k−1, native |
+|---|---|---|---|---|---|
+| 1 | 36 | 36/36 | 36/36 | 0/36 | 0/36 |
+| 2 | 99 | 99/99 | 99/99 | 36/99 | 36/99 |
+| 3 | 205 | 205/205 | 205/205 | 122/205 | 122/205 |
+| 4 | 430 | 430/430 | 430/430 | 205/430 | 205/430 |
+| 5 | 457 | 457/457 | 457/457 | 432/457 | 432/457 |
+| 6 | 508 | 508/508 | **507/508** | 457/508 | 457/508 |
+| 7 | 529 | 529/529 | **528/529** | 508/529 | **507/529** |
+| 8 | 566 | 566/566 | **565/566** | 529/566 | **528/566** |
+
+**Regression semantics.** `circuit_eval/config.yaml` does not declare `include_prior_tests`, which the memo flagged as needing an explicit setting. Both runners default it to `true`:
+- the converter emits `INCLUDE_PRIOR=true`;
+- the fork's `CheckpointConfig.include_prior_tests` defaults to `True` (`slop_code/evaluation/config.py:707-710`).
+
+Tests 1..k are therefore graded at every step, in both runners.
+
+### The divergence
+
+One test accounts for every mismatch: `checkpoint_6::test_lint_max_input_bits[20-20-run]`, wherever it is graded.
+- **Harbor:** passes in every trial, taking 2.4–3.1 s.
+- **Native:** fails with `subprocess.TimeoutExpired ... timed out after 10 seconds`.
+
+The test lints a 20-input `REDUCE_XOR` circuit, which requires 2^20 evaluations. Its helper uses a hard 10 s subprocess timeout (`circuit_eval/tests/helpers.py:25`).
+
+**Root cause, measured.** The SCB fork always runs evaluation with `measurement_coverage=True`:
+- the setting is at `entrypoints/evaluation/driver.py:115` and `agent_runner/runner.py:320`;
+- its `coverage_plugin.py` injects branch coverage into every submission subprocess through `sitecustomize`/`COVERAGE_PROCESS_START`.
+
+The same reference and circuit, timed in the same image (`uv:python3.12-trixie-slim`):
+
+| Mode | Time |
+|---|---|
+| Plain | **2.6 s** |
+| Under `coverage run --branch` | **13.6 s** |
+
+This is a measurement artifact of the fork's runner. It is not a gold-key defect, and it is not a Harbor port defect. The third-party audit ran the upstream runner (`06b5c06`) without this instrumentation, and it reports `circuit_eval` checkpoints 6–8 clean (508/508, 529/529, 566/566), matching Harbor.
+
+### Consequences
+
+- **Strict gate:** `circuit_eval` (multi-checkpoint) is **excluded** for now, per the "any failing problem is excluded" rule.
+- **Path to re-admission:** redefine the parity reference as a runner without subprocess coverage (upstream `06b5c06`, or the fork with coverage disabled), then re-run.
+- **Timing sensitivity:** the test still has only about 4× headroom on this machine. Timeout-bound tests like this one make oracle verdicts depend on host speed. Raidar's oracle should record per-case durations and flag cases within 2× of their timeout.
+- **Fork's own runs are affected (inference, not verified against fork run data).** Any SCB-fork native run of `circuit_eval` scores the reference, and plausibly well-performing agents, as failing this case at checkpoints 6–8. This matters for WS-G G2 golden parity against fork fixtures.
+- **One-shot unaffected:** the `circuit_eval/checkpoint_1` one-shot does not include this test, so its validation stands.
+
+## 5. Third-party audit claims (bad gold keys)
+
+**Source.** SCB issue [SprocketLab/slop-code-bench#27](https://github.com/SprocketLab/slop-code-bench/issues/27), "Pinned answer keys fail evaluation in the official image" (2026-08-11). The evidence repo is `kimjune01/slopcodebench-audit@44ac078`. The audit pinned runner `06b5c06` and problems `ef6a9dd`, which is the same `forge`/`circuit_eval` content as used here.
+
+**Claims and their bearing on the chosen problems:**
+
+| Audit claim | Problems named | Bearing on `forge` / `circuit_eval` |
+|---|---|---|
+| F6, deterministically defective gold keys | `dynamic_buffer` checkpoints 2–4; `env_manager` checkpoint 3 | Not named. The audit's sweep of all 196 keys reports `forge` checkpoints 1–8 (40, 70, 101, 142, 166, 214, 251, 295 tests) and `circuit_eval` checkpoints 1–8 (36 … 566 tests) **clean** in arm 1 (`receipts/gold-sweep/summary.json`). The forge totals match this run's exactly. |
+| F6, unstable gold key | `pwd_manager` checkpoint 4 | Not named. This run's three-trial repeats found no instability for `forge` or `circuit_eval/checkpoint_1`. |
+| F6, non-hermetic toolchain | `test_translator` (unpinned `npx ts-node`) | Not applicable: both problems are pure Python. The fix is upstream PR #30, still open. |
+| F8, core tests assert values the spec does not determine | 28 of 343 core tests in a 12-problem sample; none from `forge` or `circuit_eval` | **Not audited.** Neither problem was in the F8/F9 sample. The within-sample rate was about 8% of core tests. |
+| F9, cross-checkpoint leaks and spec-vs-test contradictions | `cfgpipe`, `dag_execution`, `datagate`, `meshctl`, `trajectory_api` | Not named. |
+
+**Other audit sources checked:**
+- **S `docs/KNOWN_ISSUES.md`** lists reference-solution defects for `file_merger`, `eve_market_tools`, `eve_industry`, `dynamic_buffer` and `execution_server`. None of these is a chosen problem.
+- **P `gabeorlanski/scb-problems#4`** reports spec ambiguity in `trajectory_api` and `cfgpipe`. Not a chosen problem.
+- **Open upstream PRs.** None touches `forge/` or `circuit_eval/`: #26 is `mvvault`, #29 `eve_market_tools`, #28 and #30 are converter-only.
+
+**Conclusion.** No audit claim of a bad gold key applies to the chosen problems. This run confirms the positive side independently in both runners. It does not settle the spec-determinacy question (F8) for these problems; that needs a spec-versus-test review (the `problem-audit` skill in P, stages 1–3). This validation gate does not cover that review.
+
+## 6. Findings that affect later tasks
+
+1. **The native runner cannot grade unmodified upstream problems.** The SCB fork requires a per-problem `pyproject.toml` + `uv.lock` that upstream does not ship. WS-B (the Raidar problem importer) must either generate and pin this evaluator lock itself, as this harness does, or not depend on the fork's runner. The recommendation is to do neither: grade through Raidar's own oracle.
+2. **Grading tool versions differ between the runners, but outcomes do not.**
+   - Harbor uses pytest 9.0.3, pytest-json-ctrf 0.4.1, and runs the entrypoint as `uv run --project /app forge.py`, with deps installed by pip.
+   - Native uses pytest 8.4.1, ctrf 0.3.5, and `uv run forge.py`, with deps installed by uv.
+   - Outcomes were identical for both problems. This is still a parity risk for other problems (see finding 4).
+3. **Per-test evidence is deleted by default.** The upstream converter's EXIT trap deletes `/tmp/pytest-report.json`, and Harbor's `test-stdout.txt` `-rA` summary is not a reliable id source because parameter ids contain spaces. Raidar's host-side oracle (WS-E) should persist the JSON report as its `CaseResult` source.
+4. **Skipped tests.** Both runners drop skipped tests from the denominator. Neither validated problem skips any test. Problems that do skip (e.g. `metric_transform_lang` checkpoint 4+, per the audit) need the policy stated explicitly in the oracle.
+5. **Cost.** Oracle validation is cheap on Harbor (minutes) and slow on the native runner (about 2.6–3 min per snapshot). The native parity check is a one-off porting check, not a per-run step.
+6. **Runner instrumentation can change verdicts.** The fork's always-on subprocess coverage slows submissions about 5×, which flips a timeout-bound `circuit_eval` case (§4). Raidar's oracle must not instrument the graded submission. Coverage, if needed (F14), belongs in a separate, non-grading pass.
+7. **`circuit_eval` needs a decision before it replicates.** It cannot serve as the Phase 1 replication problem until its parity is re-established against an uninstrumented runner (§4).
+
+## 7. Reproduce
+
+The results above were recorded with the retired spike harness (commit `2b66568`). The production validator runs the same checks through the public interface:
+
+```bash
+# from the repo root; OrbStack must be running with its external data drive available
+orbstack-data-status            # expect external_available=True
+make problem-import PROBLEM=scb/forge@38d627ecf668
+make problem-validate PROBLEM=scb/forge@38d627ecf668 ENGINE=harbor REPEATS=3 NATIVE_RUNNER=<scb-fork-checkout>
+make problem-import PROBLEM=scb/circuit_eval.checkpoint_1@38d627ecf668
+make problem-validate PROBLEM=scb/circuit_eval.checkpoint_1@38d627ecf668 ENGINE=harbor REPEATS=3 NATIVE_RUNNER=<scb-fork-checkout>
+```
+
+Exit codes: 0 = validated (fully or with skipped checks), 1 = a check failed (exclude the problem), 2 = infrastructure error. Omitting `NATIVE_RUNNER` skips the parity checks and records them as not run.

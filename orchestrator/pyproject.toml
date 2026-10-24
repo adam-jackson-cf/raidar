@@ -2,16 +2,24 @@
 name = "raidar"
 version = "0.14.0"
 description = "Agentic evaluation system orchestrator for testing model/harness combinations"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "pydantic>=2.0",
     "pydantic-settings>=2.0",
     "pyyaml>=6.0",
+    # PEP 508/440 parsing of the requirements a graded submission declares (FCR-007).
+    "packaging>=24.0",
     "click>=8.0",
     "python-dotenv>=1.2.2",
     "aiohttp>=3.13.5",
     "requests>=2.33.0",
     "urllib3>=2.7.0",
+    # Harbor is exact-pinned (reboot plan task 0.2); upgrade only via a spike that
+    # reruns the Phase 0 checks.
+    "harbor==0.23.0",
+    # LiteLLM is a transitive Harbor dependency; AGENTS.md requires an exact,
+    # known-safe pin (never 1.82.7 or 1.82.8).
+    "litellm==1.102.1",
 ]
 
 [project.optional-dependencies]
@@ -24,10 +32,40 @@ dev = [
     "lizard>=1.17.10",
     "mypy>=1.11",
     "import-linter>=2.0",
+    # code-quality@1 tool-env modules are imported in-process by the tests. These
+    # pins equal the Python pack tool lock's scb-python-quality entry (a test
+    # enforces it); production measurement uses the lazily provisioned tool env.
+    "tree-sitter==0.25.2",
+    "tree-sitter-language-pack==0.13.0",
+    "networkx==3.6.1",
+    "radon==6.0.1",
 ]
 
 [project.scripts]
 raidar = "raidar.cli:main"
+
+# Registry resolvers loaded lazily by `raidar lock` (raidar.spec.references).
+[project.entry-points."raidar.spec.resolvers"]
+problem = "raidar.problems.resolver:resolver_factory"
+scorer = "raidar.scorers.catalog:scorer_resolver"
+component = "raidar.components.definition.registry:component_resolver"
+
+# Component definitions (raidar.components.definition.registry), named by reference and imported lazily.
+[project.entry-points."raidar.components"]
+"rules-file@1" = "raidar.components.catalog.workspace:RULES_FILE"
+"workspace-files@1" = "raidar.components.catalog.workspace:WORKSPACE_FILES"
+"lint-config@1" = "raidar.components.catalog.workspace:LINT_CONFIG"
+"lint-tool@2" = "raidar.components.catalog.tools:LINT_TOOL"
+"skills@1" = "raidar.components.catalog.harness:SKILLS"
+"harness-settings@1" = "raidar.components.catalog.harness:HARNESS_SETTINGS"
+"stop-hook@1" = "raidar.components.catalog.harness:STOP_HOOK"
+"mcp-server@1" = "raidar.components.catalog.harness:MCP_SERVER"
+"prompt-wrapper@1" = "raidar.components.catalog.prompt:PROMPT_WRAPPER"
+"review-loop@2" = "raidar.components.catalog.workflow:REVIEW_LOOP"
+"guardrail-gate@4" = "raidar.components.catalog.gate:GUARDRAIL_GATE"
+"python-guardrails@8" = "raidar.components.catalog.guardrails:PYTHON_GUARDRAILS"
+"continue-on-stall@2" = "raidar.components.catalog.stall:CONTINUE_ON_STALL"
+"transient-retry@1" = "raidar.components.catalog.retry:TRANSIENT_RETRY"
 
 [build-system]
 requires = ["hatchling"]
@@ -38,14 +76,10 @@ packages = ["src/raidar"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 extend-exclude = [
-    "experiments",
-    "scenarios",
-    "workspace",
-    "workspace-*",
-    "results",
-    "jobs",
+    "../lab/experiments",
+    "../var",
     "**/node_modules",
     "**/*.tsbuildinfo",
     "**/*.lock",
@@ -72,6 +106,8 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = ["PLR2004"]
 "**/__init__.py" = ["F401"]
+# Canary fixture generator: each fixture is one literal source text, kept on one line.
+"tests/fixtures/python_guardrails/make_fixtures.py" = ["E501", "PLR0915"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -82,6 +118,8 @@ addopts = "--ignore-glob=.env* --ignore-glob=**/.env*"
 testpaths = ["tests"]
 
 [tool.mypy]
-python_version = "3.11"
+python_version = "3.12"
 files = ["src", "tests"]
 ignore_missing_imports = true
+# PyYAML ships no type information and types-PyYAML is not a dependency: its API is Any.
+disable_error_code = ["import-untyped"]

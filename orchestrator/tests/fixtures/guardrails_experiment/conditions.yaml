@@ -1,0 +1,30 @@
+# The conditions of the guardrails A/B experiment (its python-guardrails and guardrail-gate uses),
+# kept here so the component tests do not read the tracked experiment. Tests take the gate's
+# ``with`` from this file to render the commit script the rule canaries run.
+conditions:
+  - id: r1-baseline
+    components:
+      - use: python-guardrails@8
+        with:
+          workspace_configs: false
+      - use: guardrail-gate@4
+        with:
+          command: guardrail-check
+          mode: shadow
+          max_rounds: 3
+          timeout_sec: 300
+          autofix_before_check: true
+          autofix_command: guardrail-check --autofix
+  - id: r2-guardrails
+    components:
+      - use: python-guardrails@8
+        with:
+          workspace_configs: true
+      - use: guardrail-gate@4
+        with:
+          command: guardrail-check
+          mode: commit
+          max_rounds: 3
+          timeout_sec: 300
+          autofix_before_check: true
+          autofix_command: guardrail-check --autofix

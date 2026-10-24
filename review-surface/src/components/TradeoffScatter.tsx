@@ -36,10 +36,10 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-xs font-medium" style={{ color: C.fg3 }}>
-          Score against run time
+          Score against trial time
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          top-left is fast and good · red ring = failed run · click a point to open the run
+          top-left is fast and good · red ring = failed trial · click a point to open the trial
         </span>
         <span className="ml-auto flex flex-wrap items-center gap-2">
           {specs.map((spec) => (
@@ -54,7 +54,7 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
         viewBox={`0 0 ${WIDTH} ${HEIGHT}`}
         className="w-full max-w-2xl"
         role="img"
-        aria-label="Composite score against run duration"
+        aria-label="Composite score against trial duration"
       >
         {[0, 0.25, 0.5, 0.75, 1].map((tick) => {
           const ty = PAD.top + (1 - tick) * (HEIGHT - PAD.top - PAD.bottom);
@@ -85,7 +85,7 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
           fontSize="8"
           fill={C.fg0}
         >
-          run time →
+          trial time →
         </text>
         {points.map((run) => (
           <circle
@@ -101,7 +101,7 @@ export function TradeoffScatter({ runs }: { runs: RunRecord[] }) {
             onClick={() => navigate(`/runs/${encodeURIComponent(run.id)}`)}
           >
             <title>
-              {`${runLabel(run.id)} · ${run.agent_spec}\nscore ${fmtScore(run.composite_score)} in ${fmtDuration(run.duration_ms)}${run.status === 'ERROR' ? ' · run errored' : ''}\n${run.id}`}
+              {`${runLabel(run.id)} · ${run.agent_spec}\nscore ${fmtScore(run.composite_score)} in ${fmtDuration(run.duration_ms)}${run.status === 'ERROR' ? ' · trial errored' : ''}\n${run.id}`}
             </title>
           </circle>
         ))}

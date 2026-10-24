@@ -1,0 +1,37 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/circuit_eval.checkpoint_1@38d627ecf668",
+  "mode": "one_shot",
+  "checkpoints": 1,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "9be8d0fdf2caa51cef016a0af2bb944aa8f2223c78e592b762a974dab8cac47a",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "circuit_eval",
+    "checkpoint_selection": "checkpoint_1",
+    "problem_tree": "0b779bb21c34324446c332925425409bf501c271",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "a92763fb4a413e452f167e060d0b702627ae3acaa0e48ffe9ebcb5169aa13d5a"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "96ec208ea91b81ed25b3703cd63f3da045bb80ca2a25b526b12c307bc6a3213d",
+  "bundle_sha256": "f21fe219a120a77f882162e0844e4a550e371cc505d9b1f7824882e685d16fc9",
+  "references_sha256": "9b210f38d2bab40335ebd5060a88c589819889666256331d560ce6b1586b14fe",
+  "entry_file": "circopt.py"
+}

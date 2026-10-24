@@ -10,5 +10,4 @@ class PiCliAdapter(ExternalCliAdapter):
 
     CLI_ENV_VAR = "PI_CLI_PATH"
     DEFAULT_BINARY = "pi"
-    REQUIRED_ENV_VARS = ("PI_API_TOKEN",)
     ALLOWED_PROVIDERS = ("inflection",)

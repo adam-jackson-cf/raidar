@@ -27,13 +27,12 @@ EXCLUDED_PREFIXES = (
     ".mypy_cache/",
     ".pytest_cache/",
     ".ruff_cache/",
-    ".tmp/",
     ".venv/",
     "docs/",
-    "experiments/",
+    "lab/experiments/",
     "orchestrator/.cache/",
     "orchestrator/.venv/",
-    "scenarios/",
+    "var/",
 )
 GENERIC_NAME_PARTS = {"helpers", "misc", "stuff", "temp"}
 ALLOWED_TEST_ROOT_FILES = {
@@ -44,6 +43,7 @@ SCRIPT_NAME_ALLOWLIST = {
     "bump-version.py",
     "check-python-fanout.py",
     "check-python-quality.py",
+    "check-structure.py",
     "verify-version-wiring.py",
 }
 

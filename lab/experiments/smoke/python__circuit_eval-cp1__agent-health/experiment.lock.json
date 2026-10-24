@@ -1,0 +1,427 @@
+{
+  "analysis": {
+    "alpha": 0.05,
+    "baseline_arm": "baseline",
+    "max_exclusion_fraction": 0.2,
+    "min_effects": {},
+    "min_pairs": 5
+  },
+  "assessment": {
+    "metric": {
+      "checkpoints": [
+        1
+      ],
+      "ref": "scb-canonical-oneshot@1",
+      "selection": "declared"
+    },
+    "references": {
+      "metric": {
+        "scb-canonical-oneshot@1": {
+          "digest": "593a6b179c49d480f6c44108ae95f12183872ff18dea791edaebc3b5dd6c3dfe",
+          "metadata": {
+            "component_places": "1E-12",
+            "correctness": "C=sum_k(passed_k/graded_k)/K over planned checkpoints; unreached checkpoint=0; reached checkpoint with graded_k=0 -> ineligible",
+            "formula": "S=100*C*(0.70+0.30*I)",
+            "inertia_weights": {
+              "E": "0.30",
+              "H": "0.40",
+              "V": "0.30"
+            },
+            "max_checkpoints": 1,
+            "min_checkpoints": 1,
+            "not_applicable": [
+              "G",
+              "R"
+            ],
+            "ref": "scb-canonical-oneshot@1",
+            "rounding": "ROUND_HALF_EVEN",
+            "score_places": "0.000001",
+            "zero_correctness": null
+          }
+        }
+      },
+      "scorer": {
+        "correctness@1": {
+          "digest": "d7ee8f1f665fb18d95a3b19fac48df57ea7323ce7564bcd63c4b5924729eca6b",
+          "metadata": {
+            "implementation": "raidar.scorers.correctness:correctness_scorer",
+            "implementation_digest": "edb9646621ee887f49b5cd3ce097a112f7b0dfc84f90790cd7f34617f0d0a7d6",
+            "manifest": {
+              "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
+              "evidence_required": [
+                "oracle.cases"
+              ],
+              "execution": "host-parse",
+              "id": "correctness",
+              "metrics": [
+                {
+                  "description": "Strict solve: every graded case passed and grading had no infrastructure failure.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded cases across all groups at the checkpoint.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "strict_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded core cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "core_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded functionality cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "functionality_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded error cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "error_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Passed / graded regression cases at the checkpoint (SCB all-cases rule).",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "regression_pass_rate",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "ratio",
+                  "unit": null
+                },
+                {
+                  "description": "Graded regression cases (from earlier checkpoints) that did not pass.",
+                  "direction": "lower_better",
+                  "exactness": "native",
+                  "id": "regression_failures",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Checkpoints solved in the trajectory (continue view); C = this / K.",
+                  "direction": "higher_better",
+                  "exactness": "scb-exact",
+                  "id": "solved_checkpoints",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solve: the strict rule over the graded cases the lock's pinned problem errata keeps (exclude-from-solved cases left out); not_applicable without an errata.",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_errata",
+                  "inputs": [],
+                  "level": "checkpoint",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "boolean",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied solved checkpoints in the trajectory (continue view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "solved_checkpoints_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                },
+                {
+                  "description": "Errata-applied consecutive checkpoints solved from the first (strict view).",
+                  "direction": "higher_better",
+                  "exactness": "native",
+                  "id": "reached_errata",
+                  "inputs": [],
+                  "level": "trajectory",
+                  "range": null,
+                  "tier": "deterministic",
+                  "type": "count",
+                  "unit": null
+                }
+              ],
+              "runtimes": [
+                "*"
+              ],
+              "tools": [],
+              "version": "1"
+            },
+            "tool_lock": {}
+          }
+        }
+      }
+    },
+    "spec": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical-oneshot@1",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@1"
+      ]
+    },
+    "tools": {}
+  },
+  "document_sha256": "79ace3a8d90cb9775610acf5e59fbbf16d1d650a279280386515634162fe1b41",
+  "execution": {
+    "arms": {
+      "baseline": {
+        "agent": "agent",
+        "condition": "baseline",
+        "digest": "31b80df56f756fd04ca0c4786f76a98b8217511c8962fef518c44d1a6bf95b1b"
+      }
+    },
+    "conditions": {
+      "baseline": []
+    },
+    "design": {
+      "agents": [
+        {
+          "id": "agent",
+          "model": "gpt-6-luna",
+          "name": "codex",
+          "provider": "openai",
+          "reasoning_effort": "low",
+          "version": "0.156.1"
+        }
+      ],
+      "arms": [
+        {
+          "agent": "agent",
+          "condition": "baseline",
+          "id": "baseline"
+        }
+      ],
+      "attempts": 1,
+      "conditions": [
+        {
+          "components": [],
+          "id": "baseline"
+        }
+      ],
+      "environment": {
+        "compose_init": true,
+        "type": "docker"
+      },
+      "factors": [],
+      "id": "python__circuit_eval-cp1__agent-health",
+      "kind": "smoke",
+      "problems": [
+        {
+          "path": null,
+          "ref": "scb/circuit_eval.checkpoint_1@38d627ecf668"
+        }
+      ],
+      "protocol": {
+        "agent_timeout_sec": 1800,
+        "min_reward": null,
+        "progression": "continue",
+        "snapshot_source": "artifact",
+        "verifier_timeout_sec": 900
+      },
+      "runtime": "python",
+      "seed": 20260930
+    },
+    "files": {},
+    "problems": [
+      {
+        "checkpoints": 1,
+        "digest": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
+        "label": "scb/circuit_eval.checkpoint_1@38d627ecf668"
+      }
+    ],
+    "references": {
+      "component": {},
+      "problem": {
+        "scb/circuit_eval.checkpoint_1@38d627ecf668": {
+          "digest": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
+          "metadata": {
+            "bundle_sha256": "f21fe219a120a77f882162e0844e4a550e371cc505d9b1f7824882e685d16fc9",
+            "checkpoints": 1,
+            "entry_file": "circopt.py",
+            "mode": "one_shot",
+            "pack_image": "raidar/pack-python:2b91a52663e099f2",
+            "source": {
+              "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+              "dataset": "scb",
+              "problem": "circuit_eval",
+              "url": "https://github.com/gabeorlanski/scb-problems"
+            },
+            "steps": [
+              "checkpoint_1"
+            ],
+            "task_sha256": "96ec208ea91b81ed25b3703cd63f3da045bb80ca2a25b526b12c307bc6a3213d",
+            "validation": {
+              "not_run": [],
+              "verdict": "validated"
+            }
+          }
+        }
+      }
+    },
+    "tools": {},
+    "versions": {
+      "agents": {
+        "agent": {
+          "name": "codex",
+          "version": "0.156.1"
+        }
+      },
+      "harbor": "0.23.0"
+    }
+  },
+  "experiment": {
+    "id": "python__circuit_eval-cp1__agent-health",
+    "source": "experiment.yaml",
+    "source_sha256": "58885155d29becc70bc270e72a95989421beb8a05c42bcd49538d5e1dcab3153",
+    "spec_sha256": "8ca775601293accb1d0af95ed52ffdbb122ffd8340e572ea4c60029b324f5953"
+  },
+  "lock_sha256": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
+  "lock_version": 3,
+  "overrides": {
+    "flags": {},
+    "set": []
+  },
+  "sections": {
+    "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
+    "assessment": "bac7ffea83612379ccd44fbdc60c1b3db60e731eb336e26349426169652cacea",
+    "execution": "e6e0988b09f9f3463aaf847d417ccc561223a9a2feb590393f472b6f298c5591",
+    "toolchain": "39a8e2529819830b3b449906c4918811362b023f113b7f85e5bccba1b17ef9d5"
+  },
+  "spec": {
+    "agents": [
+      {
+        "id": "agent",
+        "model": "gpt-6-luna",
+        "name": "codex",
+        "provider": "openai",
+        "reasoning_effort": "low",
+        "version": "0.156.1"
+      }
+    ],
+    "analysis": {
+      "alpha": 0.05,
+      "attempts": 1,
+      "baseline_arm": "baseline",
+      "concurrency": 1,
+      "max_exclusion_fraction": 0.2,
+      "min_effects": {},
+      "min_pairs": 5,
+      "seed": 20260930
+    },
+    "arms": [
+      {
+        "agent": "agent",
+        "condition": "baseline",
+        "id": "baseline"
+      }
+    ],
+    "assessment": {
+      "inventory_policy": {
+        "generated_globs": [],
+        "test_globs": []
+      },
+      "metric": "scb-canonical-oneshot@1",
+      "scorer_config": {},
+      "scorers": [
+        "correctness@1"
+      ]
+    },
+    "conditions": [
+      {
+        "components": [],
+        "id": "baseline"
+      }
+    ],
+    "description": "Operational smoke of the experiment path; not citable.",
+    "environment": {
+      "compose_init": true,
+      "type": "docker"
+    },
+    "factors": [],
+    "id": "python__circuit_eval-cp1__agent-health",
+    "kind": "smoke",
+    "problems": [
+      {
+        "path": null,
+        "ref": "scb/circuit_eval.checkpoint_1@38d627ecf668"
+      }
+    ],
+    "protocol": {
+      "agent_timeout_sec": 1800,
+      "min_reward": null,
+      "progression": "continue",
+      "snapshot_source": "artifact",
+      "verifier_timeout_sec": 900
+    },
+    "runtime": "python",
+    "schema_version": 2
+  },
+  "toolchain": {
+    "litellm": "1.102.1",
+    "python": "3.13.7",
+    "raidar": "0.14.0",
+    "raidar_spec": "e86a97cd6009a3937f6bd0f87fcc9e852f207a8c085e86c519150ee2e56199c4"
+  }
+}

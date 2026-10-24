@@ -10,5 +10,4 @@ class CursorCliAdapter(ExternalCliAdapter):
 
     CLI_ENV_VAR = "CURSOR_CLI_PATH"
     DEFAULT_BINARY = "cursor"
-    REQUIRED_ENV_VARS = ("CURSOR_API_KEY",)
     ALLOWED_PROVIDERS = ("cursor", "openai", "anthropic", "google", "deepseek")

@@ -1,0 +1,121 @@
+{
+  "kind": "raidar-problem",
+  "schema_version": 1,
+  "ref": "scb/forge@38d627ecf668",
+  "mode": "multi_checkpoint",
+  "checkpoints": 8,
+  "steps": [
+    {
+      "name": "checkpoint_1",
+      "checkpoint": "checkpoint_1",
+      "instruction_sha256": "0ce995ae4a8989c133d7ae07c9e2c0c100133cd51687eae72e203292e36b3507",
+      "test_files": [
+        "test_checkpoint_1.py"
+      ]
+    },
+    {
+      "name": "checkpoint_2",
+      "checkpoint": "checkpoint_2",
+      "instruction_sha256": "28a60385e952be9278d96662d941debb187335b42428f23db991f96c1e05db97",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py"
+      ]
+    },
+    {
+      "name": "checkpoint_3",
+      "checkpoint": "checkpoint_3",
+      "instruction_sha256": "03b87bc986d43047bf4b1004f16d69198ecaca363cac165029682c62461b782d",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py"
+      ]
+    },
+    {
+      "name": "checkpoint_4",
+      "checkpoint": "checkpoint_4",
+      "instruction_sha256": "5b43ec1d8889ab9ebba9b925593b0d1cb6f45c8b6c7f372e2b4178f6e7199187",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py"
+      ]
+    },
+    {
+      "name": "checkpoint_5",
+      "checkpoint": "checkpoint_5",
+      "instruction_sha256": "878782c9f9f8bc549fe584f2bae9694d3ac0baa6f53d9dd4fec51f96820205f1",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py"
+      ]
+    },
+    {
+      "name": "checkpoint_6",
+      "checkpoint": "checkpoint_6",
+      "instruction_sha256": "cfd6b3b7473c9970dcb5cbfff08ac9cafb7e63f3ca447721653c2089d46badf9",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py"
+      ]
+    },
+    {
+      "name": "checkpoint_7",
+      "checkpoint": "checkpoint_7",
+      "instruction_sha256": "8fd83a6cb134a833f9cf9308e8bd8a5a486c0caa4210b83a09b0fe7bc8b378e6",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py",
+        "test_checkpoint_7.py"
+      ]
+    },
+    {
+      "name": "checkpoint_8",
+      "checkpoint": "checkpoint_8",
+      "instruction_sha256": "afaf43a0d5a9eaafc45a21f66cf2bebb1222f5fdb857b47d04a26fb3020f3a3f",
+      "test_files": [
+        "test_checkpoint_1.py",
+        "test_checkpoint_2.py",
+        "test_checkpoint_3.py",
+        "test_checkpoint_4.py",
+        "test_checkpoint_5.py",
+        "test_checkpoint_6.py",
+        "test_checkpoint_7.py",
+        "test_checkpoint_8.py"
+      ]
+    }
+  ],
+  "source": {
+    "dataset": "scb",
+    "url": "https://github.com/gabeorlanski/scb-problems",
+    "commit": "38d627ecf668a88f88f8d260f8df8df6116e9b03",
+    "problem": "forge",
+    "checkpoint_selection": null,
+    "problem_tree": "15045878ed4c40b4bc2f7e17c83295a1adbeb500",
+    "converter_tree": "4475c907ab812bdec61885f24e41f5a634b927ee",
+    "conversion_overrides": "733c1bef9ee8d233639a34439e67232bf5e445e8",
+    "converted_task_sha256": "dd69b24fdac87e82104fb24b8ebc4ab3974dc5fce52496c7f914fc74aa3247c9"
+  },
+  "pack": {
+    "id": "python",
+    "version": 1,
+    "image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "task_sha256": "596ae5b6af7e45c4b9a05dc8c495452042a21b9f7b23d6919516074ae5ada49f",
+  "bundle_sha256": "6ab17bb4ebf36d44b488de06a5143d9d15388f8dacf7ac8a4875eeddc941c04b",
+  "references_sha256": "1451f566df2cdd5e9b9c0550056cbf051eeaa70cde8f91dbbbf7f0b1988aebb8",
+  "entry_file": "forge.py"
+}

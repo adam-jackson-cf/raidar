@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
 from pathlib import Path
 
-from raidar.codex_auth import OPENAI_API_KEY_ENV, ResolvedCodexAuth, resolve_codex_auth
+from raidar.agents.codex_auth import ResolvedCodexAuth, resolve_codex_auth
 
 from ..config import AgentSpec
 from .harbor_cli import HarborCliAdapter, SupportedModelProfile
@@ -19,29 +18,17 @@ class CodexCliAdapter(HarborCliAdapter):
     ADAPTER_LABEL = "Codex CLI adapter"
     CLI_ENV_VAR = "CODEX_CLI_PATH"
     DEFAULT_BINARY = "codex"
-    WORKSPACE_SESSION_DIR = ".codex"
-    OPENAI_API_ENV = OPENAI_API_KEY_ENV
     SUPPORTED_MODELS: dict[str, SupportedModelProfile] = {
-        "gpt-5.5": SupportedModelProfile(
-            display_label="GPT-5.5",
-            reasoning_levels=("low", "medium", "high", "xhigh"),
-        ),
-        "gpt-5.2": SupportedModelProfile(
-            display_label="GPT-5.2",
-            reasoning_levels=("low", "medium", "high"),
-        ),
+        "gpt-5.6-terra": SupportedModelProfile(reasoning_levels=("low",)),
+        "gpt-5.6-luna": SupportedModelProfile(reasoning_levels=("low",)),
+        "gpt-6-luna": SupportedModelProfile(reasoning_levels=("low",)),
+        "gpt-5.5": SupportedModelProfile(reasoning_levels=("low", "medium", "high", "xhigh")),
+        "gpt-5.2": SupportedModelProfile(reasoning_levels=("low", "medium", "high")),
         "gpt-5.3-codex-spark": SupportedModelProfile(
-            display_label="GPT-5.3 Codex Spark",
-            reasoning_levels=("low", "medium", "high", "xhigh"),
+            reasoning_levels=("low", "medium", "high", "xhigh")
         ),
-        "gpt-5.4": SupportedModelProfile(
-            display_label="GPT-5.4",
-            reasoning_levels=("low", "medium", "high", "xhigh"),
-        ),
-        "gpt-5.4-mini": SupportedModelProfile(
-            display_label="GPT-5.4 Mini",
-            reasoning_levels=("low",),
-        ),
+        "gpt-5.4": SupportedModelProfile(reasoning_levels=("low", "medium", "high", "xhigh")),
+        "gpt-5.4-mini": SupportedModelProfile(reasoning_levels=("low",)),
     }
 
     def __init__(self, config: AgentSpec) -> None:
@@ -54,22 +41,13 @@ class CodexCliAdapter(HarborCliAdapter):
         self._resolved_auth = resolve_codex_auth()
         return self._resolved_auth
 
-    def _validate_credentials(self) -> None:
-        self._resolve_auth()
-
-    def extra_harbor_args(self) -> Iterable[str]:
-        reasoning_effort = self.config.model.reasoning_effort
-        if not reasoning_effort:
-            return []
-        return ["--ak", f"reasoning_effort={reasoning_effort}"]
-
-    def excluded_run_env_keys(self) -> set[str]:
+    def credential_environment_sources(self) -> dict[str, str]:
         auth = self._resolve_auth()
-        if auth.resolved_mode == "chatgpt":
-            return {self.OPENAI_API_ENV}
-        return set()
+        if auth.resolved_mode != "api":
+            return {}
+        return super().credential_environment_sources()
 
-    def local_secret_files(self) -> dict[str, Path]:
+    def credential_file_sources(self) -> dict[str, Path]:
         auth = self._resolve_auth()
         if auth.resolved_mode != "chatgpt" or auth.auth_json_path is None:
             return {}

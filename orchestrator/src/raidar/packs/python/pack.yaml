@@ -1,0 +1,47 @@
+# Python runtime pack (reboot plan WS-I, design memo §4).
+# The agent image carries the toolchain and harness binaries only: no scorer
+# tools and no browsers. Scorer tools live in tools.lock.yaml and are
+# provisioned lazily (host-parse) or run in the eval container (eval-sandbox).
+id: python
+version: 1
+python: "3.12"
+# SCB fork configs/environments/docker-python3.12-uv.yaml commands.entry_file.
+entry_file_template: "{entry_file}.py"
+image:
+  repository: raidar/pack-python
+  context: image
+  # Same base as the SCB python-light problem environment, pinned by digest.
+  # The toolchain differs from python-light: see image/Dockerfile (no docker
+  # CLI or compose; adds node + pinned harnesses).
+  base_image: ghcr.io/astral-sh/uv:python3.12-trixie-slim@sha256:4677e08839853fe91c523b593f822ec1e87c7b91ba4c6b30929016b2e0933cd5
+  # The agent user's HOME. Codex's install-time `codex --version` check runs
+  # with its default CODEX_HOME (~/.codex), so HOME must not be under /tmp:
+  # see models.ImageSpec._agent_home_outside_temp_dirs. At agent run time
+  # Harbor 0.23.0 sets CODEX_HOME=/tmp/codex-home itself, so codex still warns
+  # that it cannot create its PATH helper aliases there; that is Harbor's, not
+  # this image's, and does not affect the warm install check.
+  agent_home: /home/agent
+  harnesses:
+    codex-cli:
+      npm_package: "@openai/codex"
+      version: 0.156.1
+      executable: codex
+      harbor_agent: codex
+    claude-code:
+      npm_package: "@anthropic-ai/claude-code"
+      version: 2.1.285
+      executable: claude
+      harbor_agent: claude-code
+  # Browser executables that must never be present in the agent image.
+  forbidden_executables:
+    - chromium
+    - chromium-browser
+    - google-chrome
+    - firefox
+    - playwright
+task_environment:
+  # Accepted N1 decision (overhead-baseline.md §4 finding 1): PID 1 is
+  # `sleep infinity`, which ignores SIGTERM; `init: true` lets `compose down`
+  # stop the container without the 10 s grace.
+  compose_main_service:
+    init: true

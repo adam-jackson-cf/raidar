@@ -73,7 +73,7 @@ export function RunHeader({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-medium" style={{ color: C.fg5 }}>
-          {run.scenario}@{run.revision} · {runLabel(run.id)}
+          {run.problem}@{run.arm} · {runLabel(run.id)}
         </span>
         <TierPill tier={tier} size="lg" detail={`Composite ${fmtScore(run.composite_score)} — ${tier.blurb}`} />
         <span
@@ -83,14 +83,14 @@ export function RunHeader({
           {run.agent_spec}
         </span>
         {run.synthetic && <Badge label="synthetic" />}
-        {!run.valid && <Badge label="invalid" color={C.red} title="Run failed validity checks" />}
+        {!run.valid && <Badge label="invalid" color={C.red} title="Trial failed validity checks" />}
         <div className="ml-auto flex items-center gap-2">
           {actions}
         <Link
-          to={`/#family-${encodeURIComponent(run.scenario)}`}
+          to={`/#family-${encodeURIComponent(run.problem)}`}
           className="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] transition hover:bg-white/10"
           style={{ color: C.accent, border: `1px solid ${C.selectedBorder}` }}
-          title={`Open the ${run.scenario} comparison in Experiments`}
+          title={`Open the ${run.problem} comparison in Experiments`}
         >
           Compare agent specs
           <ArrowUpRight className="size-2.5" />
@@ -111,16 +111,16 @@ export function RunHeader({
           color={tier.color}
           title={`Composite score · quality ${fmtScore(run.quality_score)} · diagnostic ${fmtScore(run.diagnostic_score)}`}
         />
-        <Fact label="run time" value={fmtDuration(run.duration_ms)} />
+        <Fact label="trial time" value={fmtDuration(run.duration_ms)} />
         {run.total_input_tokens === 0 && run.total_output_tokens === 0 ? (
-          <Fact label="tokens" value="not recorded" color={C.fg0} title="No token usage captured for this run" />
+          <Fact label="tokens" value="not recorded" color={C.fg0} title="No token usage captured for this trial" />
         ) : (
           <Fact
             label="tokens"
             value={`${fmtTokens(run.total_input_tokens)} in · ${fmtTokens(run.total_output_tokens)} out`}
           />
         )}
-        <Fact label="steps" value={String(run.span_count)} title="Projected spans in this run's trace" />
+        <Fact label="steps" value={String(run.span_count)} title="Projected spans in this trial's trace" />
       </div>
 
       {run.unscored_reasons.length > 0 && (
@@ -129,7 +129,7 @@ export function RunHeader({
           style={{ background: `${C.orange}0d`, border: `1px solid ${C.orange}30` }}
         >
           <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: C.orange }}>
-            Why this run is unscored
+            Why this trial is unscored
           </span>
           {run.unscored_reasons.map((reason, i) => (
             <span key={i} className="text-[11px]" style={{ color: C.fg3 }}>
@@ -151,13 +151,13 @@ export function RunHeader({
         {detailsOpen && (
           <div className="flex flex-col gap-1.5 rounded-md p-2" style={{ background: 'rgba(255,255,255,0.02)' }}>
             <div className="flex flex-wrap gap-x-6 gap-y-2">
-              <Fact label="run id" value={run.id} color={C.fg2} />
+              <Fact label="trial id" value={run.id} color={C.fg2} />
               <Fact label="status" value={run.status} color={run.status === 'OK' ? C.green : run.status === 'ERROR' ? C.red : C.fg2} />
               <Fact label="quality" value={fmtScore(run.quality_score)} />
               <Fact label="diagnostic" value={fmtScore(run.diagnostic_score)} />
               <Fact label="valid" value={run.valid ? 'yes' : 'no'} color={run.valid ? C.green : C.red} />
             </div>
-            <ArtifactPath label="run json" path={run.artifact_paths.run_json} />
+            <ArtifactPath label="trial json" path={run.artifact_paths.run_json} />
             {run.artifact_paths.findings_json && (
               <ArtifactPath label="findings json" path={run.artifact_paths.findings_json} />
             )}

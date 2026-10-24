@@ -47,7 +47,7 @@ export function RunListItem({
         </span>
         <span className="ml-auto flex items-center gap-1.5">
           <FindingChips counts={run.finding_counts} />
-          {run.synthetic && <Badge label="syn" title="Synthetic fixture run" />}
+          {run.synthetic && <Badge label="syn" title="Synthetic fixture trial" />}
         </span>
       </div>
     </button>

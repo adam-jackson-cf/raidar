@@ -1,0 +1,392 @@
+{
+  "checks": [
+    {
+      "detail": [],
+      "name": "reference_k_passes_1..k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "reference_k-1_fails_k",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "repeat_identical_negative",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "native_parity_positive",
+      "status": "pass"
+    },
+    {
+      "detail": [],
+      "name": "native_parity_negative",
+      "status": "pass"
+    }
+  ],
+  "engine": "harbor",
+  "environment": {
+    "docker_context": "orbstack",
+    "engine": "harbor",
+    "grader_image": "raidar-oracle-grader:466e21c75a524af1",
+    "harbor": "0.23.0",
+    "native_runner": {
+      "commit": "25069ba83cdaf7abcf08acb4cf6e2b024e66d109",
+      "dirty": false
+    },
+    "pack_image": "raidar/pack-python:2b91a52663e099f2"
+  },
+  "grades": {
+    "native": {
+      "negative": {
+        "checkpoint_1": {
+          "all_pass": false,
+          "groups": {
+            "core": [
+              0,
+              9
+            ],
+            "error": [
+              0,
+              12
+            ],
+            "functionality": [
+              0,
+              15
+            ],
+            "regression": [
+              0,
+              0
+            ]
+          },
+          "infra_failure": null,
+          "passed": 0,
+          "total": 36
+        }
+      },
+      "positive": {
+        "checkpoint_1": {
+          "all_pass": true,
+          "groups": {
+            "core": [
+              9,
+              9
+            ],
+            "error": [
+              12,
+              12
+            ],
+            "functionality": [
+              15,
+              15
+            ],
+            "regression": [
+              0,
+              0
+            ]
+          },
+          "infra_failure": null,
+          "passed": 36,
+          "total": 36
+        }
+      }
+    },
+    "oracle": {
+      "negative": [
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": false,
+            "groups": {
+              "core": [
+                0,
+                9
+              ],
+              "error": [
+                0,
+                12
+              ],
+              "functionality": [
+                0,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 0,
+            "total": 36
+          }
+        }
+      ],
+      "positive": [
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 36,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 36,
+            "total": 36
+          }
+        },
+        {
+          "checkpoint_1": {
+            "all_pass": true,
+            "groups": {
+              "core": [
+                9,
+                9
+              ],
+              "error": [
+                12,
+                12
+              ],
+              "functionality": [
+                15,
+                15
+              ],
+              "regression": [
+                0,
+                0
+              ]
+            },
+            "infra_failure": null,
+            "passed": 36,
+            "total": 36
+          }
+        }
+      ]
+    }
+  },
+  "group_order": [
+    "core",
+    "functionality",
+    "error",
+    "regression"
+  ],
+  "headline_policy": {
+    "checkpoints": 1,
+    "components": {
+      "C": "used",
+      "E": "missing",
+      "G": "not_applicable",
+      "H": "missing",
+      "R": "not_applicable",
+      "V": "missing"
+    },
+    "eligible": false,
+    "policy": "scb-canonical-oneshot@1",
+    "reasons": [
+      {
+        "code": "component_missing",
+        "component": "V",
+        "detail": "scb-canonical-oneshot@1 requires component V"
+      },
+      {
+        "code": "component_missing",
+        "component": "E",
+        "detail": "scb-canonical-oneshot@1 requires component E"
+      },
+      {
+        "code": "component_missing",
+        "component": "H",
+        "detail": "scb-canonical-oneshot@1 requires component H"
+      }
+    ],
+    "reference_correctness": "1",
+    "selection": "default_by_k"
+  },
+  "kind": "raidar-problem-validation",
+  "manifest_sha256": "e2859eb9dd3804a99afb92aff8ac348b760c0b3aa05f7feb2384f95a8e582402",
+  "mode": "one_shot",
+  "not_run": [],
+  "problem": "scb/circuit_eval.checkpoint_1@38d627ecf668",
+  "repeats": 3,
+  "schema_version": 1,
+  "spec_determinacy": {
+    "assertions": {
+      "audited": 2,
+      "by_rule": {
+        "content-stated": 1,
+        "literal-in-spec": 1
+      }
+    },
+    "audit_version": 1,
+    "dynamic": {
+      "environment": {
+        "docker_context": "orbstack",
+        "grader_environment_id": "sha256:874d2b90b9adadca5aae0958053763e32c961f56990fcb952b2ed02a015ef9bf",
+        "grader_image": "raidar-oracle-grader:76fabb7fb4f407d7"
+      },
+      "reason": null,
+      "status": "ran"
+    },
+    "flagged": [],
+    "method": "Static: each audited assertion of a test (error-detail/message equality, containment or pattern; byte-level stdout comparison) is classified against the text of its origin checkpoint's specification and every earlier one (rules below). Dynamic: reference k and spec-conformant variants of it (variants below) are graded at step k; a case is sensitive to a variant when it passes on the reference and not on the variant. A case is flagged when its test has an undetermined assertion of the kind a variant it is sensitive to rewrites.",
+    "rules": {
+      "content-stated": "determined: a paragraph states what the category's detail contains",
+      "content-unstated": "undetermined: error text must contain an input value or match a pattern; no paragraph states what the category's detail contains",
+      "exact-stated": "determined: a paragraph states the exact content of the category's detail",
+      "exact-unstated": "undetermined: error text must equal an input value; no paragraph states exact content",
+      "format-stated": "determined: the specification names an output byte format",
+      "format-unstated": "undetermined: stdout compared byte for byte; no byte format stated",
+      "literal-in-spec": "determined: the asserted literal occurs in the specification text",
+      "wording-unstated": "undetermined: an error-text literal in neither the specification nor the test's inputs"
+    },
+    "sensitive_determined": [
+      {
+        "case": "test_checkpoint_1.py::test_check_cycle_error_message",
+        "variants": [
+          "neutral_error_text"
+        ]
+      }
+    ],
+    "sensitive_unexplained": [],
+    "static_undetermined": [],
+    "steps": {
+      "checkpoint_1": {
+        "reference": {
+          "infra_failure": null,
+          "passed": 36,
+          "total": 36
+        },
+        "variants": {
+          "neutral_error_text": {
+            "infra_failure": null,
+            "passed": 35,
+            "sensitive": [
+              "test_checkpoint_1.py::test_check_cycle_error_message"
+            ],
+            "total": 36
+          },
+          "reformatted_json": {
+            "infra_failure": null,
+            "passed": 36,
+            "sensitive": [],
+            "total": 36
+          }
+        }
+      }
+    },
+    "summary": {
+      "flagged": 0,
+      "flagged_by_checkpoint": {},
+      "flagged_by_rule": {},
+      "sensitive_determined": 1,
+      "sensitive_unexplained": 0,
+      "unconfirmed": 0
+    },
+    "unconfirmed": [],
+    "variants": {
+      "neutral_error_text": "every error's human-readable text (an error object's detail or message) replaced by 'request rejected'; category, exit code and format kept",
+      "reformatted_json": "JSON stdout re-serialised with two-space indentation and a trailing newline; value and key order kept"
+    }
+  },
+  "steps": [
+    "checkpoint_1"
+  ],
+  "verdict": "validated"
+}

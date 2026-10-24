@@ -1,5 +1,5 @@
 // Failure-pattern rollup adapted from benchmark-view's "Failure root causes"
-// panel: aggregates issue findings and failed gates across a scenario family's
+// panel: aggregates issue findings and failed gates across a problem family's
 // runs so reviewers can triage what keeps going wrong and where.
 import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
@@ -65,7 +65,7 @@ export function FailurePatterns({ runs }: { runs: RunRecord[] }) {
           Failure patterns
         </span>
         <span className="text-[10px]" style={{ color: C.fg0 }}>
-          recurring issues across this scenario's runs — open a run to inspect the evidence
+          recurring issues across this problem's trials — open a trial to inspect the evidence
         </span>
       </div>
       <div className="flex flex-col gap-1">
@@ -91,7 +91,7 @@ export function FailurePatterns({ runs }: { runs: RunRecord[] }) {
                   to={`/runs/${encodeURIComponent(run.id)}`}
                   className="rounded px-1 py-px text-[10px] transition hover:bg-white/10"
                   style={{ color: C.accent }}
-                  title={`${run.id} (${run.agent_spec}) — open run review`}
+                  title={`${run.id} (${run.agent_spec}) — open trial review`}
                 >
                   {runLabel(run.id)}
                 </Link>

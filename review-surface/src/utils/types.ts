@@ -5,8 +5,10 @@ export type AnnotationKind = 'issue' | 'good' | 'note';
 export interface RunRecord {
   id: string;
   name: string;
-  scenario: string;
-  revision: string;
+  /** Problem id. */
+  problem: string;
+  /** Label of the arm's condition; arms of one condition on different harnesses share it. */
+  arm: string;
   harness: string;
   model: string;
   agent_spec: string;
@@ -120,17 +122,19 @@ export interface StatBlock {
 export interface ExperimentRecord {
   experiment_id: string;
   dir: string;
-  scenario: string | null;
-  revision: string | null;
+  problem: string | null;
+  arm: string | null;
   harness: string | null;
   model: string | null;
   agent_spec: string;
   synthetic: boolean;
   repeats: number | null;
-  scenario_meta: {
+  problem_meta: {
+    display_name: string;
     description: string | null;
     difficulty: string | null;
-    category: string | null;
+    languages: string[];
+    checkpoints: number;
     timeout_sec: number | null;
   } | null;
   aggregate: {
@@ -138,7 +142,6 @@ export interface ExperimentRecord {
     run_count_scored?: number;
     unscored_count?: number;
     validity_rate?: number;
-    performance_pass_rate?: number;
     composite_score?: StatBlock;
     quality_score?: StatBlock;
     duration_sec?: StatBlock;
@@ -173,18 +176,18 @@ export interface FileDiff {
   diff: { added: number; removed: number; truncated: boolean; lines: DiffLine[] };
 }
 
-export interface RevisionDiff {
+export interface ArmDiff {
   key: string;
-  scenario: string;
-  from_revision: string;
-  to_revision: string;
+  problem: string;
+  from_arm: string;
+  to_arm: string;
   summary: string[];
   comparable_warnings: string[];
   sections?: Record<string, FileDiff>;
-  files: { scenario: FileDiff; prompt: FileDiff };
+  files: { condition: FileDiff; prompt: FileDiff };
 }
 
 export interface ExperimentsResponse {
   experiments: ExperimentRecord[];
-  revision_diffs: RevisionDiff[];
+  arm_diffs: ArmDiff[];
 }

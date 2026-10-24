@@ -1,9 +1,12 @@
 # Canonical ownership for repository architecture and workflow surfaces.
 * @adamjackson
 
-/.configs/ @adamjackson
 /.github/ @adamjackson
-/benchmark-view/ @adamjackson
 /orchestrator/ @adamjackson
-/scripts/ @adamjackson
 /orchestrator/tests/ @adamjackson
+/scripts/ @adamjackson
+/lab/ @adamjackson
+/review-surface/ @adamjackson
+/docs/reboot/ @adamjackson
+/Makefile @adamjackson
+/AGENTS.md @adamjackson

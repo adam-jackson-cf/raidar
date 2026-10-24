@@ -3,13 +3,16 @@
 A Workshop-inspired review surface over Raidar benchmark evidence. It adapts the
 review model of [Raindrop Workshop](https://github.com/raindrop-ai/workshop)
 (run list → run outline → span tree → payload drilldown, with `issue | good | note`
-annotations) to Raidar's own artifacts: scenario runs, scorecards, gate history,
-trace events, scorer/metric evidence, requirements coverage, process metrics,
-and deterministic findings.
+annotations) to Raidar's own artifacts: experiment runs (trials, ATIF
+trajectories, oracle gates, validity checks), their Assessments and Quality
+components.
 
 Raidar artifacts remain authoritative. Everything this surface shows is a
-regenerable projection of `experiments/benchmarks/**`; user annotations are the
-only data it owns (stored in `data/user-annotations.json`).
+regenerable projection of run directories (`runs/<experiment>/<run>/`) and the
+Assessment stores that score them. User annotations and Jev labels are the only
+data it owns (under `data/`). Jev is parked (2026-10-04): `/quality/runs/:id`
+shows a trial's audited Jev decisions only as a collapsed, read-only history
+that is part of no score; the labelling panel and label API are kept, dormant.
 
 ## Personas and objectives
 
@@ -18,8 +21,9 @@ behind progressive disclosure, so each persona starts zoomed-out and drills in.
 
 | Persona | Objective | Where they land |
 |---|---|---|
-| Benchmark reviewer / platform lead | Which agent spec delivers this scenario better, did a revision change help, and can I trust the sample? | **Experiments** page: a per-revision verdict headline (best delivery, the gap to the runner-up, and the run worth opening first), then a comparison table framed as delivery verdict (Strong/Solid/Shaky/Failing) · repeatability · issues · sample confidence · pace · tokens. Expanding a spec splits metrics into "where points were lost" vs "what held up" with pass-ratio bars, score-area bars, evidence-linked findings, and run pills. Below: score-vs-run-time scatter, failure-pattern rollups, and revision movement with contract diffs and comparability warnings. |
-| Scenario / eval engineer | Why did this run score what it scored, and is the scenario contract right? | **Run detail**: a verdict banner (one-sentence outcome, gates, headline score) over a "why it scored this" scorecard — each score area shows its share of the composite with bars, and each check is click-to-evidence. Findings render as plain-language, evidence-linked annotations. Long ids and source artifacts sit behind a "Technical details" disclosure. |
+| Benchmark reviewer / platform lead | Which arm delivers this problem better, did a condition change help, and can I trust the sample? | **Experiments** page: a per-arm verdict headline (best delivery, the gap to the runner-up, and the run worth opening first), then a comparison table framed as delivery verdict (Strong/Solid/Shaky/Failing) · repeatability · issues · sample confidence · pace · tokens. Expanding a spec splits metrics into "where points were lost" vs "what held up" with pass-ratio bars, score-area bars, evidence-linked findings, and run pills. Below: score-vs-run-time scatter, failure-pattern rollups, and arm movement with condition contract diffs and comparability warnings. |
+| Experiment / eval engineer | Why did this run score what it scored, and is the experiment contract right? | **Run detail**: a verdict banner (one-sentence outcome, gates, headline score) over a "why it scored this" scorecard — each score area shows its share of the composite with bars, and each check is click-to-evidence. Findings render as plain-language, evidence-linked annotations. Long ids and source artifacts sit behind a "Technical details" disclosure. |
+| Code-quality reviewer | Does a condition change the code agents leave behind, checkpoint by checkpoint, and is the headline S eligible? | **Quality** (header navigation, `/quality`): per problem, the arms' C·V·E·H·R·G·I·S curves, paired Δ vs the baseline arm, SCB distributions, the head-to-head scatter and score sensitivity. Run detail carries a **Quality** panel under the scorecard (the run's checkpoint strip with eligibility badges; a V/E/H/R/G cell or column opens its file:line evidence in `/quality/runs/:id`), and each comparison group and expanded arm on Experiments links to its experiment's Quality view. A family that mixes headline policies shows one "Headline policies differ in this comparison" notice on the family, in run detail and on both Quality views. |
 | Agent / harness debugger | Where in the delivery process did it go wrong? | **Span tree** (agent execution, gates, scoring phases) with a duration timeline, expand/collapse-all, error cycling, keyboard navigation (↑↓/←→/esc), per-run evidence search with match highlighting, and payload drilldown with copy. This is the deepest layer, where raw span names map 1:1 to the trace. |
 
 ### Semantic verdict layer
@@ -39,7 +43,11 @@ consistent good/bad vocabulary in `src/utils/verdict.ts`:
 ## Architecture
 
 ```
-experiments/benchmarks/**            Raidar benchmark artifacts (authoritative)
+runs/<experiment>/<run>/**           experiment runs (authoritative)
+<assessment store>/**                Assessments of those runs
+        │  python -m raidar.review.projection (make review-surface-data)
+        ▼
+var/tmp/review-projection.json          one schema_version=2 projection (problem, arm, arm_diffs)
         │  scripts/build-review-data.mjs
         ▼
 data/runs.json                       run index records
@@ -58,7 +66,7 @@ Projection mapping (Workshop concept → Raidar source):
 
 | Workshop | Raidar projection |
 |---|---|
-| run | one benchmark run (`run.json` + scorecard + AgentSpec + scenario revision) |
+| run | one trial of an experiment run (arm, condition, agent, problem, Assessments) |
 | span | phase/evidence node: agent trace events (commands, messages, file edits), verification gates, scorer/metric evidence, requirements, validity, process metrics, artifacts |
 | annotation | deterministic findings from `findings.json` (source `raidar`, evidence-linked) plus manual reviewer notes (source `user`) |
 | run outline | computed summary: span type counts, tool/gate rollup, error shortlist, annotations |
@@ -66,15 +74,10 @@ Projection mapping (Workshop concept → Raidar source):
 
 ## Usage
 
-From the repo root (public interface):
-
-```
-make benchmark-fixture-synthetic   # optional: labeled synthetic demo data
-make review-surface-data           # project experiments/benchmarks into data/
-make review-surface-build          # npm install + typecheck + vite build
-make review-surface-serve          # serve app + API on http://localhost:5950
-make review-surface-test           # end-to-end functional suite (Playwright)
-```
+Run the surface through the repo-root `make` targets; `make help` lists them
+under "Review surface" with their arguments, and the root `README.md`
+walkthrough shows the review step for a real run. The labelled synthetic
+fixtures are written under `var/tmp/review-fixture/`, never into `lab/experiments/`.
 
 Inside `review-surface/` for development: `npm run dev` (Vite on 5951, proxies
 `/api` to the server on 5950).
@@ -82,18 +85,22 @@ Inside `review-surface/` for development: `npm run dev` (Vite on 5951, proxies
 ## End-to-end tests
 
 `tests/surface.spec.ts` is a Playwright functional regression net over the
-synthetic fixture, asserting every interaction works: navigation and scenario
+synthetic fixture, asserting every interaction works: navigation and problem
 anchors, experiment expand/collapse and run pills, the comparison headline and
 Δ-vs-best framing, the run verdict banner, gate chips, the evidence-linked
 scorecard checks, findings jumps, per-run search (plain + regex + result
 click), the span tree (error cycle, expand/collapse-all, keyboard nav, escape),
 payload copy, annotation create/delete/kind-toggle, the runs sidebar filter and
-selection, the tradeoff scatter, failure patterns, revision-movement diffs, and
+selection, the tradeoff scatter, failure patterns, arm-movement diffs, and
 the failing / passing / **unscored** run states — plus a console-error guard.
 
-`make review-surface-test` projects the fixture, builds the app, ensures the
-Chromium browser, and runs the suite via `server.mjs` (Playwright's `webServer`
-reuses an already-running server on 5950).
+`make review-surface-test` writes the synthetic review fixture (its `runs` root
+feeds both the review and the Quality data; its `review-only` root feeds only the
+review data, so a run without Quality data renders), projects it together with any given
+`REVIEW_RUNS_ROOT` runs (one `REVIEW_STORE` for all roots, or one per root — a
+mismatch fails loudly), builds the app, ensures the Chromium browser, and runs the suite
+via `server.mjs` (Playwright's `webServer` reuses an already-running server on
+5950).
 
 Synthetic fixtures are always labeled — experiment ids, run ids, and payloads
 carry `synthetic` markers and the UI shows a `SYNTHETIC FIXTURE` badge. They
@@ -102,10 +109,10 @@ must never be read as real benchmark evidence.
 ## Relationship to the former benchmark-view
 
 The earlier `benchmark-view` dashboard is deprecated and removed. Its
-persona-relevant capabilities live here: revision movement deltas, scenario
+persona-relevant capabilities live here: arm movement deltas, condition
 contract diffs with comparability warnings, failure-pattern rollups, and the
 score-vs-duration tradeoff scatter. Its decision-score heuristic, signal
-coverage matrix, improvement playbook, and scenario portfolio census were
+coverage matrix, improvement playbook, and portfolio census were
 deliberately not carried forward — the deterministic findings layer and the
 comparison tables supersede them.
 

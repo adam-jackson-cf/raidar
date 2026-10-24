@@ -17,7 +17,7 @@ These rules guide review-surface wireframes and should be applied to relevant UI
 
 ## Dropdowns And Filters
 
-- Dropdown defaults should describe the actual scope, such as `all scenarios`, not vague tokens like `all`.
+- Dropdown defaults should describe the actual scope, such as `all problems`, not vague tokens like `all`.
 - Do not add adjacent explanatory count labels unless the count changes the user decision or cannot be inferred from visible results.
 - Keep filter bars visually quiet: inputs, selectors, and search affordances only.
 - Use neutral wording in filters and avoid duplicating the section title in the control area.

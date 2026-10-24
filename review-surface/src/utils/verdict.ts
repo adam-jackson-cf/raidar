@@ -11,7 +11,7 @@ export interface Tier {
 
 /** Composite-score verdict tiers shared by every score rendering. */
 export function scoreTier(score: number | null | undefined): Tier {
-  if (score == null) return { label: 'Unscored', color: C.fg1, blurb: 'No score recorded — run needs a rerun' };
+  if (score == null) return { label: 'Unscored', color: C.fg1, blurb: 'No score recorded — trial needs a rerun' };
   if (score >= 0.9) return { label: 'Strong', color: C.green, blurb: 'Delivered to spec' };
   if (score >= 0.75) return { label: 'Solid', color: C.cyan, blurb: 'Delivered with minor gaps' };
   if (score >= 0.5) return { label: 'Shaky', color: C.orange, blurb: 'Delivered with significant gaps' };
@@ -31,7 +31,7 @@ export function spreadTier(stat: StatBlock | undefined): Tier | null {
   if (stat.stddev < REPEAT_VARIANCE_STDDEV_THRESHOLD) {
     return { label: 'Consistent', color: C.fg2, blurb: `Repeats stay within ±${REPEAT_VARIANCE_STDDEV_THRESHOLD} — no variance flag` };
   }
-  return { label: 'Volatile', color: C.orange, blurb: 'Repeats disagree enough for Raidar to flag variance — inspect the outlier runs' };
+  return { label: 'Volatile', color: C.orange, blurb: 'Repeats disagree enough for Raidar to flag variance — inspect the outlier trials' };
 }
 
 /** Sample-trust verdict from adequacy flags. */
@@ -48,21 +48,21 @@ export function sampleTrust(sample: ExperimentRecord['sample'], scored: number, 
 /** Plain-language names for Raidar finding categories (infra ids stay in tooltips). */
 export const CATEGORY_INFO: Record<string, { label: string; hint: string }> = {
   'failed-gate': { label: 'Verification gate failed', hint: 'A required check (tests, lint, …) did not pass' },
-  'missing-required-command': { label: 'Required step never ran', hint: 'The scenario expects a verification command the agent never executed' },
-  'requirements-gap': { label: 'Requirement not satisfied', hint: 'One or more scenario requirements were not met' },
-  'requirements-satisfied': { label: 'All requirements satisfied', hint: 'Every scenario requirement was met' },
+  'missing-required-command': { label: 'Required step never ran', hint: 'The problem expects a verification command the agent never executed' },
+  'requirements-gap': { label: 'Requirement not satisfied', hint: 'One or more problem requirements were not met' },
+  'requirements-satisfied': { label: 'All requirements satisfied', hint: 'Every problem requirement was met' },
   'missing-artifact': { label: 'Evidence file missing', hint: 'A declared evidence artifact is absent or unusable' },
   'retained-evidence': { label: 'Evidence retained', hint: 'Declared evidence artifacts were kept and usable' },
   'deterministic-cap': { label: 'Score capped by failed checks', hint: 'Deterministic prerequisites failed, capping this metric' },
   'judge-review': { label: 'Judge verdict needs review', hint: 'An LLM-judge score disagrees with deterministic evidence' },
   'completion-claim': { label: 'Claimed done without proof', hint: 'The agent reported success that evidence does not support' },
-  'performance-gate': { label: 'Performance threshold missed', hint: 'The run breached a performance limit' },
+  'performance-gate': { label: 'Performance threshold missed', hint: 'The trial breached a performance limit' },
   'workflow-anomaly': { label: 'Unusual workflow', hint: 'The delivery process deviated from the expected pattern' },
-  'resource-outlier': { label: 'Unusual resource use', hint: 'Tokens or duration far from this scenario’s norm' },
-  'repeat-variance': { label: 'Inconsistent across repeats', hint: 'Repeat runs disagree more than expected' },
-  'unscored-run': { label: 'Run could not be scored', hint: 'Scoring failed — the run needs a rerun' },
-  'rerun-target': { label: 'Rerun required', hint: 'This experiment has unresolved unscored runs' },
-  'sample-adequacy': { label: 'Sample too small', hint: 'Not enough scored runs to trust the aggregate' },
+  'resource-outlier': { label: 'Unusual resource use', hint: 'Tokens or duration far from this problem’s norm' },
+  'repeat-variance': { label: 'Inconsistent across repeats', hint: 'Repeat trials disagree more than expected' },
+  'unscored-run': { label: 'Trial could not be scored', hint: 'Scoring failed — the trial needs a rerun' },
+  'rerun-target': { label: 'Rerun required', hint: 'This experiment has unresolved unscored trials' },
+  'sample-adequacy': { label: 'Sample too small', hint: 'Not enough scored trials to trust the aggregate' },
   'clean-verification': { label: 'Verification clean first try', hint: 'All gates passed without retries' },
 };
 
@@ -86,22 +86,22 @@ export function scorerName(id: string): string {
 }
 
 /**
- * Concise run label: trailing alphanumeric chunk(s) of the id, e.g.
- * "synthetic-bugfix-gpt-5.5-low-04" → "Run 04", "r017" → "Run r017". Full id belongs in a tooltip.
+ * Concise trial label: trailing alphanumeric chunk(s) of the id, e.g.
+ * "synthetic-bugfix-gpt-5.5-low-04" → "Trial 04", "r017" → "Trial r017". Full id belongs in a tooltip.
  */
 export function runLabel(id: string): string {
   const tail = id.match(/(\d+)$/);
-  if (tail) return `Run ${tail[1]}`;
+  if (tail) return `Trial ${tail[1]}`;
   const seg = id.split(/[-_]/).pop() ?? id;
-  return `Run ${seg}`;
+  return `Trial ${seg}`;
 }
 
-/** One plain-language sentence describing a run's outcome. */
+/** One plain-language sentence describing a trial's outcome. */
 export function runSummary(run: RunRecord): string {
   const tier = scoreTier(run.unscored ? null : run.composite_score);
   const parts: string[] = [];
   if (run.unscored) {
-    parts.push('This run was not scored');
+    parts.push('This trial was not scored');
   } else {
     parts.push(`${tier.blurb} — composite ${run.composite_score?.toFixed(2)}`);
   }

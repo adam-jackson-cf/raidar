@@ -69,7 +69,7 @@ export function WireframeRunListItem({
   return (
     <button
       data-run-id={run.id}
-      title={`${run.id} — ${run.scenario} ${run.revision} — ${tier.label}`}
+      title={`${run.id} — ${run.problem} ${run.arm} — ${tier.label}`}
       className="w-full rounded-md px-2.5 py-2 text-left transition"
       style={{
         background: selected ? C.selected : 'transparent',

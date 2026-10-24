@@ -1,0 +1,11 @@
+# Pinned problem datasets for `raidar problem import` (reboot plan WS-B, B1).
+# A problem reference's version is the first 12 characters of its dataset commit.
+sources:
+  scb:
+    # Upstream HEAD after PR #27 (held-out test leak fix); validated in
+    # docs/reboot/oracle-validation.md. forge/ and circuit_eval/ are byte-identical
+    # to the local fork checkout ef6a9dd.
+    format: scb-problems
+    url: https://github.com/gabeorlanski/scb-problems
+    commit: 38d627ecf668a88f88f8d260f8df8df6116e9b03
+    converter: scripts/scb_to_harbor.py

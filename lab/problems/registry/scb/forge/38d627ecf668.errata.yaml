@@ -1,0 +1,441 @@
+# Pinned errata for scb/forge@38d627ecf668 (raidar.problems.errata). The lock pins the
+# sha256 of this file; editing it changes lock_sha256 (relock, then migrate executed jobs).
+kind: raidar-problem-errata
+schema_version: 1
+problem: scb/forge@38d627ecf668
+manifest_sha256: 029cca8f775cc8cd5524647f6f2562883aec117bec667f7cf021181e613fbe94
+registered: '2026-10-02'
+basis: 'spec-determinacy audit v1 (validation report problems/registry/scb/forge/38d627ecf668.validation.json,
+  section spec_determinacy): every flagged case, by the audit rule alone. Registered before any experiment
+  that applies it; pilot v2 outcomes are cited as context only. Upstream report draft: docs/reboot/upstream/scb-forge-unspecified-assertions.md.'
+cases:
+- id: test_checkpoint_1.py::test_create_rejects_empty_name_string
+  checkpoint_origin: checkpoint_1
+  disposition: exclude-from-solved
+  rule: wording-unstated
+  assertion: assert_error(result, category='validation_error', detail_contains='name must be a non-empty
+    string')
+  reason: The test requires the error detail to contain a phrase that occurs nowhere in the specification.
+    Checkpoint 1 states the constraint ('`name` must be present and a non-empty string' / '`requirement_sets`
+    must be present and a non-empty array', problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:53-54,
+    :128-129) and that the detail 'describes the failing constraints' (:125-126), not the wording; a program
+    that rejects the input with the right category and exit code but other words fails.
+  evidence:
+  - 'audit: wording-unstated: line 568: ''name must be a non-empty string'' occurs neither in the specification
+    nor among the test''s inputs, so a conforming program would have to guess this wording'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 5/16 baseline and 14/16 guided trials'
+- id: test_checkpoint_1.py::test_create_rejects_empty_requirement_sets
+  checkpoint_origin: checkpoint_1
+  disposition: exclude-from-solved
+  rule: wording-unstated
+  assertion: assert_error(result, category='validation_error', detail_contains='requirement_sets must
+    be a non-empty array')
+  reason: The test requires the error detail to contain a phrase that occurs nowhere in the specification.
+    Checkpoint 1 states the constraint ('`name` must be present and a non-empty string' / '`requirement_sets`
+    must be present and a non-empty array', problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:53-54,
+    :128-129) and that the detail 'describes the failing constraints' (:125-126), not the wording; a program
+    that rejects the input with the right category and exit code but other words fails.
+  evidence:
+  - 'audit: wording-unstated: line 588: ''requirement_sets must be a non-empty array'' occurs neither
+    in the specification nor among the test''s inputs, so a conforming program would have to guess this
+    wording'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 5/16 baseline and 14/16 guided trials'
+- id: test_checkpoint_3.py::test_bind_duplicate_assignment_guard
+  checkpoint_origin: checkpoint_3
+  disposition: exclude-from-solved
+  rule: content-unstated
+  assertion: assert_error(duplicate, category='duplicate_assignment', detail_contains=assignment_id)
+  reason: The test requires the duplicate_assignment detail to contain the assignment_id. Checkpoint 3
+    states the guard and the category (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_3/instruction.md:38,
+    :61) and nothing about the detail.
+  evidence:
+  - 'audit: content-unstated: line 310: the error_text_contains assertion needs the duplicate_assignment
+    error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment
+    detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 0/16 baseline and 0/16 guided trials'
+- id: test_checkpoint_3.py::test_bind_invalid_op_precedes_not_found
+  checkpoint_origin: checkpoint_3
+  disposition: exclude-from-solved
+  rule: content-unstated
+  assertion: assert_error(result, category='invalid_operation', detail_contains='not-an-op')
+  reason: The test requires the invalid_operation detail to contain the offending operation value. Checkpoint
+    3 states only the category and its priority (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_3/instruction.md:54-61)
+    and nothing about any detail at checkpoint 3.
+  evidence:
+  - 'audit: content-unstated: line 381: the error_text_contains assertion needs the invalid_operation
+    error text to contain ''not-an-op'', but no paragraph of the specification states what a invalid_operation
+    detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_3.py::test_bind_invalid_op_reports_bad_value
+  checkpoint_origin: checkpoint_3
+  disposition: exclude-from-solved
+  rule: content-unstated
+  assertion: assert_error(result, category='invalid_operation', detail_contains='invalid-op')
+  reason: The test requires the invalid_operation detail to contain the offending operation value. Checkpoint
+    3 states only the category and its priority (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_3/instruction.md:54-61)
+    and nothing about any detail at checkpoint 3.
+  evidence:
+  - 'audit: content-unstated: line 265: the error_text_contains assertion needs the invalid_operation
+    error text to contain ''invalid-op'', but no paragraph of the specification states what a invalid_operation
+    detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_3.py::test_duplicate_guard_blocks_mixed_ops
+  checkpoint_origin: checkpoint_3
+  disposition: exclude-from-solved
+  rule: content-unstated
+  assertion: assert_error(mixed, category='duplicate_assignment', detail_contains=assignment_id)
+  reason: The test requires the duplicate_assignment detail to contain the assignment_id. Checkpoint 3
+    states the guard and the category (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_3/instruction.md:38,
+    :61) and nothing about the detail.
+  evidence:
+  - 'audit: content-unstated: line 344: the error_text_contains assertion needs the duplicate_assignment
+    error text to contain assignment_id, but no paragraph of the specification states what a duplicate_assignment
+    detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 0/16 baseline and 1/16 guided trials'
+- id: test_checkpoint_3.py::test_invalid_op_no_remove_side_effects
+  checkpoint_origin: checkpoint_3
+  disposition: exclude-from-solved
+  rule: content-unstated
+  assertion: assert_error(result, category='invalid_operation', detail_contains='bad-op')
+  reason: The test requires the invalid_operation detail to contain the offending operation value. Checkpoint
+    3 states only the category and its priority (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_3/instruction.md:54-61)
+    and nothing about any detail at checkpoint 3.
+  evidence:
+  - 'audit: content-unstated: line 499: the error_text_contains assertion needs the invalid_operation
+    error text to contain ''bad-op'', but no paragraph of the specification states what a invalid_operation
+    detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_3.py::test_invalid_op_precedes_duplicate
+  checkpoint_origin: checkpoint_3
+  disposition: exclude-from-solved
+  rule: content-unstated
+  assertion: assert_error(result, category='invalid_operation', detail_contains='bad-op')
+  reason: The test requires the invalid_operation detail to contain the offending operation value. Checkpoint
+    3 states only the category and its priority (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_3/instruction.md:54-61)
+    and nothing about any detail at checkpoint 3.
+  evidence:
+  - 'audit: content-unstated: line 624: the error_text_contains assertion needs the invalid_operation
+    error text to contain ''bad-op'', but no paragraph of the specification states what a invalid_operation
+    detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_create_invalid_firmware_image
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='invalid_image', detail='A1B2C3D4-E5F6-7890-ABCD-EF1234567890')
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 362: the error_text_equals assertion needs the invalid_image error text
+    to equal ''A1B2C3D4-E5F6-7890-ABCD-EF1234567890'', but no paragraph of the specification states what
+    a invalid_image detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_create_unknown_unit_not_found
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=missing)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 208: the error_text_equals assertion needs the not_found error text to
+    equal missing, but no paragraph of the specification states what a not_found detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_flash_bad_image[invalid-format]
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category=category, detail=detail)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 329: the error_text_equals assertion needs the <unknown category> error
+    text to equal detail, but no paragraph of the specification states what a <unknown category> detail
+    or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_flash_bad_image[unknown-image]
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category=category, detail=detail)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 329: the error_text_equals assertion needs the <unknown category> error
+    text to equal detail, but no paragraph of the specification states what a <unknown category> detail
+    or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_flash_bad_image[uppercase-uuid]
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category=category, detail=detail)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 329: the error_text_equals assertion needs the <unknown category> error
+    text to equal detail, but no paragraph of the specification states what a <unknown category> detail
+    or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_flash_invalid_image_precedes_not_found
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='invalid_image', detail='NOT-A-VALID-UUID')
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 343: the error_text_equals assertion needs the invalid_image error text
+    to equal ''NOT-A-VALID-UUID'', but no paragraph of the specification states what a invalid_image detail
+    or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_flash_requires_stored_image
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(final_attempt, category='flash_failed', detail=image_a)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 193: the error_text_equals assertion needs the flash_failed error text
+    to equal image_a, but no paragraph of the specification states what a flash_failed detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_flash_unknown_image_rejected_consistently
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(first_attempt, category='flash_failed', detail=new_image)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 1017: the error_text_equals assertion needs the flash_failed error text
+    to equal new_image, but no paragraph of the specification states what a flash_failed detail or message
+    contains'
+  - 'audit: exact-unstated: line 1024: the error_text_equals assertion needs the flash_failed error text
+    to equal new_image, but no paragraph of the specification states what a flash_failed detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_get_flash_nonexistent_not_found
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=missing)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 376: the error_text_equals assertion needs the not_found error text to
+    equal missing, but no paragraph of the specification states what a not_found detail or message contains'
+  - 'audit: exact-unstated: line 383: the error_text_equals assertion needs the not_found error text to
+    equal missing, but no paragraph of the specification states what a not_found detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_tag_create_requires_module
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=missing)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 519: the error_text_equals assertion needs the not_found error text to
+    equal missing, but no paragraph of the specification states what a not_found detail or message contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_tag_delete_removes_from_get_and_list
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(get_deleted, category='not_found', detail=tag['uuid'])
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 289: the error_text_equals assertion needs the not_found error text to
+    equal tag[''uuid''], but no paragraph of the specification states what a not_found detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_tag_get_delete_nonexistent[delete]
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=missing)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 1170: the error_text_equals assertion needs the not_found error text
+    to equal missing, but no paragraph of the specification states what a not_found detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_6.py::test_tag_get_delete_nonexistent[get]
+  checkpoint_origin: checkpoint_6
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=missing)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 1170: the error_text_equals assertion needs the not_found error text
+    to equal missing, but no paragraph of the specification states what a not_found detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_7.py::test_blueprint_get_uuid_shaped_name_uses_uuid_lookup
+  checkpoint_origin: checkpoint_7
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=uuid_shaped_name, revision='1.2')
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 925: the error_text_equals assertion needs the not_found error text to
+    equal uuid_shaped_name, but no paragraph of the specification states what a not_found detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_7.py::test_revision_preserves_compact_json
+  checkpoint_origin: checkpoint_7
+  disposition: exclude-from-solved
+  rule: format-unstated
+  assertion: assert_compact_sorted_json_output(result)
+  reason: The test requires byte-exact compact, key-sorted JSON with no trailing newline (tests/_helpers.py:193-198).
+    No checkpoint states an output byte format; checkpoint 1's Output Format covers ordering, UUID and
+    timestamp formats only (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:99-104).
+  evidence:
+  - 'audit: format-unstated: line 469: the test compares stdout byte for byte, but the specification names
+    no output byte format (none of: compact, sorted key, sort_keys, key order, keys sorted, whitespace
+    between, no whitespace, trailing newline, no newline, indent, separators)'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): reformatted_json'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_7.py::test_unit_missing_parent_not_found[1.1]
+  checkpoint_origin: checkpoint_7
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=parent_uuid, revision=revision)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 952: the error_text_equals assertion needs the not_found error text to
+    equal parent_uuid, but no paragraph of the specification states what a not_found detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'
+- id: test_checkpoint_7.py::test_unit_missing_parent_not_found[1.2]
+  checkpoint_origin: checkpoint_7
+  disposition: exclude-from-solved
+  rule: exact-unstated
+  assertion: assert_error(result, category='not_found', detail=parent_uuid, revision=revision)
+  reason: The test requires the error detail to equal a bare identifier or image string (detail ==). No
+    specification states a detail's exact content; checkpoint 1 says a not_found detail 'identifies' the
+    requested identifier (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_1/instruction.md:72,
+    :141-144), which a longer detail also does, and checkpoints 1-5's tests assert containment only; flash_failed
+    and invalid_image details are not described at all (problems/store/scb/forge/38d627ecf668/task/steps/checkpoint_6/instruction.md:66-74,
+    :121-131).
+  evidence:
+  - 'audit: exact-unstated: line 952: the error_text_equals assertion needs the not_found error text to
+    equal parent_uuid, but no paragraph of the specification states what a not_found detail or message
+    contains'
+  - 'audit: passes on the reference, does not pass on the spec-conformant variant(s): neutral_error_text'
+  - 'context (not an inclusion criterion): pilot v2 forge (forge-02 b00-b06, forge-03 b07-b15) failed
+    at its origin checkpoint in 16/16 baseline and 16/16 guided trials'

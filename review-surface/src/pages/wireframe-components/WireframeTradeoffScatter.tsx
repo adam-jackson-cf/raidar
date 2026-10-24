@@ -98,11 +98,11 @@ function runSequence(run: RunRecord) {
   return Number(match[1]);
 }
 
-function bestRunForEachRevisionSpec(runs: RunRecord[]) {
+function bestRunForEachArmSpec(runs: RunRecord[]) {
   const grouped = new Map<string, RunRecord[]>();
 
   for (const run of runs) {
-    const key = `${run.revision}|${run.agent_spec}`;
+    const key = `${run.arm}|${run.agent_spec}`;
     const bucket = grouped.get(key) ?? [];
     bucket.push(run);
     grouped.set(key, bucket);
@@ -167,13 +167,13 @@ function effortLabel(value: string) {
   return titleCase(value);
 }
 
-function revisionValue(run: RunRecord) {
-  return run.revision ?? 'unknown';
+function armValue(run: RunRecord) {
+  return run.arm ?? 'unknown';
 }
 
-function revisionLabel(value: string) {
-  if (value === 'unknown') return 'unknown revision';
-  return `revision ${value}`;
+function armLabel(value: string) {
+  if (value === 'unknown') return 'unknown arm';
+  return `arm ${value}`;
 }
 
 export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitle = true }: { runs: RunRecord[]; borderless?: boolean; showSubtitle?: boolean }) {
@@ -183,16 +183,16 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
   const [activeTab, setActiveTab] = useState<'runtime' | 'tokens'>('tokens');
   const [selectedProviders, setSelectedProviders] = useState<string[]>([]);
   const [selectedEfforts, setSelectedEfforts] = useState<string[]>([]);
-  const [selectedRevisions, setSelectedRevisions] = useState<string[]>([]);
+  const [selectedArms, setSelectedArms] = useState<string[]>([]);
   const filterRef = useRef<HTMLDivElement | null>(null);
   const allPoints = useMemo(
-    () => bestRunForEachRevisionSpec(runs).filter((run) => run.composite_score != null && run.duration_ms > 0),
+    () => bestRunForEachArmSpec(runs).filter((run) => run.composite_score != null && run.duration_ms > 0),
     [runs],
   );
   const providerOptions = useMemo(() => [...new Set(allPoints.map(providerValue))], [allPoints]);
   const effortOptions = useMemo(() => [...new Set(allPoints.map(effortValue))], [allPoints]);
-  const revisionOptions = useMemo(
-    () => [...new Set(allPoints.map(revisionValue))].sort((left, right) => right.localeCompare(left)),
+  const armOptions = useMemo(
+    () => [...new Set(allPoints.map(armValue))].sort((left, right) => right.localeCompare(left)),
     [allPoints],
   );
 
@@ -205,8 +205,8 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
   }, [effortOptions]);
 
   useEffect(() => {
-    setSelectedRevisions((current) => (current.length === 0 ? revisionOptions : current.filter((item) => revisionOptions.includes(item))));
-  }, [revisionOptions]);
+    setSelectedArms((current) => (current.length === 0 ? armOptions : current.filter((item) => armOptions.includes(item))));
+  }, [armOptions]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -224,10 +224,10 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
       allPoints.filter((run) => {
         const providerSelected = selectedProviders.length === 0 || selectedProviders.includes(providerValue(run));
         const effortSelected = selectedEfforts.length === 0 || selectedEfforts.includes(effortValue(run));
-        const revisionSelected = selectedRevisions.length === 0 || selectedRevisions.includes(revisionValue(run));
-        return providerSelected && effortSelected && revisionSelected;
+        const armSelected = selectedArms.length === 0 || selectedArms.includes(armValue(run));
+        return providerSelected && effortSelected && armSelected;
       }),
-    [allPoints, selectedProviders, selectedEfforts, selectedRevisions],
+    [allPoints, selectedProviders, selectedEfforts, selectedArms],
   );
   const modelLabels = useMemo(() => [...new Set(points.map((run) => reduxModelLabel(run.agent_spec)))], [points]);
 
@@ -294,7 +294,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
           </div>
           {showSubtitle ? (
             <p className="mt-0.5 text-[11px]" style={{ color: C.fg0 }}>
-              Scenario view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.
+              Problem view: highest outcome run for each agent spec, then cheapest, quickest, earliest run.
             </p>
           ) : null}
         </div>
@@ -373,22 +373,22 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
                 </div>
                 <div>
                   <div className="mb-1 border-b pb-1 text-[10px] font-semibold uppercase tracking-wide" style={{ borderColor: C.border, color: C.fg1 }}>
-                    Revision
+                    Arm
                   </div>
                   <div className="space-y-1">
-                    {revisionOptions.map((revision) => (
-                      <label key={revision} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 " style={{ color: C.fg2 }}>
+                    {armOptions.map((arm) => (
+                      <label key={arm} className="flex cursor-pointer items-center gap-2 rounded px-1 py-0.5 " style={{ color: C.fg2 }}>
                         <input
                           type="checkbox"
-                          checked={selectedRevisions.includes(revision)}
+                          checked={selectedArms.includes(arm)}
                           onChange={() => {
-                            setSelectedRevisions((current) => {
-                              if (!current.includes(revision)) return [...current, revision];
-                              return current.length === 1 ? current : current.filter((item) => item !== revision);
+                            setSelectedArms((current) => {
+                              if (!current.includes(arm)) return [...current, arm];
+                              return current.length === 1 ? current : current.filter((item) => item !== arm);
                             });
                           }}
                         />
-                        {revisionLabel(revision)}
+                        {armLabel(arm)}
                       </label>
                     ))}
                   </div>
@@ -437,7 +437,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
       </div>
       {hasChart ? (
         activeTab === 'runtime' ? (
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against run duration">
+        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} className="w-full" role="img" aria-label="Outcome against trial duration">
         <polygon
           points={`${PAD.left},${HEIGHT - PAD.bottom - 4} ${attractorMaxX},${PAD.top} ${PAD.left},${PAD.top}`}
           fill={C.greenBg}
@@ -506,7 +506,7 @@ export function WireframeTradeoffScatter({ runs, borderless = false, showSubtitl
         )
       ) : (
         <div className="flex h-40 items-center justify-center rounded-md border text-xs" style={{ borderColor: C.border, color: C.fg1 }}>
-          Select at least one matching run to plot this chart.
+          Select at least one matching trial to plot this chart.
         </div>
       )}
       {tooltip ? (

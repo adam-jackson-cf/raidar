@@ -28,15 +28,18 @@ Thumbs.db
 
 # Test outputs
 coverage/
+.coverage
+.coverage.*
 .pytest_cache/
 .import_linter_cache/
 .ruff_cache/
 .mypy_cache/
 .cache/
-.tmp/
-.clawpatch/
-.agentic-ci-validation/
-experiments/
+# Generated data root (RAIDAR_VAR relocates it): jobs, stores, analysis, problems content, scratch.
+# Tracked definitions live under lab/ (experiments, problems pins, ledger).
+/var/
+# Pre-schema-v2 job root; kept ignored for checkouts that still hold one.
+/runs/
 orchestrator/results*/
 orchestrator/workspace*/
 .enaible/

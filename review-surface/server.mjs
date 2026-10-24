@@ -6,12 +6,14 @@ import http from 'node:http';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { createQualityApi } from './quality-api.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataRoot = path.join(here, 'data');
 const distRoot = path.join(here, 'dist');
 const userAnnotationsPath = path.join(dataRoot, 'user-annotations.json');
 const port = Number(process.env.REVIEW_SURFACE_PORT || 5950);
+const handleQualityApi = createQualityApi({ dataRoot, sendJson, readBody });
 
 const MIME = {
   '.html': 'text/html; charset=utf-8',
@@ -206,6 +208,7 @@ async function readBody(req) {
 
 async function handleApi(req, res, url) {
   const parts = url.pathname.split('/').filter(Boolean); // ['api', ...]
+  if (parts[1] === 'quality') return handleQualityApi(req, res, url);
   if (req.method === 'GET' && url.pathname === '/api/runs') {
     return sendJson(res, 200, loadRunIndex().runs);
   }
@@ -272,7 +275,7 @@ async function handleApi(req, res, url) {
 function serveStatic(res, url) {
   const requested = url.pathname === '/' ? '/index.html' : url.pathname;
   const resolved = path.normalize(path.join(distRoot, requested));
-  if (!resolved.startsWith(distRoot)) {
+  if (resolved !== distRoot && !resolved.startsWith(distRoot + path.sep)) {
     res.writeHead(403);
     return res.end('forbidden');
   }
