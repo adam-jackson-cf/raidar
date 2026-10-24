@@ -24,7 +24,7 @@ def ledger_group() -> None:
 
 _ROOT_OPTION = click.option(
     "--root",
-    type=click.Path(file_okay=False, path_type=Path),
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=LEDGER_ROOT,
     show_default=True,
     help="Ledger directory.",

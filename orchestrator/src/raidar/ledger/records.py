@@ -70,7 +70,7 @@ Text = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
 def ref_problem(ref: str) -> str | None:
     """Return why an evidence reference is malformed, or None when it is a relative path."""
-    match = _REF_LINE.match(ref)
+    match = _REF_LINE.fullmatch(ref)
     if match is None:
         return "contains whitespace or is not `path[:line[-line]][#anchor]`"
     path = PurePosixPath(match.group("path"))
@@ -138,7 +138,7 @@ class RemedyRecord(_Strict):
     @field_validator("faults")
     @classmethod
     def _fault_ids(cls, faults: list[str]) -> list[str]:
-        bad = [f for f in faults if not FAULT_ID.match(f)]
+        bad = [f for f in faults if not FAULT_ID.fullmatch(f)]
         if bad:
             raise ValueError(f"not fault ids: {bad}")
         return faults
