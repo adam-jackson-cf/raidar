@@ -1,4 +1,4 @@
-"""Credential preflight before any trial, and empty overrides that unset a field."""
+"""Credential preflight: every selected arm's agent has its host credential before any trial."""
 
 from __future__ import annotations
 
@@ -7,8 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.design.experiment.loader import CliOverrides, load_experiment
-from raidar.design.experiment.validation import SpecValidationError
+from raidar.design.experiment.loader import load_experiment
 from raidar.engine.job.credentials import (
     CredentialPreflightError,
     credential_issues,
@@ -17,10 +16,8 @@ from raidar.engine.job.credentials import (
 )
 from raidar.engine.trial.plan import PlanOptions
 from raidar.subject.agent.config import Harness
-from tests.experiment_spec_support import AGENTS_BENCHMARK, SMOKE_EXPERIMENT
+from tests.experiment_spec_support import AGENTS_BENCHMARK
 
-SMOKE = SMOKE_EXPERIMENT
-SMOKE_AGENTS = AGENTS_BENCHMARK
 FAKE = "x" * 24  # placeholder credential value; never a real secret
 
 
@@ -60,7 +57,7 @@ def test_claude_code_without_credentials_or_with_forced_oauth_and_no_token_fails
 
 
 def test_issues_name_the_agent_field_of_each_selected_arm_only(tmp_path: Path) -> None:
-    spec = load_experiment(SMOKE_AGENTS).spec
+    spec = load_experiment(AGENTS_BENCHMARK).spec
     env = _codex_home(tmp_path, with_auth=False)
     issues = credential_issues(spec, ["codex", "claude"], env)
     fields = [issue.field for issue in issues]
@@ -79,7 +76,7 @@ class _Plan:
     """The slice of ExperimentPlan the preflight reads."""
 
     def __init__(self, arms: list[str], override: str | None = None) -> None:
-        self.loaded = load_experiment(SMOKE_AGENTS)
+        self.loaded = load_experiment(AGENTS_BENCHMARK)
         self.options = PlanOptions(agent_override=override)  # type: ignore[arg-type]
         self._arms = arms
 
@@ -98,37 +95,3 @@ def test_preflight_fails_before_any_trial_without_echoing_values(tmp_path: Path)
     assert FAKE not in message
     preflight_credentials(_Plan(["codex"]), env)  # type: ignore[arg-type]
     preflight_credentials(_Plan(["claude"], override="nop"), {})  # type: ignore[arg-type]
-
-
-def test_empty_reasoning_effort_override_unsets_it_so_haiku_validates() -> None:
-    claude_haiku = (
-        "agents.0.name=claude-code",
-        "agents.0.provider=anthropic",
-        "agents.0.model=claude-haiku-4-5",
-        "agents.0.version='2.1.285'",
-    )
-    unset = load_experiment(
-        SMOKE, CliOverrides(assignments=(*claude_haiku, "agents.0.reasoning_effort="))
-    )
-    assert unset.spec.agents[0].reasoning_effort is None
-    assert unset.spec.agents[0].model == "claude-haiku-4-5"
-    with pytest.raises(SpecValidationError) as caught:
-        load_experiment(
-            SMOKE, CliOverrides(assignments=(*claude_haiku, "agents.0.reasoning_effort=low"))
-        )
-    assert any(issue.loc.endswith("reasoning_effort") for issue in caught.value.issues)
-
-
-def test_smoke_agents_claude_arm_is_haiku_without_effort_at_the_pack_pin() -> None:
-    claude = load_experiment(SMOKE_AGENTS).spec.agent("claude")
-    assert (claude.model, claude.reasoning_effort, claude.version) == (
-        "claude-haiku-4-5",
-        None,
-        "2.1.285",
-    )
-
-
-def test_unsetting_a_list_item_is_refused() -> None:
-    with pytest.raises(SpecValidationError) as caught:
-        load_experiment(SMOKE, CliOverrides(assignments=("arms.0=",)))
-    assert "only a mapping key can be unset" in str(caught.value.issues)

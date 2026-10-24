@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import traceback
 
+from raidar.contract.job_layout import TASKS_DIR
 from raidar.contract.trial import PlannedTrial, TrialRecord
 from raidar.engine.trial.agent_config import reported_harness_pin
 from raidar.engine.trial.config import harbor_trial_config
@@ -31,7 +32,7 @@ def _materialise(ctx: JobContext, trial: PlannedTrial) -> MaterialisedTask:
     override = ctx.plan.options.agent_override
     return materialise_task(
         problem.task_dir,
-        ctx.job_dir / "tasks" / trial.trial_id,
+        ctx.job_dir / TASKS_DIR / trial.trial_id,
         steps=trial.steps,
         rule=ctx.plan.rule,
         condition=(ctx.plan.loaded, trial.arm, trial.hashes.condition),

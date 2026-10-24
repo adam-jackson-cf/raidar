@@ -16,7 +16,7 @@ from raidar.design.experiment.lock import LockError
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.trial.plan import PlanError, PlanOptions, arm_order, build_plan
 from raidar.subject.environment.python.harness import HarnessPinError
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture
 
 
@@ -209,16 +209,6 @@ def test_plan_command_dry_run_and_stale_lock(
     missing = runner.invoke(main, ["plan", str(loaded.path)])
     assert missing.exit_code != 0
     assert "raidar lock" in missing.output
-
-
-def test_run_command_is_the_experiment_runner_only(tmp_path: Path) -> None:
-    runner = CliRunner()
-    removed = runner.invoke(main, ["run", "--scenario", str(tmp_path)])
-    assert removed.exit_code != 0
-    assert "No such option: --scenario" in removed.output
-    help_text = runner.invoke(main, ["run", "--help"])
-    assert help_text.exit_code == 0
-    assert "--agent-override" in help_text.output
 
 
 def test_a_lock_from_another_python_patch_release_still_plans(

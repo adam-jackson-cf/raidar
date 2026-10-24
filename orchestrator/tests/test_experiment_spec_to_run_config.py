@@ -1,4 +1,4 @@
-"""Spec glue for execution: per-experiment lock paths, assessment settings feeding scorers."""
+"""How an experiment file becomes run configuration: lock paths and assessment settings."""
 
 from __future__ import annotations
 

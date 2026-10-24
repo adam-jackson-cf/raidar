@@ -1,4 +1,4 @@
-"""Execution driver (D1 concurrency, D2): ordering, guard wiring, job directory records."""
+"""Running a job's trials: start order, concurrency, guard wiring, job directory records."""
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, tamper_findings
 from raidar.engine.job.run import execute, load_problems
-from raidar.engine.target.config import Selection, implicit_target
+from raidar.engine.target.config import Selection
 from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
 from raidar.engine.target.health import TargetUnavailableError
 from raidar.engine.target.job import JobTarget
@@ -41,17 +41,18 @@ from raidar.engine.trial.plan import PlanOptions, build_plan
 from raidar.grading.verifier import RaidarVerifier
 from raidar.subject.agent.codex_auth import ResolvedCodexAuth
 from raidar.subject.agent.config import Harness
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.treatment.runtime.provision import Provision
 from tests.execution_support import (
     ImportedFixture,
     StepOutcome,
+    fake_engine_target,
     locked_experiment,
     validated_fixture,
     write_trial,
 )
 
-SELECTION = Selection.of(implicit_target("orbstack"))
+SELECTION = Selection.of(fake_engine_target("orbstack"))
 
 
 def _no_reap(trial_id: str, trials_dir: Path) -> dict[str, Any]:
@@ -311,7 +312,7 @@ def _assert_provenance(manifest: dict[str, Any], concurrency: int) -> None:
     assert manifest["mechanics_epoch"] == "mechanics-v1"
     assert "docker_context" not in manifest
     assert manifest["execution_target"] == {
-        "name": "default",
+        "name": "test",
         "kind": "docker",
         "docker_context": "orbstack",
         "trusted": True,
@@ -319,7 +320,7 @@ def _assert_provenance(manifest: dict[str, Any], concurrency: int) -> None:
         "max_concurrency": None,
         "effective_concurrency": concurrency,
         "docker": None,
-        "grader": {"name": "default", "docker_context": "orbstack"},
+        "grader": {"name": "test", "docker_context": "orbstack"},
     }
 
 

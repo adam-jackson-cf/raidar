@@ -4,12 +4,12 @@
 ``concurrency`` running at once. ``run_harbor_trial`` is the one place a
 Harbor trial starts: the Raidar verifier's pre-agent leak guard is installed
 before ``trial.run()``, as ``RaidarVerifier`` requires (it fails closed
-without it), together with the agent-end reaper (``execution.reaper``) that
+without it), together with the agent-end reaper (``raidar.engine.health.reaper``) that
 kills agent processes before artifacts are collected and graded, and the
 provisioning hooks of any component that installs a tool in the trial
 container (``raidar.subject.treatment.runtime.provision``; trial provisions install at
-environment start), then the T1 tool-tree hash (``execution.health.tool_tree``) and the
-host-side liveness monitor (``execution.health.liveness``, enforce by default).
+environment start), then the T1 tool-tree hash (``raidar.engine.health.tool_tree``) and the
+host-side liveness monitor (``raidar.engine.health.liveness``, enforce by default).
 
 Decision (deviates from plan section 1 "Harbor JobConfigs", N4 "Harbor owns
 concurrency"): Raidar builds one Harbor ``TrialConfig`` per planned trial and

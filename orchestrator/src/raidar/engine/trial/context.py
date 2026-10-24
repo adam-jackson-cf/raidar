@@ -23,7 +23,7 @@ class JobContext:
     target: JobTarget
     runner: TrialRunner = run_harbor_trial
     admission: Mapping[str, Any] | None = None
-    """The smoke-before-measure decision (``execution.health.admission``) ``job.json`` records."""
+    """The smoke-before-measure decision (``raidar.engine.health.admission``) for ``job.json``."""
 
     @property
     def docker_context(self) -> str:
