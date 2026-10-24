@@ -41,10 +41,10 @@ from raidar.contract.canonical import digest_json
 from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import rescore_config
-from raidar.evaluation.review.projection.fixture.assessments import LintFinding, QualityPlan
-from raidar.evaluation.review.projection.fixture.lock import fixture_lock
-from raidar.evaluation.review.projection.fixture.store import FixtureAssessments
-from raidar.evaluation.review.projection.fixture.trials import (
+from tests.review_fixtures.projection.assessments import LintFinding, QualityPlan
+from tests.review_fixtures.projection.lock import fixture_lock
+from tests.review_fixtures.projection.store import FixtureAssessments
+from tests.review_fixtures.projection.trials import (
     CheckpointScript,
     Outcome,
     TrialPlan,

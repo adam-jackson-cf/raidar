@@ -16,18 +16,18 @@ from raidar.evaluation.review.quality.experiment_view import _primary
 from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection
 from raidar.evaluation.review.quality.projection import build_quality_projection, main
 from raidar.evaluation.review.quality.stats import pearson, quantiles
-from raidar.evaluation.review.quality.synthetic.generate import (
+from raidar.scoring.catalog.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
+from raidar.scoring.framework.metrics import SCB_CANONICAL
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, RunStats
+from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore
+from tests.review_fixtures.quality.generate import (
     EXPERIMENT,
     INELIGIBLE_H,
     INVALID,
     RUN_ID,
     generate_quality_fixture,
 )
-from raidar.evaluation.review.quality.synthetic.lock import write_synthetic_lock
-from raidar.scoring.catalog.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
-from raidar.scoring.framework.metrics import SCB_CANONICAL
-from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, RunStats
-from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore
+from tests.review_fixtures.quality.lock import write_synthetic_lock
 
 RUN_PREFIX = f"{EXPERIMENT}.{RUN_ID}."
 

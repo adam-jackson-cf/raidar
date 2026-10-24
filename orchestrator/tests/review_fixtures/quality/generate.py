@@ -18,7 +18,7 @@ The experiment id, job ids, problem and every snapshot digest carry a
 ``synthetic: true``. It is never benchmark evidence.
 
 - the gated arm's commit-gate records under each trial's step agent dirs
-  (``raidar.evaluation.review.quality.synthetic.gate``) and every trial's ``gate-effort``
+  (``tests.review_fixtures.quality.gate``) and every trial's ``gate-effort``
   Assessment, made by the real scorer (``not_applicable`` for ``baseline``).
 
 Built-in shape (deterministic, seeded): two arms (``baseline``, ``guided``)
@@ -49,8 +49,6 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.evaluation.review.quality.synthetic.gate import GATE_EFFORT, gate_result
-from raidar.evaluation.review.quality.synthetic.lock import default_metric, write_synthetic_lock
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY, CORRECTNESS
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.framework.result import (
@@ -76,6 +74,8 @@ from raidar.scoring.judge.audit import (
 )
 from raidar.scoring.judge.policies import PolicyMode
 from raidar.scoring.judge.rubric import RUBRIC_POLICY
+from tests.review_fixtures.quality.gate import GATE_EFFORT, gate_result
+from tests.review_fixtures.quality.lock import default_metric, write_synthetic_lock
 
 EXPERIMENT = "synthetic-quality"
 PROBLEM = "synthetic/ledger@0"

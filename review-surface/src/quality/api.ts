@@ -8,7 +8,10 @@ import type {
 
 async function getJson<T>(url: string): Promise<T> {
   const res = await fetch(url);
-  if (!res.ok) throw new Error(`${url} -> ${res.status}`);
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(`${url} -> ${res.status}${body?.error ? `: ${body.error}` : ''}`);
+  }
   return res.json() as Promise<T>;
 }
 

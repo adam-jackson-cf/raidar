@@ -3,8 +3,8 @@
 A job directory (``<jobs root>/<experiment id>/<job id>/``) holds::
 
     job.json                 job manifest: lock, options, selected trials, outcome summary
-    job.lock.json            the lock the job executed under (found by review/analysis
-                             even after the experiment's own lock is relocked)
+    job.lock.json            the lock the job executed under (kept so the job stays
+                             self-describing after the experiment's own lock is relocked)
     plan.json                the full plan with every trial's hashes (D1)
     assessment-config.yaml   locked assessor settings for ``raidar assess --rescore``
     tasks/<trial>/           the materialised Harbor task of each trial

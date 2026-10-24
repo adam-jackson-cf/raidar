@@ -28,14 +28,14 @@ from raidar.evaluation.review.projection.comparability import (
     mark_policy_mismatches,
 )
 from raidar.evaluation.review.projection.conditions import ArmSide, condition_diff
-from raidar.evaluation.review.projection.fixture.generate import (
-    REVIEW_ONLY_DIR,
-    generate_review_fixture,
-)
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.evaluation.review.projection.merge import project_experiment_epoch
 from raidar.evaluation.review.projection.sources import LockIndex, load_job
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
+from tests.review_fixtures.projection.generate import (
+    REVIEW_ONLY_DIR,
+    generate_review_fixture,
+)
 
 FAILING = "synthetic-bugfix-gpt-5.5-low-04"
 UNSCORED = "synthetic-bugfix-gpt-5.5-low-05"

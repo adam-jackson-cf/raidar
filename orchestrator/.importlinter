@@ -1,5 +1,7 @@
 [importlinter]
-root_package = raidar
+root_packages =
+    raidar
+    tests
 
 # Tiers of the top-level groups, highest first. A group imports only groups below it, directly
 # or through other modules (docs/reboot/repo-structure-design.md §8).
@@ -130,3 +132,11 @@ forbidden_modules =
     raidar.engine
     raidar.scoring
     raidar.evaluation.analysis
+
+[importlinter:contract:test-tooling-is-not-product]
+name = No product module imports the review fixture generators (test tooling)
+type = forbidden
+source_modules =
+    raidar
+forbidden_modules =
+    tests

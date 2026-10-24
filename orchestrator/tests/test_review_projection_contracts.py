@@ -12,12 +12,12 @@ import pytest
 
 from raidar.contract.review import ReviewProjectionArtifact
 from raidar.evaluation.review.projection import main, merge_review_projections
-from raidar.evaluation.review.projection.fixture.generate import (
+from raidar.evaluation.review.projection.spans import PAYLOAD_CAP, payload, to_ms
+from tests.review_fixtures.projection.generate import (
     JOBS_DIR,
     REVIEW_ONLY_DIR,
     generate_review_fixture,
 )
-from raidar.evaluation.review.projection.spans import PAYLOAD_CAP, payload, to_ms
 
 
 @pytest.fixture(scope="module")

@@ -462,7 +462,7 @@ def test_review_fixture_is_written_under_the_fixture_dir() -> None:
     result = _make_dry_run("review-fixture-synthetic")
 
     assert result.returncode == 0, result.stderr
-    assert "raidar.evaluation.review.projection.fixture" in result.stdout
+    assert "tests.review_fixtures.projection" in result.stdout
     assert "/var/tmp/review-fixture" in result.stdout
     assert "experiments/" not in result.stdout
 
