@@ -27,7 +27,6 @@ Thumbs.db
 .env.*.local
 
 # Test outputs
-coverage/
 .coverage
 .coverage.*
 .pytest_cache/
