@@ -12,11 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.job_layout import (
-    DETACH_DIR,
-    JOB_MANIFEST,
-    TRIAL_RECORDS_DIR,
-)
+from raidar.contract.job_layout import DETACH_DIR, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import PlannedTrial, TrialRecord
 from raidar.design.problem.store import ImportedProblem, ProblemStore
 from raidar.engine.health.records_manifest import seal_trial

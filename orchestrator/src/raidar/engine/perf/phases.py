@@ -40,8 +40,7 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.job_layout import read_result
-from raidar.contract.timestamps import diff_s, parse_ts, span_s
+from raidar.contract.harbor_result import diff_s, parse_ts, read_result, span_s
 from raidar.contract.trial import PhaseSample
 from raidar.grading.records import (
     RECORD_FILE,

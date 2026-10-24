@@ -18,8 +18,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.job_layout import RESULT_FILE, read_result
-from raidar.contract.timestamps import parse_ts
+from raidar.contract.harbor_result import RESULT_FILE, parse_ts, read_result
 
 JOB_MANIFEST = "job.json"
 UNDETECTED_DOCKER_ACTIVITY = (

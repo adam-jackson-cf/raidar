@@ -37,8 +37,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.contract.job_layout import read_result, step_results
-from raidar.contract.timestamps import span_s
+from raidar.contract.harbor_result import read_result, span_s, step_results
 from raidar.contract.trial import (
     NOT_STARTED,
     CheckpointState,
