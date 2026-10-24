@@ -33,6 +33,7 @@ from raidar.verifier.normalise import (
     timing_sensitive,
 )
 from raidar.verifier.parity import check_parity, fork_regression_run_evidence, outcome_differences
+from raidar.verifier.sandbox import SandboxResult, SandboxRun
 from tests.verifier_support import LocalProcessSandbox, make_bundle, write_app
 
 
@@ -244,6 +245,30 @@ async def test_submission_cannot_forge_the_grading_ledger(
     assert json.loads((sandbox.root / "leaked.json").read_text()) == []
     assert ledger["plugin_id"] == "raidar-oracle-plugin@1"
     assert {c.status for c in result.grade.cases} >= {CaseStatus.FAILED}
+
+
+@pytest.mark.parametrize(
+    "ledger_text",
+    ["{not json", '{"nodes": [{"node_id": "t.py::a"}], "exit_status": 0}'],
+    ids=["truncated", "node_without_status"],
+)
+async def test_a_malformed_ledger_is_an_infra_failure_not_a_crash(
+    tmp_path: Path, bundle, sandbox: LocalProcessSandbox, ledger_text: str
+) -> None:
+    class BrokenLedger(LocalProcessSandbox):
+        async def run(self, run: SandboxRun) -> SandboxResult:
+            result = await super().run(run)
+            (run.out_dir / "ledger.json").write_text(ledger_text)
+            return result
+
+    app = write_app(tmp_path / "app")
+    result = await grade_step(
+        bundle, "checkpoint_2", app, BrokenLedger(sandbox.root), tmp_path / "w", coverage=False
+    )
+
+    assert result.grade.infra_failure is not None
+    assert result.grade.infra_failure.code == "ledger_unreadable"
+    assert not result.grade.solved
 
 
 def _consistency_ledger(status: int, node_status: str) -> dict[str, Any]:

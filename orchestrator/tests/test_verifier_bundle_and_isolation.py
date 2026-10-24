@@ -301,6 +301,16 @@ def test_leak_scan_flags_copies_of_hidden_files_and_a_populated_tests_dir() -> N
     assert tests_dir.tests_dir_entries == ("/tests/conftest.py",)
 
 
+def test_leak_scan_sees_a_copy_whose_path_sha256sum_escapes() -> None:
+    """GNU sha256sum prefixes the line with a backslash when the path holds a backslash."""
+    hashes = {"a" * 64: "test_checkpoint_1.py"}
+    escaped = parse_leak_output(
+        f"\\{'a' * 64}  /tmp/dir\\\\x/test_checkpoint_1.py\nRAIDAR_LEAK_SCAN_DONE\n", hashes, 0
+    )
+    assert not escaped.clean
+    assert escaped.hidden_copies == ("/tmp/dir\\\\x/test_checkpoint_1.py == test_checkpoint_1.py",)
+
+
 def test_leak_scan_fails_closed_when_it_cannot_complete() -> None:
     with pytest.raises(LeakScanError):
         parse_leak_output("", {}, 0.0)

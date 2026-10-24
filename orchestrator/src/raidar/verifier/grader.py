@@ -180,34 +180,49 @@ async def run_oracle(
     infra = _sandbox_infra(result, out / LEDGER_NAME)
     if infra is not None:
         return RunOutcome(role, (), infra, None, (), time.perf_counter() - started, dependencies)
-    ledger = json.loads((out / LEDGER_NAME).read_text())
-    evidence = _evidence(
-        role,
-        ledger,
-        environment_id=await sandbox.environment_id(),
-        corpus=CorpusEvidence(
-            corpus_sha256=tree_digest(bundle.tests_dir), selected_tests=step.test_files
-        ),
-        invocation=InvocationEvidence(
-            argv=render_pytest_args(step, sandbox.layout), cwd=sandbox.layout.app
-        ),
-        prefix=prefix,
-    )
-    cases = case_results(ledger, step.checkpoint)
+    try:
+        ledger = json.loads((out / LEDGER_NAME).read_text())
+        cases = case_results(ledger, step.checkpoint)
+        evidence = _evidence(
+            role,
+            ledger,
+            environment_id=await sandbox.environment_id(),
+            corpus=CorpusEvidence(
+                corpus_sha256=tree_digest(bundle.tests_dir), selected_tests=step.test_files
+            ),
+            invocation=InvocationEvidence(
+                argv=render_pytest_args(step, sandbox.layout), cwd=sandbox.layout.app
+            ),
+            prefix=prefix,
+        )
+        infra = (
+            ledger_infra_failure(ledger)
+            or ledger_consistency_failure(ledger, result.exit_code, step.test_files)
+            or no_graded_cases(cases)
+        )
+        sensitive = timing_sensitive(ledger, step.timeout_s)
+    except (ValueError, KeyError, TypeError, AttributeError) as error:
+        # The submission shares the ledger's uid, so a malformed ledger is an untrusted run.
+        malformed = InfraFailure(
+            code="ledger_unreadable", detail=f"{type(error).__name__}: {error}"
+        )
+        return RunOutcome(
+            role, (), malformed, None, (), time.perf_counter() - started, dependencies
+        )
     return RunOutcome(
         role=role,
         cases=cases,
-        infra_failure=ledger_infra_failure(ledger)
-        or ledger_consistency_failure(ledger, result.exit_code, step.test_files)
-        or no_graded_cases(cases),
+        infra_failure=infra,
         evidence=evidence,
-        timing_sensitive=timing_sensitive(ledger, step.timeout_s),
+        timing_sensitive=sensitive,
         seconds=time.perf_counter() - started,
         dependencies=dependencies,
     )
 
 
-def _parity(grading: RunOutcome, coverage: RunOutcome) -> tuple[ParityVerdict, tuple[str, ...]]:
+def parity_verdict(
+    grading: RunOutcome, coverage: RunOutcome
+) -> tuple[ParityVerdict, tuple[str, ...]]:
     if coverage.infra_failure is not None or coverage.evidence is None:
         code = coverage.infra_failure.code if coverage.infra_failure else "missing"
         return ineligible(f"coverage_run_failed:{code}"), ()
@@ -247,5 +262,5 @@ async def grade_step(
         bundle, step, snapshot, sandbox, work / "coverage", coverage=True, timeout_s=timeout_s
     )
     timings["coverage_run_s"] = measured.seconds
-    verdict, differences = _parity(grading, measured)
+    verdict, differences = parity_verdict(grading, measured)
     return StepGrade(grade, grading, measured, verdict, differences, timings)

@@ -18,7 +18,7 @@ whose lock sets ``protocol.verifier_coverage: offline`` grades without it
   coverage). Its parity is checked against the trial's own grading run, read
   back from the step's ``evidence.json``; a step whose grading run failed is
   ``ineligible`` without a coverage run, as in the trial. The parity verdict,
-  its differences and the fork-shaped G input (``records._fork_payload``, the
+  its differences and the fork-shaped G input (``records.fork_payload``, the
   same payload the trial writes as ``g-kernel-input.json``) go to the
   Assessment store (``raidar.verifier.coverage_store``), never the job. A run
   already stored is not made again;
@@ -47,7 +47,7 @@ from raidar.verifier.coverage_store import (
     coverage_path,
     read_offline_coverage,
 )
-from raidar.verifier.grader import _parity, run_oracle
+from raidar.verifier.grader import parity_verdict, run_oracle
 from raidar.verifier.models import (
     CaseResult,
     InfraFailure,
@@ -63,16 +63,17 @@ from raidar.verifier.records import (
     RECORD_FILE,
     VERIFIER_RECORD_DIR,
     StepRecord,
-    _fork_payload,
+    fork_payload,
     load_step_record,
 )
 from raidar.verifier.regrade import (
     RegradeError,
     RegradeOptions,
-    _bundle,
-    _snapshot,
     docker_sandbox_factory,
+    recorded_bundle,
+    stored_snapshot,
     trial_dirs,
+    write_store_json,
 )
 
 PRODUCTION_KIND = "raidar-offline-coverage-production"
@@ -140,9 +141,9 @@ def _grading_run(target: CoverageTarget) -> RunOutcome:
 async def run_offline_coverage(target: CoverageTarget, options: RegradeOptions) -> CoverageRun:
     """The step's coverage run from its stored snapshot, parity-checked against the trial."""
     record = target.record
-    snapshot = _snapshot(target.trial_dir, record)
+    snapshot = stored_snapshot(target.trial_dir, record)
     grading = _grading_run(target)
-    bundle = _bundle(record, options)
+    bundle = recorded_bundle(record, options)
     factory = options.sandbox_factory or docker_sandbox_factory(options.docker_context)
     sandbox = await factory(bundle)
     environment = await sandbox.environment_id()
@@ -161,8 +162,8 @@ async def run_offline_coverage(target: CoverageTarget, options: RegradeOptions) 
             coverage=True,
             timeout_s=record.grader.timeout_s,
         )
-    verdict, differences = _parity(grading, measured)
-    fork = _fork_payload(StepGrade(record.grade, grading, measured, verdict, differences))
+    verdict, differences = parity_verdict(grading, measured)
+    fork = fork_payload(StepGrade(record.grade, grading, measured, verdict, differences))
     # As the trial writes it (json.dumps, sort_keys) and reads it back: plain JSON values.
     fork = json.loads(json.dumps(fork, sort_keys=True)) if fork is not None else None
     return CoverageRun(
@@ -220,9 +221,8 @@ async def produce_offline_coverage(
         run = await run_offline_coverage(target, options)
     except RegradeError as exc:
         return _entry(target, "error", error=str(exc))
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = _payload(target, run)
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    write_store_json(path, payload)
     return _entry(
         target,
         "produced",

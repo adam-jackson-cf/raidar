@@ -302,12 +302,18 @@ class DockerCopySandbox:
             )
             timed_out = False
             try:
-                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
-            except TimeoutError:
-                timed_out = True
-                await self._kill(name)
-                proc.kill()
-                stdout, _ = await proc.communicate()
+                try:
+                    stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
+                except TimeoutError:
+                    timed_out = True
+                    try:
+                        await self._kill(name)
+                    finally:
+                        proc.kill()
+                    stdout, _ = await proc.communicate()
+            finally:
+                if proc.returncode is None:  # failed kill or cancelled run: reap `start -a`
+                    proc.kill()
             timings["run_s"] = time.perf_counter() - mark
 
             mark = time.perf_counter()

@@ -19,6 +19,8 @@ reward delta, whereas N3 needs a per-case comparison against the stored record.
 
 from __future__ import annotations
 
+import json
+import os
 import tempfile
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -75,6 +77,15 @@ def docker_sandbox_factory(docker_context: str) -> SandboxFactory:
     return build
 
 
+def write_store_json(path: Path, payload: dict[str, object]) -> None:
+    """Write one Assessment-store file by atomic replace: an interrupted run never leaves a
+    partial file that a later run would take for a stored grade."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    os.replace(temporary, path)
+
+
 def trial_dirs(path: Path) -> list[Path]:
     """A trial dir, or every trial with verifier records under a job dir."""
     if (path / VERIFIER_RECORD_DIR).is_dir():
@@ -85,7 +96,7 @@ def trial_dirs(path: Path) -> list[Path]:
     return found
 
 
-def _bundle(record: StepRecord, options: RegradeOptions) -> VerifierBundle:
+def recorded_bundle(record: StepRecord, options: RegradeOptions) -> VerifierBundle:
     root = options.bundle_override or Path(record.bundle.root)
     key = str(root)
     if key not in options.bundle_cache:
@@ -98,7 +109,7 @@ def _bundle(record: StepRecord, options: RegradeOptions) -> VerifierBundle:
     return bundle
 
 
-def _snapshot(trial_dir: Path, record: StepRecord) -> Path:
+def stored_snapshot(trial_dir: Path, record: StepRecord) -> Path:
     snapshot = trial_dir / record.snapshot.stored_path
     if not snapshot.is_dir():
         raise RegradeError(f"stored snapshot missing: {snapshot}")
@@ -133,8 +144,8 @@ def compare(record: StepRecord, result: StepGrade, environment_id: str) -> tuple
 
 async def regrade_step(trial_dir: Path, record_dir: Path, options: RegradeOptions) -> StepRegrade:
     record = load_step_record(record_dir)
-    bundle = _bundle(record, options)
-    snapshot = _snapshot(trial_dir, record)
+    bundle = recorded_bundle(record, options)
+    snapshot = stored_snapshot(trial_dir, record)
     factory = options.sandbox_factory or docker_sandbox_factory(options.docker_context)
     sandbox = await factory(bundle)
     with tempfile.TemporaryDirectory(prefix="raidar-regrade-", dir=options.work_root) as work:

@@ -80,7 +80,12 @@ async def _docker(
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.STDOUT,
     )
-    stdout, _ = await asyncio.wait_for(proc.communicate(stdin), timeout=BUILD_TIMEOUT_S)
+    try:
+        stdout, _ = await asyncio.wait_for(proc.communicate(stdin), timeout=BUILD_TIMEOUT_S)
+    except TimeoutError:
+        proc.kill()
+        await proc.communicate()
+        raise
     return int(proc.returncode or 0), stdout.decode(errors="replace")
 
 

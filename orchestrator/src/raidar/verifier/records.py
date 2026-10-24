@@ -99,7 +99,7 @@ def _run_payload(run: RunOutcome | None) -> dict[str, object] | None:
     }
 
 
-def _fork_payload(result: StepGrade) -> dict[str, object] | None:
+def fork_payload(result: StepGrade) -> dict[str, object] | None:
     grading, coverage = result.grading, result.coverage
     if grading.evidence is None or coverage is None or coverage.evidence is None:
         return None
@@ -159,7 +159,7 @@ def write_step_evidence(record_dir: Path, result: StepGrade) -> None:
     record_dir.mkdir(parents=True, exist_ok=True)
     evidence = {"grading": _run_payload(result.grading), "coverage": _run_payload(result.coverage)}
     (record_dir / EVIDENCE_FILE).write_text(json.dumps(evidence, sort_keys=True) + "\n")
-    fork = _fork_payload(result)
+    fork = fork_payload(result)
     if fork is not None:
         (record_dir / FORK_EVIDENCE_FILE).write_text(json.dumps(fork, sort_keys=True) + "\n")
 

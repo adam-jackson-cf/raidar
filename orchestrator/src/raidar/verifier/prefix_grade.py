@@ -46,9 +46,10 @@ from raidar.verifier.records import RECORD_FILE, VERIFIER_RECORD_DIR, StepRecord
 from raidar.verifier.regrade import (
     RegradeError,
     RegradeOptions,
-    _bundle,
     docker_sandbox_factory,
+    recorded_bundle,
     trial_dirs,
+    write_store_json,
 )
 
 GATE_RECORD_PATH = "guardrail-gate/guardrail-gate.json"
@@ -107,7 +108,7 @@ async def _grade(snapshot: PreFixSnapshot, options: RegradeOptions) -> tuple[Ver
         raise RegradeError(f"pre-fix snapshot missing: {snapshot.path}")
     if tree_digest(snapshot.path) != snapshot.digest:
         raise RegradeError(f"pre-fix snapshot changed since it was recorded: {snapshot.path}")
-    bundle = _bundle(snapshot.record, options)
+    bundle = recorded_bundle(snapshot.record, options)
     factory = options.sandbox_factory or docker_sandbox_factory(options.docker_context)
     sandbox = await factory(bundle)
     with tempfile.TemporaryDirectory(prefix="raidar-pre-fix-", dir=options.work_root) as work:
@@ -161,9 +162,8 @@ async def grade_pre_fix_snapshot(
         grade, environment = await _grade(snapshot, options)
     except RegradeError as exc:
         return _entry(snapshot, "error", error=str(exc))
-    target.parent.mkdir(parents=True, exist_ok=True)
     payload = _payload(snapshot, grade, environment)
-    target.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    write_store_json(target, payload)
     return _entry(snapshot, "graded", path=str(target), summary=payload["summary"])
 
 

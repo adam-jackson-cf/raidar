@@ -77,6 +77,8 @@ def parse_leak_output(stdout: str, hashes: dict[str, str], seconds: float) -> Le
             tests_entries.append(line.removeprefix(_TESTS_TAG))
             continue
         digest, _, path = line.partition("  ")
+        # sha256sum escapes a path holding a backslash or newline and prefixes the line with "\".
+        digest = digest.removeprefix("\\")
         if digest in hashes and path:
             copies.add(f"{path} == {hashes[digest]}")
     return LeakReport(
