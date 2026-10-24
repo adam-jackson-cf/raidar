@@ -4,8 +4,7 @@ Unset, the primary is the progression's default (``solve_rate`` under
 ``continue``), exactly as before. Set, it must be a known trial outcome; it is
 analysis configuration (the lock's ``analysis`` section), so ``lock_sha256``
 does not move; and an errata-applied primary is always reported with its raw
-counterpart beside it. The gate-effort version the lock declares is read too
-(``@2`` before ``@1``).
+counterpart beside it.
 """
 
 from __future__ import annotations
@@ -149,6 +148,18 @@ def test_an_errata_primary_without_errata_still_has_a_primary_effect() -> None:
     assert comparison.primary.verdict.value == "insufficient"
     assert comparison.primary_raw is not None
     assert comparison.primary_raw.metric == SOLVE_RATE
+
+
+def test_arms_with_no_shared_attempt_are_refused_not_crashed() -> None:
+    base = inputs(paired_arms(SOLVE_RATE, [0.25] * 5, [0.5] * 5), 5)
+    planned = tuple(
+        dataclasses.replace(trial, attempt=trial.attempt + 10)
+        if trial.arm != base.baseline_arm
+        else trial
+        for trial in base.planned
+    )
+    with pytest.raises(ValueError, match="no attempt is planned for both"):
+        analyse(dataclasses.replace(base, planned=planned), SETTINGS)
 
 
 def test_the_lock_declared_gate_effort_scorer_is_read() -> None:

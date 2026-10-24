@@ -27,6 +27,7 @@ from pydantic import ValidationError
 from raidar.analysis.outcomes import PoolingReport
 from raidar.analysis.pooling import PoolingError, check_pooling
 from raidar.analysis.report import PlannedTrial
+from raidar.core.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.execution.models import TrialRecord
 from raidar.spec.lock import default_lock_path, lock_integrity_issues
 
@@ -92,15 +93,15 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def read_job(job_dir: Path) -> JobDir:
     records = []
-    for path in sorted((job_dir / "trial-records").glob("*.json")):
+    for path in sorted((job_dir / TRIAL_RECORDS_DIR).glob("*.json")):
         try:
             records.append(TrialRecord.model_validate_json(path.read_bytes()))
         except ValidationError as exc:
             raise AnalysisInputError(f"invalid trial record {path}: {exc}") from exc
     return JobDir(
         path=job_dir,
-        manifest=_read_json(job_dir / "job.json"),
-        plan=_read_json(job_dir / "plan.json"),
+        manifest=_read_json(job_dir / JOB_MANIFEST),
+        plan=_read_json(job_dir / PLAN_FILE),
         records=tuple(records),
     )
 
@@ -116,9 +117,6 @@ def read_lock(path: Path) -> dict[str, Any]:
     if issues:
         raise AnalysisInputError(f"{path}: not a valid lock ({'; '.join(issues)})")
     return lock
-
-
-JOB_LOCK_FILE = "job.lock.json"
 
 
 def default_lock(job: JobDir) -> Path:
@@ -190,7 +188,7 @@ def check_jobs(
     for job in jobs:
         if job.manifest.get("lock_sha256") != lock["lock_sha256"]:
             raise AnalysisInputError(
-                f"run {job.path} was executed under lock {job.manifest.get('lock_sha256')}, "
+                f"job {job.path} was executed under lock {job.manifest.get('lock_sha256')}, "
                 f"not {lock['lock_sha256']}: the lock's execution section describes another "
                 "experiment"
             )

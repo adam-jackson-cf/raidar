@@ -237,7 +237,7 @@ class AnalysisReport(AnalysisModel):
     gate_scorer: str | None = None
     """The gate-effort version the gate outcomes come from, when the lock declares one."""
     process_scorer: str | None = None
-    """The process-compliance version the process outcomes come from (``@3`` or ``@4``)."""
+    """The process-compliance version the process outcomes come from."""
     baseline_arm: str
     progression: str
     dev_job: DevRun | None = None
@@ -348,6 +348,11 @@ def _primary_effect(
     if matching:
         return matching[-1]
     metric = outcome_metric(metric_id)
+    if not slots:
+        raise ValueError(
+            f"no attempt is planned for both the baseline and a treatment arm, so {metric_id} "
+            "has nothing to compare"
+        )
     per_problem = [
         problem_effect(metric, problem, problem_slots, settings, label=label)
         for problem, problem_slots in slots.items()
