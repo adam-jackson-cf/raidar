@@ -237,8 +237,13 @@ def _alive(pid: int) -> bool:
     if ps is None:
         return True
     try:
+        # -ww: procps cuts output to 80 columns when not on a terminal, which can drop
+        # the module name after a long interpreter path.
         listed = subprocess.run(  # noqa: S603 - fixed ps arguments
-            [ps, "-p", str(pid), "-o", "command="], capture_output=True, text=True, check=False
+            [ps, "-ww", "-p", str(pid), "-o", "command="],
+            capture_output=True,
+            text=True,
+            check=False,
         )
     except OSError:
         return True
