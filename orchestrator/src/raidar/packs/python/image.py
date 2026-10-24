@@ -27,6 +27,7 @@ from typing import Any, Protocol
 
 from raidar.packs.python.harness import harbor_reported_version, harbor_version_command
 from raidar.packs.python.models import PackSpec, ToolLock
+from raidar.spec.canonical import IGNORED_TREE_NAMES
 
 LOCK_HASH_LABEL = "dev.raidar.pack.lock-hash"
 PACK_ID_LABEL = "dev.raidar.pack.id"
@@ -66,8 +67,14 @@ def run_docker(
 
 
 def _tree_digest(root: Path) -> str:
+    """Digest of the build context; editor and OS droppings are not recipe content."""
     digest = hashlib.sha256()
-    for path in sorted(p for p in root.rglob("*") if p.is_file()):
+    files = (
+        p
+        for p in root.rglob("*")
+        if p.is_file() and not IGNORED_TREE_NAMES.intersection(p.relative_to(root).parts)
+    )
+    for path in sorted(files):
         digest.update(path.relative_to(root).as_posix().encode() + b"\0")
         digest.update(path.read_bytes() + b"\0")
     return digest.hexdigest()

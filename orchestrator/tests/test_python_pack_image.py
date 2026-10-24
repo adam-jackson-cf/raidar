@@ -142,6 +142,10 @@ def test_image_tag_is_stable_and_changes_with_any_image_input(tmp_path: Path) ->
     shutil.copytree(spec.context_dir, context)
     copied = _spec_with_context(spec, context)
     assert image_lock_hash(copied) == image_lock_hash(spec)
+    (context / ".DS_Store").write_bytes(b"finder")
+    (context / "__pycache__").mkdir()
+    (context / "__pycache__" / "x.pyc").write_bytes(b"cache")
+    assert image_lock_hash(copied) == image_lock_hash(spec), "OS and cache files are not inputs"
 
     dockerfile = context / "Dockerfile"
     dockerfile.write_text(dockerfile.read_text() + "\nRUN true\n")
