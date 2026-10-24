@@ -39,7 +39,7 @@ COVERAGE_SESSIONS = "fix_sessions_with_coverage_minimum"
 COVERAGE_COST = "fix_cost_usd_with_coverage_minimum"
 COVERAGE_WALL = "fix_wall_s_with_coverage_minimum"
 
-_NET = "(no no-untyped-call cascade, a refused suppression counted once, as gate-effort@8's *_net)"
+_NET = "(no no-untyped-call cascade, a refused suppression counted once, as the *_net counts)"
 _REFUSAL = (
     "split by the kind of refusal that started each session: its one rule family, "
     "coverage_minimum (TEST.coverage-minimum alone), mixed, or unknown; the kinds add up to "
@@ -86,7 +86,7 @@ AUTOFIX_STEP_METRICS: tuple[MetricSpec, ...] = (
     metric(
         AUTOFIX_ERRORS,
         "Autofix passes that could not complete (typed in the record; an "
-        "enforced gate then ran that check as guardrail-gate@3).",
+        "enforced gate then ran that check without autofix).",
         _CHECKPOINT,
         MetricType.COUNT,
         _LOWER,
@@ -246,7 +246,7 @@ _NEW = (
     "shadow: the dry run on the copy) minus what the previous gated step left for autofix "
     "(enforced: 0 when the pass before its last gate run completed, the tree it handed on "
     "being already fixed; shadow: its dry run, since the shadow tree is never fixed); "
-    "signed, as gate-effort@6's new_first_run_blocking. A shadow gate's per-step autofix "
+    "signed, as new_first_run_blocking. A shadow gate's per-step autofix "
     "counts re-count the whole never-fixed tree at every step, so their sums are cumulative; "
     "this form's sum telescopes to the final tree's count and compares with an enforced "
     "gate's"

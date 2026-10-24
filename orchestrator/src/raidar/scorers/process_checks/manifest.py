@@ -21,7 +21,7 @@ PROCESS_COMPLIANCE = ScorerManifest(
     id="process-compliance",
     version="6",
     description=(
-        "Deterministic trace checks of agent process (process-compliance@5: stall "
+        "Deterministic trace checks of agent process (stall "
         "outcomes, a test command counts only when it ran, the step's work session's own "
         "test run after its last edit, a compliance rate without the plan check unless the "
         "condition asks for a plan); a check the trace cannot decide is undetermined, never "

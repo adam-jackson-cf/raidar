@@ -34,14 +34,14 @@ GATE_EFFORT = ScorerManifest(
     version="10",
     description=(
         "Effort a guardrail-gate commit gate cost per step, the gate's tests check and "
-        "the fix rounds' correctness (gate-effort@7: a failed tests check counted once, "
+        "the fix rounds' correctness (a failed tests check counted once, "
         "blocking counts that compare across gate modes with and without the mypy "
         "no-untyped-call cascade, failing tests and missed coverage apart, first-pass "
         "clean rates that ignore auto-fixable layout codes, the tests check, or both), plus "
         "the cross-mode blocking counts without the cascade and with a refused suppression "
         "comment counted once (mypy's unused-ignore at a SUPPRESS line folded into it). A "
         "shadow gate reports its first-run, step-end and code outcomes only. Not applicable "
-        "to an arm without a gate. Plus a guardrail-gate@4 autofix step's effect: "
+        "to an arm without a gate. Plus the autofix step's effect: "
         "passes, errors, files and lines changed, block-tier findings fixed by family, "
         "first-pass clean and blocking counts after autofix (and before, comparable "
         "across an enforced and a shadow gate), and the fix sessions' cost and wall time "
