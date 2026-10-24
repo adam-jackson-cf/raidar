@@ -9,7 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.evaluation.review.quality.synthetic import generate_quality_fixture
+from raidar.evaluation.review.quality.synthetic.generate import generate_quality_fixture
 from raidar.scoring.judge.audit import AuditLog
 from raidar.scoring.judge.calibration import LabelImportError, import_labels, promotion_readiness
 from raidar.scoring.judge.label_export import (

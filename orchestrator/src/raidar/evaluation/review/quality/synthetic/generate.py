@@ -18,7 +18,7 @@ The experiment id, job ids, problem and every snapshot digest carry a
 ``synthetic: true``. It is never benchmark evidence.
 
 - the gated arm's commit-gate records under each trial's step agent dirs
-  (``raidar.evaluation.review.quality.synthetic_gate``) and every trial's ``gate-effort``
+  (``raidar.evaluation.review.quality.synthetic.gate``) and every trial's ``gate-effort``
   Assessment, made by the real scorer (``not_applicable`` for ``baseline``).
 
 Built-in shape (deterministic, seeded): two arms (``baseline``, ``guided``)
@@ -35,7 +35,6 @@ import hashlib
 import json
 import random
 import shutil
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -50,8 +49,8 @@ from raidar.contract.trial import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.evaluation.review.quality.synthetic_gate import GATE_EFFORT, gate_result
-from raidar.evaluation.review.quality.synthetic_lock import default_metric, write_synthetic_lock
+from raidar.evaluation.review.quality.synthetic.gate import GATE_EFFORT, gate_result
+from raidar.evaluation.review.quality.synthetic.lock import default_metric, write_synthetic_lock
 from raidar.scoring.framework.builtin_manifests import CODE_QUALITY, CORRECTNESS
 from raidar.scoring.framework.manifest import ScorerManifest
 from raidar.scoring.framework.result import (
@@ -465,12 +464,3 @@ def generate_quality_fixture(dest: Path) -> Path:
             )
             _decisions(audit, trial)
     return dest
-
-
-def main() -> None:
-    target = generate_quality_fixture(Path(sys.argv[1]))
-    print(f"Wrote synthetic Quality fixture to {target}")
-
-
-if __name__ == "__main__":
-    main()

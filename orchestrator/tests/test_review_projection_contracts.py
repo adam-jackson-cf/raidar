@@ -12,7 +12,7 @@ import pytest
 
 from raidar.contract.review import ReviewProjectionArtifact
 from raidar.evaluation.review.projection import main, merge_review_projections
-from raidar.evaluation.review.projection.fixture import (
+from raidar.evaluation.review.projection.fixture.generate import (
     JOBS_DIR,
     REVIEW_ONLY_DIR,
     generate_review_fixture,

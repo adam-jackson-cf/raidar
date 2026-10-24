@@ -27,7 +27,10 @@ from raidar.evaluation.review.projection.comparability import (
     mark_policy_mismatches,
 )
 from raidar.evaluation.review.projection.conditions import ArmSide, condition_diff
-from raidar.evaluation.review.projection.fixture import REVIEW_ONLY_DIR, generate_review_fixture
+from raidar.evaluation.review.projection.fixture.generate import (
+    REVIEW_ONLY_DIR,
+    generate_review_fixture,
+)
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.evaluation.review.projection.merge import project_experiment_epoch
 from raidar.evaluation.review.projection.sources import JobSourceError, LockIndex, load_job

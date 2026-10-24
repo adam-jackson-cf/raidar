@@ -31,7 +31,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import sys
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -39,13 +38,12 @@ from pathlib import Path
 import yaml
 
 from raidar.contract.canonical import digest_json
-from raidar.contract.paths import tmp_root
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import rescore_config
-from raidar.evaluation.review.projection.fixture_assessments import LintFinding, QualityPlan
-from raidar.evaluation.review.projection.fixture_lock import fixture_lock
-from raidar.evaluation.review.projection.fixture_store import FixtureAssessments
-from raidar.evaluation.review.projection.fixture_trials import (
+from raidar.evaluation.review.projection.fixture.assessments import LintFinding, QualityPlan
+from raidar.evaluation.review.projection.fixture.lock import fixture_lock
+from raidar.evaluation.review.projection.fixture.store import FixtureAssessments
+from raidar.evaluation.review.projection.fixture.trials import (
     CheckpointScript,
     Outcome,
     TrialPlan,
@@ -438,13 +436,3 @@ def generate_review_fixture(dest: Path) -> list[Path]:
     runs = [_run(design, dest, store) for design in designs]
     runs.append(_run(_review_only(), dest, store, REVIEW_ONLY_DIR))
     return runs
-
-
-def main() -> None:
-    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else tmp_root() / "review-fixture"
-    for job_dir in generate_review_fixture(dest.resolve()):
-        print(f"Wrote synthetic run: {job_dir}")
-
-
-if __name__ == "__main__":
-    main()

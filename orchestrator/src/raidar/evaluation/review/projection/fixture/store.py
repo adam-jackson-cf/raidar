@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 
-from raidar.evaluation.review.projection.fixture_assessments import (
+from raidar.evaluation.review.projection.fixture.assessments import (
     MEASURED_SCORERS,
     QualityPlan,
     quality_result,
