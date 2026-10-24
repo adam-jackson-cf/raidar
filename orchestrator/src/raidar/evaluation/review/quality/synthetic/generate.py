@@ -5,7 +5,7 @@ job, Assessment and Jev shapes:
 
 - ``experiment.yaml``, a digest-checked ``experiment.lock.json`` beside it
   (baseline arm and headline metric, as a real lock carries them), and
-  ``runs/synthetic-quality/<job>/`` job directories (``job.json`` naming the
+  ``jobs/<experiment>/<job>/`` job directories (``job.json`` naming the
   lock digest + ``trial-records/*.json`` TrialRecords);
 - ``store/``: ``code-quality@3`` and ``correctness@1`` Assessments whose
   inputs carry each trial's snapshot digests (correctness in the real

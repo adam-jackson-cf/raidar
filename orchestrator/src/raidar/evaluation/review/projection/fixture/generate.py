@@ -17,11 +17,11 @@ leave them, plus one Assessment store, under ``<dest>``:
   two (``scb-canonical@1``). A real problem version has one checkpoint count;
   this synthetic contrivance makes one compared family mix headline metrics,
   so the headline-policy mismatch renders.
-- ``synthetic-review-only`` (under ``<dest>/review-only``, not ``<dest>/runs``):
+- ``synthetic-review-only`` (under ``<dest>/review-only``, not ``<dest>/jobs``):
   runs projected for review whose Quality data was never built, so the surface
   shows what a run and a family without Quality data look like.
 
-``<dest>/runs`` and ``<dest>/review-only`` are run roots, ``<dest>/store`` the
+``<dest>/jobs`` and ``<dest>/review-only`` are job roots, ``<dest>/store`` the
 Assessment store of both. Review ids are ``<job id>-<trial id>``; the trial ids
 keep the review-surface suite's deterministic ids (``synthetic-bugfix-gpt-5.5-low-04``
 and friends) stable.
@@ -54,7 +54,7 @@ from raidar.evaluation.review.projection.fixture.trials import (
 )
 
 SYNTHETIC_MARKER = "synthetic"
-# Run roots of the fixture: ``runs`` is projected for review and Quality, ``review-only``
+# Job roots of the fixture: ``jobs`` is projected for review and Quality, ``review-only``
 # for review alone.
 JOBS_DIR = "jobs"
 REVIEW_ONLY_DIR = "review-only"

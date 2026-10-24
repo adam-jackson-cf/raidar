@@ -8,7 +8,7 @@ trajectories, oracle gates, validity checks), their Assessments and Quality
 components.
 
 Raidar artifacts remain authoritative. Everything this surface shows is a
-regenerable projection of run directories (`runs/<experiment>/<run>/`) and the
+regenerable projection of job directories (`<jobs-root>/<experiment>/<job>/`) and the
 Assessment stores that score them. User annotations and Jev labels are the only
 data it owns (under `data/`). Jev is parked (2026-10-04): `/quality/runs/:id`
 shows a trial's audited Jev decisions only as a collapsed, read-only history
@@ -43,7 +43,7 @@ consistent good/bad vocabulary in `src/presentation/verdict.ts`:
 ## Architecture
 
 ```
-runs/<experiment>/<run>/**           experiment runs (authoritative)
+<jobs-root>/<experiment>/<job>/**      experiment jobs (authoritative)
 <assessment store>/**                Assessments of those runs
         │  python -m raidar.evaluation.review.projection (make review-surface-data)
         ▼
@@ -94,10 +94,10 @@ payload copy, annotation create/delete/kind-toggle, the runs sidebar filter and
 selection, the tradeoff scatter, failure patterns, arm-movement diffs, and
 the failing / passing / **unscored** run states — plus a console-error guard.
 
-`make review-surface-test` writes the synthetic review fixture (its `runs` root
+`make review-surface-test` writes the synthetic review fixture (its `jobs` root
 feeds both the review and the Quality data; its `review-only` root feeds only the
 review data, so a run without Quality data renders), projects it together with any given
-`REVIEW_RUNS_ROOT` runs (one `REVIEW_STORE` for all roots, or one per root — a
+`REVIEW_JOBS_ROOT` jobs (one `REVIEW_STORE` for all roots, or one per root — a
 mismatch fails loudly), builds the app, ensures the Chromium browser, and runs the suite
 via `server.mjs` (Playwright's `webServer` reuses an already-running server on
 5950).
