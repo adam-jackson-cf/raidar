@@ -52,10 +52,24 @@ def materialise(root: Path, files: Mapping[str, str]) -> Path:
 
 
 def without_executable(payload: dict[str, Any]) -> dict[str, Any]:
-    """Raw V/E evidence minus the host path of the evaluator interpreter."""
-    interpreter = {**payload["interpreter"], "executable": "<python>"}
+    """Raw V/E evidence minus the host's evaluator interpreter identity.
+
+    The interpreter binary digest and the parser/tokenizer schema id (which hashes
+    ``sys.version``) identify the machine that ran the evaluator, not the port's
+    values, so goldens recorded on one host must not pin them.
+    """
+    interpreter = {
+        **payload["interpreter"],
+        "executable": "<python>",
+        "executable_sha256": "<host>",
+    }
     ruff = {**payload["ruff"], "invocation": ["<python>", *payload["ruff"]["invocation"][1:]]}
-    return {**payload, "interpreter": interpreter, "ruff": ruff}
+    return {
+        **payload,
+        "interpreter": interpreter,
+        "parser_tokenizer_schema_id": "<host>",
+        "ruff": ruff,
+    }
 
 
 def without_runs(attribution: dict[str, Any]) -> dict[str, Any]:
