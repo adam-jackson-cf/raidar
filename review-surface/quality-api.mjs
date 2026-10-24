@@ -1,23 +1,16 @@
-// Quality element API (plan K2/K4): serves the Python-emitted Quality
+// Quality element API: serves the Python-emitted Quality
 // projection and persists reviewer Jev calibration labels locally. Mounted by
 // server.mjs under /api/quality/*; zero runtime dependencies.
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { readJson } from './read-json.mjs';
 
 export const JEV_LABELS = ['correct', 'false_positive', 'false_negative', 'uncertain'];
 // Label provenance: a person on this surface is a `human` reviewer (source
 // `user`); a `model` reviewer must name its model id in `reviewer_model`.
 export const JEV_REVIEWERS = ['human', 'model'];
 const SAFE_ID = /^[A-Za-z0-9._-]+$/;
-
-function readJson(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return fallback;
-  }
-}
 
 export function createQualityApi({ dataRoot, sendJson, readBody }) {
   const qualityRoot = path.join(dataRoot, 'quality');

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { createQualityApi } from './quality-api.mjs';
+import { readJson } from './read-json.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const dataRoot = path.join(here, 'data');
@@ -25,14 +26,6 @@ const MIME = {
   '.woff2': 'font/woff2',
   '.ttf': 'font/ttf',
 };
-
-function readJson(filePath, fallback) {
-  try {
-    return JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  } catch {
-    return fallback;
-  }
-}
 
 function loadRunIndex() {
   return readJson(path.join(dataRoot, 'runs.json'), { runs: [] });
