@@ -27,9 +27,20 @@ from pydantic import ValidationError
 from raidar.contract.job_layout import JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path, lock_integrity_issues
+from raidar.design.problem.models import ProblemId
+from raidar.design.problem.store import ProblemStore
 from raidar.evaluation.analysis.outcomes import PoolingReport
 from raidar.evaluation.analysis.pooling import PoolingError, check_pooling
 from raidar.evaluation.analysis.report import PlannedTrial
+from raidar.scoring.framework.trial_inputs import TrialInputError
+
+
+def stored_bundle(problems: ProblemStore, problem: str) -> Path:
+    """The problem store's verifier bundle for a trial's pinned problem reference."""
+    try:
+        return problems.content_dir(ProblemId.parse(problem)) / "oracle"
+    except ValueError as exc:
+        raise TrialInputError(f"problem {problem!r} is not a store reference: {exc}") from exc
 
 
 class AnalysisInputError(ValueError):

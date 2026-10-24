@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import Any
 
@@ -33,11 +34,11 @@ from raidar.evaluation.analysis.sources import (
     read_job,
     read_lock,
     select_records,
+    stored_bundle,
 )
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY, Metric
 from raidar.scoring.framework.registry import ScorerRegistry
 from raidar.scoring.framework.store import AssessmentStore
-from raidar.scoring.framework.trial_inputs import BundleCache
 
 
 def headline(lock: Mapping[str, Any]) -> tuple[Metric, dict[str, object]]:
@@ -125,6 +126,15 @@ def _read_trials(
     return outcomes, process, gate
 
 
+def _lookup(request: LoadRequest, scorer_refs: tuple[str, ...]) -> AssessmentLookup:
+    return AssessmentLookup(
+        store=AssessmentStore(request.store_root),
+        registry=request.registry,
+        scorer_refs=scorer_refs,
+        stored_bundle=partial(stored_bundle, request.problems or open_store()),
+    )
+
+
 def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]]:
     """The analysis inputs and the lock they were checked against."""
     if not request.job_dirs:
@@ -137,13 +147,7 @@ def load_inputs(request: LoadRequest) -> tuple[AnalysisInputs, Mapping[str, Any]
     spec = lock["spec"]
     declared = tuple(spec["assessment"]["scorers"])
     process_ref = _process_ref(declared)
-    lookup = AssessmentLookup(
-        store=AssessmentStore(request.store_root),
-        registry=request.registry,
-        scorer_refs=_scorer_refs(declared, process_ref),
-        bundles=BundleCache(),
-        problems=request.problems or open_store(),
-    )
+    lookup = _lookup(request, _scorer_refs(declared, process_ref))
     chosen, replaced = select_records(jobs)
     gate_ref = gate_effort_ref(declared)
     read = _read_trials(

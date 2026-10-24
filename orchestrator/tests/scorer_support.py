@@ -266,12 +266,12 @@ def _checkpoint_observations(ctx: AssessContext, name: str, extra: bool) -> list
         counts["test_files"] = FileRole.TEST
     observations = [
         Observation(metric=metric, subject=name, status=blocked[0], reason=blocked[1])
-        if blocked is not None or inventory is None
+        if blocked is not None
         else Observation(
             metric=metric,
             subject=name,
             status=AssessStatus.OK,
-            value=len(inventory.with_role(role)),
+            value=len(inventory.with_role(role)) if inventory is not None else None,
         )
         for metric, role in counts.items()
     ]

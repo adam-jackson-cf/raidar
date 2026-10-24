@@ -296,7 +296,7 @@ def test_floor_policy_scores_c_zero_trials_zero_end_to_end_while_the_base_policy
             assert headline_effect["mean_delta"] == 0.0  # both arms S = 0 on the C = 0 pairs
 
 
-PINNED = {
+PINNED: dict[str, Any] = {
     "min_pairs": 6,
     "max_exclusion_fraction": 0.2,
     "alpha": 0.05,

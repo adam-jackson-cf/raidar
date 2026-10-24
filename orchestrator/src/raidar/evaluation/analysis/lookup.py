@@ -13,13 +13,11 @@ caller refuses it for a valid trial.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.design.problem.models import ProblemId
-from raidar.design.problem.store import ProblemStore
 from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.scoring.framework.context import AssessContext
@@ -45,8 +43,8 @@ class AssessmentLookup:
     store: AssessmentStore
     registry: ScorerRegistry
     scorer_refs: tuple[str, ...]
-    bundles: BundleCache
-    problems: ProblemStore
+    stored_bundle: Callable[[str], Path]
+    bundles: BundleCache = field(default_factory=BundleCache)
 
     def __post_init__(self) -> None:
         self._identities: dict[str, ScorerIdentity] = {}
@@ -56,13 +54,6 @@ class AssessmentLookup:
         if ref not in self._identities:
             self._identities[ref] = scorer_identity(self.registry.get(ref))
         return self._identities[ref]
-
-    def _stored_bundle(self, problem: str) -> Path:
-        """The problem store's verifier bundle for the trial's pinned problem reference."""
-        try:
-            return self.problems.content_dir(ProblemId.parse(problem)) / "oracle"
-        except ValueError as exc:
-            raise TrialInputError(f"problem {problem!r} is not a store reference: {exc}") from exc
 
     def _load(self, trial_dir: Path, config: RescoreConfig, problem: str) -> AssessContext:
         """The trial's context: its bundle where recorded, else the problem store's."""
@@ -75,7 +66,7 @@ class AssessmentLookup:
                 return load_trial_context(
                     trial_dir,
                     inventory_policy=config.inventory_policy,
-                    bundle_override=self._stored_bundle(problem),
+                    bundle_override=self.stored_bundle(problem),
                     bundle_cache=self.bundles,
                 )
             except TrialInputError as exc:
