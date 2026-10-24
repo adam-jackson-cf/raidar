@@ -46,7 +46,7 @@ def _override_options(command: Callable[..., Any]) -> Callable[..., Any]:
     return command
 
 
-def _load(
+def load_cli_experiment(
     experiment: Path,
     attempts: int | None,
     seed: int | None,
@@ -73,7 +73,7 @@ def validate_command(
     assignments: tuple[str, ...],
 ) -> None:
     """Validate an experiment.yaml (schema, kind and naming rules, factor guard, components)."""
-    loaded = _load(experiment, attempts, seed, assignments)
+    loaded = load_cli_experiment(experiment, attempts, seed, assignments)
     spec = loaded.spec
     available = default_resolvers().available_kinds()
     click.echo("Experiment validation passed.")
@@ -126,7 +126,7 @@ def lock_command(
     """
     if ignore_host_python and not check:
         raise click.UsageError("--ignore-host-python needs --check")
-    loaded = _load(experiment, attempts, seed, assignments)
+    loaded = load_cli_experiment(experiment, attempts, seed, assignments)
     lock_path = output or default_lock_path(loaded.path)
     try:
         lock = build_lock(loaded, lock_path=lock_path)

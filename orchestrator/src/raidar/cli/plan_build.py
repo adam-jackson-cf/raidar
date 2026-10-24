@@ -8,7 +8,7 @@ from typing import Any
 
 import click
 
-from raidar.cli.experiment_spec import _load
+from raidar.cli.experiment_spec import load_cli_experiment
 from raidar.execution.agent_config import AgentOverride
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.packs.drift import LockedPackError, lock_runtime_pack
@@ -43,7 +43,7 @@ def _current_lock(loaded: Any, lock_path: Path) -> dict[str, Any]:
 
 
 def build_cli_plan(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
-    loaded = _load(
+    loaded = load_cli_experiment(
         options["experiment"],
         options["attempts"],
         options["seed"],
