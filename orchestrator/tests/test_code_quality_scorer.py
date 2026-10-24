@@ -135,28 +135,19 @@ def test_problem_level_components_are_means_only_when_every_subject_has_a_value(
     assert T23 in (regression.reason or "")
 
 
-@pytest.mark.parametrize(
-    ("coverage", "parity", "reason"),
-    [
-        (
-            True,
-            ParityVerdict(eligible=False, reasons=("outcome_mismatch",)),
-            "coverage_parity_failed: outcome_mismatch",
-        ),
-    ],
-)
 def test_regression_without_coverage_parity_is_ineligible_with_reasons_never_zero(
-    tmp_path: Path, coverage: bool, parity: ParityVerdict | None, reason: str
+    tmp_path: Path,
 ) -> None:
     case = golden_case("synthetic_shop")
-    trial = case_trial(tmp_path / "trial", case, coverage=coverage, parity=parity)
+    parity = ParityVerdict(eligible=False, reasons=("outcome_mismatch",))
+    trial = case_trial(tmp_path / "trial", case, parity=parity)
     result = _scored(_context(trial))
     for key in (T12, T23):
         observation = _observation(result, "regression", key)
         assert (observation.status, observation.value, observation.reason) == (
             AssessStatus.INELIGIBLE,
             None,
-            reason,
+            "coverage_parity_failed: outcome_mismatch",
         )
     assert _observation(result, "rework", T12).status is AssessStatus.OK
 

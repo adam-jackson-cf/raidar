@@ -244,16 +244,18 @@ def test_one_flipped_case_leaves_the_case_out_not_the_step(tmp_path: Path) -> No
     store = tmp_path / "store"
     _defer(trial, store, {"checkpoint_2": FLIPPED})
 
-    v3 = _by_key(_run(trial, store)[0])
+    observed = _by_key(_run(trial, store)[0])
 
     # The flaky case passed in grading, so leaving it out gives G the clean trial's value.
-    assert v3[("regression", T12)] == reference[("regression", T12)]
+    assert observed[("regression", T12)] == reference[("regression", T12)]
     problem = ("problem_regression", "trajectory")
-    assert v3[problem] == reference[problem]
-    excluded = v3[(EXCLUDED_METRIC, T12)]
+    assert observed[problem] == reference[problem]
+    excluded = observed[(EXCLUDED_METRIC, T12)]
     assert (excluded.status, excluded.value) == (AssessStatus.OK, 1.0)
     assert excluded.reason == f"{CASE_EXCLUDED}: {FLAKY}"
-    assert v3[(EXCLUDED_METRIC, T23)] == reference_exclusions(tmp_path)[(EXCLUDED_METRIC, T23)]
+    assert (
+        observed[(EXCLUDED_METRIC, T23)] == reference_exclusions(tmp_path)[(EXCLUDED_METRIC, T23)]
+    )
 
 
 def reference_exclusions(tmp_path: Path) -> dict[tuple[str, str], Observation]:
@@ -267,10 +269,10 @@ def test_a_trial_whose_parity_held_leaves_out_no_case(tmp_path: Path) -> None:
     store = tmp_path / "store"
     _defer(trial, store, {})
 
-    v3 = _by_key(_run(trial, store)[0])
+    observed = _by_key(_run(trial, store)[0])
 
-    assert v3[("regression", T12)].status is AssessStatus.OK
-    assert v3[(EXCLUDED_METRIC, T12)].value == 0.0
+    assert observed[("regression", T12)].status is AssessStatus.OK
+    assert observed[(EXCLUDED_METRIC, T12)].value == 0.0
 
 
 @pytest.mark.parametrize(
@@ -288,24 +290,24 @@ def test_any_other_parity_failure_stays_ineligible(
     store = tmp_path / "store"
     _defer(trial, store, {"checkpoint_2": ParityVerdict(eligible=False, reasons=reasons)})
 
-    v3 = _by_key(_run(trial, store)[0])
+    observed = _by_key(_run(trial, store)[0])
 
-    item = v3[("regression", T12)]
+    item = observed[("regression", T12)]
     assert (item.status, item.reason) == (
         AssessStatus.INELIGIBLE,
         f"coverage_parity_failed: {', '.join(reasons)}",
     )
-    assert v3[(EXCLUDED_METRIC, T12)].status is AssessStatus.NOT_APPLICABLE
-    assert (v3[(EXCLUDED_METRIC, T12)].reason or "").startswith(NO_RUN_EVIDENCE)
+    assert observed[(EXCLUDED_METRIC, T12)].status is AssessStatus.NOT_APPLICABLE
+    assert (observed[(EXCLUDED_METRIC, T12)].reason or "").startswith(NO_RUN_EVIDENCE)
 
 
 def test_the_in_trial_pass_is_reconciled_the_same_way(tmp_path: Path) -> None:
     trial = case_trial(tmp_path / "trial", _flipped_case(), parity=FLIPPED)
 
-    v3 = _by_key(_run(trial, tmp_path / "empty-store")[0])
+    observed = _by_key(_run(trial, tmp_path / "empty-store")[0])
 
-    assert v3[("regression", T12)].status is AssessStatus.OK
-    assert v3[(EXCLUDED_METRIC, T12)].value == 1.0
+    assert observed[("regression", T12)].status is AssessStatus.OK
+    assert observed[(EXCLUDED_METRIC, T12)].value == 1.0
 
 
 def test_flipped_cases_names_only_outcome_flips() -> None:

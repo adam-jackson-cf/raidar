@@ -185,18 +185,30 @@ class AssessmentStore:
     def _supersede(self, path: Path, stored: bytes, data: bytes, key: str) -> None:
         """Keep the provisional bytes under ``superseded/``, then swap in the complete ones."""
         self._write_new(self.superseded_path(key, stored), stored)
-        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False, suffix=".tmp") as handle:
-            handle.write(data)
-            temporary = Path(handle.name)
-        os.replace(temporary, path)
+        temporary = self._temporary(path.parent, data)
+        try:
+            os.replace(temporary, path)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
 
     @staticmethod
-    def _write_new(path: Path, data: bytes) -> bool:
+    def _temporary(directory: Path, data: bytes) -> Path:
+        """A sibling temp file holding ``data``; removed again if the write fails."""
+        with tempfile.NamedTemporaryFile(dir=directory, delete=False, suffix=".tmp") as handle:
+            temporary = Path(handle.name)
+            try:
+                handle.write(data)
+            except BaseException:
+                temporary.unlink(missing_ok=True)
+                raise
+        return temporary
+
+    @classmethod
+    def _write_new(cls, path: Path, data: bytes) -> bool:
         """Atomically create ``path``; False when another writer created it first."""
         path.parent.mkdir(parents=True, exist_ok=True)
-        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False, suffix=".tmp") as handle:
-            handle.write(data)
-            temporary = Path(handle.name)
+        temporary = cls._temporary(path.parent, data)
         try:
             os.link(temporary, path)
         except FileExistsError:

@@ -266,12 +266,6 @@ class Eligibility(ScoringModel):
         return self
 
 
-def aggregate_eligibility(decisions: tuple[Eligibility, ...]) -> Eligibility:
-    """Union of reasons; eligible only when no decision has one (fork ``generation.py``)."""
-    reasons = tuple(sorted({reason for decision in decisions for reason in decision.reasons}))
-    return Eligibility(eligible=not reasons, reasons=reasons)
-
-
 class ProductionEvidence(ScoringModel):
     """Typed V/E/H payloads and their complete eligibility decision."""
 

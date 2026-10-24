@@ -7,12 +7,12 @@ and the next one starts from an empty ledger (the fork's
 live producer, R needs V/E evidence at both ends of the transition, and its
 lineage identities are V/E's unhashed eligible symbols (``diffs.rework_symbols``).
 
-G reads the oracle's per-step fork-shaped run evidence
-(``raidar-oracle/steps/<step>/g-kernel-input.json``, WS-E E2): the graded run
+G reads the verifier's per-step fork-shaped run evidence
+(``raidar-oracle/steps/<step>/g-kernel-input.json``): the graded run
 is the baseline and the separate coverage run is the produced run. A step whose
 trial made the verifier's coverage pass reads it through ``in_trial_run_evidence``; one
-whose trial deferred it reads the store's offline run (``coverage_reader``). A disabled
-coverage run, a failed parity check or missing evidence makes the transition
+whose trial deferred it reads the store's offline run (``coverage_reader``). A failed
+parity check or missing evidence makes the transition
 ``ineligible`` with typed reasons, never 0. That file's bytes are part of the
 step's oracle record digest (``trial_inputs._record_digest``), so a trial whose
 G input differs or is missing never reuses another trial's Assessment key.
@@ -118,8 +118,6 @@ def in_trial_run_evidence(step: StepInputs) -> RunEvidences | Gap:
     record = step.record
     if record is None:
         return Gap(AssessStatus.UNAVAILABLE, f"{step.step}: the oracle did not grade this step")
-    if not record.coverage.enabled:
-        return Gap(AssessStatus.INELIGIBLE, f"{PARITY_UNAVAILABLE}: coverage run disabled")
     parity = record.coverage.parity
     if parity is None or not parity.eligible:
         detail = ", ".join(parity.reasons) if parity is not None else "no parity verdict"

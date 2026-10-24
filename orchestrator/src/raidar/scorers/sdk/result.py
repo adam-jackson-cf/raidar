@@ -166,6 +166,3 @@ class RunStats(SdkModel):
     """Per-run facts that legitimately differ between replays; logged, never keyed."""
 
     duration_s: float = Field(ge=0)
-
-
-# touched

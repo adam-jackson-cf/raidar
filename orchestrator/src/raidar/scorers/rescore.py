@@ -17,14 +17,11 @@ explicit config only: the defaults are a function of the problem reference and
 oracle records already in the key's inputs, and analysis recomputes keys from
 the job's explicit assessment config.
 
-Trial ids such as ``b01-p0-guided`` repeat across runs, so a trial inside a
-WS-D job (``<job>/trials/<trial>`` with ``<job>/run.json``) is recorded as
+Trial ids such as ``b01-p0-guided`` repeat across jobs, so a trial inside a
+job (``<job>/trials/<trial>`` with ``<job>/job.json``) is recorded as
 its review id ``<experiment>.<job>.<trial>`` (``qualified_trial_id``; ``<job>/<trial>``
-when ``job.json`` names no experiment), in the
-store log and in the Jev audit. Calibration splits
-over those ids are then disjoint across runs, and the Quality view attaches
-the decisions to exactly one trial. A trial outside a job keeps its directory
-name.
+when ``job.json`` names no experiment) in the store log. A trial outside a job keeps its
+directory name.
 """
 
 from __future__ import annotations
@@ -40,7 +37,7 @@ from typing import Any
 
 from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry
 from raidar.scorers.inventory import InventoryPolicy
-from raidar.scorers.keys import store_key
+from raidar.scorers.keys import scorer_identity, store_key
 from raidar.scorers.sdk.context import (
     AssessContext,
     AwaitingAnswersScorer,
@@ -49,7 +46,7 @@ from raidar.scorers.sdk.context import (
 )
 from raidar.scorers.sdk.result import AssessResult, RunStats
 from raidar.scorers.sdk.validation import validate_result, validate_scorer_set
-from raidar.scorers.store import Assessment, AssessmentStore, PutOutcome
+from raidar.scorers.store import Assessment, AssessmentStore, PutOutcome, ScorerIdentity
 from raidar.scorers.trial_inputs import (
     BundleCache,
     TrialInputError,
@@ -152,9 +149,13 @@ def assess(
     *,
     trial: str,
     replay: bool = False,
+    identity: ScorerIdentity | None = None,
 ) -> AssessmentRecord:
-    """Store (or reuse, or replay-verify) one scorer's Assessment of one trial."""
-    parts = store_key(registration, ctx.config, context_inputs(ctx))
+    """Store (or reuse, or replay-verify) one scorer's Assessment of one trial.
+
+    ``identity`` lets a caller assessing many trials hash the implementation once.
+    """
+    parts = store_key(registration, ctx.config, context_inputs(ctx), identity=identity)
     identity, key = parts.identity, parts.key
     stored = None if replay else store.get(key)
     if stored is not None and not stored.provisional:
@@ -208,6 +209,7 @@ def rescore_path(
 ) -> list[AssessmentRecord]:
     """Assess every trial under ``target`` (a trial or job dir) with each scorer."""
     registrations = _registrations(scorer_refs, registry, config or {})
+    identities = [(registration, scorer_identity(registration)) for registration in registrations]
     try:
         trials = trial_dirs(target)
     except RegradeError as exc:
@@ -225,10 +227,12 @@ def rescore_path(
         except TrialInputError as exc:
             raise RescoreError(str(exc)) from exc
         trial_id = qualified_trial_id(trial_dir)
-        for registration in registrations:
+        for registration, identity in identities:
             scorer_config = dict((config or {}).get(registration.manifest.ref, {}))
             ctx = replace(loaded, config=scorer_config)
-            records.append(assess(store, registration, ctx, trial=trial_id, replay=replay))
+            records.append(
+                assess(store, registration, ctx, trial=trial_id, replay=replay, identity=identity)
+            )
     return records
 
 

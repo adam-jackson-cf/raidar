@@ -1,8 +1,8 @@
 """Run the pinned measurement tools for one snapshot (host side of G3).
 
 The measurement program in ``snapshot_tool`` and Ruff run under the
-interpreter of the Python pack's ``scb-python-quality`` tool, which the WS-I
-lazy provisioner installs into the host cache keyed by ``tools.lock.yaml``
+interpreter of the Python pack's ``scb-python-quality`` tool, which the lazy
+provisioner installs into the host cache keyed by ``tools.lock.yaml``
 (first use is timed separately and never charged to an arm). Every process
 is argv-only, isolated (``python -I``) and bounded by a deadline; a timeout
 or a missing interpreter is ``measurement_environment_mismatch``, as in the

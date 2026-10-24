@@ -146,7 +146,9 @@ def _graph(
     if entry_gap is not None:
         return entry_gap
     if not isinstance(traversal, Mapping):
-        return Gap(AssessStatus.UNAVAILABLE, ENTRY_FILE_MISSING)
+        return Gap(
+            AssessStatus.INELIGIBLE, f"{INVALID_EVIDENCE}: measurement returned no call graph"
+        )
     try:
         return produce_production_graph(checkpoint, inventory.files, traversal)
     except (ProductionGraphError, ValueError) as error:
