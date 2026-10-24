@@ -13,6 +13,7 @@ import pytest
 import yaml
 from harbor.models.task.task import Task
 
+from raidar.core.paths import VAR_ENV
 from raidar.core.snapshot import APP_SOURCE
 from raidar.packs.python.image import image_tag
 from raidar.packs.python.models import load_pack_spec
@@ -22,7 +23,13 @@ from raidar.problems.models import ProblemId, ProblemManifest, ProblemMode
 from raidar.problems.resolver import ProblemResolver, resolver_factory
 from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
 from raidar.problems.source import SourceError
-from raidar.problems.store import ROOT_ENV, ProblemStore, ProblemStoreError, find_store_root
+from raidar.problems.store import (
+    ROOT_ENV,
+    ProblemStore,
+    ProblemStoreError,
+    find_store_root,
+    open_store,
+)
 from raidar.spec.canonical import digest_json
 from raidar.spec.loader import load_experiment
 from raidar.spec.lock import build_lock
@@ -312,7 +319,10 @@ def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     monkeypatch.delenv(ROOT_ENV, raising=False)
-    store = build_fixture_store(tmp_path / "problems")
+    monkeypatch.delenv(VAR_ENV, raising=False)
+    store = build_fixture_store(
+        tmp_path / "lab" / "problems", data_root=tmp_path / "var" / "problems"
+    )
     record_validation(store, POSITIVE_REF, tmp_path / "validate")
     experiment_dir = tmp_path / "examples" / "pilot"
     experiment_dir.mkdir(parents=True)
@@ -324,7 +334,13 @@ def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
         RegistryRef.parse(RefKind.PROBLEM, POSITIVE_REF), base_dir=experiment_dir
     )
     assert resolved.metadata["checkpoints"] == 2
-    assert find_store_root(experiment_dir) == (tmp_path / "problems").resolve()
+    assert find_store_root(experiment_dir) == (tmp_path / "lab" / "problems").resolve()
+    assert open_store(experiment_dir) == ProblemStore(
+        (tmp_path / "lab" / "problems").resolve(), tmp_path.resolve() / "var" / "problems"
+    )
+    monkeypatch.setenv(VAR_ENV, str(tmp_path / "relocated"))
+    assert open_store(experiment_dir).data == (tmp_path / "relocated" / "problems").resolve()
+    monkeypatch.delenv(VAR_ENV)
     monkeypatch.setenv(ROOT_ENV, str(tmp_path / "elsewhere"))
     assert find_store_root(experiment_dir) == (tmp_path / "elsewhere").resolve()
     monkeypatch.delenv(ROOT_ENV)

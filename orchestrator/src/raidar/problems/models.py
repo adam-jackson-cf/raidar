@@ -47,7 +47,7 @@ class ProblemModel(BaseModel):
 
 
 class SourcePin(ProblemModel):
-    """A source pinned to one git commit and bound to one runtime (``problems/sources.yaml``).
+    """A source pinned to one git commit and bound to one runtime (``lab/problems/sources.yaml``).
 
     A source key is the binding's dataset segment: ``scb`` is the python
     binding of the SCB problems, a ``scb-node-ts`` key would bind the same
@@ -138,7 +138,7 @@ class PackBinding(ProblemModel):
 
 
 class ProblemManifest(ProblemModel):
-    """Committed record of one import (``problems/registry/<name>/<version>.json``)."""
+    """Committed record of one import (``lab/problems/registry/<name>/<version>.json``)."""
 
     kind: Literal["raidar-problem"] = "raidar-problem"
     schema_version: Literal[1] = 1

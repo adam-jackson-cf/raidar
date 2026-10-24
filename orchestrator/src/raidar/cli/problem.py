@@ -13,7 +13,7 @@ from raidar.problems.errata import Disposition, draft_errata, report_entries
 from raidar.problems.importer import import_problem
 from raidar.problems.models import ProblemId, ProblemManifest
 from raidar.problems.source import SourceError
-from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
+from raidar.problems.store import ProblemStore, ProblemStoreError, open_store
 from raidar.problems.validation import (
     Check,
     CheckStatus,
@@ -46,13 +46,13 @@ _STORE_OPTION = click.option(
     "store_root",
     type=click.Path(file_okay=False, path_type=Path),
     default=None,
-    help="Problems store root (default: the nearest problems/ with sources.yaml).",
+    help="Problems store root (default: the nearest lab/problems/ with sources.yaml).",
 )
 _CHECKOUT_OPTION = click.option(
     "--source-checkout",
     type=click.Path(exists=True, file_okay=False, path_type=Path),
     default=None,
-    help="Existing dataset checkout at the pinned commit (default: clone into the store cache).",
+    help="Existing dataset checkout at the pinned commit (default: clone into var/problems/cache).",
 )
 
 
@@ -62,7 +62,7 @@ def register(main: click.Group) -> None:
 
 def _store(store_root: Path | None) -> ProblemStore:
     try:
-        return ProblemStore(store_root.resolve() if store_root else find_store_root(Path.cwd()))
+        return ProblemStore(store_root.resolve()) if store_root else open_store(Path.cwd())
     except ProblemStoreError as exc:
         raise click.ClickException(str(exc)) from exc
 

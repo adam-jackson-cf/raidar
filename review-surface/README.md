@@ -47,7 +47,7 @@ runs/<experiment>/<run>/**           experiment runs (authoritative)
 <assessment store>/**                Assessments of those runs
         │  python -m raidar.review.projection (make review-surface-data)
         ▼
-.tmp/review-projection.json          one schema_version=2 projection (problem, arm, arm_diffs)
+var/tmp/review-projection.json          one schema_version=2 projection (problem, arm, arm_diffs)
         │  scripts/build-review-data.mjs
         ▼
 data/runs.json                       run index records
@@ -77,7 +77,7 @@ Projection mapping (Workshop concept → Raidar source):
 Run the surface through the repo-root `make` targets; `make help` lists them
 under "Review surface" with their arguments, and the root `README.md`
 walkthrough shows the review step for a real run. The labelled synthetic
-fixtures are written under `.tmp/review-fixture/`, never into `experiments/`.
+fixtures are written under `var/tmp/review-fixture/`, never into `lab/experiments/`.
 
 Inside `review-surface/` for development: `npm run dev` (Vite on 5951, proxies
 `/api` to the server on 5950).

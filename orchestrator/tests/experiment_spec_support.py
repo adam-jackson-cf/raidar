@@ -19,20 +19,14 @@ from raidar.spec.references import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-EXPERIMENTS = REPO_ROOT / "experiments"
-PILOT_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guided-pilot" / "experiment.yaml"
-PILOT_ONESHOT = (
-    EXPERIMENTS / "ab-test" / "python__circuit_eval-cp1__guided-pilot" / "experiment.yaml"
-)
+EXPERIMENTS = REPO_ROOT / "lab" / "experiments"
 SMOKE_EXPERIMENT = (
     EXPERIMENTS / "smoke" / "python__circuit_eval-cp1__agent-health" / "experiment.yaml"
 )
 AGENTS_BENCHMARK = (
     EXPERIMENTS / "benchmark" / "python__circuit_eval-cp1__agents" / "experiment.yaml"
 )
-GUIDED_R3_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guided-r3" / "experiment.yaml"
-GUARDRAILS_EXPERIMENT = EXPERIMENTS / "ab-test" / "python__forge__guardrails" / "experiment.yaml"
-MECHANICS_SMOKE = EXPERIMENTS / "smoke" / "python__forge__mechanics-v1" / "experiment.yaml"
+MECHANICS_SMOKE = EXPERIMENTS / "smoke" / "python__forge__mechanics" / "experiment.yaml"
 
 BASE_EXPERIMENT: dict[str, Any] = {
     "schema_version": 2,

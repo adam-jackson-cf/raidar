@@ -7,8 +7,9 @@ import shutil
 
 import click
 
-from raidar.cli.shared import ORCHESTRATOR_ROOT, REPO_ROOT, python_cmd, run_or_raise
+from raidar.cli.shared import ORCHESTRATOR_ROOT, python_cmd, run_or_raise
 from raidar.core import repo_state
+from raidar.core.paths import REPO_ROOT
 
 # Experiment-model integration paths: spec -> plan -> Harbor trial -> oracle -> projection.
 INTEGRATION_TEST_TARGETS = [

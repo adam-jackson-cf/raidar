@@ -1,4 +1,4 @@
-"""Schema v2: experiment kinds (KIND*) and naming (NAME1, NAME2)."""
+"""Experiment schema rules: kinds (KIND*) and naming (NAME1, NAME2)."""
 
 from __future__ import annotations
 
@@ -14,11 +14,7 @@ from raidar.spec.validation import SpecValidationError, spec_warnings
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     EXPERIMENTS,
-    GUARDRAILS_EXPERIMENT,
-    GUIDED_R3_EXPERIMENT,
     MECHANICS_SMOKE,
-    PILOT_EXPERIMENT,
-    PILOT_ONESHOT,
     SMOKE_EXPERIMENT,
     experiment_document,
     write_experiment,
@@ -54,19 +50,9 @@ def _benchmark(**changes: Any) -> dict[str, Any]:
 # ---- kinds ---------------------------------------------------------------------
 
 
-def test_every_committed_experiment_is_schema_v2_in_its_kind_directory() -> None:
+def test_every_committed_experiment_is_in_its_kind_directory() -> None:
     files = sorted(EXPERIMENTS.glob("*/*/experiment.yaml"))
-    assert files == sorted(
-        [
-            PILOT_EXPERIMENT,
-            PILOT_ONESHOT,
-            SMOKE_EXPERIMENT,
-            AGENTS_BENCHMARK,
-            GUIDED_R3_EXPERIMENT,
-            GUARDRAILS_EXPERIMENT,
-            MECHANICS_SMOKE,
-        ]
-    )
+    assert files == sorted([SMOKE_EXPERIMENT, AGENTS_BENCHMARK, MECHANICS_SMOKE])
     for path in files:
         spec = load_experiment(path).spec
         assert (path.parents[1].name, path.parent.name) == (spec.kind, spec.id)

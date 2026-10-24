@@ -38,6 +38,7 @@ from pathlib import Path
 
 import yaml
 
+from raidar.core.paths import tmp_root
 from raidar.execution.assessment import rescore_config
 from raidar.review.projection.fixture_assessments import (
     LintFinding,
@@ -65,7 +66,7 @@ JOBS_DIR = "jobs"
 REVIEW_ONLY_DIR = "review-only"
 POLICY_MIX_PROBLEM = "synthetic/policy-mix@1"
 _STARTED = datetime(2026, 1, 1, tzinfo=UTC)
-_SCORERS = ["correctness@1", "code-quality@1", "resource-usage@1"]
+_SCORERS = ["correctness@1", "code-quality@3", "resource-usage@1"]
 _LEDGER = (
     "import os\n\n\n"
     "def balance(entries):\n"
@@ -448,7 +449,7 @@ def generate_review_fixture(dest: Path) -> list[Path]:
 
 
 def main() -> None:
-    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("../.tmp/review-fixture")
+    dest = Path(sys.argv[1]) if len(sys.argv) > 1 else tmp_root() / "review-fixture"
     for job_dir in generate_review_fixture(dest.resolve()):
         print(f"Wrote synthetic run: {job_dir}")
 

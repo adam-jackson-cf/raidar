@@ -158,18 +158,18 @@ def test_agent_setup_auth_fails_when_login_does_not_create_auth_json(
 
 def test_generated_artifact_paths_filters_prefixes() -> None:
     paths = [
-        "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
-        "jobs/smoke/20260930T000000Z/job.json",
-        "problems/registry/scb/forge/38d627ecf668.json",
+        "var/jobs/smoke/20260930T000000Z/job.json",
+        "var/stores/example/assessments/ab/abcd.json",
+        "lab/problems/registry/scb/forge/38d627ecf668.json",
         "orchestrator/src/raidar/cli.py",
-        "experiments/ab-test/python__forge__guided-pilot/experiment.yaml",
+        "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
     ]
 
     matches = generated_artifact_paths(paths)
 
     assert matches == [
-        "experiments/operational_smoke/hello-world-smoke/runs/run-01/run.json",
-        "jobs/smoke/20260930T000000Z/job.json",
+        "var/jobs/smoke/20260930T000000Z/job.json",
+        "var/stores/example/assessments/ab/abcd.json",
     ]
 
 
@@ -642,12 +642,12 @@ def test_experiment_assess_rescores_the_run_trials_with_the_named_scorers(tmp_pa
         "experiment-assess",
         f"JOB={tmp_path}",
         "STORE=.tmp/store",
-        "SCORERS=correctness@1 code-quality@1",
+        "SCORERS=correctness@1 code-quality@3",
         "REPLAY=1",
     )
 
     assert result.returncode == 0, result.stderr
     (assess_args,) = _raidar_lines(result.stdout, "assess")
     assert assess_args.startswith(f'--rescore "{tmp_path}/trials" --store ".tmp/store"')
-    assert '--scorer "correctness@1" --scorer "code-quality@1"' in assess_args
+    assert '--scorer "correctness@1" --scorer "code-quality@3"' in assess_args
     assert "--replay" in assess_args

@@ -1,6 +1,6 @@
 """The problems store: committed pins and manifests, generated task content.
 
-Layout (repo-root ``problems/``)::
+Committed layout (``lab/problems/``)::
 
     sources.yaml                               dataset pins (committed)
     registry/<dataset>/<problem>/<version>.json  ProblemManifest (committed)
@@ -9,15 +9,19 @@ Layout (repo-root ``problems/``)::
                                                its current manifest (F13)
     registry/.../<version>.errata.yaml         optional pre-registered errata (committed);
                                                the lock pins its sha256
-    store/<dataset>/<problem>/<version>/       generated, gitignored:
+
+Generated layout (``var/problems/``, git-ignored; ``RAIDAR_VAR`` relocates ``var/``)::
+
+    store/<dataset>/<problem>/<version>/
         task/        agent-visible Harbor task (no hidden tests, no solutions)
         oracle/      host-only verifier bundle (hidden tests)
         references/  host-only reference payload per step (validation only)
     cache/                                     pinned dataset checkouts and
-                                               infra-failed validation attempts, gitignored
+                                               infra-failed validation attempts
 
-``RAIDAR_PROBLEMS_ROOT`` overrides discovery; otherwise the first ancestor of
-the start directory holding ``problems/sources.yaml`` wins.
+``RAIDAR_PROBLEMS_ROOT`` names one directory holding both layouts (a self-contained
+store); otherwise the first ancestor of the start directory holding
+``lab/problems/sources.yaml`` wins and its ``var/problems/`` holds the generated part.
 """
 
 from __future__ import annotations
@@ -31,6 +35,7 @@ from typing import Any
 import yaml
 from pydantic import ValidationError
 
+from raidar.core.paths import var_root
 from raidar.problems.content import content_digest, hidden_content_in_task
 from raidar.problems.errata import ERRATA_SUFFIX, ErrataError, LoadedErrata, load_errata
 from raidar.problems.models import ProblemId, ProblemManifest, SourcePin
@@ -42,7 +47,7 @@ from raidar.problems.validation import (
 from raidar.verifier.bundle import VerifierBundle, load_bundle
 
 ROOT_ENV = "RAIDAR_PROBLEMS_ROOT"
-STORE_DIR_NAME = "problems"
+STORE_DIR = Path("lab") / "problems"
 SOURCES_FILE = "sources.yaml"
 
 
@@ -50,17 +55,31 @@ class ProblemStoreError(ValueError):
     """The store is missing, malformed, or its content does not match a manifest."""
 
 
+def _discover(start: Path) -> tuple[Path, Path]:
+    """The committed store root and the repository root above ``start``."""
+    for directory in (start.resolve(), *start.resolve().parents):
+        candidate = directory / STORE_DIR
+        if (candidate / SOURCES_FILE).is_file():
+            return candidate, directory
+    raise ProblemStoreError(
+        f"no {STORE_DIR / SOURCES_FILE} above {start}; set {ROOT_ENV} to the problems store"
+    )
+
+
 def find_store_root(start: Path) -> Path:
     override = os.environ.get(ROOT_ENV)
     if override:
         return Path(override).resolve()
-    for directory in (start.resolve(), *start.resolve().parents):
-        candidate = directory / STORE_DIR_NAME
-        if (candidate / SOURCES_FILE).is_file():
-            return candidate
-    raise ProblemStoreError(
-        f"no {STORE_DIR_NAME}/{SOURCES_FILE} above {start}; set {ROOT_ENV} to the problems store"
-    )
+    return _discover(start)[0]
+
+
+def open_store(start: Path) -> ProblemStore:
+    """The problems store for an experiment directory (see the module docstring)."""
+    override = os.environ.get(ROOT_ENV)
+    if override:
+        return ProblemStore(Path(override).resolve())
+    root, repo = _discover(start)
+    return ProblemStore(root, data_root=var_root(repo) / "problems")
 
 
 @dataclass(frozen=True)
@@ -79,6 +98,12 @@ class ImportedProblem:
 @dataclass(frozen=True)
 class ProblemStore:
     root: Path
+    data_root: Path | None = None
+
+    @property
+    def data(self) -> Path:
+        """Where generated content and caches live (``root`` itself when not split)."""
+        return self.root if self.data_root is None else self.data_root
 
     def sources(self) -> dict[str, SourcePin]:
         path = self.root / SOURCES_FILE
@@ -153,10 +178,10 @@ class ProblemStore:
         return sorted(found, key=str)
 
     def content_dir(self, problem: ProblemId) -> Path:
-        return self.root / "store" / problem.name / problem.version
+        return self.data / "store" / problem.name / problem.version
 
     def cache_dir(self) -> Path:
-        return self.root / "cache"
+        return self.data / "cache"
 
     def load_manifest(self, problem: ProblemId) -> ProblemManifest:
         path = self.manifest_path(problem)

@@ -1,4 +1,4 @@
-"""Deterministic ``ledger/README.md``: faults and remedies by status, with links."""
+"""Deterministic ``lab/ledger/README.md``: faults and remedies by status, with links."""
 
 from __future__ import annotations
 

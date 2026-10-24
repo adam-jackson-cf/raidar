@@ -7,16 +7,10 @@ from pathlib import Path
 
 import click
 
-# Generated runtime output that must never show up as a tracked change: jobs, Assessment
-# stores, analysis output and the legacy data some checkouts keep under experiments/.
-# Experiment definitions (experiments/<kind>/) are tracked.
-ARTIFACT_CHANGE_PREFIXES = (
-    "jobs/",
-    "stores/",
-    "analysis/",
-    "experiments/research_loops/",
-    "experiments/operational_smoke/",
-)
+# Generated runtime output (``var/``: jobs, Assessment stores, analysis, problem content,
+# scratch) must never show up as a tracked change. Experiment definitions under
+# ``lab/`` are tracked.
+ARTIFACT_CHANGE_PREFIXES = ("var/",)
 
 
 def repo_paths_from_git_cmd(args: list[str]) -> list[str]:

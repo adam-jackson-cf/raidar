@@ -12,9 +12,10 @@ from raidar.spec.factor_guard import check_factors
 from raidar.spec.loader import UNSET, CliOverrides, load_experiment, parse_assignment
 from raidar.spec.validation import SpecValidationError
 from tests.experiment_spec_support import (
-    PILOT_EXPERIMENT,
-    PILOT_ONESHOT,
+    AGENTS_BENCHMARK,
+    MECHANICS_SMOKE,
     SHARED_FRAMING,
+    SMOKE_EXPERIMENT,
     experiment_document,
     write_experiment,
 )
@@ -26,13 +27,14 @@ def _issues(path: Path, overrides: CliOverrides | None = None) -> dict[str, str]
     return {issue.loc: issue.message for issue in caught.value.issues}
 
 
-@pytest.mark.parametrize("pilot", [PILOT_EXPERIMENT, PILOT_ONESHOT])
-def test_validate_command_accepts_pilot_experiments(pilot: Path) -> None:
-    result = CliRunner().invoke(main, ["validate", str(pilot)])
+@pytest.mark.parametrize("committed", [MECHANICS_SMOKE, SMOKE_EXPERIMENT, AGENTS_BENCHMARK])
+def test_validate_command_accepts_committed_experiments(committed: Path) -> None:
+    result = CliRunner().invoke(main, ["validate", str(committed)])
+    scorers = len(load_experiment(committed).spec.assessment.scorers)
 
     assert result.exit_code == 0, result.output
     assert "Experiment validation passed." in result.output
-    assert "scorer references: 4 (resolver available)" in result.output
+    assert f"scorer references: {scorers} (resolver available)" in result.output
 
 
 def test_invalid_file_reports_every_error_at_its_field(tmp_path: Path) -> None:
@@ -341,10 +343,10 @@ def test_set_override_can_replace_a_list_item(tmp_path: Path) -> None:
     path = write_experiment(tmp_path, experiment_document())
 
     spec = load_experiment(
-        path, CliOverrides(assignments=("assessment.scorers.0=code-quality@1",))
+        path, CliOverrides(assignments=("assessment.scorers.0=code-quality@3",))
     ).spec
 
-    assert spec.assessment.scorers == ("code-quality@1",)
+    assert spec.assessment.scorers == ("code-quality@3",)
 
 
 def test_verdict_thresholds_are_pinned_in_the_analysis_block(tmp_path: Path) -> None:

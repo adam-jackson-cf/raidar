@@ -16,8 +16,9 @@ from raidar.spec.loader import load_experiment
 from raidar.spec.schema import ProtocolSpec
 from raidar.spec.validation import SpecValidationError
 from tests.experiment_spec_support import (
-    GUARDRAILS_EXPERIMENT,
-    PILOT_EXPERIMENT,
+    AGENTS_BENCHMARK,
+    MECHANICS_SMOKE,
+    SMOKE_EXPERIMENT,
     experiment_document,
     write_experiment,
 )
@@ -30,12 +31,15 @@ def test_the_default_is_omitted_from_every_dump_and_offline_is_kept() -> None:
     assert ProtocolSpec.model_validate(offline.model_dump(mode="json")) == offline
 
 
-def test_committed_experiments_dump_it_only_when_they_set_it() -> None:
-    pilot = load_experiment(PILOT_EXPERIMENT).spec.to_json()
-    guardrails = load_experiment(GUARDRAILS_EXPERIMENT).spec.to_json()
+def test_committed_experiments_dump_it_only_when_they_set_it(tmp_path: Path) -> None:
+    for path in (MECHANICS_SMOKE, SMOKE_EXPERIMENT, AGENTS_BENCHMARK):
+        assert "verifier_coverage" not in load_experiment(path).spec.to_json()["protocol"]
 
-    assert "verifier_coverage" not in pilot["protocol"]
-    assert guardrails["protocol"]["verifier_coverage"] == "offline"
+    document = experiment_document(
+        protocol={"verifier_coverage": "offline"}, assessment={"scorers": ["correctness@1"]}
+    )
+    loaded = load_experiment(write_experiment(tmp_path, document))
+    assert loaded.spec.to_json()["protocol"]["verifier_coverage"] == "offline"
 
 
 @pytest.mark.parametrize(

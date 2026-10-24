@@ -46,7 +46,7 @@ FIXTURE_BASE_IMAGE = (
 POSITIVE_REF = f"fixture/adder@{FIXTURE_VERSION}"
 NEGATIVE_REF = f"fixture/adder_negative@{FIXTURE_VERSION}"
 ONESHOT_REF = f"fixture/adder.checkpoint_1@{FIXTURE_VERSION}"
-COMMITTED_FIXTURE = Path(__file__).resolve().parents[2] / "problems" / "fixtures" / "adder"
+COMMITTED_FIXTURE = Path(__file__).resolve().parents[2] / "lab" / "problems" / "fixtures" / "adder"
 SOURCES_YAML = f"""# Test fixture store (orchestrator/tests/problems_support.py builds it).
 sources:
   fixture:
@@ -149,10 +149,10 @@ def _write_problem(store: ProblemStore, name: str, *, ref_one_has_mul: bool, one
     )
 
 
-def build_fixture_store(root: Path) -> ProblemStore:
+def build_fixture_store(root: Path, data_root: Path | None = None) -> ProblemStore:
     root.mkdir(parents=True, exist_ok=True)
     (root / "sources.yaml").write_text(SOURCES_YAML)
-    store = ProblemStore(root)
+    store = ProblemStore(root, data_root)
     _write_problem(store, "fixture/adder", ref_one_has_mul=False, oneshot=False)
     _write_problem(store, "fixture/adder_negative", ref_one_has_mul=True, oneshot=False)
     _write_problem(store, "fixture/adder.checkpoint_1", ref_one_has_mul=False, oneshot=True)

@@ -6,11 +6,11 @@ from pathlib import Path
 
 import click
 
-from raidar.cli.shared import REPO_ROOT
+from raidar.core.paths import lab_root
 from raidar.ledger import index
 from raidar.ledger.check import check_ledger, load_ledger
 
-LEDGER_ROOT = REPO_ROOT / "ledger"
+LEDGER_ROOT = lab_root() / "ledger"
 
 
 def register(main: click.Group) -> None:

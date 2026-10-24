@@ -32,7 +32,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from raidar.problems.models import ProblemId
-from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
+from raidar.problems.store import ProblemStore, ProblemStoreError, open_store
 from raidar.spec.references import (
     RefKind,
     RegistryRef,
@@ -46,7 +46,7 @@ class ProblemResolver:
     """Resolve ``<dataset>/<problem>[.<checkpoint>]@<version>`` against a problems store.
 
     ``store_root`` pins the store; when unset the store is discovered from the
-    experiment's directory (see ``raidar.problems.store.find_store_root``).
+    experiment's directory (see ``raidar.problems.store.open_store``).
     """
 
     store_root: Path | None = None
@@ -58,7 +58,7 @@ class ProblemResolver:
     def resolve(self, ref: RegistryRef, *, base_dir: Path) -> ResolvedReference:
         problem = ProblemId.from_ref(ref)
         try:
-            store = ProblemStore(self.store_root or find_store_root(base_dir))
+            store = ProblemStore(self.store_root) if self.store_root else open_store(base_dir)
             manifest = store.load_manifest(problem)
             errata = store.load_errata(problem, manifest)
         except ProblemStoreError as exc:

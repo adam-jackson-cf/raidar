@@ -11,12 +11,13 @@ import click
 
 from raidar.cli.experiment_spec import _load
 from raidar.cli.target_options import job_target, run_guarded, target_option
+from raidar.core.paths import jobs_root
 from raidar.execution.agent_config import AGENT_OVERRIDES, AgentOverride
 from raidar.execution.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.execution.run import default_job_id, run_job
 from raidar.execution.run_checks import RunRefusedError, prepare_run
 from raidar.packs.drift import LockedPackError, lock_runtime_pack
-from raidar.problems.store import ProblemStore, ProblemStoreError, find_store_root
+from raidar.problems.store import ProblemStore, ProblemStoreError, open_store
 from raidar.spec.lock import (
     LockError,
     StaleLockError,
@@ -113,7 +114,7 @@ def _build(options: dict[str, Any]) -> tuple[ExperimentPlan, ProblemStore]:
     lock = _current_lock(loaded, options["lock_path"] or default_lock_path(loaded.path))
     override: AgentOverride | None = options["agent_override"]
     try:
-        store = ProblemStore(find_store_root(loaded.base_dir))
+        store = open_store(loaded.base_dir)
         plan = build_plan(
             loaded,
             lock,
@@ -176,7 +177,7 @@ def plan_command(as_json: bool, **options: Any) -> None:
 @click.option(
     "--jobs-dir",
     type=click.Path(file_okay=False, path_type=Path),
-    default=Path("jobs"),
+    default=jobs_root(),
     show_default=True,
     help="Root for job directories (<jobs-dir>/<experiment id>/<job id>/).",
 )

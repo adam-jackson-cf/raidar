@@ -5,8 +5,7 @@
 /orchestrator/ @adamjackson
 /orchestrator/tests/ @adamjackson
 /scripts/ @adamjackson
-/problems/ @adamjackson
-/examples/ @adamjackson
+/lab/ @adamjackson
 /review-surface/ @adamjackson
 /docs/reboot/ @adamjackson
 /Makefile @adamjackson

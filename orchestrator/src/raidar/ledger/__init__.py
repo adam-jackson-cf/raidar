@@ -1,1 +1,1 @@
-"""Tracked fault-category and remedy ledger (`ledger/`)."""
+"""Tracked fault-category and remedy ledger (`lab/ledger/`)."""

@@ -1,6 +1,11 @@
 SHELL := /bin/bash
 
-REPO_TMP_DIR ?= $(CURDIR)/.tmp
+# Generated data root (git-ignored): jobs, Assessment stores, analysis output, imported problem
+# content, scratch. RAIDAR_VAR relocates it; Raidar reads the same variable.
+RAIDAR_VAR ?= $(CURDIR)/var
+override RAIDAR_VAR := $(abspath $(RAIDAR_VAR))
+export RAIDAR_VAR
+REPO_TMP_DIR ?= $(RAIDAR_VAR)/tmp
 REPO_CACHE_DIR ?= $(CURDIR)/.cache
 REPO_UV_CACHE_DIR ?= $(REPO_CACHE_DIR)/uv
 REPO_RUNTIME_ENV := mkdir -p "$(REPO_TMP_DIR)" "$(REPO_UV_CACHE_DIR)" && env \
@@ -64,11 +69,11 @@ LOCK_CHECK ?=
 TIMEOUT_SEC ?=
 
 # Experiment-path smoke workflow: the smoke experiment (kind smoke) and the agent benchmark
-# (kind benchmark) are locked under .tmp/smoke with the target's overrides and run through
+# (kind benchmark) are locked under var/tmp/smoke with the target's overrides and run through
 # Harbor (Docker; the TARGET target).
-SMOKE_EXPERIMENT ?= experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
-SMOKE_AGENTS_EXPERIMENT ?= experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml
-SMOKE_JOBS_DIR ?= $(CURDIR)/jobs
+SMOKE_EXPERIMENT ?= lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
+SMOKE_AGENTS_EXPERIMENT ?= lab/experiments/benchmark/python__circuit_eval-cp1__agents/experiment.yaml
+SMOKE_JOBS_DIR ?= $(RAIDAR_VAR)/jobs
 SMOKE_LOCK_DIR ?= $(REPO_TMP_DIR)/smoke
 SMOKE_ATTEMPTS ?= 1
 SMOKE_CONCURRENCY ?= 1
@@ -120,6 +125,7 @@ AGENT_SMOKE_EFFECTIVE_VERSION = $(or $(AGENT_VERSION),$(AGENT_SMOKE_VERSION_$(AG
 	review-fixture-synthetic \
 	review-surface-data review-surface-build review-surface-serve review-surface-test \
 	review-surface-quality-data quality-fixture-synthetic \
+	structure-check release-archive \
 	quality
 
 define require_var
@@ -140,6 +146,9 @@ help:
 	@echo "  make codex-auth-setup [DEVICE_AUTH=1]                 Create or validate file-backed Codex ChatGPT auth"
 	@echo "  make harbor-cleanup [JOB=<job-dir>] [DRY_RUN=1]        Remove trial environments a stopped job left behind"
 	@echo "  make quality                                           Run repo quality gates"
+	@echo "  make structure-check                                   Check the repository layout (no versions in names, root and package allowlists, depth); part of make quality"
+	@echo "  make release-archive REF=<name>@<N>                    Tag archive/<name>@<N> at HEAD before editing a released scorer or component in place (refuses an existing tag)"
+	@echo "  Generated data lives under var/ (git-ignored; RAIDAR_VAR=<dir> relocates it): jobs, stores, analysis, problems, tmp"
 	@echo "  Secrets: execute/smoke/assess/jev targets inject Infisical (project mac-os-cf, env dev) when the infisical"
 	@echo "  CLI is logged in, else read orchestrator/.env. [SECRETS=auto|infisical|dotenv] [INFISICAL_ENV=dev]"
 	@echo ""
@@ -155,7 +164,7 @@ help:
 	@echo "  make problem-list                                      List registered problems with validation and import state"
 	@echo "  make problem-info PROBLEM=scb/forge@38d627ecf668       Show one problem's steps, source pin, pack binding and validation"
 	@echo "  make problem-import PROBLEM=scb/forge@38d627ecf668 [SOURCE_CHECKOUT=path] [UPDATE=1]"
-	@echo "                                                        Import a pinned problem binding (task + host-only verifier bundle) into problems/"
+	@echo "                                                        Import a pinned problem binding (task + host-only verifier bundle) into var/problems/ (pins and manifests: lab/problems/)"
 	@echo "  make problem-validate PROBLEM=scb/forge@38d627ecf668 [ENGINE=direct|harbor] [NATIVE_RUNNER=path] [REPEATS=3] [CONCURRENCY=4] [AUDIT=0] [AUDIT_ONLY=1]"
 	@echo "                                                        Verifier-validate an imported problem and write its report, with the"
 	@echo "                                                        spec-determinacy audit (AUDIT_ONLY=1: audit only, into the committed report)"
@@ -172,18 +181,18 @@ help:
 	@echo "                                                        control (Docker target, PyPI; not in make quality)"
 	@echo ""
 	@echo "Experiments:"
-	@echo "  make experiment-init EXPERIMENT=experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
+	@echo "  make experiment-init EXPERIMENT=lab/experiments/ab-test/<id>/experiment.yaml [PROBLEM=<ref>] [EXPERIMENT_ID=]"
 	@echo "                                                        Start a new ab-test: two-arm starter (baseline vs rules-file) plus stub rules file"
-	@echo "  make experiment-validate EXPERIMENT=experiments/<kind>/<id>/experiment.yaml [EXPERIMENT_SET='analysis.attempts=3']"
+	@echo "  make experiment-validate EXPERIMENT=lab/experiments/<kind>/<id>/experiment.yaml [EXPERIMENT_SET='analysis.attempts=3']"
 	@echo "                                                        Validate an experiment.yaml (schema, kind and naming rules, factor guard)"
 	@echo "  make experiment-lock EXPERIMENT=... [LOCK_CHECK=1]     Write (or check, naming stale sections) <experiment>.lock.json; refuses runtime"
 	@echo "                                                        incompatibilities (RT0-RT6); lock_sha256 covers execution inputs only"
-	@echo "  make experiment-locks-check                           Fail unless every experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
-	@echo "  make ledger-check                                     Check ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
-	@echo "  make ledger-index                                     Regenerate ledger/README.md from the records"
+	@echo "  make experiment-locks-check                           Fail unless every lab/experiments/*/*/*.lock.json is current (host Python patch aside); part of make quality"
+	@echo "  make ledger-check                                     Check lab/ledger/ (fault and remedy records, links, status transitions, README index); part of make quality"
+	@echo "  make ledger-index                                     Regenerate lab/ledger/README.md from the records"
 	@echo "  make experiment-plan EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [CONCURRENCY=N] [PLAN_JSON=1]"
 	@echo "                                                        Dry run: list every trial of a locked experiment with its hashes"
-	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=jobs] [JOB_ID=] [DETACH=1] [ALLOW_UNSMOKED=1]"
+	@echo "  make experiment-execute EXPERIMENT=... [LOCK=] [ARM=a] [ATTEMPT=0] [MAX_CHECKPOINTS=N] [AGENT_OVERRIDE=oracle|nop] [CONCURRENCY=N] [JOBS_DIR=var/jobs] [JOB_ID=] [DETACH=1] [ALLOW_UNSMOKED=1]"
 	@echo "                                                        Run a locked experiment through Harbor as one job; writes step results, validity and N1 phases"
 	@echo "                                                        DETACH=1: run it under a supervisor in its own session (survives the launching shell"
 	@echo "                                                        or agent session; pid, log and exit record in <job dir>/detach/); required for long jobs"
@@ -208,7 +217,7 @@ help:
 	@echo "                                                        Report each N1 phase p95 vs its budget plus trial concurrency/contention; breaches are warnings (exit 0) unless PERF_STRICT=1"
 	@echo "  make perf-fixture [PERF_FIXTURE_DIR=<dir>] [PERF_FIXTURE_CONCURRENCY=1]"
 	@echo "                                                        No-LLM fixture experiment (5 attempts x 2 arms) then strict perf check (Docker; builds the pack image if absent; fails, never skips, without Docker)"
-	@echo "  make perf-gate [PERF_GATE_DIR=.tmp/perf-gate]          Enforced N1 overhead gate: perf-fixture at concurrency 1 and 3, strict; fails on any breach (Docker; release/gate check, not in make quality)"
+	@echo "  make perf-gate [PERF_GATE_DIR=var/tmp/perf-gate]       Enforced N1 overhead gate: perf-fixture at concurrency 1 and 3, strict; fails on any breach (Docker; release/gate check, not in make quality)"
 	@echo "  Jev targets below are DORMANT (Jev parked 2026-10-04: both policies off, out of scoring and analysis;"
 	@echo "  kept for history and a future decision; see docs/reboot/requirements.md change log, F7):"
 	@echo "  make jev-shadow-rubric SNAPSHOTS=<checkpoint-dirs> STORE=<assessment-store> [SPECS=<steps-dir>] [WITHIN=artifacts/app] [TRIAL=<id>] [REPLAY_ONLY=1] [OUT=report.json]"
@@ -231,7 +240,7 @@ help:
 	@echo "                                                        [dormant] Fit and freeze the threshold on the calibration split; write mode: enforce + promotion only if it verifies"
 	@echo "                                                        (refused while the scorer's minor bump is pending unless ALLOW_SCORER_BUMP=1)"
 	@echo ""
-	@echo "Smoke (real agent trials of experiments/smoke and the agent benchmark; locks under .tmp/smoke, jobs under jobs/):"
+	@echo "Smoke (real agent trials of lab/experiments/smoke and the agent benchmark; locks under var/tmp/smoke, jobs under var/jobs/):"
 	@echo "  make orchestrator-smoke [SMOKE_ATTEMPTS=1] [SMOKE_CONCURRENCY=1] [TIMEOUT_SEC=]"
 	@echo "                                                        One one-shot trial with codex + gpt-6-luna (low), correctness only"
 	@echo "  make agent-smoke [AGENT=codex PROVIDER=openai MODEL=gpt-6-luna REASONING_EFFORT=low] [AGENT_VERSION=] [TIMEOUT_SEC=]"
@@ -241,7 +250,7 @@ help:
 	@echo "  make smoke-dry-run-check                               Print the smoke command shapes (used by make quality)"
 	@echo ""
 	@echo "Review surface:"
-	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=.tmp/review-fixture]"
+	@echo "  make review-fixture-synthetic [REVIEW_FIXTURE_DIR=var/tmp/review-fixture]"
 	@echo "                                                        Write the labelled synthetic review fixture (job roots + Assessment store)"
 	@echo "  make review-surface-data REVIEW_JOBS_ROOT=<jobs-root>... [REVIEW_STORE=<store>...] [REVIEW_LOCK=<lock>...]"
 	@echo "                                                        Project experiment jobs into review-surface data"
@@ -250,7 +259,7 @@ help:
 	@echo "  make review-surface-test [REVIEW_JOBS_ROOT=... REVIEW_STORE=... REVIEW_LOCK=...]"
 	@echo "                                                        Run the review-surface end-to-end suite (Playwright) on the experiment synthetic"
 	@echo "                                                        fixture plus any given jobs (one REVIEW_STORE for all roots, or one per root)"
-	@echo "  make quality-fixture-synthetic [QUALITY_FIXTURE_DIR=.tmp/quality-fixture]"
+	@echo "  make quality-fixture-synthetic [QUALITY_FIXTURE_DIR=var/tmp/quality-fixture]"
 	@echo "                                                        Write the labelled synthetic Quality fixture (jobs + Assessment store)"
 	@echo "  make review-surface-quality-data [QUALITY_JOBS=\"<jobs-root>...\" QUALITY_STORE=\"<store>...\"] [QUALITY_LOCK=<lock>...]"
 	@echo "                                                        Project Quality element data, each jobs root against the store at the"
@@ -425,10 +434,10 @@ experiment-lock:
 	@$(RAIDAR) lock "$(EXPERIMENT)" $(foreach item,$(EXPERIMENT_SET),--set "$(item)") $(if $(LOCK_CHECK),--check,)
 
 # Every committed experiment lock must match a fresh lock of its experiment, section by section.
-EXPERIMENT_LOCKS := $(sort $(wildcard experiments/*/*/*.lock.json))
+EXPERIMENT_LOCKS := $(sort $(wildcard lab/experiments/*/*/*.lock.json))
 
 experiment-locks-check:
-	@$(if $(EXPERIMENT_LOCKS),,$(error no experiment locks found under experiments/))
+	@$(if $(EXPERIMENT_LOCKS),,$(error no experiment locks found under lab/experiments/))
 	@$(foreach lock,$(EXPERIMENT_LOCKS),$(RAIDAR) lock "$(patsubst %.lock.json,%.yaml,$(lock))" --check --ignore-host-python &&) true
 
 ledger-check:
@@ -454,7 +463,7 @@ experiment-plan:
 # caller's other variables travel in MAKEFLAGS). Poll with make experiment-status JOB=<job dir>.
 DETACH ?=
 LOG_LINES ?= 20
-EXECUTE_JOBS_DIR = $(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(CURDIR)/jobs)
+EXECUTE_JOBS_DIR = $(if $(JOBS_DIR),$(abspath $(JOBS_DIR)),$(RAIDAR_VAR)/jobs)
 DETACH_TOOL := $(REPO_RUNTIME_ENV) uv run --project orchestrator python -m raidar.execution.detach
 
 experiment-execute: pack-build
@@ -656,7 +665,25 @@ agent-smoke: docker-check pack-build
 smoke-agents: docker-check pack-build
 	$(call smoke_run,$(SMOKE_AGENTS_EXPERIMENT),smoke-agents,$(SMOKE_SETS),$(if $(SMOKE_ARM),--arm "$(SMOKE_ARM)",))
 
+# Repository structure rules (no version in names, root and package allowlists, depth limit).
+structure-check:
+	@$(REPO_RUNTIME_ENV) uv run --project orchestrator python scripts/checks/check-structure.py --repo-root "$(CURDIR)"
+
+# The step before editing a released scorer or component in place: pin the current state as
+# an annotated tag so its old behaviour stays recoverable (REF=<name>@<N>, e.g. code-quality@3).
+REF ?=
+
+release-archive:
+	$(call require_var,REF)
+	@echo "$(REF)" | grep -Eq '^[a-z0-9][a-z0-9._-]*@[0-9]+$$' \
+		|| { echo "REF must be <name>@<N> (for example code-quality@3), got '$(REF)'"; exit 1; }
+	@if git rev-parse -q --verify "refs/tags/archive/$(REF)" >/dev/null; then \
+		echo "tag archive/$(REF) already exists; it is never moved"; exit 1; fi
+	@git tag -a "archive/$(REF)" -m "Archive of $(REF) before an in-place edit" HEAD \
+		&& echo "created tag archive/$(REF) at $$(git rev-parse --short HEAD)"
+
 quality:
+	@$(MAKE) --no-print-directory structure-check
 	@$(MAKE) --no-print-directory smoke-dry-run-check
 	@$(MAKE) --no-print-directory experiment-locks-check
 	@$(MAKE) --no-print-directory ledger-check
