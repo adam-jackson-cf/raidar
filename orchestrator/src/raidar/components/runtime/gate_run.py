@@ -27,7 +27,7 @@ from typing import Any
 from harbor.agents.options import AgentOptions
 from pydantic import Field
 
-from raidar.components.runtime.review_loop import PROMPT_ARG_BUDGET, render
+from raidar.components.runtime.review_loop import PROMPT_ARG_BUDGET, quoted_size, render
 from raidar.components.runtime.session_chain import InnerAgentSpec
 from raidar.core.snapshot import SNAPSHOT_EXCLUDES
 
@@ -42,7 +42,6 @@ SIGNAL = "gate_clean_at_step_end"
 # never moves that dir into a session's stage dir, so a report stays with its run.
 RUN_ENV = "RAIDAR_GATE_RUN"
 REPORT_DIR_ENV = "RAIDAR_GATE_REPORT_DIR"
-PROMPT_TEMPLATE_KWARG = "prompt_template_path"
 # Under the workflow scratch dir the per-step reset owns (step_reset.sh
 # RAIDAR_WORKFLOW_DIR), so hooks from one step never survive into the next.
 DEFAULT_WORK_DIR = "/tmp/raidar-review/guardrail-gate"
@@ -417,11 +416,6 @@ def read_gate_run(stdout: str, *, run: int, after: str, mode: GateMode, log: str
 # ---- prompts ---------------------------------------------------------------------------
 
 
-def _quoted_size(text: str) -> int:
-    """Bytes ``text`` takes inside a single-quoted shell word (' becomes '"'"')."""
-    return len(text.encode()) + 4 * text.count("'")
-
-
 def fix_prompt(task: str, gate: GateRun, command: str, timeout_sec: int) -> str:
     """The fix session's prompt; the gate output is cut only to fit the argument limit."""
     event = GATE_EVENTS[gate.mode] % command
@@ -430,19 +424,19 @@ def fix_prompt(task: str, gate: GateRun, command: str, timeout_sec: int) -> str:
     else:
         event += f" failed with exit status {gate.exit_code}"
     tokens = {"TASK": task, "GATE_EVENT": event, "OUTPUT": ""}
-    budget = PROMPT_ARG_BUDGET - _quoted_size(render(FIX_PROMPT, tokens)) - 2
+    budget = PROMPT_ARG_BUDGET - quoted_size(render(FIX_PROMPT, tokens)) - 2
     output = _fit(gate.output or "(no output)", budget)
     return render(FIX_PROMPT, {**tokens, "OUTPUT": output})
 
 
 def _fit(text: str, budget: int) -> str:
     """``text``, cut so its quoted size stays within ``budget`` bytes."""
-    if _quoted_size(text) <= budget:
+    if quoted_size(text) <= budget:
         return text
     marker = "\n... gate output truncated to fit the harness prompt limit ...\n"
-    used = _quoted_size(marker)
+    used = quoted_size(marker)
     for index, char in enumerate(text):
-        used += _quoted_size(char)
+        used += quoted_size(char)
         if used > budget:
             return text[:index] + marker
     return text  # pragma: no cover - the loop returns once over budget

@@ -1,4 +1,4 @@
-"""Compile every arm at ``raidar validate`` / ``raidar lock`` time (plan WS-C C1).
+"""Compile every arm at ``raidar validate`` / ``raidar lock`` time.
 
 An arm whose condition the compiler would reject (unknown or unsupported
 component, invalid ``with``/files, conflicting uses, a harness with no

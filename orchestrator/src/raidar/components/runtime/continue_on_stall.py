@@ -202,12 +202,12 @@ class ContinueOnStallOptions(AgentOptions):
     workspace: str = Field(default=APP_SOURCE, pattern=r"^/[A-Za-z0-9._/-]+$")
 
 
-def _now() -> str:
+def now_iso() -> str:
     return datetime.now(UTC).isoformat()
 
 
 @dataclass
-class _Run:
+class SessionRun:
     """One native session the wrapper ran."""
 
     role: str  # "session" or "continuation"
@@ -244,7 +244,7 @@ class _Observation:
 
 @dataclass
 class _State:
-    runs: list[_Run] = field(default_factory=list)
+    runs: list[SessionRun] = field(default_factory=list)
     first: _Observation | None = None
     continuation: _Observation | None = None
     record: dict[str, Any] = field(default_factory=dict)
@@ -323,7 +323,7 @@ class ContinueOnStallAgent(BaseAgent):
     async def _run_native(
         self, environment: BaseEnvironment, state: _State, role: str, prompt: str
     ) -> None:
-        run = _Run(role=role, logs=".", started_at=_now())
+        run = SessionRun(role=role, logs=".", started_at=now_iso())
         state.runs.append(run)
         native = self._native(self.logs_dir)
         started = time.monotonic()
@@ -420,7 +420,7 @@ class ContinueOnStallAgent(BaseAgent):
         state.record["runs"] = [run.record() for run in state.runs]
         context.metadata = {**(context.metadata or {}), "continue_on_stall": state.record}
 
-    def _run_dir(self, run: _Run) -> Path:
+    def _run_dir(self, run: SessionRun) -> Path:
         return self.logs_dir if run.logs == "." else self.logs_dir / STALL_DIR / run.logs
 
     def populate_context_post_run(self, context: AgentContext) -> None:

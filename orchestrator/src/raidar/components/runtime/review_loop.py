@@ -1,7 +1,6 @@
-"""``review-loop@2`` workflow agent (plan WS-C C4).
+"""``review-loop@2`` workflow agent.
 
-Ported from factory-x-loops ``harnesses/review_loop.py`` (``_drive``/``_run_stage``)
-as a Harbor agent that wraps the arm's own agent. One step
+A Harbor agent that wraps the arm's own agent. One step
 runs implement -> review -> [retry -> review]* inside the step's container,
 each stage a fresh session of the wrapped agent (a new harness process):
 
@@ -36,7 +35,9 @@ each stage a fresh session of the wrapped agent (a new harness process):
 A ``prompt_template_path`` on the wrapped agent (``prompt-wrapper@1``) is
 applied by the loop to the step instruction for the implementer's stages only.
 Harbor would otherwise wrap every stage prompt, telling the reviewer to build
-the program. The reviewer judges against the bare step instruction.
+the program. The reviewer judges against the bare step instruction. The wrapped
+agent may be a session wrapper given by ``import_path``
+(``raidar.components.runtime.session_chain``), which runs every stage.
 """
 
 from __future__ import annotations
@@ -45,6 +46,7 @@ import asyncio
 import json
 import re
 import shlex
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 from typing import Any, ClassVar, cast
@@ -54,7 +56,7 @@ from harbor.agents.options import AgentOptions
 from harbor.environments.base import BaseEnvironment
 from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import Field
 
 from raidar.components.definition.evidence import read_jsonl
 from raidar.components.runtime.session_chain import InnerAgentSpec, create_inner, render_task
@@ -66,7 +68,6 @@ APPROVE, CHANGES = "APPROVE", "CHANGES"
 NO_VERDICT, EMPTY_FEEDBACK = "NO_VERDICT", "EMPTY_FEEDBACK"
 UNUSABLE = (NO_VERDICT, EMPTY_FEEDBACK)
 FALLBACK_REASON = "review_unusable_after_reask"
-PROMPT_TEMPLATE_KWARG = "prompt_template_path"
 # The unusable reply quoted back to the re-asked reviewer (gpt-6-luna's run to ~2 KB).
 MAX_PREVIOUS_REVIEW_CHARS = 20_000
 # A verdict marker, wherever it sits, with optional markdown emphasis or backticks
@@ -223,21 +224,21 @@ def _clip(text: str, limit: int) -> str:
     return text[:limit] + f"\n... reply truncated at {limit} characters ...\n"
 
 
-def _quoted_size(text: str) -> int:
+def quoted_size(text: str) -> int:
     """Bytes ``text`` takes inside a single-quoted shell word (' becomes '"'"')."""
     return len(text.encode()) + 4 * text.count("'")
 
 
 def fit_diff(template: str, tokens: dict[str, str], diff: str) -> str:
     """``diff``, cut so the rendered prompt stays within ``PROMPT_ARG_BUDGET``."""
-    budget = PROMPT_ARG_BUDGET - _quoted_size(render(template, {**tokens, "DIFF": ""})) - 2
-    if _quoted_size(diff) <= budget:
+    budget = PROMPT_ARG_BUDGET - quoted_size(render(template, {**tokens, "DIFF": ""})) - 2
+    if quoted_size(diff) <= budget:
         return diff
     marker = "\n... diff truncated to fit the harness prompt limit ...\n"
-    budget -= _quoted_size(marker)
+    budget -= quoted_size(marker)
     used = 0
     for index, char in enumerate(diff):
-        used += _quoted_size(char)
+        used += quoted_size(char)
         if used > budget:
             return diff[:index] + marker
     return diff  # pragma: no cover - the loop returns once over budget
@@ -274,15 +275,8 @@ def final_message(stage_dir: Path) -> str:
     return _codex_final(codex) if codex.is_file() else ""
 
 
-class InnerAgent(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    name: str = Field(min_length=1, description="Harbor agent name of the wrapped agent")
-    kwargs: dict[str, Any] = Field(default_factory=dict)
-
-
 class ReviewLoopOptions(AgentOptions):
-    inner_agent: InnerAgent
+    inner_agent: InnerAgentSpec
     max_review_rounds: int = Field(default=3, ge=1, le=5)
     component: str = Field(default=COMPONENT)
     # Loop scratch outside the workspace (baseline tree, diffs, implementer's account).
@@ -337,10 +331,11 @@ def sum_usage(contexts: list[AgentContext]) -> dict[str, Any]:
     return totals
 
 
-def usage_gaps(stages: list[_Stage]) -> dict[str, list[str]]:
-    """For each usage field, the stages that did not report it."""
+def usage_gaps(named: Iterable[tuple[str, AgentContext]]) -> dict[str, list[str]]:
+    """For each usage field, the sessions (name, context) that did not report it."""
+    pairs = list(named)
     gaps = {
-        key: [stage.name for stage in stages if getattr(stage.context, key) is None]
+        key: [name for name, context in pairs if getattr(context, key) is None]
         for key in USAGE_FIELDS
     }
     return {key: names for key, names in gaps.items() if names}
@@ -363,21 +358,14 @@ class ReviewLoopAgent(BaseAgent):
     def loop_options(self) -> ReviewLoopOptions:
         return cast(ReviewLoopOptions, self.options)
 
-    @property
-    def prompt_template(self) -> Path | None:
-        value = self.loop_options.inner_agent.kwargs.get(PROMPT_TEMPLATE_KWARG)
-        return Path(str(value)) if value else None
-
-    def _inner_spec(self) -> InnerAgentSpec:
-        inner = self.loop_options.inner_agent
-        return InnerAgentSpec(name=inner.name, kwargs=inner.kwargs)
-
     def _implementer_task(self, instruction: str) -> str:
-        return render_task(self._inner_spec(), instruction)
+        return render_task(self.loop_options.inner_agent, instruction)
 
     def _inner(self, logs_dir: Path) -> BaseAgent:
         """The wrapped agent without its prompt template: the loop applies that itself."""
-        return create_inner(self, self._inner_spec(), logs_dir, model_name=self.model_name)
+        return create_inner(
+            self, self.loop_options.inner_agent, logs_dir, model_name=self.model_name
+        )
 
     @property
     def work_dir(self) -> PurePosixPath:
@@ -556,7 +544,7 @@ class ReviewLoopAgent(BaseAgent):
             "final_verdict": state.rounds[-1]["verdict"] if state.rounds else None,
             "verdicts": state.rounds,
             "stages": [stage.record() for stage in state.stages],
-            "usage_unavailable": usage_gaps(state.stages),
+            "usage_unavailable": usage_gaps((s.name, s.context) for s in state.stages),
             "parses": self._parses,
         }
         context.metadata = {**(context.metadata or {}), "review_loop": record}

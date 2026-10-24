@@ -1,4 +1,4 @@
-"""review-loop@2 workflow agent (plan WS-C C4; gate packet F3).
+"""review-loop@2 workflow agent (gate packet F3).
 
 A scripted inner Harbor agent stands in for the harness and a local-shell
 environment stands in for the container (mounted logs), so the loop's real
@@ -39,6 +39,7 @@ from raidar.components.runtime.review_loop import (
     parse_review,
     render,
 )
+from raidar.components.runtime.session_chain import nest_session_wrapper
 from tests.component_support import PILOT_DIR, write_jsonl
 
 
@@ -206,6 +207,33 @@ def test_changes_then_approve_runs_fresh_sessions_and_bills_every_stage(tmp_path
     assert not (tmp_path / "app" / "reasoning.md").exists()
     outcome = REVIEW_LOOP.probe(_use(), StepEvidence(logs), 0)
     assert outcome.passed, outcome.detail
+
+
+def test_a_session_wrapper_inner_agent_runs_every_stage(tmp_path: Path) -> None:
+    """continue-on-stall nests between the loop and the native agent (``import_path`` inner)."""
+    agent, environment = _agent(tmp_path)
+    wrapped = ReviewLoopAgent(
+        logs_dir=agent.logs_dir,
+        model_name=agent.model_name,
+        environment_logs_dir=agent.environment_logs_dir,
+        inner_agent=nest_session_wrapper(
+            {"name": "tests.test_review_loop_workflow:ScriptedInnerAgent", "kwargs": {}},
+            "raidar.components.runtime.continue_on_stall:ContinueOnStallAgent",
+            {"component": "continue-on-stall@2"},
+        ),
+        work_dir=str(tmp_path / "review"),
+    )
+    ScriptedInnerAgent.replies[:] = ["VERDICT: APPROVE"]
+
+    context = _run(wrapped, environment)
+
+    loop = context.metadata["review_loop"]  # type: ignore[index]
+    assert loop["termination_reason"] == "review_approved"
+    assert [stage["stage"] for stage in loop["stages"]] == ["implement", "review"]
+    assert len(ScriptedInnerAgent.prompts) == 2
+    assert (
+        tmp_path / "logs/review-loop/stage_1_implement/continue-on-stall/continue-on-stall.json"
+    ).is_file()
 
 
 def test_unusable_review_is_reasked_then_ends_the_loop_with_a_valid_trajectory(

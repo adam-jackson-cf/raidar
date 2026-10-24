@@ -1,4 +1,4 @@
-"""Component SDK (plan WS-C): manifests, registry, compiler, per-step reset, probes."""
+"""Component SDK: manifests, registry, compiler, per-step reset, probes."""
 
 from raidar.components.definition.compiled import (
     HARBOR_AGENT_NAMES,

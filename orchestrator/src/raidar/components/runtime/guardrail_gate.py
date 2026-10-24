@@ -124,7 +124,12 @@ from raidar.components.runtime.gate_run import (
     read_gate_run,
     report_dir_for,
 )
-from raidar.components.runtime.review_loop import STEP_LEVEL_LOGS, USAGE_FIELDS, sum_usage
+from raidar.components.runtime.review_loop import (
+    STEP_LEVEL_LOGS,
+    USAGE_FIELDS,
+    sum_usage,
+    usage_gaps,
+)
 from raidar.components.runtime.session_chain import create_inner, render_task
 from raidar.core.snapshot import APP_SOURCE, SNAPSHOT_EXCLUDES, snapshot_files, tree_digest
 
@@ -583,14 +588,6 @@ def _stop_clock(session: _Session, started: float) -> None:
     session.duration_sec = round(time.monotonic() - started, 3)
 
 
-def _usage_gaps(sessions: list[_Session]) -> dict[str, list[str]]:
-    """For each usage field, the sessions that did not report it (review-loop's rule)."""
-    gaps = {
-        key: [s.name for s in sessions if getattr(s.context, key) is None] for key in USAGE_FIELDS
-    }
-    return {key: names for key, names in gaps.items() if names}
-
-
 def _git_evidence(runs: list[GateRun]) -> dict[str, Any] | None:
     attempts = [run for run in runs if run.git is not None]
     if not attempts:
@@ -642,7 +639,7 @@ def gate_record(options: GuardrailGateOptions, state: _GateState) -> dict[str, A
         "git_evidence": _git_evidence(state.runs),
         "repo_created": any(run.repo_created for run in state.runs),
         "stages": [session.record() for session in state.sessions],
-        "usage_unavailable": _usage_gaps(state.sessions),
+        "usage_unavailable": usage_gaps((s.name, s.context) for s in state.sessions),
         PRE_FIX_KEY: [snapshot.record() for snapshot in state.pre_fix],
         AUTOFIX_KEY: _autofix_block(options, state),
     }

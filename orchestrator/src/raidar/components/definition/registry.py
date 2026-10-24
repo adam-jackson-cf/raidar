@@ -1,4 +1,4 @@
-"""Component registry and the lock's ``component`` resolver (plan WS-C C1).
+"""Component registry and the lock's ``component`` resolver.
 
 Definitions are registered under the ``raidar.components`` entry-point group,
 named by their full reference (``rules-file@1``). Entry points are imported
@@ -91,11 +91,11 @@ BUILTIN_COMPONENT_RUNTIMES: dict[str, tuple[str, ...]] = {
     # lint-config@1 delivers ruff/mypy-style Python config files.
     "lint-config@1": ("python",),
 }
-"""Runtimes of the released built-ins, kept beside (not in) their frozen manifests.
+"""Runtimes of built-ins whose manifest has no ``runtimes`` attribute.
 
-A released component's manifest and fingerprint sources are frozen (editing
-them would change its digest), so its runtimes live here; a built-in not
-listed works on any runtime. A third-party definition may set ``runtimes``.
+Changing a component's manifest or fingerprint sources changes its digest, so
+``lint-config@1`` keeps its runtime here rather than on its class; a built-in
+not listed works on any runtime. A definition may set ``runtimes`` itself.
 """
 
 

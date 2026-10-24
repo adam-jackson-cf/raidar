@@ -52,7 +52,7 @@ from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 from pydantic import Field
 
-from raidar.components.runtime.continue_on_stall import _now, _Run
+from raidar.components.runtime.continue_on_stall import SessionRun, now_iso
 from raidar.components.runtime.review_loop import PROMPT_ARG_BUDGET, render, sum_usage
 from raidar.components.runtime.session_chain import InnerAgentSpec, create_inner, render_task
 
@@ -100,7 +100,7 @@ class TransientRetryOptions(AgentOptions):
 
 @dataclass
 class _Attempt:
-    run: _Run
+    run: SessionRun
     waited_sec: float = 0.0
     error_class: str | None = None
 
@@ -124,7 +124,7 @@ def _optional_float(value: object) -> float | None:
 
 def _attempt_from(item: dict[str, Any]) -> _Attempt:
     """An attempt as its record describes it (usage is read again from its logs)."""
-    run = _Run(
+    run = SessionRun(
         role="attempt",
         logs=str(item.get("logs") or "."),
         error=item.get("error") if isinstance(item.get("error"), str) else None,
@@ -184,7 +184,7 @@ class TransientRetryAgent(BaseAgent):
         while True:
             before = await self._names(environment)
             prompt = task if not state.attempts else retry_prompt(task)
-            attempt = _Attempt(_Run(role="attempt", logs=".", started_at=_now()), waited)
+            attempt = _Attempt(SessionRun(role="attempt", logs=".", started_at=now_iso()), waited)
             state.attempts.append(attempt)
             try:
                 await self._run_native(environment, attempt, prompt)
@@ -264,7 +264,7 @@ class TransientRetryAgent(BaseAgent):
         state.record["attempts"] = [item.record() for item in state.attempts]
         context.metadata = {**(context.metadata or {}), "transient_retry": state.record}
 
-    def _run_dir(self, run: _Run) -> Path:
+    def _run_dir(self, run: SessionRun) -> Path:
         return self.logs_dir if run.logs == "." else self.logs_dir / RETRY_DIR / run.logs
 
     def _recorded_state(self) -> _RetryState | None:

@@ -2,11 +2,11 @@
 
 A condition has at most one workflow that wraps the agent (the compiler's
 rule, frozen with every component digest). A *session wrapper*
-(``continue-on-stall@1``) wraps each session of the native agent instead, and
-``raidar.execution.agent_config`` nests it between the workflow wrapper and
-the native agent:
+(``continue-on-stall``, ``transient-retry``) wraps each session of the native
+agent instead, and ``raidar.execution.agent_config`` nests it between the
+workflow wrapper and the native agent:
 
-    workflow wrapper (guardrail-gate@3)  ->  session wrapper  ->  native agent
+    workflow wrapper (guardrail-gate)  ->  session wrapper  ->  native agent
 
 so ``inner_agent`` may name a Harbor agent (``name``) or a wrapper class
 (``import_path``) whose own kwargs carry the next ``inner_agent``. The prompt
