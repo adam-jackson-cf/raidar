@@ -61,12 +61,6 @@ def test_changed_paths_entries_generated_artifacts_and_unstaged_detection(monkey
     monkeypatch.setattr(repo_state, "repo_paths_from_git_cmd", fake_paths)
     monkeypatch.setattr(repo_state, "repo_name_status_from_git_cmd", fake_status)
 
-    assert repo_state.changed_repo_paths(tmp_path) == [
-        "a.py",
-        "b.py",
-        "untracked.py",
-        "var/jobs/e/j/job.json",
-    ]
     assert repo_state.generated_artifact_paths(["a.py", "var/jobs/e/j/job.json"]) == [
         "var/jobs/e/j/job.json"
     ]

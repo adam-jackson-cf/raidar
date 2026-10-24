@@ -28,7 +28,6 @@ errata (``raidar.problems.errata``) is the policy response.
 
 from __future__ import annotations
 
-import hashlib
 import json
 from collections.abc import Mapping, Sequence
 from dataclasses import asdict, dataclass, field
@@ -380,7 +379,6 @@ class ValidationRecord:
     verdict: Verdict
     manifest_sha256: str
     not_run: tuple[str, ...]
-    report_sha256: str
 
     @property
     def missing_required(self) -> tuple[str, ...]:
@@ -393,7 +391,7 @@ class ValidationRecord:
     def lock_metadata(self) -> dict[str, object]:
         """What the lock pins: the verdict and what it did not check.
 
-        ``report_sha256`` is deliberately left out. The report's bytes carry
+        The report's bytes are deliberately not pinned. They carry
         machine- and run-specific fields (Docker context, Harbor version,
         native-runner commit, repeat count, per-run grades), so re-validating
         an unchanged problem elsewhere would change ``lock_sha256`` and orphan
@@ -405,13 +403,11 @@ class ValidationRecord:
 
 def read_validation_record(path: Path) -> ValidationRecord:
     try:
-        raw = path.read_bytes()
-        data = json.loads(raw)
+        data = json.loads(path.read_bytes())
         return ValidationRecord(
             verdict=Verdict(data["verdict"]),
             manifest_sha256=str(data["manifest_sha256"]),
             not_run=tuple(str(name) for name in data.get("not_run", ())),
-            report_sha256=hashlib.sha256(raw).hexdigest(),
         )
     except FileNotFoundError as exc:
         raise ValidationRecordError(f"no validation report at {path}") from exc

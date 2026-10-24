@@ -38,17 +38,6 @@ def repo_name_status_from_git_cmd(args: list[str]) -> list[tuple[str, str]]:
     return entries
 
 
-def changed_repo_paths(repo_root: Path) -> list[str]:
-    staged = repo_paths_from_git_cmd(
-        ["git", "-C", str(repo_root), "diff", "--name-only", "--cached"]
-    )
-    unstaged = repo_paths_from_git_cmd(["git", "-C", str(repo_root), "diff", "--name-only"])
-    untracked = repo_paths_from_git_cmd(
-        ["git", "-C", str(repo_root), "ls-files", "--others", "--exclude-standard"]
-    )
-    return sorted(set(staged + unstaged + untracked))
-
-
 def generated_artifact_paths(paths: list[str]) -> list[str]:
     return sorted(
         path
@@ -79,13 +68,9 @@ def changed_repo_entries(repo_root: Path) -> list[tuple[str, str]]:
 
 
 def assert_no_generated_artifact_changes(repo_root: Path) -> None:
-    changed_entries = changed_repo_entries(repo_root)
-    matches = [
-        path
-        for status, path in changed_entries
-        if not status.startswith("D")
-        and any(path.startswith(prefix) for prefix in ARTIFACT_CHANGE_PREFIXES)
-    ]
+    matches = generated_artifact_paths(
+        [path for status, path in changed_repo_entries(repo_root) if not status.startswith("D")]
+    )
     if not matches:
         return
     listed = "\n".join(f"- {path}" for path in matches)

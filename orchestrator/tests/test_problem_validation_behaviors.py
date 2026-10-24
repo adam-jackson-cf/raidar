@@ -471,7 +471,6 @@ def test_lock_metadata_ignores_run_specific_report_bytes(tmp_path: Path) -> None
 
     one, two = read_validation_record(first), read_validation_record(second)
 
-    assert one.report_sha256 != two.report_sha256
     assert one.lock_metadata() == two.lock_metadata() == {"verdict": "validated", "not_run": []}
 
 

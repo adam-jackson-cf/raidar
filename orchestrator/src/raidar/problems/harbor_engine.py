@@ -3,7 +3,7 @@
 Each repeat of each variant is one Harbor trial of the imported agent-visible
 task with Harbor's ``oracle`` agent, which runs a per-step ``solve.sh`` that
 installs the variant's payload into ``/app``. Verification is the Raidar verifier
-verifier (``VERIFIER_IMPORT_PATH``) with the pre-agent leak guard
+(``VERIFIER_IMPORT_PATH``) with the pre-agent leak guard
 installed, exactly as an experiment trial is wired. Grades are read from the
 host-only ``raidar-oracle/steps/<step>/record.json`` records, never from
 Harbor's aggregated trial reward.
