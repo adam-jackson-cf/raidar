@@ -14,13 +14,13 @@ from typing import Self
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
+from raidar.core.runtimes import ANY_RUNTIME
 from raidar.packs.python.models import ToolExecution
 from raidar.spec.canonical import digest_json
 
 _ID_PATTERN = r"^[a-z0-9][a-z0-9-]*$"
 _METRIC_PATTERN = r"^[a-z0-9][a-z0-9_]*(\.[a-z0-9][a-z0-9_]*)*$"
 _VERSION_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._+-]*$"
-ANY_RUNTIME = "*"
 
 
 class SdkModel(BaseModel):

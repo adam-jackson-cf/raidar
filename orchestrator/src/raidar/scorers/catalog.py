@@ -27,12 +27,13 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from raidar.core.runtimes import ANY_RUNTIME
 from raidar.packs.python.models import ToolLock, load_tool_lock
 from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS
 from raidar.scorers.gate_effort.manifest import GATE_EFFORT
 from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scorers.sdk.context import Scorer
-from raidar.scorers.sdk.manifest import ANY_RUNTIME, ScorerManifest
+from raidar.scorers.sdk.manifest import ScorerManifest
 from raidar.spec.canonical import digest_json
 from raidar.spec.references import (
     RefKind,
