@@ -28,12 +28,12 @@ structure = _load_structure_module()
 @pytest.mark.parametrize(
     "path",
     [
-        "orchestrator/src/raidar/scorers/gate_effort_v10/scorer.py",
+        "orchestrator/src/raidar/scoring/framework/gate_effort_v10/scorer.py",
         "orchestrator/tests/test_code_quality_v3.py",
         "lab/experiments/smoke/python__forge__mechanics-v1/experiment.yaml",
-        "orchestrator/src/raidar/components/runtime/review_loop_v2.py",
+        "orchestrator/src/raidar/subjects/treatments/runtime/review_loop_v2.py",
         "scripts/v2/run.sh",
-        "orchestrator/src/raidar/scorers/v3/x.py",
+        "orchestrator/src/raidar/scoring/framework/v3/x.py",
     ],
 )
 def test_version_suffixes_and_segments_are_refused(path: str) -> None:
@@ -43,8 +43,8 @@ def test_version_suffixes_and_segments_are_refused(path: str) -> None:
 @pytest.mark.parametrize(
     "path",
     [
-        "orchestrator/src/raidar/scorers/code_quality/scorer.py",
-        "orchestrator/src/raidar/verifier/vector.py",
+        "orchestrator/src/raidar/scoring/code_quality/scorer.py",
+        "orchestrator/src/raidar/grading/vector.py",
         "lab/experiments/smoke/python__forge__mechanics/experiment.yaml",
         "lab/experiments/ab-test/x/components/python-guardrails/v8/ruff.toml",
         "lab/components/rules/v2/AGENTS.md",
@@ -56,7 +56,7 @@ def test_unversioned_names_and_component_data_folders_pass(path: str) -> None:
 
 
 def test_a_version_segment_outside_components_is_refused_even_with_data_below_it() -> None:
-    path = "orchestrator/src/raidar/scorers/v2/data.json"
+    path = "orchestrator/src/raidar/scoring/framework/v2/data.json"
     assert structure.version_violations([path]) == [f"version in path name: {path}"]
 
 
@@ -86,32 +86,66 @@ def test_root_allowlist_names_unexpected_directories_and_files() -> None:
 def test_raidar_packages_must_be_on_the_allowlist() -> None:
     paths = [
         f"{RAIDAR}/__init__.py",
-        f"{RAIDAR}/scorers/__init__.py",
+        f"{RAIDAR}/scoring/__init__.py",
         f"{RAIDAR}/commands/run.py",
         f"{RAIDAR}/harness/definitions.py",
+        f"{RAIDAR}/scorers/correctness/scorer.py",
     ]
 
     assert structure.package_violations(paths) == [
         "unexpected raidar package: commands/",
         "unexpected raidar package: harness/",
+        "unexpected raidar package: scorers/",
+    ]
+
+
+def test_every_group_allows_only_its_own_subpackages() -> None:
+    allowed = [
+        f"{RAIDAR}/design/experiments/lock.py",
+        f"{RAIDAR}/design/problems/store.py",
+        f"{RAIDAR}/subjects/treatments/runtime/step_reset.sh",
+        f"{RAIDAR}/engine/trials/driver.py",
+        f"{RAIDAR}/engine/jobs/run.py",
+        f"{RAIDAR}/engine/health/audit.py",
+        f"{RAIDAR}/scoring/judge/policies/code-quality.yaml",
+        f"{RAIDAR}/evaluation/review/projection/spans.py",
+        f"{RAIDAR}/grading/runtime/plugin.py",
+        f"{RAIDAR}/engine/__init__.py",
+    ]
+    refused = [
+        f"{RAIDAR}/engine/execution/run.py",
+        f"{RAIDAR}/scoring/sdk/result.py",
+        f"{RAIDAR}/contracts/paths/more.py",
+        f"{RAIDAR}/cli/sub/command.py",
+        f"{RAIDAR}/evaluation/jobs/run.py",
+    ]
+
+    assert structure.package_violations(allowed) == []
+    assert structure.package_violations(refused) == [
+        "unexpected cli subpackage: cli/sub/",
+        "unexpected contracts subpackage: contracts/paths/",
+        "unexpected engine subpackage: engine/execution/",
+        "unexpected evaluation subpackage: evaluation/jobs/",
+        "unexpected scoring subpackage: scoring/sdk/",
     ]
 
 
 def test_package_depth_is_capped_at_three_below_raidar() -> None:
-    allowed = f"{RAIDAR}/scorers/code_quality/tool_env/module.py"
-    too_deep = f"{RAIDAR}/scorers/code_quality/tool_env/snapshot_tool/graph.py"
+    allowed = f"{RAIDAR}/scoring/code_quality/snapshot_tool/module.py"
+    too_deep = f"{RAIDAR}/scoring/code_quality/snapshot_tool/graph/nodes.py"
 
     assert structure.package_violations([allowed]) == []
     assert structure.package_violations([too_deep]) == [
         "package nests deeper than 3 below raidar/: "
-        f"{RAIDAR}/scorers/code_quality/tool_env/snapshot_tool"
+        f"{RAIDAR}/scoring/code_quality/snapshot_tool/graph"
     ]
 
 
-def test_payload_data_and_the_verifier_runtime_are_exempt_from_the_depth_cap() -> None:
+def test_payload_data_pack_image_and_the_grader_runtime_are_exempt_from_the_depth_cap() -> None:
     paths = [
-        f"{RAIDAR}/components/payloads/python_guardrails/rules/ruff/extra/more/file.toml",
-        f"{RAIDAR}/verifier/runtime/a/b/c/d/plugin.py",
+        f"{RAIDAR}/subjects/treatments/payloads/python_guardrails/rules/ruff/extra/more/file.toml",
+        f"{RAIDAR}/subjects/environments/python/image/Dockerfile",
+        f"{RAIDAR}/grading/runtime/a/b/c/d/plugin.py",
     ]
 
     assert structure.package_violations(paths) == []

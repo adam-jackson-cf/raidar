@@ -1,111 +1,114 @@
 [importlinter]
 root_package = raidar
 
-[importlinter:contract:core-boundary]
-name = Core value types stay independent of every other raidar layer
+[importlinter:contract:cli-boundary]
+name = Nothing imports the CLI layer
 type = forbidden
 source_modules =
-    raidar.core
-forbidden_modules =
-    raidar.agents
-    raidar.analysis
-    raidar.cli
-    raidar.components
-    raidar.execution
-    raidar.jev
-    raidar.review
-    raidar.scorers
-    raidar.spec
-
-[importlinter:contract:scorers-boundary]
-name = Scorers stay independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.scorers
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:spec-boundary]
-name = Experiment spec stays independent of execution and the CLI layer
-type = forbidden
-source_modules =
-    raidar.spec
-forbidden_modules =
-    raidar.execution
-    raidar.cli
-
-[importlinter:contract:packs-boundary]
-name = Runtime packs stay independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.packs
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:verifier-boundary]
-name = Verifier stays independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.verifier
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:problems-boundary]
-name = Problems stay independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.problems
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:components-boundary]
-name = Components stay independent of execution and the CLI layer
-type = forbidden
-source_modules =
-    raidar.components
-forbidden_modules =
-    raidar.execution
-    raidar.cli
-
-[importlinter:contract:jev-boundary]
-name = Jev stays independent of execution, agents, and the CLI layer
-type = forbidden
-source_modules =
-    raidar.jev
-forbidden_modules =
-    raidar.execution
-    raidar.agents
-    raidar.cli
-
-[importlinter:contract:execution-boundary]
-name = Execution stays independent of the CLI layer
-type = forbidden
-source_modules =
-    raidar.execution
+    raidar.contracts
+    raidar.design
+    raidar.subjects
+    raidar.engine
+    raidar.grading
+    raidar.scoring
+    raidar.evaluation
 forbidden_modules =
     raidar.cli
 
-[importlinter:contract:analysis-boundary]
-name = Analysis stays independent of the CLI layer
+[importlinter:contract:contracts-boundary]
+name = Shared contracts stay independent of every stage
 type = forbidden
 source_modules =
-    raidar.analysis
+    raidar.contracts
+forbidden_modules =
+    raidar.cli
+    raidar.design
+    raidar.subjects
+    raidar.engine
+    raidar.grading
+    raidar.scoring
+    raidar.evaluation
+
+[importlinter:contract:design-experiments-boundary]
+name = Experiment design stays independent of the engine and the CLI layer
+type = forbidden
+source_modules =
+    raidar.design.experiments
+forbidden_modules =
+    raidar.engine
+    raidar.cli
+
+[importlinter:contract:design-problems-boundary]
+name = Problems stay independent of the engine, agents, and the CLI layer
+type = forbidden
+source_modules =
+    raidar.design.problems
+forbidden_modules =
+    raidar.engine
+    raidar.subjects.agents
+    raidar.cli
+
+[importlinter:contract:subjects-environments-boundary]
+name = Runtime environments (packs) stay independent of the engine, agents, and the CLI layer
+type = forbidden
+source_modules =
+    raidar.subjects.environments
+forbidden_modules =
+    raidar.engine
+    raidar.subjects.agents
+    raidar.cli
+
+[importlinter:contract:subjects-treatments-boundary]
+name = Treatments (components) stay independent of the engine and the CLI layer
+type = forbidden
+source_modules =
+    raidar.subjects.treatments
+forbidden_modules =
+    raidar.engine
+    raidar.cli
+
+[importlinter:contract:engine-boundary]
+name = The engine stays independent of the CLI layer
+type = forbidden
+source_modules =
+    raidar.engine
 forbidden_modules =
     raidar.cli
 
-[importlinter:contract:review-boundary]
-name = Review projection and quality stay independent of the CLI layer
+[importlinter:contract:grading-boundary]
+name = Grading stays independent of the engine, subjects, and the CLI layer
 type = forbidden
 source_modules =
-    raidar.review
+    raidar.grading
+forbidden_modules =
+    raidar.engine
+    raidar.subjects
+    raidar.cli
+
+[importlinter:contract:scoring-boundary]
+name = Scoring (framework, scorers and the judge) stays independent of the engine, agents, treatments and the CLI layer
+type = forbidden
+source_modules =
+    raidar.scoring
+forbidden_modules =
+    raidar.engine
+    raidar.subjects.agents
+    raidar.subjects.treatments
+    raidar.cli
+
+[importlinter:contract:deterministic-process-checks]
+name = process-compliance decides only deterministically: no Jev import, direct or indirect
+type = forbidden
+source_modules =
+    raidar.scoring.process_checks
+forbidden_modules =
+    raidar.scoring.judge
+
+[importlinter:contract:evaluation-boundary]
+name = Evaluation (analysis, review views, ledger) stays independent of the CLI layer
+type = forbidden
+source_modules =
+    raidar.evaluation
 forbidden_modules =
     raidar.cli
 
@@ -113,20 +116,11 @@ forbidden_modules =
 name = Ledger stays independent of every other raidar layer
 type = forbidden
 source_modules =
-    raidar.ledger
+    raidar.evaluation.ledger
 forbidden_modules =
-    raidar.agents
-    raidar.analysis
     raidar.cli
-    raidar.components
-    raidar.execution
-    raidar.scorers
-    raidar.spec
-
-[importlinter:contract:deterministic-process-checks]
-name = process-compliance decides only deterministically: no Jev import, direct or indirect
-type = forbidden
-source_modules =
-    raidar.scorers.process_checks
-forbidden_modules =
-    raidar.jev
+    raidar.design
+    raidar.subjects
+    raidar.engine
+    raidar.scoring
+    raidar.evaluation.analysis

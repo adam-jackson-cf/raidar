@@ -10,11 +10,10 @@ on:
   pull_request:
     branches: [main, master]
     paths:
-      - "orchestrator/src/raidar/execution/**"
-      - "orchestrator/src/raidar/core/**"
-      - "orchestrator/src/raidar/components/**"
-      - "orchestrator/src/raidar/targets/**"
-      - "orchestrator/src/raidar/packs/**"
+      - "orchestrator/src/raidar/engine/**"
+      - "orchestrator/src/raidar/contracts/**"
+      - "orchestrator/src/raidar/subjects/treatments/**"
+      - "orchestrator/src/raidar/subjects/environments/**"
       - "orchestrator/tests/test_execution_perf_fixture.py"
       - "orchestrator/tests/execution_support.py"
       - "orchestrator/uv.lock"

@@ -206,3 +206,17 @@ There are 8 top-level packages instead of 15, and no package sits deeper than 3 
   - a scorer-parity rescore of the round-1 forge smoke `v1-forge-01` (old store vs new code, identical results);
   - `make perf-gate TARGET=mbp`;
   - `make orchestrator-smoke`.
+
+## 9. Implementation record: round 2 (2026-10-24)
+
+Built on `structure-groupings` (from `origin/main` @ `37adf8b`) as pure moves: 364 files under `orchestrator/src/raidar` in 8 top-level packages, with import paths, dotted strings and docs rewritten by a codemod. No behaviour change.
+
+- **Layout as §8.** `core` → `contracts`; `spec` and `problems` → `design/{experiments,problems}`; `agents`, `components` and `packs` → `subjects/{agents,treatments,environments}`; `targets` → `engine/targets`; `verifier` → `grading`; `scorers/sdk` is folded into `scoring/framework` (flat, no name clashes), each scorer package moves to `scoring/<name>/`, `jev` → `scoring/judge`; `analysis`, `review/{projection,quality}` and `ledger` → `evaluation/`.
+- **Jobs and trials split by what a module operates on.**
+  - `engine/jobs/` (job level): `plan`, `run`, `detach`, `job_context`, `job_manifest`, `run_checks`, `assessment` (the lock's assessment settings) and `credentials` (the preflight over every selected arm before any trial).
+  - `engine/trials/` (one trial): `driver`, `trial_run`, `trial_finish`, `trial_config`, `trial_record`, `environment`, `materialise`, `collect`, `cleanup`, `reaper`, `timestamps`, `agent_config`, `models` (planned trials, step results and trial records) and `progression` (the continue/halt rule over one trial's steps).
+  - The two packages depend on each other at package level (`jobs.run` runs `trials.trial_run`; `trials.trial_run` receives a `jobs.job_context.JobContext` and `trials.trial_config` an `ExperimentPlan`). The module graph has no cycle, so no contract separates them.
+- **Depth.** Nothing needed flattening. `scoring/code_quality/snapshot_tool` and `evaluation/review/projection` sit at depth 3. The Python pack's `subjects/environments/python/image/` (a Docker build context holding one `Dockerfile`, hashed into the image digest) would be depth 4. It is data like `payloads/` and `grading/runtime`, so `make structure-check` exempts it instead of moving the recipe.
+- **Import contracts**, one per stage, with the existing edges kept: `contracts` imports no stage; nothing imports `cli` (new); `scoring` never imports `engine`, `subjects.agents`, `subjects.treatments` or `cli` (the jev contract is folded in); `grading` never imports `engine`, `subjects` or `cli`; `scoring.process_checks` never imports `scoring.judge`. The edge `scoring` → `grading.sandbox` is not enforced: `scoring.framework.rescore` regrades coverage through `grading.regrade`, which uses the sandbox.
+- **Structure check.** `make structure-check` takes the 8 top-level packages and a second-level allowlist per group, and keeps the depth ≤3 rule with the exemptions above.
+- **Re-key.** Scorer implementation digests and the `raidar_spec` toolchain digest changed with the module paths, and the three open experiments were relocked. Entry-point groups follow the package names (`raidar.design.experiments.resolvers`, `raidar.subjects.treatments`).

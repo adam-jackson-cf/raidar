@@ -45,7 +45,7 @@ consistent good/bad vocabulary in `src/utils/verdict.ts`:
 ```
 runs/<experiment>/<run>/**           experiment runs (authoritative)
 <assessment store>/**                Assessments of those runs
-        │  python -m raidar.review.projection (make review-surface-data)
+        │  python -m raidar.evaluation.review.projection (make review-surface-data)
         ▼
 var/tmp/review-projection.json          one schema_version=2 projection (problem, arm, arm_diffs)
         │  scripts/build-review-data.mjs

@@ -7,9 +7,10 @@ Rules (docs/reboot/repo-structure-design.md §3.5):
   version is data (``name@N`` in a manifest). ``v<N>/`` data folders under a
   ``components/`` directory are the one exception;
 * the repository root holds only the allowlisted directories and files;
-* ``orchestrator/src/raidar`` holds only the allowlisted packages;
-* packages nest at most three levels below ``raidar/`` (``components/payloads/**`` data and
-  ``verifier/runtime`` are exempt).
+* ``orchestrator/src/raidar`` holds only the allowlisted stage packages, and each holds only its
+  allowlisted subpackages (§8);
+* packages nest at most three levels below ``raidar/`` (``subjects/treatments/payloads/**`` data,
+  the Python pack's ``image/`` build context and ``grading/runtime`` are exempt).
 
 Paths are the tracked files plus untracked files that are not git-ignored.
 """
@@ -50,30 +51,35 @@ ROOT_FILES = frozenset(
     }
 )
 RAIDAR_PACKAGE_DIR = "orchestrator/src/raidar"
-RAIDAR_PACKAGES = frozenset(
-    {
-        "agents",
-        "analysis",
-        "cli",
-        "components",
-        "core",
-        "execution",
-        "jev",
-        "ledger",
-        "packs",
-        "problems",
-        "review",
-        "scorers",
-        "spec",
-        "targets",
-        "verifier",
-    }
-)
+# Top-level packages (the stages of an evaluation, plus the CLI and the shared contracts), each with
+# the subpackages its group may hold (docs/reboot/repo-structure-design.md §8). Modules sit freely
+# at either level; a group's subpackage outside its set is refused.
+RAIDAR_PACKAGES: dict[str, frozenset[str]] = {
+    "cli": frozenset(),
+    "contracts": frozenset(),
+    "design": frozenset({"experiments", "problems"}),
+    "subjects": frozenset({"agents", "treatments", "environments"}),
+    "engine": frozenset({"targets", "jobs", "trials", "health", "perf"}),
+    "grading": frozenset({"runtime"}),
+    "scoring": frozenset(
+        {
+            "framework",
+            "correctness",
+            "code_quality",
+            "process_checks",
+            "gate_effort",
+            "resource_usage",
+            "judge",
+        }
+    ),
+    "evaluation": frozenset({"analysis", "review", "ledger"}),
+}
 MAX_PACKAGE_DEPTH = 3
 # Data and runtime trees below raidar/ that are not importable package structure.
 DEPTH_EXEMPT_PREFIXES = (
-    "orchestrator/src/raidar/components/payloads/",
-    "orchestrator/src/raidar/verifier/runtime/",
+    "orchestrator/src/raidar/subjects/treatments/payloads/",
+    "orchestrator/src/raidar/subjects/environments/python/image/",
+    "orchestrator/src/raidar/grading/runtime/",
 )
 VERSION_TOKEN = re.compile(r"(?<![A-Za-z0-9])v\d+(?![A-Za-z0-9])")
 DATA_VERSION_SEGMENT = re.compile(r"v\d+")
@@ -136,21 +142,19 @@ def root_violations(paths: list[str]) -> list[str]:
 def package_violations(paths: list[str]) -> list[str]:
     found = []
     prefix = RAIDAR_PACKAGE_DIR + "/"
-    packages: set[str] = set()
     for path in paths:
         if not path.startswith(prefix):
             continue
         parts = PurePosixPath(path[len(prefix) :]).parts
-        if len(parts) > 1:
-            packages.add(parts[0])
+        if len(parts) > 1 and parts[0] not in RAIDAR_PACKAGES:
+            found.append(f"unexpected raidar package: {parts[0]}/")
+        elif len(parts) > 2 and parts[1] not in RAIDAR_PACKAGES[parts[0]]:
+            found.append(f"unexpected {parts[0]} subpackage: {parts[0]}/{parts[1]}/")
         if len(parts) - 1 > MAX_PACKAGE_DEPTH and not path.startswith(DEPTH_EXEMPT_PREFIXES):
             found.append(
                 f"package nests deeper than {MAX_PACKAGE_DEPTH} below raidar/: "
                 f"{PurePosixPath(path).parent}"
             )
-    found.extend(
-        f"unexpected raidar package: {name}/" for name in sorted(packages - RAIDAR_PACKAGES)
-    )
     return sorted(set(found))
 
 
