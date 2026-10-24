@@ -231,6 +231,29 @@ def test_image_definition_names_no_scorer_tool_or_browser() -> None:
     assert build_args(spec)["AGENT_HOME"] == spec.image.agent_home
 
 
+# Deferred cleanup (repo-structure-design.md §11): the image context's bytes name the pack
+# image, and both problem pins bind this release, so its Dockerfile keeps a planning tag
+# ("reboot plan WS-I I1") until the next pack release. That release changes this hash; the
+# test below then fails until the tag is gone. Remove the tag and this exemption together.
+PLANNING_TAG_RELEASE = "2b91a52663e099f2"
+PLANNING_TAG_MARKERS = ("reboot plan", "WS-")
+
+
+def test_the_next_pack_release_drops_the_planning_tags_from_the_recipe() -> None:
+    spec = load_pack_spec()
+    # pack.yaml and tools.lock.yaml are hashed as parsed data, so their comments are free.
+    recipe = [PACK_SPEC_PATH, PACK_SPEC_PATH.with_name("tools.lock.yaml")]
+    if image_lock_hash(spec)[:16] != PLANNING_TAG_RELEASE:
+        recipe += [path for path in spec.context_dir.rglob("*") if path.is_file()]
+    tagged = [
+        f"{path.name}: {marker!r}"
+        for path in recipe
+        for marker in PLANNING_TAG_MARKERS
+        if marker in path.read_text()
+    ]
+    assert tagged == [], "drop the planning tags (and PLANNING_TAG_RELEASE) in this pack release"
+
+
 def test_build_reuses_only_a_labelled_clean_tag_and_force_rebuilds() -> None:
     spec, lock = load_pack_spec(), load_tool_lock()
 
