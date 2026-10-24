@@ -1,4 +1,4 @@
-"""``python -m raidar.evaluation.review.projection.fixture [DEST]`` (``make review-fixture-synthetic``)."""
+"""``python -m raidar.evaluation.review.projection.fixture [DEST]``: the review fixture target."""
 
 import sys
 from pathlib import Path

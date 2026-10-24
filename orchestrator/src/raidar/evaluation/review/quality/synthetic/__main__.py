@@ -1,4 +1,4 @@
-"""``python -m raidar.evaluation.review.quality.synthetic DEST`` (``make quality-fixture-synthetic``)."""
+"""``python -m raidar.evaluation.review.quality.synthetic DEST``: the Quality fixture target."""
 
 import sys
 from pathlib import Path

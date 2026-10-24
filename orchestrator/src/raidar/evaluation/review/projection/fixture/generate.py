@@ -38,6 +38,7 @@ from pathlib import Path
 import yaml
 
 from raidar.contract.canonical import digest_json
+from raidar.design.experiment.lock import default_lock_path
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import rescore_config
 from raidar.evaluation.review.projection.fixture.assessments import LintFinding, QualityPlan
@@ -379,7 +380,10 @@ def _run(design: Design, dest: Path, store: FixtureAssessments, root: str = JOBS
         design.problem,
         [f"checkpoint_{k + 1}" for k in range(len(design.trials[0].outcomes))],
     )
-    _write_json(job_dir / "experiment.lock.json", lock)
+    experiment_file = job_dir / "experiment.yaml"
+    experiment_file.parent.mkdir(parents=True, exist_ok=True)
+    experiment_file.write_text(yaml.safe_dump(spec.to_json(), sort_keys=True))
+    _write_json(default_lock_path(experiment_file), lock)
     # Assessments are keyed under the lock's assessment settings, as a rescore makes them.
     settings = rescore_config(spec.assessment, spec.protocol)
     (job_dir / "assessment-config.yaml").write_text(
@@ -417,7 +421,7 @@ def _run(design: Design, dest: Path, store: FixtureAssessments, root: str = JOBS
             "experiment": design.experiment,
             "job_id": design.experiment,
             "lock_sha256": lock["lock_sha256"],
-            "experiment_file": None,
+            "experiment_file": str(experiment_file),
             "started_at": _STARTED.isoformat(),
             SYNTHETIC_MARKER: True,
         },

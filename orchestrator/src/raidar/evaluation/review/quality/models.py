@@ -196,7 +196,7 @@ class QualityRunDetail(QualityModel):
 
 
 class CurvePoint(QualityModel):
-    """Mean across attempts with the analysis' 95% interval (``low``/``high``; two values needed)."""
+    """Mean across attempts with the analysis's 95% interval (``low``/``high``; two values)."""
 
     checkpoint: str
     n: int

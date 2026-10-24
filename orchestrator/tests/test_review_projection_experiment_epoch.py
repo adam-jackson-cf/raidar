@@ -18,6 +18,7 @@ from harbor.models.trajectories import ToolCall
 
 from raidar.contract.review import ReviewProjectionArtifact, ReviewRunDetail
 from raidar.design.experiment.schema import ExperimentSpec
+from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.evaluation.review.projection import main, merge_review_projections
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.atif import tool_label
@@ -33,7 +34,7 @@ from raidar.evaluation.review.projection.fixture.generate import (
 )
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, headline, policy_shares
 from raidar.evaluation.review.projection.merge import project_experiment_epoch
-from raidar.evaluation.review.projection.sources import JobSourceError, LockIndex, load_job
+from raidar.evaluation.review.projection.sources import LockIndex, load_job
 from raidar.scoring.framework.metrics import DEFAULT_METRIC_REGISTRY
 
 FAILING = "synthetic-bugfix-gpt-5.5-low-04"
@@ -307,8 +308,7 @@ def test_policy_mismatch_marks_every_compared_record_and_diff(
 def test_run_without_its_lock_is_skipped_not_fatal(
     fixture_root: Path, tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    run = tmp_path / "jobs/synthetic-bugfix/synthetic-bugfix"
-    shutil.copytree(fixture_root / "jobs/synthetic-bugfix/synthetic-bugfix", run)
+    run = _copy_run(fixture_root, tmp_path, "synthetic-bugfix")
     shutil.copytree(
         fixture_root / "jobs/synthetic-skill/synthetic-skill",
         tmp_path / "jobs/synthetic-skill/synthetic-skill",
@@ -320,7 +320,7 @@ def test_run_without_its_lock_is_skipped_not_fatal(
     assert "pass it with --lock" in capsys.readouterr().err
     assert skipped.details  # the other run is still projected
     assert not any("bugfix" in detail.run.id for detail in skipped.details)
-    with pytest.raises(JobSourceError, match="pass it with --lock"):
+    with pytest.raises(AnalysisInputError, match="pass it with --lock"):
         load_job(run, LockIndex())
     epoch = project_experiment_epoch([tmp_path / "jobs/synthetic-bugfix"], locks=[moved])
     assert len(epoch.details) == 5 * 3
@@ -423,8 +423,13 @@ def test_tool_spans_are_named_by_their_command(arguments: dict[str, object], lab
 
 
 def _copy_run(fixture_root: Path, tmp_path: Path, experiment: str) -> Path:
+    """A copy of a fixture run whose manifest names the copy's own experiment file and lock."""
     run = tmp_path / "jobs" / experiment / experiment
     shutil.copytree(fixture_root / "jobs" / experiment / experiment, run)
+    manifest = json.loads((run / "job.json").read_text())
+    (run / "job.json").write_text(
+        json.dumps({**manifest, "experiment_file": str(run / "experiment.yaml")})
+    )
     return run
 
 
@@ -514,9 +519,9 @@ def test_lock_whose_body_was_edited_is_refused(fixture_root: Path, tmp_path: Pat
     lock = json.loads(lock_path.read_text())
     lock["assessment"]["metric"]["ref"] = "scb-canonical-oneshot@1"
     lock_path.write_text(json.dumps(lock))
-    with pytest.raises(JobSourceError, match="section assessment does not match its digest"):
+    with pytest.raises(AnalysisInputError, match="section assessment does not match its digest"):
         LockIndex([lock_path])
-    # Found by scanning, the edited lock is skipped and the run is not projected from it.
+    # Found beside the experiment file, the edited lock is refused and the run is not projected.
     assert not project_experiment_epoch([tmp_path / "jobs"]).details
 
 

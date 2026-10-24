@@ -26,7 +26,12 @@ from raidar.contract.trial import (
 )
 from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
 from raidar.engine.job.assessment import lock_rescore_config
-from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir, select_records
+from raidar.evaluation.analysis.sources import (
+    AnalysisInputError,
+    JobDir,
+    default_lock,
+    select_records,
+)
 from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.rescore import rescore_path
@@ -384,6 +389,32 @@ def test_a_valid_rerun_replaces_an_invalid_trial_but_two_valid_ones_conflict() -
     assert replaced == ("run-1/t",)
     with pytest.raises(AnalysisInputError, match="valid in both"):
         select_records([rerun, rerun])
+
+
+def test_a_job_resolves_only_the_lock_its_manifest_names_and_otherwise_asks_for_one(
+    tmp_path: Path,
+) -> None:
+    lock = _lock(["correctness@1"])
+    experiment_file = tmp_path / "pilot.yaml"
+    lock_path = tmp_path / "pilot.lock.json"
+    lock_path.write_text(json.dumps(lock))
+    manifest = {"job_id": "j", "lock_sha256": lock["lock_sha256"]}
+    job_dir = tmp_path / "job"
+    job_dir.mkdir()
+    (job_dir / "job.lock.json").write_text(json.dumps(lock))  # never a fallback
+
+    def job(**extra: object) -> JobDir:
+        return JobDir(job_dir, {**manifest, **extra}, {}, ())
+
+    assert default_lock(job(experiment_file=str(experiment_file))) == lock_path
+    with pytest.raises(AnalysisInputError, match="names no experiment_file; pass --lock"):
+        default_lock(job())
+    lock_path.write_text(json.dumps(_lock(["correctness@1"], experiment="another")))
+    with pytest.raises(AnalysisInputError, match="another experiment.*pass --lock"):
+        default_lock(job(experiment_file=str(experiment_file)))
+    lock_path.unlink()
+    with pytest.raises(AnalysisInputError, match="pass --lock"):
+        default_lock(job(experiment_file=str(experiment_file)))
 
 
 def test_truncated_runs_are_refused_unless_labelled_and_never_pooled(tmp_path: Path) -> None:

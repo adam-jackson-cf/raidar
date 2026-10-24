@@ -17,15 +17,11 @@ from raidar.contract.review import (
     ReviewProjectionArtifact,
     ReviewRunDetail,
 )
+from raidar.evaluation.analysis.sources import AnalysisInputError
 from raidar.evaluation.review.projection.assessments import AssessmentLookup
 from raidar.evaluation.review.projection.comparability import mark_policy_mismatches
 from raidar.evaluation.review.projection.experiment_epoch import EpochProjection, project_sources
-from raidar.evaluation.review.projection.sources import (
-    JobSourceError,
-    LockIndex,
-    discover_job_dirs,
-    load_job,
-)
+from raidar.evaluation.review.projection.sources import LockIndex, discover_job_dirs, load_job
 from raidar.evaluation.review.projection.spans import repo_path
 from raidar.scoring.catalog.builtin import default_scorer_registry
 from raidar.scoring.framework.store import AssessmentStore
@@ -39,7 +35,7 @@ def project_experiment_epoch(
     for job_dir in discover_job_dirs(job_roots):
         try:
             source = load_job(job_dir, index)
-        except JobSourceError as exc:
+        except AnalysisInputError as exc:
             # One unprojectable run (e.g. its lock was overwritten) never aborts the build.
             print(f"Skipping run, lock unavailable: {repo_path(job_dir)}: {exc}", file=sys.stderr)
             continue

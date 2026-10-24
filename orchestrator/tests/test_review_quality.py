@@ -545,22 +545,14 @@ def test_cli_refuses_unpaired_runs_roots_and_stores(fixture_dir: Path) -> None:
         main(["--jobs-root", runs, "--jobs-root", runs, "--store", runs, "--output", "x.json"])
 
 
-@pytest.mark.parametrize("source", ["flag", "run-copy"])
-def test_a_relocked_runs_lock_is_found_by_flag_or_the_runs_own_copy(
-    fixture_dir: Path, tmp_path: Path, source: str
-) -> None:
+def test_a_relocked_runs_lock_is_found_by_flag(fixture_dir: Path, tmp_path: Path) -> None:
     target = _copy(fixture_dir, tmp_path)
     lock = target / "experiment.lock.json"
     executed = tmp_path / "executed.lock.json"
     shutil.copy(lock, executed)
     _lock(target, "scb-canonical-oneshot@1", experiment=f"{EXPERIMENT}-redesigned")
-    locks: tuple[Path, ...] = ()
-    if source == "flag":
-        locks = (executed,)
-    else:
-        shutil.copy(executed, target / "jobs" / EXPERIMENT / RUN_ID / "job.lock.json")
 
-    result = build_quality_projection(target / "jobs", target / "store", locks=locks)
+    result = build_quality_projection(target / "jobs", target / "store", locks=(executed,))
 
     problem = _problem(result)
     assert problem.baseline_arm == "baseline"

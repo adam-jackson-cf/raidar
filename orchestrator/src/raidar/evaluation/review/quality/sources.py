@@ -17,9 +17,8 @@
   shares it says so: a reviewer never labels a decision against another run.
 - The **lock** the run was executed under supplies the baseline arm and the
   headline metric, as the analysis reads them. Candidates, in order: locks
-  given with ``--lock``, the lock next to the ``job.json`` ``experiment_file``
-  (``default_lock_path``), and the locks in the job directory (``job.lock.json``,
-  written by ``raidar run``). A candidate is accepted only when it is a sealed
+  given with ``--lock`` and the lock next to the ``job.json`` ``experiment_file``
+  (``default_lock_path``). A candidate is accepted only when it is a sealed
   lock (``read_lock``) whose ``lock_sha256`` (the digest of its execution
   section, unchanged by scorer or threshold relocks) is the run's. The live
   experiment YAML is never read. Without a matching lock the baseline is
@@ -40,8 +39,8 @@ from typing import Any
 
 from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
-from raidar.design.experiment.lock import LOCK_SUFFIX, default_lock_path
-from raidar.evaluation.analysis.sources import AnalysisInputError, read_lock
+from raidar.design.experiment.lock import default_lock_path
+from raidar.evaluation.analysis.sources import AnalysisInputError, read_lock, read_trial_records
 from raidar.scoring.framework.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.scoring.judge.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
 from raidar.scoring.judge.ledger import current_labels
@@ -123,23 +122,20 @@ def _lock_facts(lock: dict[str, Any], executed: str) -> ExperimentInfo:
     )
 
 
-def _lock_candidates(run: dict[str, Any], job_dir: Path, locks: Sequence[Path]) -> list[Path]:
+def _lock_candidates(run: dict[str, Any], locks: Sequence[Path]) -> list[Path]:
     candidates = list(locks)
     experiment_file = run.get("experiment_file")
     if isinstance(experiment_file, str):
         candidates.append(default_lock_path(Path(experiment_file)))
-    candidates.extend(sorted(job_dir.glob(f"*{LOCK_SUFFIX}")))
     return candidates
 
 
-def _experiment_info(
-    run: dict[str, Any], job_dir: Path, locks: Sequence[Path] = ()
-) -> ExperimentInfo:
+def _experiment_info(run: dict[str, Any], locks: Sequence[Path] = ()) -> ExperimentInfo:
     executed = str(run.get("lock_sha256") or "") or None
     if executed is None:
         return ExperimentInfo(executed, None, None, "job.json names no lock_sha256")
     reasons: list[str] = []
-    for path in _lock_candidates(run, job_dir, locks):
+    for path in _lock_candidates(run, locks):
         if not path.is_file():
             reasons.append(f"no {path.name} found")
             continue
@@ -173,19 +169,18 @@ def discover_trials(jobs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSo
     trials: list[TrialSource] = []
     for job_dir in _job_dirs(jobs_root):
         run = json.loads((job_dir / JOB_MANIFEST).read_text(encoding="utf-8"))
-        experiment = _experiment_info(run, job_dir, locks)
-        for path in sorted((job_dir / TRIAL_RECORDS_DIR).glob("*.json")):
-            record = TrialRecord.model_validate_json(path.read_bytes())
-            trials.append(
-                TrialSource(
-                    jobs_root=jobs_root,
-                    job_dir=job_dir,
-                    job_id=str(run.get("job_id") or job_dir.name),
-                    finished_at=str(run.get("finished_at") or ""),
-                    record=record,
-                    experiment=experiment,
-                )
+        experiment = _experiment_info(run, locks)
+        trials.extend(
+            TrialSource(
+                jobs_root=jobs_root,
+                job_dir=job_dir,
+                job_id=str(run.get("job_id") or job_dir.name),
+                finished_at=str(run.get("finished_at") or ""),
+                record=record,
+                experiment=experiment,
             )
+            for record in read_trial_records(job_dir)
+        )
     return trials
 
 

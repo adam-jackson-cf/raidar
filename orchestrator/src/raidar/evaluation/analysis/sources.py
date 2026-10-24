@@ -24,7 +24,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
+from raidar.contract.job_layout import JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path, lock_integrity_issues
 from raidar.evaluation.analysis.outcomes import PoolingReport
@@ -81,7 +81,7 @@ class JobDir:
         return stored if stored.is_absolute() else self.path / stored
 
 
-def _read_json(path: Path) -> dict[str, Any]:
+def read_json_object(path: Path) -> dict[str, Any]:
     try:
         loaded = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError) as exc:
@@ -91,18 +91,22 @@ def _read_json(path: Path) -> dict[str, Any]:
     return loaded
 
 
-def read_job(job_dir: Path) -> JobDir:
+def read_trial_records(job_dir: Path) -> tuple[TrialRecord, ...]:
     records = []
     for path in sorted((job_dir / TRIAL_RECORDS_DIR).glob("*.json")):
         try:
             records.append(TrialRecord.model_validate_json(path.read_bytes()))
         except ValidationError as exc:
             raise AnalysisInputError(f"invalid trial record {path}: {exc}") from exc
+    return tuple(records)
+
+
+def read_job(job_dir: Path) -> JobDir:
     return JobDir(
         path=job_dir,
-        manifest=_read_json(job_dir / JOB_MANIFEST),
-        plan=_read_json(job_dir / PLAN_FILE),
-        records=tuple(records),
+        manifest=read_json_object(job_dir / JOB_MANIFEST),
+        plan=read_json_object(job_dir / PLAN_FILE),
+        records=read_trial_records(job_dir),
     )
 
 
@@ -115,7 +119,7 @@ def find_job_manifest(target: Path) -> tuple[Path, dict[str, Any]] | None:
     candidate = target.resolve()
     for _ in range(_JOB_DEPTH + 1):
         if (candidate / JOB_MANIFEST).is_file():
-            return candidate, _read_json(candidate / JOB_MANIFEST)
+            return candidate, read_json_object(candidate / JOB_MANIFEST)
         candidate = candidate.parent
     return None
 
@@ -126,7 +130,7 @@ def read_lock(path: Path) -> dict[str, Any]:
     Its ``lock_sha256`` is the digest of its execution section, the identity
     jobs record; scorer and threshold changes relock without changing it.
     """
-    lock = _read_json(path)
+    lock = read_json_object(path)
     issues = lock_integrity_issues(lock)
     if issues:
         raise AnalysisInputError(f"{path}: not a valid lock ({'; '.join(issues)})")
@@ -134,23 +138,22 @@ def read_lock(path: Path) -> dict[str, Any]:
 
 
 def default_lock(job: JobDir) -> Path:
-    """The experiment's current lock when it still describes the job, else the job's copy.
+    """The lock beside the experiment file the job names, if it is the lock the job executed under.
 
-    The current lock is preferred: a relock that changes only assessment or
-    analysis settings keeps ``lock_sha256`` and its settings apply. A job's
-    ``job.lock.json`` (the lock it executed under) is used when the
-    experiment's lock is missing or now describes another experiment.
+    A relock that changes only assessment or analysis settings keeps ``lock_sha256``, so the
+    experiment's current lock is the one whose settings apply. A missing lock, or one that
+    now describes another experiment, is refused: pass ``--lock``.
     """
     experiment_file = job.manifest.get("experiment_file")
-    copy = job.path / JOB_LOCK_FILE
     if not isinstance(experiment_file, str):
-        if copy.is_file():
-            return copy
         raise AnalysisInputError(f"{job.path}/job.json names no experiment_file; pass --lock")
-    current = default_lock_path(Path(experiment_file))
-    if copy.is_file() and _lock_digest(current) != job.manifest.get("lock_sha256"):
-        return copy
-    return current
+    path = default_lock_path(Path(experiment_file))
+    if _lock_digest(path) != job.manifest.get("lock_sha256"):
+        raise AnalysisInputError(
+            f"{path} is not the lock job {job.path} executed under (it is missing or describes "
+            "another experiment); pass --lock"
+        )
+    return path
 
 
 def _lock_digest(path: Path) -> object:

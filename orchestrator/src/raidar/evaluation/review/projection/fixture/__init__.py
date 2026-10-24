@@ -1,1 +1,1 @@
-"""Synthetic review-surface fixture: generator (``generate``) and its job, lock, trial and Assessment writers."""
+"""Synthetic review-surface fixture: its generator and its job, lock, trial and store writers."""

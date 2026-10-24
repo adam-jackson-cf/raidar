@@ -121,7 +121,7 @@ def _parser() -> argparse.ArgumentParser:
         action="append",
         default=[],
         help="Experiment lock to match runs against (repeatable); tried before the lock "
-        "beside each run's experiment file and the run's own job.lock.json",
+        "beside each run's experiment file",
     )
     parser.add_argument("--output", type=Path, required=True, help="Projection JSON to write")
     parser.add_argument(

@@ -4,7 +4,7 @@ Only what the review projection reads from a lock is filled in: the spec, the
 locked conditions and problem (execution section), the headline metric chosen
 by K (assessment section) and the analysis section. ``seal_lock`` adds the
 section digests, ``lock_sha256`` (the execution digest) and ``document_sha256``,
-so ``parse_lock`` accepts it exactly as it accepts a ``raidar lock`` output.
+so ``experiment_lock`` accepts it exactly as it accepts a ``raidar lock`` output.
 """
 
 from __future__ import annotations
