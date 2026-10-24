@@ -266,3 +266,13 @@ Inside a group the second level is a set of declared sub-tiers or of independent
 Component fingerprints are repo-relative (`orchestrator/src/raidar/...`, `lab/treatments/...`), so a payload outside the package is hashed like code. Code shipped into containers (the grader plugin `grading/runtime/`, `mcp_shim.py`, `step_reset.sh`) is code and stays in the package. `make structure-check` drops the payload and image depth exemptions (nothing needs them), allows only `experiments, problems, ledger, treatments, environments, judge` below `lab/`, and keeps the `v<N>/` data-folder rule for `components/` and `lab/treatments/`.
 
 **Re-key.** Scorer implementation digests, the `raidar_spec` toolchain digest and component fingerprints changed with the module and payload paths. The three experiments were relocked; no jobs are carried over.
+
+## 11. Final pass: gate green after the guidance fixes (2026-10-24)
+
+Twelve parallel guidance passes landed without a full gate run; this pass made `make quality` exit 0 again and changed no rule.
+
+- **`grading` owner folders.** The offline grading modules moved into `grading/prefix/` (pre-fix snapshot grades) and `grading/coverage/` (per-step coverage runs), each with its store. Both are real owners, so `make structure-check` lists them with `runtime` as the second level of `grading`.
+- **Fan-out and complexity in analysis.** Resolving a verifier bundle from the problem store (the replacement for the bundle search) pushed `analysis/lookup.py` to 12 architectural imports and `load.py` to 11. `stored_bundle` now sits in `analysis/sources.py`, the lookup takes it as a callable and builds its own `BundleCache`, and `load.py` constructs the lookup in `_lookup` (which also keeps `load_inputs` within CCN 10).
+- **Test typing.** `PINNED` in `test_analysis_command.py` is typed `dict[str, Any]`, and `scorer_support` narrows the inventory instead of indexing an optional pair.
+- **Relock.** The three experiment locks were stale after the scorer, framework and trial changes and were relocked with `make experiment-lock`; no execution section changed, so `lock_sha256` values of jobs still match.
+- **Docs.** AGENTS and README now say that a job's own `job.lock.json` is never a substitute for the lock (explicit or current lock, else a refusal, for assessment, analysis and review), name `lab/treatments` and `lab/environments` in the structure allowlist, and describe `grading/{prefix,coverage}`. The names `lab/treatments`, `lab/environments`, `tests/review_fixtures`, explicit target selection and the removal of `--bundle-search` were already current.
