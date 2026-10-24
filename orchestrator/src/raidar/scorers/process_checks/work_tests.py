@@ -1,19 +1,17 @@
-"""The work session's test runs, read two more ways (``process-compliance@6``).
+"""The work session's test runs, read two more ways.
 
-``process-compliance@5``'s ``work_session_tests_run_before_finish`` passes only
-when a test run follows the work session's last edit. In ``smoke-3b-3`` of the
-guardrails experiment it read 0 in both arms, although r1's work sessions never
-ran a test and r2's ran them at four steps and then made one more edit. Two
-checks tell those apart, over the same work-session events (a test command
-counts only when it ran):
+``work_session_tests_run_before_finish`` passes only when a test run follows
+the work session's last edit. In ``smoke-3b-3`` of the guardrails experiment it
+read 0 in both arms, although r1's work sessions never ran a test and r2's ran
+them at four steps and then made one more edit. Two checks tell those apart,
+over the same work-session events (a test command counts only when it ran):
 
 - ``work_session_tests_run_any``: the work session ran the tests at all.
 - ``work_session_tests_after_last_code_edit``: a test run follows the work
   session's last edit to a file that is not a test file (``test_*.py``,
   ``*_test.py``, ``conftest.py``, or a file under a ``tests``/``test``
   directory: the gate's test-file globs). Adding a test after the last run
-  does not fail it; an unparsed write after the last run leaves it undetermined,
-  as in ``@5``.
+  does not fail it; an unparsed write after the last run leaves it undetermined.
 
 Both are ``not_applicable`` when the work session made no source edit, and the
 second also when it edited test files only.
@@ -30,7 +28,7 @@ from raidar.scorers.process_checks.checks import (
     tests_run_before_finish,
 )
 from raidar.scorers.process_checks.trace_events import EventKind, TraceEvent
-from raidar.scorers.process_checks_v5.work_session import (
+from raidar.scorers.process_checks.work_session import (
     check_observations,
     work_events,
     work_rate,
@@ -123,7 +121,7 @@ def tests_run_any(events: Sequence[TraceEvent]) -> CheckOutcome:
 
 
 def tests_after_last_code_edit(events: Sequence[TraceEvent]) -> CheckOutcome:
-    """@5's check with the edits to test files left out."""
+    """``tests_run_before_finish`` over the work session's events less the test-file edits."""
     if not _edited(events):
         return CheckOutcome(WORK_TESTS_AFTER_CODE, Verdict.NOT_APPLICABLE, NO_EDIT)
     code = tuple(
@@ -177,7 +175,7 @@ def work_tests_rate(metric: str, observations: Sequence[Observation]) -> Observa
 
 
 def trajectory_rates(observations: Sequence[Observation]) -> tuple[Observation, ...]:
-    """@5's ``work_session_tests_run_rate`` and the rates of both @6 checks."""
+    """The rate of every work-session test check."""
     return (
         work_rate(observations),
         *(work_tests_rate(metric, observations) for metric in WORK_CHECKS),

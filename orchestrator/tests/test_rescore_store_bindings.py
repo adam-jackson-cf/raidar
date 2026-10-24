@@ -42,7 +42,7 @@ from tests.trace_trial_support import (
 )
 
 RUBRIC_POLICY = "code-quality.rubric-smells"
-DETERMINISTIC = "process-compliance@2"
+DETERMINISTIC = "process-compliance@6"
 FAKE = "fake-quality@1"
 
 

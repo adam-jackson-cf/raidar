@@ -1,4 +1,4 @@
-"""The step's work session and whether it ran tests itself (``process-compliance@5``).
+"""The step's work session and whether it ran tests itself.
 
 The work session is the session that received the step's first user prompt. A
 workflow wrapper (a commit gate, a review loop) starts its own sessions after it,
@@ -17,8 +17,7 @@ from raidar.scorers.process_checks.checks import (
     CheckOutcome,
     tests_run_before_finish,
 )
-from raidar.scorers.process_checks.core import check_observation
-from raidar.scorers.process_checks.scorer import UNDETERMINED
+from raidar.scorers.process_checks.core import UNDETERMINED, check_observation
 from raidar.scorers.process_checks.trace_events import TraceEvent
 from raidar.scorers.resource_usage.atif import Trajectory
 from raidar.scorers.sdk.manifest import (
@@ -74,7 +73,7 @@ def work_events(events: Sequence[TraceEvent], session: str | None) -> tuple[Trac
 
 
 def check_observations(step: str, outcomes: Sequence[CheckOutcome]) -> tuple[Observation, ...]:
-    """@2's observation of each check (an undecided one is ``undetermined``)."""
+    """The observation of each check (an undecided one is ``undetermined``)."""
     return tuple(check_observation(step, outcome, UNDETERMINED) for outcome in outcomes)
 
 

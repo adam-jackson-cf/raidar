@@ -1,7 +1,18 @@
 """Did a test command run? What each tool call printed, and whether its runner was found.
 
-``process-compliance@4`` drops a test command whose recorded output says its
-runner was not found (``raidar.scorers.process_checks_v4.scorer``).
+A test command whose recorded output says its runner was not found never ran: it is
+dropped before the checks run and counted separately (``test_commands_not_run``).
+
+- a test command (a ``test`` event of the classifier: the default runners
+  plus the assessment's ``extra_test_patterns``) **did not run** when the
+  output its tool call recorded says its runner was not found:
+  ``<runner>: command not found`` or ``<runner>: not found`` (shells),
+  ``<runner>: No such file or directory``, ``Failed to spawn: `<runner>``` (uv)
+  or ``No module named <module>`` for ``python -m <module>``. The runner is the
+  command's first word after launcher prefixes (``uv run``, ``timeout 60``,
+  ``FOO=1`` ...), or the module of ``python -m``;
+- a command whose call recorded no output counts as run: the trace cannot
+  show that it did not run.
 """
 
 from __future__ import annotations
@@ -15,7 +26,38 @@ from harbor.models.trajectories import Trajectory as HarborTrajectory
 from pydantic import ValidationError
 
 from raidar.scorers.process_checks.trace_events import _LAUNCHER, EventKind, TraceEvent
+from raidar.scorers.sdk.manifest import (
+    Direction,
+    Exactness,
+    MetricLevel,
+    MetricSpec,
+    MetricType,
+    Tier,
+)
+from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 
+NOT_RUN = "test_commands_not_run"
+TOTAL_NOT_RUN = f"total_{NOT_RUN}"
+NOT_RUN_METRICS = (
+    MetricSpec(
+        id=NOT_RUN,
+        description="Test commands in the step whose runner was not found (they never ran).",
+        level=MetricLevel.CHECKPOINT,
+        type=MetricType.COUNT,
+        direction=Direction.LOWER_BETTER,
+        tier=Tier.DETERMINISTIC,
+        exactness=Exactness.NATIVE,
+    ),
+    MetricSpec(
+        id=TOTAL_NOT_RUN,
+        description="Test commands whose runner was not found, over the trajectory.",
+        level=MetricLevel.TRAJECTORY,
+        type=MetricType.COUNT,
+        direction=Direction.LOWER_BETTER,
+        tier=Tier.DETERMINISTIC,
+        exactness=Exactness.NATIVE,
+    ),
+)
 _PYTHON_MODULE = re.compile(r"python[0-9.]*\s+(?:-\w+\s+)*-m\s+([\w.]+)")
 _FIRST_WORD = re.compile(r"\S+")
 
@@ -103,4 +145,38 @@ def split_unrun(events: Sequence[TraceEvent], outputs: dict[str, str]) -> SplitE
     return SplitEvents(tuple(kept), tuple(not_run))
 
 
-__all__ = ["SplitEvents", "call_outputs", "not_found", "runner_of", "split_unrun"]
+def not_run_total(observations: Sequence[Observation]) -> Observation:
+    """``total_test_commands_not_run``: the steps' counts summed (unavailable if a step is)."""
+    per_step = [item for item in observations if item.metric == NOT_RUN]
+    gaps = [item.subject for item in per_step if item.status is AssessStatus.UNAVAILABLE]
+    if gaps:
+        return Observation(
+            metric=TOTAL_NOT_RUN,
+            subject=TRAJECTORY_SUBJECT,
+            status=AssessStatus.UNAVAILABLE,
+            reason=f"{NOT_RUN} is unavailable at {', '.join(gaps)}",
+        )
+    counted = [item.value or 0.0 for item in per_step if item.status is AssessStatus.OK]
+    if not counted:
+        return Observation(
+            metric=TOTAL_NOT_RUN,
+            subject=TRAJECTORY_SUBJECT,
+            status=AssessStatus.NOT_APPLICABLE,
+            reason="no reached step with a readable trajectory",
+        )
+    return Observation(
+        metric=TOTAL_NOT_RUN, subject=TRAJECTORY_SUBJECT, status=AssessStatus.OK, value=sum(counted)
+    )
+
+
+__all__ = [
+    "NOT_RUN",
+    "NOT_RUN_METRICS",
+    "TOTAL_NOT_RUN",
+    "SplitEvents",
+    "call_outputs",
+    "not_found",
+    "not_run_total",
+    "runner_of",
+    "split_unrun",
+]

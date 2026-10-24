@@ -1,11 +1,10 @@
-"""The deterministic core every ``process-compliance`` version shares.
+"""The deterministic core of ``process-compliance``.
 
 One step's ATIF trajectory (every session, including review-loop and
 sub-agent sessions) is classified into process events (``trace_events``) and
 the checks run over them (``checks``). This module turns check outcomes into
 observations and evidence and combines steps into one result; it never asks a
-model. ``process-compliance@1`` adds its dormant Jev residue on top;
-``process-compliance@2`` uses it as is.
+model.
 """
 
 from __future__ import annotations
@@ -40,14 +39,20 @@ from raidar.scorers.sdk.result import (
 )
 
 RATE_METRIC = "compliance_rate"
+UNDETERMINED = "undetermined"
 
 
 class ProcessComplianceConfig(SdkModel):
-    """Assessor-owned settings; extra patterns extend the defaults."""
+    """Assessor-owned settings; extra patterns extend the defaults.
+
+    ``plan_in_compliance_rate``: the condition asks for a plan, so ``plan_written``
+    counts in ``compliance_rate`` (otherwise only ``tests_run_before_finish`` does).
+    """
 
     workdir: str = Field(default=DEFAULT_WORKDIR, pattern=r"^/")
     extra_test_patterns: tuple[str, ...] = ()
     extra_plan_file_patterns: tuple[str, ...] = ()
+    plan_in_compliance_rate: bool = False
 
     @field_validator("extra_test_patterns", "extra_plan_file_patterns")
     @classmethod
@@ -94,8 +99,7 @@ def statused(
 def check_observation(step: str, outcome: CheckOutcome, unsettled: str) -> Observation:
     """A decided check is ``ok`` (1 or 0); an unsettled one never carries a value.
 
-    ``unsettled`` labels the reason of a check no rule decides (``@1`` says
-    ``ambiguous``, ``@2`` says ``undetermined``); its status is
+    ``unsettled`` labels the reason of a check no rule decides; its status is
     ``insufficient_evidence``, so it is never counted as a failure.
     """
     if outcome.verdict in (Verdict.PASS, Verdict.FAIL):
@@ -114,12 +118,6 @@ def check_observation(step: str, outcome: CheckOutcome, unsettled: str) -> Obser
         status=AssessStatus.INSUFFICIENT_EVIDENCE,
         reason=f"{unsettled}: {outcome.reason}",
     )
-
-
-def decided_tally(outcomes: Sequence[CheckOutcome]) -> tuple[int, int]:
-    """(passed, decided) over the checks a rule decided."""
-    decided = [o for o in outcomes if o.verdict in (Verdict.PASS, Verdict.FAIL)]
-    return sum(1 for o in decided if o.verdict is Verdict.PASS), len(decided)
 
 
 def _call_line(lines: Sequence[str], call_id: str) -> int | None:

@@ -477,12 +477,12 @@ def test_a_moved_oracle_bundle_is_refused_or_found_by_digest_never_unassessed(
     assert _effect(report, "solve_rate")["n_pairs"] == 5
 
 
-@pytest.mark.parametrize("process", ["process-compliance@2", None])
+@pytest.mark.parametrize("process", ["process-compliance@6", None])
 def test_the_manipulation_check_reads_the_declared_process_compliance_version(
     tmp_path: Path, process: str | None
 ) -> None:
-    # Jev parked (2026-10-04): @2 is the default; a lock declaring no process-compliance
-    # version gets no manipulation check.
+    # Jev parked (2026-10-04): the deterministic scorer is the default; a lock declaring
+    # no process-compliance version gets no manipulation check.
     scorers = ["correctness@1", *([process] if process else [])]
     lock = _lock(scorers)
     lock_path = tmp_path / "lock.json"

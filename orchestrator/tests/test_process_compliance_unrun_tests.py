@@ -1,10 +1,10 @@
-"""process-compliance@4: a test command counts as a test run only when it ran (smoke-04 O2).
+"""process-compliance: a test command counts as a test run only when it ran (smoke-04 O2).
 
 In smoke-04 a ``python -m pytest -q`` that failed with "No module named pytest"
 counted as a test run, and the pack's gate (which runs the project's tests) did
-not count. @4 drops a test command whose recorded output says its runner was not
-found (``test_commands_not_run``), keeps @3's reading when nothing was recorded,
-and lets the experiment name its gate command through ``extra_test_patterns``.
+not count. A test command whose recorded output says its runner was not found
+is dropped (``test_commands_not_run``), one with nothing recorded counts, and the
+experiment names its gate command through ``extra_test_patterns``.
 """
 
 from __future__ import annotations
@@ -14,12 +14,11 @@ from typing import Any
 
 import pytest
 
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.process_checks_v3 import PROCESS_COMPLIANCE_V3, process_compliance_v3_scorer
-from raidar.scorers.process_checks_v4 import PROCESS_COMPLIANCE_V4, process_compliance_v4_scorer
-from raidar.scorers.process_checks_v4.scorer import not_found, runner_of
+from raidar.scorers.process_checks import deterministic_process_compliance_scorer
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scorers.process_checks.outputs import not_found, runner_of
 from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
+from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.scorers.sdk.validation import validate_result
 from tests.trace_trial_support import (
     TracedStep,
@@ -49,20 +48,10 @@ def _ctx(tmp_path: Path, *traces: dict, **config: Any) -> AssessContext:
     return traced_context(tmp_path, steps, **config)
 
 
-def _values(result: AssessResult) -> dict[tuple[str, str], Observation]:
+def _values(ctx: AssessContext) -> dict[tuple[str, str], Observation]:
+    scorer = deterministic_process_compliance_scorer()
+    result = validate_result(PROCESS_COMPLIANCE, ctx, scorer.assess(ctx))
     return {(item.metric, item.subject): item for item in result.observations}
-
-
-def _v4(ctx: AssessContext) -> dict[tuple[str, str], Observation]:
-    return _values(
-        validate_result(PROCESS_COMPLIANCE_V4, ctx, process_compliance_v4_scorer().assess(ctx))
-    )
-
-
-def _v3(ctx: AssessContext) -> dict[tuple[str, str], Observation]:
-    return _values(
-        validate_result(PROCESS_COMPLIANCE_V3, ctx, process_compliance_v3_scorer().assess(ctx))
-    )
 
 
 @pytest.mark.parametrize(
@@ -78,31 +67,30 @@ def test_a_test_command_whose_runner_was_not_found_is_not_a_test_run(
 ) -> None:
     ctx = _ctx(tmp_path, trajectory(agent_step(1, EDIT), _ran(2, "t1", cmd, output)))
 
-    v3, v4 = _v3(ctx), _v4(ctx)
+    values = _values(ctx)
 
-    assert v3[(CHECK, CP1)].value == 1, "@3 counted the command text"
-    assert v4[(CHECK, CP1)].value == 0
-    assert v4[("test_commands_not_run", CP1)].value == 1
-    assert v4[("total_test_commands_not_run", TRAJECTORY_SUBJECT)].value == 1
+    assert values[(CHECK, CP1)].value == 0
+    assert values[("test_commands_not_run", CP1)].value == 1
+    assert values[("total_test_commands_not_run", TRAJECTORY_SUBJECT)].value == 1
 
 
 def test_a_test_command_that_ran_still_counts(tmp_path: Path) -> None:
     output = "3 passed in 0.12s"
     ctx = _ctx(tmp_path, trajectory(agent_step(1, EDIT), _ran(2, "t1", "pytest -q", output)))
 
-    v4 = _v4(ctx)
+    values = _values(ctx)
 
-    assert v4[(CHECK, CP1)].value == 1
-    assert v4[("test_commands_not_run", CP1)].value == 0
+    assert values[(CHECK, CP1)].value == 1
+    assert values[("test_commands_not_run", CP1)].value == 0
 
 
-def test_a_command_without_recorded_output_keeps_v3s_reading(tmp_path: Path) -> None:
+def test_a_command_without_recorded_output_counts_as_a_test_run(tmp_path: Path) -> None:
     ctx = _ctx(tmp_path, trajectory(agent_step(1, EDIT), _ran(2, "t1", "pytest -q", None)))
 
-    v3, v4 = _v3(ctx), _v4(ctx)
+    values = _values(ctx)
 
-    assert all(v4[key] == value for key, value in v3.items())
-    assert v4[("test_commands_not_run", CP1)].value == 0
+    assert values[(CHECK, CP1)].value == 1
+    assert values[("test_commands_not_run", CP1)].value == 0
 
 
 def test_the_experiments_gate_pattern_counts_the_gate_as_a_test_run(tmp_path: Path) -> None:
@@ -114,31 +102,28 @@ def test_the_experiments_gate_pattern_counts_the_gate_as_a_test_run(tmp_path: Pa
         agent_step(1, EDIT), _ran(2, "g1", "guardrail-check --version", "python-guardrails@5")
     )
 
-    counted = _v4(_ctx(tmp_path / "a", gated, extra_test_patterns=[GATE_PATTERN]))
-    version = _v4(_ctx(tmp_path / "b", asked, extra_test_patterns=[GATE_PATTERN]))
-    plain = _v4(_ctx(tmp_path / "c", gated))
+    counted = _values(_ctx(tmp_path / "a", gated, extra_test_patterns=[GATE_PATTERN]))
+    version = _values(_ctx(tmp_path / "b", asked, extra_test_patterns=[GATE_PATTERN]))
+    plain = _values(_ctx(tmp_path / "c", gated))
 
     assert counted[(CHECK, CP1)].value == 1
     assert version[(CHECK, CP1)].value == 0
     assert plain[(CHECK, CP1)].value == 0
 
 
-def test_v4_keeps_every_v3_observation_when_every_test_command_ran(tmp_path: Path) -> None:
+def test_when_every_test_command_ran_none_is_counted_as_not_run(tmp_path: Path) -> None:
     ctx = _ctx(
         tmp_path,
         trajectory(agent_step(1, EDIT), _ran(2, "t1", "pytest", "1 passed")),
         trajectory(agent_step(1, EDIT)),
     )
 
-    v3, v4 = _v3(ctx), _v4(ctx)
+    values = _values(ctx)
 
-    assert all(v4[key] == value for key, value in v3.items())
-    assert set(v4) - set(v3) == {
-        ("test_commands_not_run", CP1),
-        ("test_commands_not_run", CP2),
-        ("total_test_commands_not_run", TRAJECTORY_SUBJECT),
-    }
-    assert v4[("total_test_commands_not_run", TRAJECTORY_SUBJECT)].status is AssessStatus.OK
+    assert values[("test_commands_not_run", CP1)].value == 0
+    assert values[("test_commands_not_run", CP2)].value == 0
+    total = values[("total_test_commands_not_run", TRAJECTORY_SUBJECT)]
+    assert (total.status, total.value) == (AssessStatus.OK, 0)
 
 
 @pytest.mark.parametrize(
@@ -161,12 +146,3 @@ def test_not_found_matches_only_the_commands_own_runner() -> None:
     assert not not_found("python -m pytest", "E   ModuleNotFoundError: No module named 'forge'")
     assert not not_found("pytest", "my-pytest: command not found")
     assert not_found("pytest", "/bin/sh: 1: pytest: not found")
-
-
-def test_v4_is_registered_beside_v3() -> None:
-    registry = default_scorer_registry()
-    v3, v4 = registry.get("process-compliance@3"), registry.get("process-compliance@4")
-
-    assert v4.load().manifest == PROCESS_COMPLIANCE_V4
-    assert {m.id for m in v3.manifest.metrics} < {m.id for m in v4.manifest.metrics}
-    assert v3.implementation_digest() != v4.implementation_digest()

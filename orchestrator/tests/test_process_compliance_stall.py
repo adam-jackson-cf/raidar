@@ -1,4 +1,4 @@
-"""process-compliance@3: process-compliance@2 plus whether a session stalled on a question.
+"""process-compliance: whether a session stalled on a question.
 
 The stall outcomes are read from ``continue-on-stall.json`` records (one per
 session, filed with that session's logs): ``stalled`` and ``stall_resolved``
@@ -11,11 +11,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raidar.scorers.catalog import default_scorer_registry
 from raidar.scorers.process_checks import deterministic_process_compliance_scorer
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
-from raidar.scorers.process_checks_v3 import PROCESS_COMPLIANCE_V3, process_compliance_v3_scorer
-from raidar.scorers.process_checks_v3.scorer import NO_WRAPPER
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scorers.process_checks.stall import NO_WRAPPER
 from raidar.scorers.sdk.context import AssessContext, StepInputs
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
 from raidar.scorers.sdk.validation import validate_result
@@ -54,7 +52,9 @@ def _stall(step: StepInputs, where: str, *, stalled: bool, changed: bool | None 
 
 def _assess(*steps: StepInputs) -> AssessResult:
     ctx = AssessContext(problem="scb/forge", steps=steps, config={})
-    return validate_result(PROCESS_COMPLIANCE_V3, ctx, process_compliance_v3_scorer().assess(ctx))
+    return validate_result(
+        PROCESS_COMPLIANCE, ctx, deterministic_process_compliance_scorer().assess(ctx)
+    )
 
 
 def _values(result: AssessResult) -> dict[tuple[str, str], Observation]:
@@ -95,32 +95,3 @@ def test_a_reached_step_without_a_record_is_unavailable_and_so_is_the_rate(tmp_p
     assert values[("stalled", CP2)].status is AssessStatus.UNAVAILABLE
     assert values[("stalled", CP3)].status is AssessStatus.NOT_APPLICABLE
     assert values[("stall_rate", TRAJECTORY_SUBJECT)].status is AssessStatus.UNAVAILABLE
-
-
-def test_v3_keeps_every_v2_observation(tmp_path: Path) -> None:
-    first = _step(tmp_path, CP1)
-    _stall(first, ".", stalled=True, changed=True)
-    ctx = AssessContext(problem="scb/forge", steps=(first,), config={})
-    v2 = _values(
-        validate_result(
-            PROCESS_COMPLIANCE_V2, ctx, deterministic_process_compliance_scorer().assess(ctx)
-        )
-    )
-    v3 = _values(_assess(first))
-
-    assert all(v3[key] == value for key, value in v2.items())
-    assert set(v3) - set(v2) == {
-        ("stalled", CP1),
-        ("stall_resolved", CP1),
-        ("stall_rate", TRAJECTORY_SUBJECT),
-        ("stalled_steps", TRAJECTORY_SUBJECT),
-    }
-
-
-def test_v3_is_registered_beside_v2() -> None:
-    registry = default_scorer_registry()
-    v2, v3 = registry.get("process-compliance@2"), registry.get("process-compliance@3")
-
-    assert v3.load().manifest == PROCESS_COMPLIANCE_V3
-    assert {m.id for m in v2.manifest.metrics} < {m.id for m in v3.manifest.metrics}
-    assert v2.implementation_digest() != v3.implementation_digest()

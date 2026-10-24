@@ -1,8 +1,6 @@
-"""``process-compliance@3``: process-compliance@2 and whether the agent stalled on a question.
+"""Whether the agent stalled on a question (``process-compliance`` stall outcomes).
 
-``process-compliance@2`` (``raidar.scorers.process_checks``) is released and
-unchanged; @3 keeps every @2 metric, value, status and reason, and adds the
-stall outcomes read deterministically from the step's
+The stall outcomes are read deterministically from the step's
 ``continue-on-stall.json`` records (``continue-on-stall@1`` writes one per
 session, stalled or not, beside that session's logs):
 
@@ -29,8 +27,6 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
-from raidar.scorers.process_checks.scorer import DeterministicProcessComplianceScorer
 from raidar.scorers.sdk.context import AssessContext, StepInputs
 from raidar.scorers.sdk.manifest import (
     Direction,
@@ -38,15 +34,9 @@ from raidar.scorers.sdk.manifest import (
     MetricLevel,
     MetricSpec,
     MetricType,
-    ScorerManifest,
     Tier,
 )
-from raidar.scorers.sdk.result import (
-    TRAJECTORY_SUBJECT,
-    AssessResult,
-    AssessStatus,
-    Observation,
-)
+from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 
 STALL_RECORD = "continue-on-stall.json"
 STALLED, RESOLVED = "stalled", "stall_resolved"
@@ -100,19 +90,6 @@ STALL_METRICS = (
         MetricType.COUNT,
         Direction.LOWER_BETTER,
     ),
-)
-
-PROCESS_COMPLIANCE_V3 = ScorerManifest(
-    id="process-compliance",
-    version="3",
-    description=(
-        "Deterministic trace checks of agent process; a check the trace cannot decide is "
-        "undetermined, never judged by a model. Adds whether a session stalled on a "
-        "question (continue-on-stall@1 records) and the stall rate."
-    ),
-    runtimes=PROCESS_COMPLIANCE_V2.runtimes,
-    evidence_required=PROCESS_COMPLIANCE_V2.evidence_required,
-    metrics=(*PROCESS_COMPLIANCE_V2.metrics, *STALL_METRICS),
 )
 
 
@@ -194,41 +171,3 @@ def stall_observations(ctx: AssessContext) -> tuple[Observation, ...]:
         )
     per_step = [_step(inputs, found) for inputs, found in records]
     return (*(item for step in per_step for item in step), *_totals(per_step))
-
-
-class ProcessComplianceV3Scorer(DeterministicProcessComplianceScorer):
-    """process-compliance@2's checks plus the stall outcomes."""
-
-    @property
-    def manifest(self) -> ScorerManifest:
-        return PROCESS_COMPLIANCE_V3
-
-    def assess(self, ctx: AssessContext) -> AssessResult:
-        base = super().assess(ctx)
-        if base.status is AssessStatus.ERROR:
-            return base.model_copy(
-                update={
-                    "observations": (
-                        *base.observations,
-                        *(
-                            _gap(m.id, s, AssessStatus.ERROR, base.reason or "error")
-                            for m in STALL_METRICS
-                            for s in ctx.subjects(m.level)
-                        ),
-                    )
-                }
-            )
-        observations = (*base.observations, *stall_observations(ctx))
-        measured = any(item.status is _OK for item in observations)
-        return AssessResult(
-            status=_OK if measured else base.status,
-            reason=None if measured else base.reason,
-            observations=observations,
-            evidence=base.evidence,
-            provenance=base.provenance,
-        )
-
-
-def process_compliance_v3_scorer() -> ProcessComplianceV3Scorer:
-    """Registry factory for ``process-compliance@3``."""
-    return ProcessComplianceV3Scorer()

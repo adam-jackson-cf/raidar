@@ -124,7 +124,7 @@ forbidden_modules =
     raidar.spec
 
 [importlinter:contract:deterministic-process-checks]
-name = process-compliance@2 decides only deterministically: no Jev import, direct or indirect
+name = process-compliance decides only deterministically: no Jev import, direct or indirect
 type = forbidden
 source_modules =
     raidar.scorers.process_checks

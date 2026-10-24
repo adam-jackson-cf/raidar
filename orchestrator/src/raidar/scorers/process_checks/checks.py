@@ -2,8 +2,7 @@
 
 Each check returns a ``CheckOutcome``: ``pass`` or ``fail`` when the trace
 decides it, ``ambiguous`` when an ambiguous event could change the answer
-(``process-compliance@2`` records these as undetermined; the dormant ``@1``
-also hands them to its Jev residue), and ``not_applicable`` when the step made no
+(the scorer records these as undetermined), and ``not_applicable`` when the step made no
 source edit, so neither rule has anything to order against.
 
 Order is the position of an event in the classified sequence; one call can

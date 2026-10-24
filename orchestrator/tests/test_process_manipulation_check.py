@@ -15,11 +15,7 @@ from raidar.analysis.manipulation import (
     permutation_p,
 )
 from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE_V2
-from raidar.scorers.process_checks_v3 import PROCESS_COMPLIANCE_V3
-from raidar.scorers.process_checks_v4 import PROCESS_COMPLIANCE_V4
-from raidar.scorers.process_checks_v5 import PROCESS_COMPLIANCE_V5
-from raidar.scorers.process_checks_v6 import PROCESS_COMPLIANCE_V6
+from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
 from raidar.scorers.rescore import assess
 from raidar.scorers.sdk.manifest import Tier
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
@@ -156,40 +152,15 @@ def _trial_trace(tested: bool) -> dict:
 
 
 def test_default_checks_are_deterministic_metrics_of_the_default_scorer() -> None:
-    # Jev parked (2026-10-04): the defaults read only deterministic process-compliance@2
+    # Jev parked (2026-10-04): the defaults read only deterministic process-compliance
     # metrics; an undetermined check is never ``ok``, so it never enters a share.
-    # process-compliance@6 (read first), @5, @4 and @3 keep every @2 check (@3 adds the stall
-    # outcomes, @4 counts only test commands that ran, @5 adds the work session's own, @6
-    # whether it ran the tests at all and after its last code edit).
-    for manifest in (
-        PROCESS_COMPLIANCE_V6,
-        PROCESS_COMPLIANCE_V5,
-        PROCESS_COMPLIANCE_V4,
-        PROCESS_COMPLIANCE_V3,
-        PROCESS_COMPLIANCE_V2,
-    ):
-        metrics = {metric.id: metric for metric in manifest.metrics}
-        assert set(DEFAULT_CHECKS) <= set(metrics)
-        assert {metrics[check].tier for check in DEFAULT_CHECKS} == {Tier.DETERMINISTIC}
-    assert PROCESS_COMPLIANCE_REFS[:5] == (
-        PROCESS_COMPLIANCE_V6.ref,
-        PROCESS_COMPLIANCE_V5.ref,
-        PROCESS_COMPLIANCE_V4.ref,
-        PROCESS_COMPLIANCE_V3.ref,
-        PROCESS_COMPLIANCE_V2.ref,
-    )
+    metrics = {metric.id: metric for metric in PROCESS_COMPLIANCE.metrics}
+    assert set(DEFAULT_CHECKS) <= set(metrics)
+    assert {metrics[check].tier for check in DEFAULT_CHECKS} == {Tier.DETERMINISTIC}
+    assert (PROCESS_COMPLIANCE.ref,) == PROCESS_COMPLIANCE_REFS
 
 
-@pytest.mark.parametrize(
-    "ref",
-    [
-        "process-compliance@6",
-        "process-compliance@5",
-        "process-compliance@4",
-        "process-compliance@3",
-        "process-compliance@2",
-    ],
-)
+@pytest.mark.parametrize("ref", ["process-compliance@6"])
 def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) -> None:
     registry = default_scorer_registry()
     store = AssessmentStore(tmp_path / "store")
@@ -213,10 +184,7 @@ def test_arm_results_load_from_the_assessment_store(tmp_path: Path, ref: str) ->
         traced_context(tmp_path / "c", [TracedStep("checkpoint_1", trace=_trial_trace(True))]),
         trial="c",
     )
-    with pytest.raises(
-        ValueError,
-        match="not one of process-compliance@6, process-compliance@5, process-compliance@4",
-    ):
+    with pytest.raises(ValueError, match="not one of process-compliance@6"):
         load_arm_results(store.root, {"guided": [other.key]})
     with pytest.raises(ValueError, match="no assessment"):
         load_arm_results(store.root, {"guided": ["0" * 64]})
