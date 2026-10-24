@@ -1,4 +1,4 @@
-"""Built-in components mapped onto Harbor 0.23 inputs, with probes (plan WS-C C2).
+"""Built-in components mapped onto Harbor 0.23 inputs, with probes.
 
 The real-trial probe run is Codex-only (model policy); the Claude Code mapping
 and its probe evidence shapes are covered here.

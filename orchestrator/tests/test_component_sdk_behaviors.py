@@ -1,4 +1,4 @@
-"""Component SDK contract (plan WS-C C1): registry, manifests, arm rejection, lock resolver."""
+"""Component SDK contract: registry, manifests, arm rejection, lock resolver."""
 
 from __future__ import annotations
 

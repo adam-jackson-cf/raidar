@@ -1,4 +1,4 @@
-"""Builders and evidence fixtures for component SDK tests (plan WS-C)."""
+"""Builders and evidence fixtures for component SDK tests."""
 
 from __future__ import annotations
 

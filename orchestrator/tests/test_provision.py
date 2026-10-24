@@ -151,10 +151,10 @@ def test_an_environment_that_cannot_run_work_at_start_records_a_failed_install()
     assert "cannot run an install at environment start" in record["install"]["output"]
 
 
-def test_a_frozen_provision_keeps_its_released_path_beside_a_trial_provision() -> None:
+def test_a_first_step_provision_runs_beside_a_trial_provision() -> None:
     env = _Env()
-    legacy = Provision("01-lint-tool", "lint-tool@1", "INSTALL", "CHECK")
-    hooks = _trial(env, [legacy, PROVISION])
+    first_step = Provision("01-lint-tool", "lint-tool@2", "INSTALL", "CHECK")
+    hooks = _trial(env, [first_step, PROVISION])
 
     assert len(hooks[TrialEvent.AGENT_START]) == 2
     assert len(env.hooks) == 1, "only the trial provision installs at environment start"

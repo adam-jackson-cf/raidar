@@ -2,8 +2,8 @@
 
 Builds a multi-step Harbor task whose steps carry the compiled per-step
 ``setup.sh`` (and the first step's overlay), then runs it through Harbor's
-Python API with the verifier disabled. Used by the C3 isolation regression
-test (no LLM) and the C2/C4 real-trial probe run (codex-cli + gpt-6-luna low).
+Python API with the verifier disabled. Used by the isolation regression
+test (no LLM) and the real-trial probe run (codex-cli + gpt-6-luna low).
 """
 
 from __future__ import annotations

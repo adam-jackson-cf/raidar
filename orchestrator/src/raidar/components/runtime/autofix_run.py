@@ -160,7 +160,7 @@ class AutofixRun:
             "exit_code": self.exit_code,
             "error_type": self.error_type,
             "error": self.error,
-            # apply: the gate run that follows is @3's (no fix pass before it).
+            # apply: the gate run that follows runs without autofix.
             "fallback": self.mode is AutofixMode.APPLY and not self.ok,
             "verdict": self._reported("verdict"),
             "files_changed": changed,

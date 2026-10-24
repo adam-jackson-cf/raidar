@@ -1,4 +1,4 @@
-"""Discovery probes in real Harbor trials (plan WS-C C2, C4 acceptance).
+"""Discovery probes in real Harbor trials.
 
 Costs real LLM calls, so it runs only when ``RAIDAR_REAL_LLM_PROBES=1``:
 

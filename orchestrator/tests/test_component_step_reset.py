@@ -1,4 +1,4 @@
-"""Per-step context reset as a generated setup.sh (plan WS-C C3; F3).
+"""Per-step context reset as a generated setup.sh (F3).
 
 - The wipe/materialise/evidence path runs on the host against temp dirs.
 - The 0.3 context-isolation check runs as a real two-step Harbor trial on the

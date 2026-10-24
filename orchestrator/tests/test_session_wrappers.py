@@ -90,7 +90,7 @@ def test_a_no_edit_refusal_stalls_like_a_question(message: str, expected: bool) 
     assert bool(detect_stall_message(message)) is expected
 
 
-def test_the_v2_continuation_covers_a_refusal_and_asks_for_assumptions() -> None:
+def test_the_continuation_covers_a_refusal_and_asks_for_assumptions() -> None:
     prompt = continuation_prompt("Build the CLI.", SMOKE_03_CP3)
 
     assert "could not\nproceed without more information" in prompt
