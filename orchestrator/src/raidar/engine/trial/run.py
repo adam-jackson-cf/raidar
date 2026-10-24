@@ -1,6 +1,6 @@
 """One trial of a job: materialise, run through Harbor, classify and record it.
 
-``raidar.engine.job.context.JobContext`` is what a job's trials share;
+``raidar.engine.trial.context.JobContext`` is what a job's trials share;
 ``raidar.engine.job.run`` schedules the trials and ``raidar.engine.trial.finish`` audits
 and writes each record.
 """
@@ -10,12 +10,12 @@ from __future__ import annotations
 import asyncio
 import traceback
 
-from raidar.engine.job.context import JobContext
+from raidar.contract.trial import PlannedTrial, TrialRecord
 from raidar.engine.trial.agent_config import reported_harness_pin
 from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.finish import finish_trial
 from raidar.engine.trial.materialise import MaterialisedTask, environment_cold, materialise_task
-from raidar.engine.trial.models import PlannedTrial, TrialRecord
 from raidar.engine.trial.record import (
     RunnerFailure,
     TrialEvidence,

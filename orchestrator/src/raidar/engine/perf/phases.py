@@ -40,9 +40,9 @@ from collections.abc import Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
-from raidar.engine.trial.collect import read_result
-from raidar.engine.trial.models import PhaseSample
-from raidar.engine.trial.timestamps import diff_s, parse_ts, span_s
+from raidar.contract.job_layout import read_result
+from raidar.contract.timestamps import diff_s, parse_ts, span_s
+from raidar.contract.trial import PhaseSample
 from raidar.grading.records import (
     RECORD_FILE,
     load_pre_agent_leak,

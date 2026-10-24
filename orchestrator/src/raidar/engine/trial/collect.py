@@ -31,16 +31,16 @@ allows, or the agent CLI did not run at its pinned version.
 from __future__ import annotations
 
 import hashlib
-import json
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.engine.health.liveness import idle_killed_steps
-from raidar.engine.health.model import VIOLATION, HealthReport
-from raidar.engine.trial.models import (
+from raidar.contract.job_layout import read_result, step_results
+from raidar.contract.timestamps import span_s
+from raidar.contract.trial import (
+    NOT_STARTED,
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,
@@ -51,15 +51,15 @@ from raidar.engine.trial.models import (
     Usage,
     ValidityCheck,
 )
+from raidar.engine.health.liveness import idle_killed_steps
+from raidar.engine.health.model import VIOLATION, HealthReport
+from raidar.engine.health.reaper import load_reap_report, reap_infra_reason
 from raidar.engine.trial.progression import derive_reached, gate_passes
-from raidar.engine.trial.reaper import load_reap_report, reap_infra_reason
-from raidar.engine.trial.timestamps import span_s
 from raidar.grading.records import RECORD_FILE, StepRecord, load_step_record, step_record_dir
 from raidar.grading.verifier import LEAK_REWARD_KEY
 from raidar.subject.treatment import CompiledCondition
 from raidar.subject.treatment.definition.integrity import condition_step_flags
 
-RESULT_FILE = "result.json"
 TRIAL_LOG = "trial.log"
 # Step exceptions that are the agent's own outcome: the step is still graded.
 # AgentSafetyRefusalError is a model refusal, which Harbor documents as a real
@@ -79,21 +79,7 @@ _HARNESS_INSTALL = (
     re.compile(r"npm install -g @anthropic-ai/claude-code(?:@(\S+?))?[;\s]"),
     re.compile(r"bootstrap\.sh \| bash -s --(?: (\S+?))?;"),
 )
-NOT_STARTED = "not_started"
 _USAGE_FIELDS = ("n_input_tokens", "n_cache_tokens", "n_output_tokens", "cost_usd")
-
-
-def read_result(trial_dir: Path) -> dict[str, Any] | None:
-    path = trial_dir / RESULT_FILE
-    if not path.is_file():
-        return None
-    loaded = json.loads(path.read_text())
-    return loaded if isinstance(loaded, dict) else None
-
-
-def step_results(result: Mapping[str, Any] | None) -> dict[str, Mapping[str, Any]]:
-    items = (result or {}).get("step_results") or []
-    return {item["step_name"]: item for item in items if isinstance(item, dict)}
 
 
 def _exception_type(item: Mapping[str, Any] | None) -> str | None:

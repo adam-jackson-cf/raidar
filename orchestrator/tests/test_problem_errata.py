@@ -20,8 +20,8 @@ from raidar.design.problem.errata import (
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.job.assessment import lock_errata, lock_rescore_config
-from raidar.engine.job.plan import PlanError, PlanOptions, build_plan
 from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.plan import PlanError, PlanOptions, build_plan
 from raidar.evaluation.analysis.assessed import CORRECTNESS_REF, build_outcome
 from raidar.grading.errata import ErrataOutcome, ErrataRef, errata_outcome
 from raidar.grading.models import CaseStatus

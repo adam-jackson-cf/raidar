@@ -40,8 +40,8 @@ from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
 from raidar.engine.health.liveness import install_liveness_monitor
+from raidar.engine.health.reaper import install_agent_reaper
 from raidar.engine.health.tool_tree import install_tool_tree_watch
-from raidar.engine.trial.reaper import install_agent_reaper
 from raidar.grading.guard import install_leak_guard
 from raidar.subject.treatment.runtime.provision import AnyProvision, install_trial_provisioning
 

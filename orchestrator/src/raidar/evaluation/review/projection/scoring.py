@@ -16,7 +16,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from raidar.engine.trial.models import CheckpointState, StepResult, TrialRecord
+from raidar.contract.trial import CheckpointState, StepResult, TrialRecord
 from raidar.evaluation.analysis.assessed import CODE_QUALITY_REF
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.headline import COMPONENT_METRICS, Headline, policy_shares

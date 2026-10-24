@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.engine.trial.models import (
+from raidar.contract.trial import (
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,

@@ -32,7 +32,7 @@ from raidar.design.problem.importer import import_problem
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore
 from raidar.design.problem.validator import ValidateOptions, validate_problem, write_report
-from raidar.engine.trial.reaper import ReapReport, write_reap_report
+from raidar.engine.health.reaper import ReapReport, write_reap_report
 from raidar.grading.leak import LeakReport
 from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, InfraFailure, VerifierGrade
 from raidar.grading.records import (

@@ -16,9 +16,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
-from raidar.engine.job.assessment import lock_rescore_config
-from raidar.engine.trial.models import (
+from raidar.contract.trial import (
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,
@@ -26,6 +24,8 @@ from raidar.engine.trial.models import (
     TrialRecord,
     ValidityCheck,
 )
+from raidar.design.experiment.lock import LOCK_VERSION, seal_lock
+from raidar.engine.job.assessment import lock_rescore_config
 from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir, select_records
 from raidar.grading.models import CaseStatus
 from raidar.scoring.catalog.builtin import default_scorer_registry

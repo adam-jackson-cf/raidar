@@ -25,8 +25,8 @@ from typing import Any
 from pydantic import ValidationError
 
 from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
+from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import default_lock_path, lock_integrity_issues
-from raidar.engine.trial.models import TrialRecord
 from raidar.evaluation.analysis.outcomes import PoolingReport
 from raidar.evaluation.analysis.pooling import PoolingError, check_pooling
 from raidar.evaluation.analysis.report import PlannedTrial

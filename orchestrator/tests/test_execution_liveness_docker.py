@@ -17,6 +17,7 @@ from typing import Any
 
 import pytest
 
+from raidar.contract.trial import ProbeSummary
 from raidar.engine.health.liveness import (
     LIVENESS_REPORT,
     LivenessConfig,
@@ -25,7 +26,6 @@ from raidar.engine.health.liveness import (
 )
 from raidar.engine.health.tool_tree import hash_tool_tree
 from raidar.engine.trial.collect import _infra_reasons
-from raidar.engine.trial.models import ProbeSummary
 from raidar.subject.environment.python.image import image_tag
 from raidar.subject.environment.python.models import load_pack_spec
 from tests.component_trial_support import docker_context

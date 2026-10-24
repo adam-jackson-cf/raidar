@@ -9,9 +9,8 @@ from typing import Any, cast
 
 from harbor.trial.hooks import TrialEvent
 
-from raidar.engine.trial.collect import _infra_reasons
-from raidar.engine.trial.models import ProbeSummary
-from raidar.engine.trial.reaper import (
+from raidar.contract.trial import ProbeSummary
+from raidar.engine.health.reaper import (
     REAP_REPORT,
     install_agent_reaper,
     load_reap_report,
@@ -20,6 +19,7 @@ from raidar.engine.trial.reaper import (
     reap_infra_reason,
     reap_script,
 )
+from raidar.engine.trial.collect import _infra_reasons
 from raidar.grading.records import step_record_dir
 from tests.verifier_support import make_bundle
 

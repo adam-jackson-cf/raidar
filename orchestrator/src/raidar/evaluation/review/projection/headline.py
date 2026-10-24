@@ -25,7 +25,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 
 from raidar.contract.references import RegistryReferenceError
-from raidar.engine.trial.models import CheckpointState, TrialRecord
+from raidar.contract.trial import CheckpointState, TrialRecord
 from raidar.evaluation.analysis.assessed import (
     CODE_QUALITY_REF,
     Observed,

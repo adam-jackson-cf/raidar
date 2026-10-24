@@ -15,7 +15,7 @@ from typing import Any, Literal
 
 from pydantic import Field
 
-from raidar.engine.trial.models import ExecutionModel
+from raidar.contract.trial import ExecutionModel
 
 HEALTH_FILE = "health.json"
 HealthStatus = Literal["pass", "violation", "unmeasured"]

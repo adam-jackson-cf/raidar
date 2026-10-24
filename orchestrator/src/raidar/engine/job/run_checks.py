@@ -12,11 +12,11 @@ from typing import Any
 
 from raidar.design.problem.store import ImportedProblem, ProblemStore, ProblemStoreError
 from raidar.engine.health.admission import AdmissionError, admit, experiment_kind, identity
-from raidar.engine.health.provenance import recipe_digests, runner_provenance
 from raidar.engine.job.credentials import CredentialPreflightError, preflight_credentials
-from raidar.engine.job.plan import ExperimentPlan
+from raidar.engine.job.provenance import recipe_digests, runner_provenance
 from raidar.engine.job.run import load_problems
 from raidar.engine.target.job import JobTarget
+from raidar.engine.trial.plan import ExperimentPlan
 
 
 class RunRefusedError(RuntimeError):

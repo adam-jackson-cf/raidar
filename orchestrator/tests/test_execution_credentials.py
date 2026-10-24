@@ -15,7 +15,7 @@ from raidar.engine.job.credentials import (
     harness_credential_issue,
     preflight_credentials,
 )
-from raidar.engine.job.plan import PlanOptions
+from raidar.engine.trial.plan import PlanOptions
 from raidar.subject.agent.config import Harness
 from tests.experiment_spec_support import AGENTS_BENCHMARK, SMOKE_EXPERIMENT
 

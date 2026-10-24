@@ -19,7 +19,7 @@ from raidar.engine.health.liveness import (
     liveness_script,
     parse_poll_output,
 )
-from raidar.engine.trial.reaper import _KILLED, _RESIDUAL
+from raidar.engine.health.reaper import _KILLED, _RESIDUAL
 
 NET_HEADER = (
     "Inter-|   Receive\n face |bytes packets errs drop fifo frame compressed multicast|bytes\n"

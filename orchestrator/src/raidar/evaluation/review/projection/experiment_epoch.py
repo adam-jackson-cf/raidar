@@ -27,8 +27,8 @@ from raidar.contract.review import (
     ReviewExperimentRecord,
     ReviewRunDetail,
 )
+from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.schema import ExperimentSpec
-from raidar.engine.trial.models import TrialRecord
 from raidar.evaluation.review.projection.assessments import AssessmentLookup
 from raidar.evaluation.review.projection.conditions import ArmSide, condition_diff
 from raidar.evaluation.review.projection.experiments import ArmGroup, experiment_record

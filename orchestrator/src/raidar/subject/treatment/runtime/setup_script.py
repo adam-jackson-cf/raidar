@@ -10,7 +10,7 @@ Every arm gets one, with or without components. The script:
    the environment evidence for workspace discovery probes;
 4. deletes itself from the workspace, or puts back the agent's own
    ``setup.sh`` that the step upload overwrote (stashed by the agent-end
-   reaper, ``raidar.engine.trial.reaper``).
+   reaper, ``raidar.engine.health.reaper``).
 """
 
 from __future__ import annotations

@@ -24,8 +24,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
+from raidar.contract.trial import ProgressionRule
 from raidar.design.experiment.schema import ProtocolSpec
-from raidar.engine.trial.models import ProgressionRule
 
 GATE_REWARD_KEY = "strict_pass_rate"
 STRICT_THRESHOLD = 1.0

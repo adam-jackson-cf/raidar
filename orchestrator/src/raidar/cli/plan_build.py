@@ -18,8 +18,8 @@ from raidar.design.experiment.lock import (
     render_lock,
 )
 from raidar.design.problem.store import ProblemStore, ProblemStoreError, open_store
-from raidar.engine.job.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.engine.trial.agent_config import AgentOverride
+from raidar.engine.trial.plan import ExperimentPlan, PlanError, PlanOptions, build_plan
 from raidar.subject.environment.drift import LockedPackError, lock_runtime_pack
 
 

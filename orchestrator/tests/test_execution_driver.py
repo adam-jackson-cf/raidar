@@ -21,8 +21,6 @@ from raidar.design.experiment.lock import lock_integrity_issues, spec_source_dig
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
 from raidar.design.problem.store import ROOT_ENV
 from raidar.engine.health.records_manifest import RECORDS_MANIFEST, tamper_findings
-from raidar.engine.job.context import JobContext
-from raidar.engine.job.plan import PlanOptions, build_plan
 from raidar.engine.job.run import execute, load_problems
 from raidar.engine.target.config import Selection, implicit_target
 from raidar.engine.target.guard import REAP_FILE, TargetGuard, TargetLostError
@@ -31,6 +29,7 @@ from raidar.engine.target.job import JobTarget
 from raidar.engine.trial import driver
 from raidar.engine.trial.agent_config import CODEX_AUTH_ENV, reported_harness_pin, with_host_auth
 from raidar.engine.trial.config import harbor_trial_config
+from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.driver import TrialRun, run_harbor_trial, run_in_order
 from raidar.engine.trial.environment import (
     RUN_SCOPED_DOCKER_IMPORT_PATH,
@@ -38,6 +37,7 @@ from raidar.engine.trial.environment import (
     run_scope,
 )
 from raidar.engine.trial.materialise import MaterialiseError, materialise_task
+from raidar.engine.trial.plan import PlanOptions, build_plan
 from raidar.grading.verifier import RaidarVerifier
 from raidar.subject.agent.codex_auth import ResolvedCodexAuth
 from raidar.subject.agent.config import Harness

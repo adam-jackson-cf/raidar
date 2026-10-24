@@ -20,8 +20,8 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.job_layout import JOB_LOCK_FILE, JOB_MANIFEST, TRIAL_RECORDS_DIR
+from raidar.contract.trial import TrialRecord
 from raidar.engine.health.model import load_health
-from raidar.engine.trial.models import TrialRecord
 
 SMOKE_KIND = "smoke"
 Identity = dict[str, Any]

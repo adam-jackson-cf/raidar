@@ -14,7 +14,7 @@ from raidar.cli import main
 from raidar.design.experiment.loader import load_experiment
 from raidar.design.experiment.lock import LockError
 from raidar.design.problem.store import ROOT_ENV
-from raidar.engine.job.plan import PlanError, PlanOptions, arm_order, build_plan
+from raidar.engine.trial.plan import PlanError, PlanOptions, arm_order, build_plan
 from raidar.subject.environment.python.harness import HarnessPinError
 from raidar.subject.environment.python.models import load_pack_spec
 from tests.execution_support import ImportedFixture, locked_experiment, validated_fixture

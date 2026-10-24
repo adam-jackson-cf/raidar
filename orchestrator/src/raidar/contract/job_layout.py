@@ -22,13 +22,34 @@ and ``assess --regrade`` read identically for every job.
 
 from __future__ import annotations
 
+import json
+from collections.abc import Mapping
+from pathlib import Path
+from typing import Any
+
 JOB_KIND = "raidar-job"
 JOB_MANIFEST = "job.json"
 JOB_LOCK_FILE = "job.lock.json"
 PLAN_FILE = "plan.json"
 TASKS_DIR = "tasks"
 TRIALS_DIR = "trials"
+RESULT_FILE = "result.json"
 TRIAL_RECORDS_DIR = "trial-records"
 TRIAL_RECORD_GLOB = f"{TRIAL_RECORDS_DIR}/*.json"
 DETACH_DIR = "detach"
 """A detached launch's files; the only entry a job directory may hold before its job starts."""
+
+
+def read_result(trial_dir: Path) -> dict[str, Any] | None:
+    """Harbor's ``result.json`` of a trial directory, or None before the trial wrote it."""
+    path = trial_dir / RESULT_FILE
+    if not path.is_file():
+        return None
+    loaded = json.loads(path.read_text())
+    return loaded if isinstance(loaded, dict) else None
+
+
+def step_results(result: Mapping[str, Any] | None) -> dict[str, Mapping[str, Any]]:
+    """The per-step results of a trial's ``result.json``, by step name."""
+    items = (result or {}).get("step_results") or []
+    return {item["step_name"]: item for item in items if isinstance(item, dict)}

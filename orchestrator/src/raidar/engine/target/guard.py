@@ -25,10 +25,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from raidar.contract.trial import ExecutionValidity, TrialRecord, ValidityCheck
 from raidar.engine.target.config import Target, TargetError
 from raidar.engine.target.health import TargetUnavailableError, ensure_target
 from raidar.engine.target.transport import docker_healthy
-from raidar.engine.trial.models import ExecutionValidity, TrialRecord, ValidityCheck
 
 ENV_RECONNECT_S = "RAIDAR_TARGET_RECONNECT_S"
 DEFAULT_RECONNECT_S = 300.0

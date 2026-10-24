@@ -29,10 +29,10 @@ from pydantic import ValidationError
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
+from raidar.contract.trial import TrialRecord
 from raidar.design.experiment.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.design.experiment.schema import ExperimentSpec
 from raidar.engine.job.assessment import lock_errata, rescore_config
-from raidar.engine.trial.models import TrialRecord
 from raidar.grading.errata import ErrataRef
 from raidar.scoring.framework.rescore_config import RescoreConfig
 

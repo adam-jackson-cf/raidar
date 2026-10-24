@@ -9,9 +9,9 @@ from typing import Any
 
 from raidar.contract.job_layout import TRIALS_DIR
 from raidar.design.problem.store import ImportedProblem
-from raidar.engine.job.plan import ExperimentPlan
 from raidar.engine.target.job import JobTarget
 from raidar.engine.trial.driver import TrialRunner, run_harbor_trial
+from raidar.engine.trial.plan import ExperimentPlan
 
 
 @dataclass

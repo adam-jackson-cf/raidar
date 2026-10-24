@@ -25,11 +25,11 @@ from pathlib import Path
 import yaml
 from harbor.models.task.config import TaskConfig
 
+from raidar.contract.trial import ProgressionRule
 from raidar.design.experiment.arm import compile_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.content import content_digest
 from raidar.design.problem.harbor_engine import SOLVE_SH
-from raidar.engine.trial.models import ProgressionRule
 from raidar.subject.environment.python.image import image_present
 from raidar.subject.treatment import CompiledCondition
 from raidar.subject.treatment.runtime.provision import AnyProvision, trial_provisions

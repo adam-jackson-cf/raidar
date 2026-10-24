@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from raidar.contract.review import ReviewRunDetail, ReviewRunRecord, ReviewStatus
-from raidar.engine.trial.models import CheckpointState, TrialRecord
+from raidar.contract.trial import CheckpointState, TrialRecord
 from raidar.evaluation.review.projection.assessments import TrialAssessments
 from raidar.evaluation.review.projection.atif import project_trajectory
 from raidar.evaluation.review.projection.gates import GateContext, failed_gates, project_gates

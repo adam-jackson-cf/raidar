@@ -28,8 +28,8 @@ from harbor.models.trajectories import (
 
 from raidar.contract.canonical import digest_json
 from raidar.contract.snapshot import tree_digest
-from raidar.engine.trial.collect import NOT_STARTED
-from raidar.engine.trial.models import (
+from raidar.contract.trial import (
+    NOT_STARTED,
     CheckpointState,
     ExecutionValidity,
     PhaseSample,

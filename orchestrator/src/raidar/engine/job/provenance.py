@@ -19,8 +19,8 @@ from harbor.models.trial.config import TrialConfig
 from raidar.design.experiment.lock import spec_source_digest
 from raidar.design.problem.store import ImportedProblem
 from raidar.engine.job.detach import git_state
-from raidar.engine.job.plan import ExperimentPlan
 from raidar.engine.trial.config import verifier_timeout_s
+from raidar.engine.trial.plan import ExperimentPlan
 from raidar.grading.grader_image import grader_image_tag
 from raidar.subject.environment import load_runtime_pack
 from raidar.subject.environment.python.image import image_lock_hash

@@ -21,12 +21,12 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from raidar.contract.canonical import digest_json
+from raidar.contract.trial import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.design.problem.models import ProblemId
 from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.engine.trial.agent_config import AgentOverride, agent_digest
 from raidar.engine.trial.blueprint import ArmBlueprint, arm_blueprints
-from raidar.engine.trial.models import PlannedTrial, ProgressionRule, TrialHashes
 from raidar.engine.trial.progression import progression_rule
 from raidar.subject.environment.python.models import PackSpec
 

@@ -13,10 +13,10 @@ from raidar.cli.plan_build import build_cli_plan
 from raidar.cli.target_options import job_target, run_guarded, target_option
 from raidar.contract.paths import jobs_root
 from raidar.engine.job.detach import default_job_id
-from raidar.engine.job.plan import ExperimentPlan
 from raidar.engine.job.run import run_job
 from raidar.engine.job.run_checks import RunRefusedError, prepare_run
 from raidar.engine.trial.agent_config import AGENT_OVERRIDES
+from raidar.engine.trial.plan import ExperimentPlan
 
 
 def register(main: click.Group) -> None:

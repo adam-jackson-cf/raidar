@@ -8,15 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from raidar.engine.perf.phases import trial_phases
-from raidar.engine.trial.collect import (
-    TrialContext,
-    classify_trial,
-    execution_validity,
-    trial_exception,
-)
-from raidar.engine.trial.materialise import MaterialisedTask, compose_init
-from raidar.engine.trial.models import (
+from raidar.contract.trial import (
     ExecutionValidity,
     PhaseSample,
     PlannedTrial,
@@ -25,6 +17,14 @@ from raidar.engine.trial.models import (
     TrialRecord,
     ValidityCheck,
 )
+from raidar.engine.perf.phases import trial_phases
+from raidar.engine.trial.collect import (
+    TrialContext,
+    classify_trial,
+    execution_validity,
+    trial_exception,
+)
+from raidar.engine.trial.materialise import MaterialisedTask, compose_init
 from raidar.engine.trial.progression import derive_reached, strict_rule
 
 

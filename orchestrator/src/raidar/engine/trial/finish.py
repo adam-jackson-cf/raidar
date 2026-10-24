@@ -14,13 +14,13 @@ import traceback
 from pathlib import Path
 
 from raidar.contract.job_layout import TRIAL_RECORDS_DIR
+from raidar.contract.trial import ExecutionValidity, PlannedTrial, TrialRecord, ValidityCheck
 from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.fault_candidates import append_fault_candidates
 from raidar.engine.health.model import write_health
-from raidar.engine.job.context import JobContext
 from raidar.engine.perf.contention import read_manifest
 from raidar.engine.trial.collect import health_validity
-from raidar.engine.trial.models import ExecutionValidity, PlannedTrial, TrialRecord, ValidityCheck
+from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.record import write_record
 
 HEALTH_ERROR_FILE = "raidar-health-error.txt"

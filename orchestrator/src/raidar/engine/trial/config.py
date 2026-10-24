@@ -18,12 +18,12 @@ from typing import Any
 
 from harbor.models.trial.config import EnvironmentConfig, TaskConfig, TrialConfig, VerifierConfig
 
+from raidar.contract.trial import PlannedTrial
 from raidar.design.experiment.schema import ProtocolSpec
 from raidar.design.problem.rewrite import VERIFIER_IMPORT_PATH
-from raidar.engine.job.plan import ExperimentPlan
 from raidar.engine.trial.agent_config import with_host_auth
 from raidar.engine.trial.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.engine.trial.models import PlannedTrial
+from raidar.engine.trial.plan import ExperimentPlan
 
 # Harbor's verifier phase covers the grading run and the coverage run (each
 # bounded by grader_timeout_s) plus a grader-image presence check or build.

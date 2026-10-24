@@ -1,7 +1,7 @@
 """Execution records (plan WS-D): planned trials, step results, trial records.
 
 A ``PlannedTrial`` is one arm x attempt x problem trial (one Harbor
-multi-step trial). After it runs, ``trial_finish`` writes one ``TrialRecord``
+multi-step trial). After it runs, ``raidar.engine.trial.finish`` writes one ``TrialRecord``
 holding a ``StepResult`` per planned checkpoint (Harbor's per-step result),
 the execution-validity gate and the N1 phase timings. Correctness facts come
 from the host-only verifier records (``raidar-oracle/steps/<step>/record.json``,
@@ -19,6 +19,9 @@ from enum import StrEnum
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
+
+NOT_STARTED = "not_started"
+"""The ``StepResult.termination`` of a step that never started."""
 
 
 class ExecutionModel(BaseModel):

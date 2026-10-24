@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.engine.trial.models import TrialRecord
+from raidar.contract.trial import TrialRecord
 from raidar.evaluation.analysis.assessed import build_outcome
 from raidar.evaluation.review.quality.experiment_view import _primary
 from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection

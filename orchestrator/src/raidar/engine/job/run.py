@@ -17,14 +17,14 @@ from raidar.contract.job_layout import (
     JOB_MANIFEST,
     TRIAL_RECORDS_DIR,
 )
+from raidar.contract.trial import PlannedTrial, TrialRecord
 from raidar.design.problem.store import ImportedProblem, ProblemStore
 from raidar.engine.health.records_manifest import seal_trial
-from raidar.engine.job.context import JobContext
 from raidar.engine.job.manifest import start_job, write_json
-from raidar.engine.job.plan import ExperimentPlan
 from raidar.engine.target.job import JobTarget
+from raidar.engine.trial.context import JobContext
 from raidar.engine.trial.driver import run_in_order
-from raidar.engine.trial.models import PlannedTrial, TrialRecord
+from raidar.engine.trial.plan import ExperimentPlan
 from raidar.engine.trial.run import run_trial
 
 

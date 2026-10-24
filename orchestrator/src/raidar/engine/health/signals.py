@@ -16,10 +16,10 @@ from raidar.contract.job_layout import TRIAL_RECORDS_DIR, TRIALS_DIR
 from raidar.engine.health.base import Audit, make_check
 from raidar.engine.health.liveness import LIVENESS_REPORT
 from raidar.engine.health.model import PASS, UNMEASURED, VIOLATION, HealthCheck, HealthStatus
+from raidar.engine.health.reaper import load_reap_report
 from raidar.engine.health.records_manifest import tamper_findings
 from raidar.engine.health.tool_tree import TOOL_HASHES, load_tool_hashes
 from raidar.engine.perf.contention import peak_during, trial_window
-from raidar.engine.trial.reaper import load_reap_report
 from raidar.grading.records import step_record_dir
 
 _FINDINGS_SHOWN = 20

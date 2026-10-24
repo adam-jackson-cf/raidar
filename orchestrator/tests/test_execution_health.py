@@ -12,13 +12,13 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
+from raidar.contract.trial import CheckpointState, ValidityCheck
 from raidar.engine.health.audit import audit_trial
 from raidar.engine.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
 from raidar.engine.health.model import HealthCheck, HealthReport, load_health, write_health
+from raidar.engine.health.reaper import REAP_REPORT
 from raidar.engine.trial.collect import health_validity
 from raidar.engine.trial.finish import HEALTH_ERROR_FILE, audit_and_write
-from raidar.engine.trial.models import CheckpointState, ValidityCheck
-from raidar.engine.trial.reaper import REAP_REPORT
 from raidar.grading.records import step_record_dir
 from tests.execution_support import StepOutcome
 from tests.health_support import STEP, TRIAL_ID, HealthyTrial, healthy_trial

@@ -20,7 +20,7 @@ from raidar.subject.agent.harness import harness_definition
 
 if TYPE_CHECKING:
     from raidar.design.experiment.schema import ExperimentSpec
-    from raidar.engine.job.plan import ExperimentPlan
+    from raidar.engine.trial.plan import ExperimentPlan
 
 # Harbor's claude-code agent authenticates with an API key (ANTHROPIC_API_KEY, or
 # ANTHROPIC_AUTH_TOKEN) or a subscription token (CLAUDE_CODE_OAUTH_TOKEN).
