@@ -4,6 +4,73 @@ All notable changes to this project are documented in this file.
 
 ## 0.15.0 - 2026-10-24
 
+### Documentation
+
+- docs: explicit lock resolution, grading owners, final-pass record (design §11)
+- docs: tiers, singular names and the lab data locations (AGENTS, README, structure design §10)
+
+### Refactoring
+
+- refactor(target): select targets explicitly; drop implicit Docker-context fallback and python resolver script
+- refactor(engine): behaviour-named job/trial tests, TASKS_DIR in trial run, module paths in docstrings
+- refactor(contract): Harbor result.json reading and timing arithmetic in one module (keeps collect within the fan-out limit)
+- refactor(engine): trial records, timing and result reading move down to contract; the reaper joins health, provenance joins job, the plan and job context join trial
+- refactor(design): compiling an experiment's arm into treatment components moves up from subject to design/experiment; arm blueprints leave the job plan
+- refactor(scoring): headline metrics, ATIF and the scorer registry machinery sit in framework; built-in registrations, outcome metric catalogue and manipulation checks form the catalog tier
+- refactor(contract): canonical hashing, source digests and registry references move down to contract; import order and long-line fixes
+- refactor: move run-time data out of the code package into lab/ (treatment payloads, pack recipe, judge policies); fingerprints are repo-relative
+- refactor(raidar): singular folder names; drop parent-name prefixes from modules
+- refactor(raidar): rewrite imports in cli and tests for the stage layout
+- refactor(raidar): evaluation stage (analysis, review, ledger)
+- refactor(raidar): grading and scoring stages (verifier, scorers framework and packages, judge)
+- refactor(raidar): engine stage (targets, jobs, trials, health, perf)
+- refactor(raidar): contracts, design and subjects stages (core, spec, problems, agents, components, packs)
+
+### Chores
+
+- chore(lab): relock experiments for the tier layout
+- chore(imports): import-linter layers enforce the group tiers and the sub-tiers of engine, scoring, subject, design and evaluation
+- chore(lab): relock experiments for the stage layout
+- chore: stage layout config and docs (import contracts, structure-check, entry points, AGENTS, README, design record)
+
+### Other Changes
+
+- pack recipe: restore identity-bearing bytes (comment edit re-tagged the image and broke problem pins)
+- structure-check: grading/prefix and grading/coverage are owner folders
+- Scoring and trial config guidance fixes left uncommitted by the parallel passes; relock experiments
+- Move review fixture generators to tests; review-surface data errors explicit; fix job_layout lock doc
+- Resolve analysis verifier bundles from the problem store; drop bundle search
+- Tool cache under var root; plural lab/treatments and lab/environments; drop ticket tags from pack headers
+- Name metric tests for the floor policy, not versions
+- Group offline grading into prefix/ and coverage/, name tests for behaviour, explicit artifact path
+- cli, contract: drop dead snapshot helper and workstream labels; one resolver source per kind
+- evaluation/review: group fixture and synthetic generators in folders
+- review-surface: share one JSON data reader
+- review-surface: replace utils grab-bag with presentation folder and api types
+- uv.lock: sync project version 0.15.0
+
+- analysis: bundle resolution from the problem store within the fan-out and complexity limits; type two test helpers
+- analysis: assessment settings come from the lock or an explicit file, never the job's copy
+- cli: assess takes the explicit or current lock only
+- cli: name the command runner and git-state modules for what they hold
+- design: rename compat gate to runtime_gate, drop dead code and ticket refs
+- evaluation: resolve a job's lock by explicit reference only; one reader for job files
+- evaluation: drop workstream tags from docstrings; correct Quality C wording
+- gitignore: drop scaffold 'coverage/' rule that hid raidar.grading.coverage/**init**.py from CI
+- problems: pin the imported task stub digest; record the stub and validation-snapshot findings
+- problems: imported task stub keeps its pinned bytes (fresh imports reproduce the registry); validation trials download their snapshot explicitly
+- problems: resolve the store root explicitly (argument, env, lab/problems); no upward search
+- review: docs name job roots, not runs roots
+- Scoring: group gate-effort autofix and cross-mode, type precisely without ignores, trim wiring tests
+- Subject: builtin_definition name, merged prompt truncation, no PATH/version-command fallbacks, gate_without_autofix field
+- tests: validation trials use the download snapshot source
+- tests: shorten floor-policy analysis test name
+- tests: runtime gate refusals pass --lock explicitly
+- tests: behaviour names for review projection, quality projection and floor-policy analysis tests
+- Verifier: a missing or unusable /app artifact is an infra failure, never a download
+
+## 0.15.0 - 2026-10-24
+
 ### Features
 
 - feat: generated data root var/ (RAIDAR_VAR), make release-archive and structure-check
