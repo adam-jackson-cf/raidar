@@ -101,7 +101,11 @@ def _setup_sh_s(trial_dir: Path, step: str) -> float | None:
     path = trial_dir / "steps" / step / "agent" / RESET_REPORT
     if not path.is_file():
         return None
-    duration = json.loads(path.read_text()).get("duration_ms")
+    try:
+        report = json.loads(path.read_text())
+    except (OSError, ValueError):
+        return None
+    duration = report.get("duration_ms") if isinstance(report, dict) else None
     return duration / 1000 if isinstance(duration, int | float) else None
 
 

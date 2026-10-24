@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 ENV_TARGETS_FILE = "RAIDAR_TARGETS_FILE"
 ENV_TARGET = "RAIDAR_TARGET"
@@ -72,10 +72,17 @@ class TransportSpec(_Strict):
     identity: str | None = None
     remote_socket: str = Field(min_length=1)
 
+    @field_validator("host")
+    @classmethod
+    def _host_is_not_an_option(cls, host: str) -> str:
+        if host.startswith("-"):
+            raise ValueError("host must not start with '-' (ssh would read it as an option)")
+        return host
+
 
 class TargetSpec(_Strict):
     kind: Literal["docker"] = "docker"
-    docker_context: str | None = None
+    docker_context: str | None = Field(default=None, min_length=1)
     trusted: bool | None = None
     max_concurrency: int | None = Field(default=None, ge=1)
     grader: str | None = None
@@ -167,8 +174,10 @@ def _field_errors(path: Path, error: ValidationError) -> TargetError:
 
 
 def _build(name: str, spec: TargetSpec) -> Target:
-    if not _NAME.match(name):
-        raise TargetError(f"targets.{name}: names use letters, digits, '-' and '_'")
+    if not _NAME.fullmatch(name):
+        raise TargetError(f"targets.{name!r}: names use letters, digits, '-' and '_'")
+    if spec.data_check_expect and not spec.data_check:
+        raise TargetError(f"targets.{name}: data_check_expect is set without a data_check")
     transport = None
     if spec.transport is not None:
         if spec.docker_context is not None:

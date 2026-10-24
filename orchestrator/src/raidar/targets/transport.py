@@ -8,6 +8,7 @@ The tunnel outlives the command that started it.
 
 from __future__ import annotations
 
+import contextlib
 import os
 import signal
 import subprocess
@@ -169,9 +170,10 @@ def transport_up(
         raise ValueError(f"target {target.name!r} has no transport")
     paths = TransportPaths.of(target, base)
     transport_down(target, base=base, sleep=sleep)
+    paths.socket.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    ensure_context(target, paths, runner)
     process = spawner(ssh_argv(transport, paths.socket), paths.log)
     paths.pidfile.write_text(f"{process.pid}\n")
-    ensure_context(target, paths, runner)
     waited = 0.0
     while waited <= timeout_s:
         if process.poll() is not None:
@@ -196,13 +198,14 @@ def transport_down(
     pid = read_pid(paths)
     was_running = tunnel_running(paths)
     if pid is not None and was_running:
-        os.kill(pid, signal.SIGTERM)
-        waited = 0.0
-        while pid_alive(pid) and waited < _STOP_WAIT_S:
-            sleep(0.1)
-            waited += 0.1
-        if pid_alive(pid):
-            os.kill(pid, signal.SIGKILL)
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGTERM)
+            waited = 0.0
+            while pid_alive(pid) and waited < _STOP_WAIT_S:
+                sleep(0.1)
+                waited += 0.1
+            if pid_alive(pid):
+                os.kill(pid, signal.SIGKILL)
     paths.pidfile.unlink(missing_ok=True)
     paths.socket.unlink(missing_ok=True)
     return was_running

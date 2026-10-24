@@ -93,6 +93,14 @@ def test_trusted_can_be_set_explicitly_on_a_transport_target(tmp_path: Path) -> 
         ('[targets.a]\ndocker_context = "x"\ngrader = "nope"\n', "'nope' is not a defined target"),
         ('default = "nope"\n[targets.a]\ndocker_context = "x"\n', "default: 'nope'"),
         ('[targets."bad name"]\ndocker_context = "x"\n', "names use letters"),
+        ('[targets."a\\n"]\ndocker_context = "x"\n', "names use letters"),
+        ('[targets.a]\ndocker_context = ""\n', "targets.a.docker_context"),
+        ('[targets.a]\ndocker_context = "x"\ndata_check_expect = "ok"\n', "without a data_check"),
+        (
+            '[targets.a.transport]\nkind = "ssh-socket"\nhost = "-oProxyCommand=x"\n'
+            'remote_socket = "/s"\n',
+            "must not start with '-'",
+        ),
         ("[targets.a\n", "invalid targets file"),
         (
             '[targets.a]\ndocker_context = "x"\n[targets.a.transport]\nkind = "ssh-socket"\n'

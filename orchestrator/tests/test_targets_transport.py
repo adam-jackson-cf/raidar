@@ -175,6 +175,39 @@ def test_up_reports_a_tunnel_that_exits(tmp_path: Path) -> None:
         )
 
 
+def test_up_does_not_leave_a_tunnel_behind_when_the_context_cannot_be_set(
+    tmp_path: Path,
+) -> None:
+    mbp = targets(tmp_path)["mbp"]
+    docker = FakeDocker()
+    tunnel = FakeTunnel(docker)
+    plain_run = docker.__call__
+
+    def failing_context(
+        argv: Sequence[str], timeout: float | None = None
+    ) -> subprocess.CompletedProcess[str]:
+        if list(argv)[:3] == ["docker", "context", "create"]:
+            return subprocess.CompletedProcess(list(argv), 1, stdout="", stderr="denied")
+        return plain_run(argv, timeout)
+
+    with pytest.raises(RuntimeError, match="docker context setup failed"):
+        transport_up(
+            mbp, runner=failing_context, spawner=tunnel, base=tmp_path, sleep=lambda _: None
+        )
+
+    assert tunnel.spawned == []
+
+
+def test_the_state_directory_is_created_private(tmp_path: Path) -> None:
+    mbp = targets(tmp_path)["mbp"]
+    docker = FakeDocker()
+    base = tmp_path / "run"
+
+    transport_up(mbp, runner=docker, spawner=FakeTunnel(docker), base=base, sleep=lambda _: None)
+
+    assert base.stat().st_mode & 0o777 == 0o700
+
+
 def test_up_gives_up_when_the_daemon_never_answers(tmp_path: Path) -> None:
     mbp = targets(tmp_path)["mbp"]
     docker = FakeDocker()
