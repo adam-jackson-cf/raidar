@@ -7,11 +7,11 @@ description: "Use when extracting, recording, reconciling or targeting conceptua
 
 ## Inputs
 
-- The ledger: `ledger/faults/FCR-NNN.md` and `ledger/remedies/M-NNN.md` (see
+- The ledger: `lab/ledger/faults/FCR-NNN.md` and `lab/ledger/remedies/M-NNN.md` (see
   [the record schema](references/fault-category-record-schema.md#catalog-location)).
   Read the ledger and every record you may change before changing it. A
   requester may name another location.
-- The job(s) to analyse, as `jobs/<group>/<experiment-id>/<job-id>` directories,
+- The job(s) to analyse, as `var/jobs/<group>/<experiment-id>/<job-id>` directories,
   plus their Assessment store and `analysis.json`. Persisted job artifacts are the
   authority; reports and summaries are projections.
 - Use [the Raidar evidence map](references/raidar-evidence-map.md) to find each

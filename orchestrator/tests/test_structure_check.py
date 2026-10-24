@@ -103,7 +103,8 @@ def test_package_depth_is_capped_at_three_below_raidar() -> None:
 
     assert structure.package_violations([allowed]) == []
     assert structure.package_violations([too_deep]) == [
-        f"package nests deeper than 3 below raidar/: {RAIDAR}/scorers/code_quality/tool_env/snapshot_tool"
+        "package nests deeper than 3 below raidar/: "
+        f"{RAIDAR}/scorers/code_quality/tool_env/snapshot_tool"
     ]
 
 
@@ -143,10 +144,6 @@ def test_main_exits_zero_on_a_clean_layout_and_one_on_a_violation(tmp_path: Path
 
 
 def test_this_repository_has_no_legacy_top_level_directories() -> None:
-    top_level = {
-        path.split("/", 1)[0]
-        for path in structure.repo_paths(REPO_ROOT)
-        if "/" in path
-    }
+    top_level = {path.split("/", 1)[0] for path in structure.repo_paths(REPO_ROOT) if "/" in path}
 
     assert top_level <= structure.ROOT_DIRECTORIES

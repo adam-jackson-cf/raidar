@@ -22,7 +22,7 @@ verifier and its rewards, ATIF trajectories, the Assessment store and
 
 ## Example prompts
 
-- "Extract fault categories from jobs/pilot-v2/python__forge__guided-pilot/{forge-02,forge-03}."
+- "Extract fault categories from var/jobs/pilot-v2/python__forge__guided-pilot/{forge-02,forge-03}."
 - "Why is the guided arm worse? Reconcile the evidence with the catalog."
 - "Propose the next guided revision as a locked experiment."
 
@@ -56,8 +56,8 @@ Refined in the port:
 
 Still needs refining:
 
-- **Catalog location.** The tracked home is `ledger/` (`ledger/faults/`,
-  `ledger/remedies/`, generated `ledger/README.md`), checked by
+- **Catalog location.** The tracked home is `lab/ledger/` (`lab/ledger/faults/`,
+  `lab/ledger/remedies/`, generated `lab/ledger/README.md`), checked by
   `make ledger-check`. Iteration 1's single-document catalog,
   `docs/reboot/pilot-v2-fault-catalog.md`, predates it and is not migrated
   except for the faults still open, which are seeded in the ledger.

@@ -1,7 +1,7 @@
 # Validate the jobs and analyse completed trials
 
 1. Accept a set of completed jobs of one experiment
-   (`jobs/<group>/<experiment-id>/<job-id>`), the Assessment store they were
+   (`var/jobs/<group>/<experiment-id>/<job-id>`), the Assessment store they were
    assessed into, and the `analysis.json` produced from them. Do not launch,
    resume, stop or clean up jobs; if an input is missing, name the public
    `make` target that produces it (`experiment-assess`, `experiment-analyze`)

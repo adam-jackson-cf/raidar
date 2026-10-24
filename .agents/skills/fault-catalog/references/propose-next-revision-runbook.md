@@ -32,7 +32,7 @@ locked but not executed.
 ## Steps
 
 1. Read the targeted records and the incumbent experiment's `experiment.yaml`.
-2. Create `experiments/ab-test/<runtime>__<subject>__<intent>/` (a new
+2. Create `lab/experiments/ab-test/<runtime>__<subject>__<intent>/` (a new
    experiment, because the baseline arm is the incumbent condition). Copy the
    incumbent's components; write the candidate's beside them.
 3. Write `experiment.yaml`: the incumbent and candidate conditions, arms

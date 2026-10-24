@@ -19,7 +19,7 @@ Complements Python quality checks; does not replace deterministic gates.
 - Keep folders grouped by responsibility and import boundary, not by incidental file type.
 - Add a new package only when it owns a stable concept, API boundary, or workflow slice.
 - Avoid catch-all directories unless Raidar already has a specific established convention for them.
-- Keep generated runtime surfaces such as `runs/`, Assessment stores, `problems/store/`, `problems/cache/`, `experiments/` (scenario-epoch history), `.tmp/`, and `.cache/` out of canonical source-quality reasoning.
+- Keep generated runtime surfaces such as `runs/`, Assessment stores, `var/problems/store/`, `var/problems/cache/`, `lab/experiments/` (scenario-epoch history), `var/tmp/`, and `.cache/` out of canonical source-quality reasoning.
 
 ## Object Choice
 

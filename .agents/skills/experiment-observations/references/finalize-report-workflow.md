@@ -1,7 +1,7 @@
 # Create and finalise the observations report
 
 1. Write a new, never-overwritten report at
-   `analysis/<experiment-id>/observations-<NNN>.md` (three digits, one above the
+   `var/analysis/<experiment-id>/observations-<NNN>.md` (three digits, one above the
    highest existing; recheck if the path exists). Write elsewhere only when the
    user names a path.
 2. Make the report evidence-first. Include: the question and the cohort (jobs,
@@ -45,7 +45,7 @@
 
    `Full report`
 
-   - `[observations-<NNN>.md](analysis/<experiment-id>/observations-<NNN>.md)`
+   - `[observations-<NNN>.md](var/analysis/<experiment-id>/observations-<NNN>.md)`
 
 6. Fill every placeholder from Step 1 and Step 2. Write `- None observed.` under
    `Observed fault types` when there are none. Add no other section.

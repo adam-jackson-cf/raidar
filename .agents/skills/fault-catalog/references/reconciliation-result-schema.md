@@ -46,13 +46,13 @@ reconciled_faults:
         reasoning_effort: low
         checkpoints: [checkpoint_1, checkpoint_2]
     concise_measured_evidence: "pytest missing in 65/128 guided implementer sessions."
-    record_link: "ledger/faults/FCR-003.md"
+    record_link: "lab/ledger/faults/FCR-003.md"
     changed_record_ids: [FCR-003]
 
 unresolved_candidates:
   - candidate_evidence: "Measured non-canonical candidate and its scope."
     artifact_links:
-      - "jobs/<group>/<experiment>/<job>/trials/<trial>/raidar-oracle/steps/<checkpoint>/grading.log:120"
+      - "var/jobs/<group>/<experiment>/<job>/trials/<trial>/raidar-oracle/steps/<checkpoint>/grading.log:120"
     reason: "Not distinct from FCR-005 yet; no catalog change."
 ```
 

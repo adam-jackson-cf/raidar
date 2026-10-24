@@ -46,7 +46,7 @@ Refined in the port:
 
 Still needs refining:
 
-- **Report location.** `analysis/<experiment-id>/` is gitignored, so reports are
+- **Report location.** `var/analysis/<experiment-id>/` is gitignored, so reports are
   local unless the user asks for a tracked copy (iteration 1's catalog went to
   `docs/reboot/` with consent).
 - **No public target computes the per-case failure matrix**; Step 1 uses ad hoc

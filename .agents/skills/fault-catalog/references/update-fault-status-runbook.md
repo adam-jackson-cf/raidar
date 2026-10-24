@@ -8,7 +8,7 @@ a resolved record, or make no catalog change.
 
 ## Preconditions
 
-- Read the ledger (`ledger/`), every potentially matching record and the
+- Read the ledger (`lab/ledger/`), every potentially matching record and the
   [Fault Category Record schema](fault-category-record-schema.md).
 - Use persisted job artifacts as evidence ([evidence map](raidar-evidence-map.md)).
   An observations report may point to candidates but cannot justify a creation
