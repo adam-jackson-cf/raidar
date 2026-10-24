@@ -38,11 +38,11 @@ BUILTIN_IMPLEMENTATIONS: dict[str, str] = {
 # Scorers bound to the assessment store at rescore time.
 BUILTIN_STORE_IMPLEMENTATIONS: dict[str, str] = {
     # gate-effort reads the offline grades of guardrail-gate's pre-fix snapshots,
-    # which ``raidar assess --rescore`` writes to the store (raidar.grading.prefix_grade).
+    # which ``raidar assess --rescore`` writes to the store (raidar.grading.prefix.grade).
     "gate-effort@10": "raidar.scoring.gate_effort:gate_effort_scorer_for_store",
     # code-quality reads the offline coverage runs of steps whose trial deferred the
     # coverage pass, which ``raidar assess --rescore`` makes into the store
-    # (raidar.grading.coverage_offline).
+    # (raidar.grading.coverage.offline).
     "code-quality@3": "raidar.scoring.code_quality:code_quality_scorer_for_store",
 }
 # Config keys a scorer takes from the problem unless the experiment sets them.

@@ -26,7 +26,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
-from raidar.grading.coverage_store import read_offline_coverage
+from raidar.grading.coverage.store import read_offline_coverage
 from raidar.grading.models import ParityVerdict
 from raidar.grading.records import FORK_EVIDENCE_FILE
 from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence

@@ -42,10 +42,10 @@
       },
       "scorer": {
         "correctness@1": {
-          "digest": "4b9e1e40cea4c81f3cc4b024a2869913517907f7cf1a7460e4b449172d89134c",
+          "digest": "78e8f99d2b715e049a7cbc60368720d6bc38f0a05bb34aba7075f114c27aef33",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "c4b73b18f6df955e55ffd9ff98faf25187f06ee46d60f1e2344a4b3dc3e3b40e",
+            "implementation_digest": "da199703e1610267d514ac6956f12c14dd76694a435aee2ffce814faf64daf29",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -223,7 +223,7 @@
     },
     "tools": {}
   },
-  "document_sha256": "baa9914395ad5c5ab83f911a43184795469b822bbc0079da6bce18fb410551a6",
+  "document_sha256": "74be52193680903da6195e3c018ba5a9a54df721bda6cfdaddfe68b13d920aef",
   "execution": {
     "arms": {
       "claude": {
@@ -369,9 +369,9 @@
   },
   "sections": {
     "analysis": "0a0fb32297e0c3abaad1f91cb80990bf42b3a3f0854246915ae017492003d1bc",
-    "assessment": "1c641fcd5ee4195c04ea2982456e9e4be1633c9ee30a276764ae915d78ae5f59",
+    "assessment": "20c5834d888f5ae5135460a9f2ffceae7e282f82d59f38f0681e5bb5796ba60d",
     "execution": "1fef5da2c46a18f32154b93ee5abf47f1831cf55a73aeff181342b9e04028583",
-    "toolchain": "ff330c097ff7ab1fdf12dac61fd68c94efb7e3f4b243cd3d0fb7699aa90797f1"
+    "toolchain": "caf69c8bee7081c97084bd13d2d37a95e909495e09efd5424501ce0ad4e87489"
   },
   "spec": {
     "agents": [
@@ -461,6 +461,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c14bd8cc34b8391e9025c5ed7c1b7186f497b82f222bf70b09abdea9084865ea"
+    "raidar_spec": "2d5fd95351dbd6a42ec1a1dd94602c87b0e7e0f4ceb301ad5f9e1a004e258357"
   }
 }

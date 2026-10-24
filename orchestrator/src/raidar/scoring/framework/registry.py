@@ -35,7 +35,7 @@ from raidar.contract.runtimes import ANY_RUNTIME
 from raidar.contract.source_digest import SOURCE_DIGEST_SCHEME, python_source_digest
 from raidar.scoring.framework.context import Scorer
 from raidar.scoring.framework.manifest import ScorerManifest
-from raidar.subject.environment.python.models import ToolLock, load_tool_lock
+from raidar.subject.environment.python.pack_definition import ToolLock, load_tool_lock
 
 LockedTools = dict[str, dict[str, dict[str, Any]]]
 RUNTIME_TOOL_LOCKS: dict[str, Callable[[], ToolLock]] = {"python": load_tool_lock}

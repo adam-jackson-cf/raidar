@@ -4,7 +4,7 @@ A step whose trial made the verifier's coverage pass is read from its record's p
 verdict and ``g-kernel-input.json`` (``transition.in_trial_run_evidence``); a step whose
 trial deferred it (``protocol.verifier_coverage: offline``) reads the offline coverage run
 that ``raidar assess --rescore`` makes into the Assessment store
-(``raidar.grading.coverage_offline``; read through ``raidar.grading.coverage_store``),
+(``raidar.grading.coverage.offline``; read through ``raidar.grading.coverage.store``),
 keyed by the step's bundle digest, step and snapshot digest. A run not produced yet makes G
 ``unavailable`` and the Assessment provisional (``awaiting_answers``), so a later rescore
 completes it instead of reusing it.
@@ -22,7 +22,7 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
-from raidar.grading.coverage_store import read_offline_coverage
+from raidar.grading.coverage.store import read_offline_coverage
 from raidar.grading.records import StepRecord
 from raidar.scoring.code_quality.checkpoint import Gap
 from raidar.scoring.code_quality.lineage_models import RegressionRunEvidence

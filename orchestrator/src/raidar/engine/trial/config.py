@@ -6,7 +6,7 @@ through ``TrialConfig.verifier`` (it is not a ``task.toml`` setting in Harbor
 copy of ``/app`` (accepted N1 decision ``snapshot_source=artifact``) with the
 separate coverage pass on, unless the protocol defers it
 (``verifier_coverage: offline``: assessment makes it from the stored snapshots,
-``raidar.grading.coverage_offline``). A problem whose lock pins an errata passes it to the
+``raidar.grading.coverage.offline``). A problem whose lock pins an errata passes it to the
 verifier, which records the errata-applied verdict beside the raw grade.
 """
 

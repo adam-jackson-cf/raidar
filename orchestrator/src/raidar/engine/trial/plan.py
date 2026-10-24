@@ -28,7 +28,7 @@ from raidar.design.problem.store import ProblemStore, ProblemStoreError
 from raidar.engine.trial.agent_config import AgentOverride, agent_digest
 from raidar.engine.trial.blueprint import ArmBlueprint, arm_blueprints
 from raidar.engine.trial.progression import progression_rule
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 
 
 class PlanError(ValueError):

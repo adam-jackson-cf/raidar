@@ -9,7 +9,7 @@ from harbor.models.trial.config import AgentConfig
 from raidar.design.experiment.arm import compile_arm
 from raidar.design.experiment.loader import LoadedExperiment
 from raidar.engine.trial.agent_config import AgentOverride, arm_agent_config
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.treatment import CompiledCondition
 
 

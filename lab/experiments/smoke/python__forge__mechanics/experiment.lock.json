@@ -41,10 +41,10 @@
       },
       "scorer": {
         "code-quality@3": {
-          "digest": "f59ddb3bb25f2128e0af25710305a08b6d529029d35e1a34e3b8b805bcc9ab32",
+          "digest": "a14bd039490dd81efb9c994d0f8e20c958fbb4c19001d38ea2c8fa541078cef2",
           "metadata": {
             "implementation": "raidar.scoring.code_quality:code_quality_scorer",
-            "implementation_digest": "99444913e6b58caca5e0ca215104d344ec969f01899aff6a37ada618c5b99320",
+            "implementation_digest": "43bded5c6b773a96e7045eb2b4c1db25baf640c7579a172d913de68e1124620f",
             "manifest": {
               "description": "SCB-fork code-quality and inertia components over the per-step snapshots; a step graded without the in-trial coverage pass reads G's coverage run from the offline run in the Assessment store, and G leaves out at most 3 cases whose outcome differs between the grading and coverage runs instead of reading the step as ineligible.",
               "evidence_required": [
@@ -263,10 +263,10 @@
           }
         },
         "correctness@1": {
-          "digest": "4b9e1e40cea4c81f3cc4b024a2869913517907f7cf1a7460e4b449172d89134c",
+          "digest": "78e8f99d2b715e049a7cbc60368720d6bc38f0a05bb34aba7075f114c27aef33",
           "metadata": {
             "implementation": "raidar.scoring.correctness:correctness_scorer",
-            "implementation_digest": "c4b73b18f6df955e55ffd9ff98faf25187f06ee46d60f1e2344a4b3dc3e3b40e",
+            "implementation_digest": "da199703e1610267d514ac6956f12c14dd76694a435aee2ffce814faf64daf29",
             "manifest": {
               "description": "Oracle verdicts per checkpoint and trajectory, from the oracle step records.",
               "evidence_required": [
@@ -430,10 +430,10 @@
           }
         },
         "process-compliance@6": {
-          "digest": "df6c95553994ead661951e4160f3db10c270409a33d14f043911bb8505662299",
+          "digest": "77a0736069d32f221e484de9cd410c36bfac146dd75d28529a354263f0b1e7b4",
           "metadata": {
             "implementation": "raidar.scoring.process_checks:deterministic_process_compliance_scorer",
-            "implementation_digest": "1561ec2ae6a69ade3355fbc7a58faee74e7cc7043301bd159d69436934186d2e",
+            "implementation_digest": "138557406040f75c821a232458606ce29a902f966615f03c369c63e9228ff203",
             "manifest": {
               "description": "Deterministic trace checks of agent process (stall outcomes, a test command counts only when it ran, the step's work session's own test run after its last edit, a compliance rate without the plan check unless the condition asks for a plan); a check the trace cannot decide is undetermined, never judged by a model. Adds whether the work session ran the tests at all, and whether it ran them after its last edit to a non-test file.",
               "evidence_required": [
@@ -634,10 +634,10 @@
           }
         },
         "resource-usage@1": {
-          "digest": "fb9351bfdd022877ee6e4fe58e5cb0f4e57fe6c8afa11a75858d6caeb827ef42",
+          "digest": "7ec1ce00b54134487de82e30a2f1a81342c07323379f7becd18f4d095a5f06bd",
           "metadata": {
             "implementation": "raidar.scoring.resource_usage:resource_usage_scorer",
-            "implementation_digest": "5b414efa000aba98b81c76a5b78b08487157b801b05dea2fe22d6fa4d688c0e7",
+            "implementation_digest": "2c8fa7d4b134eed7d4075e15fb3e572cc0d38f147ec9c2f8d8f184c1a7a4c6ce",
             "manifest": {
               "description": "Tokens, cost, turns and agent wall time from Harbor per-step usage and timing.",
               "evidence_required": [
@@ -789,13 +789,13 @@
       "tree-sitter-language-pack": "0.13.0"
     }
   },
-  "document_sha256": "42f5932ef17d3f83dc4a0f2410e2d11f340c2185b2e51c7e2449836bbca1ab0c",
+  "document_sha256": "605de5e3234553085289f9cad3a997e71d341851469909511a4b58f364b06292",
   "execution": {
     "arms": {
       "baseline": {
         "agent": "agent",
         "condition": "baseline",
-        "digest": "004f683f903b89973cff9bb53bad6d4634180f020ef11b4f7600bbae64ba5ad5"
+        "digest": "86357ae1e58c156af9dc73fc8572052e991e60c1e67d0c21512594913f440b66"
       }
     },
     "conditions": {
@@ -805,7 +805,7 @@
             "components/shared/starter-framing.md": "338598d54867bf5b18bdc9f2530f99c2a93c8d7ed57604582f871bf52260d15c"
           },
           "use": "prompt-wrapper@1",
-          "use_digest": "06be54cff7562ec05df32c9f96f676a7195b045b0de2d9aba14329c9fc4e40ef",
+          "use_digest": "229c5096026130d97e7c0aff94931d809aa7641a02667da8b80efafdb8cdfbe5",
           "with": {}
         }
       ]
@@ -883,7 +883,7 @@
     "references": {
       "component": {
         "prompt-wrapper@1": {
-          "digest": "06be54cff7562ec05df32c9f96f676a7195b045b0de2d9aba14329c9fc4e40ef",
+          "digest": "229c5096026130d97e7c0aff94931d809aa7641a02667da8b80efafdb8cdfbe5",
           "metadata": {
             "discovery_probe": "prompt-wrapper-rendered",
             "kind": "prompt",
@@ -980,7 +980,7 @@
     "source_sha256": "73c016377dffd7a9facbf962ac4079fa5f7e77cdec22b93d67e73fd73e2e3a58",
     "spec_sha256": "43f1c6560562b63320c50ba381c4a80a60d24536ad855fa0ba04306e446f5bc0"
   },
-  "lock_sha256": "19dd3618e98f27baf0891aaa3b7d0e98caacd99dd6866f2913c0496f9432f4a4",
+  "lock_sha256": "bd9ce1000787ca830b24b1f9723e42703f705374c45b17eef259108db9475578",
   "lock_version": 3,
   "overrides": {
     "flags": {},
@@ -988,9 +988,9 @@
   },
   "sections": {
     "analysis": "144d50057229f81b6136f89cfe8df3c9cf5dbbbec9a279c66acba88e027528b3",
-    "assessment": "2d128e3976785618af89e23038b2fc2494b458f78029854ed1e180153b79fb82",
-    "execution": "19dd3618e98f27baf0891aaa3b7d0e98caacd99dd6866f2913c0496f9432f4a4",
-    "toolchain": "ff330c097ff7ab1fdf12dac61fd68c94efb7e3f4b243cd3d0fb7699aa90797f1"
+    "assessment": "c58f70b606c5b65c63cbe5d40d8e7b1d9a345f1b8aae81298476992993af5173",
+    "execution": "bd9ce1000787ca830b24b1f9723e42703f705374c45b17eef259108db9475578",
+    "toolchain": "caf69c8bee7081c97084bd13d2d37a95e909495e09efd5424501ce0ad4e87489"
   },
   "spec": {
     "agents": [
@@ -1077,6 +1077,6 @@
     "litellm": "1.102.1",
     "python": "3.13.7",
     "raidar": "0.15.0",
-    "raidar_spec": "c14bd8cc34b8391e9025c5ed7c1b7186f497b82f222bf70b09abdea9084865ea"
+    "raidar_spec": "2d5fd95351dbd6a42ec1a1dd94602c87b0e7e0f4ceb301ad5f9e1a004e258357"
   }
 }

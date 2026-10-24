@@ -24,7 +24,7 @@ from raidar.design.experiment.schema import AgentEntry
 from raidar.subject.agent.codex_auth import resolve_codex_auth
 from raidar.subject.agent.config import Harness
 from raidar.subject.environment.python.harness import harbor_agent_kwargs
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 from raidar.subject.treatment import HARBOR_AGENT_NAMES, CompiledCondition
 from raidar.subject.treatment.runtime.session_chain import (
     apply_session_wrappers,
