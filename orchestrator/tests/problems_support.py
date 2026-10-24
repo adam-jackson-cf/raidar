@@ -8,9 +8,7 @@ bundle, references) for two problems:
 - ``fixture/adder_negative``: reference 1 already implements ``mul``, so the
   checkpoint-2 tests pass on reference k-1 and validation must exclude it.
 
-The same builder produced the committed fixture store at
-``problems/fixtures/adder`` (used by the recorded Docker run of
-``raidar problem validate``); a test keeps the two identical.
+Tests build the store into a temporary directory; no copy is committed.
 """
 
 from __future__ import annotations
@@ -46,7 +44,6 @@ FIXTURE_BASE_IMAGE = (
 POSITIVE_REF = f"fixture/adder@{FIXTURE_VERSION}"
 NEGATIVE_REF = f"fixture/adder_negative@{FIXTURE_VERSION}"
 ONESHOT_REF = f"fixture/adder.checkpoint_1@{FIXTURE_VERSION}"
-COMMITTED_FIXTURE = Path(__file__).resolve().parents[2] / "lab" / "problems" / "fixtures" / "adder"
 SOURCES_YAML = f"""# Test fixture store (orchestrator/tests/problems_support.py builds it).
 sources:
   fixture:

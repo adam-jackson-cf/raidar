@@ -1,6 +1,0 @@
-# Test fixture store (orchestrator/tests/problems_support.py builds it).
-sources:
-  fixture:
-    format: scb-problems
-    url: fixture://adder
-    commit: fefefefefefefefefefefefefefefefefefefefe

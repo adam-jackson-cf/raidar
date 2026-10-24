@@ -49,7 +49,6 @@ from tests.experiment_spec_support import (
     write_experiment,
 )
 from tests.problems_support import (
-    COMMITTED_FIXTURE,
     NEGATIVE_REF,
     ONESHOT_REF,
     POSITIVE_REF,
@@ -353,19 +352,6 @@ def test_resolver_entry_point_discovers_the_store_from_the_experiment_dir(
     assert isinstance(resolver_factory(), ProblemResolver)
 
 
-def test_committed_fixture_store_matches_its_builder(tmp_path: Path) -> None:
-    built = build_fixture_store(tmp_path / "adder").root
-
-    def files(root: Path) -> dict[str, bytes]:
-        return {
-            p.relative_to(root).as_posix(): p.read_bytes()
-            for p in sorted(root.rglob("*"))
-            if p.is_file() and not p.name.endswith(".validation.json")
-        }
-
-    assert files(COMMITTED_FIXTURE) == files(built)
-
-
 @pytest.mark.parametrize(
     ("ref", "policy", "checkpoints"),
     [(ONESHOT_REF, "scb-canonical-oneshot@1", 1), (POSITIVE_REF, "scb-canonical@1", 2)],
@@ -449,8 +435,11 @@ def test_only_a_usable_verdict_for_the_current_manifest_resolves(tmp_path: Path)
         _resolve(store, "fixture/missing@fefefefefefe", tmp_path)
 
 
-def test_manifests_without_an_entry_file_keep_their_recorded_bytes_and_digest() -> None:
-    manifests = sorted((COMMITTED_FIXTURE / "registry").rglob("*.json"))
+def test_manifests_without_an_entry_file_keep_their_recorded_bytes_and_digest(
+    tmp_path: Path,
+) -> None:
+    store_root = build_fixture_store(tmp_path / "problems").root
+    manifests = sorted((store_root / "registry").rglob("*.json"))
     assert manifests
     for path in manifests:
         if path.name.endswith(".validation.json"):
