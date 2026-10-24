@@ -4,6 +4,10 @@ All notable changes to this project are documented in this file.
 
 ## 0.15.0 - 2026-10-24
 
+- pack: drop planning tags from parsed recipe comments; a test holds the Dockerfile's tag to the next pack release
+
+## 0.15.0 - 2026-10-24
+
 ### Documentation
 
 - docs: explicit lock resolution, grading owners, final-pass record (design §11)
