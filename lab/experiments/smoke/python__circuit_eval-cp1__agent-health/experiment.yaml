@@ -2,16 +2,16 @@
 # problem x one arm x one attempt, graded by the host-only verifier, correctness only.
 # It proves the experiment path end to end (lock -> Harbor trial -> verifier -> job.json);
 # kind smoke: same engine, but its analysis is stamped not citable. The smoke targets
-# relock it under .tmp/ with their overrides (agent, attempts, timeout), so this file
+# relock it under var/tmp/ with their overrides (agent, attempts, timeout), so this file
 # stays the default. Formerly examples/smoke/experiment.yaml (id smoke).
-# Validate: make experiment-validate EXPERIMENT=experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
+# Validate: make experiment-validate EXPERIMENT=lab/experiments/smoke/python__circuit_eval-cp1__agent-health/experiment.yaml
 schema_version: 2
 kind: smoke
 id: python__circuit_eval-cp1__agent-health
 description: Operational smoke of the experiment path; not citable.
 
 problems:
-  # The pilot's one-shot problem (validated, see problems/registry/scb/).
+  # The pilot's one-shot problem (validated, see lab/problems/registry/scb/).
   - ref: scb/circuit_eval.checkpoint_1@38d627ecf668
 
 runtime: python

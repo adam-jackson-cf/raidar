@@ -1,15 +1,15 @@
-# Mechanics-v1 declaration smoke (ADR-002, design r2 §5 step 7): the 8-checkpoint forge
+# Mechanics declaration smoke (ADR-002, design r2 §5 step 7): the 8-checkpoint forge
 # problem x one vanilla codex arm x one attempt, through the copy-only path on the
 # configured Docker target, with run-health and liveness (observe) recorded.
-# It proves the multi-checkpoint path end to end on the v1 mechanics; kind smoke, not citable.
+# It proves the multi-checkpoint path end to end on the current run mechanics; kind smoke, not citable.
 # The pilot-v2 starter framing (prompt-wrapper@1, byte-identical copy) is required: without it
 # vanilla codex sees an empty /app, asks a question and writes nothing (pilot F1; observed again
-# in job mechanics-v1-01).
-# Run detached: make experiment-execute EXPERIMENT=experiments/smoke/python__forge__mechanics-v1/experiment.yaml JOB_ID=<id> DETACH=1
+# in the first mechanics smoke job).
+# Run detached: make experiment-execute EXPERIMENT=lab/experiments/smoke/python__forge__mechanics/experiment.yaml JOB_ID=<id> DETACH=1
 schema_version: 2
 kind: smoke
-id: python__forge__mechanics-v1
-description: Mechanics-v1 declaration smoke on forge (8 checkpoints); not citable.
+id: python__forge__mechanics
+description: Mechanics declaration smoke on forge (8 checkpoints); not citable.
 
 problems:
   - ref: scb/forge@38d627ecf668
@@ -44,7 +44,7 @@ arms:
     agent: agent
 
 assessment:
-  scorers: [correctness@1, code-quality@1, resource-usage@1, process-compliance@2]
+  scorers: [correctness@1, code-quality@3, resource-usage@1, process-compliance@6]
   metric: scb-canonical@2
 
 analysis:
