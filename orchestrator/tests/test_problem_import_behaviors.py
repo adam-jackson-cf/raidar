@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -143,6 +144,20 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
         "checkpoint_2",
     ]
     assert VERIFIER_IMPORT_PATH == "raidar.grading.verifier:RaidarVerifier"
+
+
+# sha256 of task/tests/test.sh in every problem registered since 2026-09-30.
+RELEASED_STUB_TEST_SH_SHA256 = "ebd7fd24b020b73cd159d980ff998a6200dbf3ca941b847123e8d7bcc65f82f0"
+
+
+def test_imported_task_stub_keeps_the_bytes_bound_by_registered_pins(
+    scb: tuple[ProblemStore, Path, str],
+) -> None:
+    store, repo, commit = scb
+    result = import_problem(store, _ref(commit), source_checkout=repo)
+    stub = result.content_dir / "task" / "tests" / "test.sh"
+    # A changed stub changes every pinned task_sha256: that is a re-release, not a refactor.
+    assert hashlib.sha256(stub.read_bytes()).hexdigest() == RELEASED_STUB_TEST_SH_SHA256
 
 
 def test_reimport_reproduces_the_manifest_and_refuses_drift_unless_updating(
