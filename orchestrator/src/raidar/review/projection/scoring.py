@@ -17,14 +17,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from raidar.analysis.assessed import CODE_QUALITY_REF
+from raidar.analysis.outcomes import CORRECTNESS_REF
 from raidar.execution.models import CheckpointState, StepResult, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments
-from raidar.review.projection.headline import (
-    COMPONENT_METRICS,
-    CORRECTNESS_SCORER,
-    Headline,
-    policy_shares,
-)
+from raidar.review.projection.headline import COMPONENT_METRICS, Headline, policy_shares
 from raidar.review.projection.notes import EvidenceRef, Finding
 from raidar.review.projection.spans import SpanBuilder
 from raidar.scorers.sdk.result import AssessStatus, Observation
@@ -45,7 +41,7 @@ class ScoringContext:
 
 def _checkpoint_payload(step_result: StepResult, assessments: TrialAssessments) -> dict:
     solved = step_result.checkpoint_state is CheckpointState.SOLVED
-    assessment = assessments.get(CORRECTNESS_SCORER)
+    assessment = assessments.get(CORRECTNESS_REF)
     observations = (
         [
             item.model_dump(mode="json")
@@ -75,13 +71,13 @@ def _correctness(ctx: ScoringContext, scoring: str) -> None:
     if ctx.headline.diagnostic is not None:
         base, _ = policy_shares(DEFAULT_METRIC_REGISTRY.get(ctx.headline.policy))
         area = ctx.builder.add(
-            name=f"scorer:{CORRECTNESS_SCORER}",
+            name=f"scorer:{CORRECTNESS_REF}",
             span_type="INTERNAL",
             status="OK",
             parent=scoring,
             start=ctx.start,
             output_value={
-                "scorer_id": CORRECTNESS_SCORER,
+                "scorer_id": CORRECTNESS_REF,
                 "version": 1,
                 "weight": base,
                 "score": ctx.headline.diagnostic,
@@ -220,7 +216,7 @@ def _evidence_findings(ctx: ScoringContext) -> list[Finding]:
 
 def _regression_findings(ctx: ScoringContext) -> list[Finding]:
     """Checkpoints where cases carried over from earlier checkpoints fail (correctness@1)."""
-    assessment = ctx.assessments.get(CORRECTNESS_SCORER)
+    assessment = ctx.assessments.get(CORRECTNESS_REF)
     if assessment is None:
         return []
     return [
@@ -231,7 +227,7 @@ def _regression_findings(ctx: ScoringContext) -> list[Finding]:
             title=f"Earlier behaviour broke at {item.subject}",
             detail=f"{int(item.value or 0)} regression case(s) from earlier checkpoints fail",
             span=f"metric:{item.subject}",
-            evidence=(EvidenceRef(CORRECTNESS_SCORER, f"regression_failures[{item.subject}]"),),
+            evidence=(EvidenceRef(CORRECTNESS_REF, f"regression_failures[{item.subject}]"),),
         )
         for item in assessment.result.observations
         if item.metric == "regression_failures"

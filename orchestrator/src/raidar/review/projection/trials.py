@@ -21,17 +21,18 @@ from pathlib import Path
 from typing import Any
 
 from raidar.analysis.assessed import CODE_QUALITY_REF
+from raidar.analysis.outcomes import CORRECTNESS_REF
 from raidar.core.review_contract import ReviewRunDetail, ReviewRunRecord, ReviewStatus
 from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments
 from raidar.review.projection.atif import project_trajectory
 from raidar.review.projection.gates import GateContext, failed_gates, project_gates
-from raidar.review.projection.headline import CORRECTNESS_SCORER, Headline
+from raidar.review.projection.headline import Headline
 from raidar.review.projection.notes import Finding, finding_counts, to_annotations
 from raidar.review.projection.scoring import ScoringContext, project_scoring
 from raidar.review.projection.spans import SpanBuilder, repo_path, to_ms
 
-_POLICY_SCORERS = frozenset({CORRECTNESS_SCORER, CODE_QUALITY_REF})
+_POLICY_SCORERS = frozenset({CORRECTNESS_REF, CODE_QUALITY_REF})
 
 
 @dataclass(frozen=True)
@@ -68,10 +69,14 @@ class TrialInput:
 
 
 def _harbor_result(trial_dir: Path) -> dict[str, Any]:
+    """Harbor's ``result.json`` for the trial; empty when it is absent or was left unparseable."""
     path = trial_dir / "result.json"
     if not path.is_file():
         return {}
-    loaded = json.loads(path.read_text(encoding="utf-8"))
+    try:
+        loaded = json.loads(path.read_text(encoding="utf-8"))
+    except ValueError:
+        return {}
     return loaded if isinstance(loaded, dict) else {}
 
 

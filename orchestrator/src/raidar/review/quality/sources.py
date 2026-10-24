@@ -39,15 +39,13 @@ from pathlib import Path
 from typing import Any
 
 from raidar.analysis.sources import AnalysisInputError, read_lock
+from raidar.core.job_layout import JOB_KIND, JOB_MANIFEST, TRIAL_RECORDS_DIR
 from raidar.execution.models import TrialRecord
 from raidar.jev.audit import AUDIT_DIR, AuditLog, DecisionRecord, LabelRecord
 from raidar.jev.ledger import current_labels
 from raidar.scorers.store import LOG_FILE, OBJECTS_DIR, Assessment
 from raidar.spec.lock import LOCK_SUFFIX, default_lock_path
 
-CODE_QUALITY_REF = "code-quality@3"
-CORRECTNESS_REF = "correctness@1"
-JOB_KIND = "raidar-job"
 _UNSAFE_ID = re.compile(r"[^A-Za-z0-9._-]")
 
 
@@ -103,7 +101,7 @@ class TrialSource:
         on this path suffix, which stays portable (no machine-specific prefix).
         """
         relative = Path(os.path.relpath(self.job_dir, self.jobs_root))
-        path = Path(self.jobs_root.name) / relative / "trial-records"
+        path = Path(self.jobs_root.name) / relative / TRIAL_RECORDS_DIR
         return (path / f"{self.record.trial.trial_id}.json").as_posix()
 
     def snapshot_digests(self) -> dict[str, str | None]:
@@ -161,7 +159,7 @@ def _experiment_info(
 
 
 def _job_dirs(jobs_root: Path) -> Iterator[Path]:
-    for manifest in sorted(jobs_root.rglob("job.json")):
+    for manifest in sorted(jobs_root.rglob(JOB_MANIFEST)):
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
@@ -174,9 +172,9 @@ def discover_trials(jobs_root: Path, locks: Sequence[Path] = ()) -> list[TrialSo
     """Every trial of every Raidar run under ``jobs_root``, in path order."""
     trials: list[TrialSource] = []
     for job_dir in _job_dirs(jobs_root):
-        run = json.loads((job_dir / "job.json").read_text(encoding="utf-8"))
+        run = json.loads((job_dir / JOB_MANIFEST).read_text(encoding="utf-8"))
         experiment = _experiment_info(run, job_dir, locks)
-        for path in sorted((job_dir / "trial-records").glob("*.json")):
+        for path in sorted((job_dir / TRIAL_RECORDS_DIR).glob("*.json")):
             record = TrialRecord.model_validate_json(path.read_bytes())
             trials.append(
                 TrialSource(

@@ -30,7 +30,14 @@ from pathlib import Path
 from typing import cast, get_args
 
 from raidar.analysis.assessed import build_outcome
-from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE, QUALITY_COMPONENTS, Value
+from raidar.analysis.outcomes import (
+    CODE_QUALITY_REF,
+    CORRECTNESS_METRIC,
+    CORRECTNESS_REF,
+    HEADLINE_SCORE,
+    QUALITY_COMPONENTS,
+    Value,
+)
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.jev.audit import DecisionRecord, LabelRecord
 from raidar.review.quality.gate_view import build_gate_view
@@ -47,7 +54,7 @@ from raidar.review.quality.models import (
     QualityRunDetail,
     QualityRunSummary,
 )
-from raidar.review.quality.sources import CODE_QUALITY_REF, CORRECTNESS_REF, TrialSource
+from raidar.review.quality.sources import TrialSource
 from raidar.scorers.sdk.result import TRANSITION_SEPARATOR, Observation
 from raidar.scorers.store import Assessment
 from raidar.spec.metrics import (

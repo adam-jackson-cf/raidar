@@ -27,6 +27,7 @@ from typing import Any
 
 from pydantic import ValidationError
 
+from raidar.core.job_layout import JOB_KIND, JOB_MANIFEST, PLAN_FILE, TRIAL_RECORDS_DIR
 from raidar.execution.assessment import lock_errata, rescore_config
 from raidar.execution.models import TrialRecord
 from raidar.scorers.rescore_config import RescoreConfig
@@ -35,8 +36,6 @@ from raidar.spec.lock import LOCK_SUFFIX, lock_integrity_issues
 from raidar.spec.schema import ExperimentSpec
 from raidar.verifier.errata import ErrataRef
 
-JOB_MANIFEST = "job.json"
-JOB_KIND = "raidar-job"
 SYNTHETIC_MARKER = "synthetic"
 
 
@@ -185,7 +184,7 @@ class LockIndex:
 
 def _records(job_dir: Path) -> tuple[TrialRecord, ...]:
     records = []
-    for path in sorted((job_dir / "trial-records").glob("*.json")):
+    for path in sorted((job_dir / TRIAL_RECORDS_DIR).glob("*.json")):
         try:
             records.append(TrialRecord.model_validate_json(path.read_text(encoding="utf-8")))
         except (OSError, ValidationError) as exc:
@@ -203,7 +202,7 @@ def load_job(job_dir: Path, locks: LockIndex) -> JobSource:
     return JobSource(
         job_dir=job_dir,
         manifest=manifest,
-        plan=_read_object(job_dir / "plan.json"),
+        plan=_read_object(job_dir / PLAN_FILE),
         lock=lock,
         assessment=rescore_config(lock.spec.assessment, lock.spec.protocol, errata=lock.errata),
         records=_records(job_dir),

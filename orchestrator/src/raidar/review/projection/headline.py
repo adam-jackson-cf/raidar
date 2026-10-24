@@ -30,6 +30,7 @@ from raidar.analysis.assessed import (
     correctness_component,
     infra_reasons,
 )
+from raidar.analysis.outcomes import CORRECTNESS_REF
 from raidar.analysis.policy_inputs import ComponentInput, score_inputs
 from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments
@@ -41,8 +42,6 @@ from raidar.spec.metrics import (
     MetricScore,
 )
 from raidar.spec.references import RegistryReferenceError
-
-CORRECTNESS_SCORER = "correctness@1"
 
 COMPONENT_METRICS = {
     "V": "problem_verbosity",
@@ -141,10 +140,10 @@ def _correctness(
     The observation is a trial-level C built from the per-checkpoint pass
     rates (status ``ok``), or the first per-checkpoint gap.
     """
-    assessment = assessments.get(CORRECTNESS_SCORER)
+    assessment = assessments.get(CORRECTNESS_REF)
     if assessment is None:
-        return None, None, _unmeasured(None, assessments.missing.get(CORRECTNESS_SCORER))
-    value = correctness_component(Observed(CORRECTNESS_SCORER, assessment.result), steps)
+        return None, None, _unmeasured(None, assessments.missing.get(CORRECTNESS_REF))
+    value = correctness_component(Observed(CORRECTNESS_REF, assessment.result), steps)
     if isinstance(value, Decimal):
         observation = Observation(
             metric="correctness",
@@ -190,8 +189,8 @@ UNDECLARED_MARKER = "which the experiment does not declare"
 def needed_scorers(policy: Metric) -> tuple[str, ...]:
     """The scorers whose Assessments the policy's components come from."""
     if not policy.inertia_weights:
-        return (CORRECTNESS_SCORER,)
-    return (CORRECTNESS_SCORER, CODE_QUALITY_REF)
+        return (CORRECTNESS_REF,)
+    return (CORRECTNESS_REF, CODE_QUALITY_REF)
 
 
 def _undeclared_reasons(policy: Metric, declared: Collection[str] | None) -> tuple[str, ...]:
@@ -217,9 +216,7 @@ def _policy_reasons(
     undeclared = _undeclared_reasons(policy, declared)
     if undeclared:
         return undeclared
-    unassessed = [
-        ref for ref in (CORRECTNESS_SCORER, CODE_QUALITY_REF) if ref in assessments.missing
-    ]
+    unassessed = [ref for ref in (CORRECTNESS_REF, CODE_QUALITY_REF) if ref in assessments.missing]
     if unassessed:
         return tuple(
             f"{policy.ref} unassessed: {ref}: {assessments.missing[ref]}" for ref in unassessed

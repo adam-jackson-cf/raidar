@@ -10,13 +10,12 @@ import argparse
 from collections.abc import Sequence
 from pathlib import Path
 
+from raidar.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.review.quality.experiment_view import ReviewedTrial, build_experiments
 from raidar.review.quality.gate_view import GATE_EFFORT_REF
 from raidar.review.quality.models import QualityProjection
 from raidar.review.quality.run_view import build_run_detail
 from raidar.review.quality.sources import (
-    CODE_QUALITY_REF,
-    CORRECTNESS_REF,
     JevAudit,
     StoreIndex,
     discover_trials,
