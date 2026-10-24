@@ -8,8 +8,8 @@ import shutil
 import click
 
 from raidar.cli.shared import ORCHESTRATOR_ROOT, python_cmd, run_or_raise
-from raidar.core import repo_state
-from raidar.core.paths import REPO_ROOT
+from raidar.contracts import repo_state
+from raidar.contracts.paths import REPO_ROOT
 
 FANOUT_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-fanout.py"
 PYTHON_QUALITY_CHECK_SCRIPT = REPO_ROOT / "scripts" / "checks" / "check-python-quality.py"

@@ -2,8 +2,9 @@ from pathlib import Path
 
 import pytest
 
-from raidar.agents.config import Harness
-from raidar.agents.harness import (
+from raidar.scoring.judge.redaction import redact
+from raidar.subjects.agents.config import Harness
+from raidar.subjects.agents.harness import (
     CredentialSourceType,
     CredentialTransport,
     HarnessDefinitionError,
@@ -12,7 +13,6 @@ from raidar.agents.harness import (
     registered_harness_definitions,
     validate_harness_registry,
 )
-from raidar.jev.redaction import redact
 
 
 def test_registry_credentials_are_transportable_and_redacted() -> None:

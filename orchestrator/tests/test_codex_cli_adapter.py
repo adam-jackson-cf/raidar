@@ -5,10 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from raidar.agents.adapters.codex_cli import CodexCliAdapter
-from raidar.agents.adapters.factory import resolve_adapter
-from raidar.agents.codex_auth import CODEX_AUTH_MODE_ENV
-from raidar.agents.config import AgentSpec, Harness, ModelTarget
+from raidar.subjects.agents.adapters.codex_cli import CodexCliAdapter
+from raidar.subjects.agents.adapters.factory import resolve_adapter
+from raidar.subjects.agents.codex_auth import CODEX_AUTH_MODE_ENV
+from raidar.subjects.agents.config import AgentSpec, Harness, ModelTarget
 
 
 def _config(

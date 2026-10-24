@@ -22,15 +22,15 @@ from pathlib import Path
 
 import click
 
-from raidar.analysis.load import LoadRequest, load_inputs
-from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import outcome_metric
-from raidar.analysis.report import AnalysisReport, analyse
-from raidar.analysis.sources import AnalysisInputError
-from raidar.analysis.thresholds import settings_from_lock
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.spec.canonical import pretty_canonical_json_bytes
-from raidar.spec.references import RegistryReferenceError
+from raidar.design.experiments.canonical import pretty_canonical_json_bytes
+from raidar.design.experiments.references import RegistryReferenceError
+from raidar.evaluation.analysis.load import LoadRequest, load_inputs
+from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.outcomes import outcome_metric
+from raidar.evaluation.analysis.report import AnalysisReport, analyse
+from raidar.evaluation.analysis.sources import AnalysisInputError
+from raidar.evaluation.analysis.thresholds import settings_from_lock
+from raidar.scoring.framework.catalog import default_scorer_registry
 
 REPORT_JSON = "analysis.json"
 REPORT_MARKDOWN = "analysis.md"

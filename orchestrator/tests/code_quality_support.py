@@ -16,15 +16,15 @@ from functools import cache
 from pathlib import Path
 from typing import Any
 
-from raidar.scorers.code_quality.measurement import ToolEnvironment, provisioned_environment
-from raidar.verifier.models import CaseStatus, ParityVerdict
-from raidar.verifier.records import (
+from raidar.grading.models import CaseStatus, ParityVerdict
+from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
     CoverageRef,
     load_step_record,
     step_record_dir,
     write_step_record,
 )
+from raidar.scoring.code_quality.measurement import ToolEnvironment, provisioned_environment
 from tests.scorer_support import StepFixture, write_files, write_trial
 
 GOLDENS = Path(__file__).parent / "fixtures" / "code_quality" / "fork_goldens.json.gz"

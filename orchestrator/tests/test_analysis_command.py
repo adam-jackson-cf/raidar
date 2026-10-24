@@ -15,10 +15,10 @@ from typing import Any
 import pytest
 from click.testing import CliRunner
 
-from raidar.analysis.sources import AnalysisInputError, JobDir, select_records
 from raidar.cli import main
-from raidar.execution.assessment import lock_rescore_config
-from raidar.execution.models import (
+from raidar.design.experiments.lock import LOCK_VERSION, seal_lock
+from raidar.engine.jobs.assessment import lock_rescore_config
+from raidar.engine.trials.models import (
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,
@@ -26,11 +26,11 @@ from raidar.execution.models import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.rescore import rescore_path
-from raidar.scorers.store import AssessmentStore
-from raidar.spec.lock import LOCK_VERSION, seal_lock
-from raidar.verifier.models import CaseStatus
+from raidar.evaluation.analysis.sources import AnalysisInputError, JobDir, select_records
+from raidar.grading.models import CaseStatus
+from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.framework.rescore import rescore_path
+from raidar.scoring.framework.store import AssessmentStore
 from tests.scorer_support import APP_V1, APP_V2, StepFixture, tree_state, write_trial
 
 PASS, FAIL = CaseStatus.PASSED, CaseStatus.FAILED

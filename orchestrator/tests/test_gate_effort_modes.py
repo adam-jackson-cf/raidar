@@ -14,10 +14,10 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scorers.gate_effort.shadow import SHADOW_REASON, SHADOW_STEP_NA, SHADOW_TOTAL_NA
-from raidar.scorers.gate_effort.sources import NO_SOURCE_CHANGE, unchanged_steps
-from raidar.scorers.sdk.context import StepInputs
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.scoring.framework.context import StepInputs
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.scoring.gate_effort.shadow import SHADOW_REASON, SHADOW_STEP_NA, SHADOW_TOTAL_NA
+from raidar.scoring.gate_effort.sources import NO_SOURCE_CHANGE, unchanged_steps
 from tests.gate_effort_support import (
     CP1,
     CP2,

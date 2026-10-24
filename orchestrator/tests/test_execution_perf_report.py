@@ -13,8 +13,10 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.core.paths import REPO_ROOT
-from raidar.execution.models import (
+from raidar.contracts.paths import REPO_ROOT
+from raidar.engine.perf.contention import TrialWindow, peak_during, peak_overlap
+from raidar.engine.perf.phases import trial_phases
+from raidar.engine.trials.models import (
     ExecutionValidity,
     PhaseSample,
     PlannedTrial,
@@ -22,8 +24,6 @@ from raidar.execution.models import (
     TrialHashes,
     TrialRecord,
 )
-from raidar.execution.perf.contention import TrialWindow, peak_during, peak_overlap
-from raidar.execution.perf.phases import trial_phases
 from tests.execution_support import StepOutcome, write_trial
 from tests.test_execution_perf_fixture import STRICT_CHECK
 

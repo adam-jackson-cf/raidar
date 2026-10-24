@@ -19,8 +19,10 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
-from raidar.components.definition.contribution import SupportFile, evidence_log
-from raidar.components.runtime.provision import (
+from raidar.engine.trials import environment as env_module
+from raidar.engine.trials.environment import RunScopedDockerEnvironment
+from raidar.subjects.treatments.definition.contribution import SupportFile, evidence_log
+from raidar.subjects.treatments.runtime.provision import (
     AGENT_USER_ENV,
     INSTALL_PHASE,
     PAYLOAD_ENV,
@@ -30,8 +32,6 @@ from raidar.components.runtime.provision import (
     TrialProvision,
     install_trial_provisioning,
 )
-from raidar.execution import environment as env_module
-from raidar.execution.environment import RunScopedDockerEnvironment
 
 SLUG = "02-tool"
 PROVISION = TrialProvision(

@@ -21,12 +21,16 @@ from typing import Any
 import pytest
 from harbor.models.trial.config import AgentConfig
 
-from raidar.agents.config import Harness
-from raidar.components import ComponentKind, ComponentRegistry
-from raidar.components.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
-from raidar.components.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH, stall_records
-from raidar.components.definition.evidence import StepEvidence
-from raidar.components.runtime.continue_on_stall import (
+from raidar.contracts.snapshot import SNAPSHOT_EXCLUDES
+from raidar.design.experiments.schema import AgentEntry
+from raidar.engine.trials.agent_config import arm_agent_config, reported_harness_pin, with_host_auth
+from raidar.subjects.agents.config import Harness
+from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.subjects.treatments import ComponentKind, ComponentRegistry
+from raidar.subjects.treatments.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
+from raidar.subjects.treatments.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH, stall_records
+from raidar.subjects.treatments.definition.evidence import StepEvidence
+from raidar.subjects.treatments.runtime.continue_on_stall import (
     ASSUMPTIONS_FILE,
     STALL_DIR,
     STALL_RECORD,
@@ -34,23 +38,19 @@ from raidar.components.runtime.continue_on_stall import (
     detect_stall_message,
     fingerprint_script,
 )
-from raidar.components.runtime.gate_run import GuardrailGateOptions
-from raidar.components.runtime.guardrail_gate import (
+from raidar.subjects.treatments.runtime.gate_run import GuardrailGateOptions
+from raidar.subjects.treatments.runtime.guardrail_gate import (
     GuardrailGateAgent,
     PreFixSnapshot,
     _GateState,
     gate_record,
 )
-from raidar.components.runtime.session_chain import (
+from raidar.subjects.treatments.runtime.session_chain import (
     InnerAgentSpec,
     apply_session_wrappers,
     condition_session_wrappers,
     render_task,
 )
-from raidar.core.snapshot import SNAPSHOT_EXCLUDES
-from raidar.execution.agent_config import arm_agent_config, reported_harness_pin, with_host_auth
-from raidar.packs.python.models import load_pack_spec
-from raidar.spec.schema import AgentEntry
 from tests.component_support import compile_uses, use
 
 GATE = {"command": "guardrail-check", "mode": "commit", "max_rounds": 3, "timeout_sec": 300}
@@ -104,7 +104,9 @@ def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> Non
     compiled = compile_uses(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
 
     assert definition.manifest.kind is ComponentKind.WORKFLOW
-    assert "raidar/components/runtime/continue_on_stall.py" in definition.manifest.fingerprint
+    assert (
+        "raidar/subjects/treatments/runtime/continue_on_stall.py" in definition.manifest.fingerprint
+    )
     assert compiled.agent_wrapper is not None
     assert compiled.agent_wrapper.import_path == GUARDRAIL_GATE_IMPORT_PATH
     (wrapper,) = condition_session_wrappers(compiled)
@@ -115,7 +117,7 @@ def test_the_component_is_a_session_wrapper_that_composes_with_the_gate() -> Non
 
 @pytest.mark.parametrize("bad", [{"max": 2}])
 def test_the_component_takes_no_with_keys(bad: dict[str, int]) -> None:
-    from raidar.components import ComponentRejectedError
+    from raidar.subjects.treatments import ComponentRejectedError
 
     with pytest.raises(ComponentRejectedError):
         compile_uses(use("continue-on-stall@2", **bad))
@@ -195,7 +197,7 @@ def test_host_auth_reaches_a_doubly_wrapped_codex(
     auth = tmp_path / "auth.json"
     auth.write_text("{}")
     resolved = SimpleNamespace(resolved_mode="chatgpt", auth_json_path=auth)
-    monkeypatch.setattr("raidar.execution.agent_config.resolve_codex_auth", lambda: resolved)
+    monkeypatch.setattr("raidar.engine.trials.agent_config.resolve_codex_auth", lambda: resolved)
     config = _config(use("continue-on-stall@2"), use("guardrail-gate@4", **GATE))
 
     assert str(auth) in with_host_auth(config, Harness.CODEX_CLI).env.values()
@@ -220,7 +222,7 @@ def test_the_task_is_rendered_once_with_the_chains_template(tmp_path: Path) -> N
 
 
 def test_apply_nests_the_first_wrapper_outermost() -> None:
-    from raidar.components.definition.contribution import AgentWrapper
+    from raidar.subjects.treatments.definition.contribution import AgentWrapper
 
     base = AgentConfig(name="codex", kwargs={"version": "1"})
     config = apply_session_wrappers(

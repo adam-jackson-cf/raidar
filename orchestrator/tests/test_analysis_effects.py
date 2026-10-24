@@ -13,13 +13,13 @@ import json
 
 import pytest
 
-from raidar.analysis.effects import Exclusions, Settings, Verdict, decide
-from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import ALL_METRICS, OUTCOME_METRICS
-from raidar.analysis.report import AnalysisReport, analyse
-from raidar.analysis.stats import IntervalMethod, summarise
-from raidar.scorers.sdk.manifest import Direction
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
+from raidar.evaluation.analysis.effects import Exclusions, Settings, Verdict, decide
+from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.outcomes import ALL_METRICS, OUTCOME_METRICS
+from raidar.evaluation.analysis.report import AnalysisReport, analyse
+from raidar.evaluation.analysis.stats import IntervalMethod, summarise
+from raidar.scoring.framework.manifest import Direction
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
 from tests.analysis_support import (
     BASELINE,
     GUIDED,
@@ -309,7 +309,7 @@ def test_process_compliance_results_add_a_manipulation_check_per_comparison() ->
 
 
 def test_lock_thresholds_merge_with_labelled_overrides() -> None:
-    from raidar.analysis.thresholds import settings_from_lock
+    from raidar.evaluation.analysis.thresholds import settings_from_lock
 
     attempt = {
         "seed": 7,
@@ -336,7 +336,7 @@ def test_lock_thresholds_merge_with_labelled_overrides() -> None:
 
 
 def test_the_pinned_alpha_sets_the_continuous_interval_level() -> None:
-    from raidar.analysis.stats import summarise
+    from raidar.evaluation.analysis.stats import summarise
 
     deltas = [0.5, -0.1, 0.4, 0.3, 0.0, 0.2]
     verdicts = {}

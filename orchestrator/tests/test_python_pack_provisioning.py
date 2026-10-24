@@ -13,8 +13,9 @@ from click.testing import CliRunner
 from pydantic import ValidationError
 
 from raidar.cli import main
-from raidar.packs.python import provisioner as provisioner_module
-from raidar.packs.python.models import (
+from raidar.grading.grader_image import GRADER_TOOLS
+from raidar.subjects.environments.python import provisioner as provisioner_module
+from raidar.subjects.environments.python.models import (
     PROVISIONING_PHASE,
     REASON_DRIFT,
     REASON_FIRST_USE,
@@ -23,7 +24,7 @@ from raidar.packs.python.models import (
     ToolLock,
     load_tool_lock,
 )
-from raidar.packs.python.provisioner import (
+from raidar.subjects.environments.python.provisioner import (
     MARKER_NAME,
     TOOL_CACHE_ENV,
     EvalSandboxToolError,
@@ -31,7 +32,6 @@ from raidar.packs.python.provisioner import (
     ToolProvisioningError,
     default_cache_root,
 )
-from raidar.verifier.grader_image import GRADER_TOOLS
 
 UV = "/fake/bin/uv"
 

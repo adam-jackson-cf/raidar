@@ -18,8 +18,8 @@ from pathlib import Path
 
 import click
 
-from raidar.agents.config import AgentName, agent_cli
-from raidar.packs import load_runtime_pack
+from raidar.subjects.agents.config import AgentName, agent_cli
+from raidar.subjects.environments import load_runtime_pack
 
 DEFAULT_PROBLEM = "scb/circuit_eval.checkpoint_1@38d627ecf668"
 RULES_FILE = Path("components") / "AGENTS.md"

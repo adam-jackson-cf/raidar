@@ -16,16 +16,16 @@ from typing import Any
 
 import pytest
 
-from raidar.core.snapshot import tree_digest
-from raidar.verifier import offline_grading
-from raidar.verifier.prefix_grade import (
+from raidar.contracts.snapshot import tree_digest
+from raidar.grading import offline_grading
+from raidar.grading.prefix_grade import (
     grade_pre_fix_path,
     pre_fix_snapshots,
     regrade_pre_fix_path,
 )
-from raidar.verifier.prefix_store import read_pre_fix_grade
-from raidar.verifier.records import load_step_record, step_record_dir
-from raidar.verifier.regrade import RegradeOptions
+from raidar.grading.prefix_store import read_pre_fix_grade
+from raidar.grading.records import load_step_record, step_record_dir
+from raidar.grading.regrade import RegradeOptions
 from tests.scorer_support import tree_state
 from tests.test_verifier_and_regrade import (
     FakeAgentEnvironment,

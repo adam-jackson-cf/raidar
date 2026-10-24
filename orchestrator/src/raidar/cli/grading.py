@@ -1,4 +1,4 @@
-"""CLI-side wrappers of the verifier's offline grading (``raidar.verifier.offline_grading``).
+"""CLI-side wrappers of the verifier's offline grading (``raidar.grading.offline_grading``).
 
 The verifier raises ``OfflineGradingError`` for a grading run that cannot proceed; here every
 failure becomes a command error. ``grading_options`` resolves the selected target's grader
@@ -14,9 +14,9 @@ from typing import Any
 import click
 
 from raidar.cli.target_options import docker_selection
-from raidar.verifier import offline_grading
-from raidar.verifier.offline_grading import OfflineGradingError, reads_docker_grades
-from raidar.verifier.regrade import RegradeOptions
+from raidar.grading import offline_grading
+from raidar.grading.offline_grading import OfflineGradingError, reads_docker_grades
+from raidar.grading.regrade import RegradeOptions
 
 
 def regrade(target: Path, options: RegradeOptions, store: Path | None) -> dict[str, Any]:

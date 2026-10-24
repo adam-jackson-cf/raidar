@@ -1,4 +1,4 @@
-"""``raidar.verifier.per_trial``: up to N trials' offline grading work at once, results in order."""
+"""``raidar.grading.per_trial``: up to N trials' offline grading work at once, results in order."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.verifier.per_trial import per_trial
+from raidar.grading.per_trial import per_trial
 
 
 async def test_at_most_n_trials_run_at_once_and_results_keep_trial_order() -> None:

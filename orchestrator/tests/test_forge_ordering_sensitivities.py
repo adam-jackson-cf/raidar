@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.problems.sensitivities import SensitivityKind, known_sensitivities
+from raidar.design.problems.sensitivities import SensitivityKind, known_sensitivities
 
 REPO = Path(__file__).resolve().parents[2]
 FORGE = "scb/forge@38d627ecf668"

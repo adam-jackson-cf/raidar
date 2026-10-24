@@ -10,24 +10,24 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.analysis.assessed import build_outcome
-from raidar.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
-from raidar.execution.models import TrialRecord
-from raidar.review.quality.experiment_view import _primary
-from raidar.review.quality.models import COMPONENTS, QualityProjection
-from raidar.review.quality.projection import build_quality_projection, main
-from raidar.review.quality.stats import pearson, quantiles
-from raidar.review.quality.synthetic import (
+from raidar.design.experiments.metrics import SCB_CANONICAL
+from raidar.engine.trials.models import TrialRecord
+from raidar.evaluation.analysis.assessed import build_outcome
+from raidar.evaluation.analysis.outcomes import CORRECTNESS_METRIC, HEADLINE_SCORE
+from raidar.evaluation.review.quality.experiment_view import _primary
+from raidar.evaluation.review.quality.models import COMPONENTS, QualityProjection
+from raidar.evaluation.review.quality.projection import build_quality_projection, main
+from raidar.evaluation.review.quality.stats import pearson, quantiles
+from raidar.evaluation.review.quality.synthetic import (
     EXPERIMENT,
     INELIGIBLE_H,
     INVALID,
     RUN_ID,
     generate_quality_fixture,
 )
-from raidar.review.quality.synthetic_lock import write_synthetic_lock
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation, RunStats
-from raidar.scorers.store import OBJECTS_DIR, AssessmentStore
-from raidar.spec.metrics import SCB_CANONICAL
+from raidar.evaluation.review.quality.synthetic_lock import write_synthetic_lock
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation, RunStats
+from raidar.scoring.framework.store import OBJECTS_DIR, AssessmentStore
 
 RUN_PREFIX = f"{EXPERIMENT}.{RUN_ID}."
 

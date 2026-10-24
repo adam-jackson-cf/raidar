@@ -12,12 +12,12 @@ from click.testing import CliRunner
 from harbor.models.task.task import Task
 
 from raidar.cli import main
-from raidar.problems import direct, harbor_engine, validator
-from raidar.problems.models import ProblemId
-from raidar.problems.native import grade_from_evaluation, stage_catalog
-from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
-from raidar.problems.store import ProblemStore
-from raidar.problems.validation import (
+from raidar.design.problems import direct, harbor_engine, validator
+from raidar.design.problems.models import ProblemId
+from raidar.design.problems.native import grade_from_evaluation, stage_catalog
+from raidar.design.problems.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problems.store import ProblemStore
+from raidar.design.problems.validation import (
     NEGATIVE,
     POSITIVE,
     Check,
@@ -33,8 +33,8 @@ from raidar.problems.validation import (
     run_checks,
     verdict,
 )
-from raidar.problems.validator import ValidateOptions, validate_problem, write_report
-from raidar.verifier.sandbox import SandboxResult, SandboxRun
+from raidar.design.problems.validator import ValidateOptions, validate_problem, write_report
+from raidar.grading.sandbox import SandboxResult, SandboxRun
 from tests.component_trial_support import docker_context, docker_target_reachable
 from tests.problems_support import (
     NEGATIVE_REF,
@@ -430,7 +430,9 @@ async def test_validator_wires_the_harbor_engine_and_the_native_arm(
     monkeypatch.setattr(harbor_engine, "run_variant", fake_variant)
     monkeypatch.setattr(validator, "resolve_checkout", lambda *args: Checkout())
     monkeypatch.setattr(validator, "stage_catalog", lambda source, catalog: catalog / source.name)
-    monkeypatch.setattr("raidar.problems.native._docker_host", lambda context: "unix:///fake")
+    monkeypatch.setattr(
+        "raidar.design.problems.native._docker_host", lambda context: "unix:///fake"
+    )
     report = await validate_problem(
         store,
         ProblemId.parse(POSITIVE_REF),

@@ -8,12 +8,12 @@ from pathlib import Path
 
 import pytest
 
-from raidar.scorers.resource_usage import resource_usage_scorer
-from raidar.scorers.resource_usage.atif import TrajectoryError, load_trajectory
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, EvidenceSource, Observation
-from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.trial_inputs import load_trial_context
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.result import AssessResult, AssessStatus, EvidenceSource, Observation
+from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.resource_usage import resource_usage_scorer
+from raidar.scoring.resource_usage.atif import TrajectoryError, load_trajectory
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,

@@ -17,17 +17,17 @@ from typing import Any
 
 import pytest
 
-from raidar.execution.collect import _infra_reasons
-from raidar.execution.health.liveness import (
+from raidar.engine.health.liveness import (
     LIVENESS_REPORT,
     LivenessConfig,
     PhaseMonitor,
     idle_killed_steps,
 )
-from raidar.execution.health.tool_tree import hash_tool_tree
-from raidar.execution.models import ProbeSummary
-from raidar.packs.python.image import image_tag
-from raidar.packs.python.models import load_pack_spec
+from raidar.engine.health.tool_tree import hash_tool_tree
+from raidar.engine.trials.collect import _infra_reasons
+from raidar.engine.trials.models import ProbeSummary
+from raidar.subjects.environments.python.image import image_tag
+from raidar.subjects.environments.python.models import load_pack_spec
 from tests.component_trial_support import docker_context
 from tests.liveness_support import AFTER_PHASE_REPORT, DETACHED_MARKER, run_probe_trial
 

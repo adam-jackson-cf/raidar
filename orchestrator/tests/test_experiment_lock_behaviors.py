@@ -10,9 +10,9 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.spec.canonical import digest_json
-from raidar.spec.loader import CliOverrides, load_experiment
-from raidar.spec.lock import (
+from raidar.design.experiments.canonical import digest_json
+from raidar.design.experiments.loader import CliOverrides, load_experiment
+from raidar.design.experiments.lock import (
     SECTIONS,
     LockError,
     build_lock,
@@ -22,8 +22,8 @@ from raidar.spec.lock import (
     render_lock,
     stale_sections,
 )
-from raidar.spec.metrics import MetricResolver
-from raidar.spec.references import (
+from raidar.design.experiments.metrics import MetricResolver
+from raidar.design.experiments.references import (
     RefKind,
     RegistryRef,
     RegistryReferenceError,
@@ -375,7 +375,7 @@ def test_lock_command_write_and_check_cycle(
 ) -> None:
     path = write_experiment(tmp_path, experiment_document())
     monkeypatch.setattr(
-        "raidar.spec.lock.default_resolvers",
+        "raidar.design.experiments.lock.default_resolvers",
         lambda policies: ResolverSet(
             [*fixture_resolvers(), MetricResolver(policies)], entry_point_group=None
         ),
@@ -428,7 +428,7 @@ def test_entry_point_resolvers_load_lazily_by_kind(monkeypatch: pytest.MonkeyPat
         return InMemoryResolver(RefKind.SCORER, {"correctness@1": {}})
 
     monkeypatch.setattr(
-        "raidar.spec.references.entry_points",
+        "raidar.design.experiments.references.entry_points",
         lambda group: [_EntryPoint("scorer", scorer_factory)],
     )
     resolvers = ResolverSet()
@@ -457,7 +457,8 @@ def test_entry_point_resolver_misconfiguration_is_rejected(
         return _EntryPoint(name, lambda: InMemoryResolver(RefKind.SCORER))
 
     monkeypatch.setattr(
-        "raidar.spec.references.entry_points", lambda group: [make(name) for name in entries]
+        "raidar.design.experiments.references.entry_points",
+        lambda group: [make(name) for name in entries],
     )
 
     with pytest.raises(RegistryReferenceError, match=message):

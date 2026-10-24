@@ -11,14 +11,14 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.targets.config import Target, parse_targets
-from raidar.targets.health import (
+from raidar.engine.targets.config import Target, parse_targets
+from raidar.engine.targets.health import (
     TargetUnavailableError,
     data_check_failure,
     docker_facts,
     ensure_target,
 )
-from raidar.targets.transport import (
+from raidar.engine.targets.transport import (
     TransportPaths,
     docker_healthy,
     ssh_argv,

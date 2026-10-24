@@ -20,12 +20,12 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.verifier import offline_grading
-from raidar.verifier.coverage_offline import check_coverage_path, produce_coverage_path
-from raidar.verifier.coverage_store import read_offline_coverage
-from raidar.verifier.records import FORK_EVIDENCE_FILE, load_step_record, step_record_dir
-from raidar.verifier.regrade import RegradeOptions
-from raidar.verifier.sandbox import GradingSandbox
+from raidar.grading import offline_grading
+from raidar.grading.coverage_offline import check_coverage_path, produce_coverage_path
+from raidar.grading.coverage_store import read_offline_coverage
+from raidar.grading.records import FORK_EVIDENCE_FILE, load_step_record, step_record_dir
+from raidar.grading.regrade import RegradeOptions
+from raidar.grading.sandbox import GradingSandbox
 from tests.scorer_support import tree_state
 from tests.test_verifier_and_regrade import (
     FakeAgentEnvironment,

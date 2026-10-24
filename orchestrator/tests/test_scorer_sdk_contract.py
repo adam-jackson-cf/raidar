@@ -10,27 +10,37 @@ import pytest
 import yaml
 from pydantic import ValidationError
 
-from raidar.scorers.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS
-from raidar.scorers.catalog import (
+from raidar.design.experiments.loader import load_experiment
+from raidar.design.experiments.lock import build_lock, render_lock
+from raidar.design.experiments.metrics import MetricResolver
+from raidar.design.experiments.references import (
+    RefKind,
+    RegistryRef,
+    RegistryReferenceError,
+    ResolverSet,
+)
+from raidar.grading.models import CaseStatus
+from raidar.scoring.framework import result as result_module
+from raidar.scoring.framework.builtin_manifests import BUILTIN_MANIFESTS, CODE_QUALITY, CORRECTNESS
+from raidar.scoring.framework.catalog import (
     ScorerRegistration,
     ScorerUnavailableError,
     scorer_resolver,
 )
-from raidar.scorers.sdk import result as result_module
-from raidar.scorers.sdk.context import statused_result
-from raidar.scorers.sdk.manifest import (
+from raidar.scoring.framework.context import statused_result
+from raidar.scoring.framework.manifest import (
     EvidenceInput,
     MetricLevel,
     MetricSpec,
     MetricType,
     ScorerManifest,
 )
-from raidar.scorers.sdk.ownership import (
+from raidar.scoring.framework.ownership import (
     DuplicateMetricError,
     MetricOwnershipError,
     MissingMetricError,
 )
-from raidar.scorers.sdk.result import (
+from raidar.scoring.framework.result import (
     AssessResult,
     AssessStatus,
     Evidence,
@@ -38,18 +48,13 @@ from raidar.scorers.sdk.result import (
     Observation,
     Span,
 )
-from raidar.scorers.sdk.validation import (
+from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.validation import (
     InvalidEvidenceError,
     InvalidObservationError,
     validate_result,
     validate_scorer_set,
 )
-from raidar.scorers.trial_inputs import load_trial_context
-from raidar.spec.loader import load_experiment
-from raidar.spec.lock import build_lock, render_lock
-from raidar.spec.metrics import MetricResolver
-from raidar.spec.references import RefKind, RegistryRef, RegistryReferenceError, ResolverSet
-from raidar.verifier.models import CaseStatus
 from tests.experiment_spec_support import (
     MECHANICS_SMOKE,
     SMOKE_EXPERIMENT,

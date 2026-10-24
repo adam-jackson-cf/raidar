@@ -9,8 +9,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from raidar.spec.loader import load_experiment
-from raidar.spec.schema import ProtocolSpec
+from raidar.design.experiments.loader import load_experiment
+from raidar.design.experiments.schema import ProtocolSpec
 from tests.experiment_spec_support import (
     AGENTS_BENCHMARK,
     MECHANICS_SMOKE,

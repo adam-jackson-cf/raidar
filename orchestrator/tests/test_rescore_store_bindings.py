@@ -12,14 +12,18 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE
-from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry, default_scorer_registry
-from raidar.scorers.rescore import RescoreOutcome, rescore_path
-from raidar.scorers.sdk.context import AssessContext, statused_result
-from raidar.scorers.sdk.result import AssessResult, AssessStatus
-from raidar.scorers.store import AssessmentConflictError, AssessmentStore
-from raidar.spec.schema import ProtocolSpec
-from raidar.verifier.models import CaseStatus
+from raidar.design.experiments.schema import ProtocolSpec
+from raidar.engine.jobs.assessment import ASSESSMENT_CONFIG_FILE
+from raidar.grading.models import CaseStatus
+from raidar.scoring.framework.catalog import (
+    ScorerRegistration,
+    ScorerRegistry,
+    default_scorer_registry,
+)
+from raidar.scoring.framework.context import AssessContext, statused_result
+from raidar.scoring.framework.rescore import RescoreOutcome, rescore_path
+from raidar.scoring.framework.result import AssessResult, AssessStatus
+from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
 from tests.scorer_support import (
     APP_V1,
     FakeScorer,

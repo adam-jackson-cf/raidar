@@ -12,20 +12,20 @@ import json
 from pathlib import Path
 from typing import Any
 
-from raidar.scorers.gate_effort import GATE_EFFORT, gate_effort_scorer, gate_effort_scorer_for_store
-from raidar.scorers.gate_effort.records import RECORD_PATH, REPORT_SCHEMA
-from raidar.scorers.sdk.context import AssessContext, StepInputs
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
-from raidar.verifier.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
-from raidar.verifier.prefix_store import GRADE_KIND, grade_path
-from raidar.verifier.records import (
+from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
+from raidar.grading.prefix_store import GRADE_KIND, grade_path
+from raidar.grading.records import (
     BundleRef,
     CoverageRef,
     GraderRef,
     SnapshotRef,
     StepRecord,
 )
+from raidar.scoring.framework.context import AssessContext, StepInputs
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
+from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.gate_effort import GATE_EFFORT, gate_effort_scorer, gate_effort_scorer_for_store
+from raidar.scoring.gate_effort.records import RECORD_PATH, REPORT_SCHEMA
 
 REFUSED = """\
 guardrail-check: REFUSED (3 blocking, 1 warnings, 2 Python files)

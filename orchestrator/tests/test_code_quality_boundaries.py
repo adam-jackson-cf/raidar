@@ -18,27 +18,27 @@ from typing import Any
 
 import pytest
 
-from raidar.scorers.code_quality.architecture import (
+from raidar.scoring.code_quality.architecture import (
     ProductionGraphError,
     produce_production_graph,
     strongly_connected_components,
 )
-from raidar.scorers.code_quality.checkpoint import Gap, eligibility_code, measure_checkpoint
-from raidar.scorers.code_quality.measurement import (
+from raidar.scoring.code_quality.checkpoint import Gap, eligibility_code, measure_checkpoint
+from raidar.scoring.code_quality.measurement import (
     MeasurementError,
     ProcessResult,
     ToolEnvironment,
     run_process,
 )
-from raidar.scorers.code_quality.quality import ProductionQualityError, produce_production_quality
-from raidar.scorers.code_quality.snapshot_tool import cli
-from raidar.scorers.code_quality.snapshot_tool.evaluator import (
+from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
+from raidar.scoring.code_quality.snapshot_tool import cli
+from raidar.scoring.code_quality.snapshot_tool.evaluator import (
     EvaluatorInputError,
     evaluate,
 )
-from raidar.scorers.inventory import FileRole, InventoryFile, build_inventory
-from raidar.scorers.sdk.context import AssessContext, StepInputs
-from raidar.scorers.sdk.result import AssessStatus
+from raidar.scoring.framework.context import AssessContext, StepInputs
+from raidar.scoring.framework.inventory import FileRole, InventoryFile, build_inventory
+from raidar.scoring.framework.result import AssessStatus
 from tests.code_quality_support import golden_case, materialise, quality_tools
 
 Runner = Callable[[Sequence[str], Path | None, str | None, float], ProcessResult]

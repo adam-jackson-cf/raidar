@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 
-from raidar.verifier.grader import BUDGET_MARGIN_S, grade_step
-from raidar.verifier.models import (
+from raidar.grading.grader import BUDGET_MARGIN_S, grade_step
+from raidar.grading.models import (
     CaseGroup,
     CaseResult,
     CaseStatus,
@@ -23,7 +23,7 @@ from raidar.verifier.models import (
     RunEvidence,
     VerifierGrade,
 )
-from raidar.verifier.normalise import (
+from raidar.grading.normalise import (
     case_results,
     checkpoint_origin,
     classify,
@@ -32,8 +32,8 @@ from raidar.verifier.normalise import (
     no_graded_cases,
     timing_sensitive,
 )
-from raidar.verifier.parity import check_parity, fork_regression_run_evidence, outcome_differences
-from raidar.verifier.sandbox import SandboxResult, SandboxRun
+from raidar.grading.parity import check_parity, fork_regression_run_evidence, outcome_differences
+from raidar.grading.sandbox import SandboxResult, SandboxRun
 from tests.verifier_support import LocalProcessSandbox, make_bundle, write_app
 
 

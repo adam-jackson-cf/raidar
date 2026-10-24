@@ -21,11 +21,16 @@ from pathlib import Path
 
 import pytest
 
-from raidar.analysis.markdown import CUMULATIVE_LEGEND, _autofix_family_table, _better, _legend
-from raidar.scorers.gate_effort.autofix_metrics import REFUSAL_KINDS
-from raidar.scorers.gate_effort.families import FAMILIES
-from raidar.scorers.gate_effort.refusals import refusal_kind
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.evaluation.analysis.markdown import (
+    CUMULATIVE_LEGEND,
+    _autofix_family_table,
+    _better,
+    _legend,
+)
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus
+from raidar.scoring.gate_effort.autofix_metrics import REFUSAL_KINDS
+from raidar.scoring.gate_effort.families import FAMILIES
+from raidar.scoring.gate_effort.refusals import refusal_kind
 from tests.gate_effort_support import (
     COVERAGE,
     CP1,

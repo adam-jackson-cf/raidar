@@ -32,11 +32,11 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.packs.python.image import image_tag
-from raidar.packs.python.models import load_pack_spec
-from raidar.problems.store import ROOT_ENV
-from raidar.targets.config import Target, TargetError
-from raidar.targets.health import ensure_target
+from raidar.design.problems.store import ROOT_ENV
+from raidar.engine.targets.config import Target, TargetError
+from raidar.engine.targets.health import ensure_target
+from raidar.subjects.environments.python.image import image_tag
+from raidar.subjects.environments.python.models import load_pack_spec
 from tests.component_trial_support import docker_target
 from tests.execution_support import imported_pack_fixture, locked_experiment
 

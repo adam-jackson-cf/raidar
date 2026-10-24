@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from raidar.execution.health.admission import (
+from raidar.engine.health.admission import (
     EMPTY_TREE_DIGEST,
     AdmissionError,
     admit,
@@ -17,9 +17,9 @@ from raidar.execution.health.admission import (
     mismatches,
     smoke_problem,
 )
-from raidar.execution.health.audit import audit_trial
-from raidar.execution.health.model import HealthCheck, HealthReport, write_health
-from raidar.execution.models import ExecutionValidity, TrialRecord, ValidityCheck
+from raidar.engine.health.audit import audit_trial
+from raidar.engine.health.model import HealthCheck, HealthReport, write_health
+from raidar.engine.trials.models import ExecutionValidity, TrialRecord, ValidityCheck
 from tests.health_support import TRIAL_ID, HealthyTrial, healthy_trial
 
 RUNNER = {"commit": "abc", "dirty": False, "toolchain_sha256": "t" * 64}

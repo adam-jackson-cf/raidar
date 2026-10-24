@@ -13,15 +13,15 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from raidar.agents.config import agent_name_for
 from raidar.cli import env_harbor, main
 from raidar.cli.shared import ORCHESTRATOR_ROOT
-from raidar.core.paths import REPO_ROOT
-from raidar.core.repo_state import (
+from raidar.contracts.paths import REPO_ROOT
+from raidar.contracts.repo_state import (
     assert_no_generated_artifact_changes,
     generated_artifact_paths,
 )
-from raidar.packs.python.models import load_pack_spec
+from raidar.subjects.agents.config import agent_name_for
+from raidar.subjects.environments.python.models import load_pack_spec
 
 quality_gates = main.commands["quality"].commands["gates"]
 
@@ -233,7 +233,7 @@ def test_env_setup_uses_frozen_sync(monkeypatch) -> None:
 
 def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.core.repo_state.changed_repo_entries",
+        "raidar.contracts.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "D",
@@ -247,7 +247,7 @@ def test_artifact_guard_allows_generated_artifact_deletions(tmp_path: Path, monk
 
 def test_artifact_guard_rejects_modified_generated_artifacts(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
-        "raidar.core.repo_state.changed_repo_entries",
+        "raidar.contracts.repo_state.changed_repo_entries",
         lambda _: [
             (
                 "M",
@@ -520,7 +520,7 @@ def test_review_fixture_is_written_under_the_fixture_dir() -> None:
     result = _make_dry_run("review-fixture-synthetic")
 
     assert result.returncode == 0, result.stderr
-    assert "raidar.review.projection.fixture" in result.stdout
+    assert "raidar.evaluation.review.projection.fixture" in result.stdout
     assert "/var/tmp/review-fixture" in result.stdout
     assert "experiments/" not in result.stdout
 
@@ -530,8 +530,12 @@ def test_review_surface_test_projects_both_fixture_roots_but_quality_only_one() 
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
-    review = next(line for line in joined.splitlines() if "raidar.review.projection " in line)
-    quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
+    review = next(
+        line for line in joined.splitlines() if "raidar.evaluation.review.projection " in line
+    )
+    quality = next(
+        line for line in joined.splitlines() if "raidar.evaluation.review.quality " in line
+    )
     assert "--legacy-root" not in review
     assert "/var/tmp/review-fixture/review-only" in review
     assert "/var/tmp/review-fixture/jobs" in review
@@ -558,7 +562,9 @@ def test_review_surface_test_applies_one_store_to_every_given_runs_root() -> Non
 
     assert result.returncode == 0, result.stderr
     joined = re.sub(r"\\\n\s*", " ", result.stdout)
-    quality = next(line for line in joined.splitlines() if "raidar.review.quality " in line)
+    quality = next(
+        line for line in joined.splitlines() if "raidar.evaluation.review.quality " in line
+    )
     assert f'--jobs-root "{REPO_ROOT / "runs/a"}"' in quality
     assert f'--jobs-root "{REPO_ROOT / "runs/b"}"' in quality
     assert quality.count(f'--store "{REPO_ROOT / "store"}"') == 2

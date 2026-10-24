@@ -16,27 +16,27 @@ from typing import Any
 
 import pytest
 
-from raidar.core.snapshot import tree_digest
-from raidar.packs.python.models import load_tool_lock
-from raidar.packs.python.provisioner import ToolProvisioningError
-from raidar.scorers.builtin_manifests import CODE_QUALITY
-from raidar.scorers.catalog import default_scorer_registry
-from raidar.scorers.code_quality import CodeQualityScorer
-from raidar.scorers.code_quality.contract import EXPECTED_RUFF_VERSION
-from raidar.scorers.code_quality.measurement import QUALITY_TOOL
-from raidar.scorers.rescore import RescoreOutcome, assess
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
-from raidar.scorers.store import AssessmentStore
-from raidar.scorers.trial_inputs import load_trial_context
-from raidar.verifier.models import CaseStatus, ParityVerdict
-from raidar.verifier.records import (
+from raidar.contracts.snapshot import tree_digest
+from raidar.grading.models import CaseStatus, ParityVerdict
+from raidar.grading.records import (
     FORK_EVIDENCE_FILE,
     load_step_record,
     step_record_dir,
     write_step_record,
 )
+from raidar.scoring.code_quality import CodeQualityScorer
+from raidar.scoring.code_quality.contract import EXPECTED_RUFF_VERSION
+from raidar.scoring.code_quality.measurement import QUALITY_TOOL
+from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
+from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.rescore import RescoreOutcome, assess
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
+from raidar.scoring.framework.store import AssessmentStore
+from raidar.scoring.framework.trial_inputs import load_trial_context
+from raidar.scoring.framework.validation import validate_result
+from raidar.subjects.environments.python.models import load_tool_lock
+from raidar.subjects.environments.python.provisioner import ToolProvisioningError
 from tests.code_quality_support import case_trial, golden_case, quality_tools
 from tests.scorer_support import StepFixture, tree_state, write_files, write_trial
 

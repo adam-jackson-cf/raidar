@@ -11,18 +11,19 @@ from pathlib import Path
 
 import click
 
-from raidar.jev.audit import ReviewerKind
-from raidar.jev.blind import derive_blind_labels, export_blind
-from raidar.jev.calibration import (
+from raidar.scoring.framework.catalog import default_scorer_registry
+from raidar.scoring.judge.audit import ReviewerKind
+from raidar.scoring.judge.blind import derive_blind_labels, export_blind
+from raidar.scoring.judge.calibration import (
     LabelImportError,
     import_labels,
     promotion_readiness,
     record_split,
     supersede_labels,
 )
-from raidar.jev.ledger import SplitRecord, recorded_split
-from raidar.jev.policies import POLICY_DIR, CalibrationSplit, PolicyError
-from raidar.jev.promotion import (
+from raidar.scoring.judge.ledger import SplitRecord, recorded_split
+from raidar.scoring.judge.policies import POLICY_DIR, CalibrationSplit, PolicyError
+from raidar.scoring.judge.promotion import (
     PromotionError,
     PromotionPlan,
     plan_promotion,
@@ -30,8 +31,7 @@ from raidar.jev.promotion import (
     verify_promotion,
     write_promotion,
 )
-from raidar.jev.session import open_runtime
-from raidar.scorers.catalog import default_scorer_registry
+from raidar.scoring.judge.session import open_runtime
 
 
 def _version_key(version: str) -> list[object]:

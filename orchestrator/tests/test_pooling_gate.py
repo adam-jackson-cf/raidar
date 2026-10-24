@@ -7,9 +7,9 @@ from typing import Any
 
 import pytest
 
-from raidar.analysis.pooling import PoolingError, check_pooling
-from raidar.analysis.sources import JobDir
-from raidar.execution.health.records_manifest import RECORDS_MANIFEST, seal_trial
+from raidar.engine.health.records_manifest import RECORDS_MANIFEST, seal_trial
+from raidar.evaluation.analysis.pooling import PoolingError, check_pooling
+from raidar.evaluation.analysis.sources import JobDir
 
 TRIAL = "t1"
 

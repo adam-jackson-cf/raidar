@@ -16,19 +16,19 @@ from harbor.models.trial.paths import TrialPaths
 from harbor.trial.hooks import TrialEvent
 
 from raidar.cli import main
-from raidar.verifier import regrade as regrade_module
-from raidar.verifier.bundle import BundleError
-from raidar.verifier.guard import install_leak_guard
-from raidar.verifier.leak import LeakScanError
-from raidar.verifier.records import (
+from raidar.grading import regrade as regrade_module
+from raidar.grading.bundle import BundleError
+from raidar.grading.guard import install_leak_guard
+from raidar.grading.leak import LeakScanError
+from raidar.grading.records import (
     RECORD_FILE,
     VERIFIER_RECORD_DIR,
     load_step_record,
     step_record_dir,
 )
-from raidar.verifier.regrade import RegradeError, RegradeOptions, regrade_path
-from raidar.verifier.sandbox import GradingSandbox
-from raidar.verifier.verifier import RaidarVerifier
+from raidar.grading.regrade import RegradeError, RegradeOptions, regrade_path
+from raidar.grading.sandbox import GradingSandbox
+from raidar.grading.verifier import RaidarVerifier
 from tests.verifier_support import FakeAgentEnvironment, LocalProcessSandbox, make_bundle, write_app
 
 
@@ -38,7 +38,7 @@ class LocalVerifier(RaidarVerifier):
     sandbox: LocalProcessSandbox
 
     async def prepare_sandbox(self) -> tuple[GradingSandbox, Any]:
-        from raidar.verifier.records import GraderRef
+        from raidar.grading.records import GraderRef
 
         return self.sandbox, GraderRef(
             image="local",

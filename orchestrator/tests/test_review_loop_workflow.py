@@ -21,11 +21,11 @@ from harbor.environments.base import BaseEnvironment, ExecResult
 from harbor.models.agent.context import AgentContext
 from harbor.models.trajectories import Trajectory
 
-from raidar.agents.config import Harness
-from raidar.components.catalog.workflow import REVIEW_LOOP
-from raidar.components.definition.evidence import StepEvidence
-from raidar.components.definition.manifest import ComponentUseContext
-from raidar.components.runtime.review_loop import (
+from raidar.subjects.agents.config import Harness
+from raidar.subjects.treatments.catalog.workflow import REVIEW_LOOP
+from raidar.subjects.treatments.definition.evidence import StepEvidence
+from raidar.subjects.treatments.definition.manifest import ComponentUseContext
+from raidar.subjects.treatments.runtime.review_loop import (
     APPROVE,
     CHANGES,
     EMPTY_FEEDBACK,
@@ -39,7 +39,7 @@ from raidar.components.runtime.review_loop import (
     parse_review,
     render,
 )
-from raidar.components.runtime.session_chain import nest_session_wrapper
+from raidar.subjects.treatments.runtime.session_chain import nest_session_wrapper
 from tests.component_support import PILOT_DIR, write_jsonl
 
 
@@ -218,7 +218,7 @@ def test_a_session_wrapper_inner_agent_runs_every_stage(tmp_path: Path) -> None:
         environment_logs_dir=agent.environment_logs_dir,
         inner_agent=nest_session_wrapper(
             {"name": "tests.test_review_loop_workflow:ScriptedInnerAgent", "kwargs": {}},
-            "raidar.components.runtime.continue_on_stall:ContinueOnStallAgent",
+            "raidar.subjects.treatments.runtime.continue_on_stall:ContinueOnStallAgent",
             {"component": "continue-on-stall@2"},
         ),
         work_dir=str(tmp_path / "review"),
@@ -342,7 +342,7 @@ def test_failed_implement_stage_skips_the_review(tmp_path: Path) -> None:
 def test_large_diffs_are_truncated_for_the_reviewer(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr("raidar.components.runtime.review_loop.MAX_DIFF_CHARS", 40)
+    monkeypatch.setattr("raidar.subjects.treatments.runtime.review_loop.MAX_DIFF_CHARS", 40)
     agent, environment = _agent(tmp_path)
     ScriptedInnerAgent.replies[:] = ["VERDICT: APPROVE"]
     asyncio.run(agent.setup(cast(BaseEnvironment, environment)))
@@ -537,7 +537,7 @@ def test_component_wraps_the_arm_agent_in_the_review_loop_agent() -> None:
     assert contribution.agent_wrapper is not None
     assert (
         contribution.agent_wrapper.import_path
-        == "raidar.components.runtime.review_loop:ReviewLoopAgent"
+        == "raidar.subjects.treatments.runtime.review_loop:ReviewLoopAgent"
     )
     assert dict(contribution.agent_wrapper.kwargs) == {
         "max_review_rounds": 2,

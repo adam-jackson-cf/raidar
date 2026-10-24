@@ -16,10 +16,15 @@ from typing import Any
 
 import pytest
 
-from raidar.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
-from raidar.analysis.effects import Settings
-from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import (
+from raidar.design.experiments.loader import load_experiment
+from raidar.design.experiments.lock import build_lock, render_lock, stale_sections
+from raidar.design.experiments.metrics import MetricResolver
+from raidar.design.experiments.references import ResolverSet
+from raidar.design.experiments.validation import SpecValidationError
+from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_effort_ref
+from raidar.evaluation.analysis.effects import Settings
+from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.outcomes import (
     PRIMARY_FROM_LOCK,
     RAW_COUNTERPART,
     SOLVE_RATE,
@@ -27,12 +32,7 @@ from raidar.analysis.outcomes import (
     primary_metric,
     primary_source,
 )
-from raidar.analysis.report import analyse
-from raidar.spec.loader import load_experiment
-from raidar.spec.lock import build_lock, render_lock, stale_sections
-from raidar.spec.metrics import MetricResolver
-from raidar.spec.references import ResolverSet
-from raidar.spec.validation import SpecValidationError
+from raidar.evaluation.analysis.report import analyse
 from tests.analysis_support import inputs, paired_arms
 from tests.experiment_spec_support import (
     experiment_document,

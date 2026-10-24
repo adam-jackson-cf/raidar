@@ -11,7 +11,7 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
-from raidar.execution.health.tool_tree import (
+from raidar.engine.health.tool_tree import (
     TOOL_HASHES,
     ToolTreeReading,
     hash_tool_tree,
@@ -89,7 +89,7 @@ def test_hooks_take_one_baseline_and_a_hash_after_every_agent_phase(
         add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
     )
     bundle = SimpleNamespace(resolve_step=lambda name: f"resolved-{name}")
-    monkeypatch.setattr("raidar.execution.health.tool_tree.load_bundle", lambda root: bundle)
+    monkeypatch.setattr("raidar.engine.health.tool_tree.load_bundle", lambda root: bundle)
     install_tool_tree_watch(cast(Any, trial), tmp_path / "bundle")
     event = SimpleNamespace(
         result=SimpleNamespace(step_results=[SimpleNamespace(step_name="checkpoint_1")])

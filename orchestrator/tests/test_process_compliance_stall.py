@@ -11,12 +11,17 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from raidar.scorers.process_checks import deterministic_process_compliance_scorer
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
-from raidar.scorers.process_checks.stall import NO_WRAPPER
-from raidar.scorers.sdk.context import AssessContext, StepInputs
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
+from raidar.scoring.framework.context import AssessContext, StepInputs
+from raidar.scoring.framework.result import (
+    TRAJECTORY_SUBJECT,
+    AssessResult,
+    AssessStatus,
+    Observation,
+)
+from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.process_checks import deterministic_process_compliance_scorer
+from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scoring.process_checks.stall import NO_WRAPPER
 
 CP1, CP2, CP3 = "checkpoint_1", "checkpoint_2", "checkpoint_3"
 

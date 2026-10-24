@@ -28,30 +28,30 @@ from harbor.agents.installed.base import ApiOverloadedError, NonZeroAgentExitCod
 from harbor.environments.base import BaseEnvironment, ExecResult
 from harbor.models.agent.context import AgentContext
 
-from raidar.components import ComponentKind, ComponentRegistry, ComponentRejectedError
-from raidar.components.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
-from raidar.components.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
-from raidar.components.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH
-from raidar.components.definition.evidence import StepEvidence
-from raidar.components.runtime import transient_retry
-from raidar.components.runtime.continue_on_stall import (
+from raidar.design.experiments.schema import AgentEntry
+from raidar.engine.trials.agent_config import arm_agent_config, reported_harness_pin
+from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.subjects.treatments import ComponentKind, ComponentRegistry, ComponentRejectedError
+from raidar.subjects.treatments.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
+from raidar.subjects.treatments.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records
+from raidar.subjects.treatments.catalog.stall import CONTINUE_ON_STALL_IMPORT_PATH
+from raidar.subjects.treatments.definition.evidence import StepEvidence
+from raidar.subjects.treatments.runtime import transient_retry
+from raidar.subjects.treatments.runtime.continue_on_stall import (
     STALL_DIR,
     STALL_RECORD,
     ContinueOnStallAgent,
     continuation_prompt,
     detect_stall_message,
 )
-from raidar.components.runtime.session_chain import InnerAgentSpec
-from raidar.components.runtime.transient_retry import (
+from raidar.subjects.treatments.runtime.session_chain import InnerAgentSpec
+from raidar.subjects.treatments.runtime.transient_retry import (
     RETRY_DIR,
     RETRY_RECORD,
     TransientRetryAgent,
     is_retryable,
     retry_prompt,
 )
-from raidar.execution.agent_config import arm_agent_config, reported_harness_pin
-from raidar.packs.python.models import load_pack_spec
-from raidar.spec.schema import AgentEntry
 from tests.component_support import compile_uses, use
 
 GATE = {"command": "guardrail-check", "mode": "commit", "max_rounds": 3, "timeout_sec": 300}
@@ -119,10 +119,10 @@ def test_both_are_workflow_session_wrappers_without_with_keys() -> None:
         assert registry.get(ref).manifest.kind is ComponentKind.WORKFLOW
         with pytest.raises(ComponentRejectedError):
             compile_uses(use(ref, retries=3))
-    assert "raidar/components/runtime/continue_on_stall.py" in (
+    assert "raidar/subjects/treatments/runtime/continue_on_stall.py" in (
         registry.get("continue-on-stall@2").manifest.fingerprint
     )
-    assert "raidar/components/runtime/transient_retry.py" in (
+    assert "raidar/subjects/treatments/runtime/transient_retry.py" in (
         registry.get("transient-retry@1").manifest.fingerprint
     )
 

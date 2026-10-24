@@ -13,15 +13,15 @@ from pathlib import Path
 
 import click
 
-from raidar.execution.perf.budgets import (
+from raidar.engine.perf.budgets import (
     MIN_SAMPLES,
     NOT_RECORDED_BY_RUNS,
     PerfInputError,
     PhaseCheck,
     load_job_samples,
 )
-from raidar.execution.perf.contention import UNDETECTED_DOCKER_ACTIVITY, Contention
-from raidar.execution.perf.perf_report import PerfReport, build_report
+from raidar.engine.perf.contention import UNDETECTED_DOCKER_ACTIVITY, Contention
+from raidar.engine.perf.perf_report import PerfReport, build_report
 
 
 def _label(check: PhaseCheck) -> str:

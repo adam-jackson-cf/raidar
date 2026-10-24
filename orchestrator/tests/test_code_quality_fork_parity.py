@@ -23,31 +23,31 @@ from typing import Any
 
 import pytest
 
-from raidar.scorers.code_quality import arithmetic
-from raidar.scorers.code_quality.architecture import produce_production_graph
-from raidar.scorers.code_quality.checkpoint import eligibility_code
-from raidar.scorers.code_quality.diffs import (
+from raidar.scoring.code_quality import arithmetic
+from raidar.scoring.code_quality.architecture import produce_production_graph
+from raidar.scoring.code_quality.checkpoint import eligibility_code
+from raidar.scoring.code_quality.diffs import (
     changed_lines,
     production_symbols,
     regression_scope,
     rework_symbols,
 )
-from raidar.scorers.code_quality.lineage import (
+from raidar.scoring.code_quality.lineage import (
     calculate_problem_rework,
     calculate_transition_rework,
 )
-from raidar.scorers.code_quality.lineage_models import (
+from raidar.scoring.code_quality.lineage_models import (
     PhysicalLineEvidence,
     RegressionBreadthInput,
     ReworkCheckpointInput,
     SymbolIdentity,
     TransitionReworkEvidence,
 )
-from raidar.scorers.code_quality.models import CheckpointCorrectnessEvidence
-from raidar.scorers.code_quality.quality import ProductionQualityError, produce_production_quality
-from raidar.scorers.code_quality.regression import calculate_regression_breadth
-from raidar.scorers.code_quality.snapshot_tool.cli import measure
-from raidar.scorers.inventory import FileRole, build_inventory
+from raidar.scoring.code_quality.models import CheckpointCorrectnessEvidence
+from raidar.scoring.code_quality.quality import ProductionQualityError, produce_production_quality
+from raidar.scoring.code_quality.regression import calculate_regression_breadth
+from raidar.scoring.code_quality.snapshot_tool.cli import measure
+from raidar.scoring.framework.inventory import FileRole, build_inventory
 from tests.code_quality_support import (
     fork_goldens,
     golden_case,

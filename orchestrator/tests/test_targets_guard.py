@@ -9,8 +9,11 @@ from typing import Any
 
 import pytest
 
-from raidar.execution.driver import run_in_order
-from raidar.execution.models import (
+from raidar.engine.targets.config import implicit_target
+from raidar.engine.targets.guard import REAP_FILE, TargetGuard, TargetLostError
+from raidar.engine.targets.health import TargetUnavailableError
+from raidar.engine.trials.driver import run_in_order
+from raidar.engine.trials.models import (
     ExecutionValidity,
     PlannedTrial,
     ProgressionRule,
@@ -18,9 +21,6 @@ from raidar.execution.models import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.targets.config import implicit_target
-from raidar.targets.guard import REAP_FILE, TargetGuard, TargetLostError
-from raidar.targets.health import TargetUnavailableError
 
 HASHES = TrialHashes(
     lock="l", problem="p", arm="a", condition="c", agent="g", protocol="r", trial="t"

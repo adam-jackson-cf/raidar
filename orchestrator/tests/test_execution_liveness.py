@@ -11,7 +11,7 @@ from typing import Any, cast
 import pytest
 from harbor.trial.hooks import TrialEvent
 
-from raidar.execution.health.liveness import (
+from raidar.engine.health.liveness import (
     LIVENESS_REPORT,
     LivenessConfig,
     PhaseMonitor,
@@ -19,7 +19,7 @@ from raidar.execution.health.liveness import (
     liveness_script,
     parse_poll_output,
 )
-from raidar.execution.reaper import _KILLED, _RESIDUAL
+from raidar.engine.trials.reaper import _KILLED, _RESIDUAL
 
 NET_HEADER = (
     "Inter-|   Receive\n face |bytes packets errs drop fifo frame compressed multicast|bytes\n"

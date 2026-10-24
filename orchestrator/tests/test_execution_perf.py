@@ -9,15 +9,7 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.execution.models import (
-    ExecutionValidity,
-    PhaseSample,
-    PlannedTrial,
-    ProgressionRule,
-    TrialHashes,
-    TrialRecord,
-)
-from raidar.execution.perf.budgets import (
+from raidar.engine.perf.budgets import (
     N1_REFERENCE_BUDGETS,
     TARGET_BUDGETS,
     Budget,
@@ -26,7 +18,15 @@ from raidar.execution.perf.budgets import (
     checks_pass,
     percentile,
 )
-from raidar.execution.perf.phases import trial_phases
+from raidar.engine.perf.phases import trial_phases
+from raidar.engine.trials.models import (
+    ExecutionValidity,
+    PhaseSample,
+    PlannedTrial,
+    ProgressionRule,
+    TrialHashes,
+    TrialRecord,
+)
 from tests.execution_support import StepOutcome, write_trial
 
 

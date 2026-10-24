@@ -31,15 +31,15 @@ from harbor.models.trial.config import (
     VerifierConfig,
 )
 
-from raidar.components import CompiledCondition
-from raidar.components.runtime.provision import AnyProvision, install_trial_provisioning
-from raidar.execution.cleanup import cleanup_trial_projects
-from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
-from raidar.packs.python.image import image_tag
-from raidar.packs.python.models import load_pack_spec
-from raidar.packs.python.task_environment import bind_task_environment
-from raidar.targets.config import Target, TargetError, activate, resolve_target
-from raidar.targets.health import ensure_target
+from raidar.engine.targets.config import Target, TargetError, activate, resolve_target
+from raidar.engine.targets.health import ensure_target
+from raidar.engine.trials.cleanup import cleanup_trial_projects
+from raidar.engine.trials.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
+from raidar.subjects.environments.python.image import image_tag
+from raidar.subjects.environments.python.models import load_pack_spec
+from raidar.subjects.environments.python.task_environment import bind_task_environment
+from raidar.subjects.treatments import CompiledCondition
+from raidar.subjects.treatments.runtime.provision import AnyProvision, install_trial_provisioning
 
 PLANT_MARKER = "raidar-planted-sentinel"
 AGENT_HOME = load_pack_spec().image.agent_home

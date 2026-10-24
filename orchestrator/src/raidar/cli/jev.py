@@ -9,18 +9,18 @@ from pathlib import Path
 import click
 
 from raidar.cli import jev_calibration
-from raidar.jev.audit import AuditLog
-from raidar.jev.label_export import (
+from raidar.scoring.judge.audit import AuditLog
+from raidar.scoring.judge.label_export import (
     LabelExportError,
     export_labels,
     load_review_labels,
     write_rows,
 )
-from raidar.jev.policies import PolicyRegistry
-from raidar.jev.report import rubric_shadow_report
-from raidar.jev.rubric import RUBRIC_POLICY, CheckpointSource, RubricRunner
-from raidar.jev.rubric_questions import load_rubric_question_set
-from raidar.jev.session import open_runtime
+from raidar.scoring.judge.policies import PolicyRegistry
+from raidar.scoring.judge.report import rubric_shadow_report
+from raidar.scoring.judge.rubric import RUBRIC_POLICY, CheckpointSource, RubricRunner
+from raidar.scoring.judge.rubric_questions import load_rubric_question_set
+from raidar.scoring.judge.session import open_runtime
 
 _NUMBER = re.compile(r"(\d+)")
 

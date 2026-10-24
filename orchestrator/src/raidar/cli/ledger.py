@@ -6,9 +6,9 @@ from pathlib import Path
 
 import click
 
-from raidar.core.paths import lab_root
-from raidar.ledger import index
-from raidar.ledger.check import check_ledger, load_ledger
+from raidar.contracts.paths import lab_root
+from raidar.evaluation.ledger import index
+from raidar.evaluation.ledger.check import check_ledger, load_ledger
 
 LEDGER_ROOT = lab_root() / "ledger"
 

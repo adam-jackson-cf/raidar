@@ -11,17 +11,17 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.jev.audit import LabelRecord, ReviewerKind
-from raidar.jev.blind import derive_blind_labels, export_blind
-from raidar.jev.calibration import (
+from raidar.scoring.judge.audit import LabelRecord, ReviewerKind
+from raidar.scoring.judge.blind import derive_blind_labels, export_blind
+from raidar.scoring.judge.calibration import (
     LabelImportError,
     import_labels,
     promotion_readiness,
     supersede_labels,
 )
-from raidar.jev.ledger import current_labels, label_history, superseded_request_ids
-from raidar.jev.policies import CalibrationSplit, PolicyMode, load_policy
-from raidar.jev.promotion import (
+from raidar.scoring.judge.ledger import current_labels, label_history, superseded_request_ids
+from raidar.scoring.judge.policies import CalibrationSplit, PolicyMode, load_policy
+from raidar.scoring.judge.promotion import (
     PromotionError,
     default_split,
     fit_threshold,
@@ -29,7 +29,7 @@ from raidar.jev.promotion import (
     regression_corpus,
     split_metrics,
 )
-from raidar.jev.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
+from raidar.scoring.judge.protocol import ChoiceQuestion, NoulQuestion, ScoreQuestion
 from tests.jev_support import (
     SUFFICIENT,
     RecordedTransport,

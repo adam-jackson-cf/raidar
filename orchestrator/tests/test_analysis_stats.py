@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.analysis.stats import (
+from raidar.evaluation.analysis.stats import (
     BOOTSTRAP_MIN_PAIRS,
     IntervalMethod,
     mcnemar_exact,

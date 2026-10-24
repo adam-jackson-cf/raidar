@@ -13,27 +13,32 @@ from pathlib import Path
 
 import pytest
 
-from raidar.analysis.assessed import GATE_EFFORT_REF, gate_metrics
-from raidar.analysis.effects import Settings
-from raidar.analysis.load import manipulation_requests
-from raidar.analysis.manipulation import (
+from raidar.design.experiments.loader import load_experiment
+from raidar.design.experiments.validation import SpecValidationError
+from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, gate_metrics
+from raidar.evaluation.analysis.effects import Settings
+from raidar.evaluation.analysis.load import manipulation_requests
+from raidar.evaluation.analysis.manipulation import (
     GATE_CLEAN,
     CheckRequest,
     Separation,
     check_report,
     step_share,
 )
-from raidar.analysis.markdown import render_markdown
-from raidar.analysis.outcomes import (
+from raidar.evaluation.analysis.markdown import render_markdown
+from raidar.evaluation.analysis.outcomes import (
     GATE_METRICS,
     TrialOutcome,
     Value,
     outcome_metric,
 )
-from raidar.analysis.report import AnalysisReport, analyse
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.spec.loader import load_experiment
-from raidar.spec.validation import SpecValidationError
+from raidar.evaluation.analysis.report import AnalysisReport, analyse
+from raidar.scoring.framework.result import (
+    TRAJECTORY_SUBJECT,
+    AssessResult,
+    AssessStatus,
+    Observation,
+)
 from tests.analysis_support import BASELINE, GUIDED, inputs, trial
 from tests.experiment_spec_support import experiment_document, write_experiment
 
@@ -331,7 +336,7 @@ def test_a_lock_without_process_compliance_has_no_process_section() -> None:
 
 
 def test_a_trial_reads_the_process_outcomes_its_scorer_reports() -> None:
-    from raidar.analysis.assessed import process_metrics
+    from raidar.evaluation.analysis.assessed import process_metrics
 
     stall = Observation(
         metric="stall_rate", subject=TRAJECTORY_SUBJECT, status=AssessStatus.OK, value=0.5

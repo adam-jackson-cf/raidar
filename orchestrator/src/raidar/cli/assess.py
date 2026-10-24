@@ -19,7 +19,7 @@ lock. Only a job with no findable lock falls back to its execution-time
 
 Pre-fix grades: when a scorer run reads them (``gate-effort``), ``--rescore``
 first grades every guardrail-gate@3 pre-fix snapshot of the target that is not
-yet graded into ``--store`` (``raidar.verifier.prefix_grade``: the step's own
+yet graded into ``--store`` (``raidar.grading.prefix_grade``: the step's own
 bundle, sandbox and timeout, on ``--target``'s grader target), never into the job, and
 reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 ``--store`` also regrades the stored pre-fix grades beside the final snapshots.
@@ -27,7 +27,7 @@ reports what it graded. ``--replay`` grades nothing. ``--regrade`` with
 Offline coverage: when a scorer run reads it (``code-quality@3``), ``--rescore``
 first makes, into ``--store``, the verifier's coverage run of every step whose
 trial deferred it (``protocol.verifier_coverage: offline``;
-``raidar.verifier.coverage_offline``), never into the job, and reports what it
+``raidar.grading.coverage_offline``), never into the job, and reports what it
 made. ``--replay`` makes nothing. ``--regrade --coverage-check`` instead makes
 every step's coverage run offline and compares it with the trial's own coverage
 pass (parity verdict and G input) or, for a deferred step, the run stored in
@@ -52,13 +52,6 @@ from typing import Any
 
 import click
 
-from raidar.analysis.sources import (
-    AnalysisInputError,
-    JobDir,
-    default_lock,
-    find_job_manifest,
-    read_lock,
-)
 from raidar.cli.grading import (
     RegradeOptions,
     check_coverage,
@@ -68,13 +61,20 @@ from raidar.cli.grading import (
     reads_docker_grades,
     regrade,
 )
-from raidar.core.runtimes import ANY_RUNTIME
-from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
-from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
-from raidar.scorers.rescore import report_payload, rescore_path
-from raidar.scorers.rescore_config import RescoreConfig, load_rescore_config
-from raidar.scorers.store import AssessmentConflictError, AssessmentStore
-from raidar.verifier.bundle import BundleError, load_bundle
+from raidar.contracts.runtimes import ANY_RUNTIME
+from raidar.engine.jobs.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
+from raidar.evaluation.analysis.sources import (
+    AnalysisInputError,
+    JobDir,
+    default_lock,
+    find_job_manifest,
+    read_lock,
+)
+from raidar.grading.bundle import BundleError, load_bundle
+from raidar.scoring.framework.catalog import ScorerUnavailableError, default_scorer_registry
+from raidar.scoring.framework.rescore import report_payload, rescore_path
+from raidar.scoring.framework.rescore_config import RescoreConfig, load_rescore_config
+from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
 
 
 def register(main: click.Group) -> None:

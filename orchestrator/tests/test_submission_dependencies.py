@@ -7,17 +7,17 @@ from pathlib import Path
 
 import pytest
 
-from raidar.verifier import submission_deps
-from raidar.verifier.bundle import (
+from raidar.grading import submission_deps
+from raidar.grading.bundle import (
     BundleManifest,
     GraderSpec,
     VerifierBundle,
     VerifierStepSpec,
     write_bundle,
 )
-from raidar.verifier.grader import grade_step
-from raidar.verifier.grader_image import grader_dockerfile
-from raidar.verifier.submission_deps import (
+from raidar.grading.grader import grade_step
+from raidar.grading.grader_image import grader_dockerfile
+from raidar.grading.submission_deps import (
     SubmissionDependencies,
     declared_requirements,
     provisioned_pins,

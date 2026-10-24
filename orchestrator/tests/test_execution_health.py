@@ -12,14 +12,14 @@ import pytest
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.execution.collect import health_validity
-from raidar.execution.health.audit import audit_trial
-from raidar.execution.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
-from raidar.execution.health.model import HealthCheck, HealthReport, load_health, write_health
-from raidar.execution.models import CheckpointState, ValidityCheck
-from raidar.execution.reaper import REAP_REPORT
-from raidar.execution.trial_finish import HEALTH_ERROR_FILE, audit_and_write
-from raidar.verifier.records import step_record_dir
+from raidar.engine.health.audit import audit_trial
+from raidar.engine.health.fault_candidates import FAULT_CANDIDATES, append_fault_candidates
+from raidar.engine.health.model import HealthCheck, HealthReport, load_health, write_health
+from raidar.engine.trials.collect import health_validity
+from raidar.engine.trials.models import CheckpointState, ValidityCheck
+from raidar.engine.trials.reaper import REAP_REPORT
+from raidar.engine.trials.trial_finish import HEALTH_ERROR_FILE, audit_and_write
+from raidar.grading.records import step_record_dir
 from tests.execution_support import StepOutcome
 from tests.health_support import STEP, TRIAL_ID, HealthyTrial, healthy_trial
 
@@ -339,7 +339,7 @@ def test_an_audit_that_raises_invalidates_the_trial_and_keeps_the_traceback(
     def boom(*args: Any) -> HealthReport:
         raise RuntimeError("audit bug")
 
-    monkeypatch.setattr("raidar.execution.trial_finish.audit_trial", boom)
+    monkeypatch.setattr("raidar.engine.trials.trial_finish.audit_trial", boom)
     (check,) = audit_and_write(t.job_dir, t.trial_dir, t.record)
     assert (check.name, check.passed) == ("health_audit", False)
     assert "audit bug" in (t.trial_dir / HEALTH_ERROR_FILE).read_text()

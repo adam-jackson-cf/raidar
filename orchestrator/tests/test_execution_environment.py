@@ -12,8 +12,8 @@ from typing import Any
 import pytest
 from harbor.environments.base import ExecResult
 
-from raidar.execution import environment as env_module
-from raidar.execution.environment import RunScopedDockerEnvironment, engine_command
+from raidar.engine.trials import environment as env_module
+from raidar.engine.trials.environment import RunScopedDockerEnvironment, engine_command
 
 
 @pytest.mark.parametrize(

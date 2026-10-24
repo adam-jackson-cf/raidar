@@ -15,11 +15,11 @@ from typing import Any, cast
 import pytest
 from harbor.models.trial.paths import TrialPaths
 
-from raidar.verifier.bundle import GraderSpec
-from raidar.verifier.grader_image import ensure_grader_image, grader_dockerfile, grader_image_tag
-from raidar.verifier.regrade import docker_sandbox_factory
-from raidar.verifier.sandbox import DockerCopySandbox, SandboxRun, sweep_grader_orphans
-from raidar.verifier.verifier import RaidarVerifier
+from raidar.grading.bundle import GraderSpec
+from raidar.grading.grader_image import ensure_grader_image, grader_dockerfile, grader_image_tag
+from raidar.grading.regrade import docker_sandbox_factory
+from raidar.grading.sandbox import DockerCopySandbox, SandboxRun, sweep_grader_orphans
+from raidar.grading.verifier import RaidarVerifier
 from tests.verifier_support import FakeAgentEnvironment, make_bundle
 
 FAKE_DOCKER = """#!/bin/bash

@@ -9,9 +9,9 @@ from typing import Any, cast
 
 from harbor.trial.hooks import TrialEvent
 
-from raidar.execution.collect import _infra_reasons
-from raidar.execution.models import ProbeSummary
-from raidar.execution.reaper import (
+from raidar.engine.trials.collect import _infra_reasons
+from raidar.engine.trials.models import ProbeSummary
+from raidar.engine.trials.reaper import (
     REAP_REPORT,
     install_agent_reaper,
     load_reap_report,
@@ -20,7 +20,7 @@ from raidar.execution.reaper import (
     reap_infra_reason,
     reap_script,
 )
-from raidar.verifier.records import step_record_dir
+from raidar.grading.records import step_record_dir
 from tests.verifier_support import make_bundle
 
 KILLED_OUTPUT = (

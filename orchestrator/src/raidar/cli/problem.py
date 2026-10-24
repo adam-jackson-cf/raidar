@@ -9,19 +9,20 @@ from pathlib import Path
 import click
 
 from raidar.cli.target_options import docker_selection, target_option
-from raidar.problems.errata import Disposition, draft_errata, report_entries
-from raidar.problems.importer import import_problem
-from raidar.problems.models import ProblemId, ProblemManifest
-from raidar.problems.source import SourceError
-from raidar.problems.store import ProblemStore, ProblemStoreError, open_store, store_at
-from raidar.problems.validation import (
+from raidar.design.experiments.references import RegistryReferenceError
+from raidar.design.problems.errata import Disposition, draft_errata, report_entries
+from raidar.design.problems.importer import import_problem
+from raidar.design.problems.models import ProblemId, ProblemManifest
+from raidar.design.problems.source import SourceError
+from raidar.design.problems.store import ProblemStore, ProblemStoreError, open_store, store_at
+from raidar.design.problems.validation import (
     Check,
     CheckStatus,
     ValidationRecordError,
     Verdict,
     read_validation_record,
 )
-from raidar.problems.validator import (
+from raidar.design.problems.validator import (
     ENGINES,
     ValidateOptions,
     audit_problem,
@@ -30,7 +31,6 @@ from raidar.problems.validator import (
     validate_problem,
     write_report,
 )
-from raidar.spec.references import RegistryReferenceError
 
 EXIT_EXCLUDED = 1
 EXIT_INFRA = 2

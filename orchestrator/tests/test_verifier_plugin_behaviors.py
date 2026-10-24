@@ -17,7 +17,7 @@ from typing import Any
 
 import pytest
 
-from raidar.verifier.sandbox import PLUGIN_FILE
+from raidar.grading.sandbox import PLUGIN_FILE
 
 
 @pytest.fixture(scope="module")

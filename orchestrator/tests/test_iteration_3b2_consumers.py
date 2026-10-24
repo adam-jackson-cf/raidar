@@ -7,13 +7,18 @@
 
 from __future__ import annotations
 
-from raidar.analysis.markdown import BETTER_LEGEND, _better
-from raidar.analysis.outcomes import GATE_METRICS, GATE_PREFIX, PROCESS_METRICS, PROCESS_PREFIX
-from raidar.review.projection.headline import needed_scorers
-from raidar.scorers.builtin_manifests import CODE_QUALITY
-from raidar.scorers.gate_effort.manifest import GATE_EFFORT
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
-from raidar.spec.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.design.experiments.metrics import DEFAULT_METRIC_REGISTRY
+from raidar.evaluation.analysis.markdown import BETTER_LEGEND, _better
+from raidar.evaluation.analysis.outcomes import (
+    GATE_METRICS,
+    GATE_PREFIX,
+    PROCESS_METRICS,
+    PROCESS_PREFIX,
+)
+from raidar.evaluation.review.projection.headline import needed_scorers
+from raidar.scoring.framework.builtin_manifests import CODE_QUALITY
+from raidar.scoring.gate_effort.manifest import GATE_EFFORT
+from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
 
 GATE_ONLY_ADDED_LATER = {
     "fix_round_correctness_delta",

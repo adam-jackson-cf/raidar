@@ -9,15 +9,13 @@ from __future__ import annotations
 
 import pytest
 
-from raidar.analysis.assessed import (
-    CODE_QUALITY_REF,
-    CORRECTNESS_REF,
-    RESOURCE_USAGE_REF,
-    build_outcome,
-    headline_score,
+from raidar.design.experiments.metrics import (
+    SCB_CANONICAL,
+    SCB_CANONICAL_ONESHOT,
+    SCB_CANONICAL_ONESHOT_V2,
+    SCB_CANONICAL_V2,
 )
-from raidar.analysis.outcomes import OUTCOME_METRICS, TRUNCATED, UNASSESSED, Value
-from raidar.execution.models import (
+from raidar.engine.trials.models import (
     CheckpointState,
     ExecutionValidity,
     PlannedTrial,
@@ -27,12 +25,19 @@ from raidar.execution.models import (
     TrialRecord,
     ValidityCheck,
 )
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessResult, AssessStatus, Observation
-from raidar.spec.metrics import (
-    SCB_CANONICAL,
-    SCB_CANONICAL_ONESHOT,
-    SCB_CANONICAL_ONESHOT_V2,
-    SCB_CANONICAL_V2,
+from raidar.evaluation.analysis.assessed import (
+    CODE_QUALITY_REF,
+    CORRECTNESS_REF,
+    RESOURCE_USAGE_REF,
+    build_outcome,
+    headline_score,
+)
+from raidar.evaluation.analysis.outcomes import OUTCOME_METRICS, TRUNCATED, UNASSESSED, Value
+from raidar.scoring.framework.result import (
+    TRAJECTORY_SUBJECT,
+    AssessResult,
+    AssessStatus,
+    Observation,
 )
 
 STEPS = ("checkpoint_1", "checkpoint_2", "checkpoint_3")

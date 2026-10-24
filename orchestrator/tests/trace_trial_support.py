@@ -12,9 +12,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.trial_inputs import load_trial_context
-from raidar.verifier.models import CaseStatus
+from raidar.grading.models import CaseStatus
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.trial_inputs import load_trial_context
 from tests.scorer_support import APP_V1, StepFixture, write_trial
 
 PASS = (CaseStatus.PASSED,)

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 
-from raidar.analysis.outcomes import TrialOutcome, Value
-from raidar.analysis.report import AnalysisInputs, PlannedTrial
+from raidar.evaluation.analysis.outcomes import TrialOutcome, Value
+from raidar.evaluation.analysis.report import AnalysisInputs, PlannedTrial
 
 BASELINE = "baseline"
 GUIDED = "guided"

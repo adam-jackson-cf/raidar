@@ -14,12 +14,12 @@ from typing import Any
 
 import pytest
 
-from raidar.scorers.process_checks import deterministic_process_compliance_scorer
-from raidar.scorers.process_checks.manifest import PROCESS_COMPLIANCE
-from raidar.scorers.process_checks.outputs import not_found, runner_of
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
-from raidar.scorers.sdk.validation import validate_result
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
+from raidar.scoring.framework.validation import validate_result
+from raidar.scoring.process_checks import deterministic_process_compliance_scorer
+from raidar.scoring.process_checks.manifest import PROCESS_COMPLIANCE
+from raidar.scoring.process_checks.outputs import not_found, runner_of
 from tests.trace_trial_support import (
     TracedStep,
     agent_step,

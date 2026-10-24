@@ -13,29 +13,13 @@ import pytest
 import yaml
 from harbor.models.task.task import Task
 
-from raidar.core.paths import VAR_ENV
-from raidar.core.snapshot import APP_SOURCE
-from raidar.packs.python.image import image_tag
-from raidar.packs.python.models import load_pack_spec
-from raidar.problems.content import content_digest, hidden_content_in_task
-from raidar.problems.importer import ProblemDriftError, import_problem
-from raidar.problems.models import ProblemId, ProblemManifest, ProblemMode
-from raidar.problems.resolver import ProblemResolver, resolver_factory
-from raidar.problems.rewrite import VERIFIER_IMPORT_PATH
-from raidar.problems.source import SourceError
-from raidar.problems.store import (
-    ROOT_ENV,
-    ProblemStore,
-    ProblemStoreError,
-    find_store_root,
-    open_store,
-    store_at,
-)
-from raidar.spec.canonical import digest_json
-from raidar.spec.loader import load_experiment
-from raidar.spec.lock import build_lock
-from raidar.spec.metrics import MetricResolver
-from raidar.spec.references import (
+from raidar.contracts.paths import VAR_ENV
+from raidar.contracts.snapshot import APP_SOURCE
+from raidar.design.experiments.canonical import digest_json
+from raidar.design.experiments.loader import load_experiment
+from raidar.design.experiments.lock import build_lock
+from raidar.design.experiments.metrics import MetricResolver
+from raidar.design.experiments.references import (
     RESOLVER_ENTRY_POINT_GROUP,
     RefKind,
     RegistryRef,
@@ -43,6 +27,22 @@ from raidar.spec.references import (
     ResolvedReference,
     ResolverSet,
 )
+from raidar.design.problems.content import content_digest, hidden_content_in_task
+from raidar.design.problems.importer import ProblemDriftError, import_problem
+from raidar.design.problems.models import ProblemId, ProblemManifest, ProblemMode
+from raidar.design.problems.resolver import ProblemResolver, resolver_factory
+from raidar.design.problems.rewrite import VERIFIER_IMPORT_PATH
+from raidar.design.problems.source import SourceError
+from raidar.design.problems.store import (
+    ROOT_ENV,
+    ProblemStore,
+    ProblemStoreError,
+    find_store_root,
+    open_store,
+    store_at,
+)
+from raidar.subjects.environments.python.image import image_tag
+from raidar.subjects.environments.python.models import load_pack_spec
 from tests.experiment_spec_support import (
     experiment_document,
     fixture_resolvers,
@@ -143,7 +143,7 @@ def test_import_splits_the_converted_task_into_agent_task_bundle_and_references(
         "checkpoint_1",
         "checkpoint_2",
     ]
-    assert VERIFIER_IMPORT_PATH == "raidar.verifier.verifier:RaidarVerifier"
+    assert VERIFIER_IMPORT_PATH == "raidar.grading.verifier:RaidarVerifier"
 
 
 def test_reimport_reproduces_the_manifest_and_refuses_drift_unless_updating(

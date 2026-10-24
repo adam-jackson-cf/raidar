@@ -1,6 +1,6 @@
 """``raidar health JOB``: recompute every trial's run-health audit (``health.json``).
 
-The audit also runs as each trial finishes (``raidar.execution.trial_run``); this command
+The audit also runs as each trial finishes (``raidar.engine.trials.trial_run``); this command
 re-derives it from the files on the host, which is the only point where ``T2`` (the sealed
 records manifest) can be verified, and appends any new provisional fault candidates to
 ``<job>/fault-candidates.jsonl``. It exits 1 when any trial has a violation.
@@ -12,10 +12,10 @@ from pathlib import Path
 
 import click
 
-from raidar.core.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR, TRIALS_DIR
-from raidar.execution.health.audit import audit_recorded_trial
-from raidar.execution.health.fault_candidates import append_fault_candidates
-from raidar.execution.health.model import HealthReport, write_health
+from raidar.contracts.job_layout import JOB_MANIFEST, TRIAL_RECORDS_DIR, TRIALS_DIR
+from raidar.engine.health.audit import audit_recorded_trial
+from raidar.engine.health.fault_candidates import append_fault_candidates
+from raidar.engine.health.model import HealthReport, write_health
 
 
 def register(main: click.Group) -> None:

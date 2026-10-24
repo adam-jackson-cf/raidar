@@ -14,12 +14,12 @@ from typing import Any
 import pytest
 from pydantic import ValidationError
 
-from raidar.scorers.code_quality import arithmetic
-from raidar.scorers.code_quality.lineage import (
+from raidar.scoring.code_quality import arithmetic
+from raidar.scoring.code_quality.lineage import (
     calculate_problem_rework,
     calculate_transition_rework,
 )
-from raidar.scorers.code_quality.lineage_models import (
+from raidar.scoring.code_quality.lineage_models import (
     CoverageContextEvidence,
     LineageCandidate,
     LineageComponentEvidence,
@@ -32,7 +32,7 @@ from raidar.scorers.code_quality.lineage_models import (
     SymbolIdentity,
     TransitionReworkEvidence,
 )
-from raidar.scorers.code_quality.models import (
+from raidar.scoring.code_quality.models import (
     CheckpointCorrectnessEvidence,
     Eligibility,
     GraphSccEvidence,

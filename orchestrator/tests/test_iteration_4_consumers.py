@@ -15,28 +15,28 @@ from types import SimpleNamespace
 
 import pytest
 
-from raidar.analysis.assessed import GATE_EFFORT_REF, disagreements
-from raidar.analysis.gate_effort import GateDescriptive
-from raidar.analysis.manipulation import GATE_EFFORT_REFS as MANIPULATION_REFS
-from raidar.analysis.markdown import (
-    _autofix_family_table,
-    _better,
-    _refusal_table,
-    _verifier_arms,
-)
-from raidar.analysis.outcomes import GATE_METRICS, GATE_PREFIX, VERIFIER_DISAGREEMENTS
-from raidar.analysis.report import ArmSummary
-from raidar.problems.sensitivities import (
+from raidar.design.problems.sensitivities import (
     SensitivityError,
     SensitivityKind,
     known_sensitivities,
     load_sensitivities,
 )
-from raidar.review.quality.gate_view import GATE_EFFORT_REF as REVIEW_REF
-from raidar.scorers.gate_effort.autofix_metrics import REFUSAL_KINDS
-from raidar.scorers.gate_effort.families import FAMILIES
-from raidar.scorers.sdk.result import AssessResult, AssessStatus, Observation
-from raidar.verifier.offline_grading import PRE_FIX_GRADE_SCORERS
+from raidar.evaluation.analysis.assessed import GATE_EFFORT_REF, disagreements
+from raidar.evaluation.analysis.gate_effort import GateDescriptive
+from raidar.evaluation.analysis.manipulation import GATE_EFFORT_REFS as MANIPULATION_REFS
+from raidar.evaluation.analysis.markdown import (
+    _autofix_family_table,
+    _better,
+    _refusal_table,
+    _verifier_arms,
+)
+from raidar.evaluation.analysis.outcomes import GATE_METRICS, GATE_PREFIX, VERIFIER_DISAGREEMENTS
+from raidar.evaluation.analysis.report import ArmSummary
+from raidar.evaluation.review.quality.gate_view import GATE_EFFORT_REF as REVIEW_REF
+from raidar.grading.offline_grading import PRE_FIX_GRADE_SCORERS
+from raidar.scoring.framework.result import AssessResult, AssessStatus, Observation
+from raidar.scoring.gate_effort.autofix_metrics import REFUSAL_KINDS
+from raidar.scoring.gate_effort.families import FAMILIES
 
 REPO = Path(__file__).resolve().parents[2]
 

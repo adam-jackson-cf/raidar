@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from raidar.spec.source_digest import python_source_digest
+from raidar.design.experiments.source_digest import python_source_digest
 
 BASE = """from dataclasses import dataclass
 

@@ -11,11 +11,11 @@ import yaml
 from click.testing import CliRunner
 
 from raidar.cli import main
-from raidar.scorers.catalog import BUILTIN_IMPLEMENTATIONS
-from raidar.scorers.rescore import RescoreError, RescoreOutcome, rescore_path
-from raidar.scorers.store import AssessmentConflictError, AssessmentStore
-from raidar.scorers.trial_inputs import TrialInputError, load_trial_context
-from raidar.verifier.models import CaseStatus
+from raidar.grading.models import CaseStatus
+from raidar.scoring.framework.catalog import BUILTIN_IMPLEMENTATIONS
+from raidar.scoring.framework.rescore import RescoreError, RescoreOutcome, rescore_path
+from raidar.scoring.framework.store import AssessmentConflictError, AssessmentStore
+from raidar.scoring.framework.trial_inputs import TrialInputError, load_trial_context
 from tests.scorer_support import (
     APP_V1,
     APP_V2,

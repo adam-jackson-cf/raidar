@@ -8,11 +8,29 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from raidar.core.snapshot import tree_digest
-from raidar.scorers.catalog import ScorerRegistration, ScorerRegistry
-from raidar.scorers.inventory import FileRole
-from raidar.scorers.sdk.context import AssessContext
-from raidar.scorers.sdk.manifest import (
+from raidar.contracts.snapshot import tree_digest
+from raidar.grading.bundle import (
+    BundleManifest,
+    GraderSpec,
+    VerifierBundle,
+    VerifierStepSpec,
+    write_bundle,
+)
+from raidar.grading.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
+from raidar.grading.records import (
+    BundleRef,
+    CoverageRef,
+    GraderRef,
+    SnapshotRef,
+    StepRecord,
+    step_record_dir,
+    stored_snapshot_path,
+    write_step_record,
+)
+from raidar.scoring.framework.catalog import ScorerRegistration, ScorerRegistry
+from raidar.scoring.framework.context import AssessContext
+from raidar.scoring.framework.inventory import FileRole
+from raidar.scoring.framework.manifest import (
     Direction,
     EvidenceInput,
     Exactness,
@@ -22,7 +40,7 @@ from raidar.scorers.sdk.manifest import (
     ScorerManifest,
     Tier,
 )
-from raidar.scorers.sdk.result import (
+from raidar.scoring.framework.result import (
     TRAJECTORY_SUBJECT,
     AssessResult,
     AssessStatus,
@@ -30,24 +48,6 @@ from raidar.scorers.sdk.result import (
     Exclusion,
     Observation,
     Span,
-)
-from raidar.verifier.bundle import (
-    BundleManifest,
-    GraderSpec,
-    VerifierBundle,
-    VerifierStepSpec,
-    write_bundle,
-)
-from raidar.verifier.models import CaseGroup, CaseResult, CaseStatus, VerifierGrade
-from raidar.verifier.records import (
-    BundleRef,
-    CoverageRef,
-    GraderRef,
-    SnapshotRef,
-    StepRecord,
-    step_record_dir,
-    stored_snapshot_path,
-    write_step_record,
 )
 
 APP_V1 = {"app/main.py": "def add(a, b):\n    return a + b\n"}
