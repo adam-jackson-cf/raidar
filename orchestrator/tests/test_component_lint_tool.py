@@ -1,9 +1,10 @@
-"""lint-tool@1: a hash-pinned Ruff installed per trial (component SDK provisioning).
+"""lint-tool@2: the pinned Ruff runnable as 'ruff', 'python -m ruff' and 'uv run ruff'.
 
-Covers the contract (manifest, configuration, the install and check scripts),
-the discovery probe over recorded evidence, the pre-agent provisioning hook
-(install once as root, check every step as the agent user, never raise), and,
-on OrbStack, a real two-step Harbor trial on the pack image.
+Covers the contract (manifest, configuration, the install and check scripts), the
+discovery probe over recorded evidence (every invocation enforced before the first
+step's agent, reported after), the pre-agent provisioning hook (install once as
+root, check every step as the agent user, never raise), and, on OrbStack, a real
+two-step Harbor trial on the pack image with the nop agent.
 """
 
 from __future__ import annotations
@@ -27,7 +28,13 @@ from raidar.components import (
     ComponentResolver,
     StepEvidence,
 )
-from raidar.components.catalog.tools import LINT_TOOL, RUFF_WHEEL_SHA256, resolved_config
+from raidar.components.catalog.tools import (
+    INVOCATIONS,
+    LINT_TOOL,
+    RUFF_WHEEL_SHA256,
+    invocation_results,
+    resolved_config,
+)
 from raidar.components.definition.contribution import evidence_log
 from raidar.components.definition.registry import component_runtimes
 from raidar.components.runtime.provision import (
@@ -45,58 +52,61 @@ from tests.component_trial_support import (
     run_trial_sync,
 )
 
-LINT_TOOL_USE = use("lint-tool@1", config="ruff.toml")
-WITH_CONFIG = (use("lint-config@1", (f"{PROBE_DIR}/ruff.toml",)), LINT_TOOL_USE)
+WITH_CONFIG = (
+    use("lint-config@1", (f"{PROBE_DIR}/ruff.toml",)),
+    use("lint-tool@2", config="ruff.toml"),
+)
 SLUG = "01-lint-tool"
-TARGET = f"/opt/raidar-tools/{SLUG}/ruff-0.8.6/bin/ruff"
-RESOLVE_PREFIX = "[ruff::resolve][DEBUG]"
+INSTALL_DIR = f"/opt/raidar-tools/{SLUG}/ruff-0.8.6"
+RESOLVE = "[ruff::resolve][DEBUG] Using configuration file (via parent) at: /app/ruff.toml"
+LABELS = ["ruff", "python -m ruff", "python3 -m ruff", "uv run ruff"]
 
 
 def _context() -> Any:
     return compile_uses(*WITH_CONFIG).uses[1].context
 
 
-def _check(**overrides: str) -> dict[str, Any]:
+def _values(**overrides: str) -> dict[str, str]:
     values = {
         "workspace": "/app",
         "path_ruff": "/usr/local/bin/ruff",
-        "pinned_target": TARGET,
+        "pinned_target": f"{INSTALL_DIR}/bin/ruff",
         "version": "ruff 0.8.6",
-        "resolve": f"{RESOLVE_PREFIX} Using configuration file (via parent) at: /app/ruff.toml",
+        "resolve": RESOLVE,
+        "uv_project": "none",
+        "project_venv_ruff": "no",
     }
-    return {"ok": True, "values": values | overrides}
+    for key, _ in INVOCATIONS:
+        values |= {key: "ruff 0.8.6", f"{key}_rc": "0"}
+    return values | overrides
 
 
-def _record(check: dict[str, Any] | None, *, install_ok: bool = True) -> dict[str, Any]:
-    return {
+def _evidence(tmp_path: Path, values: dict[str, str]) -> StepEvidence:
+    agent_dir = tmp_path / "agent"
+    record = {
         "kind": "raidar-provision",
         "slug": SLUG,
-        "install": {"ok": install_ok, "output": "" if install_ok else "network unreachable"},
-        "check": check,
+        "install": {"ok": True, "output": ""},
+        "check": {"ok": True, "values": values},
     }
-
-
-def _evidence(tmp_path: Path, *records: dict[str, Any]) -> StepEvidence:
-    agent_dir = tmp_path / "agent"
-    agent_dir.mkdir(parents=True, exist_ok=True)
-    if records:
-        log = agent_dir / "raidar-components" / f"{SLUG}.{PROVISION_CHANNEL}.jsonl"
-        write_jsonl(log, list(records))
+    write_jsonl(agent_dir / "raidar-components" / f"{SLUG}.{PROVISION_CHANNEL}.jsonl", [record])
     return StepEvidence(agent_dir)
 
 
 def test_lint_tool_is_a_python_service_component_with_declared_egress() -> None:
-    definition = ComponentRegistry().get("lint-tool@1")
+    definition = ComponentRegistry().get("lint-tool@2")
     manifest = definition.manifest
 
+    assert definition is LINT_TOOL
     assert manifest.kind is ComponentKind.SERVICE
     assert component_runtimes(definition) == ("python",)
     assert manifest.network.egress_hosts == ("files.pythonhosted.org", "pypi.org")
+    assert manifest.discovery_probe.id == "lint-tool-invocable"
     assert "raidar/components/runtime/provision.py" in manifest.fingerprint
-    ref = RegistryRef.parse(RefKind.COMPONENT, "lint-tool@1")
+    ref = RegistryRef.parse(RefKind.COMPONENT, "lint-tool@2")
     resolved = ComponentResolver().resolve(ref, base_dir=Path("."))
     assert resolved.binding["runtimes"] == ["python"]
-    assert resolved.metadata["discovery_probe"] == "lint-tool-installed"
+    assert resolved.metadata["discovery_probe"] == "lint-tool-invocable"
 
 
 @pytest.mark.parametrize(
@@ -112,7 +122,7 @@ def test_invalid_lint_tool_uses_reject_the_arm(
     with_: dict[str, str], files: tuple[str, ...], message: str
 ) -> None:
     with pytest.raises(ComponentRejectedError, match=re.escape(message)):
-        compile_uses(use("lint-tool@1", files, **with_))
+        compile_uses(use("lint-tool@2", files, **with_))
 
 
 def test_lint_tool_changes_no_workspace_or_harness_input_only_the_provisions() -> None:
@@ -126,7 +136,7 @@ def test_lint_tool_changes_no_workspace_or_harness_input_only_the_provisions() -
     assert compiled.digest != baseline.digest
     assert condition_provisions(baseline) == ()
     (provision,) = condition_provisions(compiled)
-    assert (provision.slug, provision.component) == (SLUG, "lint-tool@1")
+    assert (provision.slug, provision.component) == (SLUG, "lint-tool@2")
 
 
 def test_install_is_hash_pinned_cache_free_and_outside_the_workspace() -> None:
@@ -136,67 +146,125 @@ def test_install_is_hash_pinned_cache_free_and_outside_the_workspace() -> None:
     assert "--no-cache" in install
     assert "ruff==0.8.6" in install
     assert all(f"--hash=sha256:{digest}" in install for digest in RUFF_WHEEL_SHA256["0.8.6"])
-    assert f"--target /opt/raidar-tools/{SLUG}/ruff-0.8.6" in install
-    assert f"ln -sf /opt/raidar-tools/{SLUG}/ruff-0.8.6/bin/ruff /usr/local/bin/ruff" in install
+    assert f"--target {INSTALL_DIR}" in install
+    assert f"ln -sf {INSTALL_DIR}/bin/ruff /usr/local/bin/ruff" in install
     assert "/app" not in install
 
 
-def test_check_reports_without_linting_or_writing_a_cache() -> None:
+def test_install_adds_a_root_owned_pth_per_interpreter() -> None:
+    install = LINT_TOOL.provision(_context()).install
+
+    assert "for py in python3 python; do" in install
+    assert 'sysconfig.get_path("purelib")' in install
+    assert f"printf '%s\\n' {INSTALL_DIR} > \"$site/\"raidar-{SLUG}-ruff.pth" in install
+    assert '"$bin" -m ruff --version' in install
+
+
+def test_check_runs_every_invocation_without_linting_or_writing_to_the_workspace() -> None:
     check = LINT_TOOL.provision(_context()).check
 
     for flag in ("--show-files", "--no-cache", "--exit-zero"):
         assert flag in check
+    for line in (
+        "invoke ruff ruff",
+        "invoke python_m python -m ruff",
+        "invoke python3_m python3 -m ruff",
+    ):
+        assert line in check
+    assert 'invoke uv_run env UV_PROJECT_ENVIRONMENT="$uv_env/venv" uv run --no-sync' in check
+    assert "echo uv_project=uv.lock" in check
     assert parse_check_output("version=ruff 0.8.6\nnoise\nresolve=a=b\n") == {
         "version": "ruff 0.8.6",
         "resolve": "a=b",
     }
 
 
-def test_probe_passes_on_the_pinned_tool_and_the_expected_config(tmp_path: Path) -> None:
-    outcome = LINT_TOOL.probe(_context(), _evidence(tmp_path, _record(_check())), 0)
+def test_invocation_results_mark_only_the_pinned_answers() -> None:
+    values = _values(python_m="", python_m_rc="1", python_m_error="No module named ruff ")
+    values |= {"uv_run": "ruff 0.9.0"}
+
+    results = invocation_results(values, "0.8.6")
+
+    assert [result.label for result in results] == LABELS
+    assert [result.pinned for result in results] == [True, False, True, False]
+    assert results[1].describe() == "python -m ruff -> 'No module named ruff' (exit 1)"
+
+
+def test_probe_passes_and_records_every_usable_invocation(tmp_path: Path) -> None:
+    outcome = LINT_TOOL.probe(_context(), _evidence(tmp_path, _values()), 0)
 
     assert outcome.passed, outcome.detail
+    assert f"runs the pin: {', '.join(LABELS)}" in outcome.detail
     assert "config /app/ruff.toml" in outcome.detail
+    assert outcome.evidence[-1] == ",".join(LABELS)
 
 
 @pytest.mark.parametrize(
-    ("record", "reason"),
+    ("overrides", "reason"),
     [
-        (None, "no provision record"),
-        (_record(None, install_ok=False), "install failed: network unreachable"),
-        (_record({"ok": False, "error": "boom"}), "check failed: boom"),
-        (_record(_check(version="ruff 0.9.0")), "pinned ruff answers 'ruff 0.9.0'"),
-        (_record(_check(pinned_target="/home/agent/.local/bin/ruff")), "not the install"),
         (
-            _record(_check(resolve=f"{RESOLVE_PREFIX} Using Ruff default settings")),
-            "ruff resolves config None",
+            {"python_m": "", "python_m_rc": "1", "python_m_error": "No module named ruff"},
+            "python -m ruff -> 'No module named ruff' (exit 1)",
         ),
+        ({"python3_m": "ruff 0.9.0"}, "python3 -m ruff -> 'ruff 0.9.0' (exit 0)"),
+        ({"uv_run_rc": "2", "uv_run": "", "uv_run_error": "bad toml"}, "uv run ruff -> 'bad toml'"),
+        ({"ruff_rc": "127", "ruff": ""}, "ruff -> 'no output' (exit 127)"),
+        ({"path_ruff": "/home/agent/.local/bin/ruff"}, "resolves on PATH to"),
+        ({"resolve": "[ruff::resolve][DEBUG] Using Ruff default settings"}, "config None"),
+        ({"version": "ruff 0.9.0"}, "pinned ruff answers 'ruff 0.9.0'"),
     ],
 )
-def test_probe_fails_when_the_tool_did_not_take_effect(
-    tmp_path: Path, record: dict[str, Any] | None, reason: str
+def test_probe_fails_at_the_first_step_unless_every_invocation_runs_the_pin(
+    tmp_path: Path, overrides: dict[str, str], reason: str
 ) -> None:
-    evidence = _evidence(tmp_path, *([record] if record else []))
-
-    outcome = LINT_TOOL.probe(_context(), evidence, 0)
+    outcome = LINT_TOOL.probe(_context(), _evidence(tmp_path, _values(**overrides)), 0)
 
     assert not outcome.passed
     assert reason in outcome.detail
 
 
-def test_config_is_enforced_at_the_first_step_only(tmp_path: Path) -> None:
-    moved = _record(_check(resolve=f"{RESOLVE_PREFIX} Using Ruff default settings"))
+def test_later_steps_report_agent_changes_without_failing(tmp_path: Path) -> None:
+    shadowed = _values(
+        path_ruff="/home/agent/.local/bin/ruff",
+        ruff="ruff 0.9.0",
+        python_m="ruff 0.9.0",
+        resolve="[ruff::resolve][DEBUG] Using Ruff default settings",
+        uv_project="uv.lock",
+        project_venv_ruff="yes",
+    )
 
-    later = LINT_TOOL.probe(_context(), _evidence(tmp_path, moved), 3)
+    outcome = LINT_TOOL.probe(_context(), _evidence(tmp_path, shadowed), 2)
 
-    assert later.passed
-    assert "config ruff defaults" in later.detail
+    assert outcome.passed, outcome.detail
+    assert "runs the pin: python3 -m ruff, uv run ruff" in outcome.detail
+    assert "not the pin: ruff -> 'ruff 0.9.0' (exit 0); python -m ruff" in outcome.detail
+    assert "uv project uv.lock (project .venv ruff: yes)" in outcome.detail
+
+
+def test_later_steps_still_require_the_provisioned_install(tmp_path: Path) -> None:
+    moved = _values(pinned_target="/tmp/ruff")
+
+    outcome = LINT_TOOL.probe(_context(), _evidence(tmp_path, moved), 3)
+
+    assert not outcome.passed
+    assert "not the install" in outcome.detail
+
+
+def test_probe_without_a_record_or_with_a_failed_check_fails(tmp_path: Path) -> None:
+    (tmp_path / "agent").mkdir()
+    missing = LINT_TOOL.probe(_context(), StepEvidence(tmp_path / "agent"), 0)
+    assert "no provision record" in missing.detail
+
+    agent_dir = tmp_path / "failed"
+    record = {"slug": SLUG, "install": {"ok": True}, "check": {"ok": False, "error": "boom"}}
+    write_jsonl(agent_dir / "raidar-components" / f"{SLUG}.{PROVISION_CHANNEL}.jsonl", [record])
+    failed = LINT_TOOL.probe(_context(), StepEvidence(agent_dir), 0)
+    assert (failed.passed, failed.detail) == (False, "check failed: boom")
 
 
 def test_resolved_config_reads_the_ruff_resolve_line() -> None:
-    line = "[ruff::resolve][DEBUG] Using configuration file (via parent) at: /app/ruff.toml"
-    assert resolved_config(line) == "/app/ruff.toml"
-    assert resolved_config(f"{RESOLVE_PREFIX} Using Ruff default settings") is None
+    assert resolved_config(RESOLVE) == "/app/ruff.toml"
+    assert resolved_config("[ruff::resolve][DEBUG] Using Ruff default settings") is None
 
 
 class _FakeEnv:
@@ -228,7 +296,7 @@ def _hooked(env: _FakeEnv) -> Any:
         agent_environment=env,
         add_hook=lambda event, hook: hooks.setdefault(event, []).append(hook),
     )
-    install_provisioning(cast(Any, trial), [Provision(SLUG, "lint-tool@1", "INSTALL", "CHECK")])
+    install_provisioning(cast(Any, trial), [Provision(SLUG, "lint-tool@2", "INSTALL", "CHECK")])
     (hook,) = hooks[TrialEvent.AGENT_START]
     return hook
 
@@ -297,9 +365,7 @@ docker_trial = pytest.mark.skipif(
 
 
 @docker_trial
-def test_pinned_ruff_is_installed_per_trial_and_probed_in_a_real_harbor_trial(
-    tmp_path: Path,
-) -> None:
+def test_every_invocation_runs_the_pin_in_a_real_two_step_harbor_trial(tmp_path: Path) -> None:
     compiled = compile_uses(*WITH_CONFIG)
     task = tmp_path / "lint-tool"
     build_task(task, compiled, {"checkpoint_1": "step one", "checkpoint_2": "step two"})
@@ -318,4 +384,9 @@ def test_pinned_ruff_is_installed_per_trial_and_probed_in_a_real_harbor_trial(
         assert report.passed, report.to_json()
         record = StepEvidence(steps / step / "agent").component_log(SLUG, PROVISION_CHANNEL)[-1]
         assert record["install"]["ran_this_step"] is (index == 0)
-        assert record["check"]["values"]["path_ruff"] == "/usr/local/bin/ruff"
+        values = record["check"]["values"]
+        results = invocation_results(values, "0.8.6")
+        assert all(result.pinned for result in results), values
+        assert values["path_ruff"] == "/usr/local/bin/ruff"
+        assert values["uv_project"] == "none"
+        assert values["project_venv_ruff"] == "no"

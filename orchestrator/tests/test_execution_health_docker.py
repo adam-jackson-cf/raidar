@@ -17,8 +17,7 @@ from harbor.models.trial.config import (
 from harbor.trial.hooks import TrialEvent, TrialHookEvent
 from harbor.trial.trial import Trial
 
-from raidar.components.runtime.provision import condition_provisions
-from raidar.components.runtime.provision_v2 import install_trial_provisioning
+from raidar.components.runtime.provision import condition_provisions, install_trial_provisioning
 from raidar.execution.cleanup import cleanup_trial_projects
 from raidar.execution.environment import RUN_SCOPED_DOCKER_IMPORT_PATH, SCOPE_KWARG, run_scope
 from raidar.execution.health.signals import tool_status

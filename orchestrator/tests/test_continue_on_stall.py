@@ -7,7 +7,7 @@
 - the agent pin and auth are read through every level of wrapping;
 - guardrail-gate@4: the pre-fix snapshot record and a failed snapshot.
 
-The real-container proof is ``test_guardrails_v4_trial.py``.
+The real-container proof is ``test_guardrails_trial.py``.
 """
 
 from __future__ import annotations

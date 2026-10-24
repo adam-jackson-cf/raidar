@@ -100,7 +100,7 @@ def test_every_harness_workspace_and_prompt_builtin_is_discovered_on_codex(
 
 def test_review_loop_runs_reviewer_sessions_billed_to_the_arm(tmp_path: Path) -> None:
     compiled = compile_uses(
-        use("review-loop@1", max_review_rounds=1),
+        use("review-loop@2", max_review_rounds=1),
         use("rules-file@1", ("components/guided/AGENTS.md",)),
         base_dir=PILOT_DIR,
     )

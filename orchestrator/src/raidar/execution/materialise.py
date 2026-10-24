@@ -26,7 +26,7 @@ import yaml
 from harbor.models.task.config import TaskConfig
 
 from raidar.components import CompiledCondition, compile_arm
-from raidar.components.runtime.provision_v2 import AnyProvision, trial_provisions
+from raidar.components.runtime.provision import AnyProvision, trial_provisions
 from raidar.execution.models import ProgressionRule
 from raidar.packs.python.image import image_present
 from raidar.problems.content import content_digest
@@ -50,7 +50,7 @@ class MaterialisedTask:
 
     @property
     def provisions(self) -> tuple[AnyProvision, ...]:
-        """Per-trial tool installs the arm's components need (``provision``, ``provision_v2``)."""
+        """Per-trial tool installs the arm's components need (``runtime.provision``)."""
         return trial_provisions(self.compiled)
 
 

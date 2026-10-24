@@ -10,7 +10,7 @@
   gate -> continue-on-stall@2 -> transient-retry@1 -> native agent.
 
 The wrappers run here against a local bash environment; the real-container
-proof is ``test_guardrails_v4_trial.py``.
+proof is ``test_guardrails_trial.py``.
 """
 
 from __future__ import annotations

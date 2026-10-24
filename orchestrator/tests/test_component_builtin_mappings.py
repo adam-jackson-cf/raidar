@@ -88,7 +88,7 @@ def test_builtins_map_onto_harbor_agent_inputs(
 
 def test_workflow_wraps_the_agent_and_keeps_its_inputs() -> None:
     compiled = compile_uses(
-        use("review-loop@1", max_review_rounds=2),
+        use("review-loop@2", max_review_rounds=2),
         use("prompt-wrapper@1", (f"{PROBE_DIR}/wrapper.md",)),
     )
     config = compiled.apply_to_agent_config(

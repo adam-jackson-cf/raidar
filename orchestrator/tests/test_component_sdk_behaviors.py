@@ -45,27 +45,14 @@ SDK_RUNTIME_SOURCES = [
     "raidar/components/runtime/step_reset.sh",
 ]
 BUILTIN_REFS = [
-    "continue-on-stall@1",
     "continue-on-stall@2",
-    "guardrail-gate@1",
-    "guardrail-gate@2",
-    "guardrail-gate@3",
     "guardrail-gate@4",
     "harness-settings@1",
     "lint-config@1",
-    "lint-tool@1",
     "lint-tool@2",
     "mcp-server@1",
     "prompt-wrapper@1",
-    "python-guardrails@1",
-    "python-guardrails@2",
-    "python-guardrails@3",
-    "python-guardrails@4",
-    "python-guardrails@5",
-    "python-guardrails@6",
-    "python-guardrails@7",
     "python-guardrails@8",
-    "review-loop@1",
     "review-loop@2",
     "rules-file@1",
     "skills@1",
@@ -152,7 +139,7 @@ def test_invalid_use_and_conflicting_uses_reject_the_arm() -> None:
         (use("harness-settings@1", settings={"model": "x"}), "not harness-settings"),
         (use("harness-settings@1", settings={"web_search": "live"}), "no discovery probe"),
         (use("lint-config@1", (f"{PROBE_DIR}/AGENTS.md",)), "not a known lint config"),
-        (use("review-loop@1", max_review_rounds=9), "integer 1..5"),
+        (use("review-loop@2", max_review_rounds=9), "integer 1..5"),
         (use("rules-file@1", (PROBE_DIR,)), "must be a file"),
         (use("harness-settings@1"), "missing required 'with' keys"),
         (use("harness-settings@1", settings={}), "non-empty object"),
@@ -169,7 +156,7 @@ def test_invalid_use_and_conflicting_uses_reject_the_arm() -> None:
         with pytest.raises(ComponentRejectedError, match=message):
             compile_uses(bad)
     with pytest.raises(ComponentRejectedError, match="more than one workflow"):
-        compile_uses(use("review-loop@1"), use("review-loop@1"))
+        compile_uses(use("review-loop@2"), use("review-loop@2"))
     for duplicate, message in (
         ("prompt-wrapper@1", "more than one prompt template"),
         ("skills@1", "used twice"),
@@ -206,7 +193,7 @@ def test_validate_and_lock_reject_an_arm_the_compiler_would_reject(tmp_path: Pat
         }
     )
     document["conditions"][1]["components"].append(
-        {"use": "review-loop@1", "with": {"max_review_rounds": 9}}
+        {"use": "review-loop@2", "with": {"max_review_rounds": 9}}
     )
     document["arms"].append({"id": "gem-guided", "condition": "guided", "agent": "gem"})
     document["factors"] = [
@@ -223,7 +210,7 @@ def test_validate_and_lock_reject_an_arm_the_compiler_would_reject(tmp_path: Pat
     locked = runner.invoke(main, ["lock", str(path)])
 
     assert validated.exit_code == 1, validated.output
-    assert "arms.1: condition 'guided' on agent 'luna': components.1 (review-loop@1)" in (
+    assert "arms.1: condition 'guided' on agent 'luna': components.1 (review-loop@2)" in (
         validated.output
     )
     assert "arms.2: condition 'guided' on agent 'gem': no component mapping for gemini" in (
@@ -342,7 +329,7 @@ def test_pilot_arms_share_the_framing_and_guided_adds_the_review_loop_workflow()
     assert baseline.prompt_template == compiled.prompt_template
     assert baseline.uses[0].fingerprint == compiled.uses[0].fingerprint
     assert compiled.agent_wrapper is not None
-    assert compiled.agent_wrapper.import_path.endswith("review_loop_v2:ReviewLoopV2Agent")
+    assert compiled.agent_wrapper.import_path.endswith("review_loop:ReviewLoopAgent")
     assert compiled.agent_wrapper.kwargs["max_review_rounds"] == 2
 
 

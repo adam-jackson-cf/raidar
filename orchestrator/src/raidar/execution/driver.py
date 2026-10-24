@@ -7,7 +7,7 @@ before ``trial.run()``, as ``RaidarVerifier`` requires (it fails closed
 without it), together with the agent-end reaper (``execution.reaper``) that
 kills agent processes before artifacts are collected and graded, and the
 provisioning hooks of any component that installs a tool in the trial
-container (``raidar.components.runtime.provision``; ``provision_v2`` installs at
+container (``raidar.components.runtime.provision``; trial provisions install at
 environment start), then the T1 tool-tree hash (``execution.health.tool_tree``) and the
 host-side liveness monitor (``execution.health.liveness``, observe by default).
 
@@ -39,7 +39,7 @@ from typing import Protocol, TypeVar
 from harbor.models.trial.config import TrialConfig
 from harbor.trial.trial import Trial
 
-from raidar.components.runtime.provision_v2 import AnyProvision, install_trial_provisioning
+from raidar.components.runtime.provision import AnyProvision, install_trial_provisioning
 from raidar.execution.health.liveness import install_liveness_monitor
 from raidar.execution.health.tool_tree import install_tool_tree_watch
 from raidar.execution.reaper import install_agent_reaper

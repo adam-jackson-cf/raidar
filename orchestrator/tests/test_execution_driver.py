@@ -139,7 +139,7 @@ def test_the_leak_guard_is_installed_before_the_trial_runs(
         driver, "install_tool_tree_watch", lambda trial, bundle: events.append("tool-tree")
     )
     monkeypatch.setattr(driver, "install_liveness_monitor", lambda trial: events.append("liveness"))
-    provisions = (Provision("00-lint-tool", "lint-tool@1", "true", "true"),)
+    provisions = (Provision("00-lint-tool", "lint-tool@2", "true", "true"),)
     outcome = asyncio.run(
         run_harbor_trial(TrialConfig.model_construct(), tmp_path / "bundle", provisions)
     )
