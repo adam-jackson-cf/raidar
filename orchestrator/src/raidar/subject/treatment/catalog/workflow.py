@@ -13,9 +13,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     require_file_count,
     require_with_keys,
 )
@@ -54,7 +54,7 @@ class ReviewLoop:
         ),
         supports=BOTH_HARNESSES,
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/workflow.py",
             "orchestrator/src/raidar/subject/treatment/runtime/review_loop.py",
             "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",

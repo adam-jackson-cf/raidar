@@ -18,10 +18,7 @@ class ExternalCliAdapter(HarnessAdapter):
             return "(any provider/model)"
         return ", ".join(f"{provider}/*" for provider in cls.ALLOWED_PROVIDERS)
 
-    # ------------------------------------------------------------------
-    # Adapter overrides
-    # ------------------------------------------------------------------
-    def validate(self) -> None:  # noqa: D401
+    def validate(self) -> None:
         self._resolve_cli()
         self._validate_credentials()
         if self.ALLOWED_PROVIDERS and self.config.model.provider not in self.ALLOWED_PROVIDERS:

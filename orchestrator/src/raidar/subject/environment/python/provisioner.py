@@ -34,7 +34,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-from raidar.subject.environment.python.models import (
+from raidar.subject.environment.python.pack_definition import (
     REASON_DRIFT,
     REASON_FIRST_USE,
     ProvisioningTiming,

@@ -51,9 +51,9 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any
 
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     require_file_count,
     require_with_keys,
 )
@@ -172,7 +172,7 @@ class LintTool:
         supports=BOTH_HARNESSES,
         network=NetworkNeeds(egress_hosts=("files.pythonhosted.org", "pypi.org")),
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/tools.py",
             "orchestrator/src/raidar/subject/treatment/runtime/provision.py",
         ),

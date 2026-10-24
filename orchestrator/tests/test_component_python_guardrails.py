@@ -29,7 +29,7 @@ from raidar.contract.trial import ProbeSummary
 from raidar.design.experiment.arm import ComponentRejectedError
 from raidar.engine.trial import collect
 from raidar.subject.treatment import ComponentKind, ComponentRegistry
-from raidar.subject.treatment.catalog._common import sha256_bytes
+from raidar.subject.treatment.catalog.builtin_definition import sha256_bytes
 from raidar.subject.treatment.catalog.guardrails import (
     AGENT_SITE,
     AGENT_TOOL_VERSIONS,

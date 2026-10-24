@@ -55,9 +55,9 @@ from typing import Any
 
 from pydantic import JsonValue
 
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     require_file_count,
     require_with_keys,
 )
@@ -132,7 +132,7 @@ class GuardrailGate:
         ),
         supports=BOTH_HARNESSES,
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/gate.py",
             "orchestrator/src/raidar/subject/treatment/runtime/gate_run.py",
             "orchestrator/src/raidar/subject/treatment/runtime/autofix_run.py",

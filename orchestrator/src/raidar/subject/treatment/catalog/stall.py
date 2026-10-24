@@ -30,9 +30,9 @@ from __future__ import annotations
 
 import json
 
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     require_file_count,
     require_with_keys,
 )
@@ -65,7 +65,7 @@ class ContinueOnStall:
         ),
         supports=BOTH_HARNESSES,
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/stall.py",
             "orchestrator/src/raidar/subject/treatment/runtime/continue_on_stall.py",
             "orchestrator/src/raidar/subject/treatment/runtime/session_chain.py",

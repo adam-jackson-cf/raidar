@@ -25,9 +25,9 @@ from harbor.models.task.config import MCPServerConfig
 from pydantic import JsonValue
 
 from raidar.subject.agent.config import Harness
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     read_file,
     require_file_count,
     require_with_keys,
@@ -48,7 +48,10 @@ from raidar.subject.treatment.definition.manifest import (
     ProbeOutcome,
 )
 
-_FINGERPRINT = (*COMMON_FINGERPRINT, "orchestrator/src/raidar/subject/treatment/catalog/harness.py")
+_FINGERPRINT = (
+    *BUILTIN_FINGERPRINT,
+    "orchestrator/src/raidar/subject/treatment/catalog/harness.py",
+)
 SKILL_FILE = "SKILL.md"
 _FRONTMATTER_NAME = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.MULTILINE)
 
@@ -56,14 +59,14 @@ _FRONTMATTER_NAME = re.compile(r"^name:\s*['\"]?([^'\"\n]+?)['\"]?\s*$", re.MULT
 # ---- skills ------------------------------------------------------------------
 
 
-def skill_name(skill_md: str, fallback: str) -> str:
+def skill_name(skill_md: str, directory_name: str) -> str:
     """The ``name`` from SKILL.md front matter (the directory name when absent)."""
     if skill_md.startswith("---"):
         front = skill_md.split("---", 2)[1] if skill_md.count("---") >= 2 else ""
         match = _FRONTMATTER_NAME.search(front)
         if match:
             return match.group(1).strip()
-    return fallback
+    return directory_name
 
 
 def _claude_listed_skills(evidence: StepEvidence) -> set[str]:

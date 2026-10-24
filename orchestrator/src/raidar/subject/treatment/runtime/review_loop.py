@@ -233,19 +233,25 @@ def quoted_size(text: str) -> int:
     return len(text.encode()) + 4 * text.count("'")
 
 
+def fit_to_budget(text: str, budget: int, label: str) -> str:
+    """``text``, cut to ``budget`` quoted bytes and ended with a ``label`` truncation marker."""
+    if quoted_size(text) <= budget:
+        return text
+    marker = f"\n... {label} truncated to fit the harness prompt limit ...\n"
+    used = quoted_size(marker)
+    cut = 0
+    for char in text:
+        used += quoted_size(char)
+        if used > budget:
+            break
+        cut += 1
+    return text[:cut] + marker
+
+
 def fit_diff(template: str, tokens: dict[str, str], diff: str) -> str:
     """``diff``, cut so the rendered prompt stays within ``PROMPT_ARG_BUDGET``."""
     budget = PROMPT_ARG_BUDGET - quoted_size(render(template, {**tokens, "DIFF": ""})) - 2
-    if quoted_size(diff) <= budget:
-        return diff
-    marker = "\n... diff truncated to fit the harness prompt limit ...\n"
-    budget -= quoted_size(marker)
-    used = 0
-    for index, char in enumerate(diff):
-        used += quoted_size(char)
-        if used > budget:
-            return diff[:index] + marker
-    return diff  # pragma: no cover - the loop returns once over budget
+    return fit_to_budget(diff, budget, "diff")
 
 
 def render(template: str, tokens: dict[str, str]) -> str:

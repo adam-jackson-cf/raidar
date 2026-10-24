@@ -17,9 +17,9 @@ from pathlib import PurePosixPath
 
 from raidar.subject.agent.config import Harness
 from raidar.subject.agent.harness import harness_definition
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     missing_lines,
     read_file,
     require_file_count,
@@ -39,7 +39,7 @@ from raidar.subject.treatment.definition.manifest import (
 )
 
 _FINGERPRINT = (
-    *COMMON_FINGERPRINT,
+    *BUILTIN_FINGERPRINT,
     "orchestrator/src/raidar/subject/treatment/catalog/workspace.py",
     # rules_target: the harness's rules filename
     "orchestrator/src/raidar/subject/agent/harness.py",

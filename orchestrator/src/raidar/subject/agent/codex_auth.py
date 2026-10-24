@@ -1,4 +1,4 @@
-"""Codex authentication helpers shared across runtime layers."""
+"""Codex authentication source resolution shared across runtime layers."""
 
 from __future__ import annotations
 

@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 
 __all__ = [
     "PackSpec",
@@ -27,7 +27,7 @@ class UnknownPackError(LookupError):
 
 
 def _python_pack() -> PackSpec:
-    from raidar.subject.environment.python.models import load_pack_spec
+    from raidar.subject.environment.python.pack_definition import load_pack_spec
 
     return load_pack_spec()  # the Python pack's own loader (pack.yaml beside it)
 

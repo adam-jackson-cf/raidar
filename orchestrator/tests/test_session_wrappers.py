@@ -1,4 +1,4 @@
-"""continue-on-stall@2 and transient-retry@1: the iteration-3b session wrappers.
+"""continue-on-stall@2 and transient-retry@1: the session wrappers.
 
 - continue-on-stall@2: a no-edit refusal stalls like a question (the
   ``smoke-03`` r2 messages @1 missed); only a step's first session is eligible,
@@ -31,7 +31,7 @@ from harbor.models.agent.context import AgentContext
 from raidar.design.experiment.arm import ComponentRejectedError
 from raidar.design.experiment.schema import AgentEntry
 from raidar.engine.trial.agent_config import arm_agent_config, reported_harness_pin
-from raidar.subject.environment.python.models import load_pack_spec
+from raidar.subject.environment.python.pack_definition import load_pack_spec
 from raidar.subject.treatment import ComponentKind, ComponentRegistry
 from raidar.subject.treatment.catalog.gate import GUARDRAIL_GATE_IMPORT_PATH
 from raidar.subject.treatment.catalog.retry import TRANSIENT_RETRY_IMPORT_PATH, retry_records

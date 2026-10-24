@@ -87,9 +87,9 @@ from pathlib import PurePosixPath
 from typing import Any
 
 from raidar.contract.paths import treatment_root
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     require_file_count,
     require_with_keys,
     sha256_bytes,
@@ -764,7 +764,7 @@ class PythonGuardrails:
         supports=BOTH_HARNESSES,
         network=NetworkNeeds(egress_hosts=("files.pythonhosted.org", "pypi.org")),
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/contract/paths.py",
             "orchestrator/src/raidar/subject/treatment/catalog/guardrails.py",
             "orchestrator/src/raidar/subject/treatment/definition/integrity.py",

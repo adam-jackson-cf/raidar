@@ -30,7 +30,7 @@ from raidar.subject.environment.python.harness import (
     harbor_reported_version,
     harbor_version_command,
 )
-from raidar.subject.environment.python.models import PackSpec, ToolLock
+from raidar.subject.environment.python.pack_definition import PackSpec, ToolLock
 
 LOCK_HASH_LABEL = "dev.raidar.pack.lock-hash"
 PACK_ID_LABEL = "dev.raidar.pack.id"

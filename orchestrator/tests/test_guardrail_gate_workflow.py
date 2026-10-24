@@ -688,7 +688,12 @@ def test_enforced_autofix_runs_before_the_commit_so_a_layout_refusal_never_happe
     autofix = gate["autofix"]
     assert (autofix["enabled"], autofix["mode"], autofix["errors"]) == (True, "apply", 0)
     (fix,) = autofix["runs"]
-    assert (fix["before_gate_run"], fix["after"], fix["fallback"], fix["error_type"]) == (
+    assert (
+        fix["before_gate_run"],
+        fix["after"],
+        fix["gate_without_autofix"],
+        fix["error_type"],
+    ) == (
         1,
         "stage_1_work",
         False,
@@ -764,7 +769,7 @@ def test_a_failed_autofix_is_typed_and_the_gate_runs_without_it(
     gate = _run(agent, environment)
 
     first = gate["autofix"]["runs"][0]
-    assert (first["error_type"], first["fallback"], first["files_changed"]) == (
+    assert (first["error_type"], first["gate_without_autofix"], first["files_changed"]) == (
         error_type,
         True,
         None,
@@ -870,7 +875,7 @@ def test_a_failed_shadow_autofix_is_typed_with_no_post_check(tmp_path: Path, shi
     gate = _run(agent, environment)
 
     (fix,) = gate["autofix"]["runs"]
-    assert (fix["error_type"], fix["fallback"], fix["post_check"]) == (
+    assert (fix["error_type"], fix["gate_without_autofix"], fix["post_check"]) == (
         "command_failed",
         False,
         None,

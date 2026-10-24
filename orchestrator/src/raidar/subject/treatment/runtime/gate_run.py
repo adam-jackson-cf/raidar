@@ -28,7 +28,12 @@ from harbor.agents.options import AgentOptions
 from pydantic import Field
 
 from raidar.contract.snapshot import SNAPSHOT_EXCLUDES
-from raidar.subject.treatment.runtime.review_loop import PROMPT_ARG_BUDGET, quoted_size, render
+from raidar.subject.treatment.runtime.review_loop import (
+    PROMPT_ARG_BUDGET,
+    fit_to_budget,
+    quoted_size,
+    render,
+)
 from raidar.subject.treatment.runtime.session_chain import InnerAgentSpec
 
 COMPONENT = "guardrail-gate@4"
@@ -425,18 +430,5 @@ def fix_prompt(task: str, gate: GateRun, command: str, timeout_sec: int) -> str:
         event += f" failed with exit status {gate.exit_code}"
     tokens = {"TASK": task, "GATE_EVENT": event, "OUTPUT": ""}
     budget = PROMPT_ARG_BUDGET - quoted_size(render(FIX_PROMPT, tokens)) - 2
-    output = _fit(gate.output or "(no output)", budget)
+    output = fit_to_budget(gate.output or "(no output)", budget, "gate output")
     return render(FIX_PROMPT, {**tokens, "OUTPUT": output})
-
-
-def _fit(text: str, budget: int) -> str:
-    """``text``, cut so its quoted size stays within ``budget`` bytes."""
-    if quoted_size(text) <= budget:
-        return text
-    marker = "\n... gate output truncated to fit the harness prompt limit ...\n"
-    used = quoted_size(marker)
-    for index, char in enumerate(text):
-        used += quoted_size(char)
-        if used > budget:
-            return text[:index] + marker
-    return text  # pragma: no cover - the loop returns once over budget

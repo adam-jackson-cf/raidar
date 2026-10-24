@@ -1,4 +1,4 @@
-"""Python pack measurement tools: lock pins and lazy host provisioning (WS-I I2)."""
+"""Python pack measurement tools: lock pins and lazy host provisioning."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from pydantic import ValidationError
 from raidar.cli import main
 from raidar.grading.grader_image import GRADER_TOOLS
 from raidar.subject.environment.python import provisioner as provisioner_module
-from raidar.subject.environment.python.models import (
+from raidar.subject.environment.python.pack_definition import (
     PROVISIONING_PHASE,
     REASON_DRIFT,
     REASON_FIRST_USE,

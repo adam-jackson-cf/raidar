@@ -27,7 +27,7 @@ from pydantic import JsonValue
 
 from raidar.contract.canonical import digest_json
 from raidar.subject.agent.config import Harness
-from raidar.subject.treatment.catalog._common import tree_files
+from raidar.subject.treatment.catalog.builtin_definition import tree_files
 from raidar.subject.treatment.definition.contribution import AgentWrapper, SupportFile
 from raidar.subject.treatment.definition.evidence import StepEvidence
 from raidar.subject.treatment.definition.manifest import (

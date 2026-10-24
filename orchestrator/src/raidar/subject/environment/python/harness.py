@@ -16,7 +16,7 @@ from harbor.agents.factory import AgentFactory
 from harbor.agents.installed.base import BaseInstalledAgent
 from harbor.models.agent.name import AgentName
 
-from raidar.subject.environment.python.models import HarnessPin, PackSpec
+from raidar.subject.environment.python.pack_definition import HarnessPin, PackSpec
 
 
 class HarnessPinError(ValueError):
@@ -60,13 +60,11 @@ def harbor_version_command(pin: HarnessPin) -> str:
     """The shell command Harbor's install() runs to decide whether to reinstall.
 
     That is the agent's ``_INSTALL_VERSION_COMMAND`` (codex, claude-code), not
-    the public ``get_version_command()``; the latter is only a fallback for an
-    agent that defines no install-time command.
+    the public ``get_version_command()``.
     """
-    agent = _harbor_agent(pin)
-    command = getattr(agent, "_INSTALL_VERSION_COMMAND", None) or agent.get_version_command()
+    command = getattr(_harbor_agent(pin), "_INSTALL_VERSION_COMMAND", None)
     if not isinstance(command, str) or not command:
-        raise HarnessPinError(f"Harbor agent {pin.harbor_agent!r} has no version command")
+        raise HarnessPinError(f"Harbor agent {pin.harbor_agent!r} has no install version command")
     return command
 
 

@@ -11,9 +11,9 @@ from __future__ import annotations
 import re
 
 from raidar.subject.agent.config import Harness
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     missing_lines,
     read_file,
     require_file_count,
@@ -43,7 +43,7 @@ class PromptWrapper:
         description="Wrap each step instruction in a template with one {{ instruction }} slot",
         supports=BOTH_HARNESSES,
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/prompt.py",
         ),
         discovery_probe=DiscoveryProbe(

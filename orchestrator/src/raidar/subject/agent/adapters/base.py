@@ -14,8 +14,9 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from raidar.subject.agent.config import AgentSpec
 from raidar.subject.agent.harness import (
     CredentialSourceType,
     CredentialSpec,
@@ -23,20 +24,13 @@ from raidar.subject.agent.harness import (
     harness_definition,
 )
 
-if TYPE_CHECKING:  # pragma: no cover - import cycles avoided at runtime
-    from ..config import AgentSpec
-
 
 def harbor_executable() -> str:
-    """Return the project-pinned Harbor CLI, installed next to this interpreter.
-
-    Falls back to ``harbor`` on PATH only when the pinned entrypoint is absent
-    (for example when raidar is imported outside its uv-managed environment).
-    """
+    """Return the project-pinned Harbor CLI, installed next to this interpreter."""
     candidate = Path(sys.executable).parent / "harbor"
-    if candidate.is_file() and os.access(candidate, os.X_OK):
-        return str(candidate)
-    return "harbor"
+    if not (candidate.is_file() and os.access(candidate, os.X_OK)):
+        raise FileNotFoundError(f"project-pinned Harbor CLI not found at {candidate}")
+    return str(candidate)
 
 
 def resolve_cli_executable(

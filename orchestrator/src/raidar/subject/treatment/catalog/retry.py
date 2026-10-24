@@ -22,9 +22,9 @@ from __future__ import annotations
 
 import json
 
-from raidar.subject.treatment.catalog._common import (
+from raidar.subject.treatment.catalog.builtin_definition import (
     BOTH_HARNESSES,
-    COMMON_FINGERPRINT,
+    BUILTIN_FINGERPRINT,
     require_file_count,
     require_with_keys,
 )
@@ -55,7 +55,7 @@ class TransientRetry:
         ),
         supports=BOTH_HARNESSES,
         fingerprint=(
-            *COMMON_FINGERPRINT,
+            *BUILTIN_FINGERPRINT,
             "orchestrator/src/raidar/subject/treatment/catalog/retry.py",
             "orchestrator/src/raidar/subject/treatment/runtime/transient_retry.py",
             # the per-attempt run record

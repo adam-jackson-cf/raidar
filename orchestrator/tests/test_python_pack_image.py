@@ -1,4 +1,4 @@
-"""Python pack agent image: lock-hash tagging, scorer-free audit, task binding (WS-I I1)."""
+"""Python pack agent image: lock-hash tagging, scorer-free audit, task binding."""
 
 from __future__ import annotations
 
@@ -38,7 +38,7 @@ from raidar.subject.environment.python.image import (
     image_lock_hash,
     image_tag,
 )
-from raidar.subject.environment.python.models import (
+from raidar.subject.environment.python.pack_definition import (
     PACK_SPEC_PATH,
     PackSpec,
     load_pack_spec,

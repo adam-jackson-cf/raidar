@@ -15,7 +15,7 @@ from typing import Any
 import yaml
 
 from raidar.subject.environment.python.image import image_tag
-from raidar.subject.environment.python.models import PackSpec
+from raidar.subject.environment.python.pack_definition import PackSpec
 
 COMPOSE_FILE_NAME = "docker-compose.yaml"
 MAIN_SERVICE = "main"

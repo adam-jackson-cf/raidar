@@ -1,4 +1,4 @@
-"""Shared helpers for built-in component definitions."""
+"""Fingerprint, input checks and evidence checks shared by the built-in definitions."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ BOTH_HARNESSES = (Harness.CODEX_CLI, Harness.CLAUDE_CODE)
 # The SDK files every built-in's behaviour depends on: the contract, the merge
 # and compile rules, the generated setup.sh (reset + overlay evidence) and the
 # probe evidence readers. Changing any of them changes every component digest.
-COMMON_FINGERPRINT = (
+BUILTIN_FINGERPRINT = (
     "orchestrator/src/raidar/subject/treatment/definition/manifest.py",
     "orchestrator/src/raidar/subject/treatment/definition/contribution.py",
     "orchestrator/src/raidar/subject/treatment/definition/evidence.py",
@@ -22,7 +22,7 @@ COMMON_FINGERPRINT = (
     "orchestrator/src/raidar/subject/treatment/definition/compiled.py",
     "orchestrator/src/raidar/subject/treatment/runtime/setup_script.py",
     "orchestrator/src/raidar/subject/treatment/runtime/step_reset.sh",
-    "orchestrator/src/raidar/subject/treatment/catalog/_common.py",
+    "orchestrator/src/raidar/subject/treatment/catalog/builtin_definition.py",
 )
 
 
