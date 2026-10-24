@@ -106,6 +106,20 @@ def read_job(job_dir: Path) -> JobDir:
     )
 
 
+_JOB_DEPTH = 2  # a trial dir sits at <job>/trials/<trial>
+
+
+def find_job_manifest(target: Path) -> tuple[Path, dict[str, Any]] | None:
+    """The job directory holding ``target`` (a job or one of its trial directories) and its
+    ``job.json``, or None when ``target`` is outside any job."""
+    candidate = target.resolve()
+    for _ in range(_JOB_DEPTH + 1):
+        if (candidate / JOB_MANIFEST).is_file():
+            return candidate, _read_json(candidate / JOB_MANIFEST)
+        candidate = candidate.parent
+    return None
+
+
 def read_lock(path: Path) -> dict[str, Any]:
     """The lock document, refused unless it is a sealed lock (``lock_integrity_issues``).
 

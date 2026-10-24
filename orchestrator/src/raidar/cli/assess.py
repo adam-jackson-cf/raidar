@@ -52,7 +52,13 @@ from typing import Any
 
 import click
 
-from raidar.analysis.sources import AnalysisInputError, JobDir, default_lock, read_lock
+from raidar.analysis.sources import (
+    AnalysisInputError,
+    JobDir,
+    default_lock,
+    find_job_manifest,
+    read_lock,
+)
 from raidar.cli.grading import (
     RegradeOptions,
     check_coverage,
@@ -62,7 +68,6 @@ from raidar.cli.grading import (
     reads_docker_grades,
     regrade,
 )
-from raidar.core.job_layout import JOB_MANIFEST
 from raidar.core.runtimes import ANY_RUNTIME
 from raidar.execution.assessment import ASSESSMENT_CONFIG_FILE, lock_rescore_config
 from raidar.scorers.catalog import ScorerUnavailableError, default_scorer_registry
@@ -129,15 +134,6 @@ def run_assessment_config(target: Path) -> Path | None:
     return None
 
 
-def _job_dir(target: Path) -> Path | None:
-    candidate = target.resolve()
-    for _ in range(_JOB_CONFIG_DEPTH + 1):
-        if (candidate / JOB_MANIFEST).is_file():
-            return candidate
-        candidate = candidate.parent
-    return None
-
-
 def _scorer_issues(runtime: str | None, scorer_refs: tuple[str, ...]) -> list[str]:
     registry = default_scorer_registry()
     where = (
@@ -200,10 +196,10 @@ def _check_as1(
 
 def run_lock(target: Path, explicit: Path | None) -> Path | None:
     """The lock whose assessment settings a rescore of ``target`` uses, if one is found."""
-    job_dir = _job_dir(target)
-    if job_dir is None:
+    found = find_job_manifest(target)
+    if found is None:
         return explicit
-    manifest = json.loads((job_dir / JOB_MANIFEST).read_text())
+    job_dir, manifest = found
     path = explicit or default_lock(JobDir(path=job_dir, manifest=manifest, plan={}, records=()))
     if not path.is_file():
         return None

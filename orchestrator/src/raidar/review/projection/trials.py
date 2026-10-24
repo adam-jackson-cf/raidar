@@ -20,8 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from raidar.analysis.assessed import CODE_QUALITY_REF
-from raidar.analysis.outcomes import CORRECTNESS_REF
+from raidar.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.core.review_contract import ReviewRunDetail, ReviewRunRecord, ReviewStatus
 from raidar.execution.models import CheckpointState, TrialRecord
 from raidar.review.projection.assessments import TrialAssessments

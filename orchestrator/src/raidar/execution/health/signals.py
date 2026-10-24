@@ -103,6 +103,10 @@ def check_l2(a: Audit) -> HealthCheck:
         return failed
     if not phases:
         return make_check("L2", UNMEASURED, "the liveness record holds no agent phase")
+    return _l2_findings(phases)
+
+
+def _l2_findings(phases: list[dict[str, Any]]) -> HealthCheck:
     blind = [p.get("step") for p in phases if _blind(p)]
     observed = [_finding(p) for p in phases if p.get("decision") == "idle_observed"]
     killed = [_finding(p) for p in phases if p.get("decision") == "idle_killed"]

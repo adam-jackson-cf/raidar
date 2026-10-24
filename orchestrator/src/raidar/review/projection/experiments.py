@@ -15,8 +15,7 @@ from dataclasses import dataclass
 from statistics import fmean, median, pstdev
 from typing import Any
 
-from raidar.analysis.assessed import CODE_QUALITY_REF
-from raidar.analysis.outcomes import CORRECTNESS_REF
+from raidar.analysis.outcomes import CODE_QUALITY_REF, CORRECTNESS_REF
 from raidar.core.review_contract import (
     ArmChangeCategory,
     ArmComparableConfig,

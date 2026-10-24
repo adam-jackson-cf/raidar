@@ -194,6 +194,14 @@ class Verdict:
     idle_for_s: float | None = None
 
 
+@dataclass(frozen=True)
+class AgentHost:
+    """Where the agent runs: its container environment and the uid whose processes count."""
+
+    environment: Any
+    user: str | None
+
+
 class PhaseMonitor:
     """Liveness state of one agent phase. ``sample`` is the unit; ``run`` loops it."""
 
@@ -208,8 +216,7 @@ class PhaseMonitor:
     ) -> None:
         self.config = config
         self.step = step
-        self._environment = environment
-        self._user = user
+        self._host = AgentHost(environment, user)
         self._clock = clock
         self._started = clock()
         self._output = OutputTally(self._started)
@@ -229,11 +236,11 @@ class PhaseMonitor:
         self._output.chunks += 1
 
     async def _poll(self) -> tuple[ProcReading | None, str | None]:
-        if self._user is None:
+        if self._host.user is None:
             return None, "the task sets no agent user"
         try:
-            result = await self._environment.exec(
-                liveness_script(self._user), user="root", timeout_sec=POLL_TIMEOUT_S
+            result = await self._host.environment.exec(
+                liveness_script(self._host.user), user="root", timeout_sec=POLL_TIMEOUT_S
             )
         except Exception as error:  # an unmeasured sample, never a trial failure
             return None, f"poll exec failed: {type(error).__name__}: {error}"
@@ -318,7 +325,9 @@ class PhaseMonitor:
     async def _reap(self) -> ReapReport:
         """Kill the agent uid; a cancel (the phase ended, perhaps because of the kill) never
         abandons the kill's report, so the decision is always recorded."""
-        reaping = asyncio.ensure_future(reap_agent_processes(self._environment, self._user))
+        reaping = asyncio.ensure_future(
+            reap_agent_processes(self._host.environment, self._host.user)
+        )
         try:
             return await asyncio.shield(reaping)
         except asyncio.CancelledError:

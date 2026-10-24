@@ -294,45 +294,58 @@ class DockerCopySandbox:
             if code != 0:
                 return SandboxResult(code, False, output.decode(errors="replace"))
 
-            mark = time.perf_counter()
-            proc = await asyncio.create_subprocess_exec(
-                *self._docker("start", "-a", name),
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.STDOUT,
-            )
-            timed_out = False
-            try:
-                try:
-                    stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
-                except TimeoutError:
-                    timed_out = True
-                    try:
-                        await self._kill(name)
-                    finally:
-                        proc.kill()
-                    stdout, _ = await proc.communicate()
-            finally:
-                if proc.returncode is None:  # failed kill or cancelled run: reap `start -a`
-                    proc.kill()
-            timings["run_s"] = time.perf_counter() - mark
-
-            mark = time.perf_counter()
-            with back.open("wb") as sink:
-                copied, err = await self._exec(
-                    self._docker("cp", f"{name}:{layout.out}", "-"), stdout=sink
-                )
-            failure = err.decode(errors="replace") if copied != 0 else ""
-            if copied == 0:
-                try:
-                    await asyncio.to_thread(extract_out_tar, back, run.out_dir)
-                except (tarfile.TarError, OSError) as error:
-                    failure = f"unpacking the out directory failed: {error}"
-            timings["copy_out_s"] = time.perf_counter() - mark
+            proc, stdout, timed_out = await self._start_and_wait(run, name, timings)
+            failure = await self._copy_out(name, back, run.out_dir, timings)
         text = stdout.decode(errors="replace")
         if failure:
             text += f"\n{COPY_TIMINGS_PREFIX} copy-out failed: {failure}"
         text += f"\n{COPY_TIMINGS_PREFIX} " + " ".join(f"{k}={v:.3f}" for k, v in timings.items())
         return SandboxResult(None if timed_out else proc.returncode, timed_out, text)
+
+    async def _start_and_wait(
+        self, run: SandboxRun, name: str, timings: dict[str, float]
+    ) -> tuple[asyncio.subprocess.Process, bytes, bool]:
+        """Start the grader container and wait for it; (process, output, timed out)."""
+        mark = time.perf_counter()
+        proc = await asyncio.create_subprocess_exec(
+            *self._docker("start", "-a", name),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.STDOUT,
+        )
+        timed_out = False
+        try:
+            try:
+                stdout, _ = await asyncio.wait_for(proc.communicate(), timeout=run.timeout_s)
+            except TimeoutError:
+                timed_out = True
+                try:
+                    await self._kill(name)
+                finally:
+                    proc.kill()
+                stdout, _ = await proc.communicate()
+        finally:
+            if proc.returncode is None:  # failed kill or cancelled run: reap `start -a`
+                proc.kill()
+        timings["run_s"] = time.perf_counter() - mark
+        return proc, stdout, timed_out
+
+    async def _copy_out(
+        self, name: str, back: Path, out_dir: Path, timings: dict[str, float]
+    ) -> str:
+        """Copy the out directory back and unpack it; why that failed, or ``""``."""
+        mark = time.perf_counter()
+        with back.open("wb") as sink:
+            copied, err = await self._exec(
+                self._docker("cp", f"{name}:{self.layout.out}", "-"), stdout=sink
+            )
+        failure = err.decode(errors="replace") if copied != 0 else ""
+        if copied == 0:
+            try:
+                await asyncio.to_thread(extract_out_tar, back, out_dir)
+            except (tarfile.TarError, OSError) as error:
+                failure = f"unpacking the out directory failed: {error}"
+        timings["copy_out_s"] = time.perf_counter() - mark
+        return failure
 
     async def _kill(self, name: str) -> None:
         await asyncio.wait_for(self._exec(self._docker("kill", name)), timeout=KILL_TIMEOUT_S)
