@@ -291,7 +291,8 @@ def test_harbor_engine_variant_adds_solutions_to_a_copy_only(
     assert config.agent.name == "oracle"
     assert config.verifier.import_path == VERIFIER_IMPORT_PATH
     assert config.verifier.kwargs["oracle_bundle"] == str(problem.bundle.root)
-    assert config.verifier.kwargs["snapshot_source"] == "artifact"
+    # Validation tasks collect no /app artifact, so the verifier downloads the snapshot.
+    assert config.verifier.kwargs["snapshot_source"] == "download"
     grades = harbor_engine.read_grades(tmp_path / "trials" / "negative-0", ["checkpoint_1"])
     assert grades["checkpoint_1"].infra_failure == "no_verifier_record"
     # Harbor records (does not raise) trial exceptions; the type survives as the reason.
