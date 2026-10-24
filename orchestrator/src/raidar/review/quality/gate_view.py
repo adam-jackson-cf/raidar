@@ -1,8 +1,8 @@
-"""A trial's commit-gate effort for the Quality run view (``gate-effort@1`` + gate records).
+"""A trial's commit-gate effort for the Quality run view (``gate-effort`` + gate records).
 
 Step cells (rounds to clean, first-pass clean, unresolved, gate error,
 blocking findings in total and by rule family, fix-session cost and time) are
-the stored ``gate-effort@1`` Assessment's observations, so the view and the
+the stored ``gate-effort`` Assessment's observations, so the view and the
 analysis read one source. The per-round rows (each gate run's verdict, its
 blocking findings by family and its output log) come from the step's
 ``guardrail-gate`` record through the scorer's own reader
@@ -28,6 +28,7 @@ from raidar.review.quality.models import (
     GateView,
 )
 from raidar.review.quality.sources import TrialSource
+from raidar.scorers.gate_effort.evidence import run_summary
 from raidar.scorers.gate_effort.families import FAMILIES, family_counts
 from raidar.scorers.gate_effort.records import (
     GateRecordError,
@@ -35,25 +36,11 @@ from raidar.scorers.gate_effort.records import (
     StepGate,
     read_step_gate,
 )
-from raidar.scorers.gate_effort.scorer import run_summary
-from raidar.scorers.gate_effort_v2.scorer import SHADOW_MODE, step_mode
+from raidar.scorers.gate_effort.shadow import SHADOW_MODE, step_mode
 from raidar.scorers.sdk.result import TRAJECTORY_SUBJECT, AssessStatus, Observation
 from raidar.scorers.store import Assessment
 
-GATE_EFFORT_REF = "gate-effort@1"
-GATE_EFFORT_REFS = (
-    "gate-effort@10",
-    "gate-effort@9",
-    "gate-effort@8",
-    "gate-effort@7",
-    "gate-effort@6",
-    "gate-effort@5",
-    "gate-effort@4",
-    "gate-effort@3",
-    "gate-effort@2",
-    GATE_EFFORT_REF,
-)
-"""Read in preference order: a trial assessed with ``@2`` or later shows a shadow gate's cells."""
+GATE_EFFORT_REF = "gate-effort@10"
 STEP_CELLS = (
     "gate_runs",
     "fix_rounds",
@@ -182,18 +169,10 @@ def _is_shadow(traces: dict[str, Path], gates: dict[str, StepGate | None]) -> bo
     )
 
 
-def _assessment_notes(assessment: Assessment | None, shadow: bool) -> list[str]:
-    """Why the cells are missing, or why they misread a shadow gate."""
+def _assessment_notes(assessment: Assessment | None) -> list[str]:
+    """Why the cells are missing."""
     if assessment is None:
-        return [
-            f"{_UNASSESSED}: rescore its job with {GATE_EFFORT_REF} "
-            f"(or {GATE_EFFORT_REFS[0]} when its lock declares it)"
-        ]
-    if shadow and assessment.scorer.ref == GATE_EFFORT_REF:
-        return [
-            f"shadow gate assessed with {GATE_EFFORT_REF}, which reads it as an enforced gate; "
-            f"rescore with {GATE_EFFORT_REFS[-2]} or later (the version its lock declares)"
-        ]
+        return [f"{_UNASSESSED}: rescore its job with {GATE_EFFORT_REF}"]
     return []
 
 
@@ -207,12 +186,11 @@ def build_gate_view(
     gates = {checkpoint: _read(traces[checkpoint], notes, checkpoint) for checkpoint in checkpoints}
     if not cells.measured() and not notes and all(gate is None for gate in gates.values()):
         return None
-    shadow = _is_shadow(traces, gates)
-    notes.extend(_assessment_notes(assessment, shadow))
+    notes.extend(_assessment_notes(assessment))
     return GateView(
         source=assessment.key if assessment is not None else None,
         scorer=assessment.scorer.ref if assessment is not None else None,
-        shadow=shadow,
+        shadow=_is_shadow(traces, gates),
         steps=tuple(
             _step(trial, checkpoint, traces[checkpoint], gates[checkpoint], cells)
             for checkpoint in checkpoints

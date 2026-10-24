@@ -1,7 +1,7 @@
 """Rule families of the blocking findings a commit gate reports.
 
 A finding's code is mapped to one family; the map is fixed here (it is part of
-``gate-effort@1``'s identity) and names Ruff, mypy and the python-guardrails
+``gate-effort``'s identity) and names Ruff, mypy and the python-guardrails
 bespoke codes. Codes come in two shapes:
 
 - ``<LETTERS><DIGITS>`` (Ruff and the bespoke ``PYQ``/``PYS``/``TST`` rules):
@@ -10,7 +10,8 @@ bespoke codes. Codes come in two shapes:
   defect while other ``E`` codes are style, and ``PLR0904`` (too many public
   methods) is structure while the other ``PLR09xx`` limits are complexity;
 - dotted or bare words (``MYPY.arg-type``, ``FANOUT.general``, ``FORMAT``,
-  ``SUPPRESS``): matched on the part before the first dot.
+  ``SUPPRESS``): matched on the part before the first dot, except that every
+  ``TEST.*`` code (the python-guardrails tests check) is in the tests family.
 
 A code the map does not name is ``other``, never dropped.
 """
@@ -30,6 +31,7 @@ NAMING = "naming"
 TESTS = "tests"
 SUPPRESSIONS = "suppressions"
 OTHER = "other"
+TEST_CODE_PREFIX = "TEST."
 FAMILIES = (COMPLEXITY, TYPING, DEFECTS, STRUCTURE, STYLE, NAMING, TESTS, SUPPRESSIONS, OTHER)
 
 # (letters, digit prefix) -> family; the longest digit prefix of the same letters wins.
@@ -77,6 +79,8 @@ _NUMBERED_RE = re.compile(r"^(?P<letters>[A-Z]+)(?P<digits>\d+)$")
 
 def family_of(code: str) -> str:
     """The family of one finding code (``other`` when the map does not name it)."""
+    if code.startswith(TEST_CODE_PREFIX):
+        return TESTS
     match = _NUMBERED_RE.match(code)
     if match is None:
         return _WORDS.get(code.split(".", 1)[0], OTHER)
